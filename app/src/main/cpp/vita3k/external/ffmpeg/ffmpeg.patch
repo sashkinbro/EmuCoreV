@@ -1,0 +1,86 @@
+diff --git a/ports/ffmpeg/build.sh.in b/ports/ffmpeg/build.sh.in
+index fd794d41c8..b801972ee7 100644
+--- a/ports/ffmpeg/build.sh.in
++++ b/ports/ffmpeg/build.sh.in
+@@ -75,7 +75,7 @@ OSX_ARCH_COUNT=0@OSX_ARCH_COUNT@
+ # x64 Android build fails with 'relocation R_X86_64_PC32 cannot be used against symbol ff_h264_cabac_tables; recompile with -fPIC'
+ if [ "@VCPKG_CMAKE_SYSTEM_NAME@" = "Android" ]; then
+     OPTIONS_arm=" --disable-asm --disable-x86asm"
+-    OPTIONS_arm64=" --disable-asm --disable-x86asm"
++    OPTIONS_arm64=" --enable-asm --disable-x86asm"
+     OPTIONS_x86=" --disable-asm --disable-x86asm"
+     OPTIONS_x86_64="${OPTIONS_x86}"
+ else
+diff --git a/ports/ffmpeg/portfile.cmake b/ports/ffmpeg/portfile.cmake
+index 03397d7af2..d36c16fcbe 100644
+--- a/ports/ffmpeg/portfile.cmake
++++ b/ports/ffmpeg/portfile.cmake
+@@ -30,7 +30,20 @@ if (VCPKG_TARGET_ARCHITECTURE STREQUAL "x86" OR VCPKG_TARGET_ARCHITECTURE STREQU
+     vcpkg_add_to_path("${NASM_EXE_PATH}")
+ endif()
+
+-set(OPTIONS "--enable-pic --disable-doc --enable-debug --enable-runtime-cpudetect --disable-autodetect")
++set(OPTIONS "--enable-pic --disable-doc --enable-runtime-cpudetect --disable-autodetect")
++
++# Only enable what is used by Vita3K
++string(APPEND OPTIONS " --disable-everything")
++string(APPEND OPTIONS " --enable-decoder=aac --enable-decoder=aac_latm --enable-decoder=atrac3 --enable-decoder=atrac3p --enable-decoder=atrac9 --enable-decoder=mp3 --enable-decoder=pcm_s16le --enable-decoder=pcm_s8")
++string(APPEND OPTIONS " --enable-decoder=mov --enable-decoder=h264 --enable-decoder=mpeg4 --enable-decoder=mpeg2video --enable-decoder=mjpeg --enable-decoder=mjpegb")
++string(APPEND OPTIONS " --enable-encoder=pcm_s16le")
++string(APPEND OPTIONS " --enable-encoder=ffv1 --enable-encoder=mpeg4 --enable-encoder=mjpeg")
++string(APPEND OPTIONS " --enable-muxer=avi")
++string(APPEND OPTIONS " --enable-demuxer=h264 --enable-demuxer=m4v --enable-demuxer=mp3 --enable-demuxer=mpegvideo --enable-demuxer=mpegps --enable-demuxer=mjpeg --enable-demuxer=mov --enable-demuxer=avi --enable-demuxer=aac --enable-demuxer=pmp --enable-demuxer=oma --enable-demuxer=pcm_s16le --enable-demuxer=pcm_s8 --enable-demuxer=wav")
++string(APPEND OPTIONS " --enable-parser=h264 --enable-parser=mpeg4video --enable-parser=mpegaudio --enable-parser=mpegvideo --enable-parser=mjpeg --enable-parser=aac --enable-parser=aac_latm")
++string(APPEND OPTIONS " --enable-protocol=file")
++string(APPEND OPTIONS " --enable-bsf=mjpeg2jpeg")
++string(APPEND OPTIONS " --enable-indev=dshow")
+
+ if(VCPKG_TARGET_IS_MINGW)
+     if(VCPKG_TARGET_ARCHITECTURE STREQUAL "x86")
+@@ -62,7 +75,7 @@ endif()
+ vcpkg_cmake_get_vars(cmake_vars_file)
+ include("${cmake_vars_file}")
+ if(VCPKG_DETECTED_MSVC)
+-    string(APPEND OPTIONS " --disable-inline-asm") # clang-cl has inline assembly but this leads to undefined symbols.
++    # string(APPEND OPTIONS " --disable-inline-asm") # clang-cl has inline assembly but this leads to undefined symbols.
+     set(OPTIONS "--toolchain=msvc ${OPTIONS}")
+     # This is required because ffmpeg depends upon optimizations to link correctly
+     string(APPEND VCPKG_COMBINED_C_FLAGS_DEBUG " -O2")
+@@ -724,6 +737,11 @@ if (NOT VCPKG_BUILD_TYPE OR VCPKG_BUILD_TYPE STREQUAL "release")
+     # We use response files here as the only known way to handle spaces in paths
+     set(crsp "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/cflags.rsp")
+     string(REGEX REPLACE "-arch [A-Za-z0-9_]+" "" VCPKG_COMBINED_C_FLAGS_RELEASE_SANITIZED "${VCPKG_COMBINED_C_FLAGS_RELEASE}")
++    if(VCPKG_TARGET_IS_OSX)
++        # macosx-version-min version is set with current macOS version. So replace them to 11.0
++        string(REGEX REPLACE "-mmacosx-version-min=[0-9]+.[0-9]+" "" VCPKG_COMBINED_C_FLAGS_RELEASE_SANITIZED "${VCPKG_COMBINED_C_FLAGS_RELEASE_SANITIZED}")
++        string(APPEND VCPKG_COMBINED_C_FLAGS_RELEASE_SANITIZED " -mmacosx-version-min=11.0")
++    endif()
+     file(WRITE "${crsp}" "${VCPKG_COMBINED_C_FLAGS_RELEASE_SANITIZED}")
+     set(ldrsp "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/ldflags.rsp")
+     string(REGEX REPLACE "-arch [A-Za-z0-9_]+" "" VCPKG_COMBINED_SHARED_LINKER_FLAGS_RELEASE_SANITIZED "${VCPKG_COMBINED_SHARED_LINKER_FLAGS_RELEASE}")
+diff --git a/triplets/community/arm64-android-dynamic-release.cmake b/triplets/community/arm64-android-dynamic-release.cmake
+new file mode 100644
+index 0000000000..c585a15f36
+--- /dev/null
++++ b/triplets/community/arm64-android-dynamic-release.cmake
+@@ -0,0 +1,7 @@
++set(VCPKG_TARGET_ARCHITECTURE arm64)
++set(VCPKG_CRT_LINKAGE static)
++set(VCPKG_LIBRARY_LINKAGE dynamic)
++set(VCPKG_CMAKE_SYSTEM_NAME Android)
++set(VCPKG_MAKE_BUILD_TRIPLET "--host=aarch64-linux-android")
++set(VCPKG_CMAKE_CONFIGURE_OPTIONS -DANDROID_ABI=arm64-v8a)
++set(VCPKG_BUILD_TYPE release)
+diff --git a/triplets/community/arm64-android-static-release.cmake b/triplets/community/arm64-android-static-release.cmake
+new file mode 100644
+index 0000000000..b01b738eed
+--- /dev/null
++++ b/triplets/community/arm64-android-static-release.cmake
+@@ -0,0 +1,7 @@
++set(VCPKG_TARGET_ARCHITECTURE arm64)
++set(VCPKG_CRT_LINKAGE static)
++set(VCPKG_LIBRARY_LINKAGE static)
++set(VCPKG_CMAKE_SYSTEM_NAME Android)
++set(VCPKG_MAKE_BUILD_TRIPLET "--host=aarch64-linux-android")
++set(VCPKG_CMAKE_CONFIGURE_OPTIONS -DANDROID_ABI=arm64-v8a)
++set(VCPKG_BUILD_TYPE release)

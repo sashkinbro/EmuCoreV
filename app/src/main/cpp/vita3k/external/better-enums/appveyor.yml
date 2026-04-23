@@ -1,0 +1,29 @@
+version: "{build}"
+
+branches:
+  except:
+    - gh-pages
+    - traits
+
+skip_tags : true
+shallow_clone: true
+
+os: Visual Studio 2017
+
+environment:
+  matrix:
+    - TITLE: vc2017
+      COMPILER: Visual Studio 15 2017
+    - TITLE: vc2015
+      COMPILER: Visual Studio 14 2015
+    - TITLE: vc2013
+      COMPILER: Visual Studio 12 2013
+
+install:
+  - git clone --depth 1 https://github.com/CxxTest/cxxtest.git
+
+build_script:
+  - set CL=/I C:\projects\better-enums\cxxtest
+  - set PATH=%PATH%;C:\projects\better-enums\cxxtest\bin;C:\cygwin\bin
+  - cd test
+  - make ms

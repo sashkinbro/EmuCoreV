@@ -1,0 +1,35 @@
+[package]
+name = "cubeb-coreaudio"
+version = "0.1.0"
+authors = ["Chun-Min Chang <chun.m.chang@gmail.com>", "Paul Adenot <paul@paul.cx>"]
+license = "ISC"
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+atomic = "0.4"
+bitflags = "2"
+coreaudio-sys-utils = { path = "coreaudio-sys-utils" }
+cubeb-backend = "0.13"
+float-cmp = "0.6"
+libc = "0.2"
+mach = "0.3"
+num = "0.4.3"
+audio-mixer = "0.2"
+ringbuf = "0.2.6"
+triple_buffer = "5.0.5"
+whatsys = "0.3"
+
+[dev-dependencies]
+itertools = "0.11"
+
+[features]
+audio-dump = []
+vpio-forcelist = []
+gecko-in-tree = ["cubeb-backend/gecko-in-tree"]
+
+# Workaround for https://github.com/rust-lang/cargo/issues/6745 to allow this
+# Cargo.toml file to appear under a subdirectory of a workspace without being in
+# that workspace (e.g. in cubeb-rs).
+[workspace]

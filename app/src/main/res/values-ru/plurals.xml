@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="library_game_count">
+        <item quantity="one">Всего %1$d игра</item>
+        <item quantity="few">Всего %1$d игры</item>
+        <item quantity="many">Всего %1$d игр</item>
+        <item quantity="other">Всего %1$d игры</item>
+    </plurals>
+</resources>

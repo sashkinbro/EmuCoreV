@@ -1,0 +1,103 @@
+# EmuCoreV
+
+[![License: GPL v2+](https://img.shields.io/badge/License-GPL%20v2%2B-blue.svg)](LICENSE)
+[![Support the project](https://img.shields.io/badge/Donate-Support%20EmuCoreV-ff5f45.svg)](https://send.monobank.ua/jar/9ZocYsprhJ)
+
+EmuCoreV is a PlayStation Vita emulator for Android. It combines a custom Android interface, library and catalog UX, installer flows, and runtime controls with a Vita3K-based emulation core adapted for this app.
+
+![Status](https://img.shields.io/badge/Status-Early%20Development%20%2F%20Unstable-red)
+
+> [!WARNING]
+> EmuCoreV is still under active development. Expect instability, renderer-specific issues, incomplete compatibility, and device-to-device performance differences.
+>
+> Current Android builds target `arm64-v8a` only. Firmware handling, game installation, compatibility sync, and mobile UX are still being refined.
+>
+> Not all games boot or behave correctly yet. Compatibility, fixes, and performance work are ongoing.
+
+## Highlights
+
+- Vita3K-based native core integrated into a Kotlin + Jetpack Compose Android app
+- Library and catalog screens with cover art, metadata, media, and compatibility badges
+- Firmware, update, `VPK`, `ZIP`, `PKG`, `zRIF`, `RIF`, and `work.bin` install flows
+- In-game overlay, per-game settings, and Android-first storage and setup flows
+- App language selection and localized UI resources
+
+## What This Repository Contains
+
+This repository contains the Android application, Compose UI, JNI bridge code, bundled Vita3K source tree, catalog assets, and supporting build tooling used by EmuCoreV.
+
+## Tech Stack
+
+- Kotlin + Jetpack Compose
+- Android DataStore
+- JNI bridge to native C++
+- Vita3K-based emulation core and Android integration layer
+- Android NDK + CMake
+- Local compatibility sync against Vita3K compatibility data
+
+## Current App Scope
+
+EmuCoreV currently targets Android with:
+
+- `minSdk 28`
+- `targetSdk 36`
+- package id `com.sbro.emucorev`
+- version `0.0.2`
+- ABI `arm64-v8a`
+
+## Building Locally
+
+### Requirements
+
+- Android Studio with Android SDK, NDK `29.0.14206865`, and CMake `3.22.1+`
+- JDK compatible with the Gradle configuration in this project
+- OpenSSL Android outputs prepared under `tools/openssl-test/out`
+- `vcpkg` available either through `third_party/vcpkg` or `VCPKG_ROOT`
+
+### Debug Build
+
+```powershell
+.\gradlew :app:assembleDebug
+```
+
+### Notes For Native Dependencies
+
+- `app/build.gradle.kts` currently points `OPENSSL_ROOT_DIR` to `tools/openssl-test/out`
+- `tools/openssl-test/build_android_openssl.sh` is the local helper used to prepare the expected OpenSSL layout
+- `third_party/vcpkg` is used as the fallback `vcpkg` root when `VCPKG_ROOT` is not set
+
+## Project Structure
+
+- `app/` Android application module
+- `app/src/main/java/com/sbro/emucorev` Kotlin app code
+- `app/src/main/cpp` Native bridge and Vita3K-based sources
+- `app/src/main/assets` Catalog data and bundled assets
+- `third_party/vcpkg` Vendored `vcpkg` source tree
+- `tools/openssl-test` Local helper scripts for Android OpenSSL artifacts
+
+## Notes
+
+- Firmware files, licenses, keys, and game content are not distributed with this repository.
+- Use only your own legally obtained firmware and game dumps.
+- Compatibility data shown in the catalog and detail screens is derived from Vita3K's public compatibility data.
+
+## Credits
+
+EmuCoreV builds on the Vita3K project and its ecosystem, then layers a custom Android interface, catalog, installer flow, storage handling, and handheld-focused UX on top.
+
+- Vita3K: https://github.com/Vita3K/Vita3K
+- Vita3K Compatibility: https://github.com/Vita3K/compatibility
+- Vita3K Compatibility Page: https://vita3k.org/compatibility.html?lang=en
+
+## Support
+
+If you want to support ongoing development:
+
+- Donate: https://send.monobank.ua/jar/9ZocYsprhJ
+- More apps by the author: https://play.google.com/store/apps/dev?id=7136622298887775989
+
+## License
+
+This project includes and derives from GPL-licensed Vita3K code, so the repository is distributed under the GNU General Public License v2.0 or later.
+
+See [LICENSE](LICENSE) for details.

@@ -1,0 +1,16 @@
+matrix:
+  include:
+    - os: linux
+      dist: trusty
+      sudo: false
+    - os: osx
+      osx_image: xcode8.2
+language: c
+
+script:
+  - chmod +x build.sh
+  - ./build.sh
+
+notifications:
+  irc:
+    - $IRC_CHANNEL
