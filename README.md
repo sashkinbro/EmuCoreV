@@ -52,7 +52,7 @@ EmuCoreV currently targets Android with:
 - Android Studio with Android SDK, NDK `29.0.14206865`, and CMake `3.22.1+`
 - JDK compatible with the Gradle configuration in this project
 - OpenSSL Android outputs prepared under `tools/openssl-test/out`
-- `vcpkg` available either through `third_party/vcpkg` or `VCPKG_ROOT`
+- `vcpkg` installed locally and exposed through `VCPKG_ROOT`
 
 ### Debug Build
 
@@ -63,8 +63,8 @@ EmuCoreV currently targets Android with:
 ### Notes For Native Dependencies
 
 - `app/build.gradle.kts` currently points `OPENSSL_ROOT_DIR` to `tools/openssl-test/out`
-- `tools/openssl-test/build_android_openssl.sh` is the local helper used to prepare the expected OpenSSL layout
-- `third_party/vcpkg` is used as the fallback `vcpkg` root when `VCPKG_ROOT` is not set
+- `tools/build_android_openssl.sh` is the local helper used to prepare the expected OpenSSL layout
+- `VCPKG_ROOT` should point to your local `vcpkg` checkout
 
 ## Project Structure
 
@@ -72,8 +72,7 @@ EmuCoreV currently targets Android with:
 - `app/src/main/java/com/sbro/emucorev` Kotlin app code
 - `app/src/main/cpp` Native bridge and Vita3K-based sources
 - `app/src/main/assets` Catalog data and bundled assets
-- `third_party/vcpkg` Vendored `vcpkg` source tree
-- `tools/openssl-test` Local helper scripts for Android OpenSSL artifacts
+- `tools/` Local helper scripts and ignored machine-specific native build inputs
 
 ## Notes
 
