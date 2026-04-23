@@ -1,0 +1,25 @@
+[package]
+name = "cubeb-pulse"
+version = "0.5.0"
+authors = ["Dan Glastonbury <dglastonbury@mozilla.com>"]
+description = "Cubeb backed for PulseAudio written in Rust"
+license = "ISC"
+
+[features]
+pulse-dlopen = ["pulse-ffi/dlopen"]
+gecko-in-tree = ["cubeb-backend/gecko-in-tree"]
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+cubeb-backend = "0.13"
+pulse-ffi = { path = "pulse-ffi" }
+pulse = { path = "pulse-rs" }
+semver = "1.0"
+ringbuf = "0.2"
+
+# Workaround for https://github.com/rust-lang/cargo/issues/6745 to allow this
+# Cargo.toml file to appear under a subdirectory of a workspace without being in
+# that workspace (e.g. in cubeb-rs).
+[workspace]

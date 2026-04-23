@@ -1,0 +1,8 @@
+*.pyc
+*.obj
+*.exe
+scratch/
+doc/html/
+doc-publish/
+test/cxxtest/*.cc
+test/build

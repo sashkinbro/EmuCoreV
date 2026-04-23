@@ -1,0 +1,20 @@
+#
+#             Copyright Andrey Semashev 2016.
+# Distributed under the Boost Software License, Version 1.0.
+#    (See accompanying file LICENSE_1_0.txt or copy at
+#          http://www.boost.org/LICENSE_1_0.txt)
+#
+
+import project ;
+import ../../build/log-platform-config ;
+
+project
+    : source-location .
+    : requirements
+        <conditional>@log-platform-config.set-platform-defines
+        <library>/boost/atomic//boost_atomic
+        <pch>off
+    ;
+
+obj atomic_int32 : atomic_int32.cpp ;
+explicit atomic_int32 ;
