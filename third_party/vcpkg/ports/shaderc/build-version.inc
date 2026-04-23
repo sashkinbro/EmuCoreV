@@ -1,1 +1,0 @@
-"shaderc @VERSION@ @VERSION@\n"

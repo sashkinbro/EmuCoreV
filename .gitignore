@@ -44,16 +44,13 @@ emulog.txt
 
 # Local tooling and extracted dependencies
 .tmp_repo_style/
+third_party/vcpkg/
 tools/msys64/
 tools/msys2-base-*.exe
+tools/openssl-test/
 tools/openssl-test/out/
 tools/openssl-test/openssl-*/
 tools/openssl-test/*.tar.gz
-third_party/vcpkg/buildtrees/
-third_party/vcpkg/downloads/
-third_party/vcpkg/installed/
-third_party/vcpkg/packages/
-third_party/vcpkg/vcpkg.exe
 
 # Nested repositories / local metadata
 **/.git/

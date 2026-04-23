@@ -1,4 +1,0 @@
-abcmake provides CMake configs:
-
-    find_package(abcmake CONFIG REQUIRED)
-    add_main_component(${PROJECT_NAME})
