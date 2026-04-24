@@ -428,8 +428,17 @@
     <string name="emulation_menu_controls_desc">Показать или скрыть экранные элементы управления.</string>
     <string name="emulation_menu_hide_controls">Скрыть управление</string>
     <string name="emulation_menu_show_controls">Показать управление</string>
+    <string name="emulation_menu_edit_controls">Редактировать управление</string>
+    <string name="emulation_menu_edit_controls_desc">Перемещайте, меняйте размер, показывайте или скрывайте каждую экранную кнопку.</string>
     <string name="emulation_menu_reset_overlay">Сбросить макет управления</string>
     <string name="emulation_menu_reset_overlay_desc">Восстановить масштаб, прозрачность и макет для сенсорного управления по умолчанию.</string>
+    <string name="emulation_controls_editor_hint">Перетащите выбранный элемент на экране.</string>
+    <string name="emulation_controls_editor_title">Редактор управления</string>
+    <string name="emulation_controls_editor_visible">Видимый</string>
+    <string name="emulation_controls_editor_size">Размер</string>
+    <string name="emulation_controls_editor_percent">%1$d%%</string>
+    <string name="emulation_controls_editor_reset">Сбросить</string>
+    <string name="emulation_controls_editor_done">Готово</string>
     <string name="emulation_menu_exit_game">Выйти из игры</string>
     <string name="emulation_menu_exit_game_desc">Закрыть текущую сессию и вернуться в библиотеку.</string>
     <string name="emulation_exit_confirm_title">Выйти из игры?</string>

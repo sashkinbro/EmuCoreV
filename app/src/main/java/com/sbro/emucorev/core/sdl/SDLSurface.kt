@@ -67,6 +67,9 @@ open class SDLSurface(context: Context) : SurfaceView(context),
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         Log.v("SDL", "surfaceCreated()")
+        if (SDLActivity.mHasNativeShutdown) {
+            return
+        }
         SDLActivity.onNativeSurfaceCreated()
     }
 
@@ -75,13 +78,16 @@ open class SDLSurface(context: Context) : SurfaceView(context),
         SDLActivity.mNextNativeState = SDLActivity.NativeState.PAUSED
         SDLActivity.handleNativeState()
         mIsSurfaceReady = false
+        if (SDLActivity.mHasNativeShutdown) {
+            return
+        }
         SDLActivity.onNativeSurfaceDestroyed()
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         Log.v("SDL", "surfaceChanged()")
 
-        if (SDLActivity.mSingleton == null) {
+        if (SDLActivity.mSingleton == null || SDLActivity.mHasNativeShutdown) {
             return
         }
 
@@ -160,6 +166,9 @@ open class SDLSurface(context: Context) : SurfaceView(context),
     }
 
     override fun onApplyWindowInsets(v: View, insets: WindowInsets): WindowInsets {
+        if (SDLActivity.mHasNativeShutdown) {
+            return insets
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val combined = insets.getInsets(
                 WindowInsets.Type.systemBars() or

@@ -428,8 +428,17 @@
     <string name="emulation_menu_controls_desc">ऑन-स्क्रीन कंट्रोल दिखाएं या छिपाएं।</string>
     <string name="emulation_menu_hide_controls">कंट्रोल छिपाएं</string>
     <string name="emulation_menu_show_controls">कंट्रोल दिखाएं</string>
+    <string name="emulation_menu_edit_controls">कंट्रोल संपादित करें</string>
+    <string name="emulation_menu_edit_controls_desc">हर ऑन-स्क्रीन कंट्रोल को खिसकाएँ, आकार बदलें, दिखाएँ या छिपाएँ।</string>
     <string name="emulation_menu_reset_overlay">कंट्रोल लेआउट रीसेट करें</string>
     <string name="emulation_menu_reset_overlay_desc">टच कंट्रोल के लिए डिफ़ॉल्ट स्केल, अपारदर्शिता और लेआउट पुनर्स्थापित करें।</string>
+    <string name="emulation_controls_editor_hint">चुने गए कंट्रोल को स्क्रीन पर खींचें।</string>
+    <string name="emulation_controls_editor_title">कंट्रोल संपादक</string>
+    <string name="emulation_controls_editor_visible">दिखाएँ</string>
+    <string name="emulation_controls_editor_size">आकार</string>
+    <string name="emulation_controls_editor_percent">%1$d%%</string>
+    <string name="emulation_controls_editor_reset">रीसेट</string>
+    <string name="emulation_controls_editor_done">पूर्ण</string>
     <string name="emulation_menu_exit_game">गेम से बाहर निकलें</string>
     <string name="emulation_menu_exit_game_desc">वर्तमान सत्र बंद करें और लाइब्रेरी में वापस जाएँ।</string>
     <string name="emulation_exit_confirm_title">गेम से बाहर निकलें?</string>

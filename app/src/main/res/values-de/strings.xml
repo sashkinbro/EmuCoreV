@@ -428,8 +428,17 @@
     <string name="emulation_menu_controls_desc">Bildschirmsteuerungen ein- oder ausblenden.</string>
     <string name="emulation_menu_hide_controls">Steuerungen ausblenden</string>
     <string name="emulation_menu_show_controls">Steuerungen einblenden</string>
+    <string name="emulation_menu_edit_controls">Steuerung bearbeiten</string>
+    <string name="emulation_menu_edit_controls_desc">Verschiebe, skaliere, zeige oder verstecke jede Bildschirmtaste.</string>
     <string name="emulation_menu_reset_overlay">Steuerungslayout zurücksetzen</string>
     <string name="emulation_menu_reset_overlay_desc">Standard-Skalierung, Deckkraft und Layout für Touch-Steuerungen wiederherstellen.</string>
+    <string name="emulation_controls_editor_hint">Ziehe das ausgewählte Element auf dem Bildschirm.</string>
+    <string name="emulation_controls_editor_title">Steuerungseditor</string>
+    <string name="emulation_controls_editor_visible">Sichtbar</string>
+    <string name="emulation_controls_editor_size">Größe</string>
+    <string name="emulation_controls_editor_percent">%1$d%%</string>
+    <string name="emulation_controls_editor_reset">Zurücksetzen</string>
+    <string name="emulation_controls_editor_done">Fertig</string>
     <string name="emulation_menu_exit_game">Spiel beenden</string>
     <string name="emulation_menu_exit_game_desc">Aktuelle Sitzung schließen und zur Bibliothek zurückkehren.</string>
     <string name="emulation_exit_confirm_title">Spiel beenden?</string>
