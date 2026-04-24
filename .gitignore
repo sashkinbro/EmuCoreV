@@ -1,6 +1,7 @@
 # Android Studio / IntelliJ
 *.iml
 .idea/
+.vscode/
 .gradle/
 .gradle-home/
 .kotlin/
