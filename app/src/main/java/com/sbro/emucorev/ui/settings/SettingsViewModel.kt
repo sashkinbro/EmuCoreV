@@ -68,16 +68,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun updateAppLanguage(language: AppLanguage) {
+        if (preferences.appLanguage == language) return
         preferences.appLanguage = language
-        preferences.applyAppLanguage()
         _uiState.value = _uiState.value.copy(appLanguage = language)
+        preferences.applyAppLanguage()
     }
 
     fun updateCoreSettings(transform: (VitaCoreConfig) -> VitaCoreConfig) {
+        val updated = transform(_uiState.value.coreConfig)
+        _uiState.value = _uiState.value.copy(coreConfig = updated)
         viewModelScope.launch(Dispatchers.IO) {
-            val updated = transform(_uiState.value.coreConfig)
             coreConfigRepository.save(updated)
-            _uiState.value = _uiState.value.copy(coreConfig = updated)
         }
     }
 

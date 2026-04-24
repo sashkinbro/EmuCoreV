@@ -45,9 +45,11 @@ import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material.icons.rounded.SystemUpdateAlt
+import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -76,6 +78,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.FirmwareKind
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
@@ -89,10 +92,13 @@ fun OnboardingScreen(
     firmwareUpdateInstalled: Boolean,
     onInstallFirmware: () -> Unit,
     onInstallFirmwareUpdate: () -> Unit,
+    onInstallDownloadedFirmware: (String) -> Unit = {},
+    firmwareDownloadViewModel: FirmwareDownloadViewModel = viewModel(),
     viewModel: OnboardingViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    val downloadState by firmwareDownloadViewModel.state.collectAsState()
     val pagerState = rememberPagerState(pageCount = { uiState.totalPages })
     val scope = rememberCoroutineScope()
     var isCompleting by remember { mutableStateOf(false) }
@@ -106,6 +112,13 @@ fun OnboardingScreen(
     LaunchedEffect(pagerState.currentPage) {
         if (pagerState.currentPage != uiState.currentPage) {
             viewModel.setCurrentPage(pagerState.currentPage)
+        }
+    }
+    LaunchedEffect(downloadState.status, downloadState.resultFileUri) {
+        val resultUri = downloadState.resultFileUri
+        if (downloadState.status == FirmwareDownloadStatus.Completed && resultUri != null) {
+            onInstallDownloadedFirmware(resultUri)
+            firmwareDownloadViewModel.consumeResult()
         }
     }
 
@@ -255,6 +268,9 @@ fun OnboardingScreen(
                             firmwareUpdateInstalled = firmwareUpdateInstalled,
                             installFirmware = installFirmwareClick,
                             installFirmwareUpdate = installFirmwareUpdateClick,
+                            downloadState = downloadState,
+                            startFirmwareDownload = firmwareDownloadViewModel::start,
+                            cancelFirmwareDownload = firmwareDownloadViewModel::cancel,
                             launchFolderPicker = chooseFolderClick
                         )
                     }
@@ -401,8 +417,24 @@ private fun OnboardingSetupContent(
     firmwareUpdateInstalled: Boolean,
     installFirmware: () -> Unit,
     installFirmwareUpdate: () -> Unit,
+    downloadState: FirmwareDownloadState,
+    startFirmwareDownload: (FirmwareKind) -> Unit,
+    cancelFirmwareDownload: () -> Unit,
     launchFolderPicker: () -> Unit
 ) {
+    val isDownloading = downloadState.status == FirmwareDownloadStatus.Running
+    val downloadButton = stringResource(R.string.onboarding_firmware_download)
+    val cancelDownloadButton = stringResource(R.string.onboarding_firmware_cancel_download)
+
+    val baseDownloadStatus = firmwareDownloadStatusText(FirmwareKind.Base, downloadState)
+    val updateDownloadStatus = firmwareDownloadStatusText(FirmwareKind.Update, downloadState)
+    val baseDownloadProgress = downloadState.progress.takeIf {
+        downloadState.kind == FirmwareKind.Base && downloadState.status == FirmwareDownloadStatus.Running
+    }
+    val updateDownloadProgress = downloadState.progress.takeIf {
+        downloadState.kind == FirmwareKind.Update && downloadState.status == FirmwareDownloadStatus.Running
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -435,7 +467,14 @@ private fun OnboardingSetupContent(
                 stringResource(R.string.onboarding_status_install_firmware)
             },
             statusColor = if (firmwareInstalled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-            onClick = installFirmware
+            onClick = installFirmware,
+            secondaryActionLabel = if (firmwareInstalled) null else if (baseDownloadProgress != null) cancelDownloadButton else downloadButton,
+            secondaryActionEnabled = !isDownloading || downloadState.kind == FirmwareKind.Base,
+            onSecondaryAction = {
+                if (baseDownloadProgress != null) cancelFirmwareDownload() else startFirmwareDownload(FirmwareKind.Base)
+            },
+            downloadProgress = baseDownloadProgress,
+            downloadStatus = baseDownloadStatus
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -450,7 +489,14 @@ private fun OnboardingSetupContent(
                 stringResource(R.string.onboarding_status_install_firmware_update)
             },
             statusColor = if (firmwareUpdateInstalled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-            onClick = installFirmwareUpdate
+            onClick = installFirmwareUpdate,
+            secondaryActionLabel = if (firmwareUpdateInstalled) null else if (updateDownloadProgress != null) cancelDownloadButton else downloadButton,
+            secondaryActionEnabled = !isDownloading || downloadState.kind == FirmwareKind.Update,
+            onSecondaryAction = {
+                if (updateDownloadProgress != null) cancelFirmwareDownload() else startFirmwareDownload(FirmwareKind.Update)
+            },
+            downloadProgress = updateDownloadProgress,
+            downloadStatus = updateDownloadStatus
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -482,13 +528,35 @@ private fun OnboardingSetupContent(
 }
 
 @Composable
+private fun firmwareDownloadStatusText(
+    kind: FirmwareKind,
+    state: FirmwareDownloadState
+): String? {
+    if (state.kind != kind) return null
+    return when (state.status) {
+        FirmwareDownloadStatus.Running -> {
+            val percent = (state.progress * 100f).toInt().coerceIn(0, 100)
+            stringResource(R.string.onboarding_firmware_downloading, percent)
+        }
+
+        FirmwareDownloadStatus.Failed -> stringResource(R.string.onboarding_firmware_download_failed)
+        else -> null
+    }
+}
+
+@Composable
 private fun SetupCard(
     icon: ImageVector,
     title: String,
     description: String,
     status: String,
     statusColor: Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    secondaryActionLabel: String? = null,
+    secondaryActionEnabled: Boolean = true,
+    onSecondaryAction: (() -> Unit)? = null,
+    downloadProgress: Float? = null,
+    downloadStatus: String? = null
 ) {
     val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     Surface(
@@ -562,6 +630,50 @@ private fun SetupCard(
                         color = statusColor
                     )
                 }
+            }
+
+            if (secondaryActionLabel != null || downloadProgress != null || downloadStatus != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (downloadStatus != null) {
+                        Text(
+                            text = downloadStatus,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (downloadProgress == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+
+                    if (secondaryActionLabel != null && onSecondaryAction != null) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        OutlinedButton(
+                            onClick = onSecondaryAction,
+                            enabled = secondaryActionEnabled
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.CloudDownload,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(secondaryActionLabel)
+                        }
+                    }
+                }
+            }
+
+            if (downloadProgress != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                LinearProgressIndicator(
+                    progress = { downloadProgress },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }

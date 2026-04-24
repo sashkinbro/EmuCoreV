@@ -90,6 +90,7 @@ fun SettingsScreen(
     initialTab: SettingsTab = SettingsTab.General,
     onBackClick: () -> Unit,
     onOpenLanguageSettings: () -> Unit,
+    onOpenVitaLanguageSettings: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -170,6 +171,7 @@ fun SettingsScreen(
                     defaults = defaults,
                     viewModel = viewModel,
                     onOpenLanguageSettings = onOpenLanguageSettings,
+                    onOpenVitaLanguageSettings = onOpenVitaLanguageSettings,
                     refreshCoreSettingsClick = refreshCoreSettingsClick,
                     changeFolderClick = changeFolderClick,
                     clearFolderClick = clearFolderClick,
@@ -449,46 +451,3 @@ fun SettingSliderRow(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun SettingHeader(
-    title: String,
-    description: String,
-    modifier: Modifier = Modifier,
-    onResetDefault: (() -> Unit)? = null
-) {
-    val context = LocalContext.current
-    val resetToastMessage = stringResource(R.string.settings_reset_toast, title)
-    val resetClick = onResetDefault?.let {
-        rememberDebouncedClick {
-            it()
-            Toast.makeText(
-                context,
-                resetToastMessage,
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-    val headerModifier = if (resetClick != null) {
-        modifier.combinedClickable(
-            onClick = {},
-            onLongClick = resetClick
-        )
-    } else {
-        modifier
-    }
-
-    Row(
-        modifier = headerModifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = title,
-            modifier = Modifier.weight(1f, fill = false),
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium)
-        )
-        SettingHelpButton(title = title, description = description)
-    }
-}

@@ -37,6 +37,10 @@
     <string name="onboarding_status_install_firmware">Install the base firmware package.</string>
     <string name="onboarding_status_install_firmware_update">Install the firmware update package.</string>
     <string name="onboarding_status_ready">Setup complete.</string>
+    <string name="onboarding_firmware_download">Download</string>
+    <string name="onboarding_firmware_cancel_download">Cancel</string>
+    <string name="onboarding_firmware_downloading">Downloading %1$d%%</string>
+    <string name="onboarding_firmware_download_failed">Download failed. Try again.</string>
     <string name="onboarding_back">Back</string>
     <string name="onboarding_next">Next</string>
     <string name="onboarding_get_started">Get started</string>
@@ -248,11 +252,10 @@
     <string name="settings_app_language_chinese_traditional">Chinese Traditional</string>
     <string name="settings_app_language_hindi">Hindi</string>
     <string name="settings_app_language_italian">Italian</string>
-    <string name="settings_language_picker_title">Choose app language</string>
-    <string name="settings_language_picker_subtitle">Only languages currently available in the app are shown here.</string>
+    <string name="settings_language_picker_title">Language</string>
     <string name="settings_system_language">Vita system language</string>
     <string name="settings_help_system_language">Sets the language reported to the emulated Vita system.</string>
-    <string name="settings_vita_language_picker_title">Choose Vita system language</string>
+    <string name="settings_vita_language_picker_title">Vita language</string>
     <string name="settings_vita_language_picker_subtitle">Choose the language used by the emulated Vita system and games.</string>
     <string name="settings_vita_language_unknown">Unknown language</string>
     <string name="settings_language_english_us">English US</string>
