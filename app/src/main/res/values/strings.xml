@@ -241,6 +241,13 @@
     <string name="settings_app_language_russian_desc">Use the Russian interface.</string>
     <string name="settings_app_language_ukrainian">Ukrainian</string>
     <string name="settings_app_language_ukrainian_desc">Use the Ukrainian interface.</string>
+    <string name="settings_app_language_spanish">Spanish</string>
+    <string name="settings_app_language_french">French</string>
+    <string name="settings_app_language_german">German</string>
+    <string name="settings_app_language_portuguese">Portuguese</string>
+    <string name="settings_app_language_chinese_traditional">Chinese Traditional</string>
+    <string name="settings_app_language_hindi">Hindi</string>
+    <string name="settings_app_language_italian">Italian</string>
     <string name="settings_language_picker_title">Choose app language</string>
     <string name="settings_language_picker_subtitle">Only languages currently available in the app are shown here.</string>
     <string name="settings_system_language">Vita system language</string>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <plurals name="library_game_count" tools:ignore="UnusedQuantity">
+        <item quantity="one">En total %1$d juego</item>
+        <item quantity="few">En total %1$d juegos</item>
+        <item quantity="many">En total %1$d juegos</item>
+        <item quantity="other">En total %1$d juegos</item>
+    </plurals>
+</resources>

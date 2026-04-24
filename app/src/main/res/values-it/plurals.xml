@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <plurals name="library_game_count" tools:ignore="MissingQuantity,MissingTranslation">
+        <item quantity="one">%1$d gioco in totale</item>
+        <item quantity="other">%1$d giochi in totale</item>
+    </plurals>
+    <plurals name="install_dialog_content_done" tools:ignore="MissingQuantity,MissingTranslation">
+        <item quantity="one">%1$d gioco installato con successo.</item>
+        <item quantity="other">%1$d giochi installati con successo.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress" tools:ignore="MissingQuantity,MissingTranslation">
+        <item quantity="one">Completato %1$d di %2$d elemento</item>
+        <item quantity="other">Completato %1$d di %2$d elementi</item>
+    </plurals>
+</resources>

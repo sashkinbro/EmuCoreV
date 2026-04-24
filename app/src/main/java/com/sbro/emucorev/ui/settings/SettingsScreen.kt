@@ -89,6 +89,7 @@ enum class SettingsTab(@param:StringRes val titleRes: Int, val icon: ImageVector
 fun SettingsScreen(
     initialTab: SettingsTab = SettingsTab.General,
     onBackClick: () -> Unit,
+    onOpenLanguageSettings: () -> Unit,
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -168,6 +169,7 @@ fun SettingsScreen(
                     uiState = uiState,
                     defaults = defaults,
                     viewModel = viewModel,
+                    onOpenLanguageSettings = onOpenLanguageSettings,
                     refreshCoreSettingsClick = refreshCoreSettingsClick,
                     changeFolderClick = changeFolderClick,
                     clearFolderClick = clearFolderClick,

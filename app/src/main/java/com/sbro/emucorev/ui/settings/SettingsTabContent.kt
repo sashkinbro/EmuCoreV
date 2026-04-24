@@ -38,7 +38,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -59,7 +58,6 @@ import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
-import kotlinx.coroutines.launch
 
 private val SettingsSectionContentPadding = 14.dp
 private val SettingsSectionRowPadding = 12.dp
@@ -101,13 +99,14 @@ fun SettingsTabContent(
     uiState: SettingsUiState,
     defaults: VitaCoreConfig,
     viewModel: SettingsViewModel,
+    onOpenLanguageSettings: () -> Unit,
     refreshCoreSettingsClick: () -> Unit,
     changeFolderClick: () -> Unit,
     clearFolderClick: () -> Unit,
     installGpuDriverClick: () -> Unit
 ) {
     when (selectedTab) {
-        SettingsTab.General -> GeneralTab(uiState, defaults, viewModel)
+        SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings)
         SettingsTab.Graphics -> GraphicsTab(uiState, defaults, viewModel, installGpuDriverClick)
         SettingsTab.Audio -> AudioTab(uiState, defaults, viewModel, refreshCoreSettingsClick)
         SettingsTab.Overlay -> OverlayTab(uiState, defaults, viewModel)
@@ -120,14 +119,18 @@ fun SettingsTabContent(
 }
 
 @Composable
-private fun GeneralTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel) {
-    var showLanguageSheet by rememberSaveable { mutableStateOf(false) }
+private fun GeneralTab(
+    uiState: SettingsUiState,
+    defaults: VitaCoreConfig,
+    viewModel: SettingsViewModel,
+    onOpenLanguageSettings: () -> Unit
+) {
     var showVitaLanguageSheet by rememberSaveable { mutableStateOf(false) }
 
     SectionCard(title = stringResource(R.string.settings_tab_general), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         AppLanguageSettingRow(
             selectedLanguage = uiState.appLanguage,
-            onClick = { showLanguageSheet = true }
+            onClick = onOpenLanguageSettings
         )
         VitaLanguageSettingRow(
             selectedLanguage = uiState.coreConfig.sysLang,
@@ -157,17 +160,6 @@ private fun GeneralTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewM
         SliderRow(title = stringResource(R.string.settings_cpu_pool_size), description = stringResource(R.string.settings_help_cpu_pool_size), valueText = stringResource(R.string.settings_cpu_pool_size_value, uiState.coreConfig.cpuPoolSize), onResetDefault = { viewModel.updateCoreSettings { it.copy(cpuPoolSize = defaults.cpuPoolSize) } }) {
             Slider(value = uiState.coreConfig.cpuPoolSize.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(cpuPoolSize = value.toInt().coerceIn(1, 32)) } }, valueRange = 1f..32f, steps = 30)
         }
-    }
-
-    if (showLanguageSheet) {
-        AppLanguageSheet(
-            selectedLanguage = uiState.appLanguage,
-            onDismiss = { showLanguageSheet = false },
-            onLanguageSelected = { language ->
-                showLanguageSheet = false
-                viewModel.updateAppLanguage(language)
-            }
-        )
     }
 
     if (showVitaLanguageSheet) {
@@ -736,104 +728,6 @@ private fun AppLanguageSettingRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AppLanguageSheet(
-    selectedLanguage: AppLanguage,
-    onDismiss: () -> Unit,
-    onLanguageSelected: (AppLanguage) -> Unit
-) {
-    val scope = rememberCoroutineScope()
-    val options = listOf(
-        AppLanguage.SYSTEM,
-        AppLanguage.ENGLISH,
-        AppLanguage.RUSSIAN,
-        AppLanguage.UKRAINIAN
-    )
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = SettingsCardInnerPadding, vertical = 8.dp)
-                .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.settings_language_picker_title),
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = stringResource(R.string.settings_language_picker_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            options.forEach { language ->
-                val selected = language == selectedLanguage
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (selected) 0.36f else 0.58f)),
-                    onClick = {
-                        scope.launch { onLanguageSelected(language) }
-                    }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = SettingsCardInnerPadding, vertical = SettingsCardInnerPadding),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = appLanguageShortLabel(language),
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = appLanguageLabel(language),
-                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium),
-                                color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = appLanguageDescription(language),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        if (selected) {
-                            Icon(
-                                imageVector = Icons.Rounded.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.padding(bottom = 4.dp))
-        }
-    }
-}
-
 @Composable
 private fun VitaLanguageSettingRow(
     selectedLanguage: Int,
@@ -983,21 +877,13 @@ private fun appLanguageLabel(language: AppLanguage): String = when (language) {
     AppLanguage.ENGLISH -> stringResource(R.string.settings_app_language_english)
     AppLanguage.RUSSIAN -> stringResource(R.string.settings_app_language_russian)
     AppLanguage.UKRAINIAN -> stringResource(R.string.settings_app_language_ukrainian)
-}
-
-@Composable
-private fun appLanguageDescription(language: AppLanguage): String = when (language) {
-    AppLanguage.SYSTEM -> stringResource(R.string.settings_app_language_system_desc)
-    AppLanguage.ENGLISH -> stringResource(R.string.settings_app_language_english_desc)
-    AppLanguage.RUSSIAN -> stringResource(R.string.settings_app_language_russian_desc)
-    AppLanguage.UKRAINIAN -> stringResource(R.string.settings_app_language_ukrainian_desc)
-}
-
-private fun appLanguageShortLabel(language: AppLanguage): String = when (language) {
-    AppLanguage.SYSTEM -> "A"
-    AppLanguage.ENGLISH -> "EN"
-    AppLanguage.RUSSIAN -> "RU"
-    AppLanguage.UKRAINIAN -> "UK"
+    AppLanguage.SPANISH -> stringResource(R.string.settings_app_language_spanish)
+    AppLanguage.FRENCH -> stringResource(R.string.settings_app_language_french)
+    AppLanguage.GERMAN -> stringResource(R.string.settings_app_language_german)
+    AppLanguage.PORTUGUESE -> stringResource(R.string.settings_app_language_portuguese)
+    AppLanguage.CHINESE -> stringResource(R.string.settings_app_language_chinese_traditional)
+    AppLanguage.HINDI -> stringResource(R.string.settings_app_language_hindi)
+    AppLanguage.ITALIAN -> stringResource(R.string.settings_app_language_italian)
 }
 
 @Composable
