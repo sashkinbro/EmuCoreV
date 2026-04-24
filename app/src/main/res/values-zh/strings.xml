@@ -428,8 +428,17 @@
     <string name="emulation_menu_controls_desc">顯示或隱藏螢幕控制項。</string>
     <string name="emulation_menu_hide_controls">隱藏控制項</string>
     <string name="emulation_menu_show_controls">顯示控制項</string>
+    <string name="emulation_menu_edit_controls">編輯控制項</string>
+    <string name="emulation_menu_edit_controls_desc">移動、調整大小、顯示或隱藏每個螢幕控制項。</string>
     <string name="emulation_menu_reset_overlay">重設控制項配置</string>
     <string name="emulation_menu_reset_overlay_desc">將觸控控制項還原為預設的縮放比例、不透明度與配置。</string>
+    <string name="emulation_controls_editor_hint">在螢幕上拖曳選取的控制項。</string>
+    <string name="emulation_controls_editor_title">控制項編輯器</string>
+    <string name="emulation_controls_editor_visible">可見</string>
+    <string name="emulation_controls_editor_size">大小</string>
+    <string name="emulation_controls_editor_percent">%1$d%%</string>
+    <string name="emulation_controls_editor_reset">重設</string>
+    <string name="emulation_controls_editor_done">完成</string>
     <string name="emulation_menu_exit_game">退出遊戲</string>
     <string name="emulation_menu_exit_game_desc">關閉目前的工作階段並返回收藏庫。</string>
     <string name="emulation_exit_confirm_title">確定要退出遊戲？</string>

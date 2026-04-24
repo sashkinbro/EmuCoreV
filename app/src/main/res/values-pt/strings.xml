@@ -428,8 +428,17 @@
     <string name="emulation_menu_controls_desc">Mostre ou oculte os controles na tela.</string>
     <string name="emulation_menu_hide_controls">Ocultar controles</string>
     <string name="emulation_menu_show_controls">Mostrar controles</string>
+    <string name="emulation_menu_edit_controls">Editar controles</string>
+    <string name="emulation_menu_edit_controls_desc">Mova, redimensione, mostre ou oculte cada controle na tela.</string>
     <string name="emulation_menu_reset_overlay">Redefinir layout de controles</string>
     <string name="emulation_menu_reset_overlay_desc">Restaure a escala, a opacidade e o layout padrão para os controles de toque.</string>
+    <string name="emulation_controls_editor_hint">Arraste o controle selecionado na tela.</string>
+    <string name="emulation_controls_editor_title">Editor de controles</string>
+    <string name="emulation_controls_editor_visible">Visível</string>
+    <string name="emulation_controls_editor_size">Tamanho</string>
+    <string name="emulation_controls_editor_percent">%1$d%%</string>
+    <string name="emulation_controls_editor_reset">Redefinir</string>
+    <string name="emulation_controls_editor_done">Concluir</string>
     <string name="emulation_menu_exit_game">Sair do jogo</string>
     <string name="emulation_menu_exit_game_desc">Feche a sessão atual e retorne à biblioteca.</string>
     <string name="emulation_exit_confirm_title">Sair do jogo?</string>

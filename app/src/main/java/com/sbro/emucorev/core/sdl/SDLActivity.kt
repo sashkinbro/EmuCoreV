@@ -232,6 +232,9 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
 
         @JvmStatic
         fun handleNativeState() {
+            if (mHasNativeShutdown) {
+                return
+            }
             if (mNextNativeState == mCurrentNativeState) {
                 return
             }
@@ -1047,7 +1050,7 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         Log.v(TAG, "onWindowFocusChanged(): $hasFocus")
-        if (mBrokenLibraries) {
+        if (mBrokenLibraries || mHasNativeShutdown) {
             return
         }
         mHasFocus = hasFocus
@@ -1068,7 +1071,7 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
     override fun onTrimMemory(level: Int) {
         Log.v(TAG, "onTrimMemory()")
         super.onTrimMemory(level)
-        if (mBrokenLibraries) {
+        if (mBrokenLibraries || mHasNativeShutdown) {
             return
         }
         nativeLowMemory()
@@ -1077,7 +1080,7 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
     override fun onConfigurationChanged(newConfig: Configuration) {
         Log.v(TAG, "onConfigurationChanged()")
         super.onConfigurationChanged(newConfig)
-        if (mBrokenLibraries) {
+        if (mBrokenLibraries || mHasNativeShutdown) {
             return
         }
 
