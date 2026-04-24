@@ -1,11 +1,9 @@
 package com.sbro.emucorev.ui.settings
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -38,41 +36,48 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
-import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.ui.common.NavigationBackButton
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 
-private data class AppLanguageOption(
-    val language: AppLanguage,
+private data class VitaLangOption(
+    val value: Int,
     val shortLabel: String,
-    @param:StringRes val titleRes: Int,
-    val nativeLabel: String? = null
+    val nativeLabel: String
 )
 
-private val AppLanguageOptions = listOf(
-    AppLanguageOption(AppLanguage.SYSTEM, "SYS", R.string.settings_app_language_system, ""),
-    AppLanguageOption(AppLanguage.ENGLISH, "EN", R.string.settings_app_language_english, "English"),
-    AppLanguageOption(AppLanguage.UKRAINIAN, "UA", R.string.settings_app_language_ukrainian, "Українська"),
-    AppLanguageOption(AppLanguage.RUSSIAN, "RU", R.string.settings_app_language_russian, "Русский"),
-    AppLanguageOption(AppLanguage.SPANISH, "ES", R.string.settings_app_language_spanish, "Español"),
-    AppLanguageOption(AppLanguage.FRENCH, "FR", R.string.settings_app_language_french, "Français"),
-    AppLanguageOption(AppLanguage.GERMAN, "DE", R.string.settings_app_language_german, "Deutsch"),
-    AppLanguageOption(AppLanguage.PORTUGUESE, "PT", R.string.settings_app_language_portuguese, "Português"),
-    AppLanguageOption(AppLanguage.CHINESE, "繁", R.string.settings_app_language_chinese_traditional, "繁體中文"),
-    AppLanguageOption(AppLanguage.HINDI, "HI", R.string.settings_app_language_hindi, "हिन्दी"),
-    AppLanguageOption(AppLanguage.ITALIAN, "IT", R.string.settings_app_language_italian, "Italiano")
+private val VitaLangOptions = listOf(
+    VitaLangOption(14, "DA", "Dansk"),
+    VitaLangOption(4, "DE", "Deutsch"),
+    VitaLangOption(18, "EN", "English (United Kingdom)"),
+    VitaLangOption(1, "EN", "English (United States)"),
+    VitaLangOption(3, "ES", "Español"),
+    VitaLangOption(2, "FR", "Français"),
+    VitaLangOption(5, "IT", "Italiano"),
+    VitaLangOption(6, "NL", "Nederlands"),
+    VitaLangOption(15, "NO", "Norsk"),
+    VitaLangOption(16, "PL", "Polski"),
+    VitaLangOption(7, "PT", "Português (Portugal)"),
+    VitaLangOption(17, "BR", "Português (Brasil)"),
+    VitaLangOption(8, "RU", "Русский"),
+    VitaLangOption(12, "FI", "Suomi"),
+    VitaLangOption(13, "SV", "Svenska"),
+    VitaLangOption(19, "TR", "Türkçe"),
+    VitaLangOption(0, "JP", "日本語"),
+    VitaLangOption(9, "KO", "한국어"),
+    VitaLangOption(11, "ZH", "简体中文"),
+    VitaLangOption(10, "ZH", "繁體中文")
 )
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-fun AppLanguageScreen(
+fun VitaLanguageScreen(
     onBackClick: () -> Unit,
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 16.dp
-    val options = remember { AppLanguageOptions }
+    val options = remember { VitaLangOptions }
     val backClick = rememberDebouncedClick(onClick = onBackClick)
 
     LazyColumn(
@@ -89,14 +94,14 @@ fun AppLanguageScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            AppLanguageHeader(onBackClick = backClick)
+            VitaLanguageHeader(onBackClick = backClick)
         }
-        items(options, key = { it.language.name }) { option ->
-            AppLanguageOptionRow(
+        items(options, key = { it.value }) { option ->
+            VitaLanguageOptionRow(
                 option = option,
-                selected = option.language == uiState.appLanguage,
+                selected = option.value == uiState.coreConfig.sysLang,
                 onClick = {
-                    viewModel.updateAppLanguage(option.language)
+                    viewModel.updateCoreSettings { it.copy(sysLang = option.value) }
                 }
             )
         }
@@ -104,7 +109,7 @@ fun AppLanguageScreen(
 }
 
 @Composable
-private fun AppLanguageHeader(onBackClick: () -> Unit) {
+private fun VitaLanguageHeader(onBackClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -117,21 +122,19 @@ private fun AppLanguageHeader(onBackClick: () -> Unit) {
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = MaterialTheme.colorScheme.onSurface
         )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.settings_language_picker_title),
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+        Text(
+            text = stringResource(R.string.settings_vita_language_picker_title),
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
 @Composable
-private fun AppLanguageOptionRow(
-    option: AppLanguageOption,
+private fun VitaLanguageOptionRow(
+    option: VitaLangOption,
     selected: Boolean,
     onClick: () -> Unit
 ) {
@@ -145,12 +148,11 @@ private fun AppLanguageOptionRow(
     } else {
         MaterialTheme.colorScheme.onSurface
     }
-    val secondaryColor = if (selected) {
+    if (selected) {
         MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.74f)
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val subtitle = option.nativeLabel
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -194,24 +196,14 @@ private fun AppLanguageOptionRow(
                     color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(option.titleRes),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = contentColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (!subtitle.isNullOrEmpty()) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = secondaryColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
+            Text(
+                text = option.nativeLabel,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = contentColor,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             if (selected) {
                 Spacer(
                     modifier = Modifier

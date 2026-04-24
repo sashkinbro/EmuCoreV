@@ -1,51 +1,36 @@
 package com.sbro.emucorev.ui.settings
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRowScope
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Memory
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -100,13 +85,14 @@ fun SettingsTabContent(
     defaults: VitaCoreConfig,
     viewModel: SettingsViewModel,
     onOpenLanguageSettings: () -> Unit,
+    onOpenVitaLanguageSettings: () -> Unit = {},
     refreshCoreSettingsClick: () -> Unit,
     changeFolderClick: () -> Unit,
     clearFolderClick: () -> Unit,
     installGpuDriverClick: () -> Unit
 ) {
     when (selectedTab) {
-        SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings)
+        SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings, onOpenVitaLanguageSettings)
         SettingsTab.Graphics -> GraphicsTab(uiState, defaults, viewModel, installGpuDriverClick)
         SettingsTab.Audio -> AudioTab(uiState, defaults, viewModel, refreshCoreSettingsClick)
         SettingsTab.Overlay -> OverlayTab(uiState, defaults, viewModel)
@@ -123,10 +109,9 @@ private fun GeneralTab(
     uiState: SettingsUiState,
     defaults: VitaCoreConfig,
     viewModel: SettingsViewModel,
-    onOpenLanguageSettings: () -> Unit
+    onOpenLanguageSettings: () -> Unit,
+    onOpenVitaLanguageSettings: () -> Unit = {}
 ) {
-    var showVitaLanguageSheet by rememberSaveable { mutableStateOf(false) }
-
     SectionCard(title = stringResource(R.string.settings_tab_general), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         AppLanguageSettingRow(
             selectedLanguage = uiState.appLanguage,
@@ -134,7 +119,7 @@ private fun GeneralTab(
         )
         VitaLanguageSettingRow(
             selectedLanguage = uiState.coreConfig.sysLang,
-            onClick = { showVitaLanguageSheet = true }
+            onClick = onOpenVitaLanguageSettings
         )
         Toggle(title = stringResource(R.string.settings_core_pstv_mode), description = stringResource(R.string.settings_help_pstv_mode), checked = uiState.coreConfig.pstvMode, onCheckedChange = { enabled -> viewModel.updateCoreSettings { it.copy(pstvMode = enabled) } }, onResetDefault = { viewModel.updateCoreSettings { it.copy(pstvMode = defaults.pstvMode) } })
         Toggle(title = stringResource(R.string.settings_show_info_bar), description = stringResource(R.string.settings_help_show_info_bar), checked = uiState.coreConfig.showInfoBar, onCheckedChange = { enabled -> viewModel.updateCoreSettings { it.copy(showInfoBar = enabled) } }, onResetDefault = { viewModel.updateCoreSettings { it.copy(showInfoBar = defaults.showInfoBar) } })
@@ -162,16 +147,6 @@ private fun GeneralTab(
         }
     }
 
-    if (showVitaLanguageSheet) {
-        VitaLanguageSheet(
-            selectedLanguage = uiState.coreConfig.sysLang,
-            onDismiss = { showVitaLanguageSheet = false },
-            onLanguageSelected = { language ->
-                showVitaLanguageSheet = false
-                viewModel.updateCoreSettings { it.copy(sysLang = language) }
-            }
-        )
-    }
 }
 
 @Composable
@@ -777,96 +752,6 @@ private fun VitaLanguageSettingRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun VitaLanguageSheet(
-    selectedLanguage: Int,
-    onDismiss: () -> Unit,
-    onLanguageSelected: (Int) -> Unit
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = SettingsCardInnerPadding, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.settings_vita_language_picker_title),
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = stringResource(R.string.settings_vita_language_picker_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 520.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 12.dp)
-            ) {
-                items(VitaSystemLanguages, key = { it.value }) { language ->
-                    val selected = language.value == selectedLanguage
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (selected) 0.36f else 0.58f)),
-                        onClick = { onLanguageSelected(language.value) }
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = SettingsCardInnerPadding, vertical = SettingsCardInnerPadding),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = language.shortLabel,
-                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = language.nativeLabel,
-                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium),
-                                    color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            if (selected) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Check,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.padding(bottom = 4.dp))
         }
     }
 }

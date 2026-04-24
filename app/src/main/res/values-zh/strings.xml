@@ -37,6 +37,10 @@
     <string name="onboarding_status_install_firmware">安裝基礎韌體包。</string>
     <string name="onboarding_status_install_firmware_update">安裝韌體更新包。</string>
     <string name="onboarding_status_ready">設定完成。</string>
+    <string name="onboarding_firmware_download">下載</string>
+    <string name="onboarding_firmware_cancel_download">取消</string>
+    <string name="onboarding_firmware_downloading">下載中 %1$d%%</string>
+    <string name="onboarding_firmware_download_failed">下載失敗。請再試一次。</string>
     <string name="onboarding_back">返回</string>
     <string name="onboarding_next">下一步</string>
     <string name="onboarding_get_started">開始使用</string>
@@ -241,11 +245,10 @@
     <string name="settings_app_language_russian_desc">使用俄文介面。</string>
     <string name="settings_app_language_ukrainian">烏克蘭文</string>
     <string name="settings_app_language_ukrainian_desc">使用烏克蘭文介面。</string>
-    <string name="settings_language_picker_title">選擇應用程式語言</string>
-    <string name="settings_language_picker_subtitle">此處僅顯示目前應用程式可用的語言。</string>
+    <string name="settings_language_picker_title">語言</string>
     <string name="settings_system_language">Vita 系統語言</string>
     <string name="settings_help_system_language">設定回報給模擬之 Vita 系統的語言。</string>
-    <string name="settings_vita_language_picker_title">選擇 Vita 系統語言</string>
+    <string name="settings_vita_language_picker_title">Vita 語言</string>
     <string name="settings_vita_language_picker_subtitle">選擇模擬的 Vita 系統與遊戲所使用的語言。</string>
     <string name="settings_vita_language_unknown">未知語言</string>
     <string name="settings_language_english_us">英文 (美國)</string>
@@ -439,5 +442,11 @@
     <string name="settings_resolution_multiplier">解析度倍率</string>
     <string name="settings_stretch_display_area">延展顯示區域</string>
     <string name="settings_vsync">垂直同步</string>
-    <string name="settings_pstv_mode">PSTV 模式</string>
+    <string name="settings_pstv_mode">PSTV 模式</string><string name="settings_app_language_spanish">西班牙语</string>
+    <string name="settings_app_language_french">法语</string>
+    <string name="settings_app_language_german">德语</string>
+    <string name="settings_app_language_portuguese">葡萄牙语</string>
+    <string name="settings_app_language_chinese_traditional">繁体中文</string>
+    <string name="settings_app_language_hindi">印地语</string>
+    <string name="settings_app_language_italian">意大利语</string>
 </resources>

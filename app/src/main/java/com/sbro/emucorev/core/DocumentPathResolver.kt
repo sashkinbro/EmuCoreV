@@ -12,6 +12,7 @@ import android.util.Log
 object DocumentPathResolver {
 
     fun getDisplayName(context: Context, rawPath: String): String {
+        if (rawPath.startsWith("file://")) return File(rawPath.toUri().path.orEmpty()).name
         if (!rawPath.startsWith("content://")) return File(rawPath).name
         val uri = rawPath.toUri()
         return DocumentFile.fromSingleUri(context, uri)?.name
@@ -20,6 +21,7 @@ object DocumentPathResolver {
     }
 
     fun resolveFilePath(context: Context, rawPath: String, copyToCache: Boolean = false): String? {
+        if (rawPath.startsWith("file://")) return rawPath.toUri().path
         if (!rawPath.startsWith("content://")) return rawPath
 
         val uri = rawPath.toUri()

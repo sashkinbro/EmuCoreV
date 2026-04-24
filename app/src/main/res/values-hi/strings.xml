@@ -37,6 +37,10 @@
     <string name="onboarding_status_install_firmware">बेस फ़र्मवेयर पैकेज इंस्टॉल करें।</string>
     <string name="onboarding_status_install_firmware_update">फ़र्मवेयर अपडेट पैकेज इंस्टॉल करें।</string>
     <string name="onboarding_status_ready">सेटअप पूरा हुआ।</string>
+    <string name="onboarding_firmware_download">डाउनलोड करें</string>
+    <string name="onboarding_firmware_cancel_download">रद्द करें</string>
+    <string name="onboarding_firmware_downloading">डाउनलोड हो रहा है %1$d%%</string>
+    <string name="onboarding_firmware_download_failed">डाउनलोड विफल रहा। फिर कोशिश करें।</string>
     <string name="onboarding_back">पीछे</string>
     <string name="onboarding_next">आगे</string>
     <string name="onboarding_get_started">शुरू करें</string>
@@ -241,11 +245,10 @@
     <string name="settings_app_language_russian_desc">रूसी इंटरफ़ेस का उपयोग करें।</string>
     <string name="settings_app_language_ukrainian">यूक्रेनी</string>
     <string name="settings_app_language_ukrainian_desc">यूक्रेनी इंटरफ़ेस का उपयोग करें।</string>
-    <string name="settings_language_picker_title">ऐप की भाषा चुनें</string>
-    <string name="settings_language_picker_subtitle">वर्तमान में ऐप में उपलब्ध भाषाएँ ही यहाँ दिखाई गई हैं।</string>
+    <string name="settings_language_picker_title">भाषा</string>
     <string name="settings_system_language">Vita सिस्टम की भाषा</string>
     <string name="settings_help_system_language">एम्युलेटेड Vita सिस्टम को रिपोर्ट की गई भाषा सेट करता है।</string>
-    <string name="settings_vita_language_picker_title">Vita सिस्टम की भाषा चुनें</string>
+    <string name="settings_vita_language_picker_title">Vita भाषा</string>
     <string name="settings_vita_language_picker_subtitle">एम्युलेटेड Vita सिस्टम और गेम्स द्वारा उपयोग की जाने वाली भाषा चुनें।</string>
     <string name="settings_vita_language_unknown">अज्ञात भाषा</string>
     <string name="settings_language_english_us">अंग्रेज़ी US</string>
@@ -440,4 +443,11 @@
     <string name="settings_stretch_display_area">डिस्प्ले क्षेत्र को स्ट्रेच करें</string>
     <string name="settings_vsync">V-Sync</string>
     <string name="settings_pstv_mode">PSTV मोड</string>
+    <string name="settings_app_language_spanish">स्पेनिश</string>
+    <string name="settings_app_language_french">फ्रेंच</string>
+    <string name="settings_app_language_german">जर्मन</string>
+    <string name="settings_app_language_portuguese">पुर्तगाली</string>
+    <string name="settings_app_language_chinese_traditional">पारंपरिक चीनी</string>
+    <string name="settings_app_language_hindi">हिंदी</string>
+    <string name="settings_app_language_italian">इतालवी</string>
 </resources>

@@ -38,6 +38,7 @@ import com.sbro.emucorev.ui.onboarding.OnboardingScreen
 import com.sbro.emucorev.ui.settings.AppLanguageScreen
 import com.sbro.emucorev.ui.settings.SettingsScreen
 import com.sbro.emucorev.ui.settings.SettingsTab
+import com.sbro.emucorev.ui.settings.VitaLanguageScreen
 import com.sbro.emucorev.ui.settings.settingsTabFromRoute
 import com.sbro.emucorev.ui.setup.SetupInstallDialog
 import com.sbro.emucorev.ui.setup.SetupInstallViewModel
@@ -51,6 +52,7 @@ private const val ROUTE_CATALOG = "catalog"
 private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_SETTINGS_WITH_TAB = "settings/{tab}"
 private const val ROUTE_APP_LANGUAGE = "app-language"
+private const val ROUTE_VITA_LANGUAGE = "vita-language"
 private const val ROUTE_DETAIL_PREFIX = "detail"
 private const val ROUTE_CATALOG_DETAIL_PREFIX = "catalog-detail"
 
@@ -65,11 +67,11 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     var firmwareInstalled by remember(context) { mutableStateOf(EmulatorStorage.hasInstalledFirmware(context)) }
     var firmwareUpdateInstalled by remember(context) { mutableStateOf(EmulatorStorage.hasInstalledFirmwareUpdate(context)) }
     val startDestination = if (preferences.onboardingCompleted) ROUTE_LIBRARY else ROUTE_ONBOARDING
-    val firmwareLaunchFailed = stringResource(R.string.core_install_firmware_failed)
+    stringResource(R.string.core_install_firmware_failed)
     val unsupportedFirmware = stringResource(R.string.core_install_firmware_unsupported)
-    val contentLaunchFailed = stringResource(R.string.core_install_content_failed)
+    stringResource(R.string.core_install_content_failed)
     val unsupportedContent = stringResource(R.string.core_install_content_unsupported)
-    val pkgLaunchFailed = stringResource(R.string.core_install_pkg_failed)
+    stringResource(R.string.core_install_pkg_failed)
     val unsupportedPkg = stringResource(R.string.core_install_pkg_unsupported)
     val gameLaunchFailed = stringResource(R.string.game_launch_failed)
     val launchRequiresFirmwareMessage = stringResource(R.string.game_launch_requires_firmware)
@@ -155,6 +157,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     firmwareUpdateInstalled = firmwareUpdateInstalled,
                     onInstallFirmware = openFirmwareInstall,
                     onInstallFirmwareUpdate = openFirmwareInstall,
+                    onInstallDownloadedFirmware = installViewModel::installFirmware,
                     onComplete = {
                         navController.navigate(ROUTE_LIBRARY) {
                             popUpTo(ROUTE_ONBOARDING) { inclusive = true }
@@ -339,6 +342,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         onBackClick = navigateHome,
                         onOpenLanguageSettings = {
                             navController.navigate(ROUTE_APP_LANGUAGE) { launchSingleTop = true }
+                        },
+                        onOpenVitaLanguageSettings = {
+                            navController.navigate(ROUTE_VITA_LANGUAGE) { launchSingleTop = true }
                         }
                     )
                 }
@@ -373,12 +379,20 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         onBackClick = navigateHome,
                         onOpenLanguageSettings = {
                             navController.navigate(ROUTE_APP_LANGUAGE) { launchSingleTop = true }
+                        },
+                        onOpenVitaLanguageSettings = {
+                            navController.navigate(ROUTE_VITA_LANGUAGE) { launchSingleTop = true }
                         }
                     )
                 }
             }
             composable(ROUTE_APP_LANGUAGE) {
                 AppLanguageScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+            composable(ROUTE_VITA_LANGUAGE) {
+                VitaLanguageScreen(
                     onBackClick = { navController.popBackStack() }
                 )
             }

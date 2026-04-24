@@ -1,8 +1,11 @@
 package com.sbro.emucorev.data
 
+import android.app.LocaleManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.LocaleList
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.edit
 import androidx.core.os.LocaleListCompat
@@ -28,6 +31,7 @@ enum class AppLanguage(val storageValue: Int, val languageTag: String) {
 }
 
 class AppPreferences(context: Context) {
+    private val appContext = context.applicationContext
     private val prefs = context.getSharedPreferences("emucorev_prefs", Context.MODE_PRIVATE)
 
     var packagesFolderUri: String?
@@ -62,12 +66,22 @@ class AppPreferences(context: Context) {
     fun packagesFolderUriAsUri(): Uri? = packagesFolderUri?.let(Uri::parse)
 
     fun applyAppLanguage() {
-        val locales = if (appLanguage == AppLanguage.SYSTEM) {
-            LocaleListCompat.getEmptyLocaleList()
+        val tag = if (appLanguage == AppLanguage.SYSTEM) "" else appLanguage.languageTag
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val manager = appContext.getSystemService(LocaleManager::class.java)
+            manager?.applicationLocales = if (tag.isEmpty()) {
+                LocaleList.getEmptyLocaleList()
+            } else {
+                LocaleList.forLanguageTags(tag)
+            }
         } else {
-            LocaleListCompat.forLanguageTags(appLanguage.languageTag)
+            val locales = if (tag.isEmpty()) {
+                LocaleListCompat.getEmptyLocaleList()
+            } else {
+                LocaleListCompat.forLanguageTags(tag)
+            }
+            AppCompatDelegate.setApplicationLocales(locales)
         }
-        AppCompatDelegate.setApplicationLocales(locales)
     }
 
     fun setPackagesFolder(context: Context, uri: Uri) {

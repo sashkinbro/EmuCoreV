@@ -37,6 +37,10 @@
     <string name="onboarding_status_install_firmware">Instale o pacote de firmware base.</string>
     <string name="onboarding_status_install_firmware_update">Instale o pacote de atualização do firmware.</string>
     <string name="onboarding_status_ready">Configuração concluída.</string>
+    <string name="onboarding_firmware_download">Baixar</string>
+    <string name="onboarding_firmware_cancel_download">Cancelar</string>
+    <string name="onboarding_firmware_downloading">Baixando %1$d%%</string>
+    <string name="onboarding_firmware_download_failed">Falha ao baixar. Tente novamente.</string>
     <string name="onboarding_back">Voltar</string>
     <string name="onboarding_next">Avançar</string>
     <string name="onboarding_get_started">Começar</string>
@@ -241,11 +245,10 @@
     <string name="settings_app_language_russian_desc">Usa a interface em russo.</string>
     <string name="settings_app_language_ukrainian">Ucraniano</string>
     <string name="settings_app_language_ukrainian_desc">Usa a interface em ucraniano.</string>
-    <string name="settings_language_picker_title">Escolha o idioma do aplicativo</string>
-    <string name="settings_language_picker_subtitle">Apenas os idiomas atualmente disponíveis no aplicativo são mostrados aqui.</string>
+    <string name="settings_language_picker_title">Idioma</string>
     <string name="settings_system_language">Idioma do sistema Vita</string>
     <string name="settings_help_system_language">Define o idioma informado ao sistema Vita emulado.</string>
-    <string name="settings_vita_language_picker_title">Escolha o idioma do sistema Vita</string>
+    <string name="settings_vita_language_picker_title">Idioma Vita</string>
     <string name="settings_vita_language_picker_subtitle">Escolha o idioma usado pelo sistema Vita emulado e pelos jogos.</string>
     <string name="settings_vita_language_unknown">Idioma desconhecido</string>
     <string name="settings_language_english_us">Inglês (EUA)</string>
@@ -440,4 +443,11 @@
     <string name="settings_stretch_display_area">Esticar área de exibição</string>
     <string name="settings_vsync">V-Sync</string>
     <string name="settings_pstv_mode">Modo PSTV</string>
+    <string name="settings_app_language_spanish">Espanhol</string>
+    <string name="settings_app_language_french">Francês</string>
+    <string name="settings_app_language_german">Alemão</string>
+    <string name="settings_app_language_portuguese">Português</string>
+    <string name="settings_app_language_chinese_traditional">Chinês Tradicional</string>
+    <string name="settings_app_language_hindi">Hindi</string>
+    <string name="settings_app_language_italian">Italiano</string>
 </resources>

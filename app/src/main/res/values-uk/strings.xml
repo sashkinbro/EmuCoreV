@@ -37,6 +37,10 @@
     <string name="onboarding_status_install_firmware">Встановіть пакет базової прошивки.</string>
     <string name="onboarding_status_install_firmware_update">Встановіть пакет оновлення прошивки.</string>
     <string name="onboarding_status_ready">Налаштування завершено.</string>
+    <string name="onboarding_firmware_download">Завантажити</string>
+    <string name="onboarding_firmware_cancel_download">Скасувати</string>
+    <string name="onboarding_firmware_downloading">Завантаження %1$d%%</string>
+    <string name="onboarding_firmware_download_failed">Не вдалося завантажити. Спробуйте ще раз.</string>
     <string name="onboarding_back">Назад</string>
     <string name="onboarding_next">Далі</string>
     <string name="onboarding_get_started">Розпочати</string>
@@ -241,11 +245,10 @@
     <string name="settings_app_language_russian_desc">Використовувати російський інтерфейс.</string>
     <string name="settings_app_language_ukrainian">Українська</string>
     <string name="settings_app_language_ukrainian_desc">Використовувати український інтерфейс.</string>
-    <string name="settings_language_picker_title">Виберіть мову додатка</string>
-    <string name="settings_language_picker_subtitle">Тут показані лише ті мови, які наразі доступні в додатку.</string>
+    <string name="settings_language_picker_title">Мова</string>
     <string name="settings_system_language">Мова системи Vita</string>
     <string name="settings_help_system_language">Задає мову, яка повідомляється емульованій системі Vita.</string>
-    <string name="settings_vita_language_picker_title">Виберіть мову системи Vita</string>
+    <string name="settings_vita_language_picker_title">Мова Vita</string>
     <string name="settings_vita_language_picker_subtitle">Виберіть мову, яка використовується емульованою системою Vita та іграми.</string>
     <string name="settings_vita_language_unknown">Невідома мова</string>
     <string name="settings_language_english_us">Англійська (США)</string>
@@ -440,4 +443,11 @@
     <string name="settings_stretch_display_area">Розтягувати область екрана</string>
     <string name="settings_vsync">V-Sync</string>
     <string name="settings_pstv_mode">Режим PSTV</string>
+    <string name="settings_app_language_spanish">Іспанська</string>
+    <string name="settings_app_language_french">Французька</string>
+    <string name="settings_app_language_german">Німецька</string>
+    <string name="settings_app_language_portuguese">Португальська</string>
+    <string name="settings_app_language_chinese_traditional">Китайська (традиційна)</string>
+    <string name="settings_app_language_hindi">Гінді</string>
+    <string name="settings_app_language_italian">Італійська</string>
 </resources>
