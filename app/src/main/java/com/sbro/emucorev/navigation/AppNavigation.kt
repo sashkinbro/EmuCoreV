@@ -35,6 +35,7 @@ import com.sbro.emucorev.ui.detail.GameDetailScreen
 import com.sbro.emucorev.ui.home.HomeScreen
 import com.sbro.emucorev.ui.library.LibraryScreen
 import com.sbro.emucorev.ui.onboarding.OnboardingScreen
+import com.sbro.emucorev.ui.settings.AppLanguageScreen
 import com.sbro.emucorev.ui.settings.SettingsScreen
 import com.sbro.emucorev.ui.settings.SettingsTab
 import com.sbro.emucorev.ui.settings.settingsTabFromRoute
@@ -49,6 +50,7 @@ private const val ROUTE_LIBRARY = "library"
 private const val ROUTE_CATALOG = "catalog"
 private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_SETTINGS_WITH_TAB = "settings/{tab}"
+private const val ROUTE_APP_LANGUAGE = "app-language"
 private const val ROUTE_DETAIL_PREFIX = "detail"
 private const val ROUTE_CATALOG_DETAIL_PREFIX = "catalog-detail"
 
@@ -334,7 +336,10 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 ) {
                     SettingsScreen(
                         initialTab = SettingsTab.General,
-                        onBackClick = navigateHome
+                        onBackClick = navigateHome,
+                        onOpenLanguageSettings = {
+                            navController.navigate(ROUTE_APP_LANGUAGE) { launchSingleTop = true }
+                        }
                     )
                 }
             }
@@ -365,9 +370,17 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 ) {
                     SettingsScreen(
                         initialTab = settingsTabFromRoute(entry.arguments?.getString("tab")),
-                        onBackClick = navigateHome
+                        onBackClick = navigateHome,
+                        onOpenLanguageSettings = {
+                            navController.navigate(ROUTE_APP_LANGUAGE) { launchSingleTop = true }
+                        }
                     )
                 }
+            }
+            composable(ROUTE_APP_LANGUAGE) {
+                AppLanguageScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
             }
             composable(
                 "$ROUTE_DETAIL_PREFIX/{titleId}"

@@ -41,7 +41,13 @@ execute_process(
 	COMMAND git -c safe.directory=${CMAKE_CURRENT_SOURCE_DIR} rev-parse --short HEAD
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	OUTPUT_VARIABLE FFMPEG_GIT_SHA
+	ERROR_QUIET
 	OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+if (FFMPEG_GIT_SHA STREQUAL "")
+	set(FFMPEG_GIT_SHA "4d5f161")
+	message(STATUS "FFMPEG git metadata not found; using fallback prebuilt commit ${FFMPEG_GIT_SHA}")
+endif()
 
 # Download prebuilt ffmpeg
 if(NOT EXISTS "${CMAKE_BINARY_DIR}/external/ffmpeg.zip")

@@ -13,7 +13,14 @@ enum class AppLanguage(val storageValue: Int, val languageTag: String) {
     SYSTEM(0, ""),
     ENGLISH(1, "en"),
     RUSSIAN(2, "ru"),
-    UKRAINIAN(3, "uk");
+    UKRAINIAN(3, "uk"),
+    SPANISH(4, "es"),
+    FRENCH(5, "fr"),
+    GERMAN(6, "de"),
+    PORTUGUESE(7, "pt"),
+    CHINESE(8, "zh"),
+    HINDI(9, "hi"),
+    ITALIAN(10, "it");
 
     companion object {
         fun fromStorageValue(value: Int): AppLanguage = entries.firstOrNull { it.storageValue == value } ?: SYSTEM

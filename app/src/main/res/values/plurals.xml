@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <plurals name="library_game_count">
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <plurals name="library_game_count" tools:ignore="MissingTranslation">
         <item quantity="one">%1$d game total</item>
         <item quantity="other">%1$d games total</item>
     </plurals>
-    <plurals name="install_dialog_content_done">
+    <plurals name="install_dialog_content_done" tools:ignore="MissingTranslation">
         <item quantity="one">%1$d game installed successfully.</item>
         <item quantity="other">%1$d games installed successfully.</item>
     </plurals>
-    <plurals name="install_dialog_items_progress">
+    <plurals name="install_dialog_items_progress" tools:ignore="MissingTranslation">
         <item quantity="one">Completed %1$d of %2$d item</item>
         <item quantity="other">Completed %1$d of %2$d items</item>
     </plurals>
