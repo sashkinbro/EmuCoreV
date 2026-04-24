@@ -1,6 +1,7 @@
 package com.sbro.emucorev.ui.emulation
 
 import android.annotation.SuppressLint
+import android.view.MotionEvent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -8,8 +9,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -51,7 +52,6 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -72,13 +72,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
@@ -89,7 +88,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import android.view.MotionEvent
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
@@ -240,7 +238,7 @@ fun EmulationOverlayHost(
         }
 
         AnimatedVisibility(
-            visible = !controlsEditMode && (menuButtonVisible || menuOpen),
+            visible = !controlsEditMode && !menuOpen && menuButtonVisible,
             enter = fadeIn(tween(180)),
             exit = fadeOut(tween(140)),
             modifier = Modifier.align(Alignment.TopCenter)
@@ -494,21 +492,6 @@ private fun EmulationSidebarMenu(
                         )
                     }
                 }
-
-                MenuSectionCard(
-                    title = when (activeTab) {
-                        EmulationMenuTab.Session -> stringResource(R.string.emulation_tab_session)
-                        EmulationMenuTab.Overlay -> stringResource(R.string.emulation_tab_overlay)
-                        EmulationMenuTab.Graphics -> stringResource(R.string.emulation_tab_graphics)
-                        EmulationMenuTab.System -> stringResource(R.string.emulation_tab_system)
-                    },
-                    subtitle = when (activeTab) {
-                        EmulationMenuTab.Session -> stringResource(R.string.emulation_menu_pause_desc)
-                        EmulationMenuTab.Overlay -> stringResource(R.string.emulation_menu_overlay_live)
-                        EmulationMenuTab.Graphics -> stringResource(R.string.emulation_menu_next_launch)
-                        EmulationMenuTab.System -> stringResource(R.string.emulation_menu_next_launch)
-                    }
-                ) {}
 
                 when (activeTab) {
                     EmulationMenuTab.Session -> {
@@ -1015,6 +998,7 @@ private fun TouchControlCanvasItem(
     val yPx = element.y * canvasHeight
     val widthPx = element.width * canvasWidth
     val heightPx = element.height * canvasHeight
+    var pressed by remember(element.id, editMode) { mutableStateOf(false) }
     val sizeModifier = Modifier
         .offset { IntOffset(xPx.roundToInt(), yPx.roundToInt()) }
         .size(width = with(density) { widthPx.toDp() }, height = with(density) { heightPx.toDp() })
@@ -1053,11 +1037,13 @@ private fun TouchControlCanvasItem(
                 val controlId = descriptor.controlId ?: return@pointerInteropFilter false
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                        pressed = true
                         onButtonChange(controlId, true)
                         true
                     }
 
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                        pressed = false
                         onButtonChange(controlId, false)
                         true
                     }
@@ -1068,8 +1054,19 @@ private fun TouchControlCanvasItem(
 
             TouchControlType.TouchSwitch -> Modifier.pointerInteropFilter { event ->
                 when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                        pressed = true
+                        true
+                    }
+
                     MotionEvent.ACTION_UP -> {
+                        pressed = false
                         onBackTouchToggle()
+                        true
+                    }
+
+                    MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                        pressed = false
                         true
                     }
 
@@ -1110,7 +1107,7 @@ private fun TouchControlCanvasItem(
                     height = with(density) { heightPx.toDp() },
                     alpha = alpha,
                     shape = descriptor.shape,
-                    pressed = false
+                    pressed = !editMode && pressed
                 )
             }
         }
@@ -1356,7 +1353,6 @@ private fun buildDefaultTouchLayout(
     val centerBottomPadding = bottomPaddingPx - dp(6f)
     val clusterSpacing = (if (isLandscape) 14f else 18f) * overlayScale * dp(1f)
     val faceClusterDrop = (if (isLandscape) 18f else 14f) * overlayScale * dp(1f)
-    val leftClusterWidth = dpadClusterSize + analogSize + clusterSpacing
     val leftClusterHeight = maxOf(dpadClusterSize + faceClusterDrop, analogSize) + analogSize + clusterSpacing
     val rightClusterWidth = actionClusterSize + analogSize + clusterSpacing
     val rightClusterHeight = maxOf(actionClusterSize + faceClusterDrop, analogSize) + analogSize + clusterSpacing
@@ -1366,20 +1362,18 @@ private fun buildDefaultTouchLayout(
     val dpadStep = dpadButton + dpadGap
     val dpadExtent = dpadStep + dpadButton
     val dpadCenter = (dpadExtent - dpadButton) / 2f
-    val dpadX = sidePaddingPx
     val dpadY = canvasHeight - bottomPaddingPx - leftClusterHeight + faceClusterDrop
     val leftAnalogX = sidePaddingPx + dpadClusterSize + clusterSpacing
     val leftAnalogY = canvasHeight - bottomPaddingPx - analogSize
 
     val actionButton = actionClusterSize / 3.1f
-    val actionGap = if (isLandscape) dp(24f) else dp(28f)
+    val actionGap = if (isLandscape) dp(36f) else dp(42f)
     val actionStep = actionButton + actionGap
     val actionExtent = actionStep + actionButton
     val actionCenter = (actionExtent - actionButton) / 2f
     val rightGroupX = canvasWidth - sidePaddingPx - rightClusterWidth
     val actionX = rightGroupX + rightClusterWidth - actionClusterSize
     val actionY = canvasHeight - bottomPaddingPx - rightClusterHeight + faceClusterDrop
-    val rightAnalogX = rightGroupX
     val rightAnalogY = canvasHeight - bottomPaddingPx - analogSize
 
     val centerGroupWidth = wideCenterWidth + centerGap + centerHeight + centerGap + wideCenterWidth
@@ -1393,12 +1387,12 @@ private fun buildDefaultTouchLayout(
         element(TouchControlIds.L1, sidePaddingPx, shoulderTopPaddingPx + dp(40f), shoulderWidth, shoulderHeight),
         element(TouchControlIds.R2, canvasWidth - sidePaddingPx - shoulderWidth, shoulderTopPaddingPx, shoulderWidth, shoulderHeight),
         element(TouchControlIds.R1, canvasWidth - sidePaddingPx - shoulderWidth, shoulderTopPaddingPx + dp(40f), shoulderWidth, shoulderHeight),
-        element(TouchControlIds.DPAD_UP, dpadX + dpadCenter, dpadY, dpadButton, dpadButton),
-        element(TouchControlIds.DPAD_DOWN, dpadX + dpadCenter, dpadY + dpadStep, dpadButton, dpadButton),
-        element(TouchControlIds.DPAD_LEFT, dpadX, dpadY + dpadCenter, dpadButton, dpadButton),
-        element(TouchControlIds.DPAD_RIGHT, dpadX + dpadStep, dpadY + dpadCenter, dpadButton, dpadButton),
+        element(TouchControlIds.DPAD_UP, sidePaddingPx + dpadCenter, dpadY, dpadButton, dpadButton),
+        element(TouchControlIds.DPAD_DOWN, sidePaddingPx + dpadCenter, dpadY + dpadStep, dpadButton, dpadButton),
+        element(TouchControlIds.DPAD_LEFT, sidePaddingPx, dpadY + dpadCenter, dpadButton, dpadButton),
+        element(TouchControlIds.DPAD_RIGHT, sidePaddingPx + dpadStep, dpadY + dpadCenter, dpadButton, dpadButton),
         element(TouchControlIds.LEFT_STICK, leftAnalogX, leftAnalogY, analogSize, analogSize),
-        element(TouchControlIds.RIGHT_STICK, rightAnalogX, rightAnalogY, analogSize, analogSize),
+        element(TouchControlIds.RIGHT_STICK, rightGroupX, rightAnalogY, analogSize, analogSize),
         element(TouchControlIds.TRIANGLE, actionX + actionCenter, actionY, actionButton, actionButton),
         element(TouchControlIds.CROSS, actionX + actionCenter, actionY + actionStep, actionButton, actionButton),
         element(TouchControlIds.SQUARE, actionX, actionY + actionCenter, actionButton, actionButton),
@@ -1408,143 +1402,6 @@ private fun buildDefaultTouchLayout(
         element(TouchControlIds.START, centerX + wideCenterWidth + centerGap + centerHeight + centerGap, centerY, wideCenterWidth, centerHeight),
         element(TouchControlIds.TOUCH, (canvasWidth - touchWidth) / 2f, canvasHeight - touchHeight - dp(84f), touchWidth, touchHeight)
     )
-}
-
-private data class TouchButtonSpec(
-    val id: String,
-    val drawableRes: Int,
-    val width: Dp,
-    val height: Dp,
-    val x: Dp,
-    val y: Dp,
-    val shape: Shape,
-    val onClick: (() -> Unit)? = null,
-    val onPressChange: ((Boolean) -> Unit)? = null
-)
-
-@SuppressLint("ConfigurationScreenWidthHeight")
-@Composable
-private fun DpadCluster(clusterSize: Dp, alpha: Float, onButtonChange: (Int, Boolean) -> Unit, modifier: Modifier = Modifier) {
-    val isLandscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
-    val btn = clusterSize / 2.7f
-    val gap = if (isLandscape) 16.dp else 18.dp
-    val step = btn + gap
-    val extent = step + btn
-    val centerOffset = (extent - btn) / 2f
-    TouchButtonGroup(
-        specs = listOf(
-            TouchButtonSpec("up", R.drawable.ic_controller_up_button, btn, btn, centerOffset, 0.dp, RoundedCornerShape(8.dp)) { onButtonChange(InputOverlay.ControlId.dup, it) },
-            TouchButtonSpec("down", R.drawable.ic_controller_down_button, btn, btn, centerOffset, step, RoundedCornerShape(8.dp)) { onButtonChange(InputOverlay.ControlId.ddown, it) },
-            TouchButtonSpec("left", R.drawable.ic_controller_left_button, btn, btn, 0.dp, centerOffset, RoundedCornerShape(8.dp)) { onButtonChange(InputOverlay.ControlId.dleft, it) },
-            TouchButtonSpec("right", R.drawable.ic_controller_right_button, btn, btn, step, centerOffset, RoundedCornerShape(8.dp)) { onButtonChange(InputOverlay.ControlId.dright, it) }
-        ),
-        alpha = alpha,
-        modifier = modifier
-    )
-}
-
-@SuppressLint("ConfigurationScreenWidthHeight")
-@Composable
-private fun ActionCluster(clusterSize: Dp, alpha: Float, onButtonChange: (Int, Boolean) -> Unit, modifier: Modifier = Modifier) {
-    val isLandscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
-    val btn = clusterSize / 3.1f
-    val gap = if (isLandscape) 24.dp else 28.dp
-    val step = btn + gap
-    val extent = step + btn
-    val centerOffset = (extent - btn) / 2f
-    TouchButtonGroup(
-        specs = listOf(
-            TouchButtonSpec("triangle", R.drawable.button_triangle, btn, btn, centerOffset, 0.dp, CircleShape) { onButtonChange(InputOverlay.ControlId.y, it) },
-            TouchButtonSpec("cross", R.drawable.button_cross, btn, btn, centerOffset, step, CircleShape) { onButtonChange(InputOverlay.ControlId.a, it) },
-            TouchButtonSpec("square", R.drawable.button_square, btn, btn, 0.dp, centerOffset, CircleShape) { onButtonChange(InputOverlay.ControlId.x, it) },
-            TouchButtonSpec("circle", R.drawable.button_circle, btn, btn, step, centerOffset, CircleShape) { onButtonChange(InputOverlay.ControlId.b, it) }
-        ),
-        alpha = alpha,
-        modifier = modifier
-    )
-}
-
-@Composable
-private fun TouchButtonGroup(
-    specs: List<TouchButtonSpec>,
-    alpha: Float,
-    modifier: Modifier = Modifier,
-    rotations: Map<String, Float> = emptyMap()
-) {
-    val density = LocalDensity.current
-    val activeTargets = remember { mutableStateOf(setOf<String>()) }
-    val downTargets = remember { mutableMapOf<Int, String?>() }
-    val rects = remember(specs, density) {
-        with(density) {
-            specs.associate { spec ->
-                spec.id to Rect(spec.x.toPx(), spec.y.toPx(), spec.x.toPx() + spec.width.toPx(), spec.y.toPx() + spec.height.toPx())
-            }
-        }
-    }
-    val groupRect = remember(rects) {
-        Rect(
-            left = rects.values.minOfOrNull { it.left } ?: 0f,
-            top = rects.values.minOfOrNull { it.top } ?: 0f,
-            right = rects.values.maxOfOrNull { it.right } ?: 0f,
-            bottom = rects.values.maxOfOrNull { it.bottom } ?: 0f
-        )
-    }
-    fun hitTarget(x: Float, y: Float): String? = specs.lastOrNull { rects.getValue(it.id).contains(Offset(x, y)) }?.id
-
-    Box(
-        modifier = modifier
-            .offset { IntOffset(groupRect.left.roundToInt(), groupRect.top.roundToInt()) }
-            .size(with(density) { (groupRect.right - groupRect.left).toDp() }, with(density) { (groupRect.bottom - groupRect.top).toDp() })
-            .pointerInteropFilter { event ->
-                when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                        val index = event.actionIndex
-                        val pointerId = event.getPointerId(index)
-                        val target = hitTarget(event.getX(index) + groupRect.left, event.getY(index) + groupRect.top)
-                        downTargets[pointerId] = target
-                        activeTargets.value = activeTargets.value + listOfNotNull(target)
-                        target?.let { id -> specs.firstOrNull { it.id == id }?.onPressChange?.invoke(true) }
-                        target != null
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
-                        val index = event.actionIndex
-                        val pointerId = event.getPointerId(index)
-                        val target = downTargets.remove(pointerId)
-                        target?.let { id ->
-                            specs.firstOrNull { it.id == id }?.onPressChange?.invoke(false)
-                            specs.firstOrNull { it.id == id }?.onClick?.invoke()
-                            activeTargets.value = activeTargets.value - id
-                        }
-                        target != null
-                    }
-                    MotionEvent.ACTION_CANCEL -> {
-                        activeTargets.value.forEach { id -> specs.firstOrNull { it.id == id }?.onPressChange?.invoke(false) }
-                        activeTargets.value = emptySet()
-                        downTargets.clear()
-                        true
-                    }
-                    else -> false
-                }
-            }
-    ) {
-        specs.forEach { spec ->
-            AssetButton(
-                drawableRes = spec.drawableRes,
-                width = spec.width,
-                height = spec.height,
-                alpha = alpha,
-                shape = spec.shape,
-                pressed = activeTargets.value.contains(spec.id),
-                rotation = rotations[spec.id] ?: 0f,
-                modifier = Modifier.offset {
-                    IntOffset(
-                        (spec.x.roundToPx() - groupRect.left.roundToInt()),
-                        (spec.y.roundToPx() - groupRect.top.roundToInt())
-                    )
-                }
-            )
-        }
-    }
 }
 
 @Composable
@@ -1558,7 +1415,7 @@ private fun AssetButton(
     modifier: Modifier = Modifier,
     rotation: Float = 0f
 ) {
-    val scale by animateFloatAsState(targetValue = if (pressed) 0.94f else 1f, animationSpec = tween(80), label = "overlay_asset_scale")
+    val scale by animateFloatAsState(targetValue = if (pressed) 1.5f else 1f, animationSpec = tween(80), label = "overlay_asset_scale")
     Box(
         modifier = modifier
             .size(width = width, height = height)
@@ -1601,6 +1458,19 @@ private fun AnalogStick(
         sendAxis(0f, 0f)
     }
 
+    fun updateStick(position: Offset) {
+        if (sizePx.width == 0f || sizePx.height == 0f) return
+        val center = Offset(sizePx.width / 2f, sizePx.height / 2f)
+        val maxDistance = minOf(sizePx.width, sizePx.height) * 0.48f
+        val raw = position - center
+        val distance = raw.getDistance()
+        val clamped = if (distance > maxDistance && distance > 0f) raw * (maxDistance / distance) else raw
+        thumbOffset = clamped
+        val nx = (clamped.x / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < 0.12f) 0f else it }
+        val ny = (clamped.y / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < 0.12f) 0f else it }
+        sendAxis(nx, ny)
+    }
+
     Box(
         modifier = modifier
             .size(analogSize)
@@ -1609,29 +1479,13 @@ private fun AnalogStick(
             .pointerInput(sizePx) {
                 detectDragGestures(
                     onDragStart = { offset ->
-                        if (sizePx.width == 0f) return@detectDragGestures
-                        val center = Offset(sizePx.width / 2f, sizePx.height / 2f)
-                        val maxDistance = minOf(sizePx.width, sizePx.height) * 0.28f
-                        val raw = offset - center
-                        val distance = raw.getDistance()
-                        val clamped = if (distance > maxDistance && distance > 0f) raw * (maxDistance / distance) else raw
-                        thumbOffset = clamped
-                        sendAxis((clamped.x / maxDistance).coerceIn(-1f, 1f), (clamped.y / maxDistance).coerceIn(-1f, 1f))
+                        updateStick(offset)
                     },
                     onDragEnd = { resetStick() },
                     onDragCancel = { resetStick() }
                 ) { change, _ ->
                     change.consume()
-                    if (sizePx.width == 0f) return@detectDragGestures
-                    val center = Offset(sizePx.width / 2f, sizePx.height / 2f)
-                    val maxDistance = minOf(sizePx.width, sizePx.height) * 0.28f
-                    val raw = change.position - center
-                    val distance = raw.getDistance()
-                    val clamped = if (distance > maxDistance && distance > 0f) raw * (maxDistance / distance) else raw
-                    thumbOffset = clamped
-                    val nx = (clamped.x / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < 0.12f) 0f else it }
-                    val ny = (clamped.y / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < 0.12f) 0f else it }
-                    sendAxis(nx, ny)
+                    updateStick(change.position)
                 }
             },
         contentAlignment = Alignment.Center

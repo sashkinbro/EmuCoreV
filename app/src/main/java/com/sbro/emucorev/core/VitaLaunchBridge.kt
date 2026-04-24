@@ -25,7 +25,7 @@ object VitaLaunchBridge {
         if (!EmulatorStorage.hasInstalledFirmwareUpdate(context)) {
             return LaunchResult.MissingFirmwareUpdate
         }
-        return if (runWithArgs(context, "LAUNCH_$titleId", arrayOf("-r", titleId))) {
+        return if (launchWithArgs(context, "LAUNCH_$titleId", arrayOf("-r", titleId))) {
             LaunchResult.Success
         } else {
             LaunchResult.Failure
@@ -42,6 +42,20 @@ object VitaLaunchBridge {
 
     fun installPkg(context: Context, pkgPath: String, zrif: String): Boolean {
         return runWithArgs(context, ACTION_INSTALL_PKG, arrayOf("--pkg", pkgPath, "--zrif", zrif))
+    }
+
+    private fun launchWithArgs(context: Context, action: String, args: Array<String>): Boolean {
+        return runCatching {
+            EmulatorStorage.prepareRuntime(context)
+            NativeLibraryLoader.ensureLoaded(context)
+            VitaCoreConfigRepository(context).ensureDefaultsPersisted()
+            val intent = Intent(context, Emulator::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                putExtra(APP_RESTART_PARAMETERS, args)
+                this.action = "${action}_${System.currentTimeMillis()}"
+            }
+            context.startActivity(intent)
+        }.isSuccess
     }
 
     private fun runWithArgs(context: Context, action: String, args: Array<String>): Boolean {

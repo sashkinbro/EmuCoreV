@@ -6,4 +6,16 @@
         <item quantity="many">En total %1$d juegos</item>
         <item quantity="other">En total %1$d juegos</item>
     </plurals>
+    <plurals name="install_dialog_content_done" tools:ignore="UnusedQuantity">
+        <item quantity="one">%1$d juego instalado correctamente.</item>
+        <item quantity="few">%1$d juegos instalados correctamente.</item>
+        <item quantity="many">%1$d juegos instalados correctamente.</item>
+        <item quantity="other">%1$d juegos instalados correctamente.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress" tools:ignore="UnusedQuantity">
+        <item quantity="one">%1$d de %2$d elemento completado</item>
+        <item quantity="few">%1$d de %2$d elementos completados</item>
+        <item quantity="many">%1$d de %2$d elementos completados</item>
+        <item quantity="other">%1$d de %2$d elementos completados</item>
+    </plurals>
 </resources>

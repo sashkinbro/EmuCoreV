@@ -81,8 +81,15 @@
             android:launchMode="singleInstance"
             android:preferMinimalPostProcessing="true"
             android:screenOrientation="sensorLandscape"
-            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+            android:theme="@style/Theme.EmuCoreV.Emulator"
             tools:targetApi="r" />
+
+        <activity
+            android:name="com.jakewharton.processphoenix.PhoenixActivity"
+            android:theme="@style/Theme.EmuCoreV.Phoenix"
+            tools:replace="android:theme"
+            tools:node="merge" />
+
         <provider
             android:name="com.sbro.emucorev.core.vita.provider.VitaDocumentsProvider"
             android:authorities="${applicationId}.provider"
