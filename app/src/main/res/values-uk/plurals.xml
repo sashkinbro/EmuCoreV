@@ -6,4 +6,16 @@
         <item quantity="many">Усього %1$d ігор</item>
         <item quantity="other">Усього %1$d гри</item>
     </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="one">%1$d гру встановлено успішно.</item>
+        <item quantity="few">%1$d гри встановлено успішно.</item>
+        <item quantity="many">%1$d ігор встановлено успішно.</item>
+        <item quantity="other">%1$d гри встановлено успішно.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="one">Завершено %1$d з %2$d елемента</item>
+        <item quantity="few">Завершено %1$d з %2$d елементів</item>
+        <item quantity="many">Завершено %1$d з %2$d елементів</item>
+        <item quantity="other">Завершено %1$d з %2$d елементів</item>
+    </plurals>
 </resources>

@@ -329,22 +329,14 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         if (exitRequested) return
         exitRequested = true
         runOnUiThread {
-            runCatching { resumeNativeThread() }
-            runCatching { performNativeShutdown() }
-            runCatching {
-                startActivity(
-                    Intent(this, MainActivity::class.java).apply {
-                        addFlags(
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                                Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                                Intent.FLAG_ACTIVITY_NEW_TASK
-                        )
-                    }
-                )
+            overlayBackHandler = null
+            overlayMenuButtonRevealHandler = null
+            val homeIntent = Intent(this, MainActivity::class.java).apply {
+                action = Intent.ACTION_MAIN
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             }
-            if (!isFinishing && !isDestroyed) {
-                finish()
-            }
+            ProcessPhoenix.triggerRebirth(applicationContext, homeIntent)
         }
     }
 

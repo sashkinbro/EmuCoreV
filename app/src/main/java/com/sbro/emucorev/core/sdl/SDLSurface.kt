@@ -183,6 +183,9 @@ open class SDLSurface(context: Context) : SurfaceView(context),
     }
 
     override fun onKey(v: View, keyCode: Int, event: KeyEvent): Boolean {
+        if (SDLActivity.mHasNativeShutdown) {
+            return false
+        }
         return SDLActivity.handleKeyEvent(v, keyCode, event, null)
     }
 
@@ -195,6 +198,9 @@ open class SDLSurface(context: Context) : SurfaceView(context),
     }
 
     override fun onTouch(v: View, event: MotionEvent): Boolean {
+        if (SDLActivity.mHasNativeShutdown) {
+            return false
+        }
         val touchDevId = event.deviceId
         val pointerCount = event.pointerCount
         val action = event.actionMasked
@@ -260,6 +266,9 @@ open class SDLSurface(context: Context) : SurfaceView(context),
     }
 
     override fun onSensorChanged(event: SensorEvent) {
+        if (SDLActivity.mHasNativeShutdown) {
+            return
+        }
         if (event.sensor.type != Sensor.TYPE_ACCELEROMETER) {
             return
         }
@@ -311,6 +320,9 @@ open class SDLSurface(context: Context) : SurfaceView(context),
     }
 
     override fun onCapturedPointerEvent(event: MotionEvent): Boolean {
+        if (SDLActivity.mHasNativeShutdown) {
+            return false
+        }
         var action = event.actionMasked
         val pointerCount = event.pointerCount
 

@@ -1118,13 +1118,18 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
             return
         }
 
-        if (mSDLThread != null) {
+        val sdlThread = mSDLThread
+        if (sdlThread != null) {
             nativeSendQuit()
             try {
-                mSDLThread?.join(1000)
+                sdlThread.join(3000)
             } catch (e: Exception) {
                 Log.v(TAG, "Problem stopping SDLThread: $e")
-            } finally {
+            }
+            if (sdlThread.isAlive) {
+                Log.w(TAG, "SDLThread did not stop in time; skipping nativeQuit() to avoid destroying native state while game threads are still running")
+                return
+            } else {
                 mSDLThread = null
             }
         }
