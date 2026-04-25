@@ -77,12 +77,17 @@
             android:name="com.sbro.emucorev.core.vita.Emulator"
             android:alwaysRetainTaskState="true"
             android:configChanges="layoutDirection|locale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
-            android:exported="false"
+            android:exported="true"
             android:launchMode="singleInstance"
             android:preferMinimalPostProcessing="true"
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.EmuCoreV.Emulator"
-            tools:targetApi="r" />
+            tools:targetApi="r">
+            <intent-filter>
+                <action android:name="com.sbro.emucorev.action.LAUNCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name="com.jakewharton.processphoenix.PhoenixActivity"

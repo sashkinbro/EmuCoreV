@@ -84,10 +84,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     fun currentGameIdOrIntent(): String {
         if (currentGameId.isNotBlank()) return currentGameId
-        val action = intent?.action.orEmpty()
-        if (!action.startsWith("LAUNCH_")) return ""
-        val payload = action.removePrefix("LAUNCH_")
-        return payload.substringBeforeLast('_', payload)
+        return gameIdFromIntent(intent)
     }
 
     fun setOverlayBackHandler(handler: (() -> Boolean)?) {
@@ -115,16 +112,17 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun getArguments(): Array<String> {
-        return intent.getStringArrayExtra(APP_RESTART_PARAMETERS) ?: emptyArray()
+        val args = intent.getStringArrayExtra(APP_RESTART_PARAMETERS)
+        if (args != null) return args
+        val gameId = gameIdFromIntent(intent)
+        return if (gameId.isBlank()) emptyArray() else arrayOf("-r", gameId)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val action = intent.action ?: return
-        if (action.startsWith("LAUNCH_")) {
-            val payload = action.removePrefix("LAUNCH_")
-            val gameId = payload.substringBeforeLast('_', payload)
+        if (isLaunchIntent(intent)) {
+            val gameId = gameIdFromIntent(intent)
             if (gameId.isNotBlank()) {
                 currentGameId = gameId
             }
@@ -483,15 +481,41 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         return Intent(sourceIntent).putExtra(EXTRA_REBIRTH_HANDLED, true)
     }
 
+    private fun isLaunchIntent(intent: Intent?): Boolean {
+        val action = intent?.action.orEmpty()
+        return action == ACTION_EXTERNAL_LAUNCH || action.startsWith("LAUNCH_")
+    }
+
+    private fun gameIdFromIntent(intent: Intent?): String {
+        if (intent == null) return ""
+        intent.getStringExtra(EXTRA_TITLE_ID)?.takeIf { it.isNotBlank() }?.let { return it }
+        intent.getStringExtra(EXTRA_GAME_ID)?.takeIf { it.isNotBlank() }?.let { return it }
+
+        val args = intent.getStringArrayExtra(APP_RESTART_PARAMETERS)
+        val restartIndex = args?.indexOf("-r") ?: -1
+        if (args != null && restartIndex >= 0 && restartIndex + 1 < args.size) {
+            return args[restartIndex + 1]
+        }
+
+        val action = intent.action.orEmpty()
+        if (!action.startsWith("LAUNCH_")) return ""
+        val payload = action.removePrefix("LAUNCH_")
+        return payload.substringBeforeLast('_', payload)
+    }
+
     private fun isSpecialLaunchAction(action: String): Boolean {
-        return action.startsWith("LAUNCH_") ||
+        return action == ACTION_EXTERNAL_LAUNCH ||
+            action.startsWith("LAUNCH_") ||
             action.startsWith("INSTALL_FIRMWARE_") ||
             action.startsWith("INSTALL_CONTENT_") ||
             action.startsWith("INSTALL_PKG_")
     }
 
     private companion object {
+        const val ACTION_EXTERNAL_LAUNCH = "com.sbro.emucorev.action.LAUNCH"
         const val APP_RESTART_PARAMETERS = "AppStartParameters"
+        const val EXTRA_TITLE_ID = "titleId"
+        const val EXTRA_GAME_ID = "gameId"
         const val FILE_DIALOG_CODE = 545
         const val FOLDER_DIALOG_CODE = 546
         const val EXTRA_REBIRTH_HANDLED = "emu_rebirth_handled"
