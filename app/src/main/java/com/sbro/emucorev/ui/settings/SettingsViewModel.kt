@@ -28,8 +28,7 @@ data class SettingsUiState(
     val remoteGpuDrivers: List<RemoteGpuDriver> = emptyList(),
     val gpuDriverCatalogLoading: Boolean = false,
     val gpuDriverCatalogError: String? = null,
-    val gpuDriverDownloadId: String? = null,
-    val gpuDriverDownloadProgress: Float = 0f,
+    val gpuDriverDownloads: Map<String, Float> = emptyMap(),
     val appLanguage: AppLanguage = AppLanguage.SYSTEM
 )
 
@@ -133,15 +132,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun installRemoteGpuDriver(driver: RemoteGpuDriver, onComplete: (Result<String>) -> Unit) {
-        if (_uiState.value.gpuDriverDownloadId != null) return
+        if (_uiState.value.gpuDriverDownloads.containsKey(driver.id)) return
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = _uiState.value.copy(
-                gpuDriverDownloadId = driver.id,
-                gpuDriverDownloadProgress = 0f
+                gpuDriverDownloads = _uiState.value.gpuDriverDownloads + (driver.id to 0f)
             )
             val result = runCatching {
                 val archive = gpuDriverCatalogRepository.downloadDriver(driver) { progress ->
-                    _uiState.value = _uiState.value.copy(gpuDriverDownloadProgress = progress)
+                    _uiState.value = _uiState.value.copy(
+                        gpuDriverDownloads = _uiState.value.gpuDriverDownloads + (driver.id to progress)
+                    )
                 }
                 val driverName = gpuDriverManager.installFromArchive(archive)
                 val updated = _uiState.value.coreConfig.copy(customDriverName = driverName)
@@ -153,8 +153,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 driverName
             }
             _uiState.value = _uiState.value.copy(
-                gpuDriverDownloadId = null,
-                gpuDriverDownloadProgress = 0f
+                gpuDriverDownloads = _uiState.value.gpuDriverDownloads - driver.id
             )
             withContext(Dispatchers.Main) {
                 onComplete(result)

@@ -3,6 +3,7 @@ package com.sbro.emucorev.core
 import android.content.Context
 import org.json.JSONArray
 import java.io.File
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -22,14 +23,23 @@ data class RemoteGpuDriver(
 class GpuDriverCatalogRepository(private val context: Context) {
 
     fun loadCatalog(): List<RemoteGpuDriver> {
-        val connection = URL(CATALOG_URL).openConnection() as HttpURLConnection
-        connection.connectTimeout = 12_000
-        connection.readTimeout = 20_000
-        connection.instanceFollowRedirects = true
-        connection.setRequestProperty("Accept", "application/json")
-        return connection.inputStream.bufferedReader().use { reader ->
-            parseCatalog(reader.readText())
+        var lastFailure: Throwable? = null
+        for (catalogUrl in CATALOG_URLS) {
+            val result = runCatching {
+                val connection = openConnection(catalogUrl, "application/json,text/plain,*/*")
+                try {
+                    ensureSuccess(connection, "driver catalog")
+                    connection.inputStream.bufferedReader().use { reader ->
+                        parseCatalog(reader.readText())
+                    }
+                } finally {
+                    connection.disconnect()
+                }
+            }
+            result.onSuccess { return it }
+            lastFailure = result.exceptionOrNull()
         }
+        throw IOException("Driver catalog unavailable", lastFailure)
     }
 
     fun downloadDriver(driver: RemoteGpuDriver, onProgress: (Float) -> Unit): File {
@@ -39,26 +49,29 @@ class GpuDriverCatalogRepository(private val context: Context) {
             target.delete()
         }
 
-        val connection = URL(driver.downloadUrl).openConnection() as HttpURLConnection
-        connection.connectTimeout = 12_000
-        connection.readTimeout = 60_000
-        connection.instanceFollowRedirects = true
-
-        val total = connection.contentLengthLong.takeIf { it > 0L } ?: driver.sizeBytes ?: -1L
-        var copied = 0L
-        connection.inputStream.use { input ->
-            target.outputStream().use { output ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read <= 0) break
-                    output.write(buffer, 0, read)
-                    copied += read
-                    if (total > 0L) {
-                        onProgress((copied.toFloat() / total.toFloat()).coerceIn(0f, 1f))
+        val connection = openConnection(driver.downloadUrl, "application/zip,application/octet-stream,*/*").apply {
+            readTimeout = 60_000
+        }
+        try {
+            ensureSuccess(connection, "driver archive")
+            val total = connection.contentLengthLong.takeIf { it > 0L } ?: driver.sizeBytes ?: -1L
+            var copied = 0L
+            connection.inputStream.use { input ->
+                target.outputStream().use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        output.write(buffer, 0, read)
+                        copied += read
+                        if (total > 0L) {
+                            onProgress((copied.toFloat() / total.toFloat()).coerceIn(0f, 1f))
+                        }
                     }
                 }
             }
+        } finally {
+            connection.disconnect()
         }
         onProgress(1f)
         return target
@@ -96,7 +109,29 @@ class GpuDriverCatalogRepository(private val context: Context) {
         return if (safeName.endsWith(".zip", ignoreCase = true)) safeName else "$safeName.zip"
     }
 
+    private fun openConnection(url: String, accept: String): HttpURLConnection {
+        return (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 12_000
+            readTimeout = 20_000
+            instanceFollowRedirects = true
+            setRequestProperty("Accept", accept)
+            setRequestProperty("User-Agent", "EmuCoreV/${context.packageName}")
+        }
+    }
+
+    private fun ensureSuccess(connection: HttpURLConnection, label: String) {
+        val responseCode = connection.responseCode
+        if (responseCode !in 200..299) {
+            val responseMessage = connection.responseMessage.orEmpty().ifBlank { "HTTP $responseCode" }
+            throw IOException("Could not load $label: $responseMessage")
+        }
+    }
+
     companion object {
-        const val CATALOG_URL = "https://github.com/sashkinbro/EmuCoreV-Drivers/raw/main/drivers.json"
+        val CATALOG_URLS = listOf(
+            "https://raw.githubusercontent.com/sashkinbro/EmuCoreV-Drivers/main/drivers.json",
+            "https://github.com/sashkinbro/EmuCoreV-Drivers/raw/main/drivers.json",
+            "https://cdn.jsdelivr.net/gh/sashkinbro/EmuCoreV-Drivers@main/drivers.json"
+        )
     }
 }

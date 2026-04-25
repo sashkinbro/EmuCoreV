@@ -343,7 +343,7 @@
     <string name="settings_emulation_core">एमुलेशन कोर</string>
     <string name="settings_based_on_vita3k">Vita3K पर आधारित</string>
     <string name="settings_developer">डेवलपर</string>
-    <string name="settings_created_by_sbro">Sashkib Apps द्वारा निर्मित</string>
+    <string name="settings_created_by_sbro">Sashkin Apps द्वारा निर्मित</string>
     <string name="settings_play_store_profile">Play Store प्रोफ़ाइल</string>
     <string name="settings_core_source_code">कोर सोर्स कोड</string>
     <string name="settings_core_source_description">EmuCoreV Vita3K-आधारित कोर पर निर्मित कस्टम Android इंटरफ़ेस का उपयोग करता है।</string>
@@ -386,7 +386,7 @@
     <string name="install_dialog_firmware_failed">फ़र्मवेयर इंस्टॉलेशन विफल रहा।</string>
     <string name="install_dialog_content_failed">गेम इंस्टॉलेशन विफल रहा।</string>
     <string name="install_dialog_pkg_failed">PKG इंस्टॉलेशन विफल रहा।</string>
-    <string name="install_dialog_firmware_done">फ़र्मवेयर %1$s सफलतापूर्वक इंस्टॉल हो गया।</string>
+    <string name="install_dialog_firmware_done">फ़र्मवेयर पैकेज सफलतापूर्वक इंस्टॉल हो गया।</string>
     <string name="install_dialog_firmware_default_version">चयनित बिल्ड</string>
     <string name="install_dialog_pkg_done">PKG सफलतापूर्वक इंस्टॉल हो गया।</string>
     <string name="setup_title">गेम इंस्टॉल करें</string>
@@ -464,12 +464,16 @@
     <string name="settings_gpu_driver_manager_subtitle">Adreno ड्राइवर इंस्टॉल, डाउनलोड, लागू या निकालें।</string>
     <string name="settings_gpu_driver_active_title">सक्रिय ड्राइवर</string>
     <string name="settings_gpu_driver_install_from_file">फ़ाइल से इंस्टॉल करें</string>
-    <string name="settings_gpu_driver_catalog">Adreno ड्राइवर कैटलॉग</string>
+    <string name="settings_gpu_driver_catalog">ड्राइवर कैटलॉग</string>
     <string name="settings_gpu_driver_refresh">रीफ़्रेश करें</string>
     <string name="settings_gpu_driver_catalog_loading">ड्राइवर कैटलॉग लोड हो रहा है…</string>
     <string name="settings_gpu_driver_catalog_failed">ड्राइवर कैटलॉग लोड नहीं किया जा सका</string>
     <string name="settings_gpu_driver_catalog_empty">अभी तक कोई ऑनलाइन ड्राइवर उपलब्ध नहीं हैं।</string>
     <string name="settings_gpu_driver_download_apply">डाउनलोड करें और लागू करें</string>
+    <string name="settings_gpu_driver_downloaded">डाउनलोड किया गया</string>
+    <string name="settings_gpu_driver_apply">लागू करें</string>
+    <string name="settings_gpu_driver_applied">लागू किया गया</string>
+    <string name="settings_gpu_driver_remove_short">निकालें</string>
     <string name="settings_gpu_driver_recommended">अनुशंसित</string>
     <string name="settings_gpu_driver_source">स्रोत</string>
     <string name="settings_gpu_driver_search">ड्राइवर खोजें</string>
@@ -477,4 +481,6 @@
     <string name="settings_gpu_driver_result_count">%2$d में से %1$d ड्राइवर</string>
     <string name="settings_gpu_driver_no_matches">कोई मेल खाने वाला ड्राइवर नहीं</string>
     <string name="settings_gpu_driver_no_matches_desc">खोज टेक्स्ट या चयनित फ़िल्टर बदलें।</string>
+    <string name="onboarding_firmware_info_title">आधिकारिक फ़र्मवेयर डाउनलोड</string>
+    <string name="onboarding_firmware_info_body">फ़र्मवेयर फ़ाइलें सीधे Sony के आधिकारिक अपडेट सर्वर से डाउनलोड की जाती हैं। EmuCoreV अपने स्वयं के संसाधनों से फ़र्मवेयर को होस्ट, मिरर, संशोधित या पुनर्वितरित नहीं करता है; यह केवल आधिकारिक सार्वजनिक डाउनलोड लिंक खोलता है और आपके द्वारा चुना गया पैकेज इंस्टॉल करता है।</string>
 </resources>

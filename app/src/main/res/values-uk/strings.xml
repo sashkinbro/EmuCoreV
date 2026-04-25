@@ -24,7 +24,7 @@
     <string name="onboarding_page_3_title">Вбудований каталог</string>
     <string name="onboarding_page_3_body">Переглядайте обкладинки, скріншоти, відео та інформацію про ігри в одному місці.</string>
     <string name="onboarding_page_4_title">Майже готово</string>
-    <string name="onboarding_page_4_body">Встановіть базову прошивку, пакет оновлення прошивки та виберіть папку, де зберігаються ваші файли пакетів.</string>
+    <string name="onboarding_page_4_body">Встановіть базову прошивку та пакет оновлення перед запуском ігор.</string>
     <string name="onboarding_firmware_title">Базова прошивка</string>
     <string name="onboarding_firmware_desc">Встановіть основний пакет прошивки PS Vita перед запуском будь-якої гри.</string>
     <string name="onboarding_firmware_update_title">Пакет оновлення прошивки</string>
@@ -343,7 +343,7 @@
     <string name="settings_emulation_core">Ядро емуляції</string>
     <string name="settings_based_on_vita3k">На базі Vita3K</string>
     <string name="settings_developer">Розробник</string>
-    <string name="settings_created_by_sbro">Створено Sashkib Apps</string>
+    <string name="settings_created_by_sbro">Створено Sashkin Apps</string>
     <string name="settings_play_store_profile">Профіль Play Маркет</string>
     <string name="settings_core_source_code">Вихідний код ядра</string>
     <string name="settings_core_source_description">EmuCoreV використовує власний інтерфейс Android, створений на базі ядра Vita3K.</string>
@@ -386,7 +386,7 @@
     <string name="install_dialog_firmware_failed">Встановлення прошивки не вдалося.</string>
     <string name="install_dialog_content_failed">Встановлення гри не вдалося.</string>
     <string name="install_dialog_pkg_failed">Встановлення PKG не вдалося.</string>
-    <string name="install_dialog_firmware_done">Прошивка %1$s успішно встановлена.</string>
+    <string name="install_dialog_firmware_done">Пакет прошивки успішно встановлено.</string>
     <string name="install_dialog_firmware_default_version">вибрана збірка</string>
     <string name="install_dialog_pkg_done">PKG успішно встановлено.</string>
     <string name="setup_title">Встановлення ігор</string>
@@ -464,12 +464,16 @@
     <string name="settings_gpu_driver_manager_subtitle">Встановлення, завантаження, застосування або видалення драйверів Adreno.</string>
     <string name="settings_gpu_driver_active_title">Активний драйвер</string>
     <string name="settings_gpu_driver_install_from_file">Встановити з файлу</string>
-    <string name="settings_gpu_driver_catalog">Каталог драйверів Adreno</string>
+    <string name="settings_gpu_driver_catalog">Каталог драйверів</string>
     <string name="settings_gpu_driver_refresh">Оновити</string>
     <string name="settings_gpu_driver_catalog_loading">Завантаження каталогу драйверів…</string>
     <string name="settings_gpu_driver_catalog_failed">Не вдалося завантажити каталог драйверів</string>
     <string name="settings_gpu_driver_catalog_empty">Онлайн-драйвери поки недоступні.</string>
     <string name="settings_gpu_driver_download_apply">Завантажити та застосувати</string>
+    <string name="settings_gpu_driver_downloaded">Завантажено</string>
+    <string name="settings_gpu_driver_apply">Застосувати</string>
+    <string name="settings_gpu_driver_applied">Застосовано</string>
+    <string name="settings_gpu_driver_remove_short">Видалити</string>
     <string name="settings_gpu_driver_recommended">Рекомендовано</string>
     <string name="settings_gpu_driver_source">Джерело</string>
     <string name="settings_gpu_driver_search">Пошук драйверів</string>
@@ -477,4 +481,6 @@
     <string name="settings_gpu_driver_result_count">%1$d з %2$d драйверів</string>
     <string name="settings_gpu_driver_no_matches">Немає відповідних драйверів</string>
     <string name="settings_gpu_driver_no_matches_desc">Змініть текст пошуку або вибрані фільтри.</string>
+    <string name="onboarding_firmware_info_title">Завантаження офіційної прошивки</string>
+    <string name="onboarding_firmware_info_body">Файли прошивки завантажуються безпосередньо з офіційних серверів оновлень Sony. EmuCoreV не зберігає, не дзеркалює, не змінює та не поширює прошивку з власних ресурсів; він лише відкриває офіційні публічні посилання на завантаження та встановлює вибраний вами пакет.</string>
 </resources>
