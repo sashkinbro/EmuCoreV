@@ -18,6 +18,12 @@
 #include "audio/impl/cubeb_audio.h"
 #include "util/log.h"
 
+#include <algorithm>
+
+namespace {
+constexpr int TARGET_AUDIO_BUFFER_MS = 150;
+}
+
 static long impl_cubeb_audio_callback(cubeb_stream *stream, void *user_data, const void *input, void *output, long nframes) {
     assert(user_data != nullptr);
     assert(stream != nullptr);
@@ -96,6 +102,7 @@ AudioOutPortPtr CubebAudioAdapter::open_port(int nb_channels, int freq, int nb_s
 
     uint32_t latency;
     cubeb_get_min_latency(cubeb_ctx, &port->spec, &latency);
+    latency = std::max<uint32_t>(latency, (static_cast<uint32_t>(freq) * TARGET_AUDIO_BUFFER_MS) / 1000);
 
     if (cubeb_stream_init(cubeb_ctx, &port->out_stream, "Vita3K audio out", nullptr, nullptr, nullptr,
             &port->spec, latency, impl_cubeb_audio_callback, impl_cubeb_state_callback, port.get())
@@ -105,6 +112,7 @@ AudioOutPortPtr CubebAudioAdapter::open_port(int nb_channels, int freq, int nb_s
     }
 
     port->len_bytes = nb_sample * nb_channels * sizeof(uint16_t);
+    port->len_microseconds = (nb_sample * 1'000'000ULL) / freq;
 
     // allocate enough buffers to be able to satisfy a callback (+1 to make sure one buffer can be ready)
     const int nb_buffers = (latency + nb_sample - 1) / nb_sample + 1;

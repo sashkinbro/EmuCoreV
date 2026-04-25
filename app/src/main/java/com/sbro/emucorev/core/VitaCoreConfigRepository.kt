@@ -1,6 +1,7 @@
 package com.sbro.emucorev.core
 
 import android.content.Context
+import com.sbro.emucorev.BuildConfig
 import java.io.File
 
 data class VitaCoreConfig(
@@ -51,6 +52,7 @@ data class VitaCoreConfig(
     val cpuPoolSize: Int = 8,
     val modulesMode: Int = 0,
     val archiveLog: Boolean = false,
+    val logLevel: Int = 4,
     val discordRichPresence: Boolean = true,
     val checkForUpdates: Boolean = true,
     val fileLoadingDelay: Int = 0,
@@ -94,6 +96,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         "import-textures",
         "log-active-shaders",
         "log-compat-warn",
+        "log-level",
         "log-uniforms",
         "memory-mapping",
         "modules-mode",
@@ -180,6 +183,7 @@ class VitaCoreConfigRepository(private val context: Context) {
             cpuPoolSize = values["cpu-pool-size"]?.toIntOrNull() ?: defaults.cpuPoolSize,
             modulesMode = values["modules-mode"]?.toIntOrNull() ?: defaults.modulesMode,
             archiveLog = values["archive-log"]?.toBooleanStrictOrNull() ?: defaults.archiveLog,
+            logLevel = normalizeLogLevel(values["log-level"]?.toIntOrNull() ?: defaults.logLevel),
             discordRichPresence = values["discord-rich-presence"]?.toBooleanStrictOrNull() ?: defaults.discordRichPresence,
             checkForUpdates = values["check-for-updates"]?.toBooleanStrictOrNull() ?: defaults.checkForUpdates,
             fileLoadingDelay = values["file-loading-delay"]?.toIntOrNull() ?: defaults.fileLoadingDelay,
@@ -252,6 +256,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["cpu-pool-size"] = config.cpuPoolSize.toString()
         values["modules-mode"] = config.modulesMode.toString()
         values["archive-log"] = config.archiveLog.toString()
+        values["log-level"] = normalizeLogLevel(config.logLevel).toString()
         values["discord-rich-presence"] = config.discordRichPresence.toString()
         values["check-for-updates"] = config.checkForUpdates.toString()
         values["file-loading-delay"] = config.fileLoadingDelay.toString()
@@ -296,6 +301,11 @@ class VitaCoreConfigRepository(private val context: Context) {
         return normalized
     }
 
+    private fun normalizeLogLevel(level: Int): Int {
+        val bounded = level.coerceIn(0, 6)
+        return if (BuildConfig.DEBUG) bounded else bounded.coerceAtLeast(RELEASE_LOG_LEVEL)
+    }
+
     private fun migrateLegacyConfigIfNeeded() {
         val legacy = File(EmulatorStorage.vitaRoot(context), "config.yml")
         val target = configFile
@@ -310,6 +320,14 @@ class VitaCoreConfigRepository(private val context: Context) {
 
     private fun defaultConfig(): VitaCoreConfig {
         val recommendedCpuPool = Runtime.getRuntime().availableProcessors().coerceIn(4, 10)
-        return VitaCoreConfig(cpuPoolSize = recommendedCpuPool)
+        return VitaCoreConfig(
+            cpuPoolSize = recommendedCpuPool,
+            logLevel = if (BuildConfig.DEBUG) DEBUG_LOG_LEVEL else RELEASE_LOG_LEVEL
+        )
+    }
+
+    private companion object {
+        private const val DEBUG_LOG_LEVEL = 2
+        private const val RELEASE_LOG_LEVEL = 4
     }
 }
