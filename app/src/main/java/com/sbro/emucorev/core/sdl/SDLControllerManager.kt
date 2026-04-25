@@ -11,6 +11,7 @@ import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import com.sbro.emucorev.core.input.InputDeviceClassifier
 import java.util.Collections
 import java.util.Comparator
 
@@ -108,14 +109,7 @@ class SDLControllerManager {
 
         @JvmStatic
         fun isDeviceSDLJoystick(deviceId: Int): Boolean {
-            val device = InputDevice.getDevice(deviceId) ?: return false
-            if (deviceId < 0) {
-                return false
-            }
-            val sources = device.sources
-            return (sources and InputDevice.SOURCE_CLASS_JOYSTICK) != 0 ||
-                (sources and InputDevice.SOURCE_DPAD) == InputDevice.SOURCE_DPAD ||
-                (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
+            return InputDeviceClassifier.isPhysicalGameController(InputDevice.getDevice(deviceId))
         }
     }
 }
@@ -218,7 +212,9 @@ open class SDLJoystickHandler_API16 : SDLJoystickHandler() {
 
         val removedDevices = arrayListOf<Int>()
         mJoysticks.forEach { joystick ->
-            if (!deviceIds.contains(joystick.deviceId)) {
+            if (!deviceIds.contains(joystick.deviceId) ||
+                !SDLControllerManager.isDeviceSDLJoystick(joystick.deviceId)
+            ) {
                 removedDevices.add(joystick.deviceId)
             }
         }
@@ -505,7 +501,9 @@ class SDLHapticHandler_API31 : SDLHapticHandler() {
 
 open class SDLGenericMotionListener_API14 : View.OnGenericMotionListener {
     override fun onGenericMotion(v: View, event: MotionEvent): Boolean {
-        if (event.source == InputDevice.SOURCE_JOYSTICK) {
+        if ((event.source and InputDevice.SOURCE_CLASS_JOYSTICK) == InputDevice.SOURCE_CLASS_JOYSTICK &&
+            SDLControllerManager.isDeviceSDLJoystick(event.deviceId)
+        ) {
             return SDLControllerManager.handleJoystickMotionEvent(event)
         }
 
