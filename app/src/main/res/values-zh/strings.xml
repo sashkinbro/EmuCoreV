@@ -483,4 +483,26 @@
     <string name="onboarding_firmware_info_title">官方固件下载</string>
     <string name="onboarding_firmware_info_body">固件文件直接从索尼官方的更新服务器下载。EmuCoreV 不会利用自有资源托管、镜像、修改或重新分发固件；它只会打开官方公开的下载链接并安装您选择的包。</string>
     <string name="settings_app_language_turkish">土耳其语</string>
+    <string name="save_manager_title">存档管理器</string>
+    <string name="save_manager_subtitle">导入、导出和移除 PS Vita 存档数据。</string>
+    <string name="save_manager_open_for_game">管理存档</string>
+    <string name="save_manager_search_hint">搜索存档</string>
+    <string name="save_manager_export">导出</string>
+    <string name="save_manager_import">导入</string>
+    <string name="save_manager_delete">删除存档</string>
+    <string name="save_manager_delete_confirm_title">删除存档数据？</string>
+    <string name="save_manager_delete_confirm_body">这将移除 %1$s 的存档数据。</string>
+    <string name="save_manager_delete_failed">删除存档数据失败。</string>
+    <string name="save_manager_export_success">存档数据已导出。</string>
+    <string name="save_manager_export_failed">导出存档数据失败。</string>
+    <string name="save_manager_import_success">存档数据已导入：%1$s。</string>
+    <string name="save_manager_import_failed">导入存档数据失败。</string>
+    <string name="save_manager_import_empty">压缩包内不包含存档文件。</string>
+    <string name="save_manager_import_unsafe">压缩包包含不安全的路径。</string>
+    <string name="save_manager_import_unknown_target">在导入此压缩包之前，请选择一个游戏存档卡，或使用只包含单个存档文件夹的压缩包。</string>
+    <string name="save_manager_empty_title">未找到存档数据</string>
+    <string name="save_manager_empty_body">启动游戏以创建存档数据，或导入一个存档压缩包。</string>
+    <string name="save_manager_empty_game_title">没有 %1$s 的存档数据</string>
+    <string name="save_manager_empty_game_body">启动此游戏以创建存档数据，或为它导入一个存档压缩包。</string>
+    <string name="save_manager_orphan_save">游戏未安装</string>
 </resources>

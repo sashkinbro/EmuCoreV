@@ -484,4 +484,26 @@
     <string name="onboarding_firmware_info_title">Завантаження офіційної прошивки</string>
     <string name="onboarding_firmware_info_body">Файли прошивки завантажуються безпосередньо з офіційних серверів оновлень Sony. EmuCoreV не зберігає, не дзеркалює, не змінює та не поширює прошивку з власних ресурсів; він лише відкриває офіційні публічні посилання на завантаження та встановлює вибраний вами пакет.</string>
     <string name="settings_app_language_turkish">Турецька</string>
+    <string name="save_manager_title">Менеджер збережень</string>
+    <string name="save_manager_subtitle">Імпорт, експорт та видалення даних збережень PS Vita.</string>
+    <string name="save_manager_open_for_game">Керування збереженнями</string>
+    <string name="save_manager_search_hint">Пошук збережень</string>
+    <string name="save_manager_export">Експорт</string>
+    <string name="save_manager_import">Імпорт</string>
+    <string name="save_manager_delete">Видалити збереження</string>
+    <string name="save_manager_delete_confirm_title">Видалити дані збереження?</string>
+    <string name="save_manager_delete_confirm_body">Це призведе до видалення даних збереження для %1$s.</string>
+    <string name="save_manager_delete_failed">Не вдалося видалити дані збереження.</string>
+    <string name="save_manager_export_success">Дані збереження експортовано.</string>
+    <string name="save_manager_export_failed">Не вдалося експортувати дані збереження.</string>
+    <string name="save_manager_import_success">Дані збереження імпортовано: %1$s.</string>
+    <string name="save_manager_import_failed">Не вдалося імпортувати дані збереження.</string>
+    <string name="save_manager_import_empty">Архів не містить файлів збережень.</string>
+    <string name="save_manager_import_unsafe">Архів містить небезпечні шляхи.</string>
+    <string name="save_manager_import_unknown_target">Виберіть картку збережень гри перед імпортом цього архіву, або використовуйте архів з однією папкою збереження.</string>
+    <string name="save_manager_empty_title">Даних збережень не знайдено</string>
+    <string name="save_manager_empty_body">Запустіть гру, щоб створити дані збереження, або імпортуйте архів збережень.</string>
+    <string name="save_manager_empty_game_title">Немає даних збереження для %1$s</string>
+    <string name="save_manager_empty_game_body">Запустіть цю гру, щоб створити дані збереження, або імпортуйте архів збережень для неї.</string>
+    <string name="save_manager_orphan_save">Гра не встановлена</string>
 </resources>

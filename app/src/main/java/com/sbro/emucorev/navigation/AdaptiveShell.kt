@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.Games
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SettingsEthernet
@@ -57,7 +58,7 @@ import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import kotlinx.coroutines.launch
 
 enum class PrimaryDestination {
-    Home, Setup, Library, Search, Settings
+    Home, Setup, Library, SaveData, Search, Settings
 }
 
 private enum class MobileLeadingAction {
@@ -73,6 +74,7 @@ fun AdaptiveShell(
     onNavigateHome: () -> Unit,
     onNavigateSetup: () -> Unit,
     onNavigateLibrary: () -> Unit,
+    onNavigateSaveData: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onBackClick: (() -> Unit)? = null,
@@ -88,6 +90,7 @@ fun AdaptiveShell(
             onNavigateHome = onNavigateHome,
             onNavigateSetup = onNavigateSetup,
             onNavigateLibrary = onNavigateLibrary,
+            onNavigateSaveData = onNavigateSaveData,
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
             onOpenManageFolders = onOpenManageFolders,
@@ -128,6 +131,7 @@ fun AdaptiveShell(
             onNavigateHome = onNavigateHome,
             onNavigateSetup = onNavigateSetup,
             onNavigateLibrary = onNavigateLibrary,
+            onNavigateSaveData = onNavigateSaveData,
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
             onBackClick = onBackClick,
@@ -148,6 +152,7 @@ private fun CompactAdaptiveShell(
     onNavigateHome: () -> Unit,
     onNavigateSetup: () -> Unit,
     onNavigateLibrary: () -> Unit,
+    onNavigateSaveData: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onBackClick: (() -> Unit)?,
@@ -209,6 +214,7 @@ private fun CompactAdaptiveShell(
                     onNavigateHome = onNavigateHome,
                     onNavigateSetup = onNavigateSetup,
                     onNavigateLibrary = onNavigateLibrary,
+                    onNavigateSaveData = onNavigateSaveData,
                     onNavigateSearch = onNavigateSearch,
                     onNavigateSettings = onNavigateSettings,
                     onOpenManageFolders = onOpenManageFolders,
@@ -237,6 +243,7 @@ private fun SideNavigation(
     onNavigateHome: () -> Unit,
     onNavigateSetup: () -> Unit,
     onNavigateLibrary: () -> Unit,
+    onNavigateSaveData: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onOpenManageFolders: (() -> Unit)?,
@@ -261,6 +268,10 @@ private fun SideNavigation(
     val navigateSearch = rememberDebouncedClick {
         onCloseDrawer()
         onNavigateSearch()
+    }
+    val navigateSaveData = rememberDebouncedClick {
+        onCloseDrawer()
+        onNavigateSaveData()
     }
     val navigateSettings = rememberDebouncedClick {
         onCloseDrawer()
@@ -324,6 +335,12 @@ private fun SideNavigation(
                 label = stringResource(R.string.nav_setup),
                 selected = selected == PrimaryDestination.Setup,
                 onClick = navigateSetup
+            )
+            ShellItem(
+                icon = Icons.Rounded.Save,
+                label = stringResource(R.string.nav_save_manager),
+                selected = selected == PrimaryDestination.SaveData,
+                onClick = navigateSaveData
             )
             ShellItem(
                 icon = Icons.Rounded.Search,

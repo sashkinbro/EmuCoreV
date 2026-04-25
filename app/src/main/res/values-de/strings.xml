@@ -484,4 +484,26 @@
     <string name="onboarding_firmware_info_title">Offizieller Firmware-Download</string>
     <string name="onboarding_firmware_info_body">Firmware-Dateien werden direkt von den offiziellen Update-Servern von Sony heruntergeladen. EmuCoreV hostet, spiegelt, ändert oder verteilt keine Firmware aus eigenen Ressourcen; es öffnet lediglich die offiziellen öffentlichen Download-Links und installiert das von Ihnen gewählte Paket.</string>
     <string name="settings_app_language_turkish">Türkisch</string>
+    <string name="save_manager_title">Speicherdaten-Manager</string>
+    <string name="save_manager_subtitle">PS Vita-Speicherdaten importieren, exportieren und entfernen.</string>
+    <string name="save_manager_open_for_game">Spielstände verwalten</string>
+    <string name="save_manager_search_hint">Spielstände suchen</string>
+    <string name="save_manager_export">Exportieren</string>
+    <string name="save_manager_import">Importieren</string>
+    <string name="save_manager_delete">Spielstand löschen</string>
+    <string name="save_manager_delete_confirm_title">Speicherdaten löschen?</string>
+    <string name="save_manager_delete_confirm_body">Dadurch werden die Speicherdaten für %1$s entfernt.</string>
+    <string name="save_manager_delete_failed">Fehler beim Löschen der Speicherdaten.</string>
+    <string name="save_manager_export_success">Speicherdaten exportiert.</string>
+    <string name="save_manager_export_failed">Fehler beim Exportieren der Speicherdaten.</string>
+    <string name="save_manager_import_success">Speicherdaten importiert: %1$s.</string>
+    <string name="save_manager_import_failed">Fehler beim Importieren der Speicherdaten.</string>
+    <string name="save_manager_import_empty">Das Archiv enthält keine Speicherdateien.</string>
+    <string name="save_manager_import_unsafe">Das Archiv enthält unsichere Pfade.</string>
+    <string name="save_manager_import_unknown_target">Wähle eine Spielstandskarte, bevor du dieses Archiv importierst, oder verwende ein Archiv mit einem einzelnen Speicherordner.</string>
+    <string name="save_manager_empty_title">Keine Speicherdaten gefunden</string>
+    <string name="save_manager_empty_body">Starte ein Spiel, um Speicherdaten zu erstellen, oder importiere ein Speicherarchiv.</string>
+    <string name="save_manager_empty_game_title">Keine Speicherdaten für %1$s</string>
+    <string name="save_manager_empty_game_body">Starte dieses Spiel, um Speicherdaten zu erstellen, oder importiere ein Speicherarchiv dafür.</string>
+    <string name="save_manager_orphan_save">Spiel nicht installiert</string>
 </resources>

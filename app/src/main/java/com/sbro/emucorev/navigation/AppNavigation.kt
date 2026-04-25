@@ -35,6 +35,7 @@ import com.sbro.emucorev.ui.detail.GameDetailScreen
 import com.sbro.emucorev.ui.home.HomeScreen
 import com.sbro.emucorev.ui.library.LibraryScreen
 import com.sbro.emucorev.ui.onboarding.OnboardingScreen
+import com.sbro.emucorev.ui.saves.SaveDataScreen
 import com.sbro.emucorev.ui.settings.AppLanguageScreen
 import com.sbro.emucorev.ui.settings.GpuDriverScreen
 import com.sbro.emucorev.ui.settings.SettingsScreen
@@ -51,6 +52,8 @@ private const val ROUTE_HOME = "home"
 private const val ROUTE_SETUP = "setup"
 private const val ROUTE_LIBRARY = "library"
 private const val ROUTE_CATALOG = "catalog"
+private const val ROUTE_SAVE_MANAGER = "save-manager"
+private const val ROUTE_SAVE_MANAGER_WITH_TITLE = "save-manager/{titleId}"
 private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_SETTINGS_WITH_TAB = "settings/{tab}"
 private const val ROUTE_APP_LANGUAGE = "app-language"
@@ -60,6 +63,8 @@ private const val ROUTE_DETAIL_PREFIX = "detail"
 private const val ROUTE_CATALOG_DETAIL_PREFIX = "catalog-detail"
 
 private fun settingsRoute(tab: SettingsTab = SettingsTab.General): String = "$ROUTE_SETTINGS/${tab.name.lowercase()}"
+private fun saveManagerRoute(titleId: String? = null): String =
+    titleId?.takeIf(String::isNotBlank)?.let { "$ROUTE_SAVE_MANAGER/$it" } ?: ROUTE_SAVE_MANAGER
 
 @Composable
 fun AppNavigation(navController: NavHostController = rememberNavController()) {
@@ -182,6 +187,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onNavigateLibrary = {
                         navController.navigate(ROUTE_LIBRARY) { launchSingleTop = true }
                     },
+                    onNavigateSaveData = {
+                        navController.navigate(saveManagerRoute()) { launchSingleTop = true }
+                    },
                     onNavigateSearch = {
                         navController.navigate(ROUTE_CATALOG) { launchSingleTop = true }
                     },
@@ -225,6 +233,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onNavigateLibrary = {
                         navController.navigate(ROUTE_LIBRARY) { launchSingleTop = true }
                     },
+                    onNavigateSaveData = {
+                        navController.navigate(saveManagerRoute()) { launchSingleTop = true }
+                    },
                     onNavigateSearch = {
                         navController.navigate(ROUTE_CATALOG) { launchSingleTop = true }
                     },
@@ -263,6 +274,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
                     },
                     onNavigateLibrary = { },
+                    onNavigateSaveData = {
+                        navController.navigate(saveManagerRoute()) { launchSingleTop = true }
+                    },
                     onNavigateSearch = {
                         navController.navigate(ROUTE_CATALOG) { launchSingleTop = true }
                     },
@@ -277,6 +291,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 ) { openDrawer ->
                     LibraryScreen(
                         onLaunchGame = launchInstalledGame,
+                        onOpenSaveManager = { titleId ->
+                            navController.navigate(saveManagerRoute(titleId)) { launchSingleTop = true }
+                        },
                         onMenuClick = openDrawer
                     )
                 }
@@ -298,6 +315,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateLibrary = {
                         navController.navigate(ROUTE_LIBRARY) { launchSingleTop = true }
+                    },
+                    onNavigateSaveData = {
+                        navController.navigate(saveManagerRoute()) { launchSingleTop = true }
                     },
                     onNavigateSearch = { },
                     onNavigateSettings = {
@@ -331,6 +351,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateLibrary = {
                         navController.navigate(ROUTE_LIBRARY) { launchSingleTop = true }
+                    },
+                    onNavigateSaveData = {
+                        navController.navigate(saveManagerRoute()) { launchSingleTop = true }
                     },
                     onNavigateSearch = {
                         navController.navigate(ROUTE_CATALOG) { launchSingleTop = true }
@@ -372,6 +395,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateLibrary = {
                         navController.navigate(ROUTE_LIBRARY) { launchSingleTop = true }
+                    },
+                    onNavigateSaveData = {
+                        navController.navigate(saveManagerRoute()) { launchSingleTop = true }
                     },
                     onNavigateSearch = {
                         navController.navigate(ROUTE_CATALOG) { launchSingleTop = true }
@@ -416,13 +442,58 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     viewModel = settingsViewModel
                 )
             }
+            composable(ROUTE_SAVE_MANAGER) {
+                val navigateHome = {
+                    navController.navigate(ROUTE_LIBRARY) {
+                        launchSingleTop = true
+                        popUpTo(ROUTE_LIBRARY) { inclusive = false }
+                    }
+                }
+                AdaptiveShell(
+                    selected = PrimaryDestination.SaveData,
+                    onNavigateHome = navigateHome,
+                    onNavigateSetup = {
+                        navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
+                    },
+                    onNavigateLibrary = {
+                        navController.navigate(ROUTE_LIBRARY) { launchSingleTop = true }
+                    },
+                    onNavigateSaveData = { },
+                    onNavigateSearch = {
+                        navController.navigate(ROUTE_CATALOG) { launchSingleTop = true }
+                    },
+                    onNavigateSettings = {
+                        navController.navigate(settingsRoute()) { launchSingleTop = true }
+                    },
+                    onBackClick = navigateHome,
+                    onOpenManageFolders = {
+                        navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
+                    },
+                    onInstallFirmware = null,
+                    onInstallContent = openContentInstall
+                ) {
+                    SaveDataScreen(
+                        focusTitleId = null,
+                        onBackClick = navigateHome
+                    )
+                }
+            }
+            composable(ROUTE_SAVE_MANAGER_WITH_TITLE) { entry ->
+                SaveDataScreen(
+                    focusTitleId = entry.arguments?.getString("titleId"),
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
             composable(
                 "$ROUTE_DETAIL_PREFIX/{titleId}"
             ) { entry ->
                 GameDetailScreen(
                     titleId = entry.arguments?.getString("titleId"),
                     igdbId = null,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onOpenSaveManager = { titleId ->
+                        navController.navigate(saveManagerRoute(titleId)) { launchSingleTop = true }
+                    }
                 )
             }
             composable(

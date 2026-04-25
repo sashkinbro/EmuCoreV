@@ -4,6 +4,7 @@ data class InstalledVitaGame(
     val titleId: String,
     val title: String,
     val contentId: String?,
+    val saveDataId: String?,
     val version: String?,
     val category: String?,
     val iconPath: String?,

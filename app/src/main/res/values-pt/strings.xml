@@ -484,4 +484,26 @@
     <string name="onboarding_firmware_info_title">Download de firmware oficial</string>
     <string name="onboarding_firmware_info_body">Os arquivos de firmware são baixados diretamente dos servidores de atualização oficiais da Sony. O EmuCoreV não hospeda, espelha, modifica ou redistribui firmware a partir de seus próprios recursos; ele apenas abre os links de download públicos oficiais e instala o pacote que você escolher.</string>
     <string name="settings_app_language_turkish">Turco</string>
+    <string name="save_manager_title">Gerenciador de saves</string>
+    <string name="save_manager_subtitle">Importe, exporte e remova dados de salvamento do PS Vita.</string>
+    <string name="save_manager_open_for_game">Gerenciar saves</string>
+    <string name="save_manager_search_hint">Pesquisar saves</string>
+    <string name="save_manager_export">Exportar</string>
+    <string name="save_manager_import">Importar</string>
+    <string name="save_manager_delete">Excluir save</string>
+    <string name="save_manager_delete_confirm_title">Excluir dados de salvamento?</string>
+    <string name="save_manager_delete_confirm_body">Isso removerá os dados de salvamento de %1$s.</string>
+    <string name="save_manager_delete_failed">Falha ao excluir dados de salvamento.</string>
+    <string name="save_manager_export_success">Dados de salvamento exportados.</string>
+    <string name="save_manager_export_failed">Falha ao exportar dados de salvamento.</string>
+    <string name="save_manager_import_success">Dados de salvamento importados: %1$s.</string>
+    <string name="save_manager_import_failed">Falha ao importar dados de salvamento.</string>
+    <string name="save_manager_import_empty">O arquivo não contém arquivos de save.</string>
+    <string name="save_manager_import_unsafe">O arquivo contém caminhos inseguros.</string>
+    <string name="save_manager_import_unknown_target">Escolha um cartão de save de jogo antes de importar este arquivo ou use um arquivo com uma única pasta de save.</string>
+    <string name="save_manager_empty_title">Nenhum dado de salvamento encontrado</string>
+    <string name="save_manager_empty_body">Inicie um jogo para criar dados de salvamento ou importe um arquivo de save.</string>
+    <string name="save_manager_empty_game_title">Nenhum dado de salvamento para %1$s</string>
+    <string name="save_manager_empty_game_body">Inicie este jogo para criar dados de salvamento ou importe um arquivo de save para ele.</string>
+    <string name="save_manager_orphan_save">Jogo não instalado</string>
 </resources>

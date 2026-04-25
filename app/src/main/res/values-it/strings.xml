@@ -484,4 +484,26 @@
     <string name="onboarding_firmware_info_title">Download firmware ufficiale</string>
     <string name="onboarding_firmware_info_body">I file del firmware vengono scaricati direttamente dai server di aggiornamento ufficiali di Sony. EmuCoreV non ospita, esegue il mirroring, modifica o ridistribuisce il firmware dalle proprie risorse; apre solo i link di download pubblici ufficiali e installa il pacchetto che hai scelto.</string>
     <string name="settings_app_language_turkish">Turco</string>
+    <string name="save_manager_title">Gestore salvataggi</string>
+    <string name="save_manager_subtitle">Importa, esporta e rimuovi i dati di salvataggio PS Vita.</string>
+    <string name="save_manager_open_for_game">Gestisci salvataggi</string>
+    <string name="save_manager_search_hint">Cerca salvataggi</string>
+    <string name="save_manager_export">Esporta</string>
+    <string name="save_manager_import">Importa</string>
+    <string name="save_manager_delete">Elimina salvataggio</string>
+    <string name="save_manager_delete_confirm_title">Eliminare i dati di salvataggio?</string>
+    <string name="save_manager_delete_confirm_body">Questo rimuoverà i dati di salvataggio per %1$s.</string>
+    <string name="save_manager_delete_failed">Impossibile eliminare i dati di salvataggio.</string>
+    <string name="save_manager_export_success">Dati di salvataggio esportati.</string>
+    <string name="save_manager_export_failed">Impossibile esportare i dati di salvataggio.</string>
+    <string name="save_manager_import_success">Dati di salvataggio importati: %1$s.</string>
+    <string name="save_manager_import_failed">Impossibile importare i dati di salvataggio.</string>
+    <string name="save_manager_import_empty">L\'archivio non contiene file di salvataggio.</string>
+    <string name="save_manager_import_unsafe">L\'archivio contiene percorsi non sicuri.</string>
+    <string name="save_manager_import_unknown_target">Scegli una scheda di salvataggio del gioco prima di importare questo archivio o usa un archivio con una singola cartella di salvataggio.</string>
+    <string name="save_manager_empty_title">Nessun dato di salvataggio trovato</string>
+    <string name="save_manager_empty_body">Avvia un gioco per creare dati di salvataggio o importa un archivio di salvataggio.</string>
+    <string name="save_manager_empty_game_title">Nessun dato di salvataggio per %1$s</string>
+    <string name="save_manager_empty_game_body">Avvia questo gioco per creare dati di salvataggio o importa un archivio di salvataggio per esso.</string>
+    <string name="save_manager_orphan_save">Gioco non installato</string>
 </resources>

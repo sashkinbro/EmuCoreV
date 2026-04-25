@@ -18,6 +18,7 @@ class InstalledGameRepository {
                     titleId = metadata.titleId ?: titleId,
                     title = metadata.title ?: titleId,
                     contentId = metadata.contentId,
+                    saveDataId = metadata.saveDataId ?: metadata.titleId ?: titleId,
                     version = metadata.version,
                     category = metadata.category,
                     iconPath = iconFile.takeIf { it.exists() }?.absolutePath,
