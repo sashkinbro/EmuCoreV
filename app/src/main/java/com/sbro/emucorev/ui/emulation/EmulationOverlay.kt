@@ -892,6 +892,26 @@ private fun OnScreenControls(
             selectedId = controls[nextIndex].id
         }
 
+        if (editMode) {
+            touchControlGroups.forEach { group ->
+                val groupElements = controls.filter { it.id in group.ids }
+                if (groupElements.size == group.ids.size) {
+                    TouchControlGroupFrame(
+                        group = group,
+                        elements = groupElements,
+                        canvasWidth = canvasWidth,
+                        canvasHeight = canvasHeight,
+                        onDragStart = { selectedId = group.ids.firstOrNull() },
+                        onGroupChange = { updatedElements ->
+                            commitLayoutChange { currentControls ->
+                                currentControls.replaceElements(updatedElements)
+                            }
+                        }
+                    )
+                }
+            }
+        }
+
         controls.forEach { element ->
             val descriptor = touchControlDescriptor(element.id) ?: return@forEach
             if (!editMode && (!element.visible || (element.id == TouchControlIds.TOUCH && !showTouchSwitch))) {
@@ -953,6 +973,36 @@ private data class TouchControlDescriptor(
     val axisY: Int? = null
 )
 
+private data class TouchControlGroup(
+    val ids: Set<String>
+)
+
+private data class TouchControlGroupBounds(
+    val x: Float,
+    val y: Float,
+    val width: Float,
+    val height: Float
+)
+
+private val touchControlGroups = listOf(
+    TouchControlGroup(
+        setOf(
+            TouchControlIds.DPAD_UP,
+            TouchControlIds.DPAD_DOWN,
+            TouchControlIds.DPAD_LEFT,
+            TouchControlIds.DPAD_RIGHT
+        )
+    ),
+    TouchControlGroup(
+        setOf(
+            TouchControlIds.TRIANGLE,
+            TouchControlIds.CROSS,
+            TouchControlIds.SQUARE,
+            TouchControlIds.CIRCLE
+        )
+    )
+)
+
 private fun touchControlDescriptor(id: String): TouchControlDescriptor? = when (id) {
     TouchControlIds.L2 -> TouchControlDescriptor(id, "L2", R.drawable.button_l2, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.l2)
     TouchControlIds.L1 -> TouchControlDescriptor(id, "L1", R.drawable.button_l, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.l1)
@@ -973,6 +1023,59 @@ private fun touchControlDescriptor(id: String): TouchControlDescriptor? = when (
     TouchControlIds.START -> TouchControlDescriptor(id, "Start", R.drawable.button_start, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.start)
     TouchControlIds.TOUCH -> TouchControlDescriptor(id, "Touch", R.drawable.button_touch_f, RoundedCornerShape(8.dp), TouchControlType.TouchSwitch)
     else -> null
+}
+
+@Composable
+private fun TouchControlGroupFrame(
+    group: TouchControlGroup,
+    elements: List<TouchControlElement>,
+    canvasWidth: Float,
+    canvasHeight: Float,
+    onDragStart: () -> Unit,
+    onGroupChange: (List<TouchControlElement>) -> Unit
+) {
+    val density = LocalDensity.current
+    val latestElements by rememberUpdatedState(elements)
+    val bounds = elements.groupBounds()
+    val paddingPx = with(density) { 14.dp.toPx() }
+    val paddedX = (bounds.x * canvasWidth - paddingPx).coerceAtLeast(0f)
+    val paddedY = (bounds.y * canvasHeight - paddingPx).coerceAtLeast(0f)
+    val paddedRight = ((bounds.x + bounds.width) * canvasWidth + paddingPx).coerceAtMost(canvasWidth)
+    val paddedBottom = ((bounds.y + bounds.height) * canvasHeight + paddingPx).coerceAtMost(canvasHeight)
+    val widthPx = (paddedRight - paddedX).coerceAtLeast(1f)
+    val heightPx = (paddedBottom - paddedY).coerceAtLeast(1f)
+
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(paddedX.roundToInt(), paddedY.roundToInt()) }
+            .size(
+                width = with(density) { widthPx.toDp() },
+                height = with(density) { heightPx.toDp() }
+            )
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.42f),
+                shape = RoundedCornerShape(18.dp)
+            )
+            .pointerInput(group.ids, canvasWidth, canvasHeight) {
+                var draggedElements = latestElements
+                detectDragGestures(
+                    onDragStart = {
+                        draggedElements = latestElements
+                        onDragStart()
+                    }
+                ) { change, dragAmount ->
+                    change.consume()
+                    draggedElements = draggedElements.moveGroupBy(
+                        dx = dragAmount.x / canvasWidth,
+                        dy = dragAmount.y / canvasHeight
+                    )
+                    onGroupChange(draggedElements)
+                }
+            }
+    )
 }
 
 @Composable
@@ -1305,6 +1408,38 @@ private fun mergeTouchLayout(
 
 private fun List<TouchControlElement>.replaceElement(updated: TouchControlElement): List<TouchControlElement> {
     return map { element -> if (element.id == updated.id) updated.coerceToCanvas() else element }
+}
+
+private fun List<TouchControlElement>.replaceElements(updated: List<TouchControlElement>): List<TouchControlElement> {
+    val updatedById = updated.associateBy { it.id }
+    return map { element -> updatedById[element.id]?.coerceToCanvas() ?: element }
+}
+
+private fun List<TouchControlElement>.groupBounds(): TouchControlGroupBounds {
+    val left = minOf { it.x }
+    val top = minOf { it.y }
+    val right = maxOf { it.x + it.width }
+    val bottom = maxOf { it.y + it.height }
+    return TouchControlGroupBounds(
+        x = left,
+        y = top,
+        width = right - left,
+        height = bottom - top
+    )
+}
+
+private fun List<TouchControlElement>.moveGroupBy(dx: Float, dy: Float): List<TouchControlElement> {
+    if (isEmpty()) return this
+    val bounds = groupBounds()
+    val clampedDx = dx.coerceIn(-bounds.x, 1f - (bounds.x + bounds.width))
+    val clampedDy = dy.coerceIn(-bounds.y, 1f - (bounds.y + bounds.height))
+    if (clampedDx == 0f && clampedDy == 0f) return this
+    return map { element ->
+        element.copy(
+            x = element.x + clampedDx,
+            y = element.y + clampedDy
+        ).coerceToCanvas()
+    }
 }
 
 private fun TouchControlElement.coerceToCanvas(): TouchControlElement {
