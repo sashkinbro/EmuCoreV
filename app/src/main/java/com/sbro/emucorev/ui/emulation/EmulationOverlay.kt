@@ -133,8 +133,7 @@ fun EmulationOverlayHost(
             controlsEditMode ||
                 (
                     config.enableGamepadOverlay &&
-                        overlayBridge.effectiveOverlayMask != 0 &&
-                        !hasPhysicalGamepad
+                        overlayBridge.effectiveOverlayMask != 0
                     )
             )
 

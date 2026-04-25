@@ -44,6 +44,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.sbro.emucorev.MainActivity
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.VitaCoreConfigRepository
+import com.sbro.emucorev.core.input.InputDeviceClassifier
 import com.sbro.emucorev.core.sdl.SDLActivity
 import com.sbro.emucorev.core.sdl.SDLSurface
 import com.sbro.emucorev.core.vita.overlay.InputOverlay
@@ -474,16 +475,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     private fun detectPhysicalGamepadConnected(): Boolean {
         return InputDevice.getDeviceIds().any { deviceId ->
-            InputDevice.getDevice(deviceId)?.let { device ->
-                !device.isVirtual && isGamepadSource(device.sources)
-            } == true
+            InputDeviceClassifier.isPhysicalGameController(InputDevice.getDevice(deviceId))
         }
-    }
-
-    private fun isGamepadSource(sources: Int): Boolean {
-        return (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
-            (sources and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK ||
-            (sources and InputDevice.SOURCE_DPAD) == InputDevice.SOURCE_DPAD
     }
 
     private fun markRebirthHandled(sourceIntent: Intent): Intent {
