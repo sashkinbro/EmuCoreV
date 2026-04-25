@@ -358,7 +358,7 @@ private fun GpuDriverHeader(
     ) {
         NavigationBackButton(
             onClick = onBackClick,
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            containerColor = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface
         )
         Column(modifier = Modifier.weight(1f)) {
@@ -377,7 +377,7 @@ private fun GpuDriverHeader(
             Icon(
                 imageVector = Icons.Rounded.Search,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
         }
         HeaderIconButton(
@@ -387,7 +387,7 @@ private fun GpuDriverHeader(
             Icon(
                 imageVector = Icons.Rounded.MoreVert,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
         }
     }
@@ -402,10 +402,11 @@ private fun HeaderIconButton(
     Surface(
         modifier = Modifier.size(40.dp),
         shape = RoundedCornerShape(14.dp),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         tonalElevation = 3.dp,
         shadowElevation = 5.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         onClick = onClick
     ) {
         Box(
@@ -428,11 +429,11 @@ private fun ActiveDriverCard(
     val isActive = backendRenderer == "Vulkan" && selectedDriver?.isUsable == true
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 2.dp,
-        shadowElevation = 3.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 3.dp,
+        shadowElevation = 8.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(

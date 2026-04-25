@@ -45,9 +45,10 @@ class SaveDataRepository {
         val gamesBySaveId = installedGames
             .mapNotNull { game -> game.saveDataId?.takeIf(String::isNotBlank)?.let { it to game } }
             .toMap()
-        val saveRoot = EmulatorStorage.ux0SaveDataRoot(context)
-        return saveRoot.listFiles().orEmpty()
+        return saveRoots(context)
+            .flatMap { saveRoot -> saveRoot.listFiles().orEmpty().toList() }
             .filter { it.isDirectory && it.listFiles().orEmpty().isNotEmpty() }
+            .distinctBy { it.name }
             .map { directory ->
                 val saveId = directory.name
                 val game = gamesBySaveId[saveId] ?: installedGames.firstOrNull { it.titleId == saveId }
@@ -81,13 +82,16 @@ class SaveDataRepository {
     }
 
     fun delete(context: Context, saveId: String): Boolean {
-        val target = File(EmulatorStorage.ux0SaveDataRoot(context), saveId)
-        if (!target.exists()) return true
-        return runCatching { target.deleteRecursively() }.getOrDefault(false)
+        val targets = saveRoots(context).map { root -> File(root, saveId) }.filter(File::exists)
+        if (targets.isEmpty()) return true
+        return targets.all { target -> runCatching { target.deleteRecursively() }.getOrDefault(false) }
     }
 
     fun exportToZip(context: Context, saveId: String, destination: Uri): Result<Unit> = runCatching {
-        val source = File(EmulatorStorage.ux0SaveDataRoot(context), saveId)
+        val source = saveRoots(context)
+            .map { root -> File(root, saveId) }
+            .firstOrNull { it.isDirectory }
+            ?: File(EmulatorStorage.ux0SaveDataRoot(context), saveId)
         require(source.isDirectory) { "Save data not found." }
         context.contentResolver.openOutputStream(destination)?.use { output ->
             ZipOutputStream(output.buffered()).use { zip ->
@@ -150,6 +154,12 @@ class SaveDataRepository {
             throw error
         }
     }
+
+    private fun saveRoots(context: Context): List<File> =
+        listOf(
+            EmulatorStorage.ux0SaveDataRoot(context),
+            EmulatorStorage.ux0SaveDataRoot(context, "00")
+        ).distinctBy { it.absolutePath }
 
     private fun ZipInputStream.extractSafelyTo(destination: File): Boolean {
         val destinationPath = destination.canonicalFile.toPath()

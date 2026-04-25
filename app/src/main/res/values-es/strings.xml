@@ -484,7 +484,7 @@
     <string name="onboarding_firmware_info_title">Descarga de firmware oficial</string>
     <string name="onboarding_firmware_info_body">Los archivos de firmware se descargan directamente de los servidores de actualización oficiales de Sony. EmuCoreV no aloja, replica, modifica ni redistribuye el firmware desde sus propios recursos; solo abre los enlaces de descarga públicos oficiales e instala el paquete que elijas.</string>
     <string name="settings_app_language_turkish">Turco</string>
-    <string name="save_manager_title">Gestor de guardado</string>
+    <string name="save_manager_title">Guardados</string>
     <string name="save_manager_subtitle">Importa, exporta y elimina datos de guardado de PS Vita.</string>
     <string name="save_manager_open_for_game">Gestionar guardados</string>
     <string name="save_manager_search_hint">Buscar guardados</string>
@@ -506,4 +506,5 @@
     <string name="save_manager_empty_game_title">No hay datos de guardado para %1$s</string>
     <string name="save_manager_empty_game_body">Inicia este juego para crear datos de guardado o importa un archivo de guardado para él.</string>
     <string name="save_manager_orphan_save">Juego no instalado</string>
+    <string name="nav_save_manager">Guardados</string>
 </resources>

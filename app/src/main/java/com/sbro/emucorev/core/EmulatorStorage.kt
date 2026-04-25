@@ -4,8 +4,11 @@ import android.content.Context
 import java.io.File
 
 object EmulatorStorage {
+    private fun storageRoot(context: Context): File =
+        context.getExternalFilesDir(null) ?: context.filesDir
+
     fun vitaRoot(context: Context): File {
-        val base = context.getExternalFilesDir(null) ?: context.filesDir
+        val base = storageRoot(context)
         return File(base, "vita").apply { mkdirs() }
     }
 
@@ -15,17 +18,21 @@ object EmulatorStorage {
     }
 
     fun prepareRuntime(context: Context) {
+        val storageRoot = storageRoot(context)
         val vitaRoot = vitaRoot(context)
         val cacheRoot = cacheRoot(context)
+        val nativeCacheRoot = File(storageRoot, "cache")
         listOf(
             vitaRoot,
             cacheRoot,
+            nativeCacheRoot,
             File(vitaRoot, "ux0"),
             File(vitaRoot, "ux0/app"),
             File(vitaRoot, "ux0/data"),
             File(vitaRoot, "ux0/user"),
             File(vitaRoot, "vs0"),
-            File(vitaRoot, "shaderlog"),
+            File(storageRoot, "shaderlog"),
+            File(nativeCacheRoot, "shaders"),
             File(cacheRoot, "shaders"),
             File(cacheRoot, "logs")
         ).forEach { directory ->
@@ -37,8 +44,15 @@ object EmulatorStorage {
 
     fun ux0AppRoot(context: Context): File = File(vitaRoot(context), "ux0/app").apply { mkdirs() }
 
-    fun ux0SaveDataRoot(context: Context, userId: String = "00"): File =
-        File(vitaRoot(context), "ux0/user/$userId/savedata").apply { mkdirs() }
+    fun ux0SaveDataRoot(context: Context, userId: String? = null): File {
+        val userSegment = userId?.takeIf(String::isNotBlank)
+        val relativePath = if (userSegment == null) {
+            "ux0/user/savedata"
+        } else {
+            "ux0/user/$userSegment/savedata"
+        }
+        return File(vitaRoot(context), relativePath).apply { mkdirs() }
+    }
 
     fun hasInstalledFirmware(context: Context): Boolean {
         val firmwareRoot = File(vitaRoot(context), "vs0")

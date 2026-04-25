@@ -303,7 +303,7 @@ private fun SideNavigation(
     }
     val hasSetupActions = installFirmware != null || installContent != null
     val hasLibraryActions = refreshLibrary != null
-    val hasToolsActions = openManageFolders != null
+    val hasToolsActions = true
 
     val content: @Composable () -> Unit = {
         Column(
@@ -335,12 +335,6 @@ private fun SideNavigation(
                 label = stringResource(R.string.nav_setup),
                 selected = selected == PrimaryDestination.Setup,
                 onClick = navigateSetup
-            )
-            ShellItem(
-                icon = Icons.Rounded.Save,
-                label = stringResource(R.string.nav_save_manager),
-                selected = selected == PrimaryDestination.SaveData,
-                onClick = navigateSaveData
             )
             ShellItem(
                 icon = Icons.Rounded.Search,
@@ -411,10 +405,18 @@ private fun SideNavigation(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 4.dp)
                 )
-                ShellAction(
-                    icon = Icons.Rounded.FolderOpen,
-                    label = stringResource(R.string.shell_manage_folders),
-                    onClick = openManageFolders
+                if (openManageFolders != null) {
+                    ShellAction(
+                        icon = Icons.Rounded.FolderOpen,
+                        label = stringResource(R.string.shell_manage_folders),
+                        onClick = openManageFolders
+                    )
+                }
+                ShellItem(
+                    icon = Icons.Rounded.Save,
+                    label = stringResource(R.string.nav_save_manager),
+                    selected = selected == PrimaryDestination.SaveData,
+                    onClick = navigateSaveData
                 )
             }
         }

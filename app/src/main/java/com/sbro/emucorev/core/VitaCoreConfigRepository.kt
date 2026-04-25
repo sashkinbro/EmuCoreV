@@ -141,7 +141,7 @@ class VitaCoreConfigRepository(private val context: Context) {
             showInfoBar = values["show-info-bar"]?.toBooleanStrictOrNull() ?: defaults.showInfoBar,
             showLiveAreaScreen = false,
             backendRenderer = values["backend-renderer"] ?: defaults.backendRenderer,
-            customDriverName = values["custom-driver-name"] ?: defaults.customDriverName,
+            customDriverName = values["custom-driver-name"].sanitizeNullableString() ?: defaults.customDriverName,
             turboMode = values["turbo-mode"]?.toBooleanStrictOrNull() ?: defaults.turboMode,
             highAccuracy = values["high-accuracy"]?.toBooleanStrictOrNull() ?: defaults.highAccuracy,
             resolutionMultiplier = values["resolution-multiplier"]?.toFloatOrNull() ?: defaults.resolutionMultiplier,
@@ -213,7 +213,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["show-info-bar"] = config.showInfoBar.toString()
         values["show-live-area-screen"] = false.toString()
         values["backend-renderer"] = config.backendRenderer
-        values["custom-driver-name"] = config.customDriverName
+        values["custom-driver-name"] = config.customDriverName.sanitizeNullableString().orEmpty()
         values["turbo-mode"] = config.turboMode.toString()
         values["high-accuracy"] = config.highAccuracy.toString()
         values["resolution-multiplier"] = formatFloat(config.resolutionMultiplier)
@@ -284,6 +284,11 @@ class VitaCoreConfigRepository(private val context: Context) {
                 val value = line.substring(index + 1).trim().trim('"')
                 key to value
             }
+    }
+
+    private fun String?.sanitizeNullableString(): String? {
+        val normalized = this?.trim()?.trim('"')?.takeIf(String::isNotBlank)
+        return normalized?.takeUnless { it.equals("null", ignoreCase = true) }
     }
 
     private fun formatFloat(value: Float): String {

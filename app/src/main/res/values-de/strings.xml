@@ -484,7 +484,7 @@
     <string name="onboarding_firmware_info_title">Offizieller Firmware-Download</string>
     <string name="onboarding_firmware_info_body">Firmware-Dateien werden direkt von den offiziellen Update-Servern von Sony heruntergeladen. EmuCoreV hostet, spiegelt, ändert oder verteilt keine Firmware aus eigenen Ressourcen; es öffnet lediglich die offiziellen öffentlichen Download-Links und installiert das von Ihnen gewählte Paket.</string>
     <string name="settings_app_language_turkish">Türkisch</string>
-    <string name="save_manager_title">Speicherdaten-Manager</string>
+    <string name="save_manager_title">Speicherstände</string>
     <string name="save_manager_subtitle">PS Vita-Speicherdaten importieren, exportieren und entfernen.</string>
     <string name="save_manager_open_for_game">Spielstände verwalten</string>
     <string name="save_manager_search_hint">Spielstände suchen</string>
@@ -506,4 +506,5 @@
     <string name="save_manager_empty_game_title">Keine Speicherdaten für %1$s</string>
     <string name="save_manager_empty_game_body">Starte dieses Spiel, um Speicherdaten zu erstellen, oder importiere ein Speicherarchiv dafür.</string>
     <string name="save_manager_orphan_save">Spiel nicht installiert</string>
+    <string name="nav_save_manager">Speicherstände</string>
 </resources>

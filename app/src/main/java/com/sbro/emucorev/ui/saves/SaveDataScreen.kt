@@ -168,9 +168,6 @@ fun SaveDataScreen(
             )
         }
         item {
-            SaveManagerInfoCard()
-        }
-        item {
             AnimatedVisibility(
                 visible = searchExpanded,
                 enter = fadeIn() + expandVertically(),
@@ -302,24 +299,6 @@ private fun SaveManagerHeader(
                 Icon(Icons.Rounded.FolderOpen, contentDescription = stringResource(R.string.save_manager_import))
             }
         }
-    }
-}
-
-@Composable
-private fun SaveManagerInfoCard() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-    ) {
-        Text(
-            text = stringResource(R.string.save_manager_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)
-        )
     }
 }
 
