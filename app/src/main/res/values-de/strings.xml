@@ -459,4 +459,22 @@
     <string name="settings_app_language_chinese_traditional">Traditionelles Chinesisch</string>
     <string name="settings_app_language_hindi">Hindi</string>
     <string name="settings_app_language_italian">Italienisch</string>
+    <string name="settings_gpu_driver_manage">Treiber verwalten</string>
+    <string name="settings_gpu_driver_manager_title">GPU-Treiber</string>
+    <string name="settings_gpu_driver_manager_subtitle">Adreno-Treiber installieren, herunterladen, anwenden oder entfernen.</string>
+    <string name="settings_gpu_driver_active_title">Aktiver Treiber</string>
+    <string name="settings_gpu_driver_install_from_file">Aus Datei installieren</string>
+    <string name="settings_gpu_driver_catalog">Adreno-Treiberkatalog</string>
+    <string name="settings_gpu_driver_refresh">Aktualisieren</string>
+    <string name="settings_gpu_driver_catalog_loading">Treiberkatalog wird geladen…</string>
+    <string name="settings_gpu_driver_catalog_failed">Treiberkatalog konnte nicht geladen werden</string>
+    <string name="settings_gpu_driver_catalog_empty">Es sind noch keine Online-Treiber verfügbar.</string>
+    <string name="settings_gpu_driver_download_apply">Herunterladen &amp; anwenden</string>
+    <string name="settings_gpu_driver_recommended">Empfohlen</string>
+    <string name="settings_gpu_driver_source">Quelle</string>
+    <string name="settings_gpu_driver_search">Treiber suchen</string>
+    <string name="settings_gpu_driver_filter_all">Alle</string>
+    <string name="settings_gpu_driver_result_count">%1$d von %2$d Treibern</string>
+    <string name="settings_gpu_driver_no_matches">Keine passenden Treiber</string>
+    <string name="settings_gpu_driver_no_matches_desc">Ändern Sie den Suchtext oder die ausgewählten Filter.</string>
 </resources>

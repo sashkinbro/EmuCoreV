@@ -458,4 +458,22 @@
     <string name="settings_app_language_chinese_traditional">繁体中文</string>
     <string name="settings_app_language_hindi">印地语</string>
     <string name="settings_app_language_italian">意大利语</string>
+    <string name="settings_gpu_driver_manage">管理驱动程序</string>
+    <string name="settings_gpu_driver_manager_title">GPU 驱动程序</string>
+    <string name="settings_gpu_driver_manager_subtitle">安装、下载、应用或卸载 Adreno 驱动程序。</string>
+    <string name="settings_gpu_driver_active_title">当前驱动程序</string>
+    <string name="settings_gpu_driver_install_from_file">从文件安装</string>
+    <string name="settings_gpu_driver_catalog">Adreno 驱动程序目录</string>
+    <string name="settings_gpu_driver_refresh">刷新</string>
+    <string name="settings_gpu_driver_catalog_loading">正在加载驱动程序目录…</string>
+    <string name="settings_gpu_driver_catalog_failed">无法加载驱动程序目录</string>
+    <string name="settings_gpu_driver_catalog_empty">暂无可用的在线驱动程序。</string>
+    <string name="settings_gpu_driver_download_apply">下载并应用</string>
+    <string name="settings_gpu_driver_recommended">推荐</string>
+    <string name="settings_gpu_driver_source">来源</string>
+    <string name="settings_gpu_driver_search">搜索驱动程序</string>
+    <string name="settings_gpu_driver_filter_all">全部</string>
+    <string name="settings_gpu_driver_result_count">%2$d 个驱动程序中的 %1$d 个</string>
+    <string name="settings_gpu_driver_no_matches">没有匹配的驱动程序</string>
+    <string name="settings_gpu_driver_no_matches_desc">请更改搜索文本或所选的筛选条件。</string>
 </resources>

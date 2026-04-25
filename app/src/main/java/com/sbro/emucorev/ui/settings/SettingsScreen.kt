@@ -91,6 +91,7 @@ fun SettingsScreen(
     onBackClick: () -> Unit,
     onOpenLanguageSettings: () -> Unit,
     onOpenVitaLanguageSettings: () -> Unit = {},
+    onOpenGpuDriverSettings: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -99,11 +100,6 @@ fun SettingsScreen(
     var selectedTab by rememberSaveable(initialTab) { mutableStateOf(initialTab) }
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
     val folderPickerFailedMessage = stringResource(R.string.folder_picker_failed)
-    val gpuDriverInstallFailedMessage = stringResource(R.string.settings_gpu_driver_install_failed)
-    val gpuDriverInstallSuccessTemplate = stringResource(
-        R.string.settings_gpu_driver_install_success,
-        "%s"
-    )
 
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -111,24 +107,6 @@ fun SettingsScreen(
             viewModel.onPackagesFolderSelected(uri)
         }.onFailure {
             Toast.makeText(context, folderPickerFailedMessage, Toast.LENGTH_SHORT).show()
-        }
-    }
-    val gpuDriverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        uri ?: return@rememberLauncherForActivityResult
-        viewModel.installGpuDriver(uri) { result ->
-            result.onSuccess { driverName ->
-                Toast.makeText(
-                    context,
-                    gpuDriverInstallSuccessTemplate.format(driverName),
-                    Toast.LENGTH_SHORT
-                ).show()
-            }.onFailure {
-                Toast.makeText(
-                    context,
-                    it.message ?: gpuDriverInstallFailedMessage,
-                    Toast.LENGTH_LONG
-                ).show()
-            }
         }
     }
     val refreshCoreSettingsClick = rememberDebouncedClick(onClick = viewModel::refreshCoreSettings)
@@ -172,10 +150,10 @@ fun SettingsScreen(
                     viewModel = viewModel,
                     onOpenLanguageSettings = onOpenLanguageSettings,
                     onOpenVitaLanguageSettings = onOpenVitaLanguageSettings,
+                    onOpenGpuDriverSettings = onOpenGpuDriverSettings,
                     refreshCoreSettingsClick = refreshCoreSettingsClick,
                     changeFolderClick = changeFolderClick,
-                    clearFolderClick = clearFolderClick,
-                    installGpuDriverClick = { gpuDriverPicker.launch(arrayOf("application/zip", "*/*")) }
+                    clearFolderClick = clearFolderClick
                 )
             }
         }
@@ -450,4 +428,3 @@ fun SettingSliderRow(
         }
     }
 }
-

@@ -36,8 +36,10 @@ import com.sbro.emucorev.ui.home.HomeScreen
 import com.sbro.emucorev.ui.library.LibraryScreen
 import com.sbro.emucorev.ui.onboarding.OnboardingScreen
 import com.sbro.emucorev.ui.settings.AppLanguageScreen
+import com.sbro.emucorev.ui.settings.GpuDriverScreen
 import com.sbro.emucorev.ui.settings.SettingsScreen
 import com.sbro.emucorev.ui.settings.SettingsTab
+import com.sbro.emucorev.ui.settings.SettingsViewModel
 import com.sbro.emucorev.ui.settings.VitaLanguageScreen
 import com.sbro.emucorev.ui.settings.settingsTabFromRoute
 import com.sbro.emucorev.ui.setup.SetupInstallDialog
@@ -53,6 +55,7 @@ private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_SETTINGS_WITH_TAB = "settings/{tab}"
 private const val ROUTE_APP_LANGUAGE = "app-language"
 private const val ROUTE_VITA_LANGUAGE = "vita-language"
+private const val ROUTE_GPU_DRIVER = "gpu-driver"
 private const val ROUTE_DETAIL_PREFIX = "detail"
 private const val ROUTE_CATALOG_DETAIL_PREFIX = "catalog-detail"
 
@@ -63,6 +66,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     val context = LocalContext.current
     val preferences = remember(context) { AppPreferences(context) }
     val installViewModel: SetupInstallViewModel = viewModel()
+    val settingsViewModel: SettingsViewModel = viewModel()
     val installUiState by installViewModel.uiState.collectAsState()
     var firmwareInstalled by remember(context) { mutableStateOf(EmulatorStorage.hasInstalledFirmware(context)) }
     var firmwareUpdateInstalled by remember(context) { mutableStateOf(EmulatorStorage.hasInstalledFirmwareUpdate(context)) }
@@ -345,7 +349,11 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         },
                         onOpenVitaLanguageSettings = {
                             navController.navigate(ROUTE_VITA_LANGUAGE) { launchSingleTop = true }
-                        }
+                        },
+                        onOpenGpuDriverSettings = {
+                            navController.navigate(ROUTE_GPU_DRIVER) { launchSingleTop = true }
+                        },
+                        viewModel = settingsViewModel
                     )
                 }
             }
@@ -382,18 +390,30 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         },
                         onOpenVitaLanguageSettings = {
                             navController.navigate(ROUTE_VITA_LANGUAGE) { launchSingleTop = true }
-                        }
+                        },
+                        onOpenGpuDriverSettings = {
+                            navController.navigate(ROUTE_GPU_DRIVER) { launchSingleTop = true }
+                        },
+                        viewModel = settingsViewModel
                     )
                 }
             }
             composable(ROUTE_APP_LANGUAGE) {
                 AppLanguageScreen(
-                    onBackClick = { navController.popBackStack() }
+                    onBackClick = { navController.popBackStack() },
+                    viewModel = settingsViewModel
                 )
             }
             composable(ROUTE_VITA_LANGUAGE) {
                 VitaLanguageScreen(
-                    onBackClick = { navController.popBackStack() }
+                    onBackClick = { navController.popBackStack() },
+                    viewModel = settingsViewModel
+                )
+            }
+            composable(ROUTE_GPU_DRIVER) {
+                GpuDriverScreen(
+                    onBackClick = { navController.popBackStack() },
+                    viewModel = settingsViewModel
                 )
             }
             composable(

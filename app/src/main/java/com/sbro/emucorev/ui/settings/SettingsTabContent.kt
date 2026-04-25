@@ -86,14 +86,14 @@ fun SettingsTabContent(
     viewModel: SettingsViewModel,
     onOpenLanguageSettings: () -> Unit,
     onOpenVitaLanguageSettings: () -> Unit = {},
+    onOpenGpuDriverSettings: () -> Unit = {},
     refreshCoreSettingsClick: () -> Unit,
     changeFolderClick: () -> Unit,
-    clearFolderClick: () -> Unit,
-    installGpuDriverClick: () -> Unit
+    clearFolderClick: () -> Unit
 ) {
     when (selectedTab) {
         SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings, onOpenVitaLanguageSettings)
-        SettingsTab.Graphics -> GraphicsTab(uiState, defaults, viewModel, installGpuDriverClick)
+        SettingsTab.Graphics -> GraphicsTab(uiState, defaults, viewModel, onOpenGpuDriverSettings)
         SettingsTab.Audio -> AudioTab(uiState, defaults, viewModel, refreshCoreSettingsClick)
         SettingsTab.Overlay -> OverlayTab(uiState, defaults, viewModel)
         SettingsTab.Controls -> ControlsTab(uiState, defaults, viewModel)
@@ -150,7 +150,7 @@ private fun GeneralTab(
 }
 
 @Composable
-private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel, installGpuDriverClick: () -> Unit) {
+private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel, onOpenGpuDriverSettings: () -> Unit) {
     val selectedDriver = uiState.installedGpuDrivers.firstOrNull { it.name == uiState.coreConfig.customDriverName }
     val customDriverAvailable = uiState.coreConfig.backendRenderer == "Vulkan" && selectedDriver?.isUsable == true
 
@@ -195,44 +195,11 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
             isActive = customDriverAvailable,
             modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
         )
-        if (uiState.installedGpuDrivers.isNotEmpty()) {
-            Chips(
-                title = stringResource(R.string.settings_gpu_driver_installed),
-                description = stringResource(R.string.settings_help_gpu_driver_installed),
-                onResetDefault = { viewModel.updateCoreSettings { it.copy(customDriverName = "") } }
-            ) {
-                uiState.installedGpuDrivers.forEach { driver ->
-                    FilterChip(
-                        selected = uiState.coreConfig.customDriverName == driver.name,
-                        onClick = { viewModel.updateCoreSettings { it.copy(customDriverName = driver.name) } },
-                        colors = appFilterChipColors(),
-                        label = { Text(driver.name) }
-                    )
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Button(onClick = installGpuDriverClick, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_gpu_driver_install))
-                }
-                Button(
-                    onClick = { viewModel.removeGpuDriver(uiState.coreConfig.customDriverName) },
-                    enabled = uiState.coreConfig.customDriverName.isNotBlank(),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(stringResource(R.string.settings_gpu_driver_remove))
-                }
-            }
-        } else {
-            Text(
-                text = stringResource(R.string.settings_gpu_driver_none_installed),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
-            )
-            Button(onClick = installGpuDriverClick, modifier = Modifier.padding(top = 8.dp)) {
-                Text(stringResource(R.string.settings_gpu_driver_install))
-            }
+        Button(
+            onClick = onOpenGpuDriverSettings,
+            modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
+        ) {
+            Text(stringResource(R.string.settings_gpu_driver_manage))
         }
         Toggle(stringResource(R.string.settings_core_high_accuracy), stringResource(R.string.settings_help_high_accuracy), uiState.coreConfig.highAccuracy, { enabled -> viewModel.updateCoreSettings { it.copy(highAccuracy = enabled) } }, { viewModel.updateCoreSettings { it.copy(highAccuracy = defaults.highAccuracy) } })
         SliderRow(stringResource(R.string.settings_core_resolution_label), stringResource(R.string.settings_help_resolution), stringResource(R.string.settings_core_resolution_value, uiState.coreConfig.resolutionMultiplier), { viewModel.updateCoreSettings { it.copy(resolutionMultiplier = defaults.resolutionMultiplier) } }) {

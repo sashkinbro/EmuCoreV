@@ -1,0 +1,611 @@
+package com.sbro.emucorev.ui.settings
+
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.FolderZip
+import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sbro.emucorev.R
+import com.sbro.emucorev.core.InstalledGpuDriver
+import com.sbro.emucorev.core.RemoteGpuDriver
+import com.sbro.emucorev.ui.common.NavigationBackButton
+import com.sbro.emucorev.ui.common.rememberDebouncedClick
+import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+fun GpuDriverScreen(
+    onBackClick: () -> Unit,
+    viewModel: SettingsViewModel = viewModel()
+) {
+    val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsState()
+    val selectedDriver = uiState.installedGpuDrivers.firstOrNull { it.name == uiState.coreConfig.customDriverName }
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 16.dp
+    val installFailedMessage = stringResource(R.string.settings_gpu_driver_install_failed)
+    val installSuccessTemplate = stringResource(R.string.settings_gpu_driver_install_success, "%s")
+    val backClick = rememberDebouncedClick(onClick = onBackClick)
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var variantFilter by rememberSaveable { mutableStateOf(GPU_DRIVER_FILTER_ALL) }
+    var sourceFilter by rememberSaveable { mutableStateOf(GPU_DRIVER_FILTER_ALL) }
+    val remoteDrivers = uiState.remoteGpuDrivers.filter { driver ->
+        driver.matchesSearch(searchQuery) &&
+            (variantFilter == GPU_DRIVER_FILTER_ALL || driver.variant.equals(variantFilter, ignoreCase = true)) &&
+            (sourceFilter == GPU_DRIVER_FILTER_ALL || driver.sourceLabel().equals(sourceFilter, ignoreCase = true))
+    }
+    val variantFilters = buildList {
+        add(GPU_DRIVER_FILTER_ALL)
+        addAll(uiState.remoteGpuDrivers.map { it.variant }.filter { it.isNotBlank() }.distinct().sorted())
+    }
+    val sourceFilters = buildList {
+        add(GPU_DRIVER_FILTER_ALL)
+        addAll(uiState.remoteGpuDrivers.map { it.sourceLabel() }.distinct().sorted())
+    }
+
+    val localDriverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        viewModel.installGpuDriver(uri) { result ->
+            result.onSuccess { driverName ->
+                Toast.makeText(context, installSuccessTemplate.format(driverName), Toast.LENGTH_SHORT).show()
+            }.onFailure { error ->
+                Toast.makeText(context, error.message ?: installFailedMessage, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (uiState.remoteGpuDrivers.isEmpty() && !uiState.gpuDriverCatalogLoading) {
+            viewModel.refreshGpuDriverCatalog()
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .navigationBarsPadding(),
+        contentPadding = PaddingValues(
+            start = ScreenHorizontalPadding,
+            top = topInset,
+            end = ScreenHorizontalPadding,
+            bottom = 40.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            GpuDriverHeader(onBackClick = backClick)
+        }
+        item {
+            ActiveDriverCard(
+                selectedDriver = selectedDriver,
+                backendRenderer = uiState.coreConfig.backendRenderer,
+                onUseSystem = viewModel::useSystemGpuDriver,
+                onInstallFromFile = { localDriverPicker.launch(arrayOf("application/zip", "*/*")) },
+                onRemove = {
+                    val driverName = uiState.coreConfig.customDriverName
+                    if (driverName.isNotBlank()) {
+                        viewModel.removeGpuDriver(driverName)
+                    }
+                }
+            )
+        }
+        if (uiState.installedGpuDrivers.isNotEmpty()) {
+            item {
+                SectionLabel(text = stringResource(R.string.settings_gpu_driver_installed))
+            }
+            items(uiState.installedGpuDrivers, key = { it.name }) { driver ->
+                InstalledDriverRow(
+                    driver = driver,
+                    selected = uiState.coreConfig.customDriverName == driver.name,
+                    onSelect = { viewModel.selectGpuDriver(driver.name) },
+                    onRemove = { viewModel.removeGpuDriver(driver.name) }
+                )
+            }
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                SectionLabel(
+                    text = stringResource(R.string.settings_gpu_driver_catalog),
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedButton(
+                    onClick = viewModel::refreshGpuDriverCatalog,
+                    enabled = !uiState.gpuDriverCatalogLoading && uiState.gpuDriverDownloadId == null
+                ) {
+                    Icon(Icons.Rounded.Refresh, contentDescription = null)
+                    Text(
+                        text = stringResource(R.string.settings_gpu_driver_refresh),
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
+                }
+            }
+        }
+        if (uiState.remoteGpuDrivers.isNotEmpty()) {
+            item {
+                DriverCatalogFilters(
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = { searchQuery = it },
+                    variantFilter = variantFilter,
+                    onVariantFilterChange = { variantFilter = it },
+                    sourceFilter = sourceFilter,
+                    onSourceFilterChange = { sourceFilter = it },
+                    variantFilters = variantFilters,
+                    sourceFilters = sourceFilters,
+                    resultCount = remoteDrivers.size,
+                    totalCount = uiState.remoteGpuDrivers.size
+                )
+            }
+        }
+        if (uiState.gpuDriverCatalogLoading) {
+            item {
+                LoadingCard(text = stringResource(R.string.settings_gpu_driver_catalog_loading))
+            }
+        }
+        uiState.gpuDriverCatalogError?.let { error ->
+            item {
+                ErrorCard(
+                    title = stringResource(R.string.settings_gpu_driver_catalog_failed),
+                    message = error
+                )
+            }
+        }
+        if (!uiState.gpuDriverCatalogLoading && uiState.remoteGpuDrivers.isEmpty() && uiState.gpuDriverCatalogError == null) {
+            item {
+                LoadingCard(text = stringResource(R.string.settings_gpu_driver_catalog_empty))
+            }
+        }
+        if (!uiState.gpuDriverCatalogLoading && uiState.remoteGpuDrivers.isNotEmpty() && remoteDrivers.isEmpty()) {
+            item {
+                ErrorCard(
+                    title = stringResource(R.string.settings_gpu_driver_no_matches),
+                    message = stringResource(R.string.settings_gpu_driver_no_matches_desc)
+                )
+            }
+        }
+        items(remoteDrivers, key = { it.id }) { driver ->
+            RemoteDriverRow(
+                driver = driver,
+                downloading = uiState.gpuDriverDownloadId == driver.id,
+                downloadInProgress = uiState.gpuDriverDownloadId != null,
+                progress = uiState.gpuDriverDownloadProgress,
+                onDownload = {
+                    viewModel.installRemoteGpuDriver(driver) { result ->
+                        result.onSuccess { driverName ->
+                            Toast.makeText(context, installSuccessTemplate.format(driverName), Toast.LENGTH_SHORT).show()
+                        }.onFailure { error ->
+                            Toast.makeText(context, error.message ?: installFailedMessage, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun DriverCatalogFilters(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    variantFilter: String,
+    onVariantFilterChange: (String) -> Unit,
+    sourceFilter: String,
+    onSourceFilterChange: (String) -> Unit,
+    variantFilters: List<String>,
+    sourceFilters: List<String>,
+    resultCount: Int,
+    totalCount: Int
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                label = { Text(stringResource(R.string.settings_gpu_driver_search)) }
+            )
+            FilterChipRow(
+                filters = variantFilters,
+                selected = variantFilter,
+                onSelected = onVariantFilterChange
+            )
+            FilterChipRow(
+                filters = sourceFilters,
+                selected = sourceFilter,
+                onSelected = onSourceFilterChange
+            )
+            Text(
+                text = stringResource(R.string.settings_gpu_driver_result_count, resultCount, totalCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilterChipRow(
+    filters: List<String>,
+    selected: String,
+    onSelected: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        filters.forEach { filter ->
+            FilterChip(
+                selected = selected == filter,
+                onClick = { onSelected(filter) },
+                label = { Text(if (filter == GPU_DRIVER_FILTER_ALL) stringResource(R.string.settings_gpu_driver_filter_all) else filter) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun GpuDriverHeader(onBackClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        NavigationBackButton(
+            onClick = onBackClick,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.settings_gpu_driver_manager_title),
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = stringResource(R.string.settings_gpu_driver_manager_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActiveDriverCard(
+    selectedDriver: InstalledGpuDriver?,
+    backendRenderer: String,
+    onUseSystem: () -> Unit,
+    onInstallFromFile: () -> Unit,
+    onRemove: () -> Unit
+) {
+    val isActive = backendRenderer == "Vulkan" && selectedDriver?.isUsable == true
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 2.dp,
+        shadowElevation = 3.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = stringResource(R.string.settings_gpu_driver_active_title),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            DriverStatusText(selectedDriver = selectedDriver, backendRenderer = backendRenderer, isActive = isActive)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = selectedDriver == null,
+                    onClick = onUseSystem,
+                    label = { Text(stringResource(R.string.settings_gpu_driver_system)) }
+                )
+                Button(onClick = onInstallFromFile) {
+                    Icon(Icons.Rounded.FolderZip, contentDescription = null)
+                    Text(
+                        text = stringResource(R.string.settings_gpu_driver_install_from_file),
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
+                }
+            }
+            if (selectedDriver != null) {
+                OutlinedButton(onClick = onRemove) {
+                    Icon(Icons.Rounded.Delete, contentDescription = null)
+                    Text(
+                        text = stringResource(R.string.settings_gpu_driver_remove),
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DriverStatusText(
+    selectedDriver: InstalledGpuDriver?,
+    backendRenderer: String,
+    isActive: Boolean
+) {
+    val text = when {
+        selectedDriver == null -> stringResource(R.string.settings_gpu_driver_status_system)
+        !selectedDriver.isUsable -> stringResource(R.string.settings_gpu_driver_status_broken, selectedDriver.mainLibrary)
+        backendRenderer != "Vulkan" -> stringResource(R.string.settings_gpu_driver_status_renderer, backendRenderer)
+        else -> stringResource(R.string.settings_gpu_driver_status_active, selectedDriver.mainLibrary)
+    }
+    val supporting = when {
+        selectedDriver == null -> stringResource(R.string.settings_gpu_driver_status_system_desc)
+        !selectedDriver.isUsable -> stringResource(R.string.settings_gpu_driver_status_broken_desc)
+        !isActive -> stringResource(R.string.settings_gpu_driver_status_renderer_desc)
+        else -> stringResource(R.string.settings_gpu_driver_status_active_desc)
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+        color = MaterialTheme.colorScheme.onSurface
+    )
+    Text(
+        text = supporting,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun InstalledDriverRow(
+    driver: InstalledGpuDriver,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    onRemove: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f)),
+        onClick = onSelect
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = driver.name,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = driver.mainLibrary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            OutlinedButton(onClick = onRemove) {
+                Icon(Icons.Rounded.Delete, contentDescription = null)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemoteDriverRow(
+    driver: RemoteGpuDriver,
+    downloading: Boolean,
+    downloadInProgress: Boolean,
+    progress: Float,
+    onDownload: () -> Unit
+) {
+    val uriHandler = LocalUriHandler.current
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = driver.name,
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f, fill = false),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (driver.recommended) {
+                            Text(
+                                text = stringResource(R.string.settings_gpu_driver_recommended),
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    Text(
+                        text = listOf(driver.gpu, driver.variant).filter { it.isNotBlank() }.joinToString(" / "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Button(
+                    onClick = onDownload,
+                    enabled = !downloadInProgress
+                ) {
+                    Icon(Icons.Rounded.CloudDownload, contentDescription = null)
+                    Text(
+                        text = stringResource(R.string.settings_gpu_driver_download_apply),
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
+                }
+            }
+            if (driver.description.isNotBlank()) {
+                Text(
+                    text = driver.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (driver.credits.isNotBlank() || driver.sourceUrl.isNotBlank()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = driver.credits,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (driver.sourceUrl.isNotBlank()) {
+                        OutlinedButton(onClick = { uriHandler.openUri(driver.sourceUrl) }) {
+                            Icon(Icons.Rounded.Link, contentDescription = null)
+                            Text(
+                                text = stringResource(R.string.settings_gpu_driver_source),
+                                modifier = Modifier.padding(start = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+            if (downloading) {
+                LinearProgressIndicator(
+                    progress = { progress.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+        color = MaterialTheme.colorScheme.onBackground,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun LoadingCard(text: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(text = text, color = MaterialTheme.colorScheme.onSurface)
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun ErrorCard(title: String, message: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.errorContainer
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+    }
+}
+
+private const val GPU_DRIVER_FILTER_ALL = "all"
+
+private fun RemoteGpuDriver.matchesSearch(query: String): Boolean {
+    val normalized = query.trim()
+    if (normalized.isBlank()) return true
+    return listOf(id, name, variant, gpu, description, credits, sourceLabel())
+        .any { value -> value.contains(normalized, ignoreCase = true) }
+}
+
+private fun RemoteGpuDriver.sourceLabel(): String {
+    return when {
+        credits.contains("nihui", ignoreCase = true) -> "nihui"
+        credits.contains("K11MCH1", ignoreCase = true) -> "K11MCH1"
+        else -> credits.substringBefore('/').trim().ifBlank { "Source" }
+    }
+}

@@ -459,4 +459,22 @@
     <string name="settings_app_language_chinese_traditional">पारंपरिक चीनी</string>
     <string name="settings_app_language_hindi">हिंदी</string>
     <string name="settings_app_language_italian">इतालवी</string>
+    <string name="settings_gpu_driver_manage">ड्राइवर प्रबंधित करें</string>
+    <string name="settings_gpu_driver_manager_title">GPU ड्राइवर</string>
+    <string name="settings_gpu_driver_manager_subtitle">Adreno ड्राइवर इंस्टॉल, डाउनलोड, लागू या निकालें।</string>
+    <string name="settings_gpu_driver_active_title">सक्रिय ड्राइवर</string>
+    <string name="settings_gpu_driver_install_from_file">फ़ाइल से इंस्टॉल करें</string>
+    <string name="settings_gpu_driver_catalog">Adreno ड्राइवर कैटलॉग</string>
+    <string name="settings_gpu_driver_refresh">रीफ़्रेश करें</string>
+    <string name="settings_gpu_driver_catalog_loading">ड्राइवर कैटलॉग लोड हो रहा है…</string>
+    <string name="settings_gpu_driver_catalog_failed">ड्राइवर कैटलॉग लोड नहीं किया जा सका</string>
+    <string name="settings_gpu_driver_catalog_empty">अभी तक कोई ऑनलाइन ड्राइवर उपलब्ध नहीं हैं।</string>
+    <string name="settings_gpu_driver_download_apply">डाउनलोड करें और लागू करें</string>
+    <string name="settings_gpu_driver_recommended">अनुशंसित</string>
+    <string name="settings_gpu_driver_source">स्रोत</string>
+    <string name="settings_gpu_driver_search">ड्राइवर खोजें</string>
+    <string name="settings_gpu_driver_filter_all">सभी</string>
+    <string name="settings_gpu_driver_result_count">%2$d में से %1$d ड्राइवर</string>
+    <string name="settings_gpu_driver_no_matches">कोई मेल खाने वाला ड्राइवर नहीं</string>
+    <string name="settings_gpu_driver_no_matches_desc">खोज टेक्स्ट या चयनित फ़िल्टर बदलें।</string>
 </resources>

@@ -459,4 +459,22 @@
     <string name="settings_app_language_chinese_traditional">Chinois traditionnel</string>
     <string name="settings_app_language_hindi">Hindi</string>
     <string name="settings_app_language_italian">Italien</string>
+    <string name="settings_gpu_driver_manage">Gérer les pilotes</string>
+    <string name="settings_gpu_driver_manager_title">Pilotes GPU</string>
+    <string name="settings_gpu_driver_manager_subtitle">Installer, télécharger, appliquer ou supprimer les pilotes Adreno.</string>
+    <string name="settings_gpu_driver_active_title">Pilote actif</string>
+    <string name="settings_gpu_driver_install_from_file">Installer à partir d\'un fichier</string>
+    <string name="settings_gpu_driver_catalog">Catalogue de pilotes Adreno</string>
+    <string name="settings_gpu_driver_refresh">Actualiser</string>
+    <string name="settings_gpu_driver_catalog_loading">Chargement du catalogue de pilotes…</string>
+    <string name="settings_gpu_driver_catalog_failed">Impossible de charger le catalogue de pilotes</string>
+    <string name="settings_gpu_driver_catalog_empty">Aucun pilote en ligne n\'est encore disponible.</string>
+    <string name="settings_gpu_driver_download_apply">Télécharger et appliquer</string>
+    <string name="settings_gpu_driver_recommended">Recommandé</string>
+    <string name="settings_gpu_driver_source">Source</string>
+    <string name="settings_gpu_driver_search">Rechercher des pilotes</string>
+    <string name="settings_gpu_driver_filter_all">Tous</string>
+    <string name="settings_gpu_driver_result_count">%1$d sur %2$d pilotes</string>
+    <string name="settings_gpu_driver_no_matches">Aucun pilote correspondant</string>
+    <string name="settings_gpu_driver_no_matches_desc">Modifiez le texte de recherche ou les filtres sélectionnés.</string>
 </resources>

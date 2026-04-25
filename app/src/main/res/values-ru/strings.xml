@@ -459,4 +459,22 @@
     <string name="settings_app_language_chinese_traditional">Китайский (традиционный)</string>
     <string name="settings_app_language_hindi">Хинди</string>
     <string name="settings_app_language_italian">Итальянский</string>
+    <string name="settings_gpu_driver_manage">Управление драйверами</string>
+    <string name="settings_gpu_driver_manager_title">Драйверы GPU</string>
+    <string name="settings_gpu_driver_manager_subtitle">Установка, скачивание, применение или удаление драйверов Adreno.</string>
+    <string name="settings_gpu_driver_active_title">Активный драйвер</string>
+    <string name="settings_gpu_driver_install_from_file">Установить из файла</string>
+    <string name="settings_gpu_driver_catalog">Каталог драйверов Adreno</string>
+    <string name="settings_gpu_driver_refresh">Обновить</string>
+    <string name="settings_gpu_driver_catalog_loading">Загрузка каталога драйверов…</string>
+    <string name="settings_gpu_driver_catalog_failed">Не удалось загрузить каталог драйверов</string>
+    <string name="settings_gpu_driver_catalog_empty">Онлайн-драйверы пока недоступны.</string>
+    <string name="settings_gpu_driver_download_apply">Скачать и применить</string>
+    <string name="settings_gpu_driver_recommended">Рекомендуется</string>
+    <string name="settings_gpu_driver_source">Источник</string>
+    <string name="settings_gpu_driver_search">Поиск драйверов</string>
+    <string name="settings_gpu_driver_filter_all">Все</string>
+    <string name="settings_gpu_driver_result_count">%1$d из %2$d драйверов</string>
+    <string name="settings_gpu_driver_no_matches">Нет подходящих драйверов</string>
+    <string name="settings_gpu_driver_no_matches_desc">Измените текст поиска или выбранные фильтры.</string>
 </resources>
