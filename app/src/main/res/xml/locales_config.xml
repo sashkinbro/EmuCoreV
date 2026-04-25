@@ -10,4 +10,5 @@
     <locale android:name="zh" />
     <locale android:name="hi" />
     <locale android:name="it" />
+    <locale android:name="tr" />
 </locale-config>

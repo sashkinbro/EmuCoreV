@@ -254,6 +254,7 @@
     <string name="settings_app_language_chinese_traditional">Chinese Traditional</string>
     <string name="settings_app_language_hindi">Hindi</string>
     <string name="settings_app_language_italian">Italian</string>
+    <string name="settings_app_language_turkish">Turkish</string>
     <string name="settings_language_picker_title">Language</string>
     <string name="settings_system_language">Vita system language</string>
     <string name="settings_help_system_language">Sets the language reported to the emulated Vita system.</string>

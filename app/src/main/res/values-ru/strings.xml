@@ -483,4 +483,5 @@
     <string name="settings_gpu_driver_no_matches_desc">Измените текст поиска или выбранные фильтры.</string>
     <string name="onboarding_firmware_info_title">Загрузка официальной прошивки</string>
     <string name="onboarding_firmware_info_body">Файлы прошивки загружаются напрямую с официальных серверов обновлений Sony. EmuCoreV не хранит, не копирует, не изменяет и не распространяет прошивку из собственных ресурсов; он лишь открывает официальные публичные ссылки на скачивание и устанавливает выбранный вами пакет.</string>
+    <string name="settings_app_language_turkish">Турецкий</string>
 </resources>

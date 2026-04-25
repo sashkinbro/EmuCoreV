@@ -61,7 +61,8 @@ private val AppLanguageOptions = listOf(
     AppLanguageOption(AppLanguage.PORTUGUESE, "PT", R.string.settings_app_language_portuguese, "Português"),
     AppLanguageOption(AppLanguage.CHINESE, "繁", R.string.settings_app_language_chinese_traditional, "繁體中文"),
     AppLanguageOption(AppLanguage.HINDI, "HI", R.string.settings_app_language_hindi, "हिन्दी"),
-    AppLanguageOption(AppLanguage.ITALIAN, "IT", R.string.settings_app_language_italian, "Italiano")
+    AppLanguageOption(AppLanguage.ITALIAN, "IT", R.string.settings_app_language_italian, "Italiano"),
+    AppLanguageOption(AppLanguage.TURKISH, "TR", R.string.settings_app_language_turkish, "Türkçe")
 )
 
 @Composable

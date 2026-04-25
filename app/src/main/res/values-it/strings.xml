@@ -483,4 +483,5 @@
     <string name="settings_gpu_driver_no_matches_desc">Modifica il testo di ricerca o i filtri selezionati.</string>
     <string name="onboarding_firmware_info_title">Download firmware ufficiale</string>
     <string name="onboarding_firmware_info_body">I file del firmware vengono scaricati direttamente dai server di aggiornamento ufficiali di Sony. EmuCoreV non ospita, esegue il mirroring, modifica o ridistribuisce il firmware dalle proprie risorse; apre solo i link di download pubblici ufficiali e installa il pacchetto che hai scelto.</string>
+    <string name="settings_app_language_turkish">Turco</string>
 </resources>
