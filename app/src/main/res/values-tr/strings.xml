@@ -484,7 +484,7 @@
     <string name="settings_vsync">V-Sync</string>
     <string name="settings_pstv_mode">PSTV modu</string>
     <string name="settings_app_language_turkish">Türkçe</string>
-    <string name="save_manager_title">Kayıt yöneticisi</string>
+    <string name="save_manager_title">Kayıtlar</string>
     <string name="save_manager_subtitle">PS Vita kayıt verilerini içe aktarın, dışa aktarın ve silin.</string>
     <string name="save_manager_open_for_game">Kayıtları yönet</string>
     <string name="save_manager_search_hint">Kayıtları ara</string>
@@ -506,4 +506,5 @@
     <string name="save_manager_empty_game_title">%1$s için kayıt verisi yok</string>
     <string name="save_manager_empty_game_body">Kayıt verisi oluşturmak için bu oyunu başlatın veya bunun için bir kayıt arşivi içe aktarın.</string>
     <string name="save_manager_orphan_save">Oyun yüklü değil</string>
+    <string name="nav_save_manager">Kayıtlar</string>
 </resources>

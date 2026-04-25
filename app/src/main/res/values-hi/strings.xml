@@ -484,7 +484,7 @@
     <string name="onboarding_firmware_info_title">आधिकारिक फ़र्मवेयर डाउनलोड</string>
     <string name="onboarding_firmware_info_body">फ़र्मवेयर फ़ाइलें सीधे Sony के आधिकारिक अपडेट सर्वर से डाउनलोड की जाती हैं। EmuCoreV अपने स्वयं के संसाधनों से फ़र्मवेयर को होस्ट, मिरर, संशोधित या पुनर्वितरित नहीं करता है; यह केवल आधिकारिक सार्वजनिक डाउनलोड लिंक खोलता है और आपके द्वारा चुना गया पैकेज इंस्टॉल करता है।</string>
     <string name="settings_app_language_turkish">तुर्की</string>
-    <string name="save_manager_title">सेव मैनेजर</string>
+    <string name="save_manager_title">सेव</string>
     <string name="save_manager_subtitle">PS Vita सेव डेटा इंपोर्ट, एक्सपोर्ट और डिलीट करें।</string>
     <string name="save_manager_open_for_game">सेव प्रबंधित करें</string>
     <string name="save_manager_search_hint">सेव खोजें</string>
@@ -506,4 +506,5 @@
     <string name="save_manager_empty_game_title">%1$s के लिए कोई सेव डेटा नहीं</string>
     <string name="save_manager_empty_game_body">सेव डेटा बनाने के लिए इस गेम को लॉन्च करें, या इसके लिए सेव आर्काइव इंपोर्ट करें।</string>
     <string name="save_manager_orphan_save">गेम इंस्टॉल नहीं है</string>
+    <string name="nav_save_manager">सेव</string>
 </resources>

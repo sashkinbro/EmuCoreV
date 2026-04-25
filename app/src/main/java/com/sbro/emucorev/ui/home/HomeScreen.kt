@@ -33,7 +33,6 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Games
 import androidx.compose.material.icons.rounded.Memory
-import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.Button
@@ -60,6 +59,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.InstalledVitaGame
 import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.NavigationMenuButton
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
@@ -141,25 +141,10 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (onMenuClick != null) {
-                            Surface(
-                                modifier = Modifier.padding(end = 14.dp),
-                                shape = RoundedCornerShape(14.dp),
-                                color = MaterialTheme.colorScheme.surface,
-                                tonalElevation = 3.dp,
-                                shadowElevation = 5.dp,
-                                onClick = rememberDebouncedClick(onClick = onMenuClick)
-                            ) {
-                                Box(
-                                    modifier = Modifier.padding(horizontal = CompactCardContentPadding, vertical = CompactCardContentPadding),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Menu,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            }
+                            NavigationMenuButton(
+                                onClick = onMenuClick,
+                                modifier = Modifier.padding(end = 14.dp)
+                            )
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(

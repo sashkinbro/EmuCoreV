@@ -558,7 +558,22 @@ int main(int argc, char *argv[]) {
 
     // Pre-Compile Shaders
     emuenv.renderer->set_app(emuenv.io.title_id.c_str(), emuenv.self_name.c_str());
-    if (renderer::get_shaders_cache_hashs(*emuenv.renderer) && cfg.shader_cache) {
+    LOG_INFO("Shader cache runtime: enabled={}, async_pipeline_compilation={}, spirv_shader={}, title_id={}, self={}, cache_path={}, shader_path={}, shader_log_path={}",
+        cfg.shader_cache,
+        emuenv.cfg.current_config.async_pipeline_compilation,
+        cfg.spirv_shader,
+        emuenv.io.title_id,
+        emuenv.self_name,
+        emuenv.cache_path,
+        emuenv.renderer->shaders_path,
+        emuenv.renderer->shaders_log_path);
+
+    if (!cfg.shader_cache) {
+        LOG_INFO("Shader cache is disabled; skipping cached shader precompile.");
+    } else if (renderer::get_shaders_cache_hashs(*emuenv.renderer)) {
+        const auto precompile_start = std::chrono::steady_clock::now();
+        const auto shader_pair_count = emuenv.renderer->shaders_cache_hashs.size();
+        LOG_INFO("Precompiling {} cached shader pair(s).", shader_pair_count);
         SDL_SetWindowTitle(emuenv.window.get(), fmt::format("{} | {} ({}) | Please wait, compiling shaders...", window_title, emuenv.current_app_title, emuenv.io.title_id).c_str());
         for (const auto &hash : emuenv.renderer->shaders_cache_hashs) {
             handle_events(emuenv, gui);
@@ -571,6 +586,10 @@ int main(int argc, char *argv[]) {
             gui::draw_end(gui);
             emuenv.renderer->swap_window(emuenv.window.get());
         }
+        const auto precompile_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - precompile_start);
+        LOG_INFO("Finished cached shader precompile: {} shader pair(s) in {} ms.", shader_pair_count, precompile_elapsed.count());
+    } else {
+        LOG_INFO("No compatible shader cache metadata found; shaders will compile during gameplay.");
     }
     {
         const auto err = run_app(emuenv, main_module_id);

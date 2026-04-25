@@ -484,7 +484,7 @@
     <string name="onboarding_firmware_info_title">Загрузка официальной прошивки</string>
     <string name="onboarding_firmware_info_body">Файлы прошивки загружаются напрямую с официальных серверов обновлений Sony. EmuCoreV не хранит, не копирует, не изменяет и не распространяет прошивку из собственных ресурсов; он лишь открывает официальные публичные ссылки на скачивание и устанавливает выбранный вами пакет.</string>
     <string name="settings_app_language_turkish">Турецкий</string>
-    <string name="save_manager_title">Менеджер сохранений</string>
+    <string name="save_manager_title">Сохранения</string>
     <string name="save_manager_subtitle">Импорт, экспорт и удаление сохранений PS Vita.</string>
     <string name="save_manager_open_for_game">Управление сохранениями</string>
     <string name="save_manager_search_hint">Поиск сохранений</string>
@@ -506,4 +506,5 @@
     <string name="save_manager_empty_game_title">Нет данных сохранения для %1$s</string>
     <string name="save_manager_empty_game_body">Запустите эту игру, чтобы создать данные сохранения, или импортируйте архив сохранений для нее.</string>
     <string name="save_manager_orphan_save">Игра не установлена</string>
+    <string name="nav_save_manager">Сохранения</string>
 </resources>

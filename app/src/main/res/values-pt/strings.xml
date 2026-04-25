@@ -484,7 +484,7 @@
     <string name="onboarding_firmware_info_title">Download de firmware oficial</string>
     <string name="onboarding_firmware_info_body">Os arquivos de firmware são baixados diretamente dos servidores de atualização oficiais da Sony. O EmuCoreV não hospeda, espelha, modifica ou redistribui firmware a partir de seus próprios recursos; ele apenas abre os links de download públicos oficiais e instala o pacote que você escolher.</string>
     <string name="settings_app_language_turkish">Turco</string>
-    <string name="save_manager_title">Gerenciador de saves</string>
+    <string name="save_manager_title">Salvamentos</string>
     <string name="save_manager_subtitle">Importe, exporte e remova dados de salvamento do PS Vita.</string>
     <string name="save_manager_open_for_game">Gerenciar saves</string>
     <string name="save_manager_search_hint">Pesquisar saves</string>
@@ -506,4 +506,5 @@
     <string name="save_manager_empty_game_title">Nenhum dado de salvamento para %1$s</string>
     <string name="save_manager_empty_game_body">Inicie este jogo para criar dados de salvamento ou importe um arquivo de save para ele.</string>
     <string name="save_manager_orphan_save">Jogo não instalado</string>
+    <string name="nav_save_manager">Salvamentos</string>
 </resources>

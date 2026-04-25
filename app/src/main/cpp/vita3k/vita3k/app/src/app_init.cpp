@@ -356,6 +356,11 @@ bool init(EmuEnvState &state, Config &cfg, const Root &root_paths) {
     // Set initall current config for current backend renderer and custom driver with run app path if provided
     config::set_current_config(state, state.cfg.run_app_path.has_value() ? *state.cfg.run_app_path : "");
     LOG_INFO("backend-renderer: {}", state.cfg.current_config.backend_renderer);
+    LOG_INFO("GPU config: shader_cache={}, async_pipeline_compilation={}, spirv_shader={}, show_compile_shaders={}",
+        state.cfg.shader_cache,
+        state.cfg.current_config.async_pipeline_compilation,
+        state.cfg.spirv_shader,
+        state.cfg.show_compile_shaders);
 
     LOG_INFO("Base path: {}", state.base_path);
 #if defined(__linux__) && !defined(__ANDROID__)
@@ -363,6 +368,10 @@ bool init(EmuEnvState &state, Config &cfg, const Root &root_paths) {
     LOG_INFO("Shared path: {}", state.shared_path);
     LOG_INFO("Log path: {}", state.log_path);
     LOG_INFO("User config path: {}", state.config_path);
+    LOG_INFO("User cache path: {}", state.cache_path);
+#endif
+#if !defined(__linux__) || defined(__ANDROID__)
+    LOG_INFO("Log path: {}", state.log_path);
     LOG_INFO("User cache path: {}", state.cache_path);
 #endif
     LOG_INFO("User pref path: {}", state.pref_path);
