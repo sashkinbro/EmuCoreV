@@ -9,7 +9,8 @@ data class VitaSfoData(
     val title: String? = null,
     val version: String? = null,
     val category: String? = null,
-    val contentId: String? = null
+    val contentId: String? = null,
+    val saveDataId: String? = null
 )
 
 object VitaSfoParser {
@@ -52,7 +53,8 @@ object VitaSfoParser {
             title = values["TITLE"],
             version = values["APP_VER"],
             category = values["CATEGORY"],
-            contentId = values["CONTENT_ID"]
+            contentId = values["CONTENT_ID"],
+            saveDataId = values["INSTALL_DIR_SAVEDATA"] ?: values["TITLE_ID"]
         )
     }
 

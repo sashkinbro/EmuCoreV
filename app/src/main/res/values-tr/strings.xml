@@ -484,4 +484,26 @@
     <string name="settings_vsync">V-Sync</string>
     <string name="settings_pstv_mode">PSTV modu</string>
     <string name="settings_app_language_turkish">Türkçe</string>
+    <string name="save_manager_title">Kayıt yöneticisi</string>
+    <string name="save_manager_subtitle">PS Vita kayıt verilerini içe aktarın, dışa aktarın ve silin.</string>
+    <string name="save_manager_open_for_game">Kayıtları yönet</string>
+    <string name="save_manager_search_hint">Kayıtları ara</string>
+    <string name="save_manager_export">Dışa aktar</string>
+    <string name="save_manager_import">İçe aktar</string>
+    <string name="save_manager_delete">Kaydı sil</string>
+    <string name="save_manager_delete_confirm_title">Kayıt verileri silinsin mi?</string>
+    <string name="save_manager_delete_confirm_body">Bu, %1$s için kayıt verilerini kaldıracaktır.</string>
+    <string name="save_manager_delete_failed">Kayıt verileri silinemedi.</string>
+    <string name="save_manager_export_success">Kayıt verileri dışa aktarıldı.</string>
+    <string name="save_manager_export_failed">Kayıt verileri dışa aktarılamadı.</string>
+    <string name="save_manager_import_success">Kayıt verileri içe aktarıldı: %1$s.</string>
+    <string name="save_manager_import_failed">Kayıt verileri içe aktarılamadı.</string>
+    <string name="save_manager_import_empty">Arşiv herhangi bir kayıt dosyası içermiyor.</string>
+    <string name="save_manager_import_unsafe">Arşiv güvenli olmayan yollar içeriyor.</string>
+    <string name="save_manager_import_unknown_target">Bu arşivi içe aktarmadan önce bir oyun kayıt kartı seçin veya tek bir kayıt klasörü olan bir arşiv kullanın.</string>
+    <string name="save_manager_empty_title">Kayıt verisi bulunamadı</string>
+    <string name="save_manager_empty_body">Kayıt verisi oluşturmak için bir oyun başlatın veya bir kayıt arşivi içe aktarın.</string>
+    <string name="save_manager_empty_game_title">%1$s için kayıt verisi yok</string>
+    <string name="save_manager_empty_game_body">Kayıt verisi oluşturmak için bu oyunu başlatın veya bunun için bir kayıt arşivi içe aktarın.</string>
+    <string name="save_manager_orphan_save">Oyun yüklü değil</string>
 </resources>

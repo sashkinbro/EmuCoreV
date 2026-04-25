@@ -484,4 +484,26 @@
     <string name="onboarding_firmware_info_title">Descarga de firmware oficial</string>
     <string name="onboarding_firmware_info_body">Los archivos de firmware se descargan directamente de los servidores de actualización oficiales de Sony. EmuCoreV no aloja, replica, modifica ni redistribuye el firmware desde sus propios recursos; solo abre los enlaces de descarga públicos oficiales e instala el paquete que elijas.</string>
     <string name="settings_app_language_turkish">Turco</string>
+    <string name="save_manager_title">Gestor de guardado</string>
+    <string name="save_manager_subtitle">Importa, exporta y elimina datos de guardado de PS Vita.</string>
+    <string name="save_manager_open_for_game">Gestionar guardados</string>
+    <string name="save_manager_search_hint">Buscar guardados</string>
+    <string name="save_manager_export">Exportar</string>
+    <string name="save_manager_import">Importar</string>
+    <string name="save_manager_delete">Eliminar guardado</string>
+    <string name="save_manager_delete_confirm_title">¿Eliminar datos de guardado?</string>
+    <string name="save_manager_delete_confirm_body">Esto eliminará los datos de guardado de %1$s.</string>
+    <string name="save_manager_delete_failed">Error al eliminar los datos de guardado.</string>
+    <string name="save_manager_export_success">Datos de guardado exportados.</string>
+    <string name="save_manager_export_failed">Error al exportar los datos de guardado.</string>
+    <string name="save_manager_import_success">Datos de guardado importados: %1$s.</string>
+    <string name="save_manager_import_failed">Error al importar los datos de guardado.</string>
+    <string name="save_manager_import_empty">El archivo no contiene datos de guardado.</string>
+    <string name="save_manager_import_unsafe">El archivo contiene rutas no seguras.</string>
+    <string name="save_manager_import_unknown_target">Elige una tarjeta de guardado de juego antes de importar este archivo, o usa un archivo con una sola carpeta de guardado.</string>
+    <string name="save_manager_empty_title">No se encontraron datos de guardado</string>
+    <string name="save_manager_empty_body">Inicia un juego para crear datos de guardado o importa un archivo de guardado.</string>
+    <string name="save_manager_empty_game_title">No hay datos de guardado para %1$s</string>
+    <string name="save_manager_empty_game_body">Inicia este juego para crear datos de guardado o importa un archivo de guardado para él.</string>
+    <string name="save_manager_orphan_save">Juego no instalado</string>
 </resources>

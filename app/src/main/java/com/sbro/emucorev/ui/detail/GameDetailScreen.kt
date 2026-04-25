@@ -137,6 +137,7 @@ fun GameDetailScreen(
     titleId: String?,
     igdbId: Long?,
     onBack: () -> Unit,
+    onOpenSaveManager: (String) -> Unit = {},
     viewModel: GameDetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -148,6 +149,7 @@ fun GameDetailScreen(
     val launchRequiresFirmwareMessage = stringResource(R.string.game_launch_requires_firmware)
     val launchRequiresFirmwareUpdateMessage = stringResource(R.string.game_launch_requires_firmware_update)
     val deleteGameLabel = stringResource(R.string.detail_delete_game)
+    val manageSaveDataLabel = stringResource(R.string.save_manager_open_for_game)
     val deleteGameConfirmTitle = stringResource(R.string.detail_delete_game_confirm_title)
     val deleteGameConfirmBody = stringResource(R.string.detail_delete_game_confirm_body)
     val deleteGameFailedMessage = stringResource(R.string.detail_delete_game_failed)
@@ -210,6 +212,19 @@ fun GameDetailScreen(
                         expanded = showOverflowMenu,
                         onDismissRequest = { showOverflowMenu = false }
                     ) {
+                        DropdownMenuItem(
+                            text = { Text(manageSaveDataLabel) },
+                            onClick = {
+                                showOverflowMenu = false
+                                onOpenSaveManager(game.titleId)
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Save,
+                                    contentDescription = null
+                                )
+                            }
+                        )
                         DropdownMenuItem(
                             text = { Text(deleteGameLabel) },
                             onClick = {

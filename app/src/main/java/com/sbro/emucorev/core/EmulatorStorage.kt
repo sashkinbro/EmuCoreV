@@ -37,6 +37,9 @@ object EmulatorStorage {
 
     fun ux0AppRoot(context: Context): File = File(vitaRoot(context), "ux0/app").apply { mkdirs() }
 
+    fun ux0SaveDataRoot(context: Context, userId: String = "00"): File =
+        File(vitaRoot(context), "ux0/user/$userId/savedata").apply { mkdirs() }
+
     fun hasInstalledFirmware(context: Context): Boolean {
         val firmwareRoot = File(vitaRoot(context), "vs0")
         if (!firmwareRoot.exists() || !firmwareRoot.isDirectory) return false

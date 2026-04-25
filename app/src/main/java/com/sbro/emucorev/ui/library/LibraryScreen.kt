@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ViewModule
 import androidx.compose.material3.AlertDialog
@@ -88,6 +89,7 @@ private enum class LibraryLayoutMode {
 @Composable
 fun LibraryScreen(
     onLaunchGame: (String) -> Unit,
+    onOpenSaveManager: (String) -> Unit,
     onMenuClick: (() -> Unit)? = null,
     viewModel: LibraryViewModel = viewModel()
 ) {
@@ -104,6 +106,7 @@ fun LibraryScreen(
         uiState.items.size
     )
     val deleteGameLabel = stringResource(R.string.detail_delete_game)
+    val manageSaveDataLabel = stringResource(R.string.save_manager_open_for_game)
     val deleteGameConfirmTitle = stringResource(R.string.detail_delete_game_confirm_title)
     val deleteGameConfirmBody = stringResource(R.string.detail_delete_game_confirm_body)
     val deleteGameFailedMessage = stringResource(R.string.detail_delete_game_failed)
@@ -322,6 +325,19 @@ fun LibraryScreen(
                         onDismissRequest = { menuExpanded = false }
                     ) {
                         DropdownMenuItem(
+                            text = { Text(manageSaveDataLabel) },
+                            onClick = {
+                                onOpenSaveManager(game.titleId)
+                                menuExpanded = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Save,
+                                    contentDescription = null
+                                )
+                            }
+                        )
+                        DropdownMenuItem(
                             text = { Text(deleteGameLabel) },
                             onClick = {
                                 deleteGameId = game.titleId
@@ -395,6 +411,19 @@ fun LibraryScreen(
                                 expanded = menuExpanded,
                                 onDismissRequest = { menuExpanded = false }
                             ) {
+                                DropdownMenuItem(
+                                    text = { Text(manageSaveDataLabel) },
+                                    onClick = {
+                                        onOpenSaveManager(game.titleId)
+                                        menuExpanded = false
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Save,
+                                            contentDescription = null
+                                        )
+                                    }
+                                )
                                 DropdownMenuItem(
                                     text = { Text(deleteGameLabel) },
                                     onClick = {
