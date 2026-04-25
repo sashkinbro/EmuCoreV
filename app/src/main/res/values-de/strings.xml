@@ -507,4 +507,10 @@
     <string name="save_manager_empty_game_body">Starte dieses Spiel, um Speicherdaten zu erstellen, oder importiere ein Speicherarchiv dafür.</string>
     <string name="save_manager_orphan_save">Spiel nicht installiert</string>
     <string name="nav_save_manager">Speicherstände</string>
+    <string name="settings_options_content_description">Einstellungsoptionen</string>
+    <string name="settings_reset_defaults_menu">Standardeinstellungen wiederherstellen</string>
+    <string name="settings_reset_defaults_title">Standardeinstellungen wiederherstellen?</string>
+    <string name="settings_reset_defaults_message">Dadurch werden die Emulatoreinstellungen auf die empfohlenen Standardwerte zurückgesetzt. Deine Spiele, Speicherdaten, die App-Sprache und ausgewählte Ordner bleiben unverändert.</string>
+    <string name="settings_reset_defaults_confirm">Wiederherstellen</string>
+    <string name="settings_reset_defaults_cancel">Abbrechen</string>
 </resources>

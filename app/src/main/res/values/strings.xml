@@ -155,6 +155,12 @@
     <string name="catalog_no_results_title">No matches found</string>
     <string name="catalog_no_results_body">Try a different title, year, or spelling.</string>
     <string name="settings_title">Settings</string>
+    <string name="settings_options_content_description">Settings options</string>
+    <string name="settings_reset_defaults_menu">Restore default settings</string>
+    <string name="settings_reset_defaults_title">Restore default settings?</string>
+    <string name="settings_reset_defaults_message">This will reset emulator settings to their recommended defaults. Your games, saves, app language, and selected folders will stay unchanged.</string>
+    <string name="settings_reset_defaults_confirm">Restore</string>
+    <string name="settings_reset_defaults_cancel">Cancel</string>
     <string name="settings_assist_hint">Tap the info icon for a short explanation. Long press a setting title to restore its default value.</string>
     <string name="settings_tab_general">General</string>
     <string name="settings_tab_graphics">Graphics</string>

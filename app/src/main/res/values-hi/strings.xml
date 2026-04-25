@@ -507,4 +507,10 @@
     <string name="save_manager_empty_game_body">सेव डेटा बनाने के लिए इस गेम को लॉन्च करें, या इसके लिए सेव आर्काइव इंपोर्ट करें।</string>
     <string name="save_manager_orphan_save">गेम इंस्टॉल नहीं है</string>
     <string name="nav_save_manager">सेव</string>
+    <string name="settings_options_content_description">सेटिंग विकल्प</string>
+    <string name="settings_reset_defaults_menu">डिफ़ॉल्ट सेटिंग्स रीस्टोर करें</string>
+    <string name="settings_reset_defaults_title">डिफ़ॉल्ट सेटिंग्स रीस्टोर करें?</string>
+    <string name="settings_reset_defaults_message">यह एमुलेटर सेटिंग्स को उनके अनुशंसित डिफ़ॉल्ट पर रीसेट कर देगा। आपके गेम, सेव, ऐप की भाषा और चयनित फ़ोल्डर अपरिवर्तित रहेंगे।</string>
+    <string name="settings_reset_defaults_confirm">रीस्टोर करें</string>
+    <string name="settings_reset_defaults_cancel">रद्द करें</string>
 </resources>

@@ -506,4 +506,10 @@
     <string name="save_manager_empty_game_body">启动此游戏以创建存档数据，或为它导入一个存档压缩包。</string>
     <string name="save_manager_orphan_save">游戏未安装</string>
     <string name="nav_save_manager">存档</string>
+    <string name="settings_options_content_description">设置选项</string>
+    <string name="settings_reset_defaults_menu">恢复默认设置</string>
+    <string name="settings_reset_defaults_title">恢复默认设置？</string>
+    <string name="settings_reset_defaults_message">这会将模拟器设置重置为推荐的默认值。您的游戏、存档、应用语言和选定的文件夹将保持不变。</string>
+    <string name="settings_reset_defaults_confirm">恢复</string>
+    <string name="settings_reset_defaults_cancel">取消</string>
 </resources>

@@ -169,8 +169,26 @@ struct State {
     }
 
     void set_app(const char *title_id, const char *self_name) {
-        shaders_path = cache_path / "shaders" / title_id / self_name;
-        shaders_log_path = log_path / "shaderlog" / title_id / self_name;
+        const auto backend_name = current_backend == Backend::OpenGL ? "gl" : current_backend == Backend::Vulkan ? "vk" : "unknown";
+        fs::path shader_cache_root = cache_path / "shaders" / backend_name;
+        fs::path shader_log_root = log_path / "shaderlog" / backend_name;
+#ifdef __ANDROID__
+        const auto driver_name = current_custom_driver.empty() ? std::string("system") : sanitize_cache_path_part(current_custom_driver);
+        shader_cache_root /= driver_name;
+        shader_log_root /= driver_name;
+#endif
+        shaders_path = shader_cache_root / title_id / self_name;
+        shaders_log_path = shader_log_root / title_id / self_name;
+    }
+
+private:
+    static std::string sanitize_cache_path_part(const std::string &name) {
+        std::string sanitized = name;
+        for (char &character : sanitized) {
+            if (character < 32 || std::string_view("<>:\"/\\|?*").find(character) != std::string_view::npos)
+                character = '_';
+        }
+        return sanitized.empty() ? std::string("unknown") : sanitized;
     }
 };
 } // namespace renderer

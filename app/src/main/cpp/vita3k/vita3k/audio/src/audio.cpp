@@ -58,12 +58,21 @@ void AudioState::set_backend(const std::string &adapter_name) {
 }
 
 AudioOutPortPtr AudioState::open_port(int nb_channels, int freq, int nb_sample) {
+    if (!adapter)
+        return nullptr;
+
     AudioOutPortPtr port = adapter->open_port(nb_channels, freq, nb_sample);
+    if (!port)
+        return nullptr;
+
     set_volume(*port, port->volume);
     return port;
 }
 
 void AudioState::audio_output(AudioOutPort &out_port, const void *buffer) {
+    if (!adapter)
+        return;
+
     adapter->audio_output(out_port, buffer);
 
     uint64_t now = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
@@ -85,11 +94,15 @@ void AudioState::audio_output(AudioOutPort &out_port, const void *buffer) {
 
 void AudioState::set_volume(AudioOutPort &out_port, float volume) {
     out_port.volume = volume;
-    adapter->set_volume(out_port, volume * global_volume);
+    if (adapter)
+        adapter->set_volume(out_port, volume * global_volume);
 }
 
 void AudioState::set_global_volume(float volume) {
     global_volume = volume;
+    if (!adapter)
+        return;
+
     //  Update adapter volume for each port.
     const std::lock_guard lock(mutex);
     for (const auto &[_, port] : out_ports) {
@@ -98,9 +111,15 @@ void AudioState::set_global_volume(float volume) {
 }
 
 void AudioState::switch_state(const bool pause) {
+    if (!adapter)
+        return;
+
     adapter->switch_state(pause);
 }
 
 int AudioState::get_rest_sample(AudioOutPort &out_port) {
+    if (!adapter)
+        return 0;
+
     return adapter->get_rest_sample(out_port);
 }

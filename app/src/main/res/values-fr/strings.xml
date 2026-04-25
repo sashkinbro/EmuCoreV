@@ -507,4 +507,10 @@
     <string name="save_manager_empty_game_body">Lancez ce jeu pour créer des données de sauvegarde, ou importez une archive de sauvegarde pour celui-ci.</string>
     <string name="save_manager_orphan_save">Jeu non installé</string>
     <string name="nav_save_manager">Sauvegardes</string>
+    <string name="settings_options_content_description">Options des paramètres</string>
+    <string name="settings_reset_defaults_menu">Restaurer les paramètres par défaut</string>
+    <string name="settings_reset_defaults_title">Restaurer les paramètres par défaut ?</string>
+    <string name="settings_reset_defaults_message">Cela réinitialisera les paramètres de l\'émulateur à leurs valeurs par défaut recommandées. Vos jeux, sauvegardes, la langue de l\'application et les dossiers sélectionnés resteront inchangés.</string>
+    <string name="settings_reset_defaults_confirm">Restaurer</string>
+    <string name="settings_reset_defaults_cancel">Annuler</string>
 </resources>

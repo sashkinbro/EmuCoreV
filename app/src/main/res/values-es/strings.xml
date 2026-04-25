@@ -507,4 +507,10 @@
     <string name="save_manager_empty_game_body">Inicia este juego para crear datos de guardado o importa un archivo de guardado para él.</string>
     <string name="save_manager_orphan_save">Juego no instalado</string>
     <string name="nav_save_manager">Guardados</string>
+    <string name="settings_options_content_description">Opciones de configuración</string>
+    <string name="settings_reset_defaults_menu">Restaurar ajustes predeterminados</string>
+    <string name="settings_reset_defaults_title">¿Restaurar ajustes predeterminados?</string>
+    <string name="settings_reset_defaults_message">Esto restablecerá los ajustes del emulador a sus valores predeterminados recomendados. Tus juegos, guardados, el idioma de la aplicación y las carpetas seleccionadas no se verán afectados.</string>
+    <string name="settings_reset_defaults_confirm">Restaurar</string>
+    <string name="settings_reset_defaults_cancel">Cancelar</string>
 </resources>
