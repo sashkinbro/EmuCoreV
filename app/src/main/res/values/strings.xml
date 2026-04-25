@@ -24,7 +24,7 @@
     <string name="onboarding_page_3_title">Built-in catalog</string>
     <string name="onboarding_page_3_body">Browse covers, screenshots, videos, and game details in one place.</string>
     <string name="onboarding_page_4_title">Almost ready</string>
-    <string name="onboarding_page_4_body">Install the base firmware, install the firmware update package, and choose the folder where your package files are stored.</string>
+    <string name="onboarding_page_4_body">Install the base firmware and firmware update package before launching games.</string>
     <string name="onboarding_firmware_title">Base firmware</string>
     <string name="onboarding_firmware_desc">Install the main PS Vita firmware package before launching any game.</string>
     <string name="onboarding_firmware_update_title">Firmware update package</string>
@@ -41,6 +41,8 @@
     <string name="onboarding_firmware_cancel_download">Cancel</string>
     <string name="onboarding_firmware_downloading">Downloading %1$d%%</string>
     <string name="onboarding_firmware_download_failed">Download failed. Try again.</string>
+    <string name="onboarding_firmware_info_title">Official firmware download</string>
+    <string name="onboarding_firmware_info_body">Firmware files are downloaded directly from Sony’s official update servers. EmuCoreV does not host, mirror, modify, or redistribute firmware from its own resources; it only opens the official public download links and installs the package you choose.</string>
     <string name="onboarding_back">Back</string>
     <string name="onboarding_next">Next</string>
     <string name="onboarding_get_started">Get started</string>
@@ -316,12 +318,16 @@
     <string name="settings_gpu_driver_manager_subtitle">Install, download, apply, or remove Adreno drivers.</string>
     <string name="settings_gpu_driver_active_title">Active driver</string>
     <string name="settings_gpu_driver_install_from_file">Install from file</string>
-    <string name="settings_gpu_driver_catalog">Adreno driver catalog</string>
+    <string name="settings_gpu_driver_catalog">Driver catalog</string>
     <string name="settings_gpu_driver_refresh">Refresh</string>
     <string name="settings_gpu_driver_catalog_loading">Loading driver catalog…</string>
     <string name="settings_gpu_driver_catalog_failed">Could not load driver catalog</string>
     <string name="settings_gpu_driver_catalog_empty">No online drivers are available yet.</string>
     <string name="settings_gpu_driver_download_apply">Download &amp; apply</string>
+    <string name="settings_gpu_driver_downloaded">Downloaded</string>
+    <string name="settings_gpu_driver_apply">Apply</string>
+    <string name="settings_gpu_driver_applied">Applied</string>
+    <string name="settings_gpu_driver_remove_short">Remove</string>
     <string name="settings_gpu_driver_recommended">Recommended</string>
     <string name="settings_gpu_driver_source">Source</string>
     <string name="settings_gpu_driver_search">Search drivers</string>
@@ -368,7 +374,7 @@
     <string name="settings_emulation_core">Emulation Core</string>
     <string name="settings_based_on_vita3k">Based on Vita3K</string>
     <string name="settings_developer">Developer</string>
-    <string name="settings_created_by_sbro">Created by Sashkib Apps</string>
+    <string name="settings_created_by_sbro">Created by Sashkin Apps</string>
     <string name="settings_play_store_profile">Play Store Profile</string>
     <string name="settings_core_source_code">Core Source Code</string>
     <string name="settings_core_source_description">EmuCoreV uses a custom Android interface built on a Vita3K-based core.</string>
@@ -411,7 +417,7 @@
     <string name="install_dialog_firmware_failed">Firmware installation failed.</string>
     <string name="install_dialog_content_failed">Game installation failed.</string>
     <string name="install_dialog_pkg_failed">PKG installation failed.</string>
-    <string name="install_dialog_firmware_done">Firmware %1$s installed successfully.</string>
+    <string name="install_dialog_firmware_done">Firmware package installed successfully.</string>
     <string name="install_dialog_firmware_default_version">selected build</string>
     <string name="install_dialog_pkg_done">PKG installed successfully.</string>
     <string name="setup_title">Install games</string>

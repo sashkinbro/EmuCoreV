@@ -1,7 +1,6 @@
 package com.sbro.emucorev.ui.onboarding
 
 import android.app.Application
-import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.data.AppPreferences
@@ -12,9 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 data class OnboardingUiState(
     val currentPage: Int = 0,
     val totalPages: Int = 4,
-    val packagesFolder: String? = null,
     val storagePath: String = "",
-    val canContinue: Boolean = false
+    val canContinue: Boolean = true
 )
 
 class OnboardingViewModel(application: Application) : AndroidViewModel(application) {
@@ -23,9 +21,8 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
 
     private val _uiState = MutableStateFlow(
         OnboardingUiState(
-            packagesFolder = preferences.packagesFolderDisplayName(application),
             storagePath = EmulatorStorage.vitaRoot(application).absolutePath,
-            canContinue = preferences.packagesFolderUriAsUri() != null
+            canContinue = true
         )
     )
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
@@ -45,15 +42,6 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
     fun setCurrentPage(page: Int) {
         _uiState.value = _uiState.value.copy(
             currentPage = page.coerceIn(0, _uiState.value.totalPages - 1)
-        )
-    }
-
-    fun onPackagesFolderSelected(uri: Uri) {
-        val context = getApplication<Application>()
-        preferences.setPackagesFolder(context, uri)
-        _uiState.value = _uiState.value.copy(
-            packagesFolder = preferences.packagesFolderDisplayName(context),
-            canContinue = true
         )
     }
 

@@ -343,7 +343,7 @@
     <string name="settings_emulation_core">Cœur d\'émulation</string>
     <string name="settings_based_on_vita3k">Basé sur Vita3K</string>
     <string name="settings_developer">Développeur</string>
-    <string name="settings_created_by_sbro">Créé par Sashkib Apps</string>
+    <string name="settings_created_by_sbro">Créé par Sashkin Apps</string>
     <string name="settings_play_store_profile">Profil Play Store</string>
     <string name="settings_core_source_code">Code source du cœur</string>
     <string name="settings_core_source_description">EmuCoreV utilise une interface Android personnalisée construite sur un cœur basé sur Vita3K.</string>
@@ -386,7 +386,7 @@
     <string name="install_dialog_firmware_failed">L\'installation du firmware a échoué.</string>
     <string name="install_dialog_content_failed">L\'installation du jeu a échoué.</string>
     <string name="install_dialog_pkg_failed">L\'installation du PKG a échoué.</string>
-    <string name="install_dialog_firmware_done">Le firmware %1$s a été installé avec succès.</string>
+    <string name="install_dialog_firmware_done">Paquet de firmware installé avec succès.</string>
     <string name="install_dialog_firmware_default_version">build sélectionné</string>
     <string name="install_dialog_pkg_done">PKG installé avec succès.</string>
     <string name="setup_title">Installer des jeux</string>
@@ -464,12 +464,16 @@
     <string name="settings_gpu_driver_manager_subtitle">Installer, télécharger, appliquer ou supprimer les pilotes Adreno.</string>
     <string name="settings_gpu_driver_active_title">Pilote actif</string>
     <string name="settings_gpu_driver_install_from_file">Installer à partir d\'un fichier</string>
-    <string name="settings_gpu_driver_catalog">Catalogue de pilotes Adreno</string>
+    <string name="settings_gpu_driver_catalog">Catalogue de pilotes</string>
     <string name="settings_gpu_driver_refresh">Actualiser</string>
     <string name="settings_gpu_driver_catalog_loading">Chargement du catalogue de pilotes…</string>
     <string name="settings_gpu_driver_catalog_failed">Impossible de charger le catalogue de pilotes</string>
     <string name="settings_gpu_driver_catalog_empty">Aucun pilote en ligne n\'est encore disponible.</string>
     <string name="settings_gpu_driver_download_apply">Télécharger et appliquer</string>
+    <string name="settings_gpu_driver_downloaded">Téléchargé</string>
+    <string name="settings_gpu_driver_apply">Appliquer</string>
+    <string name="settings_gpu_driver_applied">Appliqué</string>
+    <string name="settings_gpu_driver_remove_short">Supprimer</string>
     <string name="settings_gpu_driver_recommended">Recommandé</string>
     <string name="settings_gpu_driver_source">Source</string>
     <string name="settings_gpu_driver_search">Rechercher des pilotes</string>
@@ -477,4 +481,6 @@
     <string name="settings_gpu_driver_result_count">%1$d sur %2$d pilotes</string>
     <string name="settings_gpu_driver_no_matches">Aucun pilote correspondant</string>
     <string name="settings_gpu_driver_no_matches_desc">Modifiez le texte de recherche ou les filtres sélectionnés.</string>
+    <string name="onboarding_firmware_info_title">Téléchargement de firmware officiel</string>
+    <string name="onboarding_firmware_info_body">Les fichiers de firmware sont téléchargés directement depuis les serveurs de mise à jour officiels de Sony. EmuCoreV n\'héberge, ne copie, ne modifie ni ne redistribue de firmware à partir de ses propres ressources ; l\'application se contente d\'ouvrir les liens de téléchargement publics officiels et d\'installer le paquet de votre choix.</string>
 </resources>

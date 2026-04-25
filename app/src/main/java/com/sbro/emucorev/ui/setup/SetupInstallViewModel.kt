@@ -71,12 +71,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
             }
             val version = VitaInstallBridge.installFirmware(appContext, path, systemLanguage())
             if (version != null) {
-                finishSuccess(
-                    appContext.getString(
-                        R.string.install_dialog_firmware_done,
-                        version.ifBlank { appContext.getString(R.string.install_dialog_firmware_default_version) }
-                    )
-                )
+                finishSuccess(appContext.getString(R.string.install_dialog_firmware_done))
             } else {
                 finishError(appContext.getString(R.string.install_dialog_firmware_failed))
             }

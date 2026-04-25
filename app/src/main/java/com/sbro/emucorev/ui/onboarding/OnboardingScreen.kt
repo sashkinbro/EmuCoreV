@@ -1,9 +1,5 @@
 package com.sbro.emucorev.ui.onboarding
 
-import android.net.Uri
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -40,18 +36,22 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.LibraryBooks
-import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material.icons.rounded.SystemUpdateAlt
 import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -70,17 +70,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.FirmwareKind
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
-import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -96,13 +95,11 @@ fun OnboardingScreen(
     firmwareDownloadViewModel: FirmwareDownloadViewModel = viewModel(),
     viewModel: OnboardingViewModel = viewModel()
 ) {
-    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val downloadState by firmwareDownloadViewModel.state.collectAsState()
     val pagerState = rememberPagerState(pageCount = { uiState.totalPages })
     val scope = rememberCoroutineScope()
     var isCompleting by remember { mutableStateOf(false) }
-    val folderPickerFailedMessage = stringResource(R.string.folder_picker_failed)
 
     LaunchedEffect(uiState.currentPage) {
         if (pagerState.currentPage != uiState.currentPage) {
@@ -122,16 +119,6 @@ fun OnboardingScreen(
         }
     }
 
-    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
-        uri ?: return@rememberLauncherForActivityResult
-        runCatching {
-            viewModel.onPackagesFolderSelected(uri)
-        }.onFailure {
-            Toast.makeText(context, folderPickerFailedMessage, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    val chooseFolderClick = rememberDebouncedClick { folderPicker.launch(null) }
     val installFirmwareClick = rememberDebouncedClick(onClick = onInstallFirmware)
     val installFirmwareUpdateClick = rememberDebouncedClick(onClick = onInstallFirmwareUpdate)
     val backClick = rememberDebouncedClick(onClick = viewModel::goBack)
@@ -235,14 +222,20 @@ fun OnboardingScreen(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
+                val isSetupPage = page == uiState.totalPages - 1
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .statusBarsPadding()
                         .navigationBarsPadding()
-                        .padding(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, top = 48.dp, bottom = 160.dp),
-                    verticalArrangement = Arrangement.Center,
+                        .padding(
+                            start = ScreenHorizontalPadding,
+                            end = ScreenHorizontalPadding,
+                            top = if (isSetupPage) 12.dp else 48.dp,
+                            bottom = if (isSetupPage) 144.dp else 160.dp
+                        ),
+                    verticalArrangement = if (isSetupPage) Arrangement.Top else Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     when (page) {
@@ -262,7 +255,6 @@ fun OnboardingScreen(
                             subtitle = stringResource(R.string.onboarding_page_3_body)
                         )
                         else -> OnboardingSetupContent(
-                            packagesFolder = uiState.packagesFolder,
                             storagePath = uiState.storagePath,
                             firmwareInstalled = firmwareInstalled,
                             firmwareUpdateInstalled = firmwareUpdateInstalled,
@@ -270,8 +262,7 @@ fun OnboardingScreen(
                             installFirmwareUpdate = installFirmwareUpdateClick,
                             downloadState = downloadState,
                             startFirmwareDownload = firmwareDownloadViewModel::start,
-                            cancelFirmwareDownload = firmwareDownloadViewModel::cancel,
-                            launchFolderPicker = chooseFolderClick
+                            cancelFirmwareDownload = firmwareDownloadViewModel::cancel
                         )
                     }
                 }
@@ -393,7 +384,7 @@ private fun OnboardingHero(
             text = title,
             style = MaterialTheme.typography.displayLarge.copy(
                 fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp
+                letterSpacing = 0.sp
             ),
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center
@@ -411,7 +402,6 @@ private fun OnboardingHero(
 
 @Composable
 private fun OnboardingSetupContent(
-    packagesFolder: String?,
     storagePath: String,
     firmwareInstalled: Boolean,
     firmwareUpdateInstalled: Boolean,
@@ -419,12 +409,12 @@ private fun OnboardingSetupContent(
     installFirmwareUpdate: () -> Unit,
     downloadState: FirmwareDownloadState,
     startFirmwareDownload: (FirmwareKind) -> Unit,
-    cancelFirmwareDownload: () -> Unit,
-    launchFolderPicker: () -> Unit
+    cancelFirmwareDownload: () -> Unit
 ) {
     val isDownloading = downloadState.status == FirmwareDownloadStatus.Running
     val downloadButton = stringResource(R.string.onboarding_firmware_download)
     val cancelDownloadButton = stringResource(R.string.onboarding_firmware_cancel_download)
+    var firmwareInfoVisible by remember { mutableStateOf(false) }
 
     val baseDownloadStatus = firmwareDownloadStatusText(FirmwareKind.Base, downloadState)
     val updateDownloadStatus = firmwareDownloadStatusText(FirmwareKind.Update, downloadState)
@@ -440,22 +430,22 @@ private fun OnboardingSetupContent(
     ) {
         Text(
             text = stringResource(R.string.onboarding_page_4_title),
-            style = MaterialTheme.typography.displayLarge.copy(
+            style = MaterialTheme.typography.headlineLarge.copy(
                 fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp
+                letterSpacing = 0.sp
             ),
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.onboarding_page_4_body),
-            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
+            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 23.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 6.dp)
         )
-        Spacer(modifier = Modifier.height(26.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         SetupCard(
             icon = Icons.Rounded.Memory,
@@ -473,11 +463,12 @@ private fun OnboardingSetupContent(
             onSecondaryAction = {
                 if (baseDownloadProgress != null) cancelFirmwareDownload() else startFirmwareDownload(FirmwareKind.Base)
             },
+            onInfoClick = { firmwareInfoVisible = true },
             downloadProgress = baseDownloadProgress,
             downloadStatus = baseDownloadStatus
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(9.dp))
 
         SetupCard(
             icon = Icons.Rounded.SystemUpdateAlt,
@@ -495,26 +486,12 @@ private fun OnboardingSetupContent(
             onSecondaryAction = {
                 if (updateDownloadProgress != null) cancelFirmwareDownload() else startFirmwareDownload(FirmwareKind.Update)
             },
+            onInfoClick = { firmwareInfoVisible = true },
             downloadProgress = updateDownloadProgress,
             downloadStatus = updateDownloadStatus
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        SetupCard(
-            icon = Icons.Rounded.FolderOpen,
-            title = stringResource(R.string.onboarding_packages_title),
-            description = packagesFolder ?: stringResource(R.string.onboarding_packages_desc),
-            status = if (packagesFolder == null) {
-                stringResource(R.string.onboarding_status_pick_folder)
-            } else {
-                stringResource(R.string.onboarding_status_ready)
-            },
-            statusColor = if (packagesFolder == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
-            onClick = launchFolderPicker
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(9.dp))
 
         SetupCard(
             icon = Icons.Rounded.Memory,
@@ -523,6 +500,11 @@ private fun OnboardingSetupContent(
             status = stringResource(R.string.onboarding_status_ready),
             statusColor = MaterialTheme.colorScheme.tertiary,
             onClick = {}
+        )
+
+        FirmwareDownloadInfoDialog(
+            visible = firmwareInfoVisible,
+            onDismiss = { firmwareInfoVisible = false }
         )
     }
 }
@@ -555,6 +537,7 @@ private fun SetupCard(
     secondaryActionLabel: String? = null,
     secondaryActionEnabled: Boolean = true,
     onSecondaryAction: (() -> Unit)? = null,
+    onInfoClick: (() -> Unit)? = null,
     downloadProgress: Float? = null,
     downloadStatus: String? = null
 ) {
@@ -562,8 +545,8 @@ private fun SetupCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        shape = RoundedCornerShape(32.dp),
+            .padding(vertical = 3.dp),
+        shape = RoundedCornerShape(26.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
         tonalElevation = 2.dp,
         onClick = onClick,
@@ -572,15 +555,15 @@ private fun SetupCard(
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (isDarkTheme) 0.45f else 0.7f)
         )
     ) {
-        Column(modifier = Modifier.padding(horizontal = CardContentPadding, vertical = CardContentPadding)) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(18.dp))
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -588,7 +571,7 @@ private fun SetupCard(
                         imageVector = icon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
@@ -596,65 +579,50 @@ private fun SetupCard(
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(1.dp))
                     Text(
                         text = description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Surface(
-                shape = CircleShape,
-                color = statusColor.copy(alpha = 0.12f)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(statusColor)
-                    )
-                    Text(
-                        text = status,
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                        color = statusColor
-                    )
-                }
-            }
-
-            if (secondaryActionLabel != null || downloadProgress != null || downloadStatus != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
+            Spacer(modifier = Modifier.height(14.dp))
+            if (secondaryActionLabel != null && onSecondaryAction != null) {
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (downloadStatus != null) {
-                        Text(
-                            text = downloadStatus,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (downloadProgress == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f)
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
+                    StatusPill(
+                        status = status,
+                        statusColor = statusColor,
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
-                    if (secondaryActionLabel != null && onSecondaryAction != null) {
-                        Spacer(modifier = Modifier.width(12.dp))
-                        OutlinedButton(
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (onInfoClick != null) {
+                            FirmwareInfoButton(onClick = onInfoClick)
+                        } else {
+                            Spacer(modifier = Modifier.width(48.dp))
+                        }
+                        Button(
                             onClick = onSecondaryAction,
-                            enabled = secondaryActionEnabled
+                            enabled = secondaryActionEnabled,
+                            modifier = Modifier.align(Alignment.CenterVertically),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.CloudDownload,
@@ -666,15 +634,140 @@ private fun SetupCard(
                         }
                     }
                 }
+            } else {
+                StatusPill(
+                    status = status,
+                    statusColor = statusColor
+                )
             }
 
             if (downloadProgress != null) {
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                downloadStatus?.let { statusText ->
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
                 LinearProgressIndicator(
                     progress = { downloadProgress },
                     modifier = Modifier.fillMaxWidth()
                 )
+            } else if (downloadStatus != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = downloadStatus,
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun FirmwareInfoButton(onClick: () -> Unit) {
+    val pulse = rememberInfiniteTransition(label = "firmware-info-pulse")
+    val scale by pulse.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "firmware-info-scale"
+    )
+    val alpha by pulse.animateFloat(
+        initialValue = 0.10f,
+        targetValue = 0.22f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "firmware-info-alpha"
+    )
+    Surface(
+        modifier = Modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        },
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
+        contentColor = MaterialTheme.colorScheme.primary,
+        onClick = onClick
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Info,
+            contentDescription = null,
+            modifier = Modifier
+                .padding(12.dp)
+                .size(20.dp)
+        )
+    }
+}
+
+@Composable
+private fun FirmwareDownloadInfoDialog(
+    visible: Boolean,
+    onDismiss: () -> Unit
+) {
+    if (!visible) return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(Icons.Rounded.Info, contentDescription = null)
+        },
+        title = {
+            Text(stringResource(R.string.onboarding_firmware_info_title))
+        },
+        text = {
+            Text(
+                text = stringResource(R.string.onboarding_firmware_info_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.install_dialog_close))
+            }
+        }
+    )
+}
+
+@Composable
+private fun StatusPill(
+    status: String,
+    statusColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = CircleShape,
+        color = statusColor.copy(alpha = 0.12f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(statusColor)
+            )
+            Text(
+                text = status,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = statusColor,
+                maxLines = 3,
+                overflow = TextOverflow.Clip
+            )
         }
     }
 }

@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -37,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
 import com.sbro.emucorev.ui.common.NavigationBackButton
@@ -83,10 +85,18 @@ fun SetupScreen(
                 Text(
                     text = stringResource(R.string.setup_title),
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
+
+        SetupInfoCard(
+            icon = Icons.Rounded.Storage,
+            title = stringResource(R.string.onboarding_storage_title),
+            body = vitaRootPath
+        )
 
         SetupActionCard(
             icon = Icons.Rounded.Inventory2,
@@ -98,10 +108,9 @@ fun SetupScreen(
 
         SectionCard(title = stringResource(R.string.setup_pkg_title)) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = stringResource(R.string.setup_pkg_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                SetupInfoRow(
+                    icon = Icons.Rounded.Key,
+                    text = stringResource(R.string.setup_pkg_body)
                 )
                 OutlinedTextField(
                     value = zrif,
@@ -124,6 +133,51 @@ fun SetupScreen(
 }
 
 @Composable
+private fun SetupInfoCard(
+    icon: ImageVector,
+    title: String,
+    body: String
+) {
+    SectionCard(title = title) {
+        SetupInfoRow(icon = icon, text = body)
+    }
+}
+
+@Composable
+private fun SetupInfoRow(
+    icon: ImageVector,
+    text: String
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        ) {
+            Box(
+                modifier = Modifier.padding(12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
 private fun SetupActionCard(
     icon: ImageVector,
     title: String,
@@ -133,36 +187,10 @@ private fun SetupActionCard(
 ) {
     SectionCard(title = title) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                ) {
-                    Box(
-                        modifier = Modifier.padding(12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-                Text(
-                    text = body,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            SetupInfoRow(icon = icon, text = body)
             Button(
                 onClick = onClick,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text(buttonLabel)
             }
