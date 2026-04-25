@@ -35,10 +35,14 @@ bool get_shaders_cache_hashs(State &renderer) {
     const std::string hash_file_name = fmt::format("hashs-{}.dat", (renderer.current_backend == Backend::OpenGL) ? "gl" : "vk");
     const auto hash_file_path = renderer.shaders_path / hash_file_name;
 
+#ifndef NDEBUG
     LOG_INFO("Shader cache lookup: {}", hash_file_path);
+#endif
     fs::ifstream shaders_hashs(hash_file_path, std::ios::in | std::ios::binary);
     if (!shaders_hashs.is_open()) {
+#ifndef NDEBUG
         LOG_INFO("Shader cache metadata not found for this title/backend.");
+#endif
         return false;
     }
 
@@ -87,7 +91,9 @@ bool get_shaders_cache_hashs(State &renderer) {
 
     shaders_hashs.close();
 
+#ifndef NDEBUG
     LOG_INFO("Shader cache metadata loaded: {} shader pair(s)", renderer.shaders_cache_hashs.size());
+#endif
 
     return !renderer.shaders_cache_hashs.empty();
 }
@@ -119,7 +125,9 @@ void save_shaders_cache_hashs(State &renderer, std::vector<ShadersHash> &shaders
             write(hash.vert);
         }
         shaders_hashs.close();
+#ifndef NDEBUG
         LOG_INFO("Shader cache metadata saved: {} shader pair(s) to {}", size, hash_file_path);
+#endif
     }
 }
 

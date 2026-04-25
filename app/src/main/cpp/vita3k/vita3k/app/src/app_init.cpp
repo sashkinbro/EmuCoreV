@@ -355,12 +355,14 @@ bool init(EmuEnvState &state, Config &cfg, const Root &root_paths) {
 
     // Set initall current config for current backend renderer and custom driver with run app path if provided
     config::set_current_config(state, state.cfg.run_app_path.has_value() ? *state.cfg.run_app_path : "");
+#ifndef NDEBUG
     LOG_INFO("backend-renderer: {}", state.cfg.current_config.backend_renderer);
     LOG_INFO("GPU config: shader_cache={}, async_pipeline_compilation={}, spirv_shader={}, show_compile_shaders={}",
         state.cfg.shader_cache,
         state.cfg.current_config.async_pipeline_compilation,
         state.cfg.spirv_shader,
         state.cfg.show_compile_shaders);
+#endif
 
     LOG_INFO("Base path: {}", state.base_path);
 #if defined(__linux__) && !defined(__ANDROID__)

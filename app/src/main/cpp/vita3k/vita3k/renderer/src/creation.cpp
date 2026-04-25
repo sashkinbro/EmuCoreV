@@ -274,7 +274,9 @@ bool init(SDL_Window *window, std::unique_ptr<State> &state, Backend backend, co
     state->current_backend = backend;
 
     state->set_async_compilation(config.current_config.async_pipeline_compilation);
+#ifndef NDEBUG
     LOG_INFO("Renderer async pipeline compilation: {}", config.current_config.async_pipeline_compilation ? "enabled" : "disabled");
+#endif
 
     // Can change this
     state->command_buffer_queue.maxPendingCount_ = 30;
