@@ -74,6 +74,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun resetCoreSettingsToDefaults() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val defaults = coreConfigRepository.resetToDefaults()
+            _uiState.value = _uiState.value.copy(coreConfig = defaults)
+        }
+    }
+
     fun updateAppLanguage(language: AppLanguage) {
         if (preferences.appLanguage == language) return
         preferences.appLanguage = language

@@ -507,4 +507,10 @@
     <string name="save_manager_empty_game_body">Avvia questo gioco per creare dati di salvataggio o importa un archivio di salvataggio per esso.</string>
     <string name="save_manager_orphan_save">Gioco non installato</string>
     <string name="nav_save_manager">Salvataggi</string>
+    <string name="settings_options_content_description">Opzioni impostazioni</string>
+    <string name="settings_reset_defaults_menu">Ripristina impostazioni predefinite</string>
+    <string name="settings_reset_defaults_title">Ripristinare le impostazioni predefinite?</string>
+    <string name="settings_reset_defaults_message">Questo ripristinerà le impostazioni dell\'emulatore ai valori predefiniti consigliati. I tuoi giochi, i salvataggi, la lingua dell\'app e le cartelle selezionate rimarranno invariati.</string>
+    <string name="settings_reset_defaults_confirm">Ripristina</string>
+    <string name="settings_reset_defaults_cancel">Annulla</string>
 </resources>

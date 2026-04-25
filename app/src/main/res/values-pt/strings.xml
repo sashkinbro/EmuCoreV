@@ -507,4 +507,10 @@
     <string name="save_manager_empty_game_body">Inicie este jogo para criar dados de salvamento ou importe um arquivo de save para ele.</string>
     <string name="save_manager_orphan_save">Jogo não instalado</string>
     <string name="nav_save_manager">Salvamentos</string>
+    <string name="settings_options_content_description">Opções de configurações</string>
+    <string name="settings_reset_defaults_menu">Restaurar configurações padrão</string>
+    <string name="settings_reset_defaults_title">Restaurar configurações padrão?</string>
+    <string name="settings_reset_defaults_message">Isso redefinirá as configurações do emulador para os padrões recomendados. Seus jogos, saves, idioma do aplicativo e pastas selecionadas permanecerão inalterados.</string>
+    <string name="settings_reset_defaults_confirm">Restaurar</string>
+    <string name="settings_reset_defaults_cancel">Cancelar</string>
 </resources>

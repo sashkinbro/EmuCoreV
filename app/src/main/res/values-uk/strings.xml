@@ -507,4 +507,10 @@
     <string name="save_manager_empty_game_body">Запустіть цю гру, щоб створити дані збереження, або імпортуйте архів збережень для неї.</string>
     <string name="save_manager_orphan_save">Гра не встановлена</string>
     <string name="nav_save_manager">Збереження</string>
+    <string name="settings_options_content_description">Параметри налаштувань</string>
+    <string name="settings_reset_defaults_menu">Відновити налаштування за замовчуванням</string>
+    <string name="settings_reset_defaults_title">Відновити налаштування за замовчуванням?</string>
+    <string name="settings_reset_defaults_message">Це скине налаштування емулятора до рекомендованих значень за замовчуванням. Ваші ігри, збереження, мова застосунку та вибрані папки залишаться без змін.</string>
+    <string name="settings_reset_defaults_confirm">Відновити</string>
+    <string name="settings_reset_defaults_cancel">Скасувати</string>
 </resources>

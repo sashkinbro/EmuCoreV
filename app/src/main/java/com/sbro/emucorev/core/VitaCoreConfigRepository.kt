@@ -135,64 +135,66 @@ class VitaCoreConfigRepository(private val context: Context) {
     fun load(): VitaCoreConfig {
         val defaults = defaultConfig()
         val values = readKeyValues()
-        return VitaCoreConfig(
-            validationLayer = values["validation-layer"]?.toBooleanStrictOrNull() ?: defaults.validationLayer,
-            logActiveShaders = values["log-active-shaders"]?.toBooleanStrictOrNull() ?: defaults.logActiveShaders,
-            logUniforms = values["log-uniforms"]?.toBooleanStrictOrNull() ?: defaults.logUniforms,
-            logCompatWarn = values["log-compat-warn"]?.toBooleanStrictOrNull() ?: defaults.logCompatWarn,
-            pstvMode = values["pstv-mode"]?.toBooleanStrictOrNull() ?: defaults.pstvMode,
-            showInfoBar = values["show-info-bar"]?.toBooleanStrictOrNull() ?: defaults.showInfoBar,
-            showLiveAreaScreen = false,
-            backendRenderer = values["backend-renderer"] ?: defaults.backendRenderer,
-            customDriverName = values["custom-driver-name"].sanitizeNullableString() ?: defaults.customDriverName,
-            turboMode = values["turbo-mode"]?.toBooleanStrictOrNull() ?: defaults.turboMode,
-            highAccuracy = values["high-accuracy"]?.toBooleanStrictOrNull() ?: defaults.highAccuracy,
-            resolutionMultiplier = values["resolution-multiplier"]?.toFloatOrNull() ?: defaults.resolutionMultiplier,
-            disableSurfaceSync = values["disable-surface-sync"]?.toBooleanStrictOrNull() ?: defaults.disableSurfaceSync,
-            screenFilter = values["screen-filter"] ?: defaults.screenFilter,
-            anisotropicFiltering = values["anisotropic-filtering"]?.toIntOrNull() ?: defaults.anisotropicFiltering,
-            textureCache = values["texture-cache"]?.toBooleanStrictOrNull() ?: defaults.textureCache,
-            asyncPipelineCompilation = values["async-pipeline-compilation"]?.toBooleanStrictOrNull() ?: defaults.asyncPipelineCompilation,
-            showCompileShaders = values["show-compile-shaders"]?.toBooleanStrictOrNull() ?: defaults.showCompileShaders,
-            hashlessTextureCache = values["hashless-texture-cache"]?.toBooleanStrictOrNull() ?: defaults.hashlessTextureCache,
-            importTextures = values["import-textures"]?.toBooleanStrictOrNull() ?: defaults.importTextures,
-            exportTextures = values["export-textures"]?.toBooleanStrictOrNull() ?: defaults.exportTextures,
-            exportAsPng = values["export-as-png"]?.toBooleanStrictOrNull() ?: defaults.exportAsPng,
-            memoryMapping = values["memory-mapping"] ?: defaults.memoryMapping,
-            fullscreenHdResPixelPerfect = values["fullscreen_hd_res_pixel_perfect"]?.toBooleanStrictOrNull() ?: defaults.fullscreenHdResPixelPerfect,
-            performanceOverlay = values["performance-overlay"]?.toBooleanStrictOrNull() ?: defaults.performanceOverlay,
-            performanceOverlayDetail = values["performance-overlay-detail"]?.toIntOrNull() ?: defaults.performanceOverlayDetail,
-            performanceOverlayPosition = values["performance-overlay-position"]?.toIntOrNull() ?: defaults.performanceOverlayPosition,
-            enableGamepadOverlay = values["enable-gamepad-overlay"]?.toBooleanStrictOrNull() ?: defaults.enableGamepadOverlay,
-            overlayShowTouchSwitch = values["overlay-show-touch-switch"]?.toBooleanStrictOrNull() ?: defaults.overlayShowTouchSwitch,
-            overlayScale = values["overlay-scale"]?.toFloatOrNull() ?: defaults.overlayScale,
-            overlayOpacity = values["overlay-opacity"]?.toIntOrNull() ?: defaults.overlayOpacity,
-            disableMotion = values["disable-motion"]?.toBooleanStrictOrNull() ?: defaults.disableMotion,
-            analogMultiplier = values["controller-analog-multiplier"]?.toFloatOrNull() ?: defaults.analogMultiplier,
-            stretchDisplayArea = values["stretch_the_display_area"]?.toBooleanStrictOrNull() ?: defaults.stretchDisplayArea,
-            fpsHack = values["fps-hack"]?.toBooleanStrictOrNull() ?: defaults.fpsHack,
-            vSync = values["v-sync"]?.toBooleanStrictOrNull() ?: defaults.vSync,
-            bootAppsFullScreen = values["boot-apps-full-screen"]?.toBooleanStrictOrNull() ?: defaults.bootAppsFullScreen,
-            audioBackend = values["audio-backend"] ?: defaults.audioBackend,
-            audioVolume = values["audio-volume"]?.toIntOrNull() ?: defaults.audioVolume,
-            bgmVolume = values["bgm-volume"]?.toIntOrNull() ?: defaults.bgmVolume,
-            ngsEnable = values["ngs-enable"]?.toBooleanStrictOrNull() ?: defaults.ngsEnable,
-            showTouchpadCursor = values["show-touchpad-cursor"]?.toBooleanStrictOrNull() ?: defaults.showTouchpadCursor,
-            sysButton = values["sys-button"]?.toIntOrNull() ?: defaults.sysButton,
-            sysLang = values["sys-lang"]?.toIntOrNull() ?: defaults.sysLang,
-            cpuPoolSize = values["cpu-pool-size"]?.toIntOrNull() ?: defaults.cpuPoolSize,
-            modulesMode = values["modules-mode"]?.toIntOrNull() ?: defaults.modulesMode,
-            archiveLog = values["archive-log"]?.toBooleanStrictOrNull() ?: defaults.archiveLog,
-            logLevel = normalizeLogLevel(values["log-level"]?.toIntOrNull() ?: defaults.logLevel),
-            discordRichPresence = values["discord-rich-presence"]?.toBooleanStrictOrNull() ?: defaults.discordRichPresence,
-            checkForUpdates = values["check-for-updates"]?.toBooleanStrictOrNull() ?: defaults.checkForUpdates,
-            fileLoadingDelay = values["file-loading-delay"]?.toIntOrNull() ?: defaults.fileLoadingDelay,
-            shaderCache = values["shader-cache"]?.toBooleanStrictOrNull() ?: defaults.shaderCache,
-            spirvShader = values["spirv-shader"]?.toBooleanStrictOrNull() ?: defaults.spirvShader,
-            psnSignedIn = values["psn-signed-in"]?.toBooleanStrictOrNull() ?: defaults.psnSignedIn,
-            httpEnable = values["http-enable"]?.toBooleanStrictOrNull() ?: defaults.httpEnable,
-            colorSurfaceDebug = values["color-surface-debug"]?.toBooleanStrictOrNull() ?: defaults.colorSurfaceDebug,
-            showShaderCacheWarn = values["show-shader-cache-warn"]?.toBooleanStrictOrNull() ?: defaults.showShaderCacheWarn
+        return normalizeForBuild(
+            VitaCoreConfig(
+                validationLayer = values["validation-layer"]?.toBooleanStrictOrNull() ?: defaults.validationLayer,
+                logActiveShaders = values["log-active-shaders"]?.toBooleanStrictOrNull() ?: defaults.logActiveShaders,
+                logUniforms = values["log-uniforms"]?.toBooleanStrictOrNull() ?: defaults.logUniforms,
+                logCompatWarn = values["log-compat-warn"]?.toBooleanStrictOrNull() ?: defaults.logCompatWarn,
+                pstvMode = values["pstv-mode"]?.toBooleanStrictOrNull() ?: defaults.pstvMode,
+                showInfoBar = values["show-info-bar"]?.toBooleanStrictOrNull() ?: defaults.showInfoBar,
+                showLiveAreaScreen = false,
+                backendRenderer = values["backend-renderer"] ?: defaults.backendRenderer,
+                customDriverName = values["custom-driver-name"].sanitizeNullableString() ?: defaults.customDriverName,
+                turboMode = values["turbo-mode"]?.toBooleanStrictOrNull() ?: defaults.turboMode,
+                highAccuracy = values["high-accuracy"]?.toBooleanStrictOrNull() ?: defaults.highAccuracy,
+                resolutionMultiplier = values["resolution-multiplier"]?.toFloatOrNull() ?: defaults.resolutionMultiplier,
+                disableSurfaceSync = values["disable-surface-sync"]?.toBooleanStrictOrNull() ?: defaults.disableSurfaceSync,
+                screenFilter = values["screen-filter"] ?: defaults.screenFilter,
+                anisotropicFiltering = values["anisotropic-filtering"]?.toIntOrNull() ?: defaults.anisotropicFiltering,
+                textureCache = values["texture-cache"]?.toBooleanStrictOrNull() ?: defaults.textureCache,
+                asyncPipelineCompilation = values["async-pipeline-compilation"]?.toBooleanStrictOrNull() ?: defaults.asyncPipelineCompilation,
+                showCompileShaders = values["show-compile-shaders"]?.toBooleanStrictOrNull() ?: defaults.showCompileShaders,
+                hashlessTextureCache = values["hashless-texture-cache"]?.toBooleanStrictOrNull() ?: defaults.hashlessTextureCache,
+                importTextures = values["import-textures"]?.toBooleanStrictOrNull() ?: defaults.importTextures,
+                exportTextures = values["export-textures"]?.toBooleanStrictOrNull() ?: defaults.exportTextures,
+                exportAsPng = values["export-as-png"]?.toBooleanStrictOrNull() ?: defaults.exportAsPng,
+                memoryMapping = values["memory-mapping"] ?: defaults.memoryMapping,
+                fullscreenHdResPixelPerfect = values["fullscreen_hd_res_pixel_perfect"]?.toBooleanStrictOrNull() ?: defaults.fullscreenHdResPixelPerfect,
+                performanceOverlay = values["performance-overlay"]?.toBooleanStrictOrNull() ?: defaults.performanceOverlay,
+                performanceOverlayDetail = values["performance-overlay-detail"]?.toIntOrNull() ?: defaults.performanceOverlayDetail,
+                performanceOverlayPosition = values["performance-overlay-position"]?.toIntOrNull() ?: defaults.performanceOverlayPosition,
+                enableGamepadOverlay = values["enable-gamepad-overlay"]?.toBooleanStrictOrNull() ?: defaults.enableGamepadOverlay,
+                overlayShowTouchSwitch = values["overlay-show-touch-switch"]?.toBooleanStrictOrNull() ?: defaults.overlayShowTouchSwitch,
+                overlayScale = values["overlay-scale"]?.toFloatOrNull() ?: defaults.overlayScale,
+                overlayOpacity = values["overlay-opacity"]?.toIntOrNull() ?: defaults.overlayOpacity,
+                disableMotion = values["disable-motion"]?.toBooleanStrictOrNull() ?: defaults.disableMotion,
+                analogMultiplier = values["controller-analog-multiplier"]?.toFloatOrNull() ?: defaults.analogMultiplier,
+                stretchDisplayArea = values["stretch_the_display_area"]?.toBooleanStrictOrNull() ?: defaults.stretchDisplayArea,
+                fpsHack = values["fps-hack"]?.toBooleanStrictOrNull() ?: defaults.fpsHack,
+                vSync = values["v-sync"]?.toBooleanStrictOrNull() ?: defaults.vSync,
+                bootAppsFullScreen = values["boot-apps-full-screen"]?.toBooleanStrictOrNull() ?: defaults.bootAppsFullScreen,
+                audioBackend = values["audio-backend"] ?: defaults.audioBackend,
+                audioVolume = values["audio-volume"]?.toIntOrNull() ?: defaults.audioVolume,
+                bgmVolume = values["bgm-volume"]?.toIntOrNull() ?: defaults.bgmVolume,
+                ngsEnable = values["ngs-enable"]?.toBooleanStrictOrNull() ?: defaults.ngsEnable,
+                showTouchpadCursor = values["show-touchpad-cursor"]?.toBooleanStrictOrNull() ?: defaults.showTouchpadCursor,
+                sysButton = values["sys-button"]?.toIntOrNull() ?: defaults.sysButton,
+                sysLang = values["sys-lang"]?.toIntOrNull() ?: defaults.sysLang,
+                cpuPoolSize = values["cpu-pool-size"]?.toIntOrNull() ?: defaults.cpuPoolSize,
+                modulesMode = values["modules-mode"]?.toIntOrNull() ?: defaults.modulesMode,
+                archiveLog = values["archive-log"]?.toBooleanStrictOrNull() ?: defaults.archiveLog,
+                logLevel = normalizeLogLevel(values["log-level"]?.toIntOrNull() ?: defaults.logLevel),
+                discordRichPresence = values["discord-rich-presence"]?.toBooleanStrictOrNull() ?: defaults.discordRichPresence,
+                checkForUpdates = values["check-for-updates"]?.toBooleanStrictOrNull() ?: defaults.checkForUpdates,
+                fileLoadingDelay = values["file-loading-delay"]?.toIntOrNull() ?: defaults.fileLoadingDelay,
+                shaderCache = values["shader-cache"]?.toBooleanStrictOrNull() ?: defaults.shaderCache,
+                spirvShader = values["spirv-shader"]?.toBooleanStrictOrNull() ?: defaults.spirvShader,
+                psnSignedIn = values["psn-signed-in"]?.toBooleanStrictOrNull() ?: defaults.psnSignedIn,
+                httpEnable = values["http-enable"]?.toBooleanStrictOrNull() ?: defaults.httpEnable,
+                colorSurfaceDebug = values["color-surface-debug"]?.toBooleanStrictOrNull() ?: defaults.colorSurfaceDebug,
+                showShaderCacheWarn = values["show-shader-cache-warn"]?.toBooleanStrictOrNull() ?: defaults.showShaderCacheWarn
+            )
         )
     }
 
@@ -200,14 +202,17 @@ class VitaCoreConfigRepository(private val context: Context) {
         migrateLegacyConfigIfNeeded()
         val config = load()
         val existingValues = readKeyValues()
-        val shouldPersist = !configFile.exists() || persistedKeys.any { it !in existingValues }
+        val shouldPersist = !configFile.exists() ||
+            persistedKeys.any { it !in existingValues } ||
+            releaseValuesNeedNormalization(existingValues)
         if (shouldPersist) {
             save(config)
         }
         return config
     }
 
-    fun save(config: VitaCoreConfig) {
+    fun save(inputConfig: VitaCoreConfig) {
+        val config = normalizeForBuild(inputConfig)
         val values = readKeyValues().toMutableMap()
         values["validation-layer"] = config.validationLayer.toString()
         values["log-active-shaders"] = config.logActiveShaders.toString()
@@ -278,6 +283,12 @@ class VitaCoreConfigRepository(private val context: Context) {
         )
     }
 
+    fun resetToDefaults(): VitaCoreConfig {
+        val config = normalizeForBuild(defaultConfig())
+        save(config)
+        return config
+    }
+
     private fun readKeyValues(): Map<String, String> {
         if (!configFile.exists()) return emptyMap()
         return configFile.readLines()
@@ -304,6 +315,28 @@ class VitaCoreConfigRepository(private val context: Context) {
     private fun normalizeLogLevel(level: Int): Int {
         val bounded = level.coerceIn(0, 6)
         return if (BuildConfig.DEBUG) bounded else bounded.coerceAtLeast(RELEASE_LOG_LEVEL)
+    }
+
+    private fun normalizeForBuild(config: VitaCoreConfig): VitaCoreConfig {
+        if (BuildConfig.DEBUG) return config
+        return config.copy(
+            validationLayer = false,
+            logActiveShaders = false,
+            logUniforms = false,
+            archiveLog = false,
+            logLevel = normalizeLogLevel(config.logLevel),
+            colorSurfaceDebug = false
+        )
+    }
+
+    private fun releaseValuesNeedNormalization(values: Map<String, String>): Boolean {
+        if (BuildConfig.DEBUG) return false
+        return values["validation-layer"]?.toBooleanStrictOrNull() == true ||
+            values["log-active-shaders"]?.toBooleanStrictOrNull() == true ||
+            values["log-uniforms"]?.toBooleanStrictOrNull() == true ||
+            values["archive-log"]?.toBooleanStrictOrNull() == true ||
+            values["color-surface-debug"]?.toBooleanStrictOrNull() == true ||
+            (values["log-level"]?.toIntOrNull() ?: RELEASE_LOG_LEVEL) < RELEASE_LOG_LEVEL
     }
 
     private fun migrateLegacyConfigIfNeeded() {

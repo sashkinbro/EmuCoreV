@@ -507,4 +507,10 @@
     <string name="save_manager_empty_game_body">Kayıt verisi oluşturmak için bu oyunu başlatın veya bunun için bir kayıt arşivi içe aktarın.</string>
     <string name="save_manager_orphan_save">Oyun yüklü değil</string>
     <string name="nav_save_manager">Kayıtlar</string>
+    <string name="settings_options_content_description">Ayar seçenekleri</string>
+    <string name="settings_reset_defaults_menu">Varsayılan ayarları geri yükle</string>
+    <string name="settings_reset_defaults_title">Varsayılan ayarlar geri yüklensin mi?</string>
+    <string name="settings_reset_defaults_message">Bu işlem emülatör ayarlarını önerilen varsayılan değerlerine sıfırlayacaktır. Oyunlarınız, kayıtlarınız, uygulama dili ve seçili klasörleriniz değişmeden kalacaktır.</string>
+    <string name="settings_reset_defaults_confirm">Geri yükle</string>
+    <string name="settings_reset_defaults_cancel">İptal</string>
 </resources>

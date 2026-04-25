@@ -34,10 +34,16 @@ import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Vibration
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -45,6 +51,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -113,6 +120,8 @@ fun SettingsScreen(
     val changeFolderClick = rememberDebouncedClick { folderPicker.launch(null) }
     val clearFolderClick = rememberDebouncedClick(onClick = viewModel::clearPackagesFolder)
     val backClick = rememberDebouncedClick(onClick = onBackClick)
+    val resetSettingsClick = rememberDebouncedClick(onClick = viewModel::resetCoreSettingsToDefaults)
+    var showResetDialog by rememberSaveable { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -129,7 +138,8 @@ fun SettingsScreen(
                 title = stringResource(R.string.settings_title),
                 subtitle = stringResource(selectedTab.titleRes),
                 topInset = topInset,
-                onBackClick = backClick
+                onBackClick = backClick,
+                onResetSettingsClick = { showResetDialog = true }
             )
 
             SettingsTabRow(
@@ -157,6 +167,35 @@ fun SettingsScreen(
                 )
             }
         }
+
+        if (showResetDialog) {
+            AlertDialog(
+                onDismissRequest = { showResetDialog = false },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Restore,
+                        contentDescription = null
+                    )
+                },
+                title = { Text(stringResource(R.string.settings_reset_defaults_title)) },
+                text = { Text(stringResource(R.string.settings_reset_defaults_message)) },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showResetDialog = false
+                            resetSettingsClick()
+                        }
+                    ) {
+                        Text(stringResource(R.string.settings_reset_defaults_confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showResetDialog = false }) {
+                        Text(stringResource(R.string.settings_reset_defaults_cancel))
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -169,8 +208,11 @@ private fun SettingsCompactTopBar(
     title: String,
     subtitle: String,
     topInset: androidx.compose.ui.unit.Dp,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onResetSettingsClick: () -> Unit
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -216,6 +258,57 @@ private fun SettingsCompactTopBar(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            Box {
+                SettingsHeaderIconButton(onClick = { menuExpanded = true }) {
+                    Icon(
+                        imageVector = Icons.Rounded.MoreVert,
+                        contentDescription = stringResource(R.string.settings_options_content_description),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.settings_reset_defaults_menu)) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Restore,
+                                contentDescription = null
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onResetSettingsClick()
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsHeaderIconButton(
+    onClick: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        modifier = Modifier.size(40.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 3.dp,
+        shadowElevation = 5.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+        onClick = rememberDebouncedClick(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            content()
         }
     }
 }
