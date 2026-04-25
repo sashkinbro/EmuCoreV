@@ -482,4 +482,5 @@
     <string name="settings_gpu_driver_no_matches_desc">请更改搜索文本或所选的筛选条件。</string>
     <string name="onboarding_firmware_info_title">官方固件下载</string>
     <string name="onboarding_firmware_info_body">固件文件直接从索尼官方的更新服务器下载。EmuCoreV 不会利用自有资源托管、镜像、修改或重新分发固件；它只会打开官方公开的下载链接并安装您选择的包。</string>
+    <string name="settings_app_language_turkish">土耳其语</string>
 </resources>
