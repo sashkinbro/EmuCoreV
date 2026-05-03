@@ -1,7 +1,8 @@
 # EmuCoreV
 
 [![License: GPL v2+](https://img.shields.io/badge/License-GPL%20v2%2B-blue.svg)](LICENSE)
-[![Support the project](https://img.shields.io/badge/Donate-Support%20EmuCoreV-ff5f45.svg)](https://send.monobank.ua/jar/9ZocYsprhJ)
+[![Support on Patreon](https://img.shields.io/badge/Patreon-Support%20EmuCoreV-ff424d.svg)](https://www.patreon.com/c/emucore/membership)
+[![Join Discord](https://img.shields.io/badge/Discord-Join%20the%20server-5865F2.svg)](https://discord.gg/c5EBeNRpz2)
 
 EmuCoreV is a PlayStation Vita emulator for Android. It combines a custom Android interface, library and catalog UX, installer flows, and runtime controls with a Vita3K-based emulation core adapted for this app.
 
@@ -90,9 +91,10 @@ EmuCoreV builds on the Vita3K project and its ecosystem, then layers a custom An
 
 ## Support
 
-If you want to support ongoing development:
+If you want to support ongoing development or join the community:
 
-- Donate: https://send.monobank.ua/jar/9ZocYsprhJ
+- Patreon: https://www.patreon.com/c/emucore/membership
+- Discord: https://discord.gg/c5EBeNRpz2
 - More apps by the author: https://play.google.com/store/apps/dev?id=7136622298887775989
 
 ## License
