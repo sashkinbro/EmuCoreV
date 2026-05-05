@@ -313,30 +313,29 @@ class VitaCoreConfigRepository(private val context: Context) {
     }
 
     private fun normalizeLogLevel(level: Int): Int {
-        val bounded = level.coerceIn(0, 6)
-        return if (BuildConfig.DEBUG) bounded else bounded.coerceAtLeast(RELEASE_LOG_LEVEL)
+        return level.coerceIn(0, 6)
     }
 
     private fun normalizeForBuild(config: VitaCoreConfig): VitaCoreConfig {
         if (BuildConfig.DEBUG) return config
+        val diagnosticsEnabled = config.logActiveShaders ||
+            config.logUniforms ||
+            config.logCompatWarn ||
+            config.archiveLog ||
+            config.colorSurfaceDebug
         return config.copy(
             validationLayer = false,
-            logActiveShaders = false,
-            logUniforms = false,
-            archiveLog = false,
-            logLevel = normalizeLogLevel(config.logLevel),
-            colorSurfaceDebug = false
+            logLevel = if (diagnosticsEnabled) {
+                normalizeLogLevel(config.logLevel).coerceAtMost(DEBUG_LOG_LEVEL)
+            } else {
+                normalizeLogLevel(config.logLevel)
+            }
         )
     }
 
     private fun releaseValuesNeedNormalization(values: Map<String, String>): Boolean {
         if (BuildConfig.DEBUG) return false
-        return values["validation-layer"]?.toBooleanStrictOrNull() == true ||
-            values["log-active-shaders"]?.toBooleanStrictOrNull() == true ||
-            values["log-uniforms"]?.toBooleanStrictOrNull() == true ||
-            values["archive-log"]?.toBooleanStrictOrNull() == true ||
-            values["color-surface-debug"]?.toBooleanStrictOrNull() == true ||
-            (values["log-level"]?.toIntOrNull() ?: RELEASE_LOG_LEVEL) < RELEASE_LOG_LEVEL
+        return values["validation-layer"]?.toBooleanStrictOrNull() == true
     }
 
     private fun migrateLegacyConfigIfNeeded() {
@@ -361,6 +360,6 @@ class VitaCoreConfigRepository(private val context: Context) {
 
     private companion object {
         private const val DEBUG_LOG_LEVEL = 2
-        private const val RELEASE_LOG_LEVEL = 4
+        private const val RELEASE_LOG_LEVEL = 6
     }
 }

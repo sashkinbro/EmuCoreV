@@ -2189,7 +2189,11 @@ static int gxmDrawElementGeneral(EmuEnvState &emuenv, const char *export_name, c
 
     size_t max_data_length[SCE_GXM_MAX_VERTEX_STREAMS] = {};
     std::uint32_t stream_used = 0;
+    std::uint32_t attributes_missing_shader_input = 0;
     for (const SceGxmVertexAttribute &attribute : gxm_vertex_program.attributes) {
+        if (!gxm_vertex_program.renderer_data->attribute_infos.contains(attribute.regIndex))
+            attributes_missing_shader_input++;
+
         if (!emuenv.renderer->features.enable_memory_mapping) {
             const size_t attribute_size = gxm::attribute_format_size(attribute.format) * attribute.componentCount;
             const SceGxmVertexStream &stream = gxm_vertex_program.streams[attribute.streamIndex];
@@ -2200,6 +2204,102 @@ static int gxmDrawElementGeneral(EmuEnvState &emuenv, const char *export_name, c
         }
 
         stream_used |= (1 << attribute.streamIndex);
+    }
+
+    if (emuenv.cfg.log_active_shaders) {
+        static uint64_t draw_count = 0;
+        static uint64_t indexed_u16_count = 0;
+        static uint64_t indexed_u32_count = 0;
+        static uint64_t zero_index_count = 0;
+        static uint64_t zero_instance_count = 0;
+        static uint64_t missing_stream_data_count = 0;
+        static uint64_t zero_stride_count = 0;
+        static uint64_t missing_shader_input_count = 0;
+        static size_t max_index_seen = 0;
+        static size_t max_stream_len_seen = 0;
+        static bool logged_first_suspicious = false;
+        static bool logged_first_draw = false;
+
+        draw_count++;
+        if (indexType == SCE_GXM_INDEX_FORMAT_U16)
+            indexed_u16_count++;
+        else
+            indexed_u32_count++;
+        if (indexCount == 0)
+            zero_index_count++;
+        if (instanceCount == 0)
+            zero_instance_count++;
+        max_index_seen = std::max(max_index_seen, max_index);
+
+        size_t missing_stream_data_this_draw = 0;
+        size_t zero_stride_this_draw = 0;
+        for (size_t stream_index = 0; stream_index < SCE_GXM_MAX_VERTEX_STREAMS; ++stream_index) {
+            if (!(stream_used & (1 << static_cast<std::uint16_t>(stream_index))))
+                continue;
+
+            max_stream_len_seen = std::max(max_stream_len_seen, max_data_length[stream_index]);
+            if (!context->state.stream_data[stream_index])
+                missing_stream_data_this_draw++;
+            if (gxm_vertex_program.streams[stream_index].stride == 0)
+                zero_stride_this_draw++;
+        }
+
+        missing_stream_data_count += missing_stream_data_this_draw;
+        zero_stride_count += zero_stride_this_draw;
+        missing_shader_input_count += attributes_missing_shader_input;
+
+        const bool suspicious = (indexCount == 0) || (instanceCount == 0) || (missing_stream_data_this_draw != 0)
+            || (zero_stride_this_draw != 0) || (max_index > 0x100000) || (max_stream_len_seen > 64 * 1024 * 1024);
+
+        if (!logged_first_draw) {
+            logged_first_draw = true;
+            LOG_INFO("GXM draw diagnostic first draw: export={}, prim={}, index_type={}, index_count={}, instance_count={}, max_index={}, stream_mask=0x{:x}, attrs={}, attrs_missing_shader_input={}, backend={}, mapping={}",
+                export_name,
+                static_cast<uint32_t>(primType),
+                static_cast<uint32_t>(indexType),
+                indexCount,
+                instanceCount,
+                max_index,
+                stream_used,
+                gxm_vertex_program.attributes.size(),
+                attributes_missing_shader_input,
+                static_cast<uint32_t>(emuenv.renderer->current_backend),
+                static_cast<uint32_t>(emuenv.renderer->mapping_method));
+        }
+
+        if (suspicious && !logged_first_suspicious) {
+            logged_first_suspicious = true;
+            LOG_WARN("GXM draw diagnostic suspicious sample: export={}, prim={}, index_type={}, index_count={}, instance_count={}, max_index={}, stream_mask=0x{:x}, missing_streams={}, zero_stride_streams={}, attrs={}, attrs_missing_shader_input={}, vert_hash={}, frag_hash={}",
+                export_name,
+                static_cast<uint32_t>(primType),
+                static_cast<uint32_t>(indexType),
+                indexCount,
+                instanceCount,
+                max_index,
+                stream_used,
+                missing_stream_data_this_draw,
+                zero_stride_this_draw,
+                gxm_vertex_program.attributes.size(),
+                attributes_missing_shader_input,
+                hex_string(gxm_vertex_program.renderer_data->hash),
+                hex_string(gxm_fragment_program.renderer_data->hash));
+        }
+
+        if ((draw_count & 0xffff) == 0) {
+            LOG_INFO("GXM draw diagnostic summary: draws={}, u16={}, u32={}, zero_index={}, zero_instance={}, missing_streams={}, zero_stride_streams={}, attrs_missing_shader_input={}, max_index={}, max_stream_len={}, backend={}, mapping={}",
+                draw_count,
+                indexed_u16_count,
+                indexed_u32_count,
+                zero_index_count,
+                zero_instance_count,
+                missing_stream_data_count,
+                zero_stride_count,
+                missing_shader_input_count,
+                max_index_seen,
+                max_stream_len_seen,
+                static_cast<uint32_t>(emuenv.renderer->current_backend),
+                static_cast<uint32_t>(emuenv.renderer->mapping_method));
+        }
     }
 
     // Copy and queue upload
@@ -5144,20 +5244,15 @@ EXPORT(int, sceGxmTextureSetStride, SceGxmTexture *texture, uint32_t byteStride)
 }
 
 static bool verify_texture_mode(SceGxmTexture *texture, SceGxmTextureAddrMode mode) {
+    if (mode > SCE_GXM_TEXTURE_ADDR_CLAMP_HALF_BORDER)
+        return false;
+
     if ((texture->type << 29) == SCE_GXM_TEXTURE_CUBE || (texture->type << 29) == SCE_GXM_TEXTURE_CUBE_ARBITRARY) {
         if (mode != SCE_GXM_TEXTURE_ADDR_CLAMP) {
             return false;
         }
-    } else {
-        if (mode <= SCE_GXM_TEXTURE_ADDR_CLAMP_HALF_BORDER && mode >= SCE_GXM_TEXTURE_ADDR_REPEAT_IGNORE_BORDER) {
-            if ((texture->type << 29) != SCE_GXM_TEXTURE_SWIZZLED) {
-                return false;
-            }
-        }
-        if (mode == SCE_GXM_TEXTURE_ADDR_MIRROR && ((texture->type << 29) != SCE_GXM_TEXTURE_SWIZZLED)) {
-            return false;
-        }
     }
+
     return true;
 }
 
