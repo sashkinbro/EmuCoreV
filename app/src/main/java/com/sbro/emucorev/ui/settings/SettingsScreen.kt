@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.SystemUpdateAlt
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material3.AlertDialog
@@ -89,6 +90,7 @@ enum class SettingsTab(@param:StringRes val titleRes: Int, val icon: ImageVector
     Advanced(R.string.settings_tab_advanced, Icons.Rounded.SettingsSuggest),
     Storage(R.string.settings_tab_storage, Icons.Rounded.Storage),
     About(R.string.settings_tab_about, Icons.Rounded.Info),
+    Updates(R.string.settings_tab_updates, Icons.Rounded.SystemUpdateAlt),
 }
 
 @OptIn(ExperimentalLayoutApi::class)

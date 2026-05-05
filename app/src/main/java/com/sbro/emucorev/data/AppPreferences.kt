@@ -64,6 +64,10 @@ class AppPreferences(context: Context) {
         get() = AppLanguage.fromStorageValue(prefs.getInt(KEY_APP_LANGUAGE, AppLanguage.SYSTEM.storageValue))
         set(value) = prefs.edit { putInt(KEY_APP_LANGUAGE, value.storageValue) }
 
+    var skippedUpdateTag: String?
+        get() = prefs.getString(KEY_SKIPPED_UPDATE_TAG, null)
+        set(value) = prefs.edit { putString(KEY_SKIPPED_UPDATE_TAG, value) }
+
     fun packagesFolderUriAsUri(): Uri? = packagesFolderUri?.let(Uri::parse)
 
     fun applyAppLanguage() {
@@ -129,5 +133,6 @@ class AppPreferences(context: Context) {
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_APP_LANGUAGE = "app_language"
+        private const val KEY_SKIPPED_UPDATE_TAG = "skipped_update_tag"
     }
 }

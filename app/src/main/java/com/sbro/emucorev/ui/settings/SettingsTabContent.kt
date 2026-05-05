@@ -2,7 +2,6 @@ package com.sbro.emucorev.ui.settings
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,8 +14,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -42,11 +45,15 @@ import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.ui.common.SectionCard
-import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 
 private val SettingsSectionContentPadding = 14.dp
 private val SettingsSectionRowPadding = 12.dp
 private val SettingsCardInnerPadding = 14.dp
+private const val EmuCoreRepositoryUrl = "https://github.com/sashkinbro/EmuCoreV"
+private const val EmuCoreDiscordUrl = "https://discord.gg/c5EBeNRpz2"
+private const val EmuCoreSupportUrl = "https://www.patreon.com/c/emucore/membership"
+private const val SashkinAppsPlayStoreUrl = "https://play.google.com/store/apps/dev?id=7136622298887775989"
+private const val Vita3KRepositoryUrl = "https://github.com/Vita3K/Vita3K"
 
 private data class VitaSystemLanguageOption(
     val value: Int,
@@ -101,6 +108,12 @@ fun SettingsTabContent(
         SettingsTab.Advanced -> AdvancedTab(uiState, defaults, viewModel)
         SettingsTab.Storage -> StorageTab(uiState, changeFolderClick, clearFolderClick)
         SettingsTab.About -> AboutTab()
+        SettingsTab.Updates -> AppUpdateTab(
+            state = uiState.appUpdate,
+            onCheckForUpdates = { viewModel.checkForAppUpdates(showErrors = true) },
+            onDownloadUpdate = { viewModel.downloadAppUpdate() },
+            onInstallDownloadedUpdate = { viewModel.installDownloadedAppUpdate() }
+        )
     }
 }
 
@@ -252,9 +265,9 @@ private fun GpuDriverStatus(
 ) {
     val text = when {
         selectedDriver == null -> stringResource(R.string.settings_gpu_driver_status_system)
-        !selectedDriver.isUsable -> stringResource(R.string.settings_gpu_driver_status_broken, selectedDriver.mainLibrary)
+        !selectedDriver.isUsable -> stringResource(R.string.settings_gpu_driver_status_broken, selectedDriver.name)
         backendRenderer != "Vulkan" -> stringResource(R.string.settings_gpu_driver_status_renderer, backendRenderer)
-        else -> stringResource(R.string.settings_gpu_driver_status_active, selectedDriver.mainLibrary)
+        else -> stringResource(R.string.settings_gpu_driver_status_active, selectedDriver.name)
     }
     val supporting = when {
         selectedDriver == null -> stringResource(R.string.settings_gpu_driver_status_system_desc)
@@ -427,7 +440,6 @@ private fun AdvancedTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
         Toggle(stringResource(R.string.settings_color_surface_debug), stringResource(R.string.settings_help_color_surface_debug), uiState.coreConfig.colorSurfaceDebug, { enabled -> viewModel.updateCoreSettings { it.copy(colorSurfaceDebug = enabled) } }, { viewModel.updateCoreSettings { it.copy(colorSurfaceDebug = defaults.colorSurfaceDebug) } })
         Toggle(stringResource(R.string.settings_spirv_shader_mode), stringResource(R.string.settings_help_spirv_shader_mode), uiState.coreConfig.spirvShader, { enabled -> viewModel.updateCoreSettings { it.copy(spirvShader = enabled) } }, { viewModel.updateCoreSettings { it.copy(spirvShader = defaults.spirvShader) } })
         Toggle(stringResource(R.string.settings_discord_rich_presence), stringResource(R.string.settings_help_discord_rich_presence), uiState.coreConfig.discordRichPresence, { enabled -> viewModel.updateCoreSettings { it.copy(discordRichPresence = enabled) } }, { viewModel.updateCoreSettings { it.copy(discordRichPresence = defaults.discordRichPresence) } })
-        Toggle(stringResource(R.string.settings_check_for_updates), stringResource(R.string.settings_help_check_for_updates), uiState.coreConfig.checkForUpdates, { enabled -> viewModel.updateCoreSettings { it.copy(checkForUpdates = enabled) } }, { viewModel.updateCoreSettings { it.copy(checkForUpdates = defaults.checkForUpdates) } })
     }
 }
 
@@ -465,25 +477,15 @@ private fun AboutTab() {
     }
     val versionName = packageInfo?.versionName ?: "1.0.0"
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.settings_about_title),
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
-        )
-
-        Column(
-            modifier = Modifier.padding(horizontal = ScreenHorizontalPadding),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        SectionCard(
+            title = stringResource(R.string.settings_about_title),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)
         ) {
             LinkItem(
                 icon = Icons.Rounded.Info,
-                title = stringResource(R.string.settings_tab_about),
-                subtitle = versionName,
+                title = stringResource(R.string.settings_about_version),
+                subtitle = stringResource(R.string.settings_about_version_value, versionName),
                 onClick = {}
             )
             LinkItem(
@@ -492,63 +494,71 @@ private fun AboutTab() {
                 subtitle = stringResource(R.string.settings_based_on_vita3k),
                 onClick = {}
             )
-        }
-
-        Column(modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)) {
             Text(
-                text = stringResource(R.string.settings_about_emucorev),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = stringResource(R.string.settings_about_body),
+                text = stringResource(R.string.settings_about_body_extended),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
+                modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
             )
         }
 
-        Column(modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)) {
-            Text(
-                text = stringResource(R.string.settings_developer),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onBackground
+        SectionCard(
+            title = stringResource(R.string.settings_about_community_title),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)
+        ) {
+            LinkItem(
+                icon = Icons.Rounded.Code,
+                title = stringResource(R.string.settings_about_repository),
+                subtitle = stringResource(R.string.settings_about_repository_desc),
+                onClick = { uriHandler.openUri(EmuCoreRepositoryUrl) }
             )
+            LinkItem(
+                icon = Icons.Rounded.Groups,
+                title = stringResource(R.string.settings_about_discord),
+                subtitle = stringResource(R.string.settings_about_discord_desc),
+                onClick = { uriHandler.openUri(EmuCoreDiscordUrl) }
+            )
+            LinkItem(
+                icon = Icons.Rounded.Favorite,
+                title = stringResource(R.string.settings_about_support),
+                subtitle = stringResource(R.string.settings_about_support_desc),
+                onClick = { uriHandler.openUri(EmuCoreSupportUrl) }
+            )
+        }
+
+        SectionCard(
+            title = stringResource(R.string.settings_developer),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)
+        ) {
             Text(
                 text = stringResource(R.string.settings_created_by_sbro),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
+                modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
             )
-            Text(
-                text = stringResource(R.string.settings_play_store_profile),
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .clickable { uriHandler.openUri("https://play.google.com/store/apps/dev?id=7136622298887775989") }
+            LinkItem(
+                icon = Icons.Rounded.Link,
+                title = stringResource(R.string.settings_play_store_profile),
+                subtitle = stringResource(R.string.settings_play_store_profile_desc),
+                onClick = { uriHandler.openUri(SashkinAppsPlayStoreUrl) }
             )
         }
 
-        Column(modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)) {
-            Text(
-                text = stringResource(R.string.settings_core_source_code),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onBackground
-            )
+        SectionCard(
+            title = stringResource(R.string.settings_core_source_code),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)
+        ) {
             Text(
                 text = stringResource(R.string.settings_core_source_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
+                modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
             )
-            Text(
-                text = stringResource(R.string.settings_open_github),
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .clickable { uriHandler.openUri("https://github.com/Vita3K/Vita3K") }
+            LinkItem(
+                icon = Icons.Rounded.Link,
+                title = stringResource(R.string.settings_open_github),
+                subtitle = stringResource(R.string.settings_vita3k_repository_desc),
+                onClick = { uriHandler.openUri(Vita3KRepositoryUrl) }
             )
         }
     }
