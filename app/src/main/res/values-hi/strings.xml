@@ -529,7 +529,7 @@
     <string name="settings_updates_checking_title">अपडेट जाँचे जा रहे हैं</string>
     <string name="settings_updates_available_title">अपडेट उपलब्ध है</string>
     <string name="settings_updates_current_title">आपका ऐप अप टू डेट है</string>
-    <string name="settings_updates_current_body">इस बिल्ड के लिए कोई नया GitHub रिलीज़ उपलब्ध नहीं है।</string>
+    <string name="settings_updates_current_body">इस बिल्ड के लिए कोई नया रिलीज़ उपलब्ध नहीं है।</string>
     <string name="settings_updates_error_title">अपडेट नहीं जाँचे जा सके</string>
     <string name="settings_updates_version_label">वर्ज़न</string>
     <string name="settings_updates_size_label">डाउनलोड साइज़</string>

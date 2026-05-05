@@ -529,7 +529,7 @@
     <string name="settings_updates_checking_title">Nach Updates suchen</string>
     <string name="settings_updates_available_title">Update verfügbar</string>
     <string name="settings_updates_current_title">Du bist auf dem neuesten Stand</string>
-    <string name="settings_updates_current_body">Für diesen Build ist kein neueres GitHub-Release verfügbar.</string>
+    <string name="settings_updates_current_body">Für diesen Build ist kein neueres Release verfügbar.</string>
     <string name="settings_updates_error_title">Updates konnten nicht überprüft werden</string>
     <string name="settings_updates_version_label">Version</string>
     <string name="settings_updates_size_label">Downloadgröße</string>

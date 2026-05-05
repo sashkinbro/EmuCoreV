@@ -529,7 +529,7 @@
     <string name="settings_updates_checking_title">Güncellemeler kontrol ediliyor</string>
     <string name="settings_updates_available_title">Güncelleme mevcut</string>
     <string name="settings_updates_current_title">Uygulama güncel</string>
-    <string name="settings_updates_current_body">Bu sürüm için daha yeni bir GitHub sürümü bulunmuyor.</string>
+    <string name="settings_updates_current_body">Bu sürüm için daha yeni bir sürüm bulunmuyor.</string>
     <string name="settings_updates_error_title">Güncellemeler kontrol edilemedi</string>
     <string name="settings_updates_version_label">Sürüm</string>
     <string name="settings_updates_size_label">İndirme boyutu</string>

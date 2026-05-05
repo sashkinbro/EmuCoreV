@@ -218,7 +218,7 @@ private fun CompactAdaptiveShell(
                     onRefreshLibrary = onRefreshLibrary,
                     wrapInSurface = false,
                     topInset = statusPadding,
-                    onCloseDrawer = { scope.launch { drawerState.close() } }
+                    onCloseDrawer = { scope.launch { drawerState.snapTo(DrawerValue.Closed) } }
                 )
             }
         }

@@ -529,7 +529,7 @@
     <string name="settings_updates_checking_title">Controllo aggiornamenti</string>
     <string name="settings_updates_available_title">Aggiornamento disponibile</string>
     <string name="settings_updates_current_title">Sei aggiornato</string>
-    <string name="settings_updates_current_body">Non è disponibile nessuna nuova versione su GitHub per questa build.</string>
+    <string name="settings_updates_current_body">Non è disponibile nessuna nuova versione per questa build.</string>
     <string name="settings_updates_error_title">Impossibile controllare gli aggiornamenti</string>
     <string name="settings_updates_version_label">Versione</string>
     <string name="settings_updates_size_label">Dimensione download</string>

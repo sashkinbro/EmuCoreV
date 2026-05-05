@@ -436,7 +436,7 @@
     <string name="settings_updates_checking_title">Checking for updates</string>
     <string name="settings_updates_available_title">Update available</string>
     <string name="settings_updates_current_title">You are up to date</string>
-    <string name="settings_updates_current_body">No newer GitHub release is available for this build.</string>
+    <string name="settings_updates_current_body">No newer release is available for this build.</string>
     <string name="settings_updates_error_title">Could not check updates</string>
     <string name="settings_updates_version_label">Version</string>
     <string name="settings_updates_size_label">Download size</string>

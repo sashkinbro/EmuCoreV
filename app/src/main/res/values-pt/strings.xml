@@ -529,7 +529,7 @@
     <string name="settings_updates_checking_title">Verificando atualizações</string>
     <string name="settings_updates_available_title">Atualização disponível</string>
     <string name="settings_updates_current_title">Você está atualizado</string>
-    <string name="settings_updates_current_body">Nenhuma versão mais recente do GitHub está disponível para esta compilação.</string>
+    <string name="settings_updates_current_body">Nenhuma versão mais recente está disponível para esta compilação.</string>
     <string name="settings_updates_error_title">Não foi possível verificar atualizações</string>
     <string name="settings_updates_version_label">Versão</string>
     <string name="settings_updates_size_label">Tamanho do download</string>
