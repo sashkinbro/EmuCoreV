@@ -134,7 +134,7 @@ COMMAND_SET_STATE(uniform_buffer) {
     }
 
     const auto offset = program->uniform_buffer_data_offsets.at(block_num);
-    if (offset != static_cast<uint32_t>(-1) && config.log_active_shaders) {
+    if (offset != static_cast<uint32_t>(-1) && config.log_uniforms) {
         const int base_binding_ubo_relative = is_vertex ? 0 : (SCE_GXM_REAL_MAX_UNIFORM_BUFFER + 1);
 
         std::vector<uint8_t> my_data(data.get(mem), data.get(mem) + size);
