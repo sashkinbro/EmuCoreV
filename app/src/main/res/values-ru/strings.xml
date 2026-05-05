@@ -529,7 +529,7 @@
     <string name="settings_updates_checking_title">Проверка обновлений</string>
     <string name="settings_updates_available_title">Доступно обновление</string>
     <string name="settings_updates_current_title">Установлена последняя версия</string>
-    <string name="settings_updates_current_body">Для этой сборки нет новых релизов на GitHub.</string>
+    <string name="settings_updates_current_body">Для этой сборки нет новых релизов.</string>
     <string name="settings_updates_error_title">Не удалось проверить обновления</string>
     <string name="settings_updates_version_label">Версия</string>
     <string name="settings_updates_size_label">Размер загрузки</string>

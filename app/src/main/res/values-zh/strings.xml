@@ -528,7 +528,7 @@
     <string name="settings_updates_checking_title">正在检查更新</string>
     <string name="settings_updates_available_title">有可用更新</string>
     <string name="settings_updates_current_title">您使用的是最新版本</string>
-    <string name="settings_updates_current_body">此版本目前没有更新的 GitHub 发布版本。</string>
+    <string name="settings_updates_current_body">此版本目前没有更新的发布版本。</string>
     <string name="settings_updates_error_title">无法检查更新</string>
     <string name="settings_updates_version_label">版本</string>
     <string name="settings_updates_size_label">下载大小</string>

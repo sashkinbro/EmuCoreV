@@ -4,13 +4,14 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.EaseIn
+import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -177,7 +178,8 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             enterTransition = { appScreenEnterTransition() },
             exitTransition = { appScreenExitTransition() },
             popEnterTransition = { appScreenPopEnterTransition() },
-            popExitTransition = { appScreenPopExitTransition() }
+            popExitTransition = { appScreenPopExitTransition() },
+            sizeTransform = { SizeTransform(clip = false) }
         ) {
             composable(
                 ROUTE_ONBOARDING
@@ -537,49 +539,19 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
 }
 
 private fun appScreenEnterTransition(): EnterTransition {
-    return fadeIn(animationSpec = tween(180)) +
-        slideInHorizontally(
-            animationSpec = tween(260),
-            initialOffsetX = { fullWidth -> (fullWidth * 0.08f).toInt() }
-        ) +
-        scaleIn(
-            animationSpec = tween(260),
-            initialScale = 0.985f
-        )
+    return appScreenPopEnterTransition()
 }
 
 private fun appScreenExitTransition(): ExitTransition {
-    return fadeOut(animationSpec = tween(140)) +
-        slideOutHorizontally(
-            animationSpec = tween(220),
-            targetOffsetX = { fullWidth -> -(fullWidth * 0.04f).toInt() }
-        ) +
-        scaleOut(
-            animationSpec = tween(220),
-            targetScale = 0.992f
-        )
+    return ExitTransition.None
 }
 
 private fun appScreenPopEnterTransition(): EnterTransition {
-    return fadeIn(animationSpec = tween(180)) +
-        slideInHorizontally(
-            animationSpec = tween(240),
-            initialOffsetX = { fullWidth -> -(fullWidth * 0.06f).toInt() }
-        ) +
-        scaleIn(
-            animationSpec = tween(240),
-            initialScale = 0.99f
-        )
+    return fadeIn(animationSpec = tween(durationMillis = 260, delayMillis = 70, easing = EaseOut)) +
+        scaleIn(initialScale = 0.96f, animationSpec = tween(260, delayMillis = 70, easing = EaseOut))
 }
 
 private fun appScreenPopExitTransition(): ExitTransition {
-    return fadeOut(animationSpec = tween(130)) +
-        slideOutHorizontally(
-            animationSpec = tween(210),
-            targetOffsetX = { fullWidth -> (fullWidth * 0.08f).toInt() }
-        ) +
-        scaleOut(
-            animationSpec = tween(210),
-            targetScale = 0.985f
-        )
+    return fadeOut(animationSpec = tween(durationMillis = 110, easing = EaseIn)) +
+        scaleOut(targetScale = 1.0f, animationSpec = tween(110, easing = EaseIn))
 }

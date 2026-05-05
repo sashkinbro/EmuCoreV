@@ -529,7 +529,7 @@
     <string name="settings_updates_checking_title">Перевірка оновлень</string>
     <string name="settings_updates_available_title">Доступне оновлення</string>
     <string name="settings_updates_current_title">У вас остання версія</string>
-    <string name="settings_updates_current_body">Для цієї збірки немає нових релізів на GitHub.</string>
+    <string name="settings_updates_current_body">Для цієї збірки немає нових релізів.</string>
     <string name="settings_updates_error_title">Не вдалося перевірити оновлення</string>
     <string name="settings_updates_version_label">Версія</string>
     <string name="settings_updates_size_label">Розмір завантаження</string>
