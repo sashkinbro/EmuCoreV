@@ -20,50 +20,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.composed
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-fun Modifier.shimmer(
-    showShimmer: Boolean = true
-): Modifier = composed {
-    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
-    val translateAnimation by infiniteTransition.animateFloat(
-        initialValue = -800f,
-        targetValue = 1600f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmerTranslate"
-    )
-
-    if (showShimmer) {
-        val shimmerColors = listOf(
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        )
-
-        val brush = Brush.linearGradient(
-            colors = shimmerColors,
-            start = Offset(translateAnimation, translateAnimation),
-            end = Offset(translateAnimation + 400f, translateAnimation + 400f)
-        )
-        background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            .background(brush)
-    } else {
-        this
-    }
-}
 
 @Composable
 fun PremiumLoadingAnimation(

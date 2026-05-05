@@ -336,7 +336,7 @@ private fun UpdateHeroCard(
                             release != null -> release.displayName
                             state.errorMessage != null -> state.errorMessage
                             else -> stringResource(R.string.settings_updates_current_body)
-                        }.orEmpty(),
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -538,10 +538,10 @@ private fun formatBytes(bytes: Long?): String {
 }
 
 private fun releaseSummary(release: AppUpdateRelease): String {
-    return listOf(
+    return listOfNotNull(
         release.tagName.takeIf { it.isNotBlank() },
         formatBytes(release.apkSizeBytes).takeIf { it != "-" }
-    ).filterNotNull().joinToString(" • ")
+    ).joinToString(" • ")
 }
 
 private fun displayReleaseNotes(body: String): String {

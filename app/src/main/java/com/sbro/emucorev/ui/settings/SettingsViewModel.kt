@@ -11,6 +11,7 @@ import com.sbro.emucorev.core.GpuDriverCatalogRepository
 import com.sbro.emucorev.core.GpuDriverManager
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.RemoteGpuDriver
+import com.sbro.emucorev.core.SettingsBackupRepository
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.data.AppLanguage
@@ -52,6 +53,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val gpuDriverManager = GpuDriverManager(application)
     private val gpuDriverCatalogRepository = GpuDriverCatalogRepository(application)
     private val appUpdateRepository = AppUpdateRepository(application)
+    private val settingsBackupRepository = SettingsBackupRepository(
+        application,
+        preferences,
+        coreConfigRepository
+    )
     private val initialCoreConfig = coreConfigRepository.ensureDefaultsPersisted()
 
     private val _uiState = MutableStateFlow(
@@ -76,6 +82,35 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun clearPackagesFolder() {
         preferences.clearPackagesFolder(getApplication())
         _uiState.value = _uiState.value.copy(packagesFolderPath = null)
+    }
+
+    fun exportSettingsBackup(uri: Uri, onComplete: (Result<Unit>) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                settingsBackupRepository.exportTo(uri)
+            }
+            withContext(Dispatchers.Main) {
+                onComplete(result)
+            }
+        }
+    }
+
+    fun restoreSettingsBackup(uri: Uri, onComplete: (Result<Unit>) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                val restoredConfig = settingsBackupRepository.restoreFrom(uri)
+                val context = getApplication<Application>()
+                _uiState.value = _uiState.value.copy(
+                    packagesFolderPath = preferences.packagesFolderDisplayName(context),
+                    coreConfig = restoredConfig,
+                    installedGpuDrivers = gpuDriverManager.listInstalledDrivers(),
+                    appLanguage = preferences.appLanguage
+                )
+            }
+            withContext(Dispatchers.Main) {
+                onComplete(result)
+            }
+        }
     }
 
     fun refreshCoreSettings() {

@@ -21,7 +21,6 @@ val LightOnSurfaceVariant = Color(0xFF556273)
 
 val AccentPrimary = Color(0xFF3A7ADD)
 val AccentPrimaryDark = Color(0xFF275FAE)
-val AccentPrimaryLight = Color(0xFF69A0F0)
 val AccentPrimaryContainer = Color(0xFF132C49)
 val AccentPrimaryLightContainer = Color(0xFFD7E5FA)
 val OnAccent = Color(0xFFFFFFFF)

@@ -111,7 +111,7 @@ class AppPreferences(context: Context) {
 
     fun packagesFolderDisplayName(context: Context): String? {
         val uri = packagesFolderUriAsUri() ?: return null
-        return DocumentFile.fromTreeUri(context, uri)?.name
+        return runCatching { DocumentFile.fromTreeUri(context, uri)?.name }.getOrNull()
             ?: uri.lastPathSegment?.substringAfterLast(':')
             ?: uri.toString()
     }

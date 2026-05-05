@@ -556,4 +556,15 @@
     <string name="settings_updates_dialog_later">Mais tarde</string>
     <string name="settings_updates_dialog_skip">Pular esta atualização</string>
     <string name="settings_updates_dialog_download_label">Pacote APK</string>
+    <string name="settings_backup_title">Backup de configurações</string>
+    <string name="settings_backup_body">Faça backup das preferências do aplicativo e configurações do emulador em um arquivo, ou restaure-as de um backup anterior.</string>
+    <string name="settings_backup_create">Fazer backup das configurações</string>
+    <string name="settings_backup_restore">Restaurar backup</string>
+    <string name="settings_backup_created">Backup de configurações criado.</string>
+    <string name="settings_backup_failed">Falha ao criar o backup de configurações.</string>
+    <string name="settings_backup_restored">Configurações restauradas do backup.</string>
+    <string name="settings_backup_restore_failed">Falha ao restaurar o backup de configurações.</string>
+    <string name="settings_backup_restore_title">Restaurar backup de configurações?</string>
+    <string name="settings_backup_restore_message">As preferências atuais do aplicativo e as configurações do emulador serão substituídas pelo backup selecionado.</string>
+    <string name="settings_backup_restore_confirm">Restaurar</string>
 </resources>

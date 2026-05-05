@@ -347,8 +347,7 @@ private fun EmptySetupState(
 
             StatusCard(
                 icon = Icons.Rounded.CheckCircle,
-                title = stringResource(R.string.settings_packages_folder),
-                isReady = false
+                title = stringResource(R.string.settings_packages_folder)
             )
         }
     }
@@ -357,17 +356,12 @@ private fun EmptySetupState(
 @Composable
 private fun StatusCard(
     icon: ImageVector,
-    title: String,
-    isReady: Boolean
+    title: String
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = if (isReady) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        } else {
-            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
-        },
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
         tonalElevation = 0.dp
     ) {
         Row(
@@ -381,8 +375,7 @@ private fun StatusCard(
                 modifier = Modifier
                     .size(36.dp)
                     .background(
-                        if (isReady) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                        else MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
+                        MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
                         RoundedCornerShape(10.dp)
                     ),
                 contentAlignment = Alignment.Center
@@ -390,7 +383,7 @@ private fun StatusCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (isReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -401,10 +394,9 @@ private fun StatusCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = if (isReady) stringResource(R.string.onboarding_status_ready)
-                    else stringResource(R.string.onboarding_status_pick_folder),
+                    text = stringResource(R.string.onboarding_status_pick_folder),
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    color = MaterialTheme.colorScheme.error
                 )
             }
         }

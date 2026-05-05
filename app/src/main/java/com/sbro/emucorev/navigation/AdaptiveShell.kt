@@ -27,7 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Games
 import androidx.compose.material.icons.rounded.Inventory2
-import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
@@ -55,6 +54,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
+import com.sbro.emucorev.ui.theme.shouldUseExpandedShell
 import kotlinx.coroutines.launch
 
 enum class PrimaryDestination {
@@ -71,7 +71,6 @@ private enum class MobileLeadingAction {
 @Composable
 fun AdaptiveShell(
     selected: PrimaryDestination,
-    onNavigateHome: () -> Unit,
     onNavigateSetup: () -> Unit,
     onNavigateLibrary: () -> Unit,
     onNavigateSaveData: () -> Unit,
@@ -87,7 +86,6 @@ fun AdaptiveShell(
     val navContent: @Composable () -> Unit = {
         SideNavigation(
             selected = selected,
-            onNavigateHome = onNavigateHome,
             onNavigateSetup = onNavigateSetup,
             onNavigateLibrary = onNavigateLibrary,
             onNavigateSaveData = onNavigateSaveData,
@@ -101,7 +99,7 @@ fun AdaptiveShell(
         )
     }
     val configuration = LocalConfiguration.current
-    val isWide = configuration.screenWidthDp >= 900
+    val isWide = configuration.shouldUseExpandedShell()
 
     if (isWide) {
         Row(
@@ -128,7 +126,6 @@ fun AdaptiveShell(
     } else {
         CompactAdaptiveShell(
             selected = selected,
-            onNavigateHome = onNavigateHome,
             onNavigateSetup = onNavigateSetup,
             onNavigateLibrary = onNavigateLibrary,
             onNavigateSaveData = onNavigateSaveData,
@@ -149,7 +146,6 @@ fun AdaptiveShell(
 @Composable
 private fun CompactAdaptiveShell(
     selected: PrimaryDestination,
-    onNavigateHome: () -> Unit,
     onNavigateSetup: () -> Unit,
     onNavigateLibrary: () -> Unit,
     onNavigateSaveData: () -> Unit,
@@ -211,7 +207,6 @@ private fun CompactAdaptiveShell(
             ) {
                 SideNavigation(
                     selected = selected,
-                    onNavigateHome = onNavigateHome,
                     onNavigateSetup = onNavigateSetup,
                     onNavigateLibrary = onNavigateLibrary,
                     onNavigateSaveData = onNavigateSaveData,
@@ -240,7 +235,6 @@ private fun CompactAdaptiveShell(
 @Composable
 private fun SideNavigation(
     selected: PrimaryDestination,
-    onNavigateHome: () -> Unit,
     onNavigateSetup: () -> Unit,
     onNavigateLibrary: () -> Unit,
     onNavigateSaveData: () -> Unit,

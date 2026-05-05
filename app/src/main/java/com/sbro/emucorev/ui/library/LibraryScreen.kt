@@ -6,10 +6,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,9 +17,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -75,7 +74,6 @@ import com.sbro.emucorev.ui.common.NavigationMenuButton
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.CardContentPadding
-import com.sbro.emucorev.ui.theme.CompactCardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset

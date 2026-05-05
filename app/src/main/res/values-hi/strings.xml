@@ -556,4 +556,15 @@
     <string name="settings_updates_dialog_later">बाद में</string>
     <string name="settings_updates_dialog_skip">इस अपडेट को छोड़ें</string>
     <string name="settings_updates_dialog_download_label">APK पैकेज</string>
+    <string name="settings_backup_title">सेटिंग्स बैकअप</string>
+    <string name="settings_backup_body">एक फ़ाइल में ऐप प्रेफरेंस और एमुलेटर सेटिंग्स का बैकअप लें, या उन्हें पिछले बैकअप से रीस्टोर करें।</string>
+    <string name="settings_backup_create">सेटिंग्स का बैकअप लें</string>
+    <string name="settings_backup_restore">बैकअप रीस्टोर करें</string>
+    <string name="settings_backup_created">सेटिंग्स बैकअप बन गया।</string>
+    <string name="settings_backup_failed">सेटिंग्स बैकअप बनाने में विफल।</string>
+    <string name="settings_backup_restored">बैकअप से सेटिंग्स रीस्टोर हो गईं।</string>
+    <string name="settings_backup_restore_failed">सेटिंग्स बैकअप रीस्टोर करने में विफल।</string>
+    <string name="settings_backup_restore_title">सेटिंग्स बैकअप रीस्टोर करें?</string>
+    <string name="settings_backup_restore_message">मौजूदा ऐप प्रेफरेंस और एमुलेटर सेटिंग्स को चुने गए बैकअप से बदल दिया जाएगा।</string>
+    <string name="settings_backup_restore_confirm">रीस्टोर करें</string>
 </resources>

@@ -556,4 +556,15 @@
     <string name="settings_updates_dialog_later">Пізніше</string>
     <string name="settings_updates_dialog_skip">Пропустити це оновлення</string>
     <string name="settings_updates_dialog_download_label">APK-файл</string>
+    <string name="settings_backup_title">Резервна копія налаштувань</string>
+    <string name="settings_backup_body">Створіть резервну копію налаштувань додатка та емулятора у файл або відновіть їх із попередньої копії.</string>
+    <string name="settings_backup_create">Зробити резервну копію</string>
+    <string name="settings_backup_restore">Відновити з копії</string>
+    <string name="settings_backup_created">Резервну копію налаштувань створено.</string>
+    <string name="settings_backup_failed">Не вдалося створити резервну копію налаштувань.</string>
+    <string name="settings_backup_restored">Налаштування відновлено з резервної копії.</string>
+    <string name="settings_backup_restore_failed">Не вдалося відновити резервну копію налаштувань.</string>
+    <string name="settings_backup_restore_title">Відновити налаштування?</string>
+    <string name="settings_backup_restore_message">Поточні налаштування додатка та емулятора будуть замінені вибраною резервною копією.</string>
+    <string name="settings_backup_restore_confirm">Відновити</string>
 </resources>

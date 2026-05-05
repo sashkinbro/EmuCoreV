@@ -555,4 +555,15 @@
     <string name="settings_updates_dialog_later">稍后</string>
     <string name="settings_updates_dialog_skip">跳过此更新</string>
     <string name="settings_updates_dialog_download_label">APK 安装包</string>
+    <string name="settings_backup_title">设置备份</string>
+    <string name="settings_backup_body">将应用偏好设置和模拟器设置备份到文件中，或从之前的备份中恢复。</string>
+    <string name="settings_backup_create">备份设置</string>
+    <string name="settings_backup_restore">恢复备份</string>
+    <string name="settings_backup_created">设置备份已创建。</string>
+    <string name="settings_backup_failed">无法创建设置备份。</string>
+    <string name="settings_backup_restored">已从备份中恢复设置。</string>
+    <string name="settings_backup_restore_failed">无法恢复设置备份。</string>
+    <string name="settings_backup_restore_title">恢复设置备份？</string>
+    <string name="settings_backup_restore_message">当前的应用偏好设置和模拟器设置将被选定的备份替换。</string>
+    <string name="settings_backup_restore_confirm">恢复</string>
 </resources>
