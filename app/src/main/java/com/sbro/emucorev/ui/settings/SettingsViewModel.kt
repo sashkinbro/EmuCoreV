@@ -4,6 +4,8 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.sbro.emucorev.core.AppUpdateRelease
+import com.sbro.emucorev.core.AppUpdateRepository
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.GpuDriverCatalogRepository
 import com.sbro.emucorev.core.GpuDriverManager
@@ -29,7 +31,18 @@ data class SettingsUiState(
     val gpuDriverCatalogLoading: Boolean = false,
     val gpuDriverCatalogError: String? = null,
     val gpuDriverDownloads: Map<String, Float> = emptyMap(),
-    val appLanguage: AppLanguage = AppLanguage.SYSTEM
+    val appLanguage: AppLanguage = AppLanguage.SYSTEM,
+    val appUpdate: AppUpdateUiState = AppUpdateUiState()
+)
+
+data class AppUpdateUiState(
+    val latestRelease: AppUpdateRelease? = null,
+    val checking: Boolean = false,
+    val checkedOnce: Boolean = false,
+    val errorMessage: String? = null,
+    val downloadProgress: Float? = null,
+    val downloadedApkPath: String? = null,
+    val startupDialogVisible: Boolean = false
 )
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -38,6 +51,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val coreConfigRepository = VitaCoreConfigRepository(application)
     private val gpuDriverManager = GpuDriverManager(application)
     private val gpuDriverCatalogRepository = GpuDriverCatalogRepository(application)
+    private val appUpdateRepository = AppUpdateRepository(application)
     private val initialCoreConfig = coreConfigRepository.ensureDefaultsPersisted()
 
     private val _uiState = MutableStateFlow(
@@ -190,5 +204,108 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 installedGpuDrivers = gpuDriverManager.listInstalledDrivers()
             )
         }
+    }
+
+    fun checkForAppUpdates(showErrors: Boolean = true, showStartupDialog: Boolean = false) {
+        if (_uiState.value.appUpdate.checking) return
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.value = _uiState.value.copy(
+                appUpdate = _uiState.value.appUpdate.copy(
+                    checking = true,
+                    errorMessage = null
+                )
+            )
+            runCatching {
+                appUpdateRepository.checkLatestRelease()
+            }.onSuccess { release ->
+                val startupDialogVisible = showStartupDialog &&
+                    release != null &&
+                    !release.tagName.equals(preferences.skippedUpdateTag, ignoreCase = true)
+                _uiState.value = _uiState.value.copy(
+                    appUpdate = _uiState.value.appUpdate.copy(
+                        latestRelease = release,
+                        checking = false,
+                        checkedOnce = true,
+                        errorMessage = null,
+                        startupDialogVisible = startupDialogVisible
+                    )
+                )
+            }.onFailure { error ->
+                _uiState.value = _uiState.value.copy(
+                    appUpdate = _uiState.value.appUpdate.copy(
+                        checking = false,
+                        checkedOnce = true,
+                        errorMessage = if (showErrors) error.message ?: "Could not check for updates" else null,
+                        startupDialogVisible = false
+                    )
+                )
+            }
+        }
+    }
+
+    fun dismissStartupUpdateDialog() {
+        _uiState.value = _uiState.value.copy(
+            appUpdate = _uiState.value.appUpdate.copy(startupDialogVisible = false)
+        )
+    }
+
+    fun skipStartupUpdateDialog() {
+        _uiState.value.appUpdate.latestRelease?.tagName?.takeIf { it.isNotBlank() }?.let { tag ->
+            preferences.skippedUpdateTag = tag
+        }
+        dismissStartupUpdateDialog()
+    }
+
+    fun downloadAppUpdate(onComplete: (Result<Unit>) -> Unit = {}) {
+        val release = _uiState.value.appUpdate.latestRelease ?: return
+        if (_uiState.value.appUpdate.downloadProgress != null) return
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.value = _uiState.value.copy(
+                appUpdate = _uiState.value.appUpdate.copy(
+                    downloadProgress = 0f,
+                    errorMessage = null,
+                    downloadedApkPath = null
+                )
+            )
+            val result = runCatching {
+                val apk = appUpdateRepository.downloadApk(release) { progress ->
+                    _uiState.value = _uiState.value.copy(
+                        appUpdate = _uiState.value.appUpdate.copy(downloadProgress = progress)
+                    )
+                }
+                _uiState.value = _uiState.value.copy(
+                    appUpdate = _uiState.value.appUpdate.copy(
+                        downloadProgress = null,
+                        downloadedApkPath = apk.absolutePath
+                    )
+                )
+            }
+            result.onFailure { error ->
+                _uiState.value = _uiState.value.copy(
+                    appUpdate = _uiState.value.appUpdate.copy(
+                        downloadProgress = null,
+                        errorMessage = error.message ?: "Could not download update"
+                    )
+                )
+            }
+            withContext(Dispatchers.Main) {
+                onComplete(result)
+            }
+        }
+    }
+
+    fun installDownloadedAppUpdate(onComplete: (Result<Unit>) -> Unit = {}) {
+        val apkPath = _uiState.value.appUpdate.downloadedApkPath ?: return
+        val result = runCatching {
+            appUpdateRepository.launchInstaller(java.io.File(apkPath))
+        }
+        result.onFailure { error ->
+            _uiState.value = _uiState.value.copy(
+                appUpdate = _uiState.value.appUpdate.copy(
+                    errorMessage = error.message ?: "Could not open update installer"
+                )
+            )
+        }
+        onComplete(result)
     }
 }

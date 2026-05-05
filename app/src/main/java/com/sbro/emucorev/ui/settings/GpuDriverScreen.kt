@@ -4,6 +4,12 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -169,8 +175,12 @@ fun GpuDriverScreen(
                 )
             }
         }
-        if (searchVisible) {
-            item {
+        item {
+            AnimatedVisibility(
+                visible = searchVisible,
+                enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
+                exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
+            ) {
                 DriverSearchField(
                     searchQuery = searchQuery,
                     onSearchQueryChange = { searchQuery = it },
@@ -181,8 +191,12 @@ fun GpuDriverScreen(
                 )
             }
         }
-        if (filtersVisible && uiState.remoteGpuDrivers.isNotEmpty()) {
-            item {
+        item {
+            AnimatedVisibility(
+                visible = filtersVisible && uiState.remoteGpuDrivers.isNotEmpty(),
+                enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
+                exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
+            ) {
                 DriverFilterPanel(
                     variantFilter = variantFilter,
                     onVariantFilterChange = { variantFilter = it },
@@ -484,9 +498,9 @@ private fun DriverStatusText(
 ) {
     val text = when {
         selectedDriver == null -> stringResource(R.string.settings_gpu_driver_status_system)
-        !selectedDriver.isUsable -> stringResource(R.string.settings_gpu_driver_status_broken, selectedDriver.mainLibrary)
+        !selectedDriver.isUsable -> stringResource(R.string.settings_gpu_driver_status_broken, selectedDriver.name)
         backendRenderer != "Vulkan" -> stringResource(R.string.settings_gpu_driver_status_renderer, backendRenderer)
-        else -> stringResource(R.string.settings_gpu_driver_status_active, selectedDriver.mainLibrary)
+        else -> stringResource(R.string.settings_gpu_driver_status_active, selectedDriver.name)
     }
     val supporting = when {
         selectedDriver == null -> stringResource(R.string.settings_gpu_driver_status_system_desc)

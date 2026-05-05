@@ -37,6 +37,7 @@ import com.sbro.emucorev.ui.library.LibraryScreen
 import com.sbro.emucorev.ui.onboarding.OnboardingScreen
 import com.sbro.emucorev.ui.saves.SaveDataScreen
 import com.sbro.emucorev.ui.settings.AppLanguageScreen
+import com.sbro.emucorev.ui.settings.AppUpdateAvailableDialog
 import com.sbro.emucorev.ui.settings.GpuDriverScreen
 import com.sbro.emucorev.ui.settings.SettingsScreen
 import com.sbro.emucorev.ui.settings.SettingsTab
@@ -73,6 +74,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     val installViewModel: SetupInstallViewModel = viewModel()
     val settingsViewModel: SettingsViewModel = viewModel()
     val installUiState by installViewModel.uiState.collectAsState()
+    val settingsUiState by settingsViewModel.uiState.collectAsState()
     var firmwareInstalled by remember(context) { mutableStateOf(EmulatorStorage.hasInstalledFirmware(context)) }
     var firmwareUpdateInstalled by remember(context) { mutableStateOf(EmulatorStorage.hasInstalledFirmwareUpdate(context)) }
     val startDestination = if (preferences.onboardingCompleted) ROUTE_LIBRARY else ROUTE_ONBOARDING
@@ -134,6 +136,12 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         InstallStateBus.events.collect {
             firmwareInstalled = EmulatorStorage.hasInstalledFirmware(context)
             firmwareUpdateInstalled = EmulatorStorage.hasInstalledFirmwareUpdate(context)
+        }
+    }
+
+    LaunchedEffect(preferences.onboardingCompleted) {
+        if (preferences.onboardingCompleted) {
+            settingsViewModel.checkForAppUpdates(showErrors = false, showStartupDialog = true)
         }
     }
 
@@ -512,4 +520,17 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         uiState = installUiState,
         onDismiss = installViewModel::dismissDialog
     )
+
+    val startupUpdateRelease = settingsUiState.appUpdate.latestRelease
+    if (settingsUiState.appUpdate.startupDialogVisible && startupUpdateRelease != null) {
+        AppUpdateAvailableDialog(
+            release = startupUpdateRelease,
+            onDismiss = settingsViewModel::dismissStartupUpdateDialog,
+            onSkipUpdate = settingsViewModel::skipStartupUpdateDialog,
+            onOpenUpdates = {
+                settingsViewModel.dismissStartupUpdateDialog()
+                navController.navigate(settingsRoute(SettingsTab.Updates)) { launchSingleTop = true }
+            }
+        )
+    }
 }
