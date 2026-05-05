@@ -556,4 +556,15 @@
     <string name="settings_updates_dialog_later">Más tarde</string>
     <string name="settings_updates_dialog_skip">Omitir esta actualización</string>
     <string name="settings_updates_dialog_download_label">Paquete APK</string>
+    <string name="settings_backup_title">Copia de seguridad de ajustes</string>
+    <string name="settings_backup_body">Haz una copia de seguridad de las preferencias de la aplicación y la configuración del emulador en un archivo, o restáuralas desde una copia de seguridad anterior.</string>
+    <string name="settings_backup_create">Hacer copia de seguridad</string>
+    <string name="settings_backup_restore">Restaurar copia de seguridad</string>
+    <string name="settings_backup_created">Copia de seguridad de ajustes creada.</string>
+    <string name="settings_backup_failed">Error al crear la copia de seguridad de ajustes.</string>
+    <string name="settings_backup_restored">Ajustes restaurados desde la copia de seguridad.</string>
+    <string name="settings_backup_restore_failed">Error al restaurar la copia de seguridad de ajustes.</string>
+    <string name="settings_backup_restore_title">¿Restaurar copia de seguridad?</string>
+    <string name="settings_backup_restore_message">Las preferencias actuales de la aplicación y la configuración del emulador serán reemplazadas por la copia de seguridad seleccionada.</string>
+    <string name="settings_backup_restore_confirm">Restaurar</string>
 </resources>

@@ -556,4 +556,15 @@
     <string name="settings_updates_dialog_later">Später</string>
     <string name="settings_updates_dialog_skip">Dieses Update überspringen</string>
     <string name="settings_updates_dialog_download_label">APK-Paket</string>
+    <string name="settings_backup_title">Backup der Einstellungen</string>
+    <string name="settings_backup_body">Sichern Sie App-Einstellungen und Emulator-Einstellungen in einer Datei oder stellen Sie sie aus einem vorherigen Backup wieder her.</string>
+    <string name="settings_backup_create">Einstellungen sichern</string>
+    <string name="settings_backup_restore">Backup wiederherstellen</string>
+    <string name="settings_backup_created">Einstellungs-Backup erstellt.</string>
+    <string name="settings_backup_failed">Einstellungs-Backup konnte nicht erstellt werden.</string>
+    <string name="settings_backup_restored">Einstellungen aus Backup wiederhergestellt.</string>
+    <string name="settings_backup_restore_failed">Einstellungs-Backup konnte nicht wiederhergestellt werden.</string>
+    <string name="settings_backup_restore_title">Einstellungs-Backup wiederherstellen?</string>
+    <string name="settings_backup_restore_message">Die aktuellen App- und Emulator-Einstellungen werden durch das ausgewählte Backup ersetzt.</string>
+    <string name="settings_backup_restore_confirm">Wiederherstellen</string>
 </resources>

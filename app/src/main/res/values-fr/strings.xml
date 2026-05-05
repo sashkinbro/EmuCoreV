@@ -556,4 +556,15 @@
     <string name="settings_updates_dialog_later">Plus tard</string>
     <string name="settings_updates_dialog_skip">Ignorer cette mise à jour</string>
     <string name="settings_updates_dialog_download_label">Package APK</string>
+    <string name="settings_backup_title">Sauvegarde des paramètres</string>
+    <string name="settings_backup_body">Sauvegardez les préférences de l\'application et les paramètres de l\'émulateur dans un fichier, ou restaurez-les à partir d\'une sauvegarde précédente.</string>
+    <string name="settings_backup_create">Sauvegarder les paramètres</string>
+    <string name="settings_backup_restore">Restaurer la sauvegarde</string>
+    <string name="settings_backup_created">Sauvegarde des paramètres créée.</string>
+    <string name="settings_backup_failed">Échec de la création de la sauvegarde des paramètres.</string>
+    <string name="settings_backup_restored">Paramètres restaurés à partir de la sauvegarde.</string>
+    <string name="settings_backup_restore_failed">Échec de la restauration de la sauvegarde des paramètres.</string>
+    <string name="settings_backup_restore_title">Restaurer la sauvegarde des paramètres ?</string>
+    <string name="settings_backup_restore_message">Les préférences actuelles de l\'application et les paramètres de l\'émulateur seront remplacés par la sauvegarde sélectionnée.</string>
+    <string name="settings_backup_restore_confirm">Restaurer</string>
 </resources>

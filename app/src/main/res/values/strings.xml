@@ -230,6 +230,17 @@
     <string name="settings_clear_folder">Clear folder</string>
     <string name="settings_storage_title">Storage</string>
     <string name="settings_storage_body">Emulator data is stored in the app files directory under `vita/`. Installed games are in `ux0/app`, shader cache is in `cache`, and patches are in `patch`.</string>
+    <string name="settings_backup_title">Settings backup</string>
+    <string name="settings_backup_body">Back up app preferences and emulator settings to a file, or restore them from a previous backup.</string>
+    <string name="settings_backup_create">Back up settings</string>
+    <string name="settings_backup_restore">Restore backup</string>
+    <string name="settings_backup_created">Settings backup created.</string>
+    <string name="settings_backup_failed">Failed to create settings backup.</string>
+    <string name="settings_backup_restored">Settings restored from backup.</string>
+    <string name="settings_backup_restore_failed">Failed to restore settings backup.</string>
+    <string name="settings_backup_restore_title">Restore settings backup?</string>
+    <string name="settings_backup_restore_message">Current app preferences and emulator settings will be replaced with the selected backup.</string>
+    <string name="settings_backup_restore_confirm">Restore</string>
     <string name="settings_about_title">About EmuCoreV</string>
     <string name="settings_about_body">EmuCoreV is a PS Vita emulator for Android built on the open-source Vita3K project.</string>
     <string name="settings_help_content_description">Open setting help</string>

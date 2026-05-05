@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
 import android.provider.MediaStore
+import android.util.LruCache
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.compose.animation.animateContentSize
@@ -476,71 +477,69 @@ fun GameDetailScreen(
                         }
                     }
 
-                    if (game != null || catalog != null) {
-                        SectionCard(
-                            title = stringResource(R.string.detail_compatibility_title),
-                            modifier = Modifier
-                                .align(Alignment.CenterHorizontally)
-                                .widthIn(max = contentMaxWidth)
-                                .padding(horizontal = horizontalInset)
-                        ) {
-                            when {
-                                compatibility != null -> {
+                    SectionCard(
+                        title = stringResource(R.string.detail_compatibility_title),
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .widthIn(max = contentMaxWidth)
+                            .padding(horizontal = horizontalInset)
+                    ) {
+                        when {
+                            compatibility != null -> {
+                                MetadataRow(
+                                    stringResource(R.string.detail_compatibility_status),
+                                    stringResource(compatibility.state.labelResId())
+                                )
+                                MetadataRow(
+                                    stringResource(R.string.detail_compatibility_issue),
+                                    "#${compatibility.issueId}"
+                                )
+                                MetadataRow(
+                                    stringResource(R.string.detail_compatibility_title_id_label),
+                                    compatibility.matchedTitleId
+                                )
+                                compatibility.updatedAtEpochSeconds?.let { updatedAt ->
                                     MetadataRow(
-                                        stringResource(R.string.detail_compatibility_status),
-                                        stringResource(compatibility.state.labelResId())
+                                        stringResource(R.string.detail_compatibility_updated),
+                                        formatCompatibilityUpdatedAt(updatedAt)
                                     )
+                                }
+                                if (knownTitleIds.size > 1) {
                                     MetadataRow(
-                                        stringResource(R.string.detail_compatibility_issue),
-                                        "#${compatibility.issueId}"
-                                    )
-                                    MetadataRow(
-                                        stringResource(R.string.detail_compatibility_title_id_label),
-                                        compatibility.matchedTitleId
-                                    )
-                                    compatibility.updatedAtEpochSeconds?.let { updatedAt ->
-                                        MetadataRow(
-                                            stringResource(R.string.detail_compatibility_updated),
-                                            formatCompatibilityUpdatedAt(updatedAt)
-                                        )
-                                    }
-                                    if (knownTitleIds.size > 1) {
-                                        MetadataRow(
-                                            stringResource(R.string.detail_compatibility_known_serials),
-                                            knownTitleIds.joinToString(", ")
-                                        )
-                                    }
-                                    DetailSourceCard(
-                                        text = stringResource(
-                                            R.string.detail_compatibility_source_note,
-                                            compatibility.issueId
-                                        )
+                                        stringResource(R.string.detail_compatibility_known_serials),
+                                        knownTitleIds.joinToString(", ")
                                     )
                                 }
+                                DetailSourceCard(
+                                    text = stringResource(
+                                        R.string.detail_compatibility_source_note,
+                                        compatibility.issueId
+                                    )
+                                )
+                            }
 
-                                !uiState.isCompatibilityAvailable -> {
-                                    Text(
-                                        text = stringResource(R.string.detail_compatibility_unavailable),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                            !uiState.isCompatibilityAvailable -> {
+                                Text(
+                                    text = stringResource(R.string.detail_compatibility_unavailable),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
 
-                                knownTitleIds.isEmpty() -> {
-                                    Text(
-                                        text = stringResource(R.string.detail_compatibility_unmapped),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                            knownTitleIds.isEmpty() -> {
+                                Text(
+                                    text = stringResource(R.string.detail_compatibility_unmapped),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
 
-                                else -> {
-                                    Text(
-                                        text = stringResource(R.string.detail_compatibility_missing_entry),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                            else -> {
+                                Text(
+                                    text = stringResource(R.string.detail_compatibility_missing_entry),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
@@ -1334,7 +1333,10 @@ private fun RemoteBitmapImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop
 ) {
-    val bitmap = produceState<Bitmap?>(initialValue = null, key1 = imageUrl) {
+    val bitmap = produceState(
+        initialValue = imageUrl?.let(RemoteDetailBitmapCache::get),
+        key1 = imageUrl
+    ) {
         value = imageUrl?.let { downloadBitmap(it) }
     }.value
 
@@ -1393,13 +1395,37 @@ private suspend fun saveScreenshotToGallery(
 }
 
 private suspend fun downloadBitmap(imageUrl: String): Bitmap? = withContext(Dispatchers.IO) {
+    RemoteDetailBitmapCache.get(imageUrl)?.let { return@withContext it }
     runCatching {
         val connection = URL(imageUrl).openConnection() as HttpURLConnection
         connection.connectTimeout = 10_000
         connection.readTimeout = 10_000
         connection.instanceFollowRedirects = true
         connection.inputStream.use(BitmapFactory::decodeStream)
-    }.getOrNull()
+    }.getOrNull()?.also { bitmap ->
+        RemoteDetailBitmapCache.put(imageUrl, bitmap)
+    }
+}
+
+private object RemoteDetailBitmapCache {
+    private val cache = object : LruCache<String, Bitmap>(calculateCacheSizeKb()) {
+        override fun sizeOf(key: String, value: Bitmap): Int {
+            return (value.byteCount / 1024).coerceAtLeast(1)
+        }
+    }
+
+    fun get(url: String): Bitmap? = cache.get(url)
+
+    fun put(url: String, bitmap: Bitmap) {
+        if (cache.get(url) == null) {
+            cache.put(url, bitmap)
+        }
+    }
+
+    private fun calculateCacheSizeKb(): Int {
+        val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024L).toInt()
+        return (maxMemoryKb / 10).coerceAtLeast(6 * 1024)
+    }
 }
 
 @Composable

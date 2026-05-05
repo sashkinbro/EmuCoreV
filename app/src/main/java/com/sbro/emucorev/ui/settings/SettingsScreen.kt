@@ -5,6 +5,14 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -109,6 +117,10 @@ fun SettingsScreen(
     var selectedTab by rememberSaveable(initialTab) { mutableStateOf(initialTab) }
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
     val folderPickerFailedMessage = stringResource(R.string.folder_picker_failed)
+    val backupCreatedMessage = stringResource(R.string.settings_backup_created)
+    val backupFailedMessage = stringResource(R.string.settings_backup_failed)
+    val restoreCompletedMessage = stringResource(R.string.settings_backup_restored)
+    val restoreFailedMessage = stringResource(R.string.settings_backup_restore_failed)
 
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -118,12 +130,34 @@ fun SettingsScreen(
             Toast.makeText(context, folderPickerFailedMessage, Toast.LENGTH_SHORT).show()
         }
     }
+    val backupPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        viewModel.exportSettingsBackup(uri) { result ->
+            Toast.makeText(
+                context,
+                if (result.isSuccess) backupCreatedMessage else backupFailedMessage,
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+    val restorePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        viewModel.restoreSettingsBackup(uri) { result ->
+            Toast.makeText(
+                context,
+                if (result.isSuccess) restoreCompletedMessage else restoreFailedMessage,
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
     val refreshCoreSettingsClick = rememberDebouncedClick(onClick = viewModel::refreshCoreSettings)
     val changeFolderClick = rememberDebouncedClick { folderPicker.launch(null) }
     val clearFolderClick = rememberDebouncedClick(onClick = viewModel::clearPackagesFolder)
+    val createBackupClick = rememberDebouncedClick { backupPicker.launch("emucorev-settings-backup.json") }
     val backClick = rememberDebouncedClick(onClick = onBackClick)
     val resetSettingsClick = rememberDebouncedClick(onClick = viewModel::resetCoreSettingsToDefaults)
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
+    var showRestoreBackupDialog by rememberSaveable { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -155,18 +189,47 @@ fun SettingsScreen(
                     .padding(top = 12.dp, bottom = 110.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
-                SettingsTabContent(
-                    selectedTab = selectedTab,
-                    uiState = uiState,
-                    defaults = defaults,
-                    viewModel = viewModel,
-                    onOpenLanguageSettings = onOpenLanguageSettings,
-                    onOpenVitaLanguageSettings = onOpenVitaLanguageSettings,
-                    onOpenGpuDriverSettings = onOpenGpuDriverSettings,
-                    refreshCoreSettingsClick = refreshCoreSettingsClick,
-                    changeFolderClick = changeFolderClick,
-                    clearFolderClick = clearFolderClick
-                )
+                AnimatedContent(
+                    targetState = selectedTab,
+                    transitionSpec = {
+                        val forward = targetState.ordinal > initialState.ordinal
+                        val direction = if (forward) 1 else -1
+                        (
+                            fadeIn(animationSpec = tween(160)) +
+                                slideInHorizontally(
+                                    animationSpec = tween(240),
+                                    initialOffsetX = { width -> (width * 0.08f * direction).toInt() }
+                                )
+                            ).togetherWith(
+                            fadeOut(animationSpec = tween(120)) +
+                                slideOutHorizontally(
+                                    animationSpec = tween(200),
+                                    targetOffsetX = { width -> -(width * 0.05f * direction).toInt() }
+                                )
+                        ).using(SizeTransform(clip = false))
+                    },
+                    label = "settings-tab-content"
+                ) { targetTab ->
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(18.dp)
+                    ) {
+                        SettingsTabContent(
+                            selectedTab = targetTab,
+                            uiState = uiState,
+                            defaults = defaults,
+                            viewModel = viewModel,
+                            onOpenLanguageSettings = onOpenLanguageSettings,
+                            onOpenVitaLanguageSettings = onOpenVitaLanguageSettings,
+                            onOpenGpuDriverSettings = onOpenGpuDriverSettings,
+                            refreshCoreSettingsClick = refreshCoreSettingsClick,
+                            changeFolderClick = changeFolderClick,
+                            clearFolderClick = clearFolderClick,
+                            createBackupClick = createBackupClick,
+                            restoreBackupClick = { showRestoreBackupDialog = true }
+                        )
+                    }
+                }
             }
         }
 
@@ -194,6 +257,35 @@ fun SettingsScreen(
                 dismissButton = {
                     TextButton(onClick = { showResetDialog = false }) {
                         Text(stringResource(R.string.settings_reset_defaults_cancel))
+                    }
+                }
+            )
+        }
+
+        if (showRestoreBackupDialog) {
+            AlertDialog(
+                onDismissRequest = { showRestoreBackupDialog = false },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Restore,
+                        contentDescription = null
+                    )
+                },
+                title = { Text(stringResource(R.string.settings_backup_restore_title)) },
+                text = { Text(stringResource(R.string.settings_backup_restore_message)) },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showRestoreBackupDialog = false
+                            restorePicker.launch(arrayOf("application/json", "text/json", "*/*"))
+                        }
+                    ) {
+                        Text(stringResource(R.string.settings_backup_restore_confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRestoreBackupDialog = false }) {
+                        Text(stringResource(R.string.settings_updates_cancel))
                     }
                 }
             )

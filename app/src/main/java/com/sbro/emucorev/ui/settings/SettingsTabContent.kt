@@ -96,7 +96,9 @@ fun SettingsTabContent(
     onOpenGpuDriverSettings: () -> Unit = {},
     refreshCoreSettingsClick: () -> Unit,
     changeFolderClick: () -> Unit,
-    clearFolderClick: () -> Unit
+    clearFolderClick: () -> Unit,
+    createBackupClick: () -> Unit,
+    restoreBackupClick: () -> Unit
 ) {
     when (selectedTab) {
         SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings, onOpenVitaLanguageSettings)
@@ -106,7 +108,13 @@ fun SettingsTabContent(
         SettingsTab.Controls -> ControlsTab(uiState, defaults, viewModel)
         SettingsTab.System -> SystemTab(uiState, defaults, viewModel)
         SettingsTab.Advanced -> AdvancedTab(uiState, defaults, viewModel)
-        SettingsTab.Storage -> StorageTab(uiState, changeFolderClick, clearFolderClick)
+        SettingsTab.Storage -> StorageTab(
+            uiState = uiState,
+            changeFolderClick = changeFolderClick,
+            clearFolderClick = clearFolderClick,
+            createBackupClick = createBackupClick,
+            restoreBackupClick = restoreBackupClick
+        )
         SettingsTab.About -> AboutTab()
         SettingsTab.Updates -> AppUpdateTab(
             state = uiState.appUpdate,
@@ -444,7 +452,13 @@ private fun AdvancedTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
 }
 
 @Composable
-private fun StorageTab(uiState: SettingsUiState, changeFolderClick: () -> Unit, clearFolderClick: () -> Unit) {
+private fun StorageTab(
+    uiState: SettingsUiState,
+    changeFolderClick: () -> Unit,
+    clearFolderClick: () -> Unit,
+    createBackupClick: () -> Unit,
+    restoreBackupClick: () -> Unit
+) {
     SectionCard(title = stringResource(R.string.settings_packages_folder), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Text(
             text = stringResource(R.string.settings_help_packages_folder),
@@ -461,6 +475,18 @@ private fun StorageTab(uiState: SettingsUiState, changeFolderClick: () -> Unit, 
     SectionCard(title = stringResource(R.string.settings_storage_title), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Text(text = stringResource(R.string.settings_storage_body), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f))
         Text(text = uiState.storagePath, modifier = Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.primary)
+    }
+    SectionCard(title = stringResource(R.string.settings_backup_title), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
+        Text(
+            text = stringResource(R.string.settings_backup_body),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
+        )
+        Button(onClick = createBackupClick, modifier = Modifier.padding(top = 12.dp)) {
+            Text(stringResource(R.string.settings_backup_create))
+        }
+        Button(onClick = restoreBackupClick, modifier = Modifier.padding(top = 8.dp)) {
+            Text(stringResource(R.string.settings_backup_restore))
+        }
     }
 }
 

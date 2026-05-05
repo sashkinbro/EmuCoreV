@@ -2,6 +2,7 @@ package com.sbro.emucorev.ui.common
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -24,12 +25,22 @@ fun UrlImage(
     fallbackLabel: String,
     modifier: Modifier = Modifier
 ) {
-    val bitmap = produceState<Bitmap?>(initialValue = null, key1 = imageUrl) {
+    val bitmap = produceState(
+        initialValue = imageUrl?.let(UrlBitmapMemoryCache::get),
+        key1 = imageUrl
+    ) {
         value = if (imageUrl.isNullOrBlank()) {
             null
         } else {
+            UrlBitmapMemoryCache.get(imageUrl)?.let {
+                return@produceState
+            }
             withContext(Dispatchers.IO) {
-                runCatching { URL(imageUrl).openStream().use(BitmapFactory::decodeStream) }.getOrNull()
+                runCatching {
+                    URL(imageUrl).openStream().use(BitmapFactory::decodeStream)
+                }.getOrNull()?.also { bitmap ->
+                    UrlBitmapMemoryCache.put(imageUrl, bitmap)
+                }
             }
         }
     }.value
@@ -51,5 +62,26 @@ fun UrlImage(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+private object UrlBitmapMemoryCache {
+    private val cache = object : LruCache<String, Bitmap>(calculateCacheSizeKb()) {
+        override fun sizeOf(key: String, value: Bitmap): Int {
+            return (value.byteCount / 1024).coerceAtLeast(1)
+        }
+    }
+
+    fun get(url: String): Bitmap? = cache.get(url)
+
+    fun put(url: String, bitmap: Bitmap) {
+        if (cache.get(url) == null) {
+            cache.put(url, bitmap)
+        }
+    }
+
+    private fun calculateCacheSizeKb(): Int {
+        val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024L).toInt()
+        return (maxMemoryKb / 8).coerceAtLeast(8 * 1024)
     }
 }

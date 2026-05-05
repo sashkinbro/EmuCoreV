@@ -3,6 +3,7 @@ package com.sbro.emucorev.ui.emulation
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
+import androidx.core.content.edit
 
 data class TouchControlElement(
     val id: String,
@@ -51,11 +52,11 @@ class TouchControlLayoutRepository(context: Context) {
                     .put("visible", element.visible)
             )
         }
-        preferences.edit().putString(KEY_LAYOUT, array.toString()).apply()
+        preferences.edit { putString(KEY_LAYOUT, array.toString()) }
     }
 
     fun reset() {
-        preferences.edit().remove(KEY_LAYOUT).apply()
+        preferences.edit {remove(KEY_LAYOUT)}
     }
 
     private fun TouchControlElement.coerceToCanvas(): TouchControlElement {

@@ -55,7 +55,7 @@ class FirmwareDownloadViewModel(application: Application) : AndroidViewModel(app
             kind = kind,
             totalBytes = source.approximateSizeBytes
         )
-        currentJob = viewModelScope.launch(Dispatchers.IO) {
+        currentJob = viewModelScope.launch {
             try {
                 val file = download(source.url, source.fileName)
                 withContext(Dispatchers.Main) {
@@ -93,7 +93,7 @@ class FirmwareDownloadViewModel(application: Application) : AndroidViewModel(app
         _state.value = FirmwareDownloadState()
     }
 
-    private suspend fun download(urlString: String, fileName: String): File {
+    private suspend fun download(urlString: String, fileName: String): File = withContext(Dispatchers.IO) {
         val dir = File(
             appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: appContext.cacheDir,
             "firmware-downloads"
@@ -150,7 +150,7 @@ class FirmwareDownloadViewModel(application: Application) : AndroidViewModel(app
             if (!partFile.renameTo(outFile)) {
                 throw RuntimeException("Could not finalize firmware download")
             }
-            return outFile
+            return@withContext outFile
         } catch (error: CancellationException) {
             partFile.delete()
             throw error

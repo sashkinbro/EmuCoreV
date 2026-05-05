@@ -2,6 +2,15 @@ package com.sbro.emucorev.navigation
 
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -164,7 +173,11 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             startDestination = startDestination,
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(MaterialTheme.colorScheme.background),
+            enterTransition = { appScreenEnterTransition() },
+            exitTransition = { appScreenExitTransition() },
+            popEnterTransition = { appScreenPopEnterTransition() },
+            popExitTransition = { appScreenPopExitTransition() }
         ) {
             composable(
                 ROUTE_ONBOARDING
@@ -188,7 +201,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             ) {
                 AdaptiveShell(
                     selected = PrimaryDestination.Home,
-                    onNavigateHome = { },
                     onNavigateSetup = {
                         navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
                     },
@@ -236,7 +248,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 }
                 AdaptiveShell(
                     selected = PrimaryDestination.Setup,
-                    onNavigateHome = navigateHome,
                     onNavigateSetup = { },
                     onNavigateLibrary = {
                         navController.navigate(ROUTE_LIBRARY) { launchSingleTop = true }
@@ -272,12 +283,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             ) {
                 AdaptiveShell(
                     selected = PrimaryDestination.Library,
-                    onNavigateHome = {
-                        navController.navigate(ROUTE_LIBRARY) {
-                            launchSingleTop = true
-                            popUpTo(ROUTE_LIBRARY) { inclusive = false }
-                        }
-                    },
                     onNavigateSetup = {
                         navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
                     },
@@ -317,7 +322,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 }
                 AdaptiveShell(
                     selected = PrimaryDestination.Search,
-                    onNavigateHome = navigateHome,
                     onNavigateSetup = {
                         navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
                     },
@@ -353,7 +357,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 }
                 AdaptiveShell(
                     selected = PrimaryDestination.Settings,
-                    onNavigateHome = navigateHome,
                     onNavigateSetup = {
                         navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
                     },
@@ -397,7 +400,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 }
                 AdaptiveShell(
                     selected = PrimaryDestination.Settings,
-                    onNavigateHome = navigateHome,
                     onNavigateSetup = {
                         navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
                     },
@@ -459,7 +461,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 }
                 AdaptiveShell(
                     selected = PrimaryDestination.SaveData,
-                    onNavigateHome = navigateHome,
                     onNavigateSetup = {
                         navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
                     },
@@ -533,4 +534,52 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             }
         )
     }
+}
+
+private fun appScreenEnterTransition(): EnterTransition {
+    return fadeIn(animationSpec = tween(180)) +
+        slideInHorizontally(
+            animationSpec = tween(260),
+            initialOffsetX = { fullWidth -> (fullWidth * 0.08f).toInt() }
+        ) +
+        scaleIn(
+            animationSpec = tween(260),
+            initialScale = 0.985f
+        )
+}
+
+private fun appScreenExitTransition(): ExitTransition {
+    return fadeOut(animationSpec = tween(140)) +
+        slideOutHorizontally(
+            animationSpec = tween(220),
+            targetOffsetX = { fullWidth -> -(fullWidth * 0.04f).toInt() }
+        ) +
+        scaleOut(
+            animationSpec = tween(220),
+            targetScale = 0.992f
+        )
+}
+
+private fun appScreenPopEnterTransition(): EnterTransition {
+    return fadeIn(animationSpec = tween(180)) +
+        slideInHorizontally(
+            animationSpec = tween(240),
+            initialOffsetX = { fullWidth -> -(fullWidth * 0.06f).toInt() }
+        ) +
+        scaleIn(
+            animationSpec = tween(240),
+            initialScale = 0.99f
+        )
+}
+
+private fun appScreenPopExitTransition(): ExitTransition {
+    return fadeOut(animationSpec = tween(130)) +
+        slideOutHorizontally(
+            animationSpec = tween(210),
+            targetOffsetX = { fullWidth -> (fullWidth * 0.08f).toInt() }
+        ) +
+        scaleOut(
+            animationSpec = tween(210),
+            targetScale = 0.985f
+        )
 }

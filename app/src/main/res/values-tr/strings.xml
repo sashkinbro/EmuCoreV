@@ -556,4 +556,15 @@
     <string name="settings_updates_dialog_later">Daha sonra</string>
     <string name="settings_updates_dialog_skip">Bu güncellemeyi atla</string>
     <string name="settings_updates_dialog_download_label">APK paketi</string>
+    <string name="settings_backup_title">Ayarlar yedeği</string>
+    <string name="settings_backup_body">Uygulama tercihlerini ve emülatör ayarlarını bir dosyaya yedekleyin veya önceki bir yedekten geri yükleyin.</string>
+    <string name="settings_backup_create">Ayarları yedekle</string>
+    <string name="settings_backup_restore">Yedeği geri yükle</string>
+    <string name="settings_backup_created">Ayarlar yedeği oluşturuldu.</string>
+    <string name="settings_backup_failed">Ayarlar yedeği oluşturulamadı.</string>
+    <string name="settings_backup_restored">Ayarlar yedekten geri yüklendi.</string>
+    <string name="settings_backup_restore_failed">Ayarlar yedeği geri yüklenemedi.</string>
+    <string name="settings_backup_restore_title">Ayarlar yedeği geri yüklensin mi?</string>
+    <string name="settings_backup_restore_message">Mevcut uygulama tercihleri ve emülatör ayarları, seçilen yedekle değiştirilecektir.</string>
+    <string name="settings_backup_restore_confirm">Geri yükle</string>
 </resources>
