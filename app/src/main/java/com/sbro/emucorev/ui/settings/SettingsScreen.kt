@@ -38,6 +38,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
@@ -94,6 +95,7 @@ enum class SettingsTab(@param:StringRes val titleRes: Int, val icon: ImageVector
     Audio(R.string.settings_tab_audio, Icons.AutoMirrored.Rounded.VolumeUp),
     Overlay(R.string.settings_tab_overlay, Icons.Rounded.Vibration),
     Controls(R.string.settings_tab_controls, Icons.Rounded.Gamepad),
+    Camera(R.string.settings_tab_camera, Icons.Rounded.CameraAlt),
     System(R.string.settings_tab_system, Icons.Rounded.Memory),
     Advanced(R.string.settings_tab_advanced, Icons.Rounded.SettingsSuggest),
     Storage(R.string.settings_tab_storage, Icons.Rounded.Storage),

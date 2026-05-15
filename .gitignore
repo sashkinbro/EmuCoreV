@@ -52,6 +52,13 @@ tools/openssl-test/
 tools/openssl-test/out/
 tools/openssl-test/openssl-*/
 tools/openssl-test/*.tar.gz
+tools/update_vita3k_core.ps1
+tools/vita3k-core-update-manifest.json
+tools/vita3k-core-update.README.md
+tools/vita3k-upstream/
+tools/vita3k-update-work/
+app/src/main/cpp/vita3k/android/app/assets/*
+!app/src/main/cpp/vita3k/android/app/assets/.gitignore
 
 # Nested repositories / local metadata
 **/.git/

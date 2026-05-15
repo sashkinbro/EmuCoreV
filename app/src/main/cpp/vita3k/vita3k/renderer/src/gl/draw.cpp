@@ -86,13 +86,13 @@ void draw(GLState &renderer, GLContext &context, const FeatureState &features, S
         program_id = context.last_draw_program;
     }
 
-    const bool shader_pair_changed = context.record.vertex_program.get(mem)->renderer_data->hash != context.last_draw_vertex_program_hash
-        || context.record.fragment_program.get(mem)->renderer_data->hash != context.last_draw_fragment_program_hash;
-    if (config.log_active_shaders && shader_pair_changed) {
+    if (config.log_active_shaders) {
         const std::string hash_text_f = hex_string(context.record.fragment_program.get(mem)->renderer_data->hash);
         const std::string hash_text_v = hex_string(context.record.vertex_program.get(mem)->renderer_data->hash);
 
-        LOG_DEBUG("Active shader pair changed: vertex={}, fragment={}", hash_text_v, hash_text_f);
+        LOG_DEBUG("\nVertex  : {}\nFragment: {}", hash_text_v, hash_text_f);
+        LOG_DEBUG(fmt::runtime("Vertex default uniform buffer: {}\n"), spdlog::to_hex(context.ubo_data[0], 16));
+        LOG_DEBUG(fmt::runtime("Fragment default uniform buffer: {}\n"), spdlog::to_hex(context.ubo_data[SCE_GXM_REAL_MAX_UNIFORM_BUFFER], 16));
     }
 
     if (!program_id) {

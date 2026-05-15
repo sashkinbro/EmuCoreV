@@ -25,7 +25,6 @@ class SDLAudioAdapter : public AudioAdapter {
 private:
     SDL_AudioDeviceID device_id = 0;
     int device_buffer_samples = 0;
-    int target_buffer_samples = 0;
     SDL_AudioSpec dst_spec;
 
     static void SDLCALL thread_wakeup_callback(void *userdata, SDL_AudioStream *stream, int additional_amount, int total_amount);
@@ -40,6 +39,7 @@ public:
     void audio_output(AudioOutPort &out_port, const void *buffer) override;
     void set_volume(AudioOutPort &out_port, float volume) override;
     int get_rest_sample(AudioOutPort &out_port) override;
+    void wake_all_ports() override;
 };
 
 using AudioStreamPtr = std::shared_ptr<SDL_AudioStream>;

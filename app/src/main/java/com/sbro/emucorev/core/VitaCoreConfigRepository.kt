@@ -4,8 +4,11 @@ import android.content.Context
 import com.sbro.emucorev.BuildConfig
 import java.io.File
 
+// Defaults below mirror upstream Vita3K's config/include/config/config.h
+// (CONFIG_INDIVIDUAL macro). Stay in lock-step with vanilla so games behave
+// the same as they do in the reference Vita3K Android build.
 data class VitaCoreConfig(
-    val validationLayer: Boolean = false,
+    val validationLayer: Boolean = true,
     val logActiveShaders: Boolean = false,
     val logUniforms: Boolean = false,
     val logCompatWarn: Boolean = false,
@@ -22,7 +25,7 @@ data class VitaCoreConfig(
     val anisotropicFiltering: Int = 1,
     val textureCache: Boolean = true,
     val asyncPipelineCompilation: Boolean = true,
-    val showCompileShaders: Boolean = false,
+    val showCompileShaders: Boolean = true,
     val hashlessTextureCache: Boolean = false,
     val importTextures: Boolean = false,
     val exportTextures: Boolean = false,
@@ -49,10 +52,10 @@ data class VitaCoreConfig(
     val showTouchpadCursor: Boolean = true,
     val sysButton: Int = 1,
     val sysLang: Int = 1,
-    val cpuPoolSize: Int = 8,
+    val cpuPoolSize: Int = 10,
     val modulesMode: Int = 0,
     val archiveLog: Boolean = false,
-    val logLevel: Int = 4,
+    val logLevel: Int = 0,
     val discordRichPresence: Boolean = true,
     val checkForUpdates: Boolean = true,
     val fileLoadingDelay: Int = 0,
@@ -61,8 +64,31 @@ data class VitaCoreConfig(
     val psnSignedIn: Boolean = false,
     val httpEnable: Boolean = true,
     val colorSurfaceDebug: Boolean = false,
-    val showShaderCacheWarn: Boolean = true
-)
+    val showShaderCacheWarn: Boolean = true,
+    // Camera — defaults match upstream Vita3K (type 2 = "real camera").
+    val frontCameraType: Int = 2,
+    val frontCameraId: String = "",
+    val frontCameraImage: String = "",
+    val frontCameraColor: Long = 0L,
+    val backCameraType: Int = 2,
+    val backCameraId: String = "",
+    val backCameraImage: String = "",
+    val backCameraColor: Long = 0L,
+    // Misc upstream-aligned settings.
+    val screenshotFormat: Int = SCREENSHOT_FORMAT_JPEG,
+    val showWelcome: Boolean = true,
+    val warnMissingFirmware: Boolean = true
+) {
+    companion object {
+        const val CAMERA_SOURCE_SOLID: Int = 0
+        const val CAMERA_SOURCE_IMAGE: Int = 1
+        const val CAMERA_SOURCE_REAL: Int = 2
+
+        const val SCREENSHOT_FORMAT_NONE: Int = 0
+        const val SCREENSHOT_FORMAT_JPEG: Int = 1
+        const val SCREENSHOT_FORMAT_PNG: Int = 2
+    }
+}
 
 class VitaCoreConfigRepository(private val context: Context) {
 
@@ -123,7 +149,18 @@ class VitaCoreConfigRepository(private val context: Context) {
         "texture-cache",
         "turbo-mode",
         "v-sync",
-        "validation-layer"
+        "validation-layer",
+        "front-camera-type",
+        "front-camera-id",
+        "front-camera-image",
+        "front-camera-color",
+        "back-camera-type",
+        "back-camera-id",
+        "back-camera-image",
+        "back-camera-color",
+        "screenshot-format",
+        "show-welcome",
+        "warn-missing-firmware"
     )
 
     private val configFile: File
@@ -193,22 +230,51 @@ class VitaCoreConfigRepository(private val context: Context) {
                 psnSignedIn = values["psn-signed-in"]?.toBooleanStrictOrNull() ?: defaults.psnSignedIn,
                 httpEnable = values["http-enable"]?.toBooleanStrictOrNull() ?: defaults.httpEnable,
                 colorSurfaceDebug = values["color-surface-debug"]?.toBooleanStrictOrNull() ?: defaults.colorSurfaceDebug,
-                showShaderCacheWarn = values["show-shader-cache-warn"]?.toBooleanStrictOrNull() ?: defaults.showShaderCacheWarn
+                showShaderCacheWarn = values["show-shader-cache-warn"]?.toBooleanStrictOrNull() ?: defaults.showShaderCacheWarn,
+                frontCameraType = values["front-camera-type"]?.toIntOrNull() ?: defaults.frontCameraType,
+                frontCameraId = values["front-camera-id"].sanitizeNullableString().orEmpty(),
+                frontCameraImage = values["front-camera-image"].sanitizeNullableString().orEmpty(),
+                frontCameraColor = values["front-camera-color"]?.toLongOrNull() ?: defaults.frontCameraColor,
+                backCameraType = values["back-camera-type"]?.toIntOrNull() ?: defaults.backCameraType,
+                backCameraId = values["back-camera-id"].sanitizeNullableString().orEmpty(),
+                backCameraImage = values["back-camera-image"].sanitizeNullableString().orEmpty(),
+                backCameraColor = values["back-camera-color"]?.toLongOrNull() ?: defaults.backCameraColor,
+                screenshotFormat = values["screenshot-format"]?.toIntOrNull() ?: defaults.screenshotFormat,
+                showWelcome = values["show-welcome"]?.toBooleanStrictOrNull() ?: defaults.showWelcome,
+                warnMissingFirmware = values["warn-missing-firmware"]?.toBooleanStrictOrNull() ?: defaults.warnMissingFirmware
             )
         )
     }
 
     fun ensureDefaultsPersisted(): VitaCoreConfig {
         migrateLegacyConfigIfNeeded()
-        val config = load()
         val existingValues = readKeyValues()
+        val storedSchemaVersion = existingValues[SCHEMA_VERSION_KEY]?.toIntOrNull() ?: 0
+        val schemaOutdated = configFile.exists() && storedSchemaVersion < CONFIG_SCHEMA_VERSION
+        val config = applyMigrations(load(), schemaOutdated)
         val shouldPersist = !configFile.exists() ||
             persistedKeys.any { it !in existingValues } ||
+            schemaOutdated ||
+            storedSchemaVersion != CONFIG_SCHEMA_VERSION ||
             releaseValuesNeedNormalization(existingValues)
         if (shouldPersist) {
             save(config)
         }
         return config
+    }
+
+    private fun applyMigrations(loaded: VitaCoreConfig, schemaOutdated: Boolean): VitaCoreConfig {
+        if (!schemaOutdated) return loaded
+        // Old EmuCoreV builds shipped non-upstream defaults that caused frozen
+        // launches and weaker CPU scheduling. Snap these back to vanilla Vita3K
+        // values whenever a stale config.yml is detected.
+        val upstream = VitaCoreConfig()
+        return loaded.copy(
+            showCompileShaders = upstream.showCompileShaders,
+            cpuPoolSize = upstream.cpuPoolSize,
+            validationLayer = upstream.validationLayer,
+            logLevel = defaultConfig().logLevel
+        )
     }
 
     fun save(inputConfig: VitaCoreConfig) {
@@ -271,6 +337,20 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["http-enable"] = config.httpEnable.toString()
         values["color-surface-debug"] = config.colorSurfaceDebug.toString()
         values["show-shader-cache-warn"] = config.showShaderCacheWarn.toString()
+
+        values["front-camera-type"] = config.frontCameraType.toString()
+        values["front-camera-id"] = config.frontCameraId
+        values["front-camera-image"] = config.frontCameraImage
+        values["front-camera-color"] = config.frontCameraColor.toString()
+        values["back-camera-type"] = config.backCameraType.toString()
+        values["back-camera-id"] = config.backCameraId
+        values["back-camera-image"] = config.backCameraImage
+        values["back-camera-color"] = config.backCameraColor.toString()
+        values["screenshot-format"] = config.screenshotFormat.toString()
+        values["show-welcome"] = config.showWelcome.toString()
+        values["warn-missing-firmware"] = config.warnMissingFirmware.toString()
+
+        values[SCHEMA_VERSION_KEY] = CONFIG_SCHEMA_VERSION.toString()
 
         configFile.parentFile?.mkdirs()
         configFile.writeText(
@@ -351,15 +431,20 @@ class VitaCoreConfigRepository(private val context: Context) {
     }
 
     private fun defaultConfig(): VitaCoreConfig {
-        val recommendedCpuPool = Runtime.getRuntime().availableProcessors().coerceIn(4, 10)
         return VitaCoreConfig(
-            cpuPoolSize = recommendedCpuPool,
             logLevel = if (BuildConfig.DEBUG) DEBUG_LOG_LEVEL else RELEASE_LOG_LEVEL
         )
     }
 
     private companion object {
-        private const val DEBUG_LOG_LEVEL = 2
+        // 0 = TRACE (upstream Vita3K default). Kept verbose only in debug builds;
+        // release builds collapse to OFF via normalizeForBuild below.
+        private const val DEBUG_LOG_LEVEL = 0
         private const val RELEASE_LOG_LEVEL = 6
+        // Bump whenever an old non-upstream default needs to be snapped to vanilla
+        // for users who already wrote a stale config.yml. applyMigrations() rewrites
+        // the affected keys on the next launch.
+        private const val CONFIG_SCHEMA_VERSION = 2
+        private const val SCHEMA_VERSION_KEY = "config-schema-version"
     }
 }

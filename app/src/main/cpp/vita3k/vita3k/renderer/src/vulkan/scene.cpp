@@ -410,13 +410,13 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     if (context.current_pipeline == nullptr)
         return;
 
-    const bool shader_pair_changed = context.record.vertex_program.get(mem)->renderer_data->hash != context.last_draw_vertex_program_hash
-        || context.record.fragment_program.get(mem)->renderer_data->hash != context.last_draw_fragment_program_hash;
-    if (config.log_active_shaders && shader_pair_changed) {
+    if (config.log_active_shaders) {
         const std::string hash_text_f = hex_string(context.record.fragment_program.get(mem)->renderer_data->hash);
         const std::string hash_text_v = hex_string(context.record.vertex_program.get(mem)->renderer_data->hash);
 
-        LOG_DEBUG("Active shader pair changed: vertex={}, fragment={}", hash_text_v, hash_text_f);
+        LOG_DEBUG("\nVertex  : {}\nFragment: {}", hash_text_v, hash_text_f);
+        LOG_DEBUG("Vertex default uniform buffer: {}\n", spdlog::to_hex(context.ubo_data[0], 16));
+        LOG_DEBUG("Fragment default uniform buffer: {}\n", spdlog::to_hex(context.ubo_data[SCE_GXM_REAL_MAX_UNIFORM_BUFFER], 16));
     }
 
     const bool use_memory_mapping = context.state.features.enable_memory_mapping;
@@ -499,152 +499,10 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         context.render_cmd.bindIndexBuffer(context.index_stream_ring_buffer.handle(), context.index_stream_ring_buffer.data_offset, index_type);
     }
 
-    if (config.log_active_shaders) {
-        static uint64_t draw_count = 0;
-        static uint32_t max_index_seen = 0;
-        static size_t max_stream_len_seen = 0;
-        static bool logged_first_draw = false;
-        static uint32_t next_large_index_sample = 256;
-
-        draw_count++;
-        max_index_seen = std::max(max_index_seen, max_index);
-
-        const SceGxmVertexProgram &vertex_program = *context.record.vertex_program.get(mem);
-        const VertexProgram *vkvert = vertex_program.renderer_data.get();
-        uint32_t stream_mask = 0;
-        size_t max_stream_len = 0;
-        uint32_t missing_shader_inputs = 0;
-        uint32_t missing_stream_data = 0;
-        uint32_t zero_stride_streams = 0;
-        uint32_t sample_stream_index = 0;
-        uint32_t sample_stream_stride = 0;
-        uint32_t sample_stream_offset = 0;
-        uint32_t sample_stream_size = 0;
-        uint32_t sample_stream_address = 0;
-        bool has_sample_stream = false;
-
-        for (const SceGxmVertexAttribute &attribute : vertex_program.attributes) {
-            if (!vkvert->attribute_infos.contains(attribute.regIndex)) {
-                missing_shader_inputs++;
-                continue;
-            }
-
-            const SceGxmVertexStream &stream = vertex_program.streams[attribute.streamIndex];
-            const SceGxmIndexSource index_source = static_cast<SceGxmIndexSource>(stream.indexSource);
-            const size_t attribute_size = gxm::attribute_format_size(static_cast<SceGxmAttributeFormat>(attribute.format)) * attribute.componentCount;
-            const size_t data_passed_length = gxm::is_stream_instancing(index_source) ? ((instance_count - 1) * stream.stride) : (max_index * stream.stride);
-            const size_t data_length = attribute.offset + data_passed_length + attribute_size;
-            const Ptr<const void> stream_data = context.record.vertex_streams[attribute.streamIndex].data;
-
-            stream_mask |= (1u << attribute.streamIndex);
-            max_stream_len = std::max(max_stream_len, data_length);
-            if (!stream_data)
-                missing_stream_data++;
-            if (stream.stride == 0)
-                zero_stride_streams++;
-
-            if (!has_sample_stream) {
-                has_sample_stream = true;
-                sample_stream_index = attribute.streamIndex;
-                sample_stream_stride = stream.stride;
-                sample_stream_offset = attribute.offset;
-                sample_stream_size = static_cast<uint32_t>(std::min<size_t>(data_length, UINT32_MAX));
-                sample_stream_address = stream_data.address();
-            }
-        }
-
-        max_stream_len_seen = std::max(max_stream_len_seen, max_stream_len);
-
-        const bool large_index_sample = max_index >= next_large_index_sample;
-        const bool should_log_sample = !logged_first_draw || large_index_sample || (max_stream_len > 64 * 1024 && max_stream_len == max_stream_len_seen) || missing_stream_data != 0 || zero_stride_streams != 0 || missing_shader_inputs != 0;
-        if (should_log_sample) {
-            logged_first_draw = true;
-            while (max_index >= next_large_index_sample && next_large_index_sample < 0x10000000)
-                next_large_index_sample *= 4;
-
-            std::string attr_summary;
-            uint32_t logged_attrs = 0;
-            for (const SceGxmVertexAttribute &attribute : vertex_program.attributes) {
-                if (logged_attrs >= 8)
-                    break;
-
-                const SceGxmVertexStream &stream = vertex_program.streams[attribute.streamIndex];
-                attr_summary += fmt::format("{}{{reg={},stream={},off={},fmt={},comp={},stride={},idxsrc={}}}",
-                    attr_summary.empty() ? "" : " ",
-                    attribute.regIndex,
-                    attribute.streamIndex,
-                    attribute.offset,
-                    static_cast<uint32_t>(attribute.format),
-                    attribute.componentCount,
-                    stream.stride,
-                    stream.indexSource);
-                logged_attrs++;
-            }
-
-            std::string vert_uniform_summary;
-            uint32_t logged_vert_uniforms = 0;
-            uint32_t nonzero_vert_uniforms = 0;
-            uint32_t max_vert_uniform_size = 0;
-            for (uint32_t i = 0; i < vert_render_data->buffer_count && i < SCE_GXM_REAL_MAX_UNIFORM_BUFFER; i++) {
-                const uint32_t size_bytes = vert_render_data->uniform_buffer_sizes.at(i) * 4;
-                max_vert_uniform_size = std::max(max_vert_uniform_size, size_bytes);
-                if (size_bytes == 0 && context.curr_vert_ublock.buffer_addresses[i] == 0)
-                    continue;
-
-                nonzero_vert_uniforms++;
-                if (logged_vert_uniforms >= 8)
-                    continue;
-
-                vert_uniform_summary += fmt::format("{}{}:addr=0x{:x},size={}",
-                    vert_uniform_summary.empty() ? "" : " ",
-                    i,
-                    context.curr_vert_ublock.buffer_addresses[i],
-                    size_bytes);
-                logged_vert_uniforms++;
-            }
-
-            LOG_INFO("VK draw diagnostic sample: draws={}, prim={}, index_type={}, index_count={}, instance_count={}, index_addr=0x{:x}, max_index={}, stream_mask=0x{:x}, max_stream_len={}, missing_streams={}, zero_stride_streams={}, missing_shader_inputs={}, sample_stream={}, sample_addr=0x{:x}, sample_stride={}, sample_offset={}, sample_size={}, mapping={}, vert_hash={}, frag_hash={}, vert_buffers={}/{}, max_vert_buffer_size={}, attrs=[{}], vert_uniforms=[{}]",
-                draw_count,
-                static_cast<uint32_t>(type),
-                static_cast<uint32_t>(format),
-                count,
-                instance_count,
-                indices.address(),
-                max_index,
-                stream_mask,
-                max_stream_len,
-                missing_stream_data,
-                zero_stride_streams,
-                missing_shader_inputs,
-                sample_stream_index,
-                sample_stream_address,
-                sample_stream_stride,
-                sample_stream_offset,
-                sample_stream_size,
-                static_cast<uint32_t>(context.state.mapping_method),
-                hex_string(vertex_program.renderer_data->hash),
-                hex_string(context.record.fragment_program.get(mem)->renderer_data->hash),
-                nonzero_vert_uniforms,
-                vert_render_data->buffer_count,
-                max_vert_uniform_size,
-                attr_summary,
-                vert_uniform_summary);
-        } else if ((draw_count & 0xffff) == 0) {
-            LOG_INFO("VK draw diagnostic summary: draws={}, max_index_seen={}, max_stream_len_seen={}, mapping={}",
-                draw_count,
-                max_index_seen,
-                max_stream_len_seen,
-                static_cast<uint32_t>(context.state.mapping_method));
-        }
-    }
-
     // bind the vertex streams
     bind_vertex_streams(context, mem, instance_count, max_index);
 
     context.render_cmd.drawIndexed(count, instance_count, 0, 0, 0);
-
-    context.last_draw_vertex_program_hash = context.record.vertex_program.get(mem)->renderer_data->hash;
-    context.last_draw_fragment_program_hash = context.record.fragment_program.get(mem)->renderer_data->hash;
 
     context.vertex_uniform_storage_allocated = false;
     context.fragment_uniform_storage_allocated = false;

@@ -1,7 +1,7 @@
 package com.sbro.emucorev.core
 
 import android.content.Context
-import com.sbro.emucorev.core.sdl.SDL
+import org.libsdl.app.SDL
 
 object NativeLibraryLoader {
     @Volatile

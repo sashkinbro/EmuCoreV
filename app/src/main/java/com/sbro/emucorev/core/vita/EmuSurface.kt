@@ -5,7 +5,7 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.View
-import com.sbro.emucorev.core.sdl.SDLSurface
+import org.libsdl.app.SDLSurface
 
 class EmuSurface(context: Context) : SDLSurface(context) {
     private val emulator = context as? Emulator

@@ -23,8 +23,6 @@
 #pragma once
 
 #include <functional>
-#include <io/vfs.h>
 #include <util/fs.h>
 
 std::string install_pup(const fs::path &pref_path, const fs::path &pup_path, const std::function<void(uint32_t)> &progress_callback = nullptr);
-std::string get_theme_title_from_buffer(const vfs::FileBuffer &buffer);

@@ -106,6 +106,7 @@ fun SettingsTabContent(
         SettingsTab.Audio -> AudioTab(uiState, defaults, viewModel, refreshCoreSettingsClick)
         SettingsTab.Overlay -> OverlayTab(uiState, defaults, viewModel)
         SettingsTab.Controls -> ControlsTab(uiState, defaults, viewModel)
+        SettingsTab.Camera -> CameraTab(uiState, defaults, viewModel)
         SettingsTab.System -> SystemTab(uiState, defaults, viewModel)
         SettingsTab.Advanced -> AdvancedTab(uiState, defaults, viewModel)
         SettingsTab.Storage -> StorageTab(
@@ -424,6 +425,36 @@ private fun ControlsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
 }
 
 @Composable
+private fun CameraTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel) {
+    SectionCard(title = stringResource(R.string.settings_camera_front), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
+        Chips(
+            title = stringResource(R.string.settings_camera_source),
+            description = stringResource(R.string.settings_help_camera_source),
+            onResetDefault = {
+                viewModel.updateCoreSettings { it.copy(frontCameraType = defaults.frontCameraType) }
+            }
+        ) {
+            IntChip(VitaCoreConfig.CAMERA_SOURCE_SOLID, stringResource(R.string.settings_camera_source_solid), uiState.coreConfig.frontCameraType, viewModel) { c, v -> c.copy(frontCameraType = v) }
+            IntChip(VitaCoreConfig.CAMERA_SOURCE_IMAGE, stringResource(R.string.settings_camera_source_image), uiState.coreConfig.frontCameraType, viewModel) { c, v -> c.copy(frontCameraType = v) }
+            IntChip(VitaCoreConfig.CAMERA_SOURCE_REAL, stringResource(R.string.settings_camera_source_real), uiState.coreConfig.frontCameraType, viewModel) { c, v -> c.copy(frontCameraType = v) }
+        }
+    }
+    SectionCard(title = stringResource(R.string.settings_camera_back), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
+        Chips(
+            title = stringResource(R.string.settings_camera_source),
+            description = stringResource(R.string.settings_help_camera_source),
+            onResetDefault = {
+                viewModel.updateCoreSettings { it.copy(backCameraType = defaults.backCameraType) }
+            }
+        ) {
+            IntChip(VitaCoreConfig.CAMERA_SOURCE_SOLID, stringResource(R.string.settings_camera_source_solid), uiState.coreConfig.backCameraType, viewModel) { c, v -> c.copy(backCameraType = v) }
+            IntChip(VitaCoreConfig.CAMERA_SOURCE_IMAGE, stringResource(R.string.settings_camera_source_image), uiState.coreConfig.backCameraType, viewModel) { c, v -> c.copy(backCameraType = v) }
+            IntChip(VitaCoreConfig.CAMERA_SOURCE_REAL, stringResource(R.string.settings_camera_source_real), uiState.coreConfig.backCameraType, viewModel) { c, v -> c.copy(backCameraType = v) }
+        }
+    }
+}
+
+@Composable
 private fun SystemTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel) {
     SectionCard(title = stringResource(R.string.settings_tab_system), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Toggle(stringResource(R.string.settings_core_fps_hack), stringResource(R.string.settings_help_fps_hack), uiState.coreConfig.fpsHack, { enabled -> viewModel.updateCoreSettings { it.copy(fpsHack = enabled) } }, { viewModel.updateCoreSettings { it.copy(fpsHack = defaults.fpsHack) } })
@@ -431,6 +462,8 @@ private fun SystemTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMo
         Toggle(stringResource(R.string.settings_boot_apps_fullscreen), stringResource(R.string.settings_help_boot_apps_fullscreen), uiState.coreConfig.bootAppsFullScreen, { enabled -> viewModel.updateCoreSettings { it.copy(bootAppsFullScreen = enabled) } }, { viewModel.updateCoreSettings { it.copy(bootAppsFullScreen = defaults.bootAppsFullScreen) } })
         Toggle(stringResource(R.string.settings_http_features), stringResource(R.string.settings_help_http_features), uiState.coreConfig.httpEnable, { enabled -> viewModel.updateCoreSettings { it.copy(httpEnable = enabled) } }, { viewModel.updateCoreSettings { it.copy(httpEnable = defaults.httpEnable) } })
         Toggle(stringResource(R.string.settings_psn_signed_in), stringResource(R.string.settings_help_psn_signed_in), uiState.coreConfig.psnSignedIn, { enabled -> viewModel.updateCoreSettings { it.copy(psnSignedIn = enabled) } }, { viewModel.updateCoreSettings { it.copy(psnSignedIn = defaults.psnSignedIn) } })
+        Toggle(stringResource(R.string.settings_show_welcome), stringResource(R.string.settings_help_show_welcome), uiState.coreConfig.showWelcome, { enabled -> viewModel.updateCoreSettings { it.copy(showWelcome = enabled) } }, { viewModel.updateCoreSettings { it.copy(showWelcome = defaults.showWelcome) } })
+        Toggle(stringResource(R.string.settings_warn_missing_firmware), stringResource(R.string.settings_help_warn_missing_firmware), uiState.coreConfig.warnMissingFirmware, { enabled -> viewModel.updateCoreSettings { it.copy(warnMissingFirmware = enabled) } }, { viewModel.updateCoreSettings { it.copy(warnMissingFirmware = defaults.warnMissingFirmware) } })
         SliderRow(stringResource(R.string.settings_file_loading_delay), stringResource(R.string.settings_help_file_loading_delay), stringResource(R.string.settings_file_loading_delay_value, uiState.coreConfig.fileLoadingDelay), { viewModel.updateCoreSettings { it.copy(fileLoadingDelay = defaults.fileLoadingDelay) } }) {
             Slider(value = uiState.coreConfig.fileLoadingDelay.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(fileLoadingDelay = value.toInt().coerceIn(0, 500)) } }, valueRange = 0f..500f, steps = 24)
         }
@@ -448,6 +481,15 @@ private fun AdvancedTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
         Toggle(stringResource(R.string.settings_color_surface_debug), stringResource(R.string.settings_help_color_surface_debug), uiState.coreConfig.colorSurfaceDebug, { enabled -> viewModel.updateCoreSettings { it.copy(colorSurfaceDebug = enabled) } }, { viewModel.updateCoreSettings { it.copy(colorSurfaceDebug = defaults.colorSurfaceDebug) } })
         Toggle(stringResource(R.string.settings_spirv_shader_mode), stringResource(R.string.settings_help_spirv_shader_mode), uiState.coreConfig.spirvShader, { enabled -> viewModel.updateCoreSettings { it.copy(spirvShader = enabled) } }, { viewModel.updateCoreSettings { it.copy(spirvShader = defaults.spirvShader) } })
         Toggle(stringResource(R.string.settings_discord_rich_presence), stringResource(R.string.settings_help_discord_rich_presence), uiState.coreConfig.discordRichPresence, { enabled -> viewModel.updateCoreSettings { it.copy(discordRichPresence = enabled) } }, { viewModel.updateCoreSettings { it.copy(discordRichPresence = defaults.discordRichPresence) } })
+        Chips(
+            title = stringResource(R.string.settings_screenshot_format),
+            description = stringResource(R.string.settings_help_screenshot_format),
+            onResetDefault = { viewModel.updateCoreSettings { it.copy(screenshotFormat = defaults.screenshotFormat) } }
+        ) {
+            IntChip(VitaCoreConfig.SCREENSHOT_FORMAT_NONE, stringResource(R.string.settings_screenshot_format_none), uiState.coreConfig.screenshotFormat, viewModel) { c, v -> c.copy(screenshotFormat = v) }
+            IntChip(VitaCoreConfig.SCREENSHOT_FORMAT_JPEG, stringResource(R.string.settings_screenshot_format_jpeg), uiState.coreConfig.screenshotFormat, viewModel) { c, v -> c.copy(screenshotFormat = v) }
+            IntChip(VitaCoreConfig.SCREENSHOT_FORMAT_PNG, stringResource(R.string.settings_screenshot_format_png), uiState.coreConfig.screenshotFormat, viewModel) { c, v -> c.copy(screenshotFormat = v) }
+        }
     }
 }
 

@@ -35,11 +35,9 @@ class DynarmicCPU : public CPUInterface {
     std::unique_ptr<Dynarmic::A32::Jit> jit;
     std::unique_ptr<ArmDynarmicCallback> cb;
     std::shared_ptr<ArmDynarmicCP15> cp15;
-    Dynarmic::ExclusiveMonitor *monitor;
 
     std::size_t core_id = 0;
 
-    bool exit_request = false;
     bool halted = false;
     bool break_ = false;
 
@@ -50,7 +48,7 @@ class DynarmicCPU : public CPUInterface {
     std::unique_ptr<Dynarmic::A32::Jit> make_jit();
 
 public:
-    DynarmicCPU(CPUState *state, std::size_t processor_id, Dynarmic::ExclusiveMonitor *monitor, bool cpu_opt);
+    DynarmicCPU(CPUState *state, std::size_t processor_id, bool cpu_opt);
     ~DynarmicCPU() override;
     int run() override;
     void stop() override;
@@ -92,6 +90,9 @@ public:
     bool get_log_code() override;
     bool get_log_mem() override;
 
+    void clear_exclusive() override;
     std::size_t processor_id() const override;
     void invalidate_jit_cache(Address start, size_t length) override;
+
+    static Dynarmic::ExclusiveMonitor shared_monitor;
 };

@@ -75,6 +75,7 @@ import com.sbro.emucorev.ui.theme.CompactCardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
+import com.sbro.emucorev.ui.theme.useMultiColumnLayout
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -88,7 +89,9 @@ fun CatalogScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val configuration = LocalConfiguration.current
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    // Tighter card on tablets-in-landscape only; phones in landscape keep the
+    // larger card so the grid doesn't pretend to be a tablet layout.
+    val useDenseCards = configuration.useMultiColumnLayout()
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
     val showScrollToTop = gridState.firstVisibleItemIndex > 2 || gridState.firstVisibleItemScrollOffset > 900
@@ -130,7 +133,7 @@ fun CatalogScreen(
 
             else -> {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = if (isLandscape) 128.dp else 154.dp),
+                    columns = GridCells.Adaptive(minSize = if (useDenseCards) 128.dp else 154.dp),
                     state = gridState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
@@ -316,7 +319,7 @@ fun CatalogScreen(
                             CatalogGameCard(
                                 game = game,
                                 onClick = { onGameClick(game.igdbId) },
-                                compact = isLandscape
+                                compact = useDenseCards
                             )
                         }
                         if (uiState.isLoadingMore) {
