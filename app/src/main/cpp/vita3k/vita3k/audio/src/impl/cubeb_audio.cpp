@@ -18,12 +18,6 @@
 #include "audio/impl/cubeb_audio.h"
 #include "util/log.h"
 
-#include <algorithm>
-
-namespace {
-constexpr int TARGET_AUDIO_BUFFER_MS = 150;
-}
-
 static long impl_cubeb_audio_callback(cubeb_stream *stream, void *user_data, const void *input, void *output, long nframes) {
     assert(user_data != nullptr);
     assert(stream != nullptr);
@@ -102,7 +96,6 @@ AudioOutPortPtr CubebAudioAdapter::open_port(int nb_channels, int freq, int nb_s
 
     uint32_t latency;
     cubeb_get_min_latency(cubeb_ctx, &port->spec, &latency);
-    latency = std::max<uint32_t>(latency, (static_cast<uint32_t>(freq) * TARGET_AUDIO_BUFFER_MS) / 1000);
 
     if (cubeb_stream_init(cubeb_ctx, &port->out_stream, "Vita3K audio out", nullptr, nullptr, nullptr,
             &port->spec, latency, impl_cubeb_audio_callback, impl_cubeb_state_callback, port.get())
@@ -112,7 +105,6 @@ AudioOutPortPtr CubebAudioAdapter::open_port(int nb_channels, int freq, int nb_s
     }
 
     port->len_bytes = nb_sample * nb_channels * sizeof(uint16_t);
-    port->len_microseconds = (nb_sample * 1'000'000ULL) / freq;
 
     // allocate enough buffers to be able to satisfy a callback (+1 to make sure one buffer can be ready)
     const int nb_buffers = (latency + nb_sample - 1) / nb_sample + 1;
@@ -131,8 +123,14 @@ void CubebAudioAdapter::audio_output(AudioOutPort &out_port, const void *buffer)
     CubebAudioOutPort &port = static_cast<CubebAudioOutPort &>(out_port);
 
     std::unique_lock<std::mutex> lock(port.mutex);
+
+    if (out_port.stopping)
+        return;
+
     if (port.nb_buffers_ready == port.audio_buffers.size()) {
         port.cond_var.wait(lock);
+        if (out_port.stopping)
+            return;
     }
 
     assert(port.nb_buffers_ready < port.audio_buffers.size());
@@ -161,5 +159,15 @@ void CubebAudioAdapter::switch_state(const bool pause) {
             cubeb_stream_stop(port.out_stream);
         else
             cubeb_stream_start(port.out_stream);
+    }
+}
+
+void CubebAudioAdapter::wake_all_ports() {
+    for (auto &[_, port_ptr] : state.out_ports) {
+        auto &port = static_cast<CubebAudioOutPort &>(*port_ptr);
+        {
+            std::lock_guard<std::mutex> lock(port.mutex);
+        }
+        port.cond_var.notify_all();
     }
 }

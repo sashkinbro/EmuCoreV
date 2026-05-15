@@ -488,6 +488,11 @@ SceUID load_self(KernelState &kernel, MemState &mem, const void *self, const std
         return -1;
     }
 
+    if (self_path == "app0:sce_module/steroid.suprx") {
+        LOG_CRITICAL("You're trying to load a vitamin dump. It is not supported.");
+        return -1;
+    }
+
     const uint8_t *const elf_bytes = self_bytes + self_header.elf_offset;
     const Elf32_Ehdr &elf = *reinterpret_cast<const Elf32_Ehdr *>(elf_bytes);
     const uint32_t module_info_offset = elf.e_entry & 0x3fffffff;
@@ -744,6 +749,9 @@ SceUID load_self(KernelState &kernel, MemState &mem, const void *self, const std
     sceKernelModuleInfo->state = module_info->type;
 
     LOG_INFO("Linking SELF {}...", self_path);
+    if (self_path.find("eboot.bin") != std::string::npos)
+        LOG_INFO("eboot.bin module NID: {}", log_hex(module_info->module_nid));
+
     if (!load_exports(sceKernelModuleInfo, *module_info, module_info_segment_address, kernel, mem)) {
         return -1;
     }

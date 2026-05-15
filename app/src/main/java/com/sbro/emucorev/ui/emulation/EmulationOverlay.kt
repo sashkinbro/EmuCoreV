@@ -20,13 +20,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,27 +33,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ExitToApp
-import androidx.compose.material.icons.rounded.Gamepad
-import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -72,7 +58,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -96,19 +81,10 @@ import com.sbro.emucorev.core.vita.overlay.InputOverlay
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-private enum class EmulationMenuTab {
-    Session,
-    Overlay,
-    Graphics,
-    System
-}
+// EmulationMenu.kt owns the modern pause-menu UI; this file is the orchestrator
+// (Activity bridging, state, on-screen touch controls, editor).
 
-private val EmulationPanel = Color(0xFF17171D).copy(alpha = 0.96f)
-private val EmulationPanelSoft = Color(0xFF22222B).copy(alpha = 0.92f)
-private val EmulationPanelBorder = Color.White.copy(alpha = 0.08f)
-private val EmulationTextPrimary = Color(0xFFF4F4F7)
-private val EmulationTextSecondary = Color(0xFFB7B7C9)
-
+@SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
 fun EmulationOverlayHost(
     activity: Emulator,
@@ -123,7 +99,6 @@ fun EmulationOverlayHost(
     var menuOpen by remember { mutableStateOf(false) }
     var menuButtonVisible by remember { mutableStateOf(true) }
     var pausedByMenu by remember { mutableStateOf(false) }
-    var activeTab by remember { mutableStateOf(EmulationMenuTab.Session) }
     var backTouchEnabled by remember { mutableStateOf(false) }
     var exitDialogVisible by remember { mutableStateOf(false) }
     val gameId = remember(activity) { activity.currentGameIdOrIntent() }
@@ -189,7 +164,6 @@ fun EmulationOverlayHost(
                 overlayBridge.setIsInEditMode(false)
                 true
             } else {
-                activeTab = EmulationMenuTab.Session
                 menuOpen = !menuOpen
                 menuButtonVisible = true
                 true
@@ -236,16 +210,95 @@ fun EmulationOverlayHost(
             )
         }
 
+        val configuration = LocalConfiguration.current
+        val useSidePanel = configuration.screenWidthDp > configuration.screenHeightDp &&
+            configuration.smallestScreenWidthDp >= 600
+
+        val menuCallbacks = remember(activity, overlayBridge) {
+            EmulationMenuCallbacks(
+                onPauseToggle = {
+                    val next = !pausedByMenu
+                    activity.setMenuPaused(next)
+                    pausedByMenu = next
+                },
+                onExit = { exitDialogVisible = true },
+                onEditControls = {
+                    persistConfig { it.copy(enableGamepadOverlay = true) }
+                    menuOpen = false
+                    menuButtonVisible = true
+                    controlsEditMode = true
+                    overlayBridge.setIsInEditMode(true)
+                },
+                onControlsVisibility = {
+                    persistConfig { it.copy(enableGamepadOverlay = !it.enableGamepadOverlay) }
+                },
+                onResetOverlay = {
+                    controlLayoutRepository.reset()
+                    controlLayout = null
+                    persistConfig {
+                        it.copy(
+                            enableGamepadOverlay = true,
+                            overlayShowTouchSwitch = false,
+                            overlayScale = 0.9f,
+                            overlayOpacity = 100
+                        )
+                    }
+                    backTouchEnabled = false
+                    overlayBridge.setTouchState(false)
+                },
+                onTouchSwitch = { enabled ->
+                    persistConfig { it.copy(overlayShowTouchSwitch = enabled) }
+                    if (!enabled) {
+                        backTouchEnabled = false
+                        overlayBridge.setTouchState(false)
+                    }
+                },
+                onOverlayScale = { value -> persistConfig { it.copy(overlayScale = value) } },
+                onOverlayOpacity = { value -> persistConfig { it.copy(overlayOpacity = value) } },
+                onPerformanceOverlay = { enabled ->
+                    persistConfig { it.copy(performanceOverlay = enabled) }
+                    syncPerformanceOverlayState()
+                },
+                onPerformanceDetail = { value ->
+                    persistConfig { it.copy(performanceOverlayDetail = value) }
+                    syncPerformanceOverlayState()
+                },
+                onPerformancePosition = { value ->
+                    persistConfig { it.copy(performanceOverlayPosition = value) }
+                    syncPerformanceOverlayState()
+                },
+                onAudioVolume = { volume ->
+                    persistConfig { it.copy(audioVolume = volume) }
+                    activity.setAudioVolume(volume)
+                },
+                onBgmVolume = { volume -> persistConfig { it.copy(bgmVolume = volume) } },
+                onInfoBar = { enabled -> persistConfig { it.copy(showInfoBar = enabled) } },
+                onTouchpadCursor = { enabled -> persistConfig { it.copy(showTouchpadCursor = enabled) } },
+                onResolutionMultiplier = { value -> persistConfig { it.copy(resolutionMultiplier = value) } },
+                onVsync = { enabled -> persistConfig { it.copy(vSync = enabled) } },
+                onStretchDisplay = { enabled -> persistConfig { it.copy(stretchDisplayArea = enabled) } },
+                onHighAccuracy = { enabled -> persistConfig { it.copy(highAccuracy = enabled) } },
+                onFpsHack = { enabled -> persistConfig { it.copy(fpsHack = enabled) } },
+                onTurboMode = { enabled -> persistConfig { it.copy(turboMode = enabled) } },
+                onDisableSurfaceSync = { enabled -> persistConfig { it.copy(disableSurfaceSync = enabled) } },
+                onShowShaderNotice = { enabled -> persistConfig { it.copy(showCompileShaders = enabled) } },
+                onPstvMode = { enabled -> persistConfig { it.copy(pstvMode = enabled) } },
+                onShowWelcome = { enabled -> persistConfig { it.copy(showWelcome = enabled) } },
+                onWarnMissingFirmware = { enabled -> persistConfig { it.copy(warnMissingFirmware = enabled) } }
+            )
+        }
+
         AnimatedVisibility(
-            visible = !controlsEditMode && !menuOpen && menuButtonVisible,
+            visible = !controlsEditMode && menuButtonVisible,
             enter = fadeIn(tween(180)),
             exit = fadeOut(tween(140)),
             modifier = Modifier.align(Alignment.TopCenter)
         ) {
-            TopHud(
-                menuOpen = menuOpen,
-                onMenuClick = {
-                    activeTab = EmulationMenuTab.Session
+            EmulationQuickBar(
+                paused = pausedByMenu,
+                onPauseToggle = menuCallbacks.onPauseToggle,
+                onScreenshot = { activity.requestScreenshot() },
+                onOpenMenu = {
                     menuOpen = !menuOpen
                     menuButtonVisible = true
                 }
@@ -265,80 +318,25 @@ fun EmulationOverlayHost(
 
         AnimatedVisibility(
             visible = menuOpen,
-            enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(tween(220)),
-            exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(tween(180)),
-            modifier = Modifier.align(Alignment.CenterEnd)
+            enter = if (useSidePanel) {
+                slideInHorizontally(initialOffsetX = { it }) + fadeIn(tween(220))
+            } else {
+                androidx.compose.animation.slideInVertically(initialOffsetY = { it }) + fadeIn(tween(220))
+            },
+            exit = if (useSidePanel) {
+                slideOutHorizontally(targetOffsetX = { it }) + fadeOut(tween(180))
+            } else {
+                androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) + fadeOut(tween(180))
+            },
+            modifier = Modifier.align(if (useSidePanel) Alignment.CenterEnd else Alignment.BottomCenter)
         ) {
-            EmulationSidebarMenu(
+            EmulationGameMenu(
                 gameId = gameId,
                 config = config,
-                activeTab = activeTab,
-                controlsVisible = config.enableGamepadOverlay,
                 paused = pausedByMenu,
-                onTabSelected = { activeTab = it },
-                onPauseToggle = {
-                    val next = !pausedByMenu
-                    activity.setMenuPaused(next)
-                    pausedByMenu = next
-                },
-                onControlsVisibilityToggle = {
-                    persistConfig { it.copy(enableGamepadOverlay = !it.enableGamepadOverlay) }
-                },
-                onEditControls = {
-                    persistConfig { it.copy(enableGamepadOverlay = true) }
-                    menuOpen = false
-                    menuButtonVisible = true
-                    controlsEditMode = true
-                    overlayBridge.setIsInEditMode(true)
-                },
-                onResetOverlay = {
-                    controlLayoutRepository.reset()
-                    controlLayout = null
-                    persistConfig {
-                        it.copy(
-                            enableGamepadOverlay = true,
-                            overlayShowTouchSwitch = false,
-                            overlayScale = 0.9f,
-                            overlayOpacity = 100
-                        )
-                    }
-                    backTouchEnabled = false
-                    overlayBridge.setTouchState(false)
-                },
-                onClose = { menuOpen = false },
-                onExit = { exitDialogVisible = true },
-                onOverlayScaleChange = { value -> persistConfig { it.copy(overlayScale = value) } },
-                onOverlayOpacityChange = { value -> persistConfig { it.copy(overlayOpacity = value) } },
-                onTouchSwitchChange = { enabled ->
-                    persistConfig { it.copy(overlayShowTouchSwitch = enabled) }
-                    if (!enabled) {
-                        backTouchEnabled = false
-                        overlayBridge.setTouchState(false)
-                    }
-                },
-                onPerformanceOverlayChange = { enabled ->
-                    persistConfig { it.copy(performanceOverlay = enabled) }
-                    syncPerformanceOverlayState()
-                },
-                onPerformanceDetailChange = { value ->
-                    persistConfig { it.copy(performanceOverlayDetail = value) }
-                    syncPerformanceOverlayState()
-                },
-                onPerformancePositionChange = { value ->
-                    persistConfig { it.copy(performanceOverlayPosition = value) }
-                    syncPerformanceOverlayState()
-                },
-                onResolutionMultiplierChange = { value -> persistConfig { it.copy(resolutionMultiplier = value) } },
-                onHighAccuracyChange = { enabled -> persistConfig { it.copy(highAccuracy = enabled) } },
-                onDisableSurfaceSyncChange = { enabled -> persistConfig { it.copy(disableSurfaceSync = enabled) } },
-                onShowShaderNoticeChange = { enabled -> persistConfig { it.copy(showCompileShaders = enabled) } },
-                onFpsHackChange = { enabled -> persistConfig { it.copy(fpsHack = enabled) } },
-                onStretchDisplayChange = { enabled -> persistConfig { it.copy(stretchDisplayArea = enabled) } },
-                onVsyncChange = { enabled -> persistConfig { it.copy(vSync = enabled) } },
-                onPstvModeChange = { enabled -> persistConfig { it.copy(pstvMode = enabled) } },
-                onInfoBarChange = { enabled -> persistConfig { it.copy(showInfoBar = enabled) } },
-                onTurboModeChange = { enabled -> persistConfig { it.copy(turboMode = enabled) } },
-                onTouchpadCursorChange = { enabled -> persistConfig { it.copy(showTouchpadCursor = enabled) } }
+                controlsEditMode = controlsEditMode,
+                expandHorizontally = useSidePanel,
+                callbacks = menuCallbacks
             )
         }
 
@@ -374,411 +372,6 @@ fun EmulationOverlayHost(
         if (hasPhysicalGamepad && backTouchEnabled) {
             backTouchEnabled = false
             overlayBridge.setTouchState(false)
-        }
-    }
-}
-
-@Composable
-private fun TopHud(
-    menuOpen: Boolean,
-    onMenuClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val statusInsets = WindowInsets.statusBars.asPaddingValues()
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(top = statusInsets.calculateTopPadding() + 18.dp, start = 18.dp, end = 18.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Spacer(modifier = Modifier.size(20.dp))
-
-        Surface(
-            modifier = Modifier.clickable(onClick = onMenuClick),
-            color = Color.Transparent,
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = if (menuOpen) 0.68f else 0.42f))
-        ) {
-            Box(modifier = Modifier.size(width = 44.dp, height = 38.dp), contentAlignment = Alignment.Center) {
-                Icon(imageVector = Icons.Rounded.Menu, contentDescription = null, tint = Color.White.copy(alpha = 0.96f))
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmulationSidebarMenu(
-    gameId: String,
-    config: VitaCoreConfig,
-    activeTab: EmulationMenuTab,
-    controlsVisible: Boolean,
-    paused: Boolean,
-    onTabSelected: (EmulationMenuTab) -> Unit,
-    onPauseToggle: () -> Unit,
-    onControlsVisibilityToggle: () -> Unit,
-    onEditControls: () -> Unit,
-    onResetOverlay: () -> Unit,
-    onClose: () -> Unit,
-    onExit: () -> Unit,
-    onOverlayScaleChange: (Float) -> Unit,
-    onOverlayOpacityChange: (Int) -> Unit,
-    onTouchSwitchChange: (Boolean) -> Unit,
-    onPerformanceOverlayChange: (Boolean) -> Unit,
-    onPerformanceDetailChange: (Int) -> Unit,
-    onPerformancePositionChange: (Int) -> Unit,
-    onResolutionMultiplierChange: (Float) -> Unit,
-    onHighAccuracyChange: (Boolean) -> Unit,
-    onDisableSurfaceSyncChange: (Boolean) -> Unit,
-    onShowShaderNoticeChange: (Boolean) -> Unit,
-    onFpsHackChange: (Boolean) -> Unit,
-    onStretchDisplayChange: (Boolean) -> Unit,
-    onVsyncChange: (Boolean) -> Unit,
-    onPstvModeChange: (Boolean) -> Unit,
-    onInfoBarChange: (Boolean) -> Unit,
-    onTurboModeChange: (Boolean) -> Unit,
-    onTouchpadCursorChange: (Boolean) -> Unit
-) {
-    val navInsets = WindowInsets.navigationBars.asPaddingValues()
-    Row(
-        modifier = Modifier
-            .fillMaxHeight()
-            .padding(top = 16.dp, bottom = 16.dp + navInsets.calculateBottomPadding(), end = 16.dp),
-        horizontalArrangement = Arrangement.End,
-        verticalAlignment = Alignment.Top
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxHeight().width(410.dp),
-            shape = RoundedCornerShape(28.dp),
-            color = EmulationPanel,
-            border = BorderStroke(1.dp, EmulationPanelBorder)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 18.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(22.dp),
-                    color = Color.White.copy(alpha = 0.04f),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                                    )
-                                )
-                            )
-                            .padding(horizontal = 18.dp, vertical = 18.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.emulation_menu_title),
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                            color = EmulationTextPrimary
-                        )
-                        Text(
-                            text = gameId.ifBlank { stringResource(R.string.emulation_menu_unknown_game) },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = EmulationTextSecondary
-                        )
-                    }
-                }
-
-                when (activeTab) {
-                    EmulationMenuTab.Session -> {
-                        MenuActionButton(
-                            icon = if (paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                            title = stringResource(if (paused) R.string.emulation_resume else R.string.emulation_pause),
-                            subtitle = stringResource(R.string.emulation_menu_pause_desc),
-                            onClick = onPauseToggle
-                        )
-                        MenuActionButton(
-                            icon = Icons.AutoMirrored.Rounded.ExitToApp,
-                            title = stringResource(R.string.emulation_menu_exit_game),
-                            subtitle = stringResource(R.string.emulation_menu_exit_game_desc),
-                            onClick = onExit,
-                            containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.14f)
-                        )
-                    }
-
-                    EmulationMenuTab.Overlay -> {
-                        MenuActionButton(
-                            icon = Icons.Rounded.Gamepad,
-                            title = stringResource(R.string.emulation_menu_edit_controls),
-                            subtitle = stringResource(R.string.emulation_menu_edit_controls_desc),
-                            onClick = onEditControls
-                        )
-                        MenuActionButton(
-                            icon = if (controlsVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                            title = stringResource(if (controlsVisible) R.string.emulation_menu_hide_controls else R.string.emulation_menu_show_controls),
-                            subtitle = stringResource(R.string.emulation_menu_controls_desc),
-                            onClick = onControlsVisibilityToggle
-                        )
-                        MenuActionButton(
-                            icon = Icons.Rounded.Refresh,
-                            title = stringResource(R.string.emulation_menu_reset_overlay),
-                            subtitle = stringResource(R.string.emulation_menu_reset_overlay_desc),
-                            onClick = onResetOverlay
-                        )
-                        MenuSectionCard(
-                            title = stringResource(R.string.settings_tab_overlay),
-                            subtitle = stringResource(R.string.emulation_menu_overlay_live)
-                        ) {
-                            ToggleRow(stringResource(R.string.settings_core_gamepad_overlay), controlsVisible) { onControlsVisibilityToggle() }
-                            ToggleRow(stringResource(R.string.settings_show_touch_switch), config.overlayShowTouchSwitch, onTouchSwitchChange)
-                            SliderRow(
-                                title = stringResource(R.string.settings_core_overlay_scale_label),
-                                value = config.overlayScale,
-                                valueText = stringResource(R.string.settings_core_overlay_scale_value, config.overlayScale),
-                                valueRange = 0.5f..2f,
-                                steps = 14,
-                                onValueChange = onOverlayScaleChange
-                            )
-                            SliderRow(
-                                title = stringResource(R.string.settings_core_overlay_opacity_label),
-                                value = config.overlayOpacity.toFloat(),
-                                valueText = stringResource(R.string.settings_core_overlay_opacity_value, config.overlayOpacity),
-                                valueRange = 10f..100f,
-                                steps = 8,
-                                onValueChange = { onOverlayOpacityChange(it.roundToInt()) }
-                            )
-                        }
-                    }
-
-                    EmulationMenuTab.Graphics -> {
-                        MenuSectionCard(
-                            title = stringResource(R.string.emulation_tab_graphics),
-                            subtitle = stringResource(R.string.emulation_menu_next_launch)
-                        ) {
-                            SliderRow(
-                                title = stringResource(R.string.settings_resolution_multiplier),
-                                value = config.resolutionMultiplier,
-                                valueText = stringResource(R.string.emulation_menu_resolution_value, config.resolutionMultiplier),
-                                valueRange = 1f..8f,
-                                steps = 13,
-                                onValueChange = { value -> onResolutionMultiplierChange((value * 2f).roundToInt() / 2f) }
-                            )
-                            ToggleRow(stringResource(R.string.settings_core_high_accuracy), config.highAccuracy, onHighAccuracyChange)
-                            ToggleRow(stringResource(R.string.settings_core_disable_surface_sync), config.disableSurfaceSync, onDisableSurfaceSyncChange)
-                            ToggleRow(stringResource(R.string.settings_core_shader_compilation_notice), config.showCompileShaders, onShowShaderNoticeChange)
-                            ToggleRow(stringResource(R.string.settings_core_performance_overlay), config.performanceOverlay, onPerformanceOverlayChange)
-                            ChoiceChipRow(
-                                title = stringResource(R.string.settings_core_overlay_detail_title),
-                                selected = config.performanceOverlayDetail,
-                                options = listOf(
-                                    0 to stringResource(R.string.settings_core_overlay_detail_minimum),
-                                    1 to stringResource(R.string.settings_core_overlay_detail_low),
-                                    2 to stringResource(R.string.settings_core_overlay_detail_medium),
-                                    3 to stringResource(R.string.settings_core_overlay_detail_maximum)
-                                ),
-                                onSelected = onPerformanceDetailChange
-                            )
-                            ChoiceChipRow(
-                                title = stringResource(R.string.settings_core_overlay_position_title),
-                                selected = config.performanceOverlayPosition,
-                                options = listOf(
-                                    0 to stringResource(R.string.settings_core_overlay_position_top_left),
-                                    1 to stringResource(R.string.settings_core_overlay_position_top_center),
-                                    2 to stringResource(R.string.settings_core_overlay_position_top_right),
-                                    3 to stringResource(R.string.settings_core_overlay_position_bottom_left),
-                                    4 to stringResource(R.string.settings_core_overlay_position_bottom_center),
-                                    5 to stringResource(R.string.settings_core_overlay_position_bottom_right)
-                                ),
-                                onSelected = onPerformancePositionChange
-                            )
-                            ToggleRow(stringResource(R.string.settings_stretch_display_area), config.stretchDisplayArea, onStretchDisplayChange)
-                            ToggleRow(stringResource(R.string.settings_vsync), config.vSync, onVsyncChange)
-                        }
-                    }
-
-                    EmulationMenuTab.System -> {
-                        MenuSectionCard(
-                            title = stringResource(R.string.emulation_tab_system),
-                            subtitle = stringResource(R.string.emulation_menu_next_launch)
-                        ) {
-                            ToggleRow(stringResource(R.string.settings_core_fps_hack), config.fpsHack, onFpsHackChange)
-                            ToggleRow(stringResource(R.string.settings_pstv_mode), config.pstvMode, onPstvModeChange)
-                            ToggleRow(stringResource(R.string.settings_core_touchpad_cursor), config.showTouchpadCursor, onTouchpadCursorChange)
-                            ToggleRow(stringResource(R.string.settings_show_info_bar), config.showInfoBar, onInfoBarChange)
-                            ToggleRow(stringResource(R.string.settings_turbo_mode), config.turboMode, onTurboModeChange)
-                        }
-                    }
-                }
-
-            }
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Surface(
-            modifier = Modifier.fillMaxHeight().width(74.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = EmulationPanelSoft,
-            border = BorderStroke(1.dp, EmulationPanelBorder)
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(vertical = 14.dp, horizontal = 10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                EmulationRailButton(Icons.Rounded.Menu, activeTab == EmulationMenuTab.Session) { onTabSelected(EmulationMenuTab.Session) }
-                EmulationRailButton(Icons.Rounded.Gamepad, activeTab == EmulationMenuTab.Overlay) { onTabSelected(EmulationMenuTab.Overlay) }
-                EmulationRailButton(Icons.Rounded.SettingsSuggest, activeTab == EmulationMenuTab.Graphics) { onTabSelected(EmulationMenuTab.Graphics) }
-                EmulationRailButton(Icons.Rounded.Refresh, activeTab == EmulationMenuTab.System) { onTabSelected(EmulationMenuTab.System) }
-                Spacer(modifier = Modifier.weight(1f))
-                EmulationRailButton(Icons.AutoMirrored.Rounded.ExitToApp, false, destructive = true, onClick = onClose)
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmulationRailButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    selected: Boolean,
-    destructive: Boolean = false,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.size(46.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = when {
-            destructive -> MaterialTheme.colorScheme.error.copy(alpha = 0.14f)
-            selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-            else -> Color.White.copy(alpha = 0.04f)
-        },
-        border = BorderStroke(
-            1.dp,
-            when {
-                destructive -> MaterialTheme.colorScheme.error.copy(alpha = 0.28f)
-                selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
-                else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
-            }
-        ),
-        onClick = onClick
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = when {
-                    destructive -> MaterialTheme.colorScheme.error
-                    selected -> MaterialTheme.colorScheme.primary
-                    else -> EmulationTextSecondary
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun MenuSectionCard(title: String, subtitle: String, content: @Composable () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = Color.White.copy(alpha = 0.04f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(text = title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = EmulationTextPrimary)
-                Text(text = subtitle, color = EmulationTextSecondary, style = MaterialTheme.typography.bodySmall)
-            }
-            content()
-        }
-    }
-}
-
-@Composable
-private fun MenuActionButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-    containerColor: Color = Color.White.copy(alpha = 0.04f)
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        color = containerColor,
-        shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Box(
-                modifier = Modifier.size(42.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = EmulationTextPrimary)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = EmulationTextSecondary)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ToggleRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(text = title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = EmulationTextPrimary)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-@Composable
-private fun SliderRow(
-    title: String,
-    value: Float,
-    valueText: String,
-    valueRange: ClosedFloatingPointRange<Float>,
-    steps: Int,
-    onValueChange: (Float) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = EmulationTextPrimary)
-            Text(valueText, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-        }
-        Slider(value = value, onValueChange = onValueChange, valueRange = valueRange, steps = steps)
-    }
-}
-
-@Composable
-private fun ChoiceChipRow(
-    title: String,
-    selected: Int,
-    options: List<Pair<Int, String>>,
-    onSelected: (Int) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(title, style = MaterialTheme.typography.bodyLarge, color = EmulationTextPrimary)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            options.forEach { (value, label) ->
-                FilterChip(
-                    selected = selected == value,
-                    onClick = { onSelected(value) },
-                    colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
-                        containerColor = Color.White.copy(alpha = 0.04f),
-                        labelColor = EmulationTextSecondary,
-                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-                        selectedLabelColor = EmulationTextPrimary
-                    ),
-                    label = { Text(label) }
-                )
-            }
         }
     }
 }

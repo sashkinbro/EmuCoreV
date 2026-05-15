@@ -1,16 +1,11 @@
 add_library(
     ime
     STATIC
-    include/ime/functions.h
+    src/ime.cpp
     include/ime/state.h
-    src/functions.cpp
+    include/ime/types.h
+    include/ime/functions.h
 )
 
-target_include_directories(ime PUBLIC
-    include
-    ${CMAKE_SOURCE_DIR}/vita3k/mem/include
-    ${CMAKE_SOURCE_DIR}/vita3k/util/include
-    ${CMAKE_SOURCE_DIR}/vita3k/lang/include
-    ${CMAKE_SOURCE_DIR}/vita3k/compat/include
-    ${CMAKE_SOURCE_DIR}/external/imgui
-)
+target_include_directories(ime PUBLIC include)
+target_link_libraries(ime PRIVATE mem)

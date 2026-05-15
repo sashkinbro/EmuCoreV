@@ -18,3 +18,13 @@ fun Configuration.isTabletClassDevice(): Boolean {
 fun Configuration.shouldUseExpandedShell(): Boolean {
     return isTabletClassDevice() && screenWidthDp >= 840
 }
+
+/**
+ * True when the current configuration warrants a multi-column / tablet-style
+ * layout. Phones in landscape stay single-column — they are landscape but not
+ * a tablet, so the extra horizontal space is treated as a wider single column
+ * rather than reflowed into multi-pane content.
+ */
+fun Configuration.useMultiColumnLayout(): Boolean {
+    return isTabletClassDevice() && screenWidthDp > screenHeightDp
+}

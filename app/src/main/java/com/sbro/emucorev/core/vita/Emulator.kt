@@ -45,8 +45,8 @@ import com.sbro.emucorev.MainActivity
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.input.InputDeviceClassifier
-import com.sbro.emucorev.core.sdl.SDLActivity
-import com.sbro.emucorev.core.sdl.SDLSurface
+import org.libsdl.app.SDLActivity
+import org.libsdl.app.SDLSurface
 import com.sbro.emucorev.core.vita.overlay.InputOverlay
 import com.jakewharton.processphoenix.ProcessPhoenix
 import com.sbro.emucorev.BuildConfig
@@ -312,6 +312,15 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     external fun setPerformanceOverlayState(enabled: Boolean, detail: Int, position: Int)
+
+    /** Push UI-driven audio volume (0..100) into the running emulator state. */
+    external fun setAudioVolume(volume: Int)
+
+    /**
+     * Ask the core to capture and save a screenshot using its configured format.
+     * Returns false if no emulator session is currently active.
+     */
+    external fun requestScreenshot(): Boolean
 
     fun setMenuPaused(paused: Boolean) {
         if (menuPaused == paused) return

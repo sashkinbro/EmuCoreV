@@ -124,6 +124,7 @@ import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.CompactCardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
+import com.sbro.emucorev.ui.theme.useMultiColumnLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -155,9 +156,12 @@ fun GameDetailScreen(
     val deleteGameConfirmBody = stringResource(R.string.detail_delete_game_confirm_body)
     val deleteGameFailedMessage = stringResource(R.string.detail_delete_game_failed)
     val horizontalInset = ScreenHorizontalPadding
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
-    val contentMaxWidth = if (isLandscape) 980.dp else 760.dp
-    val heroMaxWidth = if (isLandscape) 170.dp else 240.dp
+    // Two-pane hero+meta layout requires a real tablet. Phones in landscape get
+    // the stacked single-column look, just slightly wider, so they don't end up
+    // squished into a tablet layout.
+    val useTwoPaneHeader = configuration.useMultiColumnLayout()
+    val contentMaxWidth = if (useTwoPaneHeader) 980.dp else 760.dp
+    val heroMaxWidth = if (useTwoPaneHeader) 170.dp else 240.dp
     var selectedScreenshotIndex by rememberSaveable { mutableIntStateOf(-1) }
     var selectedVideoIndex by rememberSaveable { mutableIntStateOf(-1) }
     var showOverflowMenu by remember { mutableStateOf(false) }
@@ -269,7 +273,7 @@ fun GameDetailScreen(
                         }
                     }
 
-                    if (isLandscape) {
+                    if (useTwoPaneHeader) {
                         Row(
                             modifier = Modifier
                                 .align(Alignment.CenterHorizontally)

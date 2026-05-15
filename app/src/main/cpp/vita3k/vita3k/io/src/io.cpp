@@ -57,11 +57,7 @@ static int io_error_impl(const int retval, const char *export_name, const char *
 #define IO_ERROR(retval) io_error_impl(retval, export_name, __func__)
 #define IO_ERROR_UNK() IO_ERROR(-1)
 
-#ifndef NDEBUG
 constexpr bool log_file_op = true;
-#else
-constexpr bool log_file_op = false;
-#endif
 constexpr bool log_file_read = false;
 constexpr bool log_file_seek = false;
 constexpr bool log_file_stat = false;
@@ -129,6 +125,29 @@ bool init(IOState &io, const fs::path &cache_path, const fs::path &log_path, con
 #endif
 
     return true;
+}
+
+void io_deinit(IOState &io) {
+    io.std_files.clear();
+    io.dir_entries.clear();
+    io.tty_files.clear();
+
+    io.next_fd = 0;
+
+    io.device_paths = {};
+    io.addcont.clear();
+    io.content_id.clear();
+    io.savedata.clear();
+    io.title_id.clear();
+    io.app_path.clear();
+
+    io.cachemap.clear();
+
+    {
+        std::lock_guard<std::mutex> lock(io.overlay_mutex);
+        io.overlays.clear();
+        io.next_overlay_id = 1;
+    }
 }
 
 void init_device_paths(IOState &io) {

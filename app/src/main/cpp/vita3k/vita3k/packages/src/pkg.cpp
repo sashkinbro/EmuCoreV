@@ -37,8 +37,6 @@
 #include <packages/sce_types.h>
 #include <packages/sfo.h>
 
-#include <fstream>
-
 #include <util/bytes.h>
 #include <util/log.h>
 
@@ -237,28 +235,6 @@ bool install_pkg(const fs::path &pkg_path, EmuEnvState &emuenv, std::string &p_z
         break;
     }
 
-    if (p_zRIF.empty() && (type != PkgType::PKG_TYPE_VITA_THEME)) {
-        const std::string content_id(pkg_header.content_id);
-        const std::string title_id = content_id.substr(7, 9);
-        const auto license_path = emuenv.pref_path / fmt::format("ux0/license/{}/{}.rif", title_id, content_id);
-        if (!fs::exists(license_path)) {
-            LOG_ERROR("No zRIF provided and no matching installed license was found at {}", license_path);
-            return false;
-        }
-
-        fs::ifstream binfile(license_path, std::ios::in | std::ios::binary | std::ios::ate);
-        if (!binfile.is_open()) {
-            LOG_ERROR("Failed to open installed license file at {}", license_path);
-            return false;
-        }
-
-        p_zRIF = rif2zrif(binfile);
-        if (p_zRIF.empty()) {
-            LOG_ERROR("Failed to derive zRIF from installed license at {}", license_path);
-            return false;
-        }
-    }
-
     auto decrypt_aes_ctr = [&](uint32_t offset, unsigned char *data, size_t size) {
         uint8_t counter[0x10];
         ctr_init(counter, pkg_header.pkg_data_iv, offset);
@@ -375,4 +351,31 @@ bool install_pkg(const fs::path &pkg_path, EmuEnvState &emuenv, std::string &p_z
 
     progress_callback(100);
     return true;
+}
+
+std::string find_pkg_zrif(const fs::path &pkg_path, const fs::path &pref_path) {
+    FILE *infile = FOPEN(pkg_path.c_str(), "rb");
+    if (!infile)
+        return {};
+
+    PkgHeader pkg_header{};
+    fread(&pkg_header, sizeof(PkgHeader), 1, infile);
+    fclose(infile);
+
+    const std::string content_id(pkg_header.content_id);
+    if (content_id.size() < 16)
+        return {};
+
+    const std::string title_id = content_id.substr(7, 9);
+    const auto rif_path = pref_path / "ux0/license" / title_id / (content_id + ".rif");
+
+    if (!fs::exists(rif_path))
+        return {};
+
+    LOG_INFO("Found license file: {}", rif_path);
+    fs::ifstream binfile(rif_path, std::ios::in | std::ios::binary | std::ios::ate);
+    if (!binfile)
+        return {};
+
+    return rif2zrif(binfile);
 }

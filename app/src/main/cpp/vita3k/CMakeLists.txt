@@ -51,7 +51,6 @@ else()
 	option(BUILD_APPIMAGE "Build an AppImage." OFF)
 endif()
 
-option(USE_VITA3K_UPDATE "Build Vita3K with updater." ON)
 option(FORCE_BUILD_OPENSSL_MAC OFF)
 
 if("${CMAKE_CXX_COMPILER_LAUNCHER}" STREQUAL "")
@@ -191,13 +190,6 @@ macro(get_boost)
 
 			# Find Boost again to check for a existing compilation of the custom distribution
 			find_package(Boost 1.81 COMPONENTS ${BOOST_MODULES_TO_FIND} PATHS ${BOOST_INSTALLDIR} NO_DEFAULT_PATH)
-
-			# Android on Windows can lack the Visual Studio C++ workload needed by b2/vcpkg host tooling.
-			# In that case, build the vendored Boost filesystem target directly with CMake instead.
-			if(NOT Boost_FOUND AND ANDROID AND CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
-				message(STATUS "Falling back to local vendored Boost CMake targets for Android/Windows.")
-				include("${CMAKE_SOURCE_DIR}/cmake/local_boost_android.cmake")
-			endif()
 
 			# If no build of the custom distribution is found, compile it
 			if(NOT Boost_FOUND)
