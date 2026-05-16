@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,11 +39,9 @@ import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -181,6 +180,7 @@ fun EmulationGameMenu(
     config: VitaCoreConfig,
     paused: Boolean,
     expandHorizontally: Boolean,
+    physicalGamepadConnected: Boolean,
     callbacks: EmulationMenuCallbacks,
     modifier: Modifier = Modifier
 ) {
@@ -242,6 +242,11 @@ fun EmulationGameMenu(
                     EmulationMenuTab.Controls -> ControlsTab(config = config, callbacks = callbacks)
                     EmulationMenuTab.Display -> DisplayTab(config = config, callbacks = callbacks)
                     EmulationMenuTab.System -> SystemTab(config = config, callbacks = callbacks)
+                    EmulationMenuTab.Gamepad -> GamepadTab(
+                        config = config,
+                        physicalGamepadConnected = physicalGamepadConnected,
+                        callbacks = callbacks
+                    )
                 }
                 Spacer(modifier = Modifier.height(2.dp))
             }
@@ -253,7 +258,8 @@ private enum class EmulationMenuTab {
     Game,
     Controls,
     Display,
-    System
+    System,
+    Gamepad
 }
 
 @Composable
@@ -461,6 +467,98 @@ private fun SystemTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks)
 }
 
 @Composable
+private fun GamepadTab(
+    config: VitaCoreConfig,
+    physicalGamepadConnected: Boolean,
+    callbacks: EmulationMenuCallbacks
+) {
+    MenuSection(
+        title = stringResource(R.string.emulation_menu_section_gamepad),
+        subtitle = if (physicalGamepadConnected) {
+            stringResource(R.string.emulation_menu_section_gamepad_desc)
+        } else {
+            stringResource(R.string.emulation_menu_section_gamepad_disconnected)
+        },
+        badge = MenuBadge.Live
+    ) {
+        MenuSliderRow(
+            label = stringResource(R.string.settings_gamepad_deadzone),
+            value = config.gamepadDeadzone,
+            valueText = stringResource(R.string.settings_gamepad_percent_value, (config.gamepadDeadzone * 100f).roundToInt()),
+            valueRange = 0f..0.45f,
+            steps = 8,
+            enabled = physicalGamepadConnected,
+            onValueChange = { callbacks.onGamepadDeadzone((it * 100f).roundToInt() / 100f) }
+        )
+        MenuSliderRow(
+            label = stringResource(R.string.settings_core_analog_multiplier_label),
+            value = config.analogMultiplier,
+            valueText = stringResource(R.string.settings_core_analog_multiplier_value, config.analogMultiplier),
+            valueRange = 0.5f..2f,
+            steps = 14,
+            enabled = physicalGamepadConnected,
+            onValueChange = { callbacks.onGamepadAnalogMultiplier((it * 10f).roundToInt() / 10f) }
+        )
+        MenuSliderRow(
+            label = stringResource(R.string.settings_gamepad_trigger_threshold),
+            value = config.gamepadTriggerThreshold,
+            valueText = stringResource(R.string.settings_gamepad_percent_value, (config.gamepadTriggerThreshold * 100f).roundToInt()),
+            valueRange = 0f..0.9f,
+            steps = 8,
+            enabled = physicalGamepadConnected,
+            onValueChange = { callbacks.onGamepadTriggerThreshold((it * 100f).roundToInt() / 100f) }
+        )
+        MenuChipRow(
+            label = stringResource(R.string.settings_gamepad_button_profile),
+            selected = when (config.gamepadButtonProfile) {
+                VitaCoreConfig.GAMEPAD_PROFILE_SWAP_CROSS_CIRCLE -> 1
+                VitaCoreConfig.GAMEPAD_PROFILE_NINTENDO_FACE -> 2
+                else -> 0
+            },
+            options = listOf(
+                0 to stringResource(R.string.settings_gamepad_profile_standard),
+                1 to stringResource(R.string.settings_gamepad_profile_swap_cross_circle),
+                2 to stringResource(R.string.settings_gamepad_profile_nintendo_face)
+            ),
+            enabled = physicalGamepadConnected,
+            onSelected = { value ->
+                callbacks.onGamepadButtonProfile(
+                    when (value) {
+                        1 -> VitaCoreConfig.GAMEPAD_PROFILE_SWAP_CROSS_CIRCLE
+                        2 -> VitaCoreConfig.GAMEPAD_PROFILE_NINTENDO_FACE
+                        else -> VitaCoreConfig.GAMEPAD_PROFILE_STANDARD
+                    }
+                )
+            }
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_gamepad_vibration),
+            checked = config.gamepadVibration,
+            enabled = physicalGamepadConnected,
+            onCheckedChange = callbacks.onGamepadVibration
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_gamepad_swap_sticks),
+            checked = config.gamepadSwapSticks,
+            enabled = physicalGamepadConnected,
+            onCheckedChange = callbacks.onGamepadSwapSticks
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_gamepad_invert_left_y),
+            checked = config.gamepadInvertLeftY,
+            enabled = physicalGamepadConnected,
+            onCheckedChange = callbacks.onGamepadInvertLeftY
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_gamepad_invert_right_y),
+            checked = config.gamepadInvertRightY,
+            enabled = physicalGamepadConnected,
+            onCheckedChange = callbacks.onGamepadInvertRightY
+        )
+    }
+}
+
+@Composable
 private fun MenuTopActions(paused: Boolean, callbacks: EmulationMenuCallbacks) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -522,27 +620,38 @@ private fun MenuTabs(selectedTab: EmulationMenuTab, onSelected: (EmulationMenuTa
         EmulationMenuTab.Game to stringResource(R.string.emulation_tab_game),
         EmulationMenuTab.Controls to stringResource(R.string.emulation_tab_controls),
         EmulationMenuTab.Display to stringResource(R.string.emulation_tab_display),
-        EmulationMenuTab.System to stringResource(R.string.emulation_tab_system)
+        EmulationMenuTab.System to stringResource(R.string.emulation_tab_system),
+        EmulationMenuTab.Gamepad to stringResource(R.string.emulation_tab_gamepad)
     )
-    PrimaryScrollableTabRow(
-        selectedTabIndex = tabs.indexOfFirst { it.first == selectedTab }.coerceAtLeast(0),
-        containerColor = Color.Transparent,
-        contentColor = MaterialTheme.colorScheme.primary,
-        edgePadding = 0.dp,
-        divider = {}
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         tabs.forEach { (tab, label) ->
-            Tab(
-                selected = selectedTab == tab,
+            val selected = selectedTab == tab
+            Surface(
                 onClick = { onSelected(tab) },
-                text = {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (selectedTab == tab) MaterialTheme.colorScheme.primary else palette.textSecondary
-                    )
-                }
-            )
+                shape = RoundedCornerShape(12.dp),
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                } else {
+                    Color.Transparent
+                },
+                border = BorderStroke(
+                    1.dp,
+                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.42f) else Color.Transparent
+                )
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = if (selected) MaterialTheme.colorScheme.primary else palette.textSecondary,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                )
+            }
         }
     }
 }
@@ -574,7 +683,15 @@ data class EmulationMenuCallbacks(
     val onShowShaderNotice: (Boolean) -> Unit,
     val onPstvMode: (Boolean) -> Unit,
     val onShowWelcome: (Boolean) -> Unit,
-    val onWarnMissingFirmware: (Boolean) -> Unit
+    val onWarnMissingFirmware: (Boolean) -> Unit,
+    val onGamepadDeadzone: (Float) -> Unit,
+    val onGamepadAnalogMultiplier: (Float) -> Unit,
+    val onGamepadTriggerThreshold: (Float) -> Unit,
+    val onGamepadButtonProfile: (String) -> Unit,
+    val onGamepadVibration: (Boolean) -> Unit,
+    val onGamepadSwapSticks: (Boolean) -> Unit,
+    val onGamepadInvertLeftY: (Boolean) -> Unit,
+    val onGamepadInvertRightY: (Boolean) -> Unit
 )
 
 private enum class MenuBadge { Live, Restart }
@@ -723,6 +840,7 @@ private fun Badge(text: String, color: Color) {
 private fun MenuToggleRow(
     label: String,
     checked: Boolean,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
     val palette = emulationMenuPalette()
@@ -730,7 +848,7 @@ private fun MenuToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .clickable { onCheckedChange(!checked) }
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .background(palette.row)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -738,10 +856,10 @@ private fun MenuToggleRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = palette.textPrimary,
+            color = palette.textPrimary.copy(alpha = if (enabled) 1f else 0.48f),
             modifier = Modifier.weight(1f)
         )
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -752,6 +870,7 @@ private fun MenuSliderRow(
     valueText: String,
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
+    enabled: Boolean = true,
     onValueChange: (Float) -> Unit
 ) {
     val palette = emulationMenuPalette()
@@ -767,7 +886,7 @@ private fun MenuSliderRow(
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
-                color = palette.textPrimary,
+                color = palette.textPrimary.copy(alpha = if (enabled) 1f else 0.48f),
                 modifier = Modifier.weight(1f)
             )
             Text(
@@ -779,6 +898,7 @@ private fun MenuSliderRow(
         Slider(
             value = value,
             onValueChange = onValueChange,
+            enabled = enabled,
             valueRange = valueRange,
             steps = steps
         )
@@ -790,6 +910,7 @@ private fun MenuChipRow(
     label: String,
     selected: Int,
     options: List<Pair<Int, String>>,
+    enabled: Boolean = true,
     onSelected: (Int) -> Unit
 ) {
     val palette = emulationMenuPalette()
@@ -804,6 +925,7 @@ private fun MenuChipRow(
                 FilterChip(
                     selected = selected == value,
                     onClick = { onSelected(value) },
+                    enabled = enabled,
                     label = { Text(text) }
                 )
             }

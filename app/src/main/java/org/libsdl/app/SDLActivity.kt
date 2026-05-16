@@ -568,8 +568,8 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
 
             if (SDLControllerManager.isDeviceSDLJoystick(deviceId)) {
                 when (event.action) {
-                    KeyEvent.ACTION_DOWN -> if (SDLControllerManager.onNativePadDown(deviceId, keyCode)) return true
-                    KeyEvent.ACTION_UP -> if (SDLControllerManager.onNativePadUp(deviceId, keyCode)) return true
+                    KeyEvent.ACTION_DOWN -> if (SDLControllerManager.handlePadDown(deviceId, keyCode)) return true
+                    KeyEvent.ACTION_UP -> if (SDLControllerManager.handlePadUp(deviceId, keyCode)) return true
                 }
             }
 

@@ -39,6 +39,15 @@ data class VitaCoreConfig(
     val overlayOpacity: Int = 100,
     val disableMotion: Boolean = false,
     val analogMultiplier: Float = 1.0f,
+    val gamepadDeadzone: Float = 0.15f,
+    val gamepadTriggerThreshold: Float = 0.12f,
+    val gamepadButtonProfile: String = GAMEPAD_PROFILE_STANDARD,
+    val gamepadVibration: Boolean = true,
+    val gamepadSwapSticks: Boolean = false,
+    val gamepadInvertLeftX: Boolean = false,
+    val gamepadInvertLeftY: Boolean = false,
+    val gamepadInvertRightX: Boolean = false,
+    val gamepadInvertRightY: Boolean = false,
     val stretchDisplayArea: Boolean = false,
     val fpsHack: Boolean = false,
     val vSync: Boolean = true,
@@ -85,6 +94,10 @@ data class VitaCoreConfig(
         const val SCREENSHOT_FORMAT_NONE: Int = 0
         const val SCREENSHOT_FORMAT_JPEG: Int = 1
         const val SCREENSHOT_FORMAT_PNG: Int = 2
+
+        const val GAMEPAD_PROFILE_STANDARD: String = "standard"
+        const val GAMEPAD_PROFILE_SWAP_CROSS_CIRCLE: String = "swap-cross-circle"
+        const val GAMEPAD_PROFILE_NINTENDO_FACE: String = "nintendo-face"
     }
 }
 
@@ -113,6 +126,15 @@ class VitaCoreConfigRepository(private val context: Context) {
         "export-textures",
         "file-loading-delay",
         "fps-hack",
+        "gamepad-button-profile",
+        "gamepad-deadzone",
+        "gamepad-invert-left-x",
+        "gamepad-invert-left-y",
+        "gamepad-invert-right-x",
+        "gamepad-invert-right-y",
+        "gamepad-swap-sticks",
+        "gamepad-trigger-threshold",
+        "gamepad-vibration",
         "fullscreen_hd_res_pixel_perfect",
         "hashless-texture-cache",
         "high-accuracy",
@@ -205,6 +227,15 @@ class VitaCoreConfigRepository(private val context: Context) {
                 overlayOpacity = values["overlay-opacity"]?.toIntOrNull() ?: defaults.overlayOpacity,
                 disableMotion = values["disable-motion"]?.toBooleanStrictOrNull() ?: defaults.disableMotion,
                 analogMultiplier = values["controller-analog-multiplier"]?.toFloatOrNull() ?: defaults.analogMultiplier,
+                gamepadDeadzone = values["gamepad-deadzone"]?.toFloatOrNull() ?: defaults.gamepadDeadzone,
+                gamepadTriggerThreshold = values["gamepad-trigger-threshold"]?.toFloatOrNull() ?: defaults.gamepadTriggerThreshold,
+                gamepadButtonProfile = normalizeGamepadProfile(values["gamepad-button-profile"] ?: defaults.gamepadButtonProfile),
+                gamepadVibration = values["gamepad-vibration"]?.toBooleanStrictOrNull() ?: defaults.gamepadVibration,
+                gamepadSwapSticks = values["gamepad-swap-sticks"]?.toBooleanStrictOrNull() ?: defaults.gamepadSwapSticks,
+                gamepadInvertLeftX = values["gamepad-invert-left-x"]?.toBooleanStrictOrNull() ?: defaults.gamepadInvertLeftX,
+                gamepadInvertLeftY = values["gamepad-invert-left-y"]?.toBooleanStrictOrNull() ?: defaults.gamepadInvertLeftY,
+                gamepadInvertRightX = values["gamepad-invert-right-x"]?.toBooleanStrictOrNull() ?: defaults.gamepadInvertRightX,
+                gamepadInvertRightY = values["gamepad-invert-right-y"]?.toBooleanStrictOrNull() ?: defaults.gamepadInvertRightY,
                 stretchDisplayArea = values["stretch_the_display_area"]?.toBooleanStrictOrNull() ?: defaults.stretchDisplayArea,
                 fpsHack = values["fps-hack"]?.toBooleanStrictOrNull() ?: defaults.fpsHack,
                 vSync = values["v-sync"]?.toBooleanStrictOrNull() ?: defaults.vSync,
@@ -313,6 +344,15 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["overlay-opacity"] = config.overlayOpacity.toString()
         values["disable-motion"] = config.disableMotion.toString()
         values["controller-analog-multiplier"] = formatFloat(config.analogMultiplier)
+        values["gamepad-deadzone"] = formatFloat(config.gamepadDeadzone)
+        values["gamepad-trigger-threshold"] = formatFloat(config.gamepadTriggerThreshold)
+        values["gamepad-button-profile"] = normalizeGamepadProfile(config.gamepadButtonProfile)
+        values["gamepad-vibration"] = config.gamepadVibration.toString()
+        values["gamepad-swap-sticks"] = config.gamepadSwapSticks.toString()
+        values["gamepad-invert-left-x"] = config.gamepadInvertLeftX.toString()
+        values["gamepad-invert-left-y"] = config.gamepadInvertLeftY.toString()
+        values["gamepad-invert-right-x"] = config.gamepadInvertRightX.toString()
+        values["gamepad-invert-right-y"] = config.gamepadInvertRightY.toString()
         values["stretch_the_display_area"] = config.stretchDisplayArea.toString()
         values["fps-hack"] = config.fpsHack.toString()
         values["v-sync"] = config.vSync.toString()
@@ -412,12 +452,23 @@ class VitaCoreConfigRepository(private val context: Context) {
             config.colorSurfaceDebug
         return config.copy(
             validationLayer = false,
+            gamepadDeadzone = config.gamepadDeadzone.coerceIn(0f, 0.45f),
+            gamepadTriggerThreshold = config.gamepadTriggerThreshold.coerceIn(0f, 0.9f),
+            gamepadButtonProfile = normalizeGamepadProfile(config.gamepadButtonProfile),
             logLevel = if (diagnosticsEnabled) {
                 normalizeLogLevel(config.logLevel).coerceAtMost(DEBUG_LOG_LEVEL)
             } else {
                 normalizeLogLevel(config.logLevel)
             }
         )
+    }
+
+    private fun normalizeGamepadProfile(profile: String): String {
+        return when (profile) {
+            VitaCoreConfig.GAMEPAD_PROFILE_SWAP_CROSS_CIRCLE,
+            VitaCoreConfig.GAMEPAD_PROFILE_NINTENDO_FACE -> profile
+            else -> VitaCoreConfig.GAMEPAD_PROFILE_STANDARD
+        }
     }
 
     private fun releaseValuesNeedNormalization(values: Map<String, String>): Boolean {
