@@ -659,7 +659,7 @@
     <string name="play_time_daily_chart">Últimos 14 dias</string>
     <string name="play_time_games_chart">Tempo por jogo</string>
     <string name="play_time_recent_sessions">Sessões</string>
-    <string name="play_time_no_sessions_title">Nenhum tempo de jogo ainda</string>
+    <string name="play_time_no_sessions_title">Nenhuma sessão de jogo ainda</string>
     <string name="play_time_no_sessions_body">Inicie um jogo e suas sessões de jogo aparecerão aqui.</string>
     <string name="play_time_no_game_sessions_body">Este jogo ainda não foi jogado. Inicie-o e suas sessões de jogo aparecerão aqui.</string>
     <string name="library_add_shortcut">Adicionar atalho à tela inicial</string>

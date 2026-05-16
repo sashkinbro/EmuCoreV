@@ -332,7 +332,14 @@ private fun AudioTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMod
             Slider(value = uiState.coreConfig.bgmVolume.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(bgmVolume = value.toInt()) } }, valueRange = 0f..100f)
         }
         Toggle(stringResource(R.string.settings_core_ngs_enable), stringResource(R.string.settings_help_ngs_enable), uiState.coreConfig.ngsEnable, { enabled -> viewModel.updateCoreSettings { it.copy(ngsEnable = enabled) } }, { viewModel.updateCoreSettings { it.copy(ngsEnable = defaults.ngsEnable) } })
-        Button(onClick = refreshCoreSettingsClick, modifier = Modifier.padding(top = 12.dp)) { Text(stringResource(R.string.settings_core_reload)) }
+        Button(
+            onClick = refreshCoreSettingsClick,
+            modifier = Modifier
+                .padding(horizontal = SettingsSectionRowPadding, vertical = 12.dp)
+                .fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.settings_core_reload))
+        }
     }
 }
 
@@ -555,11 +562,11 @@ private fun StorageTab(
             text = stringResource(R.string.settings_backup_body),
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
         )
-        Button(onClick = createBackupClick, modifier = Modifier.padding(top = 12.dp)) {
-            Text(stringResource(R.string.settings_backup_create))
-        }
-        Button(onClick = restoreBackupClick, modifier = Modifier.padding(top = 8.dp)) {
+        Button(onClick = restoreBackupClick, modifier = Modifier.padding(top = 12.dp)) {
             Text(stringResource(R.string.settings_backup_restore))
+        }
+        Button(onClick = createBackupClick, modifier = Modifier.padding(top = 8.dp)) {
+            Text(stringResource(R.string.settings_backup_create))
         }
     }
 }

@@ -118,7 +118,7 @@
     <string name="play_time_daily_chart">آخر 14 يوماً</string>
     <string name="play_time_games_chart">الوقت حسب اللعبة</string>
     <string name="play_time_recent_sessions">الجلسات</string>
-    <string name="play_time_no_sessions_title">لا يوجد وقت لعب بعد</string>
+    <string name="play_time_no_sessions_title">لا توجد جلسات لعب بعد</string>
     <string name="play_time_no_sessions_body">قم بتشغيل لعبة وستظهر جلسات اللعب الخاصة بك هنا.</string>
     <string name="play_time_no_game_sessions_body">لم يتم لعب هذه اللعبة بعد. قم بتشغيلها وستظهر جلسات اللعب الخاصة بها هنا.</string>
     <string name="detail_title">تفاصيل اللعبة</string>

@@ -659,7 +659,7 @@
     <string name="play_time_daily_chart">Letzte 14 Tage</string>
     <string name="play_time_games_chart">Zeit nach Spiel</string>
     <string name="play_time_recent_sessions">Sitzungen</string>
-    <string name="play_time_no_sessions_title">Noch keine Spielzeit</string>
+    <string name="play_time_no_sessions_title">Noch keine Spielsitzungen</string>
     <string name="play_time_no_sessions_body">Starten Sie ein Spiel und Ihre Spielsitzungen werden hier angezeigt.</string>
     <string name="play_time_no_game_sessions_body">Dieses Spiel wurde noch nicht gespielt. Starten Sie es und seine Spielsitzungen werden hier angezeigt.</string>
     <string name="library_add_shortcut">Verknüpfung zum Startbildschirm hinzufügen</string>
