@@ -1122,7 +1122,7 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         if (sdlThread != null) {
             nativeSendQuit()
             try {
-                sdlThread.join(3000)
+                sdlThread.join(10000)
             } catch (e: Exception) {
                 Log.v(TAG, "Problem stopping SDLThread: $e")
             }

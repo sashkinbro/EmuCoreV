@@ -393,6 +393,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["warn-missing-firmware"] = config.warnMissingFirmware.toString()
 
         values[SCHEMA_VERSION_KEY] = CONFIG_SCHEMA_VERSION.toString()
+        dropEmptyUpstreamSequenceValues(values)
 
         configFile.parentFile?.mkdirs()
         configFile.writeText(
@@ -493,7 +494,16 @@ class VitaCoreConfigRepository(private val context: Context) {
             values["disable-surface-sync"]?.toBooleanStrictOrNull() == true ||
             values["discord-rich-presence"]?.toBooleanStrictOrNull() == true ||
             values["psn-signed-in"]?.let { it != "0" && it != "1" && it.toBooleanStrictOrNull() != null } == true ||
-            values["validation-layer"]?.toBooleanStrictOrNull() == true
+            values["validation-layer"]?.toBooleanStrictOrNull() == true ||
+            upstreamSequenceKeys.any { values[it].isNullOrEmpty() }
+    }
+
+    private fun dropEmptyUpstreamSequenceValues(values: MutableMap<String, String>) {
+        upstreamSequenceKeys.forEach { key ->
+            if (values[key].isNullOrEmpty()) {
+                values.remove(key)
+            }
+        }
     }
 
     private fun migrateLegacyConfigIfNeeded() {
@@ -524,5 +534,13 @@ class VitaCoreConfigRepository(private val context: Context) {
         // the affected keys on the next launch.
         private const val CONFIG_SCHEMA_VERSION = 4
         private const val SCHEMA_VERSION_KEY = "config-schema-version"
+        private val upstreamSequenceKeys = setOf(
+            "controller-axis-binds",
+            "controller-binds",
+            "controller-led-color",
+            "ime-langs",
+            "lle-modules",
+            "tracy-advanced-profiling-modules"
+        )
     }
 }
