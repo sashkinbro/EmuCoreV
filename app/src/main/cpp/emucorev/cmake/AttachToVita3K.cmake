@@ -54,6 +54,9 @@ set(EMUCOREV_BRIDGE_SOURCES
     "${EMUCOREV_BRIDGE_DIR}/src/layer_contract.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/vita_install_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/runtime_bridge.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/input_overlay_bridge.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/emu_surface_bridge.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/native_lib_bridge.cpp"
 )
 
 target_sources(vita3k PRIVATE ${EMUCOREV_BRIDGE_SOURCES})

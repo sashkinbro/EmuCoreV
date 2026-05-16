@@ -15,5 +15,6 @@ set(EMUCOREV_BRIDGE_SOURCES
     src/layer_contract.cpp
     src/vita_install_bridge.cpp
     src/runtime_bridge.cpp
+    src/input_overlay_bridge.cpp
 )
 target_sources(vita3k PRIVATE ${EMUCOREV_BRIDGE_SOURCES})

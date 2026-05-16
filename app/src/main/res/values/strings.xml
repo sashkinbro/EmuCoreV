@@ -554,6 +554,9 @@
     <string name="emulation_resume">Resume</string>
     <string name="emulation_menu_title">Game menu</string>
     <string name="emulation_menu_unknown_game">Running game</string>
+    <string name="emulation_tab_game">Game</string>
+    <string name="emulation_tab_controls">Controls</string>
+    <string name="emulation_tab_display">Display</string>
     <string name="emulation_tab_session">Session</string>
     <string name="emulation_tab_overlay">Overlay</string>
     <string name="emulation_tab_graphics">Graphics</string>
@@ -604,4 +607,3 @@
     <string name="settings_vsync">V-Sync</string>
     <string name="settings_pstv_mode">PSTV mode</string>
 </resources>
-

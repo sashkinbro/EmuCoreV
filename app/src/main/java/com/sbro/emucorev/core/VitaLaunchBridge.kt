@@ -49,6 +49,7 @@ object VitaLaunchBridge {
             EmulatorStorage.prepareRuntime(context)
             NativeLibraryLoader.ensureLoaded(context)
             VitaCoreConfigRepository(context).ensureDefaultsPersisted()
+            NativeLib.refreshAppsList()
             val intent = Intent(context, Emulator::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 putExtra(APP_RESTART_PARAMETERS, args)
@@ -63,6 +64,7 @@ object VitaLaunchBridge {
             EmulatorStorage.prepareRuntime(context)
             NativeLibraryLoader.ensureLoaded(context)
             VitaCoreConfigRepository(context).ensureDefaultsPersisted()
+            NativeLib.refreshAppsList()
             val intent = Intent(context, Emulator::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 putExtra(APP_RESTART_PARAMETERS, args)

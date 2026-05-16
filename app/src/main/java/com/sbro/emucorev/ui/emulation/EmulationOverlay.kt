@@ -81,9 +81,6 @@ import com.sbro.emucorev.core.vita.overlay.InputOverlay
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-// EmulationMenu.kt owns the modern pause-menu UI; this file is the orchestrator
-// (Activity bridging, state, on-screen touch controls, editor).
-
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
 fun EmulationOverlayHost(
@@ -211,8 +208,7 @@ fun EmulationOverlayHost(
         }
 
         val configuration = LocalConfiguration.current
-        val useSidePanel = configuration.screenWidthDp > configuration.screenHeightDp &&
-            configuration.smallestScreenWidthDp >= 600
+        val useSidePanel = configuration.screenWidthDp > configuration.screenHeightDp
 
         val menuCallbacks = remember(activity, overlayBridge) {
             EmulationMenuCallbacks(
@@ -309,7 +305,7 @@ fun EmulationOverlayHost(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f))
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f))
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                         menuOpen = false
                     }
@@ -334,7 +330,6 @@ fun EmulationOverlayHost(
                 gameId = gameId,
                 config = config,
                 paused = pausedByMenu,
-                controlsEditMode = controlsEditMode,
                 expandHorizontally = useSidePanel,
                 callbacks = menuCallbacks
             )

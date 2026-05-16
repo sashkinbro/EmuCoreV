@@ -41,12 +41,16 @@ object VitaInstallBridge {
         systemLanguage: Int
     ): Int {
         NativeLibraryLoader.ensureLoaded(context)
-        return nativeInstallContent(
+        val installedCount = nativeInstallContent(
             EmulatorStorage.vitaRoot(context).absolutePath,
             EmulatorStorage.cacheRoot(context).absolutePath,
             contentPath,
             systemLanguage
         )
+        if (installedCount > 0) {
+            NativeLib.refreshAppsList()
+        }
+        return installedCount
     }
 
     fun installPkg(
@@ -56,13 +60,17 @@ object VitaInstallBridge {
         systemLanguage: Int
     ): Boolean {
         NativeLibraryLoader.ensureLoaded(context)
-        return nativeInstallPkg(
+        val success = nativeInstallPkg(
             EmulatorStorage.vitaRoot(context).absolutePath,
             EmulatorStorage.cacheRoot(context).absolutePath,
             pkgPath,
             zrif,
             systemLanguage
         )
+        if (success) {
+            NativeLib.refreshAppsList()
+        }
+        return success
     }
 
     @JvmStatic
