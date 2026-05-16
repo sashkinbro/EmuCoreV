@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.QueryStats
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
@@ -116,6 +117,10 @@ fun LibraryScreen(
     val manageSaveDataLabel = stringResource(R.string.save_manager_open_for_game)
     val manageGameSettingsLabel = stringResource(R.string.game_manager_open_for_game)
     val playTimeLabel = stringResource(R.string.play_time_open_for_game)
+    val addShortcutLabel = stringResource(R.string.library_add_shortcut)
+    val shortcutRequestedMessage = stringResource(R.string.library_shortcut_requested)
+    val shortcutUnsupportedMessage = stringResource(R.string.library_shortcut_unsupported)
+    val shortcutFailedMessage = stringResource(R.string.library_shortcut_failed)
     val deleteGameConfirmTitle = stringResource(R.string.detail_delete_game_confirm_title)
     val deleteGameConfirmBody = stringResource(R.string.detail_delete_game_confirm_body)
     val deleteGameFailedMessage = stringResource(R.string.detail_delete_game_failed)
@@ -325,6 +330,24 @@ fun LibraryScreen(
                         onDismissRequest = { menuExpanded = false }
                     ) {
                         DropdownMenuItem(
+                            text = { Text(addShortcutLabel) },
+                            onClick = {
+                                val message = when (GameShortcutInstaller.requestPinnedShortcut(context, game.titleId, game.title, game.iconPath)) {
+                                    GameShortcutInstaller.Result.Requested -> shortcutRequestedMessage
+                                    GameShortcutInstaller.Result.Unsupported -> shortcutUnsupportedMessage
+                                    GameShortcutInstaller.Result.Failed -> shortcutFailedMessage
+                                }
+                                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                menuExpanded = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Add,
+                                    contentDescription = null
+                                )
+                            }
+                        )
+                        DropdownMenuItem(
                             text = { Text(manageGameSettingsLabel) },
                             onClick = {
                                 onOpenGameManager(game.titleId)
@@ -438,6 +461,24 @@ fun LibraryScreen(
                                 expanded = menuExpanded,
                                 onDismissRequest = { menuExpanded = false }
                             ) {
+                                DropdownMenuItem(
+                                    text = { Text(addShortcutLabel) },
+                                    onClick = {
+                                        val message = when (GameShortcutInstaller.requestPinnedShortcut(context, game.titleId, game.title, game.iconPath)) {
+                                            GameShortcutInstaller.Result.Requested -> shortcutRequestedMessage
+                                            GameShortcutInstaller.Result.Unsupported -> shortcutUnsupportedMessage
+                                            GameShortcutInstaller.Result.Failed -> shortcutFailedMessage
+                                        }
+                                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                        menuExpanded = false
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Add,
+                                            contentDescription = null
+                                        )
+                                    }
+                                )
                                 DropdownMenuItem(
                                     text = { Text(manageGameSettingsLabel) },
                                     onClick = {

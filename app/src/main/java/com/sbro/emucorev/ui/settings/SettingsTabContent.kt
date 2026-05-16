@@ -847,6 +847,7 @@ private fun appLanguageLabel(language: AppLanguage): String = when (language) {
     AppLanguage.HINDI -> stringResource(R.string.settings_app_language_hindi)
     AppLanguage.ITALIAN -> stringResource(R.string.settings_app_language_italian)
     AppLanguage.TURKISH -> stringResource(R.string.settings_app_language_turkish)
+    AppLanguage.ARABIC -> stringResource(R.string.settings_app_language_arabic)
 }
 
 @Composable

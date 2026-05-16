@@ -662,4 +662,9 @@
     <string name="play_time_no_sessions_title">Nenhum tempo de jogo ainda</string>
     <string name="play_time_no_sessions_body">Inicie um jogo e suas sessões de jogo aparecerão aqui.</string>
     <string name="play_time_no_game_sessions_body">Este jogo ainda não foi jogado. Inicie-o e suas sessões de jogo aparecerão aqui.</string>
+    <string name="library_add_shortcut">Adicionar atalho à tela inicial</string>
+    <string name="library_shortcut_requested">Solicitação de atalho enviada.</string>
+    <string name="library_shortcut_unsupported">Este launcher não suporta atalhos fixados.</string>
+    <string name="library_shortcut_failed">Falha ao criar o atalho.</string>
+    <string name="settings_app_language_arabic">Árabe</string>
 </resources>
