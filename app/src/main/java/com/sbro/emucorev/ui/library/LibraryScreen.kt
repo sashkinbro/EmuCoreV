@@ -34,9 +34,11 @@ import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.QueryStats
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.ViewModule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -60,6 +62,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -88,11 +91,14 @@ private enum class LibraryLayoutMode {
 fun LibraryScreen(
     onLaunchGame: (String) -> Unit,
     onOpenSaveManager: (String) -> Unit,
+    onOpenGameManager: (String) -> Unit,
+    onOpenPlayTime: (String) -> Unit,
     onMenuClick: (() -> Unit)? = null,
     viewModel: LibraryViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
     val refreshClick = rememberDebouncedClick(onClick = viewModel::refresh)
     var layoutMode by rememberSaveable { mutableStateOf(LibraryLayoutMode.LIST) }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
@@ -105,9 +111,17 @@ fun LibraryScreen(
     )
     val deleteGameLabel = stringResource(R.string.detail_delete_game)
     val manageSaveDataLabel = stringResource(R.string.save_manager_open_for_game)
+    val manageGameSettingsLabel = stringResource(R.string.game_manager_open_for_game)
+    val playTimeLabel = stringResource(R.string.play_time_open_for_game)
     val deleteGameConfirmTitle = stringResource(R.string.detail_delete_game_confirm_title)
     val deleteGameConfirmBody = stringResource(R.string.detail_delete_game_confirm_body)
     val deleteGameFailedMessage = stringResource(R.string.detail_delete_game_failed)
+    val gridColumns = when {
+        configuration.screenWidthDp >= 1100 -> 6
+        configuration.screenWidthDp >= 840 -> 5
+        configuration.screenWidthDp >= 600 -> 4
+        else -> 2
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -307,6 +321,32 @@ fun LibraryScreen(
                         onDismissRequest = { menuExpanded = false }
                     ) {
                         DropdownMenuItem(
+                            text = { Text(manageGameSettingsLabel) },
+                            onClick = {
+                                onOpenGameManager(game.titleId)
+                                menuExpanded = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Tune,
+                                    contentDescription = null
+                                )
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(playTimeLabel) },
+                            onClick = {
+                                onOpenPlayTime(game.titleId)
+                                menuExpanded = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.QueryStats,
+                                    contentDescription = null
+                                )
+                            }
+                        )
+                        DropdownMenuItem(
                             text = { Text(manageSaveDataLabel) },
                             onClick = {
                                 onOpenSaveManager(game.titleId)
@@ -337,7 +377,7 @@ fun LibraryScreen(
             }
         } else {
             items(
-                items = uiState.items.chunked(3),
+                items = uiState.items.chunked(gridColumns),
                 key = { row -> row.firstOrNull()?.titleId ?: row.hashCode().toString() }
             ) { rowItems ->
                 Row(
@@ -370,20 +410,14 @@ fun LibraryScreen(
                                     LibraryGameArtwork(
                                         path = game.iconPath,
                                         title = game.title,
-                                        modifier = Modifier.fillMaxWidth()
+                                        modifier = Modifier.fillMaxWidth(),
+                                        artworkAspectRatio = 1f
                                     )
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Text(
                                             text = game.title,
                                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                             maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = game.titleId,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                     }
@@ -393,6 +427,32 @@ fun LibraryScreen(
                                 expanded = menuExpanded,
                                 onDismissRequest = { menuExpanded = false }
                             ) {
+                                DropdownMenuItem(
+                                    text = { Text(manageGameSettingsLabel) },
+                                    onClick = {
+                                        onOpenGameManager(game.titleId)
+                                        menuExpanded = false
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Tune,
+                                            contentDescription = null
+                                        )
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(playTimeLabel) },
+                                    onClick = {
+                                        onOpenPlayTime(game.titleId)
+                                        menuExpanded = false
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.QueryStats,
+                                            contentDescription = null
+                                        )
+                                    }
+                                )
                                 DropdownMenuItem(
                                     text = { Text(manageSaveDataLabel) },
                                     onClick = {
@@ -422,7 +482,7 @@ fun LibraryScreen(
                             }
                         }
                     }
-                    repeat(3 - rowItems.size) {
+                    repeat(gridColumns - rowItems.size) {
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
@@ -465,7 +525,8 @@ fun LibraryScreen(
 private fun LibraryGameArtwork(
     path: String?,
     title: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    artworkAspectRatio: Float = 2f / 3f
 ) {
     Surface(
         modifier = modifier,
@@ -479,7 +540,7 @@ private fun LibraryGameArtwork(
             fallbackLabel = title,
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(2f / 3f)
+                .aspectRatio(artworkAspectRatio)
         )
     }
 }

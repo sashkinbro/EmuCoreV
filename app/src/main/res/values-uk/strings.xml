@@ -355,7 +355,7 @@
     <string name="emulator_installer_apk_missing">Пакет оновлення не знайдено.</string>
     <string name="emulator_installer_failed">Не вдалося запустити інсталятор.</string>
     <string name="shell_quick_actions">Навігація</string>
-    <string name="shell_setup_section">Налаштування</string>
+    <string name="shell_setup_section">Встановлення</string>
     <string name="shell_library_section">Бібліотека</string>
     <string name="shell_tools_section">Інструменти</string>
     <string name="shell_manage_folders">Керування папками</string>
@@ -630,4 +630,21 @@
     <string name="emulation_menu_section_gamepad">Фізичний геймпад</string>
     <string name="emulation_menu_section_gamepad_desc">Мертва зона, перепризначення, вібрація та поведінка стіків для підключеного контролера.</string>
     <string name="emulation_menu_section_gamepad_disconnected">Підключіть фізичний геймпад, щоб змінити ці налаштування керування.</string>
+    <string name="game_manager_title">Менеджер ігор</string>
+    <string name="game_manager_subtitle">Налаштовуйте графіку, звук, керування та поведінку емулятора для кожної гри.</string>
+    <string name="game_manager_open_for_game">Налаштування гри</string>
+    <string name="game_manager_empty_title">Немає встановлених ігор</string>
+    <string name="game_manager_empty_body">Спочатку встановіть гру, а потім створіть для неї власний профіль тут.</string>
+    <string name="game_manager_choose_game">Вибрати гру</string>
+    <string name="game_manager_profile">Профіль</string>
+    <string name="game_manager_no_game_selected">Гру не вибрано</string>
+    <string name="game_manager_custom_profile">Для цієї гри активні власні налаштування.</string>
+    <string name="game_manager_global_profile">Використовуються глобальні налаштування за замовчуванням, доки ви їх не зміните.</string>
+    <string name="game_manager_reset_global">Використовувати глобальні за замовчуванням</string>
+    <string name="game_manager_reset_short">Скинути</string>
+    <string name="game_manager_system_performance">Система та продуктивність</string>
+    <string name="game_manager_psn_signed_in">Емулювати стан входу в PSN</string>
+    <string name="game_manager_invert_left_x">Інвертувати лівий стік по осі X</string>
+    <string name="game_manager_invert_right_x">Інвертувати правий стік по осі X</string>
+    <string name="nav_game_manager">Менеджер ігор</string>
 </resources>

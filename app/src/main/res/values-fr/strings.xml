@@ -355,7 +355,7 @@
     <string name="emulator_installer_apk_missing">Le paquet de mise à jour n\'a pas été trouvé.</string>
     <string name="emulator_installer_failed">Échec du lancement de l\'installateur.</string>
     <string name="shell_quick_actions">Navigation</string>
-    <string name="shell_setup_section">Configuration</string>
+    <string name="shell_setup_section">Installation</string>
     <string name="shell_library_section">Bibliothèque</string>
     <string name="shell_tools_section">Outils</string>
     <string name="shell_manage_folders">Gérer les dossiers</string>
@@ -630,4 +630,21 @@
     <string name="emulation_menu_section_gamepad">Manette physique</string>
     <string name="emulation_menu_section_gamepad_desc">Zone morte, réattribution, vibrations et comportement des joysticks pour la manette connectée.</string>
     <string name="emulation_menu_section_gamepad_disconnected">Connectez une manette physique pour modifier ces commandes.</string>
+    <string name="game_manager_title">Gestionnaire de jeux</string>
+    <string name="game_manager_subtitle">Ajustez les graphismes, l\'audio, les commandes et le comportement de l\'émulateur par jeu.</string>
+    <string name="game_manager_open_for_game">Paramètres du jeu</string>
+    <string name="game_manager_empty_title">Aucun jeu installé</string>
+    <string name="game_manager_empty_body">Installez d\'abord un jeu, puis créez un profil personnalisé pour celui-ci ici.</string>
+    <string name="game_manager_choose_game">Choisir un jeu</string>
+    <string name="game_manager_profile">Profil</string>
+    <string name="game_manager_no_game_selected">Aucun jeu sélectionné</string>
+    <string name="game_manager_custom_profile">Des paramètres personnalisés sont actifs pour ce jeu.</string>
+    <string name="game_manager_global_profile">Utilisation des paramètres par défaut globaux jusqu\'à ce que vous modifiiez un paramètre.</string>
+    <string name="game_manager_reset_global">Utiliser les paramètres par défaut globaux</string>
+    <string name="game_manager_reset_short">Réinitialiser</string>
+    <string name="game_manager_system_performance">Système et performances</string>
+    <string name="game_manager_psn_signed_in">Émuler l\'état connecté au PSN</string>
+    <string name="game_manager_invert_left_x">Inverser le joystick gauche X</string>
+    <string name="game_manager_invert_right_x">Inverser le joystick droit X</string>
+    <string name="nav_game_manager">Gestionnaire de jeux</string>
 </resources>

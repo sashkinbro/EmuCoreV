@@ -355,7 +355,7 @@
     <string name="emulator_installer_apk_missing">Il pacchetto di aggiornamento non è stato trovato.</string>
     <string name="emulator_installer_failed">Impossibile avviare il programma di installazione.</string>
     <string name="shell_quick_actions">Navigazione</string>
-    <string name="shell_setup_section">Configurazione</string>
+    <string name="shell_setup_section">Installazione</string>
     <string name="shell_library_section">Libreria</string>
     <string name="shell_tools_section">Strumenti</string>
     <string name="shell_manage_folders">Gestisci cartelle</string>
@@ -630,4 +630,21 @@
     <string name="emulation_menu_section_gamepad">Gamepad fisico</string>
     <string name="emulation_menu_section_gamepad_desc">Zona morta, rimappatura, vibrazione e comportamento delle levette per il controller connesso.</string>
     <string name="emulation_menu_section_gamepad_disconnected">Collega un gamepad fisico per modificare questi controlli.</string>
+    <string name="game_manager_title">Gestore giochi</string>
+    <string name="game_manager_subtitle">Regola grafica, audio, controlli e comportamento dell\'emulatore per ogni gioco.</string>
+    <string name="game_manager_open_for_game">Impostazioni gioco</string>
+    <string name="game_manager_empty_title">Nessun gioco installato</string>
+    <string name="game_manager_empty_body">Installa prima un gioco, quindi crea un profilo personalizzato qui.</string>
+    <string name="game_manager_choose_game">Scegli gioco</string>
+    <string name="game_manager_profile">Profilo</string>
+    <string name="game_manager_no_game_selected">Nessun gioco selezionato</string>
+    <string name="game_manager_custom_profile">Le impostazioni personalizzate sono attive per questo gioco.</string>
+    <string name="game_manager_global_profile">Utilizzo delle impostazioni predefinite globali finché non modifichi un\'impostazione.</string>
+    <string name="game_manager_reset_global">Usa predefinite globali</string>
+    <string name="game_manager_reset_short">Ripristina</string>
+    <string name="game_manager_system_performance">Sistema e prestazioni</string>
+    <string name="game_manager_psn_signed_in">Emula lo stato di accesso a PSN</string>
+    <string name="game_manager_invert_left_x">Inverti levetta sinistra X</string>
+    <string name="game_manager_invert_right_x">Inverti levetta destra X</string>
+    <string name="nav_game_manager">Gestore giochi</string>
 </resources>

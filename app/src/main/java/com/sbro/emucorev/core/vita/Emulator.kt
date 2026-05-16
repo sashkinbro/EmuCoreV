@@ -43,6 +43,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.sbro.emucorev.MainActivity
 import com.sbro.emucorev.core.EmulatorStorage
+import com.sbro.emucorev.core.PlayTimeRepository
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.input.InputDeviceClassifier
 import org.libsdl.app.SDLActivity
@@ -52,6 +53,7 @@ import com.jakewharton.processphoenix.ProcessPhoenix
 import com.sbro.emucorev.BuildConfig
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppPreferences
+import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.ui.emulation.EmulationOverlayHost
 import com.sbro.emucorev.ui.theme.EmuCoreVTheme
 import java.io.File
@@ -67,6 +69,9 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var overlayBackHandler: (() -> Boolean)? = null
     private var overlayMenuButtonRevealHandler: (() -> Unit)? = null
     private var menuPaused: Boolean = false
+    private var playTimeSessionId: String? = null
+    private var playTimeSessionTitleId: String = ""
+    private var playTimeSessionStartedAt: Long = 0L
 
     var hasPhysicalGamepad by mutableStateOf(false)
         private set
@@ -76,6 +81,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     @Keep
     fun setCurrentGameId(gameId: String) {
         currentGameId = gameId
+        startPlayTimeSessionIfNeeded()
     }
 
     @Keep
@@ -139,6 +145,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         EmulatorStorage.prepareRuntime(this)
         VitaCoreConfigRepository(this).ensureDefaultsPersisted()
+        startPlayTimeSessionIfNeeded()
         composeOwners = ComposeOwners().also { it.performCreate(savedInstanceState) }
         inputManager = getSystemService(InputManager::class.java)
         hasPhysicalGamepad = detectPhysicalGamepadConnected()
@@ -163,6 +170,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onDestroy() {
+        finishPlayTimeSessionIfNeeded()
         inputManager?.unregisterInputDeviceListener(this)
         inputManager = null
         if (::inputOverlay.isInitialized) {
@@ -349,6 +357,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     fun exitEmulation() {
         if (exitRequested) return
         exitRequested = true
+        finishPlayTimeSessionIfNeeded()
         runOnUiThread {
             overlayBackHandler = null
             overlayMenuButtonRevealHandler = null
@@ -358,6 +367,15 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             }
             ProcessPhoenix.triggerRebirth(applicationContext, homeIntent)
+        }
+    }
+
+    fun currentPlayTimeElapsedMs(): Long {
+        val startedAt = playTimeSessionStartedAt
+        return if (startedAt > 0L) {
+            maxOf(0L, System.currentTimeMillis() - startedAt)
+        } else {
+            0L
         }
     }
 
@@ -484,6 +502,34 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
         )
+    }
+
+    private fun startPlayTimeSessionIfNeeded() {
+        val gameId = currentGameIdOrIntent().trim()
+        if (gameId.isBlank()) return
+        if (playTimeSessionId != null && playTimeSessionTitleId.equals(gameId, ignoreCase = true)) return
+        finishPlayTimeSessionIfNeeded()
+
+        val title = InstalledGameRepository().findByTitleId(this, gameId)
+            ?.title
+            ?.takeIf { it.isNotBlank() && !it.equals(gameId, ignoreCase = true) }
+            ?: runCatching { getRunningGameTitle() }
+                .getOrDefault("")
+                .takeIf { it.isNotBlank() && !it.equals(gameId, ignoreCase = true) }
+            ?: gameId
+
+        val session = PlayTimeRepository(this).startSession(gameId, title) ?: return
+        playTimeSessionId = session.id
+        playTimeSessionTitleId = gameId
+        playTimeSessionStartedAt = session.startedAt
+    }
+
+    private fun finishPlayTimeSessionIfNeeded() {
+        val sessionId = playTimeSessionId ?: return
+        PlayTimeRepository(this).finishSession(sessionId)
+        playTimeSessionId = null
+        playTimeSessionTitleId = ""
+        playTimeSessionStartedAt = 0L
     }
 
     private fun hideSystemBars() {

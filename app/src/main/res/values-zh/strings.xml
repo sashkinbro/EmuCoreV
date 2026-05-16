@@ -355,7 +355,7 @@
     <string name="emulator_installer_apk_missing">找不到更新包。</string>
     <string name="emulator_installer_failed">無法啟動安裝程式。</string>
     <string name="shell_quick_actions">導覽</string>
-    <string name="shell_setup_section">設定</string>
+    <string name="shell_setup_section">安裝</string>
     <string name="shell_library_section">收藏庫</string>
     <string name="shell_tools_section">工具</string>
     <string name="shell_manage_folders">管理資料夾</string>
@@ -629,4 +629,21 @@
     <string name="emulation_menu_section_gamepad">物理手柄</string>
     <string name="emulation_menu_section_gamepad_desc">连接手柄的死区、重映射、振动和摇杆行为。</string>
     <string name="emulation_menu_section_gamepad_disconnected">连接物理手柄以更改这些控制。</string>
+    <string name="game_manager_title">游戏管理器</string>
+    <string name="game_manager_subtitle">为每个游戏调整图形、音频、控制和模拟器行为。</string>
+    <string name="game_manager_open_for_game">游戏设置</string>
+    <string name="game_manager_empty_title">没有已安装的游戏</string>
+    <string name="game_manager_empty_body">请先安装游戏，然后在此处为其创建自定义配置文件。</string>
+    <string name="game_manager_choose_game">选择游戏</string>
+    <string name="game_manager_profile">配置文件</string>
+    <string name="game_manager_no_game_selected">未选择游戏</string>
+    <string name="game_manager_custom_profile">自定义设置已对此游戏生效。</string>
+    <string name="game_manager_global_profile">在您更改设置之前将使用全局默认设置。</string>
+    <string name="game_manager_reset_global">使用全局默认设置</string>
+    <string name="game_manager_reset_short">重置</string>
+    <string name="game_manager_system_performance">系统与性能</string>
+    <string name="game_manager_psn_signed_in">模拟 PSN 登录状态</string>
+    <string name="game_manager_invert_left_x">反转左摇杆 X 轴</string>
+    <string name="game_manager_invert_right_x">反转右摇杆 X 轴</string>
+    <string name="nav_game_manager">游戏管理器</string>
 </resources>

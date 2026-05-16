@@ -7,15 +7,15 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.sbro.emucorev.core.VitaCoreConfig
-import com.sbro.emucorev.core.VitaCoreConfigRepository
+import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.core.vita.Emulator
 
 class InputOverlay(context: Context) {
-    private val appContext = context.applicationContext
-    private val repository = VitaCoreConfigRepository(appContext)
-    private var latestConfig: VitaCoreConfig = repository.load()
-    private var controllerAttached = false
     private val emulator = context as? Emulator
+    private val repository = VitaGameSettingsRepository(context)
+    private var latestConfig: VitaCoreConfig = repository.loadEffective(emulator?.currentGameIdOrIntent().orEmpty())
+    private var controllerAttached = false
+    private var touchControlsRuntimeActive by mutableStateOf(true)
 
     var hasReceivedCoreState by mutableStateOf(false)
         private set
@@ -34,6 +34,9 @@ class InputOverlay(context: Context) {
 
     val effectiveOverlayMask: Int
         get() {
+            if (!touchControlsRuntimeActive) {
+                return 0
+            }
             if (!latestConfig.enableGamepadOverlay) {
                 return 0
             }
@@ -56,6 +59,19 @@ class InputOverlay(context: Context) {
     fun setState(overlayMask: Int) {
         hasReceivedCoreState = true
         coreOverlayMask = overlayMask
+        syncControllerAttachment()
+    }
+
+    fun ensureControllerAttached() {
+        if (effectiveOverlayMask != 0) {
+            attachController()
+            controllerAttached = true
+        }
+    }
+
+    fun setTouchControlsActive(active: Boolean) {
+        if (touchControlsRuntimeActive == active) return
+        touchControlsRuntimeActive = active
         syncControllerAttachment()
     }
 
@@ -95,20 +111,21 @@ class InputOverlay(context: Context) {
         latestConfig = config
         overlayScale = config.overlayScale
         overlayOpacity = config.overlayOpacity.coerceIn(10, 100)
-        repository.save(config)
+        repository.save(emulator?.currentGameIdOrIntent().orEmpty(), config)
         syncControllerAttachment()
     }
 
     private fun syncControllerAttachment() {
         val shouldAttach = effectiveOverlayMask != 0
+        if (shouldAttach) {
+            attachController()
+            controllerAttached = true
+            return
+        }
         if (shouldAttach == controllerAttached) {
             return
         }
-        if (shouldAttach) {
-            attachController()
-        } else {
-            detachController()
-        }
+        detachController()
         controllerAttached = shouldAttach
     }
 

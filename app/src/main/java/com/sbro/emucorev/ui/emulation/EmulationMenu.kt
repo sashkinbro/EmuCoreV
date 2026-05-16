@@ -179,6 +179,7 @@ fun EmulationGameMenu(
     gameId: String,
     config: VitaCoreConfig,
     paused: Boolean,
+    sessionElapsedMs: Long,
     expandHorizontally: Boolean,
     physicalGamepadConnected: Boolean,
     callbacks: EmulationMenuCallbacks,
@@ -238,7 +239,11 @@ fun EmulationGameMenu(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 when (selectedTab) {
-                    EmulationMenuTab.Game -> GameTab(config = config, callbacks = callbacks)
+                    EmulationMenuTab.Game -> GameTab(
+                        config = config,
+                        sessionElapsedMs = sessionElapsedMs,
+                        callbacks = callbacks
+                    )
                     EmulationMenuTab.Controls -> ControlsTab(config = config, callbacks = callbacks)
                     EmulationMenuTab.Display -> DisplayTab(config = config, callbacks = callbacks)
                     EmulationMenuTab.System -> SystemTab(config = config, callbacks = callbacks)
@@ -263,12 +268,20 @@ private enum class EmulationMenuTab {
 }
 
 @Composable
-private fun GameTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks) {
+private fun GameTab(
+    config: VitaCoreConfig,
+    sessionElapsedMs: Long,
+    callbacks: EmulationMenuCallbacks
+) {
     MenuSection(
         title = stringResource(R.string.emulation_menu_section_now),
         subtitle = stringResource(R.string.emulation_menu_section_now_desc),
         badge = MenuBadge.Live
     ) {
+        MenuInfoRow(
+            label = stringResource(R.string.play_time_current_session),
+            value = formatPlayDuration(sessionElapsedMs)
+        )
         MenuToggleRow(
             label = stringResource(R.string.settings_core_performance_overlay),
             checked = config.performanceOverlay,
@@ -326,6 +339,46 @@ private fun GameTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks) {
             checked = config.showTouchpadCursor,
             onCheckedChange = callbacks.onTouchpadCursor
         )
+    }
+}
+
+@Composable
+private fun MenuInfoRow(
+    label: String,
+    value: String
+) {
+    val palette = emulationMenuPalette()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.row)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = palette.textPrimary,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+private fun formatPlayDuration(durationMs: Long): String {
+    val totalSeconds = (durationMs / 1_000L).coerceAtLeast(0L)
+    val hours = totalSeconds / 3_600L
+    val minutes = (totalSeconds % 3_600L) / 60L
+    val seconds = totalSeconds % 60L
+    return when {
+        hours > 0L -> "${hours}h ${minutes.toString().padStart(2, '0')}m"
+        minutes > 0L -> "${minutes}m ${seconds.toString().padStart(2, '0')}s"
+        else -> "${seconds}s"
     }
 }
 
