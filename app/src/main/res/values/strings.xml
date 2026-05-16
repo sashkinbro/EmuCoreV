@@ -116,6 +116,7 @@
     <string name="play_time_recent_sessions">Sessions</string>
     <string name="play_time_no_sessions_title">No play time yet</string>
     <string name="play_time_no_sessions_body">Launch a game and your play sessions will appear here.</string>
+    <string name="play_time_no_game_sessions_body">This game has not been played yet. Launch it and its play sessions will appear here.</string>
     <string name="detail_title">Game details</string>
     <string name="detail_subtitle">Game info, media, and launch options.</string>
     <string name="detail_title_id">Title ID</string>

@@ -647,4 +647,19 @@
     <string name="game_manager_invert_left_x">Inverti levetta sinistra X</string>
     <string name="game_manager_invert_right_x">Inverti levetta destra X</string>
     <string name="nav_game_manager">Gestore giochi</string>
+    <string name="nav_play_time">Tempo di gioco</string>
+    <string name="play_time_title">Tempo di gioco</string>
+    <string name="play_time_open_for_game">Tempo di gioco</string>
+    <string name="play_time_current_session">Sessione corrente</string>
+    <string name="play_time_filter_game">Scegli gioco</string>
+    <string name="play_time_all_games">Tutti i giochi</string>
+    <string name="play_time_total_time">Tempo totale</string>
+    <string name="play_time_sessions">Sessioni</string>
+    <string name="play_time_games_played">Giochi giocati</string>
+    <string name="play_time_daily_chart">Ultimi 14 giorni</string>
+    <string name="play_time_games_chart">Tempo per gioco</string>
+    <string name="play_time_recent_sessions">Sessioni</string>
+    <string name="play_time_no_sessions_title">Nessun tempo di gioco per ora</string>
+    <string name="play_time_no_sessions_body">Avvia un gioco e le tue sessioni di gioco appariranno qui.</string>
+    <string name="play_time_no_game_sessions_body">Questo gioco non è ancora stato giocato. Avvialo e le sue sessioni di gioco appariranno qui.</string>
 </resources>

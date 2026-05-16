@@ -647,4 +647,19 @@
     <string name="game_manager_invert_left_x">Linken Stick X invertieren</string>
     <string name="game_manager_invert_right_x">Rechten Stick X invertieren</string>
     <string name="nav_game_manager">Game Manager</string>
+    <string name="nav_play_time">Spielzeit</string>
+    <string name="play_time_title">Spielzeit</string>
+    <string name="play_time_open_for_game">Spielzeit</string>
+    <string name="play_time_current_session">Aktuelle Sitzung</string>
+    <string name="play_time_filter_game">Spiel auswählen</string>
+    <string name="play_time_all_games">Alle Spiele</string>
+    <string name="play_time_total_time">Gesamtzeit</string>
+    <string name="play_time_sessions">Sitzungen</string>
+    <string name="play_time_games_played">Gespielte Spiele</string>
+    <string name="play_time_daily_chart">Letzte 14 Tage</string>
+    <string name="play_time_games_chart">Zeit nach Spiel</string>
+    <string name="play_time_recent_sessions">Sitzungen</string>
+    <string name="play_time_no_sessions_title">Noch keine Spielzeit</string>
+    <string name="play_time_no_sessions_body">Starten Sie ein Spiel und Ihre Spielsitzungen werden hier angezeigt.</string>
+    <string name="play_time_no_game_sessions_body">Dieses Spiel wurde noch nicht gespielt. Starten Sie es und seine Spielsitzungen werden hier angezeigt.</string>
 </resources>

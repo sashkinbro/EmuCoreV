@@ -647,4 +647,19 @@
     <string name="game_manager_invert_left_x">लेफ्ट स्टिक X उल्टा करें</string>
     <string name="game_manager_invert_right_x">राइट स्टिक X उल्टा करें</string>
     <string name="nav_game_manager">गेम मैनेजर</string>
+    <string name="nav_play_time">खेलने का समय</string>
+    <string name="play_time_title">खेलने का समय</string>
+    <string name="play_time_open_for_game">खेलने का समय</string>
+    <string name="play_time_current_session">वर्तमान सत्र</string>
+    <string name="play_time_filter_game">गेम चुनें</string>
+    <string name="play_time_all_games">सभी गेम</string>
+    <string name="play_time_total_time">कुल समय</string>
+    <string name="play_time_sessions">सत्र</string>
+    <string name="play_time_games_played">खेले गए गेम</string>
+    <string name="play_time_daily_chart">पिछले 14 दिन</string>
+    <string name="play_time_games_chart">गेम के अनुसार समय</string>
+    <string name="play_time_recent_sessions">सत्र</string>
+    <string name="play_time_no_sessions_title">अभी तक खेलने का कोई समय नहीं</string>
+    <string name="play_time_no_sessions_body">एक गेम लॉन्च करें और आपके खेलने के सत्र यहां दिखाई देंगे।</string>
+    <string name="play_time_no_game_sessions_body">यह गेम अभी तक नहीं खेला गया है। इसे लॉन्च करें और इसके खेलने के सत्र यहां दिखाई देंगे।</string>
 </resources>

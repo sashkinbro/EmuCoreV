@@ -647,4 +647,19 @@
     <string name="game_manager_invert_left_x">Инвертировать левый стик по оси X</string>
     <string name="game_manager_invert_right_x">Инвертировать правый стик по оси X</string>
     <string name="nav_game_manager">Менеджер игр</string>
+    <string name="nav_play_time">Время в игре</string>
+    <string name="play_time_title">Время в игре</string>
+    <string name="play_time_open_for_game">Время в игре</string>
+    <string name="play_time_current_session">Текущая сессия</string>
+    <string name="play_time_filter_game">Выбрать игру</string>
+    <string name="play_time_all_games">Все игры</string>
+    <string name="play_time_total_time">Общее время</string>
+    <string name="play_time_sessions">Сессии</string>
+    <string name="play_time_games_played">Игр сыграно</string>
+    <string name="play_time_daily_chart">Последние 14 дней</string>
+    <string name="play_time_games_chart">Время по играм</string>
+    <string name="play_time_recent_sessions">Сессии</string>
+    <string name="play_time_no_sessions_title">Пока нет времени в игре</string>
+    <string name="play_time_no_sessions_body">Запустите игру, и ваши игровые сессии появятся здесь.</string>
+    <string name="play_time_no_game_sessions_body">В эту игру еще не играли. Запустите ее, и игровые сессии появятся здесь.</string>
 </resources>

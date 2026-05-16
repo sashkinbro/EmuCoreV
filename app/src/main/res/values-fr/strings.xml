@@ -647,4 +647,19 @@
     <string name="game_manager_invert_left_x">Inverser le joystick gauche X</string>
     <string name="game_manager_invert_right_x">Inverser le joystick droit X</string>
     <string name="nav_game_manager">Gestionnaire de jeux</string>
+    <string name="nav_play_time">Temps de jeu</string>
+    <string name="play_time_title">Temps de jeu</string>
+    <string name="play_time_open_for_game">Temps de jeu</string>
+    <string name="play_time_current_session">Session en cours</string>
+    <string name="play_time_filter_game">Choisir un jeu</string>
+    <string name="play_time_all_games">Tous les jeux</string>
+    <string name="play_time_total_time">Temps total</string>
+    <string name="play_time_sessions">Sessions</string>
+    <string name="play_time_games_played">Jeux joués</string>
+    <string name="play_time_daily_chart">14 derniers jours</string>
+    <string name="play_time_games_chart">Temps par jeu</string>
+    <string name="play_time_recent_sessions">Sessions</string>
+    <string name="play_time_no_sessions_title">Aucun temps de jeu pour l\'instant</string>
+    <string name="play_time_no_sessions_body">Lancez un jeu et vos sessions de jeu apparaîtront ici.</string>
+    <string name="play_time_no_game_sessions_body">Ce jeu n\'a pas encore été joué. Lancez-le et ses sessions de jeu apparaîtront ici.</string>
 </resources>

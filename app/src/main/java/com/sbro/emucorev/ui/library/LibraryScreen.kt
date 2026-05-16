@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -62,8 +63,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -98,7 +100,8 @@ fun LibraryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val configuration = LocalConfiguration.current
+    val windowInfo = LocalWindowInfo.current
+    val density = LocalDensity.current
     val refreshClick = rememberDebouncedClick(onClick = viewModel::refresh)
     var layoutMode by rememberSaveable { mutableStateOf(LibraryLayoutMode.LIST) }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
@@ -116,10 +119,11 @@ fun LibraryScreen(
     val deleteGameConfirmTitle = stringResource(R.string.detail_delete_game_confirm_title)
     val deleteGameConfirmBody = stringResource(R.string.detail_delete_game_confirm_body)
     val deleteGameFailedMessage = stringResource(R.string.detail_delete_game_failed)
+    val containerWidthDp = with(density) { windowInfo.containerSize.width.toDp() }
     val gridColumns = when {
-        configuration.screenWidthDp >= 1100 -> 6
-        configuration.screenWidthDp >= 840 -> 5
-        configuration.screenWidthDp >= 600 -> 4
+        containerWidthDp >= 1100.dp -> 6
+        containerWidthDp >= 840.dp -> 5
+        containerWidthDp >= 600.dp -> 4
         else -> 2
     }
 
@@ -414,12 +418,19 @@ fun LibraryScreen(
                                         artworkAspectRatio = 1f
                                     )
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(42.dp),
+                                            contentAlignment = Alignment.BottomStart
+                                        ) {
                                         Text(
                                             text = game.title,
                                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis
                                         )
+                                        }
                                     }
                                 }
                             }

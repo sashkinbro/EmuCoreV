@@ -36,7 +36,7 @@ class VitaCompatibilityRepository(context: Context) {
         compatibilityDir.mkdirs()
         val localMeta = readMeta()
         val localSnapshot = loadLocalSnapshot(localMeta)
-        val shouldRefresh = localSnapshot == null || (System.currentTimeMillis() - localMeta.lastCheckedAtMs) >= refreshIntervalMs
+        val shouldRefresh = localSnapshot == null || (System.currentTimeMillis() - localMeta.lastCheckedAtMs) >= REFRESH_INTERVAL_MS
         val refreshedSnapshot = if (shouldRefresh) {
             downloadLatestSnapshot() ?: localSnapshot?.also { writeMeta(localMeta.copy(lastCheckedAtMs = System.currentTimeMillis(), dbUpdatedAt = it.databaseUpdatedAt)) }
         } else {
@@ -116,7 +116,7 @@ class VitaCompatibilityRepository(context: Context) {
     }
 
     private fun downloadZip(target: File) {
-        val connection = openConnection(compatibilityZipUrl)
+        val connection = openConnection(COMPATIBILITY_ZIP_URL)
         connection.inputStream.use { input ->
             FileOutputStream(target).use { output -> input.copyTo(output) }
         }
@@ -126,7 +126,7 @@ class VitaCompatibilityRepository(context: Context) {
     }
 
     private fun downloadJson(target: File) {
-        val connection = openConnection(compatibilityApiUrl)
+        val connection = openConnection(COMPATIBILITY_API_URL)
         connection.inputStream.use { input ->
             FileOutputStream(target).use { output -> input.copyTo(output) }
         }
@@ -344,32 +344,32 @@ class VitaCompatibilityRepository(context: Context) {
     }
 
     companion object {
-        private const val compatibilityZipUrl =
+        private const val COMPATIBILITY_ZIP_URL =
             "https://github.com/Vita3K/compatibility/releases/download/compat_db/app_compat_db.xml.zip"
-        private const val compatibilityApiUrl = "https://vita3k-api.pedro.moe/list/commercial"
-        private const val refreshIntervalMs = 12L * 60L * 60L * 1000L
+        private const val COMPATIBILITY_API_URL = "https://vita3k-api.pedro.moe/list/commercial"
+        private const val REFRESH_INTERVAL_MS = 12L * 60L * 60L * 1000L
         private val lock = Any()
 
         @Volatile
         private var cachedSnapshot: VitaCompatibilitySnapshot? = null
 
-        private const val labelNothing = 1260231569L
-        private const val labelBootable = 1344750319L
-        private const val labelIntro = 1260231381L
-        private const val labelMenu = 1344751053L
-        private const val labelIngameLess = 1344752299L
-        private const val labelIngameMore = 1260231985L
-        private const val labelPlayable = 920344019L
+        private const val LABEL_NOTHING = 1260231569L
+        private const val LABEL_BOOTABLE = 1344750319L
+        private const val LABEL_INTRO = 1260231381L
+        private const val LABEL_MENU = 1344751053L
+        private const val LABEL_INGAME_LESS = 1344752299L
+        private const val LABEL_INGAME_MORE = 1260231985L
+        private const val LABEL_PLAYABLE = 920344019L
 
         private fun List<Long>.toCompatibilityState(): VitaCompatibilityState {
             return when {
-                contains(labelPlayable) -> VitaCompatibilityState.PLAYABLE
-                contains(labelIngameMore) -> VitaCompatibilityState.INGAME_MORE
-                contains(labelIngameLess) -> VitaCompatibilityState.INGAME_LESS
-                contains(labelMenu) -> VitaCompatibilityState.MENU
-                contains(labelIntro) -> VitaCompatibilityState.INTRO
-                contains(labelBootable) -> VitaCompatibilityState.BOOTABLE
-                contains(labelNothing) -> VitaCompatibilityState.NOTHING
+                contains(LABEL_PLAYABLE) -> VitaCompatibilityState.PLAYABLE
+                contains(LABEL_INGAME_MORE) -> VitaCompatibilityState.INGAME_MORE
+                contains(LABEL_INGAME_LESS) -> VitaCompatibilityState.INGAME_LESS
+                contains(LABEL_MENU) -> VitaCompatibilityState.MENU
+                contains(LABEL_INTRO) -> VitaCompatibilityState.INTRO
+                contains(LABEL_BOOTABLE) -> VitaCompatibilityState.BOOTABLE
+                contains(LABEL_NOTHING) -> VitaCompatibilityState.NOTHING
                 else -> VitaCompatibilityState.UNKNOWN
             }
         }
