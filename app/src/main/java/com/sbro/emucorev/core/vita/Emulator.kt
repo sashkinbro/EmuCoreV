@@ -152,6 +152,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         composeOwners.handleResume()
         hideSystemBars()
         if (menuPaused) {
+            setAppSessionMenuPaused(true)
             pauseNativeThread()
         }
     }
@@ -175,6 +176,10 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && menuPaused) {
+            setAppSessionMenuPaused(true)
+            pauseNativeThread()
+        }
         if (hasFocus) {
             hideSystemBars()
         }
@@ -323,9 +328,16 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
      */
     external fun requestScreenshot(): Boolean
 
+    /** Pause/resume the active Vita3K app session through the upstream session controller. */
+    external fun setAppSessionMenuPaused(paused: Boolean): Boolean
+
+    /** Best-effort runtime title for the active Vita3K app session. */
+    external fun getRunningGameTitle(): String
+
     fun setMenuPaused(paused: Boolean) {
         if (menuPaused == paused) return
         menuPaused = paused
+        setAppSessionMenuPaused(paused)
         if (paused) {
             pauseNativeThread()
         } else {
