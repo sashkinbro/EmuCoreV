@@ -60,6 +60,10 @@
     <string name="library_search_hint">Search installed games</string>
     <string name="library_empty_title">No games found</string>
     <string name="library_empty_body">Install games on the Games screen, then refresh the library.</string>
+    <string name="library_add_shortcut">Add shortcut to home screen</string>
+    <string name="library_shortcut_requested">Shortcut request sent.</string>
+    <string name="library_shortcut_unsupported">This launcher does not support pinned shortcuts.</string>
+    <string name="library_shortcut_failed">Failed to create shortcut.</string>
     <string name="detail_launch">Launch game</string>
     <string name="detail_delete_game">Delete game</string>
     <string name="detail_delete_game_confirm_title">Delete installed game?</string>
@@ -367,6 +371,7 @@
     <string name="settings_app_language_hindi">Hindi</string>
     <string name="settings_app_language_italian">Italian</string>
     <string name="settings_app_language_turkish">Turkish</string>
+    <string name="settings_app_language_arabic">Arabic</string>
     <string name="settings_language_picker_title">Language</string>
     <string name="settings_system_language">Vita system language</string>
     <string name="settings_help_system_language">Sets the language reported to the emulated Vita system.\n\nUse this to match the app or emulated Vita language to the games you play. Leave System/default when you want Android or the game to choose automatically.</string>

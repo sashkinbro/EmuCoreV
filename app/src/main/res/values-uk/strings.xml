@@ -662,4 +662,9 @@
     <string name="play_time_no_sessions_title">Ще немає часу в грі</string>
     <string name="play_time_no_sessions_body">Запустіть гру, і ваші ігрові сеанси з\'являться тут.</string>
     <string name="play_time_no_game_sessions_body">У цю гру ще не грали. Запустіть її, і її ігрові сеанси з\'являться тут.</string>
+    <string name="library_add_shortcut">Додати ярлик на головний екран</string>
+    <string name="library_shortcut_requested">Запит на створення ярлика надіслано.</string>
+    <string name="library_shortcut_unsupported">Цей лаунчер не підтримує закріплені ярлики.</string>
+    <string name="library_shortcut_failed">Не вдалося створити ярлик.</string>
+    <string name="settings_app_language_arabic">Арабська</string>
 </resources>

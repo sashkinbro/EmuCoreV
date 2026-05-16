@@ -662,4 +662,9 @@
     <string name="play_time_no_sessions_title">Noch keine Spielzeit</string>
     <string name="play_time_no_sessions_body">Starten Sie ein Spiel und Ihre Spielsitzungen werden hier angezeigt.</string>
     <string name="play_time_no_game_sessions_body">Dieses Spiel wurde noch nicht gespielt. Starten Sie es und seine Spielsitzungen werden hier angezeigt.</string>
+    <string name="library_add_shortcut">Verknüpfung zum Startbildschirm hinzufügen</string>
+    <string name="library_shortcut_requested">Verknüpfungsanfrage gesendet.</string>
+    <string name="library_shortcut_unsupported">Dieser Launcher unterstützt keine angehefteten Verknüpfungen.</string>
+    <string name="library_shortcut_failed">Verknüpfung konnte nicht erstellt werden.</string>
+    <string name="settings_app_language_arabic">Arabisch</string>
 </resources>
