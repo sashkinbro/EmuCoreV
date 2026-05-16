@@ -647,4 +647,19 @@
     <string name="game_manager_invert_left_x">Sol analog X eksenini ters çevir</string>
     <string name="game_manager_invert_right_x">Sağ analog X eksenini ters çevir</string>
     <string name="nav_game_manager">Oyun Yöneticisi</string>
+    <string name="nav_play_time">Oynama Süresi</string>
+    <string name="play_time_title">Oynama Süresi</string>
+    <string name="play_time_open_for_game">Oynama süresi</string>
+    <string name="play_time_current_session">Geçerli oturum</string>
+    <string name="play_time_filter_game">Oyun seç</string>
+    <string name="play_time_all_games">Tüm oyunlar</string>
+    <string name="play_time_total_time">Toplam süre</string>
+    <string name="play_time_sessions">Oturumlar</string>
+    <string name="play_time_games_played">Oynanan oyunlar</string>
+    <string name="play_time_daily_chart">Son 14 gün</string>
+    <string name="play_time_games_chart">Oyuna göre süre</string>
+    <string name="play_time_recent_sessions">Oturumlar</string>
+    <string name="play_time_no_sessions_title">Henüz oynama süresi yok</string>
+    <string name="play_time_no_sessions_body">Bir oyun başlatın ve oynama oturumlarınız burada görünecektir.</string>
+    <string name="play_time_no_game_sessions_body">Bu oyun henüz oynanmadı. Başlatın ve oynama oturumları burada görünecektir.</string>
 </resources>

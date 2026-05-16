@@ -647,4 +647,19 @@
     <string name="game_manager_invert_left_x">Інвертувати лівий стік по осі X</string>
     <string name="game_manager_invert_right_x">Інвертувати правий стік по осі X</string>
     <string name="nav_game_manager">Менеджер ігор</string>
+    <string name="nav_play_time">Час у грі</string>
+    <string name="play_time_title">Час у грі</string>
+    <string name="play_time_open_for_game">Час у грі</string>
+    <string name="play_time_current_session">Поточний сеанс</string>
+    <string name="play_time_filter_game">Вибрати гру</string>
+    <string name="play_time_all_games">Усі ігри</string>
+    <string name="play_time_total_time">Загальний час</string>
+    <string name="play_time_sessions">Сеанси</string>
+    <string name="play_time_games_played">Ігор зіграно</string>
+    <string name="play_time_daily_chart">Останні 14 днів</string>
+    <string name="play_time_games_chart">Час за іграми</string>
+    <string name="play_time_recent_sessions">Сеанси</string>
+    <string name="play_time_no_sessions_title">Ще немає часу в грі</string>
+    <string name="play_time_no_sessions_body">Запустіть гру, і ваші ігрові сеанси з\'являться тут.</string>
+    <string name="play_time_no_game_sessions_body">У цю гру ще не грали. Запустіть її, і її ігрові сеанси з\'являться тут.</string>
 </resources>

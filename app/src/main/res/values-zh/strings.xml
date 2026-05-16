@@ -646,4 +646,19 @@
     <string name="game_manager_invert_left_x">反转左摇杆 X 轴</string>
     <string name="game_manager_invert_right_x">反转右摇杆 X 轴</string>
     <string name="nav_game_manager">游戏管理器</string>
+    <string name="nav_play_time">游玩时间</string>
+    <string name="play_time_title">游玩时间</string>
+    <string name="play_time_open_for_game">游玩时间</string>
+    <string name="play_time_current_session">当前会话</string>
+    <string name="play_time_filter_game">选择游戏</string>
+    <string name="play_time_all_games">所有游戏</string>
+    <string name="play_time_total_time">总时间</string>
+    <string name="play_time_sessions">会话</string>
+    <string name="play_time_games_played">游玩的游戏</string>
+    <string name="play_time_daily_chart">过去 14 天</string>
+    <string name="play_time_games_chart">按游戏统计时间</string>
+    <string name="play_time_recent_sessions">会话</string>
+    <string name="play_time_no_sessions_title">暂无游玩时间</string>
+    <string name="play_time_no_sessions_body">启动游戏后，您的游玩会话将显示在此处。</string>
+    <string name="play_time_no_game_sessions_body">此游戏尚未游玩过。启动它，其游玩会话将显示在此处。</string>
 </resources>

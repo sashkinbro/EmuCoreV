@@ -40,9 +40,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,7 +62,6 @@ import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
 import java.text.DateFormat
 import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -83,8 +84,6 @@ fun PlayTimeScreen(
             .background(MaterialTheme.colorScheme.background)
             .navigationBarsPadding(),
         contentPadding = PaddingValues(
-            start = ScreenHorizontalPadding,
-            end = ScreenHorizontalPadding,
             top = topInset,
             bottom = ScreenContentBottomPadding
         ),
@@ -94,7 +93,8 @@ fun PlayTimeScreen(
             PlayTimeTopBar(
                 onMenuClick = onMenuClick,
                 onBackClick = onBackClick,
-                onRefreshClick = { viewModel.refresh(uiState.selectedTitleId ?: focusTitleId) }
+                onRefreshClick = { viewModel.refresh(uiState.selectedTitleId ?: focusTitleId) },
+                modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
             )
         }
 
@@ -120,26 +120,49 @@ fun PlayTimeScreen(
             }
 
             item {
-                SummaryGrid(uiState = uiState)
+                SummaryGrid(
+                    uiState = uiState,
+                    modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
+                )
             }
 
-            if (uiState.sessions.isEmpty()) {
-                item { EmptyPlayTimeState() }
+            if (uiState.visibleSessions.isEmpty()) {
+                item {
+                    EmptyPlayTimeState(
+                        body = stringResource(
+                            if (uiState.selectedTitleId == null) {
+                                R.string.play_time_no_sessions_body
+                            } else {
+                                R.string.play_time_no_game_sessions_body
+                            }
+                        ),
+                        modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
+                    )
+                }
             } else {
                 if (uiState.selectedTitleId == null) {
                     item {
-                        PlayTimeSection(title = stringResource(R.string.play_time_daily_chart)) {
+                        PlayTimeSection(
+                            title = stringResource(R.string.play_time_daily_chart),
+                            modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
+                        ) {
                             DayChart(days = uiState.dayStats)
                         }
                     }
                     item {
-                        PlayTimeSection(title = stringResource(R.string.play_time_games_chart)) {
+                        PlayTimeSection(
+                            title = stringResource(R.string.play_time_games_chart),
+                            modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
+                        ) {
                             GameTotalsChart(games = uiState.gameStats.filter { it.totalMs > 0L }.take(6))
                         }
                     }
                 }
                 item {
-                    PlayTimeSection(title = stringResource(R.string.play_time_recent_sessions)) {
+                    PlayTimeSection(
+                        title = stringResource(R.string.play_time_recent_sessions),
+                        modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
+                    ) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             uiState.visibleSessions.take(18).forEach { session ->
                                 SessionRow(session = session)
@@ -156,10 +179,11 @@ fun PlayTimeScreen(
 private fun PlayTimeTopBar(
     onMenuClick: (() -> Unit)?,
     onBackClick: (() -> Unit)?,
-    onRefreshClick: () -> Unit
+    onRefreshClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -202,9 +226,13 @@ private fun GameSelector(
         Text(
             text = stringResource(R.string.play_time_filter_game),
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onBackground
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(horizontal = ScreenHorizontalPadding)
+        ) {
             if (showAllGames) {
                 item {
                     FilterChip(
@@ -282,9 +310,12 @@ private fun GameSelectorCard(
 }
 
 @Composable
-private fun SummaryGrid(uiState: PlayTimeUiState) {
+private fun SummaryGrid(
+    uiState: PlayTimeUiState,
+    modifier: Modifier = Modifier
+) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         SummaryTile(
@@ -349,9 +380,13 @@ private fun SummaryTile(
 @Composable
 private fun PlayTimeSection(
     title: String,
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
@@ -470,7 +505,9 @@ private fun GameTotalsChart(games: List<PlayTimeGameStats>) {
 
 @Composable
 private fun SessionRow(session: PlayTimeSession) {
-    val dateFormat = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, Locale.getDefault())
+    val configuration = LocalConfiguration.current
+    val locale = remember(configuration) { configuration.locales.get(0) }
+    val dateFormat = remember(locale) { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale) }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -513,9 +550,12 @@ private fun SessionRow(session: PlayTimeSession) {
 }
 
 @Composable
-private fun EmptyPlayTimeState() {
+private fun EmptyPlayTimeState(
+    body: String = stringResource(R.string.play_time_no_sessions_body),
+    modifier: Modifier = Modifier
+) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
@@ -537,7 +577,7 @@ private fun EmptyPlayTimeState() {
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
             )
             Text(
-                text = stringResource(R.string.play_time_no_sessions_body),
+                text = body,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
