@@ -24,7 +24,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Games
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.QueryStats
@@ -293,12 +292,6 @@ private fun SideNavigation(
         onCloseDrawer()
         onNavigateSettings()
     }
-    val openManageFolders = onOpenManageFolders?.let {
-        rememberDebouncedClick {
-            onCloseDrawer()
-            it()
-        }
-    }
     val installFirmware = onInstallFirmware?.let {
         rememberDebouncedClick {
             onCloseDrawer()
@@ -421,13 +414,6 @@ private fun SideNavigation(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 4.dp)
                 )
-                if (openManageFolders != null) {
-                    ShellAction(
-                        icon = Icons.Rounded.FolderOpen,
-                        label = stringResource(R.string.shell_manage_folders),
-                        onClick = openManageFolders
-                    )
-                }
                 ShellItem(
                     icon = Icons.Rounded.Tune,
                     label = stringResource(R.string.nav_game_manager),
