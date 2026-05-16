@@ -62,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -417,8 +418,10 @@ private fun EmptySaveState(
             Text(
                 text = focusTitle?.let { stringResource(R.string.save_manager_empty_game_title, it) }
                     ?: stringResource(R.string.save_manager_empty_title),
+                modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onBackground
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center
             )
             Text(
                 text = if (focusTitle != null) {
@@ -426,8 +429,10 @@ private fun EmptySaveState(
                 } else {
                     stringResource(R.string.save_manager_empty_body)
                 },
+                modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
             Button(onClick = onImportClick) {
                 Icon(Icons.Rounded.FolderOpen, contentDescription = null)
