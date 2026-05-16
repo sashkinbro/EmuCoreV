@@ -293,7 +293,15 @@ fun EmulationOverlayHost(
             onShowShaderNotice = { enabled -> persistConfig { it.copy(showCompileShaders = enabled) } },
             onPstvMode = { enabled -> persistConfig { it.copy(pstvMode = enabled) } },
             onShowWelcome = { enabled -> persistConfig { it.copy(showWelcome = enabled) } },
-            onWarnMissingFirmware = { enabled -> persistConfig { it.copy(warnMissingFirmware = enabled) } }
+            onWarnMissingFirmware = { enabled -> persistConfig { it.copy(warnMissingFirmware = enabled) } },
+            onGamepadDeadzone = { value -> persistConfig { it.copy(gamepadDeadzone = value) } },
+            onGamepadAnalogMultiplier = { value -> persistConfig { it.copy(analogMultiplier = value) } },
+            onGamepadTriggerThreshold = { value -> persistConfig { it.copy(gamepadTriggerThreshold = value) } },
+            onGamepadButtonProfile = { value -> persistConfig { it.copy(gamepadButtonProfile = value) } },
+            onGamepadVibration = { enabled -> persistConfig { it.copy(gamepadVibration = enabled) } },
+            onGamepadSwapSticks = { enabled -> persistConfig { it.copy(gamepadSwapSticks = enabled) } },
+            onGamepadInvertLeftY = { enabled -> persistConfig { it.copy(gamepadInvertLeftY = enabled) } },
+            onGamepadInvertRightY = { enabled -> persistConfig { it.copy(gamepadInvertRightY = enabled) } }
         )
 
         AnimatedVisibility(
@@ -344,6 +352,7 @@ fun EmulationOverlayHost(
                 config = config,
                 paused = effectivePaused,
                 expandHorizontally = useSidePanel,
+                physicalGamepadConnected = hasPhysicalGamepad,
                 callbacks = menuCallbacks
             )
         }

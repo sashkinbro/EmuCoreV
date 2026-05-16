@@ -40,9 +40,11 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.view.InputDevice
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.VitaCoreConfig
+import com.sbro.emucorev.core.input.InputDeviceClassifier
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.ui.common.SectionCard
 
@@ -415,12 +417,43 @@ private fun OverlayTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewM
 
 @Composable
 private fun ControlsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel) {
+    val gamepadConnected = remember {
+        InputDevice.getDeviceIds().any { id ->
+            InputDeviceClassifier.isPhysicalGameController(InputDevice.getDevice(id))
+        }
+    }
     SectionCard(title = stringResource(R.string.settings_tab_controls), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Toggle(stringResource(R.string.settings_core_touchpad_cursor), stringResource(R.string.settings_help_touchpad_cursor), uiState.coreConfig.showTouchpadCursor, { enabled -> viewModel.updateCoreSettings { it.copy(showTouchpadCursor = enabled) } }, { viewModel.updateCoreSettings { it.copy(showTouchpadCursor = defaults.showTouchpadCursor) } })
         Toggle(stringResource(R.string.settings_core_disable_motion), stringResource(R.string.settings_help_disable_motion), uiState.coreConfig.disableMotion, { enabled -> viewModel.updateCoreSettings { it.copy(disableMotion = enabled) } }, { viewModel.updateCoreSettings { it.copy(disableMotion = defaults.disableMotion) } })
         SliderRow(stringResource(R.string.settings_core_analog_multiplier_label), stringResource(R.string.settings_help_analog_multiplier), stringResource(R.string.settings_core_analog_multiplier_value, uiState.coreConfig.analogMultiplier), { viewModel.updateCoreSettings { it.copy(analogMultiplier = defaults.analogMultiplier) } }) {
             Slider(value = uiState.coreConfig.analogMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(analogMultiplier = (value * 10).toInt() / 10f) } }, valueRange = 0.5f..2f, steps = 14)
         }
+    }
+    SectionCard(title = stringResource(R.string.settings_gamepad_section), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
+        Text(
+            text = stringResource(
+                if (gamepadConnected) R.string.settings_gamepad_connected
+                else R.string.settings_gamepad_disconnected
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
+        )
+        SliderRow(stringResource(R.string.settings_gamepad_deadzone), stringResource(R.string.settings_help_gamepad_deadzone), stringResource(R.string.settings_gamepad_percent_value, (uiState.coreConfig.gamepadDeadzone * 100f).toInt()), { viewModel.updateCoreSettings { it.copy(gamepadDeadzone = defaults.gamepadDeadzone) } }) {
+            Slider(enabled = gamepadConnected, value = uiState.coreConfig.gamepadDeadzone, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadDeadzone = (value * 100).toInt() / 100f) } }, valueRange = 0f..0.45f, steps = 8)
+        }
+        SliderRow(stringResource(R.string.settings_gamepad_trigger_threshold), stringResource(R.string.settings_help_gamepad_trigger_threshold), stringResource(R.string.settings_gamepad_percent_value, (uiState.coreConfig.gamepadTriggerThreshold * 100f).toInt()), { viewModel.updateCoreSettings { it.copy(gamepadTriggerThreshold = defaults.gamepadTriggerThreshold) } }) {
+            Slider(enabled = gamepadConnected, value = uiState.coreConfig.gamepadTriggerThreshold, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadTriggerThreshold = (value * 100).toInt() / 100f) } }, valueRange = 0f..0.9f, steps = 8)
+        }
+        Chips(stringResource(R.string.settings_gamepad_button_profile), stringResource(R.string.settings_help_gamepad_button_profile), { viewModel.updateCoreSettings { it.copy(gamepadButtonProfile = defaults.gamepadButtonProfile) } }) {
+            TextChip(VitaCoreConfig.GAMEPAD_PROFILE_STANDARD, stringResource(R.string.settings_gamepad_profile_standard), uiState.coreConfig.gamepadButtonProfile, viewModel, enabled = gamepadConnected) { config, value -> config.copy(gamepadButtonProfile = value) }
+            TextChip(VitaCoreConfig.GAMEPAD_PROFILE_SWAP_CROSS_CIRCLE, stringResource(R.string.settings_gamepad_profile_swap_cross_circle), uiState.coreConfig.gamepadButtonProfile, viewModel, enabled = gamepadConnected) { config, value -> config.copy(gamepadButtonProfile = value) }
+            TextChip(VitaCoreConfig.GAMEPAD_PROFILE_NINTENDO_FACE, stringResource(R.string.settings_gamepad_profile_nintendo_face), uiState.coreConfig.gamepadButtonProfile, viewModel, enabled = gamepadConnected) { config, value -> config.copy(gamepadButtonProfile = value) }
+        }
+        Toggle(stringResource(R.string.settings_gamepad_vibration), stringResource(R.string.settings_help_gamepad_vibration), uiState.coreConfig.gamepadVibration, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadVibration = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadVibration = defaults.gamepadVibration) } })
+        Toggle(stringResource(R.string.settings_gamepad_swap_sticks), stringResource(R.string.settings_help_gamepad_swap_sticks), uiState.coreConfig.gamepadSwapSticks, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadSwapSticks = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadSwapSticks = defaults.gamepadSwapSticks) } })
+        Toggle(stringResource(R.string.settings_gamepad_invert_left_y), stringResource(R.string.settings_help_gamepad_invert_y), uiState.coreConfig.gamepadInvertLeftY, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadInvertLeftY = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadInvertLeftY = defaults.gamepadInvertLeftY) } })
+        Toggle(stringResource(R.string.settings_gamepad_invert_right_y), stringResource(R.string.settings_help_gamepad_invert_y), uiState.coreConfig.gamepadInvertRightY, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadInvertRightY = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadInvertRightY = defaults.gamepadInvertRightY) } })
     }
 }
 
@@ -889,11 +922,13 @@ private fun TextChip(
     label: String,
     current: String,
     viewModel: SettingsViewModel,
+    enabled: Boolean = true,
     transform: (VitaCoreConfig, String) -> VitaCoreConfig
 ) {
     FilterChip(
         selected = current == value,
         onClick = { viewModel.updateCoreSettings { config -> transform(config, value) } },
+        enabled = enabled,
         colors = appFilterChipColors(),
         label = { Text(label) }
     )

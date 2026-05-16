@@ -4,6 +4,7 @@ package org.libsdl.app
 
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -11,9 +12,13 @@ import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import com.sbro.emucorev.core.VitaCoreConfig
+import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.input.InputDeviceClassifier
 import java.util.Collections
 import java.util.Comparator
+import kotlin.math.abs
+import kotlin.math.sign
 
 class SDLControllerManager {
     companion object {
@@ -59,6 +64,16 @@ class SDLControllerManager {
         external fun onNativeHat(deviceId: Int, hatId: Int, x: Int, y: Int)
 
         @JvmStatic
+        fun handlePadDown(deviceId: Int, keycode: Int): Boolean {
+            return onNativePadDown(deviceId, GamepadRuntimeInputSettings.mapButton(keycode))
+        }
+
+        @JvmStatic
+        fun handlePadUp(deviceId: Int, keycode: Int): Boolean {
+            return onNativePadUp(deviceId, GamepadRuntimeInputSettings.mapButton(keycode))
+        }
+
+        @JvmStatic
         fun initialize() {
             if (mJoystickHandler == null) {
                 mJoystickHandler = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
@@ -94,11 +109,13 @@ class SDLControllerManager {
 
         @JvmStatic
         fun hapticRun(deviceId: Int, intensity: Float, length: Int) {
+            if (!GamepadRuntimeInputSettings.vibrationEnabled()) return
             mHapticHandler?.run(deviceId, intensity, length)
         }
 
         @JvmStatic
         fun hapticRumble(deviceId: Int, lowFrequencyIntensity: Float, highFrequencyIntensity: Float, length: Int) {
+            if (!GamepadRuntimeInputSettings.vibrationEnabled()) return
             mHapticHandler?.rumble(deviceId, lowFrequencyIntensity, highFrequencyIntensity, length)
         }
 
@@ -235,8 +252,13 @@ open class SDLJoystickHandler_API16 : SDLJoystickHandler() {
             val joystick = getJoystick(event.deviceId)
             if (joystick != null) {
                 joystick.axes.forEachIndexed { index, range ->
+                    val targetIndex = GamepadRuntimeInputSettings.targetAxisIndex(range.axis, joystick.axes, index)
                     val value = (event.getAxisValue(range.axis, actionPointerIndex) - range.min) / range.range * 2.0f - 1.0f
-                    SDLControllerManager.onNativeJoy(joystick.deviceId, index, value)
+                    SDLControllerManager.onNativeJoy(
+                        joystick.deviceId,
+                        targetIndex,
+                        GamepadRuntimeInputSettings.mapAxis(range.axis, value)
+                    )
                 }
                 for (i in 0 until joystick.hats.size / 2) {
                     val hatX = event.getAxisValue(joystick.hats[2 * i].axis, actionPointerIndex).toInt().let { kotlin.math.round(it.toFloat()).toInt() }
@@ -257,6 +279,115 @@ open class SDLJoystickHandler_API16 : SDLJoystickHandler() {
     open fun getVendorId(joystickDevice: InputDevice): Int = 0
     open fun getAxisMask(ranges: List<InputDevice.MotionRange>): Int = -1
     open fun getButtonMask(joystickDevice: InputDevice): Int = -1
+}
+
+private object GamepadRuntimeInputSettings {
+    private const val CACHE_MS = 500L
+    private var cachedAtMs = 0L
+    private var cached = Values()
+
+    private data class Values(
+        val deadzone: Float = 0.15f,
+        val triggerThreshold: Float = 0.12f,
+        val buttonProfile: String = VitaCoreConfig.GAMEPAD_PROFILE_STANDARD,
+        val vibration: Boolean = true,
+        val swapSticks: Boolean = false,
+        val invertLeftX: Boolean = false,
+        val invertLeftY: Boolean = false,
+        val invertRightX: Boolean = false,
+        val invertRightY: Boolean = false,
+        val analogMultiplier: Float = 1.0f
+    )
+
+    fun vibrationEnabled(): Boolean = current().vibration
+
+    fun mapButton(keycode: Int): Int {
+        return when (current().buttonProfile) {
+            VitaCoreConfig.GAMEPAD_PROFILE_SWAP_CROSS_CIRCLE -> when (keycode) {
+                KeyEvent.KEYCODE_BUTTON_A -> KeyEvent.KEYCODE_BUTTON_B
+                KeyEvent.KEYCODE_BUTTON_B -> KeyEvent.KEYCODE_BUTTON_A
+                else -> keycode
+            }
+            VitaCoreConfig.GAMEPAD_PROFILE_NINTENDO_FACE -> when (keycode) {
+                KeyEvent.KEYCODE_BUTTON_A -> KeyEvent.KEYCODE_BUTTON_B
+                KeyEvent.KEYCODE_BUTTON_B -> KeyEvent.KEYCODE_BUTTON_A
+                KeyEvent.KEYCODE_BUTTON_X -> KeyEvent.KEYCODE_BUTTON_Y
+                KeyEvent.KEYCODE_BUTTON_Y -> KeyEvent.KEYCODE_BUTTON_X
+                else -> keycode
+            }
+            else -> keycode
+        }
+    }
+
+    fun targetAxisIndex(axis: Int, axes: List<InputDevice.MotionRange>, fallback: Int): Int {
+        if (!current().swapSticks) return fallback
+        val targetAxis = when (axis) {
+            MotionEvent.AXIS_X -> MotionEvent.AXIS_Z
+            MotionEvent.AXIS_Y -> MotionEvent.AXIS_RZ
+            MotionEvent.AXIS_Z -> MotionEvent.AXIS_X
+            MotionEvent.AXIS_RZ -> MotionEvent.AXIS_Y
+            else -> axis
+        }
+        return axes.indexOfFirst { it.axis == targetAxis }.takeIf { it >= 0 } ?: fallback
+    }
+
+    fun mapAxis(axis: Int, value: Float): Float {
+        val settings = current()
+        val isStick = axis == MotionEvent.AXIS_X ||
+            axis == MotionEvent.AXIS_Y ||
+            axis == MotionEvent.AXIS_Z ||
+            axis == MotionEvent.AXIS_RZ
+        val isTrigger = axis == MotionEvent.AXIS_LTRIGGER ||
+            axis == MotionEvent.AXIS_RTRIGGER ||
+            axis == MotionEvent.AXIS_GAS ||
+            axis == MotionEvent.AXIS_BRAKE
+
+        val thresholded = when {
+            isStick -> applyDeadzone(value, settings.deadzone) * settings.analogMultiplier
+            isTrigger -> {
+                val amount = ((value + 1f) / 2f).coerceIn(0f, 1f)
+                if (amount < settings.triggerThreshold) -1f else value
+            }
+            else -> value
+        }.coerceIn(-1f, 1f)
+
+        val invert = when (axis) {
+            MotionEvent.AXIS_X -> if (settings.swapSticks) settings.invertRightX else settings.invertLeftX
+            MotionEvent.AXIS_Y -> if (settings.swapSticks) settings.invertRightY else settings.invertLeftY
+            MotionEvent.AXIS_Z -> if (settings.swapSticks) settings.invertLeftX else settings.invertRightX
+            MotionEvent.AXIS_RZ -> if (settings.swapSticks) settings.invertLeftY else settings.invertRightY
+            else -> false
+        }
+        return if (invert) -thresholded else thresholded
+    }
+
+    private fun applyDeadzone(value: Float, deadzone: Float): Float {
+        val magnitude = abs(value)
+        if (magnitude <= deadzone) return 0f
+        return ((magnitude - deadzone) / (1f - deadzone).coerceAtLeast(0.01f)) * value.sign
+    }
+
+    private fun current(): Values {
+        val now = SystemClock.elapsedRealtime()
+        if (now - cachedAtMs < CACHE_MS) return cached
+        cachedAtMs = now
+        cached = runCatching {
+            val config = VitaCoreConfigRepository(SDL.getContext()).load()
+            Values(
+                deadzone = config.gamepadDeadzone,
+                triggerThreshold = config.gamepadTriggerThreshold,
+                buttonProfile = config.gamepadButtonProfile,
+                vibration = config.gamepadVibration,
+                swapSticks = config.gamepadSwapSticks,
+                invertLeftX = config.gamepadInvertLeftX,
+                invertLeftY = config.gamepadInvertLeftY,
+                invertRightX = config.gamepadInvertRightX,
+                invertRightY = config.gamepadInvertRightY,
+                analogMultiplier = config.analogMultiplier
+            )
+        }.getOrDefault(cached)
+        return cached
+    }
 }
 
 class SDLJoystickHandler_API19 : SDLJoystickHandler_API16() {
