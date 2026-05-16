@@ -488,7 +488,7 @@
     <string name="settings_app_language_turkish">Turc</string>
     <string name="save_manager_title">Sauvegardes</string>
     <string name="save_manager_subtitle">Importez, exportez et supprimez les données de sauvegarde PS Vita.</string>
-    <string name="save_manager_open_for_game">Gérer les sauvegardes</string>
+    <string name="save_manager_open_for_game">Sauvegardes</string>
     <string name="save_manager_search_hint">Rechercher des sauvegardes</string>
     <string name="save_manager_export">Exporter</string>
     <string name="save_manager_import">Importer</string>
@@ -662,7 +662,7 @@
     <string name="play_time_no_sessions_title">Aucune session de jeu pour l\'instant</string>
     <string name="play_time_no_sessions_body">Lancez un jeu et vos sessions de jeu apparaîtront ici.</string>
     <string name="play_time_no_game_sessions_body">Ce jeu n\'a pas encore été joué. Lancez-le et ses sessions de jeu apparaîtront ici.</string>
-    <string name="library_add_shortcut">Ajouter un raccourci à l\'écran d\'accueil</string>
+    <string name="library_add_shortcut">Ajouter un raccourci</string>
     <string name="library_shortcut_requested">Demande de raccourci envoyée.</string>
     <string name="library_shortcut_unsupported">Ce lanceur ne prend pas en charge les raccourcis épinglés.</string>
     <string name="library_shortcut_failed">Échec de la création du raccourci.</string>

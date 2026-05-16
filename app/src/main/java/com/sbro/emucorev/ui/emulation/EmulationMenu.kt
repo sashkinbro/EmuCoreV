@@ -69,9 +69,8 @@ import kotlin.math.roundToInt
 //   - `EmulationGameMenu` is the full menu, rendered as a slide-up sheet from
 //     the bottom on phones and as a slide-in panel from the right on tablets.
 //
-// Two badge styles communicate behavior to the user:
-//   - LIVE   — change is applied to the running game immediately.
-//   - RESTART — change is persisted to config.yml; effect applies on next launch.
+// Badge styles communicate only the real runtime behavior. Restart is shown
+// per-row for upstream restart-required settings, not for whole mixed sections.
 
 private val LiveBadgeColor = Color(0xFF34D27A)
 private val RestartBadgeColor = Color(0xFFE0A82E)
@@ -276,7 +275,7 @@ private fun GameTab(
     MenuSection(
         title = stringResource(R.string.emulation_menu_section_now),
         subtitle = stringResource(R.string.emulation_menu_section_now_desc),
-        badge = MenuBadge.Live
+        badge = null
     ) {
         MenuInfoRow(
             label = stringResource(R.string.play_time_current_session),
@@ -438,8 +437,8 @@ private fun ControlsTab(config: VitaCoreConfig, callbacks: EmulationMenuCallback
 private fun DisplayTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks) {
     MenuSection(
         title = stringResource(R.string.emulation_menu_section_display),
-        subtitle = stringResource(R.string.emulation_menu_section_display_desc),
-        badge = MenuBadge.Restart
+        subtitle = "",
+        badge = null
     ) {
         MenuSliderRow(
             label = stringResource(R.string.settings_resolution_multiplier),
@@ -447,6 +446,7 @@ private fun DisplayTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks
             valueText = stringResource(R.string.emulation_menu_resolution_value, config.resolutionMultiplier),
             valueRange = 1f..8f,
             steps = 13,
+            badge = MenuBadge.Restart,
             onValueChange = { callbacks.onResolutionMultiplier((it * 2f).roundToInt() / 2f) }
         )
         MenuToggleRow(
@@ -462,14 +462,15 @@ private fun DisplayTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks
         MenuToggleRow(
             label = stringResource(R.string.settings_core_high_accuracy),
             checked = config.highAccuracy,
+            badge = MenuBadge.Restart,
             onCheckedChange = callbacks.onHighAccuracy
         )
     }
 
     MenuSection(
         title = stringResource(R.string.emulation_menu_section_performance),
-        subtitle = stringResource(R.string.emulation_menu_section_performance_desc),
-        badge = MenuBadge.Restart
+        subtitle = "",
+        badge = MenuBadge.Live
     ) {
         MenuToggleRow(
             label = stringResource(R.string.settings_core_fps_hack),
@@ -498,8 +499,8 @@ private fun DisplayTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks
 private fun SystemTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks) {
     MenuSection(
         title = stringResource(R.string.emulation_menu_section_system),
-        subtitle = stringResource(R.string.emulation_menu_section_system_desc),
-        badge = MenuBadge.Restart
+        subtitle = "",
+        badge = null
     ) {
         MenuToggleRow(
             label = stringResource(R.string.settings_pstv_mode),
@@ -862,12 +863,14 @@ private fun MenuSection(
                     null -> Unit
                 }
             }
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = palette.textSecondary
-            )
-            Spacer(modifier = Modifier.height(1.dp))
+            if (subtitle.isNotBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = palette.textSecondary
+                )
+                Spacer(modifier = Modifier.height(1.dp))
+            }
             content()
         }
     }
@@ -894,6 +897,7 @@ private fun MenuToggleRow(
     label: String,
     checked: Boolean,
     enabled: Boolean = true,
+    badge: MenuBadge? = null,
     onCheckedChange: (Boolean) -> Unit
 ) {
     val palette = emulationMenuPalette()
@@ -912,6 +916,7 @@ private fun MenuToggleRow(
             color = palette.textPrimary.copy(alpha = if (enabled) 1f else 0.48f),
             modifier = Modifier.weight(1f)
         )
+        RowBadge(badge)
         Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
     }
 }
@@ -924,6 +929,7 @@ private fun MenuSliderRow(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
     enabled: Boolean = true,
+    badge: MenuBadge? = null,
     onValueChange: (Float) -> Unit
 ) {
     val palette = emulationMenuPalette()
@@ -942,6 +948,7 @@ private fun MenuSliderRow(
                 color = palette.textPrimary.copy(alpha = if (enabled) 1f else 0.48f),
                 modifier = Modifier.weight(1f)
             )
+            RowBadge(badge)
             Text(
                 text = valueText,
                 style = MaterialTheme.typography.labelMedium,
@@ -955,6 +962,24 @@ private fun MenuSliderRow(
             valueRange = valueRange,
             steps = steps
         )
+    }
+}
+
+@Composable
+private fun RowBadge(badge: MenuBadge?) {
+    if (badge != null) {
+        Box(modifier = Modifier.padding(end = 8.dp)) {
+            when (badge) {
+                MenuBadge.Live -> Badge(
+                    text = stringResource(R.string.emulation_menu_badge_live),
+                    color = LiveBadgeColor
+                )
+                MenuBadge.Restart -> Badge(
+                    text = stringResource(R.string.emulation_menu_badge_restart),
+                    color = RestartBadgeColor
+                )
+            }
+        }
     }
 }
 
