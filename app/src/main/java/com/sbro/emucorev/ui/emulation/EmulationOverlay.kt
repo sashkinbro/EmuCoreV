@@ -75,7 +75,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.VitaCoreConfig
-import com.sbro.emucorev.core.VitaCoreConfigRepository
+import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.core.vita.Emulator
 import com.sbro.emucorev.core.vita.overlay.InputOverlay
 import com.sbro.emucorev.data.InstalledGameRepository
@@ -88,10 +88,11 @@ fun EmulationOverlayHost(
     activity: Emulator,
     modifier: Modifier = Modifier
 ) {
-    val repository = remember(activity) { VitaCoreConfigRepository(activity) }
+    val gameId = remember(activity) { activity.currentGameIdOrIntent() }
+    val repository = remember(activity) { VitaGameSettingsRepository(activity) }
     val controlLayoutRepository = remember(activity) { TouchControlLayoutRepository(activity) }
     val overlayBridge = remember(activity) { activity.getmOverlay() }
-    var config by remember(activity) { mutableStateOf(repository.load()) }
+    var config by remember(activity, gameId) { mutableStateOf(repository.loadEffective(gameId)) }
     var controlLayout by remember(activity) { mutableStateOf(controlLayoutRepository.load()) }
     var controlsEditMode by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -99,7 +100,7 @@ fun EmulationOverlayHost(
     var userPaused by remember { mutableStateOf(false) }
     var backTouchEnabled by remember { mutableStateOf(false) }
     var exitDialogVisible by remember { mutableStateOf(false) }
-    val gameId = remember(activity) { activity.currentGameIdOrIntent() }
+    var sessionElapsedMs by remember(activity) { mutableStateOf(activity.currentPlayTimeElapsedMs()) }
     val gameTitle = remember(activity, gameId) {
         val installedTitle = InstalledGameRepository().findByTitleId(activity, gameId)
             ?.title
@@ -109,11 +110,12 @@ fun EmulationOverlayHost(
             ?: gameId
     }
     val hasPhysicalGamepad = activity.hasPhysicalGamepad
+    val touchControlsActive = controlsEditMode || (config.enableGamepadOverlay && !hasPhysicalGamepad)
     val showTouchControls = !menuOpen &&
         (
             controlsEditMode ||
                 (
-                    config.enableGamepadOverlay &&
+                    touchControlsActive &&
                         overlayBridge.effectiveOverlayMask != 0
                 )
             )
@@ -121,7 +123,7 @@ fun EmulationOverlayHost(
 
     fun persistConfig(transform: (VitaCoreConfig) -> VitaCoreConfig) {
         config = transform(config)
-        repository.save(config)
+        repository.save(gameId, config)
     }
 
     fun syncPerformanceOverlayState() {
@@ -142,9 +144,29 @@ fun EmulationOverlayHost(
         activity.setMenuPaused(effectivePaused)
     }
 
+    LaunchedEffect(touchControlsActive) {
+        overlayBridge.setTouchControlsActive(touchControlsActive)
+    }
+
+    LaunchedEffect(showTouchControls) {
+        if (showTouchControls) {
+            repeat(8) {
+                overlayBridge.ensureControllerAttached()
+                kotlinx.coroutines.delay(350)
+            }
+        }
+    }
+
     LaunchedEffect(menuOpen, controlsEditMode) {
         if (menuOpen || controlsEditMode) {
             menuButtonVisible = true
+        }
+    }
+
+    LaunchedEffect(activity) {
+        while (true) {
+            sessionElapsedMs = activity.currentPlayTimeElapsedMs()
+            kotlinx.coroutines.delay(1_000)
         }
     }
 
@@ -351,6 +373,7 @@ fun EmulationOverlayHost(
                 gameId = gameId,
                 config = config,
                 paused = effectivePaused,
+                sessionElapsedMs = sessionElapsedMs,
                 expandHorizontally = useSidePanel,
                 physicalGamepadConnected = hasPhysicalGamepad,
                 callbacks = menuCallbacks
@@ -389,6 +412,9 @@ fun EmulationOverlayHost(
         if (hasPhysicalGamepad && backTouchEnabled) {
             backTouchEnabled = false
             overlayBridge.setTouchState(false)
+        }
+        if (hasPhysicalGamepad && !controlsEditMode) {
+            overlayBridge.setTouchControlsActive(false)
         }
     }
 }

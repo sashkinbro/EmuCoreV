@@ -12,11 +12,19 @@ val CompactCardContentPadding = 12.dp
 fun Configuration.isTabletClassDevice(): Boolean {
     val smallestWidth = smallestScreenWidthDp.takeIf { it > 0 }
         ?: minOf(screenWidthDp, screenHeightDp)
-    return smallestWidth >= 600
+    val screenSize = screenLayout and Configuration.SCREENLAYOUT_SIZE_MASK
+    val isAndroidLargeScreen = screenSize >= Configuration.SCREENLAYOUT_SIZE_LARGE
+    val hasStableTabletWidth = smallestWidth >= 700
+    val hasTabletLikeBounds = smallestWidth >= 600 &&
+        minOf(screenWidthDp, screenHeightDp) >= 600 &&
+        maxOf(screenWidthDp, screenHeightDp) >= 960
+    return hasStableTabletWidth || (isAndroidLargeScreen && hasTabletLikeBounds)
 }
 
 fun Configuration.shouldUseExpandedShell(): Boolean {
-    return isTabletClassDevice() && screenWidthDp >= 840
+    return isTabletClassDevice() &&
+        screenWidthDp >= 900 &&
+        screenHeightDp >= 600
 }
 
 /**
@@ -26,5 +34,7 @@ fun Configuration.shouldUseExpandedShell(): Boolean {
  * rather than reflowed into multi-pane content.
  */
 fun Configuration.useMultiColumnLayout(): Boolean {
-    return isTabletClassDevice() && screenWidthDp > screenHeightDp
+    return isTabletClassDevice() &&
+        screenWidthDp > screenHeightDp &&
+        screenHeightDp >= 600
 }

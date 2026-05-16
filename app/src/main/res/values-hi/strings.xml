@@ -355,7 +355,7 @@
     <string name="emulator_installer_apk_missing">अपडेट पैकेज नहीं मिला।</string>
     <string name="emulator_installer_failed">इंस्टॉलर लॉन्च करने में विफल।</string>
     <string name="shell_quick_actions">नेविगेशन</string>
-    <string name="shell_setup_section">सेटअप</string>
+    <string name="shell_setup_section">इंस्टॉलेशन</string>
     <string name="shell_library_section">लाइब्रेरी</string>
     <string name="shell_tools_section">उपकरण</string>
     <string name="shell_manage_folders">फ़ोल्डर प्रबंधित करें</string>
@@ -630,4 +630,21 @@
     <string name="emulation_menu_section_gamepad">भौतिक गेमपैड</string>
     <string name="emulation_menu_section_gamepad_desc">जुड़े हुए कंट्रोलर के लिए डेड ज़ोन, रीमैप, कंपन और स्टिक व्यवहार।</string>
     <string name="emulation_menu_section_gamepad_disconnected">इन नियंत्रणों को बदलने के लिए एक भौतिक गेमपैड कनेक्ट करें।</string>
+    <string name="game_manager_title">गेम मैनेजर</string>
+    <string name="game_manager_subtitle">प्रति गेम ग्राफिक्स, ऑडियो, नियंत्रण और एमुलेटर व्यवहार को ट्यून करें।</string>
+    <string name="game_manager_open_for_game">गेम सेटिंग्स</string>
+    <string name="game_manager_empty_title">कोई गेम इंस्टॉल नहीं है</string>
+    <string name="game_manager_empty_body">पहले एक गेम इंस्टॉल करें, फिर यहां उसके लिए एक कस्टम प्रोफ़ाइल बनाएं।</string>
+    <string name="game_manager_choose_game">गेम चुनें</string>
+    <string name="game_manager_profile">प्रोफ़ाइल</string>
+    <string name="game_manager_no_game_selected">कोई गेम नहीं चुना गया</string>
+    <string name="game_manager_custom_profile">इस गेम के लिए कस्टम सेटिंग्स सक्रिय हैं।</string>
+    <string name="game_manager_global_profile">जब तक आप कोई सेटिंग नहीं बदलते, तब तक वैश्विक डिफ़ॉल्ट का उपयोग किया जा रहा है।</string>
+    <string name="game_manager_reset_global">वैश्विक डिफ़ॉल्ट का उपयोग करें</string>
+    <string name="game_manager_reset_short">रीसेट करें</string>
+    <string name="game_manager_system_performance">सिस्टम और प्रदर्शन</string>
+    <string name="game_manager_psn_signed_in">PSN साइन-इन स्थिति का अनुकरण करें</string>
+    <string name="game_manager_invert_left_x">लेफ्ट स्टिक X उल्टा करें</string>
+    <string name="game_manager_invert_right_x">राइट स्टिक X उल्टा करें</string>
+    <string name="nav_game_manager">गेम मैनेजर</string>
 </resources>

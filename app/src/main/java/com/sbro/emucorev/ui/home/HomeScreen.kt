@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,9 +34,13 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Games
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.QueryStats
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +50,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -78,6 +86,8 @@ fun HomeScreen(
     onOpenLibrary: () -> Unit,
     onOpenCatalog: () -> Unit,
     onLaunchGame: (String) -> Unit,
+    onOpenGameManager: (String) -> Unit,
+    onOpenPlayTime: (String) -> Unit,
     onMenuClick: (() -> Unit)? = null,
     viewModel: HomeViewModel = viewModel()
 ) {
@@ -265,7 +275,9 @@ fun HomeScreen(
                             items(uiState.featuredGames, key = { it.titleId }) { game ->
                                 FeaturedGameCard(
                                     game = game,
-                                    onClick = { onLaunchGame(game.titleId) }
+                                    onClick = { onLaunchGame(game.titleId) },
+                                    onOpenGameManager = { onOpenGameManager(game.titleId) },
+                                    onOpenPlayTime = { onOpenPlayTime(game.titleId) }
                                 )
                             }
                         }
@@ -434,42 +446,76 @@ private fun HomeStatPill(
 @Composable
 private fun FeaturedGameCard(
     game: InstalledVitaGame,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onOpenGameManager: () -> Unit,
+    onOpenPlayTime: () -> Unit
 ) {
     val guardedClick = rememberDebouncedClick(onClick = onClick)
-    Surface(
-        modifier = Modifier.width(156.dp),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface,
-        onClick = guardedClick
-    ) {
-        Column {
-            LocalImage(
-                path = game.iconPath,
-                contentDescription = game.title,
-                fallbackLabel = game.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(106.dp)
-            )
-            Column(
-                modifier = Modifier.padding(CardContentPadding),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = game.title,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+    var menuExpanded by remember(game.titleId) { mutableStateOf(false) }
+    Box {
+        Surface(
+            modifier = Modifier
+                .width(156.dp)
+                .combinedClickable(
+                    onClick = guardedClick,
+                    onLongClick = { menuExpanded = true }
+                ),
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column {
+                LocalImage(
+                    path = game.iconPath,
+                    contentDescription = game.title,
+                    fallbackLabel = game.title,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(106.dp)
                 )
-                Text(
-                    text = game.titleId,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column(
+                    modifier = Modifier.padding(CardContentPadding),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = game.title,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = game.titleId,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
+        }
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.game_manager_open_for_game)) },
+                onClick = {
+                    onOpenGameManager()
+                    menuExpanded = false
+                },
+                leadingIcon = {
+                    Icon(Icons.Rounded.Tune, contentDescription = null)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.play_time_open_for_game)) },
+                onClick = {
+                    onOpenPlayTime()
+                    menuExpanded = false
+                },
+                leadingIcon = {
+                    Icon(Icons.Rounded.QueryStats, contentDescription = null)
+                }
+            )
         }
     }
 }

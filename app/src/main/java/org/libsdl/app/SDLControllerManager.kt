@@ -14,6 +14,8 @@ import android.view.MotionEvent
 import android.view.View
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
+import com.sbro.emucorev.core.VitaGameSettingsRepository
+import com.sbro.emucorev.core.vita.Emulator
 import com.sbro.emucorev.core.input.InputDeviceClassifier
 import java.util.Collections
 import java.util.Comparator
@@ -372,7 +374,13 @@ private object GamepadRuntimeInputSettings {
         if (now - cachedAtMs < CACHE_MS) return cached
         cachedAtMs = now
         cached = runCatching {
-            val config = VitaCoreConfigRepository(SDL.getContext()).load()
+            val context = SDL.getContext()
+            val gameId = (context as? Emulator)?.currentGameIdOrIntent().orEmpty()
+            val config = if (gameId.isNotBlank()) {
+                VitaGameSettingsRepository(context).loadEffective(gameId)
+            } else {
+                VitaCoreConfigRepository(context).load()
+            }
             Values(
                 deadzone = config.gamepadDeadzone,
                 triggerThreshold = config.gamepadTriggerThreshold,

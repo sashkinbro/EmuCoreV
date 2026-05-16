@@ -355,7 +355,7 @@
     <string name="emulator_installer_apk_missing">No se encontró el paquete de actualización.</string>
     <string name="emulator_installer_failed">No se pudo iniciar el instalador.</string>
     <string name="shell_quick_actions">Navegación</string>
-    <string name="shell_setup_section">Configuración</string>
+    <string name="shell_setup_section">Instalación</string>
     <string name="shell_library_section">Biblioteca</string>
     <string name="shell_tools_section">Herramientas</string>
     <string name="shell_manage_folders">Gestionar carpetas</string>
@@ -630,4 +630,21 @@
     <string name="emulation_menu_section_gamepad">Gamepad físico</string>
     <string name="emulation_menu_section_gamepad_desc">Zona muerta, reasignación, vibración y comportamiento de los sticks para el mando conectado.</string>
     <string name="emulation_menu_section_gamepad_disconnected">Conecta un gamepad físico para cambiar estos controles.</string>
+    <string name="game_manager_title">Gestor de juegos</string>
+    <string name="game_manager_subtitle">Ajusta los gráficos, el audio, los controles y el comportamiento del emulador por juego.</string>
+    <string name="game_manager_open_for_game">Ajustes del juego</string>
+    <string name="game_manager_empty_title">No hay juegos instalados</string>
+    <string name="game_manager_empty_body">Instala un juego primero y luego crea un perfil personalizado para él aquí.</string>
+    <string name="game_manager_choose_game">Elegir juego</string>
+    <string name="game_manager_profile">Perfil</string>
+    <string name="game_manager_no_game_selected">Ningún juego seleccionado</string>
+    <string name="game_manager_custom_profile">Los ajustes personalizados están activos para este juego.</string>
+    <string name="game_manager_global_profile">Se usan los valores predeterminados globales hasta que cambies un ajuste.</string>
+    <string name="game_manager_reset_global">Usar predeterminados globales</string>
+    <string name="game_manager_reset_short">Restablecer</string>
+    <string name="game_manager_system_performance">Sistema y rendimiento</string>
+    <string name="game_manager_psn_signed_in">Emular estado de sesión iniciada en PSN</string>
+    <string name="game_manager_invert_left_x">Invertir stick izquierdo X</string>
+    <string name="game_manager_invert_right_x">Invertir stick derecho X</string>
+    <string name="nav_game_manager">Gestor de juegos</string>
 </resources>

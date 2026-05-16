@@ -355,7 +355,7 @@
     <string name="emulator_installer_apk_missing">O pacote de atualização não foi encontrado.</string>
     <string name="emulator_installer_failed">Falha ao iniciar o instalador.</string>
     <string name="shell_quick_actions">Navegação</string>
-    <string name="shell_setup_section">Configuração</string>
+    <string name="shell_setup_section">Instalação</string>
     <string name="shell_library_section">Biblioteca</string>
     <string name="shell_tools_section">Ferramentas</string>
     <string name="shell_manage_folders">Gerenciar pastas</string>
@@ -630,4 +630,21 @@
     <string name="emulation_menu_section_gamepad">Gamepad físico</string>
     <string name="emulation_menu_section_gamepad_desc">Zona morta, remapeamento, vibração e comportamento do analógico para o controle conectado.</string>
     <string name="emulation_menu_section_gamepad_disconnected">Conecte um gamepad físico para alterar esses controles.</string>
+    <string name="game_manager_title">Gerenciador de jogos</string>
+    <string name="game_manager_subtitle">Ajuste gráficos, áudio, controles e o comportamento do emulador por jogo.</string>
+    <string name="game_manager_open_for_game">Configurações do jogo</string>
+    <string name="game_manager_empty_title">Nenhum jogo instalado</string>
+    <string name="game_manager_empty_body">Instale um jogo primeiro e depois crie um perfil personalizado para ele aqui.</string>
+    <string name="game_manager_choose_game">Escolher jogo</string>
+    <string name="game_manager_profile">Perfil</string>
+    <string name="game_manager_no_game_selected">Nenhum jogo selecionado</string>
+    <string name="game_manager_custom_profile">As configurações personalizadas estão ativas para este jogo.</string>
+    <string name="game_manager_global_profile">Usando os padrões globais até que você altere uma configuração.</string>
+    <string name="game_manager_reset_global">Usar padrões globais</string>
+    <string name="game_manager_reset_short">Redefinir</string>
+    <string name="game_manager_system_performance">Sistema e desempenho</string>
+    <string name="game_manager_psn_signed_in">Emular estado de login na PSN</string>
+    <string name="game_manager_invert_left_x">Inverter eixo X do analógico esquerdo</string>
+    <string name="game_manager_invert_right_x">Inverter eixo X do analógico direito</string>
+    <string name="nav_game_manager">Gerenciador de jogos</string>
 </resources>

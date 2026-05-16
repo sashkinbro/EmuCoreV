@@ -27,12 +27,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Games
 import androidx.compose.material.icons.rounded.Inventory2
+import androidx.compose.material.icons.rounded.QueryStats
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SettingsEthernet
 import androidx.compose.material.icons.rounded.SystemUpdateAlt
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -58,7 +60,7 @@ import com.sbro.emucorev.ui.theme.shouldUseExpandedShell
 import kotlinx.coroutines.launch
 
 enum class PrimaryDestination {
-    Home, Setup, Library, SaveData, Search, Settings
+    Home, Setup, Library, GameManager, PlayTime, SaveData, Search, Settings
 }
 
 private enum class MobileLeadingAction {
@@ -73,6 +75,8 @@ fun AdaptiveShell(
     selected: PrimaryDestination,
     onNavigateSetup: () -> Unit,
     onNavigateLibrary: () -> Unit,
+    onNavigateGameManager: () -> Unit,
+    onNavigatePlayTime: () -> Unit,
     onNavigateSaveData: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
@@ -88,6 +92,8 @@ fun AdaptiveShell(
             selected = selected,
             onNavigateSetup = onNavigateSetup,
             onNavigateLibrary = onNavigateLibrary,
+            onNavigateGameManager = onNavigateGameManager,
+            onNavigatePlayTime = onNavigatePlayTime,
             onNavigateSaveData = onNavigateSaveData,
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
@@ -128,6 +134,8 @@ fun AdaptiveShell(
             selected = selected,
             onNavigateSetup = onNavigateSetup,
             onNavigateLibrary = onNavigateLibrary,
+            onNavigateGameManager = onNavigateGameManager,
+            onNavigatePlayTime = onNavigatePlayTime,
             onNavigateSaveData = onNavigateSaveData,
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
@@ -148,6 +156,8 @@ private fun CompactAdaptiveShell(
     selected: PrimaryDestination,
     onNavigateSetup: () -> Unit,
     onNavigateLibrary: () -> Unit,
+    onNavigateGameManager: () -> Unit,
+    onNavigatePlayTime: () -> Unit,
     onNavigateSaveData: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
@@ -209,6 +219,8 @@ private fun CompactAdaptiveShell(
                     selected = selected,
                     onNavigateSetup = onNavigateSetup,
                     onNavigateLibrary = onNavigateLibrary,
+                    onNavigateGameManager = onNavigateGameManager,
+                    onNavigatePlayTime = onNavigatePlayTime,
                     onNavigateSaveData = onNavigateSaveData,
                     onNavigateSearch = onNavigateSearch,
                     onNavigateSettings = onNavigateSettings,
@@ -237,6 +249,8 @@ private fun SideNavigation(
     selected: PrimaryDestination,
     onNavigateSetup: () -> Unit,
     onNavigateLibrary: () -> Unit,
+    onNavigateGameManager: () -> Unit,
+    onNavigatePlayTime: () -> Unit,
     onNavigateSaveData: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
@@ -262,6 +276,14 @@ private fun SideNavigation(
     val navigateSearch = rememberDebouncedClick {
         onCloseDrawer()
         onNavigateSearch()
+    }
+    val navigateGameManager = rememberDebouncedClick {
+        onCloseDrawer()
+        onNavigateGameManager()
+    }
+    val navigatePlayTime = rememberDebouncedClick {
+        onCloseDrawer()
+        onNavigatePlayTime()
     }
     val navigateSaveData = rememberDebouncedClick {
         onCloseDrawer()
@@ -406,6 +428,18 @@ private fun SideNavigation(
                         onClick = openManageFolders
                     )
                 }
+                ShellItem(
+                    icon = Icons.Rounded.Tune,
+                    label = stringResource(R.string.nav_game_manager),
+                    selected = selected == PrimaryDestination.GameManager,
+                    onClick = navigateGameManager
+                )
+                ShellItem(
+                    icon = Icons.Rounded.QueryStats,
+                    label = stringResource(R.string.nav_play_time),
+                    selected = selected == PrimaryDestination.PlayTime,
+                    onClick = navigatePlayTime
+                )
                 ShellItem(
                     icon = Icons.Rounded.Save,
                     label = stringResource(R.string.nav_save_manager),
