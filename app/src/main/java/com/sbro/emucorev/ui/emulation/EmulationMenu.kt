@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -90,12 +91,12 @@ private fun emulationMenuPalette(): EmulationMenuPalette {
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < 0.5f
     return EmulationMenuPalette(
-        panel = scheme.surface.copy(alpha = if (dark) 0.96f else 0.98f),
-        panelSoft = scheme.surfaceContainerHigh.copy(alpha = if (dark) 0.92f else 0.96f),
-        row = scheme.surfaceVariant.copy(alpha = if (dark) 0.18f else 0.48f),
-        border = scheme.outlineVariant.copy(alpha = if (dark) 0.24f else 0.58f),
-        textPrimary = scheme.onSurface,
-        textSecondary = scheme.onSurfaceVariant
+        panel = if (dark) Color(0xEE10131A) else Color(0xF7FAFBFF),
+        panelSoft = if (dark) Color(0xF01A1F2A) else Color(0xFFFFFFFF),
+        row = if (dark) Color.White.copy(alpha = 0.075f) else Color(0xFFEEF2F8),
+        border = if (dark) Color.White.copy(alpha = 0.12f) else Color(0xFFD6DDE8),
+        textPrimary = if (dark) Color.White else scheme.onSurface,
+        textSecondary = if (dark) Color(0xFFB8C0CC) else scheme.onSurfaceVariant
     )
 }
 
@@ -175,6 +176,7 @@ private fun QuickBarButton(
 }
 @Composable
 fun EmulationGameMenu(
+    gameTitle: String,
     gameId: String,
     config: VitaCoreConfig,
     paused: Boolean,
@@ -185,10 +187,11 @@ fun EmulationGameMenu(
     val navInsets = WindowInsets.navigationBars.asPaddingValues()
     val palette = emulationMenuPalette()
     var selectedTab by remember { mutableStateOf(EmulationMenuTab.Game) }
+    val scrollState = rememberScrollState()
     val shape = if (expandHorizontally) {
-        RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
+        RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
     } else {
-        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     }
     Surface(
         modifier = modifier
@@ -196,11 +199,12 @@ fun EmulationGameMenu(
                 if (expandHorizontally) {
                     Modifier
                         .fillMaxHeight()
-                        .widthIn(min = 360.dp, max = 440.dp)
+                        .widthIn(min = 430.dp, max = 520.dp)
                 } else {
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 620.dp)
+                        .fillMaxHeight(0.9f)
+                        .heightIn(min = 460.dp)
                 }
             ),
         shape = shape,
@@ -212,26 +216,26 @@ fun EmulationGameMenu(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(scrollState)
                 .padding(
-                    start = 18.dp,
-                    end = 18.dp,
+                    start = if (expandHorizontally) 20.dp else 16.dp,
+                    end = if (expandHorizontally) 20.dp else 16.dp,
                     top = 14.dp,
-                    bottom = 18.dp + navInsets.calculateBottomPadding()
+                    bottom = 16.dp + navInsets.calculateBottomPadding()
                 ),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (!expandHorizontally) {
                 SheetHandle()
             }
-            MenuHeader(gameId = gameId, paused = paused)
+            MenuHeader(gameTitle = gameTitle, gameId = gameId, paused = paused)
             MenuTopActions(paused = paused, callbacks = callbacks)
             MenuTabs(selectedTab = selectedTab, onSelected = { selectedTab = it })
 
             Column(
                 modifier = Modifier
-                    .weight(1f, fill = false)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 when (selectedTab) {
                     EmulationMenuTab.Game -> GameTab(config = config, callbacks = callbacks)
@@ -239,6 +243,7 @@ fun EmulationGameMenu(
                     EmulationMenuTab.Display -> DisplayTab(config = config, callbacks = callbacks)
                     EmulationMenuTab.System -> SystemTab(config = config, callbacks = callbacks)
                 }
+                Spacer(modifier = Modifier.height(2.dp))
             }
         }
     }
@@ -488,23 +493,23 @@ private fun MenuTopAction(
     val palette = emulationMenuPalette()
     val tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     Surface(
-        modifier = modifier.height(52.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = if (destructive) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f) else palette.row,
-        border = BorderStroke(1.dp, if (destructive) MaterialTheme.colorScheme.error.copy(alpha = 0.38f) else palette.border),
+        modifier = modifier.height(44.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = if (destructive) MaterialTheme.colorScheme.error.copy(alpha = 0.16f) else palette.row,
+        border = BorderStroke(1.dp, if (destructive) MaterialTheme.colorScheme.error.copy(alpha = 0.34f) else palette.border),
         onClick = onClick
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp),
+            modifier = Modifier.padding(horizontal = 10.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
             Text(
                 text = text,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = if (destructive) MaterialTheme.colorScheme.error else palette.textPrimary,
-                modifier = Modifier.padding(start = 8.dp)
+                modifier = Modifier.padding(start = 7.dp)
             )
         }
     }
@@ -593,10 +598,10 @@ private fun SheetHandle() {
 }
 
 @Composable
-private fun MenuHeader(gameId: String, paused: Boolean) {
+private fun MenuHeader(gameTitle: String, gameId: String, paused: Boolean) {
     val palette = emulationMenuPalette()
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         color = palette.row,
         border = BorderStroke(1.dp, palette.border)
     ) {
@@ -606,13 +611,13 @@ private fun MenuHeader(gameId: String, paused: Boolean) {
                 .background(
                     Brush.horizontalGradient(
                         listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
                         )
                     )
                 )
-                .padding(horizontal = 18.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -620,7 +625,7 @@ private fun MenuHeader(gameId: String, paused: Boolean) {
             ) {
                 Text(
                     text = stringResource(R.string.emulation_menu_title),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = palette.textPrimary,
                     modifier = Modifier.weight(1f)
                 )
@@ -629,10 +634,19 @@ private fun MenuHeader(gameId: String, paused: Boolean) {
                 }
             }
             Text(
-                text = gameId.ifBlank { stringResource(R.string.emulation_menu_unknown_game) },
-                style = MaterialTheme.typography.bodyMedium,
+                text = gameTitle.ifBlank {
+                    gameId.ifBlank { stringResource(R.string.emulation_menu_unknown_game) }
+                },
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                 color = palette.textSecondary
             )
+            if (gameId.isNotBlank() && !gameTitle.equals(gameId, ignoreCase = true)) {
+                Text(
+                    text = gameId,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = palette.textSecondary.copy(alpha = 0.72f)
+                )
+            }
         }
     }
 }
@@ -646,15 +660,15 @@ private fun MenuSection(
 ) {
     val palette = emulationMenuPalette()
     Surface(
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(16.dp),
         color = palette.panelSoft,
         border = BorderStroke(1.dp, palette.border)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -683,6 +697,7 @@ private fun MenuSection(
                 style = MaterialTheme.typography.bodySmall,
                 color = palette.textSecondary
             )
+            Spacer(modifier = Modifier.height(1.dp))
             content()
         }
     }
@@ -714,9 +729,10 @@ private fun MenuToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 4.dp),
+            .background(palette.row)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -739,7 +755,14 @@ private fun MenuSliderRow(
     onValueChange: (Float) -> Unit
 ) {
     val palette = emulationMenuPalette()
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.row)
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = label,
@@ -806,7 +829,7 @@ private fun MenuActionRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
         color = containerColor,
         border = BorderStroke(1.dp, palette.border)

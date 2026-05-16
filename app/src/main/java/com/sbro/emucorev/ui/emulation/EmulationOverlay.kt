@@ -78,6 +78,7 @@ import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.vita.Emulator
 import com.sbro.emucorev.core.vita.overlay.InputOverlay
+import com.sbro.emucorev.data.InstalledGameRepository
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -95,10 +96,18 @@ fun EmulationOverlayHost(
     var controlsEditMode by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var menuButtonVisible by remember { mutableStateOf(true) }
-    var pausedByMenu by remember { mutableStateOf(false) }
+    var userPaused by remember { mutableStateOf(false) }
     var backTouchEnabled by remember { mutableStateOf(false) }
     var exitDialogVisible by remember { mutableStateOf(false) }
     val gameId = remember(activity) { activity.currentGameIdOrIntent() }
+    val gameTitle = remember(activity, gameId) {
+        val installedTitle = InstalledGameRepository().findByTitleId(activity, gameId)
+            ?.title
+            ?.takeIf { it.isNotBlank() && !it.equals(gameId, ignoreCase = true) }
+        installedTitle
+            ?: activity.getRunningGameTitle().takeIf { it.isNotBlank() && !it.equals(gameId, ignoreCase = true) }
+            ?: gameId
+    }
     val hasPhysicalGamepad = activity.hasPhysicalGamepad
     val showTouchControls = !menuOpen &&
         (
@@ -106,8 +115,9 @@ fun EmulationOverlayHost(
                 (
                     config.enableGamepadOverlay &&
                         overlayBridge.effectiveOverlayMask != 0
-                    )
+                )
             )
+    val effectivePaused = userPaused || menuOpen || controlsEditMode
 
     fun persistConfig(transform: (VitaCoreConfig) -> VitaCoreConfig) {
         config = transform(config)
@@ -128,15 +138,11 @@ fun EmulationOverlayHost(
         onDispose {}
     }
 
+    LaunchedEffect(effectivePaused) {
+        activity.setMenuPaused(effectivePaused)
+    }
+
     LaunchedEffect(menuOpen, controlsEditMode) {
-        val shouldPauseNative = menuOpen || controlsEditMode
-        if (shouldPauseNative && !pausedByMenu) {
-            activity.setMenuPaused(true)
-            pausedByMenu = true
-        } else if (!shouldPauseNative && pausedByMenu) {
-            activity.setMenuPaused(false)
-            pausedByMenu = false
-        }
         if (menuOpen || controlsEditMode) {
             menuButtonVisible = true
         }
@@ -210,79 +216,85 @@ fun EmulationOverlayHost(
         val configuration = LocalConfiguration.current
         val useSidePanel = configuration.screenWidthDp > configuration.screenHeightDp
 
-        val menuCallbacks = remember(activity, overlayBridge) {
-            EmulationMenuCallbacks(
-                onPauseToggle = {
-                    val next = !pausedByMenu
-                    activity.setMenuPaused(next)
-                    pausedByMenu = next
-                },
-                onExit = { exitDialogVisible = true },
-                onEditControls = {
-                    persistConfig { it.copy(enableGamepadOverlay = true) }
+        val menuCallbacks = EmulationMenuCallbacks(
+            onPauseToggle = {
+                if (effectivePaused) {
+                    userPaused = false
                     menuOpen = false
-                    menuButtonVisible = true
-                    controlsEditMode = true
-                    overlayBridge.setIsInEditMode(true)
-                },
-                onControlsVisibility = {
-                    persistConfig { it.copy(enableGamepadOverlay = !it.enableGamepadOverlay) }
-                },
-                onResetOverlay = {
-                    controlLayoutRepository.reset()
-                    controlLayout = null
-                    persistConfig {
-                        it.copy(
-                            enableGamepadOverlay = true,
-                            overlayShowTouchSwitch = false,
-                            overlayScale = 0.9f,
-                            overlayOpacity = 100
-                        )
+                    if (controlsEditMode) {
+                        controlsEditMode = false
+                        overlayBridge.setIsInEditMode(false)
                     }
+                } else {
+                    userPaused = true
+                    menuButtonVisible = true
+                }
+            },
+            onExit = { exitDialogVisible = true },
+            onEditControls = {
+                persistConfig { it.copy(enableGamepadOverlay = true) }
+                menuOpen = false
+                menuButtonVisible = true
+                controlsEditMode = true
+                overlayBridge.setIsInEditMode(true)
+            },
+            onControlsVisibility = {
+                persistConfig { it.copy(enableGamepadOverlay = !it.enableGamepadOverlay) }
+            },
+            onResetOverlay = {
+                controlLayoutRepository.reset()
+                controlLayout = null
+                persistConfig {
+                    it.copy(
+                        enableGamepadOverlay = true,
+                        overlayShowTouchSwitch = false,
+                        overlayScale = 0.9f,
+                        overlayOpacity = 100
+                    )
+                }
+                backTouchEnabled = false
+                overlayBridge.setTouchState(false)
+            },
+            onTouchSwitch = { enabled ->
+                persistConfig { it.copy(overlayShowTouchSwitch = enabled) }
+                if (!enabled) {
                     backTouchEnabled = false
                     overlayBridge.setTouchState(false)
-                },
-                onTouchSwitch = { enabled ->
-                    persistConfig { it.copy(overlayShowTouchSwitch = enabled) }
-                    if (!enabled) {
-                        backTouchEnabled = false
-                        overlayBridge.setTouchState(false)
-                    }
-                },
-                onOverlayScale = { value -> persistConfig { it.copy(overlayScale = value) } },
-                onOverlayOpacity = { value -> persistConfig { it.copy(overlayOpacity = value) } },
-                onPerformanceOverlay = { enabled ->
-                    persistConfig { it.copy(performanceOverlay = enabled) }
-                    syncPerformanceOverlayState()
-                },
-                onPerformanceDetail = { value ->
-                    persistConfig { it.copy(performanceOverlayDetail = value) }
-                    syncPerformanceOverlayState()
-                },
-                onPerformancePosition = { value ->
-                    persistConfig { it.copy(performanceOverlayPosition = value) }
-                    syncPerformanceOverlayState()
-                },
-                onAudioVolume = { volume ->
-                    persistConfig { it.copy(audioVolume = volume) }
-                    activity.setAudioVolume(volume)
-                },
-                onBgmVolume = { volume -> persistConfig { it.copy(bgmVolume = volume) } },
-                onInfoBar = { enabled -> persistConfig { it.copy(showInfoBar = enabled) } },
-                onTouchpadCursor = { enabled -> persistConfig { it.copy(showTouchpadCursor = enabled) } },
-                onResolutionMultiplier = { value -> persistConfig { it.copy(resolutionMultiplier = value) } },
-                onVsync = { enabled -> persistConfig { it.copy(vSync = enabled) } },
-                onStretchDisplay = { enabled -> persistConfig { it.copy(stretchDisplayArea = enabled) } },
-                onHighAccuracy = { enabled -> persistConfig { it.copy(highAccuracy = enabled) } },
-                onFpsHack = { enabled -> persistConfig { it.copy(fpsHack = enabled) } },
-                onTurboMode = { enabled -> persistConfig { it.copy(turboMode = enabled) } },
-                onDisableSurfaceSync = { enabled -> persistConfig { it.copy(disableSurfaceSync = enabled) } },
-                onShowShaderNotice = { enabled -> persistConfig { it.copy(showCompileShaders = enabled) } },
-                onPstvMode = { enabled -> persistConfig { it.copy(pstvMode = enabled) } },
-                onShowWelcome = { enabled -> persistConfig { it.copy(showWelcome = enabled) } },
-                onWarnMissingFirmware = { enabled -> persistConfig { it.copy(warnMissingFirmware = enabled) } }
-            )
-        }
+                }
+            },
+            onOverlayScale = { value -> persistConfig { it.copy(overlayScale = value) } },
+            onOverlayOpacity = { value -> persistConfig { it.copy(overlayOpacity = value) } },
+            onPerformanceOverlay = { enabled ->
+                persistConfig { it.copy(performanceOverlay = enabled) }
+                syncPerformanceOverlayState()
+            },
+            onPerformanceDetail = { value ->
+                persistConfig { it.copy(performanceOverlayDetail = value) }
+                syncPerformanceOverlayState()
+            },
+            onPerformancePosition = { value ->
+                persistConfig { it.copy(performanceOverlayPosition = value) }
+                syncPerformanceOverlayState()
+            },
+            onAudioVolume = { volume ->
+                persistConfig { it.copy(audioVolume = volume) }
+                activity.setAudioVolume(volume)
+            },
+            onBgmVolume = { volume -> persistConfig { it.copy(bgmVolume = volume) } },
+            onInfoBar = { enabled -> persistConfig { it.copy(showInfoBar = enabled) } },
+            onTouchpadCursor = { enabled -> persistConfig { it.copy(showTouchpadCursor = enabled) } },
+            onResolutionMultiplier = { value -> persistConfig { it.copy(resolutionMultiplier = value) } },
+            onVsync = { enabled -> persistConfig { it.copy(vSync = enabled) } },
+            onStretchDisplay = { enabled -> persistConfig { it.copy(stretchDisplayArea = enabled) } },
+            onHighAccuracy = { enabled -> persistConfig { it.copy(highAccuracy = enabled) } },
+            onFpsHack = { enabled -> persistConfig { it.copy(fpsHack = enabled) } },
+            onTurboMode = { enabled -> persistConfig { it.copy(turboMode = enabled) } },
+            onDisableSurfaceSync = { enabled -> persistConfig { it.copy(disableSurfaceSync = enabled) } },
+            onShowShaderNotice = { enabled -> persistConfig { it.copy(showCompileShaders = enabled) } },
+            onPstvMode = { enabled -> persistConfig { it.copy(pstvMode = enabled) } },
+            onShowWelcome = { enabled -> persistConfig { it.copy(showWelcome = enabled) } },
+            onWarnMissingFirmware = { enabled -> persistConfig { it.copy(warnMissingFirmware = enabled) } }
+        )
 
         AnimatedVisibility(
             visible = !controlsEditMode && menuButtonVisible,
@@ -291,7 +303,7 @@ fun EmulationOverlayHost(
             modifier = Modifier.align(Alignment.TopCenter)
         ) {
             EmulationQuickBar(
-                paused = pausedByMenu,
+                paused = effectivePaused,
                 onPauseToggle = menuCallbacks.onPauseToggle,
                 onScreenshot = { activity.requestScreenshot() },
                 onOpenMenu = {
@@ -327,9 +339,10 @@ fun EmulationOverlayHost(
             modifier = Modifier.align(if (useSidePanel) Alignment.CenterEnd else Alignment.BottomCenter)
         ) {
             EmulationGameMenu(
+                gameTitle = gameTitle,
                 gameId = gameId,
                 config = config,
-                paused = pausedByMenu,
+                paused = effectivePaused,
                 expandHorizontally = useSidePanel,
                 callbacks = menuCallbacks
             )

@@ -6,6 +6,7 @@
 
 #include "interface.h"
 
+#include <app/session_controller.h>
 #include <android_state.h>
 #include <config/state.h>
 #include <emuenv/state.h>
@@ -45,4 +46,32 @@ Java_com_sbro_emucorev_core_vita_Emulator_requestScreenshot(
         return JNI_TRUE;
     }
     return JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorev_core_vita_Emulator_setAppSessionMenuPaused(
+    JNIEnv * /*env*/,
+    jobject /*thiz*/,
+    jboolean paused) {
+    auto *controller = get_app_session_controller();
+    if (!controller || !controller->is_running()) {
+        return JNI_FALSE;
+    }
+
+    return controller->set_pause_reason(app::AppSessionPauseReason::Menu, paused == JNI_TRUE)
+        ? JNI_TRUE
+        : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_sbro_emucorev_core_vita_Emulator_getRunningGameTitle(
+    JNIEnv *env,
+    jobject /*thiz*/) {
+    auto *controller = get_app_session_controller();
+    auto *emuenv = get_emuenv();
+    if (!controller || !controller->is_running() || !emuenv) {
+        return env->NewStringUTF("");
+    }
+
+    return env->NewStringUTF(emuenv->current_app_title.c_str());
 }
