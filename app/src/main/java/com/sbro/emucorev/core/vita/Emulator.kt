@@ -331,6 +331,17 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     /** Push UI-driven audio volume (0..100) into the running emulator state. */
     external fun setAudioVolume(volume: Int)
 
+    /** Apply runtime-safe menu settings to the active Vita3K session. */
+    external fun applyRuntimeCoreSettings(
+        vSync: Boolean,
+        stretchDisplayArea: Boolean,
+        disableSurfaceSync: Boolean,
+        fpsHack: Boolean,
+        turboMode: Boolean,
+        showCompileShaders: Boolean,
+        pstvMode: Boolean
+    )
+
     /**
      * Ask the core to capture and save a screenshot using its configured format.
      * Returns false if no emulator session is currently active.

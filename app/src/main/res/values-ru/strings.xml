@@ -488,7 +488,7 @@
     <string name="settings_app_language_turkish">Турецкий</string>
     <string name="save_manager_title">Сохранения</string>
     <string name="save_manager_subtitle">Импорт, экспорт и удаление сохранений PS Vita.</string>
-    <string name="save_manager_open_for_game">Управление сохранениями</string>
+    <string name="save_manager_open_for_game">Сохранения</string>
     <string name="save_manager_search_hint">Поиск сохранений</string>
     <string name="save_manager_export">Экспорт</string>
     <string name="save_manager_import">Импорт</string>
@@ -662,7 +662,7 @@
     <string name="play_time_no_sessions_title">Пока нет игровых сессий</string>
     <string name="play_time_no_sessions_body">Запустите игру, и ваши игровые сессии появятся здесь.</string>
     <string name="play_time_no_game_sessions_body">В эту игру еще не играли. Запустите ее, и игровые сессии появятся здесь.</string>
-    <string name="library_add_shortcut">Добавить ярлык на главный экран</string>
+    <string name="library_add_shortcut">Добавить ярлык</string>
     <string name="library_shortcut_requested">Запрос на создание ярлыка отправлен.</string>
     <string name="library_shortcut_unsupported">Этот лаунчер не поддерживает закрепленные ярлыки.</string>
     <string name="library_shortcut_failed">Не удалось создать ярлык.</string>

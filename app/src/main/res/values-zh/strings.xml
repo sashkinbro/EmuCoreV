@@ -487,7 +487,7 @@
     <string name="settings_app_language_turkish">土耳其语</string>
     <string name="save_manager_title">存档</string>
     <string name="save_manager_subtitle">导入、导出和移除 PS Vita 存档数据。</string>
-    <string name="save_manager_open_for_game">管理存档</string>
+    <string name="save_manager_open_for_game">存档</string>
     <string name="save_manager_search_hint">搜索存档</string>
     <string name="save_manager_export">导出</string>
     <string name="save_manager_import">导入</string>
@@ -661,7 +661,7 @@
     <string name="play_time_no_sessions_title">暂无游玩会话</string>
     <string name="play_time_no_sessions_body">启动游戏后，您的游玩会话将显示在此处。</string>
     <string name="play_time_no_game_sessions_body">此游戏尚未游玩过。启动它，其游玩会话将显示在此处。</string>
-    <string name="library_add_shortcut">添加快捷方式到主屏幕</string>
+    <string name="library_add_shortcut">添加快捷方式</string>
     <string name="library_shortcut_requested">快捷方式请求已发送。</string>
     <string name="library_shortcut_unsupported">此启动器不支持固定快捷方式。</string>
     <string name="library_shortcut_failed">无法创建快捷方式。</string>

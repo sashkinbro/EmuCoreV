@@ -6,6 +6,7 @@
 
 #include "interface.h"
 
+#include <app/functions.h>
 #include <app/session_controller.h>
 #include <android_state.h>
 #include <config/state.h>
@@ -24,6 +25,7 @@ Java_com_sbro_emucorev_core_vita_Emulator_setPerformanceOverlayState(
         emuenv->cfg.performance_overlay = static_cast<bool>(enabled);
         emuenv->cfg.performance_overlay_detail = detail;
         emuenv->cfg.performance_overlay_position = position;
+        app::sync_perf_overlay_config(*emuenv);
     }
 }
 
@@ -34,6 +36,35 @@ Java_com_sbro_emucorev_core_vita_Emulator_setAudioVolume(
     jint volume) {
     if (auto *emuenv = get_emuenv()) {
         emuenv->cfg.audio_volume = volume;
+        emuenv->cfg.current_config.audio_volume = volume;
+        app::apply_runtime_settings(*emuenv);
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_core_vita_Emulator_applyRuntimeCoreSettings(
+    JNIEnv * /*env*/,
+    jobject /*thiz*/,
+    jboolean vSync,
+    jboolean stretchDisplayArea,
+    jboolean disableSurfaceSync,
+    jboolean fpsHack,
+    jboolean turboMode,
+    jboolean showCompileShaders,
+    jboolean pstvMode) {
+    if (auto *emuenv = get_emuenv()) {
+        auto &cfg = emuenv->cfg;
+        auto &current = cfg.current_config;
+
+        current.v_sync = vSync == JNI_TRUE;
+        current.stretch_the_display_area = stretchDisplayArea == JNI_TRUE;
+        current.disable_surface_sync = disableSurfaceSync == JNI_TRUE;
+        current.fps_hack = fpsHack == JNI_TRUE;
+        current.pstv_mode = pstvMode == JNI_TRUE;
+        cfg.turbo_mode = turboMode == JNI_TRUE;
+        cfg.show_compile_shaders = showCompileShaders == JNI_TRUE;
+
+        app::apply_runtime_settings(*emuenv);
     }
 }
 

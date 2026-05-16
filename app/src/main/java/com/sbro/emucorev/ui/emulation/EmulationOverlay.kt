@@ -135,9 +135,22 @@ fun EmulationOverlayHost(
         )
     }
 
+    fun applyRuntimeCoreSettings() {
+        activity.applyRuntimeCoreSettings(
+            config.vSync,
+            config.stretchDisplayArea,
+            config.disableSurfaceSync,
+            config.fpsHack,
+            config.turboMode,
+            config.showCompileShaders,
+            config.pstvMode
+        )
+    }
+
     DisposableEffect(config) {
         overlayBridge.synchronizeConfig(config)
         syncPerformanceOverlayState()
+        applyRuntimeCoreSettings()
         onDispose {}
     }
 

@@ -60,7 +60,7 @@
     <string name="library_search_hint">البحث في الألعاب المثبتة</string>
     <string name="library_empty_title">لم يتم العثور على ألعاب</string>
     <string name="library_empty_body">قم بتثبيت الألعاب من شاشة الألعاب، ثم قم بتحديث المكتبة.</string>
-    <string name="library_add_shortcut">إضافة اختصار إلى الشاشة الرئيسية</string>
+    <string name="library_add_shortcut">إضافة اختصار</string>
     <string name="library_shortcut_requested">تم إرسال طلب الاختصار.</string>
     <string name="library_shortcut_unsupported">المشغل الخاص بك لا يدعم الاختصارات المثبتة.</string>
     <string name="library_shortcut_failed">فشل إنشاء الاختصار.</string>
@@ -71,7 +71,7 @@
     <string name="detail_delete_game_failed">فشل حذف اللعبة.</string>
     <string name="save_manager_title">ملفات الحفظ</string>
     <string name="save_manager_subtitle">استيراد وتصدير وإزالة بيانات حفظ PS Vita.</string>
-    <string name="save_manager_open_for_game">إدارة الحفظ</string>
+    <string name="save_manager_open_for_game">ملفات الحفظ</string>
     <string name="save_manager_search_hint">البحث في ملفات الحفظ</string>
     <string name="save_manager_export">تصدير</string>
     <string name="save_manager_import">استيراد</string>

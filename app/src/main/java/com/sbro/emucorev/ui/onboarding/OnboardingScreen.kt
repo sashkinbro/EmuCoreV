@@ -14,18 +14,21 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -42,7 +45,6 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material.icons.rounded.SystemUpdateAlt
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,6 +62,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +78,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.FirmwareKind
@@ -413,7 +418,7 @@ private fun OnboardingSetupContent(
     val isDownloading = downloadState.status == FirmwareDownloadStatus.Running
     val downloadButton = stringResource(R.string.onboarding_firmware_download)
     val cancelDownloadButton = stringResource(R.string.onboarding_firmware_cancel_download)
-    var firmwareInfoVisible by remember { mutableStateOf(false) }
+    var firmwareInfoVisible by rememberSaveable { mutableStateOf(false) }
 
     val baseDownloadStatus = firmwareDownloadStatusText(FirmwareKind.Base, downloadState)
     val updateDownloadStatus = firmwareDownloadStatusText(FirmwareKind.Update, downloadState)
@@ -422,6 +427,12 @@ private fun OnboardingSetupContent(
     }
     val updateDownloadProgress = downloadState.progress.takeIf {
         downloadState.kind == FirmwareKind.Update && downloadState.status == FirmwareDownloadStatus.Running
+    }
+
+    LaunchedEffect(downloadState.status) {
+        if (downloadState.status == FirmwareDownloadStatus.Completed) {
+            firmwareInfoVisible = false
+        }
     }
 
     Column(
@@ -456,7 +467,10 @@ private fun OnboardingSetupContent(
                 stringResource(R.string.onboarding_status_install_firmware)
             },
             statusColor = if (firmwareInstalled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-            onClick = installFirmware,
+            onClick = {
+                firmwareInfoVisible = false
+                installFirmware()
+            },
             secondaryActionLabel = if (firmwareInstalled) null else if (baseDownloadProgress != null) cancelDownloadButton else downloadButton,
             secondaryActionEnabled = !isDownloading || downloadState.kind == FirmwareKind.Base,
             onSecondaryAction = {
@@ -479,7 +493,10 @@ private fun OnboardingSetupContent(
                 stringResource(R.string.onboarding_status_install_firmware_update)
             },
             statusColor = if (firmwareUpdateInstalled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-            onClick = installFirmwareUpdate,
+            onClick = {
+                firmwareInfoVisible = false
+                installFirmwareUpdate()
+            },
             secondaryActionLabel = if (firmwareUpdateInstalled) null else if (updateDownloadProgress != null) cancelDownloadButton else downloadButton,
             secondaryActionEnabled = !isDownloading || downloadState.kind == FirmwareKind.Update,
             onSecondaryAction = {
@@ -715,27 +732,77 @@ private fun FirmwareDownloadInfoDialog(
     onDismiss: () -> Unit
 ) {
     if (!visible) return
-    AlertDialog(
+
+    Dialog(
         onDismissRequest = onDismiss,
-        icon = {
-            Icon(Icons.Rounded.Info, contentDescription = null)
-        },
-        title = {
-            Text(stringResource(R.string.onboarding_firmware_info_title))
-        },
-        text = {
-            Text(
-                text = stringResource(R.string.onboarding_firmware_info_body),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.install_dialog_close))
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            val scrollState = rememberScrollState()
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 560.dp)
+                    .heightIn(max = maxHeight),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                shadowElevation = 12.dp,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(scrollState)
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(18.dp))
+                    Text(
+                        text = stringResource(R.string.onboarding_firmware_info_title),
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.onboarding_firmware_info_body),
+                        style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.install_dialog_close))
+                    }
+                }
             }
         }
-    )
+    }
 }
 
 @Composable

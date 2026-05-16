@@ -488,7 +488,7 @@
     <string name="settings_app_language_turkish">Turco</string>
     <string name="save_manager_title">Salvataggi</string>
     <string name="save_manager_subtitle">Importa, esporta e rimuovi i dati di salvataggio PS Vita.</string>
-    <string name="save_manager_open_for_game">Gestisci salvataggi</string>
+    <string name="save_manager_open_for_game">Salvataggi</string>
     <string name="save_manager_search_hint">Cerca salvataggi</string>
     <string name="save_manager_export">Esporta</string>
     <string name="save_manager_import">Importa</string>
@@ -662,7 +662,7 @@
     <string name="play_time_no_sessions_title">Nessuna sessione di gioco per ora</string>
     <string name="play_time_no_sessions_body">Avvia un gioco e le tue sessioni di gioco appariranno qui.</string>
     <string name="play_time_no_game_sessions_body">Questo gioco non è ancora stato giocato. Avvialo e le sue sessioni di gioco appariranno qui.</string>
-    <string name="library_add_shortcut">Aggiungi collegamento alla schermata Home</string>
+    <string name="library_add_shortcut">Aggiungi collegamento</string>
     <string name="library_shortcut_requested">Richiesta di collegamento inviata.</string>
     <string name="library_shortcut_unsupported">Questo launcher non supporta i collegamenti aggiunti.</string>
     <string name="library_shortcut_failed">Impossibile creare il collegamento.</string>
