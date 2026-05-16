@@ -18,7 +18,7 @@ data class VitaCoreConfig(
     val turboMode: Boolean = false,
     val highAccuracy: Boolean = false,
     val resolutionMultiplier: Float = 1.0f,
-    val disableSurfaceSync: Boolean = true,
+    val disableSurfaceSync: Boolean = false,
     val screenFilter: String = "Bilinear",
     val anisotropicFiltering: Int = 1,
     val textureCache: Boolean = true,
@@ -63,7 +63,7 @@ data class VitaCoreConfig(
     val modulesMode: Int = 0,
     val archiveLog: Boolean = false,
     val logLevel: Int = 0,
-    val discordRichPresence: Boolean = true,
+    val discordRichPresence: Boolean = false,
     val checkForUpdates: Boolean = true,
     val fileLoadingDelay: Int = 0,
     val shaderCache: Boolean = true,
@@ -301,8 +301,10 @@ class VitaCoreConfigRepository(private val context: Context) {
         return loaded.copy(
             showCompileShaders = upstream.showCompileShaders,
             cpuPoolSize = upstream.cpuPoolSize,
+            disableSurfaceSync = false,
             validationLayer = false,
             customDriverName = "",
+            discordRichPresence = false,
             psnSignedIn = false,
             logLevel = defaultConfig().logLevel
         )
@@ -397,7 +399,7 @@ class VitaCoreConfigRepository(private val context: Context) {
             buildString {
                 appendLine("# EmuCoreV overrides for the Vita3K core")
                 values.toSortedMap().forEach { (key, value) ->
-                    appendLine("$key: $value")
+                    appendLine("$key: ${formatYamlScalar(value)}")
                 }
             }
         )
@@ -440,6 +442,20 @@ class VitaCoreConfigRepository(private val context: Context) {
         return normalized
     }
 
+    private fun formatYamlScalar(value: String): String {
+        val needsQuotes = value.isEmpty() ||
+            value != value.trim() ||
+            value.contains(':') ||
+            value.contains('#') ||
+            value.equals("null", ignoreCase = true)
+        if (!needsQuotes) return value
+
+        val escaped = value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+        return "\"$escaped\""
+    }
+
     private fun normalizeLogLevel(level: Int): Int {
         return level.coerceIn(0, 6)
     }
@@ -452,6 +468,7 @@ class VitaCoreConfigRepository(private val context: Context) {
             config.colorSurfaceDebug
         return config.copy(
             validationLayer = false,
+            discordRichPresence = false,
             gamepadDeadzone = config.gamepadDeadzone.coerceIn(0f, 0.45f),
             gamepadTriggerThreshold = config.gamepadTriggerThreshold.coerceIn(0f, 0.9f),
             gamepadButtonProfile = normalizeGamepadProfile(config.gamepadButtonProfile),
@@ -473,6 +490,8 @@ class VitaCoreConfigRepository(private val context: Context) {
 
     private fun releaseValuesNeedNormalization(values: Map<String, String>): Boolean {
         return values["custom-driver-name"]?.equals("null", ignoreCase = true) == true ||
+            values["disable-surface-sync"]?.toBooleanStrictOrNull() == true ||
+            values["discord-rich-presence"]?.toBooleanStrictOrNull() == true ||
             values["psn-signed-in"]?.let { it != "0" && it != "1" && it.toBooleanStrictOrNull() != null } == true ||
             values["validation-layer"]?.toBooleanStrictOrNull() == true
     }
@@ -503,7 +522,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         // Bump whenever an old non-upstream default needs to be snapped to vanilla
         // for users who already wrote a stale config.yml. applyMigrations() rewrites
         // the affected keys on the next launch.
-        private const val CONFIG_SCHEMA_VERSION = 3
+        private const val CONFIG_SCHEMA_VERSION = 4
         private const val SCHEMA_VERSION_KEY = "config-schema-version"
     }
 }
