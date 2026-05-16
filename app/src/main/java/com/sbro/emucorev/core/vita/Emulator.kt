@@ -12,6 +12,7 @@ import android.os.Environment
 import android.provider.Settings
 import android.system.Os
 import android.content.pm.ActivityInfo
+import android.util.Log
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.ViewGroup
@@ -133,7 +134,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             if (gameId.isNotBlank()) {
                 currentGameId = gameId
             }
-            ProcessPhoenix.triggerRebirth(this, markRebirthHandled(intent))
+            triggerRebirthAfterNativeShutdown(markRebirthHandled(intent))
         }
     }
 
@@ -212,7 +213,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         val restartIntent = Intent(this, Emulator::class.java).apply {
             putExtra(APP_RESTART_PARAMETERS, args.toTypedArray())
         }
-        ProcessPhoenix.triggerRebirth(this, restartIntent)
+        triggerRebirthAfterNativeShutdown(restartIntent)
     }
 
     @Keep
@@ -366,7 +367,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 addCategory(Intent.CATEGORY_LAUNCHER)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             }
-            ProcessPhoenix.triggerRebirth(applicationContext, homeIntent)
+            triggerRebirthAfterNativeShutdown(homeIntent)
         }
     }
 
@@ -550,6 +551,15 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         return Intent(sourceIntent).putExtra(EXTRA_REBIRTH_HANDLED, true)
     }
 
+    private fun triggerRebirthAfterNativeShutdown(targetIntent: Intent) {
+        performNativeShutdown()
+        val sdlThread = SDLActivity.mSDLThread
+        if (sdlThread?.isAlive == true) {
+            Log.w(TAG, "Proceeding with process rebirth while SDLThread is still alive; shader cache may not be fully flushed")
+        }
+        ProcessPhoenix.triggerRebirth(applicationContext, targetIntent)
+    }
+
     private fun isLaunchIntent(intent: Intent?): Boolean {
         val action = intent?.action.orEmpty()
         return action == ACTION_EXTERNAL_LAUNCH || action.startsWith("LAUNCH_")
@@ -581,6 +591,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     private companion object {
+        const val TAG = "EmuCoreVEmulator"
         const val ACTION_EXTERNAL_LAUNCH = "com.sbro.emucorev.action.LAUNCH"
         const val APP_RESTART_PARAMETERS = "AppStartParameters"
         const val EXTRA_TITLE_ID = "titleId"
