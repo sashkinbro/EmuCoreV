@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,16 +37,23 @@ import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -55,8 +62,6 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.core.VitaCoreConfig
 import kotlin.math.roundToInt
 
-// Modern pause menu for live emulation.
-//
 // Surface roles:
 //   - `EmulationQuickBar` is the always-visible toolbar shown while the game is
 //     suspended; it exposes the few actions a player reaches for the most
@@ -68,13 +73,31 @@ import kotlin.math.roundToInt
 //   - LIVE   — change is applied to the running game immediately.
 //   - RESTART — change is persisted to config.yml; effect applies on next launch.
 
-internal val EmulationMenuPanel = Color(0xFF17171D).copy(alpha = 0.96f)
-internal val EmulationMenuPanelSoft = Color(0xFF22222B).copy(alpha = 0.92f)
-internal val EmulationMenuBorder = Color.White.copy(alpha = 0.08f)
-internal val EmulationMenuTextPrimary = Color(0xFFF4F4F7)
-internal val EmulationMenuTextSecondary = Color(0xFFB7B7C9)
 private val LiveBadgeColor = Color(0xFF34D27A)
 private val RestartBadgeColor = Color(0xFFE0A82E)
+
+private data class EmulationMenuPalette(
+    val panel: Color,
+    val panelSoft: Color,
+    val row: Color,
+    val border: Color,
+    val textPrimary: Color,
+    val textSecondary: Color
+)
+
+@Composable
+private fun emulationMenuPalette(): EmulationMenuPalette {
+    val scheme = MaterialTheme.colorScheme
+    val dark = scheme.background.luminance() < 0.5f
+    return EmulationMenuPalette(
+        panel = scheme.surface.copy(alpha = if (dark) 0.96f else 0.98f),
+        panelSoft = scheme.surfaceContainerHigh.copy(alpha = if (dark) 0.92f else 0.96f),
+        row = scheme.surfaceVariant.copy(alpha = if (dark) 0.18f else 0.48f),
+        border = scheme.outlineVariant.copy(alpha = if (dark) 0.24f else 0.58f),
+        textPrimary = scheme.onSurface,
+        textSecondary = scheme.onSurfaceVariant
+    )
+}
 
 /**
  * Floating toolbar shown above the game when the user invokes the pause UI.
@@ -89,11 +112,12 @@ fun EmulationQuickBar(
     modifier: Modifier = Modifier
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val palette = emulationMenuPalette()
     Surface(
         modifier = modifier.padding(top = topInset + 12.dp),
         shape = RoundedCornerShape(28.dp),
-        color = EmulationMenuPanel,
-        border = BorderStroke(1.dp, EmulationMenuBorder),
+        color = palette.panel,
+        border = BorderStroke(1.dp, palette.border),
         tonalElevation = 4.dp,
         shadowElevation = 12.dp
     ) {
@@ -107,17 +131,20 @@ fun EmulationQuickBar(
                 contentDescription = stringResource(
                     if (paused) R.string.emulation_resume else R.string.emulation_pause
                 ),
-                onClick = onPauseToggle
+                onClick = onPauseToggle,
+                palette = palette
             )
             QuickBarButton(
                 icon = Icons.Rounded.CameraAlt,
                 contentDescription = stringResource(R.string.emulation_quickbar_screenshot),
-                onClick = onScreenshot
+                onClick = onScreenshot,
+                palette = palette
             )
             QuickBarButton(
                 icon = Icons.Rounded.Tune,
                 contentDescription = stringResource(R.string.emulation_quickbar_open_menu),
-                onClick = onOpenMenu
+                onClick = onOpenMenu,
+                palette = palette
             )
         }
     }
@@ -127,41 +154,37 @@ fun EmulationQuickBar(
 private fun QuickBarButton(
     icon: ImageVector,
     contentDescription: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    palette: EmulationMenuPalette
 ) {
     Box(
         modifier = Modifier
             .size(48.dp)
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.05f))
+            .background(palette.row)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = EmulationMenuTextPrimary,
+            tint = palette.textPrimary,
             modifier = Modifier.size(22.dp)
         )
     }
 }
-
-/**
- * Full game menu, rendered as a translucent sheet anchored to the bottom (or
- * right edge on tablets). The composable returns a card; the host is
- * responsible for animating it in/out and for darkening the scrim behind.
- */
 @Composable
 fun EmulationGameMenu(
     gameId: String,
     config: VitaCoreConfig,
     paused: Boolean,
-    controlsEditMode: Boolean,
     expandHorizontally: Boolean,
     callbacks: EmulationMenuCallbacks,
     modifier: Modifier = Modifier
 ) {
     val navInsets = WindowInsets.navigationBars.asPaddingValues()
+    val palette = emulationMenuPalette()
+    var selectedTab by remember { mutableStateOf(EmulationMenuTab.Game) }
     val shape = if (expandHorizontally) {
         RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
     } else {
@@ -173,7 +196,7 @@ fun EmulationGameMenu(
                 if (expandHorizontally) {
                     Modifier
                         .fillMaxHeight()
-                        .width(440.dp)
+                        .widthIn(min = 360.dp, max = 440.dp)
                 } else {
                     Modifier
                         .fillMaxWidth()
@@ -181,15 +204,14 @@ fun EmulationGameMenu(
                 }
             ),
         shape = shape,
-        color = EmulationMenuPanel,
-        border = BorderStroke(1.dp, EmulationMenuBorder),
+        color = palette.panel,
+        border = BorderStroke(1.dp, palette.border),
         tonalElevation = 6.dp,
         shadowElevation = 18.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .padding(
                     start = 18.dp,
                     end = 18.dp,
@@ -202,220 +224,320 @@ fun EmulationGameMenu(
                 SheetHandle()
             }
             MenuHeader(gameId = gameId, paused = paused)
+            MenuTopActions(paused = paused, callbacks = callbacks)
+            MenuTabs(selectedTab = selectedTab, onSelected = { selectedTab = it })
 
-            MenuSection(
-                title = stringResource(R.string.emulation_menu_section_now),
-                subtitle = stringResource(R.string.emulation_menu_section_now_desc),
-                badge = MenuBadge.Live
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_core_performance_overlay),
-                    checked = config.performanceOverlay,
-                    onCheckedChange = callbacks.onPerformanceOverlay
-                )
-                if (config.performanceOverlay) {
-                    MenuChipRow(
-                        label = stringResource(R.string.settings_core_overlay_detail_title),
-                        selected = config.performanceOverlayDetail,
-                        options = listOf(
-                            0 to stringResource(R.string.settings_core_overlay_detail_minimum),
-                            1 to stringResource(R.string.settings_core_overlay_detail_low),
-                            2 to stringResource(R.string.settings_core_overlay_detail_medium),
-                            3 to stringResource(R.string.settings_core_overlay_detail_maximum)
-                        ),
-                        onSelected = callbacks.onPerformanceDetail
-                    )
-                    MenuChipRow(
-                        label = stringResource(R.string.settings_core_overlay_position_title),
-                        selected = config.performanceOverlayPosition,
-                        options = listOf(
-                            0 to stringResource(R.string.settings_core_overlay_position_top_left),
-                            1 to stringResource(R.string.settings_core_overlay_position_top_center),
-                            2 to stringResource(R.string.settings_core_overlay_position_top_right),
-                            3 to stringResource(R.string.settings_core_overlay_position_bottom_left),
-                            4 to stringResource(R.string.settings_core_overlay_position_bottom_center),
-                            5 to stringResource(R.string.settings_core_overlay_position_bottom_right)
-                        ),
-                        onSelected = callbacks.onPerformancePosition
+                when (selectedTab) {
+                    EmulationMenuTab.Game -> GameTab(config = config, callbacks = callbacks)
+                    EmulationMenuTab.Controls -> ControlsTab(config = config, callbacks = callbacks)
+                    EmulationMenuTab.Display -> DisplayTab(config = config, callbacks = callbacks)
+                    EmulationMenuTab.System -> SystemTab(config = config, callbacks = callbacks)
+                }
+            }
+        }
+    }
+}
+
+private enum class EmulationMenuTab {
+    Game,
+    Controls,
+    Display,
+    System
+}
+
+@Composable
+private fun GameTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks) {
+    MenuSection(
+        title = stringResource(R.string.emulation_menu_section_now),
+        subtitle = stringResource(R.string.emulation_menu_section_now_desc),
+        badge = MenuBadge.Live
+    ) {
+        MenuToggleRow(
+            label = stringResource(R.string.settings_core_performance_overlay),
+            checked = config.performanceOverlay,
+            onCheckedChange = callbacks.onPerformanceOverlay
+        )
+        if (config.performanceOverlay) {
+            MenuChipRow(
+                label = stringResource(R.string.settings_core_overlay_detail_title),
+                selected = config.performanceOverlayDetail,
+                options = listOf(
+                    0 to stringResource(R.string.settings_core_overlay_detail_minimum),
+                    1 to stringResource(R.string.settings_core_overlay_detail_low),
+                    2 to stringResource(R.string.settings_core_overlay_detail_medium),
+                    3 to stringResource(R.string.settings_core_overlay_detail_maximum)
+                ),
+                onSelected = callbacks.onPerformanceDetail
+            )
+            MenuChipRow(
+                label = stringResource(R.string.settings_core_overlay_position_title),
+                selected = config.performanceOverlayPosition,
+                options = listOf(
+                    0 to stringResource(R.string.settings_core_overlay_position_top_left),
+                    1 to stringResource(R.string.settings_core_overlay_position_top_center),
+                    2 to stringResource(R.string.settings_core_overlay_position_top_right),
+                    3 to stringResource(R.string.settings_core_overlay_position_bottom_left),
+                    4 to stringResource(R.string.settings_core_overlay_position_bottom_center),
+                    5 to stringResource(R.string.settings_core_overlay_position_bottom_right)
+                ),
+                onSelected = callbacks.onPerformancePosition
+            )
+        }
+        MenuSliderRow(
+            label = stringResource(R.string.settings_core_audio_volume_label),
+            value = config.audioVolume.toFloat(),
+            valueText = "${config.audioVolume}%",
+            valueRange = 0f..100f,
+            steps = 19,
+            onValueChange = { callbacks.onAudioVolume(it.roundToInt()) }
+        )
+        MenuSliderRow(
+            label = stringResource(R.string.settings_bgm_volume),
+            value = config.bgmVolume.toFloat(),
+            valueText = "${config.bgmVolume}%",
+            valueRange = 0f..100f,
+            steps = 19,
+            onValueChange = { callbacks.onBgmVolume(it.roundToInt()) }
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_show_info_bar),
+            checked = config.showInfoBar,
+            onCheckedChange = callbacks.onInfoBar
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_core_touchpad_cursor),
+            checked = config.showTouchpadCursor,
+            onCheckedChange = callbacks.onTouchpadCursor
+        )
+    }
+}
+
+@Composable
+private fun ControlsTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks) {
+    MenuSection(
+        title = stringResource(R.string.emulation_menu_section_touch),
+        subtitle = stringResource(R.string.emulation_menu_section_touch_desc),
+        badge = MenuBadge.Live
+    ) {
+        MenuActionRow(
+            icon = Icons.Rounded.Edit,
+            title = stringResource(R.string.emulation_menu_edit_controls),
+            subtitle = stringResource(R.string.emulation_menu_edit_controls_desc),
+            onClick = callbacks.onEditControls
+        )
+        MenuActionRow(
+            icon = if (config.enableGamepadOverlay) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+            title = stringResource(
+                if (config.enableGamepadOverlay) R.string.emulation_menu_hide_controls
+                else R.string.emulation_menu_show_controls
+            ),
+            subtitle = stringResource(R.string.emulation_menu_controls_desc),
+            onClick = callbacks.onControlsVisibility
+        )
+        MenuActionRow(
+            icon = Icons.Rounded.Refresh,
+            title = stringResource(R.string.emulation_menu_reset_overlay),
+            subtitle = stringResource(R.string.emulation_menu_reset_overlay_desc),
+            onClick = callbacks.onResetOverlay
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_show_touch_switch),
+            checked = config.overlayShowTouchSwitch,
+            onCheckedChange = callbacks.onTouchSwitch
+        )
+        MenuSliderRow(
+            label = stringResource(R.string.settings_core_overlay_scale_label),
+            value = config.overlayScale,
+            valueText = stringResource(R.string.settings_core_overlay_scale_value, config.overlayScale),
+            valueRange = 0.5f..2f,
+            steps = 14,
+            onValueChange = callbacks.onOverlayScale
+        )
+        MenuSliderRow(
+            label = stringResource(R.string.settings_core_overlay_opacity_label),
+            value = config.overlayOpacity.toFloat(),
+            valueText = stringResource(R.string.settings_core_overlay_opacity_value, config.overlayOpacity),
+            valueRange = 10f..100f,
+            steps = 8,
+            onValueChange = { callbacks.onOverlayOpacity(it.roundToInt()) }
+        )
+    }
+}
+
+@Composable
+private fun DisplayTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks) {
+    MenuSection(
+        title = stringResource(R.string.emulation_menu_section_display),
+        subtitle = stringResource(R.string.emulation_menu_section_display_desc),
+        badge = MenuBadge.Restart
+    ) {
+        MenuSliderRow(
+            label = stringResource(R.string.settings_resolution_multiplier),
+            value = config.resolutionMultiplier,
+            valueText = stringResource(R.string.emulation_menu_resolution_value, config.resolutionMultiplier),
+            valueRange = 1f..8f,
+            steps = 13,
+            onValueChange = { callbacks.onResolutionMultiplier((it * 2f).roundToInt() / 2f) }
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_vsync),
+            checked = config.vSync,
+            onCheckedChange = callbacks.onVsync
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_stretch_display_area),
+            checked = config.stretchDisplayArea,
+            onCheckedChange = callbacks.onStretchDisplay
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_core_high_accuracy),
+            checked = config.highAccuracy,
+            onCheckedChange = callbacks.onHighAccuracy
+        )
+    }
+
+    MenuSection(
+        title = stringResource(R.string.emulation_menu_section_performance),
+        subtitle = stringResource(R.string.emulation_menu_section_performance_desc),
+        badge = MenuBadge.Restart
+    ) {
+        MenuToggleRow(
+            label = stringResource(R.string.settings_core_fps_hack),
+            checked = config.fpsHack,
+            onCheckedChange = callbacks.onFpsHack
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_turbo_mode),
+            checked = config.turboMode,
+            onCheckedChange = callbacks.onTurboMode
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_core_disable_surface_sync),
+            checked = config.disableSurfaceSync,
+            onCheckedChange = callbacks.onDisableSurfaceSync
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_core_shader_compilation_notice),
+            checked = config.showCompileShaders,
+            onCheckedChange = callbacks.onShowShaderNotice
+        )
+    }
+}
+
+@Composable
+private fun SystemTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks) {
+    MenuSection(
+        title = stringResource(R.string.emulation_menu_section_system),
+        subtitle = stringResource(R.string.emulation_menu_section_system_desc),
+        badge = MenuBadge.Restart
+    ) {
+        MenuToggleRow(
+            label = stringResource(R.string.settings_pstv_mode),
+            checked = config.pstvMode,
+            onCheckedChange = callbacks.onPstvMode
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_show_welcome),
+            checked = config.showWelcome,
+            onCheckedChange = callbacks.onShowWelcome
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_warn_missing_firmware),
+            checked = config.warnMissingFirmware,
+            onCheckedChange = callbacks.onWarnMissingFirmware
+        )
+    }
+}
+
+@Composable
+private fun MenuTopActions(paused: Boolean, callbacks: EmulationMenuCallbacks) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        MenuTopAction(
+            icon = if (paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+            text = stringResource(if (paused) R.string.emulation_resume else R.string.emulation_pause),
+            onClick = callbacks.onPauseToggle,
+            modifier = Modifier.weight(1f)
+        )
+        MenuTopAction(
+            icon = Icons.AutoMirrored.Rounded.ExitToApp,
+            text = stringResource(R.string.emulation_menu_exit_game),
+            onClick = callbacks.onExit,
+            destructive = true,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun MenuTopAction(
+    icon: ImageVector,
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    destructive: Boolean = false
+) {
+    val palette = emulationMenuPalette()
+    val tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+    Surface(
+        modifier = modifier.height(52.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = if (destructive) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f) else palette.row,
+        border = BorderStroke(1.dp, if (destructive) MaterialTheme.colorScheme.error.copy(alpha = 0.38f) else palette.border),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = if (destructive) MaterialTheme.colorScheme.error else palette.textPrimary,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MenuTabs(selectedTab: EmulationMenuTab, onSelected: (EmulationMenuTab) -> Unit) {
+    val palette = emulationMenuPalette()
+    val tabs = listOf(
+        EmulationMenuTab.Game to stringResource(R.string.emulation_tab_game),
+        EmulationMenuTab.Controls to stringResource(R.string.emulation_tab_controls),
+        EmulationMenuTab.Display to stringResource(R.string.emulation_tab_display),
+        EmulationMenuTab.System to stringResource(R.string.emulation_tab_system)
+    )
+    PrimaryScrollableTabRow(
+        selectedTabIndex = tabs.indexOfFirst { it.first == selectedTab }.coerceAtLeast(0),
+        containerColor = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.primary,
+        edgePadding = 0.dp,
+        divider = {}
+    ) {
+        tabs.forEach { (tab, label) ->
+            Tab(
+                selected = selectedTab == tab,
+                onClick = { onSelected(tab) },
+                text = {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (selectedTab == tab) MaterialTheme.colorScheme.primary else palette.textSecondary
                     )
                 }
-                MenuSliderRow(
-                    label = stringResource(R.string.settings_core_audio_volume_label),
-                    value = config.audioVolume.toFloat(),
-                    valueText = "${config.audioVolume}%",
-                    valueRange = 0f..100f,
-                    steps = 19,
-                    onValueChange = { callbacks.onAudioVolume(it.roundToInt()) }
-                )
-                MenuSliderRow(
-                    label = stringResource(R.string.settings_bgm_volume),
-                    value = config.bgmVolume.toFloat(),
-                    valueText = "${config.bgmVolume}%",
-                    valueRange = 0f..100f,
-                    steps = 19,
-                    onValueChange = { callbacks.onBgmVolume(it.roundToInt()) }
-                )
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_show_info_bar),
-                    checked = config.showInfoBar,
-                    onCheckedChange = callbacks.onInfoBar
-                )
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_core_touchpad_cursor),
-                    checked = config.showTouchpadCursor,
-                    onCheckedChange = callbacks.onTouchpadCursor
-                )
-            }
-
-            MenuSection(
-                title = stringResource(R.string.emulation_menu_section_touch),
-                subtitle = stringResource(R.string.emulation_menu_section_touch_desc),
-                badge = MenuBadge.Live
-            ) {
-                MenuActionRow(
-                    icon = Icons.Rounded.Edit,
-                    title = stringResource(R.string.emulation_menu_edit_controls),
-                    subtitle = stringResource(R.string.emulation_menu_edit_controls_desc),
-                    onClick = callbacks.onEditControls
-                )
-                MenuActionRow(
-                    icon = if (config.enableGamepadOverlay) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                    title = stringResource(
-                        if (config.enableGamepadOverlay) R.string.emulation_menu_hide_controls
-                        else R.string.emulation_menu_show_controls
-                    ),
-                    subtitle = stringResource(R.string.emulation_menu_controls_desc),
-                    onClick = callbacks.onControlsVisibility
-                )
-                MenuActionRow(
-                    icon = Icons.Rounded.Refresh,
-                    title = stringResource(R.string.emulation_menu_reset_overlay),
-                    subtitle = stringResource(R.string.emulation_menu_reset_overlay_desc),
-                    onClick = callbacks.onResetOverlay
-                )
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_show_touch_switch),
-                    checked = config.overlayShowTouchSwitch,
-                    onCheckedChange = callbacks.onTouchSwitch
-                )
-                MenuSliderRow(
-                    label = stringResource(R.string.settings_core_overlay_scale_label),
-                    value = config.overlayScale,
-                    valueText = stringResource(R.string.settings_core_overlay_scale_value, config.overlayScale),
-                    valueRange = 0.5f..2f,
-                    steps = 14,
-                    onValueChange = callbacks.onOverlayScale
-                )
-                MenuSliderRow(
-                    label = stringResource(R.string.settings_core_overlay_opacity_label),
-                    value = config.overlayOpacity.toFloat(),
-                    valueText = stringResource(R.string.settings_core_overlay_opacity_value, config.overlayOpacity),
-                    valueRange = 10f..100f,
-                    steps = 8,
-                    onValueChange = { callbacks.onOverlayOpacity(it.roundToInt()) }
-                )
-            }
-
-            MenuSection(
-                title = stringResource(R.string.emulation_menu_section_display),
-                subtitle = stringResource(R.string.emulation_menu_section_display_desc),
-                badge = MenuBadge.Restart
-            ) {
-                MenuSliderRow(
-                    label = stringResource(R.string.settings_resolution_multiplier),
-                    value = config.resolutionMultiplier,
-                    valueText = stringResource(R.string.emulation_menu_resolution_value, config.resolutionMultiplier),
-                    valueRange = 1f..8f,
-                    steps = 13,
-                    onValueChange = { callbacks.onResolutionMultiplier((it * 2f).roundToInt() / 2f) }
-                )
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_vsync),
-                    checked = config.vSync,
-                    onCheckedChange = callbacks.onVsync
-                )
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_stretch_display_area),
-                    checked = config.stretchDisplayArea,
-                    onCheckedChange = callbacks.onStretchDisplay
-                )
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_core_high_accuracy),
-                    checked = config.highAccuracy,
-                    onCheckedChange = callbacks.onHighAccuracy
-                )
-            }
-
-            MenuSection(
-                title = stringResource(R.string.emulation_menu_section_performance),
-                subtitle = stringResource(R.string.emulation_menu_section_performance_desc),
-                badge = MenuBadge.Restart
-            ) {
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_core_fps_hack),
-                    checked = config.fpsHack,
-                    onCheckedChange = callbacks.onFpsHack
-                )
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_turbo_mode),
-                    checked = config.turboMode,
-                    onCheckedChange = callbacks.onTurboMode
-                )
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_core_disable_surface_sync),
-                    checked = config.disableSurfaceSync,
-                    onCheckedChange = callbacks.onDisableSurfaceSync
-                )
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_core_shader_compilation_notice),
-                    checked = config.showCompileShaders,
-                    onCheckedChange = callbacks.onShowShaderNotice
-                )
-            }
-
-            MenuSection(
-                title = stringResource(R.string.emulation_menu_section_system),
-                subtitle = stringResource(R.string.emulation_menu_section_system_desc),
-                badge = MenuBadge.Restart
-            ) {
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_pstv_mode),
-                    checked = config.pstvMode,
-                    onCheckedChange = callbacks.onPstvMode
-                )
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_show_welcome),
-                    checked = config.showWelcome,
-                    onCheckedChange = callbacks.onShowWelcome
-                )
-                MenuToggleRow(
-                    label = stringResource(R.string.settings_warn_missing_firmware),
-                    checked = config.warnMissingFirmware,
-                    onCheckedChange = callbacks.onWarnMissingFirmware
-                )
-            }
-
-            MenuSection(
-                title = stringResource(R.string.emulation_menu_section_session),
-                subtitle = stringResource(R.string.emulation_menu_section_session_desc),
-                badge = null
-            ) {
-                MenuActionRow(
-                    icon = if (paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                    title = stringResource(
-                        if (paused) R.string.emulation_resume else R.string.emulation_pause
-                    ),
-                    subtitle = stringResource(R.string.emulation_menu_pause_desc),
-                    onClick = callbacks.onPauseToggle
-                )
-                MenuActionRow(
-                    icon = Icons.AutoMirrored.Rounded.ExitToApp,
-                    title = stringResource(R.string.emulation_menu_exit_game),
-                    subtitle = stringResource(R.string.emulation_menu_exit_game_desc),
-                    onClick = callbacks.onExit,
-                    destructive = true
-                )
-            }
+            )
         }
     }
 }
@@ -454,6 +576,7 @@ private enum class MenuBadge { Live, Restart }
 
 @Composable
 private fun SheetHandle() {
+    val palette = emulationMenuPalette()
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -464,17 +587,18 @@ private fun SheetHandle() {
             modifier = Modifier
                 .size(width = 42.dp, height = 4.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(alpha = 0.16f))
+                .background(palette.textSecondary.copy(alpha = 0.26f))
         )
     }
 }
 
 @Composable
 private fun MenuHeader(gameId: String, paused: Boolean) {
+    val palette = emulationMenuPalette()
     Surface(
         shape = RoundedCornerShape(20.dp),
-        color = Color.White.copy(alpha = 0.04f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+        color = palette.row,
+        border = BorderStroke(1.dp, palette.border)
     ) {
         Column(
             modifier = Modifier
@@ -497,7 +621,7 @@ private fun MenuHeader(gameId: String, paused: Boolean) {
                 Text(
                     text = stringResource(R.string.emulation_menu_title),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = EmulationMenuTextPrimary,
+                    color = palette.textPrimary,
                     modifier = Modifier.weight(1f)
                 )
                 if (paused) {
@@ -507,7 +631,7 @@ private fun MenuHeader(gameId: String, paused: Boolean) {
             Text(
                 text = gameId.ifBlank { stringResource(R.string.emulation_menu_unknown_game) },
                 style = MaterialTheme.typography.bodyMedium,
-                color = EmulationMenuTextSecondary
+                color = palette.textSecondary
             )
         }
     }
@@ -520,10 +644,11 @@ private fun MenuSection(
     badge: MenuBadge?,
     content: @Composable () -> Unit
 ) {
+    val palette = emulationMenuPalette()
     Surface(
         shape = RoundedCornerShape(22.dp),
-        color = EmulationMenuPanelSoft,
-        border = BorderStroke(1.dp, EmulationMenuBorder)
+        color = palette.panelSoft,
+        border = BorderStroke(1.dp, palette.border)
     ) {
         Column(
             modifier = Modifier
@@ -538,7 +663,7 @@ private fun MenuSection(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = EmulationMenuTextPrimary,
+                    color = palette.textPrimary,
                     modifier = Modifier.weight(1f)
                 )
                 when (badge) {
@@ -556,7 +681,7 @@ private fun MenuSection(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = EmulationMenuTextSecondary
+                color = palette.textSecondary
             )
             content()
         }
@@ -585,6 +710,7 @@ private fun MenuToggleRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val palette = emulationMenuPalette()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -596,7 +722,7 @@ private fun MenuToggleRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = EmulationMenuTextPrimary,
+            color = palette.textPrimary,
             modifier = Modifier.weight(1f)
         )
         Switch(checked = checked, onCheckedChange = onCheckedChange)
@@ -612,18 +738,19 @@ private fun MenuSliderRow(
     steps: Int,
     onValueChange: (Float) -> Unit
 ) {
+    val palette = emulationMenuPalette()
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
-                color = EmulationMenuTextPrimary,
+                color = palette.textPrimary,
                 modifier = Modifier.weight(1f)
             )
             Text(
                 text = valueText,
                 style = MaterialTheme.typography.labelMedium,
-                color = EmulationMenuTextSecondary
+                color = palette.textSecondary
             )
         }
         Slider(
@@ -642,11 +769,12 @@ private fun MenuChipRow(
     options: List<Pair<Int, String>>,
     onSelected: (Int) -> Unit
 ) {
+    val palette = emulationMenuPalette()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = EmulationMenuTextSecondary
+            color = palette.textSecondary
         )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (value, text) ->
@@ -668,19 +796,20 @@ private fun MenuActionRow(
     onClick: () -> Unit,
     destructive: Boolean = false
 ) {
+    val palette = emulationMenuPalette()
     val containerColor = if (destructive) {
         MaterialTheme.colorScheme.error.copy(alpha = 0.14f)
     } else {
-        Color.White.copy(alpha = 0.05f)
+        palette.row
     }
-    val tint = if (destructive) MaterialTheme.colorScheme.error else EmulationMenuTextPrimary
+    val tint = if (destructive) MaterialTheme.colorScheme.error else palette.textPrimary
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),
         color = containerColor,
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.04f))
+        border = BorderStroke(1.dp, palette.border)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -697,7 +826,7 @@ private fun MenuActionRow(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = EmulationMenuTextSecondary
+                    color = palette.textSecondary
                 )
             }
         }

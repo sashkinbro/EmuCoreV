@@ -51,6 +51,7 @@ import com.sbro.emucorev.core.vita.overlay.InputOverlay
 import com.jakewharton.processphoenix.ProcessPhoenix
 import com.sbro.emucorev.BuildConfig
 import com.sbro.emucorev.R
+import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.ui.emulation.EmulationOverlayHost
 import com.sbro.emucorev.ui.theme.EmuCoreVTheme
 import java.io.File
@@ -453,12 +454,13 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         layout.setViewTreeSavedStateRegistryOwner(composeOwners)
         layout.setViewTreeViewModelStoreOwner(composeOwners)
         val composeView = ComposeView(this).apply {
+            val preferences = AppPreferences(this@Emulator)
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setViewTreeLifecycleOwner(composeOwners)
             setViewTreeSavedStateRegistryOwner(composeOwners)
             setViewTreeViewModelStoreOwner(composeOwners)
             setContent {
-                EmuCoreVTheme {
+                EmuCoreVTheme(themeMode = preferences.themeMode) {
                     EmulationOverlayHost(activity = this@Emulator)
                 }
             }

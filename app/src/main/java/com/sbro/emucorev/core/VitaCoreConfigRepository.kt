@@ -1,14 +1,12 @@
 package com.sbro.emucorev.core
 
 import android.content.Context
-import com.sbro.emucorev.BuildConfig
 import java.io.File
 
-// Defaults below mirror upstream Vita3K's config/include/config/config.h
-// (CONFIG_INDIVIDUAL macro). Stay in lock-step with vanilla so games behave
-// the same as they do in the reference Vita3K Android build.
+// Defaults follow upstream Vita3K unless EmuCoreV needs a mobile-safe runtime
+// override in its own layer. The vanilla core stays untouched.
 data class VitaCoreConfig(
-    val validationLayer: Boolean = true,
+    val validationLayer: Boolean = false,
     val logActiveShaders: Boolean = false,
     val logUniforms: Boolean = false,
     val logCompatWarn: Boolean = false,
@@ -227,7 +225,7 @@ class VitaCoreConfigRepository(private val context: Context) {
                 fileLoadingDelay = values["file-loading-delay"]?.toIntOrNull() ?: defaults.fileLoadingDelay,
                 shaderCache = values["shader-cache"]?.toBooleanStrictOrNull() ?: defaults.shaderCache,
                 spirvShader = values["spirv-shader"]?.toBooleanStrictOrNull() ?: defaults.spirvShader,
-                psnSignedIn = values["psn-signed-in"]?.toBooleanStrictOrNull() ?: defaults.psnSignedIn,
+                psnSignedIn = values["psn-signed-in"].toBooleanLikeOrNull() ?: defaults.psnSignedIn,
                 httpEnable = values["http-enable"]?.toBooleanStrictOrNull() ?: defaults.httpEnable,
                 colorSurfaceDebug = values["color-surface-debug"]?.toBooleanStrictOrNull() ?: defaults.colorSurfaceDebug,
                 showShaderCacheWarn = values["show-shader-cache-warn"]?.toBooleanStrictOrNull() ?: defaults.showShaderCacheWarn,
@@ -272,7 +270,9 @@ class VitaCoreConfigRepository(private val context: Context) {
         return loaded.copy(
             showCompileShaders = upstream.showCompileShaders,
             cpuPoolSize = upstream.cpuPoolSize,
-            validationLayer = upstream.validationLayer,
+            validationLayer = false,
+            customDriverName = "",
+            psnSignedIn = false,
             logLevel = defaultConfig().logLevel
         )
     }
@@ -333,7 +333,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["file-loading-delay"] = config.fileLoadingDelay.toString()
         values["shader-cache"] = config.shaderCache.toString()
         values["spirv-shader"] = config.spirvShader.toString()
-        values["psn-signed-in"] = config.psnSignedIn.toString()
+        values["psn-signed-in"] = if (config.psnSignedIn) "1" else "0"
         values["http-enable"] = config.httpEnable.toString()
         values["color-surface-debug"] = config.colorSurfaceDebug.toString()
         values["show-shader-cache-warn"] = config.showShaderCacheWarn.toString()
@@ -387,6 +387,14 @@ class VitaCoreConfigRepository(private val context: Context) {
         return normalized?.takeUnless { it.equals("null", ignoreCase = true) }
     }
 
+    private fun String?.toBooleanLikeOrNull(): Boolean? {
+        return when (this?.trim()?.lowercase()) {
+            "true", "1" -> true
+            "false", "0" -> false
+            else -> null
+        }
+    }
+
     private fun formatFloat(value: Float): String {
         val normalized = if (value % 1f == 0f) value.toInt().toString() else value.toString()
         return normalized
@@ -397,7 +405,6 @@ class VitaCoreConfigRepository(private val context: Context) {
     }
 
     private fun normalizeForBuild(config: VitaCoreConfig): VitaCoreConfig {
-        if (BuildConfig.DEBUG) return config
         val diagnosticsEnabled = config.logActiveShaders ||
             config.logUniforms ||
             config.logCompatWarn ||
@@ -414,8 +421,9 @@ class VitaCoreConfigRepository(private val context: Context) {
     }
 
     private fun releaseValuesNeedNormalization(values: Map<String, String>): Boolean {
-        if (BuildConfig.DEBUG) return false
-        return values["validation-layer"]?.toBooleanStrictOrNull() == true
+        return values["custom-driver-name"]?.equals("null", ignoreCase = true) == true ||
+            values["psn-signed-in"]?.let { it != "0" && it != "1" && it.toBooleanStrictOrNull() != null } == true ||
+            values["validation-layer"]?.toBooleanStrictOrNull() == true
     }
 
     private fun migrateLegacyConfigIfNeeded() {
@@ -432,19 +440,19 @@ class VitaCoreConfigRepository(private val context: Context) {
 
     private fun defaultConfig(): VitaCoreConfig {
         return VitaCoreConfig(
-            logLevel = if (BuildConfig.DEBUG) DEBUG_LOG_LEVEL else RELEASE_LOG_LEVEL
+            logLevel = RELEASE_LOG_LEVEL
         )
     }
 
     private companion object {
-        // 0 = TRACE (upstream Vita3K default). Kept verbose only in debug builds;
-        // release builds collapse to OFF via normalizeForBuild below.
+        // 0 = TRACE (upstream Vita3K default). EmuCoreV defaults to OFF for
+        // gameplay; diagnostics can still be enabled from advanced settings.
         private const val DEBUG_LOG_LEVEL = 0
         private const val RELEASE_LOG_LEVEL = 6
         // Bump whenever an old non-upstream default needs to be snapped to vanilla
         // for users who already wrote a stale config.yml. applyMigrations() rewrites
         // the affected keys on the next launch.
-        private const val CONFIG_SCHEMA_VERSION = 2
+        private const val CONFIG_SCHEMA_VERSION = 3
         private const val SCHEMA_VERSION_KEY = "config-schema-version"
     }
 }

@@ -1,20 +1,47 @@
 package com.sbro.emucorev.core
 
 import android.content.Context
+import android.util.Log
 import org.libsdl.app.SDL
 
 object NativeLibraryLoader {
+    private const val TAG = "NativeLibraryLoader"
+
     @Volatile
     private var loaded = false
 
+    @Volatile
+    private var initialized = false
+
     fun ensureLoaded(context: Context) {
-        if (loaded) return
-        synchronized(this) {
-            if (loaded) return
-            val appContext = context.applicationContext
-            SDL.setContext(appContext)
-            SDL.loadLibrary("Vita3K", appContext)
-            loaded = true
+        val appContext = context.applicationContext
+        if (!loaded) {
+            synchronized(this) {
+                if (!loaded) {
+                    SDL.setContext(appContext)
+                    SDL.loadLibrary("Vita3K", appContext)
+                    loaded = true
+                }
+            }
+        }
+        if (!initialized) {
+            synchronized(this) {
+                if (!initialized) {
+                    EmulatorStorage.prepareRuntime(appContext)
+                    if (!NativeLib.prepareFrontend()) {
+                        Log.e(TAG, "NativeLib.prepareFrontend() failed")
+                    }
+                    if (!NativeLib.isInitialized()) {
+                        val storagePath = appContext.getExternalFilesDir(null)?.absolutePath
+                            ?: appContext.filesDir.absolutePath
+                        if (!NativeLib.init(storagePath)) {
+                            Log.e(TAG, "NativeLib.init('$storagePath') failed")
+                            return@synchronized
+                        }
+                    }
+                    initialized = true
+                }
+            }
         }
     }
 }
