@@ -676,4 +676,6 @@
     <string name="settings_gpu_driver_status_game_active">Переопределение игры: %1$s</string>
     <string name="settings_about_website">Официальный сайт</string>
     <string name="settings_about_website_desc">Откройте сайт EmuCoreV для загрузок, новостей и ссылок на проекты.</string>
+    <string name="settings_gpu_driver_status_global_desc">Эта игра использует глобальный выбор драйвера GPU.</string>
+    <string name="settings_gpu_driver_game_title">Драйвер GPU для игры</string>
 </resources>

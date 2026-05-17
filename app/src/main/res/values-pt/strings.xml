@@ -676,4 +676,6 @@
     <string name="settings_gpu_driver_status_game_active">Substituição do jogo: %1$s</string>
     <string name="settings_about_website">Site oficial</string>
     <string name="settings_about_website_desc">Abra o site EmuCoreV para downloads, notícias e links do projeto.</string>
+    <string name="settings_gpu_driver_status_global_desc">Este jogo segue a seleção de driver de GPU global.</string>
+    <string name="settings_gpu_driver_game_title">Driver de GPU do jogo</string>
 </resources>

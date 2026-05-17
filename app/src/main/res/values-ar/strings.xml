@@ -676,4 +676,6 @@
     <string name="settings_gpu_driver_status_game_active">تجاوز اللعبة: %1$s</string>
     <string name="settings_about_website">الموقع الرسمي</string>
     <string name="settings_about_website_desc">افتح موقع EmuCoreV للتنزيلات والأخبار وروابط المشروع.</string>
+    <string name="settings_gpu_driver_status_global_desc">تتبع هذه اللعبة اختيار برنامج تشغيل GPU العالمي.</string>
+    <string name="settings_gpu_driver_game_title">برنامج تشغيل GPU للعبة</string>
 </resources>

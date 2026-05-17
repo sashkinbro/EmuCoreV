@@ -675,4 +675,6 @@
     <string name="settings_gpu_driver_status_game_active">游戏覆盖：%1$s</string>
     <string name="settings_about_website">官方网站</string>
     <string name="settings_about_website_desc">打开 EmuCoreV 网站以获取下载、新闻和项目链接。</string>
+    <string name="settings_gpu_driver_status_global_desc">此游戏遵循全局 GPU 驱动程序选择。</string>
+    <string name="settings_gpu_driver_game_title">游戏 GPU 驱动程序</string>
 </resources>

@@ -676,4 +676,6 @@
     <string name="settings_gpu_driver_status_game_active">Anulación de juego: %1$s</string>
     <string name="settings_about_website">Sitio web oficial</string>
     <string name="settings_about_website_desc">Abre el sitio web de EmuCoreV para descargas, noticias y enlaces del proyecto.</string>
+    <string name="settings_gpu_driver_status_global_desc">Este juego sigue la selección del controlador de GPU global.</string>
+    <string name="settings_gpu_driver_game_title">Controlador de GPU del juego</string>
 </resources>
