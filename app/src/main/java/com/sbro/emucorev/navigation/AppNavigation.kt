@@ -33,6 +33,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.DocumentPathResolver
@@ -99,6 +100,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     val settingsViewModel: SettingsViewModel = viewModel()
     val installUiState by installViewModel.uiState.collectAsState()
     val settingsUiState by settingsViewModel.uiState.collectAsState()
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
+    val canShowStartupUpdateDialog = currentRoute == ROUTE_LIBRARY || currentRoute == ROUTE_HOME
     var firmwareInstalled by remember(context) { mutableStateOf(EmulatorStorage.hasInstalledFirmware(context)) }
     var firmwareUpdateInstalled by remember(context) { mutableStateOf(EmulatorStorage.hasInstalledFirmwareUpdate(context)) }
     val startDestination = if (preferences.onboardingCompleted) ROUTE_LIBRARY else ROUTE_ONBOARDING
@@ -176,7 +180,17 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
 
     LaunchedEffect(preferences.onboardingCompleted) {
         if (preferences.onboardingCompleted) {
-            settingsViewModel.checkForAppUpdates(showErrors = false, showStartupDialog = true)
+            settingsViewModel.checkForStartupAppUpdates()
+        }
+    }
+
+    LaunchedEffect(currentRoute, settingsUiState.appUpdate.startupDialogVisible) {
+        if (
+            currentRoute != null &&
+            settingsUiState.appUpdate.startupDialogVisible &&
+            !canShowStartupUpdateDialog
+        ) {
+            settingsViewModel.dismissStartupUpdateDialog()
         }
     }
 
@@ -702,7 +716,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     )
 
     val startupUpdateRelease = settingsUiState.appUpdate.latestRelease
-    if (settingsUiState.appUpdate.startupDialogVisible && startupUpdateRelease != null) {
+    if (canShowStartupUpdateDialog && settingsUiState.appUpdate.startupDialogVisible && startupUpdateRelease != null) {
         AppUpdateAvailableDialog(
             release = startupUpdateRelease,
             onDismiss = settingsViewModel::dismissStartupUpdateDialog,
