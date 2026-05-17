@@ -44,7 +44,7 @@ class InputOverlay(context: Context) {
                 return buildDisplayMask(latestConfig)
             }
             if (coreOverlayMask == 0) {
-                return 0
+                return buildDisplayMask(latestConfig)
             }
             return buildDisplayMask(latestConfig)
         }

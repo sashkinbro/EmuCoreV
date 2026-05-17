@@ -696,4 +696,15 @@
     <string name="install_choice_pkg_body">Instale a licença correspondente primeiro, cole uma chave zRIF ou escolha o PKG diretamente se a licença já estiver instalada.</string>
     <string name="install_choice_pkg_without_license_note">Você pode escolher um PKG sem colar um zRIF se a licença correspondente já tiver sido instalada.</string>
     <string name="common_cancel">Cancelar</string>
+    <string name="save_manager_backup_all_title">Backup de todos os saves</string>
+    <string name="save_manager_backup_all_body">Crie um backup ZIP com todas as pastas de save, ou restaure pastas de save de um backup completo anterior.</string>
+    <string name="save_manager_backup_all">Fazer backup de tudo</string>
+    <string name="save_manager_restore_all">Restaurar tudo</string>
+    <string name="save_manager_backup_all_success">Backup de %1$d pastas de save realizado.</string>
+    <string name="save_manager_backup_all_failed">Falha ao fazer backup de todos os saves.</string>
+    <string name="save_manager_restore_all_success">%1$d pastas de save restauradas.</string>
+    <string name="save_manager_restore_all_failed">Falha ao restaurar todos os saves.</string>
+    <string name="save_manager_restore_all_confirm_title">Restaurar todos os saves?</string>
+    <string name="save_manager_restore_all_confirm_body">As pastas de save do backup selecionado substituirão as pastas de save correspondentes neste dispositivo. Os saves existentes são mantidos apenas quando o backup não contém esse ID de save.</string>
+    <string name="save_manager_restore_all_confirm">Restaurar saves</string>
 </resources>

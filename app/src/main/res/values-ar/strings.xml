@@ -696,4 +696,15 @@
     <string name="install_choice_pkg_body">قم بتثبيت الترخيص المطابق أولاً، أو الصق مفتاح zRIF، أو اختر PKG مباشرة إذا كان الترخيص مثبتًا بالفعل.</string>
     <string name="install_choice_pkg_without_license_note">يمكنك اختيار PKG دون لصق zRIF إذا كان الترخيص المطابق مثبتًا بالفعل.</string>
     <string name="common_cancel">إلغاء</string>
+    <string name="save_manager_backup_all_title">النسخ الاحتياطي لجميع عمليات الحفظ</string>
+    <string name="save_manager_backup_all_body">قم بإنشاء نسخة احتياطية واحدة بتنسيق ZIP تحتوي على كل مجلد حفظ، أو قم باستعادة مجلدات الحفظ من نسخة احتياطية كاملة سابقة.</string>
+    <string name="save_manager_backup_all">نسخ احتياطي للكل</string>
+    <string name="save_manager_restore_all">استعادة الكل</string>
+    <string name="save_manager_backup_all_success">تم إجراء نسخ احتياطي لـ %1$d من مجلدات الحفظ.</string>
+    <string name="save_manager_backup_all_failed">فشل إجراء النسخ الاحتياطي لجميع عمليات الحفظ.</string>
+    <string name="save_manager_restore_all_success">تمت استعادة %1$d من مجلدات الحفظ.</string>
+    <string name="save_manager_restore_all_failed">فشلت استعادة جميع عمليات الحفظ.</string>
+    <string name="save_manager_restore_all_confirm_title">هل تريد استعادة جميع عمليات الحفظ؟</string>
+    <string name="save_manager_restore_all_confirm_body">ستحل مجلدات الحفظ من النسخة الاحتياطية المحددة محل مجلدات الحفظ المطابقة على هذا الجهاز. يتم الاحتفاظ بعمليات الحفظ الحالية فقط عندما لا تحتوي النسخة الاحتياطية على معرف الحفظ ذلك.</string>
+    <string name="save_manager_restore_all_confirm">استعادة عمليات الحفظ</string>
 </resources>

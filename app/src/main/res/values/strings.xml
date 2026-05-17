@@ -86,6 +86,17 @@
     <string name="save_manager_import_empty">The archive does not contain save files.</string>
     <string name="save_manager_import_unsafe">The archive contains unsafe paths.</string>
     <string name="save_manager_import_unknown_target">Choose a game save card before importing this archive, or use an archive with a single save folder.</string>
+    <string name="save_manager_backup_all_title">All saves backup</string>
+    <string name="save_manager_backup_all_body">Create one ZIP backup with every save folder, or restore save folders from a previous full backup.</string>
+    <string name="save_manager_backup_all">Back up all</string>
+    <string name="save_manager_restore_all">Restore all</string>
+    <string name="save_manager_backup_all_success">Backed up %1$d save folders.</string>
+    <string name="save_manager_backup_all_failed">Failed to back up all saves.</string>
+    <string name="save_manager_restore_all_success">Restored %1$d save folders.</string>
+    <string name="save_manager_restore_all_failed">Failed to restore all saves.</string>
+    <string name="save_manager_restore_all_confirm_title">Restore all saves?</string>
+    <string name="save_manager_restore_all_confirm_body">Save folders from the selected backup will replace matching save folders on this device. Existing saves are kept only when the backup does not contain that save ID.</string>
+    <string name="save_manager_restore_all_confirm">Restore saves</string>
     <string name="save_manager_empty_title">No save data found</string>
     <string name="save_manager_empty_body">Launch a game to create save data, or import a save archive.</string>
     <string name="save_manager_empty_game_title">No save data for %1$s</string>

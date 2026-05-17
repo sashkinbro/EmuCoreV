@@ -49,6 +49,7 @@ import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.core.input.InputDeviceClassifier
 import org.libsdl.app.SDLActivity
+import org.libsdl.app.SDLControllerManager
 import org.libsdl.app.SDLSurface
 import com.sbro.emucorev.core.vita.overlay.InputOverlay
 import com.jakewharton.processphoenix.ProcessPhoenix
@@ -154,7 +155,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         startPlayTimeSessionIfNeeded()
         composeOwners = ComposeOwners().also { it.performCreate(savedInstanceState) }
         inputManager = getSystemService(InputManager::class.java)
-        hasPhysicalGamepad = detectPhysicalGamepadConnected()
+        refreshPhysicalGamepadState()
         inputManager?.registerInputDeviceListener(this, null)
         attachComposeOverlay()
         hideSystemBars()
@@ -163,6 +164,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun onResume() {
         super.onResume()
         composeOwners.handleResume()
+        refreshPhysicalGamepadState()
         hideSystemBars()
         if (menuPaused) {
             setAppSessionMenuPaused(true)
@@ -418,15 +420,15 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onInputDeviceAdded(deviceId: Int) {
-        hasPhysicalGamepad = detectPhysicalGamepadConnected()
+        refreshPhysicalGamepadState()
     }
 
     override fun onInputDeviceRemoved(deviceId: Int) {
-        hasPhysicalGamepad = detectPhysicalGamepadConnected()
+        refreshPhysicalGamepadState()
     }
 
     override fun onInputDeviceChanged(deviceId: Int) {
-        hasPhysicalGamepad = detectPhysicalGamepadConnected()
+        refreshPhysicalGamepadState()
     }
 
     @Keep
@@ -561,6 +563,12 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         return InputDevice.getDeviceIds().any { deviceId ->
             InputDeviceClassifier.isPhysicalGameController(InputDevice.getDevice(deviceId))
         }
+    }
+
+    private fun refreshPhysicalGamepadState() {
+        SDLControllerManager.pollInputDevices()
+        SDLControllerManager.pollHapticDevices()
+        hasPhysicalGamepad = detectPhysicalGamepadConnected()
     }
 
     private fun markRebirthHandled(sourceIntent: Intent): Intent {

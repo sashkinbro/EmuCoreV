@@ -695,4 +695,15 @@
     <string name="install_choice_pkg_body">首先安装匹配的许可证，粘贴 zRIF 密钥，或者如果许可证已安装，直接选择 PKG。</string>
     <string name="install_choice_pkg_without_license_note">如果已经安装了匹配的许可证，您可以直接选择 PKG 而无需粘贴 zRIF。</string>
     <string name="common_cancel">取消</string>
+    <string name="save_manager_backup_all_title">所有存档备份</string>
+    <string name="save_manager_backup_all_body">创建一个包含每个存档文件夹的 ZIP 备份，或从以前的完整备份中恢复存档文件夹。</string>
+    <string name="save_manager_backup_all">备份全部</string>
+    <string name="save_manager_restore_all">恢复全部</string>
+    <string name="save_manager_backup_all_success">已备份 %1$d 个存档文件夹。</string>
+    <string name="save_manager_backup_all_failed">备份所有存档失败。</string>
+    <string name="save_manager_restore_all_success">已恢复 %1$d 个存档文件夹。</string>
+    <string name="save_manager_restore_all_failed">恢复所有存档失败。</string>
+    <string name="save_manager_restore_all_confirm_title">恢复所有存档？</string>
+    <string name="save_manager_restore_all_confirm_body">所选备份中的存档文件夹将替换此设备上匹配的存档文件夹。仅当备份中不包含该存档 ID 时，才会保留现有存档。</string>
+    <string name="save_manager_restore_all_confirm">恢复存档</string>
 </resources>

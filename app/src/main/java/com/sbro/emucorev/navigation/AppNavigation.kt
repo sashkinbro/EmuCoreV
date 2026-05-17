@@ -265,9 +265,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onNavigateSettings = {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
-                    onOpenManageFolders = {
-                        navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
-                    },
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
                 ) { openDrawer ->
@@ -315,9 +312,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onBackClick = navigateHome,
-                    onOpenManageFolders = {
-                        navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
-                    },
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
                 ) {
@@ -351,9 +345,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateSettings = {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
-                    },
-                    onOpenManageFolders = {
-                        navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
                     },
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
@@ -396,9 +387,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onBackClick = navigateHome,
-                    onOpenManageFolders = {
-                        navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
-                    },
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
                 ) {
@@ -433,7 +421,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateSettings = { },
                     onBackClick = navigateHome,
-                    onOpenManageFolders = { },
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
                 ) {
@@ -478,7 +465,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateSettings = { },
                     onBackClick = navigateHome,
-                    onOpenManageFolders = { },
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
                 ) {
@@ -548,9 +534,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onBackClick = navigateHome,
-                    onOpenManageFolders = {
-                        navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
-                    },
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
                 ) {
@@ -593,9 +576,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onBackClick = navigateHome,
-                    onOpenManageFolders = {
-                        navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
-                    },
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
                 ) { openDrawer ->
@@ -639,9 +619,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onBackClick = navigateHome,
-                    onOpenManageFolders = {
-                        navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
-                    },
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
                 ) { openDrawer ->

@@ -696,4 +696,15 @@
     <string name="install_choice_pkg_body">Installez d\'abord la licence correspondante, collez une clé zRIF ou choisissez directement le PKG si la licence est déjà installée.</string>
     <string name="install_choice_pkg_without_license_note">Vous pouvez choisir un PKG sans coller de zRIF si la licence correspondante a déjà été installée.</string>
     <string name="common_cancel">Annuler</string>
+    <string name="save_manager_backup_all_title">Sauvegarde de toutes les parties</string>
+    <string name="save_manager_backup_all_body">Créez une sauvegarde ZIP avec chaque dossier de sauvegarde, ou restaurez des dossiers de sauvegarde à partir d\'une sauvegarde complète précédente.</string>
+    <string name="save_manager_backup_all">Tout sauvegarder</string>
+    <string name="save_manager_restore_all">Tout restaurer</string>
+    <string name="save_manager_backup_all_success">%1$d dossiers de sauvegarde sauvegardés.</string>
+    <string name="save_manager_backup_all_failed">Échec de la sauvegarde de toutes les parties.</string>
+    <string name="save_manager_restore_all_success">%1$d dossiers de sauvegarde restaurés.</string>
+    <string name="save_manager_restore_all_failed">Échec de la restauration de toutes les parties.</string>
+    <string name="save_manager_restore_all_confirm_title">Restaurer toutes les sauvegardes ?</string>
+    <string name="save_manager_restore_all_confirm_body">Les dossiers de sauvegarde de la sauvegarde sélectionnée remplaceront les dossiers de sauvegarde correspondants sur cet appareil. Les sauvegardes existantes ne sont conservées que si la sauvegarde ne contient pas cet identifiant de sauvegarde.</string>
+    <string name="save_manager_restore_all_confirm">Restaurer les sauvegardes</string>
 </resources>

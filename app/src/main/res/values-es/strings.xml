@@ -696,4 +696,15 @@
     <string name="install_choice_pkg_body">Instala primero la licencia correspondiente, pega una clave zRIF o elige el PKG directamente si la licencia ya está instalada.</string>
     <string name="install_choice_pkg_without_license_note">Puedes elegir un PKG sin pegar un zRIF si la licencia correspondiente ya se instaló.</string>
     <string name="common_cancel">Cancelar</string>
+    <string name="save_manager_backup_all_title">Copia de seguridad de todos los guardados</string>
+    <string name="save_manager_backup_all_body">Crea una copia de seguridad en un ZIP con cada carpeta de guardado, o restaura las carpetas de guardado desde una copia de seguridad completa anterior.</string>
+    <string name="save_manager_backup_all">Respaldar todo</string>
+    <string name="save_manager_restore_all">Restaurar todo</string>
+    <string name="save_manager_backup_all_success">Se respaldaron %1$d carpetas de guardado.</string>
+    <string name="save_manager_backup_all_failed">Error al respaldar todos los guardados.</string>
+    <string name="save_manager_restore_all_success">Se restauraron %1$d carpetas de guardado.</string>
+    <string name="save_manager_restore_all_failed">Error al restaurar todos los guardados.</string>
+    <string name="save_manager_restore_all_confirm_title">¿Restaurar todos los guardados?</string>
+    <string name="save_manager_restore_all_confirm_body">Las carpetas de guardado de la copia de seguridad seleccionada reemplazarán las carpetas de guardado coincidentes en este dispositivo. Los guardados existentes se mantienen solo cuando la copia de seguridad no contiene ese ID de guardado.</string>
+    <string name="save_manager_restore_all_confirm">Restaurar guardados</string>
 </resources>

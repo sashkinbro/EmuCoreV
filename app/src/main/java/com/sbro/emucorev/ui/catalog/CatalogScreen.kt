@@ -89,8 +89,6 @@ fun CatalogScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val configuration = LocalConfiguration.current
-    // Tighter card on tablets-in-landscape only; phones in landscape keep the
-    // larger card so the grid doesn't pretend to be a tablet layout.
     val useDenseCards = configuration.useMultiColumnLayout()
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()

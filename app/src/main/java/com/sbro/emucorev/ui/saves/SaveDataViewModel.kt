@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.sbro.emucorev.data.SaveDataBulkImportResult
 import com.sbro.emucorev.data.SaveDataImportResult
 import com.sbro.emucorev.data.SaveDataRepository
 import com.sbro.emucorev.data.VitaSaveDataEntry
@@ -17,9 +18,11 @@ import kotlinx.coroutines.withContext
 
 data class SaveDataUiState(
     val saves: List<VitaSaveDataEntry> = emptyList(),
+    val totalSaveCount: Int = 0,
     val query: String = "",
     val isLoading: Boolean = true,
     val busySaveId: String? = null,
+    val bulkBusy: Boolean = false,
     val focusTarget: VitaSaveDataTarget? = null
 )
 
@@ -86,6 +89,28 @@ class SaveDataViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun exportAllSaves(destination: Uri, onComplete: (Result<Int>) -> Unit) {
+        val context = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.value = _uiState.value.copy(bulkBusy = true)
+            val result = repository.exportAllToZip(context, destination)
+            _uiState.value = _uiState.value.copy(bulkBusy = false)
+            withContext(Dispatchers.Main) { onComplete(result) }
+        }
+    }
+
+    fun restoreAllSaves(source: Uri, onComplete: (SaveDataBulkImportResult) -> Unit) {
+        val context = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.value = _uiState.value.copy(bulkBusy = true)
+            val result = repository.importAllFromZip(context, source)
+            allSaves = repository.list(context)
+            publishState()
+            _uiState.value = _uiState.value.copy(bulkBusy = false)
+            withContext(Dispatchers.Main) { onComplete(result) }
+        }
+    }
+
     private fun publishState() {
         val query = _uiState.value.query.trim()
         val focusTarget = _uiState.value.focusTarget
@@ -102,6 +127,7 @@ class SaveDataViewModel(application: Application) : AndroidViewModel(application
         }
         _uiState.value = _uiState.value.copy(
             saves = filtered,
+            totalSaveCount = allSaves.size,
             isLoading = false
         )
     }

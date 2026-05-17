@@ -67,6 +67,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
+import com.sbro.emucorev.data.SaveDataBulkImportResult
 import com.sbro.emucorev.data.SaveDataImportResult
 import com.sbro.emucorev.data.VitaSaveDataEntry
 import com.sbro.emucorev.ui.common.LocalImage
@@ -77,6 +78,7 @@ import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
+import java.text.SimpleDateFormat
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -95,10 +97,14 @@ fun SaveDataScreen(
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     var pendingExportSaveId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingImportSaveId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingRestoreAllUri by rememberSaveable { mutableStateOf<String?>(null) }
     var deleteSave by remember { mutableStateOf<VitaSaveDataEntry?>(null) }
 
     val exportSuccess = stringResource(R.string.save_manager_export_success)
     val exportFailed = stringResource(R.string.save_manager_export_failed)
+    val bulkExportSuccess = stringResource(R.string.save_manager_backup_all_success)
+    val bulkExportFailed = stringResource(R.string.save_manager_backup_all_failed)
+    val bulkRestoreFailed = stringResource(R.string.save_manager_restore_all_failed)
     val deleteFailed = stringResource(R.string.save_manager_delete_failed)
     val importSuccessTemplate = stringResource(R.string.save_manager_import_success, "%s")
     val importFailed = stringResource(R.string.save_manager_import_failed)
@@ -106,6 +112,20 @@ fun SaveDataScreen(
     val importUnsafe = stringResource(R.string.save_manager_import_unsafe)
     val importUnknownTarget = stringResource(R.string.save_manager_import_unknown_target)
 
+    val bulkExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.exportAllSaves(uri) { result ->
+                val message = result.fold(
+                    onSuccess = { count -> bulkExportSuccess.format(count) },
+                    onFailure = { error -> error.message ?: bulkExportFailed }
+                )
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    val bulkRestoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        pendingRestoreAllUri = uri?.toString()
+    }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri: Uri? ->
         val saveId = pendingExportSaveId
         pendingExportSaveId = null
@@ -129,6 +149,22 @@ fun SaveDataScreen(
                 }
                 Toast.makeText(context, message, Toast.LENGTH_LONG).show()
             }
+        }
+    }
+    fun restoreAllFromPendingUri() {
+        val uri = pendingRestoreAllUri?.let(Uri::parse) ?: return
+        pendingRestoreAllUri = null
+        viewModel.restoreAllSaves(uri) { result ->
+            val message = when (result) {
+                is SaveDataBulkImportResult.Success -> context.getString(
+                    R.string.save_manager_restore_all_success,
+                    result.restoredCount
+                )
+                SaveDataBulkImportResult.EmptyArchive -> importEmpty
+                SaveDataBulkImportResult.UnsafeArchive -> importUnsafe
+                is SaveDataBulkImportResult.Failure -> result.error.message ?: bulkRestoreFailed
+            }
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -188,6 +224,20 @@ fun SaveDataScreen(
                 )
             }
         }
+        item {
+            SaveBackupCard(
+                busy = uiState.bulkBusy,
+                exportEnabled = !uiState.bulkBusy && !uiState.isLoading && uiState.totalSaveCount > 0,
+                restoreEnabled = !uiState.bulkBusy,
+                onBackupAll = {
+                    val timestamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
+                    bulkExportLauncher.launch("emucorev-saves-$timestamp.zip")
+                },
+                onRestoreAll = {
+                    bulkRestoreLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                }
+            )
+        }
         if (uiState.isLoading) {
             item {
                 Box(
@@ -228,6 +278,24 @@ fun SaveDataScreen(
         }
     }
 
+    if (pendingRestoreAllUri != null) {
+        AlertDialog(
+            onDismissRequest = { pendingRestoreAllUri = null },
+            title = { Text(stringResource(R.string.save_manager_restore_all_confirm_title)) },
+            text = { Text(stringResource(R.string.save_manager_restore_all_confirm_body)) },
+            confirmButton = {
+                TextButton(onClick = { restoreAllFromPendingUri() }) {
+                    Text(stringResource(R.string.save_manager_restore_all_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingRestoreAllUri = null }) {
+                    Text(stringResource(R.string.settings_updates_cancel))
+                }
+            }
+        )
+    }
+
     val targetDeleteSave = deleteSave
     if (targetDeleteSave != null) {
         AlertDialog(
@@ -254,6 +322,64 @@ fun SaveDataScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun SaveBackupCard(
+    busy: Boolean,
+    exportEnabled: Boolean,
+    restoreEnabled: Boolean,
+    onBackupAll: () -> Unit,
+    onRestoreAll: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 3.dp,
+        shadowElevation = 8.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+    ) {
+        Column(
+            modifier = Modifier.padding(CardContentPadding),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.save_manager_backup_all_title),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = stringResource(R.string.save_manager_backup_all_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (busy) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = onBackupAll,
+                    enabled = exportEnabled,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Rounded.Save, contentDescription = null)
+                    Text(stringResource(R.string.save_manager_backup_all), modifier = Modifier.padding(start = 8.dp))
+                }
+                OutlinedButton(
+                    onClick = onRestoreAll,
+                    enabled = restoreEnabled,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Rounded.FolderOpen, contentDescription = null)
+                    Text(stringResource(R.string.save_manager_restore_all), modifier = Modifier.padding(start = 8.dp))
+                }
+            }
+        }
     }
 }
 

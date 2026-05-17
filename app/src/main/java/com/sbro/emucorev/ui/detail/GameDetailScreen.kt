@@ -156,9 +156,6 @@ fun GameDetailScreen(
     val deleteGameConfirmBody = stringResource(R.string.detail_delete_game_confirm_body)
     val deleteGameFailedMessage = stringResource(R.string.detail_delete_game_failed)
     val horizontalInset = ScreenHorizontalPadding
-    // Two-pane hero+meta layout requires a real tablet. Phones in landscape get
-    // the stacked single-column look, just slightly wider, so they don't end up
-    // squished into a tablet layout.
     val useTwoPaneHeader = configuration.useMultiColumnLayout()
     val contentMaxWidth = if (useTwoPaneHeader) 980.dp else 760.dp
     val heroMaxWidth = if (useTwoPaneHeader) 170.dp else 240.dp

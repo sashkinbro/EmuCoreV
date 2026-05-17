@@ -49,6 +49,7 @@ import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.sbro.emucorev.core.input.InputDeviceClassifier
 import java.io.FileNotFoundException
 import java.util.Hashtable
 import java.util.Locale
@@ -558,15 +559,23 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         fun handleKeyEvent(v: View, keyCode: Int, event: KeyEvent, ic: InputConnection?): Boolean {
             val deviceId = event.deviceId
             var source = event.source
+            var device: InputDevice? = null
 
             if (source == InputDevice.SOURCE_UNKNOWN) {
-                val device = InputDevice.getDevice(deviceId)
+                device = InputDevice.getDevice(deviceId)
                 if (device != null) {
                     source = device.sources
                 }
             }
+            if (device == null) {
+                device = InputDevice.getDevice(deviceId)
+            }
 
-            if (SDLControllerManager.isDeviceSDLJoystick(deviceId)) {
+            if (
+                SDLControllerManager.isDeviceSDLJoystick(deviceId) ||
+                InputDeviceClassifier.isGameControllerKeyEvent(device, source, keyCode)
+            ) {
+                SDLControllerManager.pollInputDevices()
                 when (event.action) {
                     KeyEvent.ACTION_DOWN -> if (SDLControllerManager.handlePadDown(deviceId, keyCode)) return true
                     KeyEvent.ACTION_UP -> if (SDLControllerManager.handlePadUp(deviceId, keyCode)) return true

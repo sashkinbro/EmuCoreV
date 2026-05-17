@@ -696,4 +696,15 @@
     <string name="install_choice_pkg_body">पहले मेल खाने वाला लाइसेंस इंस्टॉल करें, zRIF कुंजी पेस्ट करें, या यदि लाइसेंस पहले से इंस्टॉल है तो सीधे PKG चुनें।</string>
     <string name="install_choice_pkg_without_license_note">यदि मेल खाने वाला लाइसेंस पहले से इंस्टॉल हो गया था, तो आप zRIF पेस्ट किए बिना PKG चुन सकते हैं।</string>
     <string name="common_cancel">रद्द करें</string>
+    <string name="save_manager_backup_all_title">सभी सेव का बैकअप</string>
+    <string name="save_manager_backup_all_body">प्रत्येक सेव फ़ोल्डर के साथ एक ज़िप (ZIP) बैकअप बनाएं, या पिछले पूर्ण बैकअप से सेव फ़ोल्डर्स को रीस्टोर करें।</string>
+    <string name="save_manager_backup_all">सभी का बैकअप लें</string>
+    <string name="save_manager_restore_all">सभी को रीस्टोर करें</string>
+    <string name="save_manager_backup_all_success">%1$d सेव फ़ोल्डर का बैकअप लिया गया।</string>
+    <string name="save_manager_backup_all_failed">सभी सेव का बैकअप लेने में विफल।</string>
+    <string name="save_manager_restore_all_success">%1$d सेव फ़ोल्डर रीस्टोर किए गए。</string>
+    <string name="save_manager_restore_all_failed">सभी सेव को रीस्टोर करने में विफल।</string>
+    <string name="save_manager_restore_all_confirm_title">सभी सेव रीस्टोर करें?</string>
+    <string name="save_manager_restore_all_confirm_body">चयनित बैकअप के सेव फ़ोल्डर इस डिवाइस पर मेल खाने वाले सेव फ़ोल्डरों को बदल देंगे। मौजूदा सेव तभी रखे जाते हैं जब बैकअप में वह सेव आईडी (ID) न हो।</string>
+    <string name="save_manager_restore_all_confirm">सेव रीस्टोर करें</string>
 </resources>

@@ -62,16 +62,6 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.core.VitaCoreConfig
 import kotlin.math.roundToInt
 
-// Surface roles:
-//   - `EmulationQuickBar` is the always-visible toolbar shown while the game is
-//     suspended; it exposes the few actions a player reaches for the most
-//     (pause/resume, screenshot, open full menu).
-//   - `EmulationGameMenu` is the full menu, rendered as a slide-up sheet from
-//     the bottom on phones and as a slide-in panel from the right on tablets.
-//
-// Badge styles communicate only the real runtime behavior. Restart is shown
-// per-row for upstream restart-required settings, not for whole mixed sections.
-
 private val LiveBadgeColor = Color(0xFF34D27A)
 private val RestartBadgeColor = Color(0xFFE0A82E)
 
