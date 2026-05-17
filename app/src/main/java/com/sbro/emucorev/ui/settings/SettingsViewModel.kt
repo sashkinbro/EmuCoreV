@@ -43,7 +43,8 @@ data class AppUpdateUiState(
     val errorMessage: String? = null,
     val downloadProgress: Float? = null,
     val downloadedApkPath: String? = null,
-    val startupDialogVisible: Boolean = false
+    val startupDialogVisible: Boolean = false,
+    val cleanInstallDialogVisible: Boolean = false
 )
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -59,6 +60,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         coreConfigRepository
     )
     private val initialCoreConfig = coreConfigRepository.ensureDefaultsPersisted()
+    private var startupUpdateCheckRequested = false
 
     private val _uiState = MutableStateFlow(
         SettingsUiState(
@@ -288,6 +290,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun checkForStartupAppUpdates() {
+        if (startupUpdateCheckRequested) return
+        startupUpdateCheckRequested = true
+        checkForAppUpdates(showErrors = false, showStartupDialog = true)
+    }
+
     fun dismissStartupUpdateDialog() {
         _uiState.value = _uiState.value.copy(
             appUpdate = _uiState.value.appUpdate.copy(startupDialogVisible = false)
@@ -299,6 +307,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             preferences.skippedUpdateTag = tag
         }
         dismissStartupUpdateDialog()
+    }
+
+    fun showCleanInstallDialog() {
+        if (_uiState.value.appUpdate.latestRelease == null) return
+        _uiState.value = _uiState.value.copy(
+            appUpdate = _uiState.value.appUpdate.copy(cleanInstallDialogVisible = true)
+        )
+    }
+
+    fun dismissCleanInstallDialog() {
+        _uiState.value = _uiState.value.copy(
+            appUpdate = _uiState.value.appUpdate.copy(cleanInstallDialogVisible = false)
+        )
     }
 
     fun downloadAppUpdate(onComplete: (Result<Unit>) -> Unit = {}) {

@@ -123,6 +123,8 @@ fun SettingsTabContent(
         SettingsTab.Updates -> AppUpdateTab(
             state = uiState.appUpdate,
             onCheckForUpdates = { viewModel.checkForAppUpdates(showErrors = true) },
+            onShowCleanInstallDialog = viewModel::showCleanInstallDialog,
+            onDismissCleanInstallDialog = viewModel::dismissCleanInstallDialog,
             onDownloadUpdate = { viewModel.downloadAppUpdate() },
             onInstallDownloadedUpdate = { viewModel.installDownloadedAppUpdate() }
         )
