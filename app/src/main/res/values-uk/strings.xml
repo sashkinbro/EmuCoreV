@@ -678,4 +678,22 @@
     <string name="settings_about_website_desc">Відкрийте сайт EmuCoreV для завантажень, новин та посилань на проєкти.</string>
     <string name="settings_gpu_driver_status_global_desc">Ця гра використовує глобальний вибір драйвера GPU.</string>
     <string name="settings_gpu_driver_game_title">Драйвер GPU для гри</string>
+    <string name="install_dialog_title_license">Встановлення ліцензії</string>
+    <string name="install_dialog_license_failed">Помилка встановлення ліцензії.</string>
+    <string name="install_dialog_license_done">Ліцензію успішно встановлено.</string>
+    <string name="setup_pkg_license_step_title">Додати ліцензію</string>
+    <string name="setup_pkg_license_step_body">Виберіть відповідний файл ліцензії. Ім\'я файлу може бути будь-яким; EmuCoreV зчитує дані ліцензії та зберігає їх у потрібному місці. Якщо натомість у вас є ключ zRIF, вставте його нижче.</string>
+    <string name="setup_pkg_license_button">Вибрати файл ліцензії</string>
+    <string name="setup_pkg_zrif_or">або вставте zRIF</string>
+    <string name="setup_pkg_file_step_title">Вибрати файл PKG</string>
+    <string name="setup_pkg_file_step_body">Після вибору ліцензії або вставки zRIF виберіть файл гри PKG, щоб почати встановлення.</string>
+    <string name="setup_pkg_order_note">Підказка: якщо встановлення PKG не вдалося, переконайтеся, що ліцензія належить тому ж пакету гри.</string>
+    <string name="install_choice_title">Встановити гру</string>
+    <string name="install_choice_body">Виберіть, як має бути встановлений цей пакет гри.</string>
+    <string name="install_choice_archive_title">Просте встановлення</string>
+    <string name="install_choice_archive_body">Використовуйте це для ігрових архівів VPK або ZIP.</string>
+    <string name="install_choice_pkg_title">Встановлення PKG</string>
+    <string name="install_choice_pkg_body">Спочатку встановіть відповідну ліцензію, вставте ключ zRIF або виберіть безпосередньо PKG, якщо ліцензію вже встановлено.</string>
+    <string name="install_choice_pkg_without_license_note">Ви можете вибрати PKG без вставки zRIF, якщо відповідна ліцензія вже була встановлена.</string>
+    <string name="common_cancel">Скасувати</string>
 </resources>

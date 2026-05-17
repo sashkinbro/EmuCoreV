@@ -678,4 +678,22 @@
     <string name="settings_about_website_desc">İndirmeler, haberler ve proje bağlantıları için EmuCoreV web sitesini açın.</string>
     <string name="settings_gpu_driver_status_global_desc">Bu oyun global GPU sürücüsü seçimini izler.</string>
     <string name="settings_gpu_driver_game_title">Oyun GPU sürücüsü</string>
+    <string name="install_dialog_title_license">Lisans yükleniyor</string>
+    <string name="install_dialog_license_failed">Lisans kurulumu başarısız oldu.</string>
+    <string name="install_dialog_license_done">Lisans başarıyla kuruldu.</string>
+    <string name="setup_pkg_license_step_title">Lisans ekle</string>
+    <string name="setup_pkg_license_step_body">Eşleşen lisans dosyasını seçin. Dosya adı herhangi bir şey olabilir; EmuCoreV lisans verilerini okur ve doğru yere kaydeder. Bunun yerine bir zRIF anahtarınız varsa, aşağıya yapıştırın.</string>
+    <string name="setup_pkg_license_button">Lisans dosyasını seç</string>
+    <string name="setup_pkg_zrif_or">veya zRIF yapıştır</string>
+    <string name="setup_pkg_file_step_title">PKG dosyasını seç</string>
+    <string name="setup_pkg_file_step_body">Lisans seçildikten veya zRIF yapıştırıldıktan sonra, kurulumu başlatmak için PKG oyun dosyasını seçin.</string>
+    <string name="setup_pkg_order_note">İpucu: PKG kurulumu başarısız olursa, lisansın aynı oyun paketine ait olduğundan emin olun.</string>
+    <string name="install_choice_title">Oyunu yükle</string>
+    <string name="install_choice_body">Bu oyun paketinin nasıl yüklenmesi gerektiğini seçin.</string>
+    <string name="install_choice_archive_title">Basit kurulum</string>
+    <string name="install_choice_archive_body">Bunu VPK veya ZIP oyun arşivleri için kullanın.</string>
+    <string name="install_choice_pkg_title">PKG kurulumu</string>
+    <string name="install_choice_pkg_body">Önce eşleşen lisansı yükleyin, bir zRIF anahtarı yapıştırın veya lisans zaten yüklüyse doğrudan PKG\'yi seçin.</string>
+    <string name="install_choice_pkg_without_license_note">Eşleşen lisans zaten yüklenmişse bir zRIF yapıştırmadan bir PKG seçebilirsiniz.</string>
+    <string name="common_cancel">İptal</string>
 </resources>

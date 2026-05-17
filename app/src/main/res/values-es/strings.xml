@@ -678,4 +678,22 @@
     <string name="settings_about_website_desc">Abre el sitio web de EmuCoreV para descargas, noticias y enlaces del proyecto.</string>
     <string name="settings_gpu_driver_status_global_desc">Este juego sigue la selección del controlador de GPU global.</string>
     <string name="settings_gpu_driver_game_title">Controlador de GPU del juego</string>
+    <string name="install_dialog_title_license">Instalando licencia</string>
+    <string name="install_dialog_license_failed">Error al instalar la licencia.</string>
+    <string name="install_dialog_license_done">Licencia instalada correctamente.</string>
+    <string name="setup_pkg_license_step_title">Añadir licencia</string>
+    <string name="setup_pkg_license_step_body">Selecciona el archivo de licencia correspondiente. El nombre del archivo puede ser cualquiera; EmuCoreV lee los datos de la licencia y los guarda en el lugar correcto. Si tienes una clave zRIF, pégala a continuación.</string>
+    <string name="setup_pkg_license_button">Seleccionar archivo de licencia</string>
+    <string name="setup_pkg_zrif_or">o pegar zRIF</string>
+    <string name="setup_pkg_file_step_title">Elegir archivo PKG</string>
+    <string name="setup_pkg_file_step_body">Después de seleccionar la licencia o pegar el zRIF, selecciona el archivo de juego PKG para iniciar la instalación.</string>
+    <string name="setup_pkg_order_note">Consejo: si la instalación del PKG falla, asegúrate de que la licencia pertenezca al mismo paquete de juego.</string>
+    <string name="install_choice_title">Instalar juego</string>
+    <string name="install_choice_body">Elige cómo se debe instalar este paquete de juego.</string>
+    <string name="install_choice_archive_title">Instalación simple</string>
+    <string name="install_choice_archive_body">Usa esto para archivos de juegos VPK o ZIP.</string>
+    <string name="install_choice_pkg_title">Instalación PKG</string>
+    <string name="install_choice_pkg_body">Instala primero la licencia correspondiente, pega una clave zRIF o elige el PKG directamente si la licencia ya está instalada.</string>
+    <string name="install_choice_pkg_without_license_note">Puedes elegir un PKG sin pegar un zRIF si la licencia correspondiente ya se instaló.</string>
+    <string name="common_cancel">Cancelar</string>
 </resources>

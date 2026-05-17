@@ -56,6 +56,7 @@ import com.sbro.emucorev.ui.settings.SettingsTab
 import com.sbro.emucorev.ui.settings.SettingsViewModel
 import com.sbro.emucorev.ui.settings.VitaLanguageScreen
 import com.sbro.emucorev.ui.settings.settingsTabFromRoute
+import com.sbro.emucorev.ui.setup.InstallGameChoiceDialog
 import com.sbro.emucorev.ui.setup.SetupInstallDialog
 import com.sbro.emucorev.ui.setup.SetupInstallViewModel
 import com.sbro.emucorev.ui.setup.SetupScreen
@@ -111,6 +112,8 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     val launchRequiresFirmwareMessage = stringResource(R.string.game_launch_requires_firmware)
     val launchRequiresFirmwareUpdateMessage = stringResource(R.string.game_launch_requires_firmware_update)
     var pendingPkgZrif by rememberSaveable { mutableStateOf("") }
+    var installChoiceZrif by rememberSaveable { mutableStateOf("") }
+    var showInstallChoiceDialog by rememberSaveable { mutableStateOf(false) }
 
     val firmwarePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -127,12 +130,17 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         uri ?: return@rememberLauncherForActivityResult
         val fileName = DocumentPathResolver.getDisplayName(context, uri.toString())
         val extension = fileName.substringAfterLast('.', "").lowercase()
-        val supported = extension in setOf("vpk", "zip", "rif", "bin")
+        val supported = extension in setOf("vpk", "zip")
         if (!supported) {
             Toast.makeText(context, unsupportedContent, Toast.LENGTH_SHORT).show()
         } else {
             installViewModel.installContent(uri.toString())
         }
+    }
+
+    val licensePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        installViewModel.installLicense(uri.toString())
     }
 
     val pkgPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -150,9 +158,13 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
 
     val openFirmwareInstall = { firmwarePicker.launch(arrayOf("*/*")) }
     val openContentInstall = { contentPicker.launch(arrayOf("*/*")) }
+    val openLicenseInstall = { licensePicker.launch(arrayOf("*/*")) }
     val openPkgInstall: (String) -> Unit = { zrif ->
         pendingPkgZrif = zrif
         pkgPicker.launch(arrayOf("*/*"))
+    }
+    val openInstallChoiceDialog = {
+        showInstallChoiceDialog = true
     }
 
     LaunchedEffect(context) {
@@ -243,7 +255,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
                     },
                     onInstallFirmware = null,
-                    onInstallContent = openContentInstall
+                    onInstallContent = openInstallChoiceDialog
                 ) { openDrawer ->
                     HomeScreen(
                         onOpenSetup = {
@@ -293,7 +305,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
                     },
                     onInstallFirmware = null,
-                    onInstallContent = openContentInstall
+                    onInstallContent = openInstallChoiceDialog
                 ) {
                     SetupScreen(
                         packagesFolderLabel = preferences.packagesFolderDisplayName(context),
@@ -301,6 +313,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         onBackClick = navigateHome,
                         onInstallFirmware = openFirmwareInstall,
                         onInstallContent = openContentInstall,
+                        onInstallLicense = openLicenseInstall,
                         onInstallPkg = openPkgInstall
                     )
                 }
@@ -329,7 +342,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
                     },
                     onInstallFirmware = null,
-                    onInstallContent = openContentInstall
+                    onInstallContent = openInstallChoiceDialog
                 ) { openDrawer ->
                     LibraryScreen(
                         onLaunchGame = launchInstalledGame,
@@ -373,7 +386,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
                     },
                     onInstallFirmware = null,
-                    onInstallContent = openContentInstall
+                    onInstallContent = openInstallChoiceDialog
                 ) {
                     CatalogScreen(
                         onGameClick = { igdbId -> navController.navigate("$ROUTE_CATALOG_DETAIL_PREFIX/$igdbId") },
@@ -408,7 +421,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onBackClick = navigateHome,
                     onOpenManageFolders = { },
                     onInstallFirmware = null,
-                    onInstallContent = openContentInstall
+                    onInstallContent = openInstallChoiceDialog
                 ) {
                     SettingsScreen(
                         initialTab = SettingsTab.General,
@@ -453,7 +466,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onBackClick = navigateHome,
                     onOpenManageFolders = { },
                     onInstallFirmware = null,
-                    onInstallContent = openContentInstall
+                    onInstallContent = openInstallChoiceDialog
                 ) {
                     SettingsScreen(
                         initialTab = settingsTabFromRoute(entry.arguments?.getString("tab")),
@@ -525,7 +538,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
                     },
                     onInstallFirmware = null,
-                    onInstallContent = openContentInstall
+                    onInstallContent = openInstallChoiceDialog
                 ) {
                     SaveDataScreen(
                         focusTitleId = null,
@@ -570,7 +583,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
                     },
                     onInstallFirmware = null,
-                    onInstallContent = openContentInstall
+                    onInstallContent = openInstallChoiceDialog
                 ) { openDrawer ->
                     PlayTimeScreen(
                         onMenuClick = openDrawer,
@@ -616,7 +629,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute(SettingsTab.Storage)) { launchSingleTop = true }
                     },
                     onInstallFirmware = null,
-                    onInstallContent = openContentInstall
+                    onInstallContent = openInstallChoiceDialog
                 ) { openDrawer ->
                     GameManagerScreen(
                         onMenuClick = openDrawer,
@@ -659,6 +672,28 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 )
             }
         }
+    }
+
+    if (showInstallChoiceDialog) {
+        InstallGameChoiceDialog(
+            zrif = installChoiceZrif,
+            onZrifChange = { installChoiceZrif = it },
+            onDismiss = {
+                showInstallChoiceDialog = false
+                installChoiceZrif = ""
+            },
+            onInstallArchive = {
+                showInstallChoiceDialog = false
+                installChoiceZrif = ""
+                openContentInstall()
+            },
+            onInstallLicense = openLicenseInstall,
+            onInstallPkg = { zrif ->
+                showInstallChoiceDialog = false
+                installChoiceZrif = ""
+                openPkgInstall(zrif)
+            }
+        )
     }
 
     SetupInstallDialog(

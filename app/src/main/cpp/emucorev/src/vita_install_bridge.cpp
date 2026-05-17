@@ -137,6 +137,29 @@ Java_com_sbro_emucorev_core_VitaInstallBridge_nativeInstallContent(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorev_core_VitaInstallBridge_nativeInstallLicense(
+    JNIEnv *env,
+    jobject thiz,
+    jstring vita_root_path,
+    jstring cache_root_path,
+    jstring license_path,
+    jint system_language) {
+    EmuEnvState emuenv;
+    configure_install_env(
+        emuenv,
+        fs_utils::utf8_to_path(from_jstring(env, vita_root_path)),
+        fs_utils::utf8_to_path(from_jstring(env, cache_root_path)),
+        system_language);
+    const auto path = fs_utils::utf8_to_path(from_jstring(env, license_path));
+    JavaProgressReporter reporter(env, thiz);
+
+    reporter.report("license", 0.f, 0.f, 0.f);
+    const auto success = copy_license(emuenv, path);
+    reporter.report("license", success ? 100.f : 0.f, 0.f, 0.f);
+    return static_cast<jboolean>(success);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorev_core_VitaInstallBridge_nativeInstallPkg(
     JNIEnv *env,
     jobject thiz,
@@ -154,6 +177,10 @@ Java_com_sbro_emucorev_core_VitaInstallBridge_nativeInstallPkg(
     const auto path = fs_utils::utf8_to_path(from_jstring(env, pkg_path));
     auto zrif_value = from_jstring(env, zrif);
     JavaProgressReporter reporter(env, thiz);
+
+    if (zrif_value.empty()) {
+        zrif_value = find_pkg_zrif(path, emuenv.pref_path);
+    }
 
     const auto success = install_pkg(path, emuenv, zrif_value, [&](float progress) {
         reporter.report("pkg", progress, 0.f, 0.f);

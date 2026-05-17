@@ -53,6 +53,20 @@ object VitaInstallBridge {
         return installedCount
     }
 
+    fun installLicense(
+        context: Context,
+        licensePath: String,
+        systemLanguage: Int
+    ): Boolean {
+        NativeLibraryLoader.ensureLoaded(context)
+        return nativeInstallLicense(
+            EmulatorStorage.vitaRoot(context).absolutePath,
+            EmulatorStorage.cacheRoot(context).absolutePath,
+            licensePath,
+            systemLanguage
+        )
+    }
+
     fun installPkg(
         context: Context,
         pkgPath: String,
@@ -104,6 +118,13 @@ object VitaInstallBridge {
         contentPath: String,
         systemLanguage: Int
     ): Int
+
+    private external fun nativeInstallLicense(
+        vitaRootPath: String,
+        cacheRootPath: String,
+        licensePath: String,
+        systemLanguage: Int
+    ): Boolean
 
     private external fun nativeInstallPkg(
         vitaRootPath: String,

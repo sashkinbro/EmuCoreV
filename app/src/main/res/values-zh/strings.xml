@@ -677,4 +677,22 @@
     <string name="settings_about_website_desc">打开 EmuCoreV 网站以获取下载、新闻和项目链接。</string>
     <string name="settings_gpu_driver_status_global_desc">此游戏遵循全局 GPU 驱动程序选择。</string>
     <string name="settings_gpu_driver_game_title">游戏 GPU 驱动程序</string>
+    <string name="install_dialog_title_license">正在安装许可证</string>
+    <string name="install_dialog_license_failed">许可证安装失败。</string>
+    <string name="install_dialog_license_done">许可证安装成功。</string>
+    <string name="setup_pkg_license_step_title">添加许可证</string>
+    <string name="setup_pkg_license_step_body">选择匹配的许可证文件。文件名可以是任何名称；EmuCoreV 会读取许可证数据并将其存储在正确的位置。如果您有 zRIF 密钥，请粘贴在下方。</string>
+    <string name="setup_pkg_license_button">选择许可证文件</string>
+    <string name="setup_pkg_zrif_or">或粘贴 zRIF</string>
+    <string name="setup_pkg_file_step_title">选择 PKG 文件</string>
+    <string name="setup_pkg_file_step_body">选择许可证或粘贴 zRIF 后，选择 PKG 游戏文件以开始安装。</string>
+    <string name="setup_pkg_order_note">提示：如果 PKG 安装失败，请确保许可证属于同一游戏包。</string>
+    <string name="install_choice_title">安装游戏</string>
+    <string name="install_choice_body">选择此游戏包的安装方式。</string>
+    <string name="install_choice_archive_title">简单安装</string>
+    <string name="install_choice_archive_body">用于 VPK 或 ZIP 游戏存档。</string>
+    <string name="install_choice_pkg_title">PKG 安装</string>
+    <string name="install_choice_pkg_body">首先安装匹配的许可证，粘贴 zRIF 密钥，或者如果许可证已安装，直接选择 PKG。</string>
+    <string name="install_choice_pkg_without_license_note">如果已经安装了匹配的许可证，您可以直接选择 PKG 而无需粘贴 zRIF。</string>
+    <string name="common_cancel">取消</string>
 </resources>

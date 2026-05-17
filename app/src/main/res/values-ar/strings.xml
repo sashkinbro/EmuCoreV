@@ -678,4 +678,22 @@
     <string name="settings_about_website_desc">افتح موقع EmuCoreV للتنزيلات والأخبار وروابط المشروع.</string>
     <string name="settings_gpu_driver_status_global_desc">تتبع هذه اللعبة اختيار برنامج تشغيل GPU العالمي.</string>
     <string name="settings_gpu_driver_game_title">برنامج تشغيل GPU للعبة</string>
+    <string name="install_dialog_title_license">جاري تثبيت الترخيص</string>
+    <string name="install_dialog_license_failed">فشل تثبيت الترخيص.</string>
+    <string name="install_dialog_license_done">تم تثبيت الترخيص بنجاح.</string>
+    <string name="setup_pkg_license_step_title">إضافة ترخيص</string>
+    <string name="setup_pkg_license_step_body">حدد ملف الترخيص المطابق. يمكن أن يكون اسم الملف أي شيء؛ يقرأ EmuCoreV بيانات الترخيص ويخزنها في المكان الصحيح. إذا كان لديك مفتاح zRIF بدلاً من ذلك، الصقه أدناه.</string>
+    <string name="setup_pkg_license_button">حدد ملف الترخيص</string>
+    <string name="setup_pkg_zrif_or">أو الصق zRIF</string>
+    <string name="setup_pkg_file_step_title">اختر ملف PKG</string>
+    <string name="setup_pkg_file_step_body">بعد تحديد الترخيص أو لصق zRIF، حدد ملف اللعبة PKG لبدء التثبيت.</string>
+    <string name="setup_pkg_order_note">تلميح: إذا فشل تثبيت PKG، فتأكد من أن الترخيص ينتمي إلى حزمة اللعبة نفسها.</string>
+    <string name="install_choice_title">تثبيت اللعبة</string>
+    <string name="install_choice_body">اختر كيف ينبغي تثبيت حزمة اللعبة هذه.</string>
+    <string name="install_choice_archive_title">تثبيت بسيط</string>
+    <string name="install_choice_archive_body">استخدم هذا لأرشيفات ألعاب VPK أو ZIP.</string>
+    <string name="install_choice_pkg_title">تثبيت PKG</string>
+    <string name="install_choice_pkg_body">قم بتثبيت الترخيص المطابق أولاً، أو الصق مفتاح zRIF، أو اختر PKG مباشرة إذا كان الترخيص مثبتًا بالفعل.</string>
+    <string name="install_choice_pkg_without_license_note">يمكنك اختيار PKG دون لصق zRIF إذا كان الترخيص المطابق مثبتًا بالفعل.</string>
+    <string name="common_cancel">إلغاء</string>
 </resources>

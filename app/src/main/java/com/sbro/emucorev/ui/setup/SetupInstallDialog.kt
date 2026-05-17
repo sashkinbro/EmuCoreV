@@ -58,6 +58,7 @@ fun SetupInstallDialog(
     val operationIcon = when (uiState.operation) {
         InstallOperation.Firmware -> Icons.Rounded.SystemUpdateAlt
         InstallOperation.Content -> Icons.Rounded.Inventory2
+        InstallOperation.License -> Icons.Rounded.VpnKey
         InstallOperation.Pkg -> Icons.Rounded.VpnKey
         null -> Icons.Rounded.Inventory2
     }
@@ -70,6 +71,7 @@ fun SetupInstallDialog(
     val title = when (uiState.operation) {
         InstallOperation.Firmware -> stringResource(R.string.install_dialog_title_firmware)
         InstallOperation.Content -> stringResource(R.string.install_dialog_title_content)
+        InstallOperation.License -> stringResource(R.string.install_dialog_title_license)
         InstallOperation.Pkg -> stringResource(R.string.install_dialog_title_pkg)
         null -> stringResource(R.string.install_dialog_title_generic)
     }
