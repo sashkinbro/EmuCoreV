@@ -18,6 +18,7 @@ import kotlin.math.roundToInt
 
 enum class InstallOperation {
     Firmware,
+    License,
     Content,
     Pkg
 }
@@ -96,6 +97,22 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                 )
             } else {
                 finishError(appContext.getString(R.string.install_dialog_content_failed))
+            }
+        }
+    }
+
+    fun installLicense(uriString: String) {
+        runInstall(InstallOperation.License) {
+            val path = DocumentPathResolver.resolveFilePath(appContext, uriString, copyToCache = true)
+            if (path == null) {
+                finishError(appContext.getString(R.string.install_dialog_license_failed))
+                return@runInstall
+            }
+            val success = VitaInstallBridge.installLicense(appContext, path, systemLanguage())
+            if (success) {
+                finishSuccess(appContext.getString(R.string.install_dialog_license_done))
+            } else {
+                finishError(appContext.getString(R.string.install_dialog_license_failed))
             }
         }
     }

@@ -4,12 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,9 +21,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Inventory2
-import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -38,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
@@ -56,6 +61,7 @@ fun SetupScreen(
     onBackClick: () -> Unit,
     onInstallFirmware: () -> Unit,
     onInstallContent: () -> Unit,
+    onInstallLicense: () -> Unit,
     onInstallPkg: (String) -> Unit
 ) {
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
@@ -98,6 +104,12 @@ fun SetupScreen(
             body = vitaRootPath
         )
 
+        Text(
+            text = stringResource(R.string.setup_subtitle),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
         SetupActionCard(
             icon = Icons.Rounded.Inventory2,
             title = stringResource(R.string.setup_content_title),
@@ -107,26 +119,59 @@ fun SetupScreen(
         )
 
         SectionCard(title = stringResource(R.string.setup_pkg_title)) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SetupInfoRow(
-                    icon = Icons.Rounded.Key,
-                    text = stringResource(R.string.setup_pkg_body)
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(
+                    text = stringResource(R.string.setup_pkg_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                OutlinedTextField(
-                    value = zrif,
-                    onValueChange = { zrif = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.setup_pkg_zrif_label)) },
-                    placeholder = { Text(stringResource(R.string.setup_pkg_zrif_placeholder)) },
-                    minLines = 3,
-                    shape = RoundedCornerShape(22.dp)
-                )
-                FilledTonalButton(
-                    onClick = { onInstallPkg(zrif.trim()) },
-                    modifier = Modifier.fillMaxWidth()
+                SetupStep(
+                    number = 1,
+                    icon = Icons.Rounded.VpnKey,
+                    title = stringResource(R.string.setup_pkg_license_step_title),
+                    body = stringResource(R.string.setup_pkg_license_step_body)
                 ) {
-                    Text(stringResource(R.string.setup_pkg_button))
+                    FilledTonalButton(
+                        onClick = onInstallLicense,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.setup_pkg_license_button))
+                    }
+                    Text(
+                        text = stringResource(R.string.setup_pkg_zrif_or),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                    OutlinedTextField(
+                        value = zrif,
+                        onValueChange = { zrif = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.setup_pkg_zrif_label)) },
+                        placeholder = { Text(stringResource(R.string.setup_pkg_zrif_placeholder)) },
+                        minLines = 2,
+                        shape = RoundedCornerShape(22.dp)
+                    )
                 }
+                SetupStep(
+                    number = 2,
+                    icon = Icons.Rounded.FileOpen,
+                    title = stringResource(R.string.setup_pkg_file_step_title),
+                    body = stringResource(R.string.setup_pkg_file_step_body)
+                ) {
+                    Button(
+                        onClick = { onInstallPkg(zrif.trim()) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.setup_pkg_button))
+                    }
+                }
+                Text(
+                    text = stringResource(R.string.setup_pkg_order_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -194,6 +239,70 @@ private fun SetupActionCard(
             ) {
                 Text(buttonLabel)
             }
+        }
+    }
+}
+
+@Composable
+private fun SetupStep(
+    number: Int,
+    icon: ImageVector,
+    title: String,
+    body: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Surface(
+                    modifier = Modifier.size(40.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = number.toString(),
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = body,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            content()
         }
     }
 }

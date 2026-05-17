@@ -678,4 +678,22 @@
     <string name="settings_about_website_desc">Откройте сайт EmuCoreV для загрузок, новостей и ссылок на проекты.</string>
     <string name="settings_gpu_driver_status_global_desc">Эта игра использует глобальный выбор драйвера GPU.</string>
     <string name="settings_gpu_driver_game_title">Драйвер GPU для игры</string>
+    <string name="install_dialog_title_license">Установка лицензии</string>
+    <string name="install_dialog_license_failed">Ошибка установки лицензии.</string>
+    <string name="install_dialog_license_done">Лицензия успешно установлена.</string>
+    <string name="setup_pkg_license_step_title">Добавить лицензию</string>
+    <string name="setup_pkg_license_step_body">Выберите подходящий файл лицензии. Имя файла может быть любым; EmuCoreV считывает данные лицензии и сохраняет их в нужном месте. Если вместо этого у вас есть ключ zRIF, вставьте его ниже.</string>
+    <string name="setup_pkg_license_button">Выбрать файл лицензии</string>
+    <string name="setup_pkg_zrif_or">или вставьте zRIF</string>
+    <string name="setup_pkg_file_step_title">Выбрать файл PKG</string>
+    <string name="setup_pkg_file_step_body">После выбора лицензии или вставки zRIF выберите файл игры PKG, чтобы начать установку.</string>
+    <string name="setup_pkg_order_note">Совет: если установка PKG не удалась, убедитесь, что лицензия принадлежит тому же пакету игры.</string>
+    <string name="install_choice_title">Установить игру</string>
+    <string name="install_choice_body">Выберите, как должен быть установлен этот пакет игры.</string>
+    <string name="install_choice_archive_title">Простая установка</string>
+    <string name="install_choice_archive_body">Используйте это для игровых архивов VPK или ZIP.</string>
+    <string name="install_choice_pkg_title">Установка PKG</string>
+    <string name="install_choice_pkg_body">Сначала установите подходящую лицензию, вставьте ключ zRIF или выберите PKG напрямую, если лицензия уже установлена.</string>
+    <string name="install_choice_pkg_without_license_note">Вы можете выбрать PKG без вставки zRIF, если подходящая лицензия уже была установлена.</string>
+    <string name="common_cancel">Отмена</string>
 </resources>
