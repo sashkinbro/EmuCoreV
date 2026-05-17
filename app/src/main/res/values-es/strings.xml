@@ -667,4 +667,13 @@
     <string name="library_shortcut_unsupported">Este lanzador no admite atajos anclados.</string>
     <string name="library_shortcut_failed">Error al crear el atajo.</string>
     <string name="settings_app_language_arabic">Árabe</string>
+    <string name="play_time_today">Hoy</string>
+    <string name="play_time_yesterday">Ayer</string>
+    <string name="settings_gpu_driver_global">Usar global</string>
+    <string name="settings_gpu_driver_status_global">Usando el controlador de GPU global: %1$s</string>
+    <string name="settings_gpu_driver_status_global_system">Usando el controlador de GPU global: System Vulkan</string>
+    <string name="settings_gpu_driver_status_game_system">Anulación de juego: controlador System Vulkan</string>
+    <string name="settings_gpu_driver_status_game_active">Anulación de juego: %1$s</string>
+    <string name="settings_about_website">Sitio web oficial</string>
+    <string name="settings_about_website_desc">Abre el sitio web de EmuCoreV para descargas, noticias y enlaces del proyecto.</string>
 </resources>

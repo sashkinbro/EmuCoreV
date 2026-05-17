@@ -667,4 +667,13 @@
     <string name="library_shortcut_unsupported">Bu başlatıcı sabitlenmiş kısayolları desteklemiyor.</string>
     <string name="library_shortcut_failed">Kısayol oluşturulamadı.</string>
     <string name="settings_app_language_arabic">Arapça</string>
+    <string name="play_time_today">Bugün</string>
+    <string name="play_time_yesterday">Dün</string>
+    <string name="settings_gpu_driver_global">Globali kullan</string>
+    <string name="settings_gpu_driver_status_global">Global GPU sürücüsü kullanılıyor: %1$s</string>
+    <string name="settings_gpu_driver_status_global_system">Global GPU sürücüsü kullanılıyor: Sistem Vulkan</string>
+    <string name="settings_gpu_driver_status_game_system">Oyun geçersiz kılma: Sistem Vulkan sürücüsü</string>
+    <string name="settings_gpu_driver_status_game_active">Oyun geçersiz kılma: %1$s</string>
+    <string name="settings_about_website">Resmi web sitesi</string>
+    <string name="settings_about_website_desc">İndirmeler, haberler ve proje bağlantıları için EmuCoreV web sitesini açın.</string>
 </resources>

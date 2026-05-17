@@ -667,4 +667,13 @@
     <string name="library_shortcut_unsupported">Este launcher não suporta atalhos fixados.</string>
     <string name="library_shortcut_failed">Falha ao criar o atalho.</string>
     <string name="settings_app_language_arabic">Árabe</string>
+    <string name="play_time_today">Hoje</string>
+    <string name="play_time_yesterday">Ontem</string>
+    <string name="settings_gpu_driver_global">Usar global</string>
+    <string name="settings_gpu_driver_status_global">Usando driver de GPU global: %1$s</string>
+    <string name="settings_gpu_driver_status_global_system">Usando driver de GPU global: System Vulkan</string>
+    <string name="settings_gpu_driver_status_game_system">Substituição do jogo: driver System Vulkan</string>
+    <string name="settings_gpu_driver_status_game_active">Substituição do jogo: %1$s</string>
+    <string name="settings_about_website">Site oficial</string>
+    <string name="settings_about_website_desc">Abra o site EmuCoreV para downloads, notícias e links do projeto.</string>
 </resources>

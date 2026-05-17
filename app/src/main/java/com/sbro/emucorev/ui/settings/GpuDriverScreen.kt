@@ -59,6 +59,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -73,19 +75,32 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.RemoteGpuDriver
+import com.sbro.emucorev.core.VitaCoreConfig
+import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.ui.common.NavigationBackButton
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 fun GpuDriverScreen(
     onBackClick: () -> Unit,
+    targetTitleId: String? = null,
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
-    val selectedDriver = uiState.installedGpuDrivers.firstOrNull { it.name == uiState.coreConfig.customDriverName }
+    val scope = rememberCoroutineScope()
+    val gameSettingsRepository = remember(context) { VitaGameSettingsRepository(context) }
+    val gameScopedTitleId = targetTitleId?.takeIf(String::isNotBlank)
+    var gameConfig by remember(gameScopedTitleId) { mutableStateOf<VitaCoreConfig?>(null) }
+    var gameDriverOverride by remember(gameScopedTitleId) { mutableStateOf<String?>(null) }
+    val activeConfig = gameConfig ?: uiState.coreConfig
+    val selectedDriver = uiState.installedGpuDrivers.firstOrNull { it.name == activeConfig.customDriverName }
+    val isGameScoped = gameScopedTitleId != null
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 16.dp
     val installFailedMessage = stringResource(R.string.settings_gpu_driver_install_failed)
     val installSuccessTemplate = stringResource(R.string.settings_gpu_driver_install_success, "%s")
@@ -108,16 +123,62 @@ fun GpuDriverScreen(
         add(GPU_DRIVER_FILTER_ALL)
         addAll(uiState.remoteGpuDrivers.map { it.sourceLabel() }.distinct().sorted())
     }
+    fun refreshGameDriverState() {
+        val titleId = gameScopedTitleId ?: return
+        scope.launch {
+            val profile = withContext(Dispatchers.IO) {
+                gameSettingsRepository.loadProfile(titleId)
+            }
+            gameConfig = profile.config
+            gameDriverOverride = profile.customDriverOverride
+        }
+    }
+    fun applyGameDriverOverride(driverName: String?) {
+        val titleId = gameScopedTitleId ?: return
+        scope.launch {
+            val profile = withContext(Dispatchers.IO) {
+                val current = gameSettingsRepository.loadProfile(titleId)
+                val effectiveConfig = current.config.copy(
+                    customDriverName = driverName ?: uiState.coreConfig.customDriverName
+                )
+                gameSettingsRepository.saveProfile(titleId, effectiveConfig, driverName)
+                gameSettingsRepository.loadProfile(titleId)
+            }
+            gameConfig = profile.config
+            gameDriverOverride = profile.customDriverOverride
+        }
+    }
+    fun applyDriver(driverName: String) {
+        if (isGameScoped) {
+            applyGameDriverOverride(driverName)
+        } else {
+            viewModel.selectGpuDriver(driverName)
+        }
+    }
+    fun useSystemDriver() {
+        if (isGameScoped) {
+            applyGameDriverOverride("")
+        } else {
+            viewModel.useSystemGpuDriver()
+        }
+    }
 
     val localDriverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
-        viewModel.installGpuDriver(uri) { result ->
+        viewModel.installGpuDriver(uri, applyGlobally = !isGameScoped) { result ->
             result.onSuccess { driverName ->
+                if (isGameScoped) {
+                    applyGameDriverOverride(driverName)
+                }
                 Toast.makeText(context, installSuccessTemplate.format(driverName), Toast.LENGTH_SHORT).show()
             }.onFailure { error ->
                 Toast.makeText(context, error.message ?: installFailedMessage, Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    LaunchedEffect(gameScopedTitleId, uiState.coreConfig.customDriverName) {
+        refreshGameDriverState()
     }
 
     LaunchedEffect(Unit) {
@@ -141,6 +202,11 @@ fun GpuDriverScreen(
     ) {
         item {
             GpuDriverHeader(
+                title = if (isGameScoped) {
+                    stringResource(R.string.settings_gpu_driver_game_title)
+                } else {
+                    stringResource(R.string.settings_gpu_driver_manager_title)
+                },
                 onBackClick = backClick,
                 searchActive = searchVisible || searchQuery.isNotBlank(),
                 filtersActive = variantFilter != GPU_DRIVER_FILTER_ALL || sourceFilter != GPU_DRIVER_FILTER_ALL,
@@ -151,13 +217,20 @@ fun GpuDriverScreen(
         item {
             ActiveDriverCard(
                 selectedDriver = selectedDriver,
-                backendRenderer = uiState.coreConfig.backendRenderer,
-                onUseSystem = viewModel::useSystemGpuDriver,
+                backendRenderer = activeConfig.backendRenderer,
+                isGameScoped = isGameScoped,
+                gameDriverOverride = gameDriverOverride,
+                globalDriverName = uiState.coreConfig.customDriverName,
+                onUseGlobal = { applyGameDriverOverride(null) },
+                onUseSystem = ::useSystemDriver,
                 onInstallFromFile = { localDriverPicker.launch(arrayOf("application/zip", "*/*")) },
                 onRemove = {
-                    val driverName = uiState.coreConfig.customDriverName
+                    val driverName = activeConfig.customDriverName
                     if (driverName.isNotBlank()) {
                         viewModel.removeGpuDriver(driverName)
+                        if (isGameScoped && gameDriverOverride == driverName) {
+                            applyGameDriverOverride(null)
+                        }
                     }
                 }
             )
@@ -169,8 +242,8 @@ fun GpuDriverScreen(
             items(uiState.installedGpuDrivers, key = { it.name }) { driver ->
                 InstalledDriverRow(
                     driver = driver,
-                    selected = uiState.coreConfig.customDriverName == driver.name,
-                    onSelect = { viewModel.selectGpuDriver(driver.name) },
+                    selected = if (isGameScoped) gameDriverOverride == driver.name else uiState.coreConfig.customDriverName == driver.name,
+                    onSelect = { applyDriver(driver.name) },
                     onRemove = { viewModel.removeGpuDriver(driver.name) }
                 )
             }
@@ -261,12 +334,19 @@ fun GpuDriverScreen(
             RemoteDriverRow(
                 driver = driver,
                 installedDriver = installedDriver,
-                selected = installedDriver?.name == uiState.coreConfig.customDriverName,
+                selected = if (isGameScoped) {
+                    installedDriver?.name == gameDriverOverride
+                } else {
+                    installedDriver?.name == uiState.coreConfig.customDriverName
+                },
                 downloading = downloadingProgress != null,
                 progress = downloadingProgress ?: 0f,
                 onDownload = {
-                    viewModel.installRemoteGpuDriver(driver) { result ->
+                    viewModel.installRemoteGpuDriver(driver, applyGlobally = !isGameScoped) { result ->
                         result.onSuccess { driverName ->
+                            if (isGameScoped) {
+                                applyGameDriverOverride(driverName)
+                            }
                             Toast.makeText(context, installSuccessTemplate.format(driverName), Toast.LENGTH_SHORT).show()
                         }.onFailure { error ->
                             Toast.makeText(context, error.message ?: installFailedMessage, Toast.LENGTH_LONG).show()
@@ -274,7 +354,7 @@ fun GpuDriverScreen(
                     }
                 },
                 onSelect = {
-                    installedDriver?.let { viewModel.selectGpuDriver(it.name) }
+                    installedDriver?.let { applyDriver(it.name) }
                 },
                 onRemove = {
                     installedDriver?.let { viewModel.removeGpuDriver(it.name) }
@@ -359,6 +439,7 @@ private fun FilterChipRow(
 
 @Composable
 private fun GpuDriverHeader(
+    title: String,
     onBackClick: () -> Unit,
     searchActive: Boolean,
     filtersActive: Boolean,
@@ -377,7 +458,7 @@ private fun GpuDriverHeader(
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = stringResource(R.string.settings_gpu_driver_manager_title),
+                text = title,
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
@@ -436,11 +517,16 @@ private fun HeaderIconButton(
 private fun ActiveDriverCard(
     selectedDriver: InstalledGpuDriver?,
     backendRenderer: String,
+    isGameScoped: Boolean,
+    gameDriverOverride: String?,
+    globalDriverName: String,
+    onUseGlobal: () -> Unit,
     onUseSystem: () -> Unit,
     onInstallFromFile: () -> Unit,
     onRemove: () -> Unit
 ) {
     val isActive = backendRenderer == "Vulkan" && selectedDriver?.isUsable == true
+    val canRemove = !isGameScoped || !gameDriverOverride.isNullOrBlank()
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -455,10 +541,25 @@ private fun ActiveDriverCard(
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onSurface
             )
-            DriverStatusText(selectedDriver = selectedDriver, backendRenderer = backendRenderer, isActive = isActive)
+            DriverStatusText(
+                selectedDriver = selectedDriver,
+                backendRenderer = backendRenderer,
+                isActive = isActive,
+                isGameScoped = isGameScoped,
+                gameDriverOverride = gameDriverOverride,
+                globalDriverName = globalDriverName
+            )
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (isGameScoped) {
+                    FilterChip(
+                        selected = gameDriverOverride == null,
+                        onClick = onUseGlobal,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.settings_gpu_driver_global)) }
+                    )
+                }
                 FilterChip(
-                    selected = selectedDriver == null,
+                    selected = if (isGameScoped) gameDriverOverride != null && gameDriverOverride.isBlank() else selectedDriver == null,
                     onClick = onUseSystem,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.settings_gpu_driver_system)) }
@@ -474,7 +575,7 @@ private fun ActiveDriverCard(
                     )
                 }
             }
-            if (selectedDriver != null) {
+            if (selectedDriver != null && canRemove) {
                 OutlinedButton(
                     onClick = onRemove,
                     modifier = Modifier.fillMaxWidth()
@@ -494,15 +595,24 @@ private fun ActiveDriverCard(
 private fun DriverStatusText(
     selectedDriver: InstalledGpuDriver?,
     backendRenderer: String,
-    isActive: Boolean
+    isActive: Boolean,
+    isGameScoped: Boolean = false,
+    gameDriverOverride: String? = null,
+    globalDriverName: String = ""
 ) {
     val text = when {
+        isGameScoped && gameDriverOverride == null && globalDriverName.isBlank() -> stringResource(R.string.settings_gpu_driver_status_global_system)
+        isGameScoped && gameDriverOverride == null -> stringResource(R.string.settings_gpu_driver_status_global, globalDriverName)
+        isGameScoped && gameDriverOverride != null && gameDriverOverride.isBlank() -> stringResource(R.string.settings_gpu_driver_status_game_system)
         selectedDriver == null -> stringResource(R.string.settings_gpu_driver_status_system)
         !selectedDriver.isUsable -> stringResource(R.string.settings_gpu_driver_status_broken, selectedDriver.name)
         backendRenderer != "Vulkan" -> stringResource(R.string.settings_gpu_driver_status_renderer, backendRenderer)
+        isGameScoped -> stringResource(R.string.settings_gpu_driver_status_game_active, selectedDriver.name)
         else -> stringResource(R.string.settings_gpu_driver_status_active, selectedDriver.name)
     }
     val supporting = when {
+        isGameScoped && gameDriverOverride == null -> stringResource(R.string.settings_gpu_driver_status_global_desc)
+        isGameScoped && gameDriverOverride != null && gameDriverOverride.isBlank() -> stringResource(R.string.settings_gpu_driver_status_system_desc)
         selectedDriver == null -> stringResource(R.string.settings_gpu_driver_status_system_desc)
         !selectedDriver.isUsable -> stringResource(R.string.settings_gpu_driver_status_broken_desc)
         !isActive -> stringResource(R.string.settings_gpu_driver_status_renderer_desc)

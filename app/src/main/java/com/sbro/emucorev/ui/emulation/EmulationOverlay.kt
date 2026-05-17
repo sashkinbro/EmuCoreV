@@ -124,7 +124,7 @@ fun EmulationOverlayHost(
 
     fun persistConfig(transform: (VitaCoreConfig) -> VitaCoreConfig) {
         config = transform(config)
-        repository.save(gameId, config)
+        repository.savePreservingDriverOverride(gameId, config)
     }
 
     fun syncPerformanceOverlayState() {

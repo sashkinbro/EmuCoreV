@@ -667,4 +667,13 @@
     <string name="library_shortcut_unsupported">Dieser Launcher unterstützt keine angehefteten Verknüpfungen.</string>
     <string name="library_shortcut_failed">Verknüpfung konnte nicht erstellt werden.</string>
     <string name="settings_app_language_arabic">Arabisch</string>
+    <string name="play_time_today">Heute</string>
+    <string name="play_time_yesterday">Gestern</string>
+    <string name="settings_gpu_driver_global">Global verwenden</string>
+    <string name="settings_gpu_driver_status_global">Verwende globalen GPU-Treiber: %1$s</string>
+    <string name="settings_gpu_driver_status_global_system">Verwende globalen GPU-Treiber: System-Vulkan</string>
+    <string name="settings_gpu_driver_status_game_system">Spiel-Überschreibung: System-Vulkan-Treiber</string>
+    <string name="settings_gpu_driver_status_game_active">Spiel-Überschreibung: %1$s</string>
+    <string name="settings_about_website">Offizielle Website</string>
+    <string name="settings_about_website_desc">Öffne die EmuCoreV-Website für Downloads, Neuigkeiten und Projekt-Links.</string>
 </resources>

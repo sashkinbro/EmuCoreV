@@ -46,6 +46,7 @@ import com.sbro.emucorev.MainActivity
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.PlayTimeRepository
 import com.sbro.emucorev.core.VitaCoreConfigRepository
+import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.core.input.InputDeviceClassifier
 import org.libsdl.app.SDLActivity
 import org.libsdl.app.SDLSurface
@@ -121,8 +122,12 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun getArguments(): Array<String> {
         val args = intent.getStringArrayExtra(APP_RESTART_PARAMETERS)
-        if (args != null) return args
+        if (args != null) {
+            syncEffectiveDriverForLaunch(gameIdFromArgs(args))
+            return args
+        }
         val gameId = gameIdFromIntent(intent)
+        syncEffectiveDriverForLaunch(gameId)
         return if (gameId.isBlank()) emptyArray() else arrayOf("-r", gameId)
     }
 
@@ -591,6 +596,16 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         if (!action.startsWith("LAUNCH_")) return ""
         val payload = action.removePrefix("LAUNCH_")
         return payload.substringBeforeLast('_', payload)
+    }
+
+    private fun gameIdFromArgs(args: Array<String>): String {
+        val restartIndex = args.indexOf("-r")
+        return if (restartIndex >= 0 && restartIndex + 1 < args.size) args[restartIndex + 1] else ""
+    }
+
+    private fun syncEffectiveDriverForLaunch(gameId: String) {
+        if (gameId.isBlank()) return
+        runCatching { VitaGameSettingsRepository(this).syncEffectiveDriverForLaunch(gameId) }
     }
 
     private fun isSpecialLaunchAction(action: String): Boolean {
