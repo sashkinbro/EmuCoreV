@@ -4,7 +4,7 @@ import android.view.InputDevice
 import android.view.KeyEvent
 
 object InputDeviceClassifier {
-    private val gamepadButtonKeys = intArrayOf(
+    private val faceAndShoulderButtonKeys = intArrayOf(
         KeyEvent.KEYCODE_BUTTON_A,
         KeyEvent.KEYCODE_BUTTON_B,
         KeyEvent.KEYCODE_BUTTON_X,
@@ -20,6 +20,16 @@ object InputDeviceClassifier {
         KeyEvent.KEYCODE_BUTTON_MODE
     )
 
+    private val dpadKeys = intArrayOf(
+        KeyEvent.KEYCODE_DPAD_UP,
+        KeyEvent.KEYCODE_DPAD_DOWN,
+        KeyEvent.KEYCODE_DPAD_LEFT,
+        KeyEvent.KEYCODE_DPAD_RIGHT,
+        KeyEvent.KEYCODE_DPAD_CENTER
+    )
+
+    private val gamepadButtonKeys = faceAndShoulderButtonKeys + dpadKeys
+
     private val blockedControllerIdentityParts = listOf(
         "uinput-fpc",
         "uinput_fpc",
@@ -31,6 +41,24 @@ object InputDeviceClassifier {
         "finger print",
         "fp_",
         "fp-"
+    )
+
+    private val controllerIdentityParts = listOf(
+        "8bitdo",
+        "bluetooth gamepad",
+        "controller",
+        "dualshock",
+        "dualsense",
+        "game controller",
+        "gamepad",
+        "gamesir",
+        "ipega",
+        "joystick",
+        "ps3",
+        "ps4",
+        "ps5",
+        "x-box",
+        "xbox"
     )
 
     fun isPhysicalGameController(device: InputDevice?): Boolean {
@@ -51,7 +79,34 @@ object InputDeviceClassifier {
             return false
         }
 
-        return hasJoystickAxes(device) || hasGamepadButtons(device)
+        if (hasJoystickAxes(device) || hasGamepadButtons(device)) {
+            return true
+        }
+
+        return ((hasJoystickSource || hasGamepadSource) ||
+            (hasDpadSource && device.isExternal)) &&
+            looksLikeControllerDevice(device)
+    }
+
+    fun isGameControllerKeyEvent(device: InputDevice?, source: Int, keyCode: Int): Boolean {
+        if (!isGamepadKeyCode(keyCode)) {
+            return false
+        }
+        if (device == null || device.id < 0 || device.isVirtual || looksLikeFingerprintDevice(device)) {
+            return false
+        }
+
+        val resolvedSource = if (source != InputDevice.SOURCE_UNKNOWN) source else device.sources
+        val hasControllerSource = (resolvedSource and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
+            (resolvedSource and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK ||
+            (resolvedSource and InputDevice.SOURCE_DPAD) == InputDevice.SOURCE_DPAD
+        if (!hasControllerSource) {
+            return false
+        }
+
+        return isPhysicalGameController(device) ||
+            (device.isExternal && looksLikeControllerDevice(device)) ||
+            ((resolvedSource and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD && looksLikeControllerDevice(device))
     }
 
     private fun looksLikeFingerprintDevice(device: InputDevice): Boolean {
@@ -64,6 +119,16 @@ object InputDeviceClassifier {
         return blockedControllerIdentityParts.any { part -> identity.contains(part) }
     }
 
+    private fun looksLikeControllerDevice(device: InputDevice): Boolean {
+        val identity = buildString {
+            append(device.name.orEmpty())
+            append(' ')
+            append(device.descriptor.orEmpty())
+        }.lowercase()
+
+        return controllerIdentityParts.any { part -> identity.contains(part) }
+    }
+
     private fun hasJoystickAxes(device: InputDevice): Boolean {
         return device.motionRanges.count { range ->
             (range.source and InputDevice.SOURCE_CLASS_JOYSTICK) == InputDevice.SOURCE_CLASS_JOYSTICK
@@ -72,7 +137,15 @@ object InputDeviceClassifier {
 
     private fun hasGamepadButtons(device: InputDevice): Boolean {
         return runCatching {
-            device.hasKeys(*gamepadButtonKeys).any { it }
+            val sources = device.sources
+            val hasGamepadSource = (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
+                (sources and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
+            val keys = if (hasGamepadSource) gamepadButtonKeys else faceAndShoulderButtonKeys
+            device.hasKeys(*keys).any { it }
         }.getOrDefault(false)
+    }
+
+    private fun isGamepadKeyCode(keyCode: Int): Boolean {
+        return gamepadButtonKeys.contains(keyCode)
     }
 }

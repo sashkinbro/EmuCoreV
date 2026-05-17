@@ -696,4 +696,15 @@
     <string name="install_choice_pkg_body">Installa prima la licenza corrispondente, incolla una chiave zRIF o scegli direttamente il PKG se la licenza è già stata installata.</string>
     <string name="install_choice_pkg_without_license_note">Puoi scegliere un PKG senza incollare uno zRIF se la licenza corrispondente è già stata installata.</string>
     <string name="common_cancel">Annulla</string>
+    <string name="save_manager_backup_all_title">Backup di tutti i salvataggi</string>
+    <string name="save_manager_backup_all_body">Crea un unico backup ZIP con ogni cartella di salvataggio, o ripristina le cartelle di salvataggio da un backup completo precedente.</string>
+    <string name="save_manager_backup_all">Esegui backup di tutto</string>
+    <string name="save_manager_restore_all">Ripristina tutto</string>
+    <string name="save_manager_backup_all_success">Backup di %1$d cartelle di salvataggio completato.</string>
+    <string name="save_manager_backup_all_failed">Impossibile eseguire il backup di tutti i salvataggi.</string>
+    <string name="save_manager_restore_all_success">%1$d cartelle di salvataggio ripristinate.</string>
+    <string name="save_manager_restore_all_failed">Impossibile ripristinare tutti i salvataggi.</string>
+    <string name="save_manager_restore_all_confirm_title">Ripristinare tutti i salvataggi?</string>
+    <string name="save_manager_restore_all_confirm_body">Le cartelle di salvataggio dal backup selezionato sostituiranno le cartelle di salvataggio corrispondenti su questo dispositivo. I salvataggi esistenti vengono mantenuti solo quando il backup non contiene quell\'ID di salvataggio.</string>
+    <string name="save_manager_restore_all_confirm">Ripristina salvataggi</string>
 </resources>

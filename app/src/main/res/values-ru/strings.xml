@@ -696,4 +696,15 @@
     <string name="install_choice_pkg_body">Сначала установите подходящую лицензию, вставьте ключ zRIF или выберите PKG напрямую, если лицензия уже установлена.</string>
     <string name="install_choice_pkg_without_license_note">Вы можете выбрать PKG без вставки zRIF, если подходящая лицензия уже была установлена.</string>
     <string name="common_cancel">Отмена</string>
+    <string name="save_manager_backup_all_title">Резервное копирование всех сохранений</string>
+    <string name="save_manager_backup_all_body">Создайте одну резервную копию в формате ZIP со всеми папками сохранений или восстановите папки сохранений из предыдущей полной резервной копии.</string>
+    <string name="save_manager_backup_all">Резервировать все</string>
+    <string name="save_manager_restore_all">Восстановить все</string>
+    <string name="save_manager_backup_all_success">Создана резервная копия %1$d папок сохранений.</string>
+    <string name="save_manager_backup_all_failed">Не удалось создать резервную копию всех сохранений.</string>
+    <string name="save_manager_restore_all_success">Восстановлено %1$d папок сохранений.</string>
+    <string name="save_manager_restore_all_failed">Не удалось восстановить все сохранения.</string>
+    <string name="save_manager_restore_all_confirm_title">Восстановить все сохранения?</string>
+    <string name="save_manager_restore_all_confirm_body">Папки сохранений из выбранной резервной копии заменят совпадающие папки сохранений на этом устройстве. Существующие сохранения сохраняются только в том случае, если в резервной копии нет такого ID сохранения.</string>
+    <string name="save_manager_restore_all_confirm">Восстановить сохранения</string>
 </resources>

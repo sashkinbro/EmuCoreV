@@ -269,6 +269,7 @@ fun LibraryScreen(
                         )
                         Button(onClick = refreshClick) {
                             Icon(Icons.Rounded.FolderOpen, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(stringResource(R.string.library_refresh))
                         }
                     }

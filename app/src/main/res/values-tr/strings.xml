@@ -696,4 +696,15 @@
     <string name="install_choice_pkg_body">Önce eşleşen lisansı yükleyin, bir zRIF anahtarı yapıştırın veya lisans zaten yüklüyse doğrudan PKG\'yi seçin.</string>
     <string name="install_choice_pkg_without_license_note">Eşleşen lisans zaten yüklenmişse bir zRIF yapıştırmadan bir PKG seçebilirsiniz.</string>
     <string name="common_cancel">İptal</string>
+    <string name="save_manager_backup_all_title">Tüm kayıtların yedeği</string>
+    <string name="save_manager_backup_all_body">Tüm kayıt klasörlerini içeren tek bir ZIP yedeği oluşturun veya önceki tam bir yedekten kayıt klasörlerini geri yükleyin.</string>
+    <string name="save_manager_backup_all">Tümünü yedekle</string>
+    <string name="save_manager_restore_all">Tümünü geri yükle</string>
+    <string name="save_manager_backup_all_success">%1$d kayıt klasörü yedeklendi.</string>
+    <string name="save_manager_backup_all_failed">Tüm kayıtlar yedeklenemedi.</string>
+    <string name="save_manager_restore_all_success">%1$d kayıt klasörü geri yüklendi.</string>
+    <string name="save_manager_restore_all_failed">Tüm kayıtlar geri yüklenemedi.</string>
+    <string name="save_manager_restore_all_confirm_title">Tüm kayıtlar geri yüklensin mi?</string>
+    <string name="save_manager_restore_all_confirm_body">Seçilen yedekteki kayıt klasörleri, bu cihazdaki eşleşen kayıt klasörleriyle değiştirilir. Mevcut kayıtlar, yalnızca yedekleme söz konusu kayıt kimliğini içermediğinde saklanır.</string>
+    <string name="save_manager_restore_all_confirm">Kayıtları geri yükle</string>
 </resources>

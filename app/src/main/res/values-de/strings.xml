@@ -696,4 +696,15 @@
     <string name="install_choice_pkg_body">Installiere zuerst die passende Lizenz, füge einen zRIF-Schlüssel ein oder wähle die PKG direkt, wenn die Lizenz bereits installiert ist.</string>
     <string name="install_choice_pkg_without_license_note">Du kannst eine PKG auswählen, ohne einen zRIF einzufügen, wenn die passende Lizenz bereits installiert wurde.</string>
     <string name="common_cancel">Abbrechen</string>
+    <string name="save_manager_backup_all_title">Backup aller Speicherstände</string>
+    <string name="save_manager_backup_all_body">Erstelle ein einzelnes ZIP-Backup mit allen Speicherordnern oder stelle Speicherordner aus einem früheren vollständigen Backup wieder her.</string>
+    <string name="save_manager_backup_all">Alle sichern</string>
+    <string name="save_manager_restore_all">Alle wiederherstellen</string>
+    <string name="save_manager_backup_all_success">%1$d Speicherordner gesichert.</string>
+    <string name="save_manager_backup_all_failed">Fehler beim Sichern aller Speicherstände.</string>
+    <string name="save_manager_restore_all_success">%1$d Speicherordner wiederhergestellt.</string>
+    <string name="save_manager_restore_all_failed">Fehler beim Wiederherstellen aller Speicherstände.</string>
+    <string name="save_manager_restore_all_confirm_title">Alle Speicherstände wiederherstellen?</string>
+    <string name="save_manager_restore_all_confirm_body">Speicherordner aus dem ausgewählten Backup ersetzen übereinstimmende Speicherordner auf diesem Gerät. Vorhandene Speicherstände bleiben nur erhalten, wenn das Backup diese Speicher-ID nicht enthält.</string>
+    <string name="save_manager_restore_all_confirm">Speicherstände wiederherstellen</string>
 </resources>

@@ -255,7 +255,11 @@ open class SDLJoystickHandler_API16 : SDLJoystickHandler() {
             if (joystick != null) {
                 joystick.axes.forEachIndexed { index, range ->
                     val targetIndex = GamepadRuntimeInputSettings.targetAxisIndex(range.axis, joystick.axes, index)
-                    val value = (event.getAxisValue(range.axis, actionPointerIndex) - range.min) / range.range * 2.0f - 1.0f
+                    val value = if (range.range > 0f) {
+                        (event.getAxisValue(range.axis, actionPointerIndex) - range.min) / range.range * 2.0f - 1.0f
+                    } else {
+                        event.getAxisValue(range.axis, actionPointerIndex)
+                    }
                     SDLControllerManager.onNativeJoy(
                         joystick.deviceId,
                         targetIndex,

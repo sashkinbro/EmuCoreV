@@ -696,4 +696,15 @@
     <string name="install_choice_pkg_body">Спочатку встановіть відповідну ліцензію, вставте ключ zRIF або виберіть безпосередньо PKG, якщо ліцензію вже встановлено.</string>
     <string name="install_choice_pkg_without_license_note">Ви можете вибрати PKG без вставки zRIF, якщо відповідна ліцензія вже була встановлена.</string>
     <string name="common_cancel">Скасувати</string>
+    <string name="save_manager_backup_all_title">Резервне копіювання всіх збережень</string>
+    <string name="save_manager_backup_all_body">Створіть одну резервну копію у форматі ZIP з усіма папками збережень або відновіть папки збережень з попередньої повної резервної копії.</string>
+    <string name="save_manager_backup_all">Зробити резервну копію всього</string>
+    <string name="save_manager_restore_all">Відновити все</string>
+    <string name="save_manager_backup_all_success">Створено резервну копію %1$d папок збережень.</string>
+    <string name="save_manager_backup_all_failed">Не вдалося створити резервну копію всіх збережень.</string>
+    <string name="save_manager_restore_all_success">Відновлено %1$d папок збережень.</string>
+    <string name="save_manager_restore_all_failed">Не вдалося відновити всі збереження.</string>
+    <string name="save_manager_restore_all_confirm_title">Відновити всі збереження?</string>
+    <string name="save_manager_restore_all_confirm_body">Папки збережень з вибраної резервної копії замінять відповідні папки збережень на цьому пристрої. Існуючі збереження зберігаються лише тоді, коли резервна копія не містить такого ID збереження.</string>
+    <string name="save_manager_restore_all_confirm">Відновити збереження</string>
 </resources>
