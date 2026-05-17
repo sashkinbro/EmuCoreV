@@ -684,14 +684,8 @@ private fun ToggleRow(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.End
         ) {
-            Text(
-                text = title,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
             Switch(checked = checked, onCheckedChange = onCheckedChange)
         }
     }
@@ -709,24 +703,11 @@ private fun SliderRow(
     onChange: (Float) -> Unit
 ) {
     SettingContainer(title = title, description = description, onReset = onReset) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = valueText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        Text(
+            text = valueText,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Slider(
             value = value,
             onValueChange = onChange,
