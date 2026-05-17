@@ -13,6 +13,9 @@ local.properties
 .firebaserc
 firebase.json
 firestore.rules
+firestore.indexes.json
+public/
+publick/
 app/google-services.json
 
 # Build outputs
