@@ -93,6 +93,7 @@ EmuCoreV builds on the Vita3K project and its ecosystem, then layers a custom An
 
 If you want to support ongoing development or join the community:
 
+- Official website: https://emucorev.web.app
 - Patreon: https://www.patreon.com/c/emucore/membership
 - Discord: https://discord.gg/c5EBeNRpz2
 - More apps by the author: https://play.google.com/store/apps/dev?id=7136622298887775989
