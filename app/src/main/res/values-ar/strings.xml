@@ -667,4 +667,13 @@
     <string name="settings_vsync">المزامنة الرأسية (V-Sync)</string>
     <string name="settings_pstv_mode">وضع PSTV</string>
     <string name="settings_app_language_arabic">العربية</string>
+    <string name="play_time_today">اليوم</string>
+    <string name="play_time_yesterday">أمس</string>
+    <string name="settings_gpu_driver_global">استخدام العالمي</string>
+    <string name="settings_gpu_driver_status_global">استخدام برنامج تشغيل GPU العالمي: %1$s</string>
+    <string name="settings_gpu_driver_status_global_system">استخدام برنامج تشغيل GPU العالمي: System Vulkan</string>
+    <string name="settings_gpu_driver_status_game_system">تجاوز اللعبة: برنامج تشغيل System Vulkan</string>
+    <string name="settings_gpu_driver_status_game_active">تجاوز اللعبة: %1$s</string>
+    <string name="settings_about_website">الموقع الرسمي</string>
+    <string name="settings_about_website_desc">افتح موقع EmuCoreV للتنزيلات والأخبار وروابط المشروع.</string>
 </resources>

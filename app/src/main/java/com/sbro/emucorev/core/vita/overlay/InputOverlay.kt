@@ -111,7 +111,7 @@ class InputOverlay(context: Context) {
         latestConfig = config
         overlayScale = config.overlayScale
         overlayOpacity = config.overlayOpacity.coerceIn(10, 100)
-        repository.save(emulator?.currentGameIdOrIntent().orEmpty(), config)
+        repository.savePreservingDriverOverride(emulator?.currentGameIdOrIntent().orEmpty(), config)
         syncControllerAttachment()
     }
 

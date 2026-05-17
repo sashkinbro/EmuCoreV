@@ -303,7 +303,6 @@ class VitaCoreConfigRepository(private val context: Context) {
             cpuPoolSize = upstream.cpuPoolSize,
             disableSurfaceSync = false,
             validationLayer = false,
-            customDriverName = "",
             discordRichPresence = false,
             psnSignedIn = false,
             logLevel = defaultConfig().logLevel
@@ -532,7 +531,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         // Bump whenever an old non-upstream default needs to be snapped to vanilla
         // for users who already wrote a stale config.yml. applyMigrations() rewrites
         // the affected keys on the next launch.
-        private const val CONFIG_SCHEMA_VERSION = 4
+        private const val CONFIG_SCHEMA_VERSION = 5
         private const val SCHEMA_VERSION_KEY = "config-schema-version"
         private val upstreamSequenceKeys = setOf(
             "controller-axis-binds",

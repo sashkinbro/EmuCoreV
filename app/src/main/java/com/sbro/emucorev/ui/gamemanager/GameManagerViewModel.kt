@@ -23,6 +23,7 @@ data class GameManagerUiState(
     val config: VitaCoreConfig = VitaCoreConfig(),
     val defaults: VitaCoreConfig = VitaCoreConfig(),
     val installedGpuDrivers: List<InstalledGpuDriver> = emptyList(),
+    val customDriverOverride: String? = null,
     val hasCustomProfile: Boolean = false,
     val isLoading: Boolean = true
 ) {
@@ -57,12 +58,14 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
                 ?.takeIf { id -> games.any { it.titleId == id } }
                 ?: games.firstOrNull()?.titleId
             val defaults = globalRepository.ensureDefaultsPersisted()
+            val profile = selected?.let(perGameRepository::loadProfile)
             _uiState.value = GameManagerUiState(
                 games = games,
                 selectedTitleId = selected,
-                config = selected?.let(perGameRepository::loadEffective) ?: defaults,
+                config = profile?.config ?: defaults,
                 defaults = defaults,
                 installedGpuDrivers = installedGpuDrivers,
+                customDriverOverride = profile?.customDriverOverride,
                 hasCustomProfile = selected?.let(perGameRepository::hasCustomConfig) == true,
                 isLoading = false
             )
@@ -76,10 +79,36 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun updateSelected(transform: (VitaCoreConfig) -> VitaCoreConfig) {
         val titleId = _uiState.value.selectedTitleId ?: return
+        val updated = transform(_uiState.value.config)
+        val driverOverride = _uiState.value.customDriverOverride
+        _uiState.value = _uiState.value.copy(
+            config = updated,
+            hasCustomProfile = true
+        )
         viewModelScope.launch(Dispatchers.IO) {
-            val updated = perGameRepository.update(titleId, transform)
+            perGameRepository.saveProfile(titleId, updated, driverOverride)
             _uiState.value = _uiState.value.copy(
                 config = updated,
+                customDriverOverride = driverOverride,
+                hasCustomProfile = true
+            )
+        }
+    }
+
+    fun selectCustomDriverOverride(driverName: String?) {
+        val titleId = _uiState.value.selectedTitleId ?: return
+        val defaults = _uiState.value.defaults
+        val updated = _uiState.value.config.copy(customDriverName = driverName ?: defaults.customDriverName)
+        _uiState.value = _uiState.value.copy(
+            config = updated,
+            customDriverOverride = driverName,
+            hasCustomProfile = true
+        )
+        viewModelScope.launch(Dispatchers.IO) {
+            perGameRepository.saveProfile(titleId, updated, driverName)
+            _uiState.value = _uiState.value.copy(
+                config = updated,
+                customDriverOverride = driverName,
                 hasCustomProfile = true
             )
         }
@@ -93,6 +122,7 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
             _uiState.value = _uiState.value.copy(
                 config = defaults,
                 defaults = defaults,
+                customDriverOverride = null,
                 hasCustomProfile = false
             )
         }

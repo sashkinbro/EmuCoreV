@@ -145,16 +145,21 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun installGpuDriver(uri: Uri, onComplete: (Result<String>) -> Unit) {
+    fun installGpuDriver(uri: Uri, applyGlobally: Boolean = true, onComplete: (Result<String>) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val result = runCatching {
                 val driverName = gpuDriverManager.installFromArchive(uri)
-                val updated = _uiState.value.coreConfig.copy(customDriverName = driverName)
-                coreConfigRepository.save(updated)
-                _uiState.value = _uiState.value.copy(
-                    coreConfig = updated,
-                    installedGpuDrivers = gpuDriverManager.listInstalledDrivers()
-                )
+                val installedDrivers = gpuDriverManager.listInstalledDrivers()
+                if (applyGlobally) {
+                    val updated = _uiState.value.coreConfig.copy(customDriverName = driverName)
+                    coreConfigRepository.save(updated)
+                    _uiState.value = _uiState.value.copy(
+                        coreConfig = updated,
+                        installedGpuDrivers = installedDrivers
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(installedGpuDrivers = installedDrivers)
+                }
                 driverName
             }
             withContext(Dispatchers.Main) {
@@ -187,7 +192,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun installRemoteGpuDriver(driver: RemoteGpuDriver, onComplete: (Result<String>) -> Unit) {
+    fun installRemoteGpuDriver(driver: RemoteGpuDriver, applyGlobally: Boolean = true, onComplete: (Result<String>) -> Unit) {
         if (_uiState.value.gpuDriverDownloads.containsKey(driver.id)) return
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = _uiState.value.copy(
@@ -200,12 +205,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     )
                 }
                 val driverName = gpuDriverManager.installFromArchive(archive)
-                val updated = _uiState.value.coreConfig.copy(customDriverName = driverName)
-                coreConfigRepository.save(updated)
-                _uiState.value = _uiState.value.copy(
-                    coreConfig = updated,
-                    installedGpuDrivers = gpuDriverManager.listInstalledDrivers()
-                )
+                val installedDrivers = gpuDriverManager.listInstalledDrivers()
+                if (applyGlobally) {
+                    val updated = _uiState.value.coreConfig.copy(customDriverName = driverName)
+                    coreConfigRepository.save(updated)
+                    _uiState.value = _uiState.value.copy(
+                        coreConfig = updated,
+                        installedGpuDrivers = installedDrivers
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(installedGpuDrivers = installedDrivers)
+                }
                 driverName
             }
             _uiState.value = _uiState.value.copy(

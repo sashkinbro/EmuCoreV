@@ -667,4 +667,13 @@
     <string name="library_shortcut_unsupported">Этот лаунчер не поддерживает закрепленные ярлыки.</string>
     <string name="library_shortcut_failed">Не удалось создать ярлык.</string>
     <string name="settings_app_language_arabic">Арабский</string>
+    <string name="play_time_today">Сегодня</string>
+    <string name="play_time_yesterday">Вчера</string>
+    <string name="settings_gpu_driver_global">Использовать глобальный</string>
+    <string name="settings_gpu_driver_status_global">Используется глобальный драйвер GPU: %1$s</string>
+    <string name="settings_gpu_driver_status_global_system">Используется глобальный драйвер GPU: системный Vulkan</string>
+    <string name="settings_gpu_driver_status_game_system">Переопределение игры: драйвер System Vulkan</string>
+    <string name="settings_gpu_driver_status_game_active">Переопределение игры: %1$s</string>
+    <string name="settings_about_website">Официальный сайт</string>
+    <string name="settings_about_website_desc">Откройте сайт EmuCoreV для загрузок, новостей и ссылок на проекты.</string>
 </resources>

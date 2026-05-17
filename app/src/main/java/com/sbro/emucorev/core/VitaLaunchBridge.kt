@@ -25,6 +25,7 @@ object VitaLaunchBridge {
         if (!EmulatorStorage.hasInstalledFirmwareUpdate(context)) {
             return LaunchResult.MissingFirmwareUpdate
         }
+        VitaGameSettingsRepository(context).syncEffectiveDriverForLaunch(titleId)
         return if (launchWithArgs(context, "LAUNCH_$titleId", arrayOf("-r", titleId))) {
             LaunchResult.Success
         } else {

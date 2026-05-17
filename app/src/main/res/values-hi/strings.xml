@@ -667,4 +667,13 @@
     <string name="library_shortcut_unsupported">यह लॉन्चर पिन किए गए शॉर्टकट का समर्थन नहीं करता है।</string>
     <string name="library_shortcut_failed">शॉर्टकट बनाने में विफल।</string>
     <string name="settings_app_language_arabic">अरबी</string>
+    <string name="play_time_today">आज</string>
+    <string name="play_time_yesterday">कल</string>
+    <string name="settings_gpu_driver_global">ग्लोबल का उपयोग करें</string>
+    <string name="settings_gpu_driver_status_global">ग्लोबल GPU ड्राइवर का उपयोग कर रहा है: %1$s</string>
+    <string name="settings_gpu_driver_status_global_system">ग्लोबल GPU ड्राइवर का उपयोग कर रहा है: सिस्टम Vulkan</string>
+    <string name="settings_gpu_driver_status_game_system">गेम ओवरराइड: सिस्टम Vulkan ड्राइवर</string>
+    <string name="settings_gpu_driver_status_game_active">गेम ओवरराइड: %1$s</string>
+    <string name="settings_about_website">आधिकारिक वेबसाइट</string>
+    <string name="settings_about_website_desc">डाउनलोड, समाचार और प्रोजेक्ट लिंक के लिए EmuCoreV वेबसाइट खोलें।</string>
 </resources>

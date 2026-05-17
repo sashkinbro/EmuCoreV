@@ -446,7 +446,7 @@ private fun DayChart(days: List<PlayTimeDayStats>) {
                     )
                 }
                 Text(
-                    text = day.label,
+                    text = day.label.displayText(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
@@ -599,5 +599,14 @@ private fun formatDuration(durationMs: Long): String {
         minutes > 0L -> "${minutes}m"
         durationMs > 0L -> "<1m"
         else -> "0m"
+    }
+}
+
+@Composable
+private fun PlayTimeDayLabel.displayText(): String {
+    return when (this) {
+        PlayTimeDayLabel.Today -> stringResource(R.string.play_time_today)
+        PlayTimeDayLabel.Yesterday -> stringResource(R.string.play_time_yesterday)
+        is PlayTimeDayLabel.Date -> text
     }
 }

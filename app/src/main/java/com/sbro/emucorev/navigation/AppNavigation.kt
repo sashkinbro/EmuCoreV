@@ -76,6 +76,7 @@ private const val ROUTE_SETTINGS_WITH_TAB = "settings/{tab}"
 private const val ROUTE_APP_LANGUAGE = "app-language"
 private const val ROUTE_VITA_LANGUAGE = "vita-language"
 private const val ROUTE_GPU_DRIVER = "gpu-driver"
+private const val ROUTE_GPU_DRIVER_WITH_TITLE = "gpu-driver/{titleId}"
 private const val ROUTE_DETAIL_PREFIX = "detail"
 private const val ROUTE_CATALOG_DETAIL_PREFIX = "catalog-detail"
 
@@ -86,6 +87,8 @@ private fun gameManagerRoute(titleId: String? = null): String =
     titleId?.takeIf(String::isNotBlank)?.let { "$ROUTE_GAME_MANAGER/$it" } ?: ROUTE_GAME_MANAGER
 private fun playTimeRoute(titleId: String? = null): String =
     titleId?.takeIf(String::isNotBlank)?.let { "$ROUTE_PLAY_TIME/$it" } ?: ROUTE_PLAY_TIME
+private fun gpuDriverRoute(titleId: String? = null): String =
+    titleId?.takeIf(String::isNotBlank)?.let { "$ROUTE_GPU_DRIVER/${Uri.encode(it)}" } ?: ROUTE_GPU_DRIVER
 
 @Composable
 fun AppNavigation(navController: NavHostController = rememberNavController()) {
@@ -486,6 +489,13 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     viewModel = settingsViewModel
                 )
             }
+            composable(ROUTE_GPU_DRIVER_WITH_TITLE) { entry ->
+                GpuDriverScreen(
+                    onBackClick = { navController.popBackStack() },
+                    targetTitleId = entry.arguments?.getString("titleId"),
+                    viewModel = settingsViewModel
+                )
+            }
             composable(ROUTE_SAVE_MANAGER) {
                 val navigateHome = {
                     navController.navigate(ROUTE_LIBRARY) {
@@ -612,7 +622,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         onMenuClick = openDrawer,
                         onBackClick = navigateHome,
                         onOpenGpuDriverManager = {
-                            navController.navigate(ROUTE_GPU_DRIVER) { launchSingleTop = true }
+                            navController.navigate(gpuDriverRoute(it)) { launchSingleTop = true }
                         }
                     )
                 }
@@ -623,7 +633,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onMenuClick = null,
                     onBackClick = { navController.popBackStack() },
                     onOpenGpuDriverManager = {
-                        navController.navigate(ROUTE_GPU_DRIVER) { launchSingleTop = true }
+                        navController.navigate(gpuDriverRoute(it)) { launchSingleTop = true }
                     }
                 )
             }

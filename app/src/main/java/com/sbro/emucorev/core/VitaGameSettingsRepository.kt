@@ -9,6 +9,11 @@ import javax.xml.transform.TransformerFactory
 import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
 
+data class VitaGameSettingsProfile(
+    val config: VitaCoreConfig,
+    val customDriverOverride: String?
+)
+
 class VitaGameSettingsRepository(private val context: Context) {
     private val globalRepository = VitaCoreConfigRepository(context)
 
@@ -25,22 +30,45 @@ class VitaGameSettingsRepository(private val context: Context) {
     }
 
     fun loadEffective(titleId: String): VitaCoreConfig {
+        return loadProfile(titleId).config
+    }
+
+    fun loadProfile(titleId: String): VitaGameSettingsProfile {
         val base = globalRepository.ensureDefaultsPersisted()
-        if (titleId.isBlank()) return base
+        if (titleId.isBlank()) return VitaGameSettingsProfile(base, null)
         val file = customConfigFile(titleId)
-        if (!file.exists()) return base
-        return runCatching { readCustomConfig(file, base) }.getOrDefault(base)
+        if (!file.exists()) return VitaGameSettingsProfile(base, null)
+        return runCatching { readCustomConfig(file, base) }.getOrDefault(VitaGameSettingsProfile(base, null))
     }
 
     fun save(titleId: String, config: VitaCoreConfig) {
+        savePreservingDriverOverride(titleId, config)
+    }
+
+    fun savePreservingDriverOverride(titleId: String, config: VitaCoreConfig) {
         if (titleId.isBlank()) return
+        val override = loadProfile(titleId).customDriverOverride
+        saveProfile(titleId, config, override)
+    }
+
+    fun saveProfile(titleId: String, config: VitaCoreConfig, customDriverOverride: String?) {
+        if (titleId.isBlank()) return
+        val base = globalRepository.ensureDefaultsPersisted()
+        val effectiveConfig = config.copy(customDriverName = customDriverOverride ?: base.customDriverName)
         configDirectory.mkdirs()
-        writeCustomConfig(customConfigFile(titleId), config)
+        writeCustomConfig(customConfigFile(titleId), effectiveConfig, customDriverOverride.driverMode())
+    }
+
+    fun syncEffectiveDriverForLaunch(titleId: String) {
+        if (titleId.isBlank() || !customConfigFile(titleId).exists()) return
+        val profile = loadProfile(titleId)
+        saveProfile(titleId, profile.config, profile.customDriverOverride)
     }
 
     fun update(titleId: String, transform: (VitaCoreConfig) -> VitaCoreConfig): VitaCoreConfig {
-        val updated = transform(loadEffective(titleId))
-        save(titleId, updated)
+        val profile = loadProfile(titleId)
+        val updated = transform(profile.config)
+        saveProfile(titleId, updated, profile.customDriverOverride)
         return updated
     }
 
@@ -49,10 +77,12 @@ class VitaGameSettingsRepository(private val context: Context) {
         customConfigFile(titleId).delete()
     }
 
-    private fun readCustomConfig(file: File, base: VitaCoreConfig): VitaCoreConfig {
+    private fun readCustomConfig(file: File, base: VitaCoreConfig): VitaGameSettingsProfile {
         val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file)
-        val root = doc.documentElement ?: return base
+        val root = doc.documentElement ?: return VitaGameSettingsProfile(base, null)
         var config = base
+        var rawDriverName: String? = null
+        var driverMode: String? = null
 
         root.childElement("core")?.let { core ->
             config = config.copy(modulesMode = core.intAttr("modules-mode", config.modulesMode))
@@ -61,6 +91,7 @@ class VitaGameSettingsRepository(private val context: Context) {
             config = config.copy(cpuPoolSize = cpu.intAttr("cpu-pool-size", config.cpuPoolSize))
         }
         root.childElement("gpu")?.let { gpu ->
+            rawDriverName = gpu.stringAttrOrNull("custom-driver-name")
             config = config.copy(
                 backendRenderer = gpu.stringAttr("backend-renderer", config.backendRenderer),
                 customDriverName = gpu.stringAttr("custom-driver-name", config.customDriverName),
@@ -115,6 +146,7 @@ class VitaGameSettingsRepository(private val context: Context) {
             config = config.copy(psnSignedIn = network.boolAttr("psn-signed-in", config.psnSignedIn))
         }
         root.childElement("emucorev")?.let { own ->
+            driverMode = own.stringAttrOrNull("gpu-driver-mode")
             config = config.copy(
                 performanceOverlay = own.boolAttr("performance-overlay", config.performanceOverlay),
                 performanceOverlayDetail = own.intAttr("performance-overlay-detail", config.performanceOverlayDetail),
@@ -141,10 +173,14 @@ class VitaGameSettingsRepository(private val context: Context) {
             )
         }
 
-        return config
+        val customDriverOverride = resolveDriverOverride(driverMode, rawDriverName, base)
+        return VitaGameSettingsProfile(
+            config = config.copy(customDriverName = customDriverOverride ?: base.customDriverName),
+            customDriverOverride = customDriverOverride
+        )
     }
 
-    private fun writeCustomConfig(file: File, config: VitaCoreConfig) {
+    private fun writeCustomConfig(file: File, config: VitaCoreConfig, driverMode: String) {
         val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
         val root = doc.createElement("config")
         doc.appendChild(root)
@@ -206,6 +242,7 @@ class VitaGameSettingsRepository(private val context: Context) {
             setAttribute("psn-signed-in", config.psnSignedIn.toString())
         })
         root.appendChild(doc.createElement("emucorev").apply {
+            setAttribute("gpu-driver-mode", driverMode)
             setAttribute("performance-overlay", config.performanceOverlay.toString())
             setAttribute("performance-overlay-detail", config.performanceOverlayDetail.toString())
             setAttribute("performance-overlay-position", config.performanceOverlayPosition.toString())
@@ -236,6 +273,27 @@ class VitaGameSettingsRepository(private val context: Context) {
         }.transform(DOMSource(doc), StreamResult(file))
     }
 
+    private fun resolveDriverOverride(mode: String?, rawDriverName: String?, base: VitaCoreConfig): String? {
+        return when (mode) {
+            DRIVER_MODE_GLOBAL -> null
+            DRIVER_MODE_SYSTEM -> ""
+            DRIVER_MODE_CUSTOM -> rawDriverName.orEmpty()
+            else -> when (rawDriverName) {
+                null -> null
+                base.customDriverName -> null
+                else -> rawDriverName
+            }
+        }
+    }
+
+    private fun String?.driverMode(): String {
+        return when {
+            this == null -> DRIVER_MODE_GLOBAL
+            this.isBlank() -> DRIVER_MODE_SYSTEM
+            else -> DRIVER_MODE_CUSTOM
+        }
+    }
+
     private fun Element.childElement(name: String): Element? {
         val nodes = getElementsByTagName(name)
         for (index in 0 until nodes.length) {
@@ -248,6 +306,9 @@ class VitaGameSettingsRepository(private val context: Context) {
     private fun Element.stringAttr(name: String, default: String): String =
         if (hasAttribute(name)) getAttribute(name) else default
 
+    private fun Element.stringAttrOrNull(name: String): String? =
+        if (hasAttribute(name)) getAttribute(name) else null
+
     private fun Element.boolAttr(name: String, default: Boolean): Boolean =
         if (hasAttribute(name)) getAttribute(name).toBooleanStrictOrNull() ?: default else default
 
@@ -256,4 +317,10 @@ class VitaGameSettingsRepository(private val context: Context) {
 
     private fun Element.floatAttr(name: String, default: Float): Float =
         if (hasAttribute(name)) getAttribute(name).toFloatOrNull() ?: default else default
+
+    companion object {
+        private const val DRIVER_MODE_GLOBAL = "global"
+        private const val DRIVER_MODE_SYSTEM = "system"
+        private const val DRIVER_MODE_CUSTOM = "custom"
+    }
 }

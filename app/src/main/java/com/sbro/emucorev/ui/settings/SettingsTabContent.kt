@@ -52,6 +52,7 @@ private val SettingsSectionContentPadding = 14.dp
 private val SettingsSectionRowPadding = 12.dp
 private val SettingsCardInnerPadding = 14.dp
 private const val EmuCoreRepositoryUrl = "https://github.com/sashkinbro/EmuCoreV"
+private const val EmuCoreWebsiteUrl = "https://emucorev.web.app"
 private const val EmuCoreDiscordUrl = "https://discord.gg/c5EBeNRpz2"
 private const val EmuCoreSupportUrl = "https://www.patreon.com/c/emucore/membership"
 private const val SashkinAppsPlayStoreUrl = "https://play.google.com/store/apps/dev?id=7136622298887775989"
@@ -613,6 +614,12 @@ private fun AboutTab() {
             title = stringResource(R.string.settings_about_community_title),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)
         ) {
+            LinkItem(
+                icon = Icons.Rounded.Language,
+                title = stringResource(R.string.settings_about_website),
+                subtitle = stringResource(R.string.settings_about_website_desc),
+                onClick = { uriHandler.openUri(EmuCoreWebsiteUrl) }
+            )
             LinkItem(
                 icon = Icons.Rounded.Code,
                 title = stringResource(R.string.settings_about_repository),

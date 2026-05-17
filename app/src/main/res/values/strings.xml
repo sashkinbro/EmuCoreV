@@ -121,6 +121,8 @@
     <string name="play_time_no_sessions_title">No play sessions yet</string>
     <string name="play_time_no_sessions_body">Launch a game and your play sessions will appear here.</string>
     <string name="play_time_no_game_sessions_body">This game has not been played yet. Launch it and its play sessions will appear here.</string>
+    <string name="play_time_today">Today</string>
+    <string name="play_time_yesterday">Yesterday</string>
     <string name="detail_title">Game details</string>
     <string name="detail_subtitle">Game info, media, and launch options.</string>
     <string name="detail_title_id">Title ID</string>
@@ -425,6 +427,7 @@
     <string name="settings_validation_layer">Validation layer</string>
     <string name="settings_help_validation_layer">Enables Vulkan validation when the driver supports it.\n\nUse this only when collecting logs or diagnosing a bug. Keep it off for gameplay because debug features can slow the emulator, fill logs, or expose developer-only visual overlays.</string>
     <string name="settings_gpu_driver">GPU driver</string>
+    <string name="settings_gpu_driver_global">Use global</string>
     <string name="settings_gpu_driver_system">System</string>
     <string name="settings_gpu_driver_custom">Custom</string>
     <string name="settings_gpu_driver_installed">Installed drivers</string>
@@ -433,6 +436,7 @@
     <string name="settings_gpu_driver_install">Install driver</string>
     <string name="settings_gpu_driver_manage">Manage drivers</string>
     <string name="settings_gpu_driver_manager_title">GPU drivers</string>
+    <string name="settings_gpu_driver_game_title">Game GPU driver</string>
     <string name="settings_gpu_driver_manager_subtitle">Install, download, apply, or remove Adreno drivers.</string>
     <string name="settings_gpu_driver_active_title">Active driver</string>
     <string name="settings_gpu_driver_install_from_file">Install from file</string>
@@ -458,6 +462,11 @@
     <string name="settings_gpu_driver_install_failed">GPU driver installation failed.</string>
     <string name="settings_gpu_driver_install_success">Installed GPU driver: %1$s</string>
     <string name="settings_gpu_driver_status_system">System Vulkan driver is active</string>
+    <string name="settings_gpu_driver_status_global">Using global GPU driver: %1$s</string>
+    <string name="settings_gpu_driver_status_global_system">Using global GPU driver: System Vulkan</string>
+    <string name="settings_gpu_driver_status_global_desc">This game follows the global GPU driver selection.</string>
+    <string name="settings_gpu_driver_status_game_system">Game override: System Vulkan driver</string>
+    <string name="settings_gpu_driver_status_game_active">Game override: %1$s</string>
     <string name="settings_gpu_driver_status_system_desc">No custom driver is selected, so the system Vulkan driver is being used.</string>
     <string name="settings_gpu_driver_status_active">Custom driver active: %1$s</string>
     <string name="settings_gpu_driver_status_active_desc">This driver is ready to use with Vulkan. Actual support still depends on device compatibility.</string>
@@ -493,6 +502,8 @@
     <string name="settings_about_version_value">Version %1$s</string>
     <string name="settings_about_body_extended">EmuCoreV brings PS Vita emulation to Android with a focused mobile interface, local library management, and a Vita3K-based emulation core.</string>
     <string name="settings_about_community_title">Community and support</string>
+    <string name="settings_about_website">Official website</string>
+    <string name="settings_about_website_desc">Open the EmuCoreV website for downloads, news, and project links.</string>
     <string name="settings_about_repository">EmuCoreV repository</string>
     <string name="settings_about_repository_desc">View source code, report issues, and follow development on GitHub.</string>
     <string name="settings_about_discord">Join our Discord</string>

@@ -26,9 +26,15 @@ data class PlayTimeGameStats(
 
 data class PlayTimeDayStats(
     val dayStartMs: Long,
-    val label: String,
+    val label: PlayTimeDayLabel,
     val totalMs: Long
 )
+
+sealed interface PlayTimeDayLabel {
+    data object Today : PlayTimeDayLabel
+    data object Yesterday : PlayTimeDayLabel
+    data class Date(val text: String) : PlayTimeDayLabel
+}
 
 data class PlayTimeUiState(
     val games: List<InstalledVitaGame> = emptyList(),
@@ -158,13 +164,13 @@ class PlayTimeViewModel(application: Application) : AndroidViewModel(application
         }.timeInMillis
     }
 
-    private fun dayLabel(dayStartMs: Long, now: Long): String {
+    private fun dayLabel(dayStartMs: Long, now: Long): PlayTimeDayLabel {
         val calendar = Calendar.getInstance().apply { timeInMillis = dayStartMs }
         val today = startOfDay(now)
         return when (dayStartMs) {
-            today -> "Today"
-            today - DAY_MS -> "Yesterday"
-            else -> "${calendar.get(Calendar.DAY_OF_MONTH)}/${calendar.get(Calendar.MONTH) + 1}"
+            today -> PlayTimeDayLabel.Today
+            today - DAY_MS -> PlayTimeDayLabel.Yesterday
+            else -> PlayTimeDayLabel.Date("${calendar.get(Calendar.DAY_OF_MONTH)}/${calendar.get(Calendar.MONTH) + 1}")
         }
     }
 

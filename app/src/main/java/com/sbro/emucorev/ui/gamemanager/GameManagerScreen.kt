@@ -37,9 +37,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -49,6 +51,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.InstalledGpuDriver
@@ -71,15 +76,27 @@ fun GameManagerScreen(
     initialTitleId: String? = null,
     onMenuClick: (() -> Unit)? = null,
     onBackClick: (() -> Unit)? = null,
-    onOpenGpuDriverManager: () -> Unit = {},
+    onOpenGpuDriverManager: (String?) -> Unit = {},
     viewModel: GameManagerViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val resumeTitleId by rememberUpdatedState(initialTitleId ?: uiState.selectedTitleId)
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
     var selectedTab by remember { mutableStateOf(GameManagerTab.Graphics) }
 
     androidx.compose.runtime.LaunchedEffect(initialTitleId) {
         initialTitleId?.takeIf(String::isNotBlank)?.let(viewModel::selectGame)
+    }
+
+    DisposableEffect(lifecycleOwner, initialTitleId) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refresh(resumeTitleId)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LazyColumn(
@@ -152,8 +169,10 @@ fun GameManagerScreen(
                             config = uiState.config,
                             defaults = uiState.defaults,
                             installedGpuDrivers = uiState.installedGpuDrivers,
-                            onOpenGpuDriverManager = onOpenGpuDriverManager,
-                            onUpdate = viewModel::updateSelected
+                            customDriverOverride = uiState.customDriverOverride,
+                            onOpenGpuDriverManager = { onOpenGpuDriverManager(uiState.selectedTitleId) },
+                            onUpdate = viewModel::updateSelected,
+                            onDriverOverrideSelected = viewModel::selectCustomDriverOverride
                         )
                         GameManagerTab.Performance -> PerformanceProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
                         GameManagerTab.Audio -> AudioProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
@@ -342,20 +361,24 @@ private fun GraphicsProfileSection(
     config: VitaCoreConfig,
     defaults: VitaCoreConfig,
     installedGpuDrivers: List<InstalledGpuDriver>,
+    customDriverOverride: String?,
     onOpenGpuDriverManager: () -> Unit,
-    onUpdate: ((VitaCoreConfig) -> VitaCoreConfig) -> Unit
+    onUpdate: ((VitaCoreConfig) -> VitaCoreConfig) -> Unit,
+    onDriverOverrideSelected: (String?) -> Unit
 ) {
     SectionCard(title = stringResource(R.string.settings_tab_graphics)) {
         ChoiceRow(stringResource(R.string.settings_core_renderer_label), stringResource(R.string.settings_help_renderer), config.backendRenderer, listOf("Vulkan", "OpenGL"), { onUpdate { it.copy(backendRenderer = defaults.backendRenderer) } }) {
             onUpdate { cfg -> cfg.copy(backendRenderer = it) }
         }
         GpuDriverChoiceRow(
-            selectedDriverName = config.customDriverName,
+            effectiveDriverName = config.customDriverName,
+            globalDriverName = defaults.customDriverName,
+            customDriverOverride = customDriverOverride,
             backendRenderer = config.backendRenderer,
             installedGpuDrivers = installedGpuDrivers,
             onOpenGpuDriverManager = onOpenGpuDriverManager,
-            onReset = { onUpdate { it.copy(customDriverName = defaults.customDriverName) } },
-            onSelected = { driverName -> onUpdate { cfg -> cfg.copy(customDriverName = driverName) } }
+            onReset = { onDriverOverrideSelected(null) },
+            onSelected = onDriverOverrideSelected
         )
         SliderRow(
             title = stringResource(R.string.settings_core_resolution_label),
@@ -397,20 +420,24 @@ private fun GraphicsProfileSection(
 
 @Composable
 private fun GpuDriverChoiceRow(
-    selectedDriverName: String,
+    effectiveDriverName: String,
+    globalDriverName: String,
+    customDriverOverride: String?,
     backendRenderer: String,
     installedGpuDrivers: List<InstalledGpuDriver>,
     onOpenGpuDriverManager: () -> Unit,
     onReset: () -> Unit,
-    onSelected: (String) -> Unit
+    onSelected: (String?) -> Unit
 ) {
-    val selectedDriver = installedGpuDrivers.firstOrNull { it.name == selectedDriverName }
+    val selectedDriver = installedGpuDrivers.firstOrNull { it.name == effectiveDriverName }
     val status = when {
-        selectedDriverName.isBlank() -> stringResource(R.string.settings_gpu_driver_status_system)
-        selectedDriver == null -> stringResource(R.string.settings_gpu_driver_status_broken, selectedDriverName)
+        customDriverOverride == null && globalDriverName.isBlank() -> stringResource(R.string.settings_gpu_driver_status_global_system)
+        customDriverOverride == null -> stringResource(R.string.settings_gpu_driver_status_global, globalDriverName)
+        customDriverOverride.isBlank() -> stringResource(R.string.settings_gpu_driver_status_game_system)
+        selectedDriver == null -> stringResource(R.string.settings_gpu_driver_status_broken, effectiveDriverName)
         !selectedDriver.isUsable -> stringResource(R.string.settings_gpu_driver_status_broken, selectedDriver.name)
         backendRenderer != "Vulkan" -> stringResource(R.string.settings_gpu_driver_status_renderer, backendRenderer)
-        else -> stringResource(R.string.settings_gpu_driver_status_active, selectedDriver.name)
+        else -> stringResource(R.string.settings_gpu_driver_status_game_active, selectedDriver.name)
     }
 
     SettingContainer(
@@ -423,33 +450,27 @@ private fun GpuDriverChoiceRow(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        val selectedLabel = when {
+            customDriverOverride == null -> stringResource(R.string.settings_gpu_driver_global)
+            customDriverOverride.isBlank() -> stringResource(R.string.settings_gpu_driver_system)
+            else -> customDriverOverride
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
-                selected = selectedDriverName.isBlank(),
-                onClick = { onSelected("") },
+                selected = true,
+                onClick = onOpenGpuDriverManager,
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
                     selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
                 ),
-                label = { Text(stringResource(R.string.settings_gpu_driver_system)) }
+                label = {
+                    Text(
+                        text = selectedLabel,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             )
-            installedGpuDrivers.forEach { driver ->
-                FilterChip(
-                    selected = selectedDriverName == driver.name,
-                    onClick = { onSelected(driver.name) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    label = {
-                        Text(
-                            text = driver.name,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                )
-            }
         }
         if (installedGpuDrivers.isEmpty()) {
             Text(

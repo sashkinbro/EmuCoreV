@@ -247,16 +247,28 @@ void MainWindow::closeEvent(QCloseEvent *event) {
         return;
     }
 
-    if (m_game_window) {
-        const int result = QMessageBox::question(this,
-            tr("Exit?"),
-            tr("A game is still running. Do you really want to exit?\n\nAny unsaved progress will be lost!"),
-            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    const bool confirm_exit_app = m_gui_settings
+        ? m_gui_settings->get_value(gui::mw_confirmExitApp).toBool()
+        : true;
 
-        if (result != QMessageBox::Yes) {
+    if (m_game_window && confirm_exit_app) {
+        QMessageBox box(this);
+        box.setIcon(QMessageBox::Question);
+        box.setWindowTitle(tr("Exit App?"));
+        box.setText(tr("An app is still running. Do you really want to exit?\n\nAny unsaved progress will be lost!"));
+        box.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        box.setDefaultButton(QMessageBox::No);
+
+        auto *dont_show_again = new QCheckBox(tr("Don't show this again"), &box);
+        box.setCheckBox(dont_show_again);
+
+        if (box.exec() != QMessageBox::Yes) {
             event->ignore();
             return;
         }
+
+        if (dont_show_again->isChecked() && m_gui_settings)
+            m_gui_settings->set_value(gui::mw_confirmExitApp, false);
     }
 
     if (!close_auxiliary_windows()) {
@@ -368,7 +380,7 @@ void MainWindow::initialize() {
     this->setWindowTitle(QString::fromStdString(window_title));
 
     emuenv.compat.log_compat_warn = emuenv.cfg.log_compat_warn;
-    m_game_compat = new GameCompatibility(emuenv.compat, emuenv.cache_path.string(), this);
+    m_game_compat = new GameCompatibility(emuenv.compat, emuenv.cache_path.native(), this);
 
     emuenv.vulkan_device_info = std::make_unique<renderer::VulkanDeviceInfo>(renderer::enumerate_vulkan_devices());
 
@@ -700,7 +712,7 @@ void MainWindow::handle_drop(const QString &path) {
 
     } else if (ext == ".bin" || ext == ".rif" || drop_path.filename() == "work.bin") {
         if (copy_license(emuenv, drop_path))
-            LOG_INFO("License installed via drop: {}", drop_path.string());
+            LOG_INFO("License installed via drop: {}", drop_path);
         else
             QMessageBox::critical(this, tr("Install Failed"),
                 tr("Failed to install the dropped license file.\n"
@@ -753,21 +765,23 @@ void MainWindow::open_settings(int tab_index) {
         register_auxiliary_window(m_settings_dialog);
         connect(m_settings_dialog, &SettingsDialog::gui_stylesheet_request, this, &MainWindow::apply_stylesheet);
         connect(m_settings_dialog, &SettingsDialog::gui_log_settings_request, this, &MainWindow::apply_log_gui_settings);
+        connect(m_settings_dialog, &SettingsDialog::storage_path_changed, this, [this] {
+            if (m_apps_list_widget)
+                m_apps_list_widget->refresh(true);
+        });
         connect(m_settings_dialog, &SettingsDialog::ui_language_request, this, &MainWindow::apply_ui_language);
         connect(m_settings_dialog, &SettingsDialog::restart_game_requested, this, &MainWindow::restart_running_app);
         connect(m_settings_dialog, &QDialog::finished, this, [this](int) {
             sync_discord_presence();
             refresh_status_bar();
             apply_log_gui_settings();
-
-            if (m_settings_dialog && m_settings_dialog->storage_path_switched())
-                m_apps_list_widget->refresh(true);
         });
         connect(m_settings_dialog, &QObject::destroyed, this, [this] {
             m_settings_dialog = nullptr;
         });
     }
 
+    m_settings_dialog->set_storage_path_locked(m_game_window != nullptr);
     m_settings_dialog->show_tab(tab_index);
     present_tool_window(m_settings_dialog);
 }
@@ -878,6 +892,10 @@ std::optional<AppLaunchRequest> MainWindow::boot_game_once(const AppLaunchReques
 
     if (launch_request.reason != AppLaunchReason::LoadExec && !confirm_missing_firmware_warning())
         return std::nullopt;
+
+    refresh_controllers(emuenv.ctrl, emuenv);
+    if (m_controls_dialog)
+        m_controls_dialog->sync_controller_state();
 
     const bool update_last_time_used = launch_request.reason != AppLaunchReason::LoadExec && !m_live_area_widget;
     if (!m_app_session.begin_launch(launch_request, update_last_time_used)) {
@@ -991,7 +1009,7 @@ std::optional<AppLaunchRequest> MainWindow::boot_game_once(const AppLaunchReques
         const QStringList locations = QStandardPaths::standardLocations(QStandardPaths::FontsLocation);
         std::vector<std::string> font_dirs;
         for (const QString &location : locations) {
-            std::string font_dir = location.toStdString();
+            std::string font_dir = location.toUtf8().constData();
             if (!font_dir.ends_with('/') && !font_dir.ends_with('\\'))
                 font_dir += '/';
             font_dirs.push_back(font_dir);
@@ -1104,6 +1122,8 @@ std::optional<AppLaunchRequest> MainWindow::boot_game_once(const AppLaunchReques
 
     LOG_INFO("Game started: {} ({})", emuenv.current_app_title, launch_request.app_path);
 
+    if (m_settings_dialog)
+        m_settings_dialog->set_storage_path_locked(true);
     refresh_emulation_actions();
     refresh_status_bar();
     return std::nullopt;
@@ -1119,6 +1139,9 @@ void MainWindow::on_game_closed() {
     m_app_session.stop(m_is_app_closing
             ? app::AppSessionStopReason::FrontendShutdown
             : app::AppSessionStopReason::UserRequest);
+    refresh_controllers(emuenv.ctrl, emuenv);
+    if (m_controls_dialog)
+        m_controls_dialog->sync_controller_state();
 
     QWindow *closed_window = m_game_container;
 
@@ -1133,6 +1156,8 @@ void MainWindow::on_game_closed() {
     m_ui->toolbar_fullscreen->setIcon(m_icon_fullscreen_on);
     m_ui->toolbar_fullscreen->setText(tr("Fullscreen"));
 
+    if (m_settings_dialog)
+        m_settings_dialog->set_storage_path_locked(false);
     refresh_emulation_actions();
 
     if (!m_is_app_closing && m_apps_list_widget)
@@ -1170,29 +1195,27 @@ bool MainWindow::confirm_missing_firmware_warning() {
     if (!firmware.font_package)
         missing_components << tr("Font package");
 
-    QMessageBox warning_box(this);
-    warning_box.setIcon(QMessageBox::Warning);
-    warning_box.setWindowTitle(tr("Missing Firmware"));
-    warning_box.setText(tr("Firmware is not fully installed."));
-    warning_box.setInformativeText(tr(
-        "The following firmware components are missing:\n- %1\n\n"
-        "Games may fail to boot or render correctly until they are installed.")
-                                       .arg(missing_components.join(QStringLiteral("\n- "))));
+    const auto result = gui::utils::show_message_box(
+        this,
+        QMessageBox::Warning,
+        tr("Missing Firmware"),
+        tr("Firmware is not fully installed."),
+        {
+            { QStringLiteral("launch"), tr("Launch Anyway"), QMessageBox::AcceptRole, false },
+            { QStringLiteral("cancel"), tr("Cancel"), QMessageBox::RejectRole, true },
+        },
+        tr(
+            "The following firmware components are missing:\n- %1\n\n"
+            "Games may fail to boot or render correctly until they are installed.")
+            .arg(missing_components.join(QStringLiteral("\n- "))),
+        tr("Don't show this warning again"));
 
-    auto *dont_show_again = new QCheckBox(tr("Don't show this warning again"), &warning_box);
-    warning_box.setCheckBox(dont_show_again);
-
-    auto *launch_button = warning_box.addButton(tr("Launch Anyway"), QMessageBox::AcceptRole);
-    warning_box.addButton(QMessageBox::Cancel);
-    warning_box.setDefaultButton(QMessageBox::Cancel);
-    warning_box.exec();
-
-    if (dont_show_again->isChecked()) {
+    if (result.checkbox_checked) {
         emuenv.cfg.warn_missing_firmware = false;
         config::serialize_config(emuenv.cfg, emuenv.cfg.config_path);
     }
 
-    return warning_box.clickedButton() == launch_button;
+    return result.clicked_id == QStringLiteral("launch");
 }
 
 bool MainWindow::prompt_admin_privileges_warning_if_needed() {
@@ -1208,25 +1231,24 @@ bool MainWindow::prompt_admin_privileges_warning_if_needed() {
         "This can create files owned by the wrong user and cause permission problems later.\n"
         "Please close Vita3K and relaunch it without elevated privileges.");
 
-    LOG_WARN("{}", text.toStdString());
+    LOG_WARN("{}", text.toUtf8().constData());
 
-    QMessageBox warning_box(this);
-    warning_box.setIcon(QMessageBox::Warning);
-    warning_box.setWindowTitle(title);
-    warning_box.setText(text);
+    const auto result = gui::utils::show_message_box(
+        this,
+        QMessageBox::Warning,
+        title,
+        text,
+        {
+            { QStringLiteral("continue"), tr("Continue"), QMessageBox::AcceptRole, false },
+            { QStringLiteral("exit"), tr("Exit"), QMessageBox::DestructiveRole, true },
+        },
+        {},
+        tr("Don't show this warning again"));
 
-    auto *dont_show_again = new QCheckBox(tr("Don't show this warning again"), &warning_box);
-    warning_box.setCheckBox(dont_show_again);
-
-    auto *continue_button = warning_box.addButton(tr("Continue"), QMessageBox::AcceptRole);
-    auto *exit_button = warning_box.addButton(tr("Exit"), QMessageBox::DestructiveRole);
-    warning_box.setDefaultButton(qobject_cast<QPushButton *>(exit_button));
-    warning_box.exec();
-
-    if (dont_show_again->isChecked() && m_gui_settings)
+    if (result.checkbox_checked && m_gui_settings)
         m_gui_settings->set_value(gui::mw_warnAdminPrivileges, false);
 
-    if (warning_box.clickedButton() == continue_button)
+    if (result.clicked_id == QStringLiteral("continue"))
         return true;
 
     close();
@@ -1481,19 +1503,19 @@ void MainWindow::setup_toolbar() {
 
         QMenu menu(this);
         menu.addAction(tr("Open Emulated Storage Path"), this, [this] {
-            gui::utils::open_dir(emuenv.pref_path.string());
+            gui::utils::open_dir(emuenv.pref_path);
         });
 
         const auto patch_path = emuenv.shared_path / "patch";
         menu.addAction(tr("Open Patch Path"), this, [patch_path] {
-            gui::utils::open_dir(patch_path.string());
+            gui::utils::open_dir(patch_path);
         });
 
         const auto textures_path = emuenv.shared_path / "textures";
         menu.addAction(tr("Open Textures Path"), this, [textures_path] {
             if (!fs::exists(textures_path))
                 fs::create_directories(textures_path);
-            gui::utils::open_dir(textures_path.string());
+            gui::utils::open_dir(textures_path);
         });
 
         menu.exec(pos);
@@ -1637,10 +1659,10 @@ void MainWindow::apply_stylesheet() {
                 QStringLiteral("url(\"gui-configs/"),
                 QStringLiteral("url(\"") + settings_dir + QStringLiteral("/"));
 
-            LOG_INFO("Loaded stylesheet '{}' from {}", stylesheet_name.toStdString(), stylesheet_path.toStdString());
+            LOG_INFO("Loaded stylesheet '{}' from {}", stylesheet_name.toUtf8().constData(), stylesheet_path.toUtf8().constData());
             qApp->setStyleSheet(qss);
         } else {
-            LOG_ERROR("Could not find stylesheet '{}', falling back to light", stylesheet_name.toStdString());
+            LOG_ERROR("Could not find stylesheet '{}', falling back to light", stylesheet_name.toUtf8().constData());
             qApp->setStyleSheet(gui::stylesheets::light_style_sheet);
         }
     }
