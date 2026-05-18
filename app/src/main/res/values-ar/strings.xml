@@ -707,4 +707,5 @@
     <string name="save_manager_restore_all_confirm_title">هل تريد استعادة جميع عمليات الحفظ؟</string>
     <string name="save_manager_restore_all_confirm_body">ستحل مجلدات الحفظ من النسخة الاحتياطية المحددة محل مجلدات الحفظ المطابقة على هذا الجهاز. يتم الاحتفاظ بعمليات الحفظ الحالية فقط عندما لا تحتوي النسخة الاحتياطية على معرف الحفظ ذلك.</string>
     <string name="save_manager_restore_all_confirm">استعادة عمليات الحفظ</string>
+    <string name="install_dialog_vitamin_unsupported">لا يتم دعم تفريغات Vitamin VPK. استخدم تفريغًا متوافقًا مثل NoNpDrm، أو قم بتثبيت PKG مع الترخيص المطابق له.</string>
 </resources>

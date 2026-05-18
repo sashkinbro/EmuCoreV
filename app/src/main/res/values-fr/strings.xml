@@ -707,4 +707,5 @@
     <string name="save_manager_restore_all_confirm_title">Restaurer toutes les sauvegardes ?</string>
     <string name="save_manager_restore_all_confirm_body">Les dossiers de sauvegarde de la sauvegarde sélectionnée remplaceront les dossiers de sauvegarde correspondants sur cet appareil. Les sauvegardes existantes ne sont conservées que si la sauvegarde ne contient pas cet identifiant de sauvegarde.</string>
     <string name="save_manager_restore_all_confirm">Restaurer les sauvegardes</string>
+    <string name="install_dialog_vitamin_unsupported">Les dumps Vitamin VPK ne sont pas pris en charge. Utilisez un dump compatible tel que NoNpDrm, ou installez le PKG avec sa licence correspondante.</string>
 </resources>

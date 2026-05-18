@@ -707,4 +707,5 @@
     <string name="save_manager_restore_all_confirm_title">Відновити всі збереження?</string>
     <string name="save_manager_restore_all_confirm_body">Папки збережень з вибраної резервної копії замінять відповідні папки збережень на цьому пристрої. Існуючі збереження зберігаються лише тоді, коли резервна копія не містить такого ID збереження.</string>
     <string name="save_manager_restore_all_confirm">Відновити збереження</string>
+    <string name="install_dialog_vitamin_unsupported">Дампи Vitamin VPK не підтримуються. Використовуйте сумісний дамп, такий як NoNpDrm, або встановіть PKG із відповідною ліцензією.</string>
 </resources>

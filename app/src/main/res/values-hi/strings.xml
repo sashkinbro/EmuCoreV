@@ -707,4 +707,5 @@
     <string name="save_manager_restore_all_confirm_title">सभी सेव रीस्टोर करें?</string>
     <string name="save_manager_restore_all_confirm_body">चयनित बैकअप के सेव फ़ोल्डर इस डिवाइस पर मेल खाने वाले सेव फ़ोल्डरों को बदल देंगे। मौजूदा सेव तभी रखे जाते हैं जब बैकअप में वह सेव आईडी (ID) न हो।</string>
     <string name="save_manager_restore_all_confirm">सेव रीस्टोर करें</string>
+    <string name="install_dialog_vitamin_unsupported">Vitamin VPK डंप समर्थित नहीं हैं। NoNpDrm जैसे संगत डंप का उपयोग करें, या मिलान वाले लाइसेंस के साथ PKG इंस्टॉल करें।</string>
 </resources>

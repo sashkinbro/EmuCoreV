@@ -707,4 +707,5 @@
     <string name="save_manager_restore_all_confirm_title">Restaurar todos os saves?</string>
     <string name="save_manager_restore_all_confirm_body">As pastas de save do backup selecionado substituirão as pastas de save correspondentes neste dispositivo. Os saves existentes são mantidos apenas quando o backup não contém esse ID de save.</string>
     <string name="save_manager_restore_all_confirm">Restaurar saves</string>
+    <string name="install_dialog_vitamin_unsupported">Dumps de Vitamin VPK não são suportados. Use um dump compatível como NoNpDrm, ou instale o PKG com a sua licença correspondente.</string>
 </resources>

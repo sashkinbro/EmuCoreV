@@ -7,6 +7,7 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.core.DocumentPathResolver
 import com.sbro.emucorev.core.InstallStateBus
 import com.sbro.emucorev.core.NativeInstallProgress
+import com.sbro.emucorev.core.VitaArchiveInspector
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.VitaInstallBridge
 import kotlinx.coroutines.Dispatchers
@@ -84,6 +85,10 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
             val path = DocumentPathResolver.resolveFilePath(appContext, uriString, copyToCache = true)
             if (path == null) {
                 finishError(appContext.getString(R.string.install_dialog_content_failed))
+                return@runInstall
+            }
+            if (VitaArchiveInspector.isVitaminDump(path)) {
+                finishError(appContext.getString(R.string.install_dialog_vitamin_unsupported))
                 return@runInstall
             }
             val installedCount = VitaInstallBridge.installContent(appContext, path, systemLanguage())
