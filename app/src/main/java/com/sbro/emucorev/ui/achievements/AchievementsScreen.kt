@@ -2,29 +2,40 @@ package com.sbro.emucorev.ui.achievements
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.WorkspacePremium
@@ -43,13 +54,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
+import com.sbro.emucorev.data.AchievementAssistResult
 import com.sbro.emucorev.data.VitaTrophy
 import com.sbro.emucorev.data.VitaTrophyGrade
 import com.sbro.emucorev.data.VitaTrophyGroup
@@ -137,7 +154,12 @@ fun AchievementsScreen(
                 set.groups.forEach { group ->
                     item(key = "${set.communicationId}-${group.id}") {
                         TrophyGroupCard(
+                            set = set,
                             group = group,
+                            assistStates = uiState.trophyAssist,
+                            canTranslate = !uiState.targetLanguageTag.startsWith("en", ignoreCase = true),
+                            onTranslate = viewModel::requestTranslation,
+                            onHint = viewModel::requestHint,
                             modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
                         )
                     }
@@ -296,7 +318,12 @@ private fun TrophySetHeader(
 
 @Composable
 private fun TrophyGroupCard(
+    set: VitaTrophySet,
     group: VitaTrophyGroup,
+    assistStates: Map<String, TrophyAssistUiState>,
+    canTranslate: Boolean,
+    onTranslate: (VitaTrophySet, VitaTrophy) -> Unit,
+    onHint: (VitaTrophySet, VitaTrophy) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -343,7 +370,15 @@ private fun TrophyGroupCard(
             }
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 group.trophies.forEach { trophy ->
-                    TrophyRow(trophy = trophy)
+                    val assistKey = "${set.communicationId}:${trophy.id}"
+                    TrophyRow(
+                        set = set,
+                        trophy = trophy,
+                        assistState = assistStates[assistKey] ?: TrophyAssistUiState(),
+                        canTranslate = canTranslate,
+                        onTranslate = onTranslate,
+                        onHint = onHint
+                    )
                 }
             }
         }
@@ -351,7 +386,14 @@ private fun TrophyGroupCard(
 }
 
 @Composable
-private fun TrophyRow(trophy: VitaTrophy) {
+private fun TrophyRow(
+    set: VitaTrophySet,
+    trophy: VitaTrophy,
+    assistState: TrophyAssistUiState,
+    canTranslate: Boolean,
+    onTranslate: (VitaTrophySet, VitaTrophy) -> Unit,
+    onHint: (VitaTrophySet, VitaTrophy) -> Unit
+) {
     val hiddenLocked = trophy.hidden && !trophy.unlocked
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -359,70 +401,310 @@ private fun TrophyRow(trophy: VitaTrophy) {
         color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.52f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f))
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Surface(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(14.dp)),
-                shape = RoundedCornerShape(14.dp),
-                color = if (trophy.unlocked) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (hiddenLocked) {
-                    Icon(
-                        imageVector = Icons.Rounded.Lock,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(15.dp)
-                    )
-                } else {
-                    LocalImage(
-                        path = trophy.iconPath,
-                        contentDescription = trophy.name.ifBlank { stringResource(R.string.achievements_trophy) },
-                        fallbackLabel = trophy.name.ifBlank { "?" },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Text(
-                    text = if (hiddenLocked) stringResource(R.string.achievements_hidden_trophy) else trophy.name.ifBlank { stringResource(R.string.achievements_trophy) },
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = if (trophy.unlocked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = if (hiddenLocked) {
-                        stringResource(R.string.achievements_hidden_trophy_body)
+                Surface(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(14.dp)),
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (trophy.unlocked) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)
+                ) {
+                    if (hiddenLocked) {
+                        Icon(
+                            imageVector = Icons.Rounded.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(15.dp)
+                        )
                     } else {
-                        trophy.detail
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                trophy.unlockedAtEpochSeconds?.let { epochSeconds ->
-                    Text(
-                        text = stringResource(
-                            R.string.achievements_unlocked_at,
-                            DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(epochSeconds * 1000L))
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                        LocalImage(
+                            path = trophy.iconPath,
+                            contentDescription = trophy.name.ifBlank { stringResource(R.string.achievements_trophy) },
+                            fallbackLabel = trophy.name.ifBlank { "?" },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Text(
+                        text = if (hiddenLocked) stringResource(R.string.achievements_hidden_trophy) else trophy.name.ifBlank { stringResource(R.string.achievements_trophy) },
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = if (trophy.unlocked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = if (hiddenLocked) {
+                            stringResource(R.string.achievements_hidden_trophy_body)
+                        } else {
+                            trophy.detail
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    trophy.unlockedAtEpochSeconds?.let { epochSeconds ->
+                        Text(
+                            text = stringResource(
+                                R.string.achievements_unlocked_at,
+                                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(epochSeconds * 1000L))
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                TrophyGradePill(grade = trophy.grade, unlocked = trophy.unlocked)
             }
-            TrophyGradePill(grade = trophy.grade, unlocked = trophy.unlocked)
+            if (!hiddenLocked) {
+                TrophyAssistActions(
+                    canTranslate = canTranslate,
+                    translationLoading = assistState.translationLoading,
+                    hintLoading = assistState.hintLoading,
+                    onTranslate = { onTranslate(set, trophy) },
+                    onHint = { onHint(set, trophy) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TrophyAssistContent(assistState = assistState)
+            }
         }
     }
+}
+
+@Composable
+private fun TrophyAssistActions(
+    canTranslate: Boolean,
+    translationLoading: Boolean,
+    hintLoading: Boolean,
+    onTranslate: () -> Unit,
+    onHint: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+    ) {
+        AssistActionChip(
+            text = stringResource(R.string.achievements_how_to_unlock),
+            icon = Icons.Rounded.Info,
+            loading = hintLoading,
+            onClick = onHint
+        )
+        if (canTranslate) {
+            TranslateIconButton(
+                loading = translationLoading,
+                onClick = onTranslate
+            )
+        }
+    }
+}
+
+@Composable
+private fun TranslateIconButton(
+    loading: Boolean,
+    onClick: () -> Unit
+) {
+    val transition = rememberInfiniteTransition(label = "achievement-translate-loading")
+    val rotation by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = if (loading) 360f else 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 950),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "achievement-translate-rotation"
+    )
+    val pulse by transition.animateFloat(
+        initialValue = 0.92f,
+        targetValue = if (loading) 1.08f else 0.92f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 620),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "achievement-translate-pulse"
+    )
+    Surface(
+        modifier = Modifier
+            .size(30.dp)
+            .scale(if (loading) pulse else 1f)
+            .clip(CircleShape)
+            .clickable(enabled = !loading, onClick = onClick),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primary,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Language,
+                contentDescription = stringResource(R.string.achievements_translate),
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier
+                    .size(18.dp)
+                    .rotate(if (loading) rotation else 0f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun AssistActionChip(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    loading: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .clickable(enabled = !loading, onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrophyAssistContent(assistState: TrophyAssistUiState) {
+    if (assistState.hintLoading || assistState.translationLoading) {
+        TrophyAssistSkeleton(modifier = Modifier.padding(top = 8.dp))
+    }
+    assistState.hint?.let { result ->
+        TrophyAssistResultBlock(
+            label = result.title.ifBlank { stringResource(R.string.achievements_hint_title) },
+            result = result,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+    }
+    assistState.translation?.let { result ->
+        TrophyAssistResultBlock(
+            label = stringResource(R.string.achievements_translation_title),
+            result = result,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+    }
+    if (assistState.hasError && !assistState.hintLoading && !assistState.translationLoading) {
+        Text(
+            text = stringResource(R.string.achievements_assist_error),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun TrophyAssistResultBlock(
+    label: String,
+    result: AchievementAssistResult,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.primary
+        )
+        if (result.title.isNotBlank() && result.title != label) {
+            Text(
+                text = result.title,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        Text(
+            text = result.body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun TrophyAssistSkeleton(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        ShimmerLine(width = 118.dp)
+        ShimmerLine(widthFraction = 0.94f)
+        ShimmerLine(widthFraction = 0.78f)
+        ShimmerLine(widthFraction = 0.56f)
+    }
+}
+
+@Composable
+private fun ShimmerLine(
+    modifier: Modifier = Modifier,
+    width: androidx.compose.ui.unit.Dp? = null,
+    widthFraction: Float = 1f
+) {
+    val transition = rememberInfiniteTransition(label = "achievement-assist-shimmer")
+    val shift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 900f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "achievement-assist-shimmer-shift"
+    )
+    val base = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.58f)
+    val highlight = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
+    val lineModifier = if (width != null) {
+        modifier.width(width)
+    } else {
+        modifier.fillMaxWidth(widthFraction.coerceIn(0.1f, 1f))
+    }
+    Box(
+        modifier = lineModifier
+            .height(11.dp)
+            .clip(RoundedCornerShape(50))
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(base, highlight, base),
+                    start = Offset(shift - 900f, 0f),
+                    end = Offset(shift, 0f)
+                )
+            )
+    )
 }
 
 @Composable
@@ -485,7 +767,7 @@ private fun EmptyAchievementsState(modifier: Modifier = Modifier) {
             Text(
                 text = stringResource(R.string.achievements_empty_title),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 14.dp)
@@ -494,7 +776,7 @@ private fun EmptyAchievementsState(modifier: Modifier = Modifier) {
                 text = stringResource(R.string.achievements_empty_body),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)

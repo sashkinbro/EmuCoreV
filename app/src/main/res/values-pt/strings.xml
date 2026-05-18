@@ -727,4 +727,9 @@
     <string name="achievements_empty_title">Nenhum troféu encontrado</string>
     <string name="achievements_empty_body">Inicie um jogo com suporte a troféus ou atualize após a instalação de jogos.</string>
     <string name="achievements_open_for_game">Conquistas</string>
+    <string name="achievements_how_to_unlock">Como desbloquear?</string>
+    <string name="achievements_translate">Traduzir</string>
+    <string name="achievements_hint_title">Como desbloquear</string>
+    <string name="achievements_translation_title">Traduzido</string>
+    <string name="achievements_assist_error">Não foi possível carregar. Tente novamente.</string>
 </resources>

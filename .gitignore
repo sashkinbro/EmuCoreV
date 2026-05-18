@@ -71,6 +71,7 @@ app/src/main/cpp/vita3k/android/app/assets/*
 *.pyc
 *.pyo
 node_modules/
+workers/
 
 # OS / temp files
 .DS_Store

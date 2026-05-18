@@ -727,4 +727,9 @@
     <string name="achievements_empty_title">لم يتم العثور على كؤوس</string>
     <string name="achievements_empty_body">قم بتشغيل لعبة تدعم الكؤوس أو قم بالتحديث بعد تثبيت الألعاب.</string>
     <string name="achievements_open_for_game">الإنجازات</string>
+    <string name="achievements_how_to_unlock">كيفية الفتح؟</string>
+    <string name="achievements_translate">ترجمة</string>
+    <string name="achievements_hint_title">كيفية الفتح</string>
+    <string name="achievements_translation_title">مترجم</string>
+    <string name="achievements_assist_error">تعذر التحميل. حاول مرة أخرى.</string>
 </resources>
