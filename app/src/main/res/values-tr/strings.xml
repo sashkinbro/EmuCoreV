@@ -732,4 +732,8 @@
     <string name="achievements_hint_title">Nasıl açılır</string>
     <string name="achievements_translation_title">Çevrildi</string>
     <string name="achievements_assist_error">Yüklenemedi. Tekrar deneyin.</string>
+    <string name="emulation_achievements_loading">Çalışan oyun için kupalar yükleniyor.</string>
+    <string name="emulation_achievements_empty">Çalışan oyun için kupa bulunamadı.</string>
+    <string name="emulation_achievements_empty_body">Kupa destekli bir oyun yükleyin veya oyun kupalarını kütüphaneden yenileyin.</string>
+    <string name="emulation_tab_achievements">Başarımlar</string>
 </resources>

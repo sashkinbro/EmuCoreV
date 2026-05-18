@@ -732,4 +732,8 @@
     <string name="achievements_hint_title">كيفية الفتح</string>
     <string name="achievements_translation_title">مترجم</string>
     <string name="achievements_assist_error">تعذر التحميل. حاول مرة أخرى.</string>
+    <string name="emulation_achievements_loading">جاري تحميل الكؤوس للعبة قيد التشغيل.</string>
+    <string name="emulation_achievements_empty">لم يتم العثور على كؤوس للعبة قيد التشغيل.</string>
+    <string name="emulation_achievements_empty_body">قم بتثبيت لعبة تدعم الكؤوس أو قم بتحديث كؤوس اللعبة من المكتبة.</string>
+    <string name="emulation_tab_achievements">الإنجازات</string>
 </resources>

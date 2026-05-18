@@ -683,6 +683,7 @@
     <string name="emulation_tab_overlay">Overlay</string>
     <string name="emulation_tab_graphics">Graphics</string>
     <string name="emulation_tab_system">System</string>
+    <string name="emulation_tab_achievements">Achievements</string>
     <string name="emulation_tab_gamepad">Gamepad</string>
     <string name="emulation_menu_pause_desc">Pause or resume the current game without leaving it.</string>
     <string name="emulation_quickbar_screenshot">Screenshot</string>
@@ -705,6 +706,9 @@
     <string name="emulation_menu_section_gamepad">Physical gamepad</string>
     <string name="emulation_menu_section_gamepad_desc">Dead zone, remap, rumble, and stick behavior for the connected controller.</string>
     <string name="emulation_menu_section_gamepad_disconnected">Connect a physical gamepad to change these controls.</string>
+    <string name="emulation_achievements_loading">Loading trophies for the running game.</string>
+    <string name="emulation_achievements_empty">No trophies found for the running game.</string>
+    <string name="emulation_achievements_empty_body">Install a game with trophy support or refresh the game trophies from the library.</string>
     <string name="emulation_menu_controls_desc">Show or hide the on-screen controls.</string>
     <string name="emulation_menu_hide_controls">Hide controls</string>
     <string name="emulation_menu_show_controls">Show controls</string>

@@ -33,6 +33,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
@@ -465,7 +466,15 @@ private fun TrophyRow(
                         )
                     }
                 }
-                TrophyGradePill(grade = trophy.grade, unlocked = trophy.unlocked)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (trophy.unlocked) {
+                        TrophyUnlockedMark()
+                    }
+                    TrophyGradePill(grade = trophy.grade, unlocked = trophy.unlocked)
+                }
             }
             if (!hiddenLocked) {
                 TrophyAssistActions(
@@ -705,6 +714,29 @@ private fun ShimmerLine(
                 )
             )
     )
+}
+
+@Composable
+private fun TrophyUnlockedMark() {
+    val color = Color(0xFF34D27A)
+    Surface(
+        modifier = Modifier.size(26.dp),
+        shape = CircleShape,
+        color = color.copy(alpha = 0.16f),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.42f))
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.CheckCircle,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(17.dp)
+            )
+        }
+    }
 }
 
 @Composable

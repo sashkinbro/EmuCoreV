@@ -731,4 +731,8 @@
     <string name="achievements_hint_title">如何解锁</string>
     <string name="achievements_translation_title">已翻译</string>
     <string name="achievements_assist_error">无法加载。请重试。</string>
+    <string name="emulation_achievements_loading">正在加载运行中游戏的奖杯。</string>
+    <string name="emulation_achievements_empty">未找到运行中游戏的奖杯。</string>
+    <string name="emulation_achievements_empty_body">安装支持奖杯的游戏或从库中刷新游戏奖杯。</string>
+    <string name="emulation_tab_achievements">成就</string>
 </resources>

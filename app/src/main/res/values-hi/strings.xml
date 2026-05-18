@@ -732,4 +732,8 @@
     <string name="achievements_hint_title">कैसे अनलॉक करें</string>
     <string name="achievements_translation_title">अनुवादित</string>
     <string name="achievements_assist_error">लोड नहीं किया जा सका। पुनः प्रयास करें।</string>
+    <string name="emulation_achievements_loading">चल रहे गेम के लिए ट्रॉफियां लोड हो रही हैं।</string>
+    <string name="emulation_achievements_empty">चल रहे गेम के लिए कोई ट्रॉफी नहीं मिली।</string>
+    <string name="emulation_achievements_empty_body">ट्रॉफी समर्थन वाला गेम इंस्टॉल करें या लाइब्रेरी से गेम ट्रॉफियों को रीफ्रेश करें।</string>
+    <string name="emulation_tab_achievements">उपलब्धियां</string>
 </resources>
