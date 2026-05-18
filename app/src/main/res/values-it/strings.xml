@@ -708,4 +708,11 @@
     <string name="save_manager_restore_all_confirm_body">Le cartelle di salvataggio dal backup selezionato sostituiranno le cartelle di salvataggio corrispondenti su questo dispositivo. I salvataggi esistenti vengono mantenuti solo quando il backup non contiene quell\'ID di salvataggio.</string>
     <string name="save_manager_restore_all_confirm">Ripristina salvataggi</string>
     <string name="install_dialog_vitamin_unsupported">I dump Vitamin VPK non sono supportati. Usa un dump compatibile come NoNpDrm, oppure installa il PKG con la licenza corrispondente.</string>
+    <string name="settings_change_storage">Cambia memoria</string>
+    <string name="settings_storage_location_internal">Memoria del dispositivo</string>
+    <string name="settings_storage_location_sd">Scheda SD</string>
+    <string name="settings_storage_location_external">Memoria esterna</string>
+    <string name="settings_storage_change_note">La modifica della memoria cambia il punto in cui le nuove installazioni e gli avvii cercano i dati Vita. I giochi esistenti non vengono spostati automaticamente.</string>
+    <string name="onboarding_storage_choose_title">Scegli memoria dell\'emulatore</string>
+    <string name="onboarding_storage_only_default">Android sta esponendo solo un percorso di archiviazione per le app in questo momento. Se è installata una scheda SD, assicurati che sia montata e disponibile per le app.</string>
 </resources>

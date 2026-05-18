@@ -48,6 +48,8 @@ import androidx.compose.material.icons.rounded.SystemUpdateAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -83,6 +85,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.FirmwareKind
+import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.delay
@@ -260,6 +263,8 @@ fun OnboardingScreen(
                         )
                         else -> OnboardingSetupContent(
                             storagePath = uiState.storagePath,
+                            storageLocations = uiState.storageLocations,
+                            selectStorageLocation = viewModel::selectStorageLocation,
                             firmwareInstalled = firmwareInstalled,
                             firmwareUpdateInstalled = firmwareUpdateInstalled,
                             installFirmware = installFirmwareClick,
@@ -407,6 +412,8 @@ private fun OnboardingHero(
 @Composable
 private fun OnboardingSetupContent(
     storagePath: String,
+    storageLocations: List<VitaStorageLocation>,
+    selectStorageLocation: (String) -> Unit,
     firmwareInstalled: Boolean,
     firmwareUpdateInstalled: Boolean,
     installFirmware: () -> Unit,
@@ -419,6 +426,7 @@ private fun OnboardingSetupContent(
     val downloadButton = stringResource(R.string.onboarding_firmware_download)
     val cancelDownloadButton = stringResource(R.string.onboarding_firmware_cancel_download)
     var firmwareInfoVisible by rememberSaveable { mutableStateOf(false) }
+    var storagePickerVisible by rememberSaveable { mutableStateOf(false) }
 
     val baseDownloadStatus = firmwareDownloadStatusText(FirmwareKind.Base, downloadState)
     val updateDownloadStatus = firmwareDownloadStatusText(FirmwareKind.Update, downloadState)
@@ -515,14 +523,169 @@ private fun OnboardingSetupContent(
             description = storagePath,
             status = stringResource(R.string.onboarding_status_ready),
             statusColor = MaterialTheme.colorScheme.tertiary,
-            onClick = {}
+            onClick = { storagePickerVisible = true }
         )
+        if (storageLocations.size > 1) {
+            Spacer(modifier = Modifier.height(8.dp))
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                storageLocations.forEachIndexed { index, location ->
+                    OnboardingStorageChip(
+                        location = location,
+                        index = index,
+                        onSelected = { selectStorageLocation(location.rootPath) }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.settings_storage_change_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+        }
 
         FirmwareDownloadInfoDialog(
             visible = firmwareInfoVisible,
             onDismiss = { firmwareInfoVisible = false }
         )
+        OnboardingStorageDialog(
+            visible = storagePickerVisible,
+            storageLocations = storageLocations,
+            onSelected = { location ->
+                selectStorageLocation(location.rootPath)
+                storagePickerVisible = false
+            },
+            onDismiss = { storagePickerVisible = false }
+        )
     }
+}
+
+@Composable
+private fun OnboardingStorageChip(
+    location: VitaStorageLocation,
+    index: Int,
+    onSelected: () -> Unit
+) {
+    FilterChip(
+        selected = location.selected,
+        onClick = onSelected,
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            labelColor = MaterialTheme.colorScheme.onSurface,
+            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+        ),
+        label = { Text(storageLocationLabel(location, index)) }
+    )
+}
+
+@Composable
+private fun OnboardingStorageDialog(
+    visible: Boolean,
+    storageLocations: List<VitaStorageLocation>,
+    onSelected: (VitaStorageLocation) -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (!visible) return
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp)
+                .widthIn(max = 560.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            shadowElevation = 10.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.onboarding_storage_choose_title),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (storageLocations.size > 1) {
+                        stringResource(R.string.settings_storage_change_note)
+                    } else {
+                        stringResource(R.string.onboarding_storage_only_default)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                storageLocations.forEachIndexed { index, location ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        color = if (location.selected) {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (location.selected) {
+                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.42f)
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)
+                            }
+                        ),
+                        onClick = { onSelected(location) }
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = storageLocationLabel(location, index),
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                                color = if (location.selected) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
+                            )
+                            Text(
+                                text = location.vitaPath,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (location.selected) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
+                    }
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(stringResource(R.string.common_close))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun storageLocationLabel(location: VitaStorageLocation, index: Int): String = when {
+    location.removable -> stringResource(R.string.settings_storage_location_sd)
+    index == 0 -> stringResource(R.string.settings_storage_location_internal)
+    else -> stringResource(R.string.settings_storage_location_external)
 }
 
 @Composable

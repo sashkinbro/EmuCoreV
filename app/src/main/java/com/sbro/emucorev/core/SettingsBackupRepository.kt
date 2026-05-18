@@ -18,6 +18,7 @@ class SettingsBackupRepository(
                 "app",
                 JSONObject()
                     .putNullable("packagesFolderUri", preferences.packagesFolderUri)
+                    .putNullable("vitaStorageRootPath", preferences.vitaStorageRootPath)
                     .put("onboardingCompleted", preferences.onboardingCompleted)
                     .put("themeMode", preferences.themeMode.name)
                     .put("appLanguage", preferences.appLanguage.name)
@@ -42,6 +43,7 @@ class SettingsBackupRepository(
 
         root.optJSONObject("app")?.let { app ->
             preferences.packagesFolderUri = app.optNullableString("packagesFolderUri")
+            preferences.vitaStorageRootPath = app.optNullableString("vitaStorageRootPath")
             preferences.onboardingCompleted = app.optBoolean(
                 "onboardingCompleted",
                 preferences.onboardingCompleted

@@ -708,4 +708,11 @@
     <string name="save_manager_restore_all_confirm_body">चयनित बैकअप के सेव फ़ोल्डर इस डिवाइस पर मेल खाने वाले सेव फ़ोल्डरों को बदल देंगे। मौजूदा सेव तभी रखे जाते हैं जब बैकअप में वह सेव आईडी (ID) न हो।</string>
     <string name="save_manager_restore_all_confirm">सेव रीस्टोर करें</string>
     <string name="install_dialog_vitamin_unsupported">Vitamin VPK डंप समर्थित नहीं हैं। NoNpDrm जैसे संगत डंप का उपयोग करें, या मिलान वाले लाइसेंस के साथ PKG इंस्टॉल करें।</string>
+    <string name="settings_change_storage">स्टोरेज बदलें</string>
+    <string name="settings_storage_location_internal">डिवाइस स्टोरेज</string>
+    <string name="settings_storage_location_sd">SD कार्ड</string>
+    <string name="settings_storage_location_external">बाहरी स्टोरेज</string>
+    <string name="settings_storage_change_note">स्टोरेज बदलने से यह बदल जाता है कि नए इंस्टॉल और लॉन्च Vita डेटा को कहाँ खोजते हैं। मौजूदा गेम स्वचालित रूप से स्थानांतरित नहीं होते हैं।</string>
+    <string name="onboarding_storage_choose_title">एमुलेटर स्टोरेज चुनें</string>
+    <string name="onboarding_storage_only_default">Android अभी केवल एक ऐप स्टोरेज स्थान प्रदर्शित कर रहा है। यदि SD कार्ड इंस्टॉल है, तो सुनिश्चित करें कि यह माउंट किया गया है और ऐप्स के लिए उपलब्ध है।</string>
 </resources>

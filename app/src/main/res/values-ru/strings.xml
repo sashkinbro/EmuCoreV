@@ -708,4 +708,11 @@
     <string name="save_manager_restore_all_confirm_body">Папки сохранений из выбранной резервной копии заменят совпадающие папки сохранений на этом устройстве. Существующие сохранения сохраняются только в том случае, если в резервной копии нет такого ID сохранения.</string>
     <string name="save_manager_restore_all_confirm">Восстановить сохранения</string>
     <string name="install_dialog_vitamin_unsupported">Дампы Vitamin VPK не поддерживаются. Используйте совместимый дамп, такой как NoNpDrm, или установите PKG с соответствующей лицензией.</string>
+    <string name="settings_change_storage">Изменить хранилище</string>
+    <string name="settings_storage_location_internal">Память устройства</string>
+    <string name="settings_storage_location_sd">SD-картка</string>
+    <string name="settings_storage_location_external">Внешний накопитель</string>
+    <string name="settings_storage_change_note">Изменение хранилища меняет место, где новые установки и запуски ищут данные Vita. Существующие игры не перемещаются автоматически.</string>
+    <string name="onboarding_storage_choose_title">Выбрать хранилище эмулятора</string>
+    <string name="onboarding_storage_only_default">В настоящее время Android предоставляет только одно место для хранения данных приложений. Если установлена SD-карта, убедитесь, что она смонтирована и доступна для приложений.</string>
 </resources>

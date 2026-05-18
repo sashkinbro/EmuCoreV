@@ -708,4 +708,11 @@
     <string name="save_manager_restore_all_confirm_body">As pastas de save do backup selecionado substituirão as pastas de save correspondentes neste dispositivo. Os saves existentes são mantidos apenas quando o backup não contém esse ID de save.</string>
     <string name="save_manager_restore_all_confirm">Restaurar saves</string>
     <string name="install_dialog_vitamin_unsupported">Dumps de Vitamin VPK não são suportados. Use um dump compatível como NoNpDrm, ou instale o PKG com a sua licença correspondente.</string>
+    <string name="settings_change_storage">Alterar armazenamento</string>
+    <string name="settings_storage_location_internal">Armazenamento do dispositivo</string>
+    <string name="settings_storage_location_sd">Cartão SD</string>
+    <string name="settings_storage_location_external">Armazenamento externo</string>
+    <string name="settings_storage_change_note">Alterar o armazenamento muda onde as novas instalações e inicializações procuram por dados do Vita. Os jogos existentes não são movidos automaticamente.</string>
+    <string name="onboarding_storage_choose_title">Escolher armazenamento do emulador</string>
+    <string name="onboarding_storage_only_default">O Android está expondo apenas um local de armazenamento de aplicativos no momento. Se um cartão SD estiver instalado, certifique-se de que ele esteja montado e disponível para os aplicativos.</string>
 </resources>
