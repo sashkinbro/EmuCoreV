@@ -715,4 +715,16 @@
     <string name="settings_storage_change_note">Depolama alanını değiştirmek, yeni kurulumların ve başlatmaların Vita verilerini aradığı yeri değiştirir. Mevcut oyunlar otomatik olarak taşınmaz.</string>
     <string name="onboarding_storage_choose_title">Emülatör depolama alanını seçin</string>
     <string name="onboarding_storage_only_default">Android şu anda yalnızca bir uygulama depolama konumu sunuyor. Bir SD kart takılıysa, takılı olduğundan ve uygulamalar tarafından erişilebilir olduğundan emin olun.</string>
+    <string name="nav_achievements">Başarımlar</string>
+    <string name="achievements_title">Başarımlar</string>
+    <string name="achievements_progress_count">%1$d/%2$d</string>
+    <string name="achievements_choose_game">Oyun seç</string>
+    <string name="achievements_trophy">Kupa</string>
+    <string name="achievements_hidden_trophy">Gizli kupa</string>
+    <string name="achievements_hidden_trophy_body">Ayrıntılarını ortaya çıkarmak için bu kupanın kilidini açın.</string>
+    <string name="achievements_unlocked_at">%1$s tarihinde açıldı</string>
+    <string name="achievements_unlocked_notification_title">Kupa kazanıldı</string>
+    <string name="achievements_empty_title">Kupa bulunamadı</string>
+    <string name="achievements_empty_body">Kupa destekli bir oyun başlatın veya oyunları yükledikten sonra yenileyin.</string>
+    <string name="achievements_open_for_game">Başarımlar</string>
 </resources>

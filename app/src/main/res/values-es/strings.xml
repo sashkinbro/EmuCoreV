@@ -715,4 +715,16 @@
     <string name="settings_storage_change_note">Cambiar el almacenamiento modifica el lugar donde las nuevas instalaciones y lanzamientos buscan los datos de Vita. Los juegos existentes no se mueven automáticamente.</string>
     <string name="onboarding_storage_choose_title">Elegir almacenamiento del emulador</string>
     <string name="onboarding_storage_only_default">Android solo expone una ubicación de almacenamiento de aplicaciones en este momento. Si hay una tarjeta SD instalada, asegúrate de que esté montada y disponible para las aplicaciones.</string>
+    <string name="nav_achievements">Logros</string>
+    <string name="achievements_title">Logros</string>
+    <string name="achievements_progress_count">%1$d/%2$d</string>
+    <string name="achievements_choose_game">Elegir juego</string>
+    <string name="achievements_trophy">Trofeo</string>
+    <string name="achievements_hidden_trophy">Trofeo oculto</string>
+    <string name="achievements_hidden_trophy_body">Desbloquea este trofeo para revelar sus detalles.</string>
+    <string name="achievements_unlocked_at">Desbloqueado %1$s</string>
+    <string name="achievements_unlocked_notification_title">Trofeo conseguido</string>
+    <string name="achievements_empty_title">No se encontraron trofeos</string>
+    <string name="achievements_empty_body">Inicia un juego con soporte para trofeos o actualiza después de instalar juegos.</string>
+    <string name="achievements_open_for_game">Logros</string>
 </resources>

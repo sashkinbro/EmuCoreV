@@ -34,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.QueryStats
@@ -96,6 +97,7 @@ fun LibraryScreen(
     onOpenSaveManager: (String) -> Unit,
     onOpenGameManager: (String) -> Unit,
     onOpenPlayTime: (String) -> Unit,
+    onOpenAchievements: (String) -> Unit,
     onMenuClick: (() -> Unit)? = null,
     viewModel: LibraryViewModel = viewModel()
 ) {
@@ -117,6 +119,7 @@ fun LibraryScreen(
     val manageSaveDataLabel = stringResource(R.string.save_manager_open_for_game)
     val manageGameSettingsLabel = stringResource(R.string.game_manager_open_for_game)
     val playTimeLabel = stringResource(R.string.play_time_open_for_game)
+    val achievementsLabel = stringResource(R.string.achievements_open_for_game)
     val addShortcutLabel = stringResource(R.string.library_add_shortcut)
     val shortcutRequestedMessage = stringResource(R.string.library_shortcut_requested)
     val shortcutUnsupportedMessage = stringResource(R.string.library_shortcut_unsupported)
@@ -303,7 +306,8 @@ fun LibraryScreen(
                             LibraryGameArtwork(
                                 path = game.iconPath,
                                 title = game.title,
-                                modifier = Modifier.width(74.dp)
+                                modifier = Modifier.width(92.dp),
+                                artworkAspectRatio = 1f
                             )
                             Column(
                                 modifier = Modifier.weight(1f),
@@ -370,6 +374,19 @@ fun LibraryScreen(
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Rounded.QueryStats,
+                                    contentDescription = null
+                                )
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(achievementsLabel) },
+                            onClick = {
+                                onOpenAchievements(game.titleId)
+                                menuExpanded = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.EmojiEvents,
                                     contentDescription = null
                                 )
                             }
@@ -502,6 +519,19 @@ fun LibraryScreen(
                                     leadingIcon = {
                                         Icon(
                                             imageVector = Icons.Rounded.QueryStats,
+                                            contentDescription = null
+                                        )
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(achievementsLabel) },
+                                    onClick = {
+                                        onOpenAchievements(game.titleId)
+                                        menuExpanded = false
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.EmojiEvents,
                                             contentDescription = null
                                         )
                                     }

@@ -40,6 +40,7 @@ import com.sbro.emucorev.core.DocumentPathResolver
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.InstallStateBus
 import com.sbro.emucorev.core.VitaLaunchBridge
+import com.sbro.emucorev.ui.achievements.AchievementsScreen
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.ui.catalog.CatalogScreen
 import com.sbro.emucorev.ui.detail.GameDetailScreen
@@ -71,6 +72,8 @@ private const val ROUTE_GAME_MANAGER = "game-manager"
 private const val ROUTE_GAME_MANAGER_WITH_TITLE = "game-manager/{titleId}"
 private const val ROUTE_PLAY_TIME = "play-time"
 private const val ROUTE_PLAY_TIME_WITH_TITLE = "play-time/{titleId}"
+private const val ROUTE_ACHIEVEMENTS = "achievements"
+private const val ROUTE_ACHIEVEMENTS_WITH_TITLE = "achievements/{titleId}"
 private const val ROUTE_SAVE_MANAGER = "save-manager"
 private const val ROUTE_SAVE_MANAGER_WITH_TITLE = "save-manager/{titleId}"
 private const val ROUTE_SETTINGS = "settings"
@@ -89,6 +92,8 @@ private fun gameManagerRoute(titleId: String? = null): String =
     titleId?.takeIf(String::isNotBlank)?.let { "$ROUTE_GAME_MANAGER/$it" } ?: ROUTE_GAME_MANAGER
 private fun playTimeRoute(titleId: String? = null): String =
     titleId?.takeIf(String::isNotBlank)?.let { "$ROUTE_PLAY_TIME/$it" } ?: ROUTE_PLAY_TIME
+private fun achievementsRoute(titleId: String? = null): String =
+    titleId?.takeIf(String::isNotBlank)?.let { "$ROUTE_ACHIEVEMENTS/${Uri.encode(it)}" } ?: ROUTE_ACHIEVEMENTS
 private fun gpuDriverRoute(titleId: String? = null): String =
     titleId?.takeIf(String::isNotBlank)?.let { "$ROUTE_GPU_DRIVER/${Uri.encode(it)}" } ?: ROUTE_GPU_DRIVER
 
@@ -208,6 +213,10 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     val navigatePlayTime: (String?) -> Unit = { titleId ->
         navController.navigate(playTimeRoute(titleId)) { launchSingleTop = true }
     }
+    val navigateAchievements: (String?) -> Unit = { titleId ->
+        navController.navigate(achievementsRoute(titleId)) { launchSingleTop = true }
+    }
+    val navigateAchievementsRoot = { navigateAchievements(null) }
 
     Box(
         modifier = Modifier
@@ -256,6 +265,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateGameManager = { navigateGameManager(null) },
                     onNavigatePlayTime = { navigatePlayTime(null) },
+                    onNavigateAchievements = navigateAchievementsRoot,
                     onNavigateSaveData = {
                         navController.navigate(saveManagerRoute()) { launchSingleTop = true }
                     },
@@ -302,6 +312,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateGameManager = { navigateGameManager(null) },
                     onNavigatePlayTime = { navigatePlayTime(null) },
+                    onNavigateAchievements = navigateAchievementsRoot,
                     onNavigateSaveData = {
                         navController.navigate(saveManagerRoute()) { launchSingleTop = true }
                     },
@@ -337,6 +348,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onNavigateLibrary = { },
                     onNavigateGameManager = { navigateGameManager(null) },
                     onNavigatePlayTime = { navigatePlayTime(null) },
+                    onNavigateAchievements = navigateAchievementsRoot,
                     onNavigateSaveData = {
                         navController.navigate(saveManagerRoute()) { launchSingleTop = true }
                     },
@@ -356,6 +368,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         },
                         onOpenGameManager = { titleId -> navigateGameManager(titleId) },
                         onOpenPlayTime = { titleId -> navigatePlayTime(titleId) },
+                        onOpenAchievements = { titleId -> navigateAchievements(titleId) },
                         onMenuClick = openDrawer
                     )
                 }
@@ -379,6 +392,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateGameManager = { navigateGameManager(null) },
                     onNavigatePlayTime = { navigatePlayTime(null) },
+                    onNavigateAchievements = navigateAchievementsRoot,
                     onNavigateSaveData = {
                         navController.navigate(saveManagerRoute()) { launchSingleTop = true }
                     },
@@ -413,6 +427,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateGameManager = { navigateGameManager(null) },
                     onNavigatePlayTime = { navigatePlayTime(null) },
+                    onNavigateAchievements = navigateAchievementsRoot,
                     onNavigateSaveData = {
                         navController.navigate(saveManagerRoute()) { launchSingleTop = true }
                     },
@@ -457,6 +472,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateGameManager = { navigateGameManager(null) },
                     onNavigatePlayTime = { navigatePlayTime(null) },
+                    onNavigateAchievements = navigateAchievementsRoot,
                     onNavigateSaveData = {
                         navController.navigate(saveManagerRoute()) { launchSingleTop = true }
                     },
@@ -526,6 +542,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateGameManager = { navigateGameManager(null) },
                     onNavigatePlayTime = { navigatePlayTime(null) },
+                    onNavigateAchievements = navigateAchievementsRoot,
                     onNavigateSaveData = { },
                     onNavigateSearch = {
                         navController.navigate(ROUTE_CATALOG) { launchSingleTop = true }
@@ -566,6 +583,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateGameManager = { navigateGameManager(null) },
                     onNavigatePlayTime = { },
+                    onNavigateAchievements = navigateAchievementsRoot,
                     onNavigateSaveData = {
                         navController.navigate(saveManagerRoute()) { launchSingleTop = true }
                     },
@@ -584,6 +602,50 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         onBackClick = navigateHome
                     )
                 }
+            }
+            composable(ROUTE_ACHIEVEMENTS) {
+                val navigateHome = {
+                    navController.navigate(ROUTE_LIBRARY) {
+                        launchSingleTop = true
+                        popUpTo(ROUTE_LIBRARY) { inclusive = false }
+                    }
+                }
+                AdaptiveShell(
+                    selected = PrimaryDestination.Achievements,
+                    onNavigateSetup = {
+                        navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
+                    },
+                    onNavigateLibrary = {
+                        navController.navigate(ROUTE_LIBRARY) { launchSingleTop = true }
+                    },
+                    onNavigateGameManager = { navigateGameManager(null) },
+                    onNavigatePlayTime = { navigatePlayTime(null) },
+                    onNavigateAchievements = { },
+                    onNavigateSaveData = {
+                        navController.navigate(saveManagerRoute()) { launchSingleTop = true }
+                    },
+                    onNavigateSearch = {
+                        navController.navigate(ROUTE_CATALOG) { launchSingleTop = true }
+                    },
+                    onNavigateSettings = {
+                        navController.navigate(settingsRoute()) { launchSingleTop = true }
+                    },
+                    onBackClick = navigateHome,
+                    onInstallFirmware = null,
+                    onInstallContent = openInstallChoiceDialog
+                ) { openDrawer ->
+                    AchievementsScreen(
+                        onMenuClick = openDrawer,
+                        onBackClick = navigateHome
+                    )
+                }
+            }
+            composable(ROUTE_ACHIEVEMENTS_WITH_TITLE) { entry ->
+                AchievementsScreen(
+                    focusTitleId = entry.arguments?.getString("titleId"),
+                    onMenuClick = null,
+                    onBackClick = { navController.popBackStack() }
+                )
             }
             composable(ROUTE_PLAY_TIME_WITH_TITLE) { entry ->
                 PlayTimeScreen(
@@ -609,6 +671,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateGameManager = { },
                     onNavigatePlayTime = { navigatePlayTime(null) },
+                    onNavigateAchievements = navigateAchievementsRoot,
                     onNavigateSaveData = {
                         navController.navigate(saveManagerRoute()) { launchSingleTop = true }
                     },

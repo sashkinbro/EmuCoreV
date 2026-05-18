@@ -53,6 +53,7 @@
     <string name="nav_library">Library</string>
     <string name="nav_game_manager">Game Manager</string>
     <string name="nav_play_time">Play Time</string>
+    <string name="nav_achievements">Achievements</string>
     <string name="nav_save_manager">Saves</string>
     <string name="nav_catalog">Catalog</string>
     <string name="nav_settings">Settings</string>
@@ -136,6 +137,17 @@
     <string name="play_time_no_game_sessions_body">This game has not been played yet. Launch it and its play sessions will appear here.</string>
     <string name="play_time_today">Today</string>
     <string name="play_time_yesterday">Yesterday</string>
+    <string name="achievements_title">Achievements</string>
+    <string name="achievements_open_for_game">Achievements</string>
+    <string name="achievements_progress_count">%1$d/%2$d</string>
+    <string name="achievements_choose_game">Choose game</string>
+    <string name="achievements_trophy">Trophy</string>
+    <string name="achievements_hidden_trophy">Hidden trophy</string>
+    <string name="achievements_hidden_trophy_body">Unlock this trophy to reveal its details.</string>
+    <string name="achievements_unlocked_at">Unlocked %1$s</string>
+    <string name="achievements_unlocked_notification_title">Trophy earned</string>
+    <string name="achievements_empty_title">No trophies found</string>
+    <string name="achievements_empty_body">Launch a game with trophy support or refresh after installing games.</string>
     <string name="detail_title">Game details</string>
     <string name="detail_subtitle">Game info, media, and launch options.</string>
     <string name="detail_title_id">Title ID</string>

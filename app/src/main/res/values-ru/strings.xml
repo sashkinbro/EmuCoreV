@@ -715,4 +715,16 @@
     <string name="settings_storage_change_note">Изменение хранилища меняет место, где новые установки и запуски ищут данные Vita. Существующие игры не перемещаются автоматически.</string>
     <string name="onboarding_storage_choose_title">Выбрать хранилище эмулятора</string>
     <string name="onboarding_storage_only_default">В настоящее время Android предоставляет только одно место для хранения данных приложений. Если установлена SD-карта, убедитесь, что она смонтирована и доступна для приложений.</string>
+    <string name="nav_achievements">Достижения</string>
+    <string name="achievements_title">Достижения</string>
+    <string name="achievements_progress_count">%1$d/%2$d</string>
+    <string name="achievements_choose_game">Выбрать игру</string>
+    <string name="achievements_trophy">Трофей</string>
+    <string name="achievements_hidden_trophy">Скрытый трофей</string>
+    <string name="achievements_hidden_trophy_body">Разблокируйте этот трофей, чтобы узнать его детали.</string>
+    <string name="achievements_unlocked_at">Разблокировано: %1$s</string>
+    <string name="achievements_unlocked_notification_title">Трофей получен</string>
+    <string name="achievements_empty_title">Трофеи не найдены</string>
+    <string name="achievements_empty_body">Запустите игру с поддержкой трофеев или обновите список после установки игр.</string>
+    <string name="achievements_open_for_game">Достижения</string>
 </resources>
