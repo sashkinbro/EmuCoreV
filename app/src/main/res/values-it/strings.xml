@@ -707,4 +707,5 @@
     <string name="save_manager_restore_all_confirm_title">Ripristinare tutti i salvataggi?</string>
     <string name="save_manager_restore_all_confirm_body">Le cartelle di salvataggio dal backup selezionato sostituiranno le cartelle di salvataggio corrispondenti su questo dispositivo. I salvataggi esistenti vengono mantenuti solo quando il backup non contiene quell\'ID di salvataggio.</string>
     <string name="save_manager_restore_all_confirm">Ripristina salvataggi</string>
+    <string name="install_dialog_vitamin_unsupported">I dump Vitamin VPK non sono supportati. Usa un dump compatibile come NoNpDrm, oppure installa il PKG con la licenza corrispondente.</string>
 </resources>

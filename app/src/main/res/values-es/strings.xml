@@ -707,4 +707,5 @@
     <string name="save_manager_restore_all_confirm_title">¿Restaurar todos los guardados?</string>
     <string name="save_manager_restore_all_confirm_body">Las carpetas de guardado de la copia de seguridad seleccionada reemplazarán las carpetas de guardado coincidentes en este dispositivo. Los guardados existentes se mantienen solo cuando la copia de seguridad no contiene ese ID de guardado.</string>
     <string name="save_manager_restore_all_confirm">Restaurar guardados</string>
+    <string name="install_dialog_vitamin_unsupported">Los volcados de Vitamin VPK no son compatibles. Usa un volcado compatible como NoNpDrm, o instala el PKG con su licencia correspondiente.</string>
 </resources>

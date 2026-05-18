@@ -599,6 +599,7 @@
     <string name="install_dialog_unexpected_error">Something went wrong during installation.</string>
     <string name="install_dialog_firmware_failed">Firmware installation failed.</string>
     <string name="install_dialog_content_failed">Game installation failed.</string>
+    <string name="install_dialog_vitamin_unsupported">Vitamin VPK dumps are not supported. Use a compatible dump such as NoNpDrm, or install the PKG with its matching license.</string>
     <string name="install_dialog_license_failed">License installation failed.</string>
     <string name="install_dialog_pkg_failed">PKG installation failed.</string>
     <string name="install_dialog_firmware_done">Firmware package installed successfully.</string>

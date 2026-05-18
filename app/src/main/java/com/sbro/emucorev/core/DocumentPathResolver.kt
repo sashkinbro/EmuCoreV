@@ -49,12 +49,13 @@ object DocumentPathResolver {
             val destFile = File(cacheDir, fileName)
             if (destFile.exists()) destFile.delete()
             
-            context.contentResolver.openInputStream(uri)?.use { input ->
+            val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+            inputStream.use { input ->
                 destFile.outputStream().use { output ->
                     input.copyTo(output)
                 }
             }
-            destFile.absolutePath
+            destFile.takeIf { it.isFile }?.absolutePath
         } catch (e: Exception) {
             Log.e("DocumentPathResolver", "Failed to copy URI to cache: $uri", e)
             null
