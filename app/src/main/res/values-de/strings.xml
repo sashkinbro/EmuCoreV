@@ -708,4 +708,11 @@
     <string name="save_manager_restore_all_confirm_body">Speicherordner aus dem ausgewählten Backup ersetzen übereinstimmende Speicherordner auf diesem Gerät. Vorhandene Speicherstände bleiben nur erhalten, wenn das Backup diese Speicher-ID nicht enthält.</string>
     <string name="save_manager_restore_all_confirm">Speicherstände wiederherstellen</string>
     <string name="install_dialog_vitamin_unsupported">Vitamin VPK-Dumps werden nicht unterstützt. Verwende einen kompatiblen Dump wie NoNpDrm oder installiere die PKG mit der passenden Lizenz.</string>
+    <string name="settings_change_storage">Speicher ändern</string>
+    <string name="settings_storage_location_internal">Gerätespeicher</string>
+    <string name="settings_storage_location_sd">SD-Karte</string>
+    <string name="settings_storage_location_external">Externer Speicher</string>
+    <string name="settings_storage_change_note">Das Ändern des Speichers ändert den Ort, an dem neue Installationen und Starts nach Vita-Daten suchen. Vorhandene Spiele werden nicht automatisch verschoben.</string>
+    <string name="onboarding_storage_choose_title">Emulator-Speicher auswählen</string>
+    <string name="onboarding_storage_only_default">Android gibt derzeit nur einen App-Speicherort frei. Wenn eine SD-Karte installiert ist, stelle sicher, dass sie gemountet und für Apps verfügbar ist.</string>
 </resources>

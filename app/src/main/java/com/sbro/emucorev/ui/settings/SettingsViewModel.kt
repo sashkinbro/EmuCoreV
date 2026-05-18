@@ -14,6 +14,7 @@ import com.sbro.emucorev.core.RemoteGpuDriver
 import com.sbro.emucorev.core.SettingsBackupRepository
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
+import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.data.AppPreferences
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +27,7 @@ import kotlinx.coroutines.launch
 data class SettingsUiState(
     val packagesFolderPath: String? = null,
     val storagePath: String = "",
+    val storageLocations: List<VitaStorageLocation> = emptyList(),
     val coreConfig: VitaCoreConfig = VitaCoreConfig(),
     val installedGpuDrivers: List<InstalledGpuDriver> = emptyList(),
     val remoteGpuDrivers: List<RemoteGpuDriver> = emptyList(),
@@ -66,6 +68,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         SettingsUiState(
             packagesFolderPath = preferences.packagesFolderDisplayName(application),
             storagePath = EmulatorStorage.vitaRoot(application).absolutePath,
+            storageLocations = EmulatorStorage.availableStorageLocations(application),
             coreConfig = initialCoreConfig,
             installedGpuDrivers = gpuDriverManager.listInstalledDrivers(),
             appLanguage = preferences.appLanguage
@@ -86,6 +89,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _uiState.value = _uiState.value.copy(packagesFolderPath = null)
     }
 
+    fun selectStorageLocation(rootPath: String) {
+        val context = getApplication<Application>()
+        EmulatorStorage.selectStorageRoot(context, rootPath)
+        _uiState.value = _uiState.value.copy(
+            storagePath = EmulatorStorage.vitaRoot(context).absolutePath,
+            storageLocations = EmulatorStorage.availableStorageLocations(context)
+        )
+    }
+
     fun exportSettingsBackup(uri: Uri, onComplete: (Result<Unit>) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val result = runCatching {
@@ -104,6 +116,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 val context = getApplication<Application>()
                 _uiState.value = _uiState.value.copy(
                     packagesFolderPath = preferences.packagesFolderDisplayName(context),
+                    storagePath = EmulatorStorage.vitaRoot(context).absolutePath,
+                    storageLocations = EmulatorStorage.availableStorageLocations(context),
                     coreConfig = restoredConfig,
                     installedGpuDrivers = gpuDriverManager.listInstalledDrivers(),
                     appLanguage = preferences.appLanguage
@@ -119,6 +133,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = _uiState.value.copy(
                 coreConfig = coreConfigRepository.ensureDefaultsPersisted(),
+                storagePath = EmulatorStorage.vitaRoot(getApplication()).absolutePath,
+                storageLocations = EmulatorStorage.availableStorageLocations(getApplication()),
                 installedGpuDrivers = gpuDriverManager.listInstalledDrivers(),
                 appLanguage = preferences.appLanguage
             )

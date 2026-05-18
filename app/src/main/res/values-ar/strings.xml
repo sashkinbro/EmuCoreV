@@ -708,4 +708,11 @@
     <string name="save_manager_restore_all_confirm_body">ستحل مجلدات الحفظ من النسخة الاحتياطية المحددة محل مجلدات الحفظ المطابقة على هذا الجهاز. يتم الاحتفاظ بعمليات الحفظ الحالية فقط عندما لا تحتوي النسخة الاحتياطية على معرف الحفظ ذلك.</string>
     <string name="save_manager_restore_all_confirm">استعادة عمليات الحفظ</string>
     <string name="install_dialog_vitamin_unsupported">لا يتم دعم تفريغات Vitamin VPK. استخدم تفريغًا متوافقًا مثل NoNpDrm، أو قم بتثبيت PKG مع الترخيص المطابق له.</string>
+    <string name="settings_change_storage">تغيير مساحة التخزين</string>
+    <string name="settings_storage_location_internal">مساحة تخزين الجهاز</string>
+    <string name="settings_storage_location_sd">بطاقة SD</string>
+    <string name="settings_storage_location_external">مساحة تخزين خارجية</string>
+    <string name="settings_storage_change_note">تغيير مساحة التخزين يغير المكان الذي تبحث فيه عمليات التثبيت والإطلاق الجديدة عن بيانات Vita. لا يتم نقل الألعاب الحالية تلقائيًا.</string>
+    <string name="onboarding_storage_choose_title">اختر مساحة تخزين المحاكي</string>
+    <string name="onboarding_storage_only_default">يعرض Android موقع تخزين تطبيق واحد فقط في الوقت الحالي. إذا تم تثبيت بطاقة SD، فتأكد من تركيبها وإتاحتها للتطبيقات.</string>
 </resources>

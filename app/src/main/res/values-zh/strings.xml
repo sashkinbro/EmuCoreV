@@ -707,4 +707,11 @@
     <string name="save_manager_restore_all_confirm_body">所选备份中的存档文件夹将替换此设备上匹配的存档文件夹。仅当备份中不包含该存档 ID 时，才会保留现有存档。</string>
     <string name="save_manager_restore_all_confirm">恢复存档</string>
     <string name="install_dialog_vitamin_unsupported">不支持 Vitamin VPK 转储。请使用兼容的转储（如 NoNpDrm），或使用其匹配的许可证安装 PKG。</string>
+    <string name="settings_change_storage">更改存储</string>
+    <string name="settings_storage_location_internal">设备存储</string>
+    <string name="settings_storage_location_sd">SD 卡</string>
+    <string name="settings_storage_location_external">外部存储</string>
+    <string name="settings_storage_change_note">更改存储位置会改变新安装和启动时查找 Vita 数据的位置。现有游戏不会自动移动。</string>
+    <string name="onboarding_storage_choose_title">选择模拟器存储</string>
+    <string name="onboarding_storage_only_default">Android 目前仅提供一个应用存储位置。如果安装了 SD 卡，请确保已挂载并可供应用使用。</string>
 </resources>

@@ -708,4 +708,11 @@
     <string name="save_manager_restore_all_confirm_body">Seçilen yedekteki kayıt klasörleri, bu cihazdaki eşleşen kayıt klasörleriyle değiştirilir. Mevcut kayıtlar, yalnızca yedekleme söz konusu kayıt kimliğini içermediğinde saklanır.</string>
     <string name="save_manager_restore_all_confirm">Kayıtları geri yükle</string>
     <string name="install_dialog_vitamin_unsupported">Vitamin VPK dökümleri desteklenmiyor. NoNpDrm gibi uyumlu bir döküm kullanın veya PKG\'yi eşleşen lisansıyla yükleyin.</string>
+    <string name="settings_change_storage">Depolama alanını değiştir</string>
+    <string name="settings_storage_location_internal">Cihaz depolama alanı</string>
+    <string name="settings_storage_location_sd">SD kart</string>
+    <string name="settings_storage_location_external">Harici depolama</string>
+    <string name="settings_storage_change_note">Depolama alanını değiştirmek, yeni kurulumların ve başlatmaların Vita verilerini aradığı yeri değiştirir. Mevcut oyunlar otomatik olarak taşınmaz.</string>
+    <string name="onboarding_storage_choose_title">Emülatör depolama alanını seçin</string>
+    <string name="onboarding_storage_only_default">Android şu anda yalnızca bir uygulama depolama konumu sunuyor. Bir SD kart takılıysa, takılı olduğundan ve uygulamalar tarafından erişilebilir olduğundan emin olun.</string>
 </resources>

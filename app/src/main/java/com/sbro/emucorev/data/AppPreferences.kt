@@ -40,6 +40,16 @@ class AppPreferences(context: Context) {
         get() = prefs.getString(KEY_PACKAGES_FOLDER_URI, null)
         set(value) = prefs.edit { putString(KEY_PACKAGES_FOLDER_URI, value) }
 
+    var vitaStorageRootPath: String?
+        get() = prefs.getString(KEY_VITA_STORAGE_ROOT_PATH, null)
+        set(value) = prefs.edit {
+            if (value == null) {
+                remove(KEY_VITA_STORAGE_ROOT_PATH)
+            } else {
+                putString(KEY_VITA_STORAGE_ROOT_PATH, value)
+            }
+        }
+
     var onboardingCompleted: Boolean
         get() = prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
         set(value) = prefs.edit { putBoolean(KEY_ONBOARDING_COMPLETED, value) }
@@ -131,6 +141,7 @@ class AppPreferences(context: Context) {
 
     companion object {
         private const val KEY_PACKAGES_FOLDER_URI = "packages_folder_uri"
+        private const val KEY_VITA_STORAGE_ROOT_PATH = "vita_storage_root_path"
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_APP_LANGUAGE = "app_language"

@@ -32,6 +32,8 @@
     <string name="onboarding_packages_title">Packages folder</string>
     <string name="onboarding_packages_desc">Choose the folder where your Vita package files are stored.</string>
     <string name="onboarding_storage_title">Emulator storage</string>
+    <string name="onboarding_storage_choose_title">Choose emulator storage</string>
+    <string name="onboarding_storage_only_default">Android is only exposing one app storage location right now. If an SD card is installed, make sure it is mounted and available to apps.</string>
     <string name="onboarding_choose_folder">Choose folder</string>
     <string name="onboarding_status_pick_folder">Choose a packages folder to finish setup.</string>
     <string name="onboarding_status_install_firmware">Install the base firmware package.</string>
@@ -309,7 +311,12 @@
     <string name="settings_change_folder">Change folder</string>
     <string name="settings_clear_folder">Clear folder</string>
     <string name="settings_storage_title">Storage</string>
-    <string name="settings_storage_body">Emulator data is stored in the app files directory under `vita/`. Installed games are in `ux0/app`, shader cache is in `cache`, and patches are in `patch`.</string>
+    <string name="settings_storage_body">Emulator data is stored in the selected app files directory under `vita/`. Installed games are in `ux0/app`, shader cache is in `cache`, and patches are in `patch`.</string>
+    <string name="settings_change_storage">Change storage</string>
+    <string name="settings_storage_location_internal">Device storage</string>
+    <string name="settings_storage_location_sd">SD card</string>
+    <string name="settings_storage_location_external">External storage</string>
+    <string name="settings_storage_change_note">Changing storage changes where new installs and launches look for Vita data. Existing games are not moved automatically.</string>
     <string name="settings_backup_title">Settings backup</string>
     <string name="settings_backup_body">Back up app preferences and emulator settings to a file, or restore them from a previous backup.</string>
     <string name="settings_backup_create">Back up settings</string>

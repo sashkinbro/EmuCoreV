@@ -3,6 +3,8 @@ package com.sbro.emucorev.ui.onboarding
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.sbro.emucorev.core.EmulatorStorage
+import com.sbro.emucorev.core.InstallStateBus
+import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.data.AppPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,6 +14,7 @@ data class OnboardingUiState(
     val currentPage: Int = 0,
     val totalPages: Int = 4,
     val storagePath: String = "",
+    val storageLocations: List<VitaStorageLocation> = emptyList(),
     val canContinue: Boolean = true
 )
 
@@ -22,6 +25,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
     private val _uiState = MutableStateFlow(
         OnboardingUiState(
             storagePath = EmulatorStorage.vitaRoot(application).absolutePath,
+            storageLocations = EmulatorStorage.availableStorageLocations(application),
             canContinue = true
         )
     )
@@ -47,5 +51,15 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
 
     fun completeOnboarding() {
         preferences.onboardingCompleted = true
+    }
+
+    fun selectStorageLocation(rootPath: String) {
+        val context = getApplication<Application>()
+        EmulatorStorage.selectStorageRoot(context, rootPath)
+        _uiState.value = _uiState.value.copy(
+            storagePath = EmulatorStorage.vitaRoot(context).absolutePath,
+            storageLocations = EmulatorStorage.availableStorageLocations(context)
+        )
+        InstallStateBus.notifyCompleted()
     }
 }

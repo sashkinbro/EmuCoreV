@@ -1,11 +1,55 @@
 package com.sbro.emucorev.core
 
 import android.content.Context
+import android.os.Environment
+import com.sbro.emucorev.data.AppPreferences
 import java.io.File
 
+data class VitaStorageLocation(
+    val rootPath: String,
+    val vitaPath: String,
+    val removable: Boolean,
+    val selected: Boolean
+)
+
 object EmulatorStorage {
-    private fun storageRoot(context: Context): File =
-        context.getExternalFilesDir(null) ?: context.filesDir
+    private fun storageRoot(context: Context): File {
+        val roots = availableStorageRoots(context)
+        val selected = AppPreferences(context).vitaStorageRootPath
+            ?.let(::File)
+            ?.takeIf { configured -> roots.any { it.absolutePath == configured.absolutePath } }
+        return selected ?: roots.firstOrNull() ?: context.filesDir
+    }
+
+    private fun availableStorageRoots(context: Context): List<File> {
+        val roots = linkedMapOf<String, File>()
+        context.getExternalFilesDir(null)?.let { roots[it.absolutePath] = it }
+        context.getExternalFilesDirs(null).filterNotNull().forEach { root ->
+            roots[root.absolutePath] = root
+        }
+        if (roots.isEmpty()) {
+            roots[context.filesDir.absolutePath] = context.filesDir
+        }
+        return roots.values.toList()
+    }
+
+    fun availableStorageLocations(context: Context): List<VitaStorageLocation> {
+        val selectedRoot = storageRoot(context).absolutePath
+        return availableStorageRoots(context).map { root ->
+            VitaStorageLocation(
+                rootPath = root.absolutePath,
+                vitaPath = File(root, "vita").absolutePath,
+                removable = runCatching { Environment.isExternalStorageRemovable(root) }.getOrDefault(false),
+                selected = root.absolutePath == selectedRoot
+            )
+        }
+    }
+
+    fun selectStorageRoot(context: Context, rootPath: String) {
+        val selectedRoot = availableStorageRoots(context).firstOrNull { it.absolutePath == rootPath } ?: return
+        AppPreferences(context).vitaStorageRootPath = selectedRoot.absolutePath
+        prepareRuntime(context)
+    }
 
     fun vitaRoot(context: Context): File {
         val base = storageRoot(context)

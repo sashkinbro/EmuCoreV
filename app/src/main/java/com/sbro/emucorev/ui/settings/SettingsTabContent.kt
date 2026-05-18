@@ -29,8 +29,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,10 +45,13 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import android.view.InputDevice
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.VitaCoreConfig
+import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.core.input.InputDeviceClassifier
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.ui.common.SectionCard
@@ -116,6 +124,7 @@ fun SettingsTabContent(
             uiState = uiState,
             changeFolderClick = changeFolderClick,
             clearFolderClick = clearFolderClick,
+            selectStorageLocation = viewModel::selectStorageLocation,
             createBackupClick = createBackupClick,
             restoreBackupClick = restoreBackupClick
         )
@@ -540,9 +549,12 @@ private fun StorageTab(
     uiState: SettingsUiState,
     changeFolderClick: () -> Unit,
     clearFolderClick: () -> Unit,
+    selectStorageLocation: (String) -> Unit,
     createBackupClick: () -> Unit,
     restoreBackupClick: () -> Unit
 ) {
+    var storagePickerVisible by rememberSaveable { mutableStateOf(false) }
+
     SectionCard(title = stringResource(R.string.settings_packages_folder), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Text(
             text = stringResource(R.string.settings_help_packages_folder),
@@ -558,8 +570,46 @@ private fun StorageTab(
     }
     SectionCard(title = stringResource(R.string.settings_storage_title), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Text(text = stringResource(R.string.settings_storage_body), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f))
+        if (uiState.storageLocations.size > 1) {
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                uiState.storageLocations.forEachIndexed { index, location ->
+                    StorageLocationChip(
+                        location = location,
+                        index = index,
+                        onSelected = { selectStorageLocation(location.rootPath) }
+                    )
+                }
+            }
+            Text(
+                text = stringResource(R.string.settings_storage_change_note),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 10.dp)
+            )
+        }
         Text(text = uiState.storagePath, modifier = Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.primary)
+        Button(
+            onClick = { storagePickerVisible = true },
+            modifier = Modifier.padding(top = 12.dp)
+        ) {
+            Text(stringResource(R.string.settings_change_storage))
+        }
     }
+    SettingsStorageDialog(
+        visible = storagePickerVisible,
+        storageLocations = uiState.storageLocations,
+        onSelected = { location ->
+            selectStorageLocation(location.rootPath)
+            storagePickerVisible = false
+        },
+        onDismiss = { storagePickerVisible = false }
+    )
     SectionCard(title = stringResource(R.string.settings_backup_title), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Text(
             text = stringResource(R.string.settings_backup_body),
@@ -572,6 +622,122 @@ private fun StorageTab(
             Text(stringResource(R.string.settings_backup_create))
         }
     }
+}
+
+@Composable
+private fun SettingsStorageDialog(
+    visible: Boolean,
+    storageLocations: List<VitaStorageLocation>,
+    onSelected: (VitaStorageLocation) -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (!visible) return
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            shadowElevation = 10.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_change_storage),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (storageLocations.size > 1) {
+                        stringResource(R.string.settings_storage_change_note)
+                    } else {
+                        stringResource(R.string.onboarding_storage_only_default)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                storageLocations.forEachIndexed { index, location ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        color = if (location.selected) {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
+                        border = BorderStroke(
+                            1.dp,
+                            if (location.selected) {
+                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.42f)
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)
+                            }
+                        ),
+                        onClick = { onSelected(location) }
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = storageLocationLabel(location, index),
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                                color = if (location.selected) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
+                            )
+                            Text(
+                                text = location.vitaPath,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (location.selected) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
+                    }
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(stringResource(R.string.common_close))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StorageLocationChip(
+    location: VitaStorageLocation,
+    index: Int,
+    onSelected: () -> Unit
+) {
+    FilterChip(
+        selected = location.selected,
+        onClick = onSelected,
+        colors = appFilterChipColors(),
+        label = { Text(storageLocationLabel(location, index)) }
+    )
+}
+
+@Composable
+private fun storageLocationLabel(location: VitaStorageLocation, index: Int): String = when {
+    location.removable -> stringResource(R.string.settings_storage_location_sd)
+    index == 0 -> stringResource(R.string.settings_storage_location_internal)
+    else -> stringResource(R.string.settings_storage_location_external)
 }
 
 @Composable
