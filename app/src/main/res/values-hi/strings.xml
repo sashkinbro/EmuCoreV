@@ -715,4 +715,16 @@
     <string name="settings_storage_change_note">स्टोरेज बदलने से यह बदल जाता है कि नए इंस्टॉल और लॉन्च Vita डेटा को कहाँ खोजते हैं। मौजूदा गेम स्वचालित रूप से स्थानांतरित नहीं होते हैं।</string>
     <string name="onboarding_storage_choose_title">एमुलेटर स्टोरेज चुनें</string>
     <string name="onboarding_storage_only_default">Android अभी केवल एक ऐप स्टोरेज स्थान प्रदर्शित कर रहा है। यदि SD कार्ड इंस्टॉल है, तो सुनिश्चित करें कि यह माउंट किया गया है और ऐप्स के लिए उपलब्ध है।</string>
+    <string name="nav_achievements">उपलब्धियां</string>
+    <string name="achievements_title">उपलब्धियां</string>
+    <string name="achievements_progress_count">%1$d/%2$d</string>
+    <string name="achievements_choose_game">गेम चुनें</string>
+    <string name="achievements_trophy">ट्रॉफी</string>
+    <string name="achievements_hidden_trophy">छिपी हुई ट्रॉफी</string>
+    <string name="achievements_hidden_trophy_body">इसका विवरण देखने के लिए इस ट्रॉफी को अनलॉक करें।</string>
+    <string name="achievements_unlocked_at">%1$s को अनलॉक किया गया</string>
+    <string name="achievements_unlocked_notification_title">ट्रॉफी अर्जित की गई</string>
+    <string name="achievements_empty_title">कोई ट्रॉफी नहीं मिली</string>
+    <string name="achievements_empty_body">ट्रॉफी समर्थन वाला गेम लॉन्च करें या गेम इंस्टॉल करने के बाद रीफ्रेश करें।</string>
+    <string name="achievements_open_for_game">उपलब्धियां</string>
 </resources>

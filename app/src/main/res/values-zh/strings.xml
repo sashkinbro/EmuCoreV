@@ -714,4 +714,16 @@
     <string name="settings_storage_change_note">更改存储位置会改变新安装和启动时查找 Vita 数据的位置。现有游戏不会自动移动。</string>
     <string name="onboarding_storage_choose_title">选择模拟器存储</string>
     <string name="onboarding_storage_only_default">Android 目前仅提供一个应用存储位置。如果安装了 SD 卡，请确保已挂载并可供应用使用。</string>
+    <string name="nav_achievements">成就</string>
+    <string name="achievements_title">成就</string>
+    <string name="achievements_progress_count">%1$d/%2$d</string>
+    <string name="achievements_choose_game">选择游戏</string>
+    <string name="achievements_trophy">奖杯</string>
+    <string name="achievements_hidden_trophy">隐藏奖杯</string>
+    <string name="achievements_hidden_trophy_body">解锁此奖杯以显示其详细信息。</string>
+    <string name="achievements_unlocked_at">已于 %1$s 解锁</string>
+    <string name="achievements_unlocked_notification_title">获得奖杯</string>
+    <string name="achievements_empty_title">未找到奖杯</string>
+    <string name="achievements_empty_body">启动支持奖杯的游戏或在安装游戏后刷新。</string>
+    <string name="achievements_open_for_game">成就</string>
 </resources>

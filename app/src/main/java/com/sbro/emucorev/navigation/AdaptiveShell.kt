@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.Games
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.QueryStats
@@ -59,7 +60,7 @@ import com.sbro.emucorev.ui.theme.shouldUseExpandedShell
 import kotlinx.coroutines.launch
 
 enum class PrimaryDestination {
-    Home, Setup, Library, GameManager, PlayTime, SaveData, Search, Settings
+    Home, Setup, Library, GameManager, PlayTime, Achievements, SaveData, Search, Settings
 }
 
 private enum class MobileLeadingAction {
@@ -76,6 +77,7 @@ fun AdaptiveShell(
     onNavigateLibrary: () -> Unit,
     onNavigateGameManager: () -> Unit,
     onNavigatePlayTime: () -> Unit,
+    onNavigateAchievements: () -> Unit,
     onNavigateSaveData: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
@@ -92,6 +94,7 @@ fun AdaptiveShell(
             onNavigateLibrary = onNavigateLibrary,
             onNavigateGameManager = onNavigateGameManager,
             onNavigatePlayTime = onNavigatePlayTime,
+            onNavigateAchievements = onNavigateAchievements,
             onNavigateSaveData = onNavigateSaveData,
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
@@ -133,6 +136,7 @@ fun AdaptiveShell(
             onNavigateLibrary = onNavigateLibrary,
             onNavigateGameManager = onNavigateGameManager,
             onNavigatePlayTime = onNavigatePlayTime,
+            onNavigateAchievements = onNavigateAchievements,
             onNavigateSaveData = onNavigateSaveData,
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
@@ -154,6 +158,7 @@ private fun CompactAdaptiveShell(
     onNavigateLibrary: () -> Unit,
     onNavigateGameManager: () -> Unit,
     onNavigatePlayTime: () -> Unit,
+    onNavigateAchievements: () -> Unit,
     onNavigateSaveData: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
@@ -216,6 +221,7 @@ private fun CompactAdaptiveShell(
                     onNavigateLibrary = onNavigateLibrary,
                     onNavigateGameManager = onNavigateGameManager,
                     onNavigatePlayTime = onNavigatePlayTime,
+                    onNavigateAchievements = onNavigateAchievements,
                     onNavigateSaveData = onNavigateSaveData,
                     onNavigateSearch = onNavigateSearch,
                     onNavigateSettings = onNavigateSettings,
@@ -245,6 +251,7 @@ private fun SideNavigation(
     onNavigateLibrary: () -> Unit,
     onNavigateGameManager: () -> Unit,
     onNavigatePlayTime: () -> Unit,
+    onNavigateAchievements: () -> Unit,
     onNavigateSaveData: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
@@ -277,6 +284,10 @@ private fun SideNavigation(
     val navigatePlayTime = rememberDebouncedClick {
         onCloseDrawer()
         onNavigatePlayTime()
+    }
+    val navigateAchievements = rememberDebouncedClick {
+        onCloseDrawer()
+        onNavigateAchievements()
     }
     val navigateSaveData = rememberDebouncedClick {
         onCloseDrawer()
@@ -419,6 +430,12 @@ private fun SideNavigation(
                     label = stringResource(R.string.nav_play_time),
                     selected = selected == PrimaryDestination.PlayTime,
                     onClick = navigatePlayTime
+                )
+                ShellItem(
+                    icon = Icons.Rounded.EmojiEvents,
+                    label = stringResource(R.string.nav_achievements),
+                    selected = selected == PrimaryDestination.Achievements,
+                    onClick = navigateAchievements
                 )
                 ShellItem(
                     icon = Icons.Rounded.Save,

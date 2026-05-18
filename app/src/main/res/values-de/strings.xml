@@ -715,4 +715,16 @@
     <string name="settings_storage_change_note">Das Ändern des Speichers ändert den Ort, an dem neue Installationen und Starts nach Vita-Daten suchen. Vorhandene Spiele werden nicht automatisch verschoben.</string>
     <string name="onboarding_storage_choose_title">Emulator-Speicher auswählen</string>
     <string name="onboarding_storage_only_default">Android gibt derzeit nur einen App-Speicherort frei. Wenn eine SD-Karte installiert ist, stelle sicher, dass sie gemountet und für Apps verfügbar ist.</string>
+    <string name="nav_achievements">Erfolge</string>
+    <string name="achievements_title">Erfolge</string>
+    <string name="achievements_progress_count">%1$d/%2$d</string>
+    <string name="achievements_choose_game">Spiel auswählen</string>
+    <string name="achievements_trophy">Trophäe</string>
+    <string name="achievements_hidden_trophy">Versteckte Trophäe</string>
+    <string name="achievements_hidden_trophy_body">Schalte diese Trophäe frei, um ihre Details anzuzeigen.</string>
+    <string name="achievements_unlocked_at">Freigeschaltet am %1$s</string>
+    <string name="achievements_unlocked_notification_title">Trophäe erhalten</string>
+    <string name="achievements_empty_title">Keine Trophäen gefunden</string>
+    <string name="achievements_empty_body">Starte ein Spiel mit Trophäenunterstützung oder aktualisiere nach der Installation von Spielen.</string>
+    <string name="achievements_open_for_game">Erfolge</string>
 </resources>

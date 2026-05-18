@@ -715,4 +715,16 @@
     <string name="settings_storage_change_note">La modifica della memoria cambia il punto in cui le nuove installazioni e gli avvii cercano i dati Vita. I giochi esistenti non vengono spostati automaticamente.</string>
     <string name="onboarding_storage_choose_title">Scegli memoria dell\'emulatore</string>
     <string name="onboarding_storage_only_default">Android sta esponendo solo un percorso di archiviazione per le app in questo momento. Se è installata una scheda SD, assicurati che sia montata e disponibile per le app.</string>
+    <string name="nav_achievements">Obiettivi</string>
+    <string name="achievements_title">Obiettivi</string>
+    <string name="achievements_progress_count">%1$d/%2$d</string>
+    <string name="achievements_choose_game">Scegli gioco</string>
+    <string name="achievements_trophy">Trofeo</string>
+    <string name="achievements_hidden_trophy">Trofeo nascosto</string>
+    <string name="achievements_hidden_trophy_body">Sblocca questo trofeo per rivelare i suoi dettagli.</string>
+    <string name="achievements_unlocked_at">Sbloccato il %1$s</string>
+    <string name="achievements_unlocked_notification_title">Trofeo ottenuto</string>
+    <string name="achievements_empty_title">Nessun trofeo trovato</string>
+    <string name="achievements_empty_body">Avvia un gioco che supporta i trofei o aggiorna dopo aver installato i giochi.</string>
+    <string name="achievements_open_for_game">Obiettivi</string>
 </resources>

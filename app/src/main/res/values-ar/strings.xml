@@ -715,4 +715,16 @@
     <string name="settings_storage_change_note">تغيير مساحة التخزين يغير المكان الذي تبحث فيه عمليات التثبيت والإطلاق الجديدة عن بيانات Vita. لا يتم نقل الألعاب الحالية تلقائيًا.</string>
     <string name="onboarding_storage_choose_title">اختر مساحة تخزين المحاكي</string>
     <string name="onboarding_storage_only_default">يعرض Android موقع تخزين تطبيق واحد فقط في الوقت الحالي. إذا تم تثبيت بطاقة SD، فتأكد من تركيبها وإتاحتها للتطبيقات.</string>
+    <string name="nav_achievements">الإنجازات</string>
+    <string name="achievements_title">الإنجازات</string>
+    <string name="achievements_progress_count">%1$d/%2$d</string>
+    <string name="achievements_choose_game">اختر اللعبة</string>
+    <string name="achievements_trophy">كأس</string>
+    <string name="achievements_hidden_trophy">كأس مخفي</string>
+    <string name="achievements_hidden_trophy_body">افتح هذا الكأس للكشف عن تفاصيله.</string>
+    <string name="achievements_unlocked_at">تم الفتح %1$s</string>
+    <string name="achievements_unlocked_notification_title">تم ربح كأس</string>
+    <string name="achievements_empty_title">لم يتم العثور على كؤوس</string>
+    <string name="achievements_empty_body">قم بتشغيل لعبة تدعم الكؤوس أو قم بالتحديث بعد تثبيت الألعاب.</string>
+    <string name="achievements_open_for_game">الإنجازات</string>
 </resources>
