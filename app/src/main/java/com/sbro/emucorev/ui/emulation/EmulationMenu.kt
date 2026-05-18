@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -29,7 +30,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
@@ -38,12 +42,14 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,11 +61,23 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.VitaCoreConfig
+import com.sbro.emucorev.data.TrophyRepository
+import com.sbro.emucorev.data.VitaTrophy
+import com.sbro.emucorev.data.VitaTrophyGrade
+import com.sbro.emucorev.data.VitaTrophySet
+import com.sbro.emucorev.ui.common.LocalImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private val LiveBadgeColor = Color(0xFF34D27A)
@@ -220,7 +238,17 @@ fun EmulationGameMenu(
             }
             MenuHeader(gameTitle = gameTitle, gameId = gameId, paused = paused)
             MenuTopActions(paused = paused, callbacks = callbacks)
-            MenuTabs(selectedTab = selectedTab, onSelected = { selectedTab = it })
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalBleed(if (expandHorizontally) 20.dp else 16.dp)
+            ) {
+                MenuTabs(
+                    selectedTab = selectedTab,
+                    onSelected = { selectedTab = it },
+                    horizontalContentPadding = if (expandHorizontally) 20.dp else 16.dp
+                )
+            }
 
             Column(
                 modifier = Modifier
@@ -236,6 +264,7 @@ fun EmulationGameMenu(
                     EmulationMenuTab.Controls -> ControlsTab(config = config, callbacks = callbacks)
                     EmulationMenuTab.Display -> DisplayTab(config = config, callbacks = callbacks)
                     EmulationMenuTab.System -> SystemTab(config = config, callbacks = callbacks)
+                    EmulationMenuTab.Achievements -> AchievementsTab(gameId = gameId)
                     EmulationMenuTab.Gamepad -> GamepadTab(
                         config = config,
                         physicalGamepadConnected = physicalGamepadConnected,
@@ -253,7 +282,19 @@ private enum class EmulationMenuTab {
     Controls,
     Display,
     System,
+    Achievements,
     Gamepad
+}
+
+private fun Modifier.horizontalBleed(horizontalPadding: Dp): Modifier = layout { measurable, constraints ->
+    val bleedPx = horizontalPadding.roundToPx()
+    val looseConstraints = constraints.copy(
+        maxWidth = (constraints.maxWidth + bleedPx * 2).coerceAtLeast(0)
+    )
+    val placeable = measurable.measure(looseConstraints)
+    layout(constraints.maxWidth, placeable.height) {
+        placeable.placeRelative(-bleedPx, 0)
+    }
 }
 
 @Composable
@@ -603,6 +644,325 @@ private fun GamepadTab(
 }
 
 @Composable
+private fun AchievementsTab(gameId: String) {
+    val context = LocalContext.current
+    var trophySets by remember(gameId) { mutableStateOf<List<VitaTrophySet>>(emptyList()) }
+    var isLoading by remember(gameId) { mutableStateOf(true) }
+
+    LaunchedEffect(context, gameId) {
+        val repository = TrophyRepository()
+        var firstLoad = true
+        while (true) {
+            if (firstLoad) {
+                isLoading = true
+            }
+            trophySets = if (gameId.isBlank()) {
+                emptyList()
+            } else {
+                withContext(Dispatchers.IO) {
+                    repository.loadForTitle(context, gameId)
+                }
+            }
+            firstLoad = false
+            isLoading = false
+            delay(2_500)
+        }
+    }
+
+    if (isLoading) {
+        MenuSection(
+            title = stringResource(R.string.achievements_title),
+            subtitle = stringResource(R.string.emulation_achievements_loading),
+            badge = null
+        ) {
+            repeat(4) {
+                AchievementMenuSkeleton()
+            }
+        }
+        return
+    }
+
+    if (trophySets.isEmpty()) {
+        MenuSection(
+            title = stringResource(R.string.achievements_title),
+            subtitle = stringResource(R.string.emulation_achievements_empty),
+            badge = null
+        ) {
+            MenuEmptyAchievements()
+        }
+        return
+    }
+
+    trophySets.forEach { set ->
+        MenuSection(
+            title = set.setName.ifBlank { set.gameTitle.ifBlank { stringResource(R.string.achievements_title) } },
+            subtitle = stringResource(R.string.achievements_progress_count, set.unlockedCount, set.trophyCount),
+            badge = null
+        ) {
+            AchievementSetProgress(set = set)
+            set.groups.forEach { group ->
+                if (group.name.isNotBlank() && set.groups.size > 1) {
+                    Text(
+                        text = group.name,
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = emulationMenuPalette().textSecondary,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+                group.trophies.forEach { trophy ->
+                    AchievementMenuRow(trophy = trophy)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AchievementSetProgress(set: VitaTrophySet) {
+    val palette = emulationMenuPalette()
+    val progress = if (set.trophyCount > 0) set.unlockedCount / set.trophyCount.toFloat() else 0f
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.row)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(42.dp),
+                shape = RoundedCornerShape(10.dp),
+                color = palette.panelSoft,
+                border = BorderStroke(1.dp, palette.border)
+            ) {
+                LocalImage(
+                    path = set.gameIconPath,
+                    contentDescription = set.gameTitle,
+                    fallbackLabel = set.gameTitle,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = set.gameTitle,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = palette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(R.string.achievements_progress_count, set.unlockedCount, set.trophyCount),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        LinearProgressIndicator(
+            progress = { progress.coerceIn(0f, 1f) },
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = palette.border
+        )
+    }
+}
+
+@Composable
+private fun AchievementMenuRow(trophy: VitaTrophy) {
+    val palette = emulationMenuPalette()
+    val hiddenLocked = trophy.hidden && !trophy.unlocked
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.row)
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Surface(
+            modifier = Modifier.size(42.dp),
+            shape = RoundedCornerShape(10.dp),
+            color = palette.panelSoft,
+            border = BorderStroke(1.dp, palette.border)
+        ) {
+            if (hiddenLocked) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = null,
+                        tint = palette.textSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            } else {
+                LocalImage(
+                    path = trophy.iconPath,
+                    contentDescription = trophy.name,
+                    fallbackLabel = trophy.name.ifBlank { "?" },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = if (hiddenLocked) stringResource(R.string.achievements_hidden_trophy) else trophy.name.ifBlank { stringResource(R.string.achievements_trophy) },
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = if (trophy.unlocked) palette.textPrimary else palette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = if (hiddenLocked) stringResource(R.string.achievements_hidden_trophy_body) else trophy.detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = palette.textSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            if (trophy.unlocked) {
+                AchievementUnlockedMark()
+            }
+            AchievementGradeBadge(grade = trophy.grade, unlocked = trophy.unlocked)
+        }
+    }
+}
+
+@Composable
+private fun AchievementUnlockedMark() {
+    val color = Color(0xFF34D27A)
+    Surface(
+        modifier = Modifier.size(22.dp),
+        shape = CircleShape,
+        color = color.copy(alpha = 0.14f),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.38f))
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.CheckCircle,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(15.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun AchievementGradeBadge(
+    grade: VitaTrophyGrade,
+    unlocked: Boolean
+) {
+    val color = if (!unlocked) {
+        emulationMenuPalette().textSecondary.copy(alpha = 0.72f)
+    } else {
+        when (grade) {
+            VitaTrophyGrade.Platinum -> Color(0xFF7AD8FF)
+            VitaTrophyGrade.Gold -> Color(0xFFE1AA28)
+            VitaTrophyGrade.Silver -> Color(0xFFB9C1CB)
+            VitaTrophyGrade.Bronze -> Color(0xFFB8794A)
+            VitaTrophyGrade.Unknown -> MaterialTheme.colorScheme.primary
+        }
+    }
+    Surface(
+        modifier = Modifier.size(34.dp),
+        shape = CircleShape,
+        color = color.copy(alpha = if (unlocked) 0.18f else 0.08f),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.45f))
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = when (grade) {
+                    VitaTrophyGrade.Platinum -> "P"
+                    VitaTrophyGrade.Gold -> "G"
+                    VitaTrophyGrade.Silver -> "S"
+                    VitaTrophyGrade.Bronze -> "B"
+                    VitaTrophyGrade.Unknown -> "-"
+                },
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                color = color
+            )
+        }
+    }
+}
+
+@Composable
+private fun AchievementMenuSkeleton() {
+    val palette = emulationMenuPalette()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.row)
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(palette.border)
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(palette.border)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.48f)
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(palette.border.copy(alpha = 0.72f))
+            )
+        }
+    }
+}
+
+@Composable
+private fun MenuEmptyAchievements() {
+    val palette = emulationMenuPalette()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.row)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.EmojiEvents,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp)
+        )
+        Text(
+            text = stringResource(R.string.emulation_achievements_empty_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = palette.textSecondary
+        )
+    }
+}
+
+@Composable
 private fun MenuTopActions(paused: Boolean, callbacks: EmulationMenuCallbacks) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -658,13 +1018,18 @@ private fun MenuTopAction(
 }
 
 @Composable
-private fun MenuTabs(selectedTab: EmulationMenuTab, onSelected: (EmulationMenuTab) -> Unit) {
+private fun MenuTabs(
+    selectedTab: EmulationMenuTab,
+    onSelected: (EmulationMenuTab) -> Unit,
+    horizontalContentPadding: Dp = 0.dp
+) {
     val palette = emulationMenuPalette()
     val tabs = listOf(
         EmulationMenuTab.Game to stringResource(R.string.emulation_tab_game),
         EmulationMenuTab.Controls to stringResource(R.string.emulation_tab_controls),
         EmulationMenuTab.Display to stringResource(R.string.emulation_tab_display),
         EmulationMenuTab.System to stringResource(R.string.emulation_tab_system),
+        EmulationMenuTab.Achievements to stringResource(R.string.emulation_tab_achievements),
         EmulationMenuTab.Gamepad to stringResource(R.string.emulation_tab_gamepad)
     )
     Row(
@@ -674,6 +1039,9 @@ private fun MenuTabs(selectedTab: EmulationMenuTab, onSelected: (EmulationMenuTa
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (horizontalContentPadding > 0.dp) {
+            Spacer(modifier = Modifier.width(horizontalContentPadding))
+        }
         tabs.forEach { (tab, label) ->
             val selected = selectedTab == tab
             Surface(
@@ -696,6 +1064,9 @@ private fun MenuTabs(selectedTab: EmulationMenuTab, onSelected: (EmulationMenuTa
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
                 )
             }
+        }
+        if (horizontalContentPadding > 0.dp) {
+            Spacer(modifier = Modifier.width(horizontalContentPadding))
         }
     }
 }

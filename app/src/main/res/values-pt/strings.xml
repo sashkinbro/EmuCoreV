@@ -732,4 +732,8 @@
     <string name="achievements_hint_title">Como desbloquear</string>
     <string name="achievements_translation_title">Traduzido</string>
     <string name="achievements_assist_error">Não foi possível carregar. Tente novamente.</string>
+    <string name="emulation_achievements_loading">Carregando troféus para o jogo em execução.</string>
+    <string name="emulation_achievements_empty">Nenhum troféu encontrado para o jogo em execução.</string>
+    <string name="emulation_achievements_empty_body">Instale um jogo com suporte a troféus ou atualize os troféus do jogo na biblioteca.</string>
+    <string name="emulation_tab_achievements">Conquistas</string>
 </resources>

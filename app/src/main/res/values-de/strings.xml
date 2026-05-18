@@ -732,4 +732,8 @@
     <string name="achievements_hint_title">Wie freischalten</string>
     <string name="achievements_translation_title">Übersetzt</string>
     <string name="achievements_assist_error">Konnte nicht geladen werden. Versuche es erneut.</string>
+    <string name="emulation_achievements_loading">Lade Trophäen für das laufende Spiel.</string>
+    <string name="emulation_achievements_empty">Keine Trophäen für das laufende Spiel gefunden.</string>
+    <string name="emulation_achievements_empty_body">Installiere ein Spiel mit Trophäenunterstützung oder aktualisiere die Spieltrophäen aus der Bibliothek.</string>
+    <string name="emulation_tab_achievements">Erfolge</string>
 </resources>

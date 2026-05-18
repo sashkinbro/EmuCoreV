@@ -224,7 +224,13 @@ fun EmulationOverlayHost(
             val next = trophyNotificationQueue.first()
             trophyNotificationQueue = trophyNotificationQueue.drop(1)
             trophyNotification = next
-            kotlinx.coroutines.delay(4_200)
+        }
+    }
+
+    LaunchedEffect(trophyNotification) {
+        val visibleTrophy = trophyNotification ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(5_000)
+        if (trophyNotification == visibleTrophy) {
             trophyNotification = null
         }
     }

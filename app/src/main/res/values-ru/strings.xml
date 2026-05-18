@@ -732,4 +732,8 @@
     <string name="achievements_hint_title">Как разблокировать</string>
     <string name="achievements_translation_title">Переведено</string>
     <string name="achievements_assist_error">Не удалось загрузить. Попробуйте еще раз.</string>
+    <string name="emulation_achievements_loading">Загрузка трофеев для запущенной игры.</string>
+    <string name="emulation_achievements_empty">Трофеи для запущенной игры не найдены.</string>
+    <string name="emulation_achievements_empty_body">Установите игру с поддержкой трофеев или обновите трофеи игры из библиотеки.</string>
+    <string name="emulation_tab_achievements">Достижения</string>
 </resources>

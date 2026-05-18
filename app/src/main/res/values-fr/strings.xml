@@ -732,4 +732,8 @@
     <string name="achievements_hint_title">Comment débloquer</string>
     <string name="achievements_translation_title">Traduit</string>
     <string name="achievements_assist_error">Impossible de charger. Réessayez.</string>
+    <string name="emulation_achievements_loading">Chargement des trophées pour le jeu en cours d\'exécution.</string>
+    <string name="emulation_achievements_empty">Aucun trophée trouvé pour le jeu en cours d\'exécution.</string>
+    <string name="emulation_achievements_empty_body">Installez un jeu compatible avec les trophées ou actualisez les trophées du jeu depuis la bibliothèque.</string>
+    <string name="emulation_tab_achievements">Succès</string>
 </resources>
