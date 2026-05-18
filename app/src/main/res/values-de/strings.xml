@@ -727,4 +727,9 @@
     <string name="achievements_empty_title">Keine Trophäen gefunden</string>
     <string name="achievements_empty_body">Starte ein Spiel mit Trophäenunterstützung oder aktualisiere nach der Installation von Spielen.</string>
     <string name="achievements_open_for_game">Erfolge</string>
+    <string name="achievements_how_to_unlock">Wie freischalten?</string>
+    <string name="achievements_translate">Übersetzen</string>
+    <string name="achievements_hint_title">Wie freischalten</string>
+    <string name="achievements_translation_title">Übersetzt</string>
+    <string name="achievements_assist_error">Konnte nicht geladen werden. Versuche es erneut.</string>
 </resources>

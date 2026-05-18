@@ -727,4 +727,9 @@
     <string name="achievements_empty_title">कोई ट्रॉफी नहीं मिली</string>
     <string name="achievements_empty_body">ट्रॉफी समर्थन वाला गेम लॉन्च करें या गेम इंस्टॉल करने के बाद रीफ्रेश करें।</string>
     <string name="achievements_open_for_game">उपलब्धियां</string>
+    <string name="achievements_how_to_unlock">कैसे अनलॉक करें?</string>
+    <string name="achievements_translate">अनुवाद करें</string>
+    <string name="achievements_hint_title">कैसे अनलॉक करें</string>
+    <string name="achievements_translation_title">अनुवादित</string>
+    <string name="achievements_assist_error">लोड नहीं किया जा सका। पुनः प्रयास करें।</string>
 </resources>

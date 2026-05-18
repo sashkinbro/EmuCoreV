@@ -727,4 +727,9 @@
     <string name="achievements_empty_title">Kupa bulunamadı</string>
     <string name="achievements_empty_body">Kupa destekli bir oyun başlatın veya oyunları yükledikten sonra yenileyin.</string>
     <string name="achievements_open_for_game">Başarımlar</string>
+    <string name="achievements_how_to_unlock">Nasıl açılır?</string>
+    <string name="achievements_translate">Çevir</string>
+    <string name="achievements_hint_title">Nasıl açılır</string>
+    <string name="achievements_translation_title">Çevrildi</string>
+    <string name="achievements_assist_error">Yüklenemedi. Tekrar deneyin.</string>
 </resources>

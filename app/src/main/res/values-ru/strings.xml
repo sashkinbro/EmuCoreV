@@ -727,4 +727,9 @@
     <string name="achievements_empty_title">Трофеи не найдены</string>
     <string name="achievements_empty_body">Запустите игру с поддержкой трофеев или обновите список после установки игр.</string>
     <string name="achievements_open_for_game">Достижения</string>
+    <string name="achievements_how_to_unlock">Как разблокировать?</string>
+    <string name="achievements_translate">Перевести</string>
+    <string name="achievements_hint_title">Как разблокировать</string>
+    <string name="achievements_translation_title">Переведено</string>
+    <string name="achievements_assist_error">Не удалось загрузить. Попробуйте еще раз.</string>
 </resources>

@@ -727,4 +727,9 @@
     <string name="achievements_empty_title">Nessun trofeo trovato</string>
     <string name="achievements_empty_body">Avvia un gioco che supporta i trofei o aggiorna dopo aver installato i giochi.</string>
     <string name="achievements_open_for_game">Obiettivi</string>
+    <string name="achievements_how_to_unlock">Come sbloccare?</string>
+    <string name="achievements_translate">Traduci</string>
+    <string name="achievements_hint_title">Come sbloccare</string>
+    <string name="achievements_translation_title">Tradotto</string>
+    <string name="achievements_assist_error">Impossibile caricare. Riprova.</string>
 </resources>

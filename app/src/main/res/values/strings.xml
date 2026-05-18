@@ -139,6 +139,11 @@
     <string name="play_time_yesterday">Yesterday</string>
     <string name="achievements_title">Achievements</string>
     <string name="achievements_open_for_game">Achievements</string>
+    <string name="achievements_how_to_unlock">How to unlock?</string>
+    <string name="achievements_translate">Translate</string>
+    <string name="achievements_hint_title">How to unlock</string>
+    <string name="achievements_translation_title">Translated</string>
+    <string name="achievements_assist_error">Could not load. Try again.</string>
     <string name="achievements_progress_count">%1$d/%2$d</string>
     <string name="achievements_choose_game">Choose game</string>
     <string name="achievements_trophy">Trophy</string>
