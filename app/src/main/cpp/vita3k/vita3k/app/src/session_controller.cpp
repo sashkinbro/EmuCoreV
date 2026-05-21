@@ -21,6 +21,7 @@
 #include <audio/state.h>
 #include <ctrl/state.h>
 #include <display/state.h>
+#include <gxm/functions.h>
 #include <gxm/state.h>
 #include <interface.h>
 #include <io/state.h>
@@ -184,33 +185,17 @@ void AppSessionController::stop(const AppSessionStopReason reason) {
         set_phase(AppSessionPhase::Stopping);
     }
 
-    const bool has_render_context = static_cast<bool>(active_platform.before_renderer_cleanup)
-        || static_cast<bool>(active_platform.destroy_render_context);
+    const bool has_render_context = static_cast<bool>(active_platform.destroy_render_context);
     const bool needs_renderer_cleanup = renderer_was_initialized || has_render_context;
 
     if (runtime_was_initialized) {
-        if (app_started && emuenv.renderer) {
-            emuenv.display.abort = true;
-            emuenv.renderer->notification_ready.notify_all();
-            emuenv.gxm.display_queue.abort();
-            emuenv.renderer->render_abort = true;
-            emuenv.renderer->command_finish_one.notify_all();
-            renderer::stop_render_thread(*emuenv.renderer);
-        }
-
-        if (needs_renderer_cleanup && active_platform.before_renderer_cleanup)
-            active_platform.before_renderer_cleanup();
-
         if (app_started && reason != AppSessionStopReason::LaunchFailure)
             update_app_time_used(emuenv, emuenv.io.app_path);
 
-        deinit(emuenv);
+        shutdown_app_runtime(emuenv);
+        reset_app_state(emuenv);
         destroy(emuenv);
-        set_current_config(emuenv, "");
     } else if (renderer_was_initialized) {
-        if (needs_renderer_cleanup && active_platform.before_renderer_cleanup)
-            active_platform.before_renderer_cleanup();
-
         if (emuenv.renderer) {
             emuenv.renderer->cleanup();
             emuenv.renderer.reset();
@@ -248,10 +233,6 @@ void AppSessionController::apply_runtime_state_locked() {
 
     const bool overlay_intercepted = paused || input_intercepted;
     emuenv.ctrl.overlay_input_intercepted.store(overlay_intercepted, std::memory_order_relaxed);
-    if (overlay_intercepted || currently_paused != paused) {
-        std::lock_guard<std::mutex> ctrl_lock(emuenv.ctrl.mutex);
-        emuenv.ctrl.ignore_input = true;
-    }
 
     emuenv.renderer->paused.store(paused, std::memory_order_relaxed);
 }
