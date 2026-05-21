@@ -19,7 +19,7 @@ class VitaGameSettingsRepository(private val context: Context) {
 
     private val configDirectory: File
         get() {
-            val base = context.getExternalFilesDir(null) ?: context.filesDir
+            val base = EmulatorStorage.storageRoot(context)
             return File(base, "config")
         }
 

@@ -333,7 +333,15 @@
     <string name="settings_storage_location_internal">Device storage</string>
     <string name="settings_storage_location_sd">SD card</string>
     <string name="settings_storage_location_external">External storage</string>
-    <string name="settings_storage_change_note">Changing storage changes where new installs and launches look for Vita data. Existing games are not moved automatically.</string>
+    <string name="settings_storage_change_note">Changing storage moves missing emulator data to the selected location. Existing files in the destination are kept.</string>
+    <string name="settings_storage_migrating">Moving emulator data…</string>
+    <string name="settings_storage_confirm_title">Change emulator storage?</string>
+    <string name="settings_storage_confirm_body">EmuCoreV will copy firmware, installed games, saves, trophies, cache, patches, and emulator settings to %1$s. Existing files in the destination are kept. The app may restart so the core can reopen the new storage.</string>
+    <string name="settings_storage_confirm_action">Move data</string>
+    <string name="settings_storage_migration_title">Moving emulator data</string>
+    <string name="settings_storage_migration_body">Keep EmuCoreV open while firmware, games, saves, trophies, cache, and settings are copied to the selected storage.</string>
+    <string name="settings_storage_migration_count">%1$d/%2$d files checked</string>
+    <string name="settings_storage_migration_failed">Could not move storage</string>
     <string name="settings_backup_title">Settings backup</string>
     <string name="settings_backup_body">Back up app preferences and emulator settings to a file, or restore them from a previous backup.</string>
     <string name="settings_backup_create">Back up settings</string>
@@ -630,8 +638,8 @@
     <string name="install_dialog_license_done">License installed successfully.</string>
     <string name="install_dialog_firmware_default_version">selected build</string>
     <string name="install_dialog_pkg_done">PKG installed successfully.</string>
-    <string name="setup_title">Install games</string>
-    <string name="setup_subtitle">Choose the install type. For PKG games, add the license first, then select the PKG file.</string>
+    <string name="setup_title">Install firmware and games</string>
+    <string name="setup_subtitle">Install firmware at any time, then choose the game install type. For PKG games, add the license first, then select the PKG file.</string>
     <string name="setup_hero_title">Install firmware and games</string>
     <string name="setup_hero_body">Install firmware, VPKs, PKGs, and license files from files on your device.</string>
     <string name="setup_pill_firmware">Firmware</string>
@@ -641,6 +649,9 @@
     <string name="setup_runtime_core_storage">Storage path</string>
     <string name="setup_runtime_bridge">Core status</string>
     <string name="setup_runtime_bridge_ready">The emulator is ready.</string>
+    <string name="setup_firmware_title">Install firmware</string>
+    <string name="setup_firmware_body">Use this if you changed emulator storage, skipped onboarding, or need to reinstall the base or update firmware package.</string>
+    <string name="setup_firmware_button">Select firmware PUP</string>
     <string name="setup_content_title">Install VPK or ZIP</string>
     <string name="setup_content_body">Use this for game archives that already contain all required install data. PKG games use the separate PKG flow below.</string>
     <string name="setup_content_button">Select VPK or ZIP</string>

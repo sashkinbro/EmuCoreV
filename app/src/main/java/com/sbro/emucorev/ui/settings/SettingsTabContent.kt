@@ -1,7 +1,11 @@
 package com.sbro.emucorev.ui.settings
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +13,7 @@ import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,9 +27,11 @@ import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -40,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -125,6 +133,7 @@ fun SettingsTabContent(
             changeFolderClick = changeFolderClick,
             clearFolderClick = clearFolderClick,
             selectStorageLocation = viewModel::selectStorageLocation,
+            dismissStorageMigrationDialog = viewModel::dismissStorageMigrationDialog,
             createBackupClick = createBackupClick,
             restoreBackupClick = restoreBackupClick
         )
@@ -550,10 +559,13 @@ private fun StorageTab(
     changeFolderClick: () -> Unit,
     clearFolderClick: () -> Unit,
     selectStorageLocation: (String) -> Unit,
+    dismissStorageMigrationDialog: () -> Unit,
     createBackupClick: () -> Unit,
     restoreBackupClick: () -> Unit
 ) {
     var storagePickerVisible by rememberSaveable { mutableStateOf(false) }
+    var pendingStorageRootPath by rememberSaveable { mutableStateOf<String?>(null) }
+    val pendingStorageLocation = uiState.storageLocations.firstOrNull { it.rootPath == pendingStorageRootPath }
 
     SectionCard(title = stringResource(R.string.settings_packages_folder), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Text(
@@ -571,21 +583,6 @@ private fun StorageTab(
     SectionCard(title = stringResource(R.string.settings_storage_title), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Text(text = stringResource(R.string.settings_storage_body), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f))
         if (uiState.storageLocations.size > 1) {
-            androidx.compose.foundation.layout.FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                uiState.storageLocations.forEachIndexed { index, location ->
-                    StorageLocationChip(
-                        location = location,
-                        index = index,
-                        onSelected = { selectStorageLocation(location.rootPath) }
-                    )
-                }
-            }
             Text(
                 text = stringResource(R.string.settings_storage_change_note),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -594,8 +591,17 @@ private fun StorageTab(
             )
         }
         Text(text = uiState.storagePath, modifier = Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.primary)
+        if (uiState.storageChangeInProgress) {
+            Text(
+                text = stringResource(R.string.settings_storage_migrating),
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
         Button(
             onClick = { storagePickerVisible = true },
+            enabled = !uiState.storageChangeInProgress,
             modifier = Modifier.padding(top = 12.dp)
         ) {
             Text(stringResource(R.string.settings_change_storage))
@@ -604,11 +610,30 @@ private fun StorageTab(
     SettingsStorageDialog(
         visible = storagePickerVisible,
         storageLocations = uiState.storageLocations,
+        enabled = !uiState.storageChangeInProgress,
         onSelected = { location ->
-            selectStorageLocation(location.rootPath)
+            if (!location.selected) {
+                pendingStorageRootPath = location.rootPath
+            }
             storagePickerVisible = false
         },
         onDismiss = { storagePickerVisible = false }
+    )
+    pendingStorageLocation?.let { location ->
+        StorageChangeConfirmDialog(
+            location = location,
+            index = uiState.storageLocations.indexOf(location),
+            onConfirm = {
+                pendingStorageRootPath = null
+                selectStorageLocation(location.rootPath)
+            },
+            onDismiss = { pendingStorageRootPath = null }
+        )
+    }
+    StorageMigrationDialog(
+        state = uiState.storageMigration,
+        inProgress = uiState.storageChangeInProgress,
+        onDismiss = dismissStorageMigrationDialog
     )
     SectionCard(title = stringResource(R.string.settings_backup_title), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Text(
@@ -625,9 +650,138 @@ private fun StorageTab(
 }
 
 @Composable
+private fun StorageChangeConfirmDialog(
+    location: VitaStorageLocation,
+    index: Int,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_storage_confirm_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(R.string.settings_storage_confirm_body, storageLocationLabel(location, index)))
+                Text(
+                    text = location.vitaPath,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text(stringResource(R.string.settings_storage_confirm_action))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun StorageMigrationDialog(
+    state: StorageMigrationUiState,
+    inProgress: Boolean,
+    onDismiss: () -> Unit
+) {
+    if (!state.visible) return
+
+    val animatedProgress by animateFloatAsState(
+        targetValue = state.progress.coerceIn(0f, 1f),
+        animationSpec = tween(260),
+        label = "storage-migration-progress"
+    )
+    val hasError = state.errorMessage != null
+    val maxDialogHeight = (LocalConfiguration.current.screenHeightDp.dp - 36.dp).coerceAtLeast(220.dp)
+
+    Dialog(
+        onDismissRequest = {
+            if (!inProgress) onDismiss()
+        },
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = !inProgress,
+            dismissOnClickOutside = !inProgress
+        )
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 18.dp)
+                .heightIn(max = maxDialogHeight),
+            shape = RoundedCornerShape(30.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp,
+            shadowElevation = 16.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = if (hasError) {
+                        stringResource(R.string.settings_storage_migration_failed)
+                    } else {
+                        stringResource(R.string.settings_storage_migration_title)
+                    },
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = if (hasError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (hasError) {
+                        state.errorMessage.orEmpty()
+                    } else {
+                        stringResource(R.string.settings_storage_migration_body)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                LinearProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier.fillMaxWidth(),
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f)
+                )
+                Text(
+                    text = stringResource(
+                        R.string.settings_storage_migration_count,
+                        state.copiedFiles + state.skippedFiles,
+                        state.totalFiles
+                    ),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                state.currentPath?.takeIf { it.isNotBlank() }?.let { currentPath ->
+                    Text(
+                        text = currentPath,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (!inProgress) {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.common_close))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SettingsStorageDialog(
     visible: Boolean,
     storageLocations: List<VitaStorageLocation>,
+    enabled: Boolean,
     onSelected: (VitaStorageLocation) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -681,7 +835,7 @@ private fun SettingsStorageDialog(
                                 MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)
                             }
                         ),
-                        onClick = { onSelected(location) }
+                        onClick = { if (enabled) onSelected(location) }
                     ) {
                         Column(
                             modifier = Modifier.padding(14.dp),
@@ -717,20 +871,6 @@ private fun SettingsStorageDialog(
             }
         }
     }
-}
-
-@Composable
-private fun StorageLocationChip(
-    location: VitaStorageLocation,
-    index: Int,
-    onSelected: () -> Unit
-) {
-    FilterChip(
-        selected = location.selected,
-        onClick = onSelected,
-        colors = appFilterChipColors(),
-        label = { Text(storageLocationLabel(location, index)) }
-    )
 }
 
 @Composable

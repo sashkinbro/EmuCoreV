@@ -711,7 +711,7 @@
     <string name="settings_storage_location_internal">设备存储</string>
     <string name="settings_storage_location_sd">SD 卡</string>
     <string name="settings_storage_location_external">外部存储</string>
-    <string name="settings_storage_change_note">更改存储位置会改变新安装和启动时查找 Vita 数据的位置。现有游戏不会自动移动。</string>
+    <string name="settings_storage_change_note">更改存储位置时，EmuCoreV 会将缺失的模拟器数据移动到所选位置。目标位置中已有的文件会保留。</string>
     <string name="onboarding_storage_choose_title">选择模拟器存储</string>
     <string name="onboarding_storage_only_default">Android 目前仅提供一个应用存储位置。如果安装了 SD 卡，请确保已挂载并可供应用使用。</string>
     <string name="nav_achievements">成就</string>
@@ -735,4 +735,15 @@
     <string name="emulation_achievements_empty">未找到运行中游戏的奖杯。</string>
     <string name="emulation_achievements_empty_body">安装支持奖杯的游戏或从库中刷新游戏奖杯。</string>
     <string name="emulation_tab_achievements">成就</string>
+    <string name="setup_firmware_title">安装固件</string>
+    <string name="setup_firmware_body">如果您更改了模拟器存储、跳过了初始设置，或者需要重新安装基础或更新固件包，请使用此选项。</string>
+    <string name="setup_firmware_button">选择固件 PUP</string>
+    <string name="settings_storage_migrating">正在移动模拟器数据…</string>
+    <string name="settings_storage_confirm_title">更改模拟器存储？</string>
+    <string name="settings_storage_confirm_body">EmuCoreV 将把固件、已安装的游戏、存档、奖杯、缓存、补丁和模拟器设置复制到 %1$s。目标位置中的现有文件将被保留。应用可能会重新启动，以便核心可以重新打开新存储。</string>
+    <string name="settings_storage_confirm_action">移动数据</string>
+    <string name="settings_storage_migration_title">正在移动模拟器数据</string>
+    <string name="settings_storage_migration_body">在将固件、游戏、存档、奖杯、缓存和设置复制到所选存储时，请保持 EmuCoreV 处于打开状态。</string>
+    <string name="settings_storage_migration_count">已检查 %1$d/%2$d 个文件</string>
+    <string name="settings_storage_migration_failed">无法移动存储</string>
 </resources>

@@ -712,7 +712,7 @@
     <string name="settings_storage_location_internal">Gerätespeicher</string>
     <string name="settings_storage_location_sd">SD-Karte</string>
     <string name="settings_storage_location_external">Externer Speicher</string>
-    <string name="settings_storage_change_note">Das Ändern des Speichers ändert den Ort, an dem neue Installationen und Starts nach Vita-Daten suchen. Vorhandene Spiele werden nicht automatisch verschoben.</string>
+    <string name="settings_storage_change_note">Beim Wechseln des Speichers verschiebt EmuCoreV fehlende Emulatordaten an den ausgewählten Ort. Vorhandene Dateien am Ziel bleiben erhalten.</string>
     <string name="onboarding_storage_choose_title">Emulator-Speicher auswählen</string>
     <string name="onboarding_storage_only_default">Android gibt derzeit nur einen App-Speicherort frei. Wenn eine SD-Karte installiert ist, stelle sicher, dass sie gemountet und für Apps verfügbar ist.</string>
     <string name="nav_achievements">Erfolge</string>
@@ -736,4 +736,15 @@
     <string name="emulation_achievements_empty">Keine Trophäen für das laufende Spiel gefunden.</string>
     <string name="emulation_achievements_empty_body">Installiere ein Spiel mit Trophäenunterstützung oder aktualisiere die Spieltrophäen aus der Bibliothek.</string>
     <string name="emulation_tab_achievements">Erfolge</string>
+    <string name="setup_firmware_title">Firmware installieren</string>
+    <string name="setup_firmware_body">Verwende dies, wenn du den Emulator-Speicher geändert hast, das Onboarding übersprungen hast oder das Basis- oder Update-Firmware-Paket neu installieren musst.</string>
+    <string name="setup_firmware_button">Firmware-PUP auswählen</string>
+    <string name="settings_storage_migrating">Emulator-Daten werden verschoben…</string>
+    <string name="settings_storage_confirm_title">Emulator-Speicher ändern?</string>
+    <string name="settings_storage_confirm_body">EmuCoreV kopiert Firmware, installierte Spiele, Speicherstände, Trophäen, Cache, Patches und Emulator-Einstellungen nach %1$s. Vorhandene Dateien am Zielort bleiben erhalten. Die App wird möglicherweise neu gestartet, damit der Core den neuen Speicher öffnen kann.</string>
+    <string name="settings_storage_confirm_action">Daten verschieben</string>
+    <string name="settings_storage_migration_title">Emulator-Daten werden verschoben</string>
+    <string name="settings_storage_migration_body">Lasse EmuCoreV geöffnet, während Firmware, Spiele, Speicherstände, Trophäen, Cache und Einstellungen auf den ausgewählten Speicher kopiert werden.</string>
+    <string name="settings_storage_migration_count">%1$d/%2$d Dateien überprüft</string>
+    <string name="settings_storage_migration_failed">Speicher konnte nicht verschoben werden</string>
 </resources>

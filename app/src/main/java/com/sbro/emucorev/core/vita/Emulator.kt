@@ -89,7 +89,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     @Keep
     fun getBaseStoragePath(): String {
-        return (getExternalFilesDir(null) ?: filesDir).absolutePath
+        return EmulatorStorage.storageRoot(this).absolutePath
     }
 
     fun currentGameIdOrIntent(): String {

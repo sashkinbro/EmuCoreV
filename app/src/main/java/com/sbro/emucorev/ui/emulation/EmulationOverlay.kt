@@ -8,9 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -82,14 +80,8 @@ import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.core.vita.Emulator
 import com.sbro.emucorev.core.vita.overlay.InputOverlay
 import com.sbro.emucorev.data.InstalledGameRepository
-import com.sbro.emucorev.data.TrophyRepository
-import com.sbro.emucorev.data.VitaTrophy
-import com.sbro.emucorev.data.VitaTrophyGrade
-import com.sbro.emucorev.ui.common.LocalImage
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
@@ -99,7 +91,6 @@ fun EmulationOverlayHost(
 ) {
     val gameId = remember(activity) { activity.currentGameIdOrIntent() }
     val repository = remember(activity) { VitaGameSettingsRepository(activity) }
-    val trophyRepository = remember(activity) { TrophyRepository() }
     val controlLayoutRepository = remember(activity) { TouchControlLayoutRepository(activity) }
     val overlayBridge = remember(activity) { activity.getmOverlay() }
     var config by remember(activity, gameId) { mutableStateOf(repository.loadEffective(gameId)) }
@@ -110,8 +101,6 @@ fun EmulationOverlayHost(
     var userPaused by remember { mutableStateOf(false) }
     var backTouchEnabled by remember { mutableStateOf(false) }
     var exitDialogVisible by remember { mutableStateOf(false) }
-    var trophyNotification by remember { mutableStateOf<VitaTrophy?>(null) }
-    var trophyNotificationQueue by remember { mutableStateOf<List<VitaTrophy>>(emptyList()) }
     var sessionElapsedMs by remember(activity) { mutableLongStateOf(activity.currentPlayTimeElapsedMs()) }
     val gameTitle = remember(activity, gameId) {
         val installedTitle = InstalledGameRepository().findByTitleId(activity, gameId)
@@ -192,46 +181,6 @@ fun EmulationOverlayHost(
         while (true) {
             sessionElapsedMs = activity.currentPlayTimeElapsedMs()
             kotlinx.coroutines.delay(1_000)
-        }
-    }
-
-    LaunchedEffect(activity, gameId) {
-        var knownUnlockedKeys = withContext(Dispatchers.IO) {
-            trophyRepository.loadForTitle(activity, gameId)
-                .flatMap { set -> set.trophies.map { trophy -> "${set.communicationId}:${trophy.id}" to trophy } }
-                .filter { it.second.unlocked }
-                .map { it.first }
-                .toSet()
-        }
-        while (true) {
-            kotlinx.coroutines.delay(1_500)
-            val unlocked = withContext(Dispatchers.IO) {
-                trophyRepository.loadForTitle(activity, gameId)
-                    .flatMap { set -> set.trophies.map { trophy -> "${set.communicationId}:${trophy.id}" to trophy } }
-                    .filter { it.second.unlocked }
-                    .sortedWith(compareBy<Pair<String, VitaTrophy>> { it.second.unlockedAtEpochSeconds ?: Long.MAX_VALUE }.thenBy { it.second.id })
-            }
-            val fresh = unlocked.filter { it.first !in knownUnlockedKeys }
-            if (fresh.isNotEmpty()) {
-                knownUnlockedKeys = knownUnlockedKeys + fresh.map { it.first }
-                trophyNotificationQueue = trophyNotificationQueue + fresh.map { it.second }
-            }
-        }
-    }
-
-    LaunchedEffect(trophyNotification, trophyNotificationQueue) {
-        if (trophyNotification == null && trophyNotificationQueue.isNotEmpty()) {
-            val next = trophyNotificationQueue.first()
-            trophyNotificationQueue = trophyNotificationQueue.drop(1)
-            trophyNotification = next
-        }
-    }
-
-    LaunchedEffect(trophyNotification) {
-        val visibleTrophy = trophyNotification ?: return@LaunchedEffect
-        kotlinx.coroutines.delay(5_000)
-        if (trophyNotification == visibleTrophy) {
-            trophyNotification = null
         }
     }
 
@@ -408,20 +357,6 @@ fun EmulationOverlayHost(
             )
         }
 
-        AnimatedVisibility(
-            visible = trophyNotification != null,
-            enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(tween(220)),
-            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(tween(180)),
-            modifier = Modifier.align(Alignment.TopEnd)
-        ) {
-            trophyNotification?.let { trophy ->
-                TrophyUnlockNotification(
-                    trophy = trophy,
-                    modifier = Modifier.padding(top = 18.dp, end = 18.dp)
-                )
-            }
-        }
-
         AnimatedVisibility(visible = menuOpen, enter = fadeIn(tween(220)), exit = fadeOut(tween(180))) {
             Box(
                 modifier = Modifier
@@ -494,74 +429,6 @@ fun EmulationOverlayHost(
         }
         if (hasPhysicalGamepad && !controlsEditMode) {
             overlayBridge.setTouchControlsActive(false)
-        }
-    }
-}
-
-@Composable
-private fun TrophyUnlockNotification(
-    trophy: VitaTrophy,
-    modifier: Modifier = Modifier
-) {
-    val gradeColor = when (trophy.grade) {
-        VitaTrophyGrade.Platinum -> Color(0xFF7AD8FF)
-        VitaTrophyGrade.Gold -> Color(0xFFE1AA28)
-        VitaTrophyGrade.Silver -> Color(0xFFB9C1CB)
-        VitaTrophyGrade.Bronze -> Color(0xFFB8794A)
-        VitaTrophyGrade.Unknown -> MaterialTheme.colorScheme.primary
-    }
-    Surface(
-        modifier = modifier.width(330.dp),
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-        tonalElevation = 8.dp,
-        border = BorderStroke(1.dp, gradeColor.copy(alpha = 0.55f))
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Surface(
-                modifier = Modifier.size(58.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = gradeColor.copy(alpha = 0.14f),
-                border = BorderStroke(1.dp, gradeColor.copy(alpha = 0.48f))
-            ) {
-                LocalImage(
-                    path = trophy.iconPath,
-                    contentDescription = trophy.name,
-                    fallbackLabel = trophy.name.ifBlank { "T" },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.achievements_unlocked_notification_title),
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                    color = gradeColor,
-                    maxLines = 1
-                )
-                Text(
-                    text = trophy.name.ifBlank { stringResource(R.string.achievements_trophy) },
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
-                if (trophy.detail.isNotBlank()) {
-                    Text(
-                        text = trophy.detail,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                    )
-                }
-            }
         }
     }
 }

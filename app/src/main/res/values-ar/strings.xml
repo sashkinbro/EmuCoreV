@@ -712,7 +712,7 @@
     <string name="settings_storage_location_internal">مساحة تخزين الجهاز</string>
     <string name="settings_storage_location_sd">بطاقة SD</string>
     <string name="settings_storage_location_external">مساحة تخزين خارجية</string>
-    <string name="settings_storage_change_note">تغيير مساحة التخزين يغير المكان الذي تبحث فيه عمليات التثبيت والإطلاق الجديدة عن بيانات Vita. لا يتم نقل الألعاب الحالية تلقائيًا.</string>
+    <string name="settings_storage_change_note">يؤدي تغيير التخزين إلى نقل بيانات المحاكي الناقصة إلى الموقع المحدد. يتم الاحتفاظ بالملفات الموجودة في الوجهة.</string>
     <string name="onboarding_storage_choose_title">اختر مساحة تخزين المحاكي</string>
     <string name="onboarding_storage_only_default">يعرض Android موقع تخزين تطبيق واحد فقط في الوقت الحالي. إذا تم تثبيت بطاقة SD، فتأكد من تركيبها وإتاحتها للتطبيقات.</string>
     <string name="nav_achievements">الإنجازات</string>
@@ -736,4 +736,15 @@
     <string name="emulation_achievements_empty">لم يتم العثور على كؤوس للعبة قيد التشغيل.</string>
     <string name="emulation_achievements_empty_body">قم بتثبيت لعبة تدعم الكؤوس أو قم بتحديث كؤوس اللعبة من المكتبة.</string>
     <string name="emulation_tab_achievements">الإنجازات</string>
+    <string name="setup_firmware_title">تثبيت البرامج الثابتة</string>
+    <string name="setup_firmware_body">استخدم هذا إذا قمت بتغيير مساحة تخزين المحاكي، أو تخطيت الإعداد الأولي، أو كنت بحاجة إلى إعادة تثبيت حزمة البرامج الثابتة الأساسية أو التحديث.</string>
+    <string name="setup_firmware_button">حدد PUP للبرامج الثابتة</string>
+    <string name="settings_storage_migrating">جاري نقل بيانات المحاكي…</string>
+    <string name="settings_storage_confirm_title">هل تريد تغيير مساحة تخزين المحاكي؟</string>
+    <string name="settings_storage_confirm_body">سيقوم EmuCoreV بنسخ البرامج الثابتة والألعاب المثبتة وعمليات الحفظ والكؤوس وذاكرة التخزين المؤقت والتصحيحات وإعدادات المحاكي إلى %1$s. يتم الاحتفاظ بالملفات الموجودة في الوجهة. قد تتم إعادة تشغيل التطبيق حتى يتمكن النواة من إعادة فتح مساحة التخزين الجديدة.</string>
+    <string name="settings_storage_confirm_action">نقل البيانات</string>
+    <string name="settings_storage_migration_title">نقل بيانات المحاكي</string>
+    <string name="settings_storage_migration_body">أبقِ EmuCoreV مفتوحًا أثناء نسخ البرامج الثابتة والألعاب وعمليات الحفظ والكؤوس وذاكرة التخزين المؤقت والإعدادات إلى مساحة التخزين المحددة.</string>
+    <string name="settings_storage_migration_count">تم فحص %1$d/%2$d من الملفات</string>
+    <string name="settings_storage_migration_failed">تعذر نقل مساحة التخزين</string>
 </resources>

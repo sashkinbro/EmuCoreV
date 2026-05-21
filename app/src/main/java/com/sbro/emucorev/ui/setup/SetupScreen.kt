@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Inventory2
+import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material3.Button
@@ -108,6 +109,14 @@ fun SetupScreen(
             text = stringResource(R.string.setup_subtitle),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        SetupActionCard(
+            icon = Icons.Rounded.Memory,
+            title = stringResource(R.string.setup_firmware_title),
+            body = stringResource(R.string.setup_firmware_body),
+            buttonLabel = stringResource(R.string.setup_firmware_button),
+            onClick = onInstallFirmware
         )
 
         SetupActionCard(

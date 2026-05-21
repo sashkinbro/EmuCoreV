@@ -130,7 +130,10 @@ fun OnboardingScreen(
     val installFirmwareUpdateClick = rememberDebouncedClick(onClick = onInstallFirmwareUpdate)
     val backClick = rememberDebouncedClick(onClick = viewModel::goBack)
     val nextClick = rememberDebouncedClick(onClick = viewModel::goNext)
-    val canComplete = uiState.canContinue && firmwareInstalled && firmwareUpdateInstalled
+    val canComplete = uiState.canContinue &&
+        firmwareInstalled &&
+        firmwareUpdateInstalled &&
+        !uiState.storageChangeInProgress
     val completeClick = rememberDebouncedClick {
         if (isCompleting || !canComplete) return@rememberDebouncedClick
         isCompleting = true
@@ -264,6 +267,7 @@ fun OnboardingScreen(
                         else -> OnboardingSetupContent(
                             storagePath = uiState.storagePath,
                             storageLocations = uiState.storageLocations,
+                            storageChangeInProgress = uiState.storageChangeInProgress,
                             selectStorageLocation = viewModel::selectStorageLocation,
                             firmwareInstalled = firmwareInstalled,
                             firmwareUpdateInstalled = firmwareUpdateInstalled,
@@ -413,6 +417,7 @@ private fun OnboardingHero(
 private fun OnboardingSetupContent(
     storagePath: String,
     storageLocations: List<VitaStorageLocation>,
+    storageChangeInProgress: Boolean,
     selectStorageLocation: (String) -> Unit,
     firmwareInstalled: Boolean,
     firmwareUpdateInstalled: Boolean,
@@ -467,6 +472,46 @@ private fun OnboardingSetupContent(
 
         SetupCard(
             icon = Icons.Rounded.Memory,
+            title = stringResource(R.string.onboarding_storage_title),
+            description = storagePath,
+            status = if (storageChangeInProgress) {
+                stringResource(R.string.settings_storage_migrating)
+            } else {
+                stringResource(R.string.onboarding_status_ready)
+            },
+            statusColor = if (storageChangeInProgress) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
+            onClick = { storagePickerVisible = true }
+        )
+        if (storageLocations.size > 1) {
+            Spacer(modifier = Modifier.height(8.dp))
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                storageLocations.forEachIndexed { index, location ->
+                    OnboardingStorageChip(
+                        location = location,
+                        index = index,
+                        enabled = !storageChangeInProgress,
+                        onSelected = { selectStorageLocation(location.rootPath) }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.settings_storage_change_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(9.dp))
+
+        SetupCard(
+            icon = Icons.Rounded.Memory,
             title = stringResource(R.string.onboarding_firmware_title),
             description = stringResource(R.string.onboarding_firmware_desc),
             status = if (firmwareInstalled) {
@@ -480,7 +525,7 @@ private fun OnboardingSetupContent(
                 installFirmware()
             },
             secondaryActionLabel = if (firmwareInstalled) null else if (baseDownloadProgress != null) cancelDownloadButton else downloadButton,
-            secondaryActionEnabled = !isDownloading || downloadState.kind == FirmwareKind.Base,
+            secondaryActionEnabled = (!isDownloading || downloadState.kind == FirmwareKind.Base) && !storageChangeInProgress,
             onSecondaryAction = {
                 if (baseDownloadProgress != null) cancelFirmwareDownload() else startFirmwareDownload(FirmwareKind.Base)
             },
@@ -506,7 +551,7 @@ private fun OnboardingSetupContent(
                 installFirmwareUpdate()
             },
             secondaryActionLabel = if (firmwareUpdateInstalled) null else if (updateDownloadProgress != null) cancelDownloadButton else downloadButton,
-            secondaryActionEnabled = !isDownloading || downloadState.kind == FirmwareKind.Update,
+            secondaryActionEnabled = (!isDownloading || downloadState.kind == FirmwareKind.Update) && !storageChangeInProgress,
             onSecondaryAction = {
                 if (updateDownloadProgress != null) cancelFirmwareDownload() else startFirmwareDownload(FirmwareKind.Update)
             },
@@ -514,41 +559,6 @@ private fun OnboardingSetupContent(
             downloadProgress = updateDownloadProgress,
             downloadStatus = updateDownloadStatus
         )
-
-        Spacer(modifier = Modifier.height(9.dp))
-
-        SetupCard(
-            icon = Icons.Rounded.Memory,
-            title = stringResource(R.string.onboarding_storage_title),
-            description = storagePath,
-            status = stringResource(R.string.onboarding_status_ready),
-            statusColor = MaterialTheme.colorScheme.tertiary,
-            onClick = { storagePickerVisible = true }
-        )
-        if (storageLocations.size > 1) {
-            Spacer(modifier = Modifier.height(8.dp))
-            androidx.compose.foundation.layout.FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                storageLocations.forEachIndexed { index, location ->
-                    OnboardingStorageChip(
-                        location = location,
-                        index = index,
-                        onSelected = { selectStorageLocation(location.rootPath) }
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.settings_storage_change_note),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
-        }
 
         FirmwareDownloadInfoDialog(
             visible = firmwareInfoVisible,
@@ -558,8 +568,10 @@ private fun OnboardingSetupContent(
             visible = storagePickerVisible,
             storageLocations = storageLocations,
             onSelected = { location ->
-                selectStorageLocation(location.rootPath)
-                storagePickerVisible = false
+                if (!storageChangeInProgress) {
+                    selectStorageLocation(location.rootPath)
+                    storagePickerVisible = false
+                }
             },
             onDismiss = { storagePickerVisible = false }
         )
@@ -570,10 +582,12 @@ private fun OnboardingSetupContent(
 private fun OnboardingStorageChip(
     location: VitaStorageLocation,
     index: Int,
+    enabled: Boolean = true,
     onSelected: () -> Unit
 ) {
     FilterChip(
         selected = location.selected,
+        enabled = enabled,
         onClick = onSelected,
         colors = FilterChipDefaults.filterChipColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,

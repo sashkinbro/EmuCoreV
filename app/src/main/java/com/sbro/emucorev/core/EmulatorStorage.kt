@@ -12,8 +12,24 @@ data class VitaStorageLocation(
     val selected: Boolean
 )
 
+data class StorageMigrationResult(
+    val sourceRootPath: String,
+    val targetRootPath: String,
+    val copiedFiles: Int = 0,
+    val skippedFiles: Int = 0
+)
+
+data class StorageMigrationProgress(
+    val sourceRootPath: String,
+    val targetRootPath: String,
+    val copiedFiles: Int,
+    val skippedFiles: Int,
+    val totalFiles: Int,
+    val currentPath: String?
+)
+
 object EmulatorStorage {
-    private fun storageRoot(context: Context): File {
+    fun storageRoot(context: Context): File {
         val roots = availableStorageRoots(context)
         val selected = AppPreferences(context).vitaStorageRootPath
             ?.let(::File)
@@ -45,10 +61,29 @@ object EmulatorStorage {
         }
     }
 
-    fun selectStorageRoot(context: Context, rootPath: String) {
-        val selectedRoot = availableStorageRoots(context).firstOrNull { it.absolutePath == rootPath } ?: return
+    fun selectStorageRoot(
+        context: Context,
+        rootPath: String,
+        migrateExistingData: Boolean = false,
+        onMigrationProgress: ((StorageMigrationProgress) -> Unit)? = null
+    ): StorageMigrationResult {
+        val selectedRoot = availableStorageRoots(context).firstOrNull { it.absolutePath == rootPath }
+            ?: return StorageMigrationResult(
+                sourceRootPath = storageRoot(context).absolutePath,
+                targetRootPath = storageRoot(context).absolutePath
+            )
+        val previousRoot = storageRoot(context)
+        val migration = if (migrateExistingData && previousRoot.absolutePath != selectedRoot.absolutePath) {
+            migrateRuntimeData(previousRoot, selectedRoot, onMigrationProgress)
+        } else {
+            StorageMigrationResult(
+                sourceRootPath = previousRoot.absolutePath,
+                targetRootPath = selectedRoot.absolutePath
+            )
+        }
         AppPreferences(context).vitaStorageRootPath = selectedRoot.absolutePath
         prepareRuntime(context)
+        return migration
     }
 
     fun vitaRoot(context: Context): File {
@@ -115,4 +150,88 @@ object EmulatorStorage {
 
     fun paramSfoPath(context: Context, titleId: String): File =
         File(ux0AppRoot(context), "$titleId/sce_sys/param.sfo")
+
+    private fun migrateRuntimeData(
+        sourceRoot: File,
+        targetRoot: File,
+        onProgress: ((StorageMigrationProgress) -> Unit)?
+    ): StorageMigrationResult {
+        if (!sourceRoot.exists() || sourceRoot.absolutePath == targetRoot.absolutePath) {
+            return StorageMigrationResult(sourceRoot.absolutePath, targetRoot.absolutePath)
+        }
+        targetRoot.mkdirs()
+        val migrationItems = listOf("vita", "cache", "patch", "shaderlog", "config.yml", "config")
+        val totalFiles = migrationItems.sumOf { name -> File(sourceRoot, name).countFiles() }
+        onProgress?.invoke(
+            StorageMigrationProgress(
+                sourceRootPath = sourceRoot.absolutePath,
+                targetRootPath = targetRoot.absolutePath,
+                copiedFiles = 0,
+                skippedFiles = 0,
+                totalFiles = totalFiles,
+                currentPath = null
+            )
+        )
+        var copied = 0
+        var skipped = 0
+        migrationItems.forEach { name ->
+            val source = File(sourceRoot, name)
+            if (source.exists()) {
+                copyMissing(source, File(targetRoot, name)) { copiedDelta, skippedDelta, current ->
+                    copied += copiedDelta
+                    skipped += skippedDelta
+                    onProgress?.invoke(
+                        StorageMigrationProgress(
+                            sourceRootPath = sourceRoot.absolutePath,
+                            targetRootPath = targetRoot.absolutePath,
+                            copiedFiles = copied,
+                            skippedFiles = skipped,
+                            totalFiles = totalFiles,
+                            currentPath = current.relativeToOrSelf(sourceRoot).path
+                        )
+                    )
+                }
+            }
+        }
+        return StorageMigrationResult(
+            sourceRootPath = sourceRoot.absolutePath,
+            targetRootPath = targetRoot.absolutePath,
+            copiedFiles = copied,
+            skippedFiles = skipped
+        )
+    }
+
+    private fun copyMissing(
+        source: File,
+        target: File,
+        onFileVisited: (copiedDelta: Int, skippedDelta: Int, current: File) -> Unit
+    ): Pair<Int, Int> {
+        if (source.isDirectory) {
+            if (!target.exists()) {
+                target.mkdirs()
+            }
+            var copied = 0
+            var skipped = 0
+            source.listFiles().orEmpty().forEach { child ->
+                val result = copyMissing(child, File(target, child.name), onFileVisited)
+                copied += result.first
+                skipped += result.second
+            }
+            return copied to skipped
+        }
+        if (target.exists()) {
+            onFileVisited(0, 1, source)
+            return 0 to 1
+        }
+        target.parentFile?.mkdirs()
+        source.copyTo(target, overwrite = false)
+        onFileVisited(1, 0, source)
+        return 1 to 0
+    }
+
+    private fun File.countFiles(): Int {
+        if (!exists()) return 0
+        if (isFile) return 1
+        return listFiles().orEmpty().sumOf { it.countFiles() }
+    }
 }
