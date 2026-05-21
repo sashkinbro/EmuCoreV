@@ -712,7 +712,7 @@
     <string name="settings_storage_location_internal">Armazenamento do dispositivo</string>
     <string name="settings_storage_location_sd">Cartão SD</string>
     <string name="settings_storage_location_external">Armazenamento externo</string>
-    <string name="settings_storage_change_note">Alterar o armazenamento muda onde as novas instalações e inicializações procuram por dados do Vita. Os jogos existentes não são movidos automaticamente.</string>
+    <string name="settings_storage_change_note">Ao alterar o armazenamento, o EmuCoreV move os dados ausentes do emulador para o local selecionado. Os arquivos existentes no destino são mantidos.</string>
     <string name="onboarding_storage_choose_title">Escolher armazenamento do emulador</string>
     <string name="onboarding_storage_only_default">O Android está expondo apenas um local de armazenamento de aplicativos no momento. Se um cartão SD estiver instalado, certifique-se de que ele esteja montado e disponível para os aplicativos.</string>
     <string name="nav_achievements">Conquistas</string>
@@ -736,4 +736,15 @@
     <string name="emulation_achievements_empty">Nenhum troféu encontrado para o jogo em execução.</string>
     <string name="emulation_achievements_empty_body">Instale um jogo com suporte a troféus ou atualize os troféus do jogo na biblioteca.</string>
     <string name="emulation_tab_achievements">Conquistas</string>
+    <string name="setup_firmware_title">Instalar firmware</string>
+    <string name="setup_firmware_body">Use isto se você alterou o armazenamento do emulador, pulou a integração ou precisa reinstalar o pacote de firmware base ou de atualização.</string>
+    <string name="setup_firmware_button">Selecionar PUP de firmware</string>
+    <string name="settings_storage_migrating">Movendo dados do emulador…</string>
+    <string name="settings_storage_confirm_title">Alterar o armazenamento do emulador?</string>
+    <string name="settings_storage_confirm_body">O EmuCoreV copiará o firmware, jogos instalados, saves, troféus, cache, patches e configurações do emulador para %1$s. Os arquivos existentes no destino são mantidos. O aplicativo pode reiniciar para que o núcleo possa reabrir o novo armazenamento.</string>
+    <string name="settings_storage_confirm_action">Mover dados</string>
+    <string name="settings_storage_migration_title">Movendo dados do emulador</string>
+    <string name="settings_storage_migration_body">Mantenha o EmuCoreV aberto enquanto o firmware, jogos, saves, troféus, cache e configurações são copiados para o armazenamento selecionado.</string>
+    <string name="settings_storage_migration_count">%1$d/%2$d arquivos verificados</string>
+    <string name="settings_storage_migration_failed">Não foi possível mover o armazenamento</string>
 </resources>

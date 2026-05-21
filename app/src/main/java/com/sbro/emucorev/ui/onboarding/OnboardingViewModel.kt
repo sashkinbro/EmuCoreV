@@ -2,19 +2,25 @@ package com.sbro.emucorev.ui.onboarding
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.jakewharton.processphoenix.ProcessPhoenix
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.InstallStateBus
+import com.sbro.emucorev.core.NativeLibraryLoader
 import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.data.AppPreferences
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 data class OnboardingUiState(
     val currentPage: Int = 0,
     val totalPages: Int = 4,
     val storagePath: String = "",
     val storageLocations: List<VitaStorageLocation> = emptyList(),
+    val storageChangeInProgress: Boolean = false,
     val canContinue: Boolean = true
 )
 
@@ -54,12 +60,32 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun selectStorageLocation(rootPath: String) {
+        if (_uiState.value.storageChangeInProgress) return
         val context = getApplication<Application>()
-        EmulatorStorage.selectStorageRoot(context, rootPath)
-        _uiState.value = _uiState.value.copy(
-            storagePath = EmulatorStorage.vitaRoot(context).absolutePath,
-            storageLocations = EmulatorStorage.availableStorageLocations(context)
-        )
-        InstallStateBus.notifyCompleted()
+        val currentRoot = EmulatorStorage.storageRoot(context).absolutePath
+        if (currentRoot == rootPath) return
+        val restartRequired = NativeLibraryLoader.isNativeSessionInitialized()
+        _uiState.value = _uiState.value.copy(storageChangeInProgress = true)
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                EmulatorStorage.selectStorageRoot(
+                    context = context,
+                    rootPath = rootPath,
+                    migrateExistingData = true
+                )
+                _uiState.value = _uiState.value.copy(
+                    storagePath = EmulatorStorage.vitaRoot(context).absolutePath,
+                    storageLocations = EmulatorStorage.availableStorageLocations(context),
+                    storageChangeInProgress = false
+                )
+                InstallStateBus.notifyCompleted()
+            }.onFailure {
+                _uiState.value = _uiState.value.copy(storageChangeInProgress = false)
+            }.onSuccess {
+                if (restartRequired) {
+                    ProcessPhoenix.triggerRebirth(context.applicationContext)
+                }
+            }
+        }
     }
 }

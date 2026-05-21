@@ -13,6 +13,10 @@ object NativeLibraryLoader {
     @Volatile
     private var initialized = false
 
+    fun isNativeSessionInitialized(): Boolean {
+        return loaded && runCatching { NativeLib.isInitialized() }.getOrDefault(false)
+    }
+
     fun ensureLoaded(context: Context) {
         val appContext = context.applicationContext
         if (!loaded) {
@@ -32,8 +36,7 @@ object NativeLibraryLoader {
                         Log.e(TAG, "NativeLib.prepareFrontend() failed")
                     }
                     if (!NativeLib.isInitialized()) {
-                        val storagePath = appContext.getExternalFilesDir(null)?.absolutePath
-                            ?: appContext.filesDir.absolutePath
+                        val storagePath = EmulatorStorage.storageRoot(appContext).absolutePath
                         if (!NativeLib.init(storagePath)) {
                             Log.e(TAG, "NativeLib.init('$storagePath') failed")
                             return@synchronized

@@ -8,6 +8,7 @@ import android.provider.DocumentsContract
 import android.provider.DocumentsProvider
 import android.webkit.MimeTypeMap
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.EmulatorStorage
 import java.io.File
 import java.io.FileNotFoundException
 
@@ -37,9 +38,8 @@ class VitaDocumentsProvider : DocumentsProvider() {
     override fun onCreate(): Boolean = true
 
     private fun getStorageDir(): File {
-        return File(context?.getExternalFilesDir(null), "vita").apply {
-            if (!exists()) mkdirs()
-        }
+        return context?.let { EmulatorStorage.vitaRoot(it) }
+            ?: throw FileNotFoundException("Provider context is not available")
     }
 
     @Throws(FileNotFoundException::class)

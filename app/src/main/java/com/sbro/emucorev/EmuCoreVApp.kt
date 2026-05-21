@@ -4,6 +4,7 @@ import android.app.Application
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.NativeLibraryLoader
 import com.sbro.emucorev.core.VitaCoreConfigRepository
+import com.sbro.emucorev.data.AppPreferences
 
 class EmuCoreVApp : Application() {
     override fun onCreate() {
@@ -12,6 +13,8 @@ class EmuCoreVApp : Application() {
             EmulatorStorage.prepareRuntime(this)
             VitaCoreConfigRepository(this).ensureDefaultsPersisted()
         }
-        NativeLibraryLoader.ensureLoaded(this)
+        if (AppPreferences(this).onboardingCompleted) {
+            NativeLibraryLoader.ensureLoaded(this)
+        }
     }
 }

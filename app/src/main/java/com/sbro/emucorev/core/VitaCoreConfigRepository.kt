@@ -185,7 +185,7 @@ class VitaCoreConfigRepository(private val context: Context) {
 
     private val configFile: File
         get() {
-            val base = context.getExternalFilesDir(null) ?: context.filesDir
+            val base = EmulatorStorage.storageRoot(context)
             return File(base, "config.yml")
         }
 

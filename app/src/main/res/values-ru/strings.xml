@@ -712,7 +712,7 @@
     <string name="settings_storage_location_internal">Память устройства</string>
     <string name="settings_storage_location_sd">SD-картка</string>
     <string name="settings_storage_location_external">Внешний накопитель</string>
-    <string name="settings_storage_change_note">Изменение хранилища меняет место, где новые установки и запуски ищут данные Vita. Существующие игры не перемещаются автоматически.</string>
+    <string name="settings_storage_change_note">При смене хранилища EmuCoreV переносит недостающие данные эмулятора в выбранное место. Уже существующие файлы в новом хранилище сохраняются.</string>
     <string name="onboarding_storage_choose_title">Выбрать хранилище эмулятора</string>
     <string name="onboarding_storage_only_default">В настоящее время Android предоставляет только одно место для хранения данных приложений. Если установлена SD-карта, убедитесь, что она смонтирована и доступна для приложений.</string>
     <string name="nav_achievements">Достижения</string>
@@ -736,4 +736,15 @@
     <string name="emulation_achievements_empty">Трофеи для запущенной игры не найдены.</string>
     <string name="emulation_achievements_empty_body">Установите игру с поддержкой трофеев или обновите трофеи игры из библиотеки.</string>
     <string name="emulation_tab_achievements">Достижения</string>
+    <string name="setup_firmware_title">Установить прошивку</string>
+    <string name="setup_firmware_body">Используйте это, если вы изменили хранилище эмулятора, пропустили первоначальную настройку или вам нужно переустановить базовый пакет или пакет обновления прошивки.</string>
+    <string name="setup_firmware_button">Выбрать PUP прошивки</string>
+    <string name="settings_storage_migrating">Перемещение данных эмулятора…</string>
+    <string name="settings_storage_confirm_title">Изменить хранилище эмулятора?</string>
+    <string name="settings_storage_confirm_body">EmuCoreV скопирует прошивку, установленные игры, сохранения, трофеи, кэш, патчи и настройки эмулятора в %1$s. Существующие файлы в месте назначения сохраняются. Приложение может перезапуститься, чтобы ядро могло переоткрыть новое хранилище.</string>
+    <string name="settings_storage_confirm_action">Переместить данные</string>
+    <string name="settings_storage_migration_title">Перемещение данных эмулятора</string>
+    <string name="settings_storage_migration_body">Держите EmuCoreV открытым, пока прошивка, игры, сохранения, трофеи, кэш и настройки копируются в выбранное хранилище.</string>
+    <string name="settings_storage_migration_count">Проверено файлов: %1$d/%2$d</string>
+    <string name="settings_storage_migration_failed">Не удалось переместить хранилище</string>
 </resources>

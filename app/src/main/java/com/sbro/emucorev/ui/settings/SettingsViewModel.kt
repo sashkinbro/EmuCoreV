@@ -4,14 +4,18 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.jakewharton.processphoenix.ProcessPhoenix
 import com.sbro.emucorev.core.AppUpdateRelease
 import com.sbro.emucorev.core.AppUpdateRepository
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.GpuDriverCatalogRepository
 import com.sbro.emucorev.core.GpuDriverManager
+import com.sbro.emucorev.core.InstallStateBus
 import com.sbro.emucorev.core.InstalledGpuDriver
+import com.sbro.emucorev.core.NativeLibraryLoader
 import com.sbro.emucorev.core.RemoteGpuDriver
 import com.sbro.emucorev.core.SettingsBackupRepository
+import com.sbro.emucorev.core.StorageMigrationProgress
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.VitaStorageLocation
@@ -34,9 +38,27 @@ data class SettingsUiState(
     val gpuDriverCatalogLoading: Boolean = false,
     val gpuDriverCatalogError: String? = null,
     val gpuDriverDownloads: Map<String, Float> = emptyMap(),
+    val storageChangeInProgress: Boolean = false,
+    val storageMigration: StorageMigrationUiState = StorageMigrationUiState(),
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val appUpdate: AppUpdateUiState = AppUpdateUiState()
 )
+
+data class StorageMigrationUiState(
+    val visible: Boolean = false,
+    val copiedFiles: Int = 0,
+    val skippedFiles: Int = 0,
+    val totalFiles: Int = 0,
+    val currentPath: String? = null,
+    val errorMessage: String? = null
+) {
+    val progress: Float
+        get() = if (totalFiles > 0) {
+            (copiedFiles + skippedFiles).toFloat() / totalFiles.toFloat()
+        } else {
+            0f
+        }
+}
 
 data class AppUpdateUiState(
     val latestRelease: AppUpdateRelease? = null,
@@ -90,11 +112,62 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun selectStorageLocation(rootPath: String) {
+        if (_uiState.value.storageChangeInProgress) return
         val context = getApplication<Application>()
-        EmulatorStorage.selectStorageRoot(context, rootPath)
+        val currentRoot = EmulatorStorage.storageRoot(context).absolutePath
+        if (currentRoot == rootPath) return
+        val restartRequired = NativeLibraryLoader.isNativeSessionInitialized()
         _uiState.value = _uiState.value.copy(
-            storagePath = EmulatorStorage.vitaRoot(context).absolutePath,
-            storageLocations = EmulatorStorage.availableStorageLocations(context)
+            storageChangeInProgress = true,
+            storageMigration = StorageMigrationUiState(visible = true)
+        )
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                EmulatorStorage.selectStorageRoot(
+                    context = context,
+                    rootPath = rootPath,
+                    migrateExistingData = true,
+                    onMigrationProgress = ::updateStorageMigrationProgress
+                )
+                val config = coreConfigRepository.ensureDefaultsPersisted()
+                _uiState.value = _uiState.value.copy(
+                    storagePath = EmulatorStorage.vitaRoot(context).absolutePath,
+                    storageLocations = EmulatorStorage.availableStorageLocations(context),
+                    coreConfig = config,
+                    storageChangeInProgress = false,
+                    storageMigration = StorageMigrationUiState()
+                )
+                InstallStateBus.notifyCompleted()
+            }.onFailure {
+                _uiState.value = _uiState.value.copy(
+                    storageChangeInProgress = false,
+                    storageMigration = _uiState.value.storageMigration.copy(
+                        visible = true,
+                        errorMessage = it.message ?: "Storage migration failed"
+                    )
+                )
+            }.onSuccess {
+                if (restartRequired) {
+                    ProcessPhoenix.triggerRebirth(context.applicationContext)
+                }
+            }
+        }
+    }
+
+    fun dismissStorageMigrationDialog() {
+        if (_uiState.value.storageChangeInProgress) return
+        _uiState.value = _uiState.value.copy(storageMigration = StorageMigrationUiState())
+    }
+
+    private fun updateStorageMigrationProgress(progress: StorageMigrationProgress) {
+        _uiState.value = _uiState.value.copy(
+            storageMigration = StorageMigrationUiState(
+                visible = true,
+                copiedFiles = progress.copiedFiles,
+                skippedFiles = progress.skippedFiles,
+                totalFiles = progress.totalFiles,
+                currentPath = progress.currentPath
+            )
         )
     }
 

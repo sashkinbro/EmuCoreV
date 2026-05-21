@@ -712,7 +712,7 @@
     <string name="settings_storage_location_internal">Cihaz depolama alanı</string>
     <string name="settings_storage_location_sd">SD kart</string>
     <string name="settings_storage_location_external">Harici depolama</string>
-    <string name="settings_storage_change_note">Depolama alanını değiştirmek, yeni kurulumların ve başlatmaların Vita verilerini aradığı yeri değiştirir. Mevcut oyunlar otomatik olarak taşınmaz.</string>
+    <string name="settings_storage_change_note">Depolama değiştirildiğinde EmuCoreV eksik emülatör verilerini seçilen konuma taşır. Hedefteki mevcut dosyalar korunur.</string>
     <string name="onboarding_storage_choose_title">Emülatör depolama alanını seçin</string>
     <string name="onboarding_storage_only_default">Android şu anda yalnızca bir uygulama depolama konumu sunuyor. Bir SD kart takılıysa, takılı olduğundan ve uygulamalar tarafından erişilebilir olduğundan emin olun.</string>
     <string name="nav_achievements">Başarımlar</string>
@@ -736,4 +736,15 @@
     <string name="emulation_achievements_empty">Çalışan oyun için kupa bulunamadı.</string>
     <string name="emulation_achievements_empty_body">Kupa destekli bir oyun yükleyin veya oyun kupalarını kütüphaneden yenileyin.</string>
     <string name="emulation_tab_achievements">Başarımlar</string>
+    <string name="setup_firmware_title">Aygıt yazılımını yükle</string>
+    <string name="setup_firmware_body">Emülatör depolama alanını değiştirdiyseniz, ilk kurulumu atladıysanız veya temel ya da güncelleme aygıt yazılımı paketini yeniden yüklemeniz gerekiyorsa bunu kullanın.</string>
+    <string name="setup_firmware_button">Aygıt yazılımı PUP dosyasını seç</string>
+    <string name="settings_storage_migrating">Emülatör verileri taşınıyor…</string>
+    <string name="settings_storage_confirm_title">Emülatör depolama alanı değiştirilsin mi?</string>
+    <string name="settings_storage_confirm_body">EmuCoreV; aygıt yazılımını, yüklü oyunları, kayıtları, kupaları, önbelleği, yamaları ve emülatör ayarlarını %1$s konumuna kopyalayacaktır. Hedefteki mevcut dosyalar saklanır. Çekirdeğin yeni depolama alanını yeniden açabilmesi için uygulama yeniden başlatılabilir.</string>
+    <string name="settings_storage_confirm_action">Verileri taşı</string>
+    <string name="settings_storage_migration_title">Emülatör verileri taşınıyor</string>
+    <string name="settings_storage_migration_body">Aygıt yazılımı, oyunlar, kayıtlar, kupalar, önbellek ve ayarlar seçilen depolama alanına kopyalanırken EmuCoreV\'yi açık tutun.</string>
+    <string name="settings_storage_migration_count">%1$d/%2$d dosya kontrol edildi</string>
+    <string name="settings_storage_migration_failed">Depolama alanı taşınamadı</string>
 </resources>

@@ -712,7 +712,7 @@
     <string name="settings_storage_location_internal">डिवाइस स्टोरेज</string>
     <string name="settings_storage_location_sd">SD कार्ड</string>
     <string name="settings_storage_location_external">बाहरी स्टोरेज</string>
-    <string name="settings_storage_change_note">स्टोरेज बदलने से यह बदल जाता है कि नए इंस्टॉल और लॉन्च Vita डेटा को कहाँ खोजते हैं। मौजूदा गेम स्वचालित रूप से स्थानांतरित नहीं होते हैं।</string>
+    <string name="settings_storage_change_note">स्टोरेज बदलने पर EmuCoreV एमुलेटर का अनुपलब्ध डेटा चुनी गई जगह पर ले जाता है। गंतव्य में मौजूद फाइलें सुरक्षित रहती हैं।</string>
     <string name="onboarding_storage_choose_title">एमुलेटर स्टोरेज चुनें</string>
     <string name="onboarding_storage_only_default">Android अभी केवल एक ऐप स्टोरेज स्थान प्रदर्शित कर रहा है। यदि SD कार्ड इंस्टॉल है, तो सुनिश्चित करें कि यह माउंट किया गया है और ऐप्स के लिए उपलब्ध है।</string>
     <string name="nav_achievements">उपलब्धियां</string>
@@ -736,4 +736,15 @@
     <string name="emulation_achievements_empty">चल रहे गेम के लिए कोई ट्रॉफी नहीं मिली।</string>
     <string name="emulation_achievements_empty_body">ट्रॉफी समर्थन वाला गेम इंस्टॉल करें या लाइब्रेरी से गेम ट्रॉफियों को रीफ्रेश करें।</string>
     <string name="emulation_tab_achievements">उपलब्धियां</string>
+    <string name="setup_firmware_title">फर्मवेयर इंस्टॉल करें</string>
+    <string name="setup_firmware_body">इसका उपयोग तब करें जब आपने एमुलेटर स्टोरेज बदला हो, ऑनबोर्डिंग छोड़ दी हो, या बेस या अपडेट फर्मवेयर पैकेज को फिर से इंस्टॉल करने की आवश्यकता हो。</string>
+    <string name="setup_firmware_button">फर्मवेयर PUP चुनें</string>
+    <string name="settings_storage_migrating">एमुलेटर डेटा स्थानांतरित किया जा रहा है…</string>
+    <string name="settings_storage_confirm_title">एमुलेटर स्टोरेज बदलें?</string>
+    <string name="settings_storage_confirm_body">EmuCoreV फर्मवेयर, इंस्टॉल किए गए गेम, सेव, ट्रॉफियां, कैश, पैच और एमुलेटर सेटिंग्स को %1$s पर कॉपी करेगा। गंतव्य में मौजूद फ़ाइलें रखी जाती हैं। ऐप रीस्टार्ट हो सकता है ताकि कोर नया स्टोरेज फिर से खोल सके。</string>
+    <string name="settings_storage_confirm_action">डेटा स्थानांतरित करें</string>
+    <string name="settings_storage_migration_title">एमुलेटर डेटा स्थानांतरित किया जा रहा है</string>
+    <string name="settings_storage_migration_body">EmuCoreV को खुला रखें जबकि फर्मवेयर, गेम, सेव, ट्रॉफियां, कैश और सेटिंग्स को चयनित स्टोरेज में कॉपी किया जा रहा है。</string>
+    <string name="settings_storage_migration_count">%1$d/%2$d फ़ाइलें जांची गईं</string>
+    <string name="settings_storage_migration_failed">स्टोरेज स्थानांतरित नहीं किया जा सका</string>
 </resources>
