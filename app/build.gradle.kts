@@ -2,10 +2,10 @@
 
 import java.io.File
 
-val androidOpenSslRoot = rootProject.layout.projectDirectory.dir("tools/openssl-test/out").asFile!!
-val emuCoreVNativeHook = project.layout.projectDirectory.file("src/main/cpp/emucorev/cmake/Vita3KProjectHook.cmake").asFile!!
-val vita3kNewAssetsDir = project.layout.projectDirectory.dir("src/main/cpp/vita3k/android/app/assets").asFile!!
-val vita3kLegacyAssetsDir = project.layout.projectDirectory.dir("src/main/cpp/vita3k/android/assets").asFile!!
+val androidOpenSslRoot = rootProject.layout.projectDirectory.dir("tools/openssl-test/out").asFile
+val emuCoreVNativeHook = project.layout.projectDirectory.file("src/main/cpp/emucorev/cmake/Vita3KProjectHook.cmake").asFile
+val vita3kNewAssetsDir = project.layout.projectDirectory.dir("src/main/cpp/vita3k/android/app/assets").asFile
+val vita3kLegacyAssetsDir = project.layout.projectDirectory.dir("src/main/cpp/vita3k/android/assets").asFile
 val vita3kAssetsDir = if (vita3kNewAssetsDir.exists()) vita3kNewAssetsDir else vita3kLegacyAssetsDir
 
 // vita3k's cmake/vcpkg_android.cmake hard-requires ANDROID_NDK_HOME and VCPKG_ROOT env vars.
@@ -57,15 +57,13 @@ android {
     namespace = "com.sbro.emucorev"
     ndkVersion = "29.0.14206865"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37)
     }
 
     defaultConfig {
         applicationId = "com.sbro.emucorev"
         minSdk = 28
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 39
         versionName = "0.0.9"
 
