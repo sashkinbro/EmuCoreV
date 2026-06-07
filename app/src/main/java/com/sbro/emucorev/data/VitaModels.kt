@@ -57,3 +57,23 @@ data class VitaCatalogDetails(
     val videos: List<String>,
     val compatibility: VitaCompatibilitySummary? = null
 )
+
+enum class ProfileGameStatus {
+    PLAYING,
+    WANT_TO_PLAY,
+    COMPLETED,
+    DROPPED
+}
+
+data class ProfileGameListEntry(
+    val igdbId: Long,
+    val status: ProfileGameStatus?,
+    val isFavorite: Boolean,
+    val addedAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long
+)
+
+data class ProfileCatalogGame(
+    val profile: ProfileGameListEntry,
+    val catalog: VitaCatalogEntry
+)

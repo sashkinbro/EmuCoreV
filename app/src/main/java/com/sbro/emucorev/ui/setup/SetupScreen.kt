@@ -24,7 +24,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Inventory2
-import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material3.Button
@@ -61,7 +60,6 @@ fun SetupScreen(
     packagesFolderLabel: String?,
     vitaRootPath: String,
     onBackClick: () -> Unit,
-    onInstallFirmware: () -> Unit,
     onInstallContent: () -> Unit,
     onRepairContent: () -> Unit,
     onInstallLicense: () -> Unit,
@@ -105,20 +103,6 @@ fun SetupScreen(
             icon = Icons.Rounded.Storage,
             title = stringResource(R.string.onboarding_storage_title),
             body = vitaRootPath
-        )
-
-        Text(
-            text = stringResource(R.string.setup_subtitle),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        SetupActionCard(
-            icon = Icons.Rounded.Memory,
-            title = stringResource(R.string.setup_firmware_title),
-            body = stringResource(R.string.setup_firmware_body),
-            buttonLabel = stringResource(R.string.setup_firmware_button),
-            onClick = onInstallFirmware
         )
 
         SetupContentActionCard(
@@ -233,27 +217,6 @@ private fun SetupInfoRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
-    }
-}
-
-@Composable
-private fun SetupActionCard(
-    icon: ImageVector,
-    title: String,
-    body: String,
-    buttonLabel: String,
-    onClick: () -> Unit
-) {
-    SectionCard(title = title) {
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            SetupInfoRow(icon = icon, text = body)
-            Button(
-                onClick = onClick,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(buttonLabel)
-            }
-        }
     }
 }
 

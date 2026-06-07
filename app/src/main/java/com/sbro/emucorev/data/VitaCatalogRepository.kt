@@ -155,6 +155,37 @@ class VitaCatalogRepository(private val context: Context) {
         }
     }
 
+    fun getEntries(igdbIds: Collection<Long>): List<VitaCatalogEntry> {
+        val ids = igdbIds.distinct()
+        if (ids.isEmpty()) return emptyList()
+        return openDatabase()?.use { database ->
+            ids.mapNotNull { igdbId ->
+                database.rawQuery(
+                    """
+                    SELECT igdb_id, name, year, rating, summary, cover_url, hero_url
+                    FROM games
+                    WHERE igdb_id = ?
+                    LIMIT 1
+                    """.trimIndent(),
+                    arrayOf(igdbId.toString())
+                ).use { cursor ->
+                    if (!cursor.moveToFirst()) return@mapNotNull null
+                    VitaCatalogEntry(
+                        igdbId = cursor.getLong(0),
+                        name = cursor.getString(1).orEmpty(),
+                        year = cursor.takeIf { !it.isNull(2) }?.getInt(2),
+                        rating = cursor.takeIf { !it.isNull(3) }?.getFloat(3),
+                        summary = cursor.getString(4),
+                        coverUrl = cursor.getString(5),
+                        heroUrl = cursor.getString(6),
+                        genres = loadGenres(database, igdbId),
+                        serials = loadSerials(database, igdbId)
+                    )
+                }
+            }
+        }.orEmpty()
+    }
+
     fun findBestMatchDetails(gameName: String): VitaCatalogDetails? {
         val match = findBestMatch(gameName) ?: return null
         return getDetails(match.igdbId)
