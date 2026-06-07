@@ -813,4 +813,18 @@
     <string name="profile_restore">Geri yükle</string>
     <string name="profile_empty_title">Henüz profil oyunu yok</string>
     <string name="profile_empty_body">Kataloğu açın, bir oyunun üzerindeki üç nokta menüsüne dokunun ve onu profil listelerinizden birine ekleyin.</string>
+    <string name="settings_updates_history_title">Güncelleme geçmişi</string>
+    <string name="settings_updates_history_body">GitHub sürümlerine, çıkış tarihlerine ve değişiklik günlüklerine göz atın.</string>
+    <string name="settings_updates_history_loading">Sürüm geçmişi yükleniyor</string>
+    <string name="settings_updates_history_empty">Hiçbir sürüm bulunamadı.</string>
+    <string name="settings_updates_history_error">Sürüm geçmişi yüklenemedi</string>
+    <string name="settings_updates_published_label">Yayınlandı</string>
+    <string name="settings_updates_parallel_title">Paralel sürümler</string>
+    <string name="settings_updates_parallel_body">Android, EmuCoreV\'nin birden fazla sürümünü yalnızca bir sürüm EmuCoreV (0.1.1) gibi benzersiz bir paket adı ve uygulama etiketiyle oluşturulmuş özel bir APK içerdiğinde yükleyebilir. Normal eski APK\'lar mevcut uygulamayı değiştirir veya eski sürümüne düşürür.</string>
+    <string name="settings_updates_parallel_install">Ayrı bir uygulama olarak yükle</string>
+    <string name="settings_updates_parallel_install_ready">Ayrı uygulama yükle</string>
+    <string name="settings_updates_parallel_downloading">Ayrı APK indiriliyor %1$d%%</string>
+    <string name="settings_updates_parallel_unavailable">Bu sürüm için ayrı APK mevcut değil.</string>
+    <string name="settings_updates_parallel_package">Ayrı uygulama paketi</string>
+    <string name="settings_updates_parallel_download">İndir</string>
 </resources>

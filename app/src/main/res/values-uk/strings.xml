@@ -813,4 +813,18 @@
     <string name="profile_restore">Відновити</string>
     <string name="profile_empty_title">У профілі поки немає ігор</string>
     <string name="profile_empty_body">Відкрийте каталог, торкніться меню з трьома крапками на грі та додайте її до одного зі списків вашого профілю.</string>
+    <string name="settings_updates_history_title">Історія оновлень</string>
+    <string name="settings_updates_history_body">Переглядайте релізи GitHub, дати випуску та списки змін.</string>
+    <string name="settings_updates_history_loading">Завантаження історії релізів</string>
+    <string name="settings_updates_history_empty">Релізи не знайдено.</string>
+    <string name="settings_updates_history_error">Не вдалося завантажити історію релізів</string>
+    <string name="settings_updates_published_label">Опубліковано</string>
+    <string name="settings_updates_parallel_title">Паралельні версії</string>
+    <string name="settings_updates_parallel_body">Android може встановити кілька версій EmuCoreV лише в тому випадку, якщо реліз містить спеціальний APK, зібраний з унікальним іменем пакета та міткою програми, наприклад EmuCoreV (0.1.1). Звичайні старі APK замінюють або знижують версію поточної програми.</string>
+    <string name="settings_updates_parallel_install">Встановити як окремий додаток</string>
+    <string name="settings_updates_parallel_install_ready">Встановити окремий додаток</string>
+    <string name="settings_updates_parallel_downloading">Завантаження окремого APK %1$d%%</string>
+    <string name="settings_updates_parallel_unavailable">Окремий APK недоступний для цього релізу.</string>
+    <string name="settings_updates_parallel_package">Окремий пакет застосунку</string>
+    <string name="settings_updates_parallel_download">Завантажити</string>
 </resources>

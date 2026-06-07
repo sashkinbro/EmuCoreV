@@ -813,4 +813,18 @@
     <string name="profile_restore">पुनर्स्थापित करें</string>
     <string name="profile_empty_title">अभी तक कोई प्रोफ़ाइल गेम नहीं है</string>
     <string name="profile_empty_body">कैटलॉग खोलें, किसी गेम पर तीन-बिंदु वाले मेनू को टैप करें, और उसे अपनी किसी प्रोफ़ाइल सूची में जोड़ें।</string>
+    <string name="settings_updates_history_title">अपडेट इतिहास</string>
+    <string name="settings_updates_history_body">GitHub रिलीज़, रिलीज़ की तारीख़ें और चैंजलॉग ब्राउज़ करें।</string>
+    <string name="settings_updates_history_loading">रिलीज़ इतिहास लोड हो रहा है</string>
+    <string name="settings_updates_history_empty">कोई रिलीज़ नहीं मिली।</string>
+    <string name="settings_updates_history_error">रिलीज़ इतिहास लोड नहीं किया जा सका</string>
+    <string name="settings_updates_published_label">प्रकाशित</string>
+    <string name="settings_updates_parallel_title">समानांतर संस्करण</string>
+    <string name="settings_updates_parallel_body">Android कई EmuCoreV संस्करणों को केवल तभी इंस्टॉल कर सकता है जब किसी रिलीज़ में एक अद्वितीय पैकेज नाम और ऐप लेबल के साथ बनाया गया एक विशेष APK शामिल हो, जैसे EmuCoreV (0.1.1)। सामान्य पुराने APK वर्तमान ऐप को बदल देते हैं या डाउनग्रेड कर देते हैं।</string>
+    <string name="settings_updates_parallel_install">अलग ऐप के रूप में इंस्टॉल करें</string>
+    <string name="settings_updates_parallel_install_ready">अलग ऐप इंस्टॉल करें</string>
+    <string name="settings_updates_parallel_downloading">अलग APK डाउनलोड हो रहा है %1$d%%</string>
+    <string name="settings_updates_parallel_unavailable">इस रिलीज़ के लिए अलग APK उपलब्ध नहीं है。</string>
+    <string name="settings_updates_parallel_package">अलग ऐप पैकेज</string>
+    <string name="settings_updates_parallel_download">डाउनलोड करें</string>
 </resources>

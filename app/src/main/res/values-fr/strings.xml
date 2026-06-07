@@ -813,4 +813,18 @@
     <string name="profile_restore">Restaurer</string>
     <string name="profile_empty_title">Aucun jeu dans le profil pour le moment</string>
     <string name="profile_empty_body">Ouvrez le catalogue, appuyez sur le menu à trois points d\'un jeu et ajoutez-le à l\'une de vos listes de profil.</string>
+    <string name="settings_updates_history_title">Historique des mises à jour</string>
+    <string name="settings_updates_history_body">Parcourez les versions de GitHub, les dates de publication et les journaux des modifications.</string>
+    <string name="settings_updates_history_loading">Chargement de l\'historique des versions</string>
+    <string name="settings_updates_history_empty">Aucune version n\'a été trouvée.</string>
+    <string name="settings_updates_history_error">Impossible de charger l\'historique des versions</string>
+    <string name="settings_updates_published_label">Publié</string>
+    <string name="settings_updates_parallel_title">Versions parallèles</string>
+    <string name="settings_updates_parallel_body">Android peut installer plusieurs versions d\'EmuCoreV uniquement lorsqu\'une version inclut un APK spécial compilé avec un nom de paquet et une étiquette d\'application uniques, tels que EmuCoreV (0.1.1). Les anciens APK normaux remplacent ou rétrogradent l\'application actuelle.</string>
+    <string name="settings_updates_parallel_install">Installer en tant qu\'application séparée</string>
+    <string name="settings_updates_parallel_install_ready">Installer l\'application séparée</string>
+    <string name="settings_updates_parallel_downloading">Téléchargement de l\'APK séparé %1$d%%</string>
+    <string name="settings_updates_parallel_unavailable">L\'APK séparé n\'est pas disponible pour cette version.</string>
+    <string name="settings_updates_parallel_package">Package d\'application séparé</string>
+    <string name="settings_updates_parallel_download">Télécharger</string>
 </resources>

@@ -813,4 +813,18 @@
     <string name="profile_restore">استعادة</string>
     <string name="profile_empty_title">لا توجد ألعاب في الملف الشخصي بعد</string>
     <string name="profile_empty_body">افتح الكتالوج، وانقر على قائمة النقاط الثلاث في اللعبة، وأضفها إلى إحدى قوائم ملفك الشخصي.</string>
+    <string name="settings_updates_history_title">سجل التحديثات</string>
+    <string name="settings_updates_history_body">تصفح إصدارات GitHub وتواريخ الإصدار وسجلات التغيير.</string>
+    <string name="settings_updates_history_loading">جارٍ تحميل سجل الإصدارات</string>
+    <string name="settings_updates_history_empty">لم يتم العثور على أي إصدارات.</string>
+    <string name="settings_updates_history_error">تعذر تحميل سجل الإصدارات</string>
+    <string name="settings_updates_published_label">تم النشر</string>
+    <string name="settings_updates_parallel_title">الإصدارات المتوازية</string>
+    <string name="settings_updates_parallel_body">يمكن لنظام Android تثبيت إصدارات EmuCoreV متعددة فقط عندما يتضمن الإصدار ملف APK خاصًا مصممًا باسم حزمة فريد وتسمية تطبيق، مثل EmuCoreV (0.1.1). تحل ملفات APK الأقدم العادية محل التطبيق الحالي أو ترجعه لإصدار أقدم.</string>
+    <string name="settings_updates_parallel_install">التثبيت كتطبيق منفصل</string>
+    <string name="settings_updates_parallel_install_ready">تثبيت تطبيق منفصل</string>
+    <string name="settings_updates_parallel_downloading">جارٍ تنزيل ملف APK منفصل %1$d%%</string>
+    <string name="settings_updates_parallel_unavailable">ملف APK المنفصل غير متوفر لهذا الإصدار.</string>
+    <string name="settings_updates_parallel_package">حزمة تطبيق منفصلة</string>
+    <string name="settings_updates_parallel_download">تنزيل</string>
 </resources>

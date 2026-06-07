@@ -37,3 +37,10 @@
 # Keep Kotlin metadata and annotations that Compose / reflection-adjacent code
 # may rely on when stack traces or external libraries inspect them.
 -keepattributes *Annotation*, InnerClasses, Signature, EnclosingMethod
+
+# Apache Commons Compress references optional XZ/Zstd integrations. The app
+# does not bundle those codecs, and R8 only needs to suppress the optional refs.
+-dontwarn com.github.luben.zstd.ZstdInputStream
+-dontwarn org.tukaani.xz.MemoryLimitException
+-dontwarn org.tukaani.xz.SingleXZInputStream
+-dontwarn org.tukaani.xz.XZInputStream

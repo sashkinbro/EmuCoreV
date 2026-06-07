@@ -6,6 +6,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import androidx.core.content.FileProvider
 import com.sbro.emucorev.BuildConfig
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -20,10 +21,14 @@ data class AppUpdateRelease(
     val htmlUrl: String,
     val apkAssetName: String?,
     val apkDownloadUrl: String?,
-    val apkSizeBytes: Long?
+    val apkSizeBytes: Long?,
+    val parallelApkAssetName: String? = null,
+    val parallelApkDownloadUrl: String? = null,
+    val parallelApkSizeBytes: Long? = null
 ) {
     val displayName: String = name.ifBlank { tagName }
     val hasInstallableApk: Boolean = !apkDownloadUrl.isNullOrBlank()
+    val hasParallelApk: Boolean = !parallelApkDownloadUrl.isNullOrBlank()
 }
 
 class AppUpdateRepository(private val context: Context) {
@@ -40,9 +45,49 @@ class AppUpdateRepository(private val context: Context) {
         }
     }
 
+    fun loadReleaseHistory(): List<AppUpdateRelease> {
+        if (!hasNetwork()) return emptyList()
+        val connection = openConnection(RELEASES_URL, "application/vnd.github+json,application/json,*/*")
+        return try {
+            ensureSuccess(connection, "release history")
+            val json = connection.inputStream.bufferedReader().use { it.readText() }
+            parseReleaseList(json)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     fun downloadApk(release: AppUpdateRelease, onProgress: (Float) -> Unit): File {
         val downloadUrl = release.apkDownloadUrl ?: throw IOException("Release does not include an APK asset")
         val target = File(context.getExternalFilesDir("updates"), release.safeApkName())
+        return downloadApkAsset(
+            downloadUrl = downloadUrl,
+            target = target,
+            expectedSizeBytes = release.apkSizeBytes,
+            label = "update APK",
+            onProgress = onProgress
+        )
+    }
+
+    fun downloadParallelApk(release: AppUpdateRelease, onProgress: (Float) -> Unit): File {
+        val downloadUrl = release.parallelApkDownloadUrl ?: throw IOException("Release does not include a parallel APK asset")
+        val target = File(context.getExternalFilesDir("updates"), release.safeParallelApkName())
+        return downloadApkAsset(
+            downloadUrl = downloadUrl,
+            target = target,
+            expectedSizeBytes = release.parallelApkSizeBytes,
+            label = "parallel APK",
+            onProgress = onProgress
+        )
+    }
+
+    private fun downloadApkAsset(
+        downloadUrl: String,
+        target: File,
+        expectedSizeBytes: Long?,
+        label: String,
+        onProgress: (Float) -> Unit
+    ): File {
         target.parentFile?.mkdirs()
         if (target.exists()) {
             target.delete()
@@ -52,8 +97,8 @@ class AppUpdateRepository(private val context: Context) {
             readTimeout = 90_000
         }
         try {
-            ensureSuccess(connection, "update APK")
-            val total = connection.contentLengthLong.takeIf { it > 0L } ?: release.apkSizeBytes ?: -1L
+            ensureSuccess(connection, label)
+            val total = connection.contentLengthLong.takeIf { it > 0L } ?: expectedSizeBytes ?: -1L
             var copied = 0L
             connection.inputStream.use { input ->
                 target.outputStream().use { output ->
@@ -88,19 +133,45 @@ class AppUpdateRepository(private val context: Context) {
 
     private fun parseRelease(json: String): AppUpdateRelease {
         val root = JSONObject(json)
+        return parseRelease(root)
+    }
+
+    private fun parseReleaseList(json: String): List<AppUpdateRelease> {
+        val items = JSONArray(json)
+        return buildList {
+            for (index in 0 until items.length()) {
+                val item = items.optJSONObject(index) ?: continue
+                add(parseRelease(item))
+            }
+        }
+    }
+
+    private fun parseRelease(root: JSONObject): AppUpdateRelease {
         val assets = root.optJSONArray("assets")
         var apkAssetName: String? = null
         var apkDownloadUrl: String? = null
         var apkSizeBytes: Long? = null
+        var parallelApkAssetName: String? = null
+        var parallelApkDownloadUrl: String? = null
+        var parallelApkSizeBytes: Long? = null
         if (assets != null) {
             for (index in 0 until assets.length()) {
                 val asset = assets.getJSONObject(index)
                 val name = asset.optString("name")
                 if (!name.endsWith(".apk", ignoreCase = true)) continue
-                apkAssetName = name
-                apkDownloadUrl = asset.optString("browser_download_url").takeIf { it.isNotBlank() }
-                apkSizeBytes = asset.optLong("size").takeIf { it > 0L }
-                break
+                val downloadUrl = asset.optString("browser_download_url").takeIf { it.isNotBlank() }
+                val sizeBytes = asset.optLong("size").takeIf { it > 0L }
+                if (name.contains("parallel", ignoreCase = true)) {
+                    if (parallelApkDownloadUrl == null) {
+                        parallelApkAssetName = name
+                        parallelApkDownloadUrl = downloadUrl
+                        parallelApkSizeBytes = sizeBytes
+                    }
+                } else if (apkDownloadUrl == null) {
+                    apkAssetName = name
+                    apkDownloadUrl = downloadUrl
+                    apkSizeBytes = sizeBytes
+                }
             }
         }
         return AppUpdateRelease(
@@ -111,12 +182,20 @@ class AppUpdateRepository(private val context: Context) {
             htmlUrl = root.optString("html_url"),
             apkAssetName = apkAssetName,
             apkDownloadUrl = apkDownloadUrl,
-            apkSizeBytes = apkSizeBytes
+            apkSizeBytes = apkSizeBytes,
+            parallelApkAssetName = parallelApkAssetName,
+            parallelApkDownloadUrl = parallelApkDownloadUrl,
+            parallelApkSizeBytes = parallelApkSizeBytes
         )
     }
 
     private fun AppUpdateRelease.safeApkName(): String {
         val rawName = apkAssetName?.ifBlank { null } ?: "EmuCoreV-${tagName.ifBlank { "update" }}.apk"
+        return rawName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+    }
+
+    private fun AppUpdateRelease.safeParallelApkName(): String {
+        val rawName = parallelApkAssetName?.ifBlank { null } ?: "EmuCoreV-${tagName.ifBlank { "parallel" }}-parallel.apk"
         return rawName.replace(Regex("[^A-Za-z0-9._-]"), "_")
     }
 
@@ -178,5 +257,6 @@ class AppUpdateRepository(private val context: Context) {
 
     companion object {
         private const val LATEST_RELEASE_URL = "https://api.github.com/repos/sashkinbro/EmuCoreV/releases/latest"
+        private const val RELEASES_URL = "https://api.github.com/repos/sashkinbro/EmuCoreV/releases?per_page=100"
     }
 }
