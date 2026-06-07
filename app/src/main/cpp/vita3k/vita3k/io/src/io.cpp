@@ -287,7 +287,7 @@ std::string translate_path(const char *path, VitaIoDevice &device, const IOState
         return std::string{};
     }
     default: {
-        LOG_CRITICAL_IF(relative_path.find(':') != std::string::npos, "Unknown device with path {} used. Report this to the developers!", relative_path);
+        LOG_CRITICAL_IF(relative_path.contains(':'), "Unknown device with path {} used. Report this to the developers!", relative_path);
         return std::string{};
     }
     }
@@ -584,7 +584,8 @@ int stat_file(IOState &io, const char *file, SceIoStat *statp, const fs::path &p
 #undef st_ctime
 #endif
 
-    statp->st_mode = SCE_S_IRUSR | SCE_S_IRGRP | SCE_S_IROTH | SCE_S_IXUSR | SCE_S_IXGRP | SCE_S_IXOTH;
+    // report regular files as readable but not executable
+    statp->st_mode = SCE_S_IRUSR | SCE_S_IRGRP | SCE_S_IROTH;
 
     if (fs::is_regular_file(file_path)) {
         statp->st_size = fs::file_size(file_path);
@@ -593,7 +594,7 @@ int stat_file(IOState &io, const char *file, SceIoStat *statp, const fs::path &p
     }
     if (fs::is_directory(file_path)) {
         statp->st_attr = SCE_SO_IFDIR;
-        statp->st_mode |= SCE_S_IFDIR;
+        statp->st_mode |= SCE_S_IFDIR | SCE_S_IXUSR | SCE_S_IXGRP | SCE_S_IXOTH;
     }
 
     __RtcTicksToPspTime(&statp->st_atime, last_access_time_ticks);
@@ -781,34 +782,11 @@ SceUID read_dir(IOState &io, const SceUID fd, SceIoDirent *dent, const fs::path 
     return IO_ERROR(SCE_ERROR_ERRNO_EBADFD);
 }
 
-bool copy_directories(const fs::path &src_path, const fs::path &dst_path) {
-    try {
-        fs::create_directories(dst_path);
-
-        for (const auto &src : fs::recursive_directory_iterator(src_path)) {
-            const auto dst_parent_path = dst_path / fs::relative(src, src_path).parent_path();
-            const auto dst_path = dst_parent_path / src.path().filename();
-
-            LOG_INFO("Copy {}", dst_path);
-
-            if (fs::is_regular_file(src))
-                fs::copy_file(src, dst_path, fs::copy_options::overwrite_existing);
-            else
-                fs::create_directories(dst_path);
-        }
-
-        return true;
-    } catch (std::exception &e) {
-        std::cout << e.what();
-        return false;
-    }
-}
-
 bool copy_path(const fs::path &src_path, const fs::path &pref_path, const std::string &app_title_id, const std::string &app_category) {
     // Check if is path
-    if (app_category.find("gp") != std::string::npos) {
+    if (app_category.contains("gp")) {
         const auto app_path{ pref_path / "ux0/app" / app_title_id };
-        const auto result = copy_directories(src_path, app_path);
+        const auto result = fs_utils::copy_directory_contents(src_path, app_path);
 
         fs::remove_all(src_path);
 

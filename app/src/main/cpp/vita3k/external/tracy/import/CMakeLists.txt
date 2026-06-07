@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.16)
 
 option(NO_ISA_EXTENSIONS "Disable ISA extensions (don't pass -march=native or -mcpu=native to the compiler)" OFF)
 option(NO_STATISTICS "Disable calculation of statistics" ON)
-option(NO_PARALLEL_STL "Disable parallel STL" OFF)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../cmake/version.cmake)
 
@@ -21,7 +20,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/../cmake/server.cmake)
 add_executable(tracy-import-chrome
     src/import-chrome.cpp
 )
-target_link_libraries(tracy-import-chrome PRIVATE TracyServer)
+target_link_libraries(tracy-import-chrome PRIVATE TracyServer nlohmann_json::nlohmann_json)
 
 add_executable(tracy-import-fuchsia
     src/import-fuchsia.cpp

@@ -747,4 +747,15 @@
     <string name="settings_storage_migration_body">Mantenha o EmuCoreV aberto enquanto o firmware, jogos, saves, troféus, cache e configurações são copiados para o armazenamento selecionado.</string>
     <string name="settings_storage_migration_count">%1$d/%2$d arquivos verificados</string>
     <string name="settings_storage_migration_failed">Não foi possível mover o armazenamento</string>
+    <string name="install_dialog_content_try_repair">Se esta for uma imagem VPK ou ZIP válida, tente "Reparar e instalar" na caixa de diálogo de instalação do jogo.</string>
+    <string name="install_dialog_archive_unreadable">O arquivo não pôde ser lido. Pode estar danificado ou incompleto.</string>
+    <string name="install_dialog_archive_missing_metadata">O arquivo não contém metadados de instalação do Vita, como `sce_sys/param.sfo` ou `theme.xml`.</string>
+    <string name="install_dialog_repack_preparing">Preparando um arquivo ZIP compatível…</string>
+    <string name="install_dialog_repack_entry">Reempacotando: %1$s</string>
+    <string name="install_dialog_repack_installing">Instalando o ZIP reconstruído…</string>
+    <string name="install_dialog_repack_failed">O reparo do arquivo não produziu um ZIP instalável. Tente outro dump ou instale o PKG e a licença correspondentes.</string>
+    <string name="install_dialog_vitamin_repair_failed">Este Vitamin VPK foi reconstruído, mas ainda não pode ser instalado pelo Vita3K. Tente um dump NoNpDrm ou instale o PKG e a licença correspondentes.</string>
+    <string name="setup_content_repair_button">Reparar e instalar VPK/ZIP</string>
+    <string name="setup_content_repair_note">O reparo converte o VPK ou ZIP selecionado em um novo ZIP no cache de instalação, normaliza o empacotamento do arquivo e remove o marcador de instalação Vitamin não suportado quando presente. Use-o apenas quando uma instalação normal falhar para um arquivo válido.</string>
+    <string name="install_choice_archive_repair_button">Reparar e instalar</string>
 </resources>

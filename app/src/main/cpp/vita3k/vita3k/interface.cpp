@@ -44,6 +44,7 @@
 #include <util/log.h>
 #include <util/string_utils.h>
 #include <util/vector_utils.h>
+#include <util/vita_theme_utils.h>
 
 #include <gdbstub/functions.h>
 #include <stb_image_write.h>
@@ -51,6 +52,8 @@
 #if USE_DISCORD
 #include <app/discord.h>
 #endif
+
+#include "patch/patch.h"
 
 #include <memory>
 #include <regex>
@@ -74,6 +77,18 @@ static size_t write_to_buffer(void *pOpaque, mz_uint64 file_ofs, const void *pBu
 
 static const char *miniz_get_error(const ZipPtr &zip) {
     return mz_zip_get_error_string(mz_zip_get_last_error(zip.get()));
+}
+
+static std::string fallback_theme_root_name(const std::string &content_path) {
+    std::string trimmed = content_path;
+    while (!trimmed.empty() && ((trimmed.back() == '/') || (trimmed.back() == '\\')))
+        trimmed.pop_back();
+
+    if (trimmed.empty())
+        return {};
+
+    const auto separator = trimmed.find_last_of("/\\");
+    return (separator == std::string::npos) ? trimmed : trimmed.substr(separator + 1);
 }
 
 static bool is_nonpdrm(EmuEnvState &emuenv, const fs::path &output_path) {
@@ -105,7 +120,7 @@ static bool set_content_path(EmuEnvState &emuenv, const bool is_theme, fs::path 
             dest_path /= fs::path("addcont") / emuenv.app_info.app_title_id / emuenv.app_info.app_content_id;
             emuenv.app_info.app_title += " (DLC)";
         }
-    } else if (emuenv.app_info.app_category.find("gp") != std::string::npos) {
+    } else if (emuenv.app_info.app_category.contains("gp")) {
         if (!fs::exists(app_path) || fs::is_empty(app_path)) {
             LOG_ERROR("Install app before patch");
             return false;
@@ -120,18 +135,32 @@ static bool set_content_path(EmuEnvState &emuenv, const bool is_theme, fs::path 
     return true;
 }
 
-static void set_theme_name(EmuEnvState &emuenv, const vfs::FileBuffer &buffer) {
+static void set_theme_name(EmuEnvState &emuenv, const vfs::FileBuffer &buffer, const std::string &fallback_id_hint = {}) {
+    std::string content_id;
+    std::string title;
+
     pugi::xml_document doc;
     if (doc.load_buffer(buffer.data(), buffer.size())) {
         const auto info = doc.child("theme").child("InfomationProperty");
-        const char *content_id = info.child("m_contentId").text().as_string();
-        const char *title = info.child("m_title").child("m_default").text().as_string();
-        if (content_id[0] != '\0') {
-            emuenv.app_info.app_content_id = content_id;
-            emuenv.app_info.app_title_id = content_id;
-        }
-        if (title[0] != '\0')
-            emuenv.app_info.app_title = title;
+        content_id = info.child("m_contentId").text().as_string();
+        title = info.child("m_title").child("m_default").text().as_string();
+    } else {
+        LOG_WARN("Unable to parse theme.xml metadata during install, falling back to folder/title-derived theme identity");
+    }
+
+    const std::string resolved_id = vita_theme_utils::resolve_theme_id(
+        content_id,
+        fallback_id_hint,
+        title,
+        buffer.empty() ? nullptr : buffer.data(),
+        buffer.size());
+    emuenv.app_info.app_content_id = resolved_id;
+    emuenv.app_info.app_title_id = resolved_id;
+
+    if (!title.empty()) {
+        emuenv.app_info.app_title = title;
+    } else if (emuenv.app_info.app_title.empty()) {
+        emuenv.app_info.app_title = resolved_id;
     }
 }
 
@@ -141,6 +170,7 @@ static bool install_archive_content(EmuEnvState &emuenv, const ZipPtr &zip, cons
     vfs::FileBuffer buffer, theme;
 
     const auto is_theme = mz_zip_reader_extract_file_to_callback(zip.get(), (content_path + theme_path).c_str(), &write_to_buffer, &theme, 0);
+    const std::string theme_root_name = fallback_theme_root_name(content_path);
 
     auto output_path{ emuenv.pref_path / "ux0" };
     if (mz_zip_reader_extract_file_to_callback(zip.get(), (content_path + sfo_path).c_str(), &write_to_buffer, &buffer, 0)) {
@@ -148,7 +178,7 @@ static bool install_archive_content(EmuEnvState &emuenv, const ZipPtr &zip, cons
         if (!set_content_path(emuenv, is_theme, output_path))
             return false;
     } else if (is_theme) {
-        set_theme_name(emuenv, theme);
+        set_theme_name(emuenv, theme, theme_root_name);
         output_path /= fs::path("theme") / emuenv.app_info.app_content_id;
     } else {
         LOG_CRITICAL("miniz error: {} extracting file: {}", miniz_get_error(zip), sfo_path);
@@ -181,7 +211,7 @@ static bool install_archive_content(EmuEnvState &emuenv, const ZipPtr &zip, cons
             continue;
         }
         const std::string m_filename = file_stat.m_filename;
-        if (m_filename.find(content_path) != std::string::npos) {
+        if (m_filename.contains(content_path)) {
             file_progress = static_cast<float>(i) / num_files * 100.0f;
             update_progress();
 
@@ -226,7 +256,7 @@ static std::vector<std::string> get_archive_contents_path(const ZipPtr &zip) {
             continue;
 
         std::string m_filename = std::string(file_stat.m_filename);
-        if (m_filename.find("sce_module/steroid.suprx") != std::string::npos) {
+        if (m_filename.contains("sce_module/steroid.suprx")) {
             LOG_CRITICAL("A Vitamin dump was detected, aborting installation...");
 #ifdef __ANDROID__
             // SDL_ShowAndroidToast("Vitamin dumps are not supported!", 1, -1, 0, 0);
@@ -235,9 +265,9 @@ static std::vector<std::string> get_archive_contents_path(const ZipPtr &zip) {
             break;
         }
 
-        const auto is_content = (m_filename.find(sfo_path) != std::string::npos) || (m_filename.find(theme_path) != std::string::npos);
+        const auto is_content = m_filename.contains(sfo_path) || m_filename.contains(theme_path);
         if (is_content) {
-            const auto content_type = (m_filename.find(sfo_path) != std::string::npos) ? sfo_path : theme_path;
+            const auto content_type = m_filename.contains(sfo_path) ? sfo_path : theme_path;
             m_filename.erase(m_filename.find(content_type));
             vector_utils::push_if_not_exists(content_path, m_filename);
         }
@@ -321,14 +351,14 @@ static bool install_content(EmuEnvState &emuenv, const fs::path &content_path) {
             fs::remove_all(dst_path);
 
     } else if (fs_utils::read_data(theme_path, buffer)) {
-        set_theme_name(emuenv, buffer);
+        set_theme_name(emuenv, buffer, fs_utils::path_to_utf8(content_path.filename()));
         dst_path /= fs::path("theme") / fs_utils::utf8_to_path(emuenv.app_info.app_title_id);
     } else {
         LOG_ERROR("Param.sfo file is missing in path", sfo_path);
         return false;
     }
 
-    if (!copy_directories(content_path, dst_path)) {
+    if (!fs_utils::copy_directory_contents(content_path, dst_path)) {
         LOG_ERROR("Failed to copy directory to: {}", dst_path);
         return false;
     }
@@ -360,6 +390,23 @@ uint32_t install_contents(EmuEnvState &emuenv, const fs::path &path) {
     }
 
     return installed;
+}
+
+static void do_patches(MemState &mem, const Patches &patches, const SceKernelModuleInfo &sceKernelModuleInfo) {
+    for (const auto &patch : patches) {
+        if (patch.seg < MODULE_INFO_NUM_SEGMENTS) {
+            auto &seg = sceKernelModuleInfo.segments[patch.seg];
+            auto seg_ptr = seg.vaddr.cast<uint8_t>();
+            if (seg_ptr) {
+                LOG_INFO("Patching segment {} at offset 0x{:X} with {} values", patch.seg, patch.offset, patch.values.size());
+                if (patch.offset + patch.values.size() <= seg.memsz) {
+                    memcpy(seg_ptr.get(mem) + patch.offset, patch.values.data(), patch.values.size());
+                } else {
+                    LOG_ERROR("Patch out of bounds for segment {} at offset 0x{:X}", patch.seg, patch.offset);
+                }
+            }
+        }
+    }
 }
 
 static ExitCode load_app_impl(SceUID &main_module_id, EmuEnvState &emuenv, const AppLaunchRequest &launch_request) {
@@ -427,14 +474,19 @@ static ExitCode load_app_impl(SceUID &main_module_id, EmuEnvState &emuenv, const
     } else {
         emuenv.self_path = !emuenv.cfg.self_path.empty() ? emuenv.cfg.self_path : EBOOT_PATH;
     }
+
     main_module_id = load_module(emuenv, "app0:" + emuenv.self_path);
+
     if (main_module_id >= 0) {
         const auto module = emuenv.kernel.loaded_modules[main_module_id];
         LOG_INFO("Main executable {} ({}) loaded", module->info.module_name, emuenv.self_path);
+        const Patches patches = get_patches(emuenv.patch_path, emuenv.io.title_id, "app0:" + emuenv.self_path);
+        if (!patches.empty())
+            do_patches(emuenv.mem, patches, module->info);
     } else
         return FileNotFound;
     // Set self name from self path, can contain folder, get file name only
-    emuenv.self_name = fs::path(emuenv.self_path).filename().string();
+    emuenv.self_name = fs_utils::path_to_utf8(fs::path(emuenv.self_path).filename());
 
     // get list of preload modules
     SceUInt32 process_preload_disabled = 0;
@@ -463,6 +515,8 @@ static ExitCode load_app_impl(SceUID &main_module_id, EmuEnvState &emuenv, const
                 emuenv.kernel.loaded_sysmodules[module_id] = {};
         }
     };
+    lib_load_list.emplace_back("os0:kd/bootimage.skprx");
+    lib_load_list.emplace_back("os0:kd/sysmodule.skprx");
     add_preload_module(0x00010000, SCE_SYSMODULE_INVALID, "libc", true);
     add_preload_module(0x00020000, SCE_SYSMODULE_DBG, "libdbg", false);
     add_preload_module(0x00080000, SCE_SYSMODULE_INVALID, "libshellsvc", false);

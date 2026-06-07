@@ -2,10 +2,12 @@ package com.sbro.emucorev.core
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.jakewharton.processphoenix.ProcessPhoenix
 import com.sbro.emucorev.core.vita.Emulator
 
 object VitaLaunchBridge {
+    private const val TAG = "VitaLaunchBridge"
     private const val APP_RESTART_PARAMETERS = "AppStartParameters"
     private const val ACTION_INSTALL_FIRMWARE = "INSTALL_FIRMWARE"
     private const val ACTION_INSTALL_CONTENT = "INSTALL_CONTENT"
@@ -47,6 +49,7 @@ object VitaLaunchBridge {
 
     private fun launchWithArgs(context: Context, action: String, args: Array<String>): Boolean {
         return runCatching {
+            Log.i(TAG, "Launching emulator action=$action args=${args.joinToString(" ")}")
             EmulatorStorage.prepareRuntime(context)
             NativeLibraryLoader.ensureLoaded(context)
             VitaCoreConfigRepository(context).ensureDefaultsPersisted()
@@ -57,11 +60,14 @@ object VitaLaunchBridge {
                 this.action = "${action}_${System.currentTimeMillis()}"
             }
             context.startActivity(intent)
+        }.onFailure { error ->
+            Log.e(TAG, "Failed to launch emulator action=$action args=${args.joinToString(" ")}", error)
         }.isSuccess
     }
 
     private fun runWithArgs(context: Context, action: String, args: Array<String>): Boolean {
         return runCatching {
+            Log.i(TAG, "Restarting emulator action=$action args=${args.joinToString(" ")}")
             EmulatorStorage.prepareRuntime(context)
             NativeLibraryLoader.ensureLoaded(context)
             VitaCoreConfigRepository(context).ensureDefaultsPersisted()
@@ -72,6 +78,8 @@ object VitaLaunchBridge {
                 this.action = "${action}_${System.currentTimeMillis()}"
             }
             ProcessPhoenix.triggerRebirth(context.applicationContext, intent)
+        }.onFailure { error ->
+            Log.e(TAG, "Failed to restart emulator action=$action args=${args.joinToString(" ")}", error)
         }.isSuccess
     }
 }

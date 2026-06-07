@@ -747,4 +747,15 @@
     <string name="settings_storage_migration_body">Mantén EmuCoreV abierto mientras el firmware, los juegos, las partidas guardadas, los trofeos, el caché y los ajustes se copian en el almacenamiento seleccionado.</string>
     <string name="settings_storage_migration_count">%1$d/%2$d archivos comprobados</string>
     <string name="settings_storage_migration_failed">No se pudo mover el almacenamiento</string>
+    <string name="install_dialog_content_try_repair">Si esta es una imagen VPK o ZIP válida, intenta "Reparar e instalar" desde el diálogo de instalación del juego.</string>
+    <string name="install_dialog_archive_unreadable">No se pudo leer el archivo. Puede estar dañado o incompleto.</string>
+    <string name="install_dialog_archive_missing_metadata">El archivo no contiene metadatos de instalación de Vita como `sce_sys/param.sfo` o `theme.xml`.</string>
+    <string name="install_dialog_repack_preparing">Preparando un archivo ZIP compatible…</string>
+    <string name="install_dialog_repack_entry">Reempaquetando: %1$s</string>
+    <string name="install_dialog_repack_installing">Instalando el ZIP reconstruido…</string>
+    <string name="install_dialog_repack_failed">La reparación del archivo no produjo un ZIP instalable. Prueba con otro dump, o instala el PKG coincidente y la licencia.</string>
+    <string name="install_dialog_vitamin_repair_failed">Este VPK de Vitamin fue reconstruido, pero aún no es instalable por Vita3K. Prueba con un dump NoNpDrm o instala el PKG coincidente y la licencia.</string>
+    <string name="setup_content_repair_button">Reparar e instalar VPK/ZIP</string>
+    <string name="setup_content_repair_note">La reparación convierte el VPK o ZIP seleccionado en un nuevo ZIP en la caché de instalación, normaliza el empaquetado del archivo y elimina el marcador de instalación de Vitamin no compatible cuando está presente. Úsalo solo cuando falla una instalación normal para un archivo válido.</string>
+    <string name="install_choice_archive_repair_button">Reparar e instalar</string>
 </resources>

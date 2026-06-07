@@ -34,7 +34,7 @@ static SysmodulePaths init_sysmodule_paths() {
     p[SCE_SYSMODULE_HTTPS] = { "libhttp", "libssl" };
     p[SCE_SYSMODULE_PERF] = { "libperf" };
     p[SCE_SYSMODULE_FIBER] = { "libfiber" };
-    p[SCE_SYSMODULE_ULT] = { "libult" };
+    p[SCE_SYSMODULE_ULT] = { "libfiber", "libult" };
     p[SCE_SYSMODULE_DBG] = { "librazorcapture_es4", "librazorhud_es4" };
     p[SCE_SYSMODULE_RAZOR_CAPTURE] = { "librazorcapture_es4" };
     p[SCE_SYSMODULE_RAZOR_HUD] = { "librazorhud_es4" };
@@ -143,6 +143,7 @@ static constexpr auto auto_lle_modules = {
     SCE_SYSMODULE_HTTP,
     SCE_SYSMODULE_SSL,
     SCE_SYSMODULE_HTTPS,
+    SCE_SYSMODULE_FIBER,
     SCE_SYSMODULE_ULT,
     SCE_SYSMODULE_SAS,
     SCE_SYSMODULE_PGF,
@@ -168,13 +169,13 @@ bool is_lle_module(SceSysmoduleModuleId module_id, EmuEnvState &emuenv) {
 
     if (have_paths) {
         if (emuenv.cfg.current_config.modules_mode != ModulesMode::MANUAL) {
-            if (vector_utils::contains(auto_lle_modules, module_id))
+            if (std::ranges::contains(auto_lle_modules, module_id))
                 return true;
         }
 
         if (emuenv.cfg.current_config.modules_mode != ModulesMode::AUTOMATIC) {
             for (auto path : paths) {
-                if (vector_utils::contains(emuenv.cfg.current_config.lle_modules, path))
+                if (std::ranges::contains(emuenv.cfg.current_config.lle_modules, path))
                     return true;
             }
         }
@@ -198,11 +199,11 @@ bool is_lle_module(const std::string &module_name, EmuEnvState &emuenv) {
     if (auto_lle_module_names.empty())
         auto_lle_module_names = init_auto_lle_module_names();
     if (emuenv.cfg.current_config.modules_mode != ModulesMode::AUTOMATIC) {
-        if (vector_utils::contains(emuenv.cfg.current_config.lle_modules, module_name))
+        if (std::ranges::contains(emuenv.cfg.current_config.lle_modules, module_name))
             return true;
     }
     if (emuenv.cfg.current_config.modules_mode != ModulesMode::MANUAL) {
-        if (vector_utils::contains(auto_lle_module_names, module_name))
+        if (std::ranges::contains(auto_lle_module_names, module_name))
             return true;
     }
     return false;

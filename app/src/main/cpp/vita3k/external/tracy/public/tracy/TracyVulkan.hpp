@@ -16,6 +16,7 @@
 #define TracyVkZoneC(c,x,y,z)
 #define TracyVkZoneTransient(c,x,y,z,w)
 #define TracyVkCollect(c,x)
+#define TracyVkCollectHost(c)
 
 #define TracyVkNamedZoneS(c,x,y,z,w,a)
 #define TracyVkNamedZoneCS(c,x,y,z,w,v,a)
@@ -256,7 +257,9 @@ public:
 #ifdef TRACY_ON_DEMAND
         if( !GetProfiler().IsConnected() )
         {
-            VK_FUNCTION_WRAPPER( vkCmdResetQueryPool( cmdbuf, m_query, 0, m_queryCount ) );
+            cmdbuf ?
+                VK_FUNCTION_WRAPPER( vkCmdResetQueryPool( cmdbuf, m_query, 0, m_queryCount ) ) :
+                VK_FUNCTION_WRAPPER( vkResetQueryPool( m_device, m_query, 0, m_queryCount ) );
             m_tail = head;
             m_oldCnt = 0;
             int64_t tgpu;
@@ -265,7 +268,7 @@ public:
         }
 #endif
         assert( head > m_tail );
-        
+
         const unsigned int wrappedTail = (unsigned int)( m_tail % m_queryCount );
 
         unsigned int cnt;
@@ -325,7 +328,9 @@ public:
             }
         }
 
-        VK_FUNCTION_WRAPPER( vkCmdResetQueryPool( cmdbuf, m_query, wrappedTail, cnt ) );
+        cmdbuf ?
+            VK_FUNCTION_WRAPPER( vkCmdResetQueryPool( cmdbuf, m_query, wrappedTail, cnt ) ) :
+            VK_FUNCTION_WRAPPER( vkResetQueryPool( m_device, m_query, wrappedTail, cnt ) );
 
         m_tail += cnt;
     }
@@ -531,7 +536,7 @@ public:
         Profiler::QueueSerialFinish();
     }
 
-    tracy_force_inline VkCtxScope( VkCtx* ctx, const SourceLocationData* srcloc, VkCommandBuffer cmdbuf, int depth, bool is_active )
+    tracy_force_inline VkCtxScope( VkCtx* ctx, const SourceLocationData* srcloc, VkCommandBuffer cmdbuf, int32_t depth, bool is_active )
 #ifdef TRACY_ON_DEMAND
         : m_active( is_active && GetProfiler().IsConnected() )
 #else
@@ -545,8 +550,17 @@ public:
         const auto queryId = ctx->NextQueryId();
         CONTEXT_VK_FUNCTION_WRAPPER( vkCmdWriteTimestamp( cmdbuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, ctx->m_query, queryId ) );
 
-        auto item = Profiler::QueueSerialCallstack( Callstack( depth ) );
-        MemWrite( &item->hdr.type, QueueType::GpuZoneBeginCallstackSerial );
+        QueueItem *item;
+        if( depth > 0 && has_callstack() )
+        {
+            item = Profiler::QueueSerialCallstack( Callstack( depth ) );
+            MemWrite( &item->hdr.type, QueueType::GpuZoneBeginCallstackSerial );
+        }
+        else
+        {
+            item = Profiler::QueueSerial();
+            MemWrite( &item->hdr.type, QueueType::GpuZoneBeginSerial );
+        }
         MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneBegin.srcloc, (uint64_t)srcloc );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
@@ -580,7 +594,7 @@ public:
         Profiler::QueueSerialFinish();
     }
 
-    tracy_force_inline VkCtxScope( VkCtx* ctx, uint32_t line, const char* source, size_t sourceSz, const char* function, size_t functionSz, const char* name, size_t nameSz, VkCommandBuffer cmdbuf, int depth, bool is_active )
+    tracy_force_inline VkCtxScope( VkCtx* ctx, uint32_t line, const char* source, size_t sourceSz, const char* function, size_t functionSz, const char* name, size_t nameSz, VkCommandBuffer cmdbuf, int32_t depth, bool is_active )
 #ifdef TRACY_ON_DEMAND
         : m_active( is_active && GetProfiler().IsConnected() )
 #else
@@ -595,8 +609,17 @@ public:
         CONTEXT_VK_FUNCTION_WRAPPER( vkCmdWriteTimestamp( cmdbuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, ctx->m_query, queryId ) );
 
         const auto srcloc = Profiler::AllocSourceLocation( line, source, sourceSz, function, functionSz, name, nameSz );
-        auto item = Profiler::QueueSerialCallstack( Callstack( depth ) );
-        MemWrite( &item->hdr.type, QueueType::GpuZoneBeginAllocSrcLocCallstackSerial );
+        QueueItem *item;
+        if( depth > 0 && has_callstack() )
+        {
+            item = Profiler::QueueSerialCallstack( Callstack( depth ) );
+            MemWrite( &item->hdr.type, QueueType::GpuZoneBeginAllocSrcLocCallstackSerial );
+        }
+        else
+        {
+            item = Profiler::QueueSerial();
+            MemWrite( &item->hdr.type, QueueType::GpuZoneBeginAllocSrcLocSerial );
+        }
         MemWrite( &item->gpuZoneBegin.cpuTime, Profiler::GetTime() );
         MemWrite( &item->gpuZoneBegin.srcloc, srcloc );
         MemWrite( &item->gpuZoneBegin.thread, GetThreadHandle() );
@@ -703,6 +726,7 @@ using TracyVkCtx = tracy::VkCtx*;
 #  define TracyVkZoneTransient( ctx, varname, cmdbuf, name, active ) tracy::VkCtxScope varname( ctx, TracyLine, TracyFile, strlen( TracyFile ), TracyFunction, strlen( TracyFunction ), name, strlen( name ), cmdbuf, active );
 #endif
 #define TracyVkCollect( ctx, cmdbuf ) ctx->Collect( cmdbuf );
+#define TracyVkCollectHost( ctx ) ctx->Collect( VK_NULL_HANDLE );
 
 #ifdef TRACY_HAS_CALLSTACK
 #  define TracyVkNamedZoneS( ctx, varname, cmdbuf, name, depth, active ) static constexpr tracy::SourceLocationData TracyConcat(__tracy_gpu_source_location,TracyLine) { name, TracyFunction,  TracyFile, (uint32_t)TracyLine, 0 }; tracy::VkCtxScope varname( ctx, &TracyConcat(__tracy_gpu_source_location,TracyLine), cmdbuf, depth, active );

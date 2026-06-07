@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Memory
@@ -62,6 +63,7 @@ fun SetupScreen(
     onBackClick: () -> Unit,
     onInstallFirmware: () -> Unit,
     onInstallContent: () -> Unit,
+    onRepairContent: () -> Unit,
     onInstallLicense: () -> Unit,
     onInstallPkg: (String) -> Unit
 ) {
@@ -119,12 +121,15 @@ fun SetupScreen(
             onClick = onInstallFirmware
         )
 
-        SetupActionCard(
+        SetupContentActionCard(
             icon = Icons.Rounded.Inventory2,
             title = stringResource(R.string.setup_content_title),
             body = stringResource(R.string.setup_content_body),
             buttonLabel = stringResource(R.string.setup_content_button),
-            onClick = onInstallContent
+            repairButtonLabel = stringResource(R.string.setup_content_repair_button),
+            repairNote = stringResource(R.string.setup_content_repair_note),
+            onClick = onInstallContent,
+            onRepairClick = onRepairContent
         )
 
         SectionCard(title = stringResource(R.string.setup_pkg_title)) {
@@ -248,6 +253,45 @@ private fun SetupActionCard(
             ) {
                 Text(buttonLabel)
             }
+        }
+    }
+}
+
+@Composable
+private fun SetupContentActionCard(
+    icon: ImageVector,
+    title: String,
+    body: String,
+    buttonLabel: String,
+    repairButtonLabel: String,
+    repairNote: String,
+    onClick: () -> Unit,
+    onRepairClick: () -> Unit
+) {
+    SectionCard(title = title) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            SetupInfoRow(icon = icon, text = body)
+            Button(
+                onClick = onClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(buttonLabel)
+            }
+            FilledTonalButton(
+                onClick = onRepairClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Rounded.Build, contentDescription = null)
+                Text(
+                    text = repairButtonLabel,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            Text(
+                text = repairNote,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

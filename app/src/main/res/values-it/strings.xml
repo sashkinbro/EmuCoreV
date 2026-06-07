@@ -747,4 +747,15 @@
     <string name="settings_storage_migration_body">Tieni aperto EmuCoreV mentre il firmware, i giochi, i salvataggi, i trofei, la cache e le impostazioni vengono copiati nella memoria selezionata.</string>
     <string name="settings_storage_migration_count">%1$d/%2$d file controllati</string>
     <string name="settings_storage_migration_failed">Impossibile spostare la memoria</string>
+    <string name="install_dialog_content_try_repair">Se questa è un\'immagine VPK o ZIP valida, prova "Ripara e installa" dalla finestra di installazione del gioco.</string>
+    <string name="install_dialog_archive_unreadable">L\'archivio non può essere letto. Potrebbe essere danneggiato o incompleto.</string>
+    <string name="install_dialog_archive_missing_metadata">L\'archivio non contiene i metadati di installazione di Vita come `sce_sys/param.sfo` o `theme.xml`.</string>
+    <string name="install_dialog_repack_preparing">Preparazione di un archivio ZIP compatibile…</string>
+    <string name="install_dialog_repack_entry">Ri-creazione archivio: %1$s</string>
+    <string name="install_dialog_repack_installing">Installazione dello ZIP ricostruito…</string>
+    <string name="install_dialog_repack_failed">La riparazione dell\'archivio non ha prodotto uno ZIP installable. Prova un altro dump o installa il PKG e la licenza corrispondenti.</string>
+    <string name="install_dialog_vitamin_repair_failed">Questo VPK Vitamin è stato ricostruito, ma non è ancora installabile da Vita3K. Prova un dump NoNpDrm o installa il PKG e la licenza corrispondenti.</string>
+    <string name="setup_content_repair_button">Ripara e installa VPK/ZIP</string>
+    <string name="setup_content_repair_note">La riparazione converte il VPK o ZIP selezionato in un nuovo ZIP nella cache di installazione, normalizza la compressione dell\'archivio e rimuove l\'indicatore di installazione Vitamin non supportato, se presente. Usalo solo quando l\'installazione normale di un archivio valido fallisce.</string>
+    <string name="install_choice_archive_repair_button">Ripara e installa</string>
 </resources>

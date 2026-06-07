@@ -1,13 +1,17 @@
 package com.sbro.emucorev.ui.setup
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.DocumentPathResolver
+import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.InstallStateBus
 import com.sbro.emucorev.core.NativeInstallProgress
+import com.sbro.emucorev.core.VitaArchiveInspection
 import com.sbro.emucorev.core.VitaArchiveInspector
+import com.sbro.emucorev.core.VitaArchiveRepacker
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.VitaInstallBridge
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +53,8 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
     private val configRepository = VitaCoreConfigRepository(appContext)
     private val _uiState = MutableStateFlow(SetupInstallUiState())
     val uiState: StateFlow<SetupInstallUiState> = _uiState.asStateFlow()
+    private var nativeProgressOffset = 0f
+    private var nativeProgressScale = 1f
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -80,18 +86,60 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun installContent(uriString: String) {
+    fun installContent(uriString: String, repairArchive: Boolean = false) {
         runInstall(InstallOperation.Content) {
             val path = DocumentPathResolver.resolveFilePath(appContext, uriString, copyToCache = true)
             if (path == null) {
                 finishError(appContext.getString(R.string.install_dialog_content_failed))
                 return@runInstall
             }
-            if (VitaArchiveInspector.isVitaminDump(path)) {
+            val inspection = VitaArchiveInspector.inspect(path)
+            Log.i(
+                TAG,
+                "Content install selected repair=$repairArchive path=$path readable=${inspection.readable} " +
+                    "metadata=${inspection.hasInstallMetadata} vitamin=${inspection.vitaminDump} " +
+                    "unsupported=${inspection.unsupportedCompressionEntries}"
+            )
+            if (inspection.vitaminDump && !repairArchive) {
                 finishError(appContext.getString(R.string.install_dialog_vitamin_unsupported))
                 return@runInstall
             }
-            val installedCount = VitaInstallBridge.installContent(appContext, path, systemLanguage())
+            val installPath = if (repairArchive) {
+                val repairedPath = repairArchiveForInstall(path) ?: run {
+                    _uiState.value = _uiState.value.copy(detail = null)
+                    finishError(
+                        message = appContext.getString(R.string.install_dialog_content_failed),
+                        fallbackDetail = archiveFailureDetail(inspection, repairRequested = true)
+                    )
+                    return@runInstall
+                }
+                val repairedInspection = VitaArchiveInspector.inspect(repairedPath)
+                Log.i(
+                    TAG,
+                    "Content repair result path=$repairedPath readable=${repairedInspection.readable} " +
+                        "metadata=${repairedInspection.hasInstallMetadata} vitamin=${repairedInspection.vitaminDump} " +
+                        "unsupported=${repairedInspection.unsupportedCompressionEntries}"
+                )
+                if (
+                    repairedInspection.vitaminDump ||
+                    !repairedInspection.readable ||
+                    !repairedInspection.hasInstallMetadata ||
+                    !repairedInspection.supportedCompression
+                ) {
+                    _uiState.value = _uiState.value.copy(detail = null)
+                    finishError(
+                        message = appContext.getString(R.string.install_dialog_content_failed),
+                        fallbackDetail = archiveFailureDetail(repairedInspection, repairRequested = true)
+                    )
+                    return@runInstall
+                }
+                repairedPath
+            } else {
+                path
+            }
+            _uiState.value = _uiState.value.copy(detail = null)
+            val installedCount = VitaInstallBridge.installContent(appContext, installPath, systemLanguage())
+            Log.i(TAG, "Content install finished repair=$repairArchive installedCount=$installedCount installPath=$installPath")
             if (installedCount > 0) {
                 finishSuccess(
                     appContext.resources.getQuantityString(
@@ -101,7 +149,10 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                     )
                 )
             } else {
-                finishError(appContext.getString(R.string.install_dialog_content_failed))
+                finishError(
+                    message = appContext.getString(R.string.install_dialog_content_failed),
+                    fallbackDetail = archiveFailureDetail(inspection, repairRequested = repairArchive)
+                )
             }
         }
     }
@@ -143,6 +194,8 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
         block: () -> Unit
     ) {
         if (_uiState.value.status == InstallStatus.Running) return
+        nativeProgressOffset = 0f
+        nativeProgressScale = 1f
         _uiState.value = SetupInstallUiState(
             status = InstallStatus.Running,
             operation = operation
@@ -159,6 +212,8 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                 )
             } finally {
                 VitaInstallBridge.setListener(null)
+                nativeProgressOffset = 0f
+                nativeProgressScale = 1f
             }
         }
     }
@@ -166,12 +221,64 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
     private fun handleProgress(progress: NativeInstallProgress) {
         val current = progress.current.takeIf { it > 0f }?.roundToInt()
         val total = progress.total.takeIf { it > 0f }?.roundToInt()
+        val scaledProgress = nativeProgressOffset + progress.progress.coerceIn(0f, 100f) * nativeProgressScale
         _uiState.value = _uiState.value.copy(
-            progress = progress.progress.coerceIn(0f, 100f),
+            progress = scaledProgress.coerceIn(0f, 100f),
             current = current,
             total = total,
             detail = progress.detail?.takeIf { it.isNotBlank() }
         )
+    }
+
+    private fun repairArchiveForInstall(path: String): String? {
+        if (!VitaArchiveRepacker.canRepack(path)) return null
+        _uiState.value = _uiState.value.copy(
+            progress = 0f,
+            current = null,
+            total = null,
+            detail = appContext.getString(R.string.install_dialog_repack_preparing)
+        )
+        return VitaArchiveRepacker.repackToInstallZip(
+            sourcePath = path,
+            cacheRoot = EmulatorStorage.cacheRoot(appContext)
+        ) { progress ->
+            _uiState.value = _uiState.value.copy(
+                progress = (progress.progress * REPAIR_REPACK_PROGRESS_SCALE).coerceIn(0f, REPAIR_NATIVE_PROGRESS_OFFSET),
+                current = progress.current,
+                total = progress.total,
+                detail = progress.detail?.let {
+                    appContext.getString(R.string.install_dialog_repack_entry, it)
+                } ?: appContext.getString(R.string.install_dialog_repack_preparing)
+            )
+        }?.absolutePath?.also {
+            nativeProgressOffset = REPAIR_NATIVE_PROGRESS_OFFSET
+            nativeProgressScale = REPAIR_NATIVE_PROGRESS_SCALE
+            _uiState.value = _uiState.value.copy(
+                progress = REPAIR_NATIVE_PROGRESS_OFFSET,
+                current = null,
+                total = null,
+                detail = appContext.getString(R.string.install_dialog_repack_installing)
+            )
+        }
+    }
+
+    private fun archiveFailureDetail(
+        inspection: VitaArchiveInspection,
+        repairRequested: Boolean
+    ): String {
+        return when {
+            !inspection.readable -> inspection.errorMessage
+                ?: appContext.getString(R.string.install_dialog_archive_unreadable)
+            !inspection.hasInstallMetadata -> appContext.getString(R.string.install_dialog_archive_missing_metadata)
+            !inspection.supportedCompression -> appContext.resources.getQuantityString(
+                R.plurals.install_dialog_archive_unsupported_compression,
+                inspection.unsupportedCompressionEntries,
+                inspection.unsupportedCompressionEntries
+            )
+            inspection.vitaminDump && repairRequested -> appContext.getString(R.string.install_dialog_vitamin_repair_failed)
+            repairRequested -> appContext.getString(R.string.install_dialog_repack_failed)
+            else -> appContext.getString(R.string.install_dialog_content_try_repair)
+        }
     }
 
     private fun finishSuccess(message: String) {
@@ -202,4 +309,11 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
     }
 
     private fun systemLanguage(): Int = configRepository.load().sysLang
+
+    private companion object {
+        const val TAG = "SetupInstallViewModel"
+        const val REPAIR_NATIVE_PROGRESS_OFFSET = 45f
+        const val REPAIR_NATIVE_PROGRESS_SCALE = 0.55f
+        const val REPAIR_REPACK_PROGRESS_SCALE = 0.45f
+    }
 }

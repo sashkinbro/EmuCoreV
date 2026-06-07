@@ -4,15 +4,17 @@
 #include "TracyMouse.hpp"
 #include "TracyPrint.hpp"
 #include "TracyView.hpp"
+#include "tracy_pdqsort.h"
+#include "../Fonts.hpp"
 
 namespace tracy
 {
 
-enum { ChunkBits = 10 };
-enum { PageBits = 10 };
-enum { PageSize = 1 << PageBits };
-enum { PageChunkBits = ChunkBits + PageBits };
-enum { PageChunkSize = 1 << PageChunkBits };
+constexpr size_t ChunkBits = 10;
+constexpr size_t PageBits = 10;
+constexpr size_t PageSize = 1 << PageBits;
+constexpr size_t PageChunkBits = ChunkBits + PageBits;
+constexpr size_t PageChunkSize = 1 << PageChunkBits;
 
 uint32_t MemDecayColor[256] = {
     0x0, 0xFF077F07, 0xFF078007, 0xFF078207, 0xFF078307, 0xFF078507, 0xFF078707, 0xFF078807,
@@ -198,7 +200,12 @@ void View::DrawMemory()
     auto& mem = m_worker.GetMemoryNamed( m_memInfo.pool );
     if( mem.data.empty() )
     {
-        ImGui::TextWrapped( "No memory data collected." );
+        const auto ty = ImGui::GetTextLineHeight();
+        ImGui::PushFont( g_fonts.normal, FontBig );
+        ImGui::Dummy( ImVec2( 0, ( ImGui::GetContentRegionAvail().y - ImGui::GetTextLineHeight() * 2 ) * 0.5f ) );
+        TextCentered( ICON_FA_DOG );
+        TextCentered( "No memory data collected" );
+        ImGui::PopFont();
         ImGui::End();
         return;
     }
@@ -724,7 +731,7 @@ void View::ListMemData( std::vector<const MemEvent*>& vec, const std::function<v
                 auto v = vec[i];
                 const auto arrIdx = std::distance( mem.data.begin(), v );
 
-                ImGui::PushFont( m_fixedFont );
+                ImGui::PushFont( g_fonts.mono, FontNormal );
                 if( m_memoryAllocInfoPool == pool && m_memoryAllocInfoWindow == arrIdx )
                 {
                     ImGui::PushStyleColor( ImGuiCol_Text, ImVec4( 1.f, 0.f, 0.f, 1.f ) );

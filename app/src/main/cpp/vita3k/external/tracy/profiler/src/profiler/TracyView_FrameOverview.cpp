@@ -48,7 +48,7 @@ void View::DrawFrames()
 
     const auto wpos = ImGui::GetCursorScreenPos();
     const auto dpos = wpos + ImVec2( 0.5f, 0.5f );
-    const auto wspace = ImGui::GetWindowContentRegionMax() - ImGui::GetWindowContentRegionMin();
+    const auto wspace = ImGui::GetContentRegionAvail() + ImGui::GetCursorScreenPos();
     const auto w = wspace.x;
     auto draw = ImGui::GetWindowDrawList();
 
@@ -95,7 +95,7 @@ void View::DrawFrames()
 
     if( hover )
     {
-        const auto hwheel_delta = io.MouseWheelH * 100.f;
+        const auto hwheel_delta = io.MouseWheelH * 100.f * m_horizontalScrollMultiplier;
         if( IsMouseDragging( 1 ) || hwheel_delta != 0 )
         {
             m_viewMode = ViewMode::Paused;

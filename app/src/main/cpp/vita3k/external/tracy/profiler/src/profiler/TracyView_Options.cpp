@@ -8,12 +8,30 @@
 #include "TracyTimelineItemGpu.hpp"
 #include "TracyUtility.hpp"
 #include "TracyView.hpp"
+#include "TracyStorage.hpp"
+#include "tracy_pdqsort.h"
+#include "../Fonts.hpp"
 
 namespace tracy
 {
 
+static void DefaultMarker( bool active, bool tooltip = true )
+{
+    // Add a red * to indicate that the default value for this setting can be configured.
+    ImGui::SameLine( 0.0f, 2.0f );
+    TextColoredUnformatted( active ? ImVec4( 0.9f, 0.05f, 0.1f, 0.8f ) : ImVec4( 0.6f, 0.6f, 0.6f, 0.4f ), "*" );
+    if( tooltip && ImGui::IsItemHovered() )
+    {
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted( "Has a default value loaded when starting Tracy (see below)." );
+        ImGui::EndTooltip();
+    }
+}
+
 void View::DrawOptions()
 {
+    static bool default_markers_active = false;
+
     ImGui::Begin( "Options", &m_showOptions, ImGuiWindowFlags_AlwaysAutoResize );
     if( ImGui::GetCurrentWindowRead()->SkipItems ) { ImGui::End(); return; }
 
@@ -24,6 +42,7 @@ void View::DrawOptions()
     val = m_vd.drawFrameTargets;
     ImGui::Checkbox( ICON_FA_FLAG_CHECKERED " Draw frame targets", &val );
     m_vd.drawFrameTargets = val;
+    DefaultMarker(default_markers_active);
     ImGui::Indent();
     int tmp = m_vd.frameTarget;
     ImGui::PushStyleVar( ImGuiStyleVar_FramePadding, ImVec2( 0, 0 ) );
@@ -33,10 +52,11 @@ void View::DrawOptions()
         if( tmp < 1 ) tmp = 1;
         m_vd.frameTarget = tmp;
     }
+    DefaultMarker(default_markers_active);
     ImGui::SameLine();
     TextDisabledUnformatted( TimeToString( 1000*1000*1000 / tmp ) );
     ImGui::PopStyleVar();
-    ImGui::PushFont( m_smallFont );
+    ImGui::PushFont( g_fonts.normal, FontSmall );
     SmallColorBox( 0xFF2222DD );
     ImGui::SameLine( 0, 0 );
     ImGui::Text( "  <  %i  <  ", tmp / 2 );
@@ -58,6 +78,7 @@ void View::DrawOptions()
         val = m_vd.drawContextSwitches;
         ImGui::Checkbox( ICON_FA_PERSON_HIKING " Draw context switches", &val );
         m_vd.drawContextSwitches = val;
+        DefaultMarker(default_markers_active);
         ImGui::Indent();
         val = m_vd.darkenContextSwitches;
         SmallCheckbox( ICON_FA_MOON " Darken inactive threads", &val );
@@ -78,6 +99,7 @@ void View::DrawOptions()
         val = m_vd.drawSamples;
         ImGui::Checkbox( ICON_FA_EYE_DROPPER " Draw stack samples", &val );
         m_vd.drawSamples = val;
+        DefaultMarker(default_markers_active);
     }
 
     const auto& gpuData = m_worker.GetGpuData();
@@ -89,7 +111,16 @@ void View::DrawOptions()
         m_vd.drawGpuZones = val;
         const auto expand = ImGui::TreeNode( "GPU zones" );
         ImGui::SameLine();
-        ImGui::TextDisabled( "(%zu)", gpuData.size() );
+        size_t visibleGpu = 0;
+        for( const auto& gd : gpuData ) if( m_tc.GetItem( gd ).IsVisible() ) visibleGpu++;
+        if( visibleGpu == gpuData.size() )
+        {
+            ImGui::TextDisabled( "(%zu)", gpuData.size() );
+        }
+        else
+        {
+            ImGui::TextDisabled( "(%zu/%zu)", visibleGpu, gpuData.size() );
+        }
         if( expand )
         {
             for( size_t i=0; i<gpuData.size(); i++ )
@@ -110,7 +141,7 @@ void View::DrawOptions()
                     char buf[64];
                     auto& item = (TimelineItemGpu&)( m_tc.GetItem( gpuData[i] ) );
                     sprintf( buf, "%s context %i", GpuContextNames[(int)gpuData[i]->type], item.GetIdx() );
-                    ImGui::PushFont( m_smallFont );
+                    ImGui::PushFont( g_fonts.normal, FontSmall );
                     ImGui::TextUnformatted( buf );
                     ImGui::PopFont();
                 }
@@ -185,7 +216,7 @@ void View::DrawOptions()
                                 }
                                 while( idx < NumSlopes );
                             }
-                            std::sort( slopes, slopes+NumSlopes );
+                            pdqsort_branchless( slopes, slopes+NumSlopes );
                             drift = int( 1000000000 * -slopes[NumSlopes/2] );
                         }
                     }
@@ -208,6 +239,7 @@ void View::DrawOptions()
         val = m_vd.ghostZones;
         SmallCheckbox( ICON_FA_GHOST " Draw ghost zones", &val );
         m_vd.ghostZones = val;
+        DefaultMarker(default_markers_active);
     }
 #endif
 
@@ -216,6 +248,10 @@ void View::DrawOptions()
     ImGui::SameLine();
     bool forceColors = m_vd.forceColors;
     if( SmallCheckbox( "Ignore custom", &forceColors ) ) m_vd.forceColors = forceColors;
+    DefaultMarker(default_markers_active);
+    ImGui::SameLine();
+    bool inheritColors = m_vd.inheritParentColors;
+    if( SmallCheckbox( "Inherit parent colors", &inheritColors ) ) m_vd.inheritParentColors = inheritColors;
     ImGui::Indent();
     ImGui::PushStyleVar( ImGuiStyleVar_FramePadding, ImVec2( 0, 0 ) );
     ImGui::RadioButton( "Static", &ival, 0 );
@@ -226,6 +262,7 @@ void View::DrawOptions()
     m_vd.dynamicColors = ival;
     ival = (int)m_vd.shortenName;
     ImGui::TextUnformatted( ICON_FA_RULER_HORIZONTAL " Zone name shortening" );
+    DefaultMarker(default_markers_active);
     ImGui::Indent();
     ImGui::PushStyleVar( ImGuiStyleVar_FramePadding, ImVec2( 0, 0 ) );
     ImGui::RadioButton( "Disabled", &ival, (uint8_t)ShortenName::Never );
@@ -274,7 +311,16 @@ void View::DrawOptions()
         m_vd.onlyContendedLocks = val;
         const auto expand = ImGui::TreeNode( "Locks" );
         ImGui::SameLine();
-        ImGui::TextDisabled( "(%zu)", lockCnt );
+        size_t visibleLocks = 0;
+        for( const auto& l : m_worker.GetLockMap() ) if( Vis( l.second ) ) visibleLocks++;
+        if( visibleLocks == lockCnt )
+        {
+            ImGui::TextDisabled( "(%zu)", lockCnt );
+        }
+        else
+        {
+            ImGui::TextDisabled( "(%zu/%zu)", visibleLocks, lockCnt );
+        }
         TooltipIfHovered( "Locks with no recorded events are counted, but not listed." );
         if( expand )
         {
@@ -299,7 +345,16 @@ void View::DrawOptions()
 
             const bool multiExpand = ImGui::TreeNodeEx( "Contended locks present in multiple threads", ImGuiTreeNodeFlags_DefaultOpen );
             ImGui::SameLine();
-            ImGui::TextDisabled( "(%zu)", multiCntCont );
+            size_t visibleMultiCntCont = 0;
+            for( const auto& l : m_worker.GetLockMap() ) if( l.second->threadList.size() != 1 && l.second->isContended && Vis( l.second ) ) visibleMultiCntCont++;
+            if( visibleMultiCntCont == multiCntCont )
+            {
+                ImGui::TextDisabled( "(%zu)", multiCntCont );
+            }
+            else
+            {
+                ImGui::TextDisabled( "(%zu/%zu)", visibleMultiCntCont, multiCntCont );
+            }
             if( multiExpand )
             {
                 ImGui::SameLine();
@@ -377,7 +432,16 @@ void View::DrawOptions()
             }
             const bool multiUncontExpand = ImGui::TreeNodeEx( "Uncontended locks present in multiple threads", 0 );
             ImGui::SameLine();
-            ImGui::TextDisabled( "(%zu)", multiCntUncont );
+            uint64_t visibleMultiCntUncont = 0;
+            for( const auto& l : m_worker.GetLockMap() ) if( l.second->threadList.size() != 1 && !l.second->isContended && Vis( l.second ) ) visibleMultiCntUncont++;
+            if( visibleMultiCntUncont == multiCntUncont )
+            {
+                ImGui::TextDisabled( "(%zu)", multiCntUncont );
+            }
+            else
+            {
+                ImGui::TextDisabled( "(%zu/%zu)", visibleMultiCntUncont, multiCntUncont );
+            }
             if( multiUncontExpand )
             {
                 ImGui::SameLine();
@@ -455,7 +519,16 @@ void View::DrawOptions()
             }
             const auto singleExpand = ImGui::TreeNodeEx( "Locks present in a single thread", 0 );
             ImGui::SameLine();
-            ImGui::TextDisabled( "(%zu)", singleCnt );
+            uint64_t visibleSingleCnt = 0;
+            for( const auto& l : m_worker.GetLockMap() ) if( l.second->threadList.size() == 1 && Vis( l.second ) ) visibleSingleCnt++;
+            if( visibleSingleCnt == singleCnt )
+            {
+                ImGui::TextDisabled( "(%zu)", singleCnt );
+            }
+            else
+            {
+                ImGui::TextDisabled( "(%zu/%zu)", visibleSingleCnt, singleCnt );
+            }
             if( singleExpand )
             {
                 ImGui::SameLine();
@@ -546,10 +619,20 @@ void View::DrawOptions()
         int pH = m_vd.plotHeight;
         ImGui::SliderInt("Plot heights", &pH, 30, 200);
         m_vd.plotHeight = pH;
+        DefaultMarker(default_markers_active);
 
         const auto expand = ImGui::TreeNode( "Plots" );
         ImGui::SameLine();
-        ImGui::TextDisabled( "(%zu)", m_worker.GetPlots().size() );
+        size_t visiblePlots = 0;
+        for( const auto& p : m_worker.GetPlots() ) if( m_tc.GetItem( p ).IsVisible() ) visiblePlots++;
+        if( visiblePlots == m_worker.GetPlots().size() )
+        {
+            ImGui::TextDisabled( "(%zu)", m_worker.GetPlots().size() );
+        }
+        else
+        {
+            ImGui::TextDisabled( "(%zu/%zu)", visiblePlots, m_worker.GetPlots().size() );
+        }
         if( expand )
         {
             ImGui::SameLine();
@@ -584,7 +667,16 @@ void View::DrawOptions()
     ImGui::Separator();
     auto expand = ImGui::TreeNode( ICON_FA_SHUFFLE " Visible threads:" );
     ImGui::SameLine();
-    ImGui::TextDisabled( "(%zu)", m_threadOrder.size() );
+    size_t visibleThreads = 0;
+    for( const auto& t : m_threadOrder ) if( m_tc.GetItem( t ).IsVisible() ) visibleThreads++;
+    if( visibleThreads == m_threadOrder.size() )
+    {
+        ImGui::TextDisabled( "(%zu)", m_threadOrder.size() );
+    }
+    else
+    {
+        ImGui::TextDisabled( "(%zu/%zu)", visibleThreads, m_threadOrder.size() );
+    }
     if( expand )
     {
         auto& crash = m_worker.GetCrashEvent();
@@ -608,7 +700,7 @@ void View::DrawOptions()
         ImGui::SameLine();
         if( ImGui::SmallButton( "Sort" ) )
         {
-            std::sort( m_threadOrder.begin(), m_threadOrder.end(), [this] ( const auto& lhs, const auto& rhs ) {
+            pdqsort_branchless( m_threadOrder.begin(), m_threadOrder.end(), [this] ( const auto& lhs, const auto& rhs ) {
                 if( lhs->groupHint != rhs->groupHint ) return lhs->groupHint < rhs->groupHint;
                 return strcmp( m_worker.GetThreadName( lhs->id ), m_worker.GetThreadName( rhs->id ) ) < 0;
             } );
@@ -715,7 +807,16 @@ void View::DrawOptions()
         ImGui::Separator();
         expand = ImGui::TreeNode( ICON_FA_IMAGES " Visible frame sets:" );
         ImGui::SameLine();
-        ImGui::TextDisabled( "(%zu)", m_worker.GetFrames().size() );
+        uint64_t visibleFrames = 0;
+        for( const auto& fd : m_worker.GetFrames() ) if( Vis( fd ) ) visibleFrames++;
+        if( visibleFrames == m_worker.GetFrames().size() )
+        {
+            ImGui::TextDisabled( "(%zu)", m_worker.GetFrames().size() );
+        }
+        else
+        {
+            ImGui::TextDisabled( "(%zu/%zu)", visibleFrames, m_worker.GetFrames().size() );
+        }
         if( expand )
         {
             ImGui::SameLine();
@@ -747,6 +848,53 @@ void View::DrawOptions()
             ImGui::TreePop();
         }
     }
+
+    ImGui::Separator();
+
+    ImGui::TextUnformatted( "" );
+    DefaultMarker( default_markers_active, false );
+    ImGui::SameLine( 0.0f, 1.0f );
+    ImGui::TextUnformatted( ": The default value for this option is configurable." );
+    bool highlight = false;
+    if( ImGui::IsItemHovered() )
+    {
+        highlight = true;
+    }
+
+    if( ImGui::Button( "Save current options as defaults" ) )
+    {
+        // Keep in sync with TracyView.cpp View::SetupConfig()
+        s_config.targetFps = m_vd.frameTarget;
+        s_config.dynamicColors = m_vd.dynamicColors;
+        s_config.forceColors = m_vd.forceColors;
+        s_config.ghostZones = m_vd.ghostZones;
+        s_config.shortenName = (int)m_vd.shortenName;
+        s_config.drawSamples = m_vd.drawSamples;
+        s_config.drawContextSwitches = m_vd.drawContextSwitches;
+        SaveConfig();
+    }
+
+    if( ImGui::IsItemHovered() )
+    {
+        highlight = true;
+        ImGui::BeginTooltip();
+        const auto fn = tracy::GetSavePath( "tracy.ini" );
+
+        ImGui::TextUnformatted( "The options above marked with " );
+        DefaultMarker( true, false );
+        ImGui::SameLine();
+        ImGui::TextUnformatted( "have configurable default values." );
+        ImGui::TextUnformatted(
+            "Pressing this button stores their current values as the default values.\n\n"
+            "Alternatively, you can manually adjust those default values by editing the config file at:" );
+        TextDisabledUnformatted( fn );
+        ImGui::Spacing();
+        ImGui::TextUnformatted( "For now, to restore the default values, you may delete this configuration file." );
+        ImGui::EndTooltip();
+    }
+
+    default_markers_active = highlight;
+
     ImGui::End();
 }
 

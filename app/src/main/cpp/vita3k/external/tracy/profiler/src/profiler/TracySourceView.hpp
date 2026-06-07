@@ -3,6 +3,7 @@
 
 #include <limits>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "tracy_robin_hood.h"
@@ -72,11 +73,11 @@ private:
         rd
     };
 
-    enum { ReadBit  = 0x100 };
-    enum { WriteBit = 0x200 };
-    enum { ReuseBit = 0x400 };
-    enum { RegMask  = 0x0FF };
-    enum { FlagMask = 0xF00 };
+    static constexpr int ReadBit  = 0x100;
+    static constexpr int WriteBit = 0x200;
+    static constexpr int ReuseBit = 0x400;
+    static constexpr int RegMask  = 0x0FF;
+    static constexpr int FlagMask = 0xF00;
 
     enum class OpType : uint8_t
     {
@@ -164,7 +165,6 @@ private:
 public:
     SourceView();
 
-    void UpdateFont( ImFont* fixed, ImFont* small, ImFont* big ) { m_font = fixed; m_smallFont = small; m_bigFont = big; }
     void SetCpuId( uint32_t cpuid );
 
     void OpenSource( const char* fileName, int line, const View& view, const Worker& worker );
@@ -214,6 +214,7 @@ private:
     const std::vector<uint64_t>* GetAddressesForLocation( uint32_t fileStringIdx, uint32_t line, const Worker& worker );
 
     tracy_force_inline float CalcJumpSeparation( float scale );
+    std::tuple<size_t, size_t> GetJumpRange( const JumpData& jump );
 
 #ifndef TRACY_NO_FILESELECTOR
     void Save( const Worker& worker, size_t start = 0, size_t stop = std::numeric_limits<size_t>::max() );
@@ -222,9 +223,6 @@ private:
     tracy_force_inline void SetFont();
     tracy_force_inline void UnsetFont();
 
-    ImFont* m_font;
-    ImFont* m_smallFont;
-    ImFont* m_bigFont;
     uint64_t m_symAddr;
     uint64_t m_baseAddr;
     uint64_t m_targetAddr;

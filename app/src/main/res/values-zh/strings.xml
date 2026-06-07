@@ -746,4 +746,15 @@
     <string name="settings_storage_migration_body">在将固件、游戏、存档、奖杯、缓存和设置复制到所选存储时，请保持 EmuCoreV 处于打开状态。</string>
     <string name="settings_storage_migration_count">已检查 %1$d/%2$d 个文件</string>
     <string name="settings_storage_migration_failed">无法移动存储</string>
+    <string name="install_dialog_content_try_repair">如果这是一个有效的 VPK 或 ZIP 映像，请尝试在游戏安装对话框中使用“修复并安装”。</string>
+    <string name="install_dialog_archive_unreadable">无法读取压缩包。它可能已损坏或不完整。</string>
+    <string name="install_dialog_archive_missing_metadata">压缩包不包含诸如 `sce_sys/param.sfo` 或 `theme.xml` 之类的 Vita 安装元数据。</string>
+    <string name="install_dialog_repack_preparing">正在准备兼容的 ZIP 压缩包…</string>
+    <string name="install_dialog_repack_entry">正在重新打包: %1$s</string>
+    <string name="install_dialog_repack_installing">正在安装重建的 ZIP…</string>
+    <string name="install_dialog_repack_failed">压缩包修复未能生成可安装的 ZIP。尝试使用其他 dump（转储），或安装匹配的 PKG 和许可。</string>
+    <string name="install_dialog_vitamin_repair_failed">此 Vitamin VPK 已重建，但 Vita3K 仍然无法安装。尝试 NoNpDrm dump（转储），或安装匹配的 PKG 和许可。</string>
+    <string name="setup_content_repair_button">修复并安装 VPK/ZIP</string>
+    <string name="setup_content_repair_note">“修复”会将选定的 VPK 或 ZIP 转换为安装缓存中全新的 ZIP，规范化压缩包结构，并在存在不受支持的 Vitamin 安装标记时将其移除。仅在正常安装有效压缩包失败时使用。</string>
+    <string name="install_choice_archive_repair_button">修复并安装</string>
 </resources>

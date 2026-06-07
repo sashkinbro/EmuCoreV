@@ -121,6 +121,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     val launchRequiresFirmwareMessage = stringResource(R.string.game_launch_requires_firmware)
     val launchRequiresFirmwareUpdateMessage = stringResource(R.string.game_launch_requires_firmware_update)
     var pendingPkgZrif by rememberSaveable { mutableStateOf("") }
+    var pendingContentRepair by rememberSaveable { mutableStateOf(false) }
     var installChoiceZrif by rememberSaveable { mutableStateOf("") }
     var showInstallChoiceDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -136,6 +137,8 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     }
 
     val contentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        val repairArchive = pendingContentRepair
+        pendingContentRepair = false
         uri ?: return@rememberLauncherForActivityResult
         val fileName = DocumentPathResolver.getDisplayName(context, uri.toString())
         val extension = fileName.substringAfterLast('.', "").lowercase()
@@ -143,7 +146,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         if (!supported) {
             Toast.makeText(context, unsupportedContent, Toast.LENGTH_SHORT).show()
         } else {
-            installViewModel.installContent(uri.toString())
+            installViewModel.installContent(uri.toString(), repairArchive = repairArchive)
         }
     }
 
@@ -166,7 +169,14 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     }
 
     val openFirmwareInstall = { firmwarePicker.launch(arrayOf("*/*")) }
-    val openContentInstall = { contentPicker.launch(arrayOf("*/*")) }
+    val openContentInstall = {
+        pendingContentRepair = false
+        contentPicker.launch(arrayOf("*/*"))
+    }
+    val openRepairContentInstall = {
+        pendingContentRepair = true
+        contentPicker.launch(arrayOf("*/*"))
+    }
     val openLicenseInstall = { licensePicker.launch(arrayOf("*/*")) }
     val openPkgInstall: (String) -> Unit = { zrif ->
         pendingPkgZrif = zrif
@@ -332,6 +342,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         onBackClick = navigateHome,
                         onInstallFirmware = openFirmwareInstall,
                         onInstallContent = openContentInstall,
+                        onRepairContent = openRepairContentInstall,
                         onInstallLicense = openLicenseInstall,
                         onInstallPkg = openPkgInstall
                     )
@@ -740,6 +751,11 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 showInstallChoiceDialog = false
                 installChoiceZrif = ""
                 openContentInstall()
+            },
+            onRepairArchive = {
+                showInstallChoiceDialog = false
+                installChoiceZrif = ""
+                openRepairContentInstall()
             },
             onInstallLicense = openLicenseInstall,
             onInstallPkg = { zrif ->

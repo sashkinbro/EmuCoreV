@@ -1,6 +1,6 @@
 # Build Vita3K
 
-Vita3K uses CMake for its project configuration and generation. In theory, it should be compatible with any project generator supported by CMake, C++20 compatible compiler and an IDE with CMake support.
+Vita3K uses CMake for its project configuration and generation. In theory, it should be compatible with any project generator supported by CMake, C++20 compatible compiler and an IDE with CMake support. 
 
 The project provides [CMake presets](https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html) to allow configuring and building Vita3K without having to deal with adding the needed arguments through a command-line interface or using the user interface of your IDE. As long as your IDE or code editor supports CMake, the software should immediately detect the presets and let you choose which configuration settings you want to use to generate the program. Reference on how to use CMake presets with various IDEs and code editors can be found here:
 
@@ -27,7 +27,7 @@ For convenience, the following building instructions are given as examples:
 
 - Install `git` to `clone` the project. Download and install `git` from [here](https://git-scm.com).
 
-- Install [Qt](https://www.qt.io/download) (6.7 or later), and select the `MSVC 2022 64-bit` component during installation.
+- Install [Qt](https://www.qt.io/download) (6.11.x or later), and select the `MSVC 2022 64-bit` component during installation.
 
 - Clone this repo.
 
@@ -62,7 +62,7 @@ If you aren't satisfied with the way the Visual Studio integrates CMake projects
 
 - Generate the project:
   ```cmd
-  set CMAKE_PREFIX_PATH=C:\Qt\6.x.x\msvc2022_64
+  set Qt6_ROOT=C:\Qt\6.11.0\msvc2022_64
   cmake --preset windows-vs2022
   ```
   The line above will generate a Visual Studio 2022 project inside a folder called `build/windows-vs2022`.
@@ -83,6 +83,8 @@ If you aren't satisfied with the way the Visual Studio integrates CMake projects
   ```sh
   brew install git cmake molten-vk openssl qt
   ```
+
+  Ensure `brew` provides Qt 6.11 or newer. If it does not, install the official Qt 6.11 package and set `Qt6_ROOT` before configuring.
 
 - Clone this repo.
 
@@ -123,6 +125,8 @@ If you aren't satisfied with the way the Visual Studio integrates CMake projects
   sudo dnf install git cmake ninja-build SDL2-devel pkg-config gtk3-devel clang lld xdg-desktop-portal openssl openssl-devel libstdc++-static qt6-base-devel
   ```
 
+Note: Your Qt packages must provide Qt 6.11 or newer. If your distro ships an older Qt, install the official Qt 6.11 package and set `Qt6_ROOT` before running CMake.
+
 Note: The CMake preset `linux-ninja-clang` makes use of the LLD linker, which will need to be installed in your system along with Clang.
 
 - Clone this repo.
@@ -150,13 +154,14 @@ Note: The CMake preset `linux-ninja-clang` makes use of the LLD linker, which wi
 
 - The Android version of Vita3K relies on [vcpkg](https://vcpkg.io/en/) to build some of its dependencies.
   ```sh
-  vcpkg install boost-system:arm64-android boost-filesystem:arm64-android boost-program-options:arm64-android boost-icl:arm64-android boost-variant:arm64-android openssl:arm64-android zlib:arm64-android
+  vcpkg install --triplet arm64-android
+  vcpkg install --triplet x64-android
   ```
-  You will also need to set the environment variable VCPKG_ROOT to its proper location.
+  Run these commands from the repository root so `vcpkg` can consume the repository's `vcpkg.json` manifest. You will also need to set the environment variable `VCPKG_ROOT` to its proper location.
 
 - Building can be done with Android studio: select the Vita3K Android folder and click on the build icon or by command line:
   ```sh
-  ./gradlew --stacktrace --configuration-cache --build-cache --parallel --configure-on-demand assembleReldebug
+  ./gradlew --stacktrace assembleReldebug
   ```
 
 ## Note

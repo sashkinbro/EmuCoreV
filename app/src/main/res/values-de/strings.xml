@@ -747,4 +747,15 @@
     <string name="settings_storage_migration_body">Lasse EmuCoreV geöffnet, während Firmware, Spiele, Speicherstände, Trophäen, Cache und Einstellungen auf den ausgewählten Speicher kopiert werden.</string>
     <string name="settings_storage_migration_count">%1$d/%2$d Dateien überprüft</string>
     <string name="settings_storage_migration_failed">Speicher konnte nicht verschoben werden</string>
+    <string name="install_dialog_content_try_repair">Wenn dies ein gültiges VPK- oder ZIP-Abbild ist, versuche "Reparieren und installieren" im Spielinstallationsdialog.</string>
+    <string name="install_dialog_archive_unreadable">Das Archiv konnte nicht gelesen werden. Es ist möglicherweise beschädigt oder unvollständig.</string>
+    <string name="install_dialog_archive_missing_metadata">Das Archiv enthält keine Vita-Installationsmetadaten wie `sce_sys/param.sfo` oder `theme.xml`.</string>
+    <string name="install_dialog_repack_preparing">Ein kompatibles ZIP-Archiv wird vorbereitet…</string>
+    <string name="install_dialog_repack_entry">Neu packen: %1$s</string>
+    <string name="install_dialog_repack_installing">Das neu erstellte ZIP wird installiert…</string>
+    <string name="install_dialog_repack_failed">Die Archiv-Reparatur hat kein installierbares ZIP erzeugt. Versuche einen anderen Dump oder installiere das passende PKG und die Lizenz.</string>
+    <string name="install_dialog_vitamin_repair_failed">Dieses Vitamin-VPK wurde neu erstellt, kann aber immer noch nicht von Vita3K installiert werden. Versuche einen NoNpDrm-Dump oder installiere das passende PKG und die Lizenz.</string>
+    <string name="setup_content_repair_button">VPK/ZIP reparieren und installieren</string>
+    <string name="setup_content_repair_note">Reparieren konvertiert das ausgewählte VPK oder ZIP in ein frisches ZIP im Installations-Cache, normalisiert das Archiv-Packen und entfernt die nicht unterstützte Vitamin-Installationsmarkierung, falls vorhanden. Verwende dies nur, wenn eine normale Installation für ein gültiges Archiv fehlschlägt.</string>
+    <string name="install_choice_archive_repair_button">Reparieren und installieren</string>
 </resources>
