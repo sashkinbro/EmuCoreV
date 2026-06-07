@@ -707,7 +707,7 @@
     <string name="save_manager_restore_all_confirm_title">सभी सेव रीस्टोर करें?</string>
     <string name="save_manager_restore_all_confirm_body">चयनित बैकअप के सेव फ़ोल्डर इस डिवाइस पर मेल खाने वाले सेव फ़ोल्डरों को बदल देंगे। मौजूदा सेव तभी रखे जाते हैं जब बैकअप में वह सेव आईडी (ID) न हो।</string>
     <string name="save_manager_restore_all_confirm">सेव रीस्टोर करें</string>
-    <string name="install_dialog_vitamin_unsupported">Vitamin VPK डंप समर्थित नहीं हैं। NoNpDrm जैसे संगत डंप का उपयोग करें, या मिलान वाले लाइसेंस के साथ PKG इंस्टॉल करें।</string>
+    <string name="install_dialog_vitamin_unsupported">कुछ VPK फ़ाइलें सही तरीके से इंस्टॉल नहीं हो सकतीं। पहले सामान्य इंस्टॉलेशन आज़माएं; अगर वह विफल हो, तो "मरम्मत करें और इंस्टॉल करें" का उपयोग करें या मेल खाने वाला PKG और लाइसेंस इंस्टॉल करें।</string>
     <string name="settings_change_storage">स्टोरेज बदलें</string>
     <string name="settings_storage_location_internal">डिवाइस स्टोरेज</string>
     <string name="settings_storage_location_sd">SD कार्ड</string>
@@ -754,9 +754,9 @@
     <string name="install_dialog_repack_entry">रीपैक किया जा रहा है: %1$s</string>
     <string name="install_dialog_repack_installing">पुनर्निर्मित ZIP इंस्टॉल किया जा रहा है…</string>
     <string name="install_dialog_repack_failed">संग्रह की मरम्मत से कोई इंस्टॉल करने योग्य ZIP प्राप्त नहीं हुआ। दूसरा डंप आज़माएं, या मेल खाने वाला PKG और लाइसेंस इंस्टॉल करें।</string>
-    <string name="install_dialog_vitamin_repair_failed">इस विटामिन (Vitamin) VPK को फिर से बनाया गया था, लेकिन यह अभी भी Vita3K द्वारा इंस्टॉल करने योग्य नहीं है। NoNpDrm डंप आज़माएं या मेल खाने वाला PKG और लाइसेंस इंस्टॉल करें।</string>
+    <string name="install_dialog_vitamin_repair_failed">दोबारा बनाया गया VPK अभी भी इंस्टॉल नहीं हो सका। कोई दूसरा डंप आज़माएं, या मेल खाने वाला PKG और लाइसेंस इंस्टॉल करें।</string>
     <string name="setup_content_repair_button">मरम्मत करें और इंस्टॉल करें</string>
-    <string name="setup_content_repair_note">मरम्मत चयनित VPK या ZIP को इंस्टॉल कैश में एक ताज़ा ZIP में बदल देती है, संग्रह पैकिंग को सामान्य करती है, और मौजूद होने पर असमर्थित विटामिन इंस्टॉल मार्कर को हटा देती है। इसका उपयोग केवल तभी करें जब किसी वैध संग्रह के लिए सामान्य इंस्टॉल विफल हो जाए।</string>
+    <string name="setup_content_repair_note">मरम्मत चयनित VPK या ZIP को इंस्टॉल कैश में एक ताज़ा ZIP में बदल देती है, संग्रह पैकिंग को सामान्य करती है, और मौजूद होने पर Vitamin मार्कर को हटा देती है। इसका उपयोग केवल तभी करें जब किसी वैध संग्रह के लिए सामान्य इंस्टॉल विफल हो जाए।</string>
     <string name="install_choice_archive_repair_button">मरम्मत करें और इंस्टॉल करें</string>
     <string name="settings_vibration_section">कंपन</string>
     <string name="settings_vibration_enable">कंपन</string>

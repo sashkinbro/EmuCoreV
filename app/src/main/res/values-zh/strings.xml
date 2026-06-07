@@ -706,7 +706,7 @@
     <string name="save_manager_restore_all_confirm_title">恢复所有存档？</string>
     <string name="save_manager_restore_all_confirm_body">所选备份中的存档文件夹将替换此设备上匹配的存档文件夹。仅当备份中不包含该存档 ID 时，才会保留现有存档。</string>
     <string name="save_manager_restore_all_confirm">恢复存档</string>
-    <string name="install_dialog_vitamin_unsupported">不支持 Vitamin VPK 转储。请使用兼容的转储（如 NoNpDrm），或使用其匹配的许可证安装 PKG。</string>
+    <string name="install_dialog_vitamin_unsupported">某些 VPK 文件可能无法正确安装。请先尝试普通安装；如果失败，请使用“修复并安装”，或安装匹配的 PKG 和许可证。</string>
     <string name="settings_change_storage">更改存储</string>
     <string name="settings_storage_location_internal">设备存储</string>
     <string name="settings_storage_location_sd">SD 卡</string>
@@ -753,9 +753,9 @@
     <string name="install_dialog_repack_entry">正在重新打包: %1$s</string>
     <string name="install_dialog_repack_installing">正在安装重建的 ZIP…</string>
     <string name="install_dialog_repack_failed">压缩包修复未能生成可安装的 ZIP。尝试使用其他 dump（转储），或安装匹配的 PKG 和许可。</string>
-    <string name="install_dialog_vitamin_repair_failed">此 Vitamin VPK 已重建，但 Vita3K 仍然无法安装。尝试 NoNpDrm dump（转储），或安装匹配的 PKG 和许可。</string>
+    <string name="install_dialog_vitamin_repair_failed">重建后的 VPK 仍无法安装。请尝试其他 dump（转储），或安装匹配的 PKG 和许可证。</string>
     <string name="setup_content_repair_button">修复并安装</string>
-    <string name="setup_content_repair_note">“修复”会将选定的 VPK 或 ZIP 转换为安装缓存中全新的 ZIP，规范化压缩包结构，并在存在不受支持的 Vitamin 安装标记时将其移除。仅在正常安装有效压缩包失败时使用。</string>
+    <string name="setup_content_repair_note">“修复”会将选定的 VPK 或 ZIP 转换为安装缓存中全新的 ZIP，规范化压缩包结构，并在存在 Vitamin 标记时将其移除。仅在正常安装有效压缩包失败时使用。</string>
     <string name="install_choice_archive_repair_button">修复并安装</string>
     <string name="settings_vibration_section">震动</string>
     <string name="settings_vibration_enable">震动</string>

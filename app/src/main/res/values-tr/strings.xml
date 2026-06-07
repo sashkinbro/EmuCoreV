@@ -707,7 +707,7 @@
     <string name="save_manager_restore_all_confirm_title">Tüm kayıtlar geri yüklensin mi?</string>
     <string name="save_manager_restore_all_confirm_body">Seçilen yedekteki kayıt klasörleri, bu cihazdaki eşleşen kayıt klasörleriyle değiştirilir. Mevcut kayıtlar, yalnızca yedekleme söz konusu kayıt kimliğini içermediğinde saklanır.</string>
     <string name="save_manager_restore_all_confirm">Kayıtları geri yükle</string>
-    <string name="install_dialog_vitamin_unsupported">Vitamin VPK dökümleri desteklenmiyor. NoNpDrm gibi uyumlu bir döküm kullanın veya PKG\'yi eşleşen lisansıyla yükleyin.</string>
+    <string name="install_dialog_vitamin_unsupported">Bazı VPK dosyaları doğru şekilde yüklenmeyebilir. Önce normal yüklemeyi deneyin; başarısız olursa "Onar ve yükle" seçeneğini kullanın veya eşleşen PKG ve lisansı yükleyin.</string>
     <string name="settings_change_storage">Depolama alanını değiştir</string>
     <string name="settings_storage_location_internal">Cihaz depolama alanı</string>
     <string name="settings_storage_location_sd">SD kart</string>
@@ -754,9 +754,9 @@
     <string name="install_dialog_repack_entry">Yeniden paketleniyor: %1$s</string>
     <string name="install_dialog_repack_installing">Yeniden oluşturulan ZIP yükleniyor…</string>
     <string name="install_dialog_repack_failed">Arşiv onarımı kurulabilir bir ZIP üretemedi. Başka bir dump deneyin veya eşleşen PKG\'yi ve lisansı yükleyin.</string>
-    <string name="install_dialog_vitamin_repair_failed">Bu Vitamin VPK yeniden oluşturuldu, ancak hala Vita3K tarafından kurulamıyor. Bir NoNpDrm dump\'ı deneyin veya eşleşen PKG\'yi ve lisansı yükleyin.</string>
+    <string name="install_dialog_vitamin_repair_failed">Yeniden oluşturulan VPK hâlâ yüklenemedi. Başka bir dump deneyin veya eşleşen PKG ve lisansı yükleyin.</string>
     <string name="setup_content_repair_button">Onar ve yükle</string>
-    <string name="setup_content_repair_note">Onarım, seçilen VPK veya ZIP dosyasını kurulum önbelleğinde yeni bir ZIP dosyasına dönüştürür, arşiv paketlemesini normalleştirir ve varsa desteklenmeyen Vitamin kurulum işaretini kaldırır. Yalnızca geçerli bir arşiv için normal kurulum başarısız olduğunda kullanın.</string>
+    <string name="setup_content_repair_note">Onarım, seçilen VPK veya ZIP dosyasını kurulum önbelleğinde yeni bir ZIP dosyasına dönüştürür, arşiv paketlemesini normalleştirir ve varsa Vitamin işaretini kaldırır. Yalnızca geçerli bir arşiv için normal kurulum başarısız olduğunda kullanın.</string>
     <string name="install_choice_archive_repair_button">Onar ve yükle</string>
     <string name="settings_vibration_section">Titreşim</string>
     <string name="settings_vibration_enable">Titreşim</string>

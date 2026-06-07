@@ -216,6 +216,10 @@ static bool install_archive_content(EmuEnvState &emuenv, const ZipPtr &zip, cons
             update_progress();
 
             std::string replace_filename = m_filename.substr(content_path.size());
+            if (string_utils::tolower(replace_filename).contains("sce_module/steroid.suprx")) {
+                LOG_WARN("Skipping Vitamin marker during archive extraction: {}", m_filename);
+                continue;
+            }
             const fs::path file_output = (output_path / fs_utils::utf8_to_path(replace_filename)).generic_path();
             if (mz_zip_reader_is_file_a_directory(zip.get(), i)) {
                 fs::create_directories(file_output);
@@ -256,13 +260,8 @@ static std::vector<std::string> get_archive_contents_path(const ZipPtr &zip) {
             continue;
 
         std::string m_filename = std::string(file_stat.m_filename);
-        if (m_filename.contains("sce_module/steroid.suprx")) {
-            LOG_CRITICAL("A Vitamin dump was detected, aborting installation...");
-#ifdef __ANDROID__
-            // SDL_ShowAndroidToast("Vitamin dumps are not supported!", 1, -1, 0, 0);
-#endif
-            content_path.clear();
-            break;
+        if (string_utils::tolower(m_filename).contains("sce_module/steroid.suprx")) {
+            LOG_WARN("A Vitamin marker was detected; continuing archive installation.");
         }
 
         const auto is_content = m_filename.contains(sfo_path) || m_filename.contains(theme_path);
