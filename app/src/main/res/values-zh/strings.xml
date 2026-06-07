@@ -812,4 +812,18 @@
     <string name="profile_restore">恢复</string>
     <string name="profile_empty_title">个人资料中还没有游戏</string>
     <string name="profile_empty_body">打开目录，点击游戏上的三点菜单，并将其添加到您的个人资料列表之一。</string>
+    <string name="settings_updates_history_title">更新历史</string>
+    <string name="settings_updates_history_body">浏览 GitHub 发布版本、发布日期和更新日志。</string>
+    <string name="settings_updates_history_loading">正在加载发布历史</string>
+    <string name="settings_updates_history_empty">未找到任何发布版本。</string>
+    <string name="settings_updates_history_error">无法加载发布历史</string>
+    <string name="settings_updates_published_label">已发布</string>
+    <string name="settings_updates_parallel_title">并行版本</string>
+    <string name="settings_updates_parallel_body">只有当发布版本包含使用唯一包名和应用标签（例如 EmuCoreV (0.1.1)）构建的特殊 APK 时，Android 才能安装多个 EmuCoreV 版本。普通的旧版 APK 会替换或降级当前应用。</string>
+    <string name="settings_updates_parallel_install">作为单独的应用安装</string>
+    <string name="settings_updates_parallel_install_ready">安装单独的应用</string>
+    <string name="settings_updates_parallel_downloading">正在下载单独的 APK %1$d%%</string>
+    <string name="settings_updates_parallel_unavailable">此发布版本没有提供单独的 APK。</string>
+    <string name="settings_updates_parallel_package">单独的应用包</string>
+    <string name="settings_updates_parallel_download">下载</string>
 </resources>

@@ -63,11 +63,16 @@ data class StorageMigrationUiState(
 
 data class AppUpdateUiState(
     val latestRelease: AppUpdateRelease? = null,
+    val releaseHistory: List<AppUpdateRelease> = emptyList(),
     val checking: Boolean = false,
+    val historyLoading: Boolean = false,
     val checkedOnce: Boolean = false,
     val errorMessage: String? = null,
+    val historyErrorMessage: String? = null,
     val downloadProgress: Float? = null,
     val downloadedApkPath: String? = null,
+    val parallelDownloadProgress: Map<String, Float> = emptyMap(),
+    val downloadedParallelApkPaths: Map<String, String> = emptyMap(),
     val startupDialogVisible: Boolean = false,
     val cleanInstallDialogVisible: Boolean = false
 )
@@ -384,6 +389,36 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun loadAppReleaseHistory(showErrors: Boolean = true) {
+        if (_uiState.value.appUpdate.historyLoading) return
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.value = _uiState.value.copy(
+                appUpdate = _uiState.value.appUpdate.copy(
+                    historyLoading = true,
+                    historyErrorMessage = null
+                )
+            )
+            runCatching {
+                appUpdateRepository.loadReleaseHistory()
+            }.onSuccess { releases ->
+                _uiState.value = _uiState.value.copy(
+                    appUpdate = _uiState.value.appUpdate.copy(
+                        releaseHistory = releases,
+                        historyLoading = false,
+                        historyErrorMessage = null
+                    )
+                )
+            }.onFailure { error ->
+                _uiState.value = _uiState.value.copy(
+                    appUpdate = _uiState.value.appUpdate.copy(
+                        historyLoading = false,
+                        historyErrorMessage = if (showErrors) error.message ?: "Could not load release history" else null
+                    )
+                )
+            }
+        }
+    }
+
     fun checkForStartupAppUpdates() {
         if (startupUpdateCheckRequested) return
         startupUpdateCheckRequested = true
@@ -467,5 +502,71 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             )
         }
         onComplete(result)
+    }
+
+    fun downloadParallelAppRelease(
+        release: AppUpdateRelease,
+        onComplete: (Result<Unit>) -> Unit = {}
+    ) {
+        val key = release.updateKey()
+        if (_uiState.value.appUpdate.parallelDownloadProgress.containsKey(key)) return
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.value = _uiState.value.copy(
+                appUpdate = _uiState.value.appUpdate.copy(
+                    historyErrorMessage = null,
+                    parallelDownloadProgress = _uiState.value.appUpdate.parallelDownloadProgress + (key to 0f),
+                    downloadedParallelApkPaths = _uiState.value.appUpdate.downloadedParallelApkPaths - key
+                )
+            )
+            val result = runCatching {
+                val apk = appUpdateRepository.downloadParallelApk(release) { progress ->
+                    _uiState.value = _uiState.value.copy(
+                        appUpdate = _uiState.value.appUpdate.copy(
+                            parallelDownloadProgress = _uiState.value.appUpdate.parallelDownloadProgress + (key to progress)
+                        )
+                    )
+                }
+                _uiState.value = _uiState.value.copy(
+                    appUpdate = _uiState.value.appUpdate.copy(
+                        parallelDownloadProgress = _uiState.value.appUpdate.parallelDownloadProgress - key,
+                        downloadedParallelApkPaths = _uiState.value.appUpdate.downloadedParallelApkPaths + (key to apk.absolutePath)
+                    )
+                )
+            }
+            result.onFailure { error ->
+                _uiState.value = _uiState.value.copy(
+                    appUpdate = _uiState.value.appUpdate.copy(
+                        parallelDownloadProgress = _uiState.value.appUpdate.parallelDownloadProgress - key,
+                        historyErrorMessage = error.message ?: "Could not download parallel APK"
+                    )
+                )
+            }
+            withContext(Dispatchers.Main) {
+                onComplete(result)
+            }
+        }
+    }
+
+    fun installDownloadedParallelAppRelease(
+        release: AppUpdateRelease,
+        onComplete: (Result<Unit>) -> Unit = {}
+    ) {
+        val key = release.updateKey()
+        val apkPath = _uiState.value.appUpdate.downloadedParallelApkPaths[key] ?: return
+        val result = runCatching {
+            appUpdateRepository.launchInstaller(java.io.File(apkPath))
+        }
+        result.onFailure { error ->
+            _uiState.value = _uiState.value.copy(
+                appUpdate = _uiState.value.appUpdate.copy(
+                    historyErrorMessage = error.message ?: "Could not open parallel APK installer"
+                )
+            )
+        }
+        onComplete(result)
+    }
+
+    private fun AppUpdateRelease.updateKey(): String {
+        return tagName.ifBlank { htmlUrl.ifBlank { displayName } }
     }
 }

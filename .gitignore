@@ -51,6 +51,9 @@ emulog.txt
 third_party/vcpkg/
 tools/msys64/
 tools/msys2-base-*.exe
+tools/apktool.jar
+tools/build_parallel_release_apks.ps1
+tools/clone_emucorev_apk.ps1
 tools/openssl-test/
 tools/openssl-test/out/
 tools/openssl-test/openssl-*/

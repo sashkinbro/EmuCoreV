@@ -142,10 +142,13 @@ fun SettingsTabContent(
         SettingsTab.Updates -> AppUpdateTab(
             state = uiState.appUpdate,
             onCheckForUpdates = { viewModel.checkForAppUpdates(showErrors = true) },
+            onLoadReleaseHistory = { viewModel.loadAppReleaseHistory(showErrors = true) },
             onShowCleanInstallDialog = viewModel::showCleanInstallDialog,
             onDismissCleanInstallDialog = viewModel::dismissCleanInstallDialog,
             onDownloadUpdate = { viewModel.downloadAppUpdate() },
-            onInstallDownloadedUpdate = { viewModel.installDownloadedAppUpdate() }
+            onInstallDownloadedUpdate = { viewModel.installDownloadedAppUpdate() },
+            onDownloadParallelRelease = { release -> viewModel.downloadParallelAppRelease(release) },
+            onInstallDownloadedParallelRelease = { release -> viewModel.installDownloadedParallelAppRelease(release) }
         )
     }
 }
