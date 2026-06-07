@@ -22,6 +22,8 @@ import java.util.Comparator
 import kotlin.math.abs
 import kotlin.math.sign
 
+private const val DEVICE_VIBRATOR_SERVICE_ID = 999999
+
 class SDLControllerManager {
     companion object {
         private var mJoystickHandler: SDLJoystickHandler? = null
@@ -112,18 +114,41 @@ class SDLControllerManager {
         @JvmStatic
         fun hapticRun(deviceId: Int, intensity: Float, length: Int) {
             if (!GamepadRuntimeInputSettings.vibrationEnabled()) return
-            mHapticHandler?.run(deviceId, intensity, length)
+            if (deviceId == DEVICE_VIBRATOR_SERVICE_ID && !GamepadRuntimeInputSettings.deviceVibrationFallbackEnabled()) return
+            val scaledIntensity = GamepadRuntimeInputSettings.scaleVibration(intensity)
+            if (scaledIntensity <= 0f) {
+                mHapticHandler?.stop(deviceId)
+                return
+            }
+            val handled = mHapticHandler?.run(deviceId, scaledIntensity, length) == true
+            if (!handled && GamepadRuntimeInputSettings.deviceVibrationFallbackEnabled() && deviceId != DEVICE_VIBRATOR_SERVICE_ID) {
+                mHapticHandler?.run(DEVICE_VIBRATOR_SERVICE_ID, scaledIntensity, length)
+            }
         }
 
         @JvmStatic
         fun hapticRumble(deviceId: Int, lowFrequencyIntensity: Float, highFrequencyIntensity: Float, length: Int) {
             if (!GamepadRuntimeInputSettings.vibrationEnabled()) return
-            mHapticHandler?.rumble(deviceId, lowFrequencyIntensity, highFrequencyIntensity, length)
+            if (deviceId == DEVICE_VIBRATOR_SERVICE_ID && !GamepadRuntimeInputSettings.deviceVibrationFallbackEnabled()) return
+            val low = GamepadRuntimeInputSettings.scaleVibration(lowFrequencyIntensity)
+            val high = GamepadRuntimeInputSettings.scaleVibration(highFrequencyIntensity)
+            if (low <= 0f && high <= 0f) {
+                mHapticHandler?.stop(deviceId)
+                return
+            }
+            val handled = mHapticHandler?.rumble(deviceId, low, high, length) == true
+            if (!handled && GamepadRuntimeInputSettings.deviceVibrationFallbackEnabled()) {
+                val fallbackIntensity = ((low * 0.6f) + (high * 0.4f)).coerceIn(0f, 1f)
+                mHapticHandler?.run(DEVICE_VIBRATOR_SERVICE_ID, fallbackIntensity, length)
+            }
         }
 
         @JvmStatic
         fun hapticStop(deviceId: Int) {
             mHapticHandler?.stop(deviceId)
+            if (deviceId != DEVICE_VIBRATOR_SERVICE_ID) {
+                mHapticHandler?.stop(DEVICE_VIBRATOR_SERVICE_ID)
+            }
         }
 
         @JvmStatic
@@ -297,6 +322,8 @@ private object GamepadRuntimeInputSettings {
         val triggerThreshold: Float = 0.12f,
         val buttonProfile: String = VitaCoreConfig.GAMEPAD_PROFILE_STANDARD,
         val vibration: Boolean = true,
+        val vibrationStrength: Int = 100,
+        val deviceVibrationFallback: Boolean = true,
         val swapSticks: Boolean = false,
         val invertLeftX: Boolean = false,
         val invertLeftY: Boolean = false,
@@ -306,6 +333,8 @@ private object GamepadRuntimeInputSettings {
     )
 
     fun vibrationEnabled(): Boolean = current().vibration
+    fun deviceVibrationFallbackEnabled(): Boolean = current().deviceVibrationFallback
+    fun scaleVibration(intensity: Float): Float = (intensity * (current().vibrationStrength.coerceIn(0, 100) / 100f)).coerceIn(0f, 1f)
 
     fun mapButton(keycode: Int): Int {
         return when (current().buttonProfile) {
@@ -390,6 +419,8 @@ private object GamepadRuntimeInputSettings {
                 triggerThreshold = config.gamepadTriggerThreshold,
                 buttonProfile = config.gamepadButtonProfile,
                 vibration = config.gamepadVibration,
+                vibrationStrength = config.gamepadVibrationStrength,
+                deviceVibrationFallback = config.deviceVibrationFallback,
                 swapSticks = config.gamepadSwapSticks,
                 invertLeftX = config.gamepadInvertLeftX,
                 invertLeftY = config.gamepadInvertLeftY,
@@ -529,29 +560,33 @@ open class SDLHapticHandler {
 
     private val mHaptics = arrayListOf<SDLHaptic>()
 
-    open fun run(deviceId: Int, intensity: Float, length: Int) {
-        getHaptic(deviceId)?.vib?.vibrate(length.toLong())
+    open fun run(deviceId: Int, intensity: Float, length: Int): Boolean {
+        val vibrator = getHaptic(deviceId)?.vib ?: return false
+        vibrator.vibrate(length.toLong())
+        return true
     }
 
-    open fun rumble(deviceId: Int, lowFrequencyIntensity: Float, highFrequencyIntensity: Float, length: Int) {
+    open fun rumble(deviceId: Int, lowFrequencyIntensity: Float, highFrequencyIntensity: Float, length: Int): Boolean {
+        return false
     }
 
-    open fun stop(deviceId: Int) {
-        getHaptic(deviceId)?.vib?.cancel()
+    open fun stop(deviceId: Int): Boolean {
+        val vibrator = getHaptic(deviceId)?.vib ?: return false
+        vibrator.cancel()
+        return true
     }
 
     open fun pollHapticDevices() {
-        val deviceIdVibratorService = 999999
         var hasVibratorService = false
 
         val vib = SDL.getContext().getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         if (vib != null) {
             hasVibratorService = vib.hasVibrator()
             if (hasVibratorService) {
-                var haptic = getHaptic(deviceIdVibratorService)
+                var haptic = getHaptic(DEVICE_VIBRATOR_SERVICE_ID)
                 if (haptic == null) {
                     haptic = SDLHaptic().apply {
-                        deviceId = deviceIdVibratorService
+                        deviceId = DEVICE_VIBRATOR_SERVICE_ID
                         name = "VIBRATOR_SERVICE"
                         this.vib = vib
                     }
@@ -563,7 +598,7 @@ open class SDLHapticHandler {
 
         val removedDevices = arrayListOf<Int>()
         mHaptics.forEach { haptic ->
-            if (haptic.deviceId != deviceIdVibratorService || !hasVibratorService) {
+            if (haptic.deviceId != DEVICE_VIBRATOR_SERVICE_ID || !hasVibratorService) {
                 removedDevices.add(haptic.deviceId)
             }
         }
@@ -580,45 +615,51 @@ open class SDLHapticHandler {
 }
 
 class SDLHapticHandler_API26 : SDLHapticHandler() {
-    override fun run(deviceId: Int, intensity: Float, length: Int) {
-        val haptic = getHaptic(deviceId) ?: return
+    override fun run(deviceId: Int, intensity: Float, length: Int): Boolean {
+        val haptic = getHaptic(deviceId) ?: return false
         if (intensity == 0.0f) {
             stop(deviceId)
-            return
+            return true
         }
 
         var vibeValue = kotlin.math.round(intensity * 255).toInt()
         if (vibeValue > 255) vibeValue = 255
         if (vibeValue < 1) {
             stop(deviceId)
-            return
+            return true
         }
         try {
             haptic.vib.vibrate(VibrationEffect.createOneShot(length.toLong(), vibeValue))
         } catch (_: Exception) {
             haptic.vib.vibrate(length.toLong())
         }
+        return true
     }
 }
 
 class SDLHapticHandler_API31 : SDLHapticHandler() {
-    override fun run(deviceId: Int, intensity: Float, length: Int) {
-        getHaptic(deviceId)?.let { vibrate(it.vib, intensity, length) }
+    override fun run(deviceId: Int, intensity: Float, length: Int): Boolean {
+        val haptic = getHaptic(deviceId) ?: return false
+        vibrate(haptic.vib, intensity, length)
+        return true
     }
 
-    override fun rumble(deviceId: Int, lowFrequencyIntensity: Float, highFrequencyIntensity: Float, length: Int) {
-        val device = InputDevice.getDevice(deviceId) ?: return
+    override fun rumble(deviceId: Int, lowFrequencyIntensity: Float, highFrequencyIntensity: Float, length: Int): Boolean {
+        val device = InputDevice.getDevice(deviceId) ?: return false
         val manager = device.vibratorManager
         val vibrators = manager.vibratorIds
-        when {
+        return when {
             vibrators.size >= 2 -> {
                 vibrate(manager.getVibrator(vibrators[0]), lowFrequencyIntensity, length)
                 vibrate(manager.getVibrator(vibrators[1]), highFrequencyIntensity, length)
+                true
             }
             vibrators.size == 1 -> {
                 val intensity = (lowFrequencyIntensity * 0.6f) + (highFrequencyIntensity * 0.4f)
                 vibrate(manager.getVibrator(vibrators[0]), intensity, length)
+                true
             }
+            else -> false
         }
     }
 

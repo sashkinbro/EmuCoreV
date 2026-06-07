@@ -758,4 +758,14 @@
     <string name="setup_content_repair_button">Réparer et installer VPK/ZIP</string>
     <string name="setup_content_repair_note">La réparation convertit le VPK ou ZIP sélectionné en un nouveau ZIP dans le cache d\'installation, normalise l\'empaquetage de l\'archive et supprime le marqueur d\'installation Vitamin non pris en charge lorsqu\'il est présent. Utilisez-le uniquement lorsqu\'une installation normale échoue pour une archive valide.</string>
     <string name="install_choice_archive_repair_button">Réparer et installer</string>
+    <string name="settings_vibration_section">Vibration</string>
+    <string name="settings_vibration_enable">Vibration</string>
+    <string name="settings_vibration_strength">Force de la vibration</string>
+    <string name="settings_test_vibration">Tester la vibration</string>
+    <string name="settings_test_vibration_button">Tester</string>
+    <string name="settings_device_vibration_fallback">Utiliser la vibration de l\'appareil comme solution de secours</string>
+    <string name="settings_help_vibration_enable">Permet aux jeux compatibles d\'envoyer des vibrations à une manette physique ou, lorsque la solution de secours est activée, au corps de l\'appareil Android.</string>
+    <string name="settings_help_vibration_strength">Ajuste l\'intensité de la vibration pour le grondement de la manette et la solution de secours de l\'appareil.</string>
+    <string name="settings_help_test_vibration">Émet une courte impulsion en utilisant la force de vibration et le routage actuels.</string>
+    <string name="settings_help_device_vibration_fallback">Fait vibrer le téléphone ou le corps de la console portable lorsqu\'une manette physique est absente ou ne possède pas de moteur de vibration.</string>
 </resources>

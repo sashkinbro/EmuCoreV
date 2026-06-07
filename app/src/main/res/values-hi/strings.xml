@@ -758,4 +758,14 @@
     <string name="setup_content_repair_button">VPK/ZIP की मरम्मत करें और इंस्टॉल करें</string>
     <string name="setup_content_repair_note">मरम्मत चयनित VPK या ZIP को इंस्टॉल कैश में एक ताज़ा ZIP में बदल देती है, संग्रह पैकिंग को सामान्य करती है, और मौजूद होने पर असमर्थित विटामिन इंस्टॉल मार्कर को हटा देती है। इसका उपयोग केवल तभी करें जब किसी वैध संग्रह के लिए सामान्य इंस्टॉल विफल हो जाए।</string>
     <string name="install_choice_archive_repair_button">मरम्मत करें और इंस्टॉल करें</string>
+    <string name="settings_vibration_section">कंपन</string>
+    <string name="settings_vibration_enable">कंपन</string>
+    <string name="settings_vibration_strength">कंपन की ताकत</string>
+    <string name="settings_test_vibration">कंपन का परीक्षण करें</string>
+    <string name="settings_test_vibration_button">परीक्षण करें</string>
+    <string name="settings_device_vibration_fallback">फ़ॉलबैक के रूप में डिवाइस के कंपन का उपयोग करें</string>
+    <string name="settings_help_vibration_enable">समर्थित गेम को भौतिक कंट्रोलर में या, जब फ़ॉलबैक सक्षम हो, Android डिवाइस के मुख्य भाग में कंपन भेजने की अनुमति देता है।</string>
+    <string name="settings_help_vibration_strength">गेमपैड रंबल और डिवाइस फ़ॉलबैक के लिए कंपन की तीव्रता को मापता है。</string>
+    <string name="settings_help_test_vibration">वर्तमान कंपन शक्ति और रूटिंग का उपयोग करके एक छोटी पल्स बजाता है।</string>
+    <string name="settings_help_device_vibration_fallback">भौतिक कंट्रोलर गुम होने या रंबल मोटर न होने पर फ़ोन या हैंडहेल्ड डिवाइस को कंपाता है।</string>
 </resources>

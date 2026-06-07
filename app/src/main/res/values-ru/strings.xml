@@ -758,4 +758,14 @@
     <string name="setup_content_repair_button">Восстановить и установить VPK/ZIP</string>
     <string name="setup_content_repair_note">Функция восстановления преобразует выбранный VPK или ZIP в новый ZIP в кэше установки, нормализует упаковку архива и удаляет неподдерживаемый маркер установки Vitamin, если он присутствует. Используйте только тогда, когда обычная установка валидного архива завершается неудачей.</string>
     <string name="install_choice_archive_repair_button">Восстановить и установить</string>
+    <string name="settings_vibration_section">Вибрация</string>
+    <string name="settings_vibration_enable">Вибрация</string>
+    <string name="settings_vibration_strength">Сила вибрации</string>
+    <string name="settings_test_vibration">Проверить вибрацию</string>
+    <string name="settings_test_vibration_button">Проверить</string>
+    <string name="settings_device_vibration_fallback">Использовать вибрацию устройства как запасной вариант</string>
+    <string name="settings_help_vibration_enable">Позволяет поддерживаемым играм отправлять вибрацию на физический контроллер или, если включен запасной вариант, на корпус устройства Android.</string>
+    <string name="settings_help_vibration_strength">Масштабирует интенсивность вибрации для отдачи геймпада и запасного варианта устройства.</string>
+    <string name="settings_help_test_vibration">Воспроизводит короткий импульс с использованием текущей силы вибрации и маршрутизации.</string>
+    <string name="settings_help_device_vibration_fallback">Вызывает вибрацию телефона или портативного устройства, если физический контроллер отсутствует или не имеет вибромотора.</string>
 </resources>

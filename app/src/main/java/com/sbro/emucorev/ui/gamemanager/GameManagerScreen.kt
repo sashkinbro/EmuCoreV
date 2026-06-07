@@ -636,7 +636,18 @@ private fun GamepadProfileSection(
         ) {
             onUpdate { cfg -> cfg.copy(gamepadButtonProfile = it) }
         }
-        ToggleRow(stringResource(R.string.settings_gamepad_vibration), config.gamepadVibration, stringResource(R.string.settings_help_gamepad_vibration), { onUpdate { it.copy(gamepadVibration = defaults.gamepadVibration) } }) { onUpdate { cfg -> cfg.copy(gamepadVibration = it) } }
+        ToggleRow(stringResource(R.string.settings_vibration_enable), config.gamepadVibration, stringResource(R.string.settings_help_vibration_enable), { onUpdate { it.copy(gamepadVibration = defaults.gamepadVibration) } }) { onUpdate { cfg -> cfg.copy(gamepadVibration = it) } }
+        SliderRow(
+            title = stringResource(R.string.settings_vibration_strength),
+            description = stringResource(R.string.settings_help_vibration_strength),
+            valueText = stringResource(R.string.settings_gamepad_percent_value, config.gamepadVibrationStrength),
+            value = config.gamepadVibrationStrength.toFloat(),
+            valueRange = 0f..100f,
+            steps = 19,
+            onReset = { onUpdate { it.copy(gamepadVibrationStrength = defaults.gamepadVibrationStrength) } },
+            onChange = { value -> onUpdate { it.copy(gamepadVibrationStrength = value.toInt().coerceIn(0, 100)) } }
+        )
+        ToggleRow(stringResource(R.string.settings_device_vibration_fallback), config.deviceVibrationFallback, stringResource(R.string.settings_help_device_vibration_fallback), { onUpdate { it.copy(deviceVibrationFallback = defaults.deviceVibrationFallback) } }) { onUpdate { cfg -> cfg.copy(deviceVibrationFallback = it) } }
         ToggleRow(stringResource(R.string.settings_gamepad_swap_sticks), config.gamepadSwapSticks, stringResource(R.string.settings_help_gamepad_swap_sticks), { onUpdate { it.copy(gamepadSwapSticks = defaults.gamepadSwapSticks) } }) { onUpdate { cfg -> cfg.copy(gamepadSwapSticks = it) } }
         ToggleRow(stringResource(R.string.game_manager_invert_left_x), config.gamepadInvertLeftX, stringResource(R.string.settings_help_gamepad_invert_y), { onUpdate { it.copy(gamepadInvertLeftX = defaults.gamepadInvertLeftX) } }) { onUpdate { cfg -> cfg.copy(gamepadInvertLeftX = it) } }
         ToggleRow(stringResource(R.string.settings_gamepad_invert_left_y), config.gamepadInvertLeftY, stringResource(R.string.settings_help_gamepad_invert_y), { onUpdate { it.copy(gamepadInvertLeftY = defaults.gamepadInvertLeftY) } }) { onUpdate { cfg -> cfg.copy(gamepadInvertLeftY = it) } }

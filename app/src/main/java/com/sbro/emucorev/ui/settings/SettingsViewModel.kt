@@ -19,6 +19,7 @@ import com.sbro.emucorev.core.StorageMigrationProgress
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.VitaStorageLocation
+import com.sbro.emucorev.core.VibrationTestController
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.data.AppPreferences
 import kotlinx.coroutines.Dispatchers
@@ -234,6 +235,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(Dispatchers.IO) {
             coreConfigRepository.save(updated)
         }
+    }
+
+    fun testVibration(): Boolean {
+        return VibrationTestController.playTestPulse(getApplication(), _uiState.value.coreConfig)
     }
 
     fun installGpuDriver(uri: Uri, applyGlobally: Boolean = true, onComplete: (Result<String>) -> Unit) {

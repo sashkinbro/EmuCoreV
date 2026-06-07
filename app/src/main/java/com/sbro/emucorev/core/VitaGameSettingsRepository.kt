@@ -161,6 +161,8 @@ class VitaGameSettingsRepository(private val context: Context) {
                 gamepadTriggerThreshold = own.floatAttr("gamepad-trigger-threshold", config.gamepadTriggerThreshold),
                 gamepadButtonProfile = own.stringAttr("gamepad-button-profile", config.gamepadButtonProfile),
                 gamepadVibration = own.boolAttr("gamepad-vibration", config.gamepadVibration),
+                gamepadVibrationStrength = own.intAttr("gamepad-vibration-strength", config.gamepadVibrationStrength),
+                deviceVibrationFallback = own.boolAttr("device-vibration-fallback", config.deviceVibrationFallback),
                 gamepadSwapSticks = own.boolAttr("gamepad-swap-sticks", config.gamepadSwapSticks),
                 gamepadInvertLeftX = own.boolAttr("gamepad-invert-left-x", config.gamepadInvertLeftX),
                 gamepadInvertLeftY = own.boolAttr("gamepad-invert-left-y", config.gamepadInvertLeftY),
@@ -256,6 +258,8 @@ class VitaGameSettingsRepository(private val context: Context) {
             setAttribute("gamepad-trigger-threshold", config.gamepadTriggerThreshold.toString())
             setAttribute("gamepad-button-profile", config.gamepadButtonProfile)
             setAttribute("gamepad-vibration", config.gamepadVibration.toString())
+            setAttribute("gamepad-vibration-strength", config.gamepadVibrationStrength.toString())
+            setAttribute("device-vibration-fallback", config.deviceVibrationFallback.toString())
             setAttribute("gamepad-swap-sticks", config.gamepadSwapSticks.toString())
             setAttribute("gamepad-invert-left-x", config.gamepadInvertLeftX.toString())
             setAttribute("gamepad-invert-left-y", config.gamepadInvertLeftY.toString())

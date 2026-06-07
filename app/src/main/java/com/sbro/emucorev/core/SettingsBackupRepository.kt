@@ -95,6 +95,17 @@ class SettingsBackupRepository(
         .put("overlayOpacity", overlayOpacity)
         .put("disableMotion", disableMotion)
         .put("analogMultiplier", analogMultiplier.toDouble())
+        .put("gamepadDeadzone", gamepadDeadzone.toDouble())
+        .put("gamepadTriggerThreshold", gamepadTriggerThreshold.toDouble())
+        .put("gamepadButtonProfile", gamepadButtonProfile)
+        .put("gamepadVibration", gamepadVibration)
+        .put("gamepadVibrationStrength", gamepadVibrationStrength)
+        .put("deviceVibrationFallback", deviceVibrationFallback)
+        .put("gamepadSwapSticks", gamepadSwapSticks)
+        .put("gamepadInvertLeftX", gamepadInvertLeftX)
+        .put("gamepadInvertLeftY", gamepadInvertLeftY)
+        .put("gamepadInvertRightX", gamepadInvertRightX)
+        .put("gamepadInvertRightY", gamepadInvertRightY)
         .put("stretchDisplayArea", stretchDisplayArea)
         .put("fpsHack", fpsHack)
         .put("vSync", vSync)
@@ -154,6 +165,17 @@ class SettingsBackupRepository(
         overlayOpacity = optInt("overlayOpacity", defaults.overlayOpacity),
         disableMotion = optBoolean("disableMotion", defaults.disableMotion),
         analogMultiplier = optFloat("analogMultiplier", defaults.analogMultiplier),
+        gamepadDeadzone = optFloat("gamepadDeadzone", defaults.gamepadDeadzone),
+        gamepadTriggerThreshold = optFloat("gamepadTriggerThreshold", defaults.gamepadTriggerThreshold),
+        gamepadButtonProfile = optString("gamepadButtonProfile", defaults.gamepadButtonProfile),
+        gamepadVibration = optBoolean("gamepadVibration", defaults.gamepadVibration),
+        gamepadVibrationStrength = optInt("gamepadVibrationStrength", defaults.gamepadVibrationStrength),
+        deviceVibrationFallback = optBoolean("deviceVibrationFallback", defaults.deviceVibrationFallback),
+        gamepadSwapSticks = optBoolean("gamepadSwapSticks", defaults.gamepadSwapSticks),
+        gamepadInvertLeftX = optBoolean("gamepadInvertLeftX", defaults.gamepadInvertLeftX),
+        gamepadInvertLeftY = optBoolean("gamepadInvertLeftY", defaults.gamepadInvertLeftY),
+        gamepadInvertRightX = optBoolean("gamepadInvertRightX", defaults.gamepadInvertRightX),
+        gamepadInvertRightY = optBoolean("gamepadInvertRightY", defaults.gamepadInvertRightY),
         stretchDisplayArea = optBoolean("stretchDisplayArea", defaults.stretchDisplayArea),
         fpsHack = optBoolean("fpsHack", defaults.fpsHack),
         vSync = optBoolean("vSync", defaults.vSync),
