@@ -707,7 +707,7 @@
     <string name="save_manager_restore_all_confirm_title">Восстановить все сохранения?</string>
     <string name="save_manager_restore_all_confirm_body">Папки сохранений из выбранной резервной копии заменят совпадающие папки сохранений на этом устройстве. Существующие сохранения сохраняются только в том случае, если в резервной копии нет такого ID сохранения.</string>
     <string name="save_manager_restore_all_confirm">Восстановить сохранения</string>
-    <string name="install_dialog_vitamin_unsupported">Дампы Vitamin VPK не поддерживаются. Используйте совместимый дамп, такой как NoNpDrm, или установите PKG с соответствующей лицензией.</string>
+    <string name="install_dialog_vitamin_unsupported">Некоторые VPK могут устанавливаться некорректно. Сначала попробуйте обычную установку; если она не сработает, используйте "Восстановить и установить" или установите соответствующий PKG и лицензию.</string>
     <string name="settings_change_storage">Изменить хранилище</string>
     <string name="settings_storage_location_internal">Память устройства</string>
     <string name="settings_storage_location_sd">SD-картка</string>
@@ -754,9 +754,9 @@
     <string name="install_dialog_repack_entry">Переупаковка: %1$s</string>
     <string name="install_dialog_repack_installing">Установка пересобранного ZIP-архива…</string>
     <string name="install_dialog_repack_failed">Восстановление архива не привело к созданию устанавливаемого ZIP. Попробуйте другой дамп или установите соответствующий PKG и лицензию.</string>
-    <string name="install_dialog_vitamin_repair_failed">Этот VPK от Vitamin был пересобран, но всё ещё не может быть установлен Vita3K. Попробуйте дамп NoNpDrm или установите соответствующий PKG и лицензию.</string>
+    <string name="install_dialog_vitamin_repair_failed">Пересобранный VPK всё ещё не удалось установить. Попробуйте другой дамп или установите соответствующий PKG и лицензию.</string>
     <string name="setup_content_repair_button">Восстановить и установить</string>
-    <string name="setup_content_repair_note">Функция восстановления преобразует выбранный VPK или ZIP в новый ZIP в кэше установки, нормализует упаковку архива и удаляет неподдерживаемый маркер установки Vitamin, если он присутствует. Используйте только тогда, когда обычная установка валидного архива завершается неудачей.</string>
+    <string name="setup_content_repair_note">Функция восстановления преобразует выбранный VPK или ZIP в новый ZIP в кэше установки, нормализует упаковку архива и удаляет маркер Vitamin, если он присутствует. Используйте только тогда, когда обычная установка валидного архива завершается неудачей.</string>
     <string name="install_choice_archive_repair_button">Восстановить и установить</string>
     <string name="settings_vibration_section">Вибрация</string>
     <string name="settings_vibration_enable">Вибрация</string>

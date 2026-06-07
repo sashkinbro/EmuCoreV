@@ -491,8 +491,7 @@ SceUID load_self(KernelState &kernel, MemState &mem, const void *self, const std
         }
 
         if (self_path == "app0:sce_module/steroid.suprx") {
-            LOG_CRITICAL("You're trying to load a vitamin dump. It is not supported.");
-            return -1;
+            LOG_WARN("Loading Vitamin marker module: {}", self_path);
         }
     }
 

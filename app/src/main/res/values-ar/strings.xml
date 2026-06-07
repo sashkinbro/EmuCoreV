@@ -707,7 +707,7 @@
     <string name="save_manager_restore_all_confirm_title">هل تريد استعادة جميع عمليات الحفظ؟</string>
     <string name="save_manager_restore_all_confirm_body">ستحل مجلدات الحفظ من النسخة الاحتياطية المحددة محل مجلدات الحفظ المطابقة على هذا الجهاز. يتم الاحتفاظ بعمليات الحفظ الحالية فقط عندما لا تحتوي النسخة الاحتياطية على معرف الحفظ ذلك.</string>
     <string name="save_manager_restore_all_confirm">استعادة عمليات الحفظ</string>
-    <string name="install_dialog_vitamin_unsupported">لا يتم دعم تفريغات Vitamin VPK. استخدم تفريغًا متوافقًا مثل NoNpDrm، أو قم بتثبيت PKG مع الترخيص المطابق له.</string>
+    <string name="install_dialog_vitamin_unsupported">قد لا يتم تثبيت بعض ملفات VPK بشكل صحيح. جرّب التثبيت العادي أولاً؛ وإذا فشل، استخدم "إصلاح وتثبيت" أو ثبّت ملف PKG والترخيص المطابقين.</string>
     <string name="settings_change_storage">تغيير مساحة التخزين</string>
     <string name="settings_storage_location_internal">مساحة تخزين الجهاز</string>
     <string name="settings_storage_location_sd">بطاقة SD</string>
@@ -754,9 +754,9 @@
     <string name="install_dialog_repack_entry">جارٍ إعادة الحزم: %1$s</string>
     <string name="install_dialog_repack_installing">جارٍ تثبيت ملف ZIP المُعاد بناؤه…</string>
     <string name="install_dialog_repack_failed">لم ينتج عن إصلاح الأرشيف ملف ZIP قابل للتثبيت. جرب نسخة أخرى، أو قم بتثبيت ملف PKG المطابق والترخيص.</string>
-    <string name="install_dialog_vitamin_repair_failed">تمت إعادة بناء ملف Vitamin VPK هذا، ولكنه لا يزال غير قابل للتثبيت بواسطة Vita3K. جرب نسخة NoNpDrm أو قم بتثبيت ملف PKG المطابق والترخيص.</string>
+    <string name="install_dialog_vitamin_repair_failed">لا يزال ملف VPK المعاد بناؤه غير قابل للتثبيت. جرّب تفريغًا آخر، أو ثبّت ملف PKG والترخيص المطابقين.</string>
     <string name="setup_content_repair_button">إصلاح وتثبيت</string>
-    <string name="setup_content_repair_note">تعمل عملية الإصلاح على تحويل ملف VPK أو ZIP المحدد إلى ملف ZIP جديد في ذاكرة التخزين المؤقت للتثبيت، وتطبيع حزم الأرشيف، وإزالة علامة تثبيت Vitamin غير المدعومة عند وجودها. استخدمه فقط عندما يفشل التثبيت العادي لأرشيف صالح.</string>
+    <string name="setup_content_repair_note">تعمل عملية الإصلاح على تحويل ملف VPK أو ZIP المحدد إلى ملف ZIP جديد في ذاكرة التخزين المؤقت للتثبيت، وتطبيع حزم الأرشيف، وإزالة علامة Vitamin عند وجودها. استخدمه فقط عندما يفشل التثبيت العادي لأرشيف صالح.</string>
     <string name="install_choice_archive_repair_button">إصلاح وتثبيت</string>
     <string name="settings_vibration_section">الاهتزاز</string>
     <string name="settings_vibration_enable">الاهتزاز</string>

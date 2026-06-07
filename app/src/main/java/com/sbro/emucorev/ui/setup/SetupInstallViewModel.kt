@@ -100,10 +100,6 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                     "metadata=${inspection.hasInstallMetadata} vitamin=${inspection.vitaminDump} " +
                     "unsupported=${inspection.unsupportedCompressionEntries}"
             )
-            if (inspection.vitaminDump && !repairArchive) {
-                finishError(appContext.getString(R.string.install_dialog_vitamin_unsupported))
-                return@runInstall
-            }
             val installPath = if (repairArchive) {
                 val repairedPath = repairArchiveForInstall(path) ?: run {
                     _uiState.value = _uiState.value.copy(detail = null)
@@ -121,7 +117,6 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                         "unsupported=${repairedInspection.unsupportedCompressionEntries}"
                 )
                 if (
-                    repairedInspection.vitaminDump ||
                     !repairedInspection.readable ||
                     !repairedInspection.hasInstallMetadata ||
                     !repairedInspection.supportedCompression
@@ -275,7 +270,6 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                 inspection.unsupportedCompressionEntries,
                 inspection.unsupportedCompressionEntries
             )
-            inspection.vitaminDump && repairRequested -> appContext.getString(R.string.install_dialog_vitamin_repair_failed)
             repairRequested -> appContext.getString(R.string.install_dialog_repack_failed)
             else -> appContext.getString(R.string.install_dialog_content_try_repair)
         }

@@ -707,7 +707,7 @@
     <string name="save_manager_restore_all_confirm_title">Ripristinare tutti i salvataggi?</string>
     <string name="save_manager_restore_all_confirm_body">Le cartelle di salvataggio dal backup selezionato sostituiranno le cartelle di salvataggio corrispondenti su questo dispositivo. I salvataggi esistenti vengono mantenuti solo quando il backup non contiene quell\'ID di salvataggio.</string>
     <string name="save_manager_restore_all_confirm">Ripristina salvataggi</string>
-    <string name="install_dialog_vitamin_unsupported">I dump Vitamin VPK non sono supportati. Usa un dump compatibile come NoNpDrm, oppure installa il PKG con la licenza corrispondente.</string>
+    <string name="install_dialog_vitamin_unsupported">Alcuni file VPK potrebbero non installarsi correttamente. Prova prima l’installazione normale; se fallisce, usa "Ripara e installa" oppure installa il PKG e la licenza corrispondenti.</string>
     <string name="settings_change_storage">Cambia memoria</string>
     <string name="settings_storage_location_internal">Memoria del dispositivo</string>
     <string name="settings_storage_location_sd">Scheda SD</string>
@@ -754,9 +754,9 @@
     <string name="install_dialog_repack_entry">Ri-creazione archivio: %1$s</string>
     <string name="install_dialog_repack_installing">Installazione dello ZIP ricostruito…</string>
     <string name="install_dialog_repack_failed">La riparazione dell\'archivio non ha prodotto uno ZIP installable. Prova un altro dump o installa il PKG e la licenza corrispondenti.</string>
-    <string name="install_dialog_vitamin_repair_failed">Questo VPK Vitamin è stato ricostruito, ma non è ancora installabile da Vita3K. Prova un dump NoNpDrm o installa il PKG e la licenza corrispondenti.</string>
+    <string name="install_dialog_vitamin_repair_failed">Il VPK ricostruito non è ancora stato installato correttamente. Prova un altro dump o installa il PKG e la licenza corrispondenti.</string>
     <string name="setup_content_repair_button">Ripara e installa</string>
-    <string name="setup_content_repair_note">La riparazione converte il VPK o ZIP selezionato in un nuovo ZIP nella cache di installazione, normalizza la compressione dell\'archivio e rimuove l\'indicatore di installazione Vitamin non supportato, se presente. Usalo solo quando l\'installazione normale di un archivio valido fallisce.</string>
+    <string name="setup_content_repair_note">La riparazione converte il VPK o ZIP selezionato in un nuovo ZIP nella cache di installazione, normalizza la compressione dell\'archivio e rimuove il marker Vitamin, se presente. Usalo solo quando l\'installazione normale di un archivio valido fallisce.</string>
     <string name="install_choice_archive_repair_button">Ripara e installa</string>
     <string name="settings_vibration_section">Vibrazione</string>
     <string name="settings_vibration_enable">Vibrazione</string>

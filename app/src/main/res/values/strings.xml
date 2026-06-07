@@ -700,7 +700,7 @@
     <string name="install_dialog_unexpected_error">Something went wrong during installation.</string>
     <string name="install_dialog_firmware_failed">Firmware installation failed.</string>
     <string name="install_dialog_content_failed">Game installation failed.</string>
-    <string name="install_dialog_vitamin_unsupported">Vitamin VPK dumps are not supported. Use a compatible dump such as NoNpDrm, or install the PKG with its matching license.</string>
+    <string name="install_dialog_vitamin_unsupported">Some VPK files may not install correctly. Try normal installation first; if it fails, use Repair and install, or install the matching PKG and license.</string>
     <string name="install_dialog_content_try_repair">If this is a valid VPK or ZIP image, try Repair and install from the game install dialog.</string>
     <string name="install_dialog_archive_unreadable">The archive could not be read. It may be damaged or incomplete.</string>
     <string name="install_dialog_archive_missing_metadata">The archive does not contain Vita install metadata such as `sce_sys/param.sfo` or `theme.xml`.</string>
@@ -708,7 +708,7 @@
     <string name="install_dialog_repack_entry">Repacking: %1$s</string>
     <string name="install_dialog_repack_installing">Installing the rebuilt ZIP…</string>
     <string name="install_dialog_repack_failed">Archive repair did not produce an installable ZIP. Try another dump, or install the matching PKG and license.</string>
-    <string name="install_dialog_vitamin_repair_failed">This Vitamin VPK was rebuilt, but it still is not installable by Vita3K. Try a NoNpDrm dump or install the matching PKG and license.</string>
+    <string name="install_dialog_vitamin_repair_failed">The rebuilt VPK still could not be installed. Try another dump, or install the matching PKG and license.</string>
     <string name="install_dialog_license_failed">License installation failed.</string>
     <string name="install_dialog_pkg_failed">PKG installation failed.</string>
     <string name="install_dialog_firmware_done">Firmware package installed successfully.</string>
@@ -733,7 +733,7 @@
     <string name="setup_content_body">Use this for game archives that already contain all required install data. If a valid VPK or ZIP fails because of archive packing, try the repair option.</string>
     <string name="setup_content_button">Select VPK or ZIP</string>
     <string name="setup_content_repair_button">Repair and install</string>
-    <string name="setup_content_repair_note">Repair converts the selected VPK or ZIP into a fresh ZIP in the install cache, normalizes archive packing, and removes the unsupported Vitamin install marker when present. Use it only when a normal install fails for a valid archive.</string>
+    <string name="setup_content_repair_note">Repair converts the selected VPK or ZIP into a fresh ZIP in the install cache, normalizes archive packing, and removes the Vitamin marker when present. Use it only when a normal install fails for a valid archive.</string>
     <string name="setup_pkg_title">Install PKG game</string>
     <string name="setup_pkg_body">PKG installs need a matching license before the game file. Complete step 1 first, then choose the PKG in step 2.</string>
     <string name="setup_pkg_license_step_title">Add license</string>
