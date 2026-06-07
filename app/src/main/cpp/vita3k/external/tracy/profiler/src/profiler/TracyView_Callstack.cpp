@@ -1,22 +1,18 @@
 #include <inttypes.h>
+#include <nlohmann/json.hpp>
 #include <sstream>
 
 #include "../public/common/TracyStackFrames.hpp"
+#include "TracyConfig.hpp"
 #include "TracyImGui.hpp"
+#include "TracyMouse.hpp"
 #include "TracyPrint.hpp"
 #include "TracyUtility.hpp"
 #include "TracyView.hpp"
+#include "../Fonts.hpp"
 
 namespace tracy
 {
-
-static bool IsFrameExternal( const char* filename, const char* image )
-{
-    if( strncmp( filename, "/usr/", 5 ) == 0 || strncmp( filename, "/lib/", 5 ) == 0 || strcmp( filename, "[unknown]" ) == 0 ) return true;
-    if( strncmp( filename, "C:\\Program Files\\", 17 ) == 0 || strncmp( filename, "d:\\a01\\_work\\", 13 ) == 0 ) return true;
-    if( !image ) return false;
-    return strncmp( image, "/usr/", 5 ) == 0 || strncmp( image, "/lib/", 5 ) == 0 || strncmp( image, "/lib64/", 7 ) == 0 || strcmp( image, "<kernel>" ) == 0;
-}
 
 void View::DrawCallstackWindow()
 {
@@ -30,6 +26,74 @@ void View::DrawCallstackWindow()
     }
     ImGui::End();
     if( !show ) m_callstackInfoWindow = 0;
+}
+
+static nlohmann::json GetCallstackJson( Worker& worker, const VarArray<CallstackFrameId>& cs )
+{
+    nlohmann::json json = {
+        { "type", "callstack" },
+        { "frames", nlohmann::json::array() }
+    };
+    auto& frames = json["frames"];
+
+    int fidx = 0;
+    for( auto& entry : cs )
+    {
+        auto frameData = worker.GetCallstackFrame( entry );
+        if( !frameData )
+        {
+            frames.push_back( { "pointer", worker.GetCanonicalPointer( entry ) } );
+        }
+        else
+        {
+            const auto fsz = frameData->size;
+            for( uint8_t f=0; f<fsz; f++ )
+            {
+                const auto& frame = frameData->data[f];
+                auto txt = worker.GetString( frame.name );
+
+                if( fidx == 0 && f != fsz-1 )
+                {
+                    auto test = tracy::s_tracyStackFrames;
+                    bool match = false;
+                    do
+                    {
+                        if( strcmp( txt, *test ) == 0 )
+                        {
+                            match = true;
+                            break;
+                        }
+                    }
+                    while( *++test );
+                    if( match ) continue;
+                }
+
+                frames.push_back( {
+                    { "function", txt },
+                    { "source", worker.GetString( frame.file ) },
+                } );
+                auto& frameJson = frames.back();
+
+                if( f == fsz-1 )
+                {
+                    frameJson["frame"] = fidx++;
+                }
+                else
+                {
+                    frameJson["inline"] = true;
+                }
+                if( frame.line != 0 )
+                {
+                    frameJson["line"] = frame.line;
+                }
+                if( frameData->imageName.Active() )
+                {
+                    frameJson["executable"] = worker.GetString( frameData->imageName );
+                }
+            }
+        }
+    }
+    return json;
 }
 
 void View::DrawCallstackTable( uint32_t callstack, bool globalEntriesButton )
@@ -104,10 +168,42 @@ void View::DrawCallstackTable( uint32_t callstack, bool globalEntriesButton )
         }
         ImGui::SetClipboardText( s.str().c_str() );
     }
+    if( s_config.llm )
+    {
+        ImGui::SameLine();
+        if( ImGui::SmallButton( ICON_FA_ROBOT ) )
+        {
+            AddLlmAttachment( GetCallstackJson( m_worker, cs ) );
+        }
+        if( ImGui::IsItemHovered() && IsMouseClicked( ImGuiMouseButton_Right ) )
+        {
+            ImGui::OpenPopup( "##callstackllm" );
+        }
+        if( ImGui::BeginPopup( "##callstackllm" ) )
+        {
+            if( ImGui::Selectable( "What is program doing at this moment?" ) )
+            {
+                AddLlmAttachment( GetCallstackJson( m_worker, cs ) );
+                AddLlmQuery( "What is program doing at this moment?" );
+                ImGui::CloseCurrentPopup();
+            }
+            if( ImGui::Selectable( "Walk me through the details of this callstack, step by step, explaining the code." ) )
+            {
+                AddLlmAttachment( GetCallstackJson( m_worker, cs ) );
+                AddLlmQuery( "Walk me through the details of this callstack, step by step, explaining the code." );
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+    }
     ImGui::SameLine();
     ImGui::Spacing();
     ImGui::SameLine();
-    SmallCheckbox( "External frames", &m_showExternalFrames );
+    SmallCheckbox( ICON_FA_SHIELD_HALVED " External frames", &m_showExternalFrames );
+    ImGui::SameLine();
+    ImGui::Spacing();
+    ImGui::SameLine();
+    SmallCheckbox( ICON_FA_SCISSORS " Short images", &m_shortImageNames );
     ImGui::SameLine();
     ImGui::Spacing();
     ImGui::SameLine();
@@ -152,7 +248,7 @@ void View::DrawCallstackTable( uint32_t callstack, bool globalEntriesButton )
         ImGui::TableSetupColumn( "Image" );
         ImGui::TableHeadersRow();
 
-        bool external = false;
+        int external = 0;
         int fidx = 0;
         int bidx = 0;
         for( auto& entry : cs )
@@ -162,7 +258,7 @@ void View::DrawCallstackTable( uint32_t callstack, bool globalEntriesButton )
             {
                 if( !m_showExternalFrames )
                 {
-                    external = true;
+                    external++;
                     continue;
                 }
                 ImGui::TableNextRow();
@@ -209,23 +305,27 @@ void View::DrawCallstackTable( uint32_t callstack, bool globalEntriesButton )
                         if( !m_showExternalFrames )
                         {
                             if( f == fsz-1 ) fidx++;
-                            external = true;
+                            external++;
                             continue;
                         }
                     }
-                    else
+                    else if( external != 0 )
                     {
-                        if( external )
+                        ImGui::TableNextRow();
+                        ImGui::TableNextColumn();
+                        ImGui::PushFont( g_fonts.normal, FontSmall );
+                        TextDisabledUnformatted( "external" );
+                        ImGui::TableNextColumn();
+                        if( external == 1 )
                         {
-                            ImGui::TableNextRow();
-                            ImGui::TableNextColumn();
-                            ImGui::PushFont( m_smallFont );
-                            TextDisabledUnformatted( "external" );
-                            ImGui::PopFont();
-                            ImGui::TableNextColumn();
-                            TextDisabledUnformatted( "\xe2\x80\xa6" );
-                            external = false;
+                            TextDisabledUnformatted( "1 frame" );
                         }
+                        else
+                        {
+                            ImGui::TextDisabled( "%i frames", external );
+                        }
+                        ImGui::PopFont();
+                        external = 0;
                     }
 
                     ImGui::TableNextRow();
@@ -237,7 +337,7 @@ void View::DrawCallstackTable( uint32_t callstack, bool globalEntriesButton )
                     }
                     else
                     {
-                        ImGui::PushFont( m_smallFont );
+                        ImGui::PushFont( g_fonts.normal, FontSmall );
                         TextDisabledUnformatted( "inline" );
                         ImGui::PopFont();
                     }
@@ -389,19 +489,47 @@ void View::DrawCallstackTable( uint32_t callstack, bool globalEntriesButton )
                     }
                     ImGui::PopTextWrapPos();
                     ImGui::TableNextColumn();
-                    if( image ) TextDisabledUnformatted( image );
+                    if( image )
+                    {
+                        const char* end = image + strlen( image );
+
+                        if( m_shortImageNames )
+                        {
+                            const char* ptr = end - 1;
+                            while( ptr > image && *ptr != '/' && *ptr != '\\' ) ptr--;
+                            if( *ptr == '/' || *ptr == '\\' ) ptr++;
+                            const auto cw = ImGui::GetContentRegionAvail().x;
+                            const auto tw = ImGui::CalcTextSize( image, end ).x;
+                            TextDisabledUnformatted( ptr );
+                            if( ptr != image || tw > cw ) TooltipIfHovered( image );
+                        }
+                        else
+                        {
+                            const auto cw = ImGui::GetContentRegionAvail().x;
+                            const auto tw = ImGui::CalcTextSize( image, end ).x;
+                            TextDisabledUnformatted( image );
+                            if( tw > cw ) TooltipIfHovered( image );
+                        }
+                    }
                 }
             }
         }
-        if( external )
+        if( external != 0 )
         {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::PushFont( m_smallFont );
+            ImGui::PushFont( g_fonts.normal, FontSmall );
             TextDisabledUnformatted( "external" );
-            ImGui::PopFont();
             ImGui::TableNextColumn();
-            TextDisabledUnformatted( "\xe2\x80\xa6" );
+            if( external == 1 )
+            {
+                TextDisabledUnformatted( "1 frame" );
+            }
+            else
+            {
+                ImGui::TextDisabled( "%i frames", external );
+            }
+            ImGui::PopFont();
         }
         ImGui::EndTable();
     }
@@ -537,7 +665,7 @@ void View::CallstackTooltipContents( uint32_t idx )
                 if( frameData->imageName.Active() )
                 {
                     ImGui::SameLine();
-                    ImGui::PushFont( m_smallFont );
+                    ImGui::PushFont( g_fonts.normal, FontSmall );
                     ImGui::AlignTextToFramePadding();
                     TextDisabledUnformatted( m_worker.GetString( frameData->imageName ) );
                     ImGui::PopFont();

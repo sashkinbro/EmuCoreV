@@ -24,7 +24,10 @@ add_library(gui-qt STATIC
     src/qt_utils.cpp
     src/settings_dialog.cpp
     src/settings_dialog_tooltips.cpp
-    src/stylesheets.cpp
+    src/theme_manager.cpp
+    src/theme_surface.cpp
+    src/vita_theme.cpp
+    src/vita_themes_dialog.cpp
     src/trophy_collection_dialog.cpp
     src/update_manager.cpp
     src/gui_language.cpp
@@ -66,7 +69,10 @@ add_library(gui-qt STATIC
     include/gui-qt/qt_utils.h
     include/gui-qt/settings_dialog.h
     include/gui-qt/settings_dialog_tooltips.h
-    include/gui-qt/stylesheets.h
+    include/gui-qt/theme_manager.h
+    include/gui-qt/theme_surface.h
+    include/gui-qt/vita_theme.h
+    include/gui-qt/vita_themes_dialog.h
     include/gui-qt/trophy_collection_dialog.h
     include/gui-qt/update_manager.h
     include/gui-qt/gui_language.h
@@ -118,3 +124,6 @@ target_link_libraries(gui-qt PUBLIC
 )
 
 target_include_directories(gui-qt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+if (TRACY_ENABLE_ON_CORE_COMPONENTS)
+	target_link_libraries(gui-qt PRIVATE tracy)
+endif()

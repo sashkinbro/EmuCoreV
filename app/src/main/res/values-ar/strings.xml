@@ -747,4 +747,15 @@
     <string name="settings_storage_migration_body">أبقِ EmuCoreV مفتوحًا أثناء نسخ البرامج الثابتة والألعاب وعمليات الحفظ والكؤوس وذاكرة التخزين المؤقت والإعدادات إلى مساحة التخزين المحددة.</string>
     <string name="settings_storage_migration_count">تم فحص %1$d/%2$d من الملفات</string>
     <string name="settings_storage_migration_failed">تعذر نقل مساحة التخزين</string>
+    <string name="install_dialog_content_try_repair">إذا كانت هذه صورة VPK أو ZIP صالحة، فحاول "إصلاح وتثبيت" من مربع حوار تثبيت اللعبة.</string>
+    <string name="install_dialog_archive_unreadable">تعذرت قراءة الأرشيف. قد يكون تالفًا أو غير مكتمل.</string>
+    <string name="install_dialog_archive_missing_metadata">لا يحتوي الأرشيف على بيانات Vita الوصفية للتثبيت مثل `sce_sys/param.sfo` أو `theme.xml`.</string>
+    <string name="install_dialog_repack_preparing">جارٍ تجهيز أرشيف ZIP متوافق…</string>
+    <string name="install_dialog_repack_entry">جارٍ إعادة الحزم: %1$s</string>
+    <string name="install_dialog_repack_installing">جارٍ تثبيت ملف ZIP المُعاد بناؤه…</string>
+    <string name="install_dialog_repack_failed">لم ينتج عن إصلاح الأرشيف ملف ZIP قابل للتثبيت. جرب نسخة أخرى، أو قم بتثبيت ملف PKG المطابق والترخيص.</string>
+    <string name="install_dialog_vitamin_repair_failed">تمت إعادة بناء ملف Vitamin VPK هذا، ولكنه لا يزال غير قابل للتثبيت بواسطة Vita3K. جرب نسخة NoNpDrm أو قم بتثبيت ملف PKG المطابق والترخيص.</string>
+    <string name="setup_content_repair_button">إصلاح وتثبيت VPK/ZIP</string>
+    <string name="setup_content_repair_note">تعمل عملية الإصلاح على تحويل ملف VPK أو ZIP المحدد إلى ملف ZIP جديد في ذاكرة التخزين المؤقت للتثبيت، وتطبيع حزم الأرشيف، وإزالة علامة تثبيت Vitamin غير المدعومة عند وجودها. استخدمه فقط عندما يفشل التثبيت العادي لأرشيف صالح.</string>
+    <string name="install_choice_archive_repair_button">إصلاح وتثبيت</string>
 </resources>

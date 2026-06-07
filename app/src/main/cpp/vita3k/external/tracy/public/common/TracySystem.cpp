@@ -10,7 +10,7 @@
 #  endif
 #  include <windows.h>
 #  include <malloc.h>
-#  include "TracyUwp.hpp"
+#  include "TracyWinFamily.hpp"
 #else
 #  include <pthread.h>
 #  include <string.h>
@@ -26,7 +26,9 @@
 #  include <fcntl.h>
 #elif defined __FreeBSD__
 #  include <sys/thr.h>
-#elif defined __NetBSD__ || defined __DragonFly__
+#elif defined __NetBSD__
+#  include <lwp.h>
+#elif defined __DragonFly__
 #  include <sys/lwp.h>
 #elif defined __QNX__
 #  include <process.h>
@@ -135,7 +137,7 @@ TRACY_API void SetThreadName( const char* name )
 TRACY_API void SetThreadNameWithHint( const char* name, int32_t groupHint )
 {
 #if defined _WIN32
-#  ifdef TRACY_UWP
+#  if defined TRACY_WIN32_NO_DESKTOP
     static auto _SetThreadDescription = &::SetThreadDescription;
 #  else
     static auto _SetThreadDescription = (t_SetThreadDescription)GetProcAddress( GetModuleHandleA( "kernel32.dll" ), "SetThreadDescription" );
@@ -244,7 +246,7 @@ TRACY_API const char* GetThreadName( uint32_t id )
 #endif
 
 #if defined _WIN32
-# ifdef TRACY_UWP
+# if defined TRACY_WIN32_NO_DESKTOP
    static auto _GetThreadDescription = &::GetThreadDescription;
 # else
    static auto _GetThreadDescription = (t_GetThreadDescription)GetProcAddress( GetModuleHandleA( "kernel32.dll" ), "GetThreadDescription" );

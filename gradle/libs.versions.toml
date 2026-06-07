@@ -1,13 +1,13 @@
 [versions]
 agp = "9.2.1"
-coreKtx = "1.18.0"
+coreKtx = "1.19.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
 lifecycleRuntimeKtx = "2.10.0"
 lifecycleViewmodelCompose = "2.10.0"
 activityCompose = "1.13.0"
-kotlin = "2.3.21"
+kotlin = "2.4.0"
 composeBom = "2026.05.01"
 navigationCompose = "2.9.8"
 documentfile = "1.1.0"
@@ -19,6 +19,7 @@ relinker = "1.4.5"
 googleShortcuts = "1.1.0"
 coreSplashscreen = "1.2.0"
 androidYoutubePlayer = "13.0.0"
+commonsCompress = "1.28.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -47,6 +48,7 @@ relinker = { group = "com.getkeepsafe.relinker", name = "relinker", version.ref 
 androidx-core-google-shortcuts = { group = "androidx.core", name = "core-google-shortcuts", version.ref = "googleShortcuts" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 android-youtube-player = { group = "com.pierfrancescosoffritti.androidyoutubeplayer", name = "core", version.ref = "androidYoutubePlayer" }
+commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

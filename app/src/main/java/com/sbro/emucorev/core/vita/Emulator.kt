@@ -124,10 +124,13 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun getArguments(): Array<String> {
         val args = intent.getStringArrayExtra(APP_RESTART_PARAMETERS)
         if (args != null) {
-            syncEffectiveDriverForLaunch(gameIdFromArgs(args))
+            val gameId = gameIdFromArgs(args)
+            Log.i(TAG, "Starting emulator with args=${args.joinToString(" ")} gameId=$gameId")
+            syncEffectiveDriverForLaunch(gameId)
             return args
         }
         val gameId = gameIdFromIntent(intent)
+        Log.i(TAG, "Starting emulator from intent action=${intent?.action.orEmpty()} gameId=$gameId")
         syncEffectiveDriverForLaunch(gameId)
         return if (gameId.isBlank()) emptyArray() else arrayOf("-r", gameId)
     }

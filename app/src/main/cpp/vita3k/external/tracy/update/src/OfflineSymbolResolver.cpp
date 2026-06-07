@@ -5,9 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unordered_map>
+#include <zstd.h>
 
 #include "../../server/TracyWorker.hpp"
-#include "../../zstd/zstd.h"
 
 #include "OfflineSymbolResolver.h"
 
@@ -15,7 +15,7 @@ bool ApplyPathSubstitutions( std::string& path, const PathSubstitutionList& path
 {
     for( const auto& substitution : pathSubstitutionlist )
     {
-        if( std::regex_match(path, substitution.first) )
+        if( std::regex_search(path, substitution.first) )
         {
             path = std::regex_replace( path, substitution.first, substitution.second );
             return true;
@@ -45,13 +45,9 @@ bool PatchSymbolsWithRegex( tracy::Worker& worker, const PathSubstitutionList& p
     auto& callstackFrameMap = worker.GetCallstackFrameMap();
     for( auto it = callstackFrameMap.begin(); it != callstackFrameMap.end(); ++it )
     {
-        tracy::CallstackFrameData* frameDataPtr = it->second;
-        if( !frameDataPtr )
-        {
-            continue;
-        }
+        if( !it->second ) continue;
 
-        tracy::CallstackFrameData& frameData = *frameDataPtr;
+        tracy::CallstackFrameData& frameData = *it->second;
         const char* imageName = worker.GetString( frameData.imageName );
 
         const uint32_t imageNameIdx = frameData.imageName.Idx();

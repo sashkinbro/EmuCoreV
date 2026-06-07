@@ -64,8 +64,8 @@ android {
         applicationId = "com.sbro.emucorev"
         minSdk = 28
         targetSdk = 37
-        versionCode = 39
-        versionName = "0.0.9"
+        versionCode = 45
+        versionName = "0.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -163,6 +163,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.android.youtube.player)
+    implementation(libs.commons.compress)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -4,6 +4,8 @@
 #include "TracyImGui.hpp"
 #include "TracyPrint.hpp"
 #include "TracyView.hpp"
+#include "tracy_pdqsort.h"
+#include "../Fonts.hpp"
 
 namespace tracy
 {
@@ -45,7 +47,12 @@ void View::DrawStatistics()
 #else
     if( !m_worker.AreSourceLocationZonesReady() && ( !m_worker.AreCallstackSamplesReady() || m_worker.GetCallstackSampleCount() == 0 ) )
     {
-        ImGui::TextWrapped( "Please wait, computing data..." );
+        const auto ty = ImGui::GetTextLineHeight();
+        ImGui::PushFont( g_fonts.normal, FontBig );
+        ImGui::Dummy( ImVec2( 0, ( ImGui::GetContentRegionAvail().y - ImGui::GetTextLineHeight() * 2 - ty ) * 0.5f ) );
+        TextCentered( ICON_FA_HIPPO );
+        TextCentered( "Please wait, computing data..." );
+        ImGui::PopFont();
         DrawWaitingDots( s_time );
         ImGui::End();
         return;
@@ -468,6 +475,8 @@ void View::DrawStatistics()
     {
         TextDisabledUnformatted( "Image" );
         ImGui::SameLine();
+        ToggleButton( ICON_FA_SCISSORS, m_shortImageNames );
+        ImGui::SameLine();
         m_statisticsImageFilter.Draw( ICON_FA_FILTER "###imageFilter", 200 );
         ImGui::SameLine();
         if( ImGui::BeginCombo( "###imageCombo", nullptr, ImGuiComboFlags_NoPreview | ImGuiComboFlags_HeightLarge ) )
@@ -487,7 +496,7 @@ void View::DrawStatistics()
             {
                 imgNames.emplace_back( m_worker.GetString( img ) );
             }
-            std::sort( imgNames.begin(), imgNames.end(), [] ( const auto& lhs, const auto& rhs ) { return strcmp( lhs, rhs ) < 0; } );
+            pdqsort_branchless( imgNames.begin(), imgNames.end(), [] ( const auto& lhs, const auto& rhs ) { return strcmp( lhs, rhs ) < 0; } );
             for( auto& img : imgNames )
             {
                 bool sel = false;
@@ -563,6 +572,10 @@ void View::DrawStatistics()
         ImGui::Spacing();
         ImGui::SameLine();
         ImGui::Checkbox( ICON_FA_LINK " Base relative", &m_relativeInlines );
+        ImGui::SameLine();
+        ImGui::Spacing();
+        ImGui::SameLine();
+        ImGui::Checkbox( ICON_FA_FIRE " Top inline", &m_topInline );
         if( m_statSeparateInlines ) ImGui::EndDisabled();
     }
 
@@ -584,7 +597,11 @@ void View::DrawStatistics()
     {
         if( srcloc.empty() )
         {
-            ImGui::TextUnformatted( "No entries to be displayed." );
+            ImGui::PushFont( g_fonts.normal, FontBig );
+            ImGui::Dummy( ImVec2( 0, ( ImGui::GetContentRegionAvail().y - ImGui::GetTextLineHeight() * 2 ) * 0.5f ) );
+            TextCentered( ICON_FA_HIPPO );
+            TextCentered( "No entries to be displayed" );
+            ImGui::PopFont();
         }
         else
         {

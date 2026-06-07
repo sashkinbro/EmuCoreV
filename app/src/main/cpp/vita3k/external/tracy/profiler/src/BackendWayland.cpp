@@ -1,14 +1,14 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-
-#include "imgui/imgui_impl_opengl3.h"
-#include "imgui/imgui_impl_opengl3_loader.h"
+#include <backends/imgui_impl_opengl3.h>
+#include <backends/imgui_impl_opengl3_loader.h>
 
 #include <chrono>
 #include <linux/input-event-codes.h>
 #include <memory>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -25,8 +25,10 @@
 #include "wayland-fractional-scale-client-protocol.h"
 #include "wayland-viewporter-client-protocol.h"
 #include "wayland-cursor-shape-client-protocol.h"
+#include "wayland-xdg-toplevel-icon-client-protocol.h"
 
 #include "profiler/TracyImGui.hpp"
+#include "stb_image_resize.h"
 
 #include "Backend.hpp"
 #include "RunQueue.hpp"
@@ -205,6 +207,18 @@ static xkb_mod_index_t s_xkbCtrl, s_xkbAlt, s_xkbShift, s_xkbSuper;
 static wp_cursor_shape_device_v1_shape s_mouseCursor;
 static uint32_t s_mouseCursorSerial;
 static bool s_hasFocus = false;
+static struct wl_data_device_manager* s_dataDevMgr;
+static struct wl_data_device* s_dataDev;
+static struct wl_data_source* s_dataSource;
+static uint32_t s_dataSerial;
+static std::string s_clipboard, s_clipboardIncoming;
+static struct wl_data_offer* s_dataOffer;
+static struct wl_data_offer* s_newDataOffer;
+static bool s_newDataOfferValid;
+static struct xdg_toplevel_icon_manager_v1* s_iconMgr;
+static std::vector<int> s_iconSizes;
+static int s_keyRepeatRate = 0;
+static int s_keyRepeatDelay = 0;
 
 struct Output
 {
@@ -214,7 +228,7 @@ struct Output
 };
 static std::unordered_map<uint32_t, std::unique_ptr<Output>> s_output;
 static int s_maxScale = 120;
-static int s_prevScale = 120;
+static int s_prevScale = -1;
 
 static bool s_running = true;
 static int s_width, s_height;
@@ -225,7 +239,15 @@ static uint64_t s_time;
 static wl_fixed_t s_wheelAxisX, s_wheelAxisY;
 static bool s_wheel;
 
-extern tracy::Config s_config;
+struct KeyRepeat
+{
+    bool active;
+    bool first;
+    ImGuiKey key;
+    char txt[8];
+    uint64_t time;
+};
+static KeyRepeat s_keyRepeat;
 
 
 static void RecomputeScale()
@@ -233,7 +255,7 @@ static void RecomputeScale()
     if( s_fracSurf ) return;
 
     // On wl_compositor >= 6 the scale is sent explicitly via wl_surface.preferred_buffer_scale.
-    if ( s_comp_version >= 6 ) return;
+    if( s_comp_version >= 6 ) return;
 
     int max = 1;
     for( auto& out : s_output )
@@ -391,6 +413,12 @@ static void KeyboardEnter( void*, struct wl_keyboard* kbd, uint32_t serial, stru
 
 static void KeyboardLeave( void*, struct wl_keyboard* kbd, uint32_t serial, struct wl_surface* surf )
 {
+    if( s_dataOffer )
+    {
+        wl_data_offer_destroy( s_dataOffer );
+        s_dataOffer = nullptr;
+    }
+
     ImGui::GetIO().AddFocusEvent( false );
     s_hasFocus = false;
 }
@@ -418,6 +446,12 @@ static void KeyboardKey( void*, struct wl_keyboard* kbd, uint32_t serial, uint32
     if( key < ( sizeof( s_keyTable ) / sizeof( *s_keyTable ) ) )
     {
         io.AddKeyEvent( s_keyTable[key], state == WL_KEYBOARD_KEY_STATE_PRESSED );
+
+        *s_keyRepeat.txt = 0;
+        s_keyRepeat.key = s_keyTable[key];
+        s_keyRepeat.active = true;
+        s_keyRepeat.first = true;
+        s_keyRepeat.time = std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now().time_since_epoch() ).count();
     }
 
     if( state == WL_KEYBOARD_KEY_STATE_PRESSED )
@@ -430,8 +464,18 @@ static void KeyboardKey( void*, struct wl_keyboard* kbd, uint32_t serial, uint32
             if( xkb_keysym_to_utf8( sym, txt, sizeof( txt ) ) > 0 )
             {
                 ImGui::GetIO().AddInputCharactersUTF8( txt );
+
+                memcpy( s_keyRepeat.txt, txt, sizeof( s_keyRepeat.txt ) );
+                s_keyRepeat.active = true;
+                s_keyRepeat.first = true;
+                s_keyRepeat.time = std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now().time_since_epoch() ).count();
             }
         }
+        s_dataSerial = serial;
+    }
+    else
+    {
+        s_keyRepeat.active = false;
     }
 }
 
@@ -449,6 +493,8 @@ static void KeyboardModifiers( void*, struct wl_keyboard* kbd, uint32_t serial, 
 
 static void KeyboardRepeatInfo( void*, struct wl_keyboard* kbd, int32_t rate, int32_t delay )
 {
+    s_keyRepeatRate = 1000000 / rate;
+    s_keyRepeatDelay = delay * 1000;
 }
 
 constexpr struct wl_keyboard_listener keyboardListener = {
@@ -551,6 +597,21 @@ constexpr struct zxdg_toplevel_decoration_v1_listener decorationListener = {
 };
 
 
+static void IconMgrSize( void*, struct xdg_toplevel_icon_manager_v1*, int32_t size )
+{
+    s_iconSizes.push_back( size );
+}
+
+static void IconMgrDone( void*, struct xdg_toplevel_icon_manager_v1* )
+{
+}
+
+constexpr struct xdg_toplevel_icon_manager_v1_listener iconMgrListener = {
+    .icon_size = IconMgrSize,
+    .done = IconMgrDone
+};
+
+
 static void RegistryGlobal( void*, struct wl_registry* reg, uint32_t name, const char* interface, uint32_t version )
 {
     if( strcmp( interface, wl_compositor_interface.name ) == 0 )
@@ -600,6 +661,15 @@ static void RegistryGlobal( void*, struct wl_registry* reg, uint32_t name, const
         s_cursorShape = (wp_cursor_shape_manager_v1*)wl_registry_bind( reg, name, &wp_cursor_shape_manager_v1_interface, 1 );
         if( s_pointer ) s_cursorShapeDev = wp_cursor_shape_manager_v1_get_pointer( s_cursorShape, s_pointer );
     }
+    else if( strcmp( interface, wl_data_device_manager_interface.name ) == 0 )
+    {
+        s_dataDevMgr = (wl_data_device_manager*)wl_registry_bind( reg, name, &wl_data_device_manager_interface, 2 );
+    }
+    else if( strcmp( interface, xdg_toplevel_icon_manager_v1_interface.name ) == 0 )
+    {
+        s_iconMgr = (xdg_toplevel_icon_manager_v1*)wl_registry_bind( reg, name, &xdg_toplevel_icon_manager_v1_interface, 1 );
+        xdg_toplevel_icon_manager_v1_add_listener( s_iconMgr, &iconMgrListener, nullptr );
+    }
 }
 
 static void RegistryGlobalRemove( void*, struct wl_registry* reg, uint32_t name )
@@ -617,10 +687,13 @@ constexpr struct wl_registry_listener registryListener = {
 };
 
 
+static bool s_configureAcked = false;
+
 static void XdgSurfaceConfigure( void*, struct xdg_surface* surf, uint32_t serial )
 {
     tracy::s_wasActive = true;
     xdg_surface_ack_configure( surf, serial );
+    s_configureAcked = true;
 }
 
 constexpr struct xdg_surface_listener xdgSurfaceListener = {
@@ -698,8 +771,10 @@ static void SurfacePreferredBufferTransform( void*, struct wl_surface* surface, 
 constexpr struct wl_surface_listener surfaceListener = {
     .enter = SurfaceEnter,
     .leave = SurfaceLeave,
+#ifdef WL_SURFACE_PREFERRED_BUFFER_SCALE_SINCE_VERSION
     .preferred_buffer_scale = SurfacePreferredBufferScale,
     .preferred_buffer_transform = SurfacePreferredBufferTransform
+#endif
 };
 
 static void FractionalPreferredScale( void*, struct wp_fractional_scale_v1* frac, uint32_t scale )
@@ -710,6 +785,126 @@ static void FractionalPreferredScale( void*, struct wp_fractional_scale_v1* frac
 
 constexpr struct wp_fractional_scale_v1_listener fractionalListener = {
     .preferred_scale = FractionalPreferredScale
+};
+
+
+static void DataOfferOffer( void*, struct wl_data_offer* offer, const char* mimeType )
+{
+    assert( s_newDataOffer == offer );
+
+    if( strcmp( mimeType, "text/plain" ) == 0 )
+    {
+        wl_data_offer_accept( offer, 0, mimeType );
+        s_newDataOfferValid = true;
+    }
+    else
+    {
+        wl_data_offer_accept( offer, 0, nullptr );
+    }
+}
+
+static void DataOfferSourceActions( void*, struct wl_data_offer* offer, uint32_t sourceActions )
+{
+}
+
+static void DataOfferAction( void*, struct wl_data_offer* offer, uint32_t dndAction )
+{
+}
+
+constexpr struct wl_data_offer_listener dataOfferListener = {
+    .offer = DataOfferOffer,
+    .source_actions = DataOfferSourceActions,
+    .action = DataOfferAction
+};
+
+
+static void DataDeviceDataOffer( void*, struct wl_data_device* dataDevice, struct wl_data_offer* offer )
+{
+    s_newDataOffer = offer;
+    wl_data_offer_add_listener( offer, &dataOfferListener, nullptr );
+    s_newDataOfferValid = false;
+}
+
+static void DataDeviceEnter( void*, struct wl_data_device* dataDevice, uint32_t serial, struct wl_surface* surface, wl_fixed_t x, wl_fixed_t y, struct wl_data_offer* offer )
+{
+    if( s_newDataOffer )
+    {
+        wl_data_offer_destroy( s_newDataOffer );
+        s_newDataOffer = nullptr;
+    }
+}
+
+static void DataDeviceLeave( void*, struct wl_data_device* dataDevice )
+{
+}
+
+static void DataDeviceMotion( void*, struct wl_data_device* dataDevice, uint32_t time, wl_fixed_t x, wl_fixed_t y )
+{
+}
+
+static void DataDeviceSelection( void*, struct wl_data_device* dataDevice, struct wl_data_offer* offer )
+{
+    if( s_dataOffer ) wl_data_offer_destroy( s_dataOffer );
+    if( offer )
+    {
+        if( s_newDataOfferValid )
+        {
+            s_dataOffer = s_newDataOffer;
+        }
+        else
+        {
+            if( s_newDataOffer ) wl_data_offer_destroy( s_newDataOffer );
+            s_dataOffer = nullptr;
+        }
+        s_newDataOffer = nullptr;
+    }
+    else
+    {
+        s_dataOffer = nullptr;
+    }
+}
+
+constexpr struct wl_data_device_listener dataDeviceListener = {
+    .data_offer = DataDeviceDataOffer,
+    .enter = DataDeviceEnter,
+    .leave = DataDeviceLeave,
+    .motion = DataDeviceMotion,
+    .selection = DataDeviceSelection
+};
+
+
+void DataSourceTarget( void*, struct wl_data_source* dataSource, const char* mimeType )
+{
+}
+
+void DataSourceSend( void*, struct wl_data_source* dataSource, const char* mimeType, int32_t fd )
+{
+    if( !s_clipboard.empty() )
+    {
+        auto len = s_clipboard.size();
+        auto ptr = s_clipboard.data();
+        while( len > 0 )
+        {
+            auto sz = write( fd, ptr, len );
+            if( sz < 0 ) break;
+            len -= sz;
+            ptr += sz;
+        }
+    }
+    close( fd );
+}
+
+void DataSourceCancelled( void*, struct wl_data_source* dataSource )
+{
+    s_clipboard.clear();
+    wl_data_source_destroy( s_dataSource );
+    s_dataSource = nullptr;
+}
+
+constexpr struct wl_data_source_listener dataSourceListener = {
+    .target = DataSourceTarget,
+    .send = DataSourceSend,
+    .cancelled = DataSourceCancelled
 };
 
 
@@ -734,6 +929,39 @@ static void SetupCursor()
     wl_surface_commit( s_cursorSurf );
     s_cursorX = cursor->images[0]->hotspot_x * 120 / s_maxScale;
     s_cursorY = cursor->images[0]->hotspot_y * 120 / s_maxScale;
+}
+
+static void SetClipboard( ImGuiContext*, const char* text )
+{
+    s_clipboard = text;
+
+    if( s_dataSource ) wl_data_source_destroy( s_dataSource );
+    s_dataSource = wl_data_device_manager_create_data_source( s_dataDevMgr );
+    wl_data_source_add_listener( s_dataSource, &dataSourceListener, nullptr );
+    wl_data_source_offer( s_dataSource, "text/plain" );
+    wl_data_device_set_selection( s_dataDev, s_dataSource, s_dataSerial );
+}
+
+static const char* GetClipboard( ImGuiContext* )
+{
+    if( !s_dataOffer ) return nullptr;
+    int fd[2];
+    if( pipe( fd ) != 0 ) return nullptr;
+    wl_data_offer_receive( s_dataOffer, "text/plain", fd[1] );
+    close( fd[1] );
+    wl_display_roundtrip( s_dpy );
+
+    s_clipboardIncoming.clear();
+    char buf[4096];
+    while( true )
+    {
+        auto len = read( fd[0], buf, sizeof( buf ) );
+        if( len <= 0 ) break;
+        s_clipboardIncoming.append( buf, len );
+    }
+
+    close( fd[0] );
+    return s_clipboardIncoming.c_str();
 }
 
 Backend::Backend( const char* title, const std::function<void()>& redraw, const std::function<void(float)>& scaleChanged, const std::function<int(void)>& isBusy, RunQueue* mainThreadTasks )
@@ -761,7 +989,6 @@ Backend::Backend( const char* title, const std::function<void()>& redraw, const 
 
     s_surf = wl_compositor_create_surface( s_comp );
     wl_surface_add_listener( s_surf, &surfaceListener, nullptr );
-    s_eglWin = wl_egl_window_create( s_surf, m_winPos.w, m_winPos.h );
     s_xdgSurf = xdg_wm_base_get_xdg_surface( s_wm, s_surf );
     xdg_surface_add_listener( s_xdgSurf, &xdgSurfaceListener, nullptr );
 
@@ -796,6 +1023,15 @@ Backend::Backend( const char* title, const std::function<void()>& redraw, const 
     res = eglBindAPI( EGL_OPENGL_API );
     if( res != EGL_TRUE ) { fprintf( stderr, "Cannot use OpenGL through EGL!\n" ); exit( 1 ); }
 
+    wl_display_roundtrip( s_dpy );
+    s_toplevel = xdg_surface_get_toplevel( s_xdgSurf );
+    xdg_toplevel_add_listener( s_toplevel, &toplevelListener, nullptr );
+    xdg_toplevel_set_title( s_toplevel, title );
+    xdg_toplevel_set_app_id( s_toplevel, "tracy" );
+    wl_surface_commit( s_surf );
+    while( !s_configureAcked ) wl_display_roundtrip( s_dpy );
+
+    s_eglWin = wl_egl_window_create( s_surf, int( round( s_width * s_maxScale / 120.f ) ), int( round( s_height * s_maxScale / 120.f ) ) );
     s_eglSurf = eglCreatePlatformWindowSurface( s_eglDpy, eglConfig, s_eglWin, nullptr );
 
     constexpr EGLint eglCtxAttrib[] = {
@@ -812,11 +1048,15 @@ Backend::Backend( const char* title, const std::function<void()>& redraw, const 
 
     ImGui_ImplOpenGL3_Init( "#version 150" );
 
-    wl_display_roundtrip( s_dpy );
-    s_toplevel = xdg_surface_get_toplevel( s_xdgSurf );
-    xdg_toplevel_add_listener( s_toplevel, &toplevelListener, nullptr );
-    xdg_toplevel_set_title( s_toplevel, title );
-    xdg_toplevel_set_app_id( s_toplevel, "tracy" );
+    if( s_activation )
+    {
+        const char* token = getenv( "XDG_ACTIVATION_TOKEN" );
+        if( token )
+        {
+            xdg_activation_v1_activate( s_activation, token, s_surf );
+            unsetenv( "XDG_ACTIVATION_TOKEN" );
+        }
+    }
 
     if( s_decoration )
     {
@@ -828,6 +1068,17 @@ Backend::Backend( const char* title, const std::function<void()>& redraw, const 
 
     ImGuiIO& io = ImGui::GetIO();
     io.BackendPlatformName = "wayland (tracy profiler)";
+
+    if( s_dataDevMgr )
+    {
+        s_dataDev = wl_data_device_manager_get_data_device( s_dataDevMgr, s_seat );
+        wl_data_device_add_listener( s_dataDev, &dataDeviceListener, nullptr );
+
+        auto& platform = ImGui::GetPlatformIO();
+        platform.Platform_SetClipboardTextFn = SetClipboard;
+        platform.Platform_GetClipboardTextFn = GetClipboard;
+    }
+
     s_time = std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now().time_since_epoch() ).count();
 }
 
@@ -835,6 +1086,11 @@ Backend::~Backend()
 {
     ImGui_ImplOpenGL3_Shutdown();
 
+    if( s_iconMgr ) xdg_toplevel_icon_manager_v1_destroy( s_iconMgr );
+    if( s_dataOffer ) wl_data_offer_destroy( s_dataOffer );
+    if( s_dataSource ) wl_data_source_destroy( s_dataSource );
+    if( s_dataDev ) wl_data_device_destroy( s_dataDev );
+    if( s_dataDevMgr ) wl_data_device_manager_destroy( s_dataDevMgr );
     if( s_cursorShapeDev ) wp_cursor_shape_device_v1_destroy( s_cursorShapeDev );
     if( s_cursorShape ) wp_cursor_shape_manager_v1_destroy( s_cursorShape );
     if( s_viewport ) wp_viewport_destroy( s_viewport );
@@ -878,9 +1134,10 @@ void Backend::Show()
 
 void Backend::Run()
 {
-    while( s_running && wl_display_dispatch( s_dpy ) != -1 )
+    timespec zero = {};
+    while( s_running && wl_display_dispatch_timeout( s_dpy, &zero ) != -1 )
     {
-        if( s_config.focusLostLimit && !s_hasFocus ) std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+        if( tracy::s_config.focusLostLimit && !s_hasFocus ) std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
         s_redraw();
         s_mainThreadTasks->Run();
     }
@@ -915,12 +1172,8 @@ void Backend::NewFrame( int& w, int& h )
     {
         s_prevWidth = s_width;
         s_prevHeight = s_height;
-        wl_egl_window_resize( s_eglWin, s_width * s_maxScale / 120, s_height * s_maxScale / 120, 0, 0 );
-        if( s_fracSurf )
-        {
-            wp_viewport_set_source( s_viewport, 0, 0, wl_fixed_from_double( s_width * s_maxScale / 120. ), wl_fixed_from_double( s_height * s_maxScale / 120. ) );
-            wp_viewport_set_destination( s_viewport, s_width, s_height );
-        }
+        wl_egl_window_resize( s_eglWin, int( round( s_width * s_maxScale / 120.f ) ), int( round( s_height * s_maxScale / 120.f ) ), 0, 0 );
+        if( s_fracSurf ) wp_viewport_set_destination( s_viewport, s_width, s_height );
     }
 
     if( s_prevScale != s_maxScale )
@@ -938,8 +1191,8 @@ void Backend::NewFrame( int& w, int& h )
         m_winPos.h = s_height;
     }
 
-    w = s_width * s_maxScale / 120;
-    h = s_height * s_maxScale / 120;
+    w = int( round ( s_width * s_maxScale / 120.f ) );
+    h = int( round ( s_height * s_maxScale / 120.f ) );
 
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize = ImVec2( w, h );
@@ -950,6 +1203,26 @@ void Backend::NewFrame( int& w, int& h )
     uint64_t time = std::chrono::duration_cast<std::chrono::microseconds>( std::chrono::high_resolution_clock::now().time_since_epoch() ).count();
     io.DeltaTime = std::min( 0.1f, ( time - s_time ) / 1000000.f );
     s_time = time;
+
+    if( s_keyRepeat.active )
+    {
+        tracy::s_wasActive = true;
+        const auto delta = s_time - s_keyRepeat.time;
+        if( ( s_keyRepeat.first && delta >= s_keyRepeatDelay ) ||
+            ( !s_keyRepeat.first && delta >= s_keyRepeatRate ) )
+        {
+            s_keyRepeat.first = false;
+            s_keyRepeat.time = s_time;
+            if( *s_keyRepeat.txt )
+            {
+                ImGui::GetIO().AddInputCharactersUTF8( s_keyRepeat.txt );
+            }
+            else
+            {
+                io.AddKeyEvent( s_keyRepeat.key, true );
+            }
+        }
+    }
 
     if( s_cursorShapeDev )
     {
@@ -994,7 +1267,11 @@ void Backend::NewFrame( int& w, int& h )
         case ImGuiMouseCursor_NotAllowed:
             shape = WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NOT_ALLOWED;
             break;
+        case ImGuiMouseCursor_Hand:
+            shape = WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER;
+            break;
         default:
+            shape = WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT;
             break;
         };
 
@@ -1018,7 +1295,7 @@ void Backend::EndFrame()
     const ImVec4 clear_color = ImColor( 20, 20, 17 );
 
     ImGui::Render();
-    glViewport( 0, 0, s_width * s_maxScale / 120, s_height * s_maxScale / 120 );
+    glViewport( 0, 0, GLsizei( round( s_width * s_maxScale / 120.f ) ), GLsizei( round ( s_height * s_maxScale / 120.f ) ) );
     glClearColor( clear_color.x, clear_color.y, clear_color.z, clear_color.w );
     glClear( GL_COLOR_BUFFER_BIT );
     ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
@@ -1028,6 +1305,62 @@ void Backend::EndFrame()
 
 void Backend::SetIcon( uint8_t* data, int w, int h )
 {
+    if( !s_iconMgr ) return;
+    if( s_iconSizes.empty() ) return;
+
+    size_t size = 0;
+    for( auto sz : s_iconSizes )
+    {
+        size += sz * sz;
+    }
+    size *= 4;
+
+    auto path = getenv( "XDG_RUNTIME_DIR" );
+    if( !path ) return;
+
+    std::string shmPath = path;
+    shmPath += "/tracy_icon-XXXXXX";
+    int fd = mkstemp( shmPath.data() );
+    if( fd < 0 ) return;
+    unlink( shmPath.data() );
+    ftruncate( fd, size );
+    auto membuf = (char*)mmap( nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
+    if( membuf == MAP_FAILED )
+    {
+        close( fd );
+        return;
+    }
+
+    auto pool = wl_shm_create_pool( s_shm, fd, size );
+    close( fd );
+    auto icon = xdg_toplevel_icon_manager_v1_create_icon( s_iconMgr );
+
+    auto rgb = new uint32_t[w * h];
+    auto bgr = (uint32_t*)data;
+    for( int i=0; i<w*h; i++ )
+    {
+        rgb[i] = ( bgr[i] & 0xff00ff00 ) | ( ( bgr[i] & 0xff ) << 16 ) | ( ( bgr[i] >> 16 ) & 0xff );
+    }
+
+    std::vector<wl_buffer*> bufs;
+    int32_t offset = 0;
+    for( auto sz : s_iconSizes )
+    {
+        auto buffer = wl_shm_pool_create_buffer( pool, offset, sz, sz, sz * 4, WL_SHM_FORMAT_ARGB8888 );
+        bufs.push_back( buffer );
+
+        auto ptr = membuf + offset;
+        offset += sz * sz * 4;
+
+        stbir_resize_uint8( (uint8_t*)rgb, w, h, 0, (uint8_t*)ptr, sz, sz, 0, 4 );
+        xdg_toplevel_icon_v1_add_buffer( icon, buffer, sz );
+    }
+
+    xdg_toplevel_icon_manager_v1_set_icon( s_iconMgr, s_toplevel, icon );
+    xdg_toplevel_icon_v1_destroy( icon );
+    for( auto buf : bufs ) wl_buffer_destroy( buf );
+    munmap( membuf, size );
+    wl_shm_pool_destroy( pool );
 }
 
 void Backend::SetTitle( const char* title )

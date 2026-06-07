@@ -747,4 +747,15 @@
     <string name="settings_storage_migration_body">Тримайте EmuCoreV відкритим, поки прошивка, ігри, збереження, трофеї, кеш і налаштування копіюються у вибране сховище.</string>
     <string name="settings_storage_migration_count">Перевірено файлів: %1$d/%2$d</string>
     <string name="settings_storage_migration_failed">Не вдалося перемістити сховище</string>
+    <string name="install_dialog_content_try_repair">Якщо це дійсний образ VPK або ZIP, спробуйте "Відновити та встановити" у діалоговому вікні встановлення гри.</string>
+    <string name="install_dialog_archive_unreadable">Не вдалося прочитати архів. Можливо, він пошкоджений або неповний.</string>
+    <string name="install_dialog_archive_missing_metadata">В архіві відсутні метадані для встановлення Vita, такі як `sce_sys/param.sfo` або `theme.xml`.</string>
+    <string name="install_dialog_repack_preparing">Підготовка сумісного ZIP-архіву…</string>
+    <string name="install_dialog_repack_entry">Перепакування: %1$s</string>
+    <string name="install_dialog_repack_installing">Встановлення перезібраного ZIP-архіву…</string>
+    <string name="install_dialog_repack_failed">Відновлення архіву не створило ZIP, придатний для встановлення. Спробуйте інший дамп або встановіть відповідний PKG та ліцензію.</string>
+    <string name="install_dialog_vitamin_repair_failed">Цей VPK від Vitamin було перезібрано, але він усе ще не може бути встановлений Vita3K. Спробуйте дамп NoNpDrm або встановіть відповідний PKG та ліцензію.</string>
+    <string name="setup_content_repair_button">Відновити та встановити VPK/ZIP</string>
+    <string name="setup_content_repair_note">Відновлення перетворює вибраний VPK або ZIP на новий ZIP у кеші встановлення, нормалізує пакування архіву та видаляє маркер встановлення Vitamin, який не підтримується, якщо він присутній. Використовуйте цю функцію лише тоді, коли звичайне встановлення для дійсного архіву завершується помилкою.</string>
+    <string name="install_choice_archive_repair_button">Відновити та встановити</string>
 </resources>

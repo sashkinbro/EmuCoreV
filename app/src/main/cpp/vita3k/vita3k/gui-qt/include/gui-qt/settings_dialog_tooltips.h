@@ -60,6 +60,8 @@ public:
     QString memory_mapping;
     QString audio_backend;
     QString audio_volume;
+    QString theme_music_enable;
+    QString theme_music_volume;
     QString ngs_enable;
     QString front_camera;
     QString back_camera;
@@ -99,6 +101,9 @@ public:
     QString color_surface_debug;
     QString validation_layer;
     QString dump_elfs;
+    QString gb_debug_tracy_section;
+    QString tracy_primitive_impl;
+    QString tracy_modules_list;
     QString sys_lang;
     QString sys_date_format;
     QString sys_time_format;

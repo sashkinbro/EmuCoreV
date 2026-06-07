@@ -6,6 +6,8 @@
 #include "TracyTimelineController.hpp"
 #include "TracyView.hpp"
 
+#include "../Fonts.hpp"
+
 namespace tracy
 {
 
@@ -18,7 +20,7 @@ TimelineController::TimelineController( View& view, Worker& worker, bool threadi
     , m_view( view )
     , m_worker( worker )
 #ifdef __EMSCRIPTEN__
-    , m_td( 0, "Render" )
+    , m_td( threading ? 2 : 0, "Render" )
 #else
     , m_td( threading ? (size_t)std::max( 0, ( (int)std::thread::hardware_concurrency() - 2 ) / 2 ) : 0, "Render" )
 #endif
@@ -97,7 +99,7 @@ std::optional<int> TimelineController::CalculateScrollPosition() const
     return std::nullopt;
 }
 
-void TimelineController::End( double pxns, const ImVec2& wpos, bool hover, bool vcenter, float yMin, float yMax, ImFont* smallFont )
+void TimelineController::End( double pxns, const ImVec2& wpos, bool hover, bool vcenter, float yMin, float yMax )
 {
     auto shouldUpdateCenterItem = [&] () {
         const auto imguiChangedScroll = m_scroll != ImGui::GetScrollY();
@@ -123,7 +125,7 @@ void TimelineController::End( double pxns, const ImVec2& wpos, bool hover, bool 
     TimelineContext ctx;
     ctx.w = ImGui::GetContentRegionAvail().x - 1;
     ctx.ty = ImGui::GetTextLineHeight();
-    ImGui::PushFont( smallFont );
+    ImGui::PushFont( g_fonts.normal, FontSmall );
     ctx.sty = ImGui::GetTextLineHeight();
     ImGui::PopFont();
     ctx.scale = GetScale();

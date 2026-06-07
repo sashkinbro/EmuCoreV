@@ -690,7 +690,9 @@ static pthread_key_t _memory_thread_heap;
 #    define _Thread_local __declspec(thread)
 #    define TLS_MODEL
 #  else
-#    ifndef __HAIKU__
+#    if defined(__ANDROID__) && __ANDROID_API__ >= 29 && defined(__NDK_MAJOR__) && __NDK_MAJOR__ >= 26
+#      define TLS_MODEL __attribute__((tls_model("local-dynamic")))
+#    elif !defined(__HAIKU__)
 #      define TLS_MODEL __attribute__((tls_model("initial-exec")))
 #    else
 #      define TLS_MODEL
@@ -2778,7 +2780,7 @@ rpmalloc_initialize_config(const rpmalloc_config_t* config) {
 			_memory_huge_pages = 1;
 	}
 
-#if PLATFORM_WINDOWS
+#if PLATFORM_WINDOWS && !defined TRACY_GDK
 	if (_memory_config.enable_huge_pages) {
 		HANDLE token = 0;
 		size_t large_page_minimum = GetLargePageMinimum();

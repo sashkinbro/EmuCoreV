@@ -747,4 +747,15 @@
     <string name="settings_storage_migration_body">Держите EmuCoreV открытым, пока прошивка, игры, сохранения, трофеи, кэш и настройки копируются в выбранное хранилище.</string>
     <string name="settings_storage_migration_count">Проверено файлов: %1$d/%2$d</string>
     <string name="settings_storage_migration_failed">Не удалось переместить хранилище</string>
+    <string name="install_dialog_content_try_repair">Если это корректный образ VPK или ZIP, попробуйте "Восстановить и установить" в диалоговом окне установки игры.</string>
+    <string name="install_dialog_archive_unreadable">Не удалось прочитать архив. Возможно, он поврежден или неполный.</string>
+    <string name="install_dialog_archive_missing_metadata">В архиве отсутствуют метаданные для установки Vita, такие как `sce_sys/param.sfo` или `theme.xml`.</string>
+    <string name="install_dialog_repack_preparing">Подготовка совместимого ZIP-архива…</string>
+    <string name="install_dialog_repack_entry">Переупаковка: %1$s</string>
+    <string name="install_dialog_repack_installing">Установка пересобранного ZIP-архива…</string>
+    <string name="install_dialog_repack_failed">Восстановление архива не привело к созданию устанавливаемого ZIP. Попробуйте другой дамп или установите соответствующий PKG и лицензию.</string>
+    <string name="install_dialog_vitamin_repair_failed">Этот VPK от Vitamin был пересобран, но всё ещё не может быть установлен Vita3K. Попробуйте дамп NoNpDrm или установите соответствующий PKG и лицензию.</string>
+    <string name="setup_content_repair_button">Восстановить и установить VPK/ZIP</string>
+    <string name="setup_content_repair_note">Функция восстановления преобразует выбранный VPK или ZIP в новый ZIP в кэше установки, нормализует упаковку архива и удаляет неподдерживаемый маркер установки Vitamin, если он присутствует. Используйте только тогда, когда обычная установка валидного архива завершается неудачей.</string>
+    <string name="install_choice_archive_repair_button">Восстановить и установить</string>
 </resources>

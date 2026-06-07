@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.VpnKey
@@ -43,6 +44,7 @@ fun InstallGameChoiceDialog(
     onZrifChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onInstallArchive: () -> Unit,
+    onRepairArchive: () -> Unit,
     onInstallLicense: () -> Unit,
     onInstallPkg: (String) -> Unit
 ) {
@@ -87,6 +89,16 @@ fun InstallGameChoiceDialog(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(stringResource(R.string.setup_content_button))
+                    }
+                    FilledTonalButton(
+                        onClick = onRepairArchive,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Rounded.Build, contentDescription = null)
+                        Text(
+                            text = stringResource(R.string.install_choice_archive_repair_button),
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
                     }
                 }
 

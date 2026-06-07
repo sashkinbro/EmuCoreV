@@ -29,6 +29,7 @@
 #include <gui-qt/qt_utils.h>
 #include <gui-qt/settings_dialog.h>
 #include <gui-qt/settings_dialog_tooltips.h>
+#include <gui-qt/theme_manager.h>
 #include <io/state.h>
 #include <kernel/state.h>
 #include <renderer/functions.h>
@@ -59,18 +60,11 @@
 #include <QTabBar>
 #include <QTextDocument>
 #include <QVBoxLayout>
+#include <QtGlobal>
+
+#include <algorithm>
 
 namespace {
-
-QString format_help_html(const QString &title, const QString &body) {
-    QString escaped = body.toHtmlEscaped();
-    escaped.replace(QLatin1Char('\n'), QStringLiteral("<br>"));
-    return QStringLiteral(
-        "<div style=\"margin:0;\"><strong>%1</strong></div>"
-        "<hr style=\"margin:1px 0 3px 0; border:0; border-top:1px solid rgba(255,255,255,0.28);\">"
-        "<div style=\"margin:0;\">%2</div>")
-        .arg(title.toHtmlEscaped(), escaped);
-}
 
 int first_visible_category(const QListWidget *list, int preferred) {
     const int count = list->count();
@@ -91,11 +85,13 @@ int first_visible_category(const QListWidget *list, int preferred) {
 
 SettingsDialog::SettingsDialog(EmuEnvState &emuenv,
     std::shared_ptr<GuiSettings> gui_settings,
+    ThemeManager &theme_manager,
     const std::string &app_path,
     int initial_tab)
     : QDialog(nullptr)
     , emuenv(emuenv)
     , m_gui_settings(std::move(gui_settings))
+    , m_theme_manager(theme_manager)
     , m_tooltips(std::make_unique<SettingsDialogTooltips>(this))
     , m_app_path(app_path)
     , m_initial_tab(initial_tab)
@@ -123,7 +119,15 @@ SettingsDialog::SettingsDialog(EmuEnvState &emuenv,
     }
     if (!m_gui_settings || !restoreGeometry(m_gui_settings->get_value(gui::sd_geometry).toByteArray()))
         resize(780, 676);
+    connect(&m_theme_manager, &ThemeManager::theme_state_changed, this, &SettingsDialog::refresh_themes);
+    connect(&m_theme_manager, &ThemeManager::theme_catalog_changed, this, &SettingsDialog::refresh_themes);
     m_ui->settingsCategory->setSpacing(0);
+    m_ui->modules_list->setSelectionMode(QAbstractItemView::NoSelection);
+    m_ui->modules_list->setFocusPolicy(Qt::NoFocus);
+    m_ui->modules_list->setAlternatingRowColors(true);
+    m_ui->tracy_modules_list->setSelectionMode(QAbstractItemView::NoSelection);
+    m_ui->tracy_modules_list->setFocusPolicy(Qt::NoFocus);
+    m_ui->tracy_modules_list->setAlternatingRowColors(true);
 
     for (int i = 0; i < m_ui->tab_widget_settings->count(); ++i) {
         auto *item = new QListWidgetItem(m_ui->tab_widget_settings->tabText(i), m_ui->settingsCategory);
@@ -169,6 +173,7 @@ SettingsDialog::SettingsDialog(EmuEnvState &emuenv,
         m_ui->show_mode->setVisible(false);
         m_ui->demo_mode->setVisible(false);
 
+        m_ui->gb_theme_music_section->setVisible(false);
         m_ui->boot_apps_fullscreen->setVisible(false);
         m_ui->show_live_area_screen->setVisible(false);
         m_ui->show_compile_shaders->setVisible(false);
@@ -198,6 +203,13 @@ SettingsDialog::SettingsDialog(EmuEnvState &emuenv,
         bb->button(QDialogButtonBox::Apply)->setEnabled(false);
 }
 
+void SettingsDialog::refresh_themes() {
+    const QString preferred_name = m_ui->combo_stylesheets
+        ? m_ui->combo_stylesheets->currentData().toString()
+        : m_current_stylesheet;
+    add_stylesheets(preferred_name);
+}
+
 SettingsDialog::~SettingsDialog() {
 }
 
@@ -206,6 +218,19 @@ void SettingsDialog::set_storage_path_locked(bool locked) {
     if (m_app_path.empty())
         m_ui->gb_storage->setEnabled(!locked);
 }
+
+#ifdef TRACY_ENABLE
+void SettingsDialog::populate_tracy_modules_list() {
+    m_ui->tracy_modules_list->clear();
+    const auto enabled_modules = m_config.tracy_advanced_profiling_modules;
+    for (const auto &name : tracy_module_utils::get_available_module_names()) {
+        const bool enabled = std::ranges::contains(enabled_modules.begin(), enabled_modules.end(), name);
+        auto *item = new QListWidgetItem(QString::fromStdString(name), m_ui->tracy_modules_list);
+        item->setFlags((item->flags() | Qt::ItemIsUserCheckable) & ~Qt::ItemIsSelectable);
+        item->setCheckState(enabled ? Qt::Checked : Qt::Unchecked);
+    }
+}
+#endif
 
 void SettingsDialog::closeEvent(QCloseEvent *event) {
     if (m_gui_settings) {
@@ -360,6 +385,17 @@ void SettingsDialog::load_config() {
 
     m_ui->audio_volume->setValue(m_config.audio_volume);
     m_ui->audio_volume_label->setText(tr("Current volume: %1%").arg(m_config.audio_volume));
+    const bool theme_music_enabled = m_gui_settings
+        ? m_gui_settings->get_value(gui::vt_bgmEnabled).toBool()
+        : gui::vt_bgmEnabled.def.toBool();
+    const int theme_music_volume = std::clamp(
+        m_gui_settings
+            ? m_gui_settings->get_value(gui::vt_bgmVolume).toInt()
+            : gui::vt_bgmVolume.def.toInt(),
+        0, 100);
+    m_ui->theme_music_enable->setChecked(theme_music_enabled);
+    m_ui->theme_music_volume->setValue(theme_music_volume);
+    m_ui->theme_music_volume_label->setText(tr("Theme music volume: %1%").arg(theme_music_volume));
 
     m_ui->ngs_enable->setChecked(m_config.ngs_enable);
 
@@ -510,7 +546,8 @@ void SettingsDialog::load_config() {
             : false);
     m_ui->ui_language_box->clear();
     m_ui->ui_language_box->addItem(tr("System Default"), QStringLiteral(""));
-    for (const auto &language : gui::i18n::ui_language_options()) {
+
+    for (const auto &language : gui::i18n::ui_language_options(emuenv.static_assets_path)) {
         const QString tag = QString::fromUtf8(language.tag.data(), static_cast<int>(language.tag.size()));
         const QString native_name = QString::fromUtf8(language.native_name.data(), static_cast<int>(language.native_name.size()));
         m_ui->ui_language_box->addItem(native_name, tag);
@@ -538,6 +575,14 @@ void SettingsDialog::load_config() {
     m_ui->color_surface_debug->setChecked(m_config.color_surface_debug);
     m_ui->validation_layer->setChecked(m_config.validation_layer);
     m_ui->dump_elfs->setChecked(emuenv.kernel.debugger.dump_elfs);
+
+#ifdef TRACY_ENABLE
+    m_ui->gb_debug_tracy_section->setEnabled(true);
+    m_ui->tracy_primitive_impl->setChecked(m_config.tracy_primitive_impl);
+    populate_tracy_modules_list();
+#else
+    m_ui->gb_debug_tracy_section->setEnabled(false);
+#endif
 }
 
 void SettingsDialog::build_desired_config(Config &desired) const {
@@ -655,6 +700,21 @@ void SettingsDialog::build_desired_config(Config &desired) const {
     current.log_uniforms = m_ui->log_uniforms->isChecked();
     current.color_surface_debug = m_ui->color_surface_debug->isChecked();
     current.validation_layer = m_ui->validation_layer->isChecked();
+
+#ifdef TRACY_ENABLE
+    current.tracy_primitive_impl = m_ui->tracy_primitive_impl->isChecked();
+    current.tracy_advanced_profiling_modules.clear();
+    for (int i = 0; i < m_ui->tracy_modules_list->count(); ++i) {
+        const auto item = m_ui->tracy_modules_list->item(i);
+        const auto name = item->text().toStdString();
+        if (item->checkState() == Qt::Checked) {
+            tracy_module_utils::set_tracy_active(name, true);
+            current.tracy_advanced_profiling_modules.push_back(name);
+        } else {
+            tracy_module_utils::set_tracy_active(name, false);
+        }
+    }
+#endif
 }
 
 bool SettingsDialog::prompt_restart_if_needed(const app::SettingsCommitResult &result, bool close_after) {
@@ -707,6 +767,12 @@ bool SettingsDialog::commit_changes(bool close_after) {
     const bool previous_windows_rounded_corners = update_gui_settings
         ? m_gui_settings->get_value(gui::gw_roundedCorners).toBool()
         : false;
+    const bool previous_theme_music_enabled = update_gui_settings
+        ? m_gui_settings->get_value(gui::vt_bgmEnabled).toBool()
+        : gui::vt_bgmEnabled.def.toBool();
+    const int previous_theme_music_volume = update_gui_settings
+        ? m_gui_settings->get_value(gui::vt_bgmVolume).toInt()
+        : gui::vt_bgmVolume.def.toInt();
 
     if (storage_path_changed && !apply_pending_storage_path())
         return false;
@@ -737,8 +803,19 @@ bool SettingsDialog::commit_changes(bool close_after) {
         m_gui_settings->set_value(gui::mw_warnAdminPrivileges, m_ui->warn_admin_privileges->isChecked());
     if (update_gui_settings && previous_windows_rounded_corners != m_ui->windows_rounded_corners->isChecked())
         m_gui_settings->set_value(gui::gw_roundedCorners, m_ui->windows_rounded_corners->isChecked());
+    bool theme_music_settings_changed = false;
+    if (update_gui_settings && previous_theme_music_enabled != m_ui->theme_music_enable->isChecked()) {
+        m_gui_settings->set_value(gui::vt_bgmEnabled, m_ui->theme_music_enable->isChecked(), false);
+        theme_music_settings_changed = true;
+    }
+    if (update_gui_settings && previous_theme_music_volume != m_ui->theme_music_volume->value()) {
+        m_gui_settings->set_value(gui::vt_bgmVolume, m_ui->theme_music_volume->value(), false);
+        theme_music_settings_changed = true;
+    }
     if (log_settings_changed)
         Q_EMIT gui_log_settings_request();
+    if (theme_music_settings_changed)
+        Q_EMIT gui_theme_music_settings_request();
 
     emuenv.kernel.debugger.log_imports = m_ui->log_imports->isChecked();
     emuenv.kernel.debugger.log_exports = m_ui->log_exports->isChecked();
@@ -756,7 +833,7 @@ void SettingsDialog::populate_modules_list() {
     const auto modules = config::get_modules_list(emuenv.pref_path, m_config.lle_modules);
     for (const auto &[name, enabled] : modules) {
         auto *item = new QListWidgetItem(QString::fromStdString(name), m_ui->modules_list);
-        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+        item->setFlags((item->flags() | Qt::ItemIsUserCheckable) & ~Qt::ItemIsSelectable);
         item->setCheckState(enabled ? Qt::Checked : Qt::Unchecked);
     }
     update_modules_list_enabled();
@@ -951,6 +1028,9 @@ void SettingsDialog::setup_connections() {
     connect(m_ui->audio_volume, &QSlider::valueChanged, this, [this](int val) {
         m_ui->audio_volume_label->setText(tr("Current volume: %1%").arg(val));
     });
+    connect(m_ui->theme_music_volume, &QSlider::valueChanged, this, [this](int val) {
+        m_ui->theme_music_volume_label->setText(tr("Theme music volume: %1%").arg(val));
+    });
 
     connect(m_ui->perf_overlay_enabled, &QCheckBox::toggled, this, [this](bool on) {
         m_ui->label_perf_detail->setEnabled(on);
@@ -1087,6 +1167,18 @@ void SettingsDialog::setup_connections() {
     m_ui->watch_memory->setText(emuenv.kernel.debugger.watch_memory ? tr("Unwatch Memory") : tr("Watch Memory"));
     m_ui->watch_import_calls->setText(emuenv.kernel.debugger.watch_import_calls ? tr("Unwatch Import Calls") : tr("Watch Import Calls"));
 
+#ifdef TRACY_ENABLE
+    connect(m_ui->tracy_select_none, &QPushButton::clicked, this, [this] {
+        for (int i = 0; i < m_ui->tracy_modules_list->count(); ++i)
+            m_ui->tracy_modules_list->item(i)->setCheckState(Qt::Unchecked);
+    });
+
+    connect(m_ui->tracy_select_all, &QPushButton::clicked, this, [this] {
+        for (int i = 0; i < m_ui->tracy_modules_list->count(); ++i)
+            m_ui->tracy_modules_list->item(i)->setCheckState(Qt::Checked);
+    });
+#endif
+
     struct DescEntry {
         QWidget *widget;
         QString title;
@@ -1122,6 +1214,8 @@ void SettingsDialog::setup_connections() {
         // Audio
         { m_ui->audio_backend_box, tr("Audio Backend"), m_tooltips->audio_backend },
         { m_ui->audio_volume, tr("Volume"), m_tooltips->audio_volume },
+        { m_ui->theme_music_enable, tr("Enable Vita Theme Background Music"), m_tooltips->theme_music_enable },
+        { m_ui->theme_music_volume, tr("Theme Music Volume"), m_tooltips->theme_music_volume },
         { m_ui->ngs_enable, tr("Enable NGS Support"), m_tooltips->ngs_enable },
         // Camera
         { m_ui->front_camera_box, tr("Front Camera Source"), m_tooltips->front_camera },
@@ -1193,6 +1287,9 @@ void SettingsDialog::setup_connections() {
         { m_ui->color_surface_debug, tr("Save color surfaces"), m_tooltips->color_surface_debug },
         { m_ui->validation_layer, tr("Vulkan Validation Layer"), m_tooltips->validation_layer },
         { m_ui->dump_elfs, tr("ELF Dumping"), m_tooltips->dump_elfs },
+        { m_ui->gb_debug_tracy_section, tr("Tracy Profiler"), m_tooltips->gb_debug_tracy_section },
+        { m_ui->tracy_primitive_impl, tr("Primitive Implementation"), m_tooltips->tracy_primitive_impl },
+        { m_ui->tracy_modules_list, tr("Tracy modules list"), m_tooltips->tracy_modules_list },
     };
 
     for (const auto &[widget, title, description] : desc_widgets) {
@@ -1202,6 +1299,7 @@ void SettingsDialog::setup_connections() {
     }
 }
 
+// TODO: Allow this to go from enter to another enter without leaving (widget to widget without setting the default title and description)
 bool SettingsDialog::eventFilter(QObject *watched, QEvent *event) {
     if (event->type() == QEvent::Enter) {
         auto *w = qobject_cast<QWidget *>(watched);
@@ -1243,9 +1341,9 @@ void SettingsDialog::set_description(QWidget *tab, const QString &title_override
     }();
 
     if (text == m_tooltips->default_description) {
-        m_ui->helpText->setHtml(format_help_html(title, m_tooltips->category_summary(static_cast<SettingsTab>(index))));
+        m_ui->helpText->setHtml(gui::utils::format_help_html(title, m_tooltips->category_summary(static_cast<SettingsTab>(index))));
     } else {
-        m_ui->helpText->setHtml(format_help_html(title, text));
+        m_ui->helpText->setHtml(gui::utils::format_help_html(title, text));
     }
 }
 
@@ -1392,30 +1490,27 @@ void SettingsDialog::update_gpu_visibility() {
     }
 }
 
-void SettingsDialog::add_stylesheets() {
+void SettingsDialog::add_stylesheets(const QString &preferred_name) {
     m_ui->combo_stylesheets->blockSignals(true);
     m_ui->combo_stylesheets->clear();
 
-    m_ui->combo_stylesheets->addItem(tr("None", "Stylesheets"), gui::NoStylesheet);
+    const auto themes = m_theme_manager.available_themes();
+    for (const auto &theme : themes)
+        m_ui->combo_stylesheets->addItem(theme.display_name, theme.name);
 
-    m_ui->combo_stylesheets->addItem(tr("Light", "Stylesheets"), gui::LightStylesheet);
-    m_ui->combo_stylesheets->addItem(tr("Dark", "Stylesheets"), gui::DarkStylesheet);
-
-    if (m_gui_settings) {
-        for (const QString &entry : m_gui_settings->get_stylesheet_entries()) {
-            if (entry != gui::LightStylesheet && entry != gui::DarkStylesheet) {
-                m_ui->combo_stylesheets->addItem(entry, entry);
-            }
-        }
-    }
-
-    m_current_stylesheet = m_gui_settings
-        ? m_gui_settings->get_value(gui::m_currentStylesheet).toString()
-        : gui::DarkStylesheet;
+    if (!preferred_name.isEmpty())
+        m_current_stylesheet = preferred_name;
+    else if (m_gui_settings)
+        m_current_stylesheet = m_gui_settings->get_value(gui::m_currentStylesheet).toString();
+    else
+        m_current_stylesheet.clear();
 
     const int index = m_ui->combo_stylesheets->findData(m_current_stylesheet);
     if (index >= 0) {
         m_ui->combo_stylesheets->setCurrentIndex(index);
+    } else if (m_ui->combo_stylesheets->count() > 0) {
+        m_ui->combo_stylesheets->setCurrentIndex(0);
+        m_current_stylesheet = m_ui->combo_stylesheets->currentData().toString();
     }
     m_ui->combo_stylesheets->blockSignals(false);
 }

@@ -747,4 +747,15 @@
     <string name="settings_storage_migration_body">Aygıt yazılımı, oyunlar, kayıtlar, kupalar, önbellek ve ayarlar seçilen depolama alanına kopyalanırken EmuCoreV\'yi açık tutun.</string>
     <string name="settings_storage_migration_count">%1$d/%2$d dosya kontrol edildi</string>
     <string name="settings_storage_migration_failed">Depolama alanı taşınamadı</string>
+    <string name="install_dialog_content_try_repair">Eğer bu geçerli bir VPK veya ZIP imajıysa, oyun kurulum iletişim kutusundan "Onar ve yükle" seçeneğini deneyin.</string>
+    <string name="install_dialog_archive_unreadable">Arşiv okunamadı. Hasarlı veya eksik olabilir.</string>
+    <string name="install_dialog_archive_missing_metadata">Arşiv, `sce_sys/param.sfo` veya `theme.xml` gibi Vita kurulum meta verilerini içermiyor.</string>
+    <string name="install_dialog_repack_preparing">Uyumlu bir ZIP arşivi hazırlanıyor…</string>
+    <string name="install_dialog_repack_entry">Yeniden paketleniyor: %1$s</string>
+    <string name="install_dialog_repack_installing">Yeniden oluşturulan ZIP yükleniyor…</string>
+    <string name="install_dialog_repack_failed">Arşiv onarımı kurulabilir bir ZIP üretemedi. Başka bir dump deneyin veya eşleşen PKG\'yi ve lisansı yükleyin.</string>
+    <string name="install_dialog_vitamin_repair_failed">Bu Vitamin VPK yeniden oluşturuldu, ancak hala Vita3K tarafından kurulamıyor. Bir NoNpDrm dump\'ı deneyin veya eşleşen PKG\'yi ve lisansı yükleyin.</string>
+    <string name="setup_content_repair_button">VPK/ZIP Onar ve Yükle</string>
+    <string name="setup_content_repair_note">Onarım, seçilen VPK veya ZIP dosyasını kurulum önbelleğinde yeni bir ZIP dosyasına dönüştürür, arşiv paketlemesini normalleştirir ve varsa desteklenmeyen Vitamin kurulum işaretini kaldırır. Yalnızca geçerli bir arşiv için normal kurulum başarısız olduğunda kullanın.</string>
+    <string name="install_choice_archive_repair_button">Onar ve yükle</string>
 </resources>
