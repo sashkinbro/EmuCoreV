@@ -43,6 +43,8 @@ data class VitaCoreConfig(
     val gamepadTriggerThreshold: Float = 0.12f,
     val gamepadButtonProfile: String = GAMEPAD_PROFILE_STANDARD,
     val gamepadVibration: Boolean = true,
+    val gamepadVibrationStrength: Int = 100,
+    val deviceVibrationFallback: Boolean = true,
     val gamepadSwapSticks: Boolean = false,
     val gamepadInvertLeftX: Boolean = false,
     val gamepadInvertLeftY: Boolean = false,
@@ -135,6 +137,8 @@ class VitaCoreConfigRepository(private val context: Context) {
         "gamepad-swap-sticks",
         "gamepad-trigger-threshold",
         "gamepad-vibration",
+        "gamepad-vibration-strength",
+        "device-vibration-fallback",
         "fullscreen_hd_res_pixel_perfect",
         "hashless-texture-cache",
         "high-accuracy",
@@ -231,6 +235,8 @@ class VitaCoreConfigRepository(private val context: Context) {
                 gamepadTriggerThreshold = values["gamepad-trigger-threshold"]?.toFloatOrNull() ?: defaults.gamepadTriggerThreshold,
                 gamepadButtonProfile = normalizeGamepadProfile(values["gamepad-button-profile"] ?: defaults.gamepadButtonProfile),
                 gamepadVibration = values["gamepad-vibration"]?.toBooleanStrictOrNull() ?: defaults.gamepadVibration,
+                gamepadVibrationStrength = values["gamepad-vibration-strength"]?.toIntOrNull() ?: defaults.gamepadVibrationStrength,
+                deviceVibrationFallback = values["device-vibration-fallback"]?.toBooleanStrictOrNull() ?: defaults.deviceVibrationFallback,
                 gamepadSwapSticks = values["gamepad-swap-sticks"]?.toBooleanStrictOrNull() ?: defaults.gamepadSwapSticks,
                 gamepadInvertLeftX = values["gamepad-invert-left-x"]?.toBooleanStrictOrNull() ?: defaults.gamepadInvertLeftX,
                 gamepadInvertLeftY = values["gamepad-invert-left-y"]?.toBooleanStrictOrNull() ?: defaults.gamepadInvertLeftY,
@@ -349,6 +355,8 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["gamepad-trigger-threshold"] = formatFloat(config.gamepadTriggerThreshold)
         values["gamepad-button-profile"] = normalizeGamepadProfile(config.gamepadButtonProfile)
         values["gamepad-vibration"] = config.gamepadVibration.toString()
+        values["gamepad-vibration-strength"] = config.gamepadVibrationStrength.toString()
+        values["device-vibration-fallback"] = config.deviceVibrationFallback.toString()
         values["gamepad-swap-sticks"] = config.gamepadSwapSticks.toString()
         values["gamepad-invert-left-x"] = config.gamepadInvertLeftX.toString()
         values["gamepad-invert-left-y"] = config.gamepadInvertLeftY.toString()
@@ -472,6 +480,7 @@ class VitaCoreConfigRepository(private val context: Context) {
             gamepadDeadzone = config.gamepadDeadzone.coerceIn(0f, 0.45f),
             gamepadTriggerThreshold = config.gamepadTriggerThreshold.coerceIn(0f, 0.9f),
             gamepadButtonProfile = normalizeGamepadProfile(config.gamepadButtonProfile),
+            gamepadVibrationStrength = config.gamepadVibrationStrength.coerceIn(0, 100),
             logLevel = if (diagnosticsEnabled) {
                 normalizeLogLevel(config.logLevel).coerceAtMost(DEBUG_LOG_LEVEL)
             } else {
@@ -531,7 +540,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         // Bump whenever an old non-upstream default needs to be snapped to vanilla
         // for users who already wrote a stale config.yml. applyMigrations() rewrites
         // the affected keys on the next launch.
-        private const val CONFIG_SCHEMA_VERSION = 5
+        private const val CONFIG_SCHEMA_VERSION = 6
         private const val SCHEMA_VERSION_KEY = "config-schema-version"
         private val upstreamSequenceKeys = setOf(
             "controller-axis-binds",

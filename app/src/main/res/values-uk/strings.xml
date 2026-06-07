@@ -758,4 +758,14 @@
     <string name="setup_content_repair_button">Відновити та встановити VPK/ZIP</string>
     <string name="setup_content_repair_note">Відновлення перетворює вибраний VPK або ZIP на новий ZIP у кеші встановлення, нормалізує пакування архіву та видаляє маркер встановлення Vitamin, який не підтримується, якщо він присутній. Використовуйте цю функцію лише тоді, коли звичайне встановлення для дійсного архіву завершується помилкою.</string>
     <string name="install_choice_archive_repair_button">Відновити та встановити</string>
+    <string name="settings_vibration_section">Вібрація</string>
+    <string name="settings_vibration_enable">Вібрація</string>
+    <string name="settings_vibration_strength">Сила вібрації</string>
+    <string name="settings_test_vibration">Перевірити вібрацію</string>
+    <string name="settings_test_vibration_button">Перевірити</string>
+    <string name="settings_device_vibration_fallback">Використовувати вібрацію пристрою як резерв</string>
+    <string name="settings_help_vibration_enable">Дозволяє підтримуваним іграм надсилати вібрацію на фізичний контролер або, якщо увімкнено резервний варіант, на корпус пристрою Android.</string>
+    <string name="settings_help_vibration_strength">Масштабує інтенсивність вібрації для віддачі геймпада та резервного варіанту пристрою.</string>
+    <string name="settings_help_test_vibration">Відтворює короткий імпульс із використанням поточної сили вібрації та маршрутизації.</string>
+    <string name="settings_help_device_vibration_fallback">Викликає вібрацію телефону або портативного пристрою, якщо фізичний контролер відсутній або не має вібромотора.</string>
 </resources>

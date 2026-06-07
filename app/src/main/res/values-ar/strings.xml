@@ -758,4 +758,14 @@
     <string name="setup_content_repair_button">إصلاح وتثبيت VPK/ZIP</string>
     <string name="setup_content_repair_note">تعمل عملية الإصلاح على تحويل ملف VPK أو ZIP المحدد إلى ملف ZIP جديد في ذاكرة التخزين المؤقت للتثبيت، وتطبيع حزم الأرشيف، وإزالة علامة تثبيت Vitamin غير المدعومة عند وجودها. استخدمه فقط عندما يفشل التثبيت العادي لأرشيف صالح.</string>
     <string name="install_choice_archive_repair_button">إصلاح وتثبيت</string>
+    <string name="settings_vibration_section">الاهتزاز</string>
+    <string name="settings_vibration_enable">الاهتزاز</string>
+    <string name="settings_vibration_strength">قوة الاهتزاز</string>
+    <string name="settings_test_vibration">اختبار الاهتزاز</string>
+    <string name="settings_test_vibration_button">اختبار</string>
+    <string name="settings_device_vibration_fallback">استخدام اهتزاز الجهاز كبديل</string>
+    <string name="settings_help_vibration_enable">يسمح للألعاب المدعومة بإرسال اهتزاز إلى وحدة تحكم فعلية أو، عند تمكين البديل، إلى هيكل جهاز Android.</string>
+    <string name="settings_help_vibration_strength">يضبط شدة الاهتزاز لاهتزاز وحدة التحكم والاهتزاز البديل للجهاز.</string>
+    <string name="settings_help_test_vibration">يقوم بتشغيل نبضة قصيرة باستخدام قوة الاهتزاز الحالية والتوجيه.</string>
+    <string name="settings_help_device_vibration_fallback">يقوم بهز الهاتف أو هيكل الجهاز المحمول عندما تكون وحدة التحكم الفعلية مفقودة أو لا تحتوي على محرك اهتزاز.</string>
 </resources>

@@ -758,4 +758,14 @@
     <string name="setup_content_repair_button">VPK/ZIP reparieren und installieren</string>
     <string name="setup_content_repair_note">Reparieren konvertiert das ausgewählte VPK oder ZIP in ein frisches ZIP im Installations-Cache, normalisiert das Archiv-Packen und entfernt die nicht unterstützte Vitamin-Installationsmarkierung, falls vorhanden. Verwende dies nur, wenn eine normale Installation für ein gültiges Archiv fehlschlägt.</string>
     <string name="install_choice_archive_repair_button">Reparieren und installieren</string>
+    <string name="settings_vibration_section">Vibration</string>
+    <string name="settings_vibration_enable">Vibration</string>
+    <string name="settings_vibration_strength">Vibrationsstärke</string>
+    <string name="settings_test_vibration">Vibration testen</string>
+    <string name="settings_test_vibration_button">Testen</string>
+    <string name="settings_device_vibration_fallback">Gerätevibration als Fallback verwenden</string>
+    <string name="settings_help_vibration_enable">Ermöglicht es unterstützten Spielen, Vibrationen an einen physischen Controller oder, wenn Fallback aktiviert ist, an das Android-Gerät zu senden.</string>
+    <string name="settings_help_vibration_strength">Skaliert die Vibrationsintensität für das Gamepad-Rumble und das Geräte-Fallback.</string>
+    <string name="settings_help_test_vibration">Spielt einen kurzen Impuls mit der aktuellen Vibrationsstärke und dem aktuellen Routing ab.</string>
+    <string name="settings_help_device_vibration_fallback">Vibriert das Telefon oder Handheld-Gehäuse, wenn ein physischer Controller fehlt oder keinen Rumble-Motor aufweist.</string>
 </resources>

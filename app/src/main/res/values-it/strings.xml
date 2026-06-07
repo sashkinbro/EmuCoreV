@@ -758,4 +758,14 @@
     <string name="setup_content_repair_button">Ripara e installa VPK/ZIP</string>
     <string name="setup_content_repair_note">La riparazione converte il VPK o ZIP selezionato in un nuovo ZIP nella cache di installazione, normalizza la compressione dell\'archivio e rimuove l\'indicatore di installazione Vitamin non supportato, se presente. Usalo solo quando l\'installazione normale di un archivio valido fallisce.</string>
     <string name="install_choice_archive_repair_button">Ripara e installa</string>
+    <string name="settings_vibration_section">Vibrazione</string>
+    <string name="settings_vibration_enable">Vibrazione</string>
+    <string name="settings_vibration_strength">Intensità vibrazione</string>
+    <string name="settings_test_vibration">Testa vibrazione</string>
+    <string name="settings_test_vibration_button">Testa</string>
+    <string name="settings_device_vibration_fallback">Usa vibrazione del dispositivo come ripiego</string>
+    <string name="settings_help_vibration_enable">Consente ai giochi supportati di inviare la vibrazione a un controller fisico o, quando il ripiego è abilitato, al corpo del dispositivo Android.</string>
+    <string name="settings_help_vibration_strength">Regola l\'intensità della vibrazione per il controller e il ripiego del dispositivo.</string>
+    <string name="settings_help_test_vibration">Riproduce un breve impulso utilizzando l\'intensità di vibrazione e il routing attuali.</string>
+    <string name="settings_help_device_vibration_fallback">Fa vibrare il telefono o il dispositivo portatile quando manca un controller fisico o non espone un motore di vibrazione.</string>
 </resources>

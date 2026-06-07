@@ -758,4 +758,14 @@
     <string name="setup_content_repair_button">VPK/ZIP Onar ve Yükle</string>
     <string name="setup_content_repair_note">Onarım, seçilen VPK veya ZIP dosyasını kurulum önbelleğinde yeni bir ZIP dosyasına dönüştürür, arşiv paketlemesini normalleştirir ve varsa desteklenmeyen Vitamin kurulum işaretini kaldırır. Yalnızca geçerli bir arşiv için normal kurulum başarısız olduğunda kullanın.</string>
     <string name="install_choice_archive_repair_button">Onar ve yükle</string>
+    <string name="settings_vibration_section">Titreşim</string>
+    <string name="settings_vibration_enable">Titreşim</string>
+    <string name="settings_vibration_strength">Titreşim gücü</string>
+    <string name="settings_test_vibration">Titreşimi test et</string>
+    <string name="settings_test_vibration_button">Test et</string>
+    <string name="settings_device_vibration_fallback">Yedek olarak cihaz titreşimini kullan</string>
+    <string name="settings_help_vibration_enable">Desteklenen oyunların fiziksel bir kontrolcüye veya yedek etkinken Android cihazın gövdesine titreşim göndermesini sağlar.</string>
+    <string name="settings_help_vibration_strength">Gamepad titreşimi ve cihaz yedeği için titreşim yoğunluğunu ölçeklendirir.</string>
+    <string name="settings_help_test_vibration">Mevcut titreşim gücünü ve yönlendirmesini kullanarak kısa bir atım oynatır.</string>
+    <string name="settings_help_device_vibration_fallback">Fiziksel bir kontrolcü eksik olduğunda veya bir titreşim motoru göstermediğinde telefonu veya el cihazı gövdesini titreştirir.</string>
 </resources>

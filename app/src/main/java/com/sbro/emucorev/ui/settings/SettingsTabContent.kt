@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -457,6 +458,42 @@ private fun ControlsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
             Slider(value = uiState.coreConfig.analogMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(analogMultiplier = (value * 10).toInt() / 10f) } }, valueRange = 0.5f..2f, steps = 14)
         }
     }
+    SectionCard(title = stringResource(R.string.settings_vibration_section), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
+        Toggle(
+            stringResource(R.string.settings_vibration_enable),
+            stringResource(R.string.settings_help_vibration_enable),
+            uiState.coreConfig.gamepadVibration,
+            { enabled -> viewModel.updateCoreSettings { it.copy(gamepadVibration = enabled) } },
+            { viewModel.updateCoreSettings { it.copy(gamepadVibration = defaults.gamepadVibration) } }
+        )
+        SliderRow(
+            stringResource(R.string.settings_vibration_strength),
+            stringResource(R.string.settings_help_vibration_strength),
+            stringResource(R.string.settings_gamepad_percent_value, uiState.coreConfig.gamepadVibrationStrength),
+            { viewModel.updateCoreSettings { it.copy(gamepadVibrationStrength = defaults.gamepadVibrationStrength) } }
+        ) {
+            Slider(
+                enabled = uiState.coreConfig.gamepadVibration,
+                value = uiState.coreConfig.gamepadVibrationStrength.toFloat(),
+                onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadVibrationStrength = value.toInt().coerceIn(0, 100)) } },
+                valueRange = 0f..100f,
+                steps = 19
+            )
+        }
+        VibrationTestRow(
+            enabled = uiState.coreConfig.gamepadVibration && uiState.coreConfig.gamepadVibrationStrength > 0,
+            onClick = {
+                viewModel.testVibration()
+            }
+        )
+        Toggle(
+            stringResource(R.string.settings_device_vibration_fallback),
+            stringResource(R.string.settings_help_device_vibration_fallback),
+            uiState.coreConfig.deviceVibrationFallback,
+            { enabled -> viewModel.updateCoreSettings { it.copy(deviceVibrationFallback = enabled) } },
+            { viewModel.updateCoreSettings { it.copy(deviceVibrationFallback = defaults.deviceVibrationFallback) } }
+        )
+    }
     SectionCard(title = stringResource(R.string.settings_gamepad_section), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Text(
             text = stringResource(
@@ -478,7 +515,6 @@ private fun ControlsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
             TextChip(VitaCoreConfig.GAMEPAD_PROFILE_SWAP_CROSS_CIRCLE, stringResource(R.string.settings_gamepad_profile_swap_cross_circle), uiState.coreConfig.gamepadButtonProfile, viewModel, enabled = gamepadConnected) { config, value -> config.copy(gamepadButtonProfile = value) }
             TextChip(VitaCoreConfig.GAMEPAD_PROFILE_NINTENDO_FACE, stringResource(R.string.settings_gamepad_profile_nintendo_face), uiState.coreConfig.gamepadButtonProfile, viewModel, enabled = gamepadConnected) { config, value -> config.copy(gamepadButtonProfile = value) }
         }
-        Toggle(stringResource(R.string.settings_gamepad_vibration), stringResource(R.string.settings_help_gamepad_vibration), uiState.coreConfig.gamepadVibration, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadVibration = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadVibration = defaults.gamepadVibration) } })
         Toggle(stringResource(R.string.settings_gamepad_swap_sticks), stringResource(R.string.settings_help_gamepad_swap_sticks), uiState.coreConfig.gamepadSwapSticks, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadSwapSticks = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadSwapSticks = defaults.gamepadSwapSticks) } })
         Toggle(stringResource(R.string.settings_gamepad_invert_left_y), stringResource(R.string.settings_help_gamepad_invert_y), uiState.coreConfig.gamepadInvertLeftY, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadInvertLeftY = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadInvertLeftY = defaults.gamepadInvertLeftY) } })
         Toggle(stringResource(R.string.settings_gamepad_invert_right_y), stringResource(R.string.settings_help_gamepad_invert_y), uiState.coreConfig.gamepadInvertRightY, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadInvertRightY = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadInvertRightY = defaults.gamepadInvertRightY) } })
@@ -1048,6 +1084,50 @@ private fun Chips(title: String, description: String, onResetDefault: () -> Unit
 @Composable
 private fun SliderRow(title: String, description: String, valueText: String, onResetDefault: () -> Unit, content: @Composable () -> Unit) =
     SettingSliderRow(title = title, description = description, valueText = valueText, onResetDefault = onResetDefault, slider = content)
+
+@Composable
+private fun VibrationTestRow(
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = SettingsSectionRowPadding),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 1.dp,
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = SettingsCardInnerPadding, vertical = SettingsCardInnerPadding),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_test_vibration),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stringResource(R.string.settings_help_test_vibration),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Button(
+                onClick = onClick,
+                enabled = enabled
+            ) {
+                Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.settings_test_vibration_button))
+            }
+        }
+    }
+}
 
 @Composable
 private fun AppLanguageSettingRow(

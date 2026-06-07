@@ -617,10 +617,24 @@ private fun GamepadTab(
             }
         )
         MenuToggleRow(
-            label = stringResource(R.string.settings_gamepad_vibration),
+            label = stringResource(R.string.settings_vibration_enable),
             checked = config.gamepadVibration,
-            enabled = physicalGamepadConnected,
             onCheckedChange = callbacks.onGamepadVibration
+        )
+        MenuSliderRow(
+            label = stringResource(R.string.settings_vibration_strength),
+            value = config.gamepadVibrationStrength.toFloat(),
+            valueText = stringResource(R.string.settings_gamepad_percent_value, config.gamepadVibrationStrength),
+            valueRange = 0f..100f,
+            steps = 19,
+            enabled = config.gamepadVibration,
+            onValueChange = { callbacks.onGamepadVibrationStrength(it.roundToInt().coerceIn(0, 100)) }
+        )
+        MenuToggleRow(
+            label = stringResource(R.string.settings_device_vibration_fallback),
+            checked = config.deviceVibrationFallback,
+            enabled = config.gamepadVibration,
+            onCheckedChange = callbacks.onDeviceVibrationFallback
         )
         MenuToggleRow(
             label = stringResource(R.string.settings_gamepad_swap_sticks),
@@ -1104,6 +1118,8 @@ data class EmulationMenuCallbacks(
     val onGamepadTriggerThreshold: (Float) -> Unit,
     val onGamepadButtonProfile: (String) -> Unit,
     val onGamepadVibration: (Boolean) -> Unit,
+    val onGamepadVibrationStrength: (Int) -> Unit,
+    val onDeviceVibrationFallback: (Boolean) -> Unit,
     val onGamepadSwapSticks: (Boolean) -> Unit,
     val onGamepadInvertLeftY: (Boolean) -> Unit,
     val onGamepadInvertRightY: (Boolean) -> Unit

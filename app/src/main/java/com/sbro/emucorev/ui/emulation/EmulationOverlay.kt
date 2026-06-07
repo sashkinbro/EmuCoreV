@@ -335,6 +335,8 @@ fun EmulationOverlayHost(
             onGamepadTriggerThreshold = { value -> persistConfig { it.copy(gamepadTriggerThreshold = value) } },
             onGamepadButtonProfile = { value -> persistConfig { it.copy(gamepadButtonProfile = value) } },
             onGamepadVibration = { enabled -> persistConfig { it.copy(gamepadVibration = enabled) } },
+            onGamepadVibrationStrength = { value -> persistConfig { it.copy(gamepadVibrationStrength = value) } },
+            onDeviceVibrationFallback = { enabled -> persistConfig { it.copy(deviceVibrationFallback = enabled) } },
             onGamepadSwapSticks = { enabled -> persistConfig { it.copy(gamepadSwapSticks = enabled) } },
             onGamepadInvertLeftY = { enabled -> persistConfig { it.copy(gamepadInvertLeftY = enabled) } },
             onGamepadInvertRightY = { enabled -> persistConfig { it.copy(gamepadInvertRightY = enabled) } }

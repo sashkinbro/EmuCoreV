@@ -757,4 +757,14 @@
     <string name="setup_content_repair_button">修复并安装 VPK/ZIP</string>
     <string name="setup_content_repair_note">“修复”会将选定的 VPK 或 ZIP 转换为安装缓存中全新的 ZIP，规范化压缩包结构，并在存在不受支持的 Vitamin 安装标记时将其移除。仅在正常安装有效压缩包失败时使用。</string>
     <string name="install_choice_archive_repair_button">修复并安装</string>
+    <string name="settings_vibration_section">震动</string>
+    <string name="settings_vibration_enable">震动</string>
+    <string name="settings_vibration_strength">震动强度</string>
+    <string name="settings_test_vibration">测试震动</string>
+    <string name="settings_test_vibration_button">测试</string>
+    <string name="settings_device_vibration_fallback">使用设备震动作为后备</string>
+    <string name="settings_help_vibration_enable">允许受支持的游戏将震动发送到物理控制器，或者在启用后备时，发送到 Android 设备机身。</string>
+    <string name="settings_help_vibration_strength">调整手柄震动和设备后备的震动强度。</string>
+    <string name="settings_help_test_vibration">使用当前的震动强度和路由播放短促的震动脉冲。</string>
+    <string name="settings_help_device_vibration_fallback">当缺少物理控制器或其没有震动马达时，使手机或掌机机身震动。</string>
 </resources>

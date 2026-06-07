@@ -313,6 +313,12 @@
     <string name="settings_gamepad_profile_standard">Standard</string>
     <string name="settings_gamepad_profile_swap_cross_circle">Swap Cross/Circle</string>
     <string name="settings_gamepad_profile_nintendo_face">Nintendo face buttons</string>
+    <string name="settings_vibration_section">Vibration</string>
+    <string name="settings_vibration_enable">Vibration</string>
+    <string name="settings_vibration_strength">Vibration strength</string>
+    <string name="settings_test_vibration">Test vibration</string>
+    <string name="settings_test_vibration_button">Test</string>
+    <string name="settings_device_vibration_fallback">Use device vibration as fallback</string>
     <string name="settings_gamepad_vibration">Gamepad vibration</string>
     <string name="settings_gamepad_swap_sticks">Swap sticks</string>
     <string name="settings_gamepad_invert_left_y">Invert left stick Y</string>
@@ -384,6 +390,10 @@
     <string name="settings_help_gamepad_deadzone">Filters small stick movement near the center to reduce drift. Raise it if the camera or character moves by itself; lower it if aiming feels unresponsive.</string>
     <string name="settings_help_gamepad_trigger_threshold">Sets how far analog triggers must move before input is sent. Raise it for noisy triggers; lower it for racing or pressure-sensitive controls.</string>
     <string name="settings_help_gamepad_button_profile">Remaps physical face buttons before they reach the emulator. Use this when your controller layout does not match Vita Cross, Circle, Square, and Triangle placement.</string>
+    <string name="settings_help_vibration_enable">Allows supported games to send vibration to a physical controller or, when fallback is enabled, to the Android device body.</string>
+    <string name="settings_help_vibration_strength">Scales vibration intensity for gamepad rumble and device fallback.</string>
+    <string name="settings_help_test_vibration">Plays a short pulse using the current vibration strength and routing.</string>
+    <string name="settings_help_device_vibration_fallback">Vibrates the phone or handheld body when a physical controller is missing or does not expose a rumble motor.</string>
     <string name="settings_help_gamepad_vibration">Allows supported physical controllers to rumble during gameplay.</string>
     <string name="settings_help_gamepad_swap_sticks">Swaps left and right stick axes. Useful for games or controllers with unusual stick routing.</string>
     <string name="settings_help_gamepad_invert_y">Flips vertical stick movement for camera or aiming controls.</string>
