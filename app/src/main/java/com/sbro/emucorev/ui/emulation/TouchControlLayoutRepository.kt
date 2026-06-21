@@ -11,8 +11,20 @@ data class TouchControlElement(
     val y: Float,
     val width: Float,
     val height: Float,
-    val visible: Boolean = true
+    val visible: Boolean = true,
+    val analogMode: TouchAnalogMode = TouchAnalogMode.Stick
 )
+
+enum class TouchAnalogMode(val storageValue: String) {
+    Stick("stick"),
+    TouchArea("touch_area");
+
+    companion object {
+        fun fromStorage(value: String?): TouchAnalogMode {
+            return entries.firstOrNull { it.storageValue == value } ?: Stick
+        }
+    }
+}
 
 class TouchControlLayoutRepository(context: Context) {
     private val preferences = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -31,7 +43,10 @@ class TouchControlLayoutRepository(context: Context) {
                             y = item.getDouble("y").toFloat(),
                             width = item.getDouble("width").toFloat(),
                             height = item.getDouble("height").toFloat(),
-                            visible = item.optBoolean("visible", true)
+                            visible = item.optBoolean("visible", true),
+                            analogMode = TouchAnalogMode.fromStorage(
+                                if (item.has("analogMode")) item.optString("analogMode") else null
+                            )
                         ).coerceToCanvas()
                     )
                 }
@@ -50,6 +65,7 @@ class TouchControlLayoutRepository(context: Context) {
                     .put("width", element.width)
                     .put("height", element.height)
                     .put("visible", element.visible)
+                    .put("analogMode", element.analogMode.storageValue)
             )
         }
         preferences.edit { putString(KEY_LAYOUT, array.toString()) }

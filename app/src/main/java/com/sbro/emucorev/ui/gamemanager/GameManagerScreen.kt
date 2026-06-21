@@ -163,22 +163,20 @@ fun GameManagerScreen(
                 GameManagerTabs(selectedTab = selectedTab, onSelected = { selectedTab = it })
             }
             item {
-                Box(modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)) {
-                    when (selectedTab) {
-                        GameManagerTab.Graphics -> GraphicsProfileSection(
-                            config = uiState.config,
-                            defaults = uiState.defaults,
-                            installedGpuDrivers = uiState.installedGpuDrivers,
-                            customDriverOverride = uiState.customDriverOverride,
-                            onOpenGpuDriverManager = { onOpenGpuDriverManager(uiState.selectedTitleId) },
-                            onUpdate = viewModel::updateSelected,
-                            onDriverOverrideSelected = viewModel::selectCustomDriverOverride
-                        )
-                        GameManagerTab.Performance -> PerformanceProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
-                        GameManagerTab.Audio -> AudioProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
-                        GameManagerTab.Overlay -> OverlayProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
-                        GameManagerTab.Gamepad -> GamepadProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
-                    }
+                when (selectedTab) {
+                    GameManagerTab.Graphics -> GraphicsProfileSection(
+                        config = uiState.config,
+                        defaults = uiState.defaults,
+                        installedGpuDrivers = uiState.installedGpuDrivers,
+                        customDriverOverride = uiState.customDriverOverride,
+                        onOpenGpuDriverManager = { onOpenGpuDriverManager(uiState.selectedTitleId) },
+                        onUpdate = viewModel::updateSelected,
+                        onDriverOverrideSelected = viewModel::selectCustomDriverOverride
+                    )
+                    GameManagerTab.Performance -> PerformanceProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
+                    GameManagerTab.Audio -> AudioProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
+                    GameManagerTab.Overlay -> OverlayProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
+                    GameManagerTab.Gamepad -> GamepadProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
                 }
             }
         }

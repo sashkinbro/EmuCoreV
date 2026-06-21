@@ -86,7 +86,7 @@ import com.sbro.emucorev.ui.common.SettingHelpButton
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 
-private val SettingsRowHorizontalPadding = 12.dp
+private val SettingsRowHorizontalPadding = ScreenHorizontalPadding
 private val SettingsRowInnerHorizontalPadding = 14.dp
 private val SettingsRowInnerVerticalPadding = 14.dp
 

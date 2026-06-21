@@ -3,7 +3,7 @@ package com.sbro.emucorev.ui.theme
 import android.content.res.Configuration
 import androidx.compose.ui.unit.dp
 
-val ScreenHorizontalPadding = 10.dp
+val ScreenHorizontalPadding = 8.dp
 val ScreenTopInsetOffset = 8.dp
 val ScreenContentBottomPadding = 110.dp
 val CardContentPadding = 14.dp
