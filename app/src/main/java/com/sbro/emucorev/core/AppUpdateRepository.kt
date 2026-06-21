@@ -35,24 +35,39 @@ data class AppUpdateRelease(
 class AppUpdateRepository(private val context: Context) {
     private val cachePrefs = context.applicationContext.getSharedPreferences(CACHE_PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun checkLatestRelease(): AppUpdateRelease? {
+    fun checkLatestRelease(forceRefresh: Boolean = false): AppUpdateRelease? {
         val json = loadCachedJson(
             keyPrefix = CACHE_KEY_LATEST,
             url = LATEST_RELEASE_URL,
             accept = GITHUB_JSON_ACCEPT,
-            label = "latest release"
+            label = "latest release",
+            forceRefresh = forceRefresh
         ) ?: return null
         return runCatching {
             parseRelease(json).takeIf { isNewerThanCurrent(it.tagName) }
         }.getOrNull()
     }
 
-    fun loadReleaseHistory(): List<AppUpdateRelease> {
+    fun loadLatestRelease(forceRefresh: Boolean = false): AppUpdateRelease? {
+        val json = loadCachedJson(
+            keyPrefix = CACHE_KEY_LATEST,
+            url = LATEST_RELEASE_URL,
+            accept = GITHUB_JSON_ACCEPT,
+            label = "latest release",
+            forceRefresh = forceRefresh
+        ) ?: return null
+        return runCatching {
+            parseRelease(json)
+        }.getOrNull()
+    }
+
+    fun loadReleaseHistory(forceRefresh: Boolean = false): List<AppUpdateRelease> {
         val json = loadCachedJson(
             keyPrefix = CACHE_KEY_HISTORY,
             url = RELEASES_URL,
             accept = GITHUB_JSON_ACCEPT,
-            label = "release history"
+            label = "release history",
+            forceRefresh = forceRefresh
         ) ?: return emptyList()
         return runCatching {
             parseReleaseList(json)
@@ -265,7 +280,8 @@ class AppUpdateRepository(private val context: Context) {
         keyPrefix: String,
         url: String,
         accept: String,
-        label: String
+        label: String,
+        forceRefresh: Boolean = false
     ): String? {
         val now = System.currentTimeMillis()
         val cachedJson = cachePrefs.getString(cacheKey(keyPrefix, "json"), null)
@@ -273,10 +289,10 @@ class AppUpdateRepository(private val context: Context) {
         val errorAt = cachePrefs.getLong(cacheKey(keyPrefix, "error_at"), 0L)
         val cachedError = cachePrefs.getString(cacheKey(keyPrefix, "error"), null)
 
-        if (!cachedJson.isNullOrBlank() && now - fetchedAt < CACHE_TTL_MILLIS) {
+        if (!forceRefresh && !cachedJson.isNullOrBlank() && now - fetchedAt < CACHE_TTL_MILLIS) {
             return cachedJson
         }
-        if (cachedJson.isNullOrBlank() && !cachedError.isNullOrBlank() && now - errorAt < CACHE_TTL_MILLIS) {
+        if (!forceRefresh && cachedJson.isNullOrBlank() && !cachedError.isNullOrBlank() && now - errorAt < CACHE_TTL_MILLIS) {
             throw IOException(cachedError)
         }
         if (!hasNetwork()) {

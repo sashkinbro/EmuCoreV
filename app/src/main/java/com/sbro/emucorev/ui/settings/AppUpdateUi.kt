@@ -72,8 +72,8 @@ import java.util.Locale
 @Composable
 fun AppUpdateTab(
     state: AppUpdateUiState,
-    onCheckForUpdates: () -> Unit,
-    onLoadReleaseHistory: () -> Unit,
+    onCheckForUpdates: (forceRefresh: Boolean) -> Unit,
+    onLoadReleaseHistory: (forceRefresh: Boolean) -> Unit,
     onShowCleanInstallDialog: () -> Unit,
     onDismissCleanInstallDialog: () -> Unit,
     onDownloadUpdate: () -> Unit,
@@ -87,10 +87,10 @@ fun AppUpdateTab(
 
     LaunchedEffect(Unit) {
         if (!state.checkedOnce && !state.checking) {
-            onCheckForUpdates()
+            onCheckForUpdates(false)
         }
         if (state.releaseHistory.isEmpty() && !state.historyLoading) {
-            onLoadReleaseHistory()
+            onLoadReleaseHistory(false)
         }
     }
 
@@ -123,7 +123,7 @@ fun AppUpdateTab(
             releases = state.releaseHistory,
             loading = state.historyLoading,
             errorMessage = state.historyErrorMessage,
-            onRetry = onLoadReleaseHistory,
+            onRetry = { onLoadReleaseHistory(true) },
             onReleaseClick = { selectedHistoryRelease = it }
         )
 
@@ -320,7 +320,7 @@ fun AppUpdateAvailableDialog(
 @Composable
 private fun UpdateHeroCard(
     state: AppUpdateUiState,
-    onCheckForUpdates: () -> Unit,
+    onCheckForUpdates: (forceRefresh: Boolean) -> Unit,
     onDownloadUpdate: () -> Unit,
     onInstallDownloadedUpdate: () -> Unit,
     onOpenRelease: () -> Unit
@@ -445,7 +445,7 @@ private fun UpdateHeroCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedButton(
-                    onClick = onCheckForUpdates,
+                    onClick = { onCheckForUpdates(true) },
                     enabled = !state.checking && progress == null,
                     modifier = Modifier.weight(1f)
                 ) {
