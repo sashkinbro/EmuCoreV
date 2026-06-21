@@ -830,4 +830,11 @@
     <string name="settings_storage_location_custom">Dossier personnalisé</string>
     <string name="settings_storage_choose_custom_folder">Choisir un dossier personnalisé</string>
     <string name="settings_storage_permission_required">Autorisez l\'accès à tous les fichiers, puis choisissez à nouveau le dossier de l\'émulateur.</string>
+    <string name="emulation_controls_editor_stick_mode">Stick</string>
+    <string name="emulation_controls_editor_touch_area_mode">Zone tactile</string>
+    <string name="emulation_controls_editor_width">Largeur</string>
+    <string name="emulation_controls_editor_height">Hauteur</string>
+    <string name="profile_forgot_password">Mot de passe oublié ?</string>
+    <string name="profile_password_reset_email_required">Entrez d\'abord votre adresse e-mail.</string>
+    <string name="profile_password_reset_sent">E-mail de réinitialisation du mot de passe envoyé. Vérifiez votre boîte de réception.</string>
 </resources>

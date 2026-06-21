@@ -830,4 +830,11 @@
     <string name="settings_storage_location_custom">Pasta personalizada</string>
     <string name="settings_storage_choose_custom_folder">Escolher pasta personalizada</string>
     <string name="settings_storage_permission_required">Permita o acesso a todos os arquivos e escolha a pasta do emulador novamente.</string>
+    <string name="emulation_controls_editor_stick_mode">Analógico</string>
+    <string name="emulation_controls_editor_touch_area_mode">Área de toque</string>
+    <string name="emulation_controls_editor_width">Largura</string>
+    <string name="emulation_controls_editor_height">Altura</string>
+    <string name="profile_forgot_password">Esqueceu a senha?</string>
+    <string name="profile_password_reset_email_required">Insira seu endereço de e-mail primeiro.</string>
+    <string name="profile_password_reset_sent">E-mail de redefinição de senha enviado. Verifique sua caixa de entrada.</string>
 </resources>

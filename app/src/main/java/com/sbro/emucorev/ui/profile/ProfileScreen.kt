@@ -328,6 +328,10 @@ fun ProfileScreen(
             onSubmit = { email, password, displayName, createAccount ->
                 showEmailDialog = false
                 viewModel.signInWithEmail(email, password, displayName, createAccount)
+            },
+            onPasswordReset = { email ->
+                showEmailDialog = false
+                viewModel.sendPasswordResetEmail(email)
             }
         )
     }
@@ -853,7 +857,8 @@ private fun ProfileEmptyState() {
 @Composable
 private fun ProfileEmailDialog(
     onDismiss: () -> Unit,
-    onSubmit: (String, String, String, Boolean) -> Unit
+    onSubmit: (String, String, String, Boolean) -> Unit,
+    onPasswordReset: (String) -> Unit
 ) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
@@ -983,6 +988,20 @@ private fun ProfileEmailDialog(
                         singleLine = true,
                         shape = RoundedCornerShape(18.dp)
                     )
+                    AnimatedVisibility(
+                        visible = !createAccount,
+                        enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(180)),
+                        exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(160))
+                    ) {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            TextButton(
+                                onClick = { onPasswordReset(email) },
+                                modifier = Modifier.align(Alignment.CenterEnd)
+                            ) {
+                                Text(stringResource(R.string.profile_forgot_password))
+                            }
+                        }
+                    }
 
                     Column(
                         modifier = Modifier.fillMaxWidth(),
