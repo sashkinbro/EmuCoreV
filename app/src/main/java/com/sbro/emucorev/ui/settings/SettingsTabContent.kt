@@ -64,9 +64,10 @@ import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.core.input.InputDeviceClassifier
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.ui.common.SectionCard
+import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 
 private val SettingsSectionContentPadding = 14.dp
-private val SettingsSectionRowPadding = 12.dp
+private val SettingsSectionRowPadding = ScreenHorizontalPadding
 private val SettingsCardInnerPadding = 14.dp
 private const val EmuCoreRepositoryUrl = "https://github.com/sashkinbro/EmuCoreV"
 private const val EmuCoreWebsiteUrl = "https://emucorev.web.app"

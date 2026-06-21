@@ -815,6 +815,10 @@
     <string name="emulation_controls_editor_visible">Visible</string>
     <string name="emulation_controls_editor_size">Size</string>
     <string name="emulation_controls_editor_percent">%1$d%%</string>
+    <string name="emulation_controls_editor_stick_mode">Stick</string>
+    <string name="emulation_controls_editor_touch_area_mode">Touch area</string>
+    <string name="emulation_controls_editor_width">Width</string>
+    <string name="emulation_controls_editor_height">Height</string>
     <string name="emulation_controls_editor_reset">Reset</string>
     <string name="emulation_controls_editor_done">Done</string>
     <string name="emulation_menu_exit_game">Exit game</string>

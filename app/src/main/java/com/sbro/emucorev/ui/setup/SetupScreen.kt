@@ -73,15 +73,15 @@ fun SetupScreen(
             .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(
-                start = ScreenHorizontalPadding,
-                end = ScreenHorizontalPadding,
                 top = topInset,
                 bottom = ScreenContentBottomPadding
             ),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = ScreenHorizontalPadding),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {

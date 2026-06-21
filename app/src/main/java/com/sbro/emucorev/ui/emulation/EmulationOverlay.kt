@@ -37,6 +37,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -500,10 +501,22 @@ private fun OnScreenControls(
         val selectedIndex = selected?.let { controls.indexOfFirst { element -> element.id == it.id } } ?: -1
         val selectedDescriptor = selected?.id?.let(::touchControlDescriptor)
         val defaultSelected = selected?.id?.let { id -> defaultLayout.firstOrNull { it.id == id } }
+        val selectedIsAnalog = selectedDescriptor?.type == TouchControlType.Analog
+        val selectedAnalogMode = selected?.analogMode ?: TouchAnalogMode.Stick
         val selectedScalePercent = if (selected != null && defaultSelected != null) {
             val currentSize = maxOf(selected.width * canvasWidth, selected.height * canvasHeight)
             val defaultSize = maxOf(defaultSelected.width * canvasWidth, defaultSelected.height * canvasHeight).coerceAtLeast(1f)
             ((currentSize / defaultSize) * 100f).roundToInt().coerceIn(25, 300)
+        } else {
+            100
+        }
+        val selectedWidthPercent = if (selected != null && defaultSelected != null) {
+            ((selected.width / defaultSelected.width.coerceAtLeast(0.001f)) * 100f).roundToInt().coerceIn(25, 300)
+        } else {
+            100
+        }
+        val selectedHeightPercent = if (selected != null && defaultSelected != null) {
+            ((selected.height / defaultSelected.height.coerceAtLeast(0.001f)) * 100f).roundToInt().coerceIn(25, 300)
         } else {
             100
         }
@@ -512,6 +525,19 @@ private fun OnScreenControls(
             val updated = transform(controls).map { it.coerceToCanvas() }
             controls = updated
             onLayoutChange(updated)
+        }
+
+        fun resizeAroundCenter(element: TouchControlElement, nextWidth: Float, nextHeight: Float): TouchControlElement {
+            val centerX = element.x + element.width / 2f
+            val centerY = element.y + element.height / 2f
+            val safeWidth = nextWidth.coerceIn(0.035f, 0.5f)
+            val safeHeight = nextHeight.coerceIn(0.035f, 0.5f)
+            return element.copy(
+                width = safeWidth,
+                height = safeHeight,
+                x = (centerX - safeWidth / 2f).coerceIn(0f, 1f - safeWidth),
+                y = (centerY - safeHeight / 2f).coerceIn(0f, 1f - safeHeight)
+            )
         }
 
         fun updateSelectedSize(percentDelta: Int) {
@@ -525,14 +551,52 @@ private fun OnScreenControls(
             val nextWidth = (baseline.width * nextPercent).coerceIn(0.035f, 0.5f)
             val nextHeight = (baseline.height * nextPercent).coerceIn(0.035f, 0.5f)
             commitLayoutChange { currentControls ->
-                currentControls.replaceElement(
-                    target.copy(
-                        width = nextWidth,
-                        height = nextHeight,
-                        x = target.x.coerceIn(0f, 1f - nextWidth),
-                        y = target.y.coerceIn(0f, 1f - nextHeight)
-                    )
+                currentControls.replaceElement(resizeAroundCenter(target, nextWidth, nextHeight))
+            }
+        }
+
+        fun updateSelectedWidth(percentDelta: Int) {
+            val selectedElement = selected ?: return
+            val target = controls.firstOrNull { it.id == selectedElement.id } ?: selectedElement
+            val baseline = defaultLayout.firstOrNull { it.id == target.id } ?: target
+            val currentPercent = ((target.width / baseline.width.coerceAtLeast(0.001f)) * 100f).roundToInt().coerceIn(25, 300)
+            val nextPercent = (currentPercent + percentDelta).coerceIn(50, 300) / 100f
+            commitLayoutChange { currentControls ->
+                currentControls.replaceElement(resizeAroundCenter(target, baseline.width * nextPercent, target.height))
+            }
+        }
+
+        fun updateSelectedHeight(percentDelta: Int) {
+            val selectedElement = selected ?: return
+            val target = controls.firstOrNull { it.id == selectedElement.id } ?: selectedElement
+            val baseline = defaultLayout.firstOrNull { it.id == target.id } ?: target
+            val currentPercent = ((target.height / baseline.height.coerceAtLeast(0.001f)) * 100f).roundToInt().coerceIn(25, 300)
+            val nextPercent = (currentPercent + percentDelta).coerceIn(50, 300) / 100f
+            commitLayoutChange { currentControls ->
+                currentControls.replaceElement(resizeAroundCenter(target, target.width, baseline.height * nextPercent))
+            }
+        }
+
+        fun toggleSelectedAnalogMode() {
+            val selectedElement = selected ?: return
+            val target = controls.firstOrNull { it.id == selectedElement.id } ?: selectedElement
+            val baseline = defaultLayout.firstOrNull { it.id == target.id } ?: target
+            val nextMode = if (target.analogMode == TouchAnalogMode.TouchArea) {
+                TouchAnalogMode.Stick
+            } else {
+                TouchAnalogMode.TouchArea
+            }
+            val resized = if (nextMode == TouchAnalogMode.TouchArea) {
+                resizeAroundCenter(
+                    element = target,
+                    nextWidth = maxOf(target.width, baseline.width * 1.8f),
+                    nextHeight = maxOf(target.height, baseline.height * 1.1f)
                 )
+            } else {
+                resizeAroundCenter(target, baseline.width, baseline.height)
+            }
+            commitLayoutChange { currentControls ->
+                currentControls.replaceElement(resized.copy(analogMode = nextMode))
             }
         }
 
@@ -625,6 +689,14 @@ private fun OnScreenControls(
                 },
                 onSizeDecrease = { updateSelectedSize(-10) },
                 onSizeIncrease = { updateSelectedSize(10) },
+                analogMode = if (selectedIsAnalog) selectedAnalogMode else null,
+                touchAreaWidthPercent = selectedWidthPercent,
+                touchAreaHeightPercent = selectedHeightPercent,
+                onAnalogModeToggle = ::toggleSelectedAnalogMode,
+                onTouchAreaWidthDecrease = { updateSelectedWidth(-10) },
+                onTouchAreaWidthIncrease = { updateSelectedWidth(10) },
+                onTouchAreaHeightDecrease = { updateSelectedHeight(-10) },
+                onTouchAreaHeightIncrease = { updateSelectedHeight(10) },
                 onDone = onEditDone,
                 modifier = Modifier.align(Alignment.TopCenter)
             )
@@ -896,6 +968,11 @@ private fun TouchControlCanvasItem(
     val widthPx = element.width * canvasWidth
     val heightPx = element.height * canvasHeight
     var pressed by remember(element.id, editMode) { mutableStateOf(false) }
+    val itemShape = if (descriptor.type == TouchControlType.Analog && element.analogMode == TouchAnalogMode.TouchArea) {
+        RoundedCornerShape(18.dp)
+    } else {
+        descriptor.shape
+    }
     val sizeModifier = Modifier
         .offset { IntOffset(xPx.roundToInt(), yPx.roundToInt()) }
         .size(width = with(density) { widthPx.toDp() }, height = with(density) { heightPx.toDp() })
@@ -926,7 +1003,7 @@ private fun TouchControlCanvasItem(
             .border(
                 width = if (selected) 2.dp else 1.dp,
                 color = if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.34f),
-                shape = descriptor.shape
+                shape = itemShape
             )
     } else if (inputHandledByGroup) {
         Modifier
@@ -981,7 +1058,19 @@ private fun TouchControlCanvasItem(
         when (descriptor.type) {
             TouchControlType.Analog -> {
                 if (editMode) {
-                    StaticAnalogStick(alpha = alpha)
+                    if (element.analogMode == TouchAnalogMode.TouchArea) {
+                        StaticAnalogTouchArea(alpha = alpha)
+                    } else {
+                        StaticAnalogStick(alpha = alpha)
+                    }
+                } else if (element.analogMode == TouchAnalogMode.TouchArea) {
+                    AnalogTouchArea(
+                        alpha = alpha,
+                        onAxisChange = { x, y ->
+                            descriptor.axisX?.let { onAxisChange(it, x) }
+                            descriptor.axisY?.let { onAxisChange(it, y) }
+                        }
+                    )
                 } else {
                     AnalogStick(
                         analogSize = with(density) { minOf(widthPx, heightPx).toDp() },
@@ -1014,6 +1103,24 @@ private fun TouchControlCanvasItem(
 }
 
 @Composable
+private fun StaticAnalogTouchArea(alpha: Float) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer(alpha = alpha)
+            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.38f), RoundedCornerShape(18.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = stringResource(R.string.emulation_controls_editor_touch_area_mode),
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            color = Color.White.copy(alpha = 0.86f)
+        )
+    }
+}
+
+@Composable
 private fun StaticAnalogStick(alpha: Float) {
     Box(
         modifier = Modifier.fillMaxSize().graphicsLayer(alpha = alpha),
@@ -1039,11 +1146,19 @@ private fun TouchControlEditorChrome(
     selectedLabel: String,
     selectedVisible: Boolean,
     selectedScalePercent: Int,
+    analogMode: TouchAnalogMode?,
+    touchAreaWidthPercent: Int,
+    touchAreaHeightPercent: Int,
     onSelectNext: () -> Unit,
     onReset: () -> Unit,
     onVisibilityToggle: () -> Unit,
     onSizeDecrease: () -> Unit,
     onSizeIncrease: () -> Unit,
+    onAnalogModeToggle: () -> Unit,
+    onTouchAreaWidthDecrease: () -> Unit,
+    onTouchAreaWidthIncrease: () -> Unit,
+    onTouchAreaHeightDecrease: () -> Unit,
+    onTouchAreaHeightIncrease: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1095,6 +1210,22 @@ private fun TouchControlEditorChrome(
                     tint = Color.White.copy(alpha = if (selectedVisible) 0.95f else 0.58f)
                 )
             }
+            if (analogMode != null) {
+                EditorIconButton(
+                    onClick = onAnalogModeToggle,
+                    containerColor = if (analogMode == TouchAnalogMode.TouchArea) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.94f)
+                    } else {
+                        Color(0xFF17171D).copy(alpha = 0.94f)
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.TouchApp,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.95f)
+                    )
+                }
+            }
             EditorToolbarButton(
                 label = stringResource(R.string.emulation_controls_editor_done),
                 onClick = onDone,
@@ -1124,6 +1255,62 @@ private fun TouchControlEditorChrome(
                 EditorSizeButton("+", onClick = onSizeIncrease)
             }
         }
+
+        if (analogMode == TouchAnalogMode.TouchArea) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = Color(0xFF171B27).copy(alpha = 0.94f),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    TouchAreaSizeRow(
+                        label = stringResource(R.string.emulation_controls_editor_width),
+                        percent = touchAreaWidthPercent,
+                        onDecrease = onTouchAreaWidthDecrease,
+                        onIncrease = onTouchAreaWidthIncrease
+                    )
+                    TouchAreaSizeRow(
+                        label = stringResource(R.string.emulation_controls_editor_height),
+                        percent = touchAreaHeightPercent,
+                        onDecrease = onTouchAreaHeightDecrease,
+                        onIncrease = onTouchAreaHeightIncrease
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TouchAreaSizeRow(
+    label: String,
+    percent: Int,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            color = Color.White,
+            modifier = Modifier.width(56.dp)
+        )
+        EditorSizeButton("-", onClick = onDecrease)
+        Text(
+            text = stringResource(R.string.emulation_controls_editor_percent, percent),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            color = Color.White,
+            modifier = Modifier.width(60.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        EditorSizeButton("+", onClick = onIncrease)
     }
 }
 
@@ -1158,12 +1345,13 @@ private fun EditorToolbarButton(
 private fun EditorIconButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
+    containerColor: Color = Color(0xFF17171D).copy(alpha = if (enabled) 0.94f else 0.54f),
     content: @Composable () -> Unit
 ) {
     Surface(
         modifier = Modifier.size(width = 54.dp, height = 42.dp),
         shape = RoundedCornerShape(14.dp),
-        color = Color(0xFF17171D).copy(alpha = if (enabled) 0.94f else 0.54f),
+        color = containerColor,
         border = BorderStroke(1.dp, Color.White.copy(alpha = if (enabled) 0.08f else 0.03f)),
         onClick = onClick
     ) {
@@ -1361,6 +1549,64 @@ private fun AssetButton(
             contentScale = ContentScale.Fit
         )
     }
+}
+
+@Composable
+private fun AnalogTouchArea(
+    alpha: Float,
+    onAxisChange: (Short, Short) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var sizePx by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
+    var startOffset by remember { mutableStateOf(Offset.Zero) }
+    var lastX by remember { mutableIntStateOf(0) }
+    var lastY by remember { mutableIntStateOf(0) }
+
+    fun sendAxis(x: Float, y: Float) {
+        val quantizedX = (x * Short.MAX_VALUE).roundToInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+        val quantizedY = (y * Short.MAX_VALUE).roundToInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+        if (quantizedX == lastX && quantizedY == lastY) return
+        lastX = quantizedX
+        lastY = quantizedY
+        onAxisChange(quantizedX.toShort(), quantizedY.toShort())
+    }
+
+    fun resetArea() {
+        sendAxis(0f, 0f)
+    }
+
+    fun updateArea(position: Offset) {
+        if (sizePx.width == 0f || sizePx.height == 0f) return
+        val maxDistance = (minOf(sizePx.width, sizePx.height) * 0.38f).coerceAtLeast(1f)
+        val raw = position - startOffset
+        val distance = raw.getDistance()
+        val clamped = if (distance > maxDistance && distance > 0f) raw * (maxDistance / distance) else raw
+        val nx = (clamped.x / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < 0.08f) 0f else it }
+        val ny = (clamped.y / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < 0.08f) 0f else it }
+        sendAxis(nx, ny)
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .graphicsLayer(alpha = alpha)
+            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(18.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.32f), RoundedCornerShape(18.dp))
+            .onSizeChanged { sizePx = androidx.compose.ui.geometry.Size(it.width.toFloat(), it.height.toFloat()) }
+            .pointerInput(sizePx) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        startOffset = offset
+                        sendAxis(0f, 0f)
+                    },
+                    onDragEnd = { resetArea() },
+                    onDragCancel = { resetArea() }
+                ) { change, _ ->
+                    change.consume()
+                    updateArea(change.position)
+                }
+            }
+    )
 }
 
 @Composable
