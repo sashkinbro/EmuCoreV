@@ -827,4 +827,7 @@
     <string name="settings_updates_parallel_unavailable">El APK separado no está disponible para esta versión.</string>
     <string name="settings_updates_parallel_package">Paquete de aplicación separado</string>
     <string name="settings_updates_parallel_download">Descargar</string>
+    <string name="settings_storage_location_custom">Carpeta personalizada</string>
+    <string name="settings_storage_choose_custom_folder">Elegir carpeta personalizada</string>
+    <string name="settings_storage_permission_required">Permite el acceso a todos los archivos y luego vuelve a elegir la carpeta del emulador.</string>
 </resources>

@@ -827,4 +827,7 @@
     <string name="settings_updates_parallel_unavailable">इस रिलीज़ के लिए अलग APK उपलब्ध नहीं है。</string>
     <string name="settings_updates_parallel_package">अलग ऐप पैकेज</string>
     <string name="settings_updates_parallel_download">डाउनलोड करें</string>
+    <string name="settings_storage_location_custom">कस्टम फ़ोल्डर</string>
+    <string name="settings_storage_choose_custom_folder">कस्टम फ़ोल्डर चुनें</string>
+    <string name="settings_storage_permission_required">सभी फ़ाइलों तक पहुंच की अनुमति दें, फिर एमुलेटर फ़ोल्डर को फिर से चुनें।</string>
 </resources>

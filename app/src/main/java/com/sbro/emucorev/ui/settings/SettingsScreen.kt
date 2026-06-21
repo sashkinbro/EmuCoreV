@@ -79,6 +79,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.StorageAccessManager
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.ui.common.NavigationBackButton
 import com.sbro.emucorev.ui.common.SettingHelpButton
@@ -119,17 +120,25 @@ fun SettingsScreen(
     var selectedTab by rememberSaveable(initialTab) { mutableStateOf(initialTab) }
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
     val folderPickerFailedMessage = stringResource(R.string.folder_picker_failed)
+    val storagePermissionRequiredMessage = stringResource(R.string.settings_storage_permission_required)
     val backupCreatedMessage = stringResource(R.string.settings_backup_created)
     val backupFailedMessage = stringResource(R.string.settings_backup_failed)
     val restoreCompletedMessage = stringResource(R.string.settings_backup_restored)
     val restoreFailedMessage = stringResource(R.string.settings_backup_restore_failed)
 
-    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+    val storageFolderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         runCatching {
-            viewModel.onPackagesFolderSelected(uri)
+            viewModel.selectCustomStorageLocation(uri)
         }.onFailure {
             Toast.makeText(context, folderPickerFailedMessage, Toast.LENGTH_SHORT).show()
+        }
+    }
+    val storagePermissionPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (StorageAccessManager.needsAllFilesAccessForCustomStorage()) {
+            Toast.makeText(context, storagePermissionRequiredMessage, Toast.LENGTH_SHORT).show()
+        } else {
+            storageFolderPicker.launch(null)
         }
     }
     val backupPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
@@ -153,8 +162,13 @@ fun SettingsScreen(
         }
     }
     val refreshCoreSettingsClick = rememberDebouncedClick(onClick = viewModel::refreshCoreSettings)
-    val changeFolderClick = rememberDebouncedClick { folderPicker.launch(null) }
-    val clearFolderClick = rememberDebouncedClick(onClick = viewModel::clearPackagesFolder)
+    val chooseCustomStorageFolderClick = rememberDebouncedClick {
+        if (StorageAccessManager.needsAllFilesAccessForCustomStorage()) {
+            storagePermissionPicker.launch(StorageAccessManager.allFilesAccessIntent(context))
+        } else {
+            storageFolderPicker.launch(null)
+        }
+    }
     val createBackupClick = rememberDebouncedClick { backupPicker.launch("emucorev-settings-backup.json") }
     val backClick = rememberDebouncedClick(onClick = onBackClick)
     val resetSettingsClick = rememberDebouncedClick(onClick = viewModel::resetCoreSettingsToDefaults)
@@ -225,8 +239,7 @@ fun SettingsScreen(
                             onOpenVitaLanguageSettings = onOpenVitaLanguageSettings,
                             onOpenGpuDriverSettings = onOpenGpuDriverSettings,
                             refreshCoreSettingsClick = refreshCoreSettingsClick,
-                            changeFolderClick = changeFolderClick,
-                            clearFolderClick = clearFolderClick,
+                            chooseCustomStorageFolderClick = chooseCustomStorageFolderClick,
                             createBackupClick = createBackupClick,
                             restoreBackupClick = { showRestoreBackupDialog = true }
                         )

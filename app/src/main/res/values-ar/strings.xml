@@ -827,4 +827,7 @@
     <string name="settings_updates_parallel_unavailable">ملف APK المنفصل غير متوفر لهذا الإصدار.</string>
     <string name="settings_updates_parallel_package">حزمة تطبيق منفصلة</string>
     <string name="settings_updates_parallel_download">تنزيل</string>
+    <string name="settings_storage_location_custom">مجلد مخصص</string>
+    <string name="settings_storage_choose_custom_folder">اختر مجلدًا مخصصًا</string>
+    <string name="settings_storage_permission_required">اسمح بالوصول إلى جميع الملفات، ثم اختر مجلد المحاكي مرة أخرى.</string>
 </resources>

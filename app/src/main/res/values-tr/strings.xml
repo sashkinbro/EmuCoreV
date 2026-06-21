@@ -827,4 +827,7 @@
     <string name="settings_updates_parallel_unavailable">Bu sürüm için ayrı APK mevcut değil.</string>
     <string name="settings_updates_parallel_package">Ayrı uygulama paketi</string>
     <string name="settings_updates_parallel_download">İndir</string>
+    <string name="settings_storage_location_custom">Özel klasör</string>
+    <string name="settings_storage_choose_custom_folder">Özel klasör seç</string>
+    <string name="settings_storage_permission_required">Tüm dosyalara erişime izin verin ve ardından emülatör klasörünü tekrar seçin.</string>
 </resources>

@@ -827,4 +827,7 @@
     <string name="settings_updates_parallel_unavailable">L\'APK separato non è disponibile per questa release.</string>
     <string name="settings_updates_parallel_package">Pacchetto app separato</string>
     <string name="settings_updates_parallel_download">Scarica</string>
+    <string name="settings_storage_location_custom">Cartella personalizzata</string>
+    <string name="settings_storage_choose_custom_folder">Scegli cartella personalizzata</string>
+    <string name="settings_storage_permission_required">Consenti l\'accesso a tutti i file, quindi scegli di nuovo la cartella dell\'emulatore.</string>
 </resources>

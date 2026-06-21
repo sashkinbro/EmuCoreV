@@ -826,4 +826,7 @@
     <string name="settings_updates_parallel_unavailable">此发布版本没有提供单独的 APK。</string>
     <string name="settings_updates_parallel_package">单独的应用包</string>
     <string name="settings_updates_parallel_download">下载</string>
+    <string name="settings_storage_location_custom">自定义文件夹</string>
+    <string name="settings_storage_choose_custom_folder">选择自定义文件夹</string>
+    <string name="settings_storage_permission_required">允许访问所有文件，然后再次选择模拟器文件夹。</string>
 </resources>

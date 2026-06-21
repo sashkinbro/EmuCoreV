@@ -167,6 +167,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun onResume() {
         super.onResume()
         composeOwners.handleResume()
+        attachComposeOverlay()
         refreshPhysicalGamepadState()
         hideSystemBars()
         if (menuPaused) {
@@ -200,6 +201,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             pauseNativeThread()
         }
         if (hasFocus) {
+            attachComposeOverlay()
             hideSystemBars()
         }
     }
@@ -511,6 +513,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             setViewTreeLifecycleOwner(composeOwners)
             setViewTreeSavedStateRegistryOwner(composeOwners)
             setViewTreeViewModelStoreOwner(composeOwners)
+            elevation = EMULATION_OVERLAY_ELEVATION
+            translationZ = EMULATION_OVERLAY_ELEVATION
             setContent {
                 EmuCoreVTheme(themeMode = preferences.themeMode) {
                     EmulationOverlayHost(activity = this@Emulator)
@@ -524,6 +528,12 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
         )
+        composeView.bringToFront()
+        layout.post {
+            composeView.bringToFront()
+            composeView.elevation = EMULATION_OVERLAY_ELEVATION
+            composeView.translationZ = EMULATION_OVERLAY_ELEVATION
+        }
     }
 
     private fun startPlayTimeSessionIfNeeded() {
@@ -636,6 +646,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         const val FILE_DIALOG_CODE = 545
         const val FOLDER_DIALOG_CODE = 546
         const val EXTRA_REBIRTH_HANDLED = "emu_rebirth_handled"
+        const val EMULATION_OVERLAY_ELEVATION = 64f
     }
 }
 

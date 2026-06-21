@@ -50,6 +50,26 @@ class AppPreferences(context: Context) {
             }
         }
 
+    var vitaCustomStorageRootUri: String?
+        get() = prefs.getString(KEY_VITA_CUSTOM_STORAGE_ROOT_URI, null)
+        private set(value) = prefs.edit {
+            if (value == null) {
+                remove(KEY_VITA_CUSTOM_STORAGE_ROOT_URI)
+            } else {
+                putString(KEY_VITA_CUSTOM_STORAGE_ROOT_URI, value)
+            }
+        }
+
+    var vitaCustomStorageRootPath: String?
+        get() = prefs.getString(KEY_VITA_CUSTOM_STORAGE_ROOT_PATH, null)
+        private set(value) = prefs.edit {
+            if (value == null) {
+                remove(KEY_VITA_CUSTOM_STORAGE_ROOT_PATH)
+            } else {
+                putString(KEY_VITA_CUSTOM_STORAGE_ROOT_PATH, value)
+            }
+        }
+
     var onboardingCompleted: Boolean
         get() = prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
         set(value) = prefs.edit { putBoolean(KEY_ONBOARDING_COMPLETED, value) }
@@ -120,6 +140,21 @@ class AppPreferences(context: Context) {
         packagesFolderUri = null
     }
 
+    fun setVitaCustomStorageRoot(context: Context, uri: Uri, rootPath: String) {
+        val resolver = context.contentResolver
+        vitaCustomStorageRootUri?.let(Uri::parse)
+            ?.takeIf { it != uri }
+            ?.let { releasePersistedPermission(resolver, it) }
+        runCatching {
+            resolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+        }
+        vitaCustomStorageRootUri = uri.toString()
+        vitaCustomStorageRootPath = rootPath
+    }
+
     fun packagesFolderDisplayName(context: Context): String? {
         val uri = packagesFolderUriAsUri() ?: return null
         return runCatching { DocumentFile.fromTreeUri(context, uri)?.name }.getOrNull()
@@ -142,6 +177,8 @@ class AppPreferences(context: Context) {
     companion object {
         private const val KEY_PACKAGES_FOLDER_URI = "packages_folder_uri"
         private const val KEY_VITA_STORAGE_ROOT_PATH = "vita_storage_root_path"
+        private const val KEY_VITA_CUSTOM_STORAGE_ROOT_URI = "vita_custom_storage_root_uri"
+        private const val KEY_VITA_CUSTOM_STORAGE_ROOT_PATH = "vita_custom_storage_root_path"
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_APP_LANGUAGE = "app_language"

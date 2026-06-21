@@ -1,5 +1,9 @@
 package com.sbro.emucorev.ui.onboarding
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -74,6 +78,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -85,6 +90,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.FirmwareKind
+import com.sbro.emucorev.core.StorageAccessManager
 import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
@@ -102,11 +108,25 @@ fun OnboardingScreen(
     firmwareDownloadViewModel: FirmwareDownloadViewModel = viewModel(),
     viewModel: OnboardingViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val downloadState by firmwareDownloadViewModel.state.collectAsState()
     val pagerState = rememberPagerState(pageCount = { uiState.totalPages })
     val scope = rememberCoroutineScope()
     var isCompleting by remember { mutableStateOf(false) }
+    val folderPickerFailedMessage = stringResource(R.string.folder_picker_failed)
+    val storagePermissionRequiredMessage = stringResource(R.string.settings_storage_permission_required)
+    val storageFolderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        viewModel.selectCustomStorageLocation(uri)
+    }
+    val storagePermissionPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (StorageAccessManager.needsAllFilesAccessForCustomStorage()) {
+            Toast.makeText(context, storagePermissionRequiredMessage, Toast.LENGTH_SHORT).show()
+        } else {
+            storageFolderPicker.launch(null)
+        }
+    }
 
     LaunchedEffect(uiState.currentPage) {
         if (pagerState.currentPage != uiState.currentPage) {
@@ -123,6 +143,12 @@ fun OnboardingScreen(
         if (downloadState.status == FirmwareDownloadStatus.Completed && resultUri != null) {
             onInstallDownloadedFirmware(resultUri)
             firmwareDownloadViewModel.consumeResult()
+        }
+    }
+    LaunchedEffect(uiState.storageErrorMessage) {
+        if (uiState.storageErrorMessage != null) {
+            Toast.makeText(context, folderPickerFailedMessage, Toast.LENGTH_SHORT).show()
+            viewModel.consumeStorageError()
         }
     }
 
@@ -269,6 +295,13 @@ fun OnboardingScreen(
                             storageLocations = uiState.storageLocations,
                             storageChangeInProgress = uiState.storageChangeInProgress,
                             selectStorageLocation = viewModel::selectStorageLocation,
+                            chooseCustomStorageFolder = {
+                                if (StorageAccessManager.needsAllFilesAccessForCustomStorage()) {
+                                    storagePermissionPicker.launch(StorageAccessManager.allFilesAccessIntent(context))
+                                } else {
+                                    storageFolderPicker.launch(null)
+                                }
+                            },
                             firmwareInstalled = firmwareInstalled,
                             firmwareUpdateInstalled = firmwareUpdateInstalled,
                             installFirmware = installFirmwareClick,
@@ -419,6 +452,7 @@ private fun OnboardingSetupContent(
     storageLocations: List<VitaStorageLocation>,
     storageChangeInProgress: Boolean,
     selectStorageLocation: (String) -> Unit,
+    chooseCustomStorageFolder: () -> Unit,
     firmwareInstalled: Boolean,
     firmwareUpdateInstalled: Boolean,
     installFirmware: () -> Unit,
@@ -567,6 +601,11 @@ private fun OnboardingSetupContent(
         OnboardingStorageDialog(
             visible = storagePickerVisible,
             storageLocations = storageLocations,
+            enabled = !storageChangeInProgress,
+            onChooseCustomFolder = {
+                storagePickerVisible = false
+                chooseCustomStorageFolder()
+            },
             onSelected = { location ->
                 if (!storageChangeInProgress) {
                     selectStorageLocation(location.rootPath)
@@ -603,6 +642,8 @@ private fun OnboardingStorageChip(
 private fun OnboardingStorageDialog(
     visible: Boolean,
     storageLocations: List<VitaStorageLocation>,
+    enabled: Boolean,
+    onChooseCustomFolder: () -> Unit,
     onSelected: (VitaStorageLocation) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -657,7 +698,7 @@ private fun OnboardingStorageDialog(
                                 MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)
                             }
                         ),
-                        onClick = { onSelected(location) }
+                        onClick = { if (enabled) onSelected(location) }
                     ) {
                         Column(
                             modifier = Modifier.padding(14.dp),
@@ -684,6 +725,13 @@ private fun OnboardingStorageDialog(
                         }
                     }
                 }
+                Button(
+                    onClick = onChooseCustomFolder,
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.settings_storage_choose_custom_folder))
+                }
                 TextButton(
                     onClick = onDismiss,
                     modifier = Modifier.align(Alignment.End)
@@ -697,6 +745,7 @@ private fun OnboardingStorageDialog(
 
 @Composable
 private fun storageLocationLabel(location: VitaStorageLocation, index: Int): String = when {
+    location.custom -> stringResource(R.string.settings_storage_location_custom)
     location.removable -> stringResource(R.string.settings_storage_location_sd)
     index == 0 -> stringResource(R.string.settings_storage_location_internal)
     else -> stringResource(R.string.settings_storage_location_external)

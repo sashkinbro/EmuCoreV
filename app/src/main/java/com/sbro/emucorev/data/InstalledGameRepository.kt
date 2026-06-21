@@ -33,7 +33,81 @@ class InstalledGameRepository {
     }
 
     fun deleteByTitleId(context: Context, titleId: String): Boolean {
-        val game = findByTitleId(context, titleId) ?: return false
-        return runCatching { File(game.installPath).deleteRecursively() }.getOrDefault(false)
+        val safeTitleId = titleId.trim().takeIf(::isSafePathSegment) ?: return false
+        val deleted = mutableListOf<File>()
+        val failed = mutableListOf<File>()
+
+        findInstalledGameFolders(context, safeTitleId).forEach { appFolder ->
+            deleteInstalledGameFiles(
+                vitaRoot = appFolder.parentFile?.parentFile?.parentFile ?: return@forEach,
+                titleSegment = appFolder.name,
+                deleted = deleted,
+                failed = failed
+            )
+        }
+
+        EmulatorStorage.knownStorageRoots(context).forEach { storageRoot ->
+            val vitaRoot = File(storageRoot, "vita")
+            deleteInstalledGameFiles(
+                vitaRoot = vitaRoot,
+                titleSegment = safeTitleId,
+                deleted = deleted,
+                failed = failed
+            )
+        }
+
+        return deleted.isNotEmpty() && failed.isEmpty() && findInstalledGameFolders(context, safeTitleId).isEmpty()
+    }
+
+    private fun findInstalledGameFolders(context: Context, titleId: String): Set<File> {
+        return EmulatorStorage.knownStorageRoots(context)
+            .map { storageRoot -> File(storageRoot, "vita/ux0/app") }
+            .flatMap { appRoot -> appRoot.listFiles().orEmpty().filter(File::isDirectory) }
+            .filter { directory ->
+                directory.name.equals(titleId, ignoreCase = true) ||
+                    VitaSfoParser.parse(File(directory, "sce_sys/param.sfo"))
+                        .titleId
+                        ?.equals(titleId, ignoreCase = true) == true
+            }
+            .toSet()
+    }
+
+    private fun deleteInstalledGameFiles(
+        vitaRoot: File,
+        titleSegment: String,
+        deleted: MutableList<File>,
+        failed: MutableList<File>
+    ) {
+        if (!isSafePathSegment(titleSegment)) return
+        listOf(
+            "ux0/app/$titleSegment",
+            "ux0/appmeta/$titleSegment",
+            "ux0/patch/$titleSegment",
+            "ux0/addcont/$titleSegment",
+            "ux0/license/app/$titleSegment"
+        ).forEach { relativePath ->
+            deleteRecursively(File(vitaRoot, relativePath), deleted, failed)
+        }
+    }
+
+    private fun deleteRecursively(
+        target: File,
+        deleted: MutableList<File>,
+        failed: MutableList<File>
+    ) {
+        if (!target.exists()) return
+        val removed = runCatching { target.deleteRecursively() }.getOrDefault(false)
+        if (removed && !target.exists()) {
+            deleted += target
+        } else {
+            failed += target
+        }
+    }
+
+    private fun isSafePathSegment(value: String): Boolean {
+        return value.isNotBlank() &&
+            value != "." &&
+            value != ".." &&
+            value.none { it == '/' || it == '\\' || it == File.separatorChar }
     }
 }

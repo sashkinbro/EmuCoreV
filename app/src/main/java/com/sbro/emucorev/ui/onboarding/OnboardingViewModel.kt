@@ -1,6 +1,7 @@
 package com.sbro.emucorev.ui.onboarding
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.jakewharton.processphoenix.ProcessPhoenix
@@ -21,6 +22,7 @@ data class OnboardingUiState(
     val storagePath: String = "",
     val storageLocations: List<VitaStorageLocation> = emptyList(),
     val storageChangeInProgress: Boolean = false,
+    val storageErrorMessage: String? = null,
     val canContinue: Boolean = true
 )
 
@@ -60,32 +62,58 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun selectStorageLocation(rootPath: String) {
+        val context = getApplication<Application>()
+        if (EmulatorStorage.storageRoot(context).absolutePath == rootPath) return
+        changeStorageLocation { appContext ->
+            EmulatorStorage.selectStorageRoot(
+                context = appContext,
+                rootPath = rootPath,
+                migrateExistingData = true
+            )
+        }
+    }
+
+    fun selectCustomStorageLocation(uri: Uri) {
+        changeStorageLocation { appContext ->
+            EmulatorStorage.selectCustomStorageRoot(
+                context = appContext,
+                treeUri = uri,
+                migrateExistingData = true
+            )
+        }
+    }
+
+    private fun changeStorageLocation(
+        selectRoot: (Application) -> Unit
+    ) {
         if (_uiState.value.storageChangeInProgress) return
         val context = getApplication<Application>()
-        val currentRoot = EmulatorStorage.storageRoot(context).absolutePath
-        if (currentRoot == rootPath) return
         val restartRequired = NativeLibraryLoader.isNativeSessionInitialized()
         _uiState.value = _uiState.value.copy(storageChangeInProgress = true)
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                EmulatorStorage.selectStorageRoot(
-                    context = context,
-                    rootPath = rootPath,
-                    migrateExistingData = true
-                )
+                selectRoot(context)
                 _uiState.value = _uiState.value.copy(
                     storagePath = EmulatorStorage.vitaRoot(context).absolutePath,
                     storageLocations = EmulatorStorage.availableStorageLocations(context),
-                    storageChangeInProgress = false
+                    storageChangeInProgress = false,
+                    storageErrorMessage = null
                 )
                 InstallStateBus.notifyCompleted()
             }.onFailure {
-                _uiState.value = _uiState.value.copy(storageChangeInProgress = false)
+                _uiState.value = _uiState.value.copy(
+                    storageChangeInProgress = false,
+                    storageErrorMessage = it.message ?: "Storage change failed"
+                )
             }.onSuccess {
                 if (restartRequired) {
                     ProcessPhoenix.triggerRebirth(context.applicationContext)
                 }
             }
         }
+    }
+
+    fun consumeStorageError() {
+        _uiState.value = _uiState.value.copy(storageErrorMessage = null)
     }
 }

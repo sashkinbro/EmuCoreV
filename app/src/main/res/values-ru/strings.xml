@@ -827,4 +827,7 @@
     <string name="settings_updates_parallel_unavailable">Отдельный APK недоступен для этого релиза.</string>
     <string name="settings_updates_parallel_package">Отдельный пакет приложения</string>
     <string name="settings_updates_parallel_download">Скачать</string>
+    <string name="settings_storage_location_custom">Пользовательская папка</string>
+    <string name="settings_storage_choose_custom_folder">Выбрать пользовательскую папку</string>
+    <string name="settings_storage_permission_required">Разрешите доступ ко всем файлам, затем снова выберите папку эмулятора.</string>
 </resources>

@@ -344,7 +344,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onInstallContent = openInstallChoiceDialog
                 ) {
                     SetupScreen(
-                        packagesFolderLabel = preferences.packagesFolderDisplayName(context),
                         vitaRootPath = EmulatorStorage.vitaRoot(context).absolutePath,
                         onBackClick = navigateHome,
                         onInstallContent = openContentInstall,
