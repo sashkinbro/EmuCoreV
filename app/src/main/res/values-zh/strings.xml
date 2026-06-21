@@ -829,4 +829,11 @@
     <string name="settings_storage_location_custom">自定义文件夹</string>
     <string name="settings_storage_choose_custom_folder">选择自定义文件夹</string>
     <string name="settings_storage_permission_required">允许访问所有文件，然后再次选择模拟器文件夹。</string>
+    <string name="emulation_controls_editor_stick_mode">摇杆</string>
+    <string name="emulation_controls_editor_touch_area_mode">触摸区域</string>
+    <string name="emulation_controls_editor_width">宽度</string>
+    <string name="emulation_controls_editor_height">高度</string>
+    <string name="profile_forgot_password">忘记密码？</string>
+    <string name="profile_password_reset_email_required">请先输入您的电子邮件地址。</string>
+    <string name="profile_password_reset_sent">密码重置电子邮件已发送。请检查您的收件箱。</string>
 </resources>

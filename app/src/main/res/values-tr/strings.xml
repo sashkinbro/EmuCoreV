@@ -830,4 +830,11 @@
     <string name="settings_storage_location_custom">Özel klasör</string>
     <string name="settings_storage_choose_custom_folder">Özel klasör seç</string>
     <string name="settings_storage_permission_required">Tüm dosyalara erişime izin verin ve ardından emülatör klasörünü tekrar seçin.</string>
+    <string name="emulation_controls_editor_stick_mode">Çubuk</string>
+    <string name="emulation_controls_editor_touch_area_mode">Dokunmatik alan</string>
+    <string name="emulation_controls_editor_width">Genişlik</string>
+    <string name="emulation_controls_editor_height">Yükseklik</string>
+    <string name="profile_forgot_password">Şifrenizi mi unuttunuz?</string>
+    <string name="profile_password_reset_email_required">Önce e-posta adresinizi girin.</string>
+    <string name="profile_password_reset_sent">Şifre sıfırlama e-postası gönderildi. Gelen kutunuzu kontrol edin.</string>
 </resources>

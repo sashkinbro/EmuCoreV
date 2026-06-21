@@ -830,4 +830,11 @@
     <string name="settings_storage_location_custom">Benutzerdefinierter Ordner</string>
     <string name="settings_storage_choose_custom_folder">Benutzerdefinierten Ordner auswählen</string>
     <string name="settings_storage_permission_required">Erlauben Sie den Zugriff auf alle Dateien und wählen Sie dann den Emulator-Ordner erneut aus.</string>
+    <string name="emulation_controls_editor_stick_mode">Stick</string>
+    <string name="emulation_controls_editor_touch_area_mode">Touch-Bereich</string>
+    <string name="emulation_controls_editor_width">Breite</string>
+    <string name="emulation_controls_editor_height">Höhe</string>
+    <string name="profile_forgot_password">Passwort vergessen?</string>
+    <string name="profile_password_reset_email_required">Geben Sie zuerst Ihre E-Mail-Adresse ein.</string>
+    <string name="profile_password_reset_sent">E-Mail zum Zurücksetzen des Passworts wurde gesendet. Überprüfen Sie Ihren Posteingang.</string>
 </resources>

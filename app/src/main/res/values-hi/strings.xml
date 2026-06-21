@@ -830,4 +830,11 @@
     <string name="settings_storage_location_custom">कस्टम फ़ोल्डर</string>
     <string name="settings_storage_choose_custom_folder">कस्टम फ़ोल्डर चुनें</string>
     <string name="settings_storage_permission_required">सभी फ़ाइलों तक पहुंच की अनुमति दें, फिर एमुलेटर फ़ोल्डर को फिर से चुनें।</string>
+    <string name="emulation_controls_editor_stick_mode">स्टिक</string>
+    <string name="emulation_controls_editor_touch_area_mode">टच एरिया</string>
+    <string name="emulation_controls_editor_width">चौड़ाई</string>
+    <string name="emulation_controls_editor_height">ऊंचाई</string>
+    <string name="profile_forgot_password">क्या आप पासवर्ड भूल गए?</string>
+    <string name="profile_password_reset_email_required">पहले अपना ईमेल पता दर्ज करें।</string>
+    <string name="profile_password_reset_sent">पासवर्ड रीसेट ईमेल भेज दिया गया है। अपना इनबॉक्स जांचें।</string>
 </resources>

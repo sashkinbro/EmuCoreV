@@ -830,4 +830,11 @@
     <string name="settings_storage_location_custom">Carpeta personalizada</string>
     <string name="settings_storage_choose_custom_folder">Elegir carpeta personalizada</string>
     <string name="settings_storage_permission_required">Permite el acceso a todos los archivos y luego vuelve a elegir la carpeta del emulador.</string>
+    <string name="emulation_controls_editor_stick_mode">Stick</string>
+    <string name="emulation_controls_editor_touch_area_mode">Área táctil</string>
+    <string name="emulation_controls_editor_width">Ancho</string>
+    <string name="emulation_controls_editor_height">Alto</string>
+    <string name="profile_forgot_password">¿Olvidaste tu contraseña?</string>
+    <string name="profile_password_reset_email_required">Introduce tu dirección de correo electrónico primero.</string>
+    <string name="profile_password_reset_sent">Se ha enviado el correo electrónico para restablecer la contraseña. Revisa tu bandeja de entrada.</string>
 </resources>

@@ -8,6 +8,7 @@ import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.UserProfileChangeRequest
+import com.sbro.emucorev.R
 import com.sbro.emucorev.data.FirebaseProfileBackupRepository
 import com.sbro.emucorev.data.ProfileCatalogGame
 import com.sbro.emucorev.data.ProfileGameListRepository
@@ -145,6 +146,22 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun sendPasswordResetEmail(email: String) {
+        val cleanEmail = email.trim()
+        if (cleanEmail.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                cloudMessage = getApplication<Application>().getString(R.string.profile_password_reset_email_required)
+            )
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCloudAction(errorMessage = ::formatPasswordResetError) {
+                auth.sendPasswordResetEmail(cleanEmail).await()
+                getApplication<Application>().getString(R.string.profile_password_reset_sent)
+            }
+        }
+    }
+
     fun setLocalAvatar(uri: String) {
         profilePreferences.edit().putString(KEY_PROFILE_AVATAR_URI, uri).apply()
         _uiState.value = _uiState.value.copy(account = auth.currentUser.toAccountState())
@@ -206,6 +223,16 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             } else {
                 "Email or password is incorrect, or this account does not exist."
             }
+            else -> formatCloudError(error)
+        }
+    }
+
+    private fun formatPasswordResetError(error: Throwable): String {
+        val authError = error as? FirebaseAuthException
+        return when (authError?.errorCode) {
+            "ERROR_INVALID_EMAIL" -> "Enter a valid email address."
+            "ERROR_USER_NOT_FOUND" -> "No account exists for this email."
+            "ERROR_OPERATION_NOT_ALLOWED" -> "Email password reset is not enabled for this app."
             else -> formatCloudError(error)
         }
     }

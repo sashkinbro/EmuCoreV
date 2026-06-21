@@ -263,6 +263,9 @@
     <string name="profile_sign_out_confirm">Sign out</string>
     <string name="profile_email">Email</string>
     <string name="profile_password">Password</string>
+    <string name="profile_forgot_password">Forgot password?</string>
+    <string name="profile_password_reset_email_required">Enter your email address first.</string>
+    <string name="profile_password_reset_sent">Password reset email sent. Check your inbox.</string>
     <string name="profile_backup">Back up</string>
     <string name="profile_restore">Restore</string>
     <string name="profile_empty_title">No profile games yet</string>

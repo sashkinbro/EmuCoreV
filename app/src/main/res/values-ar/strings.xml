@@ -830,4 +830,11 @@
     <string name="settings_storage_location_custom">مجلد مخصص</string>
     <string name="settings_storage_choose_custom_folder">اختر مجلدًا مخصصًا</string>
     <string name="settings_storage_permission_required">اسمح بالوصول إلى جميع الملفات، ثم اختر مجلد المحاكي مرة أخرى.</string>
+    <string name="emulation_controls_editor_stick_mode">عصا التحكم</string>
+    <string name="emulation_controls_editor_touch_area_mode">منطقة اللمس</string>
+    <string name="emulation_controls_editor_width">العرض</string>
+    <string name="emulation_controls_editor_height">الارتفاع</string>
+    <string name="profile_forgot_password">هل نسيت كلمة المرور؟</string>
+    <string name="profile_password_reset_email_required">أدخل عنوان بريدك الإلكتروني أولاً.</string>
+    <string name="profile_password_reset_sent">تم إرسال بريد إلكتروني لإعادة تعيين كلمة المرور. تحقق من صندوق الوارد الخاص بك.</string>
 </resources>

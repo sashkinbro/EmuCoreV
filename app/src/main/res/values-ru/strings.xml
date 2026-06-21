@@ -830,4 +830,11 @@
     <string name="settings_storage_location_custom">Пользовательская папка</string>
     <string name="settings_storage_choose_custom_folder">Выбрать пользовательскую папку</string>
     <string name="settings_storage_permission_required">Разрешите доступ ко всем файлам, затем снова выберите папку эмулятора.</string>
+    <string name="emulation_controls_editor_stick_mode">Стик</string>
+    <string name="emulation_controls_editor_touch_area_mode">Сенсорная область</string>
+    <string name="emulation_controls_editor_width">Ширина</string>
+    <string name="emulation_controls_editor_height">Высота</string>
+    <string name="profile_forgot_password">Забыли пароль?</string>
+    <string name="profile_password_reset_email_required">Сначала введите свой адрес электронной почты.</string>
+    <string name="profile_password_reset_sent">Письмо для сброса пароля отправлено. Проверьте свой почтовый ящик.</string>
 </resources>
