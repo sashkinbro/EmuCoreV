@@ -115,8 +115,7 @@ fun SettingsTabContent(
     onOpenVitaLanguageSettings: () -> Unit = {},
     onOpenGpuDriverSettings: () -> Unit = {},
     refreshCoreSettingsClick: () -> Unit,
-    changeFolderClick: () -> Unit,
-    clearFolderClick: () -> Unit,
+    chooseCustomStorageFolderClick: () -> Unit,
     createBackupClick: () -> Unit,
     restoreBackupClick: () -> Unit
 ) {
@@ -131,10 +130,9 @@ fun SettingsTabContent(
         SettingsTab.Advanced -> AdvancedTab(uiState, defaults, viewModel)
         SettingsTab.Storage -> StorageTab(
             uiState = uiState,
-            changeFolderClick = changeFolderClick,
-            clearFolderClick = clearFolderClick,
             selectStorageLocation = viewModel::selectStorageLocation,
             dismissStorageMigrationDialog = viewModel::dismissStorageMigrationDialog,
+            chooseCustomStorageFolderClick = chooseCustomStorageFolderClick,
             createBackupClick = createBackupClick,
             restoreBackupClick = restoreBackupClick
         )
@@ -595,10 +593,9 @@ private fun AdvancedTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
 @Composable
 private fun StorageTab(
     uiState: SettingsUiState,
-    changeFolderClick: () -> Unit,
-    clearFolderClick: () -> Unit,
     selectStorageLocation: (String) -> Unit,
     dismissStorageMigrationDialog: () -> Unit,
+    chooseCustomStorageFolderClick: () -> Unit,
     createBackupClick: () -> Unit,
     restoreBackupClick: () -> Unit
 ) {
@@ -606,19 +603,6 @@ private fun StorageTab(
     var pendingStorageRootPath by rememberSaveable { mutableStateOf<String?>(null) }
     val pendingStorageLocation = uiState.storageLocations.firstOrNull { it.rootPath == pendingStorageRootPath }
 
-    SectionCard(title = stringResource(R.string.settings_packages_folder), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
-        Text(
-            text = stringResource(R.string.settings_help_packages_folder),
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
-        )
-        Text(
-            text = uiState.packagesFolderPath ?: stringResource(R.string.settings_packages_not_selected),
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(top = 6.dp)
-        )
-        Button(onClick = changeFolderClick, modifier = Modifier.padding(top = 12.dp)) { Text(stringResource(R.string.settings_change_folder)) }
-        Button(onClick = clearFolderClick, modifier = Modifier.padding(top = 8.dp)) { Text(stringResource(R.string.settings_clear_folder)) }
-    }
     SectionCard(title = stringResource(R.string.settings_storage_title), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Text(text = stringResource(R.string.settings_storage_body), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f))
         if (uiState.storageLocations.size > 1) {
@@ -650,6 +634,10 @@ private fun StorageTab(
         visible = storagePickerVisible,
         storageLocations = uiState.storageLocations,
         enabled = !uiState.storageChangeInProgress,
+        onChooseCustomFolder = {
+            storagePickerVisible = false
+            chooseCustomStorageFolderClick()
+        },
         onSelected = { location ->
             if (!location.selected) {
                 pendingStorageRootPath = location.rootPath
@@ -821,6 +809,7 @@ private fun SettingsStorageDialog(
     visible: Boolean,
     storageLocations: List<VitaStorageLocation>,
     enabled: Boolean,
+    onChooseCustomFolder: () -> Unit,
     onSelected: (VitaStorageLocation) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -901,6 +890,13 @@ private fun SettingsStorageDialog(
                         }
                     }
                 }
+                Button(
+                    onClick = onChooseCustomFolder,
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.settings_storage_choose_custom_folder))
+                }
                 TextButton(
                     onClick = onDismiss,
                     modifier = Modifier.align(Alignment.End)
@@ -914,6 +910,7 @@ private fun SettingsStorageDialog(
 
 @Composable
 private fun storageLocationLabel(location: VitaStorageLocation, index: Int): String = when {
+    location.custom -> stringResource(R.string.settings_storage_location_custom)
     location.removable -> stringResource(R.string.settings_storage_location_sd)
     index == 0 -> stringResource(R.string.settings_storage_location_internal)
     else -> stringResource(R.string.settings_storage_location_external)

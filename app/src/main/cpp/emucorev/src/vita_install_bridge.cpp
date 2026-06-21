@@ -65,12 +65,20 @@ private:
 };
 
 void configure_install_env(EmuEnvState &emuenv, const fs::path &vita_root, const fs::path &cache_root, jint system_language) {
-    emuenv.pref_path = vita_root;
+    emuenv.default_path = vita_root;
+    emuenv.vita_fs_path = vita_root;
+    emuenv.config_path = vita_root;
+    emuenv.log_path = cache_root;
     emuenv.cache_path = cache_root;
-    emuenv.cfg.set_pref_path(vita_root);
+    emuenv.patch_path = vita_root.parent_path() / "patch";
+    emuenv.shared_path = vita_root.parent_path();
+    emuenv.cfg.set_vita_fs_path(vita_root);
     emuenv.cfg.sys_lang = system_language;
-    fs::create_directories(emuenv.pref_path);
+    fs::create_directories(emuenv.vita_fs_path);
+    fs::create_directories(emuenv.config_path);
+    fs::create_directories(emuenv.log_path);
     fs::create_directories(emuenv.cache_path);
+    fs::create_directories(emuenv.patch_path);
 }
 
 } // namespace
@@ -179,7 +187,7 @@ Java_com_sbro_emucorev_core_VitaInstallBridge_nativeInstallPkg(
     JavaProgressReporter reporter(env, thiz);
 
     if (zrif_value.empty()) {
-        zrif_value = find_pkg_zrif(path, emuenv.pref_path);
+        zrif_value = find_pkg_zrif(path, emuenv.vita_fs_path);
     }
 
     const auto success = install_pkg(path, emuenv, zrif_value, [&](float progress) {

@@ -94,7 +94,6 @@ object TouchControlIds {
     const val SQUARE = "square"
     const val CIRCLE = "circle"
     const val SELECT = "select"
-    const val PS = "ps"
     const val START = "start"
     const val TOUCH = "touch"
 }

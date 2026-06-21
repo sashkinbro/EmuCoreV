@@ -827,4 +827,7 @@
     <string name="settings_updates_parallel_unavailable">Für dieses Release ist keine separate APK verfügbar.</string>
     <string name="settings_updates_parallel_package">Separates App-Paket</string>
     <string name="settings_updates_parallel_download">Herunterladen</string>
+    <string name="settings_storage_location_custom">Benutzerdefinierter Ordner</string>
+    <string name="settings_storage_choose_custom_folder">Benutzerdefinierten Ordner auswählen</string>
+    <string name="settings_storage_permission_required">Erlauben Sie den Zugriff auf alle Dateien und wählen Sie dann den Emulator-Ordner erneut aus.</string>
 </resources>

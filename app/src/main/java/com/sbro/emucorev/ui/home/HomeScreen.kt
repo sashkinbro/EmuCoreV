@@ -1,9 +1,5 @@
 package com.sbro.emucorev.ui.home
 
-import android.net.Uri
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,28 +13,23 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesomeMotion
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Games
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.QueryStats
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
@@ -57,10 +48,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -91,19 +80,8 @@ fun HomeScreen(
     onMenuClick: (() -> Unit)? = null,
     viewModel: HomeViewModel = viewModel()
 ) {
-    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
-    val folderPickerFailedMessage = stringResource(R.string.folder_picker_failed)
-
-    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
-        uri ?: return@rememberLauncherForActivityResult
-        runCatching {
-            viewModel.onPackagesFolderSelected(uri)
-        }.onFailure {
-            Toast.makeText(context, folderPickerFailedMessage, Toast.LENGTH_SHORT).show()
-        }
-    }
     val openLibraryClick = rememberDebouncedClick {
         viewModel.refresh()
         onOpenLibrary()
@@ -113,9 +91,7 @@ fun HomeScreen(
         viewModel.refresh()
         onOpenCatalog()
     }
-    val choosePackagesClick = rememberDebouncedClick { folderPicker.launch(null) }
     val refreshClick = rememberDebouncedClick(onClick = viewModel::refresh)
-    val packagesFolderLabel = uiState.packagesFolderLabel
 
     Box(
         modifier = Modifier
@@ -244,30 +220,6 @@ fun HomeScreen(
                 }
             }
 
-            item {
-                if (packagesFolderLabel == null) {
-                    EmptySetupState(onChoosePackages = choosePackagesClick)
-                } else {
-                    SectionCard(title = stringResource(R.string.settings_packages_folder)) {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(
-                                text = packagesFolderLabel,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Button(onClick = choosePackagesClick) {
-                                    Icon(Icons.Rounded.FolderOpen, contentDescription = null)
-                                    Text(stringResource(R.string.home_choose_packages))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
             if (uiState.featuredGames.isNotEmpty()) {
                 item {
                     SectionCard(title = stringResource(R.string.home_recent_titles_title)) {
@@ -295,122 +247,6 @@ fun HomeScreen(
             }
 
 
-        }
-    }
-}
-
-@Composable
-private fun EmptySetupState(
-    onChoosePackages: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 360.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            modifier = Modifier.widthIn(max = 520.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(100.dp)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                GradientStart.copy(alpha = 0.15f),
-                                GradientEnd.copy(alpha = 0.15f)
-                            )
-                        ),
-                        RoundedCornerShape(28.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.SportsEsports,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.home_empty_library_title),
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
-                )
-                Text(
-                    text = stringResource(R.string.home_empty_library_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            FilledTonalButton(onClick = onChoosePackages) {
-                Icon(Icons.Rounded.FolderOpen, contentDescription = null)
-                Text(stringResource(R.string.home_choose_packages))
-            }
-
-            StatusCard(
-                icon = Icons.Rounded.CheckCircle,
-                title = stringResource(R.string.settings_packages_folder)
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatusCard(
-    icon: ImageVector,
-    title: String
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
-        tonalElevation = 0.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(CardContentPadding),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(
-                        MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
-                        RoundedCornerShape(10.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = stringResource(R.string.onboarding_status_pick_folder),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
         }
     }
 }

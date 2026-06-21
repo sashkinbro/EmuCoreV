@@ -111,7 +111,7 @@ fun EmulationOverlayHost(
             ?: gameId
     }
     val hasPhysicalGamepad = activity.hasPhysicalGamepad
-    val touchControlsActive = controlsEditMode || (config.enableGamepadOverlay && !hasPhysicalGamepad)
+    val touchControlsActive = controlsEditMode || config.enableGamepadOverlay
     val showTouchControls = !menuOpen &&
         (
             controlsEditMode ||
@@ -429,9 +429,6 @@ fun EmulationOverlayHost(
             backTouchEnabled = false
             overlayBridge.setTouchState(false)
         }
-        if (hasPhysicalGamepad && !controlsEditMode) {
-            overlayBridge.setTouchControlsActive(false)
-        }
     }
 }
 
@@ -495,6 +492,7 @@ private fun OnScreenControls(
         val mergedLayout = remember(defaultLayout, savedLayout) { mergeTouchLayout(defaultLayout, savedLayout) }
         var controls by remember(defaultLayout) { mutableStateOf(mergedLayout) }
         var selectedId by remember(editMode) { mutableStateOf<String?>(null) }
+        var pressedGroupControlIds by remember { mutableStateOf(emptySet<Int>()) }
         LaunchedEffect(mergedLayout) {
             controls = mergedLayout
         }
@@ -564,6 +562,16 @@ private fun OnScreenControls(
             }
         }
 
+        val groupHandledControlIds = touchControlGroups.flatMap { it.ids }.toSet()
+        fun handleGroupButtonChange(controlId: Int, pressed: Boolean) {
+            pressedGroupControlIds = if (pressed) {
+                pressedGroupControlIds + controlId
+            } else {
+                pressedGroupControlIds - controlId
+            }
+            onButtonChange(controlId, pressed)
+        }
+
         controls.forEach { element ->
             val descriptor = touchControlDescriptor(element.id) ?: return@forEach
             if (!editMode && (!element.visible || (element.id == TouchControlIds.TOUCH && !showTouchSwitch))) {
@@ -577,6 +585,8 @@ private fun OnScreenControls(
                 alpha = if (editMode && !element.visible) 0.28f else alpha,
                 selected = editMode && selected?.id == element.id,
                 editMode = editMode,
+                inputHandledByGroup = !editMode && element.id in groupHandledControlIds,
+                externallyPressed = descriptor.controlId?.let { it in pressedGroupControlIds } == true,
                 backTouchEnabled = backTouchEnabled,
                 onSelected = { selectedId = element.id },
                 onElementChange = { updated -> commitLayoutChange { currentControls -> currentControls.replaceElement(updated) } },
@@ -584,6 +594,20 @@ private fun OnScreenControls(
                 onButtonChange = onButtonChange,
                 onAxisChange = onAxisChange
             )
+        }
+
+        if (!editMode) {
+            touchControlGroups.forEach { group ->
+                val groupElements = controls.filter { it.id in group.ids && it.visible }
+                if (groupElements.size == group.ids.size) {
+                    TouchControlGroupInputCapture(
+                        groupElements = groupElements,
+                        canvasWidth = canvasWidth,
+                        canvasHeight = canvasHeight,
+                        onButtonChange = ::handleGroupButtonChange
+                    )
+                }
+            }
         }
 
         if (editMode && selected != null && selectedDescriptor != null) {
@@ -636,6 +660,8 @@ private data class TouchControlGroupBounds(
     val height: Float
 )
 
+private val TouchGroupDragCapturePadding = 28.dp
+
 private val touchControlGroups = listOf(
     TouchControlGroup(
         setOf(
@@ -656,23 +682,22 @@ private val touchControlGroups = listOf(
 )
 
 private fun touchControlDescriptor(id: String): TouchControlDescriptor? = when (id) {
-    TouchControlIds.L2 -> TouchControlDescriptor(id, "L2", R.drawable.button_l2, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.l2)
-    TouchControlIds.L1 -> TouchControlDescriptor(id, "L1", R.drawable.button_l, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.l1)
-    TouchControlIds.R2 -> TouchControlDescriptor(id, "R2", R.drawable.button_r2, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.r2)
-    TouchControlIds.R1 -> TouchControlDescriptor(id, "R1", R.drawable.button_r, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.r1)
+    TouchControlIds.L2 -> TouchControlDescriptor(id, "L2", R.drawable.ic_controller_l2_button, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.l2)
+    TouchControlIds.L1 -> TouchControlDescriptor(id, "L1", R.drawable.ic_controller_l1_button, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.l1)
+    TouchControlIds.R2 -> TouchControlDescriptor(id, "R2", R.drawable.ic_controller_r2_button, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.r2)
+    TouchControlIds.R1 -> TouchControlDescriptor(id, "R1", R.drawable.ic_controller_r1_button, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.r1)
     TouchControlIds.DPAD_UP -> TouchControlDescriptor(id, "Up", R.drawable.ic_controller_up_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.dup)
     TouchControlIds.DPAD_DOWN -> TouchControlDescriptor(id, "Down", R.drawable.ic_controller_down_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.ddown)
     TouchControlIds.DPAD_LEFT -> TouchControlDescriptor(id, "Left", R.drawable.ic_controller_left_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.dleft)
     TouchControlIds.DPAD_RIGHT -> TouchControlDescriptor(id, "Right", R.drawable.ic_controller_right_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.dright)
-    TouchControlIds.LEFT_STICK -> TouchControlDescriptor(id, "Left stick", R.drawable.joystick_range, CircleShape, TouchControlType.Analog, axisX = InputOverlay.ControlId.axis_left_x, axisY = InputOverlay.ControlId.axis_left_y)
-    TouchControlIds.RIGHT_STICK -> TouchControlDescriptor(id, "Right stick", R.drawable.joystick_range, CircleShape, TouchControlType.Analog, axisX = InputOverlay.ControlId.axis_right_x, axisY = InputOverlay.ControlId.axis_right_y)
-    TouchControlIds.TRIANGLE -> TouchControlDescriptor(id, "Triangle", R.drawable.button_triangle, CircleShape, TouchControlType.Button, InputOverlay.ControlId.y)
-    TouchControlIds.CROSS -> TouchControlDescriptor(id, "Cross", R.drawable.button_cross, CircleShape, TouchControlType.Button, InputOverlay.ControlId.a)
-    TouchControlIds.SQUARE -> TouchControlDescriptor(id, "Square", R.drawable.button_square, CircleShape, TouchControlType.Button, InputOverlay.ControlId.x)
-    TouchControlIds.CIRCLE -> TouchControlDescriptor(id, "Circle", R.drawable.button_circle, CircleShape, TouchControlType.Button, InputOverlay.ControlId.b)
-    TouchControlIds.SELECT -> TouchControlDescriptor(id, "Select", R.drawable.button_select, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.select)
-    TouchControlIds.PS -> TouchControlDescriptor(id, "PS", R.drawable.button_ps, CircleShape, TouchControlType.Button, InputOverlay.ControlId.guide)
-    TouchControlIds.START -> TouchControlDescriptor(id, "Start", R.drawable.button_start, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.start)
+    TouchControlIds.LEFT_STICK -> TouchControlDescriptor(id, "Left stick", R.drawable.ic_controller_analog_base, CircleShape, TouchControlType.Analog, axisX = InputOverlay.ControlId.axis_left_x, axisY = InputOverlay.ControlId.axis_left_y)
+    TouchControlIds.RIGHT_STICK -> TouchControlDescriptor(id, "Right stick", R.drawable.ic_controller_analog_base, CircleShape, TouchControlType.Analog, axisX = InputOverlay.ControlId.axis_right_x, axisY = InputOverlay.ControlId.axis_right_y)
+    TouchControlIds.TRIANGLE -> TouchControlDescriptor(id, "Triangle", R.drawable.ic_controller_triangle_button, CircleShape, TouchControlType.Button, InputOverlay.ControlId.y)
+    TouchControlIds.CROSS -> TouchControlDescriptor(id, "Cross", R.drawable.ic_controller_cross_button, CircleShape, TouchControlType.Button, InputOverlay.ControlId.a)
+    TouchControlIds.SQUARE -> TouchControlDescriptor(id, "Square", R.drawable.ic_controller_square_button, CircleShape, TouchControlType.Button, InputOverlay.ControlId.x)
+    TouchControlIds.CIRCLE -> TouchControlDescriptor(id, "Circle", R.drawable.ic_controller_circle_button, CircleShape, TouchControlType.Button, InputOverlay.ControlId.b)
+    TouchControlIds.SELECT -> TouchControlDescriptor(id, "Select", R.drawable.ic_controller_select_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.select)
+    TouchControlIds.START -> TouchControlDescriptor(id, "Start", R.drawable.ic_controller_start_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.start)
     TouchControlIds.TOUCH -> TouchControlDescriptor(id, "Touch", R.drawable.button_touch_f, RoundedCornerShape(8.dp), TouchControlType.TouchSwitch)
     else -> null
 }
@@ -731,6 +756,122 @@ private fun TouchControlGroupFrame(
 }
 
 @Composable
+private fun TouchControlGroupInputCapture(
+    groupElements: List<TouchControlElement>,
+    canvasWidth: Float,
+    canvasHeight: Float,
+    onButtonChange: (Int, Boolean) -> Unit
+) {
+    val density = LocalDensity.current
+    val pointerButtons = remember(groupElements) { mutableMapOf<Int, Int>() }
+    val buttonPressCounts = remember(groupElements) { mutableMapOf<Int, Int>() }
+    val bounds = groupElements.groupBounds()
+    val paddingPx = with(density) { TouchGroupDragCapturePadding.toPx() }
+    val paddedX = (bounds.x * canvasWidth - paddingPx).coerceAtLeast(0f)
+    val paddedY = (bounds.y * canvasHeight - paddingPx).coerceAtLeast(0f)
+    val paddedRight = ((bounds.x + bounds.width) * canvasWidth + paddingPx).coerceAtMost(canvasWidth)
+    val paddedBottom = ((bounds.y + bounds.height) * canvasHeight + paddingPx).coerceAtMost(canvasHeight)
+    val widthPx = (paddedRight - paddedX).coerceAtLeast(1f)
+    val heightPx = (paddedBottom - paddedY).coerceAtLeast(1f)
+
+    fun press(controlId: Int) {
+        val count = buttonPressCounts[controlId] ?: 0
+        buttonPressCounts[controlId] = count + 1
+        if (count == 0) {
+            onButtonChange(controlId, true)
+        }
+    }
+
+    fun release(controlId: Int) {
+        val count = buttonPressCounts[controlId] ?: return
+        if (count <= 1) {
+            buttonPressCounts.remove(controlId)
+            onButtonChange(controlId, false)
+        } else {
+            buttonPressCounts[controlId] = count - 1
+        }
+    }
+
+    fun releasePointer(pointerId: Int) {
+        pointerButtons.remove(pointerId)?.let(::release)
+    }
+
+    fun releaseAll() {
+        pointerButtons.keys.toList().forEach(::releasePointer)
+    }
+
+    fun controlAt(localX: Float, localY: Float): Int? {
+        val absoluteX = paddedX + localX
+        val absoluteY = paddedY + localY
+        return groupElements.firstNotNullOfOrNull { element ->
+            val left = element.x * canvasWidth
+            val top = element.y * canvasHeight
+            val right = left + element.width * canvasWidth
+            val bottom = top + element.height * canvasHeight
+            if (absoluteX in left..right && absoluteY in top..bottom) {
+                touchControlDescriptor(element.id)?.controlId
+            } else {
+                null
+            }
+        }
+    }
+
+    fun updatePointer(event: MotionEvent, pointerIndex: Int) {
+        val pointerId = event.getPointerId(pointerIndex)
+        val nextControl = controlAt(event.getX(pointerIndex), event.getY(pointerIndex))
+        val previousControl = pointerButtons[pointerId]
+        if (previousControl == nextControl) return
+        previousControl?.let(::release)
+        if (nextControl != null) {
+            pointerButtons[pointerId] = nextControl
+            press(nextControl)
+        } else {
+            pointerButtons.remove(pointerId)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { releaseAll() }
+    }
+
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(paddedX.roundToInt(), paddedY.roundToInt()) }
+            .size(
+                width = with(density) { widthPx.toDp() },
+                height = with(density) { heightPx.toDp() }
+            )
+            .pointerInteropFilter { event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                        updatePointer(event, event.actionIndex)
+                        true
+                    }
+
+                    MotionEvent.ACTION_MOVE -> {
+                        for (index in 0 until event.pointerCount) {
+                            updatePointer(event, index)
+                        }
+                        true
+                    }
+
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                        releasePointer(event.getPointerId(event.actionIndex))
+                        true
+                    }
+
+                    MotionEvent.ACTION_CANCEL -> {
+                        releaseAll()
+                        true
+                    }
+
+                    else -> true
+                }
+            }
+    )
+}
+
+@Composable
 private fun TouchControlCanvasItem(
     element: TouchControlElement,
     descriptor: TouchControlDescriptor,
@@ -739,6 +880,8 @@ private fun TouchControlCanvasItem(
     alpha: Float,
     selected: Boolean,
     editMode: Boolean,
+    inputHandledByGroup: Boolean,
+    externallyPressed: Boolean,
     backTouchEnabled: Boolean,
     onSelected: () -> Unit,
     onElementChange: (TouchControlElement) -> Unit,
@@ -785,6 +928,8 @@ private fun TouchControlCanvasItem(
                 color = if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.34f),
                 shape = descriptor.shape
             )
+    } else if (inputHandledByGroup) {
+        Modifier
     } else {
         when (descriptor.type) {
             TouchControlType.Button -> Modifier.pointerInteropFilter { event ->
@@ -861,7 +1006,7 @@ private fun TouchControlCanvasItem(
                     height = with(density) { heightPx.toDp() },
                     alpha = alpha,
                     shape = descriptor.shape,
-                    pressed = !editMode && pressed
+                    pressed = !editMode && (pressed || externallyPressed)
                 )
             }
         }
@@ -875,13 +1020,13 @@ private fun StaticAnalogStick(alpha: Float) {
         contentAlignment = Alignment.Center
     ) {
         Image(
-            painter = painterResource(R.drawable.joystick_range),
+            painter = painterResource(R.drawable.ic_controller_analog_base),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Fit
         )
         Image(
-            painter = painterResource(R.drawable.joystick),
+            painter = painterResource(R.drawable.ic_controller_analog_stick),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(0.56f),
             contentScale = ContentScale.Fit
@@ -1139,30 +1284,31 @@ private fun buildDefaultTouchLayout(
     val centerBottomPadding = bottomPaddingPx - dp(6f)
     val clusterSpacing = (if (isLandscape) 14f else 18f) * overlayScale * dp(1f)
     val faceClusterDrop = (if (isLandscape) 18f else 14f) * overlayScale * dp(1f)
+    val buttonClusterLowerOffset = (if (isLandscape) 24f else 18f) * overlayScale * dp(1f)
     val leftClusterHeight = maxOf(dpadClusterSize + faceClusterDrop, analogSize) + analogSize + clusterSpacing
     val rightClusterWidth = actionClusterSize + analogSize + clusterSpacing
     val rightClusterHeight = maxOf(actionClusterSize + faceClusterDrop, analogSize) + analogSize + clusterSpacing
 
-    val dpadButton = dpadClusterSize / 2.7f
-    val dpadGap = if (isLandscape) dp(16f) else dp(18f)
+    val dpadButton = dpadClusterSize / 2.45f
+    val dpadGap = if (isLandscape) dp(22f) else dp(24f)
     val dpadStep = dpadButton + dpadGap
     val dpadExtent = dpadStep + dpadButton
     val dpadCenter = (dpadExtent - dpadButton) / 2f
-    val dpadY = canvasHeight - bottomPaddingPx - leftClusterHeight + faceClusterDrop
+    val dpadY = canvasHeight - bottomPaddingPx - leftClusterHeight + faceClusterDrop + buttonClusterLowerOffset
     val leftAnalogX = sidePaddingPx + dpadClusterSize + clusterSpacing
     val leftAnalogY = canvasHeight - bottomPaddingPx - analogSize
 
-    val actionButton = actionClusterSize / 3.1f
-    val actionGap = if (isLandscape) dp(36f) else dp(42f)
+    val actionButton = actionClusterSize / 2.85f
+    val actionGap = if (isLandscape) dp(46f) else dp(52f)
     val actionStep = actionButton + actionGap
     val actionExtent = actionStep + actionButton
     val actionCenter = (actionExtent - actionButton) / 2f
     val rightGroupX = canvasWidth - sidePaddingPx - rightClusterWidth
     val actionX = rightGroupX + rightClusterWidth - actionClusterSize
-    val actionY = canvasHeight - bottomPaddingPx - rightClusterHeight + faceClusterDrop
+    val actionY = canvasHeight - bottomPaddingPx - rightClusterHeight + faceClusterDrop + buttonClusterLowerOffset
     val rightAnalogY = canvasHeight - bottomPaddingPx - analogSize
 
-    val centerGroupWidth = wideCenterWidth + centerGap + centerHeight + centerGap + wideCenterWidth
+    val centerGroupWidth = wideCenterWidth + centerGap + wideCenterWidth
     val centerX = (canvasWidth - centerGroupWidth) / 2f
     val centerY = canvasHeight - centerBottomPadding - centerHeight
     val touchWidth = centerWidth * 1.2f
@@ -1184,8 +1330,7 @@ private fun buildDefaultTouchLayout(
         element(TouchControlIds.SQUARE, actionX, actionY + actionCenter, actionButton, actionButton),
         element(TouchControlIds.CIRCLE, actionX + actionStep, actionY + actionCenter, actionButton, actionButton),
         element(TouchControlIds.SELECT, centerX, centerY, wideCenterWidth, centerHeight),
-        element(TouchControlIds.PS, centerX + wideCenterWidth + centerGap, centerY, centerHeight, centerHeight),
-        element(TouchControlIds.START, centerX + wideCenterWidth + centerGap + centerHeight + centerGap, centerY, wideCenterWidth, centerHeight),
+        element(TouchControlIds.START, centerX + wideCenterWidth + centerGap, centerY, wideCenterWidth, centerHeight),
         element(TouchControlIds.TOUCH, (canvasWidth - touchWidth) / 2f, canvasHeight - touchHeight - dp(84f), touchWidth, touchHeight)
     )
 }
@@ -1277,13 +1422,13 @@ private fun AnalogStick(
         contentAlignment = Alignment.Center
     ) {
         Image(
-            painter = painterResource(R.drawable.joystick_range),
+            painter = painterResource(R.drawable.ic_controller_analog_base),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Fit
         )
         Image(
-            painter = painterResource(R.drawable.joystick),
+            painter = painterResource(R.drawable.ic_controller_analog_stick),
             contentDescription = null,
             modifier = Modifier.size(analogSize * 0.56f).offset { IntOffset(thumbOffset.x.roundToInt(), thumbOffset.y.roundToInt()) },
             contentScale = ContentScale.Fit

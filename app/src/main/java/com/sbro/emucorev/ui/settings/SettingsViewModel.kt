@@ -30,7 +30,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
-    val packagesFolderPath: String? = null,
     val storagePath: String = "",
     val storageLocations: List<VitaStorageLocation> = emptyList(),
     val coreConfig: VitaCoreConfig = VitaCoreConfig(),
@@ -94,7 +93,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val _uiState = MutableStateFlow(
         SettingsUiState(
-            packagesFolderPath = preferences.packagesFolderDisplayName(application),
             storagePath = EmulatorStorage.vitaRoot(application).absolutePath,
             storageLocations = EmulatorStorage.availableStorageLocations(application),
             coreConfig = initialCoreConfig,
@@ -104,24 +102,35 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
-    fun onPackagesFolderSelected(uri: Uri) {
-        val context = getApplication<Application>()
-        preferences.setPackagesFolder(context, uri)
-        _uiState.value = _uiState.value.copy(
-            packagesFolderPath = preferences.packagesFolderDisplayName(context)
-        )
-    }
-
-    fun clearPackagesFolder() {
-        preferences.clearPackagesFolder(getApplication())
-        _uiState.value = _uiState.value.copy(packagesFolderPath = null)
-    }
-
     fun selectStorageLocation(rootPath: String) {
+        val context = getApplication<Application>()
+        if (EmulatorStorage.storageRoot(context).absolutePath == rootPath) return
+        changeStorageLocation { context, onProgress ->
+            EmulatorStorage.selectStorageRoot(
+                context = context,
+                rootPath = rootPath,
+                migrateExistingData = true,
+                onMigrationProgress = onProgress
+            )
+        }
+    }
+
+    fun selectCustomStorageLocation(uri: Uri) {
+        changeStorageLocation { context, onProgress ->
+            EmulatorStorage.selectCustomStorageRoot(
+                context = context,
+                treeUri = uri,
+                migrateExistingData = true,
+                onMigrationProgress = onProgress
+            )
+        }
+    }
+
+    private fun changeStorageLocation(
+        selectRoot: (Application, (StorageMigrationProgress) -> Unit) -> Unit
+    ) {
         if (_uiState.value.storageChangeInProgress) return
         val context = getApplication<Application>()
-        val currentRoot = EmulatorStorage.storageRoot(context).absolutePath
-        if (currentRoot == rootPath) return
         val restartRequired = NativeLibraryLoader.isNativeSessionInitialized()
         _uiState.value = _uiState.value.copy(
             storageChangeInProgress = true,
@@ -129,12 +138,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         )
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                EmulatorStorage.selectStorageRoot(
-                    context = context,
-                    rootPath = rootPath,
-                    migrateExistingData = true,
-                    onMigrationProgress = ::updateStorageMigrationProgress
-                )
+                selectRoot(context, ::updateStorageMigrationProgress)
                 val config = coreConfigRepository.ensureDefaultsPersisted()
                 _uiState.value = _uiState.value.copy(
                     storagePath = EmulatorStorage.vitaRoot(context).absolutePath,
@@ -194,7 +198,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 val restoredConfig = settingsBackupRepository.restoreFrom(uri)
                 val context = getApplication<Application>()
                 _uiState.value = _uiState.value.copy(
-                    packagesFolderPath = preferences.packagesFolderDisplayName(context),
                     storagePath = EmulatorStorage.vitaRoot(context).absolutePath,
                     storageLocations = EmulatorStorage.availableStorageLocations(context),
                     coreConfig = restoredConfig,

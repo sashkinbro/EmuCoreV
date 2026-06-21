@@ -54,10 +54,8 @@ import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
 
 @OptIn(ExperimentalLayoutApi::class)
-@Suppress("UNUSED_PARAMETER")
 @Composable
 fun SetupScreen(
-    packagesFolderLabel: String?,
     vitaRootPath: String,
     onBackClick: () -> Unit,
     onInstallContent: () -> Unit,

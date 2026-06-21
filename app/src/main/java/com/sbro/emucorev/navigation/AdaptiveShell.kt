@@ -177,6 +177,7 @@ private fun CompactAdaptiveShell(
     val statusPadding = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val isLandscapeCompact = configuration.screenWidthDp > configuration.screenHeightDp
     val drawerWidthFraction = if (isLandscapeCompact) 0.54f else 0.74f
+    val drawerTopPadding = maxOf(statusPadding, 32.dp)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -235,7 +236,7 @@ private fun CompactAdaptiveShell(
                     onInstallContent = onInstallContent,
                     onRefreshLibrary = onRefreshLibrary,
                     wrapInSurface = false,
-                    topInset = statusPadding,
+                    topInset = drawerTopPadding,
                     onCloseDrawer = { scope.launch { drawerState.snapTo(DrawerValue.Closed) } }
                 )
             }
@@ -271,6 +272,11 @@ private fun SideNavigation(
 ) {
     val drawerInset = 18.dp
     val drawerBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val drawerBottomPadding = drawerInset + if (wrapInSurface) {
+        drawerBottomInset
+    } else {
+        maxOf(drawerBottomInset, 18.dp)
+    }
 
     val navigateLibrary = rememberDebouncedClick {
         onCloseDrawer()
@@ -334,143 +340,138 @@ private fun SideNavigation(
         Column(
             modifier = Modifier
                 .fillMaxHeight()
+                .verticalScroll(rememberScrollState())
                 .padding(
                     start = drawerInset,
                     end = drawerInset,
-                    top = drawerInset,
-                    bottom = drawerInset + drawerBottomInset
+                    top = drawerInset + topInset + 4.dp,
+                    bottom = drawerBottomPadding
                 ),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.app_name_emucorev),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = topInset + 4.dp, start = 6.dp, end = 6.dp)
-                )
-                ShellItem(
-                    icon = Icons.Rounded.Games,
-                    label = stringResource(R.string.nav_library),
-                    selected = selected == PrimaryDestination.Library,
-                    onClick = navigateLibrary
-                )
-                ShellItem(
-                    icon = Icons.Rounded.SettingsEthernet,
-                    label = stringResource(R.string.nav_setup),
-                    selected = selected == PrimaryDestination.Setup,
-                    onClick = navigateSetup
-                )
-                ShellItem(
-                    icon = Icons.Rounded.Search,
-                    label = stringResource(R.string.nav_catalog),
-                    selected = selected == PrimaryDestination.Search,
-                    onClick = navigateSearch
-                )
-                ShellItem(
-                    icon = Icons.Rounded.Settings,
-                    label = stringResource(R.string.nav_settings),
-                    selected = selected == PrimaryDestination.Settings,
-                    onClick = navigateSettings
-                )
+            Text(
+                text = stringResource(R.string.app_name_emucorev),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(start = 6.dp, end = 6.dp)
+            )
+            ShellItem(
+                icon = Icons.Rounded.Games,
+                label = stringResource(R.string.nav_library),
+                selected = selected == PrimaryDestination.Library,
+                onClick = navigateLibrary
+            )
+            ShellItem(
+                icon = Icons.Rounded.SettingsEthernet,
+                label = stringResource(R.string.nav_setup),
+                selected = selected == PrimaryDestination.Setup,
+                onClick = navigateSetup
+            )
+            ShellItem(
+                icon = Icons.Rounded.Search,
+                label = stringResource(R.string.nav_catalog),
+                selected = selected == PrimaryDestination.Search,
+                onClick = navigateSearch
+            )
+            ShellItem(
+                icon = Icons.Rounded.Settings,
+                label = stringResource(R.string.nav_settings),
+                selected = selected == PrimaryDestination.Settings,
+                onClick = navigateSettings
+            )
 
-                if (hasSetupActions) {
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-                    )
-                    Text(
-                        text = stringResource(R.string.shell_setup_section),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-                    if (installFirmware != null) {
-                        ShellAction(
-                            icon = Icons.Rounded.SystemUpdateAlt,
-                            label = stringResource(R.string.shell_install_firmware),
-                            onClick = installFirmware
-                        )
-                    }
-                    if (installContent != null) {
-                        ShellAction(
-                            icon = Icons.Rounded.Inventory2,
-                            label = stringResource(R.string.shell_install_content),
-                            onClick = installContent
-                        )
-                    }
-                }
-
-                if (hasLibraryActions) {
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-                    )
-                    Text(
-                        text = stringResource(R.string.shell_library_section),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-                    ShellAction(
-                        icon = Icons.Rounded.Refresh,
-                        label = stringResource(R.string.library_refresh),
-                        onClick = refreshLibrary
-                    )
-                }
-
-                if (hasToolsActions) {
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-                    )
-                    Text(
-                        text = stringResource(R.string.shell_tools_section),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-                    ShellItem(
-                        icon = Icons.Rounded.Tune,
-                        label = stringResource(R.string.nav_game_manager),
-                        selected = selected == PrimaryDestination.GameManager,
-                        onClick = navigateGameManager
-                    )
-                    ShellItem(
-                        icon = Icons.Rounded.QueryStats,
-                        label = stringResource(R.string.nav_play_time),
-                        selected = selected == PrimaryDestination.PlayTime,
-                        onClick = navigatePlayTime
-                    )
-                    ShellItem(
-                        icon = Icons.Rounded.EmojiEvents,
-                        label = stringResource(R.string.nav_achievements),
-                        selected = selected == PrimaryDestination.Achievements,
-                        onClick = navigateAchievements
-                    )
-                    ShellItem(
-                        icon = Icons.Rounded.Save,
-                        label = stringResource(R.string.nav_save_manager),
-                        selected = selected == PrimaryDestination.SaveData,
-                        onClick = navigateSaveData
-                    )
-                }
-
+            if (hasSetupActions) {
                 HorizontalDivider(
                     thickness = 1.dp,
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
                 )
-                ShellItem(
-                    icon = Icons.Rounded.AccountCircle,
-                    label = stringResource(R.string.nav_profile),
-                    selected = selected == PrimaryDestination.Profile,
-                    onClick = navigateProfile
+                Text(
+                    text = stringResource(R.string.shell_setup_section),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+                if (installFirmware != null) {
+                    ShellAction(
+                        icon = Icons.Rounded.SystemUpdateAlt,
+                        label = stringResource(R.string.shell_install_firmware),
+                        onClick = installFirmware
+                    )
+                }
+                if (installContent != null) {
+                    ShellAction(
+                        icon = Icons.Rounded.Inventory2,
+                        label = stringResource(R.string.shell_install_content),
+                        onClick = installContent
+                    )
+                }
+            }
+
+            if (hasLibraryActions) {
+                HorizontalDivider(
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                )
+                Text(
+                    text = stringResource(R.string.shell_library_section),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+                ShellAction(
+                    icon = Icons.Rounded.Refresh,
+                    label = stringResource(R.string.library_refresh),
+                    onClick = refreshLibrary
                 )
             }
+
+            if (hasToolsActions) {
+                HorizontalDivider(
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                )
+                Text(
+                    text = stringResource(R.string.shell_tools_section),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+                ShellItem(
+                    icon = Icons.Rounded.Tune,
+                    label = stringResource(R.string.nav_game_manager),
+                    selected = selected == PrimaryDestination.GameManager,
+                    onClick = navigateGameManager
+                )
+                ShellItem(
+                    icon = Icons.Rounded.QueryStats,
+                    label = stringResource(R.string.nav_play_time),
+                    selected = selected == PrimaryDestination.PlayTime,
+                    onClick = navigatePlayTime
+                )
+                ShellItem(
+                    icon = Icons.Rounded.EmojiEvents,
+                    label = stringResource(R.string.nav_achievements),
+                    selected = selected == PrimaryDestination.Achievements,
+                    onClick = navigateAchievements
+                )
+                ShellItem(
+                    icon = Icons.Rounded.Save,
+                    label = stringResource(R.string.nav_save_manager),
+                    selected = selected == PrimaryDestination.SaveData,
+                    onClick = navigateSaveData
+                )
+            }
+
+            HorizontalDivider(
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            )
+            ShellItem(
+                icon = Icons.Rounded.AccountCircle,
+                label = stringResource(R.string.nav_profile),
+                selected = selected == PrimaryDestination.Profile,
+                onClick = navigateProfile
+            )
         }
     }
 

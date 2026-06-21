@@ -1,7 +1,12 @@
 package com.sbro.emucorev.core
 
 import android.content.Context
+import android.net.Uri
 import android.os.Environment
+import android.os.storage.StorageManager
+import android.provider.DocumentsContract
+import android.system.Os
+import androidx.documentfile.provider.DocumentFile
 import com.sbro.emucorev.data.AppPreferences
 import java.io.File
 
@@ -9,7 +14,8 @@ data class VitaStorageLocation(
     val rootPath: String,
     val vitaPath: String,
     val removable: Boolean,
-    val selected: Boolean
+    val selected: Boolean,
+    val custom: Boolean = false
 )
 
 data class StorageMigrationResult(
@@ -43,11 +49,17 @@ object EmulatorStorage {
         context.getExternalFilesDirs(null).filterNotNull().forEach { root ->
             roots[root.absolutePath] = root
         }
+        AppPreferences(context).vitaCustomStorageRootPath
+            ?.let(::File)
+            ?.takeIf { it.canBeRuntimeRoot() }
+            ?.let { roots[it.absolutePath] = it }
         if (roots.isEmpty()) {
             roots[context.filesDir.absolutePath] = context.filesDir
         }
         return roots.values.toList()
     }
+
+    fun knownStorageRoots(context: Context): List<File> = availableStorageRoots(context)
 
     fun availableStorageLocations(context: Context): List<VitaStorageLocation> {
         val selectedRoot = storageRoot(context).absolutePath
@@ -56,7 +68,8 @@ object EmulatorStorage {
                 rootPath = root.absolutePath,
                 vitaPath = File(root, "vita").absolutePath,
                 removable = runCatching { Environment.isExternalStorageRemovable(root) }.getOrDefault(false),
-                selected = root.absolutePath == selectedRoot
+                selected = root.absolutePath == selectedRoot,
+                custom = root.absolutePath == AppPreferences(context).vitaCustomStorageRootPath
             )
         }
     }
@@ -81,9 +94,29 @@ object EmulatorStorage {
                 targetRootPath = selectedRoot.absolutePath
             )
         }
+        migrateLegacyCacheRoot(context, selectedRoot)
         AppPreferences(context).vitaStorageRootPath = selectedRoot.absolutePath
         prepareRuntime(context)
         return migration
+    }
+
+    fun selectCustomStorageRoot(
+        context: Context,
+        treeUri: Uri,
+        migrateExistingData: Boolean = false,
+        onMigrationProgress: ((StorageMigrationProgress) -> Unit)? = null
+    ): StorageMigrationResult {
+        val selectedRoot = resolveTreeUriToFile(context, treeUri)
+            ?.takeIf { it.canBeRuntimeRoot() }
+            ?: throw IllegalArgumentException("Selected folder is not available as emulator storage.")
+
+        AppPreferences(context).setVitaCustomStorageRoot(context, treeUri, selectedRoot.absolutePath)
+        return selectStorageRoot(
+            context = context,
+            rootPath = selectedRoot.absolutePath,
+            migrateExistingData = migrateExistingData,
+            onMigrationProgress = onMigrationProgress
+        )
     }
 
     fun vitaRoot(context: Context): File {
@@ -92,26 +125,22 @@ object EmulatorStorage {
     }
 
     fun cacheRoot(context: Context): File {
-        val base = context.externalCacheDir ?: context.cacheDir
-        return File(base, "vita_cache").apply { mkdirs() }
+        return File(storageRoot(context), "cache").apply { mkdirs() }
     }
 
     fun prepareRuntime(context: Context) {
         val storageRoot = storageRoot(context)
         val vitaRoot = vitaRoot(context)
         val cacheRoot = cacheRoot(context)
-        val nativeCacheRoot = File(storageRoot, "cache")
         listOf(
             vitaRoot,
             cacheRoot,
-            nativeCacheRoot,
             File(vitaRoot, "ux0"),
             File(vitaRoot, "ux0/app"),
             File(vitaRoot, "ux0/data"),
             File(vitaRoot, "ux0/user"),
             File(vitaRoot, "vs0"),
             File(storageRoot, "shaderlog"),
-            File(nativeCacheRoot, "shaders"),
             File(cacheRoot, "shaders"),
             File(cacheRoot, "logs")
         ).forEach { directory ->
@@ -160,7 +189,7 @@ object EmulatorStorage {
             return StorageMigrationResult(sourceRoot.absolutePath, targetRoot.absolutePath)
         }
         targetRoot.mkdirs()
-        val migrationItems = listOf("vita", "cache", "patch", "shaderlog", "config.yml", "config")
+        val migrationItems = listOf("vita", "cache", "patch", "shaderlog", "config.yml", "config", "play_time.json")
         val totalFiles = migrationItems.sumOf { name -> File(sourceRoot, name).countFiles() }
         onProgress?.invoke(
             StorageMigrationProgress(
@@ -233,5 +262,93 @@ object EmulatorStorage {
         if (!exists()) return 0
         if (isFile) return 1
         return listFiles().orEmpty().sumOf { it.countFiles() }
+    }
+
+    private fun migrateLegacyCacheRoot(context: Context, targetRoot: File) {
+        val legacyBase = context.externalCacheDir ?: context.cacheDir
+        val legacyCache = File(legacyBase, "vita_cache")
+        val targetCache = File(targetRoot, "cache")
+        if (legacyCache.exists() && legacyCache.absolutePath != targetCache.absolutePath) {
+            copyMissing(legacyCache, targetCache) { _, _, _ -> }
+        }
+    }
+
+    private fun File.canBeRuntimeRoot(): Boolean {
+        if (exists() && !isDirectory) return false
+        if (!exists() && !mkdirs()) return false
+        if (!canRead()) return false
+        return runCatching {
+            val testFile = File(this, ".emucorev_storage_write_test")
+            if (testFile.exists()) {
+                testFile.delete()
+            }
+            try {
+                testFile.writeText("ok")
+                testFile.isFile
+            } finally {
+                testFile.delete()
+            }
+        }.getOrDefault(false)
+    }
+
+    private fun resolveTreeUriToFile(context: Context, treeUri: Uri): File? {
+        resolveTreeUriFromDescriptor(context, treeUri)?.let { return it }
+
+        val rawPath = treeUri.path
+            ?.removePrefix("/tree/raw:")
+            ?.takeIf { it.startsWith("/") }
+            ?.let(::File)
+        if (rawPath != null) return rawPath
+
+        val documentId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
+            ?: return null
+        val separatorIndex = documentId.indexOf(':')
+        val volumeId = if (separatorIndex >= 0) documentId.substring(0, separatorIndex) else documentId
+        val relativePath = if (separatorIndex >= 0) documentId.substring(separatorIndex + 1) else ""
+
+        if (volumeId.equals("primary", ignoreCase = true)) {
+            val root = Environment.getExternalStorageDirectory()
+            return if (relativePath.isBlank()) root else File(root, relativePath)
+        }
+
+        resolveStorageVolumeRoot(context, volumeId)?.let { root ->
+            return if (relativePath.isBlank()) root else File(root, relativePath)
+        }
+
+        return File("/storage/$volumeId").takeIf { it.exists() }
+            ?.let { root -> if (relativePath.isBlank()) root else File(root, relativePath) }
+    }
+
+    private fun resolveTreeUriFromDescriptor(context: Context, treeUri: Uri): File? {
+        val documentUri = DocumentFile.fromTreeUri(context, treeUri)?.uri ?: treeUri
+        return runCatching {
+            context.contentResolver.openFileDescriptor(documentUri, "r")?.use { descriptor ->
+                Os.readlink("/proc/self/fd/${descriptor.fd}")
+                    .normalizeAndroidStoragePath()
+                    .takeIf { it.startsWith("/") }
+                    ?.let(::File)
+            }
+        }.getOrNull()
+    }
+
+    private fun String.normalizeAndroidStoragePath(): String {
+        if (!startsWith("/mnt/user/")) return this
+        val withoutUserPrefix = substring("/mnt/user/".length)
+        val storageSeparator = withoutUserPrefix.indexOf('/')
+        if (storageSeparator < 0) return this
+        return "/storage" + withoutUserPrefix.substring(storageSeparator)
+    }
+
+    private fun resolveStorageVolumeRoot(context: Context, volumeId: String): File? {
+        val storageManager = context.getSystemService(StorageManager::class.java) ?: return null
+        return storageManager.storageVolumes.firstNotNullOfOrNull { volume ->
+            val uuid = runCatching { volume.uuid }.getOrNull()
+            if (!uuid.equals(volumeId, ignoreCase = true)) {
+                return@firstNotNullOfOrNull null
+            }
+            runCatching {
+                volume.javaClass.getMethod("getPathFile").invoke(volume) as? File
+            }.getOrNull()
+        }
     }
 }

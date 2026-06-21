@@ -1,12 +1,10 @@
 package com.sbro.emucorev.ui.home
 
 import android.app.Application
-import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.InstallStateBus
-import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.InstalledVitaGame
 import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.VitaCatalogRepository
@@ -20,14 +18,12 @@ data class HomeUiState(
     val installedCount: Int = 0,
     val catalogCount: Int = 0,
     val storagePath: String = "",
-    val packagesFolderLabel: String? = null,
     val featuredGames: List<InstalledVitaGame> = emptyList(),
     val isLoading: Boolean = true
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val preferences = AppPreferences(application)
     private val installedRepository = InstalledGameRepository()
     private val catalogRepository = VitaCatalogRepository(application)
 
@@ -53,19 +49,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(
                 installedCount = installedGames.size,
                 catalogCount = catalogRepository.getCatalogCount(),
-                packagesFolderLabel = preferences.packagesFolderDisplayName(context),
                 storagePath = EmulatorStorage.vitaRoot(context).absolutePath,
                 featuredGames = installedGames.take(6),
                 isLoading = false
             )
         }
-    }
-
-    fun onPackagesFolderSelected(uri: Uri) {
-        val context = getApplication<Application>()
-        preferences.setPackagesFolder(context, uri)
-        _uiState.value = _uiState.value.copy(
-            packagesFolderLabel = preferences.packagesFolderDisplayName(context)
-        )
     }
 }
