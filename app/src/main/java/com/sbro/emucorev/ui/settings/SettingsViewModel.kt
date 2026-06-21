@@ -355,7 +355,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun checkForAppUpdates(showErrors: Boolean = true, showStartupDialog: Boolean = false) {
+    fun checkForAppUpdates(
+        showErrors: Boolean = true,
+        showStartupDialog: Boolean = false,
+        forceRefresh: Boolean = false
+    ) {
         if (_uiState.value.appUpdate.checking) return
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = _uiState.value.copy(
@@ -365,7 +369,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 )
             )
             runCatching {
-                appUpdateRepository.checkLatestRelease()
+                appUpdateRepository.checkLatestRelease(forceRefresh = forceRefresh)
             }.onSuccess { release ->
                 val startupDialogVisible = showStartupDialog &&
                     release != null &&
@@ -392,7 +396,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun loadAppReleaseHistory(showErrors: Boolean = true) {
+    fun loadAppReleaseHistory(showErrors: Boolean = true, forceRefresh: Boolean = false) {
         if (_uiState.value.appUpdate.historyLoading) return
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = _uiState.value.copy(
@@ -402,7 +406,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 )
             )
             runCatching {
-                appUpdateRepository.loadReleaseHistory()
+                val releases = appUpdateRepository.loadReleaseHistory(forceRefresh = forceRefresh)
+                val latest = appUpdateRepository.loadLatestRelease(forceRefresh = forceRefresh)
+                mergeLatestReleaseIntoHistory(releases, latest)
             }.onSuccess { releases ->
                 _uiState.value = _uiState.value.copy(
                     appUpdate = _uiState.value.appUpdate.copy(
@@ -571,5 +577,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private fun AppUpdateRelease.updateKey(): String {
         return tagName.ifBlank { htmlUrl.ifBlank { displayName } }
+    }
+
+    private fun mergeLatestReleaseIntoHistory(
+        history: List<AppUpdateRelease>,
+        latestRelease: AppUpdateRelease?
+    ): List<AppUpdateRelease> {
+        if (latestRelease == null) return history
+        return listOf(latestRelease) + history.filterNot { release ->
+            release.tagName.equals(latestRelease.tagName, ignoreCase = true)
+        }
     }
 }
