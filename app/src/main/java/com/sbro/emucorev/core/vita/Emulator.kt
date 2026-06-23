@@ -579,8 +579,11 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     private fun refreshPhysicalGamepadState() {
-        SDLControllerManager.pollInputDevices()
-        SDLControllerManager.pollHapticDevices()
+        // Do NOT call SDLControllerManager.pollInputDevices() or pollHapticDevices() here.
+        // SDL already calls both from its own native thread via JNI (SDL_PollEvent loop).
+        // Calling them from the UI thread concurrently causes a race condition on the
+        // unsynchronized mJoysticks ArrayList inside SDLJoystickHandler, leading to
+        // input glitches and high latency on low-end devices under CPU load.
         hasPhysicalGamepad = detectPhysicalGamepadConnected()
     }
 
