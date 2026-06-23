@@ -429,10 +429,12 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onInputDeviceRemoved(deviceId: Int) {
+        InputDeviceClassifier.invalidateDevice(deviceId)
         refreshPhysicalGamepadState()
     }
 
     override fun onInputDeviceChanged(deviceId: Int) {
+        InputDeviceClassifier.invalidateDevice(deviceId)
         refreshPhysicalGamepadState()
     }
 

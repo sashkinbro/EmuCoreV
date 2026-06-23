@@ -575,7 +575,6 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
                 SDLControllerManager.isDeviceSDLJoystick(deviceId) ||
                 InputDeviceClassifier.isGameControllerKeyEvent(device, source, keyCode)
             ) {
-                SDLControllerManager.pollInputDevices()
                 when (event.action) {
                     KeyEvent.ACTION_DOWN -> if (SDLControllerManager.handlePadDown(deviceId, keyCode)) return true
                     KeyEvent.ACTION_UP -> if (SDLControllerManager.handlePadUp(deviceId, keyCode)) return true

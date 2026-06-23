@@ -53,7 +53,6 @@ object InputDeviceClassifier {
         "gamepad",
         "gamesir",
         "ipega",
-        "joystick",
         "ps3",
         "ps4",
         "ps5",
@@ -61,7 +60,26 @@ object InputDeviceClassifier {
         "xbox"
     )
 
+    private val physicalControllerCache = java.util.concurrent.ConcurrentHashMap<Int, Boolean>()
+    private val controllerIdentityCache = java.util.concurrent.ConcurrentHashMap<Int, Boolean>()
+    private val fingerprintIdentityCache = java.util.concurrent.ConcurrentHashMap<Int, Boolean>()
+
+    fun invalidateDevice(deviceId: Int) {
+        physicalControllerCache.remove(deviceId)
+        controllerIdentityCache.remove(deviceId)
+        fingerprintIdentityCache.remove(deviceId)
+    }
+
     fun isPhysicalGameController(device: InputDevice?): Boolean {
+        if (device == null || device.id < 0 || device.isVirtual) {
+            return false
+        }
+        return physicalControllerCache.getOrPut(device.id) {
+            determineIsPhysicalGameController(device)
+        }
+    }
+
+    private fun determineIsPhysicalGameController(device: InputDevice): Boolean {
         if (device == null || device.id < 0 || device.isVirtual) {
             return false
         }
@@ -110,23 +128,27 @@ object InputDeviceClassifier {
     }
 
     private fun looksLikeFingerprintDevice(device: InputDevice): Boolean {
-        val identity = buildString {
-            append(device.name.orEmpty())
-            append(' ')
-            append(device.descriptor.orEmpty())
-        }.lowercase()
+        return fingerprintIdentityCache.getOrPut(device.id) {
+            val identity = buildString {
+                append(device.name.orEmpty())
+                append(' ')
+                append(device.descriptor.orEmpty())
+            }.lowercase()
 
-        return blockedControllerIdentityParts.any { part -> identity.contains(part) }
+            blockedControllerIdentityParts.any { part -> identity.contains(part) }
+        }
     }
 
     private fun looksLikeControllerDevice(device: InputDevice): Boolean {
-        val identity = buildString {
-            append(device.name.orEmpty())
-            append(' ')
-            append(device.descriptor.orEmpty())
-        }.lowercase()
+        return controllerIdentityCache.getOrPut(device.id) {
+            val identity = buildString {
+                append(device.name.orEmpty())
+                append(' ')
+                append(device.descriptor.orEmpty())
+            }.lowercase()
 
-        return controllerIdentityParts.any { part -> identity.contains(part) }
+            controllerIdentityParts.any { part -> identity.contains(part) }
+        }
     }
 
     private fun hasJoystickAxes(device: InputDevice): Boolean {
