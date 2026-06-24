@@ -28,7 +28,7 @@ object VibrationTestController {
         var handled = false
         InputDevice.getDeviceIds().forEach { deviceId ->
             val device = InputDevice.getDevice(deviceId) ?: return@forEach
-            if (!InputDeviceClassifier.isPhysicalGameController(device)) return@forEach
+            if (!InputDeviceClassifier.isPhysicalGameController(deviceId)) return@forEach
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val manager = device.vibratorManager
                 manager.vibratorIds.forEach { vibratorId ->

@@ -576,7 +576,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     private fun detectPhysicalGamepadConnected(): Boolean {
         return InputDevice.getDeviceIds().any { deviceId ->
-            InputDeviceClassifier.isPhysicalGameController(InputDevice.getDevice(deviceId))
+            InputDeviceClassifier.isPhysicalGameController(deviceId)
         }
     }
 

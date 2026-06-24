@@ -80,7 +80,7 @@ object InputDeviceClassifier {
     }
 
     private fun determineIsPhysicalGameController(device: InputDevice): Boolean {
-        if (device == null || device.id < 0 || device.isVirtual) {
+        if (device.id < 0 || device.isVirtual) {
             return false
         }
         if (looksLikeFingerprintDevice(device)) {

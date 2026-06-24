@@ -450,7 +450,7 @@ private fun OverlayTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewM
 private fun ControlsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel) {
     val gamepadConnected = remember {
         InputDevice.getDeviceIds().any { id ->
-            InputDeviceClassifier.isPhysicalGameController(InputDevice.getDevice(id))
+            InputDeviceClassifier.isPhysicalGameController(id)
         }
     }
     SectionCard(title = stringResource(R.string.settings_tab_controls), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
