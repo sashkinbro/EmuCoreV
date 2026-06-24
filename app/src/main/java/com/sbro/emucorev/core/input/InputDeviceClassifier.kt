@@ -70,11 +70,11 @@ object InputDeviceClassifier {
         fingerprintIdentityCache.remove(deviceId)
     }
 
-    fun isPhysicalGameController(device: InputDevice?): Boolean {
-        if (device == null || device.id < 0 || device.isVirtual) {
-            return false
-        }
-        return physicalControllerCache.getOrPut(device.id) {
+    fun isPhysicalGameController(deviceId: Int): Boolean {
+        if (deviceId < 0) return false
+        return physicalControllerCache.getOrPut(deviceId) {
+            val device = InputDevice.getDevice(deviceId) ?: return@getOrPut false
+            if (device.isVirtual) return@getOrPut false
             determineIsPhysicalGameController(device)
         }
     }
@@ -106,11 +106,12 @@ object InputDeviceClassifier {
             looksLikeControllerDevice(device)
     }
 
-    fun isGameControllerKeyEvent(device: InputDevice?, source: Int, keyCode: Int): Boolean {
+    fun isGameControllerKeyEvent(deviceId: Int, source: Int, keyCode: Int): Boolean {
         if (!isGamepadKeyCode(keyCode)) {
             return false
         }
-        if (device == null || device.id < 0 || device.isVirtual || looksLikeFingerprintDevice(device)) {
+        val device = InputDevice.getDevice(deviceId) ?: return false
+        if (device.id < 0 || device.isVirtual || looksLikeFingerprintDevice(device)) {
             return false
         }
 
@@ -122,7 +123,7 @@ object InputDeviceClassifier {
             return false
         }
 
-        return isPhysicalGameController(device) ||
+        return isPhysicalGameController(deviceId) ||
             (device.isExternal && looksLikeControllerDevice(device)) ||
             ((resolvedSource and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD && looksLikeControllerDevice(device))
     }
