@@ -153,7 +153,7 @@ class SDLControllerManager {
 
         @JvmStatic
         fun isDeviceSDLJoystick(deviceId: Int): Boolean {
-            return InputDeviceClassifier.isPhysicalGameController(InputDevice.getDevice(deviceId))
+            return InputDeviceClassifier.isPhysicalGameController(deviceId)
         }
     }
 }
@@ -278,7 +278,8 @@ open class SDLJoystickHandler_API16 : SDLJoystickHandler() {
         if (event.actionMasked == MotionEvent.ACTION_MOVE) {
             val joystick = getJoystick(event.deviceId)
             if (joystick != null) {
-                joystick.axes.forEachIndexed { index, range ->
+                for (index in 0 until joystick.axes.size) {
+                    val range = joystick.axes[index]
                     val targetIndex = GamepadRuntimeInputSettings.targetAxisIndex(range.axis, joystick.axes, index)
                     val value = if (range.range > 0f) {
                         (event.getAxisValue(range.axis, actionPointerIndex) - range.min) / range.range * 2.0f - 1.0f
@@ -313,7 +314,7 @@ open class SDLJoystickHandler_API16 : SDLJoystickHandler() {
 }
 
 private object GamepadRuntimeInputSettings {
-    private const val CACHE_MS = 500L
+    private const val CACHE_MS = 5000L
     private var cachedAtMs = 0L
     private var cached = Values()
 
@@ -363,7 +364,10 @@ private object GamepadRuntimeInputSettings {
             MotionEvent.AXIS_RZ -> MotionEvent.AXIS_Y
             else -> axis
         }
-        return axes.indexOfFirst { it.axis == targetAxis }.takeIf { it >= 0 } ?: fallback
+        for (i in 0 until axes.size) {
+            if (axes[i].axis == targetAxis) return i
+        }
+        return fallback
     }
 
     fun mapAxis(axis: Int, value: Float): Float {
@@ -402,33 +406,42 @@ private object GamepadRuntimeInputSettings {
         return ((magnitude - deadzone) / (1f - deadzone).coerceAtLeast(0.01f)) * value.sign
     }
 
+    @Volatile
+    private var isFetching = false
+
     private fun current(): Values {
         val now = SystemClock.elapsedRealtime()
-        if (now - cachedAtMs < CACHE_MS) return cached
-        cachedAtMs = now
-        cached = runCatching {
-            val context = SDL.getContext()
-            val gameId = (context as? Emulator)?.currentGameIdOrIntent().orEmpty()
-            val config = if (gameId.isNotBlank()) {
-                VitaGameSettingsRepository(context).loadEffective(gameId)
-            } else {
-                VitaCoreConfigRepository(context).load()
+        if (now - cachedAtMs >= CACHE_MS && !isFetching) {
+            isFetching = true
+            kotlin.concurrent.thread {
+                val newValues = runCatching {
+                    val context = SDL.getContext()
+                    val gameId = (context as? Emulator)?.currentGameIdOrIntent().orEmpty()
+                    val config = if (gameId.isNotBlank()) {
+                        VitaGameSettingsRepository(context).loadEffective(gameId)
+                    } else {
+                        VitaCoreConfigRepository(context).load()
+                    }
+                    Values(
+                        deadzone = config.gamepadDeadzone,
+                        triggerThreshold = config.gamepadTriggerThreshold,
+                        buttonProfile = config.gamepadButtonProfile,
+                        vibration = config.gamepadVibration,
+                        vibrationStrength = config.gamepadVibrationStrength,
+                        deviceVibrationFallback = config.deviceVibrationFallback,
+                        swapSticks = config.gamepadSwapSticks,
+                        invertLeftX = config.gamepadInvertLeftX,
+                        invertLeftY = config.gamepadInvertLeftY,
+                        invertRightX = config.gamepadInvertRightX,
+                        invertRightY = config.gamepadInvertRightY,
+                        analogMultiplier = config.analogMultiplier
+                    )
+                }.getOrDefault(cached)
+                cached = newValues
+                cachedAtMs = SystemClock.elapsedRealtime()
+                isFetching = false
             }
-            Values(
-                deadzone = config.gamepadDeadzone,
-                triggerThreshold = config.gamepadTriggerThreshold,
-                buttonProfile = config.gamepadButtonProfile,
-                vibration = config.gamepadVibration,
-                vibrationStrength = config.gamepadVibrationStrength,
-                deviceVibrationFallback = config.deviceVibrationFallback,
-                swapSticks = config.gamepadSwapSticks,
-                invertLeftX = config.gamepadInvertLeftX,
-                invertLeftY = config.gamepadInvertLeftY,
-                invertRightX = config.gamepadInvertRightX,
-                invertRightY = config.gamepadInvertRightY,
-                analogMultiplier = config.analogMultiplier
-            )
-        }.getOrDefault(cached)
+        }
         return cached
     }
 }

@@ -559,21 +559,16 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         fun handleKeyEvent(v: View, keyCode: Int, event: KeyEvent, ic: InputConnection?): Boolean {
             val deviceId = event.deviceId
             var source = event.source
-            var device: InputDevice? = null
-
             if (source == InputDevice.SOURCE_UNKNOWN) {
-                device = InputDevice.getDevice(deviceId)
+                val device = InputDevice.getDevice(deviceId)
                 if (device != null) {
                     source = device.sources
                 }
             }
-            if (device == null) {
-                device = InputDevice.getDevice(deviceId)
-            }
 
             if (
                 SDLControllerManager.isDeviceSDLJoystick(deviceId) ||
-                InputDeviceClassifier.isGameControllerKeyEvent(device, source, keyCode)
+                InputDeviceClassifier.isGameControllerKeyEvent(deviceId, source, keyCode)
             ) {
                 when (event.action) {
                     KeyEvent.ACTION_DOWN -> if (SDLControllerManager.handlePadDown(deviceId, keyCode)) return true
