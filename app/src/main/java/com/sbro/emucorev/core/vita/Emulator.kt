@@ -45,6 +45,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.sbro.emucorev.MainActivity
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.PlayTimeRepository
+import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.core.input.InputDeviceClassifier
@@ -84,6 +85,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     @Keep
     fun setCurrentGameId(gameId: String) {
         currentGameId = gameId
+        refreshGamepadRuntimeInputSettings()
         startPlayTimeSessionIfNeeded()
     }
 
@@ -155,6 +157,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         EmulatorStorage.prepareRuntime(this)
         VitaCoreConfigRepository(this).ensureDefaultsPersisted()
+        refreshGamepadRuntimeInputSettings()
         startPlayTimeSessionIfNeeded()
         composeOwners = ComposeOwners().also { it.performCreate(savedInstanceState) }
         inputManager = getSystemService(InputManager::class.java)
@@ -168,6 +171,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         super.onResume()
         composeOwners.handleResume()
         attachComposeOverlay()
+        refreshGamepadRuntimeInputSettings()
         refreshPhysicalGamepadState()
         hideSystemBars()
         if (menuPaused) {
@@ -403,6 +407,10 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
+    fun updateGamepadRuntimeInputSettings(config: VitaCoreConfig) {
+        SDLControllerManager.updateRuntimeInputSettings(config)
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (overlayBackHandler?.invoke() == true) return
@@ -425,6 +433,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onInputDeviceAdded(deviceId: Int) {
+        InputDeviceClassifier.invalidateDevice(deviceId)
         refreshPhysicalGamepadState()
     }
 
@@ -587,6 +596,16 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         // unsynchronized mJoysticks ArrayList inside SDLJoystickHandler, leading to
         // input glitches and high latency on low-end devices under CPU load.
         hasPhysicalGamepad = detectPhysicalGamepadConnected()
+    }
+
+    private fun refreshGamepadRuntimeInputSettings() {
+        val gameId = currentGameIdOrIntent()
+        val config = if (gameId.isNotBlank()) {
+            VitaGameSettingsRepository(this).loadEffective(gameId)
+        } else {
+            VitaCoreConfigRepository(this).load()
+        }
+        updateGamepadRuntimeInputSettings(config)
     }
 
     private fun markRebirthHandled(sourceIntent: Intent): Intent {

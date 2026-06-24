@@ -72,9 +72,9 @@ object InputDeviceClassifier {
 
     fun isPhysicalGameController(deviceId: Int): Boolean {
         if (deviceId < 0) return false
+        val device = InputDevice.getDevice(deviceId) ?: return false
+        if (device.isVirtual) return false
         return physicalControllerCache.getOrPut(deviceId) {
-            val device = InputDevice.getDevice(deviceId) ?: return@getOrPut false
-            if (device.isVirtual) return@getOrPut false
             determineIsPhysicalGameController(device)
         }
     }

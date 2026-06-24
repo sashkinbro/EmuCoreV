@@ -4,7 +4,6 @@ package org.libsdl.app
 
 import android.content.Context
 import android.os.Build
-import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -13,10 +12,6 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import com.sbro.emucorev.core.VitaCoreConfig
-import com.sbro.emucorev.core.VitaCoreConfigRepository
-import com.sbro.emucorev.core.VitaGameSettingsRepository
-import com.sbro.emucorev.core.vita.Emulator
-import com.sbro.emucorev.core.input.InputDeviceClassifier
 import java.util.Collections
 import java.util.Comparator
 import kotlin.math.abs
@@ -152,8 +147,18 @@ class SDLControllerManager {
         }
 
         @JvmStatic
+        fun updateRuntimeInputSettings(config: VitaCoreConfig) {
+            GamepadRuntimeInputSettings.update(config)
+        }
+
+        @JvmStatic
         fun isDeviceSDLJoystick(deviceId: Int): Boolean {
-            return InputDeviceClassifier.isPhysicalGameController(deviceId)
+            val device = InputDevice.getDevice(deviceId) ?: return false
+            if (deviceId < 0) return false
+            val sources = device.sources
+            return (sources and InputDevice.SOURCE_CLASS_JOYSTICK) != 0 ||
+                (sources and InputDevice.SOURCE_DPAD) == InputDevice.SOURCE_DPAD ||
+                (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
         }
     }
 }
@@ -314,8 +319,7 @@ open class SDLJoystickHandler_API16 : SDLJoystickHandler() {
 }
 
 private object GamepadRuntimeInputSettings {
-    private const val CACHE_MS = 5000L
-    private var cachedAtMs = 0L
+    @Volatile
     private var cached = Values()
 
     private data class Values(
@@ -332,6 +336,23 @@ private object GamepadRuntimeInputSettings {
         val invertRightY: Boolean = false,
         val analogMultiplier: Float = 1.0f
     )
+
+    fun update(config: VitaCoreConfig) {
+        cached = Values(
+            deadzone = config.gamepadDeadzone,
+            triggerThreshold = config.gamepadTriggerThreshold,
+            buttonProfile = config.gamepadButtonProfile,
+            vibration = config.gamepadVibration,
+            vibrationStrength = config.gamepadVibrationStrength,
+            deviceVibrationFallback = config.deviceVibrationFallback,
+            swapSticks = config.gamepadSwapSticks,
+            invertLeftX = config.gamepadInvertLeftX,
+            invertLeftY = config.gamepadInvertLeftY,
+            invertRightX = config.gamepadInvertRightX,
+            invertRightY = config.gamepadInvertRightY,
+            analogMultiplier = config.analogMultiplier
+        )
+    }
 
     fun vibrationEnabled(): Boolean = current().vibration
     fun deviceVibrationFallbackEnabled(): Boolean = current().deviceVibrationFallback
@@ -406,44 +427,7 @@ private object GamepadRuntimeInputSettings {
         return ((magnitude - deadzone) / (1f - deadzone).coerceAtLeast(0.01f)) * value.sign
     }
 
-    @Volatile
-    private var isFetching = false
-
-    private fun current(): Values {
-        val now = SystemClock.elapsedRealtime()
-        if (now - cachedAtMs >= CACHE_MS && !isFetching) {
-            isFetching = true
-            kotlin.concurrent.thread {
-                val newValues = runCatching {
-                    val context = SDL.getContext()
-                    val gameId = (context as? Emulator)?.currentGameIdOrIntent().orEmpty()
-                    val config = if (gameId.isNotBlank()) {
-                        VitaGameSettingsRepository(context).loadEffective(gameId)
-                    } else {
-                        VitaCoreConfigRepository(context).load()
-                    }
-                    Values(
-                        deadzone = config.gamepadDeadzone,
-                        triggerThreshold = config.gamepadTriggerThreshold,
-                        buttonProfile = config.gamepadButtonProfile,
-                        vibration = config.gamepadVibration,
-                        vibrationStrength = config.gamepadVibrationStrength,
-                        deviceVibrationFallback = config.deviceVibrationFallback,
-                        swapSticks = config.gamepadSwapSticks,
-                        invertLeftX = config.gamepadInvertLeftX,
-                        invertLeftY = config.gamepadInvertLeftY,
-                        invertRightX = config.gamepadInvertRightX,
-                        invertRightY = config.gamepadInvertRightY,
-                        analogMultiplier = config.analogMultiplier
-                    )
-                }.getOrDefault(cached)
-                cached = newValues
-                cachedAtMs = SystemClock.elapsedRealtime()
-                isFetching = false
-            }
-        }
-        return cached
-    }
+    private fun current(): Values = cached
 }
 
 class SDLJoystickHandler_API19 : SDLJoystickHandler_API16() {
