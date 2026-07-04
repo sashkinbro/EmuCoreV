@@ -65,6 +65,7 @@ tools/vita3k-upstream/
 tools/vita3k-update-work/
 app/src/main/cpp/vita3k/android/app/assets/*
 !app/src/main/cpp/vita3k/android/app/assets/.gitignore
+app/src/main/jniLibs/
 
 # Nested repositories / local metadata
 **/.git/

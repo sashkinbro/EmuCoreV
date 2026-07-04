@@ -32,6 +32,7 @@ object NativeLibraryLoader {
             synchronized(this) {
                 if (!initialized) {
                     EmulatorStorage.prepareRuntime(appContext)
+                    VitaCoreConfigRepository(appContext).ensureDefaultsPersisted()
                     if (!NativeLib.prepareFrontend()) {
                         Log.e(TAG, "NativeLib.prepareFrontend() failed")
                     }

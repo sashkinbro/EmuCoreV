@@ -3,6 +3,7 @@ package com.sbro.emucorev.core
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import android.system.Os
 import com.jakewharton.processphoenix.ProcessPhoenix
 import com.sbro.emucorev.core.vita.Emulator
 
@@ -27,8 +28,12 @@ object VitaLaunchBridge {
         if (!EmulatorStorage.hasInstalledFirmwareUpdate(context)) {
             return LaunchResult.MissingFirmwareUpdate
         }
-        VitaGameSettingsRepository(context).syncEffectiveDriverForLaunch(titleId)
-        return if (launchWithArgs(context, "LAUNCH_$titleId", arrayOf("-r", titleId))) {
+        val gameSettingsRepo = VitaGameSettingsRepository(context)
+        gameSettingsRepo.syncEffectiveDriverForLaunch(titleId)
+        val config = gameSettingsRepo.loadEffective(titleId)
+        val shouldAngle = config.useAngle && config.backendRenderer == "OpenGL"
+        
+        return if (launchWithArgs(context, "LAUNCH_$titleId", arrayOf("-r", titleId), shouldAngle)) {
             LaunchResult.Success
         } else {
             LaunchResult.Failure
@@ -47,12 +52,13 @@ object VitaLaunchBridge {
         return runWithArgs(context, ACTION_INSTALL_PKG, arrayOf("--pkg", pkgPath, "--zrif", zrif))
     }
 
-    private fun launchWithArgs(context: Context, action: String, args: Array<String>): Boolean {
+    private fun launchWithArgs(context: Context, action: String, args: Array<String>, useAngle: Boolean = false): Boolean {
         return runCatching {
             Log.i(TAG, "Launching emulator action=$action args=${args.joinToString(" ")}")
+            applyAngleEnvironment(context, useAngle)
             EmulatorStorage.prepareRuntime(context)
-            NativeLibraryLoader.ensureLoaded(context)
             VitaCoreConfigRepository(context).ensureDefaultsPersisted()
+            NativeLibraryLoader.ensureLoaded(context)
             NativeLib.refreshAppsList()
             val intent = Intent(context, Emulator::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -68,9 +74,10 @@ object VitaLaunchBridge {
     private fun runWithArgs(context: Context, action: String, args: Array<String>): Boolean {
         return runCatching {
             Log.i(TAG, "Restarting emulator action=$action args=${args.joinToString(" ")}")
+            applyAngleEnvironment(context, false)
             EmulatorStorage.prepareRuntime(context)
-            NativeLibraryLoader.ensureLoaded(context)
             VitaCoreConfigRepository(context).ensureDefaultsPersisted()
+            NativeLibraryLoader.ensureLoaded(context)
             NativeLib.refreshAppsList()
             val intent = Intent(context, Emulator::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -81,5 +88,33 @@ object VitaLaunchBridge {
         }.onFailure { error ->
             Log.e(TAG, "Failed to restart emulator action=$action args=${args.joinToString(" ")}", error)
         }.isSuccess
+    }
+
+    private fun applyAngleEnvironment(context: Context, useAngle: Boolean) {
+        try {
+            if (useAngle) {
+                val libDir = context.applicationInfo.nativeLibraryDir
+                val eglPath = "$libDir/libEGL_angle.so"
+                val glPath = "$libDir/libGLESv2_angle.so"
+                Log.i(TAG, "Enabling ANGLE. EGL: $eglPath, GL: $glPath")
+                
+                try {
+                    System.load(glPath)
+                    System.load(eglPath)
+                    Log.i(TAG, "Successfully pre-loaded ANGLE libraries into memory.")
+                } catch (e: Throwable) {
+                    Log.e(TAG, "Failed to pre-load ANGLE libraries: ${e.message}", e)
+                }
+
+                Os.setenv("SDL_VIDEO_EGL_DRIVER", eglPath, true)
+                Os.setenv("SDL_VIDEO_GL_DRIVER", glPath, true)
+            } else {
+                Log.i(TAG, "Disabling ANGLE.")
+                Os.unsetenv("SDL_VIDEO_EGL_DRIVER")
+                Os.unsetenv("SDL_VIDEO_GL_DRIVER")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update ANGLE environment variables", e)
+        }
     }
 }

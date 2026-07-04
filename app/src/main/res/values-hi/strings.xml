@@ -837,4 +837,6 @@
     <string name="profile_forgot_password">क्या आप पासवर्ड भूल गए?</string>
     <string name="profile_password_reset_email_required">पहले अपना ईमेल पता दर्ज करें।</string>
     <string name="profile_password_reset_sent">पासवर्ड रीसेट ईमेल भेज दिया गया है। अपना इनबॉक्स जांचें।</string>
+    <string name="settings_use_angle">ग्राफ़िक्स फ़िक्स (ANGLE)</string>
+    <string name="settings_help_use_angle">OpenGL रेंडरर का उपयोग करने वाले गेम के लिए ग्राफिकल समस्याओं को ठीक करता है। यदि आप गेमप्ले के दौरान टिमटिमाते ग्राफिक्स, काली स्क्रीन, या क्रैश का अनुभव करते हैं, तो इसे चालू करें। अधिकांश आधुनिक Android उपकरणों के लिए अनुशंसित।</string>
 </resources>

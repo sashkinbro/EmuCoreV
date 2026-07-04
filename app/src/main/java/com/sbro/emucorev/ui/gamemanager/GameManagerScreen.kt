@@ -368,6 +368,7 @@ private fun GraphicsProfileSection(
         ChoiceRow(stringResource(R.string.settings_core_renderer_label), stringResource(R.string.settings_help_renderer), config.backendRenderer, listOf("Vulkan", "OpenGL"), { onUpdate { it.copy(backendRenderer = defaults.backendRenderer) } }) {
             onUpdate { cfg -> cfg.copy(backendRenderer = it) }
         }
+        ToggleRow(stringResource(R.string.settings_use_angle), config.useAngle, stringResource(R.string.settings_help_use_angle), { onUpdate { it.copy(useAngle = defaults.useAngle) } }, enabled = config.backendRenderer == "OpenGL") { onUpdate { cfg -> cfg.copy(useAngle = it) } }
         GpuDriverChoiceRow(
             effectiveDriverName = config.customDriverName,
             globalDriverName = defaults.customDriverName,
@@ -687,15 +688,16 @@ private fun ToggleRow(
     checked: Boolean,
     description: String = title,
     onReset: (() -> Unit)? = null,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    SettingContainer(title = title, description = description, onReset = onReset) {
+    SettingContainer(title = title, description = description, onReset = onReset, enabled = enabled) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.End
         ) {
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
+            Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
         }
     }
 }
@@ -731,6 +733,7 @@ private fun SettingContainer(
     title: String,
     description: String,
     onReset: (() -> Unit)? = null,
+    enabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Surface(
@@ -758,7 +761,7 @@ private fun SettingContainer(
                     text = title,
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
                 SettingHelpButton(title = title, description = description)
             }

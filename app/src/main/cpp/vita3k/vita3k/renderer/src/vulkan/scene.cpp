@@ -25,7 +25,57 @@
 
 #include <util/log.h>
 
+#if defined(__ANDROID__) && !defined(NDEBUG)
+#include <atomic>
+#include <fstream>
+#include <mutex>
+#endif
+
 namespace renderer::vulkan {
+
+#if defined(__ANDROID__) && !defined(NDEBUG)
+static void write_double_buffer_draw_diag(const VKContext &context, const SceGxmPrimitiveType type, const SceGxmIndexFormat format,
+    const Ptr<void> indices, const size_t count, const uint32_t instance_count, const uint32_t max_index, const size_t index_size) {
+    static std::atomic<uint32_t> draw_counter{ 0 };
+    static std::mutex diag_mutex;
+    static uint32_t lines_written = 0;
+
+    const uint32_t draw_no = draw_counter.fetch_add(1, std::memory_order_relaxed) + 1;
+    if (draw_no > 32 && (draw_no % 256) != 0)
+        return;
+
+    std::lock_guard<std::mutex> lock(diag_mutex);
+    if (lines_written >= 512)
+        return;
+
+    try {
+        const fs::path log_dir = context.state.log_path / "logs";
+        fs::create_directories(log_dir);
+        const auto diag_path = (log_dir / "emucorev_gpu_diag.log").generic_path().native();
+        std::ofstream out(diag_path, std::ios::app);
+        if (!out)
+            return;
+
+        if (lines_written == 0) {
+            out << "EmuCoreV GPU diagnostic log (debug build only)\n";
+            out << "title_id,draw,type,index_format,index_addr,index_count,index_size,max_index,instance_count,memory_mapping\n";
+        }
+
+        out << context.state.current_title_id << ','
+            << draw_no << ','
+            << static_cast<int>(type) << ','
+            << static_cast<int>(format) << ','
+            << log_hex_full(indices.address()) << ','
+            << count << ','
+            << index_size << ','
+            << max_index << ','
+            << instance_count << ','
+            << "double-buffer\n";
+        lines_written++;
+    } catch (...) {
+    }
+}
+#endif
 
 void set_uniform_buffer(VKContext &context, MemState &mem, const ShaderProgram *program, const bool vertex_shader, const int block_num, const int size, Ptr<uint8_t> data) {
     auto offset = program->uniform_buffer_data_offsets.at(block_num);
@@ -282,7 +332,10 @@ static void bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
         for (int i = 0; i < max_stream_idx; i++) {
             if (state.vertex_streams[i].data)
                 // on the PS Vita, shader stores are used most of the time to write to a vertex buffer
-                context.state.buffer_trapping.access_buffer(state.vertex_streams[i].data.address(), static_cast<uint32_t>(state.vertex_streams[i].size), mem, context.state.has_shader_store);
+                // Cover partial pages too; dynamic meshes commonly update unaligned
+                // vertex buffers, and missing the first/last page can leave stale
+                // mapped GPU data visible.
+                context.state.buffer_trapping.access_buffer(state.vertex_streams[i].data.address(), static_cast<uint32_t>(state.vertex_streams[i].size), mem, context.state.has_shader_store, true);
         }
     }
 
@@ -479,18 +532,22 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     if (use_memory_mapping) {
         auto [buffer, offset] = context.state.get_matching_mapping(indices);
         if (context.state.mapping_method == MappingMethod::DoubleBuffer) {
-            TrappedBuffer *trapped_buffer = context.state.buffer_trapping.access_buffer(indices.address(), count * index_size, mem);
-            if (trapped_buffer->extra == ~0) {
-                // store the max element in extra
-                if (format == SCE_GXM_INDEX_FORMAT_U16) {
-                    uint16_t *data = indices.cast<uint16_t>().get(mem);
-                    trapped_buffer->extra = *std::max_element(&data[0], &data[count]);
-                } else {
-                    uint32_t *data = indices.cast<uint32_t>().get(mem);
-                    trapped_buffer->extra = *std::max_element(&data[0], &data[count]);
-                }
+            context.state.buffer_trapping.access_buffer(indices.address(), count * index_size, mem, false, true);
+
+            // Some games reuse the same mapped index-buffer memory for draws with
+            // different ranges. Reusing a cached max index can make the following
+            // vertex-stream upload too small, leaving stale vertices visible.
+            if (format == SCE_GXM_INDEX_FORMAT_U16) {
+                uint16_t *data = indices.cast<uint16_t>().get(mem);
+                max_index = *std::max_element(&data[0], &data[count]);
+            } else {
+                uint32_t *data = indices.cast<uint32_t>().get(mem);
+                max_index = *std::max_element(&data[0], &data[count]);
             }
-            max_index = trapped_buffer->extra;
+
+#if defined(__ANDROID__) && !defined(NDEBUG)
+            write_double_buffer_draw_diag(context, type, format, indices, count, instance_count, max_index, index_size);
+#endif
         }
         context.render_cmd.bindIndexBuffer(buffer, offset, index_type);
     } else {

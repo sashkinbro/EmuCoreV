@@ -334,6 +334,8 @@
     <string name="settings_core_renderer_label">Renderer</string>
     <string name="settings_renderer_vulkan">Vulkan</string>
     <string name="settings_renderer_opengl">OpenGL</string>
+    <string name="settings_use_angle">Graphics Fix (ANGLE)</string>
+    <string name="settings_help_use_angle">Fixes graphical issues for games using the OpenGL renderer. Turn this on if you experience flickering graphics, black screens, or crashes during gameplay. Recommended for most modern Android devices.</string>
     <string name="settings_core_screen_filter_label">Screen filter</string>
     <string name="settings_filter_bilinear">Bilinear</string>
     <string name="settings_filter_nearest">Nearest</string>

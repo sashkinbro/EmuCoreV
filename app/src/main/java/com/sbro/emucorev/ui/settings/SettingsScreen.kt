@@ -471,7 +471,8 @@ fun SettingToggleRow(
     description: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    onResetDefault: () -> Unit
+    onResetDefault: () -> Unit,
+    enabled: Boolean = true
 ) {
     val context = LocalContext.current
     val resetToastMessage = stringResource(R.string.settings_reset_toast, title)
@@ -484,10 +485,12 @@ fun SettingToggleRow(
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = { onCheckedChange(!checked) },
+                onClick = { if (enabled) onCheckedChange(!checked) },
                 onLongClick = {
-                    onResetDefault()
-                    Toast.makeText(context, resetToastMessage, Toast.LENGTH_SHORT).show()
+                    if (enabled) {
+                        onResetDefault()
+                        Toast.makeText(context, resetToastMessage, Toast.LENGTH_SHORT).show()
+                    }
                 }
             ),
         shape = RoundedCornerShape(18.dp),
@@ -514,7 +517,7 @@ fun SettingToggleRow(
                     Text(
                         text = title,
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     SettingHelpButton(title = title, description = description)
@@ -523,6 +526,7 @@ fun SettingToggleRow(
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
+                enabled = enabled,
                 modifier = Modifier.padding(start = 4.dp)
             )
         }

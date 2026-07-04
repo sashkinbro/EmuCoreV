@@ -213,6 +213,7 @@ using PhysicalKeyCode = input::PhysicalKeyCode;
     code(std::string, "back-camera-id", std::string{}, back_camera_id)                                  \
     code(std::string, "back-camera-image", std::string{}, back_camera_image)                            \
     code(uint32_t, "back-camera-color", 0, back_camera_color)                                           \
+    code(bool, "use-angle", false, use_angle)                                                           \
     code(bool, "tracy-primitive-impl", false, tracy_primitive_impl)
 
 // Vector members produced in the config file

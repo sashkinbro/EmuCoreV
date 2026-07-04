@@ -837,4 +837,6 @@
     <string name="profile_forgot_password">Şifrenizi mi unuttunuz?</string>
     <string name="profile_password_reset_email_required">Önce e-posta adresinizi girin.</string>
     <string name="profile_password_reset_sent">Şifre sıfırlama e-postası gönderildi. Gelen kutunuzu kontrol edin.</string>
+    <string name="settings_use_angle">Grafik Düzeltmesi (ANGLE)</string>
+    <string name="settings_help_use_angle">OpenGL oluşturucuyu kullanan oyunlar için grafik sorunlarını giderir. Oyun sırasında titreyen grafikler, siyah ekranlar veya çökmeler yaşarsanız bu seçeneği açın. Çoğu modern Android cihazı için önerilir.</string>
 </resources>
