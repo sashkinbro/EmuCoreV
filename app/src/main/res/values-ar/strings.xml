@@ -837,4 +837,6 @@
     <string name="profile_forgot_password">هل نسيت كلمة المرور؟</string>
     <string name="profile_password_reset_email_required">أدخل عنوان بريدك الإلكتروني أولاً.</string>
     <string name="profile_password_reset_sent">تم إرسال بريد إلكتروني لإعادة تعيين كلمة المرور. تحقق من صندوق الوارد الخاص بك.</string>
+    <string name="settings_use_angle">إصلاح الرسومات (ANGLE)</string>
+    <string name="settings_help_use_angle">يعمل على إصلاح المشكلات الرسومية للألعاب التي تستخدم عارض OpenGL. قم بتشغيل هذا الخيار إذا واجهت رسومات وامضة، أو شاشات سوداء، أو أعطال أثناء اللعب. يوصى به لمعظم أجهزة Android الحديثة.</string>
 </resources>

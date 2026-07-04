@@ -837,4 +837,6 @@
     <string name="profile_forgot_password">Забыли пароль?</string>
     <string name="profile_password_reset_email_required">Сначала введите свой адрес электронной почты.</string>
     <string name="profile_password_reset_sent">Письмо для сброса пароля отправлено. Проверьте свой почтовый ящик.</string>
+    <string name="settings_use_angle">Исправление графики (ANGLE)</string>
+    <string name="settings_help_use_angle">Исправляет графические проблемы в играх, использующих рендерер OpenGL. Включите эту опцию, если вы сталкиваетесь с мерцающей графикой, черными экранами или сбоями во время игры. Рекомендуется для большинства современных устройств Android.</string>
 </resources>

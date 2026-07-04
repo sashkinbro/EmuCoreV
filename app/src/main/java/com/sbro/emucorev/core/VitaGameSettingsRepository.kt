@@ -94,6 +94,7 @@ class VitaGameSettingsRepository(private val context: Context) {
             rawDriverName = gpu.stringAttrOrNull("custom-driver-name")
             config = config.copy(
                 backendRenderer = gpu.stringAttr("backend-renderer", config.backendRenderer),
+                useAngle = gpu.boolAttr("use-angle", config.useAngle),
                 customDriverName = gpu.stringAttr("custom-driver-name", config.customDriverName),
                 highAccuracy = gpu.boolAttr("high-accuracy", config.highAccuracy),
                 resolutionMultiplier = gpu.floatAttr("resolution-multiplier", config.resolutionMultiplier),
@@ -197,6 +198,7 @@ class VitaGameSettingsRepository(private val context: Context) {
         })
         root.appendChild(doc.createElement("gpu").apply {
             setAttribute("backend-renderer", config.backendRenderer)
+            setAttribute("use-angle", config.useAngle.toString())
             setAttribute("gpu-idx", "0")
             setAttribute("custom-driver-name", config.customDriverName)
             setAttribute("high-accuracy", config.highAccuracy.toString())

@@ -836,4 +836,6 @@
     <string name="profile_forgot_password">忘记密码？</string>
     <string name="profile_password_reset_email_required">请先输入您的电子邮件地址。</string>
     <string name="profile_password_reset_sent">密码重置电子邮件已发送。请检查您的收件箱。</string>
+    <string name="settings_use_angle">图形修复 (ANGLE)</string>
+    <string name="settings_help_use_angle">修复使用 OpenGL 渲染器的游戏的图形问题。如果您在游戏过程中遇到图形闪烁、黑屏或崩溃，请开启此选项。推荐大多数现代 Android 设备使用。</string>
 </resources>

@@ -75,6 +75,10 @@ bool initialize_session(const fs::path &storage_path, Root &root_paths, std::uni
         if (logging::init(root_paths, true) != Success)
             return false;
 
+#ifdef NDEBUG
+        logging::set_level(spdlog::level::off);
+#endif
+
         LOG_INFO("{}", window_title);
 
         emuenv = std::make_unique<EmuEnvState>();

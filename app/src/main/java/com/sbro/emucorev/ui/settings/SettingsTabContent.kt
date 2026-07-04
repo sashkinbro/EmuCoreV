@@ -249,6 +249,7 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
         ) {
             Text(stringResource(R.string.settings_gpu_driver_manage))
         }
+        Toggle(stringResource(R.string.settings_use_angle), stringResource(R.string.settings_help_use_angle), uiState.coreConfig.useAngle, { enabled -> viewModel.updateCoreSettings { it.copy(useAngle = enabled) } }, { viewModel.updateCoreSettings { it.copy(useAngle = defaults.useAngle) } }, enabled = uiState.coreConfig.backendRenderer == "OpenGL")
         Toggle(stringResource(R.string.settings_core_high_accuracy), stringResource(R.string.settings_help_high_accuracy), uiState.coreConfig.highAccuracy, { enabled -> viewModel.updateCoreSettings { it.copy(highAccuracy = enabled) } }, { viewModel.updateCoreSettings { it.copy(highAccuracy = defaults.highAccuracy) } })
         SliderRow(stringResource(R.string.settings_core_resolution_label), stringResource(R.string.settings_help_resolution), stringResource(R.string.settings_core_resolution_value, uiState.coreConfig.resolutionMultiplier), { viewModel.updateCoreSettings { it.copy(resolutionMultiplier = defaults.resolutionMultiplier) } }) {
             Slider(value = uiState.coreConfig.resolutionMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(resolutionMultiplier = (value * 4).toInt() / 4f) } }, valueRange = 0.5f..4f, steps = 13)
@@ -1075,8 +1076,8 @@ private fun LinkItem(
 }
 
 @Composable
-private fun Toggle(title: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, onResetDefault: () -> Unit) =
-    SettingToggleRow(title = title, description = description, checked = checked, onCheckedChange = onCheckedChange, onResetDefault = onResetDefault)
+private fun Toggle(title: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, onResetDefault: () -> Unit, enabled: Boolean = true) =
+    SettingToggleRow(title = title, description = description, checked = checked, onCheckedChange = onCheckedChange, onResetDefault = onResetDefault, enabled = enabled)
 
 @Composable
 private fun Chips(title: String, description: String, onResetDefault: () -> Unit, content: @Composable FlowRowScope.() -> Unit) =

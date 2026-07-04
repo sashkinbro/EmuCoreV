@@ -109,6 +109,7 @@ struct State {
 
     std::vector<ShadersHash> shaders_cache_hashs;
     std::string shader_version;
+    std::string current_title_id;
 
     int last_scene_id = 0;
 
@@ -231,6 +232,7 @@ struct State {
     }
 
     void set_app(const char *title_id, const char *self_name) {
+        current_title_id = title_id ? title_id : "";
         shaders_path = cache_path / "shaders" / title_id / self_name;
         shaders_log_path = log_path / "shaderlog" / title_id / self_name;
     }

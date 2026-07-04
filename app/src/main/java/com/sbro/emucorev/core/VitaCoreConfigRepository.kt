@@ -1,6 +1,7 @@
 package com.sbro.emucorev.core
 
 import android.content.Context
+import com.sbro.emucorev.BuildConfig
 import java.io.File
 
 // Defaults follow upstream Vita3K unless EmuCoreV needs a mobile-safe runtime
@@ -13,6 +14,7 @@ data class VitaCoreConfig(
     val pstvMode: Boolean = false,
     val showInfoBar: Boolean = false,
     val showLiveAreaScreen: Boolean = false,
+    val useAngle: Boolean = false,
     val backendRenderer: String = "Vulkan",
     val customDriverName: String = "",
     val turboMode: Boolean = false,
@@ -64,7 +66,7 @@ data class VitaCoreConfig(
     val cpuPoolSize: Int = 10,
     val modulesMode: Int = 0,
     val archiveLog: Boolean = false,
-    val logLevel: Int = 0,
+    val logLevel: Int = if (BuildConfig.DEBUG) 3 else 6,
     val discordRichPresence: Boolean = false,
     val checkForUpdates: Boolean = true,
     val fileLoadingDelay: Int = 0,
@@ -172,6 +174,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         "sys-lang",
         "texture-cache",
         "turbo-mode",
+        "use-angle",
         "v-sync",
         "validation-layer",
         "front-camera-type",
@@ -205,6 +208,7 @@ class VitaCoreConfigRepository(private val context: Context) {
                 pstvMode = values["pstv-mode"]?.toBooleanStrictOrNull() ?: defaults.pstvMode,
                 showInfoBar = values["show-info-bar"]?.toBooleanStrictOrNull() ?: defaults.showInfoBar,
                 showLiveAreaScreen = false,
+                useAngle = values["use-angle"]?.toBooleanStrictOrNull() ?: defaults.useAngle,
                 backendRenderer = values["backend-renderer"] ?: defaults.backendRenderer,
                 customDriverName = values["custom-driver-name"].sanitizeNullableString() ?: defaults.customDriverName,
                 turboMode = values["turbo-mode"]?.toBooleanStrictOrNull() ?: defaults.turboMode,
@@ -325,6 +329,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["pstv-mode"] = config.pstvMode.toString()
         values["show-info-bar"] = config.showInfoBar.toString()
         values["show-live-area-screen"] = false.toString()
+        values["use-angle"] = config.useAngle.toString()
         values["backend-renderer"] = config.backendRenderer
         values["custom-driver-name"] = config.customDriverName.sanitizeNullableString().orEmpty()
         values["turbo-mode"] = config.turboMode.toString()
@@ -474,6 +479,11 @@ class VitaCoreConfigRepository(private val context: Context) {
             config.logCompatWarn ||
             config.archiveLog ||
             config.colorSurfaceDebug
+        val normalizedLogLevel = when {
+            !BuildConfig.DEBUG -> RELEASE_LOG_LEVEL
+            diagnosticsEnabled -> normalizeLogLevel(config.logLevel).coerceAtMost(DIAGNOSTIC_LOG_LEVEL)
+            else -> maxOf(normalizeLogLevel(config.logLevel), DEFAULT_DEBUG_LOG_LEVEL)
+        }
         return config.copy(
             validationLayer = false,
             discordRichPresence = false,
@@ -481,11 +491,7 @@ class VitaCoreConfigRepository(private val context: Context) {
             gamepadTriggerThreshold = config.gamepadTriggerThreshold.coerceIn(0f, 0.9f),
             gamepadButtonProfile = normalizeGamepadProfile(config.gamepadButtonProfile),
             gamepadVibrationStrength = config.gamepadVibrationStrength.coerceIn(0, 100),
-            logLevel = if (diagnosticsEnabled) {
-                normalizeLogLevel(config.logLevel).coerceAtMost(DEBUG_LOG_LEVEL)
-            } else {
-                normalizeLogLevel(config.logLevel)
-            }
+            logLevel = normalizedLogLevel
         )
     }
 
@@ -501,6 +507,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         return values["custom-driver-name"]?.equals("null", ignoreCase = true) == true ||
             values["disable-surface-sync"]?.toBooleanStrictOrNull() == true ||
             values["discord-rich-presence"]?.toBooleanStrictOrNull() == true ||
+            values["log-level"]?.toIntOrNull()?.let { it < defaultRuntimeLogLevel() } == true ||
             values["psn-signed-in"]?.let { it != "0" && it != "1" && it.toBooleanStrictOrNull() != null } == true ||
             values["validation-layer"]?.toBooleanStrictOrNull() == true ||
             upstreamSequenceKeys.any { values[it].isNullOrEmpty() }
@@ -528,19 +535,24 @@ class VitaCoreConfigRepository(private val context: Context) {
 
     private fun defaultConfig(): VitaCoreConfig {
         return VitaCoreConfig(
-            logLevel = RELEASE_LOG_LEVEL
+            logLevel = defaultRuntimeLogLevel()
         )
     }
 
+    private fun defaultRuntimeLogLevel(): Int {
+        return if (BuildConfig.DEBUG) DEFAULT_DEBUG_LOG_LEVEL else RELEASE_LOG_LEVEL
+    }
+
     private companion object {
-        // 0 = TRACE (upstream Vita3K default). EmuCoreV defaults to OFF for
-        // gameplay; diagnostics can still be enabled from advanced settings.
-        private const val DEBUG_LOG_LEVEL = 0
+        // 0 = TRACE (upstream Vita3K default). EmuCoreV keeps debug gameplay at
+        // WARN and release at OFF; explicit diagnostics can opt into DEBUG.
+        private const val DIAGNOSTIC_LOG_LEVEL = 1
+        private const val DEFAULT_DEBUG_LOG_LEVEL = 3
         private const val RELEASE_LOG_LEVEL = 6
         // Bump whenever an old non-upstream default needs to be snapped to vanilla
         // for users who already wrote a stale config.yml. applyMigrations() rewrites
         // the affected keys on the next launch.
-        private const val CONFIG_SCHEMA_VERSION = 6
+        private const val CONFIG_SCHEMA_VERSION = 7
         private const val SCHEMA_VERSION_KEY = "config-schema-version"
         private val upstreamSequenceKeys = setOf(
             "controller-axis-binds",

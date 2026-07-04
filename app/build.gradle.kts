@@ -65,8 +65,8 @@ android {
         applicationId = "com.sbro.emucorev"
         minSdk = 28
         targetSdk = 37
-        versionCode = 51
-        versionName = "0.1.5"
+        versionCode = 53
+        versionName = "0.1.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -120,7 +120,7 @@ android {
                     vita3kAssetsDir
                 )
             )
-            jniLibs.setSrcDirs(listOf("src/main/cpp/vita3k/android/prebuilt"))
+            jniLibs.setSrcDirs(listOf("src/main/cpp/vita3k/android/prebuilt", "src/main/jniLibs"))
         }
     }
 

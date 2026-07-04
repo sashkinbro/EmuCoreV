@@ -837,4 +837,6 @@
     <string name="profile_forgot_password">¿Olvidaste tu contraseña?</string>
     <string name="profile_password_reset_email_required">Introduce tu dirección de correo electrónico primero.</string>
     <string name="profile_password_reset_sent">Se ha enviado el correo electrónico para restablecer la contraseña. Revisa tu bandeja de entrada.</string>
+    <string name="settings_use_angle">Corrección de gráficos (ANGLE)</string>
+    <string name="settings_help_use_angle">Soluciona problemas gráficos para juegos que utilizan el renderizador OpenGL. Activa esta opción si experimentas gráficos parpadeantes, pantallas negras o fallos durante el juego. Recomendado para la mayoría de los dispositivos Android modernos.</string>
 </resources>
