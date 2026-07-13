@@ -213,9 +213,14 @@ fun EmulationOverlayHost(
         activity.setOverlayMenuButtonRevealHandler {
             menuButtonVisible = true
         }
+        activity.setOverlayPauseMenuOpenHandler {
+            menuOpen = true
+            menuButtonVisible = true
+        }
         onDispose {
             activity.setOverlayBackHandler(null)
             activity.setOverlayMenuButtonRevealHandler(null)
+            activity.setOverlayPauseMenuOpenHandler(null)
         }
     }
 

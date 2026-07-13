@@ -11,6 +11,7 @@
 #include <android_state.h>
 #include <config/state.h>
 #include <emuenv/state.h>
+#include <ime/keyboard.h>
 
 #include <jni.h>
 
@@ -92,6 +93,34 @@ Java_com_sbro_emucorev_core_vita_Emulator_setAppSessionMenuPaused(
     return controller->set_pause_reason(app::AppSessionPauseReason::Menu, paused == JNI_TRUE)
         ? JNI_TRUE
         : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorev_core_vita_Emulator_isNativeImeActive(
+    JNIEnv * /*env*/,
+    jobject /*thiz*/) {
+    auto *emuenv = get_emuenv();
+    auto *controller = get_app_session_controller();
+    return emuenv && controller && controller->is_running() && is_any_ime_active(*emuenv)
+        ? JNI_TRUE
+        : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorev_core_vita_Emulator_dismissNativeIme(
+    JNIEnv * /*env*/,
+    jobject /*thiz*/) {
+    auto *emuenv = get_emuenv();
+    auto *controller = get_app_session_controller();
+    if (!emuenv || !controller || !controller->is_running()) {
+        return JNI_FALSE;
+    }
+
+    const bool dismissed = dismiss_current_ime(*emuenv);
+    if (dismissed) {
+        ime::notify_ime_state_changed();
+    }
+    return dismissed ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jstring JNICALL

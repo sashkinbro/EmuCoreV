@@ -45,6 +45,20 @@
 
 namespace {
 
+jmethodID get_optional_activity_method(JNIEnv *env, jclass clazz, const char *name, const char *signature) {
+    const jmethodID method_id = env->GetMethodID(clazz, name, signature);
+    if (!method_id && env->ExceptionCheck())
+        env->ExceptionClear();
+    return method_id;
+}
+
+void clear_activity_callback_exception(JNIEnv *env) {
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+    }
+}
+
 void reset_android_session_audio(EmuEnvState &emuenv) {
     if (!emuenv.audio.adapter)
         return;
@@ -266,11 +280,15 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
             return;
 
         jclass clazz = jni_env->GetObjectClass(activity);
-        jmethodID method_id = jni_env->GetMethodID(clazz, "openPauseMenuFromController", "()V");
+        jmethodID method_id = clazz
+            ? get_optional_activity_method(jni_env, clazz, "openPauseMenuFromController", "()V")
+            : nullptr;
         if (method_id)
             jni_env->CallVoidMethod(activity, method_id);
+        clear_activity_callback_exception(jni_env);
 
-        jni_env->DeleteLocalRef(clazz);
+        if (clazz)
+            jni_env->DeleteLocalRef(clazz);
         jni_env->DeleteLocalRef(activity);
     };
 
@@ -281,14 +299,18 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
             return;
 
         jclass clazz = jni_env->GetObjectClass(activity);
-        jmethodID method_id = jni_env->GetMethodID(clazz, "setCurrentGameId", "(Ljava/lang/String;)V");
+        jmethodID method_id = clazz
+            ? get_optional_activity_method(jni_env, clazz, "setCurrentGameId", "(Ljava/lang/String;)V")
+            : nullptr;
         if (method_id) {
             jstring jgame_id = jni_env->NewStringUTF(game_id.c_str());
             jni_env->CallVoidMethod(activity, method_id, jgame_id);
             jni_env->DeleteLocalRef(jgame_id);
         }
+        clear_activity_callback_exception(jni_env);
 
-        jni_env->DeleteLocalRef(clazz);
+        if (clazz)
+            jni_env->DeleteLocalRef(clazz);
         jni_env->DeleteLocalRef(activity);
     };
 
@@ -334,11 +356,18 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
         {
             JNIEnv *jni_env = reinterpret_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
             jobject activity = reinterpret_cast<jobject>(SDL_GetAndroidActivity());
-            jclass clazz = jni_env->GetObjectClass(activity);
-            jmethodID method_id = jni_env->GetMethodID(clazz, "getNativeDisplayRotation", "()I");
-            set_display_rotation(emuenv->motion, jni_env->CallIntMethod(activity, method_id));
-            jni_env->DeleteLocalRef(clazz);
-            jni_env->DeleteLocalRef(activity);
+            if (jni_env && activity) {
+                jclass clazz = jni_env->GetObjectClass(activity);
+                jmethodID method_id = clazz
+                    ? get_optional_activity_method(jni_env, clazz, "getNativeDisplayRotation", "()I")
+                    : nullptr;
+                if (method_id)
+                    set_display_rotation(emuenv->motion, jni_env->CallIntMethod(activity, method_id));
+                clear_activity_callback_exception(jni_env);
+                if (clazz)
+                    jni_env->DeleteLocalRef(clazz);
+                jni_env->DeleteLocalRef(activity);
+            }
         }
 
         if (!session_controller->begin_launch(launch_request, launch_request.reason != AppLaunchReason::LoadExec)) {
