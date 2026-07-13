@@ -72,6 +72,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var inputManager: InputManager? = null
     private var overlayBackHandler: (() -> Boolean)? = null
     private var overlayMenuButtonRevealHandler: (() -> Unit)? = null
+    private var overlayPauseMenuOpenHandler: (() -> Unit)? = null
     private var menuPaused: Boolean = false
     private var playTimeSessionId: String? = null
     private var playTimeSessionTitleId: String = ""
@@ -107,9 +108,20 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         overlayMenuButtonRevealHandler = handler
     }
 
+    fun setOverlayPauseMenuOpenHandler(handler: (() -> Unit)?) {
+        overlayPauseMenuOpenHandler = handler
+    }
+
     fun requestOverlayMenuButtonReveal() {
         runOnUiThread {
             overlayMenuButtonRevealHandler?.invoke()
+        }
+    }
+
+    @Keep
+    fun openPauseMenuFromController() {
+        runOnUiThread {
+            overlayPauseMenuOpenHandler?.invoke()
         }
     }
 
@@ -328,6 +340,44 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
+    /**
+     * JNI callback used by Vita3K's Android IME bridge.
+     *
+     * SDL owns the actual soft-keyboard lifecycle in this activity through
+     * SDL_StartTextInput/SDL_StopTextInput. Keeping this callback available is
+     * nevertheless part of the native Activity ABI; upstream uses it for
+     * additional keyboard-related UI bookkeeping.
+     */
+    @Keep
+    fun setKeyboardActive(active: Boolean) {
+        Log.d(TAG, "Native keyboard active=$active")
+    }
+
+    /**
+     * Receives the native IME snapshot for upstream UI integrations.
+     *
+     * EmuCoreV currently renders the game's own IME and routes text through
+     * SDL, so there is no separate Android preview to update. The exact method
+     * signature must still be exposed because the native bridge resolves it
+     * dynamically with GetMethodID.
+     */
+    @Keep
+    @Suppress("UNUSED_PARAMETER")
+    fun updateNativeImeState(
+        sceImeActive: Boolean,
+        dialogActive: Boolean,
+        text: String,
+        preeditStart: Int,
+        preeditLength: Int,
+        caretIndex: Int,
+        multiline: Boolean,
+        enterLabel: String
+    ) = Unit
+
+    /** Clears the optional Android-side IME snapshot. See [updateNativeImeState]. */
+    @Keep
+    fun clearNativeImeState() = Unit
+
     @Keep
     fun setControllerOverlayScale(scale: Float) {
         runOnUiThread {
@@ -367,6 +417,12 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     /** Pause/resume the active Vita3K app session through the upstream session controller. */
     external fun setAppSessionMenuPaused(paused: Boolean): Boolean
 
+    /** Native IME state used to route the Android keyboard Back action. */
+    external fun isNativeImeActive(): Boolean
+
+    /** Requests the Vita IME's Close/Cancel action. */
+    external fun dismissNativeIme(): Boolean
+
     /** Best-effort runtime title for the active Vita3K app session. */
     external fun getRunningGameTitle(): String
 
@@ -389,6 +445,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         runOnUiThread {
             overlayBackHandler = null
             overlayMenuButtonRevealHandler = null
+            overlayPauseMenuOpenHandler = null
             val homeIntent = Intent(this, MainActivity::class.java).apply {
                 action = Intent.ACTION_MAIN
                 addCategory(Intent.CATEGORY_LAUNCHER)
@@ -430,6 +487,17 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             if (overlayBackHandler?.invoke() == true) return true
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    override fun onScreenKeyboardFocusLost(): Boolean {
+        if (!isNativeImeActive()) return false
+
+        if (dismissNativeIme()) {
+            SDLActivity.onNativeKeyboardFocusLost()
+        }
+        // A non-cancelable Vita dialog must keep the Android IME open. Either
+        // way, SDL must not independently consume the Back press afterward.
+        return true
     }
 
     override fun onInputDeviceAdded(deviceId: Int) {

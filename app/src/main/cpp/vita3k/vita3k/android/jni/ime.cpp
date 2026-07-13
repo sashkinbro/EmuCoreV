@@ -20,8 +20,6 @@
 #include <dialog/state.h>
 #include <ime/keyboard.h>
 #include <ime/state.h>
-#include <util/string_utils.h>
-
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_system.h>
 #include <jni.h>
@@ -32,10 +30,29 @@ static SDL_Window *s_window = nullptr;
 
 namespace {
 
+// These callbacks are an optional Android UI extension. A Java/native version
+// mismatch must not leave NoSuchMethodError pending on the JNI thread because
+// every subsequent JNI operation is invalid while that exception is pending.
+jmethodID get_optional_method(JNIEnv *env, jclass clazz, const char *name, const char *signature) {
+    const jmethodID method_id = env->GetMethodID(clazz, name, signature);
+    if (!method_id && env->ExceptionCheck())
+        env->ExceptionClear();
+    return method_id;
+}
+
+void clear_callback_exception(JNIEnv *env) {
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+    }
+}
+
 void clear_ime_state(JNIEnv *env, jobject activity, jclass clazz) {
-    const jmethodID method_id = env->GetMethodID(clazz, "clearNativeImeState", "()V");
-    if (method_id)
+    const jmethodID method_id = get_optional_method(env, clazz, "clearNativeImeState", "()V");
+    if (method_id) {
         env->CallVoidMethod(activity, method_id);
+        clear_callback_exception(env);
+    }
 }
 
 void push_ime_state(JNIEnv *env, jobject activity, jclass clazz, EmuEnvState &emuenv) {
@@ -66,16 +83,27 @@ void push_ime_state(JNIEnv *env, jobject activity, jclass clazz, EmuEnvState &em
         enter_label = emuenv.ime.enter_label;
     }
 
-    const jmethodID method_id = env->GetMethodID(
+    const jmethodID method_id = get_optional_method(
+        env,
         clazz,
         "updateNativeImeState",
         "(ZZLjava/lang/String;IIIZLjava/lang/String;)V");
     if (!method_id)
         return;
 
-    const std::string utf8_text = string_utils::utf16_to_utf8(text);
-    jstring text_value = env->NewStringUTF(utf8_text.c_str());
+    jstring text_value = env->NewString(
+        reinterpret_cast<const jchar *>(text.data()),
+        static_cast<jsize>(text.size()));
     jstring enter_label_value = env->NewStringUTF(enter_label.c_str());
+    if (!text_value || !enter_label_value) {
+        if (text_value)
+            env->DeleteLocalRef(text_value);
+        if (enter_label_value)
+            env->DeleteLocalRef(enter_label_value);
+        clear_callback_exception(env);
+        return;
+    }
+
     env->CallVoidMethod(activity,
         method_id,
         static_cast<jboolean>(sce_ime_active),
@@ -86,6 +114,7 @@ void push_ime_state(JNIEnv *env, jobject activity, jclass clazz, EmuEnvState &em
         static_cast<jint>(caret_index),
         static_cast<jboolean>(multiline),
         enter_label_value);
+    clear_callback_exception(env);
     env->DeleteLocalRef(text_value);
     env->DeleteLocalRef(enter_label_value);
 }
@@ -106,10 +135,22 @@ void set_keyboard_active(bool active) {
 
     JNIEnv *env = reinterpret_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
     jobject activity = reinterpret_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity)
+        return;
+
     jclass clazz = env->GetObjectClass(activity);
-    jmethodID method_id = env->GetMethodID(clazz, "setKeyboardActive", "(Z)V");
-    if (method_id)
+    if (!clazz) {
+        if (env->ExceptionCheck())
+            env->ExceptionClear();
+        env->DeleteLocalRef(activity);
+        return;
+    }
+
+    jmethodID method_id = get_optional_method(env, clazz, "setKeyboardActive", "(Z)V");
+    if (method_id) {
         env->CallVoidMethod(activity, method_id, static_cast<jboolean>(active));
+        clear_callback_exception(env);
+    }
 
     auto *emuenv = get_emuenv();
     if (emuenv)

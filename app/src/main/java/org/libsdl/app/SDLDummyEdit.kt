@@ -28,6 +28,9 @@ class SDLDummyEdit(context: Context) : View(context), View.OnKeyListener {
 
     override fun onKeyPreIme(keyCode: Int, event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_UP && keyCode == KeyEvent.KEYCODE_BACK) {
+            if (SDLActivity.mSingleton?.onScreenKeyboardFocusLost() == true) {
+                return true
+            }
             val textEdit = SDLActivity.mTextEdit
             if (textEdit != null && textEdit.visibility == VISIBLE) {
                 SDLActivity.onNativeKeyboardFocusLost()

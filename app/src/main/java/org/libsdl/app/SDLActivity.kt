@@ -1183,6 +1183,12 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         super.onBackPressed()
     }
 
+    /**
+     * Gives a subclass first chance to translate keyboard loss into its own
+     * native IME protocol. Returning true means the request was fully handled.
+     */
+    open fun onScreenKeyboardFocusLost(): Boolean = false
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (mBrokenLibraries) {
             return false
