@@ -126,7 +126,7 @@
     <string name="catalog_filter_any_rating">任何評分</string>
     <string name="catalog_filters_clear">清除篩選器</string>
     <string name="catalog_empty_title">找不到目錄資料庫</string>
-    <string name="catalog_empty_body">新增 `psvita_games.db` 以啟用本機目錄。</string>
+    <string name="catalog_empty_body">新增 psvita_games.db 以啟用本機目錄。</string>
     <string name="catalog_no_results_title">找不到符合的項目</string>
     <string name="catalog_no_results_body">請嘗試其他的遊戲名稱、年份或拼寫方式。</string>
     <string name="settings_title">設定</string>
@@ -199,7 +199,7 @@
     <string name="settings_change_folder">變更資料夾</string>
     <string name="settings_clear_folder">清除資料夾</string>
     <string name="settings_storage_title">儲存空間</string>
-    <string name="settings_storage_body">模擬器資料儲存於應用程式檔案目錄的 `vita/` 下。已安裝遊戲位於 `ux0/app`，著色器快取位於 `cache`，修補程式則位於 `patch`。</string>
+    <string name="settings_storage_body">模擬器資料儲存於應用程式檔案目錄的 vita/ 下。已安裝遊戲位於 ux0/app，著色器快取位於 cache，修補程式則位於 patch。</string>
     <string name="settings_about_title">關於 EmuCoreV</string>
     <string name="settings_about_body">EmuCoreV 是一款基於開源專案 Vita3K 建置的 Android 平台 PS Vita 模擬器。</string>
     <string name="settings_help_content_description">開啟設定說明</string>
@@ -370,11 +370,11 @@
     <string name="game_launch_failed">啟動此遊戲失敗。</string>
     <string name="folder_picker_failed">無法使用所選的資料夾。</string>
     <string name="core_install_firmware_failed">無法開始韌體安裝。</string>
-    <string name="core_install_firmware_unsupported">請選擇支援的韌體檔案，例如 `.PUP`。</string>
+    <string name="core_install_firmware_unsupported">請選擇支援的韌體檔案，例如 .PUP。</string>
     <string name="core_install_content_failed">無法開始內容安裝。</string>
-    <string name="core_install_content_unsupported">請選擇支援的遊戲檔案，例如 `VPK`、`ZIP`、`RIF` 或 `work.bin`。</string>
+    <string name="core_install_content_unsupported">請選擇支援的遊戲檔案，例如 VPK、ZIP、RIF 或 work.bin。</string>
     <string name="core_install_pkg_failed">無法開始 PKG 安裝。</string>
-    <string name="core_install_pkg_missing_zrif">輸入 zRIF 金鑰，或在選擇 PKG 檔案前安裝相符的 `RIF`/`work.bin`。</string>
+    <string name="core_install_pkg_missing_zrif">輸入 zRIF 金鑰，或在選擇 PKG 檔案前安裝相符的 RIF/work.bin。</string>
     <string name="core_install_pkg_unsupported">請選擇支援的 PKG 檔案。</string>
     <string name="game_launch_requires_firmware">在啟動遊戲前，請先安裝基礎韌體。</string>
     <string name="game_launch_requires_firmware_update">在啟動遊戲前，請先安裝韌體更新包。</string>
@@ -406,10 +406,10 @@
     <string name="setup_runtime_bridge">核心狀態</string>
     <string name="setup_runtime_bridge_ready">模擬器已就緒。</string>
     <string name="setup_content_title">安裝遊戲</string>
-    <string name="setup_content_body">從您裝置上儲存的 `VPK`、`ZIP`、`RIF` 或 `work.bin` 檔案安裝遊戲。</string>
+    <string name="setup_content_body">從您裝置上儲存的 VPK、ZIP、RIF 或 work.bin 檔案安裝遊戲。</string>
     <string name="setup_content_button">選擇遊戲檔案</string>
     <string name="setup_pkg_title">安裝 PKG</string>
-    <string name="setup_pkg_body">某些 PKG 檔案需要相符的授權。請在下方輸入 zRIF 金鑰，或先安裝相符的 `RIF`/`work.bin`，然後再選擇 PKG 檔案。</string>
+    <string name="setup_pkg_body">某些 PKG 檔案需要相符的授權。請在下方輸入 zRIF 金鑰，或先安裝相符的 RIF/work.bin，然後再選擇 PKG 檔案。</string>
     <string name="setup_pkg_zrif_label">zRIF 金鑰</string>
     <string name="setup_pkg_zrif_placeholder">貼上 zRIF 金鑰於此處</string>
     <string name="setup_pkg_button">選擇 PKG 檔案</string>
@@ -700,7 +700,7 @@
     <string name="common_cancel">取消</string>
     <string name="save_manager_backup_all_title">所有存档备份</string>
     <string name="save_manager_backup_all_body">创建一个包含每个存档文件夹的 ZIP 备份，或从以前的完整备份中恢复存档文件夹。</string>
-    <string name="save_manager_backup_all">备份全部</string>
+    <string name="save_manager_backup_all">备份</string>
     <string name="save_manager_restore_all">恢复全部</string>
     <string name="save_manager_backup_all_success">已备份 %1$d 个存档文件夹。</string>
     <string name="save_manager_backup_all_failed">备份所有存档失败。</string>
@@ -751,7 +751,7 @@
     <string name="settings_storage_migration_failed">无法移动存储</string>
     <string name="install_dialog_content_try_repair">如果这是一个有效的 VPK 或 ZIP 映像，请尝试在游戏安装对话框中使用“修复并安装”。</string>
     <string name="install_dialog_archive_unreadable">无法读取压缩包。它可能已损坏或不完整。</string>
-    <string name="install_dialog_archive_missing_metadata">压缩包不包含诸如 `sce_sys/param.sfo` 或 `theme.xml` 之类的 Vita 安装元数据。</string>
+    <string name="install_dialog_archive_missing_metadata">压缩包不包含诸如 sce_sys/param.sfo 或 theme.xml 之类的 Vita 安装元数据。</string>
     <string name="install_dialog_repack_preparing">正在准备兼容的 ZIP 压缩包…</string>
     <string name="install_dialog_repack_entry">正在重新打包: %1$s</string>
     <string name="install_dialog_repack_installing">正在安装重建的 ZIP…</string>
@@ -1010,4 +1010,13 @@
     <string name="settings_help_gyro_smoothing">过滤传感器噪声和手部抖动。数值越低反应越快；数值越高感觉越稳定，但会增加少许延迟。</string>
     <string name="settings_gyro_unavailable">此设备未提供所选模式所需的运动传感器。</string>
     <string name="settings_touch_controls_section">触屏控制</string>
+    <string name="settings_gpu_driver_detected_device">检测到：%1$s · %2$s</string>
+    <string name="settings_gpu_driver_device_hint">兼容的驱动会优先显示。点按驱动卡片可查看支持的 Snapdragon 芯片。</string>
+    <string name="settings_gpu_driver_compatibility">Snapdragon 兼容性</string>
+    <string name="settings_gpu_driver_best_match">最佳匹配</string>
+    <string name="settings_gpu_driver_compatible">兼容</string>
+    <string name="settings_gpu_driver_other_family">其他 Adreno 系列</string>
+    <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx：Snapdragon 845/855/865/888 及众多 Snapdragon 6/7 系列型号</string>
+    <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx：Snapdragon 8 Gen 1/2/3、8s Gen 3、较新的 Snapdragon 7 系列和 6 Gen 1/3</string>
+    <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx：Snapdragon 8 Elite Gen 5、8 Gen 5、8 Elite、8s Gen 4 和 6 Gen 4</string>
 </resources>

@@ -126,7 +126,7 @@
     <string name="catalog_filter_any_rating">Toute évaluation</string>
     <string name="catalog_filters_clear">Effacer les filtres</string>
     <string name="catalog_empty_title">Base de données du catalogue introuvable</string>
-    <string name="catalog_empty_body">Ajoutez `psvita_games.db` pour activer le catalogue local.</string>
+    <string name="catalog_empty_body">Ajoutez psvita_games.db pour activer le catalogue local.</string>
     <string name="catalog_no_results_title">Aucune correspondance trouvée</string>
     <string name="catalog_no_results_body">Essayez un autre titre, année ou orthographe.</string>
     <string name="settings_title">Paramètres</string>
@@ -199,7 +199,7 @@
     <string name="settings_change_folder">Changer de dossier</string>
     <string name="settings_clear_folder">Vider le dossier</string>
     <string name="settings_storage_title">Stockage</string>
-    <string name="settings_storage_body">Les données de l\'émulateur sont stockées dans le répertoire des fichiers de l\'application sous `vita/`. Les jeux installés sont dans `ux0/app`, le cache des shaders dans `cache`, et les patchs dans `patch`.</string>
+    <string name="settings_storage_body">Les données de l\'émulateur sont stockées dans le répertoire des fichiers de l\'application sous vita/. Les jeux installés sont dans ux0/app, le cache des shaders dans cache, et les patchs dans patch.</string>
     <string name="settings_about_title">À propos d\'EmuCoreV</string>
     <string name="settings_about_body">EmuCoreV est un émulateur PS Vita pour Android basé sur le projet open-source Vita3K.</string>
     <string name="settings_help_content_description">Ouvrir l\'aide des paramètres</string>
@@ -370,11 +370,11 @@
     <string name="game_launch_failed">Échec du lancement de ce jeu.</string>
     <string name="folder_picker_failed">Échec de l\'utilisation du dossier sélectionné.</string>
     <string name="core_install_firmware_failed">Échec du démarrage de l\'installation du firmware.</string>
-    <string name="core_install_firmware_unsupported">Choisissez un fichier de firmware pris en charge, comme `.PUP`.</string>
+    <string name="core_install_firmware_unsupported">Choisissez un fichier de firmware pris en charge, comme .PUP.</string>
     <string name="core_install_content_failed">Échec du démarrage de l\'installation du contenu.</string>
-    <string name="core_install_content_unsupported">Choisissez un fichier de jeu pris en charge, tel que `VPK`, `ZIP`, `RIF`, ou `work.bin`.</string>
+    <string name="core_install_content_unsupported">Choisissez un fichier de jeu pris en charge, tel que VPK, ZIP, RIF, ou work.bin.</string>
     <string name="core_install_pkg_failed">Échec du démarrage de l\'installation du PKG.</string>
-    <string name="core_install_pkg_missing_zrif">Entrez une clé zRIF, ou installez le `RIF`/`work.bin` correspondant avant de choisir un fichier PKG.</string>
+    <string name="core_install_pkg_missing_zrif">Entrez une clé zRIF, ou installez le RIF/work.bin correspondant avant de choisir un fichier PKG.</string>
     <string name="core_install_pkg_unsupported">Sélectionnez un fichier PKG pris en charge.</string>
     <string name="game_launch_requires_firmware">Installez le firmware de base avant de lancer un jeu.</string>
     <string name="game_launch_requires_firmware_update">Installez le paquet de mise à jour du firmware avant de lancer un jeu.</string>
@@ -406,10 +406,10 @@
     <string name="setup_runtime_bridge">Statut du cœur</string>
     <string name="setup_runtime_bridge_ready">L\'émulateur est prêt.</string>
     <string name="setup_content_title">Installer un jeu</string>
-    <string name="setup_content_body">Installez des jeux à partir de fichiers `VPK`, `ZIP`, `RIF` ou `work.bin` stockés sur votre appareil.</string>
+    <string name="setup_content_body">Installez des jeux à partir de fichiers VPK, ZIP, RIF ou work.bin stockés sur votre appareil.</string>
     <string name="setup_content_button">Sélectionner un fichier de jeu</string>
     <string name="setup_pkg_title">Installer un PKG</string>
-    <string name="setup_pkg_body">Certains fichiers PKG nécessitent une licence correspondante. Entrez une clé zRIF ci-dessous, ou installez d\'abord le `RIF`/`work.bin` correspondant, puis choisissez le fichier PKG.</string>
+    <string name="setup_pkg_body">Certains fichiers PKG nécessitent une licence correspondante. Entrez une clé zRIF ci-dessous, ou installez d\'abord le RIF/work.bin correspondant, puis choisissez le fichier PKG.</string>
     <string name="setup_pkg_zrif_label">Clé zRIF</string>
     <string name="setup_pkg_zrif_placeholder">Collez la clé zRIF ici</string>
     <string name="setup_pkg_button">Choisir un fichier PKG</string>
@@ -701,7 +701,7 @@
     <string name="common_cancel">Annuler</string>
     <string name="save_manager_backup_all_title">Sauvegarde de toutes les parties</string>
     <string name="save_manager_backup_all_body">Créez une sauvegarde ZIP avec chaque dossier de sauvegarde, ou restaurez des dossiers de sauvegarde à partir d\'une sauvegarde complète précédente.</string>
-    <string name="save_manager_backup_all">Tout sauvegarder</string>
+    <string name="save_manager_backup_all">Sauvegarde</string>
     <string name="save_manager_restore_all">Tout restaurer</string>
     <string name="save_manager_backup_all_success">%1$d dossiers de sauvegarde sauvegardés.</string>
     <string name="save_manager_backup_all_failed">Échec de la sauvegarde de toutes les parties.</string>
@@ -752,7 +752,7 @@
     <string name="settings_storage_migration_failed">Impossible de déplacer le stockage</string>
     <string name="install_dialog_content_try_repair">S\'il s\'agit d\'une image VPK ou ZIP valide, essayez "Réparer et installer" depuis la boîte de dialogue d\'installation du jeu.</string>
     <string name="install_dialog_archive_unreadable">L\'archive n\'a pas pu être lue. Elle peut être endommagée ou incomplète.</string>
-    <string name="install_dialog_archive_missing_metadata">L\'archive ne contient pas de métadonnées d\'installation Vita telles que `sce_sys/param.sfo` ou `theme.xml`.</string>
+    <string name="install_dialog_archive_missing_metadata">L\'archive ne contient pas de métadonnées d\'installation Vita telles que sce_sys/param.sfo ou theme.xml.</string>
     <string name="install_dialog_repack_preparing">Préparation d\'une archive ZIP compatible…</string>
     <string name="install_dialog_repack_entry">Réempaquetage : %1$s</string>
     <string name="install_dialog_repack_installing">Installation du ZIP reconstruit…</string>
@@ -1011,4 +1011,13 @@
     <string name="settings_help_gyro_smoothing">Фильтрует шум датчика и дрожание рук. Более низкие значения реагируют быстрее; более высокие значения кажутся более стабильными, но добавляют небольшую задержку.</string>
     <string name="settings_gyro_unavailable">Данное устройство не оснащено датчиком движения, необходимым для выбранного режима.</string>
     <string name="settings_touch_controls_section">Сенсорное управление</string>
+    <string name="settings_gpu_driver_detected_device">Détecté : %1$s · %2$s</string>
+    <string name="settings_gpu_driver_device_hint">Les pilotes compatibles sont affichés en premier. Touchez une fiche pour voir les puces Snapdragon prises en charge.</string>
+    <string name="settings_gpu_driver_compatibility">Compatibilité Snapdragon</string>
+    <string name="settings_gpu_driver_best_match">Meilleur choix</string>
+    <string name="settings_gpu_driver_compatible">Compatible</string>
+    <string name="settings_gpu_driver_other_family">Autre famille Adreno</string>
+    <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx : Snapdragon 845/855/865/888 et de nombreux modèles Snapdragon séries 6/7</string>
+    <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx : Snapdragon 8 Gen 1/2/3, 8s Gen 3, modèles récents Snapdragon série 7 et 6 Gen 1/3</string>
+    <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx : Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 et 6 Gen 4</string>
 </resources>

@@ -59,6 +59,7 @@ import androidx.compose.ui.window.DialogProperties
 import android.view.InputDevice
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.AndroidGyroscopeInput
+import com.sbro.emucorev.core.GpuDriverCompatibility
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.FrameLimit
 import com.sbro.emucorev.core.VitaCoreConfig
@@ -208,6 +209,7 @@ private fun GeneralTab(
 private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel, onOpenGpuDriverSettings: () -> Unit) {
     val selectedDriver = uiState.installedGpuDrivers.firstOrNull { it.name == uiState.coreConfig.customDriverName }
     val customDriverAvailable = uiState.coreConfig.backendRenderer == "Vulkan" && selectedDriver?.isUsable == true
+    val customDriversSupported = remember { GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers() }
 
     SectionCard(title = stringResource(R.string.settings_tab_graphics), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Chips(title = stringResource(R.string.settings_core_renderer_label), description = stringResource(R.string.settings_help_renderer), onResetDefault = { viewModel.updateCoreSettings { it.copy(backendRenderer = defaults.backendRenderer) } }) {
@@ -222,39 +224,41 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
                 viewModel
             ) { config, value -> config.copy(backendRenderer = value) }
         }
-        Chips(
-            title = stringResource(R.string.settings_gpu_driver),
-            description = stringResource(R.string.settings_help_gpu_driver),
-            onResetDefault = { viewModel.updateCoreSettings { it.copy(customDriverName = defaults.customDriverName) } }
-        ) {
-            FilterChip(
-                selected = uiState.coreConfig.customDriverName.isBlank(),
-                onClick = { viewModel.updateCoreSettings { it.copy(customDriverName = "") } },
-                label = { Text(stringResource(R.string.settings_gpu_driver_system)) }
+        if (customDriversSupported) {
+            Chips(
+                title = stringResource(R.string.settings_gpu_driver),
+                description = stringResource(R.string.settings_help_gpu_driver),
+                onResetDefault = { viewModel.updateCoreSettings { it.copy(customDriverName = defaults.customDriverName) } }
+            ) {
+                FilterChip(
+                    selected = uiState.coreConfig.customDriverName.isBlank(),
+                    onClick = { viewModel.updateCoreSettings { it.copy(customDriverName = "") } },
+                    label = { Text(stringResource(R.string.settings_gpu_driver_system)) }
+                )
+                FilterChip(
+                    selected = uiState.coreConfig.customDriverName.isNotBlank(),
+                    onClick = {
+                        val firstDriver = uiState.installedGpuDrivers.firstOrNull()
+                        if (firstDriver != null) {
+                            viewModel.updateCoreSettings { it.copy(customDriverName = firstDriver.name) }
+                        }
+                    },
+                    enabled = uiState.installedGpuDrivers.isNotEmpty(),
+                    label = { Text(stringResource(R.string.settings_gpu_driver_custom)) }
+                )
+            }
+            GpuDriverStatus(
+                selectedDriver = selectedDriver,
+                backendRenderer = uiState.coreConfig.backendRenderer,
+                isActive = customDriverAvailable,
+                modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
             )
-            FilterChip(
-                selected = uiState.coreConfig.customDriverName.isNotBlank(),
-                onClick = {
-                    val firstDriver = uiState.installedGpuDrivers.firstOrNull()
-                    if (firstDriver != null) {
-                        viewModel.updateCoreSettings { it.copy(customDriverName = firstDriver.name) }
-                    }
-                },
-                enabled = uiState.installedGpuDrivers.isNotEmpty(),
-                label = { Text(stringResource(R.string.settings_gpu_driver_custom)) }
-            )
-        }
-        GpuDriverStatus(
-            selectedDriver = selectedDriver,
-            backendRenderer = uiState.coreConfig.backendRenderer,
-            isActive = customDriverAvailable,
-            modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
-        )
-        Button(
-            onClick = onOpenGpuDriverSettings,
-            modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
-        ) {
-            Text(stringResource(R.string.settings_gpu_driver_manage))
+            Button(
+                onClick = onOpenGpuDriverSettings,
+                modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
+            ) {
+                Text(stringResource(R.string.settings_gpu_driver_manage))
+            }
         }
         Toggle(stringResource(R.string.settings_use_angle), stringResource(R.string.settings_help_use_angle), uiState.coreConfig.useAngle, { enabled -> viewModel.updateCoreSettings { it.copy(useAngle = enabled) } }, { viewModel.updateCoreSettings { it.copy(useAngle = defaults.useAngle) } }, enabled = uiState.coreConfig.backendRenderer == "OpenGL")
         Toggle(stringResource(R.string.settings_core_high_accuracy), stringResource(R.string.settings_help_high_accuracy), uiState.coreConfig.highAccuracy, { enabled -> viewModel.updateCoreSettings { it.copy(highAccuracy = enabled) } }, { viewModel.updateCoreSettings { it.copy(highAccuracy = defaults.highAccuracy) } })

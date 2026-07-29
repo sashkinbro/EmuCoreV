@@ -57,6 +57,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.FrameLimit
+import com.sbro.emucorev.core.GpuDriverCompatibility
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.data.InstalledVitaGame
@@ -355,16 +356,18 @@ private fun GraphicsProfileSection(
             onUpdate { cfg -> cfg.copy(backendRenderer = it) }
         }
         ToggleRow(stringResource(R.string.settings_use_angle), config.useAngle, stringResource(R.string.settings_help_use_angle), { onUpdate { it.copy(useAngle = defaults.useAngle) } }, enabled = config.backendRenderer == "OpenGL") { onUpdate { cfg -> cfg.copy(useAngle = it) } }
-        GpuDriverChoiceRow(
-            effectiveDriverName = config.customDriverName,
-            globalDriverName = defaults.customDriverName,
-            customDriverOverride = customDriverOverride,
-            backendRenderer = config.backendRenderer,
-            installedGpuDrivers = installedGpuDrivers,
-            onOpenGpuDriverManager = onOpenGpuDriverManager,
-            onReset = { onDriverOverrideSelected(null) },
-            onSelected = onDriverOverrideSelected
-        )
+        if (remember { GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers() }) {
+            GpuDriverChoiceRow(
+                effectiveDriverName = config.customDriverName,
+                globalDriverName = defaults.customDriverName,
+                customDriverOverride = customDriverOverride,
+                backendRenderer = config.backendRenderer,
+                installedGpuDrivers = installedGpuDrivers,
+                onOpenGpuDriverManager = onOpenGpuDriverManager,
+                onReset = { onDriverOverrideSelected(null) },
+                onSelected = onDriverOverrideSelected
+            )
+        }
         SliderRow(
             title = stringResource(R.string.settings_core_resolution_label),
             description = stringResource(R.string.settings_help_resolution),

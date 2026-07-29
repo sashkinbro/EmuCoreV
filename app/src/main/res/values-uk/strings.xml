@@ -126,7 +126,7 @@
     <string name="catalog_filter_any_rating">Будь-який рейтинг</string>
     <string name="catalog_filters_clear">Скинути фільтри</string>
     <string name="catalog_empty_title">Базу даних каталогу не знайдено</string>
-    <string name="catalog_empty_body">Додайте `psvita_games.db`, щоб увімкнути локальний каталог.</string>
+    <string name="catalog_empty_body">Додайте psvita_games.db, щоб увімкнути локальний каталог.</string>
     <string name="catalog_no_results_title">Збігів не знайдено</string>
     <string name="catalog_no_results_body">Спробуйте іншу назву, рік або написання.</string>
     <string name="settings_title">Налаштування</string>
@@ -199,7 +199,7 @@
     <string name="settings_change_folder">Змінити папку</string>
     <string name="settings_clear_folder">Очистити папку</string>
     <string name="settings_storage_title">Сховище</string>
-    <string name="settings_storage_body">Дані емулятора зберігаються в каталозі файлів програми в папці `vita/`. Встановлені ігри знаходяться в `ux0/app`, кеш шейдерів — у `cache`, а патчі — у `patch`.</string>
+    <string name="settings_storage_body">Дані емулятора зберігаються в каталозі файлів програми в папці vita/. Встановлені ігри знаходяться в ux0/app, кеш шейдерів — у cache, а патчі — у patch.</string>
     <string name="settings_about_title">Про EmuCoreV</string>
     <string name="settings_about_body">EmuCoreV — це емулятор PS Vita для Android, створений на базі проекту Vita3K з відкритим вихідним кодом.</string>
     <string name="settings_help_content_description">Відкрити довідку з налаштування</string>
@@ -370,11 +370,11 @@
     <string name="game_launch_failed">Не вдалося запустити цю гру.</string>
     <string name="folder_picker_failed">Не вдалося використати вибрану папку.</string>
     <string name="core_install_firmware_failed">Не вдалося розпочати встановлення прошивки.</string>
-    <string name="core_install_firmware_unsupported">Виберіть підтримуваний файл прошивки, наприклад `.PUP`.</string>
+    <string name="core_install_firmware_unsupported">Виберіть підтримуваний файл прошивки, наприклад .PUP.</string>
     <string name="core_install_content_failed">Не вдалося розпочати встановлення контенту.</string>
-    <string name="core_install_content_unsupported">Виберіть підтримуваний файл гри, наприклад `VPK`, `ZIP`, `RIF` або `work.bin`.</string>
+    <string name="core_install_content_unsupported">Виберіть підтримуваний файл гри, наприклад VPK, ZIP, RIF або work.bin.</string>
     <string name="core_install_pkg_failed">Не вдалося розпочати встановлення PKG.</string>
-    <string name="core_install_pkg_missing_zrif">Введіть ключ zRIF або встановіть відповідний `RIF`/`work.bin` перед вибором файлу PKG.</string>
+    <string name="core_install_pkg_missing_zrif">Введіть ключ zRIF або встановіть відповідний RIF/work.bin перед вибором файлу PKG.</string>
     <string name="core_install_pkg_unsupported">Виберіть підтримуваний файл PKG.</string>
     <string name="game_launch_requires_firmware">Встановіть базову прошивку перед запуском гри.</string>
     <string name="game_launch_requires_firmware_update">Встановіть пакет оновлення прошивки перед запуском гри.</string>
@@ -406,10 +406,10 @@
     <string name="setup_runtime_bridge">Статус ядра</string>
     <string name="setup_runtime_bridge_ready">Емулятор готовий.</string>
     <string name="setup_content_title">Встановити гру</string>
-    <string name="setup_content_body">Встановлюйте ігри з файлів `VPK`, `ZIP`, `RIF` або `work.bin`, що зберігаються на вашому пристрої.</string>
+    <string name="setup_content_body">Встановлюйте ігри з файлів VPK, ZIP, RIF або work.bin, що зберігаються на вашому пристрої.</string>
     <string name="setup_content_button">Вибрати файл гри</string>
     <string name="setup_pkg_title">Встановити PKG</string>
-    <string name="setup_pkg_body">Деяким файлам PKG потрібна відповідна ліцензія. Введіть ключ zRIF нижче або спочатку встановіть відповідний `RIF`/`work.bin`, а потім виберіть файл PKG.</string>
+    <string name="setup_pkg_body">Деяким файлам PKG потрібна відповідна ліцензія. Введіть ключ zRIF нижче або спочатку встановіть відповідний RIF/work.bin, а потім виберіть файл PKG.</string>
     <string name="setup_pkg_zrif_label">Ключ zRIF</string>
     <string name="setup_pkg_zrif_placeholder">Вставте ключ zRIF сюди</string>
     <string name="setup_pkg_button">Вибрати файл PKG</string>
@@ -701,7 +701,7 @@
     <string name="common_cancel">Скасувати</string>
     <string name="save_manager_backup_all_title">Резервне копіювання всіх збережень</string>
     <string name="save_manager_backup_all_body">Створіть одну резервну копію у форматі ZIP з усіма папками збережень або відновіть папки збережень з попередньої повної резервної копії.</string>
-    <string name="save_manager_backup_all">Зробити резервну копію всього</string>
+    <string name="save_manager_backup_all">Резервна копія</string>
     <string name="save_manager_restore_all">Відновити все</string>
     <string name="save_manager_backup_all_success">Створено резервну копію %1$d папок збережень.</string>
     <string name="save_manager_backup_all_failed">Не вдалося створити резервну копію всіх збережень.</string>
@@ -752,7 +752,7 @@
     <string name="settings_storage_migration_failed">Не вдалося перемістити сховище</string>
     <string name="install_dialog_content_try_repair">Якщо це дійсний образ VPK або ZIP, спробуйте "Відновити та встановити" у діалоговому вікні встановлення гри.</string>
     <string name="install_dialog_archive_unreadable">Не вдалося прочитати архів. Можливо, він пошкоджений або неповний.</string>
-    <string name="install_dialog_archive_missing_metadata">В архіві відсутні метадані для встановлення Vita, такі як `sce_sys/param.sfo` або `theme.xml`.</string>
+    <string name="install_dialog_archive_missing_metadata">В архіві відсутні метадані для встановлення Vita, такі як sce_sys/param.sfo або theme.xml.</string>
     <string name="install_dialog_repack_preparing">Підготовка сумісного ZIP-архіву…</string>
     <string name="install_dialog_repack_entry">Перепакування: %1$s</string>
     <string name="install_dialog_repack_installing">Встановлення перезібраного ZIP-архіву…</string>
@@ -1014,4 +1014,13 @@
     <string name="settings_help_gyro_smoothing">Фільтрує шум датчика та тремтіння рук. Менші значення реагують швидше; більші значення здаються стабільнішими, але додають невелику затримку.</string>
     <string name="settings_gyro_unavailable">Цей пристрій не має датчика руху, необхідного для вибраного режиму.</string>
     <string name="settings_touch_controls_section">Сенсорне керування</string>
+    <string name="settings_gpu_driver_detected_device">Виявлено: %1$s · %2$s</string>
+    <string name="settings_gpu_driver_device_hint">Сумісні драйвери показано першими. Натисніть картку драйвера, щоб переглянути підтримувані чипи Snapdragon.</string>
+    <string name="settings_gpu_driver_compatibility">Сумісність зі Snapdragon</string>
+    <string name="settings_gpu_driver_best_match">Найкращий вибір</string>
+    <string name="settings_gpu_driver_compatible">Сумісний</string>
+    <string name="settings_gpu_driver_other_family">Інше покоління Adreno</string>
+    <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 і багато моделей серій Snapdragon 6/7</string>
+    <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, нові моделі серії Snapdragon 7 та 6 Gen 1/3</string>
+    <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 та 6 Gen 4</string>
 </resources>

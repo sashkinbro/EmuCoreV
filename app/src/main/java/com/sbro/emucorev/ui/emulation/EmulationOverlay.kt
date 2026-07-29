@@ -787,7 +787,6 @@ private fun OnScreenControls(
                 onSelected = { selectedId = element.id },
                 onElementChange = { updated -> commitLayoutChange { currentControls -> currentControls.replaceElement(updated) } },
                 onBackTouchToggle = onBackTouchToggle,
-                onTouchHaptic = ::performTouchHaptic,
                 onButtonChange = ::dispatchButtonChange,
                 onAxisChange = onAxisChange
             )
@@ -1093,7 +1092,6 @@ private fun TouchControlCanvasItem(
     onSelected: () -> Unit,
     onElementChange: (TouchControlElement) -> Unit,
     onBackTouchToggle: () -> Unit,
-    onTouchHaptic: (ButtonPhase) -> Unit,
     onButtonChange: (Int, Boolean) -> Unit,
     onAxisChange: (Int, Short) -> Unit
 ) {
@@ -1204,7 +1202,6 @@ private fun TouchControlCanvasItem(
                         alpha = alpha,
                         visualStyle = visualStyle,
                         pressEffect = pressEffect,
-                        onTouchHaptic = onTouchHaptic,
                         onAxisChange = { x, y ->
                             descriptor.axisX?.let { onAxisChange(it, x) }
                             descriptor.axisY?.let { onAxisChange(it, y) }
@@ -1216,7 +1213,6 @@ private fun TouchControlCanvasItem(
                         alpha = alpha,
                         visualStyle = visualStyle,
                         pressEffect = pressEffect,
-                        onTouchHaptic = onTouchHaptic,
                         onAxisChange = { x, y ->
                             descriptor.axisX?.let { onAxisChange(it, x) }
                             descriptor.axisY?.let { onAxisChange(it, y) }
@@ -1713,7 +1709,6 @@ private fun AnalogTouchArea(
     alpha: Float,
     visualStyle: TouchControlVisualStyle,
     pressEffect: TouchControlPressEffect,
-    onTouchHaptic: (ButtonPhase) -> Unit,
     onAxisChange: (Short, Short) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1734,11 +1729,9 @@ private fun AnalogTouchArea(
     }
 
     fun resetArea() {
-        val wasPressed = pressed
         pressed = false
         activePointerId = MotionEvent.INVALID_POINTER_ID
         sendAxis(0f, 0f)
-        if (wasPressed) onTouchHaptic(ButtonPhase.RELEASE)
     }
 
     fun updateArea(position: Offset) {
@@ -1764,7 +1757,6 @@ private fun AnalogTouchArea(
                             val index = event.actionIndex
                             activePointerId = event.getPointerId(index)
                             pressed = true
-                            onTouchHaptic(ButtonPhase.PRESS)
                             startOffset = Offset(event.getX(index), event.getY(index))
                             sendAxis(0f, 0f)
                         }
@@ -1807,7 +1799,6 @@ private fun AnalogStick(
     alpha: Float,
     visualStyle: TouchControlVisualStyle,
     pressEffect: TouchControlPressEffect,
-    onTouchHaptic: (ButtonPhase) -> Unit,
     onAxisChange: (Short, Short) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1828,12 +1819,10 @@ private fun AnalogStick(
     }
 
     fun resetStick() {
-        val wasPressed = pressed
         pressed = false
         activePointerId = MotionEvent.INVALID_POINTER_ID
         thumbOffset = Offset.Zero
         sendAxis(0f, 0f)
-        if (wasPressed) onTouchHaptic(ButtonPhase.RELEASE)
     }
 
     fun updateStick(position: Offset) {
@@ -1861,7 +1850,6 @@ private fun AnalogStick(
                             val index = event.actionIndex
                             activePointerId = event.getPointerId(index)
                             pressed = true
-                            onTouchHaptic(ButtonPhase.PRESS)
                             updateStick(Offset(event.getX(index), event.getY(index)))
                         }
                         true
