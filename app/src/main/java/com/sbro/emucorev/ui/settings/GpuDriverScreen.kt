@@ -12,6 +12,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +40,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.FolderZip
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.MoreVert
@@ -73,8 +77,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.AdrenoFamily
+import com.sbro.emucorev.core.GpuDriverMatch
+import com.sbro.emucorev.core.GpuDriverRecommendations
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.RemoteGpuDriver
+import com.sbro.emucorev.core.SnapdragonGpuProfile
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.ui.common.ScreenTopBar
@@ -110,11 +118,13 @@ fun GpuDriverScreen(
     var filtersVisible by rememberSaveable { mutableStateOf(false) }
     var variantFilter by rememberSaveable { mutableStateOf(GPU_DRIVER_FILTER_ALL) }
     var sourceFilter by rememberSaveable { mutableStateOf(GPU_DRIVER_FILTER_ALL) }
+    var expandedDriverId by rememberSaveable { mutableStateOf<String?>(null) }
+    val deviceProfile = remember { GpuDriverRecommendations.currentDeviceProfile() }
     val remoteDrivers = uiState.remoteGpuDrivers.filter { driver ->
         driver.matchesSearch(searchQuery) &&
             (variantFilter == GPU_DRIVER_FILTER_ALL || driver.variant.equals(variantFilter, ignoreCase = true)) &&
             (sourceFilter == GPU_DRIVER_FILTER_ALL || driver.sourceLabel().equals(sourceFilter, ignoreCase = true))
-    }
+    }.sortedByDescending { it.recommendationRank(deviceProfile) }
     val variantFilters = buildList {
         add(GPU_DRIVER_FILTER_ALL)
         addAll(uiState.remoteGpuDrivers.map { it.variant }.filter { it.isNotBlank() }.distinct().sorted())
@@ -235,6 +245,11 @@ fun GpuDriverScreen(
                 }
             )
         }
+        deviceProfile?.let { profile ->
+            item {
+                DeviceCompatibilityCard(profile = profile)
+            }
+        }
         if (uiState.installedGpuDrivers.isNotEmpty()) {
             item {
                 SectionLabel(text = stringResource(R.string.settings_gpu_driver_installed))
@@ -333,6 +348,8 @@ fun GpuDriverScreen(
             val downloadingProgress = uiState.gpuDriverDownloads[driver.id]
             RemoteDriverRow(
                 driver = driver,
+                match = GpuDriverRecommendations.match(driver, deviceProfile),
+                expanded = expandedDriverId == driver.id,
                 installedDriver = installedDriver,
                 selected = if (isGameScoped) {
                     installedDriver?.name == gameDriverOverride
@@ -341,6 +358,9 @@ fun GpuDriverScreen(
                 },
                 downloading = downloadingProgress != null,
                 progress = downloadingProgress ?: 0f,
+                onToggleExpanded = {
+                    expandedDriverId = if (expandedDriverId == driver.id) null else driver.id
+                },
                 onDownload = {
                     viewModel.installRemoteGpuDriver(driver, applyGlobally = !isGameScoped) { result ->
                         result.onSuccess { driverName ->
@@ -659,39 +679,60 @@ private fun InstalledDriverRow(
 @Composable
 private fun RemoteDriverRow(
     driver: RemoteGpuDriver,
+    match: GpuDriverMatch,
+    expanded: Boolean,
     installedDriver: InstalledGpuDriver?,
     selected: Boolean,
     downloading: Boolean,
     progress: Float,
+    onToggleExpanded: () -> Unit,
     onDownload: () -> Unit,
     onSelect: () -> Unit,
     onRemove: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(18.dp)
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onToggleExpanded
+            ),
+        shape = shape,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = driver.name,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    DriverBadgeRow(
+                        recommended = driver.recommended,
+                        downloaded = installedDriver != null,
+                        match = match
+                    )
+                    Text(
+                        text = listOf(driver.gpu, driver.variant).filter { it.isNotBlank() }.joinToString(" / "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    contentDescription = stringResource(R.string.settings_gpu_driver_compatibility),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = driver.name,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                DriverBadgeRow(
-                    recommended = driver.recommended,
-                    downloaded = installedDriver != null
-                )
-                Text(
-                    text = listOf(driver.gpu, driver.variant).filter { it.isNotBlank() }.joinToString(" / "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
                 if (installedDriver == null) {
                     Button(
                         onClick = onDownload,
@@ -728,31 +769,49 @@ private fun RemoteDriverRow(
                     }
                 }
             }
-            if (driver.description.isNotBlank()) {
-                Text(
-                    text = driver.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (driver.credits.isNotBlank() || driver.sourceUrl.isNotBlank()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = driver.credits,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (driver.sourceUrl.isNotBlank()) {
-                        CompactOutlinedActionButton(
-                            onClick = { uriHandler.openUri(driver.sourceUrl) },
-                            icon = { Icon(Icons.Rounded.Link, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            text = stringResource(R.string.settings_gpu_driver_source)
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(animationSpec = tween(160)) + expandVertically(animationSpec = tween(200)),
+                exit = fadeOut(animationSpec = tween(100)) + shrinkVertically(animationSpec = tween(160))
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (driver.description.isNotBlank()) {
+                        Text(
+                            text = driver.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                    Text(
+                        text = stringResource(R.string.settings_gpu_driver_compatibility),
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = driver.snapdragonSummary(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (driver.credits.isNotBlank() || driver.sourceUrl.isNotBlank()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = driver.credits,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (driver.sourceUrl.isNotBlank()) {
+                                CompactOutlinedActionButton(
+                                    onClick = { uriHandler.openUri(driver.sourceUrl) },
+                                    icon = { Icon(Icons.Rounded.Link, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                                    text = stringResource(R.string.settings_gpu_driver_source)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -762,6 +821,35 @@ private fun RemoteDriverRow(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun DeviceCompatibilityCard(profile: SnapdragonGpuProfile) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = stringResource(
+                    R.string.settings_gpu_driver_detected_device,
+                    profile.socName,
+                    profile.adrenoName
+                ),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Text(
+                text = stringResource(R.string.settings_gpu_driver_device_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
+            )
         }
     }
 }
@@ -802,14 +890,28 @@ private fun CompactOutlinedActionButton(
 @Composable
 private fun DriverBadgeRow(
     recommended: Boolean,
-    downloaded: Boolean
+    downloaded: Boolean,
+    match: GpuDriverMatch = GpuDriverMatch.UNKNOWN
 ) {
-    if (!recommended && !downloaded) return
+    if (!recommended && !downloaded && match == GpuDriverMatch.UNKNOWN) return
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (recommended) {
+        if (match == GpuDriverMatch.COMPATIBLE) {
+            DriverBadge(
+                text = stringResource(
+                    if (recommended) R.string.settings_gpu_driver_best_match
+                    else R.string.settings_gpu_driver_compatible
+                ),
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else if (match == GpuDriverMatch.OTHER_FAMILY) {
+            DriverBadge(
+                text = stringResource(R.string.settings_gpu_driver_other_family),
+                color = MaterialTheme.colorScheme.error
+            )
+        } else if (recommended) {
             DriverBadge(
                 text = stringResource(R.string.settings_gpu_driver_recommended),
                 color = MaterialTheme.colorScheme.primary
@@ -822,6 +924,29 @@ private fun DriverBadgeRow(
             )
         }
     }
+}
+
+private fun RemoteGpuDriver.recommendationRank(profile: SnapdragonGpuProfile?): Int =
+    when (GpuDriverRecommendations.match(this, profile)) {
+        GpuDriverMatch.COMPATIBLE -> if (recommended) 3 else 2
+        GpuDriverMatch.UNKNOWN -> if (recommended) 1 else 0
+        GpuDriverMatch.OTHER_FAMILY -> -1
+    }
+
+@Composable
+private fun RemoteGpuDriver.snapdragonSummary(): String {
+    val lines = GpuDriverRecommendations.supportedFamilies(gpu)
+        .sortedBy(AdrenoFamily::ordinal)
+        .map { family ->
+            stringResource(
+                when (family) {
+                    AdrenoFamily.A6XX -> R.string.settings_gpu_driver_compatibility_a6xx
+                    AdrenoFamily.A7XX -> R.string.settings_gpu_driver_compatibility_a7xx
+                    AdrenoFamily.A8XX -> R.string.settings_gpu_driver_compatibility_a8xx
+                }
+            )
+        }
+    return lines.joinToString(separator = "\n").ifBlank { gpu }
 }
 
 @Composable

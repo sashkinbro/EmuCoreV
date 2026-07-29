@@ -187,7 +187,7 @@
     <string name="catalog_filter_any_rating">أي تقييم</string>
     <string name="catalog_filters_clear">مسح الفلاتر</string>
     <string name="catalog_empty_title">لم يتم العثور على قاعدة بيانات الكتالوج</string>
-    <string name="catalog_empty_body">أضف `psvita_games.db` لتمكين الكتالوج المحلي.</string>
+    <string name="catalog_empty_body">أضف psvita_games.db لتمكين الكتالوج المحلي.</string>
     <string name="catalog_no_results_title">لم يتم العثور على نتائج مطابقة</string>
     <string name="catalog_no_results_body">جرب عنواناً، أو سنة، أو تهجئة مختلفة.</string>
     <string name="settings_title">الإعدادات</string>
@@ -298,7 +298,7 @@
     <string name="settings_change_folder">تغيير المجلد</string>
     <string name="settings_clear_folder">مسح المجلد</string>
     <string name="settings_storage_title">مساحة التخزين</string>
-    <string name="settings_storage_body">يتم تخزين بيانات المحاكي في دليل ملفات التطبيق ضمن `vita/`. توجد الألعاب المثبتة في `ux0/app`، وذاكرة التظليل المؤقتة في `cache`، والتصحيحات في `patch`.</string>
+    <string name="settings_storage_body">يتم تخزين بيانات المحاكي في دليل ملفات التطبيق ضمن vita/. توجد الألعاب المثبتة في ux0/app، وذاكرة التظليل المؤقتة في cache، والتصحيحات في patch.</string>
     <string name="settings_backup_title">النسخ الاحتياطي للإعدادات</string>
     <string name="settings_backup_body">قم بنسخ تفضيلات التطبيق وإعدادات المحاكي احتياطياً إلى ملف، أو استعادتها من نسخة احتياطية سابقة.</string>
     <string name="settings_backup_create">نسخ الإعدادات احتياطياً</string>
@@ -558,11 +558,11 @@
     <string name="game_launch_failed">فشل تشغيل هذه اللعبة.</string>
     <string name="folder_picker_failed">فشل استخدام المجلد المحدد.</string>
     <string name="core_install_firmware_failed">فشل بدء تثبيت البرامج الثابتة.</string>
-    <string name="core_install_firmware_unsupported">اختر ملف برامج ثابتة مدعوم، مثل `.PUP`.</string>
+    <string name="core_install_firmware_unsupported">اختر ملف برامج ثابتة مدعوم، مثل .PUP.</string>
     <string name="core_install_content_failed">فشل بدء تثبيت المحتوى.</string>
-    <string name="core_install_content_unsupported">اختر ملف لعبة مدعوم، مثل `VPK`، `ZIP`، `RIF`، أو `work.bin`.</string>
+    <string name="core_install_content_unsupported">اختر ملف لعبة مدعوم، مثل VPK، ZIP، RIF، أو work.bin.</string>
     <string name="core_install_pkg_failed">فشل بدء تثبيت PKG.</string>
-    <string name="core_install_pkg_missing_zrif">أدخل مفتاح zRIF، أو قم بتثبيت `RIF`/`work.bin` المطابق قبل اختيار ملف PKG.</string>
+    <string name="core_install_pkg_missing_zrif">أدخل مفتاح zRIF، أو قم بتثبيت RIF/work.bin المطابق قبل اختيار ملف PKG.</string>
     <string name="core_install_pkg_unsupported">حدد ملف PKG مدعوم.</string>
     <string name="game_launch_requires_firmware">قم بتثبيت البرامج الثابتة الأساسية قبل تشغيل اللعبة.</string>
     <string name="game_launch_requires_firmware_update">قم بتثبيت حزمة تحديث البرامج الثابتة قبل تشغيل اللعبة.</string>
@@ -594,10 +594,10 @@
     <string name="setup_runtime_bridge">حالة النواة</string>
     <string name="setup_runtime_bridge_ready">المحاكي جاهز.</string>
     <string name="setup_content_title">تثبيت اللعبة</string>
-    <string name="setup_content_body">قم بتثبيت الألعاب من ملفات `VPK`، `ZIP`، `RIF`، أو `work.bin` المخزنة على جهازك.</string>
+    <string name="setup_content_body">قم بتثبيت الألعاب من ملفات VPK، ZIP، RIF، أو work.bin المخزنة على جهازك.</string>
     <string name="setup_content_button">تحديد ملف اللعبة</string>
     <string name="setup_pkg_title">تثبيت PKG</string>
-    <string name="setup_pkg_body">تتطلب بعض ملفات PKG ترخيصاً مطابقاً. أدخل مفتاح zRIF أدناه، أو قم بتثبيت `RIF`/`work.bin` المطابق أولاً، ثم اختر ملف PKG.</string>
+    <string name="setup_pkg_body">تتطلب بعض ملفات PKG ترخيصاً مطابقاً. أدخل مفتاح zRIF أدناه، أو قم بتثبيت RIF/work.bin المطابق أولاً، ثم اختر ملف PKG.</string>
     <string name="setup_pkg_zrif_label">مفتاح zRIF</string>
     <string name="setup_pkg_zrif_placeholder">الصق مفتاح zRIF هنا</string>
     <string name="setup_pkg_button">اختيار ملف PKG</string>
@@ -701,7 +701,7 @@
     <string name="common_cancel">إلغاء</string>
     <string name="save_manager_backup_all_title">النسخ الاحتياطي لجميع عمليات الحفظ</string>
     <string name="save_manager_backup_all_body">قم بإنشاء نسخة احتياطية واحدة بتنسيق ZIP تحتوي على كل مجلد حفظ، أو قم باستعادة مجلدات الحفظ من نسخة احتياطية كاملة سابقة.</string>
-    <string name="save_manager_backup_all">نسخ احتياطي للكل</string>
+    <string name="save_manager_backup_all">نسخ احتياطي</string>
     <string name="save_manager_restore_all">استعادة الكل</string>
     <string name="save_manager_backup_all_success">تم إجراء نسخ احتياطي لـ %1$d من مجلدات الحفظ.</string>
     <string name="save_manager_backup_all_failed">فشل إجراء النسخ الاحتياطي لجميع عمليات الحفظ.</string>
@@ -752,7 +752,7 @@
     <string name="settings_storage_migration_failed">تعذر نقل مساحة التخزين</string>
     <string name="install_dialog_content_try_repair">إذا كانت هذه صورة VPK أو ZIP صالحة، فحاول "إصلاح وتثبيت" من مربع حوار تثبيت اللعبة.</string>
     <string name="install_dialog_archive_unreadable">تعذرت قراءة الأرشيف. قد يكون تالفًا أو غير مكتمل.</string>
-    <string name="install_dialog_archive_missing_metadata">لا يحتوي الأرشيف على بيانات Vita الوصفية للتثبيت مثل `sce_sys/param.sfo` أو `theme.xml`.</string>
+    <string name="install_dialog_archive_missing_metadata">لا يحتوي الأرشيف على بيانات Vita الوصفية للتثبيت مثل sce_sys/param.sfo أو theme.xml.</string>
     <string name="install_dialog_repack_preparing">جارٍ تجهيز أرشيف ZIP متوافق…</string>
     <string name="install_dialog_repack_entry">جارٍ إعادة الحزم: %1$s</string>
     <string name="install_dialog_repack_installing">جارٍ تثبيت ملف ZIP المُعاد بناؤه…</string>
@@ -1015,4 +1015,13 @@
     <string name="settings_help_gyro_smoothing">يصفي ضوضاء المستشعر واهتزاز اليد. تتفاعل القيم الأقل بشكل أسرع؛ وتشعر القيم الأعلى بثبات أكبر ولكنها تضيف مقدارًا صغيرًا من التأخير.</string>
     <string name="settings_gyro_unavailable">لا يوفر هذا الجهاز مستشعر الحركة المطلوب للوضع المحدد.</string>
     <string name="settings_touch_controls_section">عناصر التحكم باللمس</string>
+    <string name="settings_gpu_driver_detected_device">تم الاكتشاف: %1$s · %2$s</string>
+    <string name="settings_gpu_driver_device_hint">تظهر برامج التشغيل المتوافقة أولاً. اضغط على بطاقة برنامج التشغيل لرؤية شرائح Snapdragon المدعومة.</string>
+    <string name="settings_gpu_driver_compatibility">التوافق مع Snapdragon</string>
+    <string name="settings_gpu_driver_best_match">أفضل تطابق</string>
+    <string name="settings_gpu_driver_compatible">متوافق</string>
+    <string name="settings_gpu_driver_other_family">عائلة Adreno مختلفة</string>
+    <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: ‏Snapdragon 845/855/865/888 والعديد من طرز سلسلتي Snapdragon 6/7</string>
+    <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: ‏Snapdragon 8 Gen 1/2/3 و8s Gen 3 وطرازات Snapdragon 7 الحديثة و6 Gen 1/3</string>
+    <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: ‏Snapdragon 8 Elite Gen 5 و8 Gen 5 و8 Elite و8s Gen 4 و6 Gen 4</string>
 </resources>

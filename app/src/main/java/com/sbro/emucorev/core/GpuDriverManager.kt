@@ -2,9 +2,11 @@ package com.sbro.emucorev.core
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.util.Locale
 import java.util.zip.ZipInputStream
 
 data class InstalledGpuDriver(
@@ -128,5 +130,42 @@ class GpuDriverManager(private val context: Context) {
             val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
             if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
         }
+    }
+}
+
+object GpuDriverCompatibility {
+    fun supportsAdrenoToolsCustomDrivers(): Boolean {
+        val deviceInfo = buildList {
+            add(Build.BOARD)
+            add(Build.BRAND)
+            add(Build.DEVICE)
+            add(Build.HARDWARE)
+            add(Build.MANUFACTURER)
+            add(Build.MODEL)
+            add(Build.PRODUCT)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                add(Build.SOC_MANUFACTURER)
+                add(Build.SOC_MODEL)
+            }
+        }
+            .joinToString(" ")
+            .lowercase(Locale.US)
+        return supportsAdrenoToolsCustomDrivers(deviceInfo)
+    }
+
+    internal fun supportsAdrenoToolsCustomDrivers(deviceInfo: String): Boolean {
+        val normalizedDeviceInfo = deviceInfo.lowercase(Locale.US)
+        val qualcommSignals = listOf(
+            "adreno", "qcom", "qualcomm", "qti", "snapdragon", "msm", "sdm",
+            "sm8", "sm7", "sm6", "kalama", "lahaina", "taro", "waipio"
+        )
+        if (qualcommSignals.any { it in normalizedDeviceInfo }) return true
+
+        val knownNonAdrenoSignals = listOf(
+            "mediatek", "mtk", "dimensity", "helio", "exynos", "mali", "kirin",
+            "hisilicon", "tensor", "unisoc", "spreadtrum", "powervr", "imgtec"
+        )
+        return knownNonAdrenoSignals.none { it in normalizedDeviceInfo } &&
+            Regex("""\bsm[0-9]{3,4}\b""").containsMatchIn(normalizedDeviceInfo)
     }
 }

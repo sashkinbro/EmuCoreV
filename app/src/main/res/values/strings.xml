@@ -92,7 +92,7 @@
     <string name="save_manager_import_unknown_target">Choose a game save card before importing this archive, or use an archive with a single save folder.</string>
     <string name="save_manager_backup_all_title">All saves backup</string>
     <string name="save_manager_backup_all_body">Create one ZIP backup with every save folder, or restore save folders from a previous full backup.</string>
-    <string name="save_manager_backup_all">Back up all</string>
+    <string name="save_manager_backup_all">Backup</string>
     <string name="save_manager_restore_all">Restore all</string>
     <string name="save_manager_backup_all_success">Backed up %1$d save folders.</string>
     <string name="save_manager_backup_all_failed">Failed to back up all saves.</string>
@@ -222,7 +222,7 @@
     <string name="catalog_filter_any_rating">Any rating</string>
     <string name="catalog_filters_clear">Clear filters</string>
     <string name="catalog_empty_title">Catalog database not found</string>
-    <string name="catalog_empty_body">Add `psvita_games.db` to enable the local catalog.</string>
+    <string name="catalog_empty_body">Add psvita_games.db to enable the local catalog.</string>
     <string name="catalog_no_results_title">No matches found</string>
     <string name="catalog_no_results_body">Try a different title, year, or spelling.</string>
     <string name="catalog_profile_menu">Profile list</string>
@@ -386,7 +386,7 @@
     <string name="settings_change_folder">Change folder</string>
     <string name="settings_clear_folder">Clear folder</string>
     <string name="settings_storage_title">Storage</string>
-    <string name="settings_storage_body">Emulator data is stored under the selected storage root. Installed games are in `vita/ux0/app`, shader cache and temporary files are in `cache`, and patches are in `patch`.</string>
+    <string name="settings_storage_body">Emulator data is stored under the selected storage root. Installed games are in vita/ux0/app, shader cache and temporary files are in cache, and patches are in patch.</string>
     <string name="settings_change_storage">Change storage</string>
     <string name="settings_storage_location_internal">Device storage</string>
     <string name="settings_storage_location_sd">SD card</string>
@@ -690,11 +690,11 @@
     <string name="game_launch_failed">Failed to launch this game.</string>
     <string name="folder_picker_failed">Failed to use the selected folder.</string>
     <string name="core_install_firmware_failed">Failed to start firmware installation.</string>
-    <string name="core_install_firmware_unsupported">Choose a supported firmware file, such as `.PUP`.</string>
+    <string name="core_install_firmware_unsupported">Choose a supported firmware file, such as .PUP.</string>
     <string name="core_install_content_failed">Failed to start content installation.</string>
-    <string name="core_install_content_unsupported">Choose a supported game archive, such as `VPK` or `ZIP`.</string>
+    <string name="core_install_content_unsupported">Choose a supported game archive, such as VPK or ZIP.</string>
     <string name="core_install_pkg_failed">Failed to start PKG installation.</string>
-    <string name="core_install_pkg_missing_zrif">Enter a zRIF key, or install the matching `RIF`/`work.bin` before choosing a PKG file.</string>
+    <string name="core_install_pkg_missing_zrif">Enter a zRIF key, or install the matching RIF/work.bin before choosing a PKG file.</string>
     <string name="core_install_pkg_unsupported">Select a supported PKG file.</string>
     <string name="game_launch_requires_firmware">Install the base firmware before launching a game.</string>
     <string name="game_launch_requires_firmware_update">Install the firmware update package before launching a game.</string>
@@ -714,7 +714,7 @@
     <string name="install_dialog_vitamin_unsupported">Some VPK files may not install correctly. Try normal installation first; if it fails, use Repair and install, or install the matching PKG and license.</string>
     <string name="install_dialog_content_try_repair">If this is a valid VPK or ZIP image, try Repair and install from the game install dialog.</string>
     <string name="install_dialog_archive_unreadable">The archive could not be read. It may be damaged or incomplete.</string>
-    <string name="install_dialog_archive_missing_metadata">The archive does not contain Vita install metadata such as `sce_sys/param.sfo` or `theme.xml`.</string>
+    <string name="install_dialog_archive_missing_metadata">The archive does not contain Vita install metadata such as sce_sys/param.sfo or theme.xml.</string>
     <string name="install_dialog_repack_preparing">Preparing a compatible ZIP archive…</string>
     <string name="install_dialog_repack_entry">Repacking: %1$s</string>
     <string name="install_dialog_repack_installing">Installing the rebuilt ZIP…</string>
@@ -1014,4 +1014,13 @@
     <string name="settings_help_gyro_smoothing">Filters sensor noise and hand shake. Lower values react faster; higher values feel steadier but add a small amount of latency.</string>
     <string name="settings_gyro_unavailable">This device does not expose the motion sensor required by the selected mode.</string>
     <string name="settings_touch_controls_section">Touch Controls</string>
+    <string name="settings_gpu_driver_detected_device">Detected: %1$s · %2$s</string>
+    <string name="settings_gpu_driver_device_hint">Compatible drivers are shown first. Tap a driver card to see supported Snapdragon chips.</string>
+    <string name="settings_gpu_driver_compatibility">Snapdragon compatibility</string>
+    <string name="settings_gpu_driver_best_match">Best match</string>
+    <string name="settings_gpu_driver_compatible">Compatible</string>
+    <string name="settings_gpu_driver_other_family">Different Adreno family</string>
+    <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 and many Snapdragon 6/7 series</string>
+    <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, recent Snapdragon 7 series, and 6 Gen 1/3</string>
+    <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4, and 6 Gen 4</string>
 </resources>

@@ -29,6 +29,72 @@ data class AppUpdateRelease(
     val hasParallelApk: Boolean = !parallelApkDownloadUrl.isNullOrBlank()
 }
 
+internal data class AppUpdateAsset(
+    val name: String,
+    val downloadUrl: String?,
+    val sizeBytes: Long?
+)
+
+internal data class ClassifiedAppUpdateAssets(
+    val regular: AppUpdateAsset?,
+    val parallel: AppUpdateAsset?
+)
+
+internal fun classifyAppUpdateAssets(assets: List<AppUpdateAsset>): ClassifiedAppUpdateAssets {
+    var regular: AppUpdateAsset? = null
+    var parallel: AppUpdateAsset? = null
+    assets.forEach { asset ->
+        if (!asset.name.endsWith(".apk", ignoreCase = true)) return@forEach
+        if (asset.name.contains("parallel", ignoreCase = true)) {
+            if (parallel == null && !asset.downloadUrl.isNullOrBlank()) parallel = asset
+        } else if (regular == null && !asset.downloadUrl.isNullOrBlank()) {
+            regular = asset
+        }
+    }
+    return ClassifiedAppUpdateAssets(regular = regular, parallel = parallel)
+}
+
+internal fun parseAppUpdateReleaseList(json: String): List<AppUpdateRelease> {
+    val items = JSONArray(json)
+    return buildList {
+        for (index in 0 until items.length()) {
+            val item = items.optJSONObject(index) ?: continue
+            add(parseAppUpdateRelease(item))
+        }
+    }
+}
+
+internal fun parseAppUpdateRelease(root: JSONObject): AppUpdateRelease {
+    val assets = root.optJSONArray("assets")
+    val releaseAssets = buildList {
+        if (assets == null) return@buildList
+        for (index in 0 until assets.length()) {
+            val asset = assets.getJSONObject(index)
+            add(
+                AppUpdateAsset(
+                    name = asset.optString("name"),
+                    downloadUrl = asset.optString("browser_download_url").takeIf(String::isNotBlank),
+                    sizeBytes = asset.optLong("size").takeIf { it > 0L }
+                )
+            )
+        }
+    }
+    val classifiedAssets = classifyAppUpdateAssets(releaseAssets)
+    return AppUpdateRelease(
+        tagName = root.optString("tag_name"),
+        name = root.optString("name"),
+        body = root.optString("body"),
+        publishedAt = root.optString("published_at"),
+        htmlUrl = root.optString("html_url"),
+        apkAssetName = classifiedAssets.regular?.name,
+        apkDownloadUrl = classifiedAssets.regular?.downloadUrl,
+        apkSizeBytes = classifiedAssets.regular?.sizeBytes,
+        parallelApkAssetName = classifiedAssets.parallel?.name,
+        parallelApkDownloadUrl = classifiedAssets.parallel?.downloadUrl,
+        parallelApkSizeBytes = classifiedAssets.parallel?.sizeBytes
+    )
+}
+
 class AppUpdateRepository(private val context: Context) {
     private val cachePrefs = context.applicationContext.getSharedPreferences(CACHE_PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -41,66 +107,8 @@ class AppUpdateRepository(private val context: Context) {
             forceRefresh = forceRefresh
         ) ?: return emptyList()
         return runCatching {
-            parseReleaseList(json)
+            parseAppUpdateReleaseList(json)
         }.getOrDefault(emptyList())
-    }
-
-    private fun parseRelease(json: String): AppUpdateRelease {
-        val root = JSONObject(json)
-        return parseRelease(root)
-    }
-
-    private fun parseReleaseList(json: String): List<AppUpdateRelease> {
-        val items = JSONArray(json)
-        return buildList {
-            for (index in 0 until items.length()) {
-                val item = items.optJSONObject(index) ?: continue
-                add(parseRelease(item))
-            }
-        }
-    }
-
-    private fun parseRelease(root: JSONObject): AppUpdateRelease {
-        val assets = root.optJSONArray("assets")
-        var apkAssetName: String? = null
-        var apkDownloadUrl: String? = null
-        var apkSizeBytes: Long? = null
-        var parallelApkAssetName: String? = null
-        var parallelApkDownloadUrl: String? = null
-        var parallelApkSizeBytes: Long? = null
-        if (assets != null) {
-            for (index in 0 until assets.length()) {
-                val asset = assets.getJSONObject(index)
-                val name = asset.optString("name")
-                if (!name.endsWith(".apk", ignoreCase = true)) continue
-                val downloadUrl = asset.optString("browser_download_url").takeIf { it.isNotBlank() }
-                val sizeBytes = asset.optLong("size").takeIf { it > 0L }
-                if (name.contains("parallel", ignoreCase = true)) {
-                    if (parallelApkDownloadUrl == null) {
-                        parallelApkAssetName = name
-                        parallelApkDownloadUrl = downloadUrl
-                        parallelApkSizeBytes = sizeBytes
-                    }
-                } else if (apkDownloadUrl == null) {
-                    apkAssetName = name
-                    apkDownloadUrl = downloadUrl
-                    apkSizeBytes = sizeBytes
-                }
-            }
-        }
-        return AppUpdateRelease(
-            tagName = root.optString("tag_name"),
-            name = root.optString("name"),
-            body = root.optString("body"),
-            publishedAt = root.optString("published_at"),
-            htmlUrl = root.optString("html_url"),
-            apkAssetName = apkAssetName,
-            apkDownloadUrl = apkDownloadUrl,
-            apkSizeBytes = apkSizeBytes,
-            parallelApkAssetName = parallelApkAssetName,
-            parallelApkDownloadUrl = parallelApkDownloadUrl,
-            parallelApkSizeBytes = parallelApkSizeBytes
-        )
     }
 
     private fun hasNetwork(): Boolean {
