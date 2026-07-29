@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -20,7 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -1172,17 +1174,13 @@ private fun MenuTabs(
 ) {
     val palette = emulationMenuPalette()
     val tabs = emulationMenuTabs()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = horizontalContentPadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (horizontalContentPadding > 0.dp) {
-            Spacer(modifier = Modifier.width(horizontalContentPadding))
-        }
-        tabs.forEach { item ->
+        items(tabs, key = { it.tab }) { item ->
             val selected = selectedTab == item.tab
             Surface(
                 onClick = { onSelected(item.tab) },
@@ -1204,9 +1202,6 @@ private fun MenuTabs(
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
                 )
             }
-        }
-        if (horizontalContentPadding > 0.dp) {
-            Spacer(modifier = Modifier.width(horizontalContentPadding))
         }
     }
 }

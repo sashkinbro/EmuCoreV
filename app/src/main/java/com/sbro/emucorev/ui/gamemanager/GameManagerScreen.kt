@@ -68,6 +68,7 @@ import com.sbro.emucorev.ui.common.SettingHelpButton
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -591,6 +592,77 @@ private fun GamepadProfileSection(
     defaults: VitaCoreConfig,
     onUpdate: ((VitaCoreConfig) -> VitaCoreConfig) -> Unit
 ) {
+    SectionCard(title = stringResource(R.string.settings_touch_controls_section)) {
+        ToggleRow(
+            stringResource(R.string.settings_touch_haptics),
+            config.touchHaptics,
+            stringResource(R.string.settings_help_touch_haptics),
+            { onUpdate { it.copy(touchHaptics = defaults.touchHaptics) } }
+        ) { enabled -> onUpdate { it.copy(touchHaptics = enabled) } }
+        IntChoiceRow(
+            title = stringResource(R.string.settings_touch_haptics_preset),
+            description = stringResource(R.string.settings_help_touch_haptics_preset),
+            selected = config.touchHapticsPreset,
+            options = listOf(
+                VitaCoreConfig.TOUCH_HAPTICS_PRESET_SOFT to stringResource(R.string.settings_touch_haptics_preset_soft),
+                VitaCoreConfig.TOUCH_HAPTICS_PRESET_BALANCED to stringResource(R.string.settings_touch_haptics_preset_balanced),
+                VitaCoreConfig.TOUCH_HAPTICS_PRESET_CRISP to stringResource(R.string.settings_touch_haptics_preset_crisp),
+                VitaCoreConfig.TOUCH_HAPTICS_PRESET_STRONG to stringResource(R.string.settings_touch_haptics_preset_strong)
+            ),
+            enabled = config.touchHaptics,
+            onReset = { onUpdate { it.copy(touchHapticsPreset = defaults.touchHapticsPreset) } }
+        ) { value -> onUpdate { it.copy(touchHapticsPreset = value) } }
+        SliderRow(
+            title = stringResource(R.string.settings_touch_haptics_strength),
+            description = stringResource(R.string.settings_help_touch_haptics_strength),
+            valueText = stringResource(R.string.settings_gamepad_percent_value, config.touchHapticsStrength),
+            value = config.touchHapticsStrength.toFloat(),
+            valueRange = 10f..100f,
+            steps = 17,
+            enabled = config.touchHaptics,
+            onReset = { onUpdate { it.copy(touchHapticsStrength = defaults.touchHapticsStrength) } },
+            onChange = { value -> onUpdate { it.copy(touchHapticsStrength = value.roundToInt()) } }
+        )
+    }
+    SectionCard(title = stringResource(R.string.settings_gyro_mode)) {
+        IntChoiceRow(
+            title = stringResource(R.string.settings_gyro_mode),
+            description = stringResource(R.string.settings_help_gyro_mode),
+            selected = config.gyroMode,
+            options = listOf(
+                VitaCoreConfig.GYRO_MODE_OFF to stringResource(R.string.settings_gyro_off),
+                VitaCoreConfig.GYRO_MODE_AIM to stringResource(R.string.settings_gyro_aim),
+                VitaCoreConfig.GYRO_MODE_STEERING to stringResource(R.string.settings_gyro_steering)
+            ),
+            onReset = { onUpdate { it.copy(gyroMode = defaults.gyroMode) } }
+        ) { value -> onUpdate { it.copy(gyroMode = value) } }
+        if (config.gyroMode != VitaCoreConfig.GYRO_MODE_OFF) {
+            SliderRow(
+                title = stringResource(R.string.settings_gyro_sensitivity),
+                description = stringResource(R.string.settings_help_gyro_sensitivity),
+                valueText = stringResource(R.string.settings_gamepad_percent_value, config.gyroSensitivity),
+                value = config.gyroSensitivity.toFloat(),
+                valueRange = 25f..300f,
+                steps = 10,
+                onReset = { onUpdate { it.copy(gyroSensitivity = defaults.gyroSensitivity) } },
+                onChange = { value -> onUpdate { it.copy(gyroSensitivity = value.roundToInt()) } }
+            )
+            SliderRow(
+                title = stringResource(R.string.settings_gyro_smoothing),
+                description = stringResource(R.string.settings_help_gyro_smoothing),
+                valueText = stringResource(R.string.settings_gamepad_percent_value, config.gyroSmoothing),
+                value = config.gyroSmoothing.toFloat(),
+                valueRange = 0f..90f,
+                steps = 8,
+                onReset = { onUpdate { it.copy(gyroSmoothing = defaults.gyroSmoothing) } },
+                onChange = { value -> onUpdate { it.copy(gyroSmoothing = value.roundToInt()) } }
+            )
+            ToggleRow(stringResource(R.string.settings_gyro_invert_x), config.gyroInvertX, stringResource(R.string.settings_gyro_invert_x_desc), { onUpdate { it.copy(gyroInvertX = defaults.gyroInvertX) } }) { enabled -> onUpdate { it.copy(gyroInvertX = enabled) } }
+            if (config.gyroMode == VitaCoreConfig.GYRO_MODE_AIM) {
+                ToggleRow(stringResource(R.string.settings_gyro_invert_y), config.gyroInvertY, stringResource(R.string.settings_gyro_invert_y_desc), { onUpdate { it.copy(gyroInvertY = defaults.gyroInvertY) } }) { enabled -> onUpdate { it.copy(gyroInvertY = enabled) } }
+            }
+        }
+    }
     SectionCard(title = stringResource(R.string.settings_gamepad_section)) {
         SliderRow(
             title = stringResource(R.string.settings_gamepad_deadzone),
@@ -682,6 +754,43 @@ private fun ChoiceRow(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun IntChoiceRow(
+    title: String,
+    description: String = title,
+    selected: Int,
+    options: List<Pair<Int, String>>,
+    enabled: Boolean = true,
+    onReset: (() -> Unit)? = null,
+    onSelected: (Int) -> Unit
+) {
+    SettingContainer(
+        title = title,
+        description = description,
+        onReset = onReset,
+        enabled = enabled
+    ) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            options.forEach { (value, label) ->
+                FilterChip(
+                    selected = selected == value,
+                    enabled = enabled,
+                    onClick = { onSelected(value) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    ),
+                    label = { Text(label) }
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun ToggleRow(
     title: String,
@@ -710,16 +819,18 @@ private fun SliderRow(
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int = 0,
+    enabled: Boolean = true,
     onReset: () -> Unit,
     onChange: (Float) -> Unit
 ) {
-    SettingContainer(title = title, description = description, onReset = onReset) {
+    SettingContainer(title = title, description = description, onReset = onReset, enabled = enabled) {
         Text(
             text = valueText,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Slider(
+            enabled = enabled,
             value = value,
             onValueChange = onChange,
             valueRange = valueRange,

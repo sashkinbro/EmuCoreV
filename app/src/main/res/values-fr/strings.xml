@@ -918,7 +918,6 @@
     <string name="settings_customization_touch_style_glass">Héritage</string>
     <string name="settings_customization_touch_style_neon">Moderne</string>
     <string name="settings_game_menu_tab">Menu du jeu</string>
-    <string name="settings_game_menu_preview_section">Aperçu du menu</string>
     <string name="settings_customization_drawer_section">Tiroir de navigation</string>
     <string name="settings_customization_touch_style_arcade">Arcade</string>
     <string name="settings_customization_touch_style_minimal">Minimaliste</string>
@@ -932,7 +931,6 @@
     <string name="settings_drawer_style_compact">Compact</string>
     <string name="settings_drawer_style_glass">Verre</string>
     <string name="settings_drawer_style_console">Console</string>
-    <string name="settings_game_menu_layout_section">Disposition du menu</string>
     <string name="settings_game_menu_layout_help">Modifie la structure et la navigation du menu en jeu. Les onglets, la visibilité du contenu, les actions de sécurité et les commandes de la manette restent partagés entre chaque disposition.</string>
     <string name="settings_game_menu_layout_sidebar">Barre latérale</string>
     <string name="settings_game_menu_layout_dashboard">Tableau de bord</string>
@@ -983,4 +981,34 @@
     <string name="feedback_discard_action">Ignorer</string>
 
     <string name="settings_customization_drawer_style">Apparence du tiroir</string>
+    <string name="settings_touch_haptics">Retour haptique tactile</string>
+    <string name="settings_touch_haptics_desc">Émettre un bref retour haptique lors d\'une pression sur les commandes à l\'écran.</string>
+    <string name="settings_help_touch_haptics">Ajoute un léger retour haptique Android lorsqu\'un bouton à l\'écran, une direction de la croix directionnelle ou un stick analogique est pressé pour la première fois. Cela affecte uniquement la sensation de contrôle et ne modifie pas les vibrations du jeu.</string>
+    <string name="settings_touch_haptics_strength">Intensité du retour haptique</string>
+    <string name="settings_help_touch_haptics_strength">Contrôle l\'intensité des vibrations de l\'appareil utilisée pour le retour haptique tactile. Augmentez-la si la vibration est trop subtile, ou baissez-la pour jouer plus silencieusement en mode portable.</string>
+    <string name="settings_touch_haptics_test">Tester le retour haptique</string>
+    <string name="settings_touch_haptics_test_desc">Émet une brève vibration en u…5552 tokens truncated…ings_touch_haptics_test_desc">Запускает короткую вибрацию с текущей силой тактильной отдачи.</string>
+    <string name="settings_help_touch_haptics_test">Воспроизводит тот же тактильный импульс устройства, что и наэкранные элементы управления, чтобы вы могли настроить силу отдачи перед запуском игры.</string>
+    <string name="settings_touch_haptics_preset">Тактильный отклик</string>
+    <string name="settings_touch_haptics_preset_soft">Мягкий</string>
+    <string name="settings_touch_haptics_preset_balanced">Сбалансированный</string>
+    <string name="settings_touch_haptics_preset_crisp">Четкий</string>
+    <string name="settings_touch_haptics_preset_strong">Сильный</string>
+    <string name="settings_touch_haptics_preset_desc">«Мягкий» — нежный, «Сбалансированный» — естественный по умолчанию, «Четкий» — короткий и точный, а «Сильный» — более глубокий для слабых вибромоторов.</string>
+    <string name="settings_help_touch_haptics_preset">При «Мягком» используется нежное нажатие и очень легкое отпускание. «Сбалансированный» дает четкое нажатие с более легким отпусканием и используется по умолчанию. «Четкий» использует самую короткую и резкую пару для точных касаний. В режиме «Сильный» используются более глубокие и длинные импульсы для телефонов с более слабыми вибромоторами. Ползунок силы настраивает масштаб выбранного ощущения.</string>
+    <string name="settings_gyro_mode">Управление гироскопом</string>
+    <string name="settings_gyro_off">Выкл.</string>
+    <string name="settings_gyro_aim">Прицеливание — правый стик</string>
+    <string name="settings_gyro_steering">Руль — левый стик</string>
+    <string name="settings_gyro_sensitivity">Чувствительность гироскопа</string>
+    <string name="settings_gyro_smoothing">Сглаживание гироскопа</string>
+    <string name="settings_gyro_invert_x">Инвертировать гироскоп по горизонтали</string>
+    <string name="settings_gyro_invert_x_desc">Меняет местами движения влево и вправо.</string>
+    <string name="settings_gyro_invert_y">Инвертировать гироскоп по вертикали</string>
+    <string name="settings_gyro_invert_y_desc">Меняет местами движения прицеливания вверх и вниз.</string>
+    <string name="settings_help_gyro_mode">«Прицеливание» преобразует скорость вращения телефона в движение правого аналогового стика для управления камерой в шутерах и автоматически возвращается в центр, когда телефон перестает двигаться. «Руль» преобразует наклон телефона в движение левого аналогового стика для гоночных игр и калибрует текущий угол как центральный в начале игры. Выбранный режим используется только во время работы игры и требует наличия соответствующего датчика движения.</string>
+    <string name="settings_help_gyro_sensitivity">Управляет тем, насколько сильно движение телефона отклоняет эмулируемый аналоговый стик. Рекомендуется настраивать этот параметр для каждой игры отдельно, поскольку в играх используются разные кривые отклика для камеры и руля.</string>
+    <string name="settings_help_gyro_smoothing">Фильтрует шум датчика и дрожание рук. Более низкие значения реагируют быстрее; более высокие значения кажутся более стабильными, но добавляют небольшую задержку.</string>
+    <string name="settings_gyro_unavailable">Данное устройство не оснащено датчиком движения, необходимым для выбранного режима.</string>
+    <string name="settings_touch_controls_section">Сенсорное управление</string>
 </resources>

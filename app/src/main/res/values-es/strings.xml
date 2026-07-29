@@ -918,7 +918,6 @@
     <string name="settings_customization_touch_style_glass">Retro</string>
     <string name="settings_customization_touch_style_neon">Moderno</string>
     <string name="settings_game_menu_tab">Menú del juego</string>
-    <string name="settings_game_menu_preview_section">Vista previa del menú</string>
     <string name="settings_customization_drawer_section">Menú de navegación</string>
     <string name="settings_customization_touch_style_arcade">Arcade</string>
     <string name="settings_customization_touch_style_minimal">Minimalista</string>
@@ -932,7 +931,6 @@
     <string name="settings_drawer_style_compact">Compacto</string>
     <string name="settings_drawer_style_glass">Cristal</string>
     <string name="settings_drawer_style_console">Consola</string>
-    <string name="settings_game_menu_layout_section">Diseño del menú</string>
     <string name="settings_game_menu_layout_help">Cambia la estructura y navegación del menú del juego. Las pestañas, la visibilidad del contenido, las acciones de seguridad y los controles del gamepad siguen siendo compartidos entre cada diseño.</string>
     <string name="settings_game_menu_layout_sidebar">Barra lateral</string>
     <string name="settings_game_menu_layout_dashboard">Panel</string>
@@ -983,4 +981,34 @@
     <string name="feedback_discard_action">Descartar</string>
 
     <string name="settings_customization_drawer_style">Apariencia del cajón</string>
+    <string name="settings_touch_haptics">Respuesta háptica táctil</string>
+    <string name="settings_touch_haptics_desc">Reproducir una breve vibración al presionar los controles en pantalla.</string>
+    <string name="settings_help_touch_haptics">Añade una ligera respuesta háptica de Android cuando se presiona por primera vez un botón en pantalla, una dirección del D-pad o un stick analógico. Esto solo afecta la sensación de control y no cambia la vibración del juego.</string>
+    <string name="settings_touch_haptics_strength">Intensidad de respuesta háptica</string>
+    <string name="settings_help_touch_haptics_strength">Controla la intensidad de vibración del dispositivo utilizada para la respuesta háptica táctil. Auméntala si la vibración es muy sutil, o redúcela para jugar de forma portátil más silenciosa.</string>
+    <string name="settings_touch_haptics_test">Probar respuesta háptica</string>
+    <string name="settings_touch_haptics_test_desc">Reproduce una breve vibración usando la intensidad de respuesta háptica actual.</string>
+    <string name="settings_help_touch_haptics_test">Reproduce el mismo pulso háptico del dispositivo que utilizan los controles en pantalla, para que puedas ajustar la intensidad antes de iniciar un juego.</string>
+    <string name="settings_touch_haptics_preset">Sensación háptica</string>
+    <string name="settings_touch_haptics_preset_soft">Suave</string>
+    <string name="settings_touch_haptics_preset_balanced">Equilibrado</string>
+    <string name="settings_touch_haptics_preset_crisp">Nítido</string>
+    <string name="settings_touch_haptics_preset_strong">Fuerte</string>
+    <string name="settings_touch_haptics_preset_desc">Suave es delicado, Equilibrado es el valor predeterminado natural, Nítido es corto y preciso, y Fuerte es más profundo para motores de vibración más débiles.</string>
+    <string name="settings_help_touch_haptics_preset">Suave usa una presión delicada y una liberación muy ligera. Equilibrado da una presión clara con una liberación más ligera y es el predeterminado. Nítido usa el par más corto y agudo para toques precisos. Fuerte usa pulsos más profundos y largos para teléfonos con motores de vibración más débiles. El control deslizante de intensidad ajusta la sensación seleccionada.</string>
+    <string name="settings_gyro_mode">Control de giroscopio</string>
+    <string name="settings_gyro_off">Desactivado</string>
+    <string name="settings_gyro_aim">Apuntar — joystick derecho</string>
+    <string name="settings_gyro_steering">Conducción — joystick izquierdo</string>
+    <string name="settings_gyro_sensitivity">Sensibilidad del giroscopio</string>
+    <string name="settings_gyro_smoothing">Suavizado del giroscopio</string>
+    <string name="settings_gyro_invert_x">Invertir giroscopio horizontal</string>
+    <string name="settings_gyro_invert_x_desc">Invierte el movimiento de izquierda y derecha.</string>
+    <string name="settings_gyro_invert_y">Invertir giroscopio vertical</string>
+    <string name="settings_gyro_invert_y_desc">Invierte el movimiento de apuntado hacia arriba y hacia abajo.</string>
+    <string name="settings_help_gyro_mode">"Apuntar" convierte la velocidad de rotación del teléfono en el joystick analógico derecho para el control de la cámara en los juegos de disparos y vuelve automáticamente al centro cuando el teléfono deja de moverse. "Conducción" convierte la inclinación mantenida del teléfono en el joystick analógico izquierdo para los juegos de carreras y calibra el ángulo actual como centro cuando comienza el juego. El modo seleccionado se usa solo mientras se ejecuta un juego y requiere el sensor de movimiento correspondiente.</string>
+    <string name="settings_help_gyro_sensitivity">Controla la fuerza con la que el movimiento del teléfono desvía el joystick analógico emulado. Se recomiendan ajustes específicos por juego porque usan diferentes curvas de respuesta de cámara y dirección.</string>
+    <string name="settings_help_gyro_smoothing">Filtra el ruido del sensor y el temblor de las manos. Los valores más bajos reaccionan más rápido; los valores más altos se sienten más estables pero añaden un poco de latencia.</string>
+    <string name="settings_gyro_unavailable">Este dispositivo no dispone del sensor de movimiento requerido por el modo seleccionado.</string>
+    <string name="settings_touch_controls_section">Controles táctiles</string>
 </resources>

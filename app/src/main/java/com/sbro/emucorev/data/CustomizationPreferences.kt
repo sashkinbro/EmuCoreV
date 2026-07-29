@@ -103,6 +103,7 @@ class CustomizationPreferences(context: Context) : Closeable {
             putString(KEY_BACKGROUND_PATH, path)
             putString(KEY_BACKGROUND_MIME_TYPE, mimeType)
         }
+        _settings.value = readSettings()
     }
 
     fun setCoverSizePercent(value: Int) {

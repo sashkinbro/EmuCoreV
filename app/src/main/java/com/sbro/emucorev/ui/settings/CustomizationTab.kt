@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.TextFields
@@ -58,6 +59,7 @@ import com.sbro.emucorev.data.CustomizationSettings
 import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.theme.ThemeMode
 import com.sbro.emucorev.ui.library.LibraryGridSizing
+import java.io.File
 
 @Composable
 fun CustomizationTab(
@@ -137,15 +139,21 @@ fun CustomizationTab(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp)
         ) {
             CustomizationActionRow(
-                icon = Icons.Rounded.Image,
-                title = stringResource(R.string.customization_background_select),
-                subtitle = stringResource(
+                icon = if (settings.backgroundPath == null) {
+                    Icons.Rounded.Image
+                } else {
+                    Icons.Rounded.CheckCircle
+                },
+                title = stringResource(
                     if (settings.backgroundPath == null) {
-                        R.string.customization_background_default
+                        R.string.customization_background_select
                     } else {
                         R.string.customization_background_selected
                     }
                 ),
+                subtitle = settings.backgroundPath?.let { File(it).name }
+                    ?: stringResource(R.string.customization_background_default),
+                selected = settings.backgroundPath != null,
                 onClick = { backgroundPicker.launch(arrayOf("image/*", "video/*")) }
             )
         }
@@ -176,6 +184,11 @@ fun CustomizationTab(
         DrawerStyleSection(
             selected = settings.drawerVisualStyle,
             onSelected = viewModel::updateDrawerVisualStyle
+        )
+
+        GameMenuStyleSection(
+            selected = settings.gameMenuLayoutStyle,
+            onSelected = viewModel::updateGameMenuLayoutStyle
         )
 
         SectionCard(
@@ -434,17 +447,24 @@ private fun CustomizationActionRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     subtitle: String,
+    selected: Boolean = false,
     onClick: () -> Unit
 ) {
+    val accent = if (selected) Color(0xFF4FC3A1) else MaterialTheme.colorScheme.primary
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+        color = if (selected) {
+            accent.copy(alpha = 0.12f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+        },
         border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+            if (selected) 2.dp else 1.dp,
+            if (selected) accent.copy(alpha = 0.72f)
+            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
         )
     ) {
         Row(
@@ -454,10 +474,10 @@ private fun CustomizationActionRow(
             Surface(
                 modifier = Modifier.size(48.dp),
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                color = accent.copy(alpha = 0.14f)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(icon, contentDescription = null, tint = accent)
                 }
             }
             Spacer(Modifier.width(14.dp))

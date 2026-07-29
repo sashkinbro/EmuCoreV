@@ -9,10 +9,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,50 +21,38 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.GameMenuLayoutStyle
 import com.sbro.emucorev.ui.common.SectionCard
-import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 
 @Composable
-fun GameMenuCustomizationTab(
+internal fun GameMenuStyleSection(
     selected: GameMenuLayoutStyle,
     onSelected: (GameMenuLayoutStyle) -> Unit
 ) {
-    Column(
-        modifier = Modifier.padding(horizontal = ScreenHorizontalPadding),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+    SectionCard(
+        title = stringResource(R.string.settings_game_menu_tab),
+        contentPadding = PaddingValues(vertical = 14.dp)
     ) {
-        SectionCard(
-            title = stringResource(R.string.settings_game_menu_preview_section),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp)
+        Text(
+            text = stringResource(R.string.settings_game_menu_layout_help),
+            modifier = Modifier.padding(horizontal = 14.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = stringResource(R.string.settings_game_menu_layout_help),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = stringResource(R.string.settings_game_menu_layout_section),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.primary
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                GameMenuLayoutStyle.entries.forEach { style ->
-                    StylePreviewCard(
-                        selected = selected == style,
-                        label = gameMenuLayoutLabel(style),
-                        onClick = { onSelected(style) }
-                    ) {
-                        GameMenuLayoutMiniature(style)
-                    }
+            items(GameMenuLayoutStyle.entries, key = { it.name }) { style ->
+                StylePreviewCard(
+                    selected = selected == style,
+                    label = gameMenuLayoutLabel(style),
+                    onClick = { onSelected(style) }
+                ) {
+                    GameMenuLayoutMiniature(style)
                 }
             }
         }

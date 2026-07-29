@@ -918,7 +918,6 @@
     <string name="settings_customization_touch_style_glass">Klasik nesil</string>
     <string name="settings_customization_touch_style_neon">Modern</string>
     <string name="settings_game_menu_tab">Oyun menüsü</string>
-    <string name="settings_game_menu_preview_section">Menü önizlemesi</string>
     <string name="settings_customization_drawer_section">Gezinme çekmecesi</string>
     <string name="settings_customization_touch_style_arcade">Arcade</string>
     <string name="settings_customization_touch_style_minimal">Minimal</string>
@@ -932,7 +931,6 @@
     <string name="settings_drawer_style_compact">Kompakt</string>
     <string name="settings_drawer_style_glass">Cam</string>
     <string name="settings_drawer_style_console">Konsol</string>
-    <string name="settings_game_menu_layout_section">Menü düzeni</string>
     <string name="settings_game_menu_layout_help">Oyun içi menünün yapısını ve gezinmesini değiştirir. Sekmeler, içerik görünürlüğü, güvenlik eylemleri ve gamepad kontrolleri her düzende ortak kalır.</string>
     <string name="settings_game_menu_layout_sidebar">Kenar çubuğu</string>
     <string name="settings_game_menu_layout_dashboard">Kontrol paneli</string>
@@ -983,4 +981,34 @@
     <string name="feedback_discard_action">At</string>
 
     <string name="settings_customization_drawer_style">Çekmece görünümü</string>
+    <string name="settings_touch_haptics">Dokunmatik kontrol titreşimi</string>
+    <string name="settings_touch_haptics_desc">Ekrandaki kontrollere basıldığında kısa bir titreşim oynatır.</string>
+    <string name="settings_help_touch_haptics">Ekranda bir düğmeye, D-pad yönüne veya analog çubuğa ilk basıldığında hafif bir Android titreşim geri bildirimi ekler. Bu sadece kontrol hissini etkiler ve oyun içi titreşimi değiştirmez.</string>
+    <string name="settings_touch_haptics_strength">Dokunmatik titreşim gücü</string>
+    <string name="settings_help_touch_haptics_strength">Dokunmatik kontrol titreşimi için kullanılan cihaz titreşim gücünü kontrol eder. Titreşim çok hafifse artırın veya daha sessiz bir el cihazı deneyimi için azaltın.</string>
+    <string name="settings_touch_haptics_test">Dokunmatik titreşimi test et</string>
+    <string name="settings_touch_haptics_test_desc">Geçerli dokunmatik titreşim gücünü kullanarak kısa bir titreşim oynatır.</string>
+    <string name="settings_help_touch_haptics_test">Ekrandaki kontrollerin kullandığı aynı cihaz titreşim darbesini oynatır, böylece bir oyunu başlatmadan önce gücü ayarlayabilirsiniz.</string>
+    <string name="settings_touch_haptics_preset">Dokunma hissi</string>
+    <string name="settings_touch_haptics_preset_soft">Yumuşak</string>
+    <string name="settings_touch_haptics_preset_balanced">Dengeli</string>
+    <string name="settings_touch_haptics_preset_crisp">Keskin</string>
+    <string name="settings_touch_haptics_preset_strong">Güçlü</string>
+    <string name="settings_touch_haptics_preset_desc">Yumuşak hafiftir, Dengeli doğal varsayılandır, Keskin kısa ve isabetlidir, Güçlü ise zayıf titreşim motorları için daha derindir.</string>
+    <string name="settings_help_touch_haptics_preset">Yumuşak, hafif bir basma ve çok hafif bir bırakma kullanır. Dengeli, daha hafif bir bırakma ile net bir basma sağlar ve varsayılandır. Keskin, hassas dokunuşlar için en kısa ve en keskin çifti kullanır. Güçlü, daha zayıf titreşim motorlarına sahip telefonlar için daha derin, daha uzun vuruşlar kullanır. Güç kaydırıcısı seçilen hissi ölçeklendirir.</string>
+    <string name="settings_gyro_mode">Jiroskop kontrolü</string>
+    <string name="settings_gyro_off">Kapalı</string>
+    <string name="settings_gyro_aim">Nişan alma — sağ çubuk</string>
+    <string name="settings_gyro_steering">Direksiyon — sol çubuk</string>
+    <string name="settings_gyro_sensitivity">Jiroskop hassasiyeti</string>
+    <string name="settings_gyro_smoothing">Jiroskop yumuşatma</string>
+    <string name="settings_gyro_invert_x">Yatay jiroskopu ters çevir</string>
+    <string name="settings_gyro_invert_x_desc">Sol ve sağ hareketi tersine çevirir.</string>
+    <string name="settings_gyro_invert_y">Dikey jiroskopu ters çevir</string>
+    <string name="settings_gyro_invert_y_desc">Yukarı ve aşağı nişan alma hareketini tersine çevirir.</string>
+    <string name="settings_help_gyro_mode">"Nişan alma", nişancı oyunlarında kamera kontrolü için telefonun dönüş hızını sağ analog çubuğa dönüştürür ve telefon hareket etmeyi bıraktığında otomatik olarak merkeze döner. "Direksiyon", yarış oyunları için telefonun eğimini sol analog çubuğa dönüştürür ve oyun başladığında mevcut açıyı merkez olarak kalibre eder. Seçilen mod yalnızca oyun çalışırken kullanılır ve ilgili hareket sensörünü gerektirir.</string>
+    <string name="settings_help_gyro_sensitivity">Telefon hareketinin emüle edilmiş analog çubuğu ne kadar güçlü saptıracağını kontrol eder. Oyunlar farklı kamera ve direksiyon tepki eğrileri kullandığından, oyuna özel ayarlamalar önerilir.</string>
+    <string name="settings_help_gyro_smoothing">Sensör gürültüsünü ve el titremesini filtreler. Daha düşük değerler daha hızlı tepki verir; daha yüksek değerler daha dengeli hissettirir ancak az miktarda gecikme ekler.</string>
+    <string name="settings_gyro_unavailable">Bu cihaz, seçilen modun gerektirdiği hareket sensörüne sahip değil.</string>
+    <string name="settings_touch_controls_section">Dokunmatik Kontroller</string>
 </resources>

@@ -921,7 +921,6 @@
     <string name="settings_customization_touch_style_glass">Ретро</string>
     <string name="settings_customization_touch_style_neon">Сучасний</string>
     <string name="settings_game_menu_tab">Ігрове меню</string>
-    <string name="settings_game_menu_preview_section">Попередній перегляд меню</string>
     <string name="settings_customization_drawer_section">Бокове меню</string>
     <string name="settings_customization_touch_style_arcade">Аркадний</string>
     <string name="settings_customization_touch_style_minimal">Мінімалістичний</string>
@@ -935,7 +934,6 @@
     <string name="settings_drawer_style_compact">Компактний</string>
     <string name="settings_drawer_style_glass">Скло</string>
     <string name="settings_drawer_style_console">Консоль</string>
-    <string name="settings_game_menu_layout_section">Макет меню</string>
     <string name="settings_game_menu_layout_help">Змінює структуру та навігацію внутрішньоігрового меню. Вкладки, видимість контенту, дії щодо безпеки та елементи керування геймпада залишаються спільними для кожного макета.</string>
     <string name="settings_game_menu_layout_sidebar">Бічна панель</string>
     <string name="settings_game_menu_layout_dashboard">Панель керування</string>
@@ -986,4 +984,34 @@
     <string name="feedback_discard_action">Скинути</string>
 
     <string name="settings_customization_drawer_style">Вигляд меню</string>
+    <string name="settings_touch_haptics">Тактильна віддача сенсорного керування</string>
+    <string name="settings_touch_haptics_desc">Короткочасна тактильна віддача при натисканні на екранні елементи керування.</string>
+    <string name="settings_help_touch_haptics">Додає легку тактильну віддачу Android при першому натисканні екранної кнопки, напрямку хрестовини або аналогового стіка. Це впливає лише на відчуття від керування і не змінює вібрацію в грі.</string>
+    <string name="settings_touch_haptics_strength">Сила тактильної віддачі</string>
+    <string name="settings_help_touch_haptics_strength">Керує силою вібрації пристрою для тактильної віддачі сенсорного керування. Збільште її, якщо віддача надто слабка, або зменште для тихішої гри в портативному режимі.</string>
+    <string name="settings_touch_haptics_test">Перевірка тактильної віддачі</string>
+    <string name="settings_touch_haptics_test_desc">Запускає коротку вібрацію з поточною силою тактильної віддачі.</string>
+    <string name="settings_help_touch_haptics_test">Відтворює той самий тактильний імпульс пристрою, що й екранні елементи керування, щоб ви могли налаштувати силу віддачі перед запуском гри.</string>
+    <string name="settings_touch_haptics_preset">Тактильний відгук</string>
+    <string name="settings_touch_haptics_preset_soft">М\'який</string>
+    <string name="settings_touch_haptics_preset_balanced">Збалансований</string>
+    <string name="settings_touch_haptics_preset_crisp">Чіткий</string>
+    <string name="settings_touch_haptics_preset_strong">Сильний</string>
+    <string name="settings_touch_haptics_preset_desc">«М\'який» — ніжний, «Збалансований» — природний за замовчуванням, «Чіткий» — короткий і точний, а «Сильний» — глибший для слабких вібромоторів.</string>
+    <string name="settings_help_touch_haptics_preset">«М\'який» використовує ніжне натискання та дуже легке відпускання. «Збалансований» дає чітке натискання з легшим відпусканням і є стандартним. «Чіткий» використовує найкоротшу та найрізкішу пару для точних дотиків. «Сильний» використовує глибші та довші імпульси для телефонів зі слабкішими вібромоторами. Повзунок сили налаштовує вибране відчуття.</string>
+    <string name="settings_gyro_mode">Керування гіроскопом</string>
+    <string name="settings_gyro_off">Вимк.</string>
+    <string name="settings_gyro_aim">Прицілювання — правий стік</string>
+    <string name="settings_gyro_steering">Кермо — лівий стік</string>
+    <string name="settings_gyro_sensitivity">Чутливість гіроскопа</string>
+    <string name="settings_gyro_smoothing">Згладжування гіроскопа</string>
+    <string name="settings_gyro_invert_x">Інвертувати гіроскоп по горизонталі</string>
+    <string name="settings_gyro_invert_x_desc">Міняє місцями рухи вліво та вправо.</string>
+    <string name="settings_gyro_invert_y">Інвертувати гіроскоп по вертикалі</string>
+    <string name="settings_gyro_invert_y_desc">Міняє місцями рух прицілювання вгору та вниз.</string>
+    <string name="settings_help_gyro_mode">«Прицілювання» перетворює швидкість обертання телефону на рух правого аналогового стіка для керування камерою в шутерах і автоматично повертається в центр, коли телефон перестає рухатися. «Кермо» перетворює нахил телефону на рух лівого аналогового стіка для гоночних ігор і калібрує поточний кут як центральний на початку гри. Вибраний режим використовується лише під час роботи гри і вимагає наявності відповідного датчика руху.</string>
+    <string name="settings_help_gyro_sensitivity">Керує тим, наскільки сильно рух телефону відхиляє емульований аналоговий стік. Рекомендується налаштовувати цей параметр для кожної гри окремо, оскільки ігри використовують різні криві відгуку для камери та кермування.</string>
+    <string name="settings_help_gyro_smoothing">Фільтрує шум датчика та тремтіння рук. Менші значення реагують швидше; більші значення здаються стабільнішими, але додають невелику затримку.</string>
+    <string name="settings_gyro_unavailable">Цей пристрій не має датчика руху, необхідного для вибраного режиму.</string>
+    <string name="settings_touch_controls_section">Сенсорне керування</string>
 </resources>
