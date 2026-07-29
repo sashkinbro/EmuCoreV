@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.sbro.emucorev.ui.emulation
 
 import androidx.compose.foundation.BorderStroke
@@ -16,10 +18,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.horizontalScroll
@@ -51,6 +53,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -118,7 +121,7 @@ fun EmulationQuickBar(
     onOpenMenu: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val palette = emulationMenuPalette()
     Surface(
         modifier = modifier.padding(top = topInset + 12.dp),
@@ -192,7 +195,8 @@ fun EmulationGameMenu(
     callbacks: EmulationMenuCallbacks,
     modifier: Modifier = Modifier
 ) {
-    val navInsets = WindowInsets.navigationBars.asPaddingValues()
+    val statusInsets = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues()
+    val navInsets = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues()
     val palette = emulationMenuPalette()
     var selectedTab by remember { mutableStateOf(EmulationMenuTab.Game) }
     val scrollState = rememberScrollState()
@@ -228,8 +232,8 @@ fun EmulationGameMenu(
                 .padding(
                     start = if (expandHorizontally) 20.dp else 16.dp,
                     end = if (expandHorizontally) 20.dp else 16.dp,
-                    top = 14.dp,
-                    bottom = 16.dp + navInsets.calculateBottomPadding()
+                    top = statusInsets.calculateTopPadding(),
+                    bottom = navInsets.calculateBottomPadding()
                 ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -503,6 +507,17 @@ private fun DisplayTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks
         subtitle = "",
         badge = MenuBadge.Live
     ) {
+        MenuChipRow(
+            label = stringResource(R.string.settings_frame_limit),
+            selected = config.frameLimit,
+            options = listOf(
+                0 to stringResource(R.string.settings_frame_limit_unlimited),
+                30 to "30 FPS",
+                45 to "45 FPS",
+                60 to "60 FPS"
+            ),
+            onSelected = callbacks.onFrameLimit
+        )
         MenuToggleRow(
             label = stringResource(R.string.settings_core_fps_hack),
             checked = config.fpsHack,
@@ -1107,6 +1122,7 @@ data class EmulationMenuCallbacks(
     val onStretchDisplay: (Boolean) -> Unit,
     val onHighAccuracy: (Boolean) -> Unit,
     val onFpsHack: (Boolean) -> Unit,
+    val onFrameLimit: (Int) -> Unit,
     val onTurboMode: (Boolean) -> Unit,
     val onDisableSurfaceSync: (Boolean) -> Unit,
     val onShowShaderNotice: (Boolean) -> Unit,
@@ -1310,6 +1326,10 @@ private fun MenuSliderRow(
     onValueChange: (Float) -> Unit
 ) {
     val palette = emulationMenuPalette()
+    var pendingValue by remember(label) { mutableFloatStateOf(value) }
+    LaunchedEffect(value) {
+        pendingValue = value
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1333,8 +1353,9 @@ private fun MenuSliderRow(
             )
         }
         Slider(
-            value = value,
-            onValueChange = onValueChange,
+            value = pendingValue,
+            onValueChange = { pendingValue = it },
+            onValueChangeFinished = { onValueChange(pendingValue) },
             enabled = enabled,
             valueRange = valueRange,
             steps = steps

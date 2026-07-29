@@ -35,6 +35,14 @@ data class StorageMigrationProgress(
 )
 
 object EmulatorStorage {
+    /**
+     * Stable location for configuration, logs, patches and transient cache.
+     * Only the large Vita filesystem is allowed to move to removable storage.
+     */
+    fun runtimeRoot(context: Context): File {
+        return (context.getExternalFilesDir(null) ?: context.filesDir).apply { mkdirs() }
+    }
+
     fun storageRoot(context: Context): File {
         val roots = availableStorageRoots(context)
         val selected = AppPreferences(context).vitaStorageRootPath
@@ -86,6 +94,7 @@ object EmulatorStorage {
                 targetRootPath = storageRoot(context).absolutePath
             )
         val previousRoot = storageRoot(context)
+        migrateLegacyRuntimeData(context, previousRoot)
         val migration = if (migrateExistingData && previousRoot.absolutePath != selectedRoot.absolutePath) {
             migrateRuntimeData(previousRoot, selectedRoot, onMigrationProgress)
         } else {
@@ -94,7 +103,7 @@ object EmulatorStorage {
                 targetRootPath = selectedRoot.absolutePath
             )
         }
-        migrateLegacyCacheRoot(context, selectedRoot)
+        migrateLegacyCacheRoot(context)
         AppPreferences(context).vitaStorageRootPath = selectedRoot.absolutePath
         prepareRuntime(context)
         return migration
@@ -125,11 +134,12 @@ object EmulatorStorage {
     }
 
     fun cacheRoot(context: Context): File {
-        return File(storageRoot(context), "cache").apply { mkdirs() }
+        return File(runtimeRoot(context), "cache").apply { mkdirs() }
     }
 
     fun prepareRuntime(context: Context) {
-        val storageRoot = storageRoot(context)
+        val runtimeRoot = runtimeRoot(context)
+        migrateLegacyRuntimeData(context, storageRoot(context))
         val vitaRoot = vitaRoot(context)
         val cacheRoot = cacheRoot(context)
         listOf(
@@ -140,7 +150,10 @@ object EmulatorStorage {
             File(vitaRoot, "ux0/data"),
             File(vitaRoot, "ux0/user"),
             File(vitaRoot, "vs0"),
-            File(storageRoot, "shaderlog"),
+            File(runtimeRoot, "shaderlog"),
+            File(runtimeRoot, "texturelog"),
+            File(runtimeRoot, "patch"),
+            File(runtimeRoot, "config"),
             File(cacheRoot, "shaders"),
             File(cacheRoot, "logs")
         ).forEach { directory ->
@@ -189,7 +202,7 @@ object EmulatorStorage {
             return StorageMigrationResult(sourceRoot.absolutePath, targetRoot.absolutePath)
         }
         targetRoot.mkdirs()
-        val migrationItems = listOf("vita", "cache", "patch", "shaderlog", "config.yml", "config", "play_time.json")
+        val migrationItems = listOf("vita")
         val totalFiles = migrationItems.sumOf { name -> File(sourceRoot, name).countFiles() }
         onProgress?.invoke(
             StorageMigrationProgress(
@@ -264,13 +277,38 @@ object EmulatorStorage {
         return listFiles().orEmpty().sumOf { it.countFiles() }
     }
 
-    private fun migrateLegacyCacheRoot(context: Context, targetRoot: File) {
+    private fun migrateLegacyCacheRoot(context: Context) {
         val legacyBase = context.externalCacheDir ?: context.cacheDir
         val legacyCache = File(legacyBase, "vita_cache")
-        val targetCache = File(targetRoot, "cache")
+        val targetCache = cacheRoot(context)
         if (legacyCache.exists() && legacyCache.absolutePath != targetCache.absolutePath) {
             copyMissing(legacyCache, targetCache) { _, _, _ -> }
         }
+    }
+
+    private fun migrateLegacyRuntimeData(context: Context, legacyRoot: File) {
+        val targetRoot = runtimeRoot(context)
+        if (!legacyRoot.exists() || legacyRoot.absolutePath == targetRoot.absolutePath) return
+        listOf("cache", "patch", "shaderlog", "texturelog", "config.yml", "config", "play_time.json")
+            .forEach { name ->
+                val source = File(legacyRoot, name)
+                if (source.exists()) {
+                    copyNewer(source, File(targetRoot, name))
+                }
+            }
+    }
+
+    private fun copyNewer(source: File, target: File) {
+        if (source.isDirectory) {
+            target.mkdirs()
+            source.listFiles().orEmpty().forEach { child ->
+                copyNewer(child, File(target, child.name))
+            }
+            return
+        }
+        if (target.exists() && target.lastModified() >= source.lastModified()) return
+        target.parentFile?.mkdirs()
+        source.copyTo(target, overwrite = true)
     }
 
     private fun File.canBeRuntimeRoot(): Boolean {

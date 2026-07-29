@@ -1,5 +1,6 @@
 package com.sbro.emucorev.core.vita
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -27,9 +28,6 @@ import androidx.core.content.FileProvider
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -58,6 +56,7 @@ import com.sbro.emucorev.BuildConfig
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.InstalledGameRepository
+import com.sbro.emucorev.ui.common.ImmersiveMode
 import com.sbro.emucorev.ui.emulation.EmulationOverlayHost
 import com.sbro.emucorev.ui.theme.EmuCoreVTheme
 import java.io.File
@@ -92,7 +91,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     @Keep
     fun getBaseStoragePath(): String {
-        return EmulatorStorage.storageRoot(this).absolutePath
+        return EmulatorStorage.runtimeRoot(this).absolutePath
     }
 
     fun currentGameIdOrIntent(): String {
@@ -126,6 +125,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun getLibraries(): Array<String> = arrayOf("Vita3K")
+
+    override fun shouldForceFullscreen(): Boolean = true
 
     override fun createSDLSurface(context: Context): SDLSurface {
         if (!::inputOverlay.isInitialized) {
@@ -403,6 +404,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         stretchDisplayArea: Boolean,
         disableSurfaceSync: Boolean,
         fpsHack: Boolean,
+        frameLimit: Int,
         turboMode: Boolean,
         showCompileShaders: Boolean,
         pstvMode: Boolean
@@ -469,6 +471,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     @Deprecated("Deprecated in Java")
+    @SuppressLint("GestureBackNavigation")
     override fun onBackPressed() {
         if (overlayBackHandler?.invoke() == true) return
         super.onBackPressed()
@@ -644,11 +647,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     private fun hideSystemBars() {
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        WindowInsetsControllerCompat(window, window.decorView).apply {
-            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            hide(WindowInsetsCompat.Type.systemBars())
-        }
+        setWindowStyle(true)
+        ImmersiveMode.apply(window)
     }
 
     private fun detectPhysicalGamepadConnected(): Boolean {

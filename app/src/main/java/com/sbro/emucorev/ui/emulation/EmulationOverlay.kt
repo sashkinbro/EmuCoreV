@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.sbro.emucorev.ui.emulation
 
 import android.annotation.SuppressLint
@@ -31,7 +33,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -143,6 +145,7 @@ fun EmulationOverlayHost(
             config.stretchDisplayArea,
             config.disableSurfaceSync,
             config.fpsHack,
+            config.frameLimit,
             config.turboMode,
             config.showCompileShaders,
             config.pstvMode
@@ -166,8 +169,7 @@ fun EmulationOverlayHost(
 
     LaunchedEffect(showTouchControls) {
         if (showTouchControls) {
-            repeat(8) {
-                overlayBridge.ensureControllerAttached()
+            while (!overlayBridge.ensureControllerAttached()) {
                 kotlinx.coroutines.delay(350)
             }
         }
@@ -331,6 +333,7 @@ fun EmulationOverlayHost(
             onStretchDisplay = { enabled -> persistConfig { it.copy(stretchDisplayArea = enabled) } },
             onHighAccuracy = { enabled -> persistConfig { it.copy(highAccuracy = enabled) } },
             onFpsHack = { enabled -> persistConfig { it.copy(fpsHack = enabled) } },
+            onFrameLimit = { limit -> persistConfig { it.copy(frameLimit = limit) } },
             onTurboMode = { enabled -> persistConfig { it.copy(turboMode = enabled) } },
             onDisableSurfaceSync = { enabled -> persistConfig { it.copy(disableSurfaceSync = enabled) } },
             onShowShaderNotice = { enabled -> persistConfig { it.copy(showCompileShaders = enabled) } },
@@ -460,7 +463,10 @@ private fun OnScreenControls(
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val cutoutInsets = WindowInsets.displayCutout.asPaddingValues()
     val navInsets = WindowInsets.navigationBars.asPaddingValues()
-    val topInset = maxOf(cutoutInsets.calculateTopPadding(), WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
+    val topInset = maxOf(
+        cutoutInsets.calculateTopPadding(),
+        WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding(),
+    )
     val bottomInset = navInsets.calculateBottomPadding()
     val sideInset = maxOf(
         cutoutInsets.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),

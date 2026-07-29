@@ -148,6 +148,8 @@
     <string name="settings_core_performance_overlay">Leistungs-Overlay</string>
     <string name="settings_core_stretch_display">Anzeigebereich strecken</string>
     <string name="settings_core_fps_hack">FPS-Hack</string>
+    <string name="settings_frame_limit">Bildratenbegrenzung</string>
+    <string name="settings_frame_limit_unlimited">Unbegrenzt</string>
     <string name="settings_core_vsync">Vertikale Synchronisation</string>
     <string name="settings_core_high_accuracy">GPU-Modus mit hoher Genauigkeit</string>
     <string name="settings_core_overlay_detail_title">Daten-Detailgrad im Overlay</string>
@@ -209,6 +211,7 @@
     <string name="settings_help_performance_overlay_position">Legt fest, wo das Leistungs-Overlay auf dem Bildschirm angezeigt wird.\n\nNutze dies, wenn du beim Testen Leistungsdaten sehen musst. Für normales Spielen ausschalten, weil Overlays ablenken und etwas Rendering-Leistung kosten können.</string>
     <string name="settings_help_stretch_display">Füllt mehr vom Bildschirm aus, kann das Bild jedoch strecken.\n\nNutze dies für bessere Schärfe, Skalierung oder visuelle Stabilität in Spielen, die bereits gut laufen. Reduziere es oder nutze den Standard, wenn FPS fallen, das Gerät heiß wird oder die Grafik instabil wird.</string>
     <string name="settings_help_fps_hack">Hebt das normale Frame-Limit in einigen Spielen auf. Dies kann die Geschwindigkeit verbessern, jedoch das Timing stören.\n\nNutze dies zum Testen, Überspringen langsamer Stellen oder für spielbezogene Workarounds. Vermeide es im normalen Spiel, wenn Timing, Physik, Zwischensequenzen oder Dienstprüfungen korrekt bleiben müssen.</string>
+    <string name="settings_help_frame_limit">Begrenzt die dargestellten Bilder, ohne das Timing der emulierten Vita zu ändern. Verwende 30 oder 45 FPS, um Energieverbrauch und Wärmeentwicklung zu reduzieren.</string>
     <string name="settings_help_vsync">Reduziert Screen Tearing, kann aber in einigen Spielen die Leistung verringern.\n\nNutze dies für bessere Schärfe, Skalierung oder visuelle Stabilität in Spielen, die bereits gut laufen. Reduziere es oder nutze den Standard, wenn FPS fallen, das Gerät heiß wird oder die Grafik instabil wird.</string>
     <string name="settings_help_high_accuracy">Kann Grafikprobleme beheben, verringert jedoch normalerweise die Leistung.\n\nNutze dies für bessere Schärfe, Skalierung oder visuelle Stabilität in Spielen, die bereits gut laufen. Reduziere es oder nutze den Standard, wenn FPS fallen, das Gerät heiß wird oder die Grafik instabil wird.</string>
     <string name="settings_help_resolution">Höhere Werte machen das Bild schärfer, verbrauchen aber mehr GPU-Leistung.\n\nNutze dies für bessere Schärfe, Skalierung oder visuelle Stabilität in Spielen, die bereits gut laufen. Reduziere es oder nutze den Standard, wenn FPS fallen, das Gerät heiß wird oder die Grafik instabil wird.</string>

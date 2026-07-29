@@ -50,10 +50,12 @@ std::string format_app_version() {
     return version;
 }
 
-bool initialize_session(const fs::path &storage_path, Root &root_paths, std::unique_ptr<EmuEnvState> &emuenv) {
+bool initialize_session(
+    const fs::path &storage_path,
+    const fs::path &vita_path,
+    Root &root_paths,
+    std::unique_ptr<EmuEnvState> &emuenv) {
     try {
-        const fs::path vita_path = storage_path / "vita" / "";
-
         root_paths.set_static_assets_path({});
         root_paths.set_vita_fs_path(vita_path);
         root_paths.set_log_path(storage_path);
@@ -156,12 +158,7 @@ jint to_firmware_state_mask(const app::FirmwareState &state) {
 extern "C" {
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_prepareFrontend(JNIEnv *, jclass) {
-    return prepare_frontend_runtime() ? JNI_TRUE : JNI_FALSE;
-}
-
-JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_init(JNIEnv *env, jclass, jstring storage_path_str) {
+Vita3K_initWithPaths(JNIEnv *env, jstring storage_path_str, jstring vita_path_str) {
     auto &session = android_session_state();
 
     if (session.emuenv) {
@@ -169,11 +166,11 @@ Java_org_vita3k_emulator_NativeLib_init(JNIEnv *env, jclass, jstring storage_pat
         return JNI_TRUE;
     }
 
-    const std::string storage = jstring_to_string(env, storage_path_str);
-    const fs::path storage_path = fs::path(storage) / "";
+    const fs::path storage_path = fs::path(jstring_to_string(env, storage_path_str)) / "";
+    const fs::path vita_path = fs::path(jstring_to_string(env, vita_path_str)) / "";
     Root root_paths;
     std::unique_ptr<EmuEnvState> emuenv;
-    if (!initialize_session(storage_path, root_paths, emuenv))
+    if (!initialize_session(storage_path, vita_path, root_paths, emuenv))
         return JNI_FALSE;
 
     session.root_paths = std::move(root_paths);
@@ -182,6 +179,24 @@ Java_org_vita3k_emulator_NativeLib_init(JNIEnv *env, jclass, jstring storage_pat
 
     LOG_INFO("Vita3K Android initialised.");
     return JNI_TRUE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_org_vita3k_emulator_NativeLib_prepareFrontend(JNIEnv *, jclass) {
+    return prepare_frontend_runtime() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_org_vita3k_emulator_NativeLib_init(JNIEnv *env, jclass, jstring storage_path_str) {
+    const std::string storage = jstring_to_string(env, storage_path_str);
+    const fs::path storage_path = fs::path(storage) / "";
+    const std::string vita = (storage_path / "vita" / "").string();
+    jstring vita_path_str = env->NewStringUTF(vita.c_str());
+    if (!vita_path_str)
+        return JNI_FALSE;
+    const jboolean result = Vita3K_initWithPaths(env, storage_path_str, vita_path_str);
+    env->DeleteLocalRef(vita_path_str);
+    return result;
 }
 
 JNIEXPORT jboolean JNICALL

@@ -2,6 +2,7 @@
 
 package org.libsdl.app
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
@@ -406,7 +407,10 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
 
         @JvmStatic
         fun setWindowStyle(fullscreen: Boolean) {
-            mSingleton?.sendCommand(COMMAND_CHANGE_WINDOW_STYLE, if (fullscreen) 1 else 0)
+            mSingleton?.let { activity ->
+                val effectiveFullscreen = fullscreen || activity.shouldForceFullscreen()
+                activity.sendCommand(COMMAND_CHANGE_WINDOW_STYLE, if (effectiveFullscreen) 1 else 0)
+            }
         }
 
         @JvmStatic
@@ -1003,6 +1007,12 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         handleNativeState()
     }
 
+    /**
+     * Frontends that exclusively render games may keep SDL immersive even when
+     * the native core requests a temporary windowed style.
+     */
+    open fun shouldForceFullscreen(): Boolean = false
+
     protected fun resumeNativeThread() {
         mNextNativeState = NativeState.RESUMED
         mIsResumedCalled = true
@@ -1136,6 +1146,7 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         nativeQuit()
     }
 
+    @SuppressLint("GestureBackNavigation")
     override fun onBackPressed() {
         val trapBack = nativeGetHintBoolean("SDL_ANDROID_TRAP_BACK_BUTTON", false)
         if (trapBack) {

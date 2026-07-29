@@ -1,24 +1,33 @@
 @file:Suppress("UnstableApiUsage", "DEPRECATION")
 
 import java.io.File
+import java.util.Properties
 
 val androidOpenSslRoot = rootProject.layout.projectDirectory.dir("tools/openssl-test/out").asFile
 val emuCoreVNativeHook = project.layout.projectDirectory.file("src/main/cpp/emucorev/cmake/Vita3KProjectHook.cmake").asFile
 val vita3kNewAssetsDir = project.layout.projectDirectory.dir("src/main/cpp/vita3k/android/app/assets").asFile
 val vita3kLegacyAssetsDir = project.layout.projectDirectory.dir("src/main/cpp/vita3k/android/assets").asFile
 val vita3kAssetsDir = if (vita3kNewAssetsDir.exists()) vita3kNewAssetsDir else vita3kLegacyAssetsDir
+val localBuildProperties = Properties().apply {
+    rootProject.layout.projectDirectory.file("local.properties").asFile
+        .takeIf(File::exists)
+        ?.inputStream()
+        ?.use { input -> load(input) }
+}
+val python3Executable = sequenceOf(
+    providers.gradleProperty("python3.path").orNull,
+    localBuildProperties.getProperty("python3.path"),
+    System.getenv("PYTHON3"),
+    System.getenv("PYTHON")
+).filterNotNull()
+    .map(::File)
+    .firstOrNull(File::isFile)
 
 // vita3k's cmake/vcpkg_android.cmake hard-requires ANDROID_NDK_HOME and VCPKG_ROOT env vars.
 // The EmuCoreV layer must not patch vita3k core, so inject them here for the CMake subprocess.
 run {
     val ndkVersion = "29.0.14206865"
-    val sdkDir = rootProject.layout.projectDirectory.file("local.properties").asFile
-        .takeIf { it.exists() }
-        ?.readLines()
-        ?.firstOrNull { it.startsWith("sdk.dir=") }
-        ?.substringAfter("sdk.dir=")
-        ?.replace("\\:", ":")
-        ?.replace("\\\\", "\\")
+    val sdkDir = localBuildProperties.getProperty("sdk.dir")
         ?: System.getenv("ANDROID_HOME")
         ?: System.getenv("ANDROID_SDK_ROOT")
     val ndkHome: File? = sdkDir?.let { File(it, "ndk/$ndkVersion") }
@@ -65,8 +74,8 @@ android {
         applicationId = "com.sbro.emucorev"
         minSdk = 28
         targetSdk = 37
-        versionCode = 53
-        versionName = "0.1.6"
+        versionCode = 55
+        versionName = "0.1.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -81,6 +90,12 @@ android {
                 arguments += "-DOPENSSL_ROOT_DIR=${androidOpenSslRoot.invariantSeparatorsPath}"
                 arguments += "-DOPENSSL_USE_STATIC_LIBS=TRUE"
                 arguments += "-DCMAKE_PROJECT_Vita3K_INCLUDE=${emuCoreVNativeHook.invariantSeparatorsPath}"
+                // Android dependencies are vendored by the Vita3K tree. Avoid vcpkg trying
+                // to build host tools with MSVC during ordinary Gradle/Android Studio builds.
+                arguments += "-DVCPKG_MANIFEST_INSTALL=OFF"
+                python3Executable?.let { python ->
+                    arguments += "-DPython3_EXECUTABLE=${python.invariantSeparatorsPath}"
+                }
             }
         }
     }

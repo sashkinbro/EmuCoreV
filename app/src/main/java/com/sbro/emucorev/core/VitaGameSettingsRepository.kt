@@ -3,6 +3,7 @@ package com.sbro.emucorev.core
 import android.content.Context
 import org.w3c.dom.Element
 import java.io.File
+import java.io.StringWriter
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.transform.OutputKeys
 import javax.xml.transform.TransformerFactory
@@ -19,7 +20,7 @@ class VitaGameSettingsRepository(private val context: Context) {
 
     private val configDirectory: File
         get() {
-            val base = EmulatorStorage.storageRoot(context)
+            val base = EmulatorStorage.runtimeRoot(context)
             return File(base, "config")
         }
 
@@ -108,6 +109,7 @@ class VitaGameSettingsRepository(private val context: Context) {
                 exportTextures = gpu.boolAttr("export-textures", config.exportTextures),
                 exportAsPng = gpu.boolAttr("export-as-png", config.exportAsPng),
                 fpsHack = gpu.boolAttr("fps-hack", config.fpsHack),
+                frameLimit = FrameLimit.normalize(gpu.intAttr("frame-limit", config.frameLimit)),
                 shaderCache = gpu.boolAttr("shader-cache", config.shaderCache),
                 spirvShader = gpu.boolAttr("spirv-shader", config.spirvShader),
                 textureCache = gpu.boolAttr("texture-cache", config.textureCache),
@@ -213,6 +215,7 @@ class VitaGameSettingsRepository(private val context: Context) {
             setAttribute("export-textures", config.exportTextures.toString())
             setAttribute("export-as-png", config.exportAsPng.toString())
             setAttribute("fps-hack", config.fpsHack.toString())
+            setAttribute("frame-limit", FrameLimit.normalize(config.frameLimit).toString())
             setAttribute("shader-cache", config.shaderCache.toString())
             setAttribute("spirv-shader", config.spirvShader.toString())
             setAttribute("texture-cache", config.textureCache.toString())
@@ -273,10 +276,12 @@ class VitaGameSettingsRepository(private val context: Context) {
             setAttribute("bgm-volume", config.bgmVolume.toString())
         })
 
+        val output = StringWriter()
         TransformerFactory.newInstance().newTransformer().apply {
             setOutputProperty(OutputKeys.INDENT, "yes")
             setOutputProperty(OutputKeys.ENCODING, "utf-8")
-        }.transform(DOMSource(doc), StreamResult(file))
+        }.transform(DOMSource(doc), StreamResult(output))
+        AtomicTextFile.write(file, output.toString())
     }
 
     private fun resolveDriverOverride(mode: String?, rawDriverName: String?, base: VitaCoreConfig): String? {

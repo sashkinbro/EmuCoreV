@@ -56,6 +56,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.FrameLimit
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.data.InstalledVitaGame
@@ -409,6 +410,21 @@ private fun GraphicsProfileSection(
         ToggleRow(stringResource(R.string.settings_core_vsync), config.vSync, stringResource(R.string.settings_help_vsync), { onUpdate { it.copy(vSync = defaults.vSync) } }) { onUpdate { cfg -> cfg.copy(vSync = it) } }
         ToggleRow(stringResource(R.string.settings_core_stretch_display), config.stretchDisplayArea, stringResource(R.string.settings_help_stretch_display), { onUpdate { it.copy(stretchDisplayArea = defaults.stretchDisplayArea) } }) { onUpdate { cfg -> cfg.copy(stretchDisplayArea = it) } }
         ToggleRow(stringResource(R.string.settings_core_fps_hack), config.fpsHack, stringResource(R.string.settings_help_fps_hack), { onUpdate { it.copy(fpsHack = defaults.fpsHack) } }) { onUpdate { cfg -> cfg.copy(fpsHack = it) } }
+        val unlimitedLabel = stringResource(R.string.settings_frame_limit_unlimited)
+        val frameLimitOptions = FrameLimit.supportedValues.map { limit ->
+            if (limit == FrameLimit.UNLIMITED) unlimitedLabel else "$limit FPS"
+        }
+        ChoiceRow(
+            stringResource(R.string.settings_frame_limit),
+            stringResource(R.string.settings_help_frame_limit),
+            if (config.frameLimit == FrameLimit.UNLIMITED) unlimitedLabel else "${config.frameLimit} FPS",
+            frameLimitOptions,
+            { onUpdate { it.copy(frameLimit = defaults.frameLimit) } }
+        ) { selected ->
+            val selectedIndex = frameLimitOptions.indexOf(selected)
+            val limit = FrameLimit.supportedValues.getOrElse(selectedIndex) { FrameLimit.UNLIMITED }
+            onUpdate { cfg -> cfg.copy(frameLimit = limit) }
+        }
         ToggleRow(stringResource(R.string.settings_core_disable_surface_sync), config.disableSurfaceSync, stringResource(R.string.settings_help_disable_surface_sync), { onUpdate { it.copy(disableSurfaceSync = defaults.disableSurfaceSync) } }) { onUpdate { cfg -> cfg.copy(disableSurfaceSync = it) } }
         ToggleRow(stringResource(R.string.settings_core_texture_cache), config.textureCache, stringResource(R.string.settings_help_texture_cache), { onUpdate { it.copy(textureCache = defaults.textureCache) } }) { onUpdate { cfg -> cfg.copy(textureCache = it) } }
         ToggleRow(stringResource(R.string.settings_core_async_pipeline), config.asyncPipelineCompilation, stringResource(R.string.settings_help_async_pipeline), { onUpdate { it.copy(asyncPipelineCompilation = defaults.asyncPipelineCompilation) } }) { onUpdate { cfg -> cfg.copy(asyncPipelineCompilation = it) } }

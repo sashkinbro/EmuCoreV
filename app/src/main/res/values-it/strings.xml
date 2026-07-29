@@ -148,6 +148,8 @@
     <string name="settings_core_performance_overlay">Sovrimpressione prestazioni</string>
     <string name="settings_core_stretch_display">Allarga l\'area di visualizzazione</string>
     <string name="settings_core_fps_hack">Hack FPS</string>
+    <string name="settings_frame_limit">Limite frequenza fotogrammi</string>
+    <string name="settings_frame_limit_unlimited">Illimitato</string>
     <string name="settings_core_vsync">Sincronizzazione verticale (V-Sync)</string>
     <string name="settings_core_high_accuracy">Modalità GPU ad alta precisione</string>
     <string name="settings_core_overlay_detail_title">Livello dati in sovrimpressione</string>
@@ -209,6 +211,7 @@
     <string name="settings_help_performance_overlay_position">Imposta dove appare la sovrimpressione delle prestazioni sullo schermo.\n\nUsalo quando ti servono dati di prestazione durante i test. Spegnilo per giocare normalmente, perché gli overlay distraggono e aggiungono un piccolo costo di rendering.</string>
     <string name="settings_help_stretch_display">Riempie maggiormente lo schermo, ma potrebbe distorcere l\'immagine.\n\nUsalo per migliorare nitidezza, scaling o stabilità visiva nei giochi che già funzionano bene. Riducilo o torna al valore predefinito se calano gli FPS, il telefono scalda o la grafica diventa instabile.</string>
     <string name="settings_help_fps_hack">Rimuove il normale limite di frame in alcuni giochi. Può migliorare la velocità, ma potrebbe alterare il timing.\n\nUsalo per test, per saltare sezioni lente o per aggirare comportamenti specifici di un gioco. Evitalo nel gameplay normale quando timing, fisica, filmati o controlli devono restare accurati.</string>
+    <string name="settings_help_frame_limit">Limita i fotogrammi visualizzati senza modificare il timing della Vita emulata. Usa 30 o 45 FPS per ridurre il consumo energetico e il calore.</string>
     <string name="settings_help_vsync">Riduce il tearing dello schermo, ma in alcuni giochi potrebbe diminuire le prestazioni.\n\nUsalo per migliorare nitidezza, scaling o stabilità visiva nei giochi che già funzionano bene. Riducilo o torna al valore predefinito se calano gli FPS, il telefono scalda o la grafica diventa instabile.</string>
     <string name="settings_help_high_accuracy">Può risolvere problemi grafici, ma di solito riduce le prestazioni.\n\nUsalo per migliorare nitidezza, scaling o stabilità visiva nei giochi che già funzionano bene. Riducilo o torna al valore predefinito se calano gli FPS, il telefono scalda o la grafica diventa instabile.</string>
     <string name="settings_help_resolution">Valori più alti rendono l\'immagine più nitida, ma utilizzano più potenza della GPU.\n\nUsalo per migliorare nitidezza, scaling o stabilità visiva nei giochi che già funzionano bene. Riducilo o torna al valore predefinito se calano gli FPS, il telefono scalda o la grafica diventa instabile.</string>

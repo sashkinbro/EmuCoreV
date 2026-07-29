@@ -148,6 +148,8 @@
     <string name="settings_core_performance_overlay">Sobreposição de desempenho</string>
     <string name="settings_core_stretch_display">Esticar área de exibição</string>
     <string name="settings_core_fps_hack">Hack de FPS</string>
+    <string name="settings_frame_limit">Limite de taxa de quadros</string>
+    <string name="settings_frame_limit_unlimited">Sem limite</string>
     <string name="settings_core_vsync">Sincronização vertical (V-Sync)</string>
     <string name="settings_core_high_accuracy">Modo de GPU de alta precisão</string>
     <string name="settings_core_overlay_detail_title">Nível de dados da sobreposição</string>
@@ -209,6 +211,7 @@
     <string name="settings_help_performance_overlay_position">Define onde a sobreposição de desempenho aparece na tela.\n\nUse isto quando precisar ver informações de desempenho durante testes. Desative para jogar normalmente, pois overlays distraem e adicionam um pequeno custo de renderização.</string>
     <string name="settings_help_stretch_display">Preenche uma maior parte da tela, mas pode esticar a imagem.\n\nUse isto para melhorar nitidez, escala ou estabilidade visual em jogos que já rodam bem. Reduza ou volte ao padrão se os FPS caírem, o telefone aquecer ou os gráficos ficarem instáveis.</string>
     <string name="settings_help_fps_hack">Remove o limite normal de quadros em alguns jogos. Pode melhorar a velocidade, mas pode quebrar a sincronização de tempo.\n\nUse isto para testes, pular partes lentas ou contornar comportamento específico de um jogo. Evite no jogo normal quando timing, física, cenas ou verificações precisam permanecer corretos.</string>
+    <string name="settings_help_frame_limit">Limita os quadros exibidos sem alterar a temporização da Vita emulada. Use 30 ou 45 FPS para reduzir o consumo de energia e o aquecimento.</string>
     <string name="settings_help_vsync">Reduz as quebras (tearing) de imagem, mas pode diminuir o desempenho em alguns jogos.\n\nUse isto para melhorar nitidez, escala ou estabilidade visual em jogos que já rodam bem. Reduza ou volte ao padrão se os FPS caírem, o telefone aquecer ou os gráficos ficarem instáveis.</string>
     <string name="settings_help_high_accuracy">Pode corrigir problemas gráficos, mas geralmente reduz o desempenho.\n\nUse isto para melhorar nitidez, escala ou estabilidade visual em jogos que já rodam bem. Reduza ou volte ao padrão se os FPS caírem, o telefone aquecer ou os gráficos ficarem instáveis.</string>
     <string name="settings_help_resolution">Valores mais altos tornam a imagem mais nítida, mas consomem mais poder da GPU.\n\nUse isto para melhorar nitidez, escala ou estabilidade visual em jogos que já rodam bem. Reduza ou volte ao padrão se os FPS caírem, o telefone aquecer ou os gráficos ficarem instáveis.</string>

@@ -14,7 +14,7 @@ class InputOverlay(context: Context) {
     private val emulator = context as? Emulator
     private val repository = VitaGameSettingsRepository(context)
     private var latestConfig: VitaCoreConfig = repository.loadEffective(emulator?.currentGameIdOrIntent().orEmpty())
-    private var controllerAttached = false
+    private val controllerAttachment = ControllerAttachmentState()
     private var touchControlsRuntimeActive by mutableStateOf(true)
 
     var hasReceivedCoreState by mutableStateOf(false)
@@ -62,11 +62,9 @@ class InputOverlay(context: Context) {
         syncControllerAttachment()
     }
 
-    fun ensureControllerAttached() {
-        if (effectiveOverlayMask != 0) {
-            attachController()
-            controllerAttached = true
-        }
+    fun ensureControllerAttached(): Boolean {
+        syncControllerAttachment()
+        return controllerAttachment.isAttached
     }
 
     fun setTouchControlsActive(active: Boolean) {
@@ -100,11 +98,11 @@ class InputOverlay(context: Context) {
     }
 
     fun dispose() {
-        if (!controllerAttached) {
-            return
-        }
-        detachController()
-        controllerAttached = false
+        controllerAttachment.synchronize(
+            shouldAttach = false,
+            attach = ::attachController,
+            detach = ::detachController
+        )
     }
 
     private fun persistConfig(config: VitaCoreConfig) {
@@ -116,17 +114,11 @@ class InputOverlay(context: Context) {
     }
 
     private fun syncControllerAttachment() {
-        val shouldAttach = effectiveOverlayMask != 0
-        if (shouldAttach) {
-            attachController()
-            controllerAttached = true
-            return
-        }
-        if (shouldAttach == controllerAttached) {
-            return
-        }
-        detachController()
-        controllerAttached = shouldAttach
+        controllerAttachment.synchronize(
+            shouldAttach = effectiveOverlayMask != 0,
+            attach = ::attachController,
+            detach = ::detachController
+        )
     }
 
     private fun buildDisplayMask(config: VitaCoreConfig): Int {
@@ -143,7 +135,7 @@ class InputOverlay(context: Context) {
         return mask
     }
 
-    external fun attachController()
+    external fun attachController(): Boolean
 
     external fun detachController()
 
