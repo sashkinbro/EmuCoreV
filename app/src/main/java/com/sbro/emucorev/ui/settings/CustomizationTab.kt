@@ -167,6 +167,17 @@ fun CustomizationTab(
             )
         }
 
+        TouchControlStyleSection(
+            settings = settings,
+            onStyleSelected = viewModel::updateTouchControlVisualStyle,
+            onPressEffectSelected = viewModel::updateTouchControlPressEffect
+        )
+
+        DrawerStyleSection(
+            selected = settings.drawerVisualStyle,
+            onSelected = viewModel::updateDrawerVisualStyle
+        )
+
         SectionCard(
             title = stringResource(R.string.customization_text_and_fonts),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp)

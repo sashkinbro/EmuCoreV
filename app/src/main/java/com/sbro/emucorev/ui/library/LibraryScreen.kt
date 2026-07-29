@@ -79,13 +79,13 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.ui.common.LocalImage
 import com.sbro.emucorev.ui.common.CustomizationBackground
 import com.sbro.emucorev.ui.common.NavigationMenuButton
+import com.sbro.emucorev.ui.common.ScreenTopBarSurface
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.LocalCustomizationSettings
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
-import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
 
 private enum class LibraryLayoutMode {
     LIST,
@@ -112,7 +112,7 @@ fun LibraryScreen(
     var layoutMode by rememberSaveable { mutableStateOf(LibraryLayoutMode.LIST) }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     var deleteGameId by remember { mutableStateOf<String?>(null) }
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val gameCountSubtitle = pluralStringResource(
         R.plurals.library_game_count,
         uiState.items.size,
@@ -168,11 +168,7 @@ fun LibraryScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            ScreenTopBarSurface {
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically

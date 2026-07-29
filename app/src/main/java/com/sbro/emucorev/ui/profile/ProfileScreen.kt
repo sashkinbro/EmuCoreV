@@ -101,6 +101,7 @@ import com.sbro.emucorev.data.ProfileCatalogGame
 import com.sbro.emucorev.data.ProfileGameStatus
 import com.sbro.emucorev.ui.common.NavigationBackButton
 import com.sbro.emucorev.ui.common.NavigationMenuButton
+import com.sbro.emucorev.ui.common.ScreenTopBarSurface
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.UrlImage
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
@@ -108,7 +109,6 @@ import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.CompactCardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
-import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
 import com.sbro.emucorev.ui.theme.useMultiColumnLayout
 import java.util.Locale
 
@@ -125,7 +125,7 @@ fun ProfileScreen(
     val proState by remember(context) { ProPurchaseManager.getInstance(context) }.state.collectAsState()
     val configuration = LocalConfiguration.current
     val useDenseCards = configuration.useMultiColumnLayout()
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val guardedBackClick = rememberDebouncedClick(onClick = onBackClick)
     val gridState = rememberLazyGridState()
     var showEmailDialog by rememberSaveable { mutableStateOf(false) }
@@ -362,16 +362,13 @@ private fun ProfileHeader(
     onLayoutMode: (ProfileLayoutMode) -> Unit,
     onShowAccount: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    ScreenTopBarSurface {
         if (onMenuClick != null) {
             NavigationMenuButton(onClick = onMenuClick)
         } else {
             NavigationBackButton(onClick = onBackClick)
         }
+        Spacer(modifier = Modifier.width(12.dp))
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp)

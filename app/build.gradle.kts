@@ -60,8 +60,16 @@ run {
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.google.services)
 }
+
+fun buildConfigString(value: String): String = "\"" + value
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"") + "\""
+
+val feedbackEndpoint = localBuildProperties.getProperty("emucorev.feedback.endpoint").orEmpty()
+val feedbackApiKey = localBuildProperties.getProperty("emucorev.feedback.apiKey").orEmpty()
 
 android {
     namespace = "com.sbro.emucorev"
@@ -76,6 +84,9 @@ android {
         targetSdk = 37
         versionCode = 55
         versionName = "0.1.7"
+
+        buildConfigField("String", "FEEDBACK_ENDPOINT", buildConfigString(feedbackEndpoint))
+        buildConfigField("String", "FEEDBACK_API_KEY", buildConfigString(feedbackApiKey))
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -184,6 +195,8 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.google.play.billing)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.work.runtime)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

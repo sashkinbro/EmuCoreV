@@ -47,11 +47,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
-import com.sbro.emucorev.ui.common.NavigationBackButton
+import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
-import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -63,7 +62,7 @@ fun SetupScreen(
     onInstallLicense: () -> Unit,
     onInstallPkg: (String) -> Unit
 ) {
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     var zrif by rememberSaveable { mutableStateOf("") }
 
     Column(
@@ -78,24 +77,14 @@ fun SetupScreen(
             ),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        Row(
+        ScreenTopBar(
+            title = stringResource(R.string.setup_title),
+            onBackClick = onBackClick,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = ScreenHorizontalPadding),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            NavigationBackButton(onClick = onBackClick)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.setup_title),
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
+            titleMaxLines = 2
+        )
 
         SetupInfoCard(
             icon = Icons.Rounded.Storage,

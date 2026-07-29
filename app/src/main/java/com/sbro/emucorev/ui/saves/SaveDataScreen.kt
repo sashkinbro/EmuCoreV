@@ -71,13 +71,12 @@ import com.sbro.emucorev.data.SaveDataBulkImportResult
 import com.sbro.emucorev.data.SaveDataImportResult
 import com.sbro.emucorev.data.VitaSaveDataEntry
 import com.sbro.emucorev.ui.common.LocalImage
-import com.sbro.emucorev.ui.common.NavigationBackButton
+import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
-import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
 import java.text.SimpleDateFormat
 import java.text.DateFormat
 import java.util.Date
@@ -92,7 +91,7 @@ fun SaveDataScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val backClick = rememberDebouncedClick(onClick = onBackClick)
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     var pendingExportSaveId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -391,26 +390,10 @@ private fun SaveManagerHeader(
     onRefreshClick: () -> Unit,
     onImportClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            NavigationBackButton(onClick = onBackClick)
-            Column(modifier = Modifier.padding(start = 14.dp)) {
-                Text(
-                    text = stringResource(R.string.save_manager_title),
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-        Row {
+    ScreenTopBar(
+        title = stringResource(R.string.save_manager_title),
+        onBackClick = onBackClick,
+        actions = {
             IconButton(onClick = onSearchClick) {
                 Icon(
                     imageVector = if (searchExpanded) Icons.Rounded.Close else Icons.Rounded.Search,
@@ -424,7 +407,7 @@ private fun SaveManagerHeader(
                 Icon(Icons.Rounded.FolderOpen, contentDescription = stringResource(R.string.save_manager_import))
             }
         }
-    }
+    )
 }
 
 @Composable

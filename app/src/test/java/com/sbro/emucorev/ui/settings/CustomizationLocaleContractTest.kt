@@ -41,7 +41,13 @@ class CustomizationLocaleContractTest {
             val nodes = document.getElementsByTagName(tag)
             for (index in 0 until nodes.length) {
                 val name = nodes.item(index).attributes?.getNamedItem("name")?.nodeValue.orEmpty()
-                if (name.startsWith("customization_") || name == "settings_tab_customization") {
+                if (
+                    name.startsWith("customization_") ||
+                    name.startsWith("settings_customization_") ||
+                    name.startsWith("settings_drawer_style_") ||
+                    name.startsWith("settings_game_menu_") ||
+                    name == "settings_tab_customization"
+                ) {
                     keys += name
                 }
             }

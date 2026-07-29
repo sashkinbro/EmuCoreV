@@ -98,6 +98,7 @@ private val SettingsRowInnerVerticalPadding = 14.dp
 enum class SettingsTab(@param:StringRes val titleRes: Int, val icon: ImageVector) {
     General(R.string.settings_tab_general, Icons.Rounded.Tune),
     Customization(R.string.settings_tab_customization, Icons.Rounded.Palette),
+    GameMenu(R.string.settings_game_menu_tab, Icons.Rounded.MoreVert),
     Graphics(R.string.settings_tab_graphics, Icons.Rounded.GraphicEq),
     Audio(R.string.settings_tab_audio, Icons.AutoMirrored.Rounded.VolumeUp),
     Overlay(R.string.settings_tab_overlay, Icons.Rounded.Vibration),
@@ -125,7 +126,7 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val defaults = remember { VitaCoreConfig() }
     var selectedTab by rememberSaveable(initialTab) { mutableStateOf(initialTab) }
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val backupCreatedMessage = stringResource(R.string.settings_backup_created)
     val backupFailedMessage = stringResource(R.string.settings_backup_failed)
     val restoreCompletedMessage = stringResource(R.string.settings_backup_restored)
@@ -310,19 +311,19 @@ private fun SettingsCompactTopBar(
             .padding(
                 start = ScreenHorizontalPadding,
                 end = ScreenHorizontalPadding,
-                top = topInset + 8.dp,
+                top = topInset,
                 bottom = 4.dp
             ),
-        shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 4.dp,
-        shadowElevation = 8.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
+        tonalElevation = 1.dp,
+        shadowElevation = 0.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 10.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             NavigationBackButton(
@@ -332,11 +333,11 @@ private fun SettingsCompactTopBar(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 4.dp, end = 12.dp)
+                    .padding(start = 14.dp, end = 8.dp)
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -344,7 +345,7 @@ private fun SettingsCompactTopBar(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

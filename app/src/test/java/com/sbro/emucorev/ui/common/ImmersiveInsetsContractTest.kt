@@ -40,6 +40,33 @@ class ImmersiveInsetsContractTest {
             "The quick-bar island must stay at its original 12 dp top position",
             "modifier = modifier.padding(top = 12.dp)" in emulationMenu
         )
+
+        listOf(
+            "home/HomeScreen.kt",
+            "library/LibraryScreen.kt",
+            "catalog/CatalogScreen.kt",
+            "detail/GameDetailScreen.kt",
+            "setup/SetupScreen.kt",
+            "profile/ProfileScreen.kt",
+            "saves/SaveDataScreen.kt",
+            "playtime/PlayTimeScreen.kt",
+            "achievements/AchievementsScreen.kt",
+            "gamemanager/GameManagerScreen.kt",
+            "settings/AppLanguageScreen.kt",
+            "settings/VitaLanguageScreen.kt",
+            "settings/GpuDriverScreen.kt",
+            "settings/SettingsScreen.kt"
+        ).forEach { relativePath ->
+            val source = sourceRoot
+                .resolve("com/sbro/emucorev/ui/$relativePath")
+                .readText()
+            assertTrue(
+                "$relativePath must derive its top inset directly from the persistent safe area",
+                Regex(
+                    """val topInset = WindowInsets\.statusBarsIgnoringVisibility\.asPaddingValues\(\)\.calculateTopPadding\(\)"""
+                ).containsMatchIn(source)
+            )
+        }
     }
 
     private fun locateSourceRoot(): Path {

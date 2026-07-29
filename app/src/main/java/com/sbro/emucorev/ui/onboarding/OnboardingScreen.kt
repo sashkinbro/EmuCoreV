@@ -144,8 +144,15 @@ fun OnboardingScreen(
 
     val installFirmwareClick = rememberDebouncedClick(onClick = onInstallFirmware)
     val installFirmwareUpdateClick = rememberDebouncedClick(onClick = onInstallFirmwareUpdate)
-    val backClick = rememberDebouncedClick(onClick = viewModel::goBack)
-    val nextClick = rememberDebouncedClick(onClick = viewModel::goNext)
+    val goToPage: (Int) -> Unit = { page ->
+        val targetPage = page.coerceIn(0, uiState.totalPages - 1)
+        scope.launch {
+            pagerState.animateScrollToPage(targetPage)
+            viewModel.setCurrentPage(targetPage)
+        }
+    }
+    val backClick = { goToPage(pagerState.currentPage - 1) }
+    val nextClick = { goToPage(pagerState.currentPage + 1) }
     val canComplete = uiState.canContinue &&
         firmwareInstalled &&
         firmwareUpdateInstalled &&
@@ -317,7 +324,7 @@ fun OnboardingScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                        if (uiState.currentPage > 0) {
+                        if (pagerState.currentPage > 0) {
                             OutlinedButton(
                                 onClick = backClick,
                                 shape = RoundedCornerShape(12.dp)
@@ -330,7 +337,7 @@ fun OnboardingScreen(
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                        if (uiState.currentPage < uiState.totalPages - 1) {
+                        if (pagerState.currentPage < uiState.totalPages - 1) {
                             Button(
                                 onClick = nextClick,
                                 shape = RoundedCornerShape(12.dp)

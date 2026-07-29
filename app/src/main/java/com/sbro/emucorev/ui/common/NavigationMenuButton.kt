@@ -22,18 +22,18 @@ import com.sbro.emucorev.R
 fun NavigationMenuButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surface,
-    contentColor: Color = MaterialTheme.colorScheme.onSurface,
-    tonalElevation: Dp = 3.dp,
-    shadowElevation: Dp = 5.dp
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
+    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    tonalElevation: Dp = 0.dp,
+    shadowElevation: Dp = 0.dp
 ) {
     Surface(
-        modifier = modifier.size(40.dp),
+        modifier = modifier.size(44.dp),
         shape = RoundedCornerShape(14.dp),
         color = containerColor,
         tonalElevation = tonalElevation,
         shadowElevation = shadowElevation,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
         onClick = rememberDebouncedClick(onClick = onClick)
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -41,7 +41,7 @@ fun NavigationMenuButton(
                 imageVector = Icons.Rounded.Menu,
                 contentDescription = stringResource(R.string.compatibility_menu),
                 tint = contentColor,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(19.dp)
             )
         }
     }

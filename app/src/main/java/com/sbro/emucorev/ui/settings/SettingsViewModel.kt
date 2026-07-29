@@ -27,6 +27,10 @@ import com.sbro.emucorev.data.AppFont
 import com.sbro.emucorev.data.CustomizationFileStore
 import com.sbro.emucorev.data.CustomizationPreferences
 import com.sbro.emucorev.data.CustomizationSettings
+import com.sbro.emucorev.data.DrawerVisualStyle
+import com.sbro.emucorev.data.GameMenuLayoutStyle
+import com.sbro.emucorev.data.TouchControlPressEffect
+import com.sbro.emucorev.data.TouchControlVisualStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
@@ -256,6 +260,22 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun updateAppFont(font: AppFont) {
         if (font == AppFont.CUSTOM && customizationPreferences.current.customFontPath == null) return
         customizationPreferences.setAppFont(font)
+    }
+
+    fun updateTouchControlVisualStyle(style: TouchControlVisualStyle) {
+        customizationPreferences.setTouchControlVisualStyle(style)
+    }
+
+    fun updateTouchControlPressEffect(effect: TouchControlPressEffect) {
+        customizationPreferences.setTouchControlPressEffect(effect)
+    }
+
+    fun updateGameMenuLayoutStyle(style: GameMenuLayoutStyle) {
+        customizationPreferences.setGameMenuLayoutStyle(style)
+    }
+
+    fun updateDrawerVisualStyle(style: DrawerVisualStyle) {
+        customizationPreferences.setDrawerVisualStyle(style)
     }
 
     fun importCustomizationBackground(uri: Uri, onComplete: (Result<Unit>) -> Unit) {

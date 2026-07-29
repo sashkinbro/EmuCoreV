@@ -65,6 +65,7 @@ import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.core.input.InputDeviceClassifier
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.ui.common.SectionCard
+import com.sbro.emucorev.ui.pro.ProBenefitCards
 import com.sbro.emucorev.ui.pro.ProPurchasePanel
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import kotlin.math.roundToInt
@@ -126,7 +127,17 @@ fun SettingsTabContent(
     when (selectedTab) {
         SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings, onOpenVitaLanguageSettings)
         SettingsTab.Customization -> CustomizationTab(uiState.customization, viewModel)
-        SettingsTab.Pro -> ProPurchasePanel(modifier = Modifier.padding(horizontal = ScreenHorizontalPadding))
+        SettingsTab.GameMenu -> GameMenuCustomizationTab(
+            selected = uiState.customization.gameMenuLayoutStyle,
+            onSelected = viewModel::updateGameMenuLayoutStyle
+        )
+        SettingsTab.Pro -> Column(
+            modifier = Modifier.padding(horizontal = ScreenHorizontalPadding),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ProBenefitCards()
+            ProPurchasePanel(showFeatures = false)
+        }
         SettingsTab.Graphics -> GraphicsTab(uiState, defaults, viewModel, onOpenGpuDriverSettings)
         SettingsTab.Audio -> AudioTab(uiState, defaults, viewModel, refreshCoreSettingsClick)
         SettingsTab.Overlay -> OverlayTab(uiState, defaults, viewModel)

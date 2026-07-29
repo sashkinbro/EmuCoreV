@@ -59,6 +59,7 @@ import com.sbro.emucorev.ui.common.LocalImage
 import com.sbro.emucorev.ui.common.CustomizationBackground
 import com.sbro.emucorev.ui.common.NavigationMenuButton
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
+import com.sbro.emucorev.ui.common.ScreenTopBarSurface
 import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.CardContentPadding
@@ -68,7 +69,6 @@ import com.sbro.emucorev.ui.theme.GradientStart
 import com.sbro.emucorev.ui.theme.LocalCustomizationSettings
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
-import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -84,7 +84,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val customization = LocalCustomizationSettings.current
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val openLibraryClick = rememberDebouncedClick {
         viewModel.refresh()
         onOpenLibrary()
@@ -132,11 +132,7 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                ScreenTopBarSurface {
                     Row(
                         modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically

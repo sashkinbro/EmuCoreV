@@ -55,6 +55,20 @@ class SettingsTabsUiContractTest {
         assertTrue("Benefit cards need independent surfaces", "private fun ProBenefitCard(" in proUi)
     }
 
+    @Test
+    fun settingsProTabUsesSeparateBenefitCardsAndPurchaseCard() {
+        val source = sourceRoot()
+            .resolve("ui/settings/SettingsTabContent.kt")
+            .readText()
+        val proBranch = Regex(
+            """SettingsTab\.Pro\s*->\s*Column\([\s\S]*?SettingsTab\.Graphics"""
+        ).find(source)?.value.orEmpty()
+
+        assertTrue("The Pro settings tab must use a dedicated column", proBranch.isNotBlank())
+        assertTrue("The Pro settings tab must render separate benefit cards", "ProBenefitCards()" in proBranch)
+        assertTrue("The purchase card must not duplicate the benefits", "showFeatures = false" in proBranch)
+    }
+
     private fun sourceRoot(): Path {
         val workingDirectory = Path.of(System.getProperty("user.dir"))
         val appModule = sequenceOf(

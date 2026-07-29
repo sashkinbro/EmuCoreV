@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppLanguage
-import com.sbro.emucorev.ui.common.NavigationBackButton
+import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 
@@ -73,7 +73,7 @@ fun AppLanguageScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 16.dp
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val options = remember { AppLanguageOptions }
     val backClick = rememberDebouncedClick(onClick = onBackClick)
 
@@ -107,28 +107,11 @@ fun AppLanguageScreen(
 
 @Composable
 private fun AppLanguageHeader(onBackClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        NavigationBackButton(
-            onClick = onBackClick,
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurface
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.settings_language_picker_title),
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
+    ScreenTopBar(
+        title = stringResource(R.string.settings_language_picker_title),
+        onBackClick = onBackClick,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
 }
 
 @Composable

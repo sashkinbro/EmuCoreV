@@ -6,6 +6,7 @@ import android.annotation.SuppressLint
 import android.view.MotionEvent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -51,6 +52,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -63,6 +65,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -83,6 +86,9 @@ import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.core.vita.Emulator
 import com.sbro.emucorev.core.vita.overlay.InputOverlay
 import com.sbro.emucorev.data.InstalledGameRepository
+import com.sbro.emucorev.data.CustomizationPreferences
+import com.sbro.emucorev.data.TouchControlPressEffect
+import com.sbro.emucorev.data.TouchControlVisualStyle
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -95,6 +101,8 @@ fun EmulationOverlayHost(
     val gameId = remember(activity) { activity.currentGameIdOrIntent() }
     val repository = remember(activity) { VitaGameSettingsRepository(activity) }
     val controlLayoutRepository = remember(activity) { TouchControlLayoutRepository(activity) }
+    val customizationPreferences = remember(activity) { CustomizationPreferences(activity) }
+    val customization by customizationPreferences.settings.collectAsState()
     val overlayBridge = remember(activity) { activity.getmOverlay() }
     var config by remember(activity, gameId) { mutableStateOf(repository.loadEffective(gameId)) }
     var controlLayout by remember(activity) { mutableStateOf(controlLayoutRepository.load()) }
@@ -223,6 +231,7 @@ fun EmulationOverlayHost(
             activity.setOverlayBackHandler(null)
             activity.setOverlayMenuButtonRevealHandler(null)
             activity.setOverlayPauseMenuOpenHandler(null)
+            customizationPreferences.close()
         }
     }
 
@@ -234,6 +243,8 @@ fun EmulationOverlayHost(
                 overlayOpacity = config.overlayOpacity,
                 showTouchSwitch = config.overlayShowTouchSwitch,
                 backTouchEnabled = backTouchEnabled,
+                visualStyle = customization.touchControlVisualStyle,
+                pressEffect = customization.touchControlPressEffect,
                 editMode = controlsEditMode,
                 savedLayout = controlLayout,
                 onLayoutChange = { updated ->
@@ -401,6 +412,7 @@ fun EmulationOverlayHost(
                 paused = effectivePaused,
                 sessionElapsedMs = sessionElapsedMs,
                 expandHorizontally = useSidePanel,
+                layoutStyle = customization.gameMenuLayoutStyle,
                 physicalGamepadConnected = hasPhysicalGamepad,
                 callbacks = menuCallbacks
             )
@@ -449,6 +461,8 @@ private fun OnScreenControls(
     overlayOpacity: Int,
     showTouchSwitch: Boolean,
     backTouchEnabled: Boolean,
+    visualStyle: TouchControlVisualStyle,
+    pressEffect: TouchControlPressEffect,
     editMode: Boolean,
     savedLayout: List<TouchControlElement>?,
     onLayoutChange: (List<TouchControlElement>) -> Unit,
@@ -664,6 +678,8 @@ private fun OnScreenControls(
                 inputHandledByGroup = !editMode && element.id in groupHandledControlIds,
                 externallyPressed = descriptor.controlId?.let { it in pressedGroupControlIds } == true,
                 backTouchEnabled = backTouchEnabled,
+                visualStyle = visualStyle,
+                pressEffect = pressEffect,
                 onSelected = { selectedId = element.id },
                 onElementChange = { updated -> commitLayoutChange { currentControls -> currentControls.replaceElement(updated) } },
                 onBackTouchToggle = onBackTouchToggle,
@@ -967,6 +983,8 @@ private fun TouchControlCanvasItem(
     inputHandledByGroup: Boolean,
     externallyPressed: Boolean,
     backTouchEnabled: Boolean,
+    visualStyle: TouchControlVisualStyle,
+    pressEffect: TouchControlPressEffect,
     onSelected: () -> Unit,
     onElementChange: (TouchControlElement) -> Unit,
     onBackTouchToggle: () -> Unit,
@@ -1071,13 +1089,15 @@ private fun TouchControlCanvasItem(
             TouchControlType.Analog -> {
                 if (editMode) {
                     if (element.analogMode == TouchAnalogMode.TouchArea) {
-                        StaticAnalogTouchArea(alpha = alpha)
+                        StaticAnalogTouchArea(alpha = alpha, visualStyle = visualStyle)
                     } else {
-                        StaticAnalogStick(alpha = alpha)
+                        StaticAnalogStick(alpha = alpha, visualStyle = visualStyle)
                     }
                 } else if (element.analogMode == TouchAnalogMode.TouchArea) {
                     AnalogTouchArea(
                         alpha = alpha,
+                        visualStyle = visualStyle,
+                        pressEffect = pressEffect,
                         onAxisChange = { x, y ->
                             descriptor.axisX?.let { onAxisChange(it, x) }
                             descriptor.axisY?.let { onAxisChange(it, y) }
@@ -1087,6 +1107,8 @@ private fun TouchControlCanvasItem(
                     AnalogStick(
                         analogSize = with(density) { minOf(widthPx, heightPx).toDp() },
                         alpha = alpha,
+                        visualStyle = visualStyle,
+                        pressEffect = pressEffect,
                         onAxisChange = { x, y ->
                             descriptor.axisX?.let { onAxisChange(it, x) }
                             descriptor.axisY?.let { onAxisChange(it, y) }
@@ -1107,7 +1129,9 @@ private fun TouchControlCanvasItem(
                     height = with(density) { heightPx.toDp() },
                     alpha = alpha,
                     shape = descriptor.shape,
-                    pressed = !editMode && (pressed || externallyPressed)
+                    pressed = !editMode && (pressed || externallyPressed),
+                    visualStyle = visualStyle,
+                    pressEffect = pressEffect
                 )
             }
         }
@@ -1115,40 +1139,48 @@ private fun TouchControlCanvasItem(
 }
 
 @Composable
-private fun StaticAnalogTouchArea(alpha: Float) {
+private fun StaticAnalogTouchArea(alpha: Float, visualStyle: TouchControlVisualStyle) {
+    val palette = touchVisualPalette(visualStyle)
     Box(
         modifier = Modifier
             .fillMaxSize()
             .graphicsLayer(alpha = alpha)
-            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.38f), RoundedCornerShape(18.dp)),
+            .background(palette.fill, RoundedCornerShape(18.dp))
+            .border(palette.borderWidth, palette.accent.copy(alpha = 0.70f), RoundedCornerShape(18.dp)),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = stringResource(R.string.emulation_controls_editor_touch_area_mode),
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            color = Color.White.copy(alpha = 0.86f)
+            color = palette.accent
         )
     }
 }
 
 @Composable
-private fun StaticAnalogStick(alpha: Float) {
+private fun StaticAnalogStick(alpha: Float, visualStyle: TouchControlVisualStyle) {
+    val palette = touchVisualPalette(visualStyle)
     Box(
-        modifier = Modifier.fillMaxSize().graphicsLayer(alpha = alpha),
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer(alpha = alpha)
+            .background(palette.fill, CircleShape)
+            .border(palette.borderWidth, palette.accent.copy(alpha = 0.64f), CircleShape),
         contentAlignment = Alignment.Center
     ) {
         Image(
             painter = painterResource(R.drawable.ic_controller_analog_base),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit
+            contentScale = ContentScale.Fit,
+            colorFilter = palette.colorFilter
         )
         Image(
             painter = painterResource(R.drawable.ic_controller_analog_stick),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(0.56f),
-            contentScale = ContentScale.Fit
+            contentScale = ContentScale.Fit,
+            colorFilter = palette.colorFilter
         )
     }
 }
@@ -1543,22 +1575,49 @@ private fun AssetButton(
     alpha: Float,
     shape: Shape,
     pressed: Boolean,
+    visualStyle: TouchControlVisualStyle,
+    pressEffect: TouchControlPressEffect,
     modifier: Modifier = Modifier,
     rotation: Float = 0f
 ) {
-    val scale by animateFloatAsState(targetValue = if (pressed) 1.5f else 1f, animationSpec = tween(80), label = "overlay_asset_scale")
+    val palette = touchVisualPalette(visualStyle)
+    val targetScale = touchPressScale(pressed, pressEffect)
+    val scale by animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = if (pressEffect == TouchControlPressEffect.SPRING) {
+            spring(dampingRatio = 0.42f, stiffness = 520f)
+        } else {
+            tween(90)
+        },
+        label = "overlay_asset_scale"
+    )
     Box(
         modifier = modifier
             .size(width = width, height = height)
             .graphicsLayer(alpha = alpha, rotationZ = rotation, scaleX = scale, scaleY = scale)
-            .clip(shape),
+            .clip(shape)
+            .background(
+                if (pressed && pressEffect == TouchControlPressEffect.GLOW) {
+                    palette.accent.copy(alpha = 0.32f)
+                } else {
+                    palette.fill
+                }
+            )
+            .border(
+                width = if (pressed && pressEffect == TouchControlPressEffect.GLOW) 3.dp else palette.borderWidth,
+                color = palette.accent.copy(
+                    alpha = if (pressed && pressEffect == TouchControlPressEffect.GLOW) 0.95f else 0.62f
+                ),
+                shape = shape
+            ),
         contentAlignment = Alignment.Center
     ) {
         Image(
             painter = painterResource(drawableRes),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit
+            contentScale = ContentScale.Fit,
+            colorFilter = palette.colorFilter
         )
     }
 }
@@ -1566,11 +1625,14 @@ private fun AssetButton(
 @Composable
 private fun AnalogTouchArea(
     alpha: Float,
+    visualStyle: TouchControlVisualStyle,
+    pressEffect: TouchControlPressEffect,
     onAxisChange: (Short, Short) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var sizePx by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
     var startOffset by remember { mutableStateOf(Offset.Zero) }
+    var pressed by remember { mutableStateOf(false) }
     var lastX by remember { mutableIntStateOf(0) }
     var lastY by remember { mutableIntStateOf(0) }
 
@@ -1584,6 +1646,7 @@ private fun AnalogTouchArea(
     }
 
     fun resetArea() {
+        pressed = false
         sendAxis(0f, 0f)
     }
 
@@ -1601,13 +1664,11 @@ private fun AnalogTouchArea(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .graphicsLayer(alpha = alpha)
-            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(18.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.32f), RoundedCornerShape(18.dp))
             .onSizeChanged { sizePx = androidx.compose.ui.geometry.Size(it.width.toFloat(), it.height.toFloat()) }
             .pointerInput(sizePx) {
                 detectDragGestures(
                     onDragStart = { offset ->
+                        pressed = true
                         startOffset = offset
                         sendAxis(0f, 0f)
                     },
@@ -1618,18 +1679,31 @@ private fun AnalogTouchArea(
                     updateArea(change.position)
                 }
             }
-    )
+    ) {
+        TouchControlVisualLayer(
+            alpha = alpha,
+            pressed = pressed,
+            visualStyle = visualStyle,
+            pressEffect = pressEffect,
+            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier.fillMaxSize()
+        )
+    }
 }
 
 @Composable
 private fun AnalogStick(
     analogSize: Dp,
     alpha: Float,
+    visualStyle: TouchControlVisualStyle,
+    pressEffect: TouchControlPressEffect,
     onAxisChange: (Short, Short) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val palette = touchVisualPalette(visualStyle)
     var sizePx by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
     var thumbOffset by remember { mutableStateOf(Offset.Zero) }
+    var pressed by remember { mutableStateOf(false) }
     var lastX by remember { mutableIntStateOf(0) }
     var lastY by remember { mutableIntStateOf(0) }
 
@@ -1643,6 +1717,7 @@ private fun AnalogStick(
     }
 
     fun resetStick() {
+        pressed = false
         thumbOffset = Offset.Zero
         sendAxis(0f, 0f)
     }
@@ -1663,11 +1738,11 @@ private fun AnalogStick(
     Box(
         modifier = modifier
             .size(analogSize)
-            .graphicsLayer(alpha = alpha)
             .onSizeChanged { sizePx = androidx.compose.ui.geometry.Size(it.width.toFloat(), it.height.toFloat()) }
             .pointerInput(sizePx) {
                 detectDragGestures(
                     onDragStart = { offset ->
+                        pressed = true
                         updateStick(offset)
                     },
                     onDragEnd = { resetStick() },
@@ -1679,17 +1754,143 @@ private fun AnalogStick(
             },
         contentAlignment = Alignment.Center
     ) {
-        Image(
-            painter = painterResource(R.drawable.ic_controller_analog_base),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit
+        val scale by animateFloatAsState(
+            targetValue = touchPressScale(pressed, pressEffect),
+            animationSpec = if (pressEffect == TouchControlPressEffect.SPRING) {
+                spring(dampingRatio = 0.42f, stiffness = 520f)
+            } else {
+                tween(90)
+            },
+            label = "overlay_analog_scale"
         )
-        Image(
-            painter = painterResource(R.drawable.ic_controller_analog_stick),
-            contentDescription = null,
-            modifier = Modifier.size(analogSize * 0.56f).offset { IntOffset(thumbOffset.x.roundToInt(), thumbOffset.y.roundToInt()) },
-            contentScale = ContentScale.Fit
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(alpha = alpha, scaleX = scale, scaleY = scale)
+                .background(
+                    if (pressed && pressEffect == TouchControlPressEffect.GLOW) {
+                        palette.accent.copy(alpha = 0.30f)
+                    } else {
+                        palette.fill
+                    },
+                    CircleShape
+                )
+                .border(
+                    if (pressed && pressEffect == TouchControlPressEffect.GLOW) 3.dp else palette.borderWidth,
+                    palette.accent.copy(
+                        alpha = if (pressed && pressEffect == TouchControlPressEffect.GLOW) 0.95f else 0.64f
+                    ),
+                    CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_controller_analog_base),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+                colorFilter = palette.colorFilter
+            )
+            Image(
+                painter = painterResource(R.drawable.ic_controller_analog_stick),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(analogSize * 0.56f)
+                    .offset { IntOffset(thumbOffset.x.roundToInt(), thumbOffset.y.roundToInt()) },
+                contentScale = ContentScale.Fit,
+                colorFilter = palette.colorFilter
+            )
+        }
     }
+}
+
+private data class TouchVisualPalette(
+    val accent: Color,
+    val fill: Color,
+    val borderWidth: Dp,
+    val colorFilter: ColorFilter?
+)
+
+@Composable
+private fun touchVisualPalette(style: TouchControlVisualStyle): TouchVisualPalette = when (style) {
+    TouchControlVisualStyle.CLASSIC -> TouchVisualPalette(
+        accent = Color.White,
+        fill = Color.Transparent,
+        borderWidth = 0.dp,
+        colorFilter = null
+    )
+    TouchControlVisualStyle.LEGACY -> TouchVisualPalette(
+        accent = Color.White,
+        fill = Color.White.copy(alpha = 0.09f),
+        borderWidth = 1.dp,
+        colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.94f))
+    )
+    TouchControlVisualStyle.MODERN -> TouchVisualPalette(
+        accent = MaterialTheme.colorScheme.primary,
+        fill = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+        borderWidth = 2.dp,
+        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
+    )
+    TouchControlVisualStyle.ARCADE -> TouchVisualPalette(
+        accent = Color(0xFFFFD166),
+        fill = Color(0xFF653754).copy(alpha = 0.72f),
+        borderWidth = 2.dp,
+        colorFilter = ColorFilter.tint(Color(0xFFFFD166))
+    )
+    TouchControlVisualStyle.MINIMAL -> TouchVisualPalette(
+        accent = Color.White.copy(alpha = 0.74f),
+        fill = Color.Transparent,
+        borderWidth = 1.dp,
+        colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.74f))
+    )
+}
+
+private fun touchPressScale(pressed: Boolean, effect: TouchControlPressEffect): Float {
+    if (!pressed) return 1f
+    return when (effect) {
+        TouchControlPressEffect.GROW -> 1.18f
+        TouchControlPressEffect.SHRINK -> 0.88f
+        TouchControlPressEffect.SPRING -> 1.14f
+        TouchControlPressEffect.GLOW -> 1.02f
+    }
+}
+
+@Composable
+private fun TouchControlVisualLayer(
+    alpha: Float,
+    pressed: Boolean,
+    visualStyle: TouchControlVisualStyle,
+    pressEffect: TouchControlPressEffect,
+    shape: Shape,
+    modifier: Modifier = Modifier
+) {
+    val palette = touchVisualPalette(visualStyle)
+    val scale by animateFloatAsState(
+        targetValue = touchPressScale(pressed, pressEffect),
+        animationSpec = if (pressEffect == TouchControlPressEffect.SPRING) {
+            spring(dampingRatio = 0.42f, stiffness = 520f)
+        } else {
+            tween(90)
+        },
+        label = "overlay_touch_area_scale"
+    )
+    Box(
+        modifier = modifier
+            .graphicsLayer(alpha = alpha, scaleX = scale, scaleY = scale)
+            .background(
+                if (pressed && pressEffect == TouchControlPressEffect.GLOW) {
+                    palette.accent.copy(alpha = 0.30f)
+                } else {
+                    palette.fill
+                },
+                shape
+            )
+            .border(
+                if (pressed && pressEffect == TouchControlPressEffect.GLOW) 3.dp else palette.borderWidth,
+                palette.accent.copy(
+                    alpha = if (pressed && pressEffect == TouchControlPressEffect.GLOW) 0.95f else 0.66f
+                ),
+                shape
+            )
+    )
 }

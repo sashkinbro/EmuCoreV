@@ -39,6 +39,10 @@ class SettingsBackupRepository(
                             ?.name ?: AppFont.SYSTEM.name
                     )
                     .put("textSizePercent", customizationPreferences.current.textSizePercent)
+                    .put("touchControlVisualStyle", customizationPreferences.current.touchControlVisualStyle.name)
+                    .put("touchControlPressEffect", customizationPreferences.current.touchControlPressEffect.name)
+                    .put("gameMenuLayoutStyle", customizationPreferences.current.gameMenuLayoutStyle.name)
+                    .put("drawerVisualStyle", customizationPreferences.current.drawerVisualStyle.name)
             )
 
         context.contentResolver.openOutputStream(uri)?.use { output ->
@@ -82,6 +86,30 @@ class SettingsBackupRepository(
                 customization.optInt(
                     "textSizePercent",
                     customizationPreferences.current.textSizePercent
+                )
+            )
+            customizationPreferences.setTouchControlVisualStyle(
+                customization.optEnum(
+                    "touchControlVisualStyle",
+                    customizationPreferences.current.touchControlVisualStyle
+                )
+            )
+            customizationPreferences.setTouchControlPressEffect(
+                customization.optEnum(
+                    "touchControlPressEffect",
+                    customizationPreferences.current.touchControlPressEffect
+                )
+            )
+            customizationPreferences.setGameMenuLayoutStyle(
+                customization.optEnum(
+                    "gameMenuLayoutStyle",
+                    customizationPreferences.current.gameMenuLayoutStyle
+                )
+            )
+            customizationPreferences.setDrawerVisualStyle(
+                customization.optEnum(
+                    "drawerVisualStyle",
+                    customizationPreferences.current.drawerVisualStyle
                 )
             )
         }
