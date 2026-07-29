@@ -50,6 +50,7 @@ Java_com_sbro_emucorev_core_vita_Emulator_applyRuntimeCoreSettings(
     jboolean stretchDisplayArea,
     jboolean disableSurfaceSync,
     jboolean fpsHack,
+    jint frameLimit,
     jboolean turboMode,
     jboolean showCompileShaders,
     jboolean pstvMode) {
@@ -61,6 +62,11 @@ Java_com_sbro_emucorev_core_vita_Emulator_applyRuntimeCoreSettings(
         current.stretch_the_display_area = stretchDisplayArea == JNI_TRUE;
         current.disable_surface_sync = disableSurfaceSync == JNI_TRUE;
         current.fps_hack = fpsHack == JNI_TRUE;
+        const int normalized_frame_limit = frameLimit == 30 || frameLimit == 45 || frameLimit == 60
+            ? frameLimit
+            : 0;
+        if (emuenv->renderer)
+            emuenv->renderer->frame_limit.store(normalized_frame_limit, std::memory_order_relaxed);
         current.pstv_mode = pstvMode == JNI_TRUE;
         cfg.turbo_mode = turboMode == JNI_TRUE;
         cfg.show_compile_shaders = showCompileShaders == JNI_TRUE;

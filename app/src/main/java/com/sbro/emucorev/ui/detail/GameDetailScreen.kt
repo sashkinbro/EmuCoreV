@@ -116,6 +116,7 @@ import com.sbro.emucorev.data.VitaCompatibilityState
 import com.sbro.emucorev.data.VitaCompatibilitySummary
 import com.sbro.emucorev.data.VitaCatalogDetails
 import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.ImmersiveMode
 import com.sbro.emucorev.ui.common.NavigationBackButton
 import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.common.UrlImage
@@ -1192,7 +1193,7 @@ private fun VideoPlayerOverlay(
         controller?.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         onDispose {
-            controller?.show(WindowInsetsCompat.Type.systemBars())
+            window?.let(ImmersiveMode::apply)
         }
     }
 

@@ -26,7 +26,7 @@ data class PlayTimeSession(
 
 class PlayTimeRepository(private val context: Context) {
     private val playTimeFile: File
-        get() = File(EmulatorStorage.storageRoot(context), "play_time.json")
+        get() = File(EmulatorStorage.runtimeRoot(context), "play_time.json")
 
     @Synchronized
     fun loadSessions(): List<PlayTimeSession> = readSessionsLocked()

@@ -54,6 +54,7 @@ data class VitaCoreConfig(
     val gamepadInvertRightY: Boolean = false,
     val stretchDisplayArea: Boolean = false,
     val fpsHack: Boolean = false,
+    val frameLimit: Int = FrameLimit.UNLIMITED,
     val vSync: Boolean = true,
     val bootAppsFullScreen: Boolean = false,
     val audioBackend: String = "SDL",
@@ -130,6 +131,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         "export-textures",
         "file-loading-delay",
         "fps-hack",
+        "frame-limit",
         "gamepad-button-profile",
         "gamepad-deadzone",
         "gamepad-invert-left-x",
@@ -192,7 +194,7 @@ class VitaCoreConfigRepository(private val context: Context) {
 
     private val configFile: File
         get() {
-            val base = EmulatorStorage.storageRoot(context)
+            val base = EmulatorStorage.runtimeRoot(context)
             return File(base, "config.yml")
         }
 
@@ -248,6 +250,7 @@ class VitaCoreConfigRepository(private val context: Context) {
                 gamepadInvertRightY = values["gamepad-invert-right-y"]?.toBooleanStrictOrNull() ?: defaults.gamepadInvertRightY,
                 stretchDisplayArea = values["stretch_the_display_area"]?.toBooleanStrictOrNull() ?: defaults.stretchDisplayArea,
                 fpsHack = values["fps-hack"]?.toBooleanStrictOrNull() ?: defaults.fpsHack,
+                frameLimit = FrameLimit.normalize(values["frame-limit"]?.toIntOrNull() ?: defaults.frameLimit),
                 vSync = values["v-sync"]?.toBooleanStrictOrNull() ?: defaults.vSync,
                 bootAppsFullScreen = values["boot-apps-full-screen"]?.toBooleanStrictOrNull() ?: defaults.bootAppsFullScreen,
                 audioBackend = values["audio-backend"] ?: defaults.audioBackend,
@@ -319,7 +322,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         )
     }
 
-    fun save(inputConfig: VitaCoreConfig) {
+    fun save(inputConfig: VitaCoreConfig) = synchronized(CONFIG_IO_LOCK) {
         val config = normalizeForBuild(inputConfig)
         val values = readKeyValues().toMutableMap()
         values["validation-layer"] = config.validationLayer.toString()
@@ -369,6 +372,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["gamepad-invert-right-y"] = config.gamepadInvertRightY.toString()
         values["stretch_the_display_area"] = config.stretchDisplayArea.toString()
         values["fps-hack"] = config.fpsHack.toString()
+        values["frame-limit"] = FrameLimit.normalize(config.frameLimit).toString()
         values["v-sync"] = config.vSync.toString()
         values["boot-apps-full-screen"] = config.bootAppsFullScreen.toString()
         values["audio-backend"] = config.audioBackend
@@ -407,15 +411,13 @@ class VitaCoreConfigRepository(private val context: Context) {
         values[SCHEMA_VERSION_KEY] = CONFIG_SCHEMA_VERSION.toString()
         dropEmptyUpstreamSequenceValues(values)
 
-        configFile.parentFile?.mkdirs()
-        configFile.writeText(
-            buildString {
-                appendLine("# EmuCoreV overrides for the Vita3K core")
-                values.toSortedMap().forEach { (key, value) ->
-                    appendLine("$key: ${formatYamlScalar(value)}")
-                }
+        val content = buildString {
+            appendLine("# EmuCoreV overrides for the Vita3K core")
+            values.toSortedMap().forEach { (key, value) ->
+                appendLine("$key: ${formatYamlScalar(value)}")
             }
-        )
+        }
+        AtomicTextFile.write(configFile, content)
     }
 
     fun resetToDefaults(): VitaCoreConfig {
@@ -424,9 +426,9 @@ class VitaCoreConfigRepository(private val context: Context) {
         return config
     }
 
-    private fun readKeyValues(): Map<String, String> {
+    private fun readKeyValues(): Map<String, String> = synchronized(CONFIG_IO_LOCK) {
         if (!configFile.exists()) return emptyMap()
-        return configFile.readLines()
+        configFile.readLines()
             .map(String::trim)
             .filter { it.isNotEmpty() && !it.startsWith("#") && ":" in it }
             .associate { line ->
@@ -491,6 +493,7 @@ class VitaCoreConfigRepository(private val context: Context) {
             gamepadTriggerThreshold = config.gamepadTriggerThreshold.coerceIn(0f, 0.9f),
             gamepadButtonProfile = normalizeGamepadProfile(config.gamepadButtonProfile),
             gamepadVibrationStrength = config.gamepadVibrationStrength.coerceIn(0, 100),
+            frameLimit = FrameLimit.normalize(config.frameLimit),
             logLevel = normalizedLogLevel
         )
     }
@@ -544,6 +547,7 @@ class VitaCoreConfigRepository(private val context: Context) {
     }
 
     private companion object {
+        private val CONFIG_IO_LOCK = Any()
         // 0 = TRACE (upstream Vita3K default). EmuCoreV keeps debug gameplay at
         // WARN and release at OFF; explicit diagnostics can opt into DEBUG.
         private const val DIAGNOSTIC_LOG_LEVEL = 1

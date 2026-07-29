@@ -148,6 +148,8 @@
     <string name="settings_core_performance_overlay">效能覆疊層</string>
     <string name="settings_core_stretch_display">延展顯示區域</string>
     <string name="settings_core_fps_hack">FPS 破解 (FPS hack)</string>
+    <string name="settings_frame_limit">幀率限制</string>
+    <string name="settings_frame_limit_unlimited">無限制</string>
     <string name="settings_core_vsync">垂直同步</string>
     <string name="settings_core_high_accuracy">高精準度 GPU 模式</string>
     <string name="settings_core_overlay_detail_title">覆疊層資料層級</string>
@@ -209,6 +211,7 @@
     <string name="settings_help_performance_overlay_position">設定效能覆疊層在螢幕上出現的位置。\n\n用于测试游戏时查看性能信息。普通游玩时建议关闭，因为覆盖层会分散注意力并带来少量渲染开销。</string>
     <string name="settings_help_stretch_display">填滿更多螢幕畫面，但可能會使影像變形。\n\n用于提升已经运行良好的游戏的清晰度、缩放或画面稳定性。如果 FPS 下降、手机发热或图形不稳定，请降低或恢复默认。</string>
     <string name="settings_help_fps_hack">移除某些遊戲的一般影格限制。可提升速度，但可能會破壞遊戲的時序。\n\n用于测试、跳过缓慢片段或绕过某个游戏的特殊行为。普通游玩中若需要准确时序、物理、过场或服务检查，请避免使用。</string>
+    <string name="settings_help_frame_limit">在不改變模擬 Vita 時序的情況下限制顯示幀數。使用 30 或 45 FPS 可降低耗電量與發熱。</string>
     <string name="settings_help_vsync">減少螢幕畫面撕裂，但在某些遊戲中可能會降低效能。\n\n用于提升已经运行良好的游戏的清晰度、缩放或画面稳定性。如果 FPS 下降、手机发热或图形不稳定，请降低或恢复默认。</string>
     <string name="settings_help_high_accuracy">可修復圖形問題，但通常會降低效能。\n\n用于提升已经运行良好的游戏的清晰度、缩放或画面稳定性。如果 FPS 下降、手机发热或图形不稳定，请降低或恢复默认。</string>
     <string name="settings_help_resolution">數值越高影像越清晰，但會耗用更多 GPU 效能。\n\n用于提升已经运行良好的游戏的清晰度、缩放或画面稳定性。如果 FPS 下降、手机发热或图形不稳定，请降低或恢复默认。</string>

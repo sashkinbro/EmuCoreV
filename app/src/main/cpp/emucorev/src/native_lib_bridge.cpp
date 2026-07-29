@@ -12,7 +12,7 @@ JNIEXPORT jboolean JNICALL
 Java_org_vita3k_emulator_NativeLib_prepareFrontend(JNIEnv *env, jclass clazz);
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_init(JNIEnv *env, jclass clazz, jstring storage_path);
+Vita3K_initWithPaths(JNIEnv *env, jstring runtime_path, jstring vita_path);
 
 JNIEXPORT jboolean JNICALL
 Java_org_vita3k_emulator_NativeLib_isInitialized(JNIEnv *env, jclass clazz);
@@ -26,8 +26,12 @@ Java_com_sbro_emucorev_core_NativeLib_prepareFrontend(JNIEnv *env, jobject /*thi
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_sbro_emucorev_core_NativeLib_init(JNIEnv *env, jobject /*thiz*/, jstring storage_path) {
-    return Java_org_vita3k_emulator_NativeLib_init(env, nullptr, storage_path);
+Java_com_sbro_emucorev_core_NativeLib_init(
+    JNIEnv *env,
+    jobject /*thiz*/,
+    jstring runtime_path,
+    jstring vita_path) {
+    return Vita3K_initWithPaths(env, runtime_path, vita_path);
 }
 
 JNIEXPORT jboolean JNICALL

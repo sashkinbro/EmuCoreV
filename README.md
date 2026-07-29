@@ -41,9 +41,9 @@ This repository contains the Android application, Compose UI, JNI bridge code, b
 EmuCoreV currently targets Android with:
 
 - `minSdk 28`
-- `targetSdk 36`
+- `targetSdk 37`
 - package id `com.sbro.emucorev`
-- version `0.1.3`
+- version `0.1.7`
 - ABI `arm64-v8a`
 
 ## Building Locally
@@ -51,9 +51,10 @@ EmuCoreV currently targets Android with:
 ### Requirements
 
 - Android Studio with Android SDK, NDK `29.0.14206865`, and CMake `3.22.1+`
-- JDK compatible with the Gradle configuration in this project
+- JDK 21 (Android Studio's bundled JBR is supported)
+- Python 3 available to CMake; use `python3.path` in `local.properties` when it is not on `PATH`
 - OpenSSL Android outputs prepared under `tools/openssl-test/out`
-- `vcpkg` installed locally and exposed through `VCPKG_ROOT`
+- the `third_party/vcpkg` checkout initialized
 
 ### Debug Build
 
@@ -65,7 +66,7 @@ EmuCoreV currently targets Android with:
 
 - `app/build.gradle.kts` currently points `OPENSSL_ROOT_DIR` to `tools/openssl-test/out`
 - `tools/build_android_openssl.sh` is the local helper used to prepare the expected OpenSSL layout
-- `VCPKG_ROOT` should point to your local `vcpkg` checkout
+- Gradle passes the bundled `third_party/vcpkg` checkout and Android NDK to CMake automatically
 
 ## Project Structure
 

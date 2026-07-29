@@ -2,6 +2,7 @@ package com.sbro.emucorev.ui.settings
 
 import android.app.Application
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.jakewharton.processphoenix.ProcessPhoenix
@@ -23,6 +24,7 @@ import com.sbro.emucorev.core.VibrationTestController
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.data.AppPreferences
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -89,6 +91,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         coreConfigRepository
     )
     private val initialCoreConfig = coreConfigRepository.ensureDefaultsPersisted()
+    private val coreSettingsSaveQueue = Channel<VitaCoreConfig>(Channel.CONFLATED)
     private var startupUpdateCheckRequested = false
 
     private val _uiState = MutableStateFlow(
@@ -101,6 +104,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            for (config in coreSettingsSaveQueue) {
+                runCatching { coreConfigRepository.save(config) }
+                    .onFailure { error -> Log.e(TAG, "Could not persist core settings", error) }
+            }
+        }
+    }
+
+    private companion object {
+        const val TAG = "SettingsViewModel"
+    }
 
     fun selectStorageLocation(rootPath: String) {
         val context = getApplication<Application>()
@@ -240,9 +256,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun updateCoreSettings(transform: (VitaCoreConfig) -> VitaCoreConfig) {
         val updated = transform(_uiState.value.coreConfig)
         _uiState.value = _uiState.value.copy(coreConfig = updated)
-        viewModelScope.launch(Dispatchers.IO) {
-            coreConfigRepository.save(updated)
-        }
+        coreSettingsSaveQueue.trySend(updated)
     }
 
     fun testVibration(): Boolean {

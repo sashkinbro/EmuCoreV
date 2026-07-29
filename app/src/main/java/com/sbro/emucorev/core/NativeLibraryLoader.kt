@@ -37,9 +37,10 @@ object NativeLibraryLoader {
                         Log.e(TAG, "NativeLib.prepareFrontend() failed")
                     }
                     if (!NativeLib.isInitialized()) {
-                        val storagePath = EmulatorStorage.storageRoot(appContext).absolutePath
-                        if (!NativeLib.init(storagePath)) {
-                            Log.e(TAG, "NativeLib.init('$storagePath') failed")
+                        val runtimePath = EmulatorStorage.runtimeRoot(appContext).absolutePath
+                        val vitaPath = EmulatorStorage.vitaRoot(appContext).absolutePath
+                        if (!NativeLib.init(runtimePath, vitaPath)) {
+                            Log.e(TAG, "NativeLib.init(runtime='$runtimePath', vita='$vitaPath') failed")
                             return@synchronized
                         }
                     }

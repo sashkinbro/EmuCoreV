@@ -121,6 +121,7 @@ struct State {
 
     std::atomic<bool> async_flip_requested{ false };
     std::atomic<int> pending_vsync{ -1 };
+    std::atomic<int> frame_limit{ 0 };
 
     std::unique_ptr<std::thread> render_thread;
     std::atomic<bool> render_abort{ false };

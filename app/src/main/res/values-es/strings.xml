@@ -148,6 +148,8 @@
     <string name="settings_core_performance_overlay">Superposición de rendimiento</string>
     <string name="settings_core_stretch_display">Estirar área de visualización</string>
     <string name="settings_core_fps_hack">Hack de FPS</string>
+    <string name="settings_frame_limit">Límite de fotogramas</string>
+    <string name="settings_frame_limit_unlimited">Sin límite</string>
     <string name="settings_core_vsync">Sincronización vertical</string>
     <string name="settings_core_high_accuracy">Modo de GPU de alta precisión</string>
     <string name="settings_core_overlay_detail_title">Nivel de datos de la superposición</string>
@@ -209,6 +211,7 @@
     <string name="settings_help_performance_overlay_position">Establece dónde aparece la superposición de rendimiento en la pantalla.\n\nÚsalo cuando necesites ver datos de rendimiento al probar un juego. Apágalo para jugar normal, porque puede distraer y añadir un pequeño coste de renderizado.</string>
     <string name="settings_help_stretch_display">Llena una mayor parte de la pantalla, pero puede estirar la imagen.\n\nÚsalo para mejorar nitidez, escalado o estabilidad visual en juegos que ya funcionan bien. Redúcelo o vuelve al valor predeterminado si bajan los FPS, el teléfono se calienta o los gráficos se vuelven inestables.</string>
     <string name="settings_help_fps_hack">Elimina el límite de fotogramas normal en algunos juegos. Puede mejorar la velocidad, pero podría romper la sincronización.\n\nÚsalo para pruebas, saltar partes lentas o rodear un comportamiento específico de un juego. Evítalo en juego normal cuando temporización, físicas, escenas o comprobaciones tipo online deban ser precisas.</string>
+    <string name="settings_help_frame_limit">Limita los fotogramas mostrados sin cambiar la temporización de la Vita emulada. Usa 30 o 45 FPS para reducir el consumo de energía y el calor.</string>
     <string name="settings_help_vsync">Reduce el desgarro de pantalla (tearing), pero puede disminuir el rendimiento en algunos juegos.\n\nÚsalo para mejorar nitidez, escalado o estabilidad visual en juegos que ya funcionan bien. Redúcelo o vuelve al valor predeterminado si bajan los FPS, el teléfono se calienta o los gráficos se vuelven inestables.</string>
     <string name="settings_help_high_accuracy">Puede arreglar problemas gráficos, pero normalmente reduce el rendimiento.\n\nÚsalo para mejorar nitidez, escalado o estabilidad visual en juegos que ya funcionan bien. Redúcelo o vuelve al valor predeterminado si bajan los FPS, el teléfono se calienta o los gráficos se vuelven inestables.</string>
     <string name="settings_help_resolution">Los valores altos hacen la imagen más nítida, pero usan más potencia de la GPU.\n\nÚsalo para mejorar nitidez, escalado o estabilidad visual en juegos que ya funcionan bien. Redúcelo o vuelve al valor predeterminado si bajan los FPS, el teléfono se calienta o los gráficos se vuelven inestables.</string>

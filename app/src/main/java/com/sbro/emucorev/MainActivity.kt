@@ -5,15 +5,14 @@ import android.content.res.Configuration
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.navigation.AppNavigation
+import com.sbro.emucorev.ui.common.ImmersiveMode
 import com.sbro.emucorev.ui.theme.EmuCoreVTheme
 import com.sbro.emucorev.ui.theme.ThemeMode
 
@@ -23,17 +22,8 @@ class MainActivity : ComponentActivity() {
         val preferences = AppPreferences(this)
         preferences.applyAppLanguage()
         installSplashScreen()
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.auto(
-                android.graphics.Color.TRANSPARENT,
-                android.graphics.Color.TRANSPARENT
-            ),
-            navigationBarStyle = SystemBarStyle.auto(
-                android.graphics.Color.TRANSPARENT,
-                android.graphics.Color.TRANSPARENT
-            )
-        )
         super.onCreate(savedInstanceState)
+        enterImmersiveMode()
         window.setBackgroundDrawable(ColorDrawable(resolveWindowBackground(preferences.themeMode)))
         setContent {
             EmuCoreVTheme(themeMode = preferences.themeMode) {
@@ -44,6 +34,23 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        window.decorView.post(::enterImmersiveMode)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        enterImmersiveMode()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            enterImmersiveMode()
+        }
+    }
+
+    private fun enterImmersiveMode() {
+        ImmersiveMode.apply(window)
     }
 
     private fun resolveWindowBackground(themeMode: ThemeMode): Int {

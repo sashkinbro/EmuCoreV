@@ -28,13 +28,14 @@
 static int virtual_joystick_id = -1;
 static SDL_Joystick *virtual_joystick = nullptr;
 
-static void refresh_overlay_controllers() {
+static bool refresh_overlay_controllers() {
     auto *emuenv = get_emuenv();
     auto *controller = get_app_session_controller();
     if (!emuenv || !controller || !controller->has_active_session() || !SDL_WasInit(SDL_INIT_GAMEPAD))
-        return;
+        return false;
 
     refresh_controllers(emuenv->ctrl, *emuenv);
+    return true;
 }
 
 void detach_overlay_virtual_controller() {
@@ -47,11 +48,14 @@ void detach_overlay_virtual_controller() {
     refresh_overlay_controllers();
 }
 
-void attach_overlay_virtual_controller() {
+bool attach_overlay_virtual_controller() {
+    if (virtual_joystick)
+        return refresh_overlay_controllers();
+
     detach_overlay_virtual_controller();
 
     if (!SDL_WasInit(SDL_INIT_GAMEPAD))
-        return;
+        return false;
 
     SDL_VirtualJoystickDesc desc;
     SDL_INIT_INTERFACE(&desc);
@@ -63,17 +67,17 @@ void attach_overlay_virtual_controller() {
     virtual_joystick_id = SDL_AttachVirtualJoystick(&desc);
     if (virtual_joystick_id == 0) {
         SDL_Log("Could not create overlay virtual controller: %s", SDL_GetError());
-        return;
+        return false;
     }
 
     virtual_joystick = SDL_OpenJoystick(virtual_joystick_id);
     if (!virtual_joystick) {
         SDL_Log("Could not create virtual joystick: %s", SDL_GetError());
         detach_overlay_virtual_controller();
-        return;
+        return false;
     }
 
-    refresh_overlay_controllers();
+    return refresh_overlay_controllers();
 }
 
 extern "C" {

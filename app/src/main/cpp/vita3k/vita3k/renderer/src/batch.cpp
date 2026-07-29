@@ -242,6 +242,8 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
             state.swap_window();
         }
     }
+    auto next_presentation = std::chrono::steady_clock::now();
+    int previous_frame_limit = 0;
     while (!state.render_abort.load(std::memory_order_relaxed)) {
 #ifdef TRACY_ENABLE
         ZoneScopedN("Game rendering");
@@ -268,8 +270,27 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
             }
         }
 
-        state.render_frame(display, gxm, mem);
-        state.swap_window();
+        const int frame_limit = state.frame_limit.load(std::memory_order_relaxed);
+        const auto now = std::chrono::steady_clock::now();
+        if (frame_limit != previous_frame_limit) {
+            previous_frame_limit = frame_limit;
+            next_presentation = now;
+        }
+        const bool should_present = frame_limit <= 0 || now >= next_presentation;
+        if (should_present) {
+            state.render_frame(display, gxm, mem);
+            state.swap_window();
+            if (frame_limit > 0) {
+                const auto interval = std::chrono::nanoseconds(1'000'000'000LL / frame_limit);
+                next_presentation += interval;
+                if (next_presentation + interval < now)
+                    next_presentation = now + interval;
+            }
+        } else {
+            // Consume this Vita display tick without presenting it. This limits
+            // output FPS without changing emulated vblank timing or game speed.
+            state.should_display = false;
+        }
         state.async_flip_requested.store(false, std::memory_order_relaxed);
 
 #ifdef TRACY_ENABLE

@@ -59,12 +59,14 @@ import androidx.compose.ui.window.DialogProperties
 import android.view.InputDevice
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.InstalledGpuDriver
+import com.sbro.emucorev.core.FrameLimit
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.core.input.InputDeviceClassifier
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
+import kotlin.math.roundToInt
 
 private val SettingsSectionContentPadding = 14.dp
 private val SettingsSectionRowPadding = ScreenHorizontalPadding
@@ -191,7 +193,7 @@ private fun GeneralTab(
             ModeChip(2, stringResource(R.string.settings_modules_mode_manual), uiState, viewModel)
         }
         SliderRow(title = stringResource(R.string.settings_cpu_pool_size), description = stringResource(R.string.settings_help_cpu_pool_size), valueText = stringResource(R.string.settings_cpu_pool_size_value, uiState.coreConfig.cpuPoolSize), onResetDefault = { viewModel.updateCoreSettings { it.copy(cpuPoolSize = defaults.cpuPoolSize) } }) {
-            Slider(value = uiState.coreConfig.cpuPoolSize.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(cpuPoolSize = value.toInt().coerceIn(1, 32)) } }, valueRange = 1f..32f, steps = 30)
+            Slider(value = uiState.coreConfig.cpuPoolSize.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(cpuPoolSize = value.roundToInt().coerceIn(1, 32)) } }, valueRange = 1f..32f, steps = 30)
         }
     }
 
@@ -252,7 +254,7 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
         Toggle(stringResource(R.string.settings_use_angle), stringResource(R.string.settings_help_use_angle), uiState.coreConfig.useAngle, { enabled -> viewModel.updateCoreSettings { it.copy(useAngle = enabled) } }, { viewModel.updateCoreSettings { it.copy(useAngle = defaults.useAngle) } }, enabled = uiState.coreConfig.backendRenderer == "OpenGL")
         Toggle(stringResource(R.string.settings_core_high_accuracy), stringResource(R.string.settings_help_high_accuracy), uiState.coreConfig.highAccuracy, { enabled -> viewModel.updateCoreSettings { it.copy(highAccuracy = enabled) } }, { viewModel.updateCoreSettings { it.copy(highAccuracy = defaults.highAccuracy) } })
         SliderRow(stringResource(R.string.settings_core_resolution_label), stringResource(R.string.settings_help_resolution), stringResource(R.string.settings_core_resolution_value, uiState.coreConfig.resolutionMultiplier), { viewModel.updateCoreSettings { it.copy(resolutionMultiplier = defaults.resolutionMultiplier) } }) {
-            Slider(value = uiState.coreConfig.resolutionMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(resolutionMultiplier = (value * 4).toInt() / 4f) } }, valueRange = 0.5f..4f, steps = 13)
+            Slider(value = uiState.coreConfig.resolutionMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(resolutionMultiplier = (value * 4).roundToInt() / 4f) } }, valueRange = 0.5f..4f, steps = 13)
         }
         Chips(stringResource(R.string.settings_core_screen_filter_label), stringResource(R.string.settings_help_screen_filter), { viewModel.updateCoreSettings { it.copy(screenFilter = defaults.screenFilter) } }) {
             TextChip(
@@ -267,7 +269,7 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
             ) { config, value -> config.copy(screenFilter = value) }
         }
         SliderRow(stringResource(R.string.settings_core_anisotropic_label), stringResource(R.string.settings_help_anisotropic), stringResource(R.string.settings_core_anisotropic_value, uiState.coreConfig.anisotropicFiltering), { viewModel.updateCoreSettings { it.copy(anisotropicFiltering = defaults.anisotropicFiltering) } }) {
-            Slider(value = uiState.coreConfig.anisotropicFiltering.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { config -> config.copy(anisotropicFiltering = listOf(1, 2, 4, 8, 16).minByOrNull { kotlin.math.abs(it - value.toInt()) } ?: 1) } }, valueRange = 1f..16f, steps = 3)
+            Slider(value = uiState.coreConfig.anisotropicFiltering.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { config -> config.copy(anisotropicFiltering = listOf(1, 2, 4, 8, 16).minByOrNull { kotlin.math.abs(it - value.roundToInt()) } ?: 1) } }, valueRange = 1f..16f, steps = 3)
         }
         Toggle(stringResource(R.string.settings_core_texture_cache), stringResource(R.string.settings_help_texture_cache), uiState.coreConfig.textureCache, { enabled -> viewModel.updateCoreSettings { it.copy(textureCache = enabled) } }, { viewModel.updateCoreSettings { it.copy(textureCache = defaults.textureCache) } })
         Toggle(stringResource(R.string.settings_hashless_texture_cache), stringResource(R.string.settings_help_hashless_texture_cache), uiState.coreConfig.hashlessTextureCache, { enabled -> viewModel.updateCoreSettings { it.copy(hashlessTextureCache = enabled) } }, { viewModel.updateCoreSettings { it.copy(hashlessTextureCache = defaults.hashlessTextureCache) } })
@@ -351,10 +353,10 @@ private fun AudioTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMod
             ) { config, value -> config.copy(audioBackend = value) }
         }
         SliderRow(stringResource(R.string.settings_core_audio_volume_label), stringResource(R.string.settings_help_audio_volume), stringResource(R.string.settings_core_audio_volume_value, uiState.coreConfig.audioVolume), { viewModel.updateCoreSettings { it.copy(audioVolume = defaults.audioVolume) } }) {
-            Slider(value = uiState.coreConfig.audioVolume.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(audioVolume = value.toInt()) } }, valueRange = 0f..100f)
+            Slider(value = uiState.coreConfig.audioVolume.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(audioVolume = value.roundToInt()) } }, valueRange = 0f..100f)
         }
         SliderRow(stringResource(R.string.settings_bgm_volume), stringResource(R.string.settings_help_bgm_volume), stringResource(R.string.settings_bgm_volume_value, uiState.coreConfig.bgmVolume), { viewModel.updateCoreSettings { it.copy(bgmVolume = defaults.bgmVolume) } }) {
-            Slider(value = uiState.coreConfig.bgmVolume.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(bgmVolume = value.toInt()) } }, valueRange = 0f..100f)
+            Slider(value = uiState.coreConfig.bgmVolume.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(bgmVolume = value.roundToInt()) } }, valueRange = 0f..100f)
         }
         Toggle(stringResource(R.string.settings_core_ngs_enable), stringResource(R.string.settings_help_ngs_enable), uiState.coreConfig.ngsEnable, { enabled -> viewModel.updateCoreSettings { it.copy(ngsEnable = enabled) } }, { viewModel.updateCoreSettings { it.copy(ngsEnable = defaults.ngsEnable) } })
         Button(
@@ -439,10 +441,10 @@ private fun OverlayTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewM
         Toggle(stringResource(R.string.settings_core_gamepad_overlay), stringResource(R.string.settings_help_gamepad_overlay), uiState.coreConfig.enableGamepadOverlay, { enabled -> viewModel.updateCoreSettings { it.copy(enableGamepadOverlay = enabled) } }, { viewModel.updateCoreSettings { it.copy(enableGamepadOverlay = defaults.enableGamepadOverlay) } })
         Toggle(stringResource(R.string.settings_show_touch_switch), stringResource(R.string.settings_help_show_touch_switch), uiState.coreConfig.overlayShowTouchSwitch, { enabled -> viewModel.updateCoreSettings { it.copy(overlayShowTouchSwitch = enabled) } }, { viewModel.updateCoreSettings { it.copy(overlayShowTouchSwitch = defaults.overlayShowTouchSwitch) } })
         SliderRow(stringResource(R.string.settings_core_overlay_scale_label), stringResource(R.string.settings_help_overlay_scale), stringResource(R.string.settings_core_overlay_scale_value, uiState.coreConfig.overlayScale), { viewModel.updateCoreSettings { it.copy(overlayScale = defaults.overlayScale) } }) {
-            Slider(value = uiState.coreConfig.overlayScale, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(overlayScale = (value * 10).toInt() / 10f) } }, valueRange = 0.5f..2f, steps = 14)
+            Slider(value = uiState.coreConfig.overlayScale, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(overlayScale = (value * 10).roundToInt() / 10f) } }, valueRange = 0.5f..2f, steps = 14)
         }
         SliderRow(stringResource(R.string.settings_core_overlay_opacity_label), stringResource(R.string.settings_help_overlay_opacity), stringResource(R.string.settings_core_overlay_opacity_value, uiState.coreConfig.overlayOpacity), { viewModel.updateCoreSettings { it.copy(overlayOpacity = defaults.overlayOpacity) } }) {
-            Slider(value = uiState.coreConfig.overlayOpacity.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(overlayOpacity = value.toInt()) } }, valueRange = 10f..100f, steps = 8)
+            Slider(value = uiState.coreConfig.overlayOpacity.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(overlayOpacity = value.roundToInt()) } }, valueRange = 10f..100f, steps = 8)
         }
     }
 }
@@ -458,7 +460,7 @@ private fun ControlsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
         Toggle(stringResource(R.string.settings_core_touchpad_cursor), stringResource(R.string.settings_help_touchpad_cursor), uiState.coreConfig.showTouchpadCursor, { enabled -> viewModel.updateCoreSettings { it.copy(showTouchpadCursor = enabled) } }, { viewModel.updateCoreSettings { it.copy(showTouchpadCursor = defaults.showTouchpadCursor) } })
         Toggle(stringResource(R.string.settings_core_disable_motion), stringResource(R.string.settings_help_disable_motion), uiState.coreConfig.disableMotion, { enabled -> viewModel.updateCoreSettings { it.copy(disableMotion = enabled) } }, { viewModel.updateCoreSettings { it.copy(disableMotion = defaults.disableMotion) } })
         SliderRow(stringResource(R.string.settings_core_analog_multiplier_label), stringResource(R.string.settings_help_analog_multiplier), stringResource(R.string.settings_core_analog_multiplier_value, uiState.coreConfig.analogMultiplier), { viewModel.updateCoreSettings { it.copy(analogMultiplier = defaults.analogMultiplier) } }) {
-            Slider(value = uiState.coreConfig.analogMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(analogMultiplier = (value * 10).toInt() / 10f) } }, valueRange = 0.5f..2f, steps = 14)
+            Slider(value = uiState.coreConfig.analogMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(analogMultiplier = (value * 10).roundToInt() / 10f) } }, valueRange = 0.5f..2f, steps = 14)
         }
     }
     SectionCard(title = stringResource(R.string.settings_vibration_section), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
@@ -478,7 +480,7 @@ private fun ControlsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
             Slider(
                 enabled = uiState.coreConfig.gamepadVibration,
                 value = uiState.coreConfig.gamepadVibrationStrength.toFloat(),
-                onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadVibrationStrength = value.toInt().coerceIn(0, 100)) } },
+                onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadVibrationStrength = value.roundToInt().coerceIn(0, 100)) } },
                 valueRange = 0f..100f,
                 steps = 19
             )
@@ -508,10 +510,10 @@ private fun ControlsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
             modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
         )
         SliderRow(stringResource(R.string.settings_gamepad_deadzone), stringResource(R.string.settings_help_gamepad_deadzone), stringResource(R.string.settings_gamepad_percent_value, (uiState.coreConfig.gamepadDeadzone * 100f).toInt()), { viewModel.updateCoreSettings { it.copy(gamepadDeadzone = defaults.gamepadDeadzone) } }) {
-            Slider(enabled = gamepadConnected, value = uiState.coreConfig.gamepadDeadzone, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadDeadzone = (value * 100).toInt() / 100f) } }, valueRange = 0f..0.45f, steps = 8)
+            Slider(enabled = gamepadConnected, value = uiState.coreConfig.gamepadDeadzone, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadDeadzone = (value * 100).roundToInt() / 100f) } }, valueRange = 0f..0.45f, steps = 8)
         }
         SliderRow(stringResource(R.string.settings_gamepad_trigger_threshold), stringResource(R.string.settings_help_gamepad_trigger_threshold), stringResource(R.string.settings_gamepad_percent_value, (uiState.coreConfig.gamepadTriggerThreshold * 100f).toInt()), { viewModel.updateCoreSettings { it.copy(gamepadTriggerThreshold = defaults.gamepadTriggerThreshold) } }) {
-            Slider(enabled = gamepadConnected, value = uiState.coreConfig.gamepadTriggerThreshold, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadTriggerThreshold = (value * 100).toInt() / 100f) } }, valueRange = 0f..0.9f, steps = 8)
+            Slider(enabled = gamepadConnected, value = uiState.coreConfig.gamepadTriggerThreshold, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadTriggerThreshold = (value * 100).roundToInt() / 100f) } }, valueRange = 0f..0.9f, steps = 8)
         }
         Chips(stringResource(R.string.settings_gamepad_button_profile), stringResource(R.string.settings_help_gamepad_button_profile), { viewModel.updateCoreSettings { it.copy(gamepadButtonProfile = defaults.gamepadButtonProfile) } }) {
             TextChip(VitaCoreConfig.GAMEPAD_PROFILE_STANDARD, stringResource(R.string.settings_gamepad_profile_standard), uiState.coreConfig.gamepadButtonProfile, viewModel, enabled = gamepadConnected) { config, value -> config.copy(gamepadButtonProfile = value) }
@@ -558,6 +560,23 @@ private fun CameraTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMo
 private fun SystemTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel) {
     SectionCard(title = stringResource(R.string.settings_tab_system), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Toggle(stringResource(R.string.settings_core_fps_hack), stringResource(R.string.settings_help_fps_hack), uiState.coreConfig.fpsHack, { enabled -> viewModel.updateCoreSettings { it.copy(fpsHack = enabled) } }, { viewModel.updateCoreSettings { it.copy(fpsHack = defaults.fpsHack) } })
+        Chips(stringResource(R.string.settings_frame_limit), stringResource(R.string.settings_help_frame_limit), { viewModel.updateCoreSettings { it.copy(frameLimit = defaults.frameLimit) } }) {
+            FrameLimit.supportedValues.forEach { limit ->
+                FilterChip(
+                    selected = uiState.coreConfig.frameLimit == limit,
+                    onClick = { viewModel.updateCoreSettings { it.copy(frameLimit = limit) } },
+                    label = {
+                        Text(
+                            if (limit == FrameLimit.UNLIMITED) {
+                                stringResource(R.string.settings_frame_limit_unlimited)
+                            } else {
+                                "$limit FPS"
+                            }
+                        )
+                    }
+                )
+            }
+        }
         Toggle(stringResource(R.string.settings_turbo_mode), stringResource(R.string.settings_help_turbo_mode), uiState.coreConfig.turboMode, { enabled -> viewModel.updateCoreSettings { it.copy(turboMode = enabled) } }, { viewModel.updateCoreSettings { it.copy(turboMode = defaults.turboMode) } })
         Toggle(stringResource(R.string.settings_boot_apps_fullscreen), stringResource(R.string.settings_help_boot_apps_fullscreen), uiState.coreConfig.bootAppsFullScreen, { enabled -> viewModel.updateCoreSettings { it.copy(bootAppsFullScreen = enabled) } }, { viewModel.updateCoreSettings { it.copy(bootAppsFullScreen = defaults.bootAppsFullScreen) } })
         Toggle(stringResource(R.string.settings_http_features), stringResource(R.string.settings_help_http_features), uiState.coreConfig.httpEnable, { enabled -> viewModel.updateCoreSettings { it.copy(httpEnable = enabled) } }, { viewModel.updateCoreSettings { it.copy(httpEnable = defaults.httpEnable) } })
@@ -565,7 +584,7 @@ private fun SystemTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMo
         Toggle(stringResource(R.string.settings_show_welcome), stringResource(R.string.settings_help_show_welcome), uiState.coreConfig.showWelcome, { enabled -> viewModel.updateCoreSettings { it.copy(showWelcome = enabled) } }, { viewModel.updateCoreSettings { it.copy(showWelcome = defaults.showWelcome) } })
         Toggle(stringResource(R.string.settings_warn_missing_firmware), stringResource(R.string.settings_help_warn_missing_firmware), uiState.coreConfig.warnMissingFirmware, { enabled -> viewModel.updateCoreSettings { it.copy(warnMissingFirmware = enabled) } }, { viewModel.updateCoreSettings { it.copy(warnMissingFirmware = defaults.warnMissingFirmware) } })
         SliderRow(stringResource(R.string.settings_file_loading_delay), stringResource(R.string.settings_help_file_loading_delay), stringResource(R.string.settings_file_loading_delay_value, uiState.coreConfig.fileLoadingDelay), { viewModel.updateCoreSettings { it.copy(fileLoadingDelay = defaults.fileLoadingDelay) } }) {
-            Slider(value = uiState.coreConfig.fileLoadingDelay.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(fileLoadingDelay = value.toInt().coerceIn(0, 500)) } }, valueRange = 0f..500f, steps = 24)
+            Slider(value = uiState.coreConfig.fileLoadingDelay.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(fileLoadingDelay = value.roundToInt().coerceIn(0, 500)) } }, valueRange = 0f..500f, steps = 24)
         }
     }
 }

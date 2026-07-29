@@ -69,6 +69,7 @@ class SettingsBackupRepository(
         .put("pstvMode", pstvMode)
         .put("showInfoBar", showInfoBar)
         .put("showLiveAreaScreen", showLiveAreaScreen)
+        .put("useAngle", useAngle)
         .put("backendRenderer", backendRenderer)
         .put("customDriverName", customDriverName)
         .put("turboMode", turboMode)
@@ -108,6 +109,7 @@ class SettingsBackupRepository(
         .put("gamepadInvertRightY", gamepadInvertRightY)
         .put("stretchDisplayArea", stretchDisplayArea)
         .put("fpsHack", fpsHack)
+        .put("frameLimit", frameLimit)
         .put("vSync", vSync)
         .put("bootAppsFullScreen", bootAppsFullScreen)
         .put("audioBackend", audioBackend)
@@ -130,6 +132,17 @@ class SettingsBackupRepository(
         .put("httpEnable", httpEnable)
         .put("colorSurfaceDebug", colorSurfaceDebug)
         .put("showShaderCacheWarn", showShaderCacheWarn)
+        .put("frontCameraType", frontCameraType)
+        .put("frontCameraId", frontCameraId)
+        .put("frontCameraImage", frontCameraImage)
+        .put("frontCameraColor", frontCameraColor)
+        .put("backCameraType", backCameraType)
+        .put("backCameraId", backCameraId)
+        .put("backCameraImage", backCameraImage)
+        .put("backCameraColor", backCameraColor)
+        .put("screenshotFormat", screenshotFormat)
+        .put("showWelcome", showWelcome)
+        .put("warnMissingFirmware", warnMissingFirmware)
 
     private fun JSONObject.toVitaCoreConfig(defaults: VitaCoreConfig): VitaCoreConfig = defaults.copy(
         validationLayer = optBoolean("validationLayer", defaults.validationLayer),
@@ -139,6 +152,7 @@ class SettingsBackupRepository(
         pstvMode = optBoolean("pstvMode", defaults.pstvMode),
         showInfoBar = optBoolean("showInfoBar", defaults.showInfoBar),
         showLiveAreaScreen = optBoolean("showLiveAreaScreen", defaults.showLiveAreaScreen),
+        useAngle = optBoolean("useAngle", defaults.useAngle),
         backendRenderer = optString("backendRenderer", defaults.backendRenderer),
         customDriverName = optString("customDriverName", defaults.customDriverName),
         turboMode = optBoolean("turboMode", defaults.turboMode),
@@ -178,6 +192,7 @@ class SettingsBackupRepository(
         gamepadInvertRightY = optBoolean("gamepadInvertRightY", defaults.gamepadInvertRightY),
         stretchDisplayArea = optBoolean("stretchDisplayArea", defaults.stretchDisplayArea),
         fpsHack = optBoolean("fpsHack", defaults.fpsHack),
+        frameLimit = FrameLimit.normalize(optInt("frameLimit", defaults.frameLimit)),
         vSync = optBoolean("vSync", defaults.vSync),
         bootAppsFullScreen = optBoolean("bootAppsFullScreen", defaults.bootAppsFullScreen),
         audioBackend = optString("audioBackend", defaults.audioBackend),
@@ -199,11 +214,26 @@ class SettingsBackupRepository(
         psnSignedIn = optBoolean("psnSignedIn", defaults.psnSignedIn),
         httpEnable = optBoolean("httpEnable", defaults.httpEnable),
         colorSurfaceDebug = optBoolean("colorSurfaceDebug", defaults.colorSurfaceDebug),
-        showShaderCacheWarn = optBoolean("showShaderCacheWarn", defaults.showShaderCacheWarn)
+        showShaderCacheWarn = optBoolean("showShaderCacheWarn", defaults.showShaderCacheWarn),
+        frontCameraType = optInt("frontCameraType", defaults.frontCameraType),
+        frontCameraId = optString("frontCameraId", defaults.frontCameraId),
+        frontCameraImage = optString("frontCameraImage", defaults.frontCameraImage),
+        frontCameraColor = optLongValue("frontCameraColor", defaults.frontCameraColor),
+        backCameraType = optInt("backCameraType", defaults.backCameraType),
+        backCameraId = optString("backCameraId", defaults.backCameraId),
+        backCameraImage = optString("backCameraImage", defaults.backCameraImage),
+        backCameraColor = optLongValue("backCameraColor", defaults.backCameraColor),
+        screenshotFormat = optInt("screenshotFormat", defaults.screenshotFormat),
+        showWelcome = optBoolean("showWelcome", defaults.showWelcome),
+        warnMissingFirmware = optBoolean("warnMissingFirmware", defaults.warnMissingFirmware)
     )
 
     private fun JSONObject.optFloat(name: String, fallback: Float): Float {
         return if (has(name)) optDouble(name, fallback.toDouble()).toFloat() else fallback
+    }
+
+    private fun JSONObject.optLongValue(name: String, fallback: Long): Long {
+        return if (has(name)) optLong(name, fallback) else fallback
     }
 
     private fun JSONObject.optNullableString(name: String): String? {
