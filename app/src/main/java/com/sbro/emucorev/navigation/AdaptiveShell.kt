@@ -2,6 +2,7 @@ package com.sbro.emucorev.navigation
 
 import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -47,15 +49,22 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.ProPurchaseManager
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.shouldUseExpandedShell
 import kotlinx.coroutines.launch
@@ -270,6 +279,9 @@ private fun SideNavigation(
     topInset: Dp = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding(),
     onCloseDrawer: () -> Unit
 ) {
+    val context = LocalContext.current
+    val proManager = remember(context) { ProPurchaseManager.getInstance(context) }
+    val proState by proManager.state.collectAsState()
     val drawerInset = 18.dp
     val drawerBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val drawerBottomPadding = drawerInset + if (wrapInSurface) {
@@ -349,12 +361,32 @@ private fun SideNavigation(
                 ),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(
-                text = stringResource(R.string.app_name_emucorev),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = 6.dp, end = 6.dp)
-            )
+            Row(
+                modifier = Modifier.padding(start = 6.dp, end = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    painter = painterResource(
+                        if (proState.isProUnlocked) {
+                            R.drawable.ic_drawer_app_pro
+                        } else {
+                            R.drawable.ic_drawer_app
+                        }
+                    ),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                )
+                Text(
+                    text = stringResource(R.string.app_name_emucorev),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 14.dp)
+                )
+            }
             ShellItem(
                 icon = Icons.Rounded.Games,
                 label = stringResource(R.string.nav_library),
