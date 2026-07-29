@@ -1,7 +1,6 @@
 package com.sbro.emucorev.ui.onboarding
 
 import android.app.Application
-import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.jakewharton.processphoenix.ProcessPhoenix
@@ -18,7 +17,7 @@ import kotlinx.coroutines.launch
 
 data class OnboardingUiState(
     val currentPage: Int = 0,
-    val totalPages: Int = 4,
+    val totalPages: Int = 5,
     val storagePath: String = "",
     val storageLocations: List<VitaStorageLocation> = emptyList(),
     val storageChangeInProgress: Boolean = false,
@@ -68,16 +67,6 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             EmulatorStorage.selectStorageRoot(
                 context = appContext,
                 rootPath = rootPath,
-                migrateExistingData = true
-            )
-        }
-    }
-
-    fun selectCustomStorageLocation(uri: Uri) {
-        changeStorageLocation { appContext ->
-            EmulatorStorage.selectCustomStorageRoot(
-                context = appContext,
-                treeUri = uri,
                 migrateExistingData = true
             )
         }

@@ -48,6 +48,7 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.SystemUpdateAlt
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Vibration
@@ -80,7 +81,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
-import com.sbro.emucorev.core.StorageAccessManager
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.ui.common.NavigationBackButton
 import com.sbro.emucorev.ui.common.SettingHelpButton
@@ -94,6 +94,7 @@ private val SettingsRowInnerVerticalPadding = 14.dp
 enum class SettingsTab(@param:StringRes val titleRes: Int, val icon: ImageVector) {
     General(R.string.settings_tab_general, Icons.Rounded.Tune),
     Customization(R.string.settings_tab_customization, Icons.Rounded.Palette),
+    Pro(R.string.settings_pro_tab, Icons.Rounded.Star),
     Graphics(R.string.settings_tab_graphics, Icons.Rounded.GraphicEq),
     Audio(R.string.settings_tab_audio, Icons.AutoMirrored.Rounded.VolumeUp),
     Overlay(R.string.settings_tab_overlay, Icons.Rounded.Vibration),
@@ -121,28 +122,11 @@ fun SettingsScreen(
     val defaults = remember { VitaCoreConfig() }
     var selectedTab by rememberSaveable(initialTab) { mutableStateOf(initialTab) }
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
-    val folderPickerFailedMessage = stringResource(R.string.folder_picker_failed)
-    val storagePermissionRequiredMessage = stringResource(R.string.settings_storage_permission_required)
     val backupCreatedMessage = stringResource(R.string.settings_backup_created)
     val backupFailedMessage = stringResource(R.string.settings_backup_failed)
     val restoreCompletedMessage = stringResource(R.string.settings_backup_restored)
     val restoreFailedMessage = stringResource(R.string.settings_backup_restore_failed)
 
-    val storageFolderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
-        uri ?: return@rememberLauncherForActivityResult
-        runCatching {
-            viewModel.selectCustomStorageLocation(uri)
-        }.onFailure {
-            Toast.makeText(context, folderPickerFailedMessage, Toast.LENGTH_SHORT).show()
-        }
-    }
-    val storagePermissionPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (StorageAccessManager.needsAllFilesAccessForCustomStorage()) {
-            Toast.makeText(context, storagePermissionRequiredMessage, Toast.LENGTH_SHORT).show()
-        } else {
-            storageFolderPicker.launch(null)
-        }
-    }
     val backupPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         viewModel.exportSettingsBackup(uri) { result ->
@@ -164,13 +148,6 @@ fun SettingsScreen(
         }
     }
     val refreshCoreSettingsClick = rememberDebouncedClick(onClick = viewModel::refreshCoreSettings)
-    val chooseCustomStorageFolderClick = rememberDebouncedClick {
-        if (StorageAccessManager.needsAllFilesAccessForCustomStorage()) {
-            storagePermissionPicker.launch(StorageAccessManager.allFilesAccessIntent(context))
-        } else {
-            storageFolderPicker.launch(null)
-        }
-    }
     val createBackupClick = rememberDebouncedClick { backupPicker.launch("emucorev-settings-backup.json") }
     val backClick = rememberDebouncedClick(onClick = onBackClick)
     val resetSettingsClick = rememberDebouncedClick(onClick = viewModel::resetCoreSettingsToDefaults)
@@ -241,7 +218,6 @@ fun SettingsScreen(
                             onOpenVitaLanguageSettings = onOpenVitaLanguageSettings,
                             onOpenGpuDriverSettings = onOpenGpuDriverSettings,
                             refreshCoreSettingsClick = refreshCoreSettingsClick,
-                            chooseCustomStorageFolderClick = chooseCustomStorageFolderClick,
                             createBackupClick = createBackupClick,
                             restoreBackupClick = { showRestoreBackupDialog = true }
                         )

@@ -50,9 +50,9 @@ import com.sbro.emucorev.ui.library.LibraryScreen
 import com.sbro.emucorev.ui.onboarding.OnboardingScreen
 import com.sbro.emucorev.ui.playtime.PlayTimeScreen
 import com.sbro.emucorev.ui.profile.ProfileScreen
+import com.sbro.emucorev.ui.pro.ProWelcomeDialog
 import com.sbro.emucorev.ui.saves.SaveDataScreen
 import com.sbro.emucorev.ui.settings.AppLanguageScreen
-import com.sbro.emucorev.ui.settings.AppUpdateAvailableDialog
 import com.sbro.emucorev.ui.settings.GpuDriverScreen
 import com.sbro.emucorev.ui.settings.SettingsScreen
 import com.sbro.emucorev.ui.settings.SettingsTab
@@ -106,10 +106,8 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     val installViewModel: SetupInstallViewModel = viewModel()
     val settingsViewModel: SettingsViewModel = viewModel()
     val installUiState by installViewModel.uiState.collectAsState()
-    val settingsUiState by settingsViewModel.uiState.collectAsState()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
-    val canShowStartupUpdateDialog = currentRoute == ROUTE_LIBRARY || currentRoute == ROUTE_HOME
     var firmwareInstalled by remember(context) { mutableStateOf(EmulatorStorage.hasInstalledFirmware(context)) }
     var firmwareUpdateInstalled by remember(context) { mutableStateOf(EmulatorStorage.hasInstalledFirmwareUpdate(context)) }
     val startDestination = if (preferences.onboardingCompleted) ROUTE_LIBRARY else ROUTE_ONBOARDING
@@ -126,6 +124,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     var pendingContentRepair by rememberSaveable { mutableStateOf(false) }
     var installChoiceZrif by rememberSaveable { mutableStateOf("") }
     var showInstallChoiceDialog by rememberSaveable { mutableStateOf(false) }
+    var showWelcomeDialog by rememberSaveable {
+        mutableStateOf(preferences.onboardingCompleted && !preferences.welcomeDialogShown)
+    }
 
     val firmwarePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -195,21 +196,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         }
     }
 
-    LaunchedEffect(preferences.onboardingCompleted) {
-        if (preferences.onboardingCompleted) {
-            settingsViewModel.checkForStartupAppUpdates()
-        }
-    }
-
-    LaunchedEffect(currentRoute, settingsUiState.appUpdate.startupDialogVisible) {
-        if (
-            currentRoute != null &&
-            settingsUiState.appUpdate.startupDialogVisible &&
-            !canShowStartupUpdateDialog
-        ) {
-            settingsViewModel.dismissStartupUpdateDialog()
-        }
-    }
 
     val launchInstalledGame: (String) -> Unit = { titleId ->
         when (VitaLaunchBridge.launchInstalledTitle(context, titleId)) {
@@ -260,6 +246,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onInstallFirmwareUpdate = openFirmwareInstall,
                     onInstallDownloadedFirmware = installViewModel::installFirmware,
                     onComplete = {
+                        showWelcomeDialog = !preferences.welcomeDialogShown
                         navController.navigate(ROUTE_LIBRARY) {
                             popUpTo(ROUTE_ONBOARDING) { inclusive = true }
                             launchSingleTop = true
@@ -823,18 +810,19 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         onDismiss = installViewModel::dismissDialog
     )
 
-    val startupUpdateRelease = settingsUiState.appUpdate.latestRelease
-    if (canShowStartupUpdateDialog && settingsUiState.appUpdate.startupDialogVisible && startupUpdateRelease != null) {
-        AppUpdateAvailableDialog(
-            release = startupUpdateRelease,
-            onDismiss = settingsViewModel::dismissStartupUpdateDialog,
-            onSkipUpdate = settingsViewModel::skipStartupUpdateDialog,
-            onOpenUpdates = {
-                settingsViewModel.dismissStartupUpdateDialog()
-                navController.navigate(settingsRoute(SettingsTab.Updates)) { launchSingleTop = true }
+    if (
+        showWelcomeDialog &&
+        preferences.onboardingCompleted &&
+        (currentRoute == ROUTE_LIBRARY || currentRoute == ROUTE_HOME)
+    ) {
+        ProWelcomeDialog(
+            onContinue = {
+                preferences.welcomeDialogShown = true
+                showWelcomeDialog = false
             }
         )
     }
+
 }
 
 private fun appScreenEnterTransition(): EnterTransition {

@@ -96,6 +96,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.ProPurchaseManager
 import com.sbro.emucorev.data.ProfileCatalogGame
 import com.sbro.emucorev.data.ProfileGameStatus
 import com.sbro.emucorev.ui.common.NavigationBackButton
@@ -121,6 +122,7 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val proState by remember(context) { ProPurchaseManager.getInstance(context) }.state.collectAsState()
     val configuration = LocalConfiguration.current
     val useDenseCards = configuration.useMultiColumnLayout()
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
@@ -180,6 +182,7 @@ fun ProfileScreen(
                             totalCount = uiState.totalCount,
                             layoutMode = uiState.layoutMode,
                             accountCardHidden = accountCardHidden,
+                            isProUnlocked = proState.isProUnlocked,
                             onBackClick = guardedBackClick,
                             onMenuClick = onMenuClick,
                             onRefresh = viewModel::refresh,
@@ -257,6 +260,7 @@ fun ProfileScreen(
                             totalCount = uiState.totalCount,
                             layoutMode = uiState.layoutMode,
                             accountCardHidden = accountCardHidden,
+                            isProUnlocked = proState.isProUnlocked,
                             onBackClick = guardedBackClick,
                             onMenuClick = onMenuClick,
                             onRefresh = viewModel::refresh,
@@ -351,6 +355,7 @@ private fun ProfileHeader(
     totalCount: Int,
     layoutMode: ProfileLayoutMode,
     accountCardHidden: Boolean,
+    isProUnlocked: Boolean,
     onBackClick: () -> Unit,
     onMenuClick: (() -> Unit)?,
     onRefresh: () -> Unit,
@@ -371,11 +376,30 @@ private fun ProfileHeader(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text(
-                text = stringResource(R.string.profile_title),
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.profile_title),
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                if (isProUnlocked) {
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = Color(0xFFFFC857).copy(alpha = 0.18f),
+                        border = BorderStroke(1.dp, Color(0xFFFFC857).copy(alpha = 0.65f))
+                    ) {
+                        Text(
+                            text = stringResource(R.string.profile_pro_badge),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = Color(0xFFFFC857)
+                        )
+                    }
+                }
+            }
             Text(
                 text = stringResource(R.string.profile_game_count, totalCount),
                 style = MaterialTheme.typography.bodyMedium,

@@ -69,7 +69,7 @@ data class VitaCoreConfig(
     val archiveLog: Boolean = false,
     val logLevel: Int = if (BuildConfig.DEBUG) 3 else 6,
     val discordRichPresence: Boolean = false,
-    val checkForUpdates: Boolean = true,
+    val checkForUpdates: Boolean = false,
     val fileLoadingDelay: Int = 0,
     val shaderCache: Boolean = true,
     val spirvShader: Boolean = false,
@@ -265,7 +265,7 @@ class VitaCoreConfigRepository(private val context: Context) {
                 archiveLog = values["archive-log"]?.toBooleanStrictOrNull() ?: defaults.archiveLog,
                 logLevel = normalizeLogLevel(values["log-level"]?.toIntOrNull() ?: defaults.logLevel),
                 discordRichPresence = values["discord-rich-presence"]?.toBooleanStrictOrNull() ?: defaults.discordRichPresence,
-                checkForUpdates = values["check-for-updates"]?.toBooleanStrictOrNull() ?: defaults.checkForUpdates,
+                checkForUpdates = false,
                 fileLoadingDelay = values["file-loading-delay"]?.toIntOrNull() ?: defaults.fileLoadingDelay,
                 shaderCache = values["shader-cache"]?.toBooleanStrictOrNull() ?: defaults.shaderCache,
                 spirvShader = values["spirv-shader"]?.toBooleanStrictOrNull() ?: defaults.spirvShader,
@@ -387,7 +387,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["archive-log"] = config.archiveLog.toString()
         values["log-level"] = normalizeLogLevel(config.logLevel).toString()
         values["discord-rich-presence"] = config.discordRichPresence.toString()
-        values["check-for-updates"] = config.checkForUpdates.toString()
+        values["check-for-updates"] = false.toString()
         values["file-loading-delay"] = config.fileLoadingDelay.toString()
         values["shader-cache"] = config.shaderCache.toString()
         values["spirv-shader"] = config.spirvShader.toString()

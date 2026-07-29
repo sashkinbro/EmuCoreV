@@ -7,6 +7,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import com.sbro.emucorev.data.CustomizationSettings
 
 private val DarkColorScheme = darkColorScheme(
@@ -66,8 +67,35 @@ private val LightColorScheme = lightColorScheme(
     onErrorContainer = ErrorRedLight
 )
 
+private val ProColorScheme = darkColorScheme(
+    primary = ProPrimary,
+    onPrimary = OnAccent,
+    primaryContainer = ProPrimaryContainer,
+    onPrimaryContainer = ProOnPrimaryContainer,
+    secondary = ProSecondary,
+    onSecondary = Color(0xFF21181C),
+    secondaryContainer = ProSecondaryContainer,
+    onSecondaryContainer = Color(0xFFE6D8DD),
+    tertiary = ProTertiary,
+    onTertiary = Color(0xFF1A0D00),
+    background = ProBackground,
+    onBackground = ProOnBackground,
+    surface = ProSurface,
+    surfaceTint = Color.Transparent,
+    onSurface = ProOnSurface,
+    surfaceVariant = ProSurfaceVariant,
+    onSurfaceVariant = ProOnSurfaceVariant,
+    outline = ProOutline,
+    outlineVariant = ProOutline,
+    error = ErrorRed,
+    onError = OnAccent,
+    errorContainer = ErrorContainer,
+    onErrorContainer = ErrorRed,
+    scrim = ProScrim
+)
+
 enum class ThemeMode {
-    SYSTEM, LIGHT, DARK
+    SYSTEM, LIGHT, DARK, PRO
 }
 
 val LocalCustomizationSettings = staticCompositionLocalOf { CustomizationSettings() }
@@ -82,12 +110,16 @@ fun EmuCoreVTheme(
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
+        ThemeMode.PRO -> true
     }
 
     val customizedTypography = rememberCustomizedTypography(customization)
     CompositionLocalProvider(LocalCustomizationSettings provides customization) {
         MaterialTheme(
-            colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+            colorScheme = when (themeMode) {
+                ThemeMode.PRO -> ProColorScheme
+                else -> if (darkTheme) DarkColorScheme else LightColorScheme
+            },
             typography = customizedTypography,
             content = content
         )

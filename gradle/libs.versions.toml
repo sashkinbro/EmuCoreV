@@ -22,6 +22,7 @@ androidYoutubePlayer = "13.0.0"
 commonsCompress = "1.28.0"
 firebaseBom = "34.16.0"
 googleServices = "4.5.0"
+billing = "9.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -54,6 +55,7 @@ commons-compress = { group = "org.apache.commons", name = "commons-compress", ve
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
+google-play-billing = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billing" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -65,6 +65,7 @@ import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.core.input.InputDeviceClassifier
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.ui.common.SectionCard
+import com.sbro.emucorev.ui.pro.ProPurchasePanel
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import kotlin.math.roundToInt
 
@@ -77,6 +78,7 @@ private const val EmuCoreDiscordUrl = "https://discord.gg/c5EBeNRpz2"
 private const val EmuCoreSupportUrl = "https://www.patreon.com/c/emucore/membership"
 private const val SashkinAppsPlayStoreUrl = "https://play.google.com/store/apps/dev?id=7136622298887775989"
 private const val Vita3KRepositoryUrl = "https://github.com/Vita3K/Vita3K"
+private const val PrivacyPolicyUrl = "https://sites.google.com/view/privacy-policy-for-emucorev/%D0%B3%D0%BE%D0%BB%D0%BE%D0%B2%D0%BD%D0%B0-%D1%81%D1%82%D0%BE%D1%80%D1%96%D0%BD%D0%BA%D0%B0"
 
 private data class VitaSystemLanguageOption(
     val value: Int,
@@ -118,13 +120,13 @@ fun SettingsTabContent(
     onOpenVitaLanguageSettings: () -> Unit = {},
     onOpenGpuDriverSettings: () -> Unit = {},
     refreshCoreSettingsClick: () -> Unit,
-    chooseCustomStorageFolderClick: () -> Unit,
     createBackupClick: () -> Unit,
     restoreBackupClick: () -> Unit
 ) {
     when (selectedTab) {
         SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings, onOpenVitaLanguageSettings)
         SettingsTab.Customization -> CustomizationTab(uiState.customization, viewModel)
+        SettingsTab.Pro -> ProPurchasePanel(modifier = Modifier.padding(horizontal = ScreenHorizontalPadding))
         SettingsTab.Graphics -> GraphicsTab(uiState, defaults, viewModel, onOpenGpuDriverSettings)
         SettingsTab.Audio -> AudioTab(uiState, defaults, viewModel, refreshCoreSettingsClick)
         SettingsTab.Overlay -> OverlayTab(uiState, defaults, viewModel)
@@ -136,21 +138,15 @@ fun SettingsTabContent(
             uiState = uiState,
             selectStorageLocation = viewModel::selectStorageLocation,
             dismissStorageMigrationDialog = viewModel::dismissStorageMigrationDialog,
-            chooseCustomStorageFolderClick = chooseCustomStorageFolderClick,
             createBackupClick = createBackupClick,
             restoreBackupClick = restoreBackupClick
         )
         SettingsTab.About -> AboutTab()
         SettingsTab.Updates -> AppUpdateTab(
             state = uiState.appUpdate,
-            onCheckForUpdates = { forceRefresh -> viewModel.checkForAppUpdates(showErrors = true, forceRefresh = forceRefresh) },
-            onLoadReleaseHistory = { forceRefresh -> viewModel.loadAppReleaseHistory(showErrors = true, forceRefresh = forceRefresh) },
-            onShowCleanInstallDialog = viewModel::showCleanInstallDialog,
-            onDismissCleanInstallDialog = viewModel::dismissCleanInstallDialog,
-            onDownloadUpdate = { viewModel.downloadAppUpdate() },
-            onInstallDownloadedUpdate = { viewModel.installDownloadedAppUpdate() },
-            onDownloadParallelRelease = { release -> viewModel.downloadParallelAppRelease(release) },
-            onInstallDownloadedParallelRelease = { release -> viewModel.installDownloadedParallelAppRelease(release) }
+            onLoadReleaseHistory = { forceRefresh ->
+                viewModel.loadAppReleaseHistory(showErrors = true, forceRefresh = forceRefresh)
+            }
         )
     }
 }
@@ -617,7 +613,6 @@ private fun StorageTab(
     uiState: SettingsUiState,
     selectStorageLocation: (String) -> Unit,
     dismissStorageMigrationDialog: () -> Unit,
-    chooseCustomStorageFolderClick: () -> Unit,
     createBackupClick: () -> Unit,
     restoreBackupClick: () -> Unit
 ) {
@@ -656,10 +651,6 @@ private fun StorageTab(
         visible = storagePickerVisible,
         storageLocations = uiState.storageLocations,
         enabled = !uiState.storageChangeInProgress,
-        onChooseCustomFolder = {
-            storagePickerVisible = false
-            chooseCustomStorageFolderClick()
-        },
         onSelected = { location ->
             if (!location.selected) {
                 pendingStorageRootPath = location.rootPath
@@ -831,7 +822,6 @@ private fun SettingsStorageDialog(
     visible: Boolean,
     storageLocations: List<VitaStorageLocation>,
     enabled: Boolean,
-    onChooseCustomFolder: () -> Unit,
     onSelected: (VitaStorageLocation) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -912,13 +902,6 @@ private fun SettingsStorageDialog(
                         }
                     }
                 }
-                Button(
-                    onClick = onChooseCustomFolder,
-                    enabled = enabled,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.settings_storage_choose_custom_folder))
-                }
                 TextButton(
                     onClick = onDismiss,
                     modifier = Modifier.align(Alignment.End)
@@ -932,7 +915,6 @@ private fun SettingsStorageDialog(
 
 @Composable
 private fun storageLocationLabel(location: VitaStorageLocation, index: Int): String = when {
-    location.custom -> stringResource(R.string.settings_storage_location_custom)
     location.removable -> stringResource(R.string.settings_storage_location_sd)
     index == 0 -> stringResource(R.string.settings_storage_location_internal)
     else -> stringResource(R.string.settings_storage_location_external)
@@ -1003,6 +985,12 @@ private fun AboutTab() {
                 title = stringResource(R.string.settings_about_support),
                 subtitle = stringResource(R.string.settings_about_support_desc),
                 onClick = { uriHandler.openUri(EmuCoreSupportUrl) }
+            )
+            LinkItem(
+                icon = Icons.Rounded.Info,
+                title = stringResource(R.string.settings_about_privacy_policy),
+                subtitle = stringResource(R.string.settings_about_privacy_policy_desc),
+                onClick = { uriHandler.openUri(PrivacyPolicyUrl) }
             )
         }
 
