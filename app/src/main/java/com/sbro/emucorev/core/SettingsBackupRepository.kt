@@ -155,6 +155,14 @@ class SettingsBackupRepository(
         .put("overlayScale", overlayScale.toDouble())
         .put("overlayOpacity", overlayOpacity)
         .put("disableMotion", disableMotion)
+        .put("touchHaptics", touchHaptics)
+        .put("touchHapticsPreset", touchHapticsPreset)
+        .put("touchHapticsStrength", touchHapticsStrength)
+        .put("gyroMode", gyroMode)
+        .put("gyroSensitivity", gyroSensitivity)
+        .put("gyroSmoothing", gyroSmoothing)
+        .put("gyroInvertX", gyroInvertX)
+        .put("gyroInvertY", gyroInvertY)
         .put("analogMultiplier", analogMultiplier.toDouble())
         .put("gamepadDeadzone", gamepadDeadzone.toDouble())
         .put("gamepadTriggerThreshold", gamepadTriggerThreshold.toDouble())
@@ -238,6 +246,19 @@ class SettingsBackupRepository(
         overlayScale = optFloat("overlayScale", defaults.overlayScale),
         overlayOpacity = optInt("overlayOpacity", defaults.overlayOpacity),
         disableMotion = optBoolean("disableMotion", defaults.disableMotion),
+        touchHaptics = optBoolean("touchHaptics", defaults.touchHaptics),
+        touchHapticsPreset = optInt("touchHapticsPreset", defaults.touchHapticsPreset)
+            .coerceIn(VitaCoreConfig.TOUCH_HAPTICS_PRESET_SOFT, VitaCoreConfig.TOUCH_HAPTICS_PRESET_STRONG),
+        touchHapticsStrength = optInt("touchHapticsStrength", defaults.touchHapticsStrength)
+            .coerceIn(10, 100),
+        gyroMode = optInt("gyroMode", defaults.gyroMode)
+            .coerceIn(VitaCoreConfig.GYRO_MODE_OFF, VitaCoreConfig.GYRO_MODE_STEERING),
+        gyroSensitivity = optInt("gyroSensitivity", defaults.gyroSensitivity)
+            .coerceIn(25, 300),
+        gyroSmoothing = optInt("gyroSmoothing", defaults.gyroSmoothing)
+            .coerceIn(0, 90),
+        gyroInvertX = optBoolean("gyroInvertX", defaults.gyroInvertX),
+        gyroInvertY = optBoolean("gyroInvertY", defaults.gyroInvertY),
         analogMultiplier = optFloat("analogMultiplier", defaults.analogMultiplier),
         gamepadDeadzone = optFloat("gamepadDeadzone", defaults.gamepadDeadzone),
         gamepadTriggerThreshold = optFloat("gamepadTriggerThreshold", defaults.gamepadTriggerThreshold),

@@ -922,7 +922,6 @@
     <string name="settings_customization_touch_style_glass">تراثي</string>
     <string name="settings_customization_touch_style_neon">حديث</string>
     <string name="settings_game_menu_tab">قائمة اللعبة</string>
-    <string name="settings_game_menu_preview_section">معاينة القائمة</string>
     <string name="settings_customization_drawer_section">قائمة التنقل</string>
     <string name="settings_customization_touch_style_arcade">أركيد</string>
     <string name="settings_customization_touch_style_minimal">بسيط</string>
@@ -936,7 +935,6 @@
     <string name="settings_drawer_style_compact">مضغوط</string>
     <string name="settings_drawer_style_glass">زجاجي</string>
     <string name="settings_drawer_style_console">كونسول</string>
-    <string name="settings_game_menu_layout_section">تخطيط القائمة</string>
     <string name="settings_game_menu_layout_help">يغير هيكل وتنقل القائمة داخل اللعبة. تظل علامات التبويب ورؤية المحتوى وإجراءات الأمان وعناصر تحكم لوحة الألعاب مشتركة بين كل تخطيط.</string>
     <string name="settings_game_menu_layout_sidebar">شريط جانبي</string>
     <string name="settings_game_menu_layout_dashboard">لوحة القيادة</string>
@@ -987,4 +985,34 @@
     <string name="feedback_discard_action">تجاهل</string>
 
     <string name="settings_customization_drawer_style">مظهر الدرج</string>
+    <string name="settings_touch_haptics">استجابة اللمس لعناصر التحكم</string>
+    <string name="settings_touch_haptics_desc">تشغيل نبضة اهتزاز قصيرة عند الضغط على عناصر التحكم على الشاشة.</string>
+    <string name="settings_help_touch_haptics">يضيف استجابة لمس Android خفيفة عند الضغط لأول مرة على زر على الشاشة أو اتجاه D-pad أو عصا تناظرية. هذا يؤثر على الشعور بالتحكم فقط ولا يغير اهتزاز اللعبة.</string>
+    <string name="settings_touch_haptics_strength">قوة استجابة اللمس</string>
+    <string name="settings_help_touch_haptics_strength">يتحكم في قوة اهتزاز الجهاز المستخدمة لاستجابة اللمس لعناصر التحكم. قم بزيادتها إذا كانت النبضة خفيفة للغاية، أو قم بخفضها للعب محمول أكثر هدوءًا.</string>
+    <string name="settings_touch_haptics_test">اختبار استجابة اللمس</string>
+    <string name="settings_touch_haptics_test_desc">يشغل نبضة قصيرة باستخدام قوة استجابة اللمس الحالية.</string>
+    <string name="settings_help_touch_haptics_test">يشغل نفس نبضة اللمس للجهاز التي تستخدمها عناصر التحكم على الشاشة، حتى تتمكن من ضبط القوة قبل بدء اللعبة.</string>
+    <string name="settings_touch_haptics_preset">الشعور اللمسي</string>
+    <string name="settings_touch_haptics_preset_soft">ناعم</string>
+    <string name="settings_touch_haptics_preset_balanced">متوازن</string>
+    <string name="settings_touch_haptics_preset_crisp">واضح</string>
+    <string name="settings_touch_haptics_preset_strong">قوي</string>
+    <string name="settings_touch_haptics_preset_desc">"ناعم" يكون رقيقاً، و"متوازن" هو الافتراضي الطبيعي، و"واضح" يكون قصيراً ودقيقاً، و"قوي" يكون أعمق لمحركات الاهتزاز الضعيفة.</string>
+    <string name="settings_help_touch_haptics_preset">يستخدم "ناعم" ضغطة رقيقة وإفلاتاً خفيفاً جداً. يعطي "متوازن" ضغطة واضحة مع إفلات أخف وهو الإعداد الافتراضي. يستخدم "واضح" الزوج الأقصر والأكثر حدة للنقرات الدقيقة. يستخدم "قوي" نبضات أعمق وأطول للهواتف ذات محركات الاهتزاز الأضعف. يقوم شريط التمرير الخاص بالقوة بضبط الشعور المحدد.</string>
+    <string name="settings_gyro_mode">تحكم الجيروسكوب</string>
+    <string name="settings_gyro_off">إيقاف</string>
+    <string name="settings_gyro_aim">التصويب — العصا اليمنى</string>
+    <string name="settings_gyro_steering">التوجيه — العصا اليسرى</string>
+    <string name="settings_gyro_sensitivity">حساسية الجيروسكوب</string>
+    <string name="settings_gyro_smoothing">تنعيم الجيروسكوب</string>
+    <string name="settings_gyro_invert_x">عكس الجيروسكوب الأفقي</string>
+    <string name="settings_gyro_invert_x_desc">يعكس الحركة يمينًا ويسارًا.</string>
+    <string name="settings_gyro_invert_y">عكس الجيروسكوب العمودي</string>
+    <string name="settings_gyro_invert_y_desc">يعكس حركة التصويب لأعلى ولأسفل.</string>
+    <string name="settings_help_gyro_mode">يحول "التصويب" سرعة دوران الهاتف إلى العصا التناظرية اليمنى للتحكم في الكاميرا في ألعاب التصويب ويعود تلقائيًا إلى المركز عندما يتوقف الهاتف عن الحركة. يحول "التوجيه" إمالة الهاتف إلى العصا التناظرية اليسرى لألعاب السباق ويعاير الزاوية الحالية كمركز عند بدء اللعب. يُستخدم الوضع المحدد فقط أثناء تشغيل اللعبة ويتطلب مستشعر الحركة المقابل.</string>
+    <string name="settings_help_gyro_sensitivity">يتحكم في مدى قوة تأثير حركة الهاتف على العصا التناظرية المحاكية. يُوصى بتخصيص الإعدادات لكل لعبة لأن الألعاب تستخدم منحنيات استجابة مختلفة للكاميرا والتوجيه.</string>
+    <string name="settings_help_gyro_smoothing">يصفي ضوضاء المستشعر واهتزاز اليد. تتفاعل القيم الأقل بشكل أسرع؛ وتشعر القيم الأعلى بثبات أكبر ولكنها تضيف مقدارًا صغيرًا من التأخير.</string>
+    <string name="settings_gyro_unavailable">لا يوفر هذا الجهاز مستشعر الحركة المطلوب للوضع المحدد.</string>
+    <string name="settings_touch_controls_section">عناصر التحكم باللمس</string>
 </resources>

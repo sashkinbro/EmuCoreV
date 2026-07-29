@@ -918,7 +918,6 @@
     <string name="settings_customization_touch_style_glass">Retrò</string>
     <string name="settings_customization_touch_style_neon">Moderno</string>
     <string name="settings_game_menu_tab">Menu di gioco</string>
-    <string name="settings_game_menu_preview_section">Anteprima menu</string>
     <string name="settings_customization_drawer_section">Menu di navigazione</string>
     <string name="settings_customization_touch_style_arcade">Arcade</string>
     <string name="settings_customization_touch_style_minimal">Minimale</string>
@@ -932,7 +931,6 @@
     <string name="settings_drawer_style_compact">Compatto</string>
     <string name="settings_drawer_style_glass">Vetro</string>
     <string name="settings_drawer_style_console">Console</string>
-    <string name="settings_game_menu_layout_section">Layout del menu</string>
     <string name="settings_game_menu_layout_help">Modifica la struttura e la navigazione del menu di gioco. Le schede, la visibilità dei contenuti, le azioni di sicurezza e i controlli del gamepad rimangono condivisi in ogni layout.</string>
     <string name="settings_game_menu_layout_sidebar">Barra laterale</string>
     <string name="settings_game_menu_layout_dashboard">Dashboard</string>
@@ -983,4 +981,34 @@
     <string name="feedback_discard_action">Elimina</string>
 
     <string name="settings_customization_drawer_style">Aspetto del cassetto</string>
+    <string name="settings_touch_haptics">Feedback aptico per controlli touch</string>
+    <string name="settings_touch_haptics_desc">Riproduce un breve feedback aptico quando si premono i controlli sullo schermo.</string>
+    <string name="settings_help_touch_haptics">Aggiunge un leggero feedback aptico di Android quando viene premuto per la prima volta un pulsante sullo schermo, una direzione del D-pad o uno stick analogico. Questo influenza solo la sensazione dei controlli e non modifica la vibrazione del gioco.</string>
+    <string name="settings_touch_haptics_strength">Intensità feedback aptico</string>
+    <string name="settings_help_touch_haptics_strength">Controlla l\'intensità della vibrazione del dispositivo utilizzata per il feedback aptico dei controlli touch. Aumentala se la vibrazione è troppo leggera, oppure diminuiscila per un gioco portatile più silenzioso.</string>
+    <string name="settings_touch_haptics_test">Testa feedback aptico</string>
+    <string name="settings_touch_haptics_test_desc">Riproduce una breve vibrazione utilizzando l\'attuale intensità del feedback aptico.</string>
+    <string name="settings_help_touch_haptics_test">Riproduce lo stesso impulso aptico del dispositivo utilizzato dai controlli sullo schermo, in modo da poter regolare l\'intensità prima di avviare un gioco.</string>
+    <string name="settings_touch_haptics_preset">Feedback aptico</string>
+    <string name="settings_touch_haptics_preset_soft">Morbido</string>
+    <string name="settings_touch_haptics_preset_balanced">Bilanciato</string>
+    <string name="settings_touch_haptics_preset_crisp">Netto</string>
+    <string name="settings_touch_haptics_preset_strong">Forte</string>
+    <string name="settings_touch_haptics_preset_desc">Morbido è delicato, Bilanciato è l\'impostazione predefinita, Netto è breve e preciso e Forte è più profondo per motorini di vibrazione più deboli.</string>
+    <string name="settings_help_touch_haptics_preset">Morbido usa una pressione delicata e un rilascio molto leggero. Bilanciato fornisce una pressione chiara con un rilascio più leggero ed è l\'impostazione predefinita. Netto usa la combinazione più breve e definita per tocchi precisi. Forte usa impulsi più profondi e lunghi per telefoni con motorini di vibrazione più deboli. Il cursore dell\'intensità regola la sensazione selezionata.</string>
+    <string name="settings_gyro_mode">Controllo giroscopio</string>
+    <string name="settings_gyro_off">Disattivato</string>
+    <string name="settings_gyro_aim">Mira — levetta destra</string>
+    <string name="settings_gyro_steering">Sterzo — levetta sinistra</string>
+    <string name="settings_gyro_sensitivity">Sensibilità giroscopio</string>
+    <string name="settings_gyro_smoothing">Arrotondamento giroscopio</string>
+    <string name="settings_gyro_invert_x">Inverti giroscopio orizzontale</string>
+    <string name="settings_gyro_invert_x_desc">Inverte il movimento a destra e a sinistra.</string>
+    <string name="settings_gyro_invert_y">Inverti giroscopio verticale</string>
+    <string name="settings_gyro_invert_y_desc">Inverte il movimento di mira verso l\'alto e verso il basso.</string>
+    <string name="settings_help_gyro_mode">"Mira" converte la velocità di rotazione del telefono nella levetta analogica destra per il controllo della telecamera negli sparatutto e torna automaticamente al centro quando il telefono si ferma. "Sterzo" converte l\'inclinazione del telefono nella levetta analogica sinistra per i giochi di corsa e calibra l\'angolo corrente come centro all\'avvio del gioco. La modalità selezionata viene utilizzata solo durante l\'esecuzione di un gioco e richiede il sensore di movimento corrispondente.</string>
+    <string name="settings_help_gyro_sensitivity">Controlla la forza con cui il movimento del telefono devia la levetta analogica emulata. Si consigliano regolazioni per ogni singolo gioco poiché i titoli utilizzano curve di risposta della telecamera e dello sterzo differenti.</string>
+    <string name="settings_help_gyro_smoothing">Filtra il rumore del sensore e il tremolio della mano. Valori più bassi reagiscono più velocemente; valori più alti risultano più stabili ma aggiungono una leggera latenza.</string>
+    <string name="settings_gyro_unavailable">Questo dispositivo non dispone del sensore di movimento richiesto dalla modalità selezionata.</string>
+    <string name="settings_touch_controls_section">Controlli touch</string>
 </resources>

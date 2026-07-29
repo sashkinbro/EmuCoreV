@@ -40,6 +40,14 @@ data class VitaCoreConfig(
     val overlayScale: Float = 0.9f,
     val overlayOpacity: Int = 100,
     val disableMotion: Boolean = false,
+    val touchHaptics: Boolean = true,
+    val touchHapticsPreset: Int = TOUCH_HAPTICS_PRESET_BALANCED,
+    val touchHapticsStrength: Int = 60,
+    val gyroMode: Int = GYRO_MODE_OFF,
+    val gyroSensitivity: Int = 100,
+    val gyroSmoothing: Int = 45,
+    val gyroInvertX: Boolean = false,
+    val gyroInvertY: Boolean = false,
     val analogMultiplier: Float = 1.0f,
     val gamepadDeadzone: Float = 0.15f,
     val gamepadTriggerThreshold: Float = 0.12f,
@@ -103,6 +111,15 @@ data class VitaCoreConfig(
         const val GAMEPAD_PROFILE_STANDARD: String = "standard"
         const val GAMEPAD_PROFILE_SWAP_CROSS_CIRCLE: String = "swap-cross-circle"
         const val GAMEPAD_PROFILE_NINTENDO_FACE: String = "nintendo-face"
+
+        const val TOUCH_HAPTICS_PRESET_SOFT: Int = 0
+        const val TOUCH_HAPTICS_PRESET_BALANCED: Int = 1
+        const val TOUCH_HAPTICS_PRESET_CRISP: Int = 2
+        const val TOUCH_HAPTICS_PRESET_STRONG: Int = 3
+
+        const val GYRO_MODE_OFF: Int = 0
+        const val GYRO_MODE_AIM: Int = 1
+        const val GYRO_MODE_STEERING: Int = 2
     }
 }
 
@@ -124,6 +141,14 @@ class VitaCoreConfigRepository(private val context: Context) {
         "cpu-pool-size",
         "custom-driver-name",
         "disable-motion",
+        "touch-haptics",
+        "touch-haptics-preset",
+        "touch-haptics-strength",
+        "gyro-mode",
+        "gyro-sensitivity",
+        "gyro-smoothing",
+        "gyro-invert-x",
+        "gyro-invert-y",
         "disable-surface-sync",
         "discord-rich-presence",
         "enable-gamepad-overlay",
@@ -236,6 +261,14 @@ class VitaCoreConfigRepository(private val context: Context) {
                 overlayScale = values["overlay-scale"]?.toFloatOrNull() ?: defaults.overlayScale,
                 overlayOpacity = values["overlay-opacity"]?.toIntOrNull() ?: defaults.overlayOpacity,
                 disableMotion = values["disable-motion"]?.toBooleanStrictOrNull() ?: defaults.disableMotion,
+                touchHaptics = values["touch-haptics"]?.toBooleanStrictOrNull() ?: defaults.touchHaptics,
+                touchHapticsPreset = values["touch-haptics-preset"]?.toIntOrNull() ?: defaults.touchHapticsPreset,
+                touchHapticsStrength = values["touch-haptics-strength"]?.toIntOrNull() ?: defaults.touchHapticsStrength,
+                gyroMode = values["gyro-mode"]?.toIntOrNull() ?: defaults.gyroMode,
+                gyroSensitivity = values["gyro-sensitivity"]?.toIntOrNull() ?: defaults.gyroSensitivity,
+                gyroSmoothing = values["gyro-smoothing"]?.toIntOrNull() ?: defaults.gyroSmoothing,
+                gyroInvertX = values["gyro-invert-x"]?.toBooleanStrictOrNull() ?: defaults.gyroInvertX,
+                gyroInvertY = values["gyro-invert-y"]?.toBooleanStrictOrNull() ?: defaults.gyroInvertY,
                 analogMultiplier = values["controller-analog-multiplier"]?.toFloatOrNull() ?: defaults.analogMultiplier,
                 gamepadDeadzone = values["gamepad-deadzone"]?.toFloatOrNull() ?: defaults.gamepadDeadzone,
                 gamepadTriggerThreshold = values["gamepad-trigger-threshold"]?.toFloatOrNull() ?: defaults.gamepadTriggerThreshold,
@@ -318,6 +351,7 @@ class VitaCoreConfigRepository(private val context: Context) {
             validationLayer = false,
             discordRichPresence = false,
             psnSignedIn = false,
+            touchHaptics = upstream.touchHaptics,
             logLevel = defaultConfig().logLevel
         )
     }
@@ -358,6 +392,14 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["overlay-scale"] = formatFloat(config.overlayScale)
         values["overlay-opacity"] = config.overlayOpacity.toString()
         values["disable-motion"] = config.disableMotion.toString()
+        values["touch-haptics"] = config.touchHaptics.toString()
+        values["touch-haptics-preset"] = config.touchHapticsPreset.toString()
+        values["touch-haptics-strength"] = config.touchHapticsStrength.toString()
+        values["gyro-mode"] = config.gyroMode.toString()
+        values["gyro-sensitivity"] = config.gyroSensitivity.toString()
+        values["gyro-smoothing"] = config.gyroSmoothing.toString()
+        values["gyro-invert-x"] = config.gyroInvertX.toString()
+        values["gyro-invert-y"] = config.gyroInvertY.toString()
         values["controller-analog-multiplier"] = formatFloat(config.analogMultiplier)
         values["gamepad-deadzone"] = formatFloat(config.gamepadDeadzone)
         values["gamepad-trigger-threshold"] = formatFloat(config.gamepadTriggerThreshold)
@@ -493,6 +535,17 @@ class VitaCoreConfigRepository(private val context: Context) {
             gamepadTriggerThreshold = config.gamepadTriggerThreshold.coerceIn(0f, 0.9f),
             gamepadButtonProfile = normalizeGamepadProfile(config.gamepadButtonProfile),
             gamepadVibrationStrength = config.gamepadVibrationStrength.coerceIn(0, 100),
+            touchHapticsPreset = config.touchHapticsPreset.coerceIn(
+                VitaCoreConfig.TOUCH_HAPTICS_PRESET_SOFT,
+                VitaCoreConfig.TOUCH_HAPTICS_PRESET_STRONG
+            ),
+            touchHapticsStrength = config.touchHapticsStrength.coerceIn(10, 100),
+            gyroMode = config.gyroMode.coerceIn(
+                VitaCoreConfig.GYRO_MODE_OFF,
+                VitaCoreConfig.GYRO_MODE_STEERING
+            ),
+            gyroSensitivity = config.gyroSensitivity.coerceIn(25, 300),
+            gyroSmoothing = config.gyroSmoothing.coerceIn(0, 90),
             frameLimit = FrameLimit.normalize(config.frameLimit),
             logLevel = normalizedLogLevel
         )
@@ -556,7 +609,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         // Bump whenever an old non-upstream default needs to be snapped to vanilla
         // for users who already wrote a stale config.yml. applyMigrations() rewrites
         // the affected keys on the next launch.
-        private const val CONFIG_SCHEMA_VERSION = 7
+        private const val CONFIG_SCHEMA_VERSION = 8
         private const val SCHEMA_VERSION_KEY = "config-schema-version"
         private val upstreamSequenceKeys = setOf(
             "controller-axis-binds",

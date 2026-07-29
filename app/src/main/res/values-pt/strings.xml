@@ -918,7 +918,6 @@
     <string name="settings_customization_touch_style_glass">Retrô</string>
     <string name="settings_customization_touch_style_neon">Moderno</string>
     <string name="settings_game_menu_tab">Menu do jogo</string>
-    <string name="settings_game_menu_preview_section">Visualização do menu</string>
     <string name="settings_customization_drawer_section">Menu de navegação</string>
     <string name="settings_customization_touch_style_arcade">Arcade</string>
     <string name="settings_customization_touch_style_minimal">Minimalista</string>
@@ -932,7 +931,6 @@
     <string name="settings_drawer_style_compact">Compacto</string>
     <string name="settings_drawer_style_glass">Vidro</string>
     <string name="settings_drawer_style_console">Console</string>
-    <string name="settings_game_menu_layout_section">Layout do menu</string>
     <string name="settings_game_menu_layout_help">Altera a estrutura e a navegação do menu no jogo. As guias, a visibilidade do conteúdo, as ações de segurança e os controles do gamepad permanecem compartilhados entre cada layout.</string>
     <string name="settings_game_menu_layout_sidebar">Barra lateral</string>
     <string name="settings_game_menu_layout_dashboard">Painel</string>
@@ -983,4 +981,34 @@
     <string name="feedback_discard_action">Descartar</string>
 
     <string name="settings_customization_drawer_style">Aparência da gaveta</string>
+    <string name="settings_touch_haptics">Resposta tátil para controles de toque</string>
+    <string name="settings_touch_haptics_desc">Reproduzir uma curta vibração ao pressionar os controles na tela.</string>
+    <string name="settings_help_touch_haptics">Adiciona um leve feedback tátil do Android quando um botão na tela, direção do D-pad ou direcional analógico é pressionado pela primeira vez. Isso afeta apenas a sensação de controle e não altera a vibração do jogo.</string>
+    <string name="settings_touch_haptics_strength">Intensidade da resposta tátil</string>
+    <string name="settings_help_touch_haptics_strength">Controla a força da vibração do dispositivo usada para a resposta tátil dos controles de toque. Aumente se a vibração for muito sutil ou diminua para jogar no modo portátil de forma mais silenciosa.</string>
+    <string name="settings_touch_haptics_test">Testar resposta tátil</string>
+    <string name="settings_touch_haptics_test_desc">Reproduz uma curta vibração usando a intensidade da resposta tátil atual.</string>
+    <string name="settings_help_touch_haptics_test">Reproduz o mesmo pulso tátil do dispositivo usado pelos controles na tela, para que você possa ajustar a intensidade antes de iniciar um jogo.</string>
+    <string name="settings_touch_haptics_preset">Sensação tátil</string>
+    <string name="settings_touch_haptics_preset_soft">Suave</string>
+    <string name="settings_touch_haptics_preset_balanced">Equilibrado</string>
+    <string name="settings_touch_haptics_preset_crisp">Nítido</string>
+    <string name="settings_touch_haptics_preset_strong">Forte</string>
+    <string name="settings_touch_haptics_preset_desc">Suave é delicado, Equilibrado é o padrão natural, Nítido é curto e preciso e Forte é mais profundo para motores de vibração mais fracos.</string>
+    <string name="settings_help_touch_haptics_preset">Suave usa um toque delicado e uma liberação muito leve. Equilibrado dá um toque claro com uma liberação mais leve e é o padrão. Nítido usa o par mais curto e agudo para toques precisos. Forte usa pulsos mais profundos e longos para telefones com motores de vibração mais fracos. O controle deslizante de intensidade ajusta a sensação selecionada.</string>
+    <string name="settings_gyro_mode">Controle de giroscópio</string>
+    <string name="settings_gyro_off">Desativado</string>
+    <string name="settings_gyro_aim">Mira — analógico direito</string>
+    <string name="settings_gyro_steering">Direção — analógico esquerdo</string>
+    <string name="settings_gyro_sensitivity">Sensibilidade do giroscópio</string>
+    <string name="settings_gyro_smoothing">Suavização do giroscópio</string>
+    <string name="settings_gyro_invert_x">Inverter giroscópio horizontal</string>
+    <string name="settings_gyro_invert_x_desc">Inverte o movimento para a esquerda e para a direita.</string>
+    <string name="settings_gyro_invert_y">Inverter giroscópio vertical</string>
+    <string name="settings_gyro_invert_y_desc">Inverte o movimento de mira para cima e para baixo.</string>
+    <string name="settings_help_gyro_mode">"Mira" converte a velocidade de rotação do telefone no analógico direito para o controle da câmera em jogos de tiro e retorna automaticamente ao centro quando o telefone para de se mover. "Direção" converte a inclinação do telefone no analógico esquerdo para jogos de corrida e calibra o ângulo atual como o centro quando o jogo começa. O modo selecionado é usado apenas enquanto um jogo está em execução e requer o sensor de movimento correspondente.</string>
+    <string name="settings_help_gyro_sensitivity">Controla a força com que o movimento do telefone desvia o analógico emulado. Ajustes específicos por jogo são recomendados, pois os jogos usam diferentes curvas de resposta para câmera e direção.</string>
+    <string name="settings_help_gyro_smoothing">Filtra o ruído do sensor e o tremor da mão. Valores mais baixos reagem mais rápido; valores mais altos parecem mais estáveis, mas adicionam um pouco de latência.</string>
+    <string name="settings_gyro_unavailable">Este dispositivo não possui o sensor de movimento exigido pelo modo selecionado.</string>
+    <string name="settings_touch_controls_section">Controles por toque</string>
 </resources>

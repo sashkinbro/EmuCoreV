@@ -930,8 +930,6 @@
     <string name="settings_customization_touch_style_arcade">Arcade</string>
     <string name="settings_customization_touch_style_minimal">Minimal</string>
     <string name="settings_game_menu_tab">Game menu</string>
-    <string name="settings_game_menu_preview_section">Menu preview</string>
-    <string name="settings_game_menu_layout_section">Menu layout</string>
     <string name="settings_game_menu_layout_help">Changes the structure and navigation of the in-game menu. Tabs, content visibility, safety actions, and gamepad controls remain shared between every layout.</string>
     <string name="settings_game_menu_layout_sidebar">Sidebar</string>
     <string name="settings_game_menu_layout_dashboard">Dashboard</string>
@@ -986,4 +984,34 @@
     <string name="feedback_discard_action">Discard</string>
 
     <string name="settings_customization_drawer_style">Drawer appearance</string>
+    <string name="settings_touch_haptics">Touch control haptics</string>
+    <string name="settings_touch_haptics_desc">Play a short haptic tick when pressing on-screen controls.</string>
+    <string name="settings_help_touch_haptics">Adds light Android haptic feedback when an on-screen button, D-pad direction, or analog stick is first pressed. This affects control feel only and does not change in-game rumble.</string>
+    <string name="settings_touch_haptics_strength">Touch haptic strength</string>
+    <string name="settings_help_touch_haptics_strength">Controls the device vibration strength used for touch control haptics. Raise it if the tick is too subtle, or lower it for quieter handheld play.</string>
+    <string name="settings_touch_haptics_test">Test touch haptics</string>
+    <string name="settings_touch_haptics_test_desc">Previews the selected press-and-release feel at the current strength.</string>
+    <string name="settings_help_touch_haptics_test">Plays the same press-and-release haptic pair used by on-screen controls, so you can compare presets and tune strength before launching a game.</string>
+    <string name="settings_touch_haptics_preset">Haptic feel</string>
+    <string name="settings_touch_haptics_preset_soft">Soft</string>
+    <string name="settings_touch_haptics_preset_balanced">Balanced</string>
+    <string name="settings_touch_haptics_preset_crisp">Crisp</string>
+    <string name="settings_touch_haptics_preset_strong">Strong</string>
+    <string name="settings_touch_haptics_preset_desc">Soft is gentle, Balanced is the natural default, Crisp is short and precise, and Strong is deeper for weaker vibration motors.</string>
+    <string name="settings_help_touch_haptics_preset">Soft uses a gentle press and a very light release. Balanced gives a clear press with a lighter release and is the default. Crisp uses the shortest, sharpest pair for precise taps. Strong uses deeper, longer pulses for phones with weaker vibration motors. The strength slider scales the selected feel.</string>
+    <string name="settings_gyro_mode">Gyroscope control</string>
+    <string name="settings_gyro_off">Off</string>
+    <string name="settings_gyro_aim">Aim — right stick</string>
+    <string name="settings_gyro_steering">Steering — left stick</string>
+    <string name="settings_gyro_sensitivity">Gyroscope sensitivity</string>
+    <string name="settings_gyro_smoothing">Gyroscope smoothing</string>
+    <string name="settings_gyro_invert_x">Invert horizontal gyro</string>
+    <string name="settings_gyro_invert_x_desc">Reverses left and right motion.</string>
+    <string name="settings_gyro_invert_y">Invert vertical gyro</string>
+    <string name="settings_gyro_invert_y_desc">Reverses up and down aiming motion.</string>
+    <string name="settings_help_gyro_mode">Aim converts phone rotation speed into the right analog stick for camera control in shooters and automatically returns to center when the phone stops moving. Steering converts the phone’s held tilt into the left analog stick for racing games and calibrates the current angle as center when gameplay starts. The selected mode is used only while a game is running and requires the corresponding motion sensor.</string>
+    <string name="settings_help_gyro_sensitivity">Controls how strongly phone movement deflects the emulated analog stick. Per-game overrides are recommended because games use different camera and steering response curves.</string>
+    <string name="settings_help_gyro_smoothing">Filters sensor noise and hand shake. Lower values react faster; higher values feel steadier but add a small amount of latency.</string>
+    <string name="settings_gyro_unavailable">This device does not expose the motion sensor required by the selected mode.</string>
+    <string name="settings_touch_controls_section">Touch Controls</string>
 </resources>

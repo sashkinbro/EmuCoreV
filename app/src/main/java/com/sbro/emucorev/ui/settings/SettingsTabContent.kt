@@ -58,6 +58,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import android.view.InputDevice
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.AndroidGyroscopeInput
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.FrameLimit
 import com.sbro.emucorev.core.VitaCoreConfig
@@ -127,10 +128,6 @@ fun SettingsTabContent(
     when (selectedTab) {
         SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings, onOpenVitaLanguageSettings)
         SettingsTab.Customization -> CustomizationTab(uiState.customization, viewModel)
-        SettingsTab.GameMenu -> GameMenuCustomizationTab(
-            selected = uiState.customization.gameMenuLayoutStyle,
-            onSelected = viewModel::updateGameMenuLayoutStyle
-        )
         SettingsTab.Pro -> Column(
             modifier = Modifier.padding(horizontal = ScreenHorizontalPadding),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -459,6 +456,7 @@ private fun OverlayTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewM
 
 @Composable
 private fun ControlsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel) {
+    val context = LocalContext.current
     val gamepadConnected = remember {
         InputDevice.getDeviceIds().any { id ->
             InputDeviceClassifier.isPhysicalGameController(id)
@@ -469,6 +467,88 @@ private fun ControlsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
         Toggle(stringResource(R.string.settings_core_disable_motion), stringResource(R.string.settings_help_disable_motion), uiState.coreConfig.disableMotion, { enabled -> viewModel.updateCoreSettings { it.copy(disableMotion = enabled) } }, { viewModel.updateCoreSettings { it.copy(disableMotion = defaults.disableMotion) } })
         SliderRow(stringResource(R.string.settings_core_analog_multiplier_label), stringResource(R.string.settings_help_analog_multiplier), stringResource(R.string.settings_core_analog_multiplier_value, uiState.coreConfig.analogMultiplier), { viewModel.updateCoreSettings { it.copy(analogMultiplier = defaults.analogMultiplier) } }) {
             Slider(value = uiState.coreConfig.analogMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(analogMultiplier = (value * 10).roundToInt() / 10f) } }, valueRange = 0.5f..2f, steps = 14)
+        }
+    }
+    SectionCard(title = stringResource(R.string.settings_touch_controls_section), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
+        Toggle(
+            stringResource(R.string.settings_touch_haptics),
+            stringResource(R.string.settings_help_touch_haptics),
+            uiState.coreConfig.touchHaptics,
+            { enabled -> viewModel.updateCoreSettings { it.copy(touchHaptics = enabled) } },
+            { viewModel.updateCoreSettings { it.copy(touchHaptics = defaults.touchHaptics) } }
+        )
+        Chips(
+            stringResource(R.string.settings_touch_haptics_preset),
+            stringResource(R.string.settings_help_touch_haptics_preset),
+            { viewModel.updateCoreSettings { it.copy(touchHapticsPreset = defaults.touchHapticsPreset) } }
+        ) {
+            IntChip(VitaCoreConfig.TOUCH_HAPTICS_PRESET_SOFT, stringResource(R.string.settings_touch_haptics_preset_soft), uiState.coreConfig.touchHapticsPreset, viewModel, enabled = uiState.coreConfig.touchHaptics) { config, value -> config.copy(touchHapticsPreset = value) }
+            IntChip(VitaCoreConfig.TOUCH_HAPTICS_PRESET_BALANCED, stringResource(R.string.settings_touch_haptics_preset_balanced), uiState.coreConfig.touchHapticsPreset, viewModel, enabled = uiState.coreConfig.touchHaptics) { config, value -> config.copy(touchHapticsPreset = value) }
+            IntChip(VitaCoreConfig.TOUCH_HAPTICS_PRESET_CRISP, stringResource(R.string.settings_touch_haptics_preset_crisp), uiState.coreConfig.touchHapticsPreset, viewModel, enabled = uiState.coreConfig.touchHaptics) { config, value -> config.copy(touchHapticsPreset = value) }
+            IntChip(VitaCoreConfig.TOUCH_HAPTICS_PRESET_STRONG, stringResource(R.string.settings_touch_haptics_preset_strong), uiState.coreConfig.touchHapticsPreset, viewModel, enabled = uiState.coreConfig.touchHaptics) { config, value -> config.copy(touchHapticsPreset = value) }
+        }
+        SliderRow(
+            stringResource(R.string.settings_touch_haptics_strength),
+            stringResource(R.string.settings_help_touch_haptics_strength),
+            stringResource(R.string.settings_gamepad_percent_value, uiState.coreConfig.touchHapticsStrength),
+            { viewModel.updateCoreSettings { it.copy(touchHapticsStrength = defaults.touchHapticsStrength) } }
+        ) {
+            Slider(
+                enabled = uiState.coreConfig.touchHaptics,
+                value = uiState.coreConfig.touchHapticsStrength.toFloat(),
+                onValueChange = { value -> viewModel.updateCoreSettings { it.copy(touchHapticsStrength = value.roundToInt().coerceIn(10, 100)) } },
+                valueRange = 10f..100f,
+                steps = 17
+            )
+        }
+        VibrationTestRow(
+            title = stringResource(R.string.settings_touch_haptics_test),
+            description = stringResource(R.string.settings_help_touch_haptics_test),
+            enabled = uiState.coreConfig.touchHaptics,
+            onClick = viewModel::testTouchHaptics
+        )
+    }
+    SectionCard(title = stringResource(R.string.settings_gyro_mode), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
+        Chips(
+            stringResource(R.string.settings_gyro_mode),
+            stringResource(R.string.settings_help_gyro_mode),
+            { viewModel.updateCoreSettings { it.copy(gyroMode = defaults.gyroMode) } }
+        ) {
+            IntChip(VitaCoreConfig.GYRO_MODE_OFF, stringResource(R.string.settings_gyro_off), uiState.coreConfig.gyroMode, viewModel) { config, value -> config.copy(gyroMode = value) }
+            IntChip(VitaCoreConfig.GYRO_MODE_AIM, stringResource(R.string.settings_gyro_aim), uiState.coreConfig.gyroMode, viewModel) { config, value -> config.copy(gyroMode = value) }
+            IntChip(VitaCoreConfig.GYRO_MODE_STEERING, stringResource(R.string.settings_gyro_steering), uiState.coreConfig.gyroMode, viewModel) { config, value -> config.copy(gyroMode = value) }
+        }
+        if (uiState.coreConfig.gyroMode != VitaCoreConfig.GYRO_MODE_OFF &&
+            !AndroidGyroscopeInput.isModeAvailable(context, uiState.coreConfig.gyroMode)
+        ) {
+            Text(
+                text = stringResource(R.string.settings_gyro_unavailable),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
+            )
+        }
+        if (uiState.coreConfig.gyroMode != VitaCoreConfig.GYRO_MODE_OFF) {
+            SliderRow(
+                stringResource(R.string.settings_gyro_sensitivity),
+                stringResource(R.string.settings_help_gyro_sensitivity),
+                stringResource(R.string.settings_gamepad_percent_value, uiState.coreConfig.gyroSensitivity),
+                { viewModel.updateCoreSettings { it.copy(gyroSensitivity = defaults.gyroSensitivity) } }
+            ) {
+                Slider(value = uiState.coreConfig.gyroSensitivity.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gyroSensitivity = value.roundToInt()) } }, valueRange = 25f..300f, steps = 10)
+            }
+            SliderRow(
+                stringResource(R.string.settings_gyro_smoothing),
+                stringResource(R.string.settings_help_gyro_smoothing),
+                stringResource(R.string.settings_gamepad_percent_value, uiState.coreConfig.gyroSmoothing),
+                { viewModel.updateCoreSettings { it.copy(gyroSmoothing = defaults.gyroSmoothing) } }
+            ) {
+                Slider(value = uiState.coreConfig.gyroSmoothing.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gyroSmoothing = value.roundToInt()) } }, valueRange = 0f..90f, steps = 8)
+            }
+            Toggle(stringResource(R.string.settings_gyro_invert_x), stringResource(R.string.settings_gyro_invert_x_desc), uiState.coreConfig.gyroInvertX, { enabled -> viewModel.updateCoreSettings { it.copy(gyroInvertX = enabled) } }, { viewModel.updateCoreSettings { it.copy(gyroInvertX = defaults.gyroInvertX) } })
+            if (uiState.coreConfig.gyroMode == VitaCoreConfig.GYRO_MODE_AIM) {
+                Toggle(stringResource(R.string.settings_gyro_invert_y), stringResource(R.string.settings_gyro_invert_y_desc), uiState.coreConfig.gyroInvertY, { enabled -> viewModel.updateCoreSettings { it.copy(gyroInvertY = enabled) } }, { viewModel.updateCoreSettings { it.copy(gyroInvertY = defaults.gyroInvertY) } })
+            }
         }
     }
     SectionCard(title = stringResource(R.string.settings_vibration_section), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
@@ -494,6 +574,8 @@ private fun ControlsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
             )
         }
         VibrationTestRow(
+            title = stringResource(R.string.settings_test_vibration),
+            description = stringResource(R.string.settings_help_test_vibration),
             enabled = uiState.coreConfig.gamepadVibration && uiState.coreConfig.gamepadVibrationStrength > 0,
             onClick = {
                 viewModel.testVibration()
@@ -1108,6 +1190,8 @@ private fun SliderRow(title: String, description: String, valueText: String, onR
 
 @Composable
 private fun VibrationTestRow(
+    title: String,
+    description: String,
     enabled: Boolean,
     onClick: () -> Unit
 ) {
@@ -1128,12 +1212,12 @@ private fun VibrationTestRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.settings_test_vibration),
+                    text = title,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = stringResource(R.string.settings_help_test_vibration),
+                    text = description,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1315,10 +1399,12 @@ private fun IntChip(
     label: String,
     current: Int,
     viewModel: SettingsViewModel,
+    enabled: Boolean = true,
     transform: (VitaCoreConfig, Int) -> VitaCoreConfig
 ) {
     FilterChip(
         selected = current == value,
+        enabled = enabled,
         onClick = { viewModel.updateCoreSettings { config -> transform(config, value) } },
         colors = appFilterChipColors(),
         label = { Text(label) }

@@ -917,7 +917,6 @@
     <string name="settings_customization_touch_style_glass">经典立体</string>
     <string name="settings_customization_touch_style_neon">现代</string>
     <string name="settings_game_menu_tab">游戏菜单</string>
-    <string name="settings_game_menu_preview_section">菜单预览</string>
     <string name="settings_customization_drawer_section">导航抽屉</string>
     <string name="settings_customization_touch_style_arcade">街机</string>
     <string name="settings_customization_touch_style_minimal">极简</string>
@@ -931,7 +930,6 @@
     <string name="settings_drawer_style_compact">紧凑</string>
     <string name="settings_drawer_style_glass">玻璃</string>
     <string name="settings_drawer_style_console">主机</string>
-    <string name="settings_game_menu_layout_section">菜单布局</string>
     <string name="settings_game_menu_layout_help">更改游戏内菜单的结构和导航。标签页、内容可见性、安全操作和手柄控制在每个布局之间保持共享。</string>
     <string name="settings_game_menu_layout_sidebar">侧边栏</string>
     <string name="settings_game_menu_layout_dashboard">仪表板</string>
@@ -982,4 +980,34 @@
     <string name="feedback_discard_action">放弃</string>
 
     <string name="settings_customization_drawer_style">抽屉外观</string>
+    <string name="settings_touch_haptics">触摸控制震动反馈</string>
+    <string name="settings_touch_haptics_desc">按下屏幕控件时播放短促的触觉反馈。</string>
+    <string name="settings_help_touch_haptics">首次按下屏幕按钮、十字键方向或模拟摇杆时添加轻微的 Android 触觉反馈。这仅影响控制手感，不会改变游戏内的震动。</string>
+    <string name="settings_touch_haptics_strength">触摸震动强度</string>
+    <string name="settings_help_touch_haptics_strength">控制用于触摸控件震动反馈的设备震动强度。如果震动太微弱，请将其调高；如果想在掌机模式下安静游玩，请将其调低。</string>
+    <string name="settings_touch_haptics_test">测试触摸震动</string>
+    <string name="settings_touch_haptics_test_desc">使用当前的触摸震动强度播放短促的震动。</string>
+    <string name="settings_help_touch_haptics_test">播放与屏幕控件使用的相同设备震动反馈，以便在启动游戏前调整强度。</string>
+    <string name="settings_touch_haptics_preset">触感</string>
+    <string name="settings_touch_haptics_preset_soft">柔和</string>
+    <string name="settings_touch_haptics_preset_balanced">均衡</string>
+    <string name="settings_touch_haptics_preset_crisp">清脆</string>
+    <string name="settings_touch_haptics_preset_strong">强烈</string>
+    <string name="settings_touch_haptics_preset_desc">“柔和”表示轻柔，“均衡”是自然的默认设置，“清脆”表示短促而精确，而“强烈”的振动更深，适用于较弱的振动马达。</string>
+    <string name="settings_help_touch_haptics_preset">“柔和”使用轻柔的按下和非常轻的释放感觉。“均衡”提供清晰的按下和较轻的释放感觉，是默认设置。“清脆”使用最短、最干脆的组合来实现精确的点按。“强烈”针对振动马达较弱的手机使用更深、更长的脉冲。强度滑块可调节所选触感的强度。</string>
+    <string name="settings_gyro_mode">陀螺仪控制</string>
+    <string name="settings_gyro_off">关闭</string>
+    <string name="settings_gyro_aim">瞄准 — 右摇杆</string>
+    <string name="settings_gyro_steering">转向 — 左摇杆</string>
+    <string name="settings_gyro_sensitivity">陀螺仪灵敏度</string>
+    <string name="settings_gyro_smoothing">陀螺仪平滑度</string>
+    <string name="settings_gyro_invert_x">反转水平陀螺仪</string>
+    <string name="settings_gyro_invert_x_desc">反转左右移动方向。</string>
+    <string name="settings_gyro_invert_y">反转垂直陀螺仪</string>
+    <string name="settings_gyro_invert_y_desc">反转上下瞄准移动方向。</string>
+    <string name="settings_help_gyro_mode">“瞄准”将手机的旋转速度转换为射击游戏中的右摇杆来控制视角，并在手机停止移动时自动回中。“转向”将手机的倾斜角度转换为赛车游戏中的左摇杆，并在游戏开始时将当前角度校准为中心点。所选模式仅在游戏运行时生效，并且需要相应的运动传感器。</string>
+    <string name="settings_help_gyro_sensitivity">控制手机移动对模拟摇杆产生的偏移强度。由于不同游戏具有不同的视角和转向响应曲线，建议为每个游戏单独设置。</string>
+    <string name="settings_help_gyro_smoothing">过滤传感器噪声和手部抖动。数值越低反应越快；数值越高感觉越稳定，但会增加少许延迟。</string>
+    <string name="settings_gyro_unavailable">此设备未提供所选模式所需的运动传感器。</string>
+    <string name="settings_touch_controls_section">触屏控制</string>
 </resources>

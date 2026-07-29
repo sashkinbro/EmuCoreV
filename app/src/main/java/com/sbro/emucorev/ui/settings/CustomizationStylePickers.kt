@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,11 +11,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -25,7 +24,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -35,6 +33,8 @@ import com.sbro.emucorev.data.DrawerVisualStyle
 import com.sbro.emucorev.data.TouchControlPressEffect
 import com.sbro.emucorev.data.TouchControlVisualStyle
 import com.sbro.emucorev.ui.common.SectionCard
+import com.sbro.emucorev.ui.common.VectorAnalogStick
+import com.sbro.emucorev.ui.common.VectorOverlayButton
 
 @Composable
 internal fun TouchControlStyleSection(
@@ -44,20 +44,23 @@ internal fun TouchControlStyleSection(
 ) {
     SectionCard(
         title = stringResource(R.string.settings_customization_touch_controls_section),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp)
+        contentPadding = PaddingValues(vertical = 14.dp)
     ) {
-        TouchControlsPreview(style = settings.touchControlVisualStyle)
+        TouchControlsPreview(
+            style = settings.touchControlVisualStyle,
+            pressEffect = settings.touchControlPressEffect
+        )
         Text(
             text = stringResource(R.string.settings_customization_touch_controls_style),
+            modifier = Modifier.padding(horizontal = 14.dp),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            TouchControlVisualStyle.entries.forEach { style ->
+            items(TouchControlVisualStyle.entries, key = { it.name }) { style ->
                 FilterChip(
                     selected = settings.touchControlVisualStyle == style,
                     onClick = { onStyleSelected(style) },
@@ -68,15 +71,14 @@ internal fun TouchControlStyleSection(
         Text(
             text = stringResource(R.string.settings_customization_touch_press_effect),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            modifier = Modifier.padding(top = 6.dp)
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            TouchControlPressEffect.entries.forEach { effect ->
+            items(TouchControlPressEffect.entries, key = { it.name }) { effect ->
                 FilterChip(
                     selected = settings.touchControlPressEffect == effect,
                     onClick = { onPressEffectSelected(effect) },
@@ -86,11 +88,13 @@ internal fun TouchControlStyleSection(
         }
         Text(
             text = stringResource(R.string.settings_customization_touch_press_effect_help),
+            modifier = Modifier.padding(horizontal = 14.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = stringResource(R.string.settings_customization_touch_controls_help),
+            modifier = Modifier.padding(horizontal = 14.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -104,19 +108,20 @@ internal fun DrawerStyleSection(
 ) {
     SectionCard(
         title = stringResource(R.string.settings_customization_drawer_section),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp)
+        contentPadding = PaddingValues(vertical = 14.dp)
     ) {
         Text(
             text = stringResource(R.string.settings_customization_drawer_style),
+            modifier = Modifier.padding(horizontal = 14.dp),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
         )
-        Row(
+        LazyRow(
             modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                .fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            DrawerVisualStyle.entries.forEach { style ->
+            items(DrawerVisualStyle.entries, key = { it.name }) { style ->
                 StylePreviewCard(
                     selected = selected == style,
                     label = drawerStyleLabel(style),
@@ -138,7 +143,8 @@ internal fun StylePreviewCard(
 ) {
     Surface(
         modifier = Modifier
-            .width(172.dp)
+            .width(176.dp)
+            .height(132.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         color = if (selected) {
@@ -160,7 +166,7 @@ internal fun StylePreviewCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(92.dp)
+                    .weight(1f)
                     .background(
                         MaterialTheme.colorScheme.background,
                         RoundedCornerShape(14.dp)
@@ -180,85 +186,58 @@ internal fun StylePreviewCard(
 }
 
 @Composable
-private fun TouchControlsPreview(style: TouchControlVisualStyle) {
-    val accent = when (style) {
-        TouchControlVisualStyle.CLASSIC -> Color(0xFFD5D8E0)
-        TouchControlVisualStyle.LEGACY -> Color.White
-        TouchControlVisualStyle.MODERN -> MaterialTheme.colorScheme.primary
-        TouchControlVisualStyle.ARCADE -> Color(0xFFFFD166)
-        TouchControlVisualStyle.MINIMAL -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val fill = when (style) {
-        TouchControlVisualStyle.CLASSIC -> Color.White.copy(alpha = 0.20f)
-        TouchControlVisualStyle.LEGACY -> Color.White.copy(alpha = 0.12f)
-        TouchControlVisualStyle.MODERN -> MaterialTheme.colorScheme.primary.copy(alpha = 0.20f)
-        TouchControlVisualStyle.ARCADE -> Color(0xFF653754).copy(alpha = 0.72f)
-        TouchControlVisualStyle.MINIMAL -> Color.Transparent
-    }
+private fun TouchControlsPreview(
+    style: TouchControlVisualStyle,
+    pressEffect: TouchControlPressEffect
+) {
     Surface(
         modifier = Modifier
+            .padding(horizontal = 14.dp)
             .fillMaxWidth()
-            .height(150.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.background,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f))
+            .height(124.dp),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+        )
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .padding(start = 28.dp)
-                    .align(Alignment.CenterStart)
-                    .size(92.dp)
-                    .background(fill, CircleShape)
-                    .border(if (style == TouchControlVisualStyle.MINIMAL) 1.dp else 3.dp, accent, CircleShape),
-                contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 22.dp, vertical = 18.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            VectorAnalogStick(
+                analogSize = 76.dp,
+                visualStyle = style,
+                pressEffect = pressEffect,
+                pressed = true,
+                interactive = false
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(accent.copy(alpha = 0.30f), CircleShape)
-                        .border(1.dp, accent, CircleShape)
+                VectorOverlayButton(
+                    drawableRes = R.drawable.ic_controller_square_button,
+                    width = 44.dp,
+                    height = 44.dp,
+                    visualStyle = style,
+                    pressEffect = pressEffect,
+                    interactive = false
+                )
+                VectorOverlayButton(
+                    drawableRes = R.drawable.ic_controller_cross_button,
+                    width = 44.dp,
+                    height = 44.dp,
+                    visualStyle = style,
+                    pressEffect = pressEffect,
+                    pressed = true,
+                    interactive = false
                 )
             }
-            Row(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 28.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                PreviewFaceButton("□", accent, fill, style)
-                PreviewFaceButton("×", accent, fill, style, large = true)
-            }
         }
-    }
-}
-
-@Composable
-private fun PreviewFaceButton(
-    symbol: String,
-    accent: Color,
-    fill: Color,
-    style: TouchControlVisualStyle,
-    large: Boolean = false
-) {
-    val shape = when (style) {
-        TouchControlVisualStyle.MODERN -> RoundedCornerShape(12.dp)
-        TouchControlVisualStyle.MINIMAL -> RoundedCornerShape(50)
-        else -> CircleShape
-    }
-    Box(
-        modifier = Modifier
-            .size(if (large) 62.dp else 48.dp)
-            .background(fill, shape)
-            .border(if (style == TouchControlVisualStyle.MINIMAL) 1.dp else 2.dp, accent, shape),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = symbol,
-            color = accent,
-            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Light)
-        )
     }
 }
 

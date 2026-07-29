@@ -98,7 +98,6 @@ private val SettingsRowInnerVerticalPadding = 14.dp
 enum class SettingsTab(@param:StringRes val titleRes: Int, val icon: ImageVector) {
     General(R.string.settings_tab_general, Icons.Rounded.Tune),
     Customization(R.string.settings_tab_customization, Icons.Rounded.Palette),
-    GameMenu(R.string.settings_game_menu_tab, Icons.Rounded.MoreVert),
     Graphics(R.string.settings_tab_graphics, Icons.Rounded.GraphicEq),
     Audio(R.string.settings_tab_audio, Icons.AutoMirrored.Rounded.VolumeUp),
     Overlay(R.string.settings_tab_overlay, Icons.Rounded.Vibration),

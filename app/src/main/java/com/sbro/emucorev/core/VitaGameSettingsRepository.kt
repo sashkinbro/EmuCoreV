@@ -159,6 +159,19 @@ class VitaGameSettingsRepository(private val context: Context) {
                 overlayScale = own.floatAttr("overlay-scale", config.overlayScale),
                 overlayOpacity = own.intAttr("overlay-opacity", config.overlayOpacity),
                 disableMotion = own.boolAttr("disable-motion", config.disableMotion),
+                touchHaptics = own.boolAttr("touch-haptics", config.touchHaptics),
+                touchHapticsPreset = own.intAttr("touch-haptics-preset", config.touchHapticsPreset)
+                    .coerceIn(VitaCoreConfig.TOUCH_HAPTICS_PRESET_SOFT, VitaCoreConfig.TOUCH_HAPTICS_PRESET_STRONG),
+                touchHapticsStrength = own.intAttr("touch-haptics-strength", config.touchHapticsStrength)
+                    .coerceIn(10, 100),
+                gyroMode = own.intAttr("gyro-mode", config.gyroMode)
+                    .coerceIn(VitaCoreConfig.GYRO_MODE_OFF, VitaCoreConfig.GYRO_MODE_STEERING),
+                gyroSensitivity = own.intAttr("gyro-sensitivity", config.gyroSensitivity)
+                    .coerceIn(25, 300),
+                gyroSmoothing = own.intAttr("gyro-smoothing", config.gyroSmoothing)
+                    .coerceIn(0, 90),
+                gyroInvertX = own.boolAttr("gyro-invert-x", config.gyroInvertX),
+                gyroInvertY = own.boolAttr("gyro-invert-y", config.gyroInvertY),
                 analogMultiplier = own.floatAttr("controller-analog-multiplier", config.analogMultiplier),
                 gamepadDeadzone = own.floatAttr("gamepad-deadzone", config.gamepadDeadzone),
                 gamepadTriggerThreshold = own.floatAttr("gamepad-trigger-threshold", config.gamepadTriggerThreshold),
@@ -258,6 +271,14 @@ class VitaGameSettingsRepository(private val context: Context) {
             setAttribute("overlay-scale", config.overlayScale.toString())
             setAttribute("overlay-opacity", config.overlayOpacity.toString())
             setAttribute("disable-motion", config.disableMotion.toString())
+            setAttribute("touch-haptics", config.touchHaptics.toString())
+            setAttribute("touch-haptics-preset", config.touchHapticsPreset.toString())
+            setAttribute("touch-haptics-strength", config.touchHapticsStrength.toString())
+            setAttribute("gyro-mode", config.gyroMode.toString())
+            setAttribute("gyro-sensitivity", config.gyroSensitivity.toString())
+            setAttribute("gyro-smoothing", config.gyroSmoothing.toString())
+            setAttribute("gyro-invert-x", config.gyroInvertX.toString())
+            setAttribute("gyro-invert-y", config.gyroInvertY.toString())
             setAttribute("controller-analog-multiplier", config.analogMultiplier.toString())
             setAttribute("gamepad-deadzone", config.gamepadDeadzone.toString())
             setAttribute("gamepad-trigger-threshold", config.gamepadTriggerThreshold.toString())

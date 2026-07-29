@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.jakewharton.processphoenix.ProcessPhoenix
 import com.sbro.emucorev.core.AppUpdateRelease
 import com.sbro.emucorev.core.AppUpdateRepository
+import com.sbro.emucorev.core.AndroidTouchHaptics
+import com.sbro.emucorev.core.AndroidTouchHaptics.ButtonPhase
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.GpuDriverCatalogRepository
 import com.sbro.emucorev.core.GpuDriverManager
@@ -32,6 +34,7 @@ import com.sbro.emucorev.data.GameMenuLayoutStyle
 import com.sbro.emucorev.data.TouchControlPressEffect
 import com.sbro.emucorev.data.TouchControlVisualStyle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -316,6 +319,25 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun testVibration(): Boolean {
         return VibrationTestController.playTestPulse(getApplication(), _uiState.value.coreConfig)
+    }
+
+    fun testTouchHaptics() {
+        val config = _uiState.value.coreConfig
+        AndroidTouchHaptics.playButton(
+            context = getApplication(),
+            strengthPercent = config.touchHapticsStrength,
+            preset = config.touchHapticsPreset,
+            phase = ButtonPhase.PRESS
+        )
+        viewModelScope.launch {
+            delay(55)
+            AndroidTouchHaptics.playButton(
+                context = getApplication(),
+                strengthPercent = config.touchHapticsStrength,
+                preset = config.touchHapticsPreset,
+                phase = ButtonPhase.RELEASE
+            )
+        }
     }
 
     fun installGpuDriver(uri: Uri, applyGlobally: Boolean = true, onComplete: (Result<String>) -> Unit) {

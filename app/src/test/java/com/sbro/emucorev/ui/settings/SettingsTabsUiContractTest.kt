@@ -9,6 +9,18 @@ import org.junit.Test
 
 class SettingsTabsUiContractTest {
     @Test
+    fun gameMenuIsASectionInsideCustomizationInsteadOfASeparateTab() {
+        val root = sourceRoot()
+        val screen = root.resolve("ui/settings/SettingsScreen.kt").readText()
+        val content = root.resolve("ui/settings/SettingsTabContent.kt").readText()
+        val customization = root.resolve("ui/settings/CustomizationTab.kt").readText()
+
+        assertTrue("Game menu must not remain a standalone settings tab", "SettingsTab.GameMenu" !in content)
+        assertTrue("Game menu must not remain in the settings tab enum", "GameMenu(R.string.settings_game_menu_tab" !in screen)
+        assertTrue("Game menu settings must be rendered by Customization", "GameMenuStyleSection(" in customization)
+    }
+
+    @Test
     fun updatesProAndAboutAreTheFinalTabsInThatOrder() {
         val source = sourceRoot()
             .resolve("ui/settings/SettingsScreen.kt")
@@ -67,6 +79,20 @@ class SettingsTabsUiContractTest {
         assertTrue("The Pro settings tab must use a dedicated column", proBranch.isNotBlank())
         assertTrue("The Pro settings tab must render separate benefit cards", "ProBenefitCards()" in proBranch)
         assertTrue("The purchase card must not duplicate the benefits", "showFeatures = false" in proBranch)
+    }
+
+    @Test
+    fun proPurchaseButtonHasAVisibleGoldIdentityEverywhere() {
+        val proUi = sourceRoot()
+            .resolve("ui/pro/ProPurchaseUi.kt")
+            .readText()
+
+        assertTrue("Shared Pro purchase button must have a minimum touch height", ".heightIn(min = 56.dp)" in proUi)
+        assertTrue("Shared Pro purchase button must use the gold container", "containerColor = ProGold" in proUi)
+        assertTrue(
+            "Unavailable billing must still retain a visible Pro identity",
+            "disabledContainerColor = ProGold.copy(alpha = 0.42f)" in proUi
+        )
     }
 
     private fun sourceRoot(): Path {

@@ -918,7 +918,6 @@
     <string name="settings_customization_touch_style_glass">Legacy</string>
     <string name="settings_customization_touch_style_neon">Modern</string>
     <string name="settings_game_menu_tab">Spielmenü</string>
-    <string name="settings_game_menu_preview_section">Menüvorschau</string>
     <string name="settings_customization_drawer_section">Navigationsmenü</string>
     <string name="settings_customization_touch_style_arcade">Arcade</string>
     <string name="settings_customization_touch_style_minimal">Minimal</string>
@@ -932,7 +931,6 @@
     <string name="settings_drawer_style_compact">Kompakt</string>
     <string name="settings_drawer_style_glass">Glas</string>
     <string name="settings_drawer_style_console">Konsole</string>
-    <string name="settings_game_menu_layout_section">Menü-Layout</string>
     <string name="settings_game_menu_layout_help">Ändert die Struktur und Navigation des In-Game-Menüs. Tabs, Sichtbarkeit von Inhalten, Sicherheitsaktionen und Gamepad-Steuerung bleiben bei jedem Layout erhalten.</string>
     <string name="settings_game_menu_layout_sidebar">Seitenleiste</string>
     <string name="settings_game_menu_layout_dashboard">Dashboard</string>
@@ -983,4 +981,34 @@
     <string name="feedback_discard_action">Verwerfen</string>
 
     <string name="settings_customization_drawer_style">Drawer-Design</string>
+    <string name="settings_touch_haptics">Haptisches Feedback für Touch-Steuerung</string>
+    <string name="settings_touch_haptics_desc">Spiele ein kurzes haptisches Ticken ab, wenn On-Screen-Bedienelemente gedrückt werden.</string>
+    <string name="settings_help_touch_haptics">Fügt ein leichtes haptisches Android-Feedback hinzu, wenn eine On-Screen-Taste, eine Steuerkreuz-Richtung oder ein Analogstick zum ersten Mal gedrückt wird. Dies wirkt sich nur auf das Steuerungsgefühl aus und ändert nicht das Rumble im Spiel.</string>
+    <string name="settings_touch_haptics_strength">Stärke des haptischen Feedbacks</string>
+    <string name="settings_help_touch_haptics_strength">Steuert die Vibrationsstärke des Geräts für das haptische Feedback der Touch-Steuerung. Erhöhe sie, wenn das Ticken zu schwach ist, oder verringere sie für leiseres Spielen im Handheld-Modus.</string>
+    <string name="settings_touch_haptics_test">Haptisches Feedback testen</string>
+    <string name="settings_touch_haptics_test_desc">Führt ein kurzes Ticken mit der aktuellen Stärke des haptischen Feedbacks aus.</string>
+    <string name="settings_help_touch_haptics_test">Spielt denselben haptischen Impuls des Geräts ab, der von On-Screen-Bedienelementen verwendet wird, damit du die Stärke vor dem Starten eines Spiels anpassen kannst.</string>
+    <string name="settings_touch_haptics_preset">Haptisches Feedback</string>
+    <string name="settings_touch_haptics_preset_soft">Sanft</string>
+    <string name="settings_touch_haptics_preset_balanced">Ausgeglichen</string>
+    <string name="settings_touch_haptics_preset_crisp">Knackig</string>
+    <string name="settings_touch_haptics_preset_strong">Stark</string>
+    <string name="settings_touch_haptics_preset_desc">"Sanft" ist leicht, "Ausgeglichen" ist der natürliche Standard, "Knackig" ist kurz und präzise, und "Stark" ist tiefer für schwächere Vibrationsmotoren.</string>
+    <string name="settings_help_touch_haptics_preset">"Sanft" verwendet ein leichtes Drücken und ein sehr leichtes Loslassen. "Ausgeglichen" bietet ein klares Drücken mit einem leichteren Loslassen und ist der Standard. "Knackig" verwendet das kürzeste, schärfste Paar für präzises Tippen. "Stark" verwendet tiefere, längere Impulse für Telefone mit schwächeren Vibrationsmotoren. Der Schieberegler für die Stärke skaliert das ausgewählte Gefühl.</string>
+    <string name="settings_gyro_mode">Gyroskop-Steuerung</string>
+    <string name="settings_gyro_off">Aus</string>
+    <string name="settings_gyro_aim">Zielen — rechter Stick</string>
+    <string name="settings_gyro_steering">Lenken — linker Stick</string>
+    <string name="settings_gyro_sensitivity">Gyroskop-Empfindlichkeit</string>
+    <string name="settings_gyro_smoothing">Gyroskop-Glättung</string>
+    <string name="settings_gyro_invert_x">Horizontales Gyroskop umkehren</string>
+    <string name="settings_gyro_invert_x_desc">Kehrt die linke und rechte Bewegung um.</string>
+    <string name="settings_gyro_invert_y">Vertikales Gyroskop umkehren</string>
+    <string name="settings_gyro_invert_y_desc">Kehrt die Auf- und Abwärtsbewegung beim Zielen um.</string>
+    <string name="settings_help_gyro_mode">„Zielen“ wandelt die Rotationsgeschwindigkeit des Telefons in den rechten Analogstick für die Kamerasteuerung in Shootern um und kehrt automatisch in die Mitte zurück, wenn das Telefon aufhört sich zu bewegen. „Lenken“ wandelt die Neigung des Telefons in den linken Analogstick für Rennspiele um und kalibriert den aktuellen Winkel beim Spielstart als Mitte. Der ausgewählte Modus wird nur verwendet, während ein Spiel läuft, und erfordert den entsprechenden Bewegungssensor.</string>
+    <string name="settings_help_gyro_sensitivity">Steuert, wie stark die Telefonbewegung den emulierten Analogstick ausschlägt. Spielspezifische Einstellungen werden empfohlen, da Spiele unterschiedliche Reaktionskurven für Kamera und Lenkung verwenden.</string>
+    <string name="settings_help_gyro_smoothing">Filtert Sensorrauschen und Handzittern. Niedrigere Werte reagieren schneller; höhere Werte fühlen sich ruhiger an, fügen jedoch eine geringe Verzögerung hinzu.</string>
+    <string name="settings_gyro_unavailable">Dieses Gerät verfügt nicht über den für den ausgewählten Modus erforderlichen Bewegungssensor.</string>
+    <string name="settings_touch_controls_section">Touch-Steuerung</string>
 </resources>
