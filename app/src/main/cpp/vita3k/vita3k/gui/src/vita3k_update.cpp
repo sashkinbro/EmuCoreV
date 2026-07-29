@@ -197,6 +197,22 @@ static std::atomic<uint64_t> remaining(0);
 static net_utils::ProgressState progress_state{};
 
 static void download_update(const fs::path &base_path) {
+#ifdef __ANDROID__
+    {
+        // EmuCoreV updates are distributed through Google Play/GitHub. Android
+        // must never download an APK or invoke the package installer in-app.
+        JNIEnv *env = reinterpret_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+        jobject activity = reinterpret_cast<jobject>(SDL_GetAndroidActivity());
+        jclass clazz(env->GetObjectClass(activity));
+        jmethodID method_id = env->GetMethodID(clazz, "requestInstallUpdate", "()V");
+        env->CallVoidMethod(activity, method_id);
+        env->DeleteLocalRef(clazz);
+        env->DeleteLocalRef(activity);
+        state = NO_UPDATE;
+        return;
+    }
+#endif
+
     progress_state.download = true;
     progress_state.pause = false;
     std::thread download([base_path]() {
@@ -288,14 +304,6 @@ static void download_update(const fs::path &base_path) {
 #elif defined(__APPLE__)
             const auto vita3K_batch = fmt::format("sh \"{}/update-vita3k.sh\"", base_path);
 #elif defined(__ANDROID__)
-            if (SDL_GetAndroidSDKVersion() < 26) {
-                auto callback = [](void *userdata, const char *permission, bool granted) {
-                    SDL_Log("Permission %s was %s", permission, granted ? "granted" : "denied");
-                };
-
-                SDL_RequestAndroidPermission("android.permission.REQUEST_INSTALL_PACKAGES", callback, nullptr);
-            }
-
             // retrieve the JNI environment.
             JNIEnv *env = reinterpret_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
 

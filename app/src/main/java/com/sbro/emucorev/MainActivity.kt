@@ -33,8 +33,9 @@ class MainActivity : ComponentActivity() {
         window.setBackgroundDrawable(ColorDrawable(resolveWindowBackground(preferences.themeMode)))
         setContent {
             val customization by customizationPreferences.settings.collectAsState()
+            val themeMode by preferences.themeModeFlow.collectAsState(initial = preferences.themeMode)
             EmuCoreVTheme(
-                themeMode = preferences.themeMode,
+                themeMode = themeMode,
                 customization = customization
             ) {
                 Surface(
@@ -78,6 +79,7 @@ class MainActivity : ComponentActivity() {
             }
             ThemeMode.LIGHT -> false
             ThemeMode.DARK -> true
+            ThemeMode.PRO -> true
         }
         return if (darkTheme) 0xFF000000.toInt() else 0xFFF4F7FB.toInt()
     }

@@ -1,15 +1,12 @@
 package com.sbro.emucorev.core
 
 import android.content.Context
-import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import androidx.core.content.edit
-import androidx.core.content.FileProvider
 import com.sbro.emucorev.BuildConfig
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -35,32 +32,6 @@ data class AppUpdateRelease(
 class AppUpdateRepository(private val context: Context) {
     private val cachePrefs = context.applicationContext.getSharedPreferences(CACHE_PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun checkLatestRelease(forceRefresh: Boolean = false): AppUpdateRelease? {
-        val json = loadCachedJson(
-            keyPrefix = CACHE_KEY_LATEST,
-            url = LATEST_RELEASE_URL,
-            accept = GITHUB_JSON_ACCEPT,
-            label = "latest release",
-            forceRefresh = forceRefresh
-        ) ?: return null
-        return runCatching {
-            parseRelease(json).takeIf { isNewerThanCurrent(it.tagName) }
-        }.getOrNull()
-    }
-
-    fun loadLatestRelease(forceRefresh: Boolean = false): AppUpdateRelease? {
-        val json = loadCachedJson(
-            keyPrefix = CACHE_KEY_LATEST,
-            url = LATEST_RELEASE_URL,
-            accept = GITHUB_JSON_ACCEPT,
-            label = "latest release",
-            forceRefresh = forceRefresh
-        ) ?: return null
-        return runCatching {
-            parseRelease(json)
-        }.getOrNull()
-    }
-
     fun loadReleaseHistory(forceRefresh: Boolean = false): List<AppUpdateRelease> {
         val json = loadCachedJson(
             keyPrefix = CACHE_KEY_HISTORY,
@@ -72,80 +43,6 @@ class AppUpdateRepository(private val context: Context) {
         return runCatching {
             parseReleaseList(json)
         }.getOrDefault(emptyList())
-    }
-
-    fun downloadApk(release: AppUpdateRelease, onProgress: (Float) -> Unit): File {
-        val downloadUrl = release.apkDownloadUrl ?: throw IOException("Release does not include an APK asset")
-        val target = File(context.getExternalFilesDir("updates"), release.safeApkName())
-        return downloadApkAsset(
-            downloadUrl = downloadUrl,
-            target = target,
-            expectedSizeBytes = release.apkSizeBytes,
-            label = "update APK",
-            onProgress = onProgress
-        )
-    }
-
-    fun downloadParallelApk(release: AppUpdateRelease, onProgress: (Float) -> Unit): File {
-        val downloadUrl = release.parallelApkDownloadUrl ?: throw IOException("Release does not include a parallel APK asset")
-        val target = File(context.getExternalFilesDir("updates"), release.safeParallelApkName())
-        return downloadApkAsset(
-            downloadUrl = downloadUrl,
-            target = target,
-            expectedSizeBytes = release.parallelApkSizeBytes,
-            label = "parallel APK",
-            onProgress = onProgress
-        )
-    }
-
-    private fun downloadApkAsset(
-        downloadUrl: String,
-        target: File,
-        expectedSizeBytes: Long?,
-        label: String,
-        onProgress: (Float) -> Unit
-    ): File {
-        target.parentFile?.mkdirs()
-        if (target.exists()) {
-            target.delete()
-        }
-
-        val connection = openConnection(downloadUrl, "application/vnd.android.package-archive,application/octet-stream,*/*").apply {
-            readTimeout = 90_000
-        }
-        try {
-            ensureSuccess(connection, label)
-            val total = connection.contentLengthLong.takeIf { it > 0L } ?: expectedSizeBytes ?: -1L
-            var copied = 0L
-            connection.inputStream.use { input ->
-                target.outputStream().use { output ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read <= 0) break
-                        output.write(buffer, 0, read)
-                        copied += read
-                        if (total > 0L) {
-                            onProgress((copied.toFloat() / total.toFloat()).coerceIn(0f, 1f))
-                        }
-                    }
-                }
-            }
-        } finally {
-            connection.disconnect()
-        }
-        onProgress(1f)
-        return target
-    }
-
-    fun launchInstaller(apkFile: File) {
-        val apkUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apkFile)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(apkUri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
     }
 
     private fun parseRelease(json: String): AppUpdateRelease {
@@ -206,51 +103,11 @@ class AppUpdateRepository(private val context: Context) {
         )
     }
 
-    private fun AppUpdateRelease.safeApkName(): String {
-        val rawName = apkAssetName?.ifBlank { null } ?: "EmuCoreV-${tagName.ifBlank { "update" }}.apk"
-        return rawName.replace(Regex("[^A-Za-z0-9._-]"), "_")
-    }
-
-    private fun AppUpdateRelease.safeParallelApkName(): String {
-        val rawName = parallelApkAssetName?.ifBlank { null } ?: "EmuCoreV-${tagName.ifBlank { "parallel" }}-parallel.apk"
-        return rawName.replace(Regex("[^A-Za-z0-9._-]"), "_")
-    }
-
     private fun hasNetwork(): Boolean {
         val manager = context.getSystemService(ConnectivityManager::class.java) ?: return false
         val network = manager.activeNetwork ?: return false
         val capabilities = manager.getNetworkCapabilities(network) ?: return false
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-    }
-
-    private fun isNewerThanCurrent(remoteTag: String): Boolean {
-        val remote = parseVersion(remoteTag)
-        val current = parseVersion(BuildConfig.VERSION_NAME)
-        return if (remote != null && current != null) {
-            compareVersions(remote, current) > 0
-        } else {
-            remoteTag.trim().removePrefix("v").isNotBlank() &&
-                !remoteTag.trim().removePrefix("v").equals(BuildConfig.VERSION_NAME.trim().removePrefix("v"), ignoreCase = true)
-        }
-    }
-
-    private fun parseVersion(value: String): List<Int>? {
-        val parts = value.trim()
-            .removePrefix("v")
-            .substringBefore('-')
-            .split('.')
-            .mapNotNull { part -> part.takeWhile(Char::isDigit).toIntOrNull() }
-        return parts.takeIf { it.isNotEmpty() }
-    }
-
-    private fun compareVersions(left: List<Int>, right: List<Int>): Int {
-        val maxSize = maxOf(left.size, right.size)
-        for (index in 0 until maxSize) {
-            val l = left.getOrNull(index) ?: 0
-            val r = right.getOrNull(index) ?: 0
-            if (l != r) return l.compareTo(r)
-        }
-        return 0
     }
 
     private fun openConnection(url: String, accept: String): HttpURLConnection {
@@ -382,11 +239,9 @@ class AppUpdateRepository(private val context: Context) {
 
     companion object {
         private const val CACHE_PREFS_NAME = "app_update_cache"
-        private const val CACHE_KEY_LATEST = "latest_release"
         private const val CACHE_KEY_HISTORY = "release_history"
         private const val CACHE_TTL_MILLIS = 15 * 60 * 1000L
         private const val GITHUB_JSON_ACCEPT = "application/vnd.github+json,application/json,*/*"
-        private const val LATEST_RELEASE_URL = "https://api.github.com/repos/sashkinbro/EmuCoreV/releases/latest"
         private const val RELEASES_URL = "https://api.github.com/repos/sashkinbro/EmuCoreV/releases?per_page=100"
     }
 }

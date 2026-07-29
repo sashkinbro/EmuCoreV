@@ -32,6 +32,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,8 +51,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppFont
+import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.CustomizationSettings
 import com.sbro.emucorev.ui.common.SectionCard
+import com.sbro.emucorev.ui.theme.ThemeMode
 import com.sbro.emucorev.ui.library.LibraryGridSizing
 
 @Composable
@@ -60,6 +63,8 @@ fun CustomizationTab(
     viewModel: SettingsViewModel
 ) {
     val context = LocalContext.current
+    val preferences = remember(context) { AppPreferences(context) }
+    val themeMode by preferences.themeModeFlow.collectAsState(initial = preferences.themeMode)
     val backgroundImported = stringResource(R.string.customization_background_imported)
     val backgroundFailed = stringResource(R.string.customization_background_failed)
     val fontImported = stringResource(R.string.customization_font_imported)
@@ -89,6 +94,41 @@ fun CustomizationTab(
 
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         CustomizationPreview(settings)
+
+        SectionCard(
+            title = stringResource(R.string.settings_theme),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp)
+        ) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ThemeChip(
+                    selected = themeMode == ThemeMode.SYSTEM,
+                    label = stringResource(R.string.settings_theme_system),
+                    onClick = { preferences.themeMode = ThemeMode.SYSTEM }
+                )
+                ThemeChip(
+                    selected = themeMode == ThemeMode.LIGHT,
+                    label = stringResource(R.string.settings_theme_light),
+                    onClick = { preferences.themeMode = ThemeMode.LIGHT }
+                )
+                ThemeChip(
+                    selected = themeMode == ThemeMode.DARK,
+                    label = stringResource(R.string.settings_theme_dark),
+                    onClick = { preferences.themeMode = ThemeMode.DARK }
+                )
+                ThemeChip(
+                    selected = themeMode == ThemeMode.PRO,
+                    label = stringResource(
+                        if (preferences.proUnlocked) R.string.settings_theme_pro
+                        else R.string.settings_theme_pro_locked
+                    ),
+                    enabled = preferences.proUnlocked,
+                    onClick = { preferences.themeMode = ThemeMode.PRO }
+                )
+            }
+        }
 
         SectionCard(
             title = stringResource(R.string.customization_home_background),
@@ -214,6 +254,21 @@ fun CustomizationTab(
             }
         )
     }
+}
+
+@Composable
+private fun ThemeChip(
+    selected: Boolean,
+    label: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        enabled = enabled,
+        label = { Text(label) }
+    )
 }
 
 @Composable

@@ -1,45 +1,21 @@
 package org.vita3k.emulator
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
-import android.os.Environment
-import android.provider.Settings
-import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 
 object StorageAccess {
 
     @JvmStatic
-    fun hasStorageAccess(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Environment.isExternalStorageManager()
-        } else {
-            missingStoragePermissions(context).isEmpty()
-        }
-    }
+    fun hasStorageAccess(context: Context): Boolean = true
 
     @JvmStatic
-    fun missingStoragePermissions(context: Context): Array<String> {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return emptyArray()
-        }
-
-        return arrayOf(
-            Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
-        ).filter { permission ->
-            ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED
-        }.toTypedArray()
-    }
+    fun missingStoragePermissions(context: Context): Array<String> = emptyArray()
 
     @JvmStatic
     fun createManageAllFilesIntent(context: Context): Intent {
-        return Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-            .setData(Uri.parse("package:${context.packageName}"))
+        return createFolderPickerIntent()
     }
 
     @JvmStatic

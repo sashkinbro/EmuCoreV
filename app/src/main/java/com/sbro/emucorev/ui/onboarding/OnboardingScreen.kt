@@ -2,10 +2,7 @@
 
 package com.sbro.emucorev.ui.onboarding
 
-import android.net.Uri
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -94,9 +91,9 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.FirmwareKind
-import com.sbro.emucorev.core.StorageAccessManager
 import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
+import com.sbro.emucorev.ui.pro.ProPurchasePanel
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -119,18 +116,6 @@ fun OnboardingScreen(
     val scope = rememberCoroutineScope()
     var isCompleting by remember { mutableStateOf(false) }
     val folderPickerFailedMessage = stringResource(R.string.folder_picker_failed)
-    val storagePermissionRequiredMessage = stringResource(R.string.settings_storage_permission_required)
-    val storageFolderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
-        uri ?: return@rememberLauncherForActivityResult
-        viewModel.selectCustomStorageLocation(uri)
-    }
-    val storagePermissionPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (StorageAccessManager.needsAllFilesAccessForCustomStorage()) {
-            Toast.makeText(context, storagePermissionRequiredMessage, Toast.LENGTH_SHORT).show()
-        } else {
-            storageFolderPicker.launch(null)
-        }
-    }
 
     LaunchedEffect(uiState.currentPage) {
         if (pagerState.currentPage != uiState.currentPage) {
@@ -294,18 +279,12 @@ fun OnboardingScreen(
                             title = stringResource(R.string.onboarding_page_3_title),
                             subtitle = stringResource(R.string.onboarding_page_3_body)
                         )
+                        3 -> OnboardingProContent()
                         else -> OnboardingSetupContent(
                             storagePath = uiState.storagePath,
                             storageLocations = uiState.storageLocations,
                             storageChangeInProgress = uiState.storageChangeInProgress,
                             selectStorageLocation = viewModel::selectStorageLocation,
-                            chooseCustomStorageFolder = {
-                                if (StorageAccessManager.needsAllFilesAccessForCustomStorage()) {
-                                    storagePermissionPicker.launch(StorageAccessManager.allFilesAccessIntent(context))
-                                } else {
-                                    storageFolderPicker.launch(null)
-                                }
-                            },
                             firmwareInstalled = firmwareInstalled,
                             firmwareUpdateInstalled = firmwareUpdateInstalled,
                             installFirmware = installFirmwareClick,
@@ -407,6 +386,28 @@ fun OnboardingScreen(
 }
 
 @Composable
+private fun OnboardingProContent() {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.onboarding_pro_title),
+            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = stringResource(R.string.onboarding_pro_subtitle),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        ProPurchasePanel()
+    }
+}
+
+@Composable
 private fun OnboardingHero(
     icon: ImageVector,
     title: String,
@@ -456,7 +457,6 @@ private fun OnboardingSetupContent(
     storageLocations: List<VitaStorageLocation>,
     storageChangeInProgress: Boolean,
     selectStorageLocation: (String) -> Unit,
-    chooseCustomStorageFolder: () -> Unit,
     firmwareInstalled: Boolean,
     firmwareUpdateInstalled: Boolean,
     installFirmware: () -> Unit,
@@ -606,10 +606,6 @@ private fun OnboardingSetupContent(
             visible = storagePickerVisible,
             storageLocations = storageLocations,
             enabled = !storageChangeInProgress,
-            onChooseCustomFolder = {
-                storagePickerVisible = false
-                chooseCustomStorageFolder()
-            },
             onSelected = { location ->
                 if (!storageChangeInProgress) {
                     selectStorageLocation(location.rootPath)
@@ -647,7 +643,6 @@ private fun OnboardingStorageDialog(
     visible: Boolean,
     storageLocations: List<VitaStorageLocation>,
     enabled: Boolean,
-    onChooseCustomFolder: () -> Unit,
     onSelected: (VitaStorageLocation) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -729,13 +724,6 @@ private fun OnboardingStorageDialog(
                         }
                     }
                 }
-                Button(
-                    onClick = onChooseCustomFolder,
-                    enabled = enabled,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.settings_storage_choose_custom_folder))
-                }
                 TextButton(
                     onClick = onDismiss,
                     modifier = Modifier.align(Alignment.End)
@@ -749,7 +737,6 @@ private fun OnboardingStorageDialog(
 
 @Composable
 private fun storageLocationLabel(location: VitaStorageLocation, index: Int): String = when {
-    location.custom -> stringResource(R.string.settings_storage_location_custom)
     location.removable -> stringResource(R.string.settings_storage_location_sd)
     index == 0 -> stringResource(R.string.settings_storage_location_internal)
     else -> stringResource(R.string.settings_storage_location_external)

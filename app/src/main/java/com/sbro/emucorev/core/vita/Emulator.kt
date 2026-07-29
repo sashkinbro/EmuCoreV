@@ -7,10 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.hardware.input.InputManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.os.Environment
-import android.provider.Settings
 import android.system.Os
 import android.content.pm.ActivityInfo
 import android.util.Log
@@ -20,11 +17,11 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.annotation.Keep
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.runtime.setValue
-import androidx.core.content.FileProvider
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -52,7 +49,6 @@ import org.libsdl.app.SDLControllerManager
 import org.libsdl.app.SDLSurface
 import com.sbro.emucorev.core.vita.overlay.InputOverlay
 import com.jakewharton.processphoenix.ProcessPhoenix
-import com.sbro.emucorev.BuildConfig
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.InstalledGameRepository
@@ -247,19 +243,12 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     @Keep
     fun setStoragePermission() {
-        startActivity(
-            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                .setData(Uri.parse("package:${BuildConfig.APPLICATION_ID}"))
-        )
+        // Kept for the native JNI contract. Storage access is handled exclusively
+        // by Android's system document pickers and app-specific directories.
     }
 
     @Keep
     fun showFileDialog() {
-        if (!isStorageManagerEnabled()) {
-            setStoragePermission()
-            return
-        }
-
         val pickerIntent = Intent()
             .setType("*/*")
             .setAction(Intent.ACTION_GET_CONTENT)
@@ -270,21 +259,10 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     @Keep
-    fun isStorageManagerEnabled(): Boolean {
-        return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            true
-        } else {
-            Environment.isExternalStorageManager()
-        }
-    }
+    fun isStorageManagerEnabled(): Boolean = true
 
     @Keep
     fun showFolderDialog() {
-        if (!isStorageManagerEnabled()) {
-            setStoragePermission()
-            return
-        }
-
         val pickerIntent = Intent()
             .setAction(Intent.ACTION_OPEN_DOCUMENT_TREE)
             .putExtra(Intent.EXTRA_LOCAL_ONLY, true)
@@ -549,27 +527,15 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     @Keep
     fun requestInstallUpdate() {
         runOnUiThread {
-            val apkFile = File(getExternalFilesDir(null), "vita3k-latest.apk")
-            if (!apkFile.exists()) {
-                Toast.makeText(this, getString(R.string.emulator_installer_apk_missing), Toast.LENGTH_LONG).show()
-                return@runOnUiThread
-            }
-
-            try {
-                val apkUri = FileProvider.getUriForFile(
-                    this,
-                    "${BuildConfig.APPLICATION_ID}.fileprovider",
-                    apkFile
-                )
+            runCatching {
                 startActivity(
-                    Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(apkUri, "application/vnd.android.package-archive")
-                        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
+                    Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("https://github.com/sashkinbro/EmuCoreV/releases")
+                    )
                 )
-            } catch (error: Exception) {
-                error.printStackTrace()
-                Toast.makeText(this, getString(R.string.emulator_installer_failed), Toast.LENGTH_LONG).show()
+            }.onFailure { error ->
+                Log.e(TAG, "Could not open the releases page", error)
             }
         }
     }
@@ -598,7 +564,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             elevation = EMULATION_OVERLAY_ELEVATION
             translationZ = EMULATION_OVERLAY_ELEVATION
             setContent {
-                EmuCoreVTheme(themeMode = preferences.themeMode) {
+                val themeMode by preferences.themeModeFlow.collectAsState(initial = preferences.themeMode)
+                EmuCoreVTheme(themeMode = themeMode) {
                     EmulationOverlayHost(activity = this@Emulator)
                 }
             }
