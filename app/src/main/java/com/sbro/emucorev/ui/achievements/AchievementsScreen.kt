@@ -73,12 +73,10 @@ import com.sbro.emucorev.data.VitaTrophyGrade
 import com.sbro.emucorev.data.VitaTrophyGroup
 import com.sbro.emucorev.data.VitaTrophySet
 import com.sbro.emucorev.ui.common.LocalImage
-import com.sbro.emucorev.ui.common.NavigationBackButton
-import com.sbro.emucorev.ui.common.NavigationMenuButton
+import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
-import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
 import java.text.DateFormat
 import java.util.Date
 
@@ -91,7 +89,7 @@ fun AchievementsScreen(
     viewModel: AchievementsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
 
     LaunchedEffect(focusTitleId) {
         if (!focusTitleId.isNullOrBlank()) {
@@ -177,37 +175,21 @@ private fun AchievementsTopBar(
     onRefreshClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (onBackClick != null) {
-                NavigationBackButton(onClick = onBackClick)
-            } else if (onMenuClick != null) {
-                NavigationMenuButton(onClick = onMenuClick)
+    ScreenTopBar(
+        title = stringResource(R.string.achievements_title),
+        onBackClick = onBackClick,
+        onMenuClick = onMenuClick,
+        modifier = modifier,
+        actions = {
+            IconButton(onClick = onRefreshClick) {
+                Icon(
+                    imageVector = Icons.Rounded.Refresh,
+                    contentDescription = stringResource(R.string.library_refresh),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-            Text(
-                text = stringResource(R.string.achievements_title),
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = if (onBackClick != null || onMenuClick != null) 14.dp else 0.dp)
-            )
         }
-        IconButton(onClick = onRefreshClick) {
-            Icon(
-                imageVector = Icons.Rounded.Refresh,
-                contentDescription = stringResource(R.string.library_refresh),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+    )
 }
 
 @Composable

@@ -1,7 +1,8 @@
 package com.sbro.emucorev.ui.common
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -22,28 +23,32 @@ import com.sbro.emucorev.R
 fun NavigationBackButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surface,
-    contentColor: Color = MaterialTheme.colorScheme.onSurface,
-    tonalElevation: Dp = 3.dp,
-    shadowElevation: Dp = 5.dp
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
+    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    tonalElevation: Dp = 0.dp,
+    shadowElevation: Dp = 0.dp
 ) {
     Surface(
-        modifier = modifier.size(40.dp),
+        modifier = modifier.size(44.dp),
         shape = RoundedCornerShape(14.dp),
         color = containerColor,
         tonalElevation = tonalElevation,
         shadowElevation = shadowElevation,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)
+        ),
         onClick = rememberDebouncedClick(onClick = onClick)
     ) {
         Box(
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                 contentDescription = stringResource(R.string.common_back),
                 tint = contentColor,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(19.dp)
             )
         }
     }

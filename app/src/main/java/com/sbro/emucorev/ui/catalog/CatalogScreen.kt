@@ -90,15 +90,14 @@ import com.sbro.emucorev.data.ProfileGameStatus
 import com.sbro.emucorev.data.VitaCompatibilityState
 import com.sbro.emucorev.data.VitaCompatibilitySummary
 import com.sbro.emucorev.data.VitaCatalogEntry
-import com.sbro.emucorev.ui.common.NavigationBackButton
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
+import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.UrlImage
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.CompactCardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
-import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
 import com.sbro.emucorev.ui.theme.useMultiColumnLayout
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -119,7 +118,7 @@ fun CatalogScreen(
     val scope = rememberCoroutineScope()
     val profileRepository = remember(context) { ProfileGameListRepository(context.applicationContext) }
     val showScrollToTop = gridState.firstVisibleItemIndex > 2 || gridState.firstVisibleItemScrollOffset > 900
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     var showGenreMenu by remember { mutableStateOf(false) }
     var showYearMenu by remember { mutableStateOf(false) }
     var showRatingMenu by remember { mutableStateOf(false) }
@@ -182,35 +181,24 @@ fun CatalogScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            NavigationBackButton(onClick = guardedBackClick)
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.catalog_title),
-                                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.onBackground
+                        ScreenTopBar(
+                            title = stringResource(R.string.catalog_title),
+                            onBackClick = guardedBackClick,
+                            actions = {
+                                CatalogTopBarAction(
+                                    icon = Icons.Rounded.Search,
+                                    contentDescription = stringResource(R.string.catalog_toggle_search),
+                                    selected = isSearchPanelVisible,
+                                    onClick = { showSearchPanel = !showSearchPanel }
+                                )
+                                CatalogTopBarAction(
+                                    icon = Icons.Rounded.FilterList,
+                                    contentDescription = stringResource(R.string.catalog_toggle_filters),
+                                    selected = isFiltersPanelVisible,
+                                    onClick = { showFiltersPanel = !showFiltersPanel }
                                 )
                             }
-                            CatalogTopBarAction(
-                                icon = Icons.Rounded.Search,
-                                contentDescription = stringResource(R.string.catalog_toggle_search),
-                                selected = isSearchPanelVisible,
-                                onClick = { showSearchPanel = !showSearchPanel }
-                            )
-                            CatalogTopBarAction(
-                                icon = Icons.Rounded.FilterList,
-                                contentDescription = stringResource(R.string.catalog_toggle_filters),
-                                selected = isFiltersPanelVisible,
-                                onClick = { showFiltersPanel = !showFiltersPanel }
-                            )
-                        }
+                        )
                     }
 
                     item(span = { GridItemSpan(maxLineSpan) }) {

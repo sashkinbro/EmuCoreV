@@ -61,15 +61,13 @@ import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.data.InstalledVitaGame
 import com.sbro.emucorev.ui.common.LocalImage
-import com.sbro.emucorev.ui.common.NavigationBackButton
-import com.sbro.emucorev.ui.common.NavigationMenuButton
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
+import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.common.SettingHelpButton
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
-import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -83,7 +81,7 @@ fun GameManagerScreen(
     val uiState by viewModel.uiState.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val resumeTitleId by rememberUpdatedState(initialTitleId ?: uiState.selectedTitleId)
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     var selectedTab by remember { mutableStateOf(GameManagerTab.Graphics) }
 
     androidx.compose.runtime.LaunchedEffect(initialTitleId) {
@@ -112,26 +110,12 @@ fun GameManagerScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = ScreenHorizontalPadding),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                if (onBackClick != null) {
-                    NavigationBackButton(onClick = onBackClick)
-                } else if (onMenuClick != null) {
-                    NavigationMenuButton(onClick = onMenuClick)
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.game_manager_title),
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                }
-            }
+            ScreenTopBar(
+                title = stringResource(R.string.game_manager_title),
+                onBackClick = onBackClick,
+                onMenuClick = onMenuClick,
+                modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
+            )
         }
 
         if (uiState.isLoading) {

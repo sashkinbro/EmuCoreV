@@ -44,6 +44,7 @@ import com.sbro.emucorev.ui.achievements.AchievementsScreen
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.ui.catalog.CatalogScreen
 import com.sbro.emucorev.ui.detail.GameDetailScreen
+import com.sbro.emucorev.ui.feedback.FeedbackScreen
 import com.sbro.emucorev.ui.gamemanager.GameManagerScreen
 import com.sbro.emucorev.ui.home.HomeScreen
 import com.sbro.emucorev.ui.library.LibraryScreen
@@ -79,6 +80,7 @@ private const val ROUTE_SAVE_MANAGER = "save-manager"
 private const val ROUTE_SAVE_MANAGER_WITH_TITLE = "save-manager/{titleId}"
 private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_PROFILE = "profile"
+private const val ROUTE_FEEDBACK = "feedback"
 private const val ROUTE_SETTINGS_WITH_TAB = "settings/{tab}"
 private const val ROUTE_APP_LANGUAGE = "app-language"
 private const val ROUTE_VITA_LANGUAGE = "vita-language"
@@ -218,6 +220,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     val navigateProfile = {
         navController.navigate(ROUTE_PROFILE) { launchSingleTop = true }
     }
+    val navigateFeedback = {
+        navController.navigate(ROUTE_FEEDBACK) { launchSingleTop = true }
+    }
 
     Box(
         modifier = Modifier
@@ -278,6 +283,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateFeedback = navigateFeedback,
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
                 ) { openDrawer ->
@@ -326,6 +332,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
@@ -362,6 +369,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateFeedback = navigateFeedback,
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
                 ) { openDrawer ->
@@ -405,6 +413,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
@@ -441,6 +450,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateSettings = { },
                     onNavigateProfile = navigateProfile,
+                    onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
@@ -487,6 +497,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateSettings = { },
                     onNavigateProfile = navigateProfile,
+                    onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
@@ -558,6 +569,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
@@ -602,6 +614,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
@@ -640,6 +653,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
@@ -692,6 +706,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = { },
+                    onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
@@ -701,6 +716,36 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         onMenuClick = openDrawer,
                         onGameClick = { igdbId -> navController.navigate("$ROUTE_CATALOG_DETAIL_PREFIX/$igdbId") }
                     )
+                }
+            }
+            composable(ROUTE_FEEDBACK) {
+                AdaptiveShell(
+                    selected = PrimaryDestination.Feedback,
+                    onNavigateSetup = {
+                        navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
+                    },
+                    onNavigateLibrary = {
+                        navController.navigate(ROUTE_LIBRARY) { launchSingleTop = true }
+                    },
+                    onNavigateGameManager = { navigateGameManager(null) },
+                    onNavigatePlayTime = { navigatePlayTime(null) },
+                    onNavigateAchievements = navigateAchievementsRoot,
+                    onNavigateSaveData = {
+                        navController.navigate(saveManagerRoute()) { launchSingleTop = true }
+                    },
+                    onNavigateSearch = {
+                        navController.navigate(ROUTE_CATALOG) { launchSingleTop = true }
+                    },
+                    onNavigateSettings = {
+                        navController.navigate(settingsRoute()) { launchSingleTop = true }
+                    },
+                    onNavigateProfile = navigateProfile,
+                    onNavigateFeedback = {},
+                    onBackClick = { navController.popBackStack() },
+                    onInstallFirmware = null,
+                    onInstallContent = null
+                ) {
+                    FeedbackScreen(onBackClick = { navController.popBackStack() })
                 }
             }
             composable(ROUTE_GAME_MANAGER) {
@@ -731,6 +776,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog

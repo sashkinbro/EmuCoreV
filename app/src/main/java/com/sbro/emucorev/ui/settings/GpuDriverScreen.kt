@@ -77,7 +77,7 @@ import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.RemoteGpuDriver
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaGameSettingsRepository
-import com.sbro.emucorev.ui.common.NavigationBackButton
+import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.Dispatchers
@@ -101,7 +101,7 @@ fun GpuDriverScreen(
     val activeConfig = gameConfig ?: uiState.coreConfig
     val selectedDriver = uiState.installedGpuDrivers.firstOrNull { it.name == activeConfig.customDriverName }
     val isGameScoped = gameScopedTitleId != null
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 16.dp
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val installFailedMessage = stringResource(R.string.settings_gpu_driver_install_failed)
     val installSuccessTemplate = stringResource(R.string.settings_gpu_driver_install_success, "%s")
     val backClick = rememberDebouncedClick(onClick = onBackClick)
@@ -446,46 +446,32 @@ private fun GpuDriverHeader(
     onSearchClick: () -> Unit,
     onFiltersClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        NavigationBackButton(
-            onClick = onBackClick,
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+    ScreenTopBar(
+        title = title,
+        onBackClick = onBackClick,
+        actions = {
+            HeaderIconButton(
+                selected = searchActive,
+                onClick = onSearchClick
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            HeaderIconButton(
+                selected = filtersActive,
+                onClick = onFiltersClick
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.MoreVert,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
-        HeaderIconButton(
-            selected = searchActive,
-            onClick = onSearchClick
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Search,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        HeaderIconButton(
-            selected = filtersActive,
-            onClick = onFiltersClick
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.MoreVert,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-    }
+    )
 }
 
 @Composable

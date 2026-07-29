@@ -28,6 +28,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.Feedback
+import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.Games
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.QueryStats
@@ -48,35 +50,42 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.ProPurchaseManager
+import com.sbro.emucorev.data.DrawerVisualStyle
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
+import com.sbro.emucorev.ui.theme.LocalCustomizationSettings
 import com.sbro.emucorev.ui.theme.shouldUseExpandedShell
 import kotlinx.coroutines.launch
 
 enum class PrimaryDestination {
-    Home, Setup, Library, GameManager, PlayTime, Achievements, SaveData, Search, Settings, Profile
+    Home, Setup, Library, GameManager, PlayTime, Achievements, SaveData, Search, Settings, Profile, Feedback
 }
 
 private enum class MobileLeadingAction {
     Drawer,
     Back
 }
+
+private val LocalDrawerVisualStyle = staticCompositionLocalOf { DrawerVisualStyle.CLASSIC }
 
 @OptIn(ExperimentalLayoutApi::class)
 @SuppressLint("ConfigurationScreenWidthHeight")
@@ -92,12 +101,14 @@ fun AdaptiveShell(
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateProfile: () -> Unit = {},
+    onNavigateFeedback: () -> Unit = {},
     onBackClick: (() -> Unit)? = null,
     onInstallFirmware: (() -> Unit)? = null,
     onInstallContent: (() -> Unit)? = null,
     onRefreshLibrary: (() -> Unit)? = null,
     content: @Composable ((() -> Unit)?) -> Unit
 ) {
+    val drawerVisualStyle = LocalCustomizationSettings.current.drawerVisualStyle
     val navContent: @Composable () -> Unit = {
         SideNavigation(
             selected = selected,
@@ -110,9 +121,11 @@ fun AdaptiveShell(
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
             onNavigateProfile = onNavigateProfile,
+            onNavigateFeedback = onNavigateFeedback,
             onInstallFirmware = onInstallFirmware,
             onInstallContent = onInstallContent,
             onRefreshLibrary = onRefreshLibrary,
+            drawerVisualStyle = drawerVisualStyle,
             onCloseDrawer = { }
         )
     }
@@ -128,7 +141,13 @@ fun AdaptiveShell(
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(320.dp)
+                    .width(
+                        when (drawerVisualStyle) {
+                            DrawerVisualStyle.COMPACT -> 272.dp
+                            DrawerVisualStyle.CONSOLE -> 348.dp
+                            else -> 320.dp
+                        }
+                    )
                     .padding(start = 12.dp, top = 12.dp, bottom = 12.dp)
             ) {
                 navContent()
@@ -153,10 +172,12 @@ fun AdaptiveShell(
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
             onNavigateProfile = onNavigateProfile,
+            onNavigateFeedback = onNavigateFeedback,
             onBackClick = onBackClick,
             onInstallFirmware = onInstallFirmware,
             onInstallContent = onInstallContent,
             onRefreshLibrary = onRefreshLibrary,
+            drawerVisualStyle = drawerVisualStyle,
             content = content
         )
     }
@@ -176,16 +197,25 @@ private fun CompactAdaptiveShell(
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateProfile: () -> Unit,
+    onNavigateFeedback: () -> Unit,
     onBackClick: (() -> Unit)?,
     onInstallFirmware: (() -> Unit)?,
     onInstallContent: (() -> Unit)?,
     onRefreshLibrary: (() -> Unit)?,
+    drawerVisualStyle: DrawerVisualStyle,
     content: @Composable ((() -> Unit)?) -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val statusPadding = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val isLandscapeCompact = configuration.screenWidthDp > configuration.screenHeightDp
-    val drawerWidthFraction = if (isLandscapeCompact) 0.54f else 0.74f
+    val drawerWidthFraction = when {
+        drawerVisualStyle == DrawerVisualStyle.COMPACT && isLandscapeCompact -> 0.40f
+        drawerVisualStyle == DrawerVisualStyle.COMPACT -> 0.66f
+        drawerVisualStyle == DrawerVisualStyle.CONSOLE && isLandscapeCompact -> 0.58f
+        drawerVisualStyle == DrawerVisualStyle.CONSOLE -> 0.82f
+        isLandscapeCompact -> 0.54f
+        else -> 0.74f
+    }
     val drawerTopPadding = maxOf(statusPadding, 32.dp)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -224,8 +254,17 @@ private fun CompactAdaptiveShell(
                     .fillMaxHeight()
                     .fillMaxWidth(drawerWidthFraction)
                     .widthIn(min = 292.dp, max = 360.dp),
-                drawerShape = RoundedCornerShape(topEnd = 30.dp, bottomEnd = 30.dp),
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
+                drawerShape = when (drawerVisualStyle) {
+                    DrawerVisualStyle.COMPACT -> RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp)
+                    DrawerVisualStyle.GLASS -> RoundedCornerShape(topEnd = 38.dp, bottomEnd = 38.dp)
+                    DrawerVisualStyle.CONSOLE -> RoundedCornerShape(0.dp)
+                    DrawerVisualStyle.CLASSIC -> RoundedCornerShape(topEnd = 30.dp, bottomEnd = 30.dp)
+                },
+                drawerContainerColor = when (drawerVisualStyle) {
+                    DrawerVisualStyle.GLASS -> MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
+                    DrawerVisualStyle.CONSOLE -> MaterialTheme.colorScheme.surfaceContainerLowest
+                    else -> MaterialTheme.colorScheme.surface
+                },
                 drawerContentColor = MaterialTheme.colorScheme.onSurface,
                 drawerTonalElevation = 6.dp,
                 windowInsets = WindowInsets(0, 0, 0, 0)
@@ -241,9 +280,11 @@ private fun CompactAdaptiveShell(
                     onNavigateSearch = onNavigateSearch,
                     onNavigateSettings = onNavigateSettings,
                     onNavigateProfile = onNavigateProfile,
+                    onNavigateFeedback = onNavigateFeedback,
                     onInstallFirmware = onInstallFirmware,
                     onInstallContent = onInstallContent,
                     onRefreshLibrary = onRefreshLibrary,
+                    drawerVisualStyle = drawerVisualStyle,
                     wrapInSurface = false,
                     topInset = drawerTopPadding,
                     onCloseDrawer = { scope.launch { drawerState.snapTo(DrawerValue.Closed) } }
@@ -272,17 +313,24 @@ private fun SideNavigation(
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateProfile: () -> Unit,
+    onNavigateFeedback: () -> Unit,
     onInstallFirmware: (() -> Unit)?,
     onInstallContent: (() -> Unit)?,
     onRefreshLibrary: (() -> Unit)?,
+    drawerVisualStyle: DrawerVisualStyle,
     wrapInSurface: Boolean = true,
     topInset: Dp = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding(),
     onCloseDrawer: () -> Unit
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val proManager = remember(context) { ProPurchaseManager.getInstance(context) }
     val proState by proManager.state.collectAsState()
-    val drawerInset = 18.dp
+    val drawerInset = when (drawerVisualStyle) {
+        DrawerVisualStyle.COMPACT -> 12.dp
+        DrawerVisualStyle.CONSOLE -> 22.dp
+        else -> 18.dp
+    }
     val drawerBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val drawerBottomPadding = drawerInset + if (wrapInSurface) {
         drawerBottomInset
@@ -325,6 +373,14 @@ private fun SideNavigation(
     val navigateProfile = rememberDebouncedClick {
         onCloseDrawer()
         onNavigateProfile()
+    }
+    val navigateFeedback = rememberDebouncedClick {
+        onCloseDrawer()
+        onNavigateFeedback()
+    }
+    val openDiscord = rememberDebouncedClick {
+        onCloseDrawer()
+        runCatching { uriHandler.openUri(DISCORD_INVITE_URL) }
     }
     val installFirmware = onInstallFirmware?.let {
         rememberDebouncedClick {
@@ -504,22 +560,46 @@ private fun SideNavigation(
                 selected = selected == PrimaryDestination.Profile,
                 onClick = navigateProfile
             )
+            ShellItem(
+                icon = Icons.Rounded.Feedback,
+                label = stringResource(R.string.feedback_title),
+                selected = selected == PrimaryDestination.Feedback,
+                onClick = navigateFeedback
+            )
+            ShellAction(
+                icon = Icons.Rounded.Forum,
+                label = stringResource(R.string.shell_discord_server),
+                onClick = openDiscord
+            )
         }
     }
 
-    if (wrapInSurface) {
-        Surface(
-            modifier = Modifier.fillMaxHeight(),
-            shape = RoundedCornerShape(30.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp
-        ) {
+    CompositionLocalProvider(LocalDrawerVisualStyle provides drawerVisualStyle) {
+        if (wrapInSurface) {
+            Surface(
+                modifier = Modifier.fillMaxHeight(),
+                shape = when (drawerVisualStyle) {
+                    DrawerVisualStyle.COMPACT -> RoundedCornerShape(14.dp)
+                    DrawerVisualStyle.GLASS -> RoundedCornerShape(36.dp)
+                    DrawerVisualStyle.CONSOLE -> RoundedCornerShape(8.dp)
+                    DrawerVisualStyle.CLASSIC -> RoundedCornerShape(30.dp)
+                },
+                color = when (drawerVisualStyle) {
+                    DrawerVisualStyle.GLASS -> MaterialTheme.colorScheme.surface.copy(alpha = 0.86f)
+                    DrawerVisualStyle.CONSOLE -> MaterialTheme.colorScheme.surfaceContainerLowest
+                    else -> MaterialTheme.colorScheme.surface
+                },
+                tonalElevation = if (drawerVisualStyle == DrawerVisualStyle.COMPACT) 0.dp else 2.dp
+            ) {
+                content()
+            }
+        } else {
             content()
         }
-    } else {
-        content()
     }
 }
+
+private const val DISCORD_INVITE_URL = "https://discord.gg/82hhArvYwC"
 
 @Composable
 private fun ShellAction(
@@ -528,16 +608,34 @@ private fun ShellAction(
     label: String,
     onClick: () -> Unit
 ) {
+    val style = LocalDrawerVisualStyle.current
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .focusable(),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f),
+        shape = when (style) {
+            DrawerVisualStyle.COMPACT -> RoundedCornerShape(9.dp)
+            DrawerVisualStyle.GLASS -> RoundedCornerShape(22.dp)
+            DrawerVisualStyle.CONSOLE -> RoundedCornerShape(6.dp)
+            DrawerVisualStyle.CLASSIC -> RoundedCornerShape(18.dp)
+        },
+        color = when (style) {
+            DrawerVisualStyle.COMPACT -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.08f)
+            DrawerVisualStyle.GLASS -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
+            DrawerVisualStyle.CONSOLE -> MaterialTheme.colorScheme.surfaceContainerHigh
+            DrawerVisualStyle.CLASSIC -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
+        },
         onClick = onClick
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier.padding(
+                horizontal = if (style == DrawerVisualStyle.COMPACT) 12.dp else 16.dp,
+                vertical = when (style) {
+                    DrawerVisualStyle.COMPACT -> 10.dp
+                    DrawerVisualStyle.CONSOLE -> 16.dp
+                    else -> 14.dp
+                }
+            ),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -563,31 +661,53 @@ private fun ShellItem(
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    val style = LocalDrawerVisualStyle.current
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .focusable(),
-        shape = RoundedCornerShape(18.dp),
-        color = if (selected) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.96f)
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f)
+        shape = when (style) {
+            DrawerVisualStyle.COMPACT -> RoundedCornerShape(9.dp)
+            DrawerVisualStyle.GLASS -> RoundedCornerShape(22.dp)
+            DrawerVisualStyle.CONSOLE -> RoundedCornerShape(6.dp)
+            DrawerVisualStyle.CLASSIC -> RoundedCornerShape(18.dp)
+        },
+        color = when {
+            selected && style == DrawerVisualStyle.CONSOLE -> MaterialTheme.colorScheme.primaryContainer
+            selected -> MaterialTheme.colorScheme.primary.copy(
+                alpha = if (style == DrawerVisualStyle.GLASS) 0.22f else 0.16f
+            )
+            style == DrawerVisualStyle.COMPACT -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.06f)
+            style == DrawerVisualStyle.GLASS -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.26f)
+            style == DrawerVisualStyle.CONSOLE -> MaterialTheme.colorScheme.surfaceContainerHigh
+            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f)
         },
         onClick = onClick
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier.padding(
+                horizontal = if (style == DrawerVisualStyle.COMPACT) 12.dp else 16.dp,
+                vertical = when (style) {
+                    DrawerVisualStyle.COMPACT -> 10.dp
+                    DrawerVisualStyle.CONSOLE -> 16.dp
+                    else -> 14.dp
+                }
+            ),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(if (style == DrawerVisualStyle.CONSOLE) 22.dp else 20.dp)
             )
             Text(
                 text = label,
-                style = MaterialTheme.typography.titleMedium,
+                style = when (style) {
+                    DrawerVisualStyle.COMPACT -> MaterialTheme.typography.labelLarge
+                    DrawerVisualStyle.CONSOLE -> MaterialTheme.typography.titleMedium
+                    else -> MaterialTheme.typography.titleMedium
+                },
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(start = 12.dp)
             )

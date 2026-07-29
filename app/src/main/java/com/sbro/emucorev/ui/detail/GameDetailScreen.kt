@@ -124,7 +124,6 @@ import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.CompactCardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
-import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
 import com.sbro.emucorev.ui.theme.useMultiColumnLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -146,7 +145,7 @@ fun GameDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val backClick = rememberDebouncedClick(onClick = onBack)
     val launchFailedMessage = stringResource(R.string.game_launch_failed)
     val launchRequiresFirmwareMessage = stringResource(R.string.game_launch_requires_firmware)
