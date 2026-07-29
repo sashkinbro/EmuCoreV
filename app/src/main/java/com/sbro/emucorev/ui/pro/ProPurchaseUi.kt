@@ -55,6 +55,7 @@ private val ProGold = Color(0xFFFFC857)
 @Composable
 fun ProPurchasePanel(
     modifier: Modifier = Modifier,
+    showFeatures: Boolean = true,
     manager: ProPurchaseManager = ProPurchaseManager.getInstance(LocalContext.current)
 ) {
     val context = LocalContext.current
@@ -102,9 +103,11 @@ fun ProPurchasePanel(
                 }
             }
 
-            ProFeatureRow(Icons.Rounded.Palette, R.string.settings_pro_feature_crimson_title, R.string.settings_pro_feature_crimson_desc)
-            ProFeatureRow(Icons.Rounded.Apps, R.string.settings_pro_feature_icon_title, R.string.settings_pro_feature_icon_desc)
-            ProFeatureRow(Icons.Rounded.AccountCircle, R.string.settings_pro_feature_profile_title, R.string.settings_pro_feature_badge_desc)
+            if (showFeatures) {
+                ProFeatureRow(Icons.Rounded.Palette, R.string.settings_pro_feature_crimson_title, R.string.settings_pro_feature_crimson_desc)
+                ProFeatureRow(Icons.Rounded.Apps, R.string.settings_pro_feature_icon_title, R.string.settings_pro_feature_icon_desc)
+                ProFeatureRow(Icons.Rounded.AccountCircle, R.string.settings_pro_feature_profile_title, R.string.settings_pro_feature_badge_desc)
+            }
 
             if (!state.isProUnlocked) {
                 Button(
@@ -170,6 +173,83 @@ fun ProPurchasePanel(
             },
             onDismiss = { supportDialogVisible = false }
         )
+    }
+}
+
+@Composable
+fun ProBenefitCards(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        ProBenefitCard(
+            icon = Icons.Rounded.Palette,
+            titleRes = R.string.settings_pro_feature_crimson_title,
+            descriptionRes = R.string.settings_pro_feature_crimson_desc
+        )
+        ProBenefitCard(
+            icon = Icons.Rounded.Apps,
+            titleRes = R.string.settings_pro_feature_icon_title,
+            descriptionRes = R.string.settings_pro_feature_icon_desc
+        )
+        ProBenefitCard(
+            icon = Icons.Rounded.AccountCircle,
+            titleRes = R.string.settings_pro_feature_profile_title,
+            descriptionRes = R.string.settings_pro_feature_badge_desc
+        )
+    }
+}
+
+@Composable
+private fun ProBenefitCard(
+    icon: ImageVector,
+    titleRes: Int,
+    descriptionRes: Int
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+        tonalElevation = 3.dp,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = ProGold.copy(alpha = 0.14f)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = ProGold,
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .size(26.dp)
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = stringResource(titleRes),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = stringResource(descriptionRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 
