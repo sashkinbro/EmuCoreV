@@ -842,4 +842,32 @@
     <string name="profile_password_reset_sent">Email di reimpostazione della password inviata. Controlla la tua casella di posta.</string>
     <string name="settings_use_angle">Correzione grafica (ANGLE)</string>
     <string name="settings_help_use_angle">Risolve i problemi grafici per i giochi che utilizzano il renderer OpenGL. Attiva questa opzione se riscontri grafica tremolante, schermi neri o arresti anomali durante il gioco. Consigliato per la maggior parte dei dispositivi Android moderni.</string>
+    <string name="settings_tab_customization">Personalizzazione</string>
+    <string name="customization_preview_title">Anteprima</string>
+    <string name="customization_preview_subtitle">La tua raccolta, su misura per te</string>
+    <plurals name="customization_games_per_row"><item quantity="one">%1$d gioco per riga</item><item quantity="other">%1$d giochi per riga</item></plurals>
+    <string name="customization_home_background">Sfondo della schermata principale</string>
+    <string name="customization_background_select">Scegli un’immagine, una GIF o un video</string>
+    <string name="customization_background_default">Sfondo predefinito</string>
+    <string name="customization_background_selected">Sfondo personalizzato selezionato</string>
+    <string name="customization_background_imported">Sfondo aggiornato</string>
+    <string name="customization_background_failed">Impossibile usare questo file come sfondo</string>
+    <string name="customization_library_layout">Layout della raccolta</string>
+    <string name="customization_cover_size">Dimensione delle copertine</string>
+    <string name="customization_percent_value">%1$d%%</string>
+    <string name="customization_text_and_fonts">Testo e caratteri</string>
+    <string name="customization_app_font">Carattere dell’app</string>
+    <string name="customization_font_system">Predefinito di sistema</string>
+    <string name="customization_font_custom">Personalizzato</string>
+    <string name="customization_import_font">Importa un carattere personalizzato</string>
+    <string name="customization_import_font_hint">Scegli un file TTF o OTF</string>
+    <string name="customization_font_imported">Carattere importato</string>
+    <string name="customization_font_failed">Impossibile usare questo file di carattere</string>
+    <string name="customization_text_size">Dimensione del testo</string>
+    <string name="customization_reset_section">Ripristino</string>
+    <string name="customization_reset">Ripristina personalizzazione</string>
+    <string name="customization_reset_description">Ripristina sfondo, dimensione delle copertine, carattere e testo predefiniti</string>
+    <string name="customization_reset_confirm_title">Ripristinare la personalizzazione?</string>
+    <string name="customization_reset_confirm_body">Lo sfondo personalizzato e il carattere importato verranno rimossi.</string>
+    <string name="customization_reset_action">Ripristina</string>
 </resources>

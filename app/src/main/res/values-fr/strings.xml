@@ -842,4 +842,32 @@
     <string name="profile_password_reset_sent">E-mail de réinitialisation du mot de passe envoyé. Vérifiez votre boîte de réception.</string>
     <string name="settings_use_angle">Correction graphique (ANGLE)</string>
     <string name="settings_help_use_angle">Corrige les problèmes graphiques pour les jeux utilisant le moteur de rendu OpenGL. Activez cette option si vous rencontrez des graphismes scintillants, des écrans noirs ou des plantages pendant le jeu. Recommandé pour la plupart des appareils Android modernes.</string>
+    <string name="settings_tab_customization">Personnalisation</string>
+    <string name="customization_preview_title">Aperçu</string>
+    <string name="customization_preview_subtitle">Votre bibliothèque, adaptée à vos goûts</string>
+    <plurals name="customization_games_per_row"><item quantity="one">%1$d jeu par ligne</item><item quantity="other">%1$d jeux par ligne</item></plurals>
+    <string name="customization_home_background">Arrière-plan de l’écran d’accueil</string>
+    <string name="customization_background_select">Choisir une image, un GIF ou une vidéo</string>
+    <string name="customization_background_default">Arrière-plan par défaut</string>
+    <string name="customization_background_selected">Arrière-plan personnalisé sélectionné</string>
+    <string name="customization_background_imported">Arrière-plan mis à jour</string>
+    <string name="customization_background_failed">Impossible d’utiliser ce fichier d’arrière-plan</string>
+    <string name="customization_library_layout">Disposition de la bibliothèque</string>
+    <string name="customization_cover_size">Taille des jaquettes</string>
+    <string name="customization_percent_value">%1$d%%</string>
+    <string name="customization_text_and_fonts">Texte et polices</string>
+    <string name="customization_app_font">Police de l’application</string>
+    <string name="customization_font_system">Police système par défaut</string>
+    <string name="customization_font_custom">Personnalisée</string>
+    <string name="customization_import_font">Importer une police personnalisée</string>
+    <string name="customization_import_font_hint">Choisissez un fichier TTF ou OTF</string>
+    <string name="customization_font_imported">Police importée</string>
+    <string name="customization_font_failed">Impossible d’utiliser ce fichier de police</string>
+    <string name="customization_text_size">Taille du texte</string>
+    <string name="customization_reset_section">Réinitialiser</string>
+    <string name="customization_reset">Réinitialiser la personnalisation</string>
+    <string name="customization_reset_description">Restaurer l’arrière-plan, la taille des jaquettes, la police et la taille du texte par défaut</string>
+    <string name="customization_reset_confirm_title">Réinitialiser la personnalisation ?</string>
+    <string name="customization_reset_confirm_body">L’arrière-plan personnalisé et la police importée seront supprimés.</string>
+    <string name="customization_reset_action">Réinitialiser</string>
 </resources>

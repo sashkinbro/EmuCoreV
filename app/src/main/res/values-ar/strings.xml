@@ -842,4 +842,36 @@
     <string name="profile_password_reset_sent">تم إرسال بريد إلكتروني لإعادة تعيين كلمة المرور. تحقق من صندوق الوارد الخاص بك.</string>
     <string name="settings_use_angle">إصلاح الرسومات (ANGLE)</string>
     <string name="settings_help_use_angle">يعمل على إصلاح المشكلات الرسومية للألعاب التي تستخدم عارض OpenGL. قم بتشغيل هذا الخيار إذا واجهت رسومات وامضة، أو شاشات سوداء، أو أعطال أثناء اللعب. يوصى به لمعظم أجهزة Android الحديثة.</string>
+    <string name="settings_tab_customization">التخصيص</string>
+    <string name="customization_preview_title">معاينة</string>
+    <string name="customization_preview_subtitle">مكتبتك مضبوطة حسب تفضيلاتك</string>
+    <plurals name="customization_games_per_row">
+        <item quantity="zero">لا ألعاب في الصف</item><item quantity="one">لعبة واحدة في الصف</item>
+        <item quantity="two">لعبتان في الصف</item><item quantity="few">%1$d ألعاب في الصف</item>
+        <item quantity="many">%1$d لعبة في الصف</item><item quantity="other">%1$d لعبة في الصف</item>
+    </plurals>
+    <string name="customization_home_background">خلفية الشاشة الرئيسية</string>
+    <string name="customization_background_select">اختر صورة أو GIF أو فيديو</string>
+    <string name="customization_background_default">الخلفية الافتراضية</string>
+    <string name="customization_background_selected">تم اختيار خلفية مخصصة</string>
+    <string name="customization_background_imported">تم تحديث الخلفية</string>
+    <string name="customization_background_failed">تعذر استخدام ملف الخلفية هذا</string>
+    <string name="customization_library_layout">تخطيط المكتبة</string>
+    <string name="customization_cover_size">حجم غلاف اللعبة</string>
+    <string name="customization_percent_value">%1$d%%</string>
+    <string name="customization_text_and_fonts">النص والخطوط</string>
+    <string name="customization_app_font">خط التطبيق</string>
+    <string name="customization_font_system">خط النظام الافتراضي</string>
+    <string name="customization_font_custom">مخصص</string>
+    <string name="customization_import_font">استيراد خط مخصص</string>
+    <string name="customization_import_font_hint">اختر ملف TTF أو OTF</string>
+    <string name="customization_font_imported">تم استيراد الخط</string>
+    <string name="customization_font_failed">تعذر استخدام ملف الخط هذا</string>
+    <string name="customization_text_size">حجم النص</string>
+    <string name="customization_reset_section">إعادة الضبط</string>
+    <string name="customization_reset">إعادة ضبط التخصيص</string>
+    <string name="customization_reset_description">استعادة الخلفية وحجم الأغلفة والخط وحجم النص الافتراضي</string>
+    <string name="customization_reset_confirm_title">هل تريد إعادة ضبط التخصيص؟</string>
+    <string name="customization_reset_confirm_body">ستتم إزالة الخلفية المخصصة والخط المستورد.</string>
+    <string name="customization_reset_action">إعادة الضبط</string>
 </resources>

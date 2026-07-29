@@ -5,6 +5,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import com.sbro.emucorev.data.CustomizationSettings
 
 private val DarkColorScheme = darkColorScheme(
     primary = AccentPrimary,
@@ -67,9 +70,12 @@ enum class ThemeMode {
     SYSTEM, LIGHT, DARK
 }
 
+val LocalCustomizationSettings = staticCompositionLocalOf { CustomizationSettings() }
+
 @Composable
 fun EmuCoreVTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
+    customization: CustomizationSettings = CustomizationSettings(),
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (themeMode) {
@@ -78,9 +84,12 @@ fun EmuCoreVTheme(
         ThemeMode.DARK -> true
     }
 
-    MaterialTheme(
-        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
-        typography = Typography,
-        content = content
-    )
+    val customizedTypography = rememberCustomizedTypography(customization)
+    CompositionLocalProvider(LocalCustomizationSettings provides customization) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+            typography = customizedTypography,
+            content = content
+        )
+    }
 }

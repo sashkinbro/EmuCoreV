@@ -842,4 +842,35 @@
     <string name="profile_password_reset_sent">Лист для скидання пароля надіслано. Перевірте свою поштову скриньку.</string>
     <string name="settings_use_angle">Виправлення графіки (ANGLE)</string>
     <string name="settings_help_use_angle">Виправляє графічні проблеми для ігор, що використовують рендерер OpenGL. Увімкніть цю опцію, якщо під час гри виникає мерехтіння графіки, чорний екран або збої. Рекомендовано для більшості сучасних пристроїв Android.</string>
+    <string name="settings_tab_customization">Кастомізація</string>
+    <string name="customization_preview_title">Попередній перегляд</string>
+    <string name="customization_preview_subtitle">Ваша бібліотека, налаштована для вас</string>
+    <plurals name="customization_games_per_row">
+        <item quantity="one">%1$d гра в ряд</item><item quantity="few">%1$d гри в ряд</item>
+        <item quantity="many">%1$d ігор у ряд</item><item quantity="other">%1$d гри в ряд</item>
+    </plurals>
+    <string name="customization_home_background">Фон головного екрана</string>
+    <string name="customization_background_select">Вибрати зображення, GIF або відео</string>
+    <string name="customization_background_default">Стандартний фон</string>
+    <string name="customization_background_selected">Вибрано власний фон</string>
+    <string name="customization_background_imported">Фон оновлено</string>
+    <string name="customization_background_failed">Не вдалося використати цей файл фону</string>
+    <string name="customization_library_layout">Макет бібліотеки</string>
+    <string name="customization_cover_size">Розмір обкладинки гри</string>
+    <string name="customization_percent_value">%1$d%%</string>
+    <string name="customization_text_and_fonts">Текст і шрифти</string>
+    <string name="customization_app_font">Шрифт застосунку</string>
+    <string name="customization_font_system">Системний за замовчуванням</string>
+    <string name="customization_font_custom">Власний</string>
+    <string name="customization_import_font">Імпортувати власний шрифт</string>
+    <string name="customization_import_font_hint">Виберіть файл TTF або OTF</string>
+    <string name="customization_font_imported">Шрифт імпортовано</string>
+    <string name="customization_font_failed">Не вдалося використати цей файл шрифту</string>
+    <string name="customization_text_size">Розмір тексту</string>
+    <string name="customization_reset_section">Скидання</string>
+    <string name="customization_reset">Скинути налаштування кастомізації</string>
+    <string name="customization_reset_description">Відновити стандартний фон, розмір обкладинок, шрифт і розмір тексту</string>
+    <string name="customization_reset_confirm_title">Скинути кастомізацію?</string>
+    <string name="customization_reset_confirm_body">Власний фон та імпортований шрифт буде видалено.</string>
+    <string name="customization_reset_action">Скинути</string>
 </resources>

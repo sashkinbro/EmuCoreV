@@ -841,4 +841,32 @@
     <string name="profile_password_reset_sent">密码重置电子邮件已发送。请检查您的收件箱。</string>
     <string name="settings_use_angle">图形修复 (ANGLE)</string>
     <string name="settings_help_use_angle">修复使用 OpenGL 渲染器的游戏的图形问题。如果您在游戏过程中遇到图形闪烁、黑屏或崩溃，请开启此选项。推荐大多数现代 Android 设备使用。</string>
+    <string name="settings_tab_customization">个性化</string>
+    <string name="customization_preview_title">预览</string>
+    <string name="customization_preview_subtitle">为你定制的游戏库</string>
+    <plurals name="customization_games_per_row"><item quantity="other">每行 %1$d 个游戏</item></plurals>
+    <string name="customization_home_background">主屏幕背景</string>
+    <string name="customization_background_select">选择图片、GIF 或视频</string>
+    <string name="customization_background_default">默认背景</string>
+    <string name="customization_background_selected">已选择自定义背景</string>
+    <string name="customization_background_imported">背景已更新</string>
+    <string name="customization_background_failed">无法使用此背景文件</string>
+    <string name="customization_library_layout">游戏库布局</string>
+    <string name="customization_cover_size">游戏封面大小</string>
+    <string name="customization_percent_value">%1$d%%</string>
+    <string name="customization_text_and_fonts">文字和字体</string>
+    <string name="customization_app_font">应用字体</string>
+    <string name="customization_font_system">系统默认</string>
+    <string name="customization_font_custom">自定义</string>
+    <string name="customization_import_font">导入自定义字体</string>
+    <string name="customization_import_font_hint">选择 TTF 或 OTF 文件</string>
+    <string name="customization_font_imported">字体已导入</string>
+    <string name="customization_font_failed">无法使用此字体文件</string>
+    <string name="customization_text_size">文字大小</string>
+    <string name="customization_reset_section">重置</string>
+    <string name="customization_reset">重置个性化设置</string>
+    <string name="customization_reset_description">恢复默认背景、封面大小、字体和文字大小</string>
+    <string name="customization_reset_confirm_title">重置个性化设置？</string>
+    <string name="customization_reset_confirm_body">自定义背景和导入的字体将被删除。</string>
+    <string name="customization_reset_action">重置</string>
 </resources>

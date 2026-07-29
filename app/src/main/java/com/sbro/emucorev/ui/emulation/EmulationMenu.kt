@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -195,8 +194,6 @@ fun EmulationGameMenu(
     callbacks: EmulationMenuCallbacks,
     modifier: Modifier = Modifier
 ) {
-    val statusInsets = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues()
-    val navInsets = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues()
     val palette = emulationMenuPalette()
     var selectedTab by remember { mutableStateOf(EmulationMenuTab.Game) }
     val scrollState = rememberScrollState()
@@ -207,6 +204,7 @@ fun EmulationGameMenu(
     }
     Surface(
         modifier = modifier
+            .padding(vertical = 4.dp)
             .then(
                 if (expandHorizontally) {
                     Modifier
@@ -232,8 +230,8 @@ fun EmulationGameMenu(
                 .padding(
                     start = if (expandHorizontally) 20.dp else 16.dp,
                     end = if (expandHorizontally) 20.dp else 16.dp,
-                    top = statusInsets.calculateTopPadding(),
-                    bottom = navInsets.calculateBottomPadding()
+                    top = 14.dp,
+                    bottom = 16.dp
                 ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {

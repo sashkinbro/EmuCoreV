@@ -842,4 +842,32 @@
     <string name="profile_password_reset_sent">पासवर्ड रीसेट ईमेल भेज दिया गया है। अपना इनबॉक्स जांचें।</string>
     <string name="settings_use_angle">ग्राफ़िक्स फ़िक्स (ANGLE)</string>
     <string name="settings_help_use_angle">OpenGL रेंडरर का उपयोग करने वाले गेम के लिए ग्राफिकल समस्याओं को ठीक करता है। यदि आप गेमप्ले के दौरान टिमटिमाते ग्राफिक्स, काली स्क्रीन, या क्रैश का अनुभव करते हैं, तो इसे चालू करें। अधिकांश आधुनिक Android उपकरणों के लिए अनुशंसित।</string>
+    <string name="settings_tab_customization">मनपसंद बनाना</string>
+    <string name="customization_preview_title">पूर्वावलोकन</string>
+    <string name="customization_preview_subtitle">आपके अनुसार बनाई गई आपकी लाइब्रेरी</string>
+    <plurals name="customization_games_per_row"><item quantity="one">हर पंक्ति में %1$d गेम</item><item quantity="other">हर पंक्ति में %1$d गेम</item></plurals>
+    <string name="customization_home_background">होम स्क्रीन की पृष्ठभूमि</string>
+    <string name="customization_background_select">चित्र, GIF या वीडियो चुनें</string>
+    <string name="customization_background_default">डिफ़ॉल्ट पृष्ठभूमि</string>
+    <string name="customization_background_selected">कस्टम पृष्ठभूमि चुनी गई</string>
+    <string name="customization_background_imported">पृष्ठभूमि अपडेट हुई</string>
+    <string name="customization_background_failed">इस पृष्ठभूमि फ़ाइल का उपयोग नहीं हो सका</string>
+    <string name="customization_library_layout">लाइब्रेरी लेआउट</string>
+    <string name="customization_cover_size">गेम कवर का आकार</string>
+    <string name="customization_percent_value">%1$d%%</string>
+    <string name="customization_text_and_fonts">टेक्स्ट और फ़ॉन्ट</string>
+    <string name="customization_app_font">ऐप फ़ॉन्ट</string>
+    <string name="customization_font_system">सिस्टम डिफ़ॉल्ट</string>
+    <string name="customization_font_custom">कस्टम</string>
+    <string name="customization_import_font">कस्टम फ़ॉन्ट आयात करें</string>
+    <string name="customization_import_font_hint">TTF या OTF फ़ाइल चुनें</string>
+    <string name="customization_font_imported">फ़ॉन्ट आयात हुआ</string>
+    <string name="customization_font_failed">इस फ़ॉन्ट फ़ाइल का उपयोग नहीं हो सका</string>
+    <string name="customization_text_size">टेक्स्ट का आकार</string>
+    <string name="customization_reset_section">रीसेट</string>
+    <string name="customization_reset">मनपसंद सेटिंग रीसेट करें</string>
+    <string name="customization_reset_description">डिफ़ॉल्ट पृष्ठभूमि, कवर आकार, फ़ॉन्ट और टेक्स्ट आकार वापस लाएँ</string>
+    <string name="customization_reset_confirm_title">मनपसंद सेटिंग रीसेट करें?</string>
+    <string name="customization_reset_confirm_body">कस्टम पृष्ठभूमि और आयात किया गया फ़ॉन्ट हटा दिया जाएगा।</string>
+    <string name="customization_reset_action">रीसेट</string>
 </resources>
