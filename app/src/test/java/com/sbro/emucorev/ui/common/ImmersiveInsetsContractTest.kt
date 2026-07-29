@@ -36,6 +36,10 @@ class ImmersiveInsetsContractTest {
             "The in-game menu must keep its 4 dp spacing outside the panel",
             ".padding(vertical = 4.dp)" in emulationMenu
         )
+        assertTrue(
+            "The quick-bar island must stay at its original 12 dp top position",
+            "modifier = modifier.padding(top = 12.dp)" in emulationMenu
+        )
     }
 
     private fun locateSourceRoot(): Path {

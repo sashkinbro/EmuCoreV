@@ -17,6 +17,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -65,12 +67,14 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -94,7 +98,6 @@ private val SettingsRowInnerVerticalPadding = 14.dp
 enum class SettingsTab(@param:StringRes val titleRes: Int, val icon: ImageVector) {
     General(R.string.settings_tab_general, Icons.Rounded.Tune),
     Customization(R.string.settings_tab_customization, Icons.Rounded.Palette),
-    Pro(R.string.settings_pro_tab, Icons.Rounded.Star),
     Graphics(R.string.settings_tab_graphics, Icons.Rounded.GraphicEq),
     Audio(R.string.settings_tab_audio, Icons.AutoMirrored.Rounded.VolumeUp),
     Overlay(R.string.settings_tab_overlay, Icons.Rounded.Vibration),
@@ -103,8 +106,9 @@ enum class SettingsTab(@param:StringRes val titleRes: Int, val icon: ImageVector
     System(R.string.settings_tab_system, Icons.Rounded.Memory),
     Advanced(R.string.settings_tab_advanced, Icons.Rounded.SettingsSuggest),
     Storage(R.string.settings_tab_storage, Icons.Rounded.Storage),
-    About(R.string.settings_tab_about, Icons.Rounded.Info),
     Updates(R.string.settings_tab_updates, Icons.Rounded.SystemUpdateAlt),
+    Pro(R.string.settings_pro_tab, Icons.Rounded.Star),
+    About(R.string.settings_tab_about, Icons.Rounded.Info),
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -406,7 +410,33 @@ private fun SettingsTabRow(
     onSelected: (SettingsTab) -> Unit
 ) {
     val tabs = remember { SettingsTab.entries.toList() }
+    val listState = rememberLazyListState()
+    LaunchedEffect(selectedTab) {
+        val selectedIndex = tabs.indexOf(selectedTab).coerceAtLeast(0)
+        var selectedItem = listState.layoutInfo.visibleItemsInfo
+            .firstOrNull { it.index == selectedIndex }
+        if (selectedItem == null) {
+            listState.scrollToItem(selectedIndex)
+            withFrameNanos { }
+            selectedItem = listState.layoutInfo.visibleItemsInfo
+                .firstOrNull { it.index == selectedIndex }
+        }
+
+        selectedItem?.let { item ->
+            val layoutInfo = listState.layoutInfo
+            val delta = centeredTabScrollDelta(
+                itemOffset = item.offset,
+                itemSize = item.size,
+                viewportStart = layoutInfo.viewportStartOffset,
+                viewportEnd = layoutInfo.viewportEndOffset
+            )
+            if (kotlin.math.abs(delta) > 1f) {
+                listState.animateScrollBy(delta)
+            }
+        }
+    }
     LazyRow(
+        state = listState,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),

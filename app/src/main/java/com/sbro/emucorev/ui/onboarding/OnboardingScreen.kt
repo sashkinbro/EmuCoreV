@@ -93,6 +93,7 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.core.FirmwareKind
 import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
+import com.sbro.emucorev.ui.pro.ProBenefitCards
 import com.sbro.emucorev.ui.pro.ProPurchasePanel
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.delay
@@ -403,7 +404,11 @@ private fun OnboardingProContent() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
-        ProPurchasePanel()
+        ProBenefitCards(modifier = Modifier.widthIn(max = 640.dp))
+        ProPurchasePanel(
+            modifier = Modifier.widthIn(max = 640.dp),
+            showFeatures = false
+        )
     }
 }
 
