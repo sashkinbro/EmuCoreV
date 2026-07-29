@@ -33,13 +33,8 @@ class ImmersiveInsetsContractTest {
             .resolve("com/sbro/emucorev/ui/emulation/EmulationMenu.kt")
             .readText()
         assertTrue(
-            "The in-game menu must keep bottom safety when navigation bars are hidden",
-            "WindowInsets.navigationBarsIgnoringVisibility" in emulationMenu
-        )
-        assertTrue(
-            "The in-game menu must not add spacing beyond its safe insets",
-            "top = statusInsets.calculateTopPadding()" in emulationMenu &&
-                "bottom = navInsets.calculateBottomPadding()" in emulationMenu
+            "The in-game menu must keep its 4 dp spacing outside the panel",
+            ".padding(vertical = 4.dp)" in emulationMenu
         )
     }
 

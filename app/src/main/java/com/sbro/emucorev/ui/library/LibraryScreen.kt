@@ -77,10 +77,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.CustomizationBackground
 import com.sbro.emucorev.ui.common.NavigationMenuButton
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.CardContentPadding
+import com.sbro.emucorev.ui.theme.LocalCustomizationSettings
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
@@ -105,6 +107,7 @@ fun LibraryScreen(
     val context = LocalContext.current
     val windowInfo = LocalWindowInfo.current
     val density = LocalDensity.current
+    val customization = LocalCustomizationSettings.current
     val refreshClick = rememberDebouncedClick(onClick = viewModel::refresh)
     var layoutMode by rememberSaveable { mutableStateOf(LibraryLayoutMode.LIST) }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
@@ -128,18 +131,34 @@ fun LibraryScreen(
     val deleteGameConfirmBody = stringResource(R.string.detail_delete_game_confirm_body)
     val deleteGameFailedMessage = stringResource(R.string.detail_delete_game_failed)
     val containerWidthDp = with(density) { windowInfo.containerSize.width.toDp() }
-    val gridColumns = when {
-        containerWidthDp >= 1100.dp -> 6
-        containerWidthDp >= 840.dp -> 5
-        containerWidthDp >= 600.dp -> 4
-        else -> 2
+    val gridColumns = remember(containerWidthDp, customization.coverSizePercent) {
+        LibraryGridSizing.columnsForWidth(
+            containerWidthDp.value,
+            customization.coverSizePercent
+        )
     }
 
-    LazyColumn(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .navigationBarsPadding(),
+    ) {
+        CustomizationBackground(
+            path = customization.backgroundPath,
+            mimeType = customization.backgroundMimeType,
+            modifier = Modifier.matchParentSize()
+        )
+        if (customization.backgroundPath != null) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.72f))
+            )
+        }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
             start = ScreenHorizontalPadding,
             end = ScreenHorizontalPadding,
@@ -570,6 +589,7 @@ fun LibraryScreen(
                     }
                 }
             }
+        }
         }
     }
 

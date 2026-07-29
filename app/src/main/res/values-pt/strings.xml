@@ -842,4 +842,32 @@
     <string name="profile_password_reset_sent">E-mail de redefinição de senha enviado. Verifique sua caixa de entrada.</string>
     <string name="settings_use_angle">Correção de Gráficos (ANGLE)</string>
     <string name="settings_help_use_angle">Corrige problemas gráficos para jogos que usam o renderizador OpenGL. Ative esta opção se você tiver gráficos piscando, telas pretas ou travamentos durante o jogo. Recomendado para a maioria dos dispositivos Android modernos.</string>
+    <string name="settings_tab_customization">Personalização</string>
+    <string name="customization_preview_title">Pré-visualização</string>
+    <string name="customization_preview_subtitle">A sua biblioteca, ajustada a si</string>
+    <plurals name="customization_games_per_row"><item quantity="one">%1$d jogo por linha</item><item quantity="other">%1$d jogos por linha</item></plurals>
+    <string name="customization_home_background">Fundo do ecrã principal</string>
+    <string name="customization_background_select">Escolher imagem, GIF ou vídeo</string>
+    <string name="customization_background_default">Fundo predefinido</string>
+    <string name="customization_background_selected">Fundo personalizado selecionado</string>
+    <string name="customization_background_imported">Fundo atualizado</string>
+    <string name="customization_background_failed">Não foi possível usar este ficheiro de fundo</string>
+    <string name="customization_library_layout">Disposição da biblioteca</string>
+    <string name="customization_cover_size">Tamanho das capas dos jogos</string>
+    <string name="customization_percent_value">%1$d%%</string>
+    <string name="customization_text_and_fonts">Texto e tipos de letra</string>
+    <string name="customization_app_font">Tipo de letra da aplicação</string>
+    <string name="customization_font_system">Predefinição do sistema</string>
+    <string name="customization_font_custom">Personalizado</string>
+    <string name="customization_import_font">Importar tipo de letra personalizado</string>
+    <string name="customization_import_font_hint">Escolha um ficheiro TTF ou OTF</string>
+    <string name="customization_font_imported">Tipo de letra importado</string>
+    <string name="customization_font_failed">Não foi possível usar este ficheiro de tipo de letra</string>
+    <string name="customization_text_size">Tamanho do texto</string>
+    <string name="customization_reset_section">Repor</string>
+    <string name="customization_reset">Repor personalização</string>
+    <string name="customization_reset_description">Restaurar fundo, tamanho das capas, tipo de letra e tamanho do texto predefinidos</string>
+    <string name="customization_reset_confirm_title">Repor a personalização?</string>
+    <string name="customization_reset_confirm_body">O fundo personalizado e o tipo de letra importado serão removidos.</string>
+    <string name="customization_reset_action">Repor</string>
 </resources>

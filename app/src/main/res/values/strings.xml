@@ -842,4 +842,35 @@
     <string name="settings_stretch_display_area">Stretch display area</string>
     <string name="settings_vsync">V-Sync</string>
     <string name="settings_pstv_mode">PSTV mode</string>
+    <string name="settings_tab_customization">Customization</string>
+    <string name="customization_preview_title">Preview</string>
+    <string name="customization_preview_subtitle">Your library, tailored to you</string>
+    <plurals name="customization_games_per_row">
+        <item quantity="one">%1$d game per row</item>
+        <item quantity="other">%1$d games per row</item>
+    </plurals>
+    <string name="customization_home_background">Home screen background</string>
+    <string name="customization_background_select">Choose an image, GIF, or video</string>
+    <string name="customization_background_default">Default background</string>
+    <string name="customization_background_selected">Custom background selected</string>
+    <string name="customization_background_imported">Background updated</string>
+    <string name="customization_background_failed">Could not use this background file</string>
+    <string name="customization_library_layout">Library layout</string>
+    <string name="customization_cover_size">Game cover size</string>
+    <string name="customization_percent_value">%1$d%%</string>
+    <string name="customization_text_and_fonts">Text and fonts</string>
+    <string name="customization_app_font">App font</string>
+    <string name="customization_font_system">System default</string>
+    <string name="customization_font_custom">Custom</string>
+    <string name="customization_import_font">Import a custom font</string>
+    <string name="customization_import_font_hint">Choose a TTF or OTF file</string>
+    <string name="customization_font_imported">Font imported</string>
+    <string name="customization_font_failed">Could not use this font file</string>
+    <string name="customization_text_size">Text size</string>
+    <string name="customization_reset_section">Reset</string>
+    <string name="customization_reset">Reset customization</string>
+    <string name="customization_reset_description">Restore the default background, cover size, font, and text size</string>
+    <string name="customization_reset_confirm_title">Reset customization?</string>
+    <string name="customization_reset_confirm_body">Your custom background and imported font will be removed.</string>
+    <string name="customization_reset_action">Reset</string>
 </resources>

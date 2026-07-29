@@ -23,6 +23,10 @@ import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.core.VibrationTestController
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.data.AppPreferences
+import com.sbro.emucorev.data.AppFont
+import com.sbro.emucorev.data.CustomizationFileStore
+import com.sbro.emucorev.data.CustomizationPreferences
+import com.sbro.emucorev.data.CustomizationSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
@@ -43,6 +47,7 @@ data class SettingsUiState(
     val storageChangeInProgress: Boolean = false,
     val storageMigration: StorageMigrationUiState = StorageMigrationUiState(),
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
+    val customization: CustomizationSettings = CustomizationSettings(),
     val appUpdate: AppUpdateUiState = AppUpdateUiState()
 )
 
@@ -81,6 +86,8 @@ data class AppUpdateUiState(
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val preferences = AppPreferences(application)
+    private val customizationPreferences = CustomizationPreferences(application)
+    private val customizationFileStore = CustomizationFileStore(application)
     private val coreConfigRepository = VitaCoreConfigRepository(application)
     private val gpuDriverManager = GpuDriverManager(application)
     private val gpuDriverCatalogRepository = GpuDriverCatalogRepository(application)
@@ -88,7 +95,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val settingsBackupRepository = SettingsBackupRepository(
         application,
         preferences,
-        coreConfigRepository
+        coreConfigRepository,
+        customizationPreferences
     )
     private val initialCoreConfig = coreConfigRepository.ensureDefaultsPersisted()
     private val coreSettingsSaveQueue = Channel<VitaCoreConfig>(Channel.CONFLATED)
@@ -100,12 +108,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             storageLocations = EmulatorStorage.availableStorageLocations(application),
             coreConfig = initialCoreConfig,
             installedGpuDrivers = gpuDriverManager.listInstalledDrivers(),
-            appLanguage = preferences.appLanguage
+            appLanguage = preferences.appLanguage,
+            customization = customizationPreferences.current
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            customizationPreferences.settings.collect { customization ->
+                _uiState.value = _uiState.value.copy(customization = customization)
+            }
+        }
         viewModelScope.launch(Dispatchers.IO) {
             for (config in coreSettingsSaveQueue) {
                 runCatching { coreConfigRepository.save(config) }
@@ -253,10 +267,53 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         preferences.applyAppLanguage()
     }
 
+    fun updateCoverSizePercent(value: Int) {
+        customizationPreferences.setCoverSizePercent(value)
+    }
+
+    fun updateTextSizePercent(value: Int) {
+        customizationPreferences.setTextSizePercent(value)
+    }
+
+    fun updateAppFont(font: AppFont) {
+        if (font == AppFont.CUSTOM && customizationPreferences.current.customFontPath == null) return
+        customizationPreferences.setAppFont(font)
+    }
+
+    fun importCustomizationBackground(uri: Uri, onComplete: (Result<Unit>) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                val imported = customizationFileStore.importBackground(uri)
+                customizationPreferences.setBackground(imported.path, imported.mimeType)
+            }
+            withContext(Dispatchers.Main) { onComplete(result) }
+        }
+    }
+
+    fun importCustomFont(uri: Uri, onComplete: (Result<Unit>) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                val path = customizationFileStore.importFont(uri)
+                customizationPreferences.setAppFont(AppFont.CUSTOM, path)
+            }
+            withContext(Dispatchers.Main) { onComplete(result) }
+        }
+    }
+
+    fun resetCustomization() {
+        customizationFileStore.clear()
+        customizationPreferences.reset()
+    }
+
     fun updateCoreSettings(transform: (VitaCoreConfig) -> VitaCoreConfig) {
         val updated = transform(_uiState.value.coreConfig)
         _uiState.value = _uiState.value.copy(coreConfig = updated)
         coreSettingsSaveQueue.trySend(updated)
+    }
+
+    override fun onCleared() {
+        customizationPreferences.close()
+        super.onCleared()
     }
 
     fun testVibration(): Boolean {

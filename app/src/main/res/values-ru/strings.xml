@@ -842,4 +842,35 @@
     <string name="profile_password_reset_sent">Письмо для сброса пароля отправлено. Проверьте свой почтовый ящик.</string>
     <string name="settings_use_angle">Исправление графики (ANGLE)</string>
     <string name="settings_help_use_angle">Исправляет графические проблемы в играх, использующих рендерер OpenGL. Включите эту опцию, если вы сталкиваетесь с мерцающей графикой, черными экранами или сбоями во время игры. Рекомендуется для большинства современных устройств Android.</string>
+    <string name="settings_tab_customization">Персонализация</string>
+    <string name="customization_preview_title">Предварительный просмотр</string>
+    <string name="customization_preview_subtitle">Ваша библиотека, настроенная для вас</string>
+    <plurals name="customization_games_per_row">
+        <item quantity="one">%1$d игра в ряду</item><item quantity="few">%1$d игры в ряду</item>
+        <item quantity="many">%1$d игр в ряду</item><item quantity="other">%1$d игры в ряду</item>
+    </plurals>
+    <string name="customization_home_background">Фон главного экрана</string>
+    <string name="customization_background_select">Выбрать изображение, GIF или видео</string>
+    <string name="customization_background_default">Стандартный фон</string>
+    <string name="customization_background_selected">Выбран собственный фон</string>
+    <string name="customization_background_imported">Фон обновлён</string>
+    <string name="customization_background_failed">Не удалось использовать этот файл фона</string>
+    <string name="customization_library_layout">Макет библиотеки</string>
+    <string name="customization_cover_size">Размер обложки игры</string>
+    <string name="customization_percent_value">%1$d%%</string>
+    <string name="customization_text_and_fonts">Текст и шрифты</string>
+    <string name="customization_app_font">Шрифт приложения</string>
+    <string name="customization_font_system">Системный по умолчанию</string>
+    <string name="customization_font_custom">Собственный</string>
+    <string name="customization_import_font">Импортировать собственный шрифт</string>
+    <string name="customization_import_font_hint">Выберите файл TTF или OTF</string>
+    <string name="customization_font_imported">Шрифт импортирован</string>
+    <string name="customization_font_failed">Не удалось использовать этот файл шрифта</string>
+    <string name="customization_text_size">Размер текста</string>
+    <string name="customization_reset_section">Сброс</string>
+    <string name="customization_reset">Сбросить персонализацию</string>
+    <string name="customization_reset_description">Вернуть стандартный фон, размер обложек, шрифт и размер текста</string>
+    <string name="customization_reset_confirm_title">Сбросить персонализацию?</string>
+    <string name="customization_reset_confirm_body">Собственный фон и импортированный шрифт будут удалены.</string>
+    <string name="customization_reset_action">Сбросить</string>
 </resources>

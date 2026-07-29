@@ -124,6 +124,7 @@ fun SettingsTabContent(
 ) {
     when (selectedTab) {
         SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings, onOpenVitaLanguageSettings)
+        SettingsTab.Customization -> CustomizationTab(uiState.customization, viewModel)
         SettingsTab.Graphics -> GraphicsTab(uiState, defaults, viewModel, onOpenGpuDriverSettings)
         SettingsTab.Audio -> AudioTab(uiState, defaults, viewModel, refreshCoreSettingsClick)
         SettingsTab.Overlay -> OverlayTab(uiState, defaults, viewModel)

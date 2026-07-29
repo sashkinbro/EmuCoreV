@@ -842,4 +842,32 @@
     <string name="profile_password_reset_sent">Şifre sıfırlama e-postası gönderildi. Gelen kutunuzu kontrol edin.</string>
     <string name="settings_use_angle">Grafik Düzeltmesi (ANGLE)</string>
     <string name="settings_help_use_angle">OpenGL oluşturucuyu kullanan oyunlar için grafik sorunlarını giderir. Oyun sırasında titreyen grafikler, siyah ekranlar veya çökmeler yaşarsanız bu seçeneği açın. Çoğu modern Android cihazı için önerilir.</string>
+    <string name="settings_tab_customization">Özelleştirme</string>
+    <string name="customization_preview_title">Ön izleme</string>
+    <string name="customization_preview_subtitle">Size göre düzenlenmiş kitaplığınız</string>
+    <plurals name="customization_games_per_row"><item quantity="one">Satır başına %1$d oyun</item><item quantity="other">Satır başına %1$d oyun</item></plurals>
+    <string name="customization_home_background">Ana ekran arka planı</string>
+    <string name="customization_background_select">Resim, GIF veya video seç</string>
+    <string name="customization_background_default">Varsayılan arka plan</string>
+    <string name="customization_background_selected">Özel arka plan seçildi</string>
+    <string name="customization_background_imported">Arka plan güncellendi</string>
+    <string name="customization_background_failed">Bu arka plan dosyası kullanılamadı</string>
+    <string name="customization_library_layout">Kitaplık düzeni</string>
+    <string name="customization_cover_size">Oyun kapağı boyutu</string>
+    <string name="customization_percent_value">%%%1$d</string>
+    <string name="customization_text_and_fonts">Metin ve yazı tipleri</string>
+    <string name="customization_app_font">Uygulama yazı tipi</string>
+    <string name="customization_font_system">Sistem varsayılanı</string>
+    <string name="customization_font_custom">Özel</string>
+    <string name="customization_import_font">Özel yazı tipi içe aktar</string>
+    <string name="customization_import_font_hint">TTF veya OTF dosyası seçin</string>
+    <string name="customization_font_imported">Yazı tipi içe aktarıldı</string>
+    <string name="customization_font_failed">Bu yazı tipi dosyası kullanılamadı</string>
+    <string name="customization_text_size">Metin boyutu</string>
+    <string name="customization_reset_section">Sıfırla</string>
+    <string name="customization_reset">Özelleştirmeyi sıfırla</string>
+    <string name="customization_reset_description">Varsayılan arka planı, kapak boyutunu, yazı tipini ve metin boyutunu geri yükle</string>
+    <string name="customization_reset_confirm_title">Özelleştirme sıfırlansın mı?</string>
+    <string name="customization_reset_confirm_body">Özel arka plan ve içe aktarılan yazı tipi kaldırılacak.</string>
+    <string name="customization_reset_action">Sıfırla</string>
 </resources>

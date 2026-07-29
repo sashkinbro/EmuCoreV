@@ -3,12 +3,15 @@ package com.sbro.emucorev.core
 import android.content.Context
 import android.net.Uri
 import com.sbro.emucorev.data.AppPreferences
+import com.sbro.emucorev.data.AppFont
+import com.sbro.emucorev.data.CustomizationPreferences
 import org.json.JSONObject
 
 class SettingsBackupRepository(
     private val context: Context,
     private val preferences: AppPreferences,
-    private val coreConfigRepository: VitaCoreConfigRepository
+    private val coreConfigRepository: VitaCoreConfigRepository,
+    private val customizationPreferences: CustomizationPreferences
 ) {
     fun exportTo(uri: Uri) {
         val config = coreConfigRepository.ensureDefaultsPersisted()
@@ -25,6 +28,18 @@ class SettingsBackupRepository(
                     .putNullable("skippedUpdateTag", preferences.skippedUpdateTag)
             )
             .put("core", config.toJson())
+            .put(
+                "customization",
+                JSONObject()
+                    .put("coverSizePercent", customizationPreferences.current.coverSizePercent)
+                    .put(
+                        "appFont",
+                        customizationPreferences.current.appFont
+                            .takeUnless { it == AppFont.CUSTOM }
+                            ?.name ?: AppFont.SYSTEM.name
+                    )
+                    .put("textSizePercent", customizationPreferences.current.textSizePercent)
+            )
 
         context.contentResolver.openOutputStream(uri)?.use { output ->
             output.write(root.toString(2).toByteArray(Charsets.UTF_8))
@@ -52,6 +67,23 @@ class SettingsBackupRepository(
             preferences.appLanguage = app.optEnum("appLanguage", preferences.appLanguage)
             preferences.skippedUpdateTag = app.optNullableString("skippedUpdateTag")
             preferences.applyAppLanguage()
+        }
+        root.optJSONObject("customization")?.let { customization ->
+            customizationPreferences.setCoverSizePercent(
+                customization.optInt(
+                    "coverSizePercent",
+                    customizationPreferences.current.coverSizePercent
+                )
+            )
+            customizationPreferences.setAppFont(
+                customization.optEnum("appFont", AppFont.SYSTEM)
+            )
+            customizationPreferences.setTextSizePercent(
+                customization.optInt(
+                    "textSizePercent",
+                    customizationPreferences.current.textSizePercent
+                )
+            )
         }
 
         val restoredConfig = root.optJSONObject("core")

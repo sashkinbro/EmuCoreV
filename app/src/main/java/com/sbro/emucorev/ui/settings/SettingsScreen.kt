@@ -44,6 +44,7 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.Storage
@@ -92,6 +93,7 @@ private val SettingsRowInnerVerticalPadding = 14.dp
 
 enum class SettingsTab(@param:StringRes val titleRes: Int, val icon: ImageVector) {
     General(R.string.settings_tab_general, Icons.Rounded.Tune),
+    Customization(R.string.settings_tab_customization, Icons.Rounded.Palette),
     Graphics(R.string.settings_tab_graphics, Icons.Rounded.GraphicEq),
     Audio(R.string.settings_tab_audio, Icons.AutoMirrored.Rounded.VolumeUp),
     Overlay(R.string.settings_tab_overlay, Icons.Rounded.Vibration),

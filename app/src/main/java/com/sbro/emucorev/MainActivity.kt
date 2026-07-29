@@ -8,25 +8,35 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.sbro.emucorev.data.AppPreferences
+import com.sbro.emucorev.data.CustomizationPreferences
 import com.sbro.emucorev.navigation.AppNavigation
 import com.sbro.emucorev.ui.common.ImmersiveMode
 import com.sbro.emucorev.ui.theme.EmuCoreVTheme
 import com.sbro.emucorev.ui.theme.ThemeMode
 
 class MainActivity : ComponentActivity() {
+    private lateinit var customizationPreferences: CustomizationPreferences
+
     @SuppressLint("UseKtx")
     override fun onCreate(savedInstanceState: Bundle?) {
         val preferences = AppPreferences(this)
+        customizationPreferences = CustomizationPreferences(this)
         preferences.applyAppLanguage()
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enterImmersiveMode()
         window.setBackgroundDrawable(ColorDrawable(resolveWindowBackground(preferences.themeMode)))
         setContent {
-            EmuCoreVTheme(themeMode = preferences.themeMode) {
+            val customization by customizationPreferences.settings.collectAsState()
+            EmuCoreVTheme(
+                themeMode = preferences.themeMode,
+                customization = customization
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -35,6 +45,13 @@ class MainActivity : ComponentActivity() {
             }
         }
         window.decorView.post(::enterImmersiveMode)
+    }
+
+    override fun onDestroy() {
+        if (::customizationPreferences.isInitialized) {
+            customizationPreferences.close()
+        }
+        super.onDestroy()
     }
 
     override fun onResume() {

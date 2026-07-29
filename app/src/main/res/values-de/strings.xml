@@ -842,4 +842,32 @@
     <string name="profile_password_reset_sent">E-Mail zum Zurücksetzen des Passworts wurde gesendet. Überprüfen Sie Ihren Posteingang.</string>
     <string name="settings_use_angle">Grafik-Fix (ANGLE)</string>
     <string name="settings_help_use_angle">Behebt Grafikprobleme für Spiele, die den OpenGL-Renderer verwenden. Aktivieren Sie diese Option, wenn Sie flackernde Grafiken, schwarze Bildschirme oder Abstürze während des Spielens feststellen. Empfohlen für die meisten modernen Android-Geräte.</string>
+    <string name="settings_tab_customization">Anpassung</string>
+    <string name="customization_preview_title">Vorschau</string>
+    <string name="customization_preview_subtitle">Deine Bibliothek, passend für dich</string>
+    <plurals name="customization_games_per_row"><item quantity="one">%1$d Spiel pro Reihe</item><item quantity="other">%1$d Spiele pro Reihe</item></plurals>
+    <string name="customization_home_background">Hintergrund des Startbildschirms</string>
+    <string name="customization_background_select">Bild, GIF oder Video auswählen</string>
+    <string name="customization_background_default">Standardhintergrund</string>
+    <string name="customization_background_selected">Eigener Hintergrund ausgewählt</string>
+    <string name="customization_background_imported">Hintergrund aktualisiert</string>
+    <string name="customization_background_failed">Diese Hintergrunddatei konnte nicht verwendet werden</string>
+    <string name="customization_library_layout">Bibliothekslayout</string>
+    <string name="customization_cover_size">Größe der Spielcover</string>
+    <string name="customization_percent_value">%1$d%%</string>
+    <string name="customization_text_and_fonts">Text und Schriftarten</string>
+    <string name="customization_app_font">App-Schriftart</string>
+    <string name="customization_font_system">Systemstandard</string>
+    <string name="customization_font_custom">Benutzerdefiniert</string>
+    <string name="customization_import_font">Eigene Schriftart importieren</string>
+    <string name="customization_import_font_hint">TTF- oder OTF-Datei auswählen</string>
+    <string name="customization_font_imported">Schriftart importiert</string>
+    <string name="customization_font_failed">Diese Schriftdatei konnte nicht verwendet werden</string>
+    <string name="customization_text_size">Textgröße</string>
+    <string name="customization_reset_section">Zurücksetzen</string>
+    <string name="customization_reset">Anpassung zurücksetzen</string>
+    <string name="customization_reset_description">Standardhintergrund, Covergröße, Schriftart und Textgröße wiederherstellen</string>
+    <string name="customization_reset_confirm_title">Anpassung zurücksetzen?</string>
+    <string name="customization_reset_confirm_body">Der eigene Hintergrund und die importierte Schriftart werden entfernt.</string>
+    <string name="customization_reset_action">Zurücksetzen</string>
 </resources>

@@ -56,6 +56,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.InstalledVitaGame
 import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.CustomizationBackground
 import com.sbro.emucorev.ui.common.NavigationMenuButton
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.SectionCard
@@ -64,6 +65,7 @@ import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.CompactCardContentPadding
 import com.sbro.emucorev.ui.theme.GradientEnd
 import com.sbro.emucorev.ui.theme.GradientStart
+import com.sbro.emucorev.ui.theme.LocalCustomizationSettings
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorev.ui.theme.ScreenTopInsetOffset
@@ -81,6 +83,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val customization = LocalCustomizationSettings.current
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + ScreenTopInsetOffset
     val openLibraryClick = rememberDebouncedClick {
         viewModel.refresh()
@@ -99,6 +102,18 @@ fun HomeScreen(
             .background(MaterialTheme.colorScheme.background)
             .navigationBarsPadding()
     ) {
+        CustomizationBackground(
+            path = customization.backgroundPath,
+            mimeType = customization.backgroundMimeType,
+            modifier = Modifier.matchParentSize()
+        )
+        if (customization.backgroundPath != null) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.72f))
+            )
+        }
         if (uiState.isLoading) {
             Box(modifier = Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
                 PremiumLoadingAnimation(size = 80.dp)

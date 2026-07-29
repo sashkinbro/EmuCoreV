@@ -842,4 +842,32 @@
     <string name="profile_password_reset_sent">Se ha enviado el correo electrónico para restablecer la contraseña. Revisa tu bandeja de entrada.</string>
     <string name="settings_use_angle">Corrección de gráficos (ANGLE)</string>
     <string name="settings_help_use_angle">Soluciona problemas gráficos para juegos que utilizan el renderizador OpenGL. Activa esta opción si experimentas gráficos parpadeantes, pantallas negras o fallos durante el juego. Recomendado para la mayoría de los dispositivos Android modernos.</string>
+    <string name="settings_tab_customization">Personalización</string>
+    <string name="customization_preview_title">Vista previa</string>
+    <string name="customization_preview_subtitle">Tu biblioteca, adaptada a ti</string>
+    <plurals name="customization_games_per_row"><item quantity="one">%1$d juego por fila</item><item quantity="other">%1$d juegos por fila</item></plurals>
+    <string name="customization_home_background">Fondo de la pantalla principal</string>
+    <string name="customization_background_select">Elegir una imagen, GIF o vídeo</string>
+    <string name="customization_background_default">Fondo predeterminado</string>
+    <string name="customization_background_selected">Fondo personalizado seleccionado</string>
+    <string name="customization_background_imported">Fondo actualizado</string>
+    <string name="customization_background_failed">No se pudo usar este archivo de fondo</string>
+    <string name="customization_library_layout">Diseño de la biblioteca</string>
+    <string name="customization_cover_size">Tamaño de las carátulas</string>
+    <string name="customization_percent_value">%1$d%%</string>
+    <string name="customization_text_and_fonts">Texto y fuentes</string>
+    <string name="customization_app_font">Fuente de la aplicación</string>
+    <string name="customization_font_system">Predeterminada del sistema</string>
+    <string name="customization_font_custom">Personalizada</string>
+    <string name="customization_import_font">Importar una fuente personalizada</string>
+    <string name="customization_import_font_hint">Elige un archivo TTF u OTF</string>
+    <string name="customization_font_imported">Fuente importada</string>
+    <string name="customization_font_failed">No se pudo usar este archivo de fuente</string>
+    <string name="customization_text_size">Tamaño del texto</string>
+    <string name="customization_reset_section">Restablecer</string>
+    <string name="customization_reset">Restablecer personalización</string>
+    <string name="customization_reset_description">Restaurar el fondo, tamaño de carátulas, fuente y tamaño de texto predeterminados</string>
+    <string name="customization_reset_confirm_title">¿Restablecer la personalización?</string>
+    <string name="customization_reset_confirm_body">Se eliminarán el fondo personalizado y la fuente importada.</string>
+    <string name="customization_reset_action">Restablecer</string>
 </resources>
