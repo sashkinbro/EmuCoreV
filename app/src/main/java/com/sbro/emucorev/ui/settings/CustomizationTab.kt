@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -276,6 +278,7 @@ private fun CustomizationPreview(settings: CustomizationSettings) {
     val density = LocalDensity.current
     val windowInfo = LocalWindowInfo.current
     val containerWidthDp = with(density) { windowInfo.containerSize.width.toDp() }
+    val coverScale = settings.coverSizePercent / 100f
     val columns = remember(containerWidthDp, settings.coverSizePercent) {
         LibraryGridSizing.columnsForWidth(
             containerWidthDp.value,
@@ -286,72 +289,79 @@ private fun CustomizationPreview(settings: CustomizationSettings) {
         title = stringResource(R.string.customization_preview_title),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp)
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(26.dp),
-                color = MaterialTheme.colorScheme.background,
-                border = BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-                )
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(210.dp),
+            shape = RoundedCornerShape(26.dp),
+            color = MaterialTheme.colorScheme.background,
+            border = BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.app_name_emucorev),
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                            )
-                            Text(
-                                text = stringResource(R.string.customization_preview_subtitle),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Text(
-                                text = pluralStringResource(
-                                    R.plurals.customization_games_per_row,
-                                    columns,
-                                    columns
-                                ),
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.app_name_emucorev),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Text(
+                            text = stringResource(R.string.customization_preview_subtitle),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.Bottom
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.primaryContainer
                     ) {
-                        repeat(columns) { index ->
-                            val colors = listOf(
-                                Color(0xFF17345E),
-                                Color(0xFF30255C),
-                                Color(0xFF704054),
-                                Color(0xFF225C55)
-                            )
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .aspectRatio(0.72f),
-                                shape = RoundedCornerShape(12.dp),
-                                color = colors[index % colors.size]
-                            ) {}
-                        }
+                        Text(
+                            text = pluralStringResource(
+                                R.plurals.customization_games_per_row,
+                                columns,
+                                columns
+                            ),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(
+                        8.dp,
+                        Alignment.CenterHorizontally
+                    ),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    repeat(columns) { index ->
+                        val colors = listOf(
+                            Color(0xFF17345E),
+                            Color(0xFF30255C),
+                            Color(0xFF704054),
+                            Color(0xFF225C55)
+                        )
+                        Surface(
+                            modifier = Modifier
+                                .width(52.dp * coverScale)
+                                .aspectRatio(0.72f),
+                            shape = RoundedCornerShape(12.dp),
+                            color = colors[index % colors.size]
+                        ) {}
                     }
                 }
             }
