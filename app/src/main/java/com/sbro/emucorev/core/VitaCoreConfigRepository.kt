@@ -125,6 +125,9 @@ data class VitaCoreConfig(
 
 class VitaCoreConfigRepository(private val context: Context) {
 
+    // Used to backup EmuCoreV UI settings that get dropped when native Vita3K rewrites config.yml
+    private val prefs = context.getSharedPreferences("emucorev_ui_config", Context.MODE_PRIVATE)
+
     private val persistedKeys = setOf(
         "anisotropic-filtering",
         "archive-log",
@@ -225,7 +228,15 @@ class VitaCoreConfigRepository(private val context: Context) {
 
     fun load(): VitaCoreConfig {
         val defaults = defaultConfig()
-        val values = readKeyValues()
+        val fileValues = readKeyValues()
+        // Native Vita3K drops unknown keys (like touch-haptics) when saving config.yml.
+        // We restore them from prefs so the user's UI settings don't reset to defaults.
+        val values = mutableMapOf<String, String>()
+        prefs.all.forEach { (k, v) ->
+            if (v is String) values[k] = v
+        }
+        values.putAll(fileValues)
+
         return normalizeForBuild(
             VitaCoreConfig(
                 validationLayer = values["validation-layer"]?.toBooleanStrictOrNull() ?: defaults.validationLayer,
@@ -461,6 +472,11 @@ class VitaCoreConfigRepository(private val context: Context) {
             }
         }
         AtomicTextFile.write(configFile, content)
+        
+        // Backup to SharedPreferences so these settings survive native core rewrites
+        prefs.edit().apply {
+            values.forEach { (k, v) -> putString(k, v) }
+        }.apply()
     }
 
     fun resetToDefaults(): VitaCoreConfig {
