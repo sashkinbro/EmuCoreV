@@ -343,15 +343,16 @@ class VitaCoreConfigRepository(private val context: Context) {
         // Old EmuCoreV builds shipped non-upstream defaults that caused frozen
         // launches and weaker CPU scheduling. Snap these back to vanilla Vita3K
         // values whenever a stale config.yml is detected.
-        val upstream = VitaCoreConfig()
+        // NOTE: User-facing preferences (touchHaptics, touchHapticsPreset,
+        // touchHapticsStrength, gamepadVibration, etc.) are intentionally NOT
+        // reset here — the user's choices must survive schema upgrades.
         return loaded.copy(
-            showCompileShaders = upstream.showCompileShaders,
-            cpuPoolSize = upstream.cpuPoolSize,
+            showCompileShaders = VitaCoreConfig().showCompileShaders,
+            cpuPoolSize = VitaCoreConfig().cpuPoolSize,
             disableSurfaceSync = false,
             validationLayer = false,
             discordRichPresence = false,
             psnSignedIn = false,
-            touchHaptics = upstream.touchHaptics,
             logLevel = defaultConfig().logLevel
         )
     }

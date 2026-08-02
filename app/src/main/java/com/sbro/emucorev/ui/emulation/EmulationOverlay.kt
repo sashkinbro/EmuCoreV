@@ -108,7 +108,11 @@ fun EmulationOverlayHost(
     activity: Emulator,
     modifier: Modifier = Modifier
 ) {
-    val gameId = remember(activity) { activity.currentGameIdOrIntent() }
+    // Read currentGameId as Compose State — recomposes automatically when the
+    // native core calls setCurrentGameId() after the SDL surface is ready.
+    // Fall back to the intent-carried ID until the native callback fires.
+    val nativeGameId = activity.currentGameId
+    val gameId = nativeGameId.ifBlank { activity.currentGameIdOrIntent() }
     val repository = remember(activity) { VitaGameSettingsRepository(activity) }
     val controlLayoutRepository = remember(activity) { TouchControlLayoutRepository(activity) }
     val customizationPreferences = remember(activity) { CustomizationPreferences(activity) }
@@ -167,6 +171,9 @@ fun EmulationOverlayHost(
 
     fun persistConfig(transform: (VitaCoreConfig) -> VitaCoreConfig) {
         config = transform(config)
+        // Only persist when we have a real game ID — if still blank the native
+        // core hasn't reported the title yet and the save would be a no-op
+        // (savePreservingDriverOverride guards against blank IDs internally).
         repository.savePreservingDriverOverride(gameId, config)
         activity.updateGamepadRuntimeInputSettings(config)
     }
