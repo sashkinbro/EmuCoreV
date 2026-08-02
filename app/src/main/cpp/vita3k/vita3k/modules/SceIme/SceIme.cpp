@@ -81,9 +81,28 @@ EXPORT(SceInt32, sceImeOpen, SceImeParam *param) {
     default: break;
     }
 
+    // Clamp maxTextLength to a sane upper bound so that alloc() cannot crash
+    // when a game passes an untrusted or corrupted param struct.
+    static constexpr SceUInt32 MAX_SAFE_TEXT_LENGTH = 65535;
+    if (emuenv.ime.param.maxTextLength == 0 || emuenv.ime.param.maxTextLength > MAX_SAFE_TEXT_LENGTH)
+        emuenv.ime.param.maxTextLength = MAX_SAFE_TEXT_LENGTH;
+
     emuenv.ime.edit_text.str = emuenv.ime.param.inputTextBuffer;
     emuenv.ime.param.inputTextBuffer = Ptr<SceWChar16>(alloc(emuenv.mem, SCE_IME_MAX_PREEDIT_LENGTH + emuenv.ime.param.maxTextLength + 1, "ime_str"));
-    emuenv.ime.str = emuenv.ime.param.initialText ? reinterpret_cast<char16_t *>(emuenv.ime.param.initialText.get(emuenv.mem)) : u"";
+
+    // Safely read initialText: walk the guest buffer up to maxTextLength chars
+    // instead of relying on an unbounded reinterpret_cast that may read past
+    // an unterminated buffer and crash.
+    if (emuenv.ime.param.initialText) {
+        const SceWChar16 *src = reinterpret_cast<const SceWChar16 *>(emuenv.ime.param.initialText.get(emuenv.mem));
+        if (src) {
+            SceUInt32 len = 0;
+            while (len < emuenv.ime.param.maxTextLength && src[len] != 0)
+                ++len;
+            emuenv.ime.str.assign(reinterpret_cast<const char16_t *>(src), len);
+        }
+    }
+
     if (!emuenv.ime.str.empty())
         emuenv.ime.caretIndex = emuenv.ime.edit_text.caretIndex = emuenv.ime.edit_text.preeditIndex = static_cast<SceUInt32>(emuenv.ime.str.length());
     else
@@ -150,7 +169,14 @@ EXPORT(SceInt32, sceImeUpdate) {
     Ptr<SceImeEvent> event = Ptr<SceImeEvent>(alloc(emuenv.mem, sizeof(SceImeEvent), "ime_event"));
     SceImeEvent *e = event.get(emuenv.mem);
     e->id = emuenv.ime.event_id;
-    memcpy(emuenv.ime.edit_text.str.get(emuenv.mem), emuenv.ime.str.c_str(), (emuenv.ime.str.length() + 1) * sizeof(SceWChar16));
+
+    // Guard against a null inputTextBuffer — can happen if sceImeOpen allocated
+    // the buffer but the game never initialised the edit_text.str pointer.
+    SceWChar16 *text_dst = emuenv.ime.edit_text.str.get(emuenv.mem);
+    if (text_dst) {
+        memcpy(text_dst, emuenv.ime.str.c_str(), (emuenv.ime.str.length() + 1) * sizeof(SceWChar16));
+    }
+
     e->param.text = emuenv.ime.edit_text;
     e->param.caretIndex = emuenv.ime.caretIndex;
     CALL_EXPORT(SceImeEventHandler, emuenv.ime.param.arg, e);
