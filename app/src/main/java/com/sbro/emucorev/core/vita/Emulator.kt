@@ -58,10 +58,11 @@ import com.sbro.emucorev.ui.theme.EmuCoreVTheme
 import java.io.File
 
 class Emulator : SDLActivity(), InputManager.InputDeviceListener {
-    // Observable so that EmulationOverlayHost recomposes when the native
-    // core calls setCurrentGameId() after the SDL surface is ready.
-    var currentGameId by mutableStateOf("")
-        private set
+    // Private backing state so that Compose observes changes when the native
+    // core calls setCurrentGameId(). Using a separate computed property avoids
+    // a JVM signature clash between the property setter and the @Keep JNI method.
+    private var _currentGameId by mutableStateOf("")
+    val currentGameId: String get() = _currentGameId
     private lateinit var surfaceView: EmuSurface
     private lateinit var inputOverlay: InputOverlay
     private var composeOverlayAttached = false
@@ -83,7 +84,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     @Keep
     fun setCurrentGameId(gameId: String) {
-        currentGameId = gameId
+        _currentGameId = gameId
         refreshGamepadRuntimeInputSettings()
         startPlayTimeSessionIfNeeded()
     }
