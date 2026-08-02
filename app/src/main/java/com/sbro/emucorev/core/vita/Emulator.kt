@@ -58,7 +58,10 @@ import com.sbro.emucorev.ui.theme.EmuCoreVTheme
 import java.io.File
 
 class Emulator : SDLActivity(), InputManager.InputDeviceListener {
-    private var currentGameId = ""
+    // Observable so that EmulationOverlayHost recomposes when the native
+    // core calls setCurrentGameId() after the SDL surface is ready.
+    var currentGameId by mutableStateOf("")
+        private set
     private lateinit var surfaceView: EmuSurface
     private lateinit var inputOverlay: InputOverlay
     private var composeOverlayAttached = false
