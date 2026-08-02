@@ -156,7 +156,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         if (isLaunchIntent(intent)) {
             val gameId = gameIdFromIntent(intent)
             if (gameId.isNotBlank()) {
-                currentGameId = gameId
+                _currentGameId = gameId
             }
             triggerRebirthAfterNativeShutdown(markRebirthHandled(intent))
         }
