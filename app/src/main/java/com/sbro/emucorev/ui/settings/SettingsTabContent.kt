@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -57,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import android.view.InputDevice
+import android.widget.Toast
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.AndroidGyroscopeInput
 import com.sbro.emucorev.core.GpuDriverCompatibility
@@ -145,6 +147,7 @@ fun SettingsTabContent(
         SettingsTab.Advanced -> AdvancedTab(uiState, defaults, viewModel)
         SettingsTab.Storage -> StorageTab(
             uiState = uiState,
+            viewModel = viewModel,
             selectStorageLocation = viewModel::selectStorageLocation,
             dismissStorageMigrationDialog = viewModel::dismissStorageMigrationDialog,
             createBackupClick = createBackupClick,
@@ -708,6 +711,7 @@ private fun AdvancedTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
 @Composable
 private fun StorageTab(
     uiState: SettingsUiState,
+    viewModel: SettingsViewModel,
     selectStorageLocation: (String) -> Unit,
     dismissStorageMigrationDialog: () -> Unit,
     createBackupClick: () -> Unit,
@@ -783,6 +787,92 @@ private fun StorageTab(
         Button(onClick = createBackupClick, modifier = Modifier.padding(top = 8.dp)) {
             Text(stringResource(R.string.settings_backup_create))
         }
+    }
+    ClearCacheSection(cacheSizeBytes = uiState.cacheSizeBytes, viewModel = viewModel)
+}
+
+@Composable
+private fun ClearCacheSection(
+    cacheSizeBytes: Long,
+    viewModel: SettingsViewModel
+) {
+    val context = LocalContext.current
+    var confirmVisible by rememberSaveable { mutableStateOf(false) }
+    var clearing by rememberSaveable { mutableStateOf(false) }
+    val formattedSize = remember(cacheSizeBytes) {
+        android.text.format.Formatter.formatShortFileSize(context, cacheSizeBytes)
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshCacheSize()
+    }
+
+    SectionCard(
+        title = stringResource(R.string.settings_clear_cache_title),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)
+    ) {
+        Text(
+            text = stringResource(R.string.settings_clear_cache_body),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
+        )
+        Text(
+            text = stringResource(R.string.settings_clear_cache_size, formattedSize),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        Button(
+            onClick = { confirmVisible = true },
+            enabled = !clearing && cacheSizeBytes > 0L,
+            modifier = Modifier.padding(top = 12.dp)
+        ) {
+            Text(stringResource(R.string.settings_clear_cache_action))
+        }
+        if (cacheSizeBytes <= 0L) {
+            Text(
+                text = stringResource(R.string.settings_clear_cache_empty),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+    }
+
+    if (confirmVisible) {
+        AlertDialog(
+            onDismissRequest = { if (!clearing) confirmVisible = false },
+            title = { Text(stringResource(R.string.settings_clear_cache_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_clear_cache_confirm_message, formattedSize)) },
+            confirmButton = {
+                Button(
+                    enabled = !clearing,
+                    onClick = {
+                        clearing = true
+                        viewModel.clearCaches { result ->
+                            clearing = false
+                            confirmVisible = false
+                            val message = result.fold(
+                                onSuccess = { cleared ->
+                                    context.getString(
+                                        R.string.settings_clear_cache_done,
+                                        android.text.format.Formatter.formatShortFileSize(context, cleared.bytesFreed)
+                                    )
+                                },
+                                onFailure = { context.getString(R.string.settings_clear_cache_failed) }
+                            )
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.settings_clear_cache_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(enabled = !clearing, onClick = { confirmVisible = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
     }
 }
 

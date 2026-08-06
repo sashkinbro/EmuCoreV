@@ -55,6 +55,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
     val uiState: StateFlow<SetupInstallUiState> = _uiState.asStateFlow()
     private var nativeProgressOffset = 0f
     private var nativeProgressScale = 1f
+    private val stagedFilesToCleanup = mutableListOf<String>()
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -72,7 +73,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
 
     fun installFirmware(uriString: String) {
         runInstall(InstallOperation.Firmware) {
-            val path = DocumentPathResolver.resolveFilePath(appContext, uriString, copyToCache = true)
+            val path = resolveInstallSource(uriString)
             if (path == null) {
                 finishError(appContext.getString(R.string.install_dialog_firmware_failed))
                 return@runInstall
@@ -88,7 +89,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
 
     fun installContent(uriString: String, repairArchive: Boolean = false) {
         runInstall(InstallOperation.Content) {
-            val path = DocumentPathResolver.resolveFilePath(appContext, uriString, copyToCache = true)
+            val path = resolveInstallSource(uriString)
             if (path == null) {
                 finishError(appContext.getString(R.string.install_dialog_content_failed))
                 return@runInstall
@@ -154,7 +155,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
 
     fun installLicense(uriString: String) {
         runInstall(InstallOperation.License) {
-            val path = DocumentPathResolver.resolveFilePath(appContext, uriString, copyToCache = true)
+            val path = resolveInstallSource(uriString)
             if (path == null) {
                 finishError(appContext.getString(R.string.install_dialog_license_failed))
                 return@runInstall
@@ -170,7 +171,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
 
     fun installPkg(uriString: String, zrif: String) {
         runInstall(InstallOperation.Pkg) {
-            val path = DocumentPathResolver.resolveFilePath(appContext, uriString, copyToCache = true)
+            val path = resolveInstallSource(uriString)
             if (path == null) {
                 finishError(appContext.getString(R.string.install_dialog_pkg_failed))
                 return@runInstall
@@ -191,6 +192,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
         if (_uiState.value.status == InstallStatus.Running) return
         nativeProgressOffset = 0f
         nativeProgressScale = 1f
+        stagedFilesToCleanup.clear()
         _uiState.value = SetupInstallUiState(
             status = InstallStatus.Running,
             operation = operation
@@ -206,11 +208,30 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                     fallbackDetail = error.message
                 )
             } finally {
+                // Staged payloads are game-sized. Always remove them, including
+                // on failure, otherwise every install permanently leaks a full
+                // copy of the source package.
+                stagedFilesToCleanup.forEach { staged ->
+                    DocumentPathResolver.cleanupStagedFile(appContext, staged)
+                }
+                stagedFilesToCleanup.clear()
                 VitaInstallBridge.setListener(null)
                 nativeProgressOffset = 0f
                 nativeProgressScale = 1f
             }
         }
+    }
+
+    /**
+     * Resolves an install source and marks any staged copy for cleanup once the
+     * operation finishes.
+     */
+    private fun resolveInstallSource(uriString: String): String? {
+        val path = DocumentPathResolver.resolveFilePath(appContext, uriString, copyToCache = true)
+        if (path != null) {
+            stagedFilesToCleanup.add(path)
+        }
+        return path
     }
 
     private fun handleProgress(progress: NativeInstallProgress) {
@@ -235,7 +256,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
         )
         return VitaArchiveRepacker.repackToInstallZip(
             sourcePath = path,
-            cacheRoot = EmulatorStorage.cacheRoot(appContext)
+            cacheRoot = EmulatorStorage.installStagingRoot(appContext)
         ) { progress ->
             _uiState.value = _uiState.value.copy(
                 progress = (progress.progress * REPAIR_REPACK_PROGRESS_SCALE).coerceIn(0f, REPAIR_NATIVE_PROGRESS_OFFSET),
@@ -246,6 +267,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                 } ?: appContext.getString(R.string.install_dialog_repack_preparing)
             )
         }?.absolutePath?.also {
+            stagedFilesToCleanup.add(it)
             nativeProgressOffset = REPAIR_NATIVE_PROGRESS_OFFSET
             nativeProgressScale = REPAIR_NATIVE_PROGRESS_SCALE
             _uiState.value = _uiState.value.copy(

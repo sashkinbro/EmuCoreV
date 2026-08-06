@@ -571,6 +571,17 @@
     <string name="settings_backup_restore_title">恢复设置备份？</string>
     <string name="settings_backup_restore_message">当前的应用偏好设置和模拟器设置将被选定的备份替换。</string>
     <string name="settings_backup_restore_confirm">恢复</string>
+    <string name="settings_clear_cache_title">清除缓存</string>
+    <string name="settings_clear_cache_body">删除着色器缓存、纹理缓存、日志和临时安装文件。您的设置、存档、已安装的游戏和固件不会受到影响。</string>
+    <string name="settings_clear_cache_action">清除缓存</string>
+    <string name="settings_clear_cache_size">缓存大小：%1$s</string>
+    <string name="settings_clear_cache_empty">没有可删除的缓存数据。</string>
+    <string name="settings_clear_cache_confirm_title">要清除缓存吗？</string>
+    <string name="settings_clear_cache_confirm_message">这将释放 %1$s。重新生成着色器期间，游戏首次启动可能会稍慢。</string>
+    <string name="settings_clear_cache_confirm_action">清除</string>
+    <string name="settings_clear_cache_done">缓存已清除，释放了 %1$s。</string>
+    <string name="settings_clear_cache_failed">无法清除缓存。</string>
+    <string name="settings_pro_support_more_hint">下面每个选项都已包含全部功能，只有当您想更多地支持开发时才选择更高的档位。</string>
     <string name="settings_tab_camera">相机</string>
     <string name="settings_camera_front">前置摄像头</string>
     <string name="settings_camera_back">后置摄像头</string>

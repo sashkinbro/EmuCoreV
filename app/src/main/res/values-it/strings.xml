@@ -572,6 +572,17 @@
     <string name="settings_backup_restore_title">Ripristinare il backup delle impostazioni?</string>
     <string name="settings_backup_restore_message">Le preferenze attuali dell\'app e le impostazioni dell\'emulatore verranno sostituite con il backup selezionato.</string>
     <string name="settings_backup_restore_confirm">Ripristina</string>
+    <string name="settings_clear_cache_title">Svuota cache</string>
+    <string name="settings_clear_cache_body">Rimuove la cache degli shader, la cache delle texture, i registri e i file temporanei di installazione. Impostazioni, salvataggi, giochi installati e firmware non vengono modificati.</string>
+    <string name="settings_clear_cache_action">Svuota cache</string>
+    <string name="settings_clear_cache_size">Dimensione cache: %1$s</string>
+    <string name="settings_clear_cache_empty">Nessun dato in cache da rimuovere.</string>
+    <string name="settings_clear_cache_confirm_title">Svuotare la cache?</string>
+    <string name="settings_clear_cache_confirm_message">Verranno liberati %1$s. I giochi potrebbero avviarsi leggermente più lentamente la prima volta, mentre gli shader vengono ricreati.</string>
+    <string name="settings_clear_cache_confirm_action">Svuota</string>
+    <string name="settings_clear_cache_done">Cache svuotata, liberati %1$s.</string>
+    <string name="settings_clear_cache_failed">Impossibile svuotare la cache.</string>
+    <string name="settings_pro_support_more_hint">Ogni opzione qui sotto include già tutto: scegline una più grande solo se vuoi sostenere maggiormente lo sviluppo.</string>
     <string name="settings_tab_camera">Fotocamera</string>
     <string name="settings_camera_front">Fotocamera anteriore</string>
     <string name="settings_camera_back">Fotocamera posteriore</string>

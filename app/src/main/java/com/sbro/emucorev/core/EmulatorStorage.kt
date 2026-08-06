@@ -107,6 +107,18 @@ object EmulatorStorage {
         return File(runtimeRoot(context), "cache").apply { mkdirs() }
     }
 
+    /**
+     * Staging area for install payloads (PKG/VPK/ZIP).
+     *
+     * These are game-sized, so they must follow the user's selected storage
+     * root instead of always landing on internal storage. Keeping this separate
+     * from [cacheRoot] means small runtime data (logs, shader cache, patches)
+     * stays on stable internal storage while bulk transfers go to the SD card.
+     */
+    fun installStagingRoot(context: Context): File {
+        return File(storageRoot(context), "cache/install_cache").apply { mkdirs() }
+    }
+
     fun prepareRuntime(context: Context) {
         val runtimeRoot = runtimeRoot(context)
         migrateLegacyRuntimeData(context, storageRoot(context))
@@ -131,9 +143,111 @@ object EmulatorStorage {
                 directory.mkdirs()
             }
         }
+
+        purgeOrphanedInstallStaging(context)
+    }
+
+    /**
+     * Removes install payloads left behind by earlier versions.
+     *
+     * Staging used to live on internal storage and was never cleaned up, so a
+     * single game install could strand several GB there. Both the legacy
+     * internal location and the current one are swept, since a staged file only
+     * ever needs to outlive the install that created it.
+     */
+    private fun purgeOrphanedInstallStaging(context: Context) {
+        val stagingDirs = buildSet {
+            add(File(runtimeRoot(context), "cache/install_cache"))
+            add(File(storageRoot(context), "cache/install_cache"))
+        }
+
+        stagingDirs.forEach { dir ->
+            runCatching {
+                if (!dir.isDirectory) return@runCatching
+                dir.listFiles()?.forEach { staged ->
+                    if (staged.isFile) staged.delete() else staged.deleteRecursively()
+                }
+            }
+        }
     }
 
     fun ux0AppRoot(context: Context): File = File(vitaRoot(context), "ux0/app").apply { mkdirs() }
+
+    /** Summary of a cache clear, in bytes freed and files removed. */
+    data class CacheClearResult(
+        val bytesFreed: Long,
+        val filesRemoved: Int
+    )
+
+    /**
+     * Reports the size of caches that [clearCaches] would remove.
+     */
+    fun cacheSizeBytes(context: Context): Long =
+        clearableCacheDirs(context).sumOf { dir ->
+            runCatching {
+                if (!dir.isDirectory) 0L
+                else dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+            }.getOrDefault(0L)
+        }
+
+    /**
+     * Deletes regenerable caches only.
+     *
+     * Shader/texture caches, logs and install staging are all rebuilt on demand,
+     * so removing them is always safe. Saves, installed games, firmware,
+     * trophies, settings and GPU drivers are deliberately untouched.
+     */
+    fun clearCaches(context: Context): CacheClearResult {
+        var bytesFreed = 0L
+        var filesRemoved = 0
+
+        clearableCacheDirs(context).forEach { dir ->
+            runCatching {
+                if (!dir.isDirectory) return@runCatching
+                dir.listFiles()?.forEach { entry ->
+                    val size = if (entry.isFile) {
+                        entry.length()
+                    } else {
+                        entry.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+                    }
+                    val count = if (entry.isFile) {
+                        1
+                    } else {
+                        entry.walkTopDown().count { it.isFile }
+                    }
+                    val deleted = if (entry.isFile) entry.delete() else entry.deleteRecursively()
+                    if (deleted) {
+                        bytesFreed += size
+                        filesRemoved += count
+                    }
+                }
+            }
+        }
+
+        // Recreate the directory skeleton so the core does not have to.
+        prepareRuntime(context)
+
+        return CacheClearResult(bytesFreed = bytesFreed, filesRemoved = filesRemoved)
+    }
+
+    /**
+     * Cache directories that are safe to delete.
+     *
+     * Both storage roots are covered because the selected root may have changed
+     * since the cache was written.
+     */
+    private fun clearableCacheDirs(context: Context): List<File> {
+        val runtimeRoot = runtimeRoot(context)
+        val storageRoot = storageRoot(context)
+        return buildSet {
+            add(File(runtimeRoot, "cache"))
+            add(File(storageRoot, "cache"))
+            add(File(runtimeRoot, "shaderlog"))
+            add(File(runtimeRoot, "texturelog"))
+            add(context.cacheDir)
+            context.externalCacheDir?.let(::add)
+        }.toList()
+    }
 
     fun ux0SaveDataRoot(context: Context, userId: String? = null): File {
         val userSegment = userId?.takeIf(String::isNotBlank)

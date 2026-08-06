@@ -572,6 +572,17 @@
     <string name="settings_backup_restore_title">Restaurer la sauvegarde des paramètres ?</string>
     <string name="settings_backup_restore_message">Les préférences actuelles de l\'application et les paramètres de l\'émulateur seront remplacés par la sauvegarde sélectionnée.</string>
     <string name="settings_backup_restore_confirm">Restaurer</string>
+    <string name="settings_clear_cache_title">Vider le cache</string>
+    <string name="settings_clear_cache_body">Supprime le cache des shaders, le cache des textures, les journaux et les fichiers d\'installation temporaires. Vos réglages, sauvegardes, jeux installés et le firmware ne sont pas affectés.</string>
+    <string name="settings_clear_cache_action">Vider le cache</string>
+    <string name="settings_clear_cache_size">Taille du cache : %1$s</string>
+    <string name="settings_clear_cache_empty">Aucune donnée en cache à supprimer.</string>
+    <string name="settings_clear_cache_confirm_title">Vider le cache ?</string>
+    <string name="settings_clear_cache_confirm_message">Cela libérera %1$s. Les jeux peuvent démarrer un peu plus lentement la première fois, le temps que les shaders soient reconstruits.</string>
+    <string name="settings_clear_cache_confirm_action">Vider</string>
+    <string name="settings_clear_cache_done">Cache vidé, %1$s libérés.</string>
+    <string name="settings_clear_cache_failed">Impossible de vider le cache.</string>
+    <string name="settings_pro_support_more_hint">Chaque option ci-dessous inclut déjà tout — choisissez-en une plus élevée uniquement si vous souhaitez soutenir davantage le développement.</string>
     <string name="settings_tab_camera">Caméra</string>
     <string name="settings_camera_front">Caméra frontale</string>
     <string name="settings_camera_back">Caméra arrière</string>

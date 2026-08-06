@@ -31,20 +31,42 @@ object DocumentPathResolver {
         }
 
         val fileName = getDisplayName(context, rawPath)
-        
+
+        // Prefer resolving to a real on-disk path before falling back to a full
+        // byte-for-byte copy. Install payloads are game-sized, so an avoidable
+        // copy costs the user gigabytes of duplicated storage.
+        val treePath = findFileInPersistedTree(context, uri, fileName)
+        if (treePath != null) return treePath
+
         if (copyToCache) {
             return copyUriToCache(context, uri, fileName)
         }
 
-        val treePath = findFileInPersistedTree(context, uri, fileName)
-        if (treePath != null) return treePath
-
         return null
+    }
+
+    /**
+     * Deletes a staged install payload previously produced by [resolveFilePath].
+     *
+     * No-op when [path] is not inside the staging directory, so it is safe to
+     * call with a directly-resolved source path that must not be removed.
+     */
+    fun cleanupStagedFile(context: Context, path: String?) {
+        if (path.isNullOrBlank()) return
+        runCatching {
+            val staged = File(path)
+            val stagingDir = EmulatorStorage.installStagingRoot(context)
+            if (staged.isFile && staged.canonicalPath.startsWith(stagingDir.canonicalPath)) {
+                staged.delete()
+            }
+        }.onFailure { error ->
+            Log.w("DocumentPathResolver", "Failed to clean staged install file: $path", error)
+        }
     }
 
     private fun copyUriToCache(context: Context, uri: Uri, fileName: String): String? {
         return try {
-            val cacheDir = File(EmulatorStorage.cacheRoot(context), "install_cache")
+            val cacheDir = EmulatorStorage.installStagingRoot(context)
             if (!cacheDir.exists()) cacheDir.mkdirs()
             val destFile = File(cacheDir, fileName)
             if (destFile.exists()) destFile.delete()

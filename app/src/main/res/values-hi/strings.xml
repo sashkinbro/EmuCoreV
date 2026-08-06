@@ -572,6 +572,17 @@
     <string name="settings_backup_restore_title">सेटिंग्स बैकअप रीस्टोर करें?</string>
     <string name="settings_backup_restore_message">मौजूदा ऐप प्रेफरेंस और एमुलेटर सेटिंग्स को चुने गए बैकअप से बदल दिया जाएगा।</string>
     <string name="settings_backup_restore_confirm">रीस्टोर करें</string>
+    <string name="settings_clear_cache_title">कैश साफ़ करें</string>
+    <string name="settings_clear_cache_body">शेडर कैश, टेक्सचर कैश, लॉग और अस्थायी इंस्टॉल फ़ाइलें हटाता है। आपकी सेटिंग्स, सेव, इंस्टॉल किए गए गेम और फ़र्मवेयर प्रभावित नहीं होते।</string>
+    <string name="settings_clear_cache_action">कैश साफ़ करें</string>
+    <string name="settings_clear_cache_size">कैश आकार: %1$s</string>
+    <string name="settings_clear_cache_empty">हटाने के लिए कोई कैश डेटा नहीं है।</string>
+    <string name="settings_clear_cache_confirm_title">कैश साफ़ करें?</string>
+    <string name="settings_clear_cache_confirm_message">इससे %1$s खाली होगा। शेडर दोबारा बनने तक गेम पहली बार शुरू होने में थोड़ा अधिक समय ले सकते हैं।</string>
+    <string name="settings_clear_cache_confirm_action">साफ़ करें</string>
+    <string name="settings_clear_cache_done">कैश साफ़ हो गया, %1$s खाली हुआ।</string>
+    <string name="settings_clear_cache_failed">कैश साफ़ नहीं किया जा सका।</string>
+    <string name="settings_pro_support_more_hint">नीचे दिया गया हर विकल्प पहले से ही सब कुछ शामिल करता है — बड़ा विकल्प केवल तभी चुनें जब आप विकास को और अधिक समर्थन देना चाहते हों।</string>
     <string name="settings_tab_camera">कैमरा</string>
     <string name="settings_camera_front">फ्रंट कैमरा</string>
     <string name="settings_camera_back">बैक कैमरा</string>

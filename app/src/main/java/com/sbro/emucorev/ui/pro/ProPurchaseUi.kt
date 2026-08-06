@@ -162,6 +162,24 @@ fun ProPurchasePanel(
                 }
             }
 
+            // Offered next to the base purchase, not gated behind it, so the
+            // larger contribution options are visible from the start.
+            if (!state.isProUnlocked && supportOffers.isNotEmpty()) {
+                OutlinedButton(
+                    onClick = { supportDialogVisible = true },
+                    enabled = !state.isPurchaseInProgress,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Rounded.Star, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(stringResource(R.string.settings_pro_support_more), modifier = Modifier.padding(start = 8.dp))
+                }
+                Text(
+                    text = stringResource(R.string.settings_pro_support_more_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             TextButton(
                 onClick = { manager.restorePurchases(showMessage = true) },
                 enabled = !state.isPurchaseInProgress,
@@ -328,6 +346,7 @@ fun ProWelcomeDialog(
     val context = LocalContext.current
     val activity = context.findActivity()
     val state by manager.state.collectAsState()
+    val supportOffers = availableProSupportOffers(state.products, state.ownedProductIds)
     AlertDialog(
         onDismissRequest = onContinue,
         icon = {
@@ -346,7 +365,35 @@ fun ProWelcomeDialog(
             )
         },
         title = { Text(stringResource(R.string.welcome_title)) },
-        text = { Text(stringResource(R.string.welcome_body)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(R.string.welcome_body))
+                // Larger contributions are presented here directly rather than
+                // unlocking only after Pro is bought.
+                if (!state.isProUnlocked && supportOffers.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.settings_pro_support_more_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    supportOffers.forEach { offer ->
+                        OutlinedButton(
+                            onClick = { if (activity != null) manager.purchase(activity, offer.tier) },
+                            enabled = activity != null &&
+                                state.isBillingReady &&
+                                !state.isPurchaseInProgress,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Rounded.Star, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Text(
+                                text = "${offer.title} · ${offer.formattedPrice}",
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
         confirmButton = {
             Button(
                 onClick = {

@@ -572,6 +572,17 @@
     <string name="settings_backup_restore_title">Einstellungs-Backup wiederherstellen?</string>
     <string name="settings_backup_restore_message">Die aktuellen App- und Emulator-Einstellungen werden durch das ausgewählte Backup ersetzt.</string>
     <string name="settings_backup_restore_confirm">Wiederherstellen</string>
+    <string name="settings_clear_cache_title">Cache leeren</string>
+    <string name="settings_clear_cache_body">Entfernt Shader-Cache, Textur-Cache, Protokolle und temporäre Installationsdateien. Einstellungen, Spielstände, installierte Spiele und Firmware bleiben unverändert.</string>
+    <string name="settings_clear_cache_action">Cache leeren</string>
+    <string name="settings_clear_cache_size">Cache-Größe: %1$s</string>
+    <string name="settings_clear_cache_empty">Keine Cache-Daten zum Entfernen.</string>
+    <string name="settings_clear_cache_confirm_title">Cache leeren?</string>
+    <string name="settings_clear_cache_confirm_message">Dies gibt %1$s frei. Spiele starten beim ersten Mal möglicherweise etwas langsamer, während die Shader neu erstellt werden.</string>
+    <string name="settings_clear_cache_confirm_action">Leeren</string>
+    <string name="settings_clear_cache_done">Cache geleert, %1$s freigegeben.</string>
+    <string name="settings_clear_cache_failed">Cache konnte nicht geleert werden.</string>
+    <string name="settings_pro_support_more_hint">Jede Option unten enthält bereits alle Funktionen – wähle eine größere nur, wenn du die Entwicklung stärker unterstützen möchtest.</string>
     <string name="settings_tab_camera">Kamera</string>
     <string name="settings_camera_front">Frontkamera</string>
     <string name="settings_camera_back">Rückkamera</string>

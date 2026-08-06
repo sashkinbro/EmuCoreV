@@ -73,6 +73,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var overlayMenuButtonRevealHandler: (() -> Unit)? = null
     private var overlayPauseMenuOpenHandler: (() -> Unit)? = null
     private var menuPaused: Boolean = false
+    private var nativeThreadPaused: Boolean = false
     private var playTimeSessionId: String? = null
     private var playTimeSessionTitleId: String = ""
     private var playTimeSessionStartedAt: Long = 0L
@@ -188,8 +189,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         refreshPhysicalGamepadState()
         hideSystemBars()
         if (menuPaused) {
-            setAppSessionMenuPaused(true)
-            pauseNativeThread()
+            applyMenuPauseState(true)
         }
     }
 
@@ -214,8 +214,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus && menuPaused) {
-            setAppSessionMenuPaused(true)
-            pauseNativeThread()
+            applyMenuPauseState(true)
         }
         if (hasFocus) {
             attachComposeOverlay()
@@ -413,12 +412,28 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     fun setMenuPaused(paused: Boolean) {
         if (menuPaused == paused) return
         menuPaused = paused
+        applyMenuPauseState(paused)
+        if (!paused) {
+            hideSystemBars()
+        }
+    }
+
+    /**
+     * Drives the native pause state for the menu.
+     *
+     * [pauseNativeThread] and [resumeNativeThread] are not reference counted, so
+     * every pause must be matched by exactly one resume. Re-applying a pause that
+     * is already active would desynchronise the SDL thread from the core session
+     * and leave input dropped after the menu closes.
+     */
+    private fun applyMenuPauseState(paused: Boolean) {
+        if (nativeThreadPaused == paused) return
+        nativeThreadPaused = paused
         setAppSessionMenuPaused(paused)
         if (paused) {
             pauseNativeThread()
         } else {
             resumeNativeThread()
-            hideSystemBars()
         }
     }
 
