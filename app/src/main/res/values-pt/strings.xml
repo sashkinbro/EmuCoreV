@@ -572,6 +572,17 @@
     <string name="settings_backup_restore_title">Restaurar backup de configurações?</string>
     <string name="settings_backup_restore_message">As preferências atuais do aplicativo e as configurações do emulador serão substituídas pelo backup selecionado.</string>
     <string name="settings_backup_restore_confirm">Restaurar</string>
+    <string name="settings_clear_cache_title">Limpar cache</string>
+    <string name="settings_clear_cache_body">Remove o cache de sombreadores, o cache de texturas, os registros e os arquivos temporários de instalação. Suas configurações, saves, jogos instalados e firmware não são afetados.</string>
+    <string name="settings_clear_cache_action">Limpar cache</string>
+    <string name="settings_clear_cache_size">Tamanho do cache: %1$s</string>
+    <string name="settings_clear_cache_empty">Nenhum dado em cache para remover.</string>
+    <string name="settings_clear_cache_confirm_title">Limpar o cache?</string>
+    <string name="settings_clear_cache_confirm_message">Isso liberará %1$s. Os jogos podem demorar um pouco mais para iniciar na primeira vez enquanto os sombreadores são recriados.</string>
+    <string name="settings_clear_cache_confirm_action">Limpar</string>
+    <string name="settings_clear_cache_done">Cache limpo, %1$s liberados.</string>
+    <string name="settings_clear_cache_failed">Não foi possível limpar o cache.</string>
+    <string name="settings_pro_support_more_hint">Qualquer opção abaixo já inclui tudo — escolha uma maior apenas se quiser apoiar mais o desenvolvimento.</string>
     <string name="settings_tab_camera">Câmera</string>
     <string name="settings_camera_front">Câmera frontal</string>
     <string name="settings_camera_back">Câmera traseira</string>

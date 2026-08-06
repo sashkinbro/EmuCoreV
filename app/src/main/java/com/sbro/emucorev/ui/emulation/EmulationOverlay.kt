@@ -752,6 +752,11 @@ private fun OnScreenControls(
         }
 
         fun dispatchButtonChange(controlId: Int, pressed: Boolean) {
+            // Send the press to the core first. Haptics and Compose state are
+            // presentation concerns; doing them before this adds their cost
+            // straight onto input latency.
+            onButtonChange(controlId, pressed)
+
             val wasPressed = controlId in hapticPressedControlIds
             if (pressed != wasPressed) {
                 hapticPressedControlIds = if (pressed) {
@@ -761,16 +766,15 @@ private fun OnScreenControls(
                 }
                 performTouchHaptic(if (pressed) ButtonPhase.PRESS else ButtonPhase.RELEASE)
             }
-            onButtonChange(controlId, pressed)
         }
 
         fun handleGroupButtonChange(controlId: Int, pressed: Boolean) {
+            dispatchButtonChange(controlId, pressed)
             pressedGroupControlIds = if (pressed) {
                 pressedGroupControlIds + controlId
             } else {
                 pressedGroupControlIds - controlId
             }
-            dispatchButtonChange(controlId, pressed)
         }
 
         controls.forEach { element ->

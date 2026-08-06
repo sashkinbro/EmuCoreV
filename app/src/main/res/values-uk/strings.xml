@@ -572,6 +572,17 @@
     <string name="settings_backup_restore_title">Відновити налаштування?</string>
     <string name="settings_backup_restore_message">Поточні налаштування додатка та емулятора будуть замінені вибраною резервною копією.</string>
     <string name="settings_backup_restore_confirm">Відновити</string>
+    <string name="settings_clear_cache_title">Очистити кеш</string>
+    <string name="settings_clear_cache_body">Видаляє кеш шейдерів, кеш текстур, журнали та тимчасові файли встановлення. Налаштування, збереження, встановлені ігри та прошивка не змінюються.</string>
+    <string name="settings_clear_cache_action">Очистити кеш</string>
+    <string name="settings_clear_cache_size">Розмір кешу: %1$s</string>
+    <string name="settings_clear_cache_empty">Немає кешованих даних для видалення.</string>
+    <string name="settings_clear_cache_confirm_title">Очистити кеш?</string>
+    <string name="settings_clear_cache_confirm_message">Це звільнить %1$s. Перший запуск ігор може бути трохи довшим, поки шейдери створюються заново.</string>
+    <string name="settings_clear_cache_confirm_action">Очистити</string>
+    <string name="settings_clear_cache_done">Кеш очищено, звільнено %1$s.</string>
+    <string name="settings_clear_cache_failed">Не вдалося очистити кеш.</string>
+    <string name="settings_pro_support_more_hint">Кожен варіант нижче вже включає всі можливості — обирайте більший, лише якщо хочете підтримати розробку сильніше.</string>
     <string name="settings_tab_camera">Камера</string>
     <string name="settings_camera_front">Фронтальна камера</string>
     <string name="settings_camera_back">Основна камера</string>

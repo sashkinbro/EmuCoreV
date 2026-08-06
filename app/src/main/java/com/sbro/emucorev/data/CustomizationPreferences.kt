@@ -106,6 +106,20 @@ class CustomizationPreferences(context: Context) : Closeable {
         _settings.value = readSettings()
     }
 
+    /**
+     * Forgets the current background.
+     *
+     * Called when a background turns out to be unrenderable, so the app can
+     * recover on its own instead of failing again on the next launch.
+     */
+    fun clearBackground() {
+        prefs.edit {
+            remove(KEY_BACKGROUND_PATH)
+            remove(KEY_BACKGROUND_MIME_TYPE)
+        }
+        _settings.value = readSettings()
+    }
+
     fun setCoverSizePercent(value: Int) {
         prefs.edit {
             putInt(
@@ -364,6 +378,14 @@ class CustomizationFileStore(private val context: Context) {
         private const val MAX_BACKGROUND_BYTES = 256L * 1024L * 1024L
         private const val MAX_FONT_BYTES = 32L * 1024L * 1024L
 
+        /**
+         * Upper bound on decoded image size (~64 MP).
+         *
+         * Anything larger is refused at import time rather than crashing with
+         * [OutOfMemoryError] while the home screen composes.
+         */
+        private const val MAX_BACKGROUND_PIXELS = 64_000_000L
+
         fun isSupportedBackground(mimeType: String?, extension: String): Boolean {
             return mimeType?.startsWith("image/") == true ||
                 mimeType?.startsWith("video/") == true ||
@@ -377,7 +399,13 @@ class CustomizationFileStore(private val context: Context) {
         private fun isValidImage(file: File): Boolean {
             val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(file.absolutePath, options)
-            return options.outWidth > 0 && options.outHeight > 0
+            if (options.outWidth <= 0 || options.outHeight <= 0) return false
+
+            // Reject images that cannot be decoded within a normal app heap.
+            // The bounds pass already gives us the dimensions, so refusing here
+            // avoids importing a file that would crash at render time.
+            val pixels = options.outWidth.toLong() * options.outHeight.toLong()
+            return pixels <= MAX_BACKGROUND_PIXELS
         }
 
         private fun isValidVideo(file: File): Boolean {

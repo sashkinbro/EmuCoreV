@@ -572,6 +572,17 @@
     <string name="settings_backup_restore_title">¿Restaurar copia de seguridad?</string>
     <string name="settings_backup_restore_message">Las preferencias actuales de la aplicación y la configuración del emulador serán reemplazadas por la copia de seguridad seleccionada.</string>
     <string name="settings_backup_restore_confirm">Restaurar</string>
+    <string name="settings_clear_cache_title">Borrar caché</string>
+    <string name="settings_clear_cache_body">Elimina la caché de sombreadores, la caché de texturas, los registros y los archivos temporales de instalación. Tus ajustes, partidas guardadas, juegos instalados y firmware no se ven afectados.</string>
+    <string name="settings_clear_cache_action">Borrar caché</string>
+    <string name="settings_clear_cache_size">Tamaño de la caché: %1$s</string>
+    <string name="settings_clear_cache_empty">No hay datos en caché para eliminar.</string>
+    <string name="settings_clear_cache_confirm_title">¿Borrar la caché?</string>
+    <string name="settings_clear_cache_confirm_message">Esto liberará %1$s. Los juegos pueden tardar un poco más en iniciarse la primera vez mientras se reconstruyen los sombreadores.</string>
+    <string name="settings_clear_cache_confirm_action">Borrar</string>
+    <string name="settings_clear_cache_done">Caché borrada, %1$s liberados.</string>
+    <string name="settings_clear_cache_failed">No se pudo borrar la caché.</string>
+    <string name="settings_pro_support_more_hint">Cualquier opción de abajo ya lo incluye todo: elige una mayor solo si quieres apoyar más el desarrollo.</string>
     <string name="settings_tab_camera">Cámara</string>
     <string name="settings_camera_front">Cámara frontal</string>
     <string name="settings_camera_back">Cámara trasera</string>

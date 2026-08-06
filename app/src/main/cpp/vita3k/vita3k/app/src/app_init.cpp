@@ -166,7 +166,6 @@ static overlay::button_states poll_overlay_input(EmuEnvState &emuenv) {
 }
 
 static void set_backend_renderer(EmuEnvState &emuenv, const std::string &backend_renderer) {
-    LOG_INFO("set_backend_renderer called with: '{}', toupper: '{}'", backend_renderer, string_utils::toupper(backend_renderer));
 #ifndef __APPLE__
     emuenv.backend_renderer = (string_utils::toupper(backend_renderer) == "OPENGL")
         ? renderer::Backend::OpenGL

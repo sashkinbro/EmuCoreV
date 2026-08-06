@@ -572,6 +572,17 @@
     <string name="settings_backup_restore_title">Ayarlar yedeği geri yüklensin mi?</string>
     <string name="settings_backup_restore_message">Mevcut uygulama tercihleri ve emülatör ayarları, seçilen yedekle değiştirilecektir.</string>
     <string name="settings_backup_restore_confirm">Geri yükle</string>
+    <string name="settings_clear_cache_title">Önbelleği temizle</string>
+    <string name="settings_clear_cache_body">Gölgelendirici önbelleğini, doku önbelleğini, günlükleri ve geçici kurulum dosyalarını kaldırır. Ayarlarınız, kayıtlarınız, kurulu oyunlarınız ve donanım yazılımınız etkilenmez.</string>
+    <string name="settings_clear_cache_action">Önbelleği temizle</string>
+    <string name="settings_clear_cache_size">Önbellek boyutu: %1$s</string>
+    <string name="settings_clear_cache_empty">Kaldırılacak önbellek verisi yok.</string>
+    <string name="settings_clear_cache_confirm_title">Önbellek temizlensin mi?</string>
+    <string name="settings_clear_cache_confirm_message">Bu işlem %1$s alan açar. Gölgelendiriciler yeniden oluşturulurken oyunlar ilk seferde biraz daha yavaş başlayabilir.</string>
+    <string name="settings_clear_cache_confirm_action">Temizle</string>
+    <string name="settings_clear_cache_done">Önbellek temizlendi, %1$s alan açıldı.</string>
+    <string name="settings_clear_cache_failed">Önbellek temizlenemedi.</string>
+    <string name="settings_pro_support_more_hint">Aşağıdaki her seçenek zaten her şeyi içerir; yalnızca geliştirmeyi daha fazla desteklemek istiyorsanız daha büyük bir seçenek seçin.</string>
     <string name="settings_tab_camera">Kamera</string>
     <string name="settings_camera_front">Ön kamera</string>
     <string name="settings_camera_back">Arka kamera</string>

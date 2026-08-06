@@ -45,6 +45,14 @@ data class ProProductOffer(
     val formattedPrice: String
 )
 
+/**
+ * Support tiers that the user can still buy.
+ *
+ * These are shown alongside the base Pro offer rather than only after Pro is
+ * owned: a higher tier is purely a larger contribution, so hiding it behind a
+ * purchase means most users never discover it. Tiers already owned are removed,
+ * and owning any support tier removes the rest since it fully covers Pro.
+ */
 fun availableProSupportOffers(
     offers: List<ProProductOffer>,
     ownedProductIds: Set<String>

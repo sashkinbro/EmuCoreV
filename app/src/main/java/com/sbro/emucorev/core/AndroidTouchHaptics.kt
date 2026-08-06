@@ -8,6 +8,8 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.HapticFeedbackConstants
 import android.view.View
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
@@ -24,6 +26,48 @@ object AndroidTouchHaptics {
             .build()
     }
 
+    /**
+     * Resolving the vibrator and querying its capabilities are binder calls into
+     * the system vibrator service. Doing that per button press adds several
+     * milliseconds of jitter to the input path, so both are resolved once.
+     */
+    @Volatile
+    private var cachedVibrator: Vibrator? = null
+
+    @Volatile
+    private var vibratorResolved: Boolean = false
+
+    @Volatile
+    private var cachedAmplitudeControl: Boolean = false
+
+    /**
+     * Vibration is dispatched off the caller's thread so a slow or contended
+     * vibrator service can never delay the button reaching the emulator core.
+     */
+    private val hapticExecutor: ExecutorService by lazy {
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "touch-haptics").apply {
+                isDaemon = true
+                priority = Thread.MAX_PRIORITY
+            }
+        }
+    }
+
+    private fun resolveVibrator(context: Context): Vibrator? {
+        if (!vibratorResolved) {
+            synchronized(this) {
+                if (!vibratorResolved) {
+                    val vibrator = findVibrator(context)
+                    cachedVibrator = vibrator
+                    cachedAmplitudeControl = vibrator != null &&
+                        runCatching { vibrator.hasAmplitudeControl() }.getOrDefault(false)
+                    vibratorResolved = true
+                }
+            }
+        }
+        return cachedVibrator
+    }
+
     fun playButton(
         context: Context,
         view: View? = null,
@@ -31,14 +75,23 @@ object AndroidTouchHaptics {
         preset: Int,
         phase: ButtonPhase
     ) {
-        val vibrator = findVibrator(context)
-        val played = vibrator != null && runCatching {
-            vibrate(
-                vibrator,
-                createButtonEffect(vibrator, strengthPercent, preset, phase)
-            )
-        }.isSuccess
-        if (!played) performViewHaptic(view, phase)
+        val vibrator = resolveVibrator(context)
+        if (vibrator == null) {
+            performViewHaptic(view, phase)
+            return
+        }
+
+        val hasAmplitudeControl = cachedAmplitudeControl
+        runCatching {
+            hapticExecutor.execute {
+                runCatching {
+                    vibrate(
+                        vibrator,
+                        createButtonEffect(hasAmplitudeControl, strengthPercent, preset, phase)
+                    )
+                }
+            }
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -63,7 +116,7 @@ object AndroidTouchHaptics {
     }
 
     private fun createButtonEffect(
-        vibrator: Vibrator,
+        hasAmplitudeControl: Boolean,
         strengthPercent: Int,
         preset: Int,
         phase: ButtonPhase
@@ -89,7 +142,7 @@ object AndroidTouchHaptics {
                 if (phase == ButtonPhase.PRESS) Pulse(24L, 28, 153, 255)
                 else Pulse(14L, 14, 98, 163)
         }
-        if (!runCatching { vibrator.hasAmplitudeControl() }.getOrDefault(false)) {
+        if (!hasAmplitudeControl) {
             if (
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
                 strengthPercent.coerceIn(10, 100) == 60

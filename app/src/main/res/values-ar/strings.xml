@@ -310,6 +310,17 @@
     <string name="settings_backup_restore_title">استعادة النسخة الاحتياطية للإعدادات؟</string>
     <string name="settings_backup_restore_message">سيتم استبدال تفضيلات التطبيق الحالية وإعدادات المحاكي بالنسخة الاحتياطية المحددة.</string>
     <string name="settings_backup_restore_confirm">استعادة</string>
+    <string name="settings_clear_cache_title">مسح ذاكرة التخزين المؤقت</string>
+    <string name="settings_clear_cache_body">يزيل ذاكرة التخزين المؤقت للمظللات والقوام والسجلات وملفات التثبيت المؤقتة. لن تتأثر إعداداتك أو ملفات الحفظ أو الألعاب المثبتة أو البرنامج الثابت.</string>
+    <string name="settings_clear_cache_action">مسح ذاكرة التخزين المؤقت</string>
+    <string name="settings_clear_cache_size">حجم ذاكرة التخزين المؤقت: %1$s</string>
+    <string name="settings_clear_cache_empty">لا توجد بيانات مخزنة مؤقتًا لإزالتها.</string>
+    <string name="settings_clear_cache_confirm_title">مسح ذاكرة التخزين المؤقت؟</string>
+    <string name="settings_clear_cache_confirm_message">سيؤدي هذا إلى تحرير %1$s. قد تستغرق الألعاب وقتًا أطول قليلًا عند التشغيل الأول أثناء إعادة إنشاء المظللات.</string>
+    <string name="settings_clear_cache_confirm_action">مسح</string>
+    <string name="settings_clear_cache_done">تم مسح ذاكرة التخزين المؤقت، وتم تحرير %1$s.</string>
+    <string name="settings_clear_cache_failed">تعذر مسح ذاكرة التخزين المؤقت.</string>
+    <string name="settings_pro_support_more_hint">كل خيار أدناه يتضمن كل المزايا بالفعل — اختر خيارًا أكبر فقط إذا كنت ترغب في دعم التطوير أكثر.</string>
     <string name="settings_about_title">حول EmuCoreV</string>
     <string name="settings_about_body">EmuCoreV هو محاكي PS Vita لنظام Android مبني على مشروع Vita3K مفتوح المصدر.</string>
     <string name="settings_help_content_description">فتح مساعدة الإعدادات</string>

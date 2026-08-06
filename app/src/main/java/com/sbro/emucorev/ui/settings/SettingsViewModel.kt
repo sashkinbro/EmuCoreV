@@ -55,7 +55,8 @@ data class SettingsUiState(
     val storageMigration: StorageMigrationUiState = StorageMigrationUiState(),
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val customization: CustomizationSettings = CustomizationSettings(),
-    val appUpdate: AppUpdateUiState = AppUpdateUiState()
+    val appUpdate: AppUpdateUiState = AppUpdateUiState(),
+    val cacheSizeBytes: Long = 0L
 )
 
 data class StorageMigrationUiState(
@@ -236,12 +237,37 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 appLanguage = preferences.appLanguage
             )
         }
+        refreshCacheSize()
     }
 
     fun resetCoreSettingsToDefaults() {
         viewModelScope.launch(Dispatchers.IO) {
             val defaults = coreConfigRepository.resetToDefaults()
             _uiState.value = _uiState.value.copy(coreConfig = defaults)
+        }
+    }
+
+    /**
+     * Clears regenerable caches without touching settings, saves or games.
+     */
+    fun clearCaches(onComplete: (Result<EmulatorStorage.CacheClearResult>) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                EmulatorStorage.clearCaches(getApplication())
+            }
+            refreshCacheSize()
+            withContext(Dispatchers.Main) {
+                onComplete(result)
+            }
+        }
+    }
+
+    fun refreshCacheSize() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val size = runCatching {
+                EmulatorStorage.cacheSizeBytes(getApplication())
+            }.getOrDefault(0L)
+            _uiState.value = _uiState.value.copy(cacheSizeBytes = size)
         }
     }
 
