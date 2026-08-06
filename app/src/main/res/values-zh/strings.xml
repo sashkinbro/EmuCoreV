@@ -886,6 +886,7 @@
     <string name="settings_pro_buy">获取 Pro</string>
     <string name="settings_pro_restore">恢复购买</string>
     <string name="settings_pro_support_more">进一步支持开发</string>
+    <string name="settings_pro_support_more_short">支持更多</string>
     <string name="pro_price_loading">正在加载价格</string>
     <string name="pro_price_unavailable">Pro 尚未可用</string>
     <string name="settings_pro_feature_crimson_title">Crimson 主题</string>

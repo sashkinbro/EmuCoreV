@@ -887,6 +887,7 @@
     <string name="settings_pro_buy">Pro holen</string>
     <string name="settings_pro_restore">Kauf wiederherstellen</string>
     <string name="settings_pro_support_more">Entwicklung stärker unterstützen</string>
+    <string name="settings_pro_support_more_short">Mehr unterstützen</string>
     <string name="pro_price_loading">Preis wird geladen</string>
     <string name="pro_price_unavailable">Pro ist noch nicht verfügbar</string>
     <string name="settings_pro_feature_crimson_title">Crimson-Design</string>

@@ -891,6 +891,7 @@
     <string name="settings_pro_buy">احصل على Pro</string>
     <string name="settings_pro_restore">استعادة الشراء</string>
     <string name="settings_pro_support_more">دعم التطوير بشكل أكبر</string>
+    <string name="settings_pro_support_more_short">دعم أكبر</string>
     <string name="pro_price_loading">جاري تحميل السعر</string>
     <string name="pro_price_unavailable">Pro غير متوفر بعد</string>
     <string name="settings_pro_feature_crimson_title">مظهر Crimson</string>

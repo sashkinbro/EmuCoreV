@@ -887,6 +887,7 @@
     <string name="settings_pro_buy">Pro प्राप्त करें</string>
     <string name="settings_pro_restore">खरीदारी पुनर्स्थापित करें</string>
     <string name="settings_pro_support_more">विकास को और सहयोग दें</string>
+    <string name="settings_pro_support_more_short">और सहयोग दें</string>
     <string name="pro_price_loading">मूल्य लोड हो रहा है</string>
     <string name="pro_price_unavailable">Pro अभी उपलब्ध नहीं है</string>
     <string name="settings_pro_feature_crimson_title">Crimson थीम</string>

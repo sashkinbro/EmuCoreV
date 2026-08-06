@@ -887,6 +887,7 @@
     <string name="settings_pro_buy">Pro Al</string>
     <string name="settings_pro_restore">Satın alımı geri yükle</string>
     <string name="settings_pro_support_more">Geliştirmeyi daha fazla destekle</string>
+    <string name="settings_pro_support_more_short">Daha fazla destekle</string>
     <string name="pro_price_loading">Fiyat yükleniyor</string>
     <string name="pro_price_unavailable">Pro henüz kullanılamıyor</string>
     <string name="settings_pro_feature_crimson_title">Crimson teması</string>
