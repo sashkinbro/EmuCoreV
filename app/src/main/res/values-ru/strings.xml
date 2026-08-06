@@ -890,6 +890,7 @@
     <string name="settings_pro_buy">Получить Pro</string>
     <string name="settings_pro_restore">Восстановить покупку</string>
     <string name="settings_pro_support_more">Поддержать разработку сильнее</string>
+    <string name="settings_pro_support_more_short">Поддержать больше</string>
     <string name="pro_price_loading">Загрузка цены</string>
     <string name="pro_price_unavailable">Версия Pro пока недоступна</string>
     <string name="settings_pro_feature_crimson_title">Тема Crimson</string>

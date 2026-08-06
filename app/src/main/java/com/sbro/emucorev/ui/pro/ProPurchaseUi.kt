@@ -151,33 +151,21 @@ fun ProPurchasePanel(
                         modifier = Modifier.padding(start = 8.dp)
                     )
                 }
-            } else if (supportOffers.isNotEmpty()) {
-                OutlinedButton(
-                    onClick = { supportDialogVisible = true },
-                    enabled = !state.isPurchaseInProgress,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Rounded.Star, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Text(stringResource(R.string.settings_pro_support_more), modifier = Modifier.padding(start = 8.dp))
-                }
             }
 
-            // Offered next to the base purchase, not gated behind it, so the
-            // larger contribution options are visible from the start.
-            if (!state.isProUnlocked && supportOffers.isNotEmpty()) {
+            if (supportOffers.isNotEmpty()) {
                 OutlinedButton(
                     onClick = { supportDialogVisible = true },
                     enabled = !state.isPurchaseInProgress,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Rounded.Star, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Text(stringResource(R.string.settings_pro_support_more), modifier = Modifier.padding(start = 8.dp))
+                    Text(
+                        text = stringResource(R.string.settings_pro_support_more_short),
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
                 }
-                Text(
-                    text = stringResource(R.string.settings_pro_support_more_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
 
             TextButton(
@@ -346,6 +334,7 @@ fun ProWelcomeDialog(
     val context = LocalContext.current
     val activity = context.findActivity()
     val state by manager.state.collectAsState()
+    var supportDialogVisible by remember { mutableStateOf(false) }
     val supportOffers = availableProSupportOffers(state.products, state.ownedProductIds)
     AlertDialog(
         onDismissRequest = onContinue,
@@ -365,58 +354,66 @@ fun ProWelcomeDialog(
             )
         },
         title = { Text(stringResource(R.string.welcome_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(stringResource(R.string.welcome_body))
-                // Larger contributions are presented here directly rather than
-                // unlocking only after Pro is bought.
-                if (!state.isProUnlocked && supportOffers.isNotEmpty()) {
-                    Text(
-                        text = stringResource(R.string.settings_pro_support_more_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    supportOffers.forEach { offer ->
-                        OutlinedButton(
-                            onClick = { if (activity != null) manager.purchase(activity, offer.tier) },
-                            enabled = activity != null &&
-                                state.isBillingReady &&
-                                !state.isPurchaseInProgress,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Rounded.Star, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Text(
-                                text = "${offer.title} · ${offer.formattedPrice}",
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
+        text = { Text(stringResource(R.string.welcome_body)) },
+        confirmButton = {
+            // Laid out as a single full-width column so "support more" sits
+            // directly under the primary action instead of beside it.
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        if (state.isProUnlocked) {
+                            onContinue()
+                        } else if (activity != null) {
+                            manager.purchase(activity, ProPurchaseTier.BASE)
                         }
+                    },
+                    enabled = state.isProUnlocked ||
+                        (activity != null && state.isBillingReady && state.isProductAvailable && !state.isPurchaseInProgress),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        stringResource(
+                            if (state.isProUnlocked) R.string.welcome_primary else R.string.settings_pro_buy
+                        )
+                    )
+                }
+                if (!state.isProUnlocked && supportOffers.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = { supportDialogVisible = true },
+                        enabled = !state.isPurchaseInProgress,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Rounded.Star, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text(
+                            text = stringResource(R.string.settings_pro_support_more_short),
+                            maxLines = 1,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
                     }
                 }
+                TextButton(
+                    onClick = onContinue,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.welcome_secondary))
+                }
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (state.isProUnlocked) {
-                        onContinue()
-                    } else if (activity != null) {
-                        manager.purchase(activity, ProPurchaseTier.BASE)
-                    }
-                },
-                enabled = state.isProUnlocked ||
-                    (activity != null && state.isBillingReady && state.isProductAvailable && !state.isPurchaseInProgress)
-            ) {
-                Text(
-                    stringResource(
-                        if (state.isProUnlocked) R.string.welcome_primary else R.string.settings_pro_buy
-                    )
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onContinue) { Text(stringResource(R.string.welcome_secondary)) }
         }
     )
+
+    if (supportDialogVisible) {
+        ProSupportDialog(
+            offers = supportOffers,
+            purchaseInProgress = state.isPurchaseInProgress,
+            onPurchase = { tier ->
+                if (activity != null) manager.purchase(activity, tier)
+            },
+            onDismiss = { supportDialogVisible = false }
+        )
+    }
 }
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {

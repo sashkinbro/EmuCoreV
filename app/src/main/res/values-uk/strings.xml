@@ -890,6 +890,7 @@
     <string name="settings_pro_buy">Отримати Pro</string>
     <string name="settings_pro_restore">Відновити покупку</string>
     <string name="settings_pro_support_more">Підтримати розробку більше</string>
+    <string name="settings_pro_support_more_short">Підтримати більше</string>
     <string name="pro_price_loading">Завантаження ціни</string>
     <string name="pro_price_unavailable">Версія Pro поки недоступна</string>
     <string name="settings_pro_feature_crimson_title">Тема Crimson</string>
