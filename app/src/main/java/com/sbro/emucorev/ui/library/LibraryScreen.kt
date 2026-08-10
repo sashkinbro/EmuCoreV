@@ -181,7 +181,7 @@ fun LibraryScreen(
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "EmuCoreV",
+                            text = stringResource(R.string.nav_library),
                             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onBackground
                         )
