@@ -195,8 +195,10 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.google.play.billing)
+    implementation(libs.google.play.review)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.google.play.review.ktx)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

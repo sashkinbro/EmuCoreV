@@ -12,15 +12,26 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.CustomizationPreferences
+import com.sbro.emucorev.core.review.AndroidInAppReviewAttemptStore
+import com.sbro.emucorev.core.review.GooglePlayInAppReviewClient
+import com.sbro.emucorev.core.review.InAppReviewCoordinator
+import com.sbro.emucorev.core.review.PlayTimeReviewProgressSource
 import com.sbro.emucorev.navigation.AppNavigation
 import com.sbro.emucorev.ui.common.ImmersiveMode
 import com.sbro.emucorev.ui.theme.EmuCoreVTheme
 import com.sbro.emucorev.ui.theme.ThemeMode
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private lateinit var customizationPreferences: CustomizationPreferences
+    private lateinit var inAppReviewCoordinator: InAppReviewCoordinator
+    private var reviewPromptJob: Job? = null
 
     @SuppressLint("UseKtx")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,6 +40,11 @@ class MainActivity : ComponentActivity() {
         preferences.applyAppLanguage()
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        inAppReviewCoordinator = InAppReviewCoordinator(
+            progressSource = PlayTimeReviewProgressSource(applicationContext),
+            store = AndroidInAppReviewAttemptStore(applicationContext),
+            client = GooglePlayInAppReviewClient(this)
+        )
         enterImmersiveMode()
         window.setBackgroundDrawable(ColorDrawable(resolveWindowBackground(preferences.themeMode)))
         setContent {
@@ -58,6 +74,19 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         enterImmersiveMode()
+        reviewPromptJob?.cancel()
+        reviewPromptJob = lifecycleScope.launch {
+            delay(REVIEW_PROMPT_DELAY_MS)
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                inAppReviewCoordinator.attempt()
+            }
+        }
+    }
+
+    override fun onPause() {
+        reviewPromptJob?.cancel()
+        reviewPromptJob = null
+        super.onPause()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -82,5 +111,9 @@ class MainActivity : ComponentActivity() {
             ThemeMode.PRO -> true
         }
         return if (darkTheme) 0xFF000000.toInt() else 0xFFF4F7FB.toInt()
+    }
+
+    private companion object {
+        const val REVIEW_PROMPT_DELAY_MS = 750L
     }
 }
