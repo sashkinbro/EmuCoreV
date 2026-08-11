@@ -47,6 +47,8 @@ void copy_global_to_current(Config::CurrentConfig &current, const Config &cfg) {
     current.v_sync = cfg.v_sync;
     current.anisotropic_filtering = cfg.anisotropic_filtering;
     current.async_pipeline_compilation = cfg.async_pipeline_compilation;
+    current.show_compile_shaders = cfg.show_compile_shaders;
+    current.show_shader_cache_warn = cfg.show_shader_cache_warn;
     current.import_textures = cfg.import_textures;
     current.export_textures = cfg.export_textures;
     current.export_as_png = cfg.export_as_png;
@@ -92,6 +94,8 @@ void copy_current_to_global(Config &cfg, const Config::CurrentConfig &current) {
     cfg.v_sync = current.v_sync;
     cfg.anisotropic_filtering = current.anisotropic_filtering;
     cfg.async_pipeline_compilation = current.async_pipeline_compilation;
+    cfg.show_compile_shaders = current.show_compile_shaders;
+    cfg.show_shader_cache_warn = current.show_shader_cache_warn;
     cfg.import_textures = current.import_textures;
     cfg.export_textures = current.export_textures;
     cfg.export_as_png = current.export_as_png;
@@ -194,6 +198,8 @@ bool load_custom_config(Config::CurrentConfig &out, const fs::path &config_path,
         out.v_sync = gpu.attribute("v-sync").as_bool();
         out.anisotropic_filtering = gpu.attribute("anisotropic-filtering").as_int();
         out.async_pipeline_compilation = gpu.attribute("async-pipeline-compilation").as_bool();
+        out.show_compile_shaders = gpu.attribute("show-compile-shaders").as_bool(true);
+        out.show_shader_cache_warn = gpu.attribute("show-shader-cache-warn").as_bool(true);
         out.import_textures = gpu.attribute("import-textures").as_bool();
         out.export_textures = gpu.attribute("export-textures").as_bool();
         out.export_as_png = gpu.attribute("export-as-png").as_bool();
@@ -282,6 +288,8 @@ bool save_custom_config(const Config::CurrentConfig &cc, const fs::path &config_
     gpu_child.append_attribute("v-sync") = cc.v_sync;
     gpu_child.append_attribute("anisotropic-filtering") = cc.anisotropic_filtering;
     gpu_child.append_attribute("async-pipeline-compilation") = cc.async_pipeline_compilation;
+    gpu_child.append_attribute("show-compile-shaders") = cc.show_compile_shaders;
+    gpu_child.append_attribute("show-shader-cache-warn") = cc.show_shader_cache_warn;
     gpu_child.append_attribute("import-textures") = cc.import_textures;
     gpu_child.append_attribute("export-textures") = cc.export_textures;
     gpu_child.append_attribute("export-as-png") = cc.export_as_png;

@@ -1,6 +1,7 @@
 package com.sbro.emucorev.ui.gamemanager
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorev.core.InstallStateBus
@@ -12,10 +13,14 @@ import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.InstalledVitaGame
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 data class GameManagerUiState(
     val games: List<InstalledVitaGame> = emptyList(),
@@ -36,11 +41,30 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
     private val globalRepository = VitaCoreConfigRepository(application)
     private val perGameRepository = VitaGameSettingsRepository(application)
     private val gpuDriverManager = GpuDriverManager(application)
+    private val profileSaveQueue = Channel<ProfileWriteRequest>(Channel.UNLIMITED)
+    private val latestProfileWrites = linkedMapOf<String, ProfileWriteRequest>()
+    private lateinit var profileSaveJob: Job
 
     private val _uiState = MutableStateFlow(GameManagerUiState())
     val uiState: StateFlow<GameManagerUiState> = _uiState.asStateFlow()
 
     init {
+        profileSaveJob = viewModelScope.launch(Dispatchers.IO) {
+            for (request in profileSaveQueue) {
+                runCatching {
+                    when (request) {
+                        is ProfileWriteRequest.Save -> perGameRepository.saveProfile(
+                            request.titleId,
+                            request.config,
+                            request.customDriverOverride
+                        )
+                        is ProfileWriteRequest.Reset -> perGameRepository.reset(request.titleId)
+                    }
+                }.onFailure { error ->
+                    Log.e(TAG, "Could not persist settings for ${request.titleId}", error)
+                }
+            }
+        }
         refresh()
         viewModelScope.launch {
             InstallStateBus.events.collect {
@@ -85,14 +109,7 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
             config = updated,
             hasCustomProfile = true
         )
-        viewModelScope.launch(Dispatchers.IO) {
-            perGameRepository.saveProfile(titleId, updated, driverOverride)
-            _uiState.value = _uiState.value.copy(
-                config = updated,
-                customDriverOverride = driverOverride,
-                hasCustomProfile = true
-            )
-        }
+        enqueueProfileWrite(ProfileWriteRequest.Save(titleId, updated, driverOverride))
     }
 
     fun selectCustomDriverOverride(driverName: String?) {
@@ -104,27 +121,57 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
             customDriverOverride = driverName,
             hasCustomProfile = true
         )
-        viewModelScope.launch(Dispatchers.IO) {
-            perGameRepository.saveProfile(titleId, updated, driverName)
-            _uiState.value = _uiState.value.copy(
-                config = updated,
-                customDriverOverride = driverName,
-                hasCustomProfile = true
-            )
-        }
+        enqueueProfileWrite(ProfileWriteRequest.Save(titleId, updated, driverName))
     }
 
     fun resetSelectedToGlobal() {
         val titleId = _uiState.value.selectedTitleId ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            perGameRepository.reset(titleId)
-            val defaults = globalRepository.ensureDefaultsPersisted()
-            _uiState.value = _uiState.value.copy(
-                config = defaults,
-                defaults = defaults,
-                customDriverOverride = null,
-                hasCustomProfile = false
-            )
+        val defaults = _uiState.value.defaults
+        _uiState.value = _uiState.value.copy(
+            config = defaults,
+            customDriverOverride = null,
+            hasCustomProfile = false
+        )
+        enqueueProfileWrite(ProfileWriteRequest.Reset(titleId))
+    }
+
+    override fun onCleared() {
+        profileSaveQueue.cancel()
+        runBlocking { profileSaveJob.cancelAndJoin() }
+        latestProfileWrites.values.forEach { request ->
+            runCatching {
+                when (request) {
+                    is ProfileWriteRequest.Save -> perGameRepository.saveProfile(
+                        request.titleId,
+                        request.config,
+                        request.customDriverOverride
+                    )
+                    is ProfileWriteRequest.Reset -> perGameRepository.reset(request.titleId)
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "Could not flush settings for ${request.titleId}", error)
+            }
         }
+    }
+
+    private fun enqueueProfileWrite(request: ProfileWriteRequest) {
+        latestProfileWrites[request.titleId] = request
+        profileSaveQueue.trySend(request)
+    }
+
+    private sealed interface ProfileWriteRequest {
+        val titleId: String
+
+        data class Save(
+            override val titleId: String,
+            val config: VitaCoreConfig,
+            val customDriverOverride: String?
+        ) : ProfileWriteRequest
+
+        data class Reset(override val titleId: String) : ProfileWriteRequest
+    }
+
+    private companion object {
+        const val TAG = "GameManagerViewModel"
     }
 }

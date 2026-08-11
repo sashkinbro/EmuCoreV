@@ -335,7 +335,14 @@ class VitaCoreConfigRepository(private val context: Context) {
     fun ensureDefaultsPersisted(): VitaCoreConfig {
         migrateLegacyConfigIfNeeded()
         val existingValues = readKeyValues()
-        val storedSchemaVersion = existingValues[SCHEMA_VERSION_KEY]?.toIntOrNull() ?: 0
+        // Native Vita3K rewrites config.yml at startup and intentionally drops
+        // EmuCoreV-only keys. Keep the schema marker in the preference mirror as
+        // the durable source so migrations run once per app upgrade, not once per
+        // process restart.
+        val storedSchemaVersion = maxOf(
+            existingValues[SCHEMA_VERSION_KEY]?.toIntOrNull() ?: 0,
+            prefs.getString(SCHEMA_VERSION_KEY, null)?.toIntOrNull() ?: 0
+        )
         val schemaOutdated = configFile.exists() && storedSchemaVersion < CONFIG_SCHEMA_VERSION
         val config = applyMigrations(load(), schemaOutdated)
         val shouldPersist = !configFile.exists() ||
@@ -358,7 +365,6 @@ class VitaCoreConfigRepository(private val context: Context) {
         // touchHapticsStrength, gamepadVibration, etc.) are intentionally NOT
         // reset here — the user's choices must survive schema upgrades.
         return loaded.copy(
-            showCompileShaders = VitaCoreConfig().showCompileShaders,
             cpuPoolSize = VitaCoreConfig().cpuPoolSize,
             disableSurfaceSync = false,
             validationLayer = false,

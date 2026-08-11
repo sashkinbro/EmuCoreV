@@ -154,6 +154,7 @@ using PhysicalKeyCode = input::PhysicalKeyCode;
     code(bool, "texture-cache", true, texture_cache)                                                    \
     code(bool, "async-pipeline-compilation", true, async_pipeline_compilation)                          \
     code(bool, "show-compile-shaders", true, show_compile_shaders)                                      \
+    code(bool, "show-shader-cache-warn", true, show_shader_cache_warn)                                  \
     code(bool, "hashless-texture-cache", false, hashless_texture_cache)                                 \
     code(bool, "import-textures", false, import_textures)                                               \
     code(bool, "export-textures", false, export_textures)                                               \

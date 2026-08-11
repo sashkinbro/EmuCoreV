@@ -34,8 +34,11 @@ import com.sbro.emucorev.data.GameMenuLayoutStyle
 import com.sbro.emucorev.data.TouchControlPressEffect
 import com.sbro.emucorev.data.TouchControlVisualStyle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -98,6 +101,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
     private val initialCoreConfig = coreConfigRepository.ensureDefaultsPersisted()
     private val coreSettingsSaveQueue = Channel<VitaCoreConfig>(Channel.CONFLATED)
+    private lateinit var coreSettingsSaveJob: Job
 
     private val _uiState = MutableStateFlow(
         SettingsUiState(
@@ -117,7 +121,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 _uiState.value = _uiState.value.copy(customization = customization)
             }
         }
-        viewModelScope.launch(Dispatchers.IO) {
+        coreSettingsSaveJob = viewModelScope.launch(Dispatchers.IO) {
             for (config in coreSettingsSaveQueue) {
                 runCatching { coreConfigRepository.save(config) }
                     .onFailure { error -> Log.e(TAG, "Could not persist core settings", error) }
@@ -339,8 +343,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     override fun onCleared() {
+        // Do not lose the last conflated update when the user leaves Settings
+        // before the IO consumer gets scheduled.
+        coreSettingsSaveQueue.cancel()
+        runBlocking { coreSettingsSaveJob.cancelAndJoin() }
+        runCatching { coreConfigRepository.save(_uiState.value.coreConfig) }
+            .onFailure { error -> Log.e(TAG, "Could not flush core settings", error) }
         customizationPreferences.close()
-        super.onCleared()
     }
 
     fun testVibration(): Boolean {

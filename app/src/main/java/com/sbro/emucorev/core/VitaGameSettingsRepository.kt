@@ -54,10 +54,12 @@ class VitaGameSettingsRepository(private val context: Context) {
 
     fun saveProfile(titleId: String, config: VitaCoreConfig, customDriverOverride: String?) {
         if (titleId.isBlank()) return
-        val base = globalRepository.ensureDefaultsPersisted()
-        val effectiveConfig = config.copy(customDriverName = customDriverOverride ?: base.customDriverName)
-        configDirectory.mkdirs()
-        writeCustomConfig(customConfigFile(titleId), effectiveConfig, customDriverOverride.driverMode())
+        synchronized(CONFIG_IO_LOCK) {
+            val base = globalRepository.ensureDefaultsPersisted()
+            val effectiveConfig = config.copy(customDriverName = customDriverOverride ?: base.customDriverName)
+            configDirectory.mkdirs()
+            writeCustomConfig(customConfigFile(titleId), effectiveConfig, customDriverOverride.driverMode())
+        }
     }
 
     fun syncEffectiveDriverForLaunch(titleId: String) {
@@ -75,7 +77,9 @@ class VitaGameSettingsRepository(private val context: Context) {
 
     fun reset(titleId: String) {
         if (titleId.isBlank()) return
-        customConfigFile(titleId).delete()
+        synchronized(CONFIG_IO_LOCK) {
+            customConfigFile(titleId).delete()
+        }
     }
 
     private fun readCustomConfig(file: File, base: VitaCoreConfig): VitaGameSettingsProfile {
@@ -113,6 +117,7 @@ class VitaGameSettingsRepository(private val context: Context) {
                 shaderCache = gpu.boolAttr("shader-cache", config.shaderCache),
                 spirvShader = gpu.boolAttr("spirv-shader", config.spirvShader),
                 textureCache = gpu.boolAttr("texture-cache", config.textureCache),
+                showCompileShaders = gpu.boolAttr("show-compile-shaders", config.showCompileShaders),
                 showShaderCacheWarn = gpu.boolAttr("show-shader-cache-warn", config.showShaderCacheWarn)
             )
         }
@@ -232,6 +237,7 @@ class VitaGameSettingsRepository(private val context: Context) {
             setAttribute("shader-cache", config.shaderCache.toString())
             setAttribute("spirv-shader", config.spirvShader.toString())
             setAttribute("texture-cache", config.textureCache.toString())
+            setAttribute("show-compile-shaders", config.showCompileShaders.toString())
             setAttribute("show-shader-cache-warn", config.showShaderCacheWarn.toString())
         })
         root.appendChild(doc.createElement("audio").apply {
@@ -351,6 +357,7 @@ class VitaGameSettingsRepository(private val context: Context) {
         if (hasAttribute(name)) getAttribute(name).toFloatOrNull() ?: default else default
 
     companion object {
+        private val CONFIG_IO_LOCK = Any()
         private const val DRIVER_MODE_GLOBAL = "global"
         private const val DRIVER_MODE_SYSTEM = "system"
         private const val DRIVER_MODE_CUSTOM = "custom"
