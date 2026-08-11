@@ -69,7 +69,7 @@ Java_com_sbro_emucorev_core_vita_Emulator_applyRuntimeCoreSettings(
             emuenv->renderer->frame_limit.store(normalized_frame_limit, std::memory_order_relaxed);
         current.pstv_mode = pstvMode == JNI_TRUE;
         cfg.turbo_mode = turboMode == JNI_TRUE;
-        cfg.show_compile_shaders = showCompileShaders == JNI_TRUE;
+        current.show_compile_shaders = showCompileShaders == JNI_TRUE;
 
         app::apply_runtime_settings(*emuenv);
     }

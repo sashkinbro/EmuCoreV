@@ -923,10 +923,10 @@ void draw_vita_area(GuiState &gui, EmuEnvState &emuenv) {
     if (gui.vita_area.user_management)
         draw_user_management(gui, emuenv);
 
-    if (emuenv.cfg.show_compile_shaders && gui.shaders_compiled_display_count > 0)
+    if (emuenv.cfg.current_config.show_compile_shaders && gui.shaders_compiled_display_count > 0)
         draw_shaders_count_compiled(gui, emuenv);
 
-    if (emuenv.cfg.show_shader_cache_warn && emuenv.frame_count < 600 && !emuenv.io.app_path.empty())
+    if (emuenv.cfg.current_config.show_shader_cache_warn && emuenv.frame_count < 600 && !emuenv.io.app_path.empty())
         draw_shader_caching_warn(gui, emuenv);
 
     if (!gui.trophy_unlock_display_requests.empty())
