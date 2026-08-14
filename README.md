@@ -1,8 +1,11 @@
 # EmuCoreV
 
+[![Get it on Google Play](https://img.shields.io/badge/Google_Play-EmuCoreV-01875f.svg?logo=google-play&logoColor=white)](https://play.google.com/store/apps/details?id=com.sbro.emucorev)
 [![License: GPL v2+](https://img.shields.io/badge/License-GPL%20v2%2B-blue.svg)](LICENSE)
 [![Support on Patreon](https://img.shields.io/badge/Patreon-Support%20EmuCoreV-ff424d.svg?logo=patreon&logoColor=white)](https://www.patreon.com/c/emucore/membership)
 [![Join Discord](https://img.shields.io/badge/Discord-Join%20our%20server-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/c5EBeNRpz2)
+
+<a href="https://play.google.com/store/apps/details?id=com.sbro.emucorev"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="60"/></a>
 
 EmuCoreV is a PlayStation Vita emulator for Android. It combines a custom Android interface, library and catalog UX, installer flows, and runtime controls with a Vita3K-based emulation core adapted for this app.
 
@@ -98,6 +101,8 @@ If you want to support ongoing development or join the community:
 - Patreon: https://www.patreon.com/c/emucore/membership
 - Discord: https://discord.gg/c5EBeNRpz2
 - More apps by the author: https://play.google.com/store/apps/dev?id=7136622298887775989
+
+<a href="https://play.google.com/store/apps/details?id=com.sbro.emucorev"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="60"/></a>
 
 ## License
 
