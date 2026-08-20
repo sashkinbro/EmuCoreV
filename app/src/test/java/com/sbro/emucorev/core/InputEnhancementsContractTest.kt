@@ -90,6 +90,19 @@ class InputEnhancementsContractTest {
     }
 
     @Test
+    fun nativeTouchInputRejectsInvalidCoordinatesAndReleasesExactPointers() {
+        val touch = appModule()
+            .resolve("src/main/cpp/vita3k/vita3k/touch/src/touch.cpp")
+            .readText()
+
+        assertTrue("SDL cancellation must release a stranded touch", "SDL_EVENT_FINGER_CANCELED" in touch)
+        assertTrue("Letterbox touches must be validated", "normalized_touch_to_report" in touch)
+        assertTrue("An invalid viewport must not be divided by", "viewport_w <= 0" in touch)
+        assertTrue("Unknown up events must not remove another finger", touch.split("finger_index < 0").size >= 3)
+        assertTrue("Overflow must preserve existing touches", "finger_count >= SCE_TOUCH_MAX_REPORT" in touch)
+    }
+
+    @Test
     fun everySupportedLocaleContainsTheInputEnhancementStrings() {
         val resourceRoot = resourceRoot()
         val requiredKeys = requiredKeys(resourceRoot.resolve("values/strings.xml"))

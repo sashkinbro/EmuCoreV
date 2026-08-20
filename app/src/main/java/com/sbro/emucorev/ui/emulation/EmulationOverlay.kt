@@ -978,6 +978,7 @@ private fun TouchControlGroupInputCapture(
     onButtonChange: (Int, Boolean) -> Unit
 ) {
     val density = LocalDensity.current
+    val currentOnButtonChange by rememberUpdatedState(onButtonChange)
     val pointerButtons = remember(groupElements) { mutableMapOf<Int, Int>() }
     val buttonPressCounts = remember(groupElements) { mutableMapOf<Int, Int>() }
     val bounds = groupElements.groupBounds()
@@ -993,7 +994,7 @@ private fun TouchControlGroupInputCapture(
         val count = buttonPressCounts[controlId] ?: 0
         buttonPressCounts[controlId] = count + 1
         if (count == 0) {
-            onButtonChange(controlId, true)
+            currentOnButtonChange(controlId, true)
         }
     }
 
@@ -1001,7 +1002,7 @@ private fun TouchControlGroupInputCapture(
         val count = buttonPressCounts[controlId] ?: return
         if (count <= 1) {
             buttonPressCounts.remove(controlId)
-            onButtonChange(controlId, false)
+            currentOnButtonChange(controlId, false)
         } else {
             buttonPressCounts[controlId] = count - 1
         }
@@ -1108,11 +1109,13 @@ private fun TouchControlCanvasItem(
 ) {
     val density = LocalDensity.current
     val latestElement by rememberUpdatedState(element)
+    val currentOnButtonChange by rememberUpdatedState(onButtonChange)
     val xPx = element.x * canvasWidth
     val yPx = element.y * canvasHeight
     val widthPx = element.width * canvasWidth
     val heightPx = element.height * canvasHeight
     var pressed by remember(element.id, editMode) { mutableStateOf(false) }
+    val pointerOwner = remember(element.id, editMode) { TouchPointerOwner() }
     val itemShape = if (descriptor.type == TouchControlType.Analog && element.analogMode == TouchAnalogMode.TouchArea) {
         RoundedCornerShape(18.dp)
     } else {
@@ -1121,6 +1124,14 @@ private fun TouchControlCanvasItem(
     val sizeModifier = Modifier
         .offset { IntOffset(xPx.roundToInt(), yPx.roundToInt()) }
         .size(width = with(density) { widthPx.toDp() }, height = with(density) { heightPx.toDp() })
+
+    DisposableEffect(element.id, editMode, inputHandledByGroup, descriptor.type, descriptor.controlId) {
+        onDispose {
+            if (pointerOwner.cancel() && descriptor.type == TouchControlType.Button) {
+                descriptor.controlId?.let { currentOnButtonChange(it, false) }
+            }
+        }
+    }
 
     val inputModifier = if (editMode) {
         Modifier
@@ -1158,14 +1169,28 @@ private fun TouchControlCanvasItem(
                 val controlId = descriptor.controlId ?: return@pointerInteropFilter false
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                        pressed = true
-                        onButtonChange(controlId, true)
+                        val pointerId = event.getPointerId(event.actionIndex)
+                        if (pointerOwner.acquire(pointerId) && !pressed) {
+                            pressed = true
+                            currentOnButtonChange(controlId, true)
+                        }
                         true
                     }
 
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
-                        pressed = false
-                        onButtonChange(controlId, false)
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                        val pointerId = event.getPointerId(event.actionIndex)
+                        if (pointerOwner.release(pointerId) && pressed) {
+                            pressed = false
+                            currentOnButtonChange(controlId, false)
+                        }
+                        true
+                    }
+
+                    MotionEvent.ACTION_CANCEL -> {
+                        if (pointerOwner.cancel() && pressed) {
+                            pressed = false
+                            currentOnButtonChange(controlId, false)
+                        }
                         true
                     }
 
@@ -1176,18 +1201,26 @@ private fun TouchControlCanvasItem(
             TouchControlType.TouchSwitch -> Modifier.pointerInteropFilter { event ->
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                        pressed = true
+                        val pointerId = event.getPointerId(event.actionIndex)
+                        if (pointerOwner.acquire(pointerId)) {
+                            pressed = true
+                        }
                         true
                     }
 
-                    MotionEvent.ACTION_UP -> {
-                        pressed = false
-                        onBackTouchToggle()
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                        val pointerId = event.getPointerId(event.actionIndex)
+                        if (pointerOwner.release(pointerId)) {
+                            pressed = false
+                            onBackTouchToggle()
+                        }
                         true
                     }
 
-                    MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
-                        pressed = false
+                    MotionEvent.ACTION_CANCEL -> {
+                        if (pointerOwner.cancel()) {
+                            pressed = false
+                        }
                         true
                     }
 
@@ -1723,6 +1756,7 @@ private fun AnalogTouchArea(
     onAxisChange: (Short, Short) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val currentOnAxisChange by rememberUpdatedState(onAxisChange)
     var sizePx by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
     var startOffset by remember { mutableStateOf(Offset.Zero) }
     var pressed by remember { mutableStateOf(false) }
@@ -1736,7 +1770,7 @@ private fun AnalogTouchArea(
         if (quantizedX == lastX && quantizedY == lastY) return
         lastX = quantizedX
         lastY = quantizedY
-        onAxisChange(quantizedX.toShort(), quantizedY.toShort())
+        currentOnAxisChange(quantizedX.toShort(), quantizedY.toShort())
     }
 
     fun resetArea() {
@@ -1754,6 +1788,14 @@ private fun AnalogTouchArea(
         val nx = (clamped.x / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < 0.08f) 0f else it }
         val ny = (clamped.y / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < 0.08f) 0f else it }
         sendAxis(nx, ny)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (lastX != 0 || lastY != 0) {
+                currentOnAxisChange(0.toShort(), 0.toShort())
+            }
+        }
     }
 
     Box(
@@ -1813,6 +1855,7 @@ private fun AnalogStick(
     onAxisChange: (Short, Short) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val currentOnAxisChange by rememberUpdatedState(onAxisChange)
     var sizePx by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
     var thumbOffset by remember { mutableStateOf(Offset.Zero) }
     var pressed by remember { mutableStateOf(false) }
@@ -1826,7 +1869,7 @@ private fun AnalogStick(
         if (quantizedX == lastX && quantizedY == lastY) return
         lastX = quantizedX
         lastY = quantizedY
-        onAxisChange(quantizedX.toShort(), quantizedY.toShort())
+        currentOnAxisChange(quantizedX.toShort(), quantizedY.toShort())
     }
 
     fun resetStick() {
@@ -1847,6 +1890,14 @@ private fun AnalogStick(
         val nx = (clamped.x / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < 0.12f) 0f else it }
         val ny = (clamped.y / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < 0.12f) 0f else it }
         sendAxis(nx, ny)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (lastX != 0 || lastY != 0) {
+                currentOnAxisChange(0.toShort(), 0.toShort())
+            }
+        }
     }
 
     Box(
