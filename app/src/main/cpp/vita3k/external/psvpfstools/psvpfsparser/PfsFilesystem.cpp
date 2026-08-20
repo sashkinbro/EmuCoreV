@@ -35,7 +35,7 @@ static void to_uppercase(std::string &str) {
    std::transform(str.begin(), str.end(), str.begin(), static_cast<int (*)(int)>(std::toupper));
 }
 
-int PfsFilesystem::decrypt_files(const psvpfs::path& destTitleIdPath) const
+int PfsFilesystem::decrypt_files(const psvpfs::path& destTitleIdPath, PfsProgressCallback progress) const
 {
    const sce_ng_pfs_header_t& ngpfs = m_filesDbParser->get_header();
    const std::vector<sce_ng_pfs_file_t>& files = m_filesDbParser->get_files();
@@ -96,6 +96,25 @@ int PfsFilesystem::decrypt_files(const psvpfs::path& destTitleIdPath) const
 
    m_output << "Decrypting files..." << std::endl;
 
+   std::uint64_t total_bytes = 0;
+   for (const auto& t : unicv->m_tables)
+   {
+     if (t->get_header()->get_numSectors() == 0)
+       continue;
+
+     auto me = pageMap.find(t->get_icv_salt());
+     if (me == pageMap.end())
+       continue;
+
+     std::string p = me->second.get_value().string();
+     to_uppercase(p);
+     auto fp = file_map.find(p);
+     if (fp != file_map.end())
+       total_bytes += fp->second->file.m_info.header.size;
+   }
+
+   std::uint64_t processed_bytes = 0;
+
    for(auto& t : unicv->m_tables)
    {
       //skip empty files and directories
@@ -112,6 +131,10 @@ int PfsFilesystem::decrypt_files(const psvpfs::path& destTitleIdPath) const
 
       //find file in files.db by filepath
       sce_junction filepath = map_entry->second;
+
+      if (progress)
+        progress(processed_bytes, total_bytes, filepath.get_value().string());
+
       std::string path = filepath.get_value().string();
       to_uppercase(path);
       auto file_ptr = file_map.find(path);
@@ -161,6 +184,9 @@ int PfsFilesystem::decrypt_files(const psvpfs::path& destTitleIdPath) const
          m_output << "Unexpected file type" << std::endl;
          return -1;
       }
+      processed_bytes += file->file.m_info.header.size;
+      if (progress)
+        progress(processed_bytes, total_bytes, filepath.get_value().string());
    }
 
    return 0;

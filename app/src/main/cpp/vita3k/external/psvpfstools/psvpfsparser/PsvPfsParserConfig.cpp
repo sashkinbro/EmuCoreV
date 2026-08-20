@@ -14,13 +14,13 @@
 #include "PsvPfsParserConfig.h"
 #include "LocalKeyGenerator.h"
 
-int execute(std::shared_ptr<ICryptoOperations> cryptops, std::shared_ptr<IF00DKeyEncryptor> iF00D, const unsigned char *klicensee, const psvpfs::path& titleIdPath, const psvpfs::path& destTitleIdPath) {
+int execute(std::shared_ptr<ICryptoOperations> cryptops, std::shared_ptr<IF00DKeyEncryptor> iF00D, const unsigned char *klicensee, const psvpfs::path& titleIdPath, const psvpfs::path& destTitleIdPath, PfsProgressCallback progress) {
     PfsFilesystem pfs(cryptops, iF00D, std::cout, klicensee, titleIdPath);
 
     if (pfs.mount() < 0)
         return -1;
 
-    if (pfs.decrypt_files(destTitleIdPath) < 0)
+    if (pfs.decrypt_files(destTitleIdPath, progress) < 0)
         return -1;
 
     std::cout << "keystone sanity check..." << std::endl;
@@ -74,7 +74,7 @@ std::shared_ptr<IF00DKeyEncryptor> create_F00D_encryptor(const PsvPfsParserConfi
     return iF00D;
 }
 
-int execute(std::string &zrif, std::string &title_src, std::string &title_dst, F00DEncryptorTypes type, std::string &f00d_arg) {
+int execute(std::string &zrif, std::string &title_src, std::string &title_dst, F00DEncryptorTypes type, std::string &f00d_arg, PfsProgressCallback progress) {
     PsvPfsParserConfig cfg;
 
     cfg.zRIF = zrif;
@@ -89,5 +89,5 @@ int execute(std::string &zrif, std::string &title_src, std::string &title_dst, F
     if (extract_klicensee(cfg, cryptops, klicensee) < 0)
         return -1;
 
-    return execute(cryptops, iF00D, klicensee, psvpfs::path{cfg.title_id_src}, psvpfs::path{cfg.title_id_dst});
+    return execute(cryptops, iF00D, klicensee, psvpfs::path{cfg.title_id_src}, psvpfs::path{cfg.title_id_dst}, progress);
 }

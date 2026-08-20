@@ -3,6 +3,7 @@
 #include <string>
 
 #include "F00DKeyEncryptorFactory.h"
+#include "PfsProgress.h"
 
 struct PsvPfsParserConfig {
     std::string title_id_src;
@@ -13,4 +14,4 @@ struct PsvPfsParserConfig {
     std::string f00d_arg;
 };
 
-int execute(std::string &zrif, std::string &title_src, std::string &title_dst, F00DEncryptorTypes type, std::string &f00d_arg);
+int execute(std::string &zrif, std::string &title_src, std::string &title_dst, F00DEncryptorTypes type, std::string &f00d_arg, PfsProgressCallback progress = nullptr);
