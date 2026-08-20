@@ -58,10 +58,8 @@ public:
     vk::RenderPass default_render_pass;
     // renderpass used after a post-processing pass clearing the swapchain, compatible with the default render pass
     vk::RenderPass post_filter_render_pass;
-#ifdef __ANDROID__
     // renderpass used to (partially) prevent a driver bug using stock adreno drivers
     vk::RenderPass stock_adreno_pass;
-#endif
 
     std::unique_ptr<ScreenFilter> filter;
 
@@ -78,6 +76,13 @@ public:
     int current_frame = 0;
     // set when the swapchain needs to be rebuilt before the next acquire
     bool need_rebuild = false;
+    // a size disagreement that lasts one frame should not cause a swapchain rebuild
+    int size_mismatch_frames = 0;
+    // why the last rebuild happened, for the log
+    const char *rebuild_reason = "initial";
+    // the swapchain images were created with eTransferDst (required by render_transfer)
+    bool support_swapchain_transfer_dst = false;
+
     // set when we also need to recreate the surface before rebuilding swapchain
     bool need_surface_recreate = false;
 
@@ -98,6 +103,7 @@ private:
     void create_render_pass();
     void create_layout_sync();
     void create_swapchain();
+    bool note_size_mismatch(bool mismatched);
     vk::Pipeline create_graphics_pipeline_impl(std::array<vk::PipelineShaderStageCreateInfo, 2> &shader_stages);
     bool create_graphics_pipelines();
     void copy_to_vao(const void *data);

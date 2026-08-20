@@ -21,11 +21,14 @@
 #include <renderer/vulkan/gxm_to_vulkan.h>
 #include <renderer/vulkan/state.h>
 
+#include <cpu/functions.h>
 #include <gxm/functions.h>
 #include <renderer/functions.h>
 
 #include <util/log.h>
 #include <util/overloaded.h>
+
+#include <algorithm>
 
 namespace renderer::vulkan {
 
@@ -33,27 +36,36 @@ void VKContext::wait_thread_function(const MemState &mem) {
     // try to wait for multiple fences at the same time if possible
     std::vector<vk::Fence> fences;
 
+    uint64_t stat_fence_us = 0, stat_post_us = 0;
+    uint32_t stat_notifs = 0, stat_posts = 0, stat_frames = 0, stat_buffer_syncs = 0;
+    auto stat_last = std::chrono::steady_clock::now();
+    auto elapsed_us = [](std::chrono::steady_clock::time_point t0) {
+        return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count());
+    };
+
     auto wait_for_fences = [&]() {
+        const auto t0 = std::chrono::steady_clock::now();
         while (!fences.empty()) {
             // timeout so we can check for shutdown
             auto result = state.device.waitForFences(fences, VK_TRUE, 100'000'000ULL);
             if (result == vk::Result::eSuccess) {
                 // don't reset them
                 fences.clear();
-                return;
+                break;
             }
             if (result == vk::Result::eTimeout) {
                 if (state.request_queue.is_aborted()) {
                     fences.clear();
-                    return;
+                    break;
                 }
                 continue;
             }
             LOG_ERROR("Could not wait for fences.");
             assert(false);
             fences.clear();
-            return;
+            break;
         }
+        stat_fence_us += elapsed_us(t0);
     };
 
     while (true) {
@@ -68,8 +80,10 @@ void VKContext::wait_thread_function(const MemState &mem) {
                        },
                        [&](NotificationRequest &request) {
                            if (request.notifications[0].address || request.notifications[1].address) {
+                               stat_notifs++;
                                wait_for_fences();
 
+                               const std::shared_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
                                // same as in handle_sync_surface_data
                                std::unique_lock<std::mutex> lock(state.notification_mutex);
 
@@ -84,6 +98,7 @@ void VKContext::wait_thread_function(const MemState &mem) {
                            }
                        },
                        [&](FrameDoneRequest &request) {
+                           stat_frames++;
                            wait_for_fences();
 
                            // don't reset them, the reset will be done in the new_frame function
@@ -94,7 +109,9 @@ void VKContext::wait_thread_function(const MemState &mem) {
                            new_frame_condv.notify_one();
                        },
                        [&](BufferSyncRequest &request) {
+                           stat_buffer_syncs++;
                            wait_for_fences();
+                           const std::shared_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
                            auto mem_it = state.mapped_memories.lower_bound(request.location);
                            if (mem_it == state.mapped_memories.end() || mem_it->first + mem_it->second.size < request.location + request.size) {
                                LOG_ERROR("Buffer Sync request for {}-{} is not fully mapped", log_hex(request.location), log_hex(request.location + request.size));
@@ -102,19 +119,37 @@ void VKContext::wait_thread_function(const MemState &mem) {
                            }
                            uint8_t *src = reinterpret_cast<uint8_t *>(std::get<vkutil::Buffer>(mem_it->second.buffer_impl).mapped_data);
                            src += request.location - mem_it->first;
-                           memcpy(Ptr<void>(request.location).get(mem), src, request.size);
+                           renderer::vulkan::surface_sync_internal_write = true;
+                           if (request.row_stride != 0) {
+                               uint8_t *dst = reinterpret_cast<uint8_t *>(Ptr<void>(request.location).get(mem));
+                               for (uint32_t row = 0; row < request.row_count; row++) {
+                                   memcpy(dst, src, request.row_bytes);
+                                   src += request.row_stride;
+                                   dst += request.row_stride;
+                               }
+                           } else {
+                               memcpy(Ptr<void>(request.location).get(mem), src, request.size);
+                           }
+                           renderer::vulkan::surface_sync_internal_write = false;
                        },
                        [&](PostSurfaceSyncRequest &request) {
+                           const auto post_t0 = std::chrono::steady_clock::now();
                            wait_for_fences();
-
+                           const std::shared_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
+                           renderer::vulkan::surface_sync_internal_write = true;
                            state.surface_cache.perform_post_surface_sync(mem, request.cache_info);
+                           renderer::vulkan::surface_sync_internal_write = false;
+                           stat_post_us += elapsed_us(post_t0);
                        },
                        [&](SyncSignalRequest &request) {
                            wait_for_fences();
 
+                           const std::shared_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
                            renderer::subject_done(request.sync, request.timestamp);
                        },
                        [&](CallbackRequest &request) {
+                           if (request.wait_for_gpu)
+                               wait_for_fences();
                            if (request.callback) {
                                (*request.callback)();
                                delete request.callback;
@@ -125,6 +160,16 @@ void VKContext::wait_thread_function(const MemState &mem) {
 }
 
 void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const FeatureState &features) {
+    context.state.surface_cache.resolve_ds_scene_end(context.scene_wrote_depth);
+    context.scene_wrote_depth = false;
+    context.scene_has_drawn = false;
+    context.scene_macroblock_flushed = false;
+
+    context.rendered_rect_x0 = INT32_MAX;
+    context.rendered_rect_y0 = INT32_MAX;
+    context.rendered_rect_x1 = 0;
+    context.rendered_rect_y1 = 0;
+
     context.render_target = rt;
     context.scene_timestamp++;
     context.state.texture_cache.current_scene_timestamp = context.scene_timestamp;
@@ -133,7 +178,7 @@ void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const Fe
     // set these values for the pipeline cache
     context.record.color_base_format = gxm::get_base_format(color_surface_fin->colorFormat);
     context.record.is_gamma_corrected = static_cast<bool>(color_surface_fin->gamma);
-    vk::Format vk_format = color::translate_format(context.record.color_base_format);
+    vk::Format vk_format = color::translate_surface_format(context.record.color_base_format);
 
     if (color_surface_fin->gamma && vk_format == vk::Format::eR8G8B8A8Unorm) {
         vk_format = vk::Format::eR8G8B8A8Srgb;
@@ -158,9 +203,10 @@ void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const Fe
     }
 
     SceGxmDepthStencilSurface *ds_surface_fin = &context.record.depth_stencil_surface;
-    // if the depth-stencil buffer is not backed by memory or we don't read nor write it to memory, use the transient attachment instead
-    if ((!ds_surface_fin->depth_data && !ds_surface_fin->stencil_data)
-        || (!ds_surface_fin->force_load && !ds_surface_fin->force_store)) {
+    // if the depth-stencil buffer is not backed by memory, use the transient attachment instead.
+    // Was the Android build that added the changes:
+    // || (!ds_surface_fin->force_load && !ds_surface_fin->force_store)) {
+    if (!ds_surface_fin->depth_data && !ds_surface_fin->stencil_data) {
         ds_surface_fin = nullptr;
     }
 
@@ -176,18 +222,31 @@ void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const Fe
         force_load = false;
         force_store = false;
     }
-    if (context.state.features.support_shader_interlock)
-        // we must always store the depth stencil
-        force_store = true;
-    context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(vk_format, force_load, force_store, color_surface_fin == nullptr);
+    // GXM force_store controls write-back to the depth surface memory, not whether the buffer keeps its contents
+    force_store = true;
+
+    bool depth_load = force_load;
+    bool stencil_load = force_load;
+    if (ds_surface_fin != nullptr) {
+        constexpr bool use_ds_depth_validity = true;
+        const bool game_stores = context.record.depth_stencil_surface.force_store;
+        const bool depth_content_valid = state.surface_cache.begin_ds_scene_depth_check(*ds_surface_fin, game_stores, context.record.color_surface.data.address());
+        if (use_ds_depth_validity && game_stores && !depth_content_valid)
+            depth_load = false;
+    }
+    const bool color_has_raw = context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16;
+    context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(vk_format, depth_load, stencil_load, force_store, color_surface_fin == nullptr, false, color_has_raw);
     if (context.state.features.support_shader_interlock)
         // also retrieve / create the shader interlock pass
-        context.current_shader_interlock_pass = context.state.pipeline_cache.retrieve_render_pass(vk_format, true, true, color_surface_fin == nullptr, true);
+        context.current_shader_interlock_pass = context.state.pipeline_cache.retrieve_render_pass(vk_format, true, true, true, color_surface_fin == nullptr, true);
 
     Framebuffer &framebuffer = state.surface_cache.retrieve_framebuffer_handle(mem, color_surface_fin, ds_surface_fin, context.current_render_pass, context.current_shader_interlock_pass, context.current_color_view, context.current_ds_view);
     context.current_framebuffer = framebuffer.standard;
     context.current_shader_interlock_framebuffer = framebuffer.shader_interlock;
     context.current_color_base_image = framebuffer.base_image;
+    context.current_fb_width = framebuffer.width;
+    context.current_fb_height = framebuffer.height;
+    context.current_color_raw_view = framebuffer.raw_image ? framebuffer.raw_image->view : state.default_raw_image.view;
 
     // make sure we are not keeping any texture from the previous pass
     // (textures can be still bound even though they are not used)
@@ -281,16 +340,23 @@ static vk::DescriptorSet retrieve_color_descriptor(VKState &state, FrameDescript
         return frame_descriptor.sets[frame_descriptor.descriptors_idx++];
 
     // we have no more frame descriptor available, create a bunch of new one for this specific layout
-    // the type depends on the way we read it
-    vk::DescriptorPoolSize pool_size{
-        .type = state.features.support_shader_interlock ? vk::DescriptorType::eStorageImage : vk::DescriptorType::eInputAttachment,
-        .descriptorCount = DESCRIPTOR_PACK_SIZE * MAX_FRAMES_RENDERING
-    };
+    // the type depends on the way we read it; each set holds the color attachment (binding 0)
+    uint32_t storage_images_per_set = state.features.support_shader_interlock ? 1 : 0;
+    if (state.features.use_mask_bit)
+        storage_images_per_set++;
+    if (state.features.preserve_f16_nan_as_u16)
+        storage_images_per_set++;
+
+    std::vector<vk::DescriptorPoolSize> pool_sizes;
+    if (!state.features.support_shader_interlock)
+        pool_sizes.push_back({ vk::DescriptorType::eInputAttachment, DESCRIPTOR_PACK_SIZE * MAX_FRAMES_RENDERING });
+    if (storage_images_per_set > 0)
+        pool_sizes.push_back({ vk::DescriptorType::eStorageImage, storage_images_per_set * DESCRIPTOR_PACK_SIZE * MAX_FRAMES_RENDERING });
 
     vk::DescriptorPoolCreateInfo descriptor_pool_info{
         .maxSets = DESCRIPTOR_PACK_SIZE * MAX_FRAMES_RENDERING
     };
-    descriptor_pool_info.setPoolSizes(pool_size);
+    descriptor_pool_info.setPoolSizes(pool_sizes);
 
     vk::DescriptorPool descriptor_pool = state.device.createDescriptorPool(descriptor_pool_info);
     state.frame_descriptor_pools.push_back(descriptor_pool);
@@ -345,12 +411,29 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
         };
     }
 
-    // only the depth-stencil attachment may be clear if not force loaded
-    std::array<vk::ClearValue, 2> curr_clear_values{};
-    curr_clear_values[1].depthStencil = vk::ClearDepthStencilValue{
+    if (current_fb_width != 0) {
+        const uint32_t max_w = current_fb_width - std::min<uint32_t>(current_fb_width, static_cast<uint32_t>(curr_renderpass_info.renderArea.offset.x));
+        const uint32_t max_h = current_fb_height - std::min<uint32_t>(current_fb_height, static_cast<uint32_t>(curr_renderpass_info.renderArea.offset.y));
+        curr_renderpass_info.renderArea.extent.width = std::min(curr_renderpass_info.renderArea.extent.width, max_w);
+        curr_renderpass_info.renderArea.extent.height = std::min(curr_renderpass_info.renderArea.extent.height, max_h);
+    }
+
+    if (render_target->has_macroblock_sync) {
+        const auto &area = curr_renderpass_info.renderArea;
+        rendered_rect_x0 = std::min(rendered_rect_x0, area.offset.x);
+        rendered_rect_y0 = std::min(rendered_rect_y0, area.offset.y);
+        rendered_rect_x1 = std::max(rendered_rect_x1, area.offset.x + static_cast<int32_t>(area.extent.width));
+        rendered_rect_y1 = std::max(rendered_rect_y1, area.offset.y + static_cast<int32_t>(area.extent.height));
+    }
+
+    // only the depth-stencil attachment may be clear if not force loaded. It can sit at attachment index 1 or 2 (raw u16 attachment present) so provide the value at both
+    std::array<vk::ClearValue, 3> curr_clear_values{};
+    const vk::ClearDepthStencilValue ds_clear{
         .depth = record.depth_stencil_surface.background_depth,
         .stencil = record.depth_stencil_surface.stencil
     };
+    curr_clear_values[1].depthStencil = ds_clear;
+    curr_clear_values[2].depthStencil = ds_clear;
     curr_renderpass_info.setClearValues(curr_clear_values);
     render_cmd.beginRenderPass(curr_renderpass_info, vk::SubpassContents::eInline);
 
@@ -383,7 +466,25 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
         .descriptorType = input_type,
     };
     write_descr.setImageInfo(descr_color_info);
-    state.device.updateDescriptorSets(write_descr, {});
+
+    if (state.features.preserve_f16_nan_as_u16) {
+        vk::DescriptorImageInfo descr_raw_info{
+            .sampler = nullptr,
+            .imageView = current_color_raw_view ? current_color_raw_view : state.default_raw_image.view,
+            .imageLayout = vk::ImageLayout::eGeneral,
+        };
+        vk::WriteDescriptorSet write_raw_descr{
+            .dstSet = rendertarget_set,
+            .dstBinding = 2,
+            .dstArrayElement = 0,
+            .descriptorType = vk::DescriptorType::eStorageImage,
+        };
+        write_raw_descr.setImageInfo(descr_raw_info);
+        std::array<vk::WriteDescriptorSet, 2> writes = { write_descr, write_raw_descr };
+        state.device.updateDescriptorSets(writes, {});
+    } else {
+        state.device.updateDescriptorSets(write_descr, {});
+    }
 }
 
 void VKContext::stop_render_pass() {
@@ -493,20 +594,46 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
             }
 
             // we must sync the two buffers
-            if (surface_info && surface_info->need_buffer_sync)
-                state.request_queue.push(BufferSyncRequest{ surface_info->data.address(), static_cast<uint32_t>(surface_info->total_bytes) });
+            if (surface_info && surface_info->need_buffer_sync) {
+                if (render_target->has_macroblock_sync && state.res_multiplier != 1.0f
+                    && rendered_rect_x1 > rendered_rect_x0 && rendered_rect_y1 > rendered_rect_y0) {
+                    const uint32_t bpp = gxm::bits_per_pixel(surface_info->format) / 8;
+                    const uint32_t row_stride_bytes = surface_info->stride_bytes;
+                    const int32_t nx0 = static_cast<int32_t>(rendered_rect_x0 / state.res_multiplier);
+                    const int32_t ny0 = static_cast<int32_t>(rendered_rect_y0 / state.res_multiplier);
+                    const int32_t nx1 = static_cast<int32_t>(rendered_rect_x1 / state.res_multiplier);
+                    const int32_t ny1 = static_cast<int32_t>(rendered_rect_y1 / state.res_multiplier);
+                    const Address rect_start = surface_info->data.address() + ny0 * row_stride_bytes + nx0 * bpp;
+                    const uint32_t rect_row_bytes = static_cast<uint32_t>(nx1 - nx0) * bpp;
+                    const uint32_t rect_row_count = static_cast<uint32_t>(ny1 - ny0);
+                    state.request_queue.push(BufferSyncRequest{
+                        rect_start,
+                        static_cast<uint32_t>(surface_info->total_bytes),
+                        row_stride_bytes,
+                        rect_row_bytes,
+                        rect_row_count });
+                } else {
+                    state.request_queue.push(BufferSyncRequest{ surface_info->data.address(), static_cast<uint32_t>(surface_info->total_bytes) });
+                }
+            }
         }
 
-        if (surface_info && surface_info->need_post_surface_sync) {
+        // U2F10F10F10 guest write-back is throttled so run it after the notifications
+        const bool post_sync_after_notifications = surface_info && surface_info->need_post_surface_sync && surface_info->format == SCE_GXM_COLOR_BASE_FORMAT_U2F10F10F10;
+
+        if (surface_info && surface_info->need_post_surface_sync && !post_sync_after_notifications) {
             state.request_queue.push(PostSurfaceSyncRequest{ surface_info });
         }
 
         if (notif1.address || notif2.address) {
-            // notifications last
             NotificationRequest request = {
                 .notifications = { notif1, notif2 },
             };
             state.request_queue.push(request);
+        }
+
+        if (post_sync_after_notifications) {
+            state.request_queue.push(PostSurfaceSyncRequest{ surface_info });
         }
     }
 }
@@ -521,7 +648,7 @@ void VKContext::check_for_macroblock_change(bool is_draw) {
         // TODO: with the feedback loop extension we can do better
         ignore_macroblock = true;
         // in this case we must load and store the depth stencil each time
-        current_render_pass = state.pipeline_cache.retrieve_render_pass(current_color_format, true, true, !record.color_surface.data);
+        current_render_pass = state.pipeline_cache.retrieve_render_pass(current_color_format, true, true, true, !record.color_surface.data, false, record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16);
     }
 
     // use the scissor to know in which macroblock we are
@@ -532,6 +659,9 @@ void VKContext::check_for_macroblock_change(bool is_draw) {
         // we changed the current macroblock, restart the renderpass
         last_macroblock_x = curr_macroblock_x;
         last_macroblock_y = curr_macroblock_y;
+
+        // the finished block's content is now visible to samples within this scene
+        scene_macroblock_flushed = true;
 
         if (in_renderpass) {
             if (state.features.use_texture_viewport) {

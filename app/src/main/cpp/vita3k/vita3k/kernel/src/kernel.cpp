@@ -33,6 +33,10 @@
 #include <SDL3/SDL_mutex.h>
 #include <SDL3/SDL_thread.h>
 
+#include <chrono>
+#include <fstream>
+#include <iomanip>
+
 int CorenumAllocator::new_corenum() {
     const std::lock_guard<std::mutex> guard(lock);
 
@@ -50,6 +54,9 @@ void CorenumAllocator::set_max_core_count(const std::size_t max) {
     alloc.set_maximum(max);
 }
 
+void set_current_thread_state(SceUID id, const ThreadStatePtr &thread);
+void clear_current_thread_state();
+
 // TODO implement cross platform debug thread name setter and eliminate SDL thread
 struct ThreadParams {
     KernelState *kernel = nullptr;
@@ -62,6 +69,7 @@ static int SDLCALL thread_function(void *data) {
     const ThreadParams params = *static_cast<const ThreadParams *>(data);
     SDL_SignalSemaphore(params.host_may_destroy_params);
     const ThreadStatePtr thread = params.kernel->get_thread(params.thid);
+    set_current_thread_state(params.thid, thread);
 #ifdef TRACY_ENABLE
     if (!thread->name.empty()) {
         tracy::SetThreadName(thread->name.c_str());
@@ -73,6 +81,7 @@ static int SDLCALL thread_function(void *data) {
 
     thread->run_loop();
     const uint32_t r0 = read_reg(*thread->cpu, 0);
+    clear_current_thread_state();
 
     {
         std::lock_guard<std::mutex> lock(params.kernel->mutex);
@@ -90,6 +99,7 @@ KernelState::KernelState()
 
 bool KernelState::init(MemState &mem, const CallImportFunc &call_import, bool cpu_opt) {
     corenum_allocator.set_max_core_count(MAX_CORE_COUNT);
+
     start_tick = rtc_get_ticks(rtc_base_ticks());
     base_tick = { rtc_base_ticks() };
     this->call_import = call_import;
@@ -138,7 +148,22 @@ void KernelState::invalidate_jit_cache(Address start, size_t length) {
     }
 }
 
+static thread_local SceUID tls_self_id = 0;
+static thread_local ThreadStatePtr tls_self;
+
+void set_current_thread_state(SceUID id, const ThreadStatePtr &thread) {
+    tls_self_id = id;
+    tls_self = thread;
+}
+
+void clear_current_thread_state() {
+    tls_self_id = 0;
+    tls_self.reset();
+}
+
 ThreadStatePtr KernelState::get_thread(SceUID thread_id) {
+    if (thread_id == tls_self_id && tls_self)
+        return tls_self;
     return lock_and_find(thread_id, threads, mutex);
 }
 
@@ -214,6 +239,69 @@ void KernelState::resume_threads() {
             thread->resume();
     }
     paused_threads_status.clear();
+}
+
+int KernelState::stop_world(SceUID except_id, std::chrono::milliseconds budget) {
+    {
+        const std::lock_guard<std::mutex> lock(mutex);
+        world_stopped_threads.clear();
+        world_stopped_threads.reserve(threads.size());
+        for (auto &[tid, thread] : threads) {
+            if (tid != except_id)
+                world_stopped_threads.push_back(thread);
+        }
+    }
+
+    // Phase 1: flag + halt everyone first (halts latch, so none is lost)...
+    for (const auto &thread : world_stopped_threads)
+        thread->request_world_stop();
+
+    // Phase 2: ...then wait for each to be provably outside the JIT, on a shared deadline.
+    const auto deadline = std::chrono::steady_clock::now() + budget;
+    int not_parked = 0;
+    for (const auto &thread : world_stopped_threads) {
+        if (!thread->wait_world_stopped(deadline))
+            ++not_parked;
+    }
+    return not_parked;
+}
+
+void KernelState::log_thread_hang_dump() {
+    std::vector<ThreadStatePtr> snapshot;
+    {
+        const std::lock_guard<std::mutex> lock(mutex);
+        for (auto &[tid, t] : threads)
+            snapshot.push_back(t);
+    }
+
+    std::string dump = fmt::format("HANG DUMP: {} guest thread(s)\n", snapshot.size());
+    for (const auto &t : snapshot) {
+        const ThreadStatus status = t->status;
+        const char *status_str = (status == ThreadStatus::run) ? "run" : (status == ThreadStatus::wait) ? "wait"
+            : (status == ThreadStatus::suspend)                                                         ? "suspend"
+                                                                                                        : "dormant";
+        std::string line;
+        if (status == ThreadStatus::run) {
+            line = fmt::format("thread {} ({}) status=run (executing or blocked inside an HLE import) last_import_nid=0x{:08X} import_lr=0x{:X}", t->name, t->id, t->last_import_nid, t->last_import_lr);
+        } else {
+            line = fmt::format("thread {} ({}) status={} PC=0x{:X} LR=0x{:X} last_import_nid=0x{:08X} import_lr=0x{:X} stack:\n{}", t->name, t->id, status_str, read_pc(*t->cpu), read_lr(*t->cpu), t->last_import_nid, t->last_import_lr, t->log_stack_traceback());
+        }
+        LOG_ERROR("HANG DUMP: {}", line);
+        dump += line + "\n";
+    }
+
+    // vita3k.log is truncated on relaunch, so also persist the dump where a restart cannot eat it
+    const auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::ofstream hang_file("vita3k_hangdump.log", std::ios::app);
+    if (hang_file)
+        hang_file << "==== " << std::put_time(std::localtime(&now), "%Y-%m-%d %H:%M:%S") << " ====\n"
+                  << dump << std::endl;
+}
+
+void KernelState::resume_world() {
+    for (const auto &thread : world_stopped_threads)
+        thread->resume_from_world();
+    world_stopped_threads.clear();
 }
 
 void KernelState::deinit(MemState &mem) {

@@ -187,17 +187,22 @@ ProgramInput get_program_input(const SceGxmProgram &program) {
             break;
         }
         case SCE_GXM_PARAMETER_CATEGORY_UNIFORM_BUFFER: {
+            auto container = gxp::get_container_by_index(program, parameter.resource_index);
             if (!uniform_buffers.contains(parameter.resource_index)) {
                 UniformBuffer buffer;
                 buffer.index = parameter.resource_index;
-                buffer.reg_block_size = 0;
+                buffer.reg_block_size = container ? container->size_in_f32 : 0;
                 buffer.rw = false;
-                buffer.reg_start_offset = 0;
+                buffer.reg_start_offset = container ? container->base_sa_offset : 0;
                 buffer.size = (parameter.array_size + 3) / 4;
                 uniform_buffers.emplace(parameter.resource_index, buffer);
             } else {
                 auto &buffer = uniform_buffers.at(parameter.resource_index);
                 buffer.size = std::max((parameter.array_size + 3) / 4, buffer.size);
+                if (buffer.reg_block_size == 0 && container) {
+                    buffer.reg_block_size = container->size_in_f32;
+                    buffer.reg_start_offset = container->base_sa_offset;
+                }
             }
             break;
         }

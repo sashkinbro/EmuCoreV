@@ -262,6 +262,11 @@ void ScreenRenderer::create_swapchain() {
     // Create Swapchain
     {
         vk::ImageUsageFlags surface_usage = vk::ImageUsageFlagBits::eColorAttachment;
+        support_swapchain_transfer_dst = static_cast<bool>(surface_capabilities.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferDst);
+        if (support_swapchain_transfer_dst)
+            surface_usage |= vk::ImageUsageFlagBits::eTransferDst;
+        if (surface_capabilities.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc)
+            surface_usage |= vk::ImageUsageFlagBits::eTransferSrc;
         vk::ImageUsageFlags fsr_flags = vk::ImageUsageFlagBits::eTransferDst;
         if (!state.is_adreno_turnip)
             // workaround for a Turnip driver bug: adding storage flag here breaks the swapchain
@@ -271,6 +276,11 @@ void ScreenRenderer::create_swapchain() {
         if (surface_capabilities.supportedUsageFlags & vk::ImageUsageFlagBits::eStorage)
             // needed for FSR
             surface_usage |= fsr_flags;
+
+        LOG_INFO("swapchain: format={} colorspace={} extent={}x{} supportedUsage=0x{:X} chosenUsage=0x{:X} images={} currentTransform={} usedTransform=Identity",
+            vk::to_string(surface_format.format), vk::to_string(surface_format.colorSpace), extent.width, extent.height,
+            static_cast<uint32_t>(surface_capabilities.supportedUsageFlags), static_cast<uint32_t>(surface_usage),
+            swapchain_size, vk::to_string(surface_capabilities.currentTransform));
 
         vk::CompositeAlphaFlagBitsKHR comp_alpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
         if (!(surface_capabilities.supportedCompositeAlpha & comp_alpha))
@@ -446,6 +456,7 @@ bool ScreenRenderer::acquire_swapchain_image() {
         if (acquire_result == vk::Result::eErrorOutOfDateKHR
             || acquire_result == vk::Result::eErrorSurfaceLostKHR) {
             need_rebuild = true;
+            rebuild_reason = acquire_result == vk::Result::eErrorOutOfDateKHR ? "acquire: out of date" : "acquire: surface lost";
             need_surface_recreate = acquire_result == vk::Result::eErrorSurfaceLostKHR;
         } else {
             LOG_WARN("Failed to get next image. Error: {}", vk::to_string(acquire_result));
@@ -456,8 +467,10 @@ bool ScreenRenderer::acquire_swapchain_image() {
         return false;
     }
 
-    if (acquire_result == vk::Result::eSuboptimalKHR)
-        need_rebuild = !surface_matches_window_size();
+    if (acquire_result == vk::Result::eSuboptimalKHR && note_size_mismatch(!surface_matches_window_size())) {
+        need_rebuild = true;
+        rebuild_reason = "suboptimal + persistent size mismatch";
+    }
 
     // wait for the previous frame using this image to finish
     auto result = state.device.waitForFences(fences[swapchain_image_idx], VK_TRUE, next_image_timeout);
@@ -524,7 +537,15 @@ void ScreenRenderer::render(vk::ImageView image_view, vk::ImageLayout layout, co
     // if there is too much load on the GPU, it just drops any render pass with ImGui graphics in it....
     // I still don't know exactly why
     // so as a partial fix, render the gui and screen in different render passes
-    if (state.is_adreno_stock) {
+    const bool keep_single_pass = state.mapping_method == MappingMethod::PageTable
+        || state.mapping_method == MappingMethod::NativeBuffer;
+    if (state.is_adreno_stock && keep_single_pass) {
+        static bool logged_single_pass = false;
+        if (!logged_single_pass) {
+            logged_single_pass = true;
+            LOG_INFO("present: SINGLE-PASS mode active (game + GUI in one render pass, PT/NB on stock Adreno)");
+        }
+    } else if (state.is_adreno_stock) {
         current_cmd_buffer.endRenderPass();
         pass_info.renderPass = stock_adreno_pass;
         current_cmd_buffer.beginRenderPass(pass_info, vk::SubpassContents::eInline);
@@ -562,9 +583,13 @@ void ScreenRenderer::swap_window() {
 
     auto result = state.general_queue.presentKHR(&present_info);
     if (result == vk::Result::eSuboptimalKHR) {
-        need_rebuild = !surface_matches_window_size();
+        if (note_size_mismatch(!surface_matches_window_size())) {
+            need_rebuild = true;
+            rebuild_reason = "present: suboptimal + persistent size mismatch";
+        }
     } else if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eErrorSurfaceLostKHR) {
         need_rebuild = true;
+        rebuild_reason = result == vk::Result::eErrorOutOfDateKHR ? "present: out of date" : "present: surface lost";
         need_surface_recreate = result == vk::Result::eErrorSurfaceLostKHR;
     } else if (result != vk::Result::eSuccess) {
         LOG_ERROR("Could not present KHR.");
@@ -672,13 +697,11 @@ void ScreenRenderer::create_render_pass() {
         .setInitialLayout(vk::ImageLayout::eGeneral);
     post_filter_render_pass = state.device.createRenderPass(pass_info);
 
-#ifdef __ANDROID__
     if (state.is_adreno_stock) {
         // used to fix an adreno driver bug
         color_attachment.setInitialLayout(vk::ImageLayout::ePresentSrcKHR);
         stock_adreno_pass = state.device.createRenderPass(pass_info);
     }
-#endif
 }
 
 void ScreenRenderer::create_surface_image() {
@@ -697,8 +720,12 @@ bool ScreenRenderer::ensure_swapchain() {
     if (!window_has_drawable_size(state))
         return false;
 
-    if (!need_rebuild && !need_surface_recreate && swapchain && surface_matches_window_size())
-        return true;
+    if (!need_rebuild && !need_surface_recreate && swapchain) {
+        // A one-frame disagreement between what Vulkan reports as the surface extent and what the window reports as its client size is not a resize
+        if (!note_size_mismatch(!surface_matches_window_size()))
+            return true;
+        rebuild_reason = "persistent window size mismatch";
+    }
 
     if (!rebuild_swapchain_if_visible()) {
         need_rebuild = true;
@@ -710,12 +737,26 @@ bool ScreenRenderer::ensure_swapchain() {
     return true;
 }
 
+bool ScreenRenderer::note_size_mismatch(bool mismatched) {
+    if (!mismatched) {
+        size_mismatch_frames = 0;
+        return false;
+    }
+    return ++size_mismatch_frames >= 4;
+}
+
 bool ScreenRenderer::rebuild_swapchain_if_visible() {
     if (!window_has_drawable_size(state))
         return false;
 
+    // This is the most expensive thing the emulator does outside loading
+    // it idles the device, which stalls the vblank thread too
+    auto *frame_host = static_cast<renderer::State &>(state).frame;
+    const auto rebuild_start = std::chrono::steady_clock::now();
     state.device.waitIdle();
+    const auto idled = std::chrono::steady_clock::now();
     destroy_swapchain();
+    const auto destroyed = std::chrono::steady_clock::now();
 
 #ifdef __ANDROID__
     if (!create())
@@ -726,6 +767,15 @@ bool ScreenRenderer::rebuild_swapchain_if_visible() {
 #endif
 
     create_swapchain();
+    const auto created = std::chrono::steady_clock::now();
+    const auto ms = [](auto a, auto b) {
+        return std::chrono::duration_cast<std::chrono::microseconds>(b - a).count() / 1000.0;
+    };
+    LOG_WARN("[SWAPCHAIN] rebuild ({}): window={}x{} -> swapchain={}x{} | waitIdle={:.1f}ms destroy={:.1f}ms create={:.1f}ms total={:.1f}ms",
+        rebuild_reason, frame_host->drawable_width(), frame_host->drawable_height(),
+        extent.width, extent.height, ms(rebuild_start, idled), ms(idled, destroyed),
+        ms(destroyed, created), ms(rebuild_start, created));
+    size_mismatch_frames = 0;
     return static_cast<bool>(swapchain);
 }
 

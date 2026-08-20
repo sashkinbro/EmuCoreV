@@ -17,6 +17,7 @@
 
 #include <chrono>
 #include <future>
+#include <memory>
 #include <renderer/commands.h>
 #include <renderer/driver_functions.h>
 #include <renderer/state.h>
@@ -124,12 +125,15 @@ void finish(State &state, Context *context) {
     // Push a callback request on the queue and wait for it to be treated
     if (state.current_backend == Backend::Vulkan && state.features.enable_memory_mapping) {
         auto &vk_state = static_cast<vulkan::VKState &>(state);
-        std::promise<void> promise;
-        auto callback = [&]() {
-            promise.set_value();
-        };
-        vk_state.request_queue.push(vulkan::CallbackRequest{ new vulkan::CallbackRequestFunction(callback) });
-        promise.get_future().wait();
+        auto promise = std::make_shared<std::promise<void>>();
+        std::future<void> future = promise->get_future();
+        vk_state.request_queue.push(vulkan::CallbackRequest{
+            new vulkan::CallbackRequestFunction([promise]() { promise->set_value(); }), /* wait_for_gpu = */ true });
+
+        while (future.wait_for(std::chrono::milliseconds(5)) != std::future_status::ready) {
+            if (state.render_abort.load(std::memory_order_relaxed) || vk_state.request_queue.is_aborted())
+                return;
+        }
     }
 }
 

@@ -122,6 +122,24 @@ class SettingsPersistenceContractTest {
         assertTrue("Legacy GUI must consume the effective cache-warning value", "current_config.show_shader_cache_warn" in gui)
     }
 
+    @Test
+    fun accurateThreadSchedulingRoundTripsAndControlsTheGuestScheduler() {
+        val configHeader = cppSource("vita3k/vita3k/config/include/config/config.h")
+        val stateHeader = cppSource("vita3k/vita3k/config/include/config/state.h")
+        val settings = cppSource("vita3k/vita3k/config/src/settings.cpp")
+        val runtime = cppSource("vita3k/vita3k/interface.cpp")
+        val thread = cppSource("vita3k/vita3k/kernel/src/thread.cpp")
+
+        listOf("accurate-thread-scheduling", "guest-cores").forEach { key ->
+            assertTrue("Global config must serialize $key", key in configHeader)
+            assertTrue("Per-game config must read and write $key", settings.split(key).size >= 3)
+        }
+        assertTrue("Effective config must carry accurate scheduling", "accurate_thread_scheduling" in stateHeader)
+        assertTrue("Effective config must carry the guest core count", "guest_cores" in stateHeader)
+        assertTrue("Runtime initialization must apply the guest core limit", "guest_sched_set_cores" in runtime)
+        assertTrue("Guest execution must be gated by the effective setting", "kernel.accurate_thread_scheduling" in thread)
+    }
+
     private fun javaSource(relative: String): String = appModule()
         .resolve("src/main/java/com/sbro/emucorev")
         .resolve(relative)

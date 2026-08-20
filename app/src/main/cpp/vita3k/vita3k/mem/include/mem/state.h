@@ -24,6 +24,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 
 struct AllocMemPage {
     uint32_t allocated : 4;
@@ -77,4 +78,6 @@ struct MemState {
     bool use_page_table = false;
     PageTable page_table;
     std::map<uint64_t, MemExternalMapping, std::greater<>> external_mapping;
+    mutable std::mutex external_mapping_mutex;
+    mutable std::shared_mutex external_transition_mutex;
 };

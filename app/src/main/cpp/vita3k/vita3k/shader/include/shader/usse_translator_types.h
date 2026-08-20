@@ -89,6 +89,9 @@ struct SpirvShaderParameters {
     int viewport_ratio_id;
     int viewport_offset_id;
 
+    // number of entries in the buffer_addresses[] uniform array
+    int buffer_count = 0;
+
     // when using a thread, texture or literal buffer, if not -1, this fields contain the sa register
     // with the matching address, this assumes of course that this address is not copied somewhere
     // else and that this register is not overwritten
@@ -104,6 +107,10 @@ struct SpirvShaderParameters {
     spv::Id thread_buffer;
 
     spv::Id render_info_id;
+
+    spv::Id frag_coord_id = 0;
+
+    spv::Id front_facing_id = 0;
 
     // When using shader interlock, specialization constant telling us if the texture is gamma corrected
     spv::Id is_srgb_constant;

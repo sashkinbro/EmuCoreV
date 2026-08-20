@@ -23,6 +23,7 @@
 #include <mem/block.h>
 #include <mem/ptr.h>
 
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <optional>
@@ -31,6 +32,11 @@
 struct CPUContext;
 
 struct ThreadState;
+
+void guest_sched_set_cores(int cores);
+void guest_sched_release_for_block();
+void guest_sched_forget_cpu(CPUState *cpu);
+CPUState *guest_sched_token_cpu();
 struct ThreadParams;
 struct KernelState;
 
@@ -62,6 +68,9 @@ struct ThreadState {
     std::mutex mutex;
     std::string name;
     SceUID id;
+
+    uint32_t last_import_nid = 0;
+    uint32_t last_import_lr = 0;
     Address entry_point;
 
     Block stack;
@@ -77,7 +86,6 @@ struct ThreadState {
 
     CPUStatePtr cpu;
     ThreadStatus status = ThreadStatus::dormant;
-
     ThreadSignal signal;
     std::vector<CallbackPtr> callbacks;
     std::condition_variable status_cond;
@@ -86,6 +94,7 @@ struct ThreadState {
 
     ThreadState() = delete;
     explicit ThreadState(SceUID id, KernelState &kernel, MemState &mem);
+    ~ThreadState();
 
     int init(const char *name, Ptr<const void> entry_point, int init_priority, SceInt32 affinity_mask, int stack_size, const SceKernelThreadOptParam *option);
     int start(SceSize arglen, const Ptr<void> argp, bool run_entry_callback = false);
@@ -93,6 +102,7 @@ struct ThreadState {
     void exit_delete(bool exit = true);
 
     void update_status(ThreadStatus status, std::optional<ThreadStatus> expected = std::nullopt);
+    bool is_delete_requested() const { return delete_requested; }
     Address stack_top() const;
 
     void run_loop();
@@ -107,7 +117,15 @@ struct ThreadState {
     uint32_t run_guest_function(Address callback_address, SceSize args = 0, const Ptr<void> argp = Ptr<void>{});
 
     void suspend();
+    void suspend_and_wait();
     void resume(bool step = false);
+    void resume_if_suspended();
+
+    // Stop-the-world support: distinct from suspend()/vm_suspended so they cannot cancel each other
+    void request_world_stop();
+    bool wait_world_stopped(std::chrono::steady_clock::time_point deadline);
+    bool resume_from_world();
+
     std::string log_stack_traceback() const;
 
 private:
@@ -123,6 +141,11 @@ private:
     bool delete_requested = false;
     // Set by suspend(), consumed in run_loop() to transition to ThreadStatus::suspend.
     bool suspend_requested = false;
+    // Suspended by sceKernelSuspendThreadForVM
+    bool vm_suspended = false;
+    // Stop-the-world
+    bool world_stop_requested = false;
+    bool world_stopped = false;
     // Single stepping mode.
     bool single_stepping = false;
 

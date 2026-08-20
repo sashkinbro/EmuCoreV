@@ -34,6 +34,7 @@
 #include <emuenv/app_launch_request.h>
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <functional>
 #include <map>
@@ -99,6 +100,8 @@ struct KernelState {
     std::mutex mutex;
     CodecEngineBlocks codec_blocks;
 
+    bool accurate_thread_scheduling = false;
+
     Ptr<const void> tls_address = Ptr<const void>(0);
     unsigned int tls_psize = 0;
     unsigned int tls_msize = 0;
@@ -132,6 +135,7 @@ struct KernelState {
     std::mutex export_nids_mutex;
     ExportNids export_nids;
     FuncBindingInfos func_binding_infos;
+    std::unordered_map<uint32_t, std::string> nid_libraries;
     VarBindingInfos var_binding_infos;
     ModuleUidByNid module_uid_by_nid;
 
@@ -176,6 +180,11 @@ struct KernelState {
     void pause_threads();
     void resume_threads();
 
+    int stop_world(SceUID except_id, std::chrono::milliseconds budget);
+    void resume_world();
+
+    void log_thread_hang_dump();
+
     // Kill all guest threads and block until they have exited. Must only be called from a host thread.
     void process_exit();
     std::function<void(int, std::optional<AppLaunchRequest>)> process_exit_callback;
@@ -190,4 +199,5 @@ struct KernelState {
 private:
     std::atomic<SceUID> next_uid{ 1 };
     std::map<SceUID, ThreadStatus> paused_threads_status;
+    std::vector<ThreadStatePtr> world_stopped_threads;
 };

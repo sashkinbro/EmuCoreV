@@ -15,6 +15,21 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <algorithm>
+#include <cpu/functions.h>
+#include <thread>
+
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+// after windows.h
+#include <psapi.h>
+#endif
 #include <display/functions.h>
 
 #include <dialog/state.h>
@@ -35,8 +50,73 @@ static constexpr int64_t TARGET_MICRO_PER_FRAME = 1000000LL / TARGET_FPS;
 static constexpr int predict_threshold = 3;
 static constexpr int max_expected_swapchain_size = 6;
 
+struct ProcSample {
+    uint64_t page_faults = 0;
+    uint64_t working_set_mb = 0;
+    uint64_t private_mb = 0;
+    uint64_t user_us = 0;
+    uint64_t kernel_us = 0;
+    uint64_t sys_idle_us = 0;
+    uint64_t sys_busy_us = 0;
+};
+
+static ProcSample sample_process() {
+    ProcSample out;
+#ifdef _WIN32
+    PROCESS_MEMORY_COUNTERS pmc{};
+    pmc.cb = sizeof(pmc);
+    if (K32GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+        out.page_faults = pmc.PageFaultCount;
+        out.working_set_mb = pmc.WorkingSetSize / (1024 * 1024);
+        out.private_mb = pmc.PagefileUsage / (1024 * 1024);
+    }
+    auto to_us = [](const FILETIME &ft) {
+        return ((static_cast<uint64_t>(ft.dwHighDateTime) << 32) | ft.dwLowDateTime) / 10;
+    };
+    FILETIME created{}, exited{}, kernel{}, user{};
+    if (GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user)) {
+        out.kernel_us = to_us(kernel);
+        out.user_us = to_us(user);
+    }
+    FILETIME sys_idle{}, sys_kernel{}, sys_user{};
+    if (GetSystemTimes(&sys_idle, &sys_kernel, &sys_user)) {
+        out.sys_idle_us = to_us(sys_idle);
+        out.sys_busy_us = to_us(sys_kernel) + to_us(sys_user) - to_us(sys_idle);
+    }
+#endif
+    return out;
+}
+
+static void freeze_watchdog_thread(EmuEnvState &emuenv) {
+    DisplayState &display = emuenv.display;
+    ProcSample prev = sample_process();
+    while (!display.abort.load()) {
+        const auto before = std::chrono::steady_clock::now();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        const auto slept_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - before).count();
+        const int64_t overshoot = std::max<int64_t>(0, slept_us - 10000);
+
+        const ProcSample now = sample_process();
+        if (overshoot > 100000) {
+            const double sys_idle_ms = (now.sys_idle_us - prev.sys_idle_us) / 1000.0;
+            const double sys_busy_ms = (now.sys_busy_us - prev.sys_busy_us) / 1000.0;
+            LOG_WARN("[FREEZE] {:.0f}ms process-wide stall | page_faults +{} (total {}) | working_set {}MB (delta {}MB) | private {}MB | OUR cpu: user {:.0f}ms kernel {:.0f}ms (= {:.0f}% of one core) | SYSTEM cpu: busy {:.0f}ms idle {:.0f}ms across {} cores (= {:.0f}% busy)",
+                overshoot / 1000.0,
+                now.page_faults - prev.page_faults, now.page_faults,
+                now.working_set_mb, static_cast<int64_t>(now.working_set_mb) - static_cast<int64_t>(prev.working_set_mb),
+                now.private_mb,
+                (now.user_us - prev.user_us) / 1000.0, (now.kernel_us - prev.kernel_us) / 1000.0,
+                100.0 * (now.user_us - prev.user_us + now.kernel_us - prev.kernel_us) / static_cast<double>(slept_us),
+                sys_busy_ms, sys_idle_ms, std::thread::hardware_concurrency(),
+                (sys_busy_ms + sys_idle_ms) > 0.0 ? (100.0 * sys_busy_ms / (sys_busy_ms + sys_idle_ms)) : 0.0);
+        }
+        prev = now;
+    }
+}
+
 static void vblank_sync_thread(EmuEnvState &emuenv) {
     DisplayState &display = emuenv.display;
+    std::thread watchdog(freeze_watchdog_thread, std::ref(emuenv));
 
     while (!display.abort.load()) {
         {
@@ -75,10 +155,25 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
                 }
             }
         }
+        // Hang watchdog: no framebuffer flip for ~10s (600 vblanks) while unpaused -> dump guest threads once per stall.
+        {
+            static uint64_t last_dumped_setframe = ~0ull;
+            const uint64_t setframe = emuenv.display.last_setframe_vblank_count.load();
+            const uint64_t vblanks = emuenv.display.vblank_count.load();
+            if (setframe > 0 && vblanks > setframe && (vblanks - setframe) > 600
+                && !emuenv.kernel.is_threads_paused() && last_dumped_setframe != setframe) {
+                last_dumped_setframe = setframe; // one dump per distinct stall
+                LOG_ERROR("HANG WATCHDOG: no framebuffer flip for {} vblanks — dumping guest threads", vblanks - setframe);
+                emuenv.kernel.log_thread_hang_dump();
+            }
+        }
+
         const auto time_ms = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         const auto time_left = TARGET_MICRO_PER_FRAME - (time_ms % TARGET_MICRO_PER_FRAME);
         std::this_thread::sleep_for(std::chrono::microseconds(time_left));
     }
+
+    watchdog.join();
 }
 
 void start_sync_thread(EmuEnvState &emuenv) {

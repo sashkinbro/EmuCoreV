@@ -29,6 +29,8 @@
 struct SceNpServiceStateCallback {
     Address pc;
     Address data;
+    bool delivered = false;
+    uint32_t last_state = 0;
 };
 
 typedef std::map<int, SceNpServiceStateCallback> np_callbacks;

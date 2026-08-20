@@ -140,6 +140,8 @@ class SettingsBackupRepository(
         .put("anisotropicFiltering", anisotropicFiltering)
         .put("textureCache", textureCache)
         .put("asyncPipelineCompilation", asyncPipelineCompilation)
+        .put("accurateThreadScheduling", accurateThreadScheduling)
+        .put("guestCores", guestCores)
         .put("showCompileShaders", showCompileShaders)
         .put("hashlessTextureCache", hashlessTextureCache)
         .put("importTextures", importTextures)
@@ -231,6 +233,8 @@ class SettingsBackupRepository(
         anisotropicFiltering = optInt("anisotropicFiltering", defaults.anisotropicFiltering),
         textureCache = optBoolean("textureCache", defaults.textureCache),
         asyncPipelineCompilation = optBoolean("asyncPipelineCompilation", defaults.asyncPipelineCompilation),
+        accurateThreadScheduling = optBoolean("accurateThreadScheduling", defaults.accurateThreadScheduling),
+        guestCores = optInt("guestCores", defaults.guestCores).coerceIn(1, 4),
         showCompileShaders = optBoolean("showCompileShaders", defaults.showCompileShaders),
         hashlessTextureCache = optBoolean("hashlessTextureCache", defaults.hashlessTextureCache),
         importTextures = optBoolean("importTextures", defaults.importTextures),

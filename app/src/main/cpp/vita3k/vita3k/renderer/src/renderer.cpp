@@ -19,6 +19,10 @@
 #include <renderer/state.h>
 #include <renderer/types.h>
 
+#include <atomic>
+#include <chrono>
+#include <mutex>
+
 #include <dialog/state.h>
 #include <overlay/common_dialog.h>
 #include <overlay/display_manager.h>

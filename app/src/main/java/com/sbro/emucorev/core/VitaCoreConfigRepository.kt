@@ -25,6 +25,8 @@ data class VitaCoreConfig(
     val anisotropicFiltering: Int = 1,
     val textureCache: Boolean = true,
     val asyncPipelineCompilation: Boolean = true,
+    val accurateThreadScheduling: Boolean = false,
+    val guestCores: Int = 1,
     val showCompileShaders: Boolean = true,
     val hashlessTextureCache: Boolean = false,
     val importTextures: Boolean = false,
@@ -85,15 +87,15 @@ data class VitaCoreConfig(
     val httpEnable: Boolean = true,
     val colorSurfaceDebug: Boolean = false,
     val showShaderCacheWarn: Boolean = true,
-    // Camera — defaults match upstream Vita3K (type 2 = "real camera").
+    // Camera — type 2 uses the real camera; opaque white is the upstream fallback.
     val frontCameraType: Int = 2,
     val frontCameraId: String = "",
     val frontCameraImage: String = "",
-    val frontCameraColor: Long = 0L,
+    val frontCameraColor: Long = 0xFFFFFFFFL,
     val backCameraType: Int = 2,
     val backCameraId: String = "",
     val backCameraImage: String = "",
-    val backCameraColor: Long = 0L,
+    val backCameraColor: Long = 0xFFFFFFFFL,
     // Misc upstream-aligned settings.
     val screenshotFormat: Int = SCREENSHOT_FORMAT_JPEG,
     val showWelcome: Boolean = true,
@@ -131,6 +133,7 @@ class VitaCoreConfigRepository(private val context: Context) {
     private val persistedKeys = setOf(
         "anisotropic-filtering",
         "archive-log",
+        "accurate-thread-scheduling",
         "async-pipeline-compilation",
         "audio-backend",
         "audio-volume",
@@ -170,6 +173,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         "gamepad-trigger-threshold",
         "gamepad-vibration",
         "gamepad-vibration-strength",
+        "guest-cores",
         "device-vibration-fallback",
         "fullscreen_hd_res_pixel_perfect",
         "hashless-texture-cache",
@@ -257,6 +261,8 @@ class VitaCoreConfigRepository(private val context: Context) {
                 anisotropicFiltering = values["anisotropic-filtering"]?.toIntOrNull() ?: defaults.anisotropicFiltering,
                 textureCache = values["texture-cache"]?.toBooleanStrictOrNull() ?: defaults.textureCache,
                 asyncPipelineCompilation = values["async-pipeline-compilation"]?.toBooleanStrictOrNull() ?: defaults.asyncPipelineCompilation,
+                accurateThreadScheduling = values["accurate-thread-scheduling"]?.toBooleanStrictOrNull() ?: defaults.accurateThreadScheduling,
+                guestCores = values["guest-cores"]?.toIntOrNull() ?: defaults.guestCores,
                 showCompileShaders = values["show-compile-shaders"]?.toBooleanStrictOrNull() ?: defaults.showCompileShaders,
                 hashlessTextureCache = values["hashless-texture-cache"]?.toBooleanStrictOrNull() ?: defaults.hashlessTextureCache,
                 importTextures = values["import-textures"]?.toBooleanStrictOrNull() ?: defaults.importTextures,
@@ -395,6 +401,8 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["anisotropic-filtering"] = config.anisotropicFiltering.toString()
         values["texture-cache"] = config.textureCache.toString()
         values["async-pipeline-compilation"] = config.asyncPipelineCompilation.toString()
+        values["accurate-thread-scheduling"] = config.accurateThreadScheduling.toString()
+        values["guest-cores"] = config.guestCores.toString()
         values["show-compile-shaders"] = config.showCompileShaders.toString()
         values["hashless-texture-cache"] = config.hashlessTextureCache.toString()
         values["import-textures"] = config.importTextures.toString()
@@ -569,6 +577,7 @@ class VitaCoreConfigRepository(private val context: Context) {
             ),
             gyroSensitivity = config.gyroSensitivity.coerceIn(25, 300),
             gyroSmoothing = config.gyroSmoothing.coerceIn(0, 90),
+            guestCores = config.guestCores.coerceIn(1, 4),
             frameLimit = FrameLimit.normalize(config.frameLimit),
             logLevel = normalizedLogLevel
         )

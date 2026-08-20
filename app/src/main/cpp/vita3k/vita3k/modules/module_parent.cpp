@@ -160,6 +160,8 @@ void call_import(EmuEnvState &emuenv, CPUState &cpu, uint32_t nid, SceUID thread
         auto lr = read_lr(cpu);
         log_import_call('H', nid, thread_id, hle_nid_blacklist, lr);
     }
+    set_last_import_call(nid, read_lr(cpu));
+
     const ImportFn *fn = resolve_import(nid);
     if (fn) {
         (*fn)(emuenv, cpu, thread_id);
@@ -169,7 +171,14 @@ void call_import(EmuEnvState &emuenv, CPUState &cpu, uint32_t nid, SceUID thread
         write_reg(*thread->cpu, 0, 0);
 
         if (!emuenv.missing_nids.contains(nid) || LOG_UNK_NIDS_ALWAYS) {
-            LOG_ERROR("Import function for NID {} not found (thread name: {}, thread ID: {})", log_hex(nid), thread->name, thread_id);
+            std::string lib_name = "unknown library";
+            {
+                const std::lock_guard<std::mutex> guard(emuenv.kernel.export_nids_mutex);
+                const auto lib_it = emuenv.kernel.nid_libraries.find(nid);
+                if (lib_it != emuenv.kernel.nid_libraries.end())
+                    lib_name = lib_it->second;
+            }
+            LOG_ERROR("Import function for NID {} ({}) not found - RETURNING 0 (thread name: {}, thread ID: {}, LR: {})", log_hex(nid), lib_name, thread->name, thread_id, log_hex(read_lr(cpu)));
             if (!LOG_UNK_NIDS_ALWAYS)
                 emuenv.missing_nids.insert(nid);
         }

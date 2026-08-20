@@ -1,0 +1,61 @@
+// Vita3K emulator project
+// Copyright (C) 2026 Vita3K team
+//
+// This program is free software; you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation; either version 2 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along
+// with this program; if not, write to the Free Software Foundation, Inc.,
+// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(push_constant) uniform PushConstants {
+    uint out_width;      // scaled cast width  (== ratio * scaled_store_w)
+    uint out_height;     // scaled cast height
+    uint scaled_store_w; // store texels per row at the current resolution
+    uint scaled_store_h; // store rows at the current resolution
+    uint ratio;          // bppStore / bppReq  (== 2 here)
+    uint half_index;     // which 32-bit word of each store texel this view reads
+    uint interleave;     // 1 = interleave both words per column, 0 = duplicate word[half_index]
+} pc;
+
+layout(set = 0, binding = 0) uniform usampler2D u_store;
+layout(set = 0, binding = 1, r32ui) uniform writeonly uimage2D u_cast;
+
+void main() {
+    const uint x = gl_GlobalInvocationID.x;
+    const uint y = gl_GlobalInvocationID.y;
+    if (x >= pc.out_width || y >= pc.out_height)
+        return;
+
+    uint s = x / pc.ratio;
+    if (s >= pc.scaled_store_w)
+        s = pc.scaled_store_w - 1u;
+
+    uint ys = y;
+    if (ys >= pc.scaled_store_h)
+        ys = pc.scaled_store_h - 1u;
+
+    const uvec2 words = texelFetch(u_store, ivec2(int(s), int(ys)), 0).xy;
+    // Two cast layouts, chosen by the caller per consumer style:
+    //  interleave=1: cast[2j] = lo word, cast[2j+1] = hi word of store texel j — for games
+    //    that bind ONE view and select the word with half-texel UV offsets (COD:BOD,
+    //    Resistance; paired with the shader-side UV re-anchor at res multipliers != 1).
+    //  interleave=0: every column = word[half_index] — for games that bind a separate
+    //    byte-offset view per word and sample with plain UVs (AC3L); any UV then lands on
+    //    the word that view addresses, at any resolution.
+    const uint word_idx = (pc.interleave != 0u) ? (x % pc.ratio) : pc.half_index;
+    const uint word = (word_idx == 0u) ? words.x : words.y;
+
+    imageStore(u_cast, ivec2(int(x), int(y)), uvec4(word, 0u, 0u, 0u));
+}

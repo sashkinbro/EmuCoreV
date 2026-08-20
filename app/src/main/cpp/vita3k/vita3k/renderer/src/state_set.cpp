@@ -15,6 +15,9 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <array>
+#include <chrono>
+#include <cpu/functions.h>
 #include <gxm/types.h>
 #include <renderer/commands.h>
 #include <renderer/driver_functions.h>
@@ -558,11 +561,18 @@ COMMAND(handle_set_state) {
         { GXMState::VisibilityIndex, cmd_set_state_visibility_index }
     };
 
-    auto result = handlers.find(gxm_state_to_set);
+    static const std::array<StateChangeHandlerFunc *, static_cast<size_t>(GXMState::TotalState)> handler_table = [&]() {
+        std::array<StateChangeHandlerFunc *, static_cast<size_t>(GXMState::TotalState)> table{};
+        for (const auto &[state, fn] : handlers)
+            table[static_cast<size_t>(state)] = fn;
+        return table;
+    }();
 
-    if (result != handlers.end()) {
-        // LOG_TRACE("State set: {}", (int)gxm_state_to_set);
-        result->second(renderer, mem, config, helper, render_context);
+    const size_t state_index = static_cast<size_t>(gxm_state_to_set);
+    StateChangeHandlerFunc *fn = state_index < handler_table.size() ? handler_table[state_index] : nullptr;
+
+    if (fn) {
+        fn(renderer, mem, config, helper, render_context);
     } else {
         LOG_ERROR("Unknown state set command {}", static_cast<uint16_t>(gxm_state_to_set));
     }

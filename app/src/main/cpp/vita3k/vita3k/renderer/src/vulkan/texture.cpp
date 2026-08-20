@@ -15,6 +15,8 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <chrono>
+#include <cpu/functions.h>
 #include <renderer/vulkan/functions.h>
 
 #include <renderer/vulkan/gxm_to_vulkan.h>
@@ -112,21 +114,26 @@ void sync_texture(VKContext &context, MemState &mem, std::size_t index, SceGxmTe
 
     TextureViewport texture_viewport{};
 
-    if (renderer::texture::convert_base_texture_format_to_base_color_format(base_format, format_target_of_texture)) {
+    // surface-cache views are always 2D, so a cube texture must skip it or the shader samples a cube sampler through a 2D view
+    const bool texture_is_cube = texture.texture_type() == SCE_GXM_TEXTURE_CUBE || texture.texture_type() == SCE_GXM_TEXTURE_CUBE_ARBITRARY;
+
+    bool color_convertible = renderer::texture::convert_base_texture_format_to_base_color_format(base_format, format_target_of_texture);
+    if (color_convertible && !texture_is_cube) {
         // try to retrieve it from the color surface cache
         lookup_result = context.state.surface_cache.retrieve_color_surface_as_texture(texture, format_target_of_texture, &texture_viewport);
     }
 
     bool is_depth_surface = false;
-    if (!lookup_result.has_value() && is_depth_stencil_compatible_format(base_format, is_depth_surface)) {
+    if (!lookup_result.has_value() && !texture_is_cube && is_depth_stencil_compatible_format(base_format, is_depth_surface)) {
         // Try to retrieve depth/stencil cache
         lookup_result = context.state.surface_cache.retrieve_depth_stencil_as_texture(texture, &texture_viewport);
     }
 
     if (lookup_result.has_value()) {
-        // get the sampler now
-        context.state.texture_cache.cache_and_bind_sampler(texture, is_depth_surface);
+        const bool needs_nearest = !context.state.texture_cache.format_supports_linear_filter(lookup_result->format);
+        context.state.texture_cache.cache_and_bind_sampler(texture, needs_nearest);
     } else {
+        context.state.texture_cache.current_scene = context.scene_timestamp;
         context.state.texture_cache.cache_and_bind_texture(texture, mem);
         auto &image = context.state.texture_cache.current_texture->texture;
         lookup_result = TextureLookupResult{
@@ -164,6 +171,9 @@ void sync_texture(VKContext &context, MemState &mem, std::size_t index, SceGxmTe
             context.curr_frag_ublock.set_viewport_offset(index, texture_viewport.offset);
         }
     }
+
+    if (!is_vertex)
+        context.curr_frag_ublock.set_cast_sampler_bit(index, lookup_result->is_typeless_cast, lookup_result->cast_phase_hi);
 }
 
 void VKTextureCache::prepare_staging_buffer(bool is_configure) {
@@ -554,6 +564,18 @@ void VKTextureCache::upload_done() {
     is_texture_transfer_ready = false;
 }
 
+bool VKTextureCache::format_supports_linear_filter(vk::Format format) {
+    auto it = linear_filter_support_cache.find(static_cast<VkFormat>(format));
+    if (it != linear_filter_support_cache.end())
+        return it->second;
+    const vk::FormatProperties props = state.physical_device.getFormatProperties(format);
+    const bool supported = static_cast<bool>(props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear);
+    linear_filter_support_cache[static_cast<VkFormat>(format)] = supported;
+    if (!supported)
+        LOG_INFO("format {} lacks linear-filter support: samplers for it will use nearest", vk::to_string(format));
+    return supported;
+}
+
 void VKTextureCache::configure_sampler(size_t index, const SceGxmTexture &texture, bool no_linear) {
     vk::Sampler &sampler = samplers[index];
     if (sampler) {
@@ -586,7 +608,7 @@ void VKTextureCache::configure_sampler(size_t index, const SceGxmTexture &textur
         .mipLodBias = (static_cast<float>(texture.lod_bias) - 31.f) / 8.f,
         .maxAnisotropy = static_cast<float>(anisotropic_filtering),
         .compareEnable = VK_FALSE,
-        .minLod = static_cast<float>(texture.lod_min0 | (texture.lod_min1 << 2)),
+        .minLod = static_cast<float>(texture.true_lod_min()),
         .maxLod = VK_LOD_CLAMP_NONE,
         .unnormalizedCoordinates = VK_FALSE,
     };

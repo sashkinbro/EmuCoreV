@@ -17,12 +17,15 @@
 
 #include <app/functions.h>
 
+#include <exception>
+
 #include <audio/state.h>
 #include <camera/state.h>
 #include <compat/state.h>
 #include <config/settings.h>
 #include <config/state.h>
 #include <config/version.h>
+#include <cpu/functions.h>
 #include <ctrl/functions.h>
 #include <ctrl/state.h>
 #include <dialog/state.h>
@@ -40,6 +43,7 @@
 #include <motion/state.h>
 #include <net/state.h>
 #include <ngs/state.h>
+#include <nids/functions.h>
 #include <np/functions.h>
 #include <np/state.h>
 #include <np/trophy/context.h>
@@ -413,6 +417,22 @@ bool init_paths(Root &root_paths) {
 }
 
 bool init(EmuEnvState &state, Config &cfg, const Root &root_paths) {
+    // Log the escaped exception's message before dying instead of a bare std::terminate().
+    std::set_terminate([]() {
+        if (auto exc = std::current_exception()) {
+            try {
+                std::rethrow_exception(exc);
+            } catch (const std::exception &e) {
+                LOG_CRITICAL("std::terminate: unhandled exception: {}", e.what());
+            } catch (...) {
+                LOG_CRITICAL("std::terminate: unhandled non-standard exception");
+            }
+        } else {
+            LOG_CRITICAL("std::terminate called without an active exception");
+        }
+        std::abort();
+    });
+
     state.cfg = std::move(cfg);
 
     state.default_path = root_paths.get_vita_fs_path();
@@ -555,10 +575,25 @@ void reset_app_state(EmuEnvState &state) {
     }
 }
 
+// Formats guest PC/LR + last HLE import for mem's unhandled-fault logs; runs on the faulting thread.
+static std::string fault_context_provider() {
+    uint32_t pc = 0, lr = 0, imp_nid = 0, imp_lr = 0;
+    if (CPUState *cpu = get_current_cpu_state()) {
+        pc = read_pc(*cpu);
+        lr = read_lr(*cpu);
+    }
+    get_last_import_call(imp_nid, imp_lr);
+    return fmt::format(" guest PC=0x{:X} LR=0x{:X} last_import=0x{:X} ({}) called from LR=0x{:X}",
+        pc, lr, imp_nid, import_name(imp_nid), imp_lr);
+}
+
 bool late_init(EmuEnvState &state) {
     // note: mem is not initialized yet but that's not an issue
     // the renderer is not using it yet, just storing it for later uses
     state.renderer->late_init(state.cfg, state.app_path, state.mem);
+    // for the stop-the-world bracket around page-table memory transitions
+    state.renderer->kernel = &state.kernel;
+    set_fault_context_provider(&fault_context_provider);
 
     const bool need_page_table = state.renderer->mapping_method == MappingMethod::PageTable || state.renderer->mapping_method == MappingMethod::NativeBuffer;
     if (!init(state.mem, need_page_table)) {

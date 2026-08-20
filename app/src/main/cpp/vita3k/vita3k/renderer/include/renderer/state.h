@@ -38,6 +38,7 @@ struct DialogState;
 struct DisplayState;
 struct GxmState;
 struct Config;
+struct KernelState;
 
 namespace overlay {
 class display_manager;
@@ -88,6 +89,7 @@ struct State {
     fs::path shaders_log_path;
 
     FrameHost *frame = nullptr;
+    KernelState *kernel = nullptr;
 
     Backend current_backend;
     FeatureState features;

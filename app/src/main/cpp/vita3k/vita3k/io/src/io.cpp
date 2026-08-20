@@ -95,7 +95,8 @@ static bool is_valid_output_path(const VitaIoDevice device) {
     return !(device == VitaIoDevice::savedata0 || device == VitaIoDevice::savedata1 || device == VitaIoDevice::app0
         || device == VitaIoDevice::_INVALID || device == VitaIoDevice::addcont0 || device == VitaIoDevice::tty0
         || device == VitaIoDevice::tty1 || device == VitaIoDevice::tty2 || device == VitaIoDevice::tty3
-        || device == VitaIoDevice::music0 || device == VitaIoDevice::photo0 || device == VitaIoDevice::video0);
+        || device == VitaIoDevice::music0 || device == VitaIoDevice::photo0 || device == VitaIoDevice::video0
+        || device == VitaIoDevice::memory);
 }
 
 bool init(IOState &io, const fs::path &cache_path, const fs::path &log_path, const fs::path &vita_fs_path, bool redirect_stdio) {
@@ -110,6 +111,8 @@ bool init(IOState &io, const fs::path &cache_path, const fs::path &log_path, con
     const fs::path vd0{ vita_fs_path / "vd0" };
 
     fs::create_directories(ux0 / "data");
+    fs::remove_all(ux0 / "data/memory");
+    fs::create_directories(ux0 / "data/memory");
     fs::create_directories(ux0 / "app");
     fs::create_directories(ux0 / "music");
     fs::create_directories(ux0 / "picture");
@@ -255,6 +258,11 @@ std::string translate_path(const char *path, VitaIoDevice &device, const IOState
         device = VitaIoDevice::ux0;
         break;
     }
+    case VitaIoDevice::memory: { // Redirect memory: (RAM work directory) to ux0:data/memory
+        relative_path = device::remove_device_from_path(relative_path, device, "data/memory");
+        device = VitaIoDevice::ux0;
+        break;
+    }
     case VitaIoDevice::video0: { // Redirect video0: to ux0:video
         relative_path = device::remove_device_from_path(relative_path, device, "video");
         device = VitaIoDevice::ux0;
@@ -387,6 +395,58 @@ SceUID open_file(IOState &io, const char *path, const int flags, const fs::path 
     return fd;
 }
 
+int read_file_at(void *data, IOState &io, const SceUID fd, const SceSize size, const SceOff offset, const char *export_name) {
+    assert(data != nullptr);
+    if (fd < 0)
+        return IO_ERROR(SCE_ERROR_ERRNO_EBADFD);
+
+    if (!io.file_mutex.try_lock()) {
+        io.concurrent_positional_io.fetch_add(1, std::memory_order_relaxed);
+        io.file_mutex.lock();
+    }
+    const std::lock_guard<std::mutex> lock(io.file_mutex, std::adopt_lock);
+
+    const auto file = io.std_files.find(fd);
+    if (file == io.std_files.end())
+        return IO_ERROR(SCE_ERROR_ERRNO_EBADFD);
+
+    const SceOff previous = file->second.tell();
+    if (previous < 0)
+        return static_cast<int>(previous);
+    if (!file->second.seek(offset, SCE_SEEK_SET))
+        return IO_ERROR_UNK();
+
+    const auto read = file->second.read(data, 1, size);
+
+    // put the shared position back exactly as we found it
+    file->second.seek(previous, SCE_SEEK_SET);
+    return static_cast<int>(read);
+}
+
+int write_file_at(const SceUID fd, const void *data, const SceSize size, const SceOff offset, IOState &io, const char *export_name) {
+    assert(data != nullptr);
+    if (fd < 0)
+        return IO_ERROR(SCE_ERROR_ERRNO_EBADFD);
+
+    const std::lock_guard<std::mutex> lock(io.file_mutex);
+
+    const auto file = io.std_files.find(fd);
+    if (file == io.std_files.end())
+        return IO_ERROR(SCE_ERROR_ERRNO_EBADFD);
+    if (!file->second.can_write_file())
+        return IO_ERROR(SCE_ERROR_ERRNO_EBADFD);
+
+    const SceOff previous = file->second.tell();
+    if (previous < 0)
+        return static_cast<int>(previous);
+    if (!file->second.seek(offset, SCE_SEEK_SET))
+        return IO_ERROR_UNK();
+
+    const auto written = file->second.write(data, 1, size);
+    file->second.seek(previous, SCE_SEEK_SET);
+    return static_cast<int>(written);
+}
+
 int read_file(void *data, IOState &io, const SceUID fd, const SceSize size, const char *export_name) {
     assert(data != nullptr);
     assert(size >= 0);
@@ -429,9 +489,11 @@ int write_file(SceUID fd, const void *data, const SceSize size, const IOState &i
             if (io.redirect_stdio) {
                 std::cout << s;
             } else {
-                if (s.back() == '\n')
+                if (!s.empty() && s.back() == '\n')
                     s.pop_back();
-                LOG_TRACE_IF(log_file_op, "*** TTY: {}", s);
+                // Always log it. This is the guest telling us what went wrong in its own words
+                if (!s.empty())
+                    LOG_INFO("*** TTY: {}", s);
             }
 
             return size;

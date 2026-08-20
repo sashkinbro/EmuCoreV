@@ -20,8 +20,23 @@
 
 namespace ngs {
 
+uint32_t InputMixerModule::input_index_of(const ModuleData &data) {
+    uint32_t input_index = 0;
+    const auto &modules = data.parent->rack->modules;
+    for (uint32_t i = 0; i < data.index && i < modules.size(); i++) {
+        if (modules[i] && modules[i]->module_id() == input_mixer_module_id)
+            input_index++;
+    }
+    return input_index;
+}
+
 bool InputMixerModule::process(KernelState &kern, const MemState &mem, const SceUID thread_id, ModuleData &data, std::unique_lock<std::recursive_mutex> &scheduler_lock, std::unique_lock<std::mutex> &voice_lock) {
-    data.parent->products[0].data = data.parent->inputs.inputs[0].data();
+    const uint32_t input_index = input_index_of(data);
+    if (input_index >= data.parent->inputs.inputs.size())
+        return false;
+
+    if (input_index == 0)
+        data.parent->products[0].data = data.parent->inputs.inputs[0].data();
 
     return false;
 }

@@ -203,4 +203,19 @@ Java_org_vita3k_emulator_NativeLib_getAppInstallSize(JNIEnv *env, jclass, jstrin
     }
 }
 
+JNIEXPORT jboolean JNICALL
+Java_org_vita3k_emulator_NativeLib_clearShaderCache(JNIEnv *, jclass) {
+    auto *emuenv = get_emuenv();
+    if (!emuenv)
+        return JNI_FALSE;
+
+    bool removed = false;
+    removed |= remove_path_if_exists(emuenv->cache_path / "shaders");
+    removed |= remove_path_if_exists(emuenv->cache_path / "shaderlog");
+    removed |= remove_path_if_exists(emuenv->log_path / "shaderlog");
+    if (removed)
+        LOG_INFO("Shaders cache cleaned.");
+    return removed ? JNI_TRUE : JNI_FALSE;
+}
+
 } // extern "C"

@@ -109,6 +109,8 @@ class VitaGameSettingsRepository(private val context: Context) {
                 vSync = gpu.boolAttr("v-sync", config.vSync),
                 anisotropicFiltering = gpu.intAttr("anisotropic-filtering", config.anisotropicFiltering),
                 asyncPipelineCompilation = gpu.boolAttr("async-pipeline-compilation", config.asyncPipelineCompilation),
+                accurateThreadScheduling = gpu.boolAttr("accurate-thread-scheduling", config.accurateThreadScheduling),
+                guestCores = gpu.intAttr("guest-cores", config.guestCores).coerceIn(1, 4),
                 importTextures = gpu.boolAttr("import-textures", config.importTextures),
                 exportTextures = gpu.boolAttr("export-textures", config.exportTextures),
                 exportAsPng = gpu.boolAttr("export-as-png", config.exportAsPng),
@@ -229,6 +231,8 @@ class VitaGameSettingsRepository(private val context: Context) {
             setAttribute("v-sync", config.vSync.toString())
             setAttribute("anisotropic-filtering", config.anisotropicFiltering.toString())
             setAttribute("async-pipeline-compilation", config.asyncPipelineCompilation.toString())
+            setAttribute("accurate-thread-scheduling", config.accurateThreadScheduling.toString())
+            setAttribute("guest-cores", config.guestCores.coerceIn(1, 4).toString())
             setAttribute("import-textures", config.importTextures.toString())
             setAttribute("export-textures", config.exportTextures.toString())
             setAttribute("export-as-png", config.exportAsPng.toString())

@@ -520,7 +520,78 @@ bool USSETranslatorVisitor::vpck(
         source = utils::convert_to_int(m_b, m_util_funcs, source, inst.opr.dest.type, scale);
     }
 
-    store(inst.opr.dest, source, dest_mask, dest_repeat_offset);
+    const int type_size = get_data_type_size(inst.opr.dest.type);
+    const uint32_t base_reg = (inst.opr.dest.num + dest_repeat_offset) & 0xFFFFFF;
+    const auto byte_key = [&](uint32_t word) {
+        return (static_cast<uint32_t>(inst.opr.dest.bank) << 24) | (word & 0xFFFFFF);
+    };
+    const auto bytes_written = [&](uint32_t word) -> std::uint8_t {
+        const auto ite = m_vpck_written_bytes.find(byte_key(word));
+        return (ite == m_vpck_written_bytes.end()) ? 0 : ite->second;
+    };
+
+    Imm4 store_mask = dest_mask;
+    if (is_integer_data_type(inst.opr.dest.type) && type_size < 4) {
+        const int pack = (type_size == 1) ? 4 : 2;
+        Imm4 expanded = 0;
+        for (int s = 0; s < 4; s += pack) {
+            Imm4 slot_bits = ((1 << pack) - 1) << s;
+            if (dest_mask & slot_bits)
+                expanded |= slot_bits;
+        }
+
+        Imm4 zero_lanes = 0;
+        for (int i = 0; i < 4; i++) {
+            if (!(expanded & (1 << i)) || (dest_mask & (1 << i)))
+                continue;
+            const uint32_t byte_off = i * type_size;
+            const std::uint8_t lane_bytes = static_cast<std::uint8_t>(((1u << type_size) - 1) << (byte_off % 4));
+            if ((bytes_written(base_reg + byte_off / 4) & lane_bytes) == 0)
+                zero_lanes |= static_cast<Imm4>(1 << i);
+        }
+        const Imm4 target_mask = dest_mask | zero_lanes;
+
+        if (zero_lanes != 0) {
+            spv::Id comp_type = m_b.isScalar(source) ? m_b.getTypeId(source) : m_b.getContainedTypeId(m_b.getTypeId(source));
+            spv::Id zero_val = m_b.isUintType(comp_type) ? m_b.makeUintConstant(0) : m_b.makeIntConstant(0);
+
+            std::vector<spv::Id> comps;
+            int src_idx = 0;
+            for (int i = 0; i < 4; i++) {
+                if (!(target_mask & (1 << i)))
+                    continue;
+                if (dest_mask & (1 << i)) {
+                    if (m_b.getNumComponents(source) == 1)
+                        comps.push_back(source);
+                    else
+                        comps.push_back(m_b.createCompositeExtract(source, comp_type, src_idx));
+                    src_idx++;
+                } else {
+                    comps.push_back(zero_val);
+                }
+            }
+
+            if (comps.size() == 1) {
+                source = comps[0];
+            } else {
+                source = m_b.createCompositeConstruct(utils::make_vector_or_scalar_type(m_b, comp_type, static_cast<int>(comps.size())), comps);
+            }
+            store_mask = target_mask;
+        }
+    }
+
+    for (int i = 0; i < 4; i++) {
+        if (!(store_mask & (1 << i)))
+            continue;
+        const uint32_t byte_off = i * type_size;
+        const std::uint8_t lane_bytes = static_cast<std::uint8_t>(((type_size >= 4) ? 0xFu : ((1u << type_size) - 1)) << (byte_off % 4));
+        m_vpck_written_bytes[byte_key(base_reg + byte_off / 4)] |= lane_bytes;
+    }
+
+    m_store_from_vpck = true;
+    store(inst.opr.dest, source, store_mask, dest_repeat_offset);
+    m_store_from_vpck = false;
+
     END_REPEAT()
 
     reset_repeat_multiplier();

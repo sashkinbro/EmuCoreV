@@ -25,6 +25,10 @@
 #include <renderer/vulkan/functions.h>
 #include <renderer/vulkan/state.h>
 
+#include <chrono>
+#include <future>
+#include <vector>
+
 #include <config/state.h>
 #include <config/version.h>
 #include <display/state.h>
@@ -105,11 +109,23 @@ static void debug_log_message(std::string_view msg) {
 }
 
 static vk::DebugUtilsMessengerEXT debug_messenger;
+static bool debug_messenger_is_driver_only = false;
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_util_callback(
     vk::DebugUtilsMessageSeverityFlagBitsEXT message_severity,
     vk::DebugUtilsMessageTypeFlagsEXT message_type,
     const vk::DebugUtilsMessengerCallbackDataEXT *callback_data,
     void *pUserData) {
+    if (debug_messenger_is_driver_only) {
+        const std::string_view msg = callback_data->pMessage ? callback_data->pMessage : "(no message)";
+        if (message_severity >= vk::DebugUtilsMessageSeverityFlagBitsEXT::eError)
+            LOG_ERROR("Vulkan driver [{}]: {}", vk::to_string(message_type), msg);
+        else if (message_severity >= vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning)
+            LOG_WARN("Vulkan driver [{}]: {}", vk::to_string(message_type), msg);
+        else
+            LOG_INFO("Vulkan driver [{}]: {}", vk::to_string(message_type), msg);
+        return VK_FALSE;
+    }
+
     if (message_severity >= vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
         // for now we are not interested by performance warnings
         && (message_type & ~vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance)) {
@@ -448,14 +464,32 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         }
 
         std::vector<const char *> instance_layers;
+        const bool use_validation_layer = has_validation_layer && !found_debug_extension.empty() && config.validation_layer;
         if (has_validation_layer && !found_debug_extension.empty()) {
-            if (config.validation_layer) {
+            if (config.validation_layer)
                 LOG_INFO("Enabling vulkan validation layers (has a performance impact but allows better error messages)");
-                instance_layers.push_back(validation_layer.c_str());
-                instance_extensions.push_back(found_debug_extension.data());
-            } else {
+            else
                 LOG_INFO("Disabling Vulkan validation layers (may improve performance but provides limited error messages)");
+        }
+        if (use_validation_layer)
+            instance_layers.push_back(validation_layer.c_str());
+        // Always take the debug extension when the loader offers it, even without the validation layer
+        if (!found_debug_extension.empty()) {
+            instance_extensions.push_back(found_debug_extension.data());
+            debug_messenger_is_driver_only = !use_validation_layer;
+        }
+        // required for the VkValidationFeaturesEXT chain (synchronization validation) below
+        bool has_validation_features_ext = false;
+        if (use_validation_layer) {
+            for (const vk::ExtensionProperties &prop : vk::enumerateInstanceExtensionProperties(std::string(validation_layer))) {
+                if (std::string_view(prop.extensionName.data()) == VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME) {
+                    instance_extensions.push_back(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
+                    has_validation_features_ext = true;
+                    break;
+                }
             }
+            if (!has_validation_features_ext)
+                LOG_WARN("VK_EXT_validation_features not available: synchronization validation cannot be enabled");
         }
 
 #ifdef __APPLE__
@@ -484,6 +518,13 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         const void *instance_create_pnext = has_layer_settings_extension ? &layer_settings_info : nullptr;
 #endif
 
+        static const std::array<vk::ValidationFeatureEnableEXT, 2> enabled_val_features = {
+            vk::ValidationFeatureEnableEXT::eSynchronizationValidation,
+            vk::ValidationFeatureEnableEXT::eBestPractices,
+        };
+        vk::ValidationFeaturesEXT validation_features{};
+        validation_features.setEnabledValidationFeatures(enabled_val_features);
+
         vk::InstanceCreateInfo instance_info{
 #ifdef __APPLE__
             .flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR,
@@ -493,29 +534,41 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         };
         instance_info.setPEnabledLayerNames(instance_layers);
         instance_info.setPEnabledExtensionNames(instance_extensions);
+#ifndef __APPLE__
+        if (use_validation_layer && has_validation_features_ext) {
+            validation_features.pNext = instance_info.pNext;
+            instance_info.pNext = &validation_features;
+            LOG_INFO("Synchronization validation + best-practices enabled");
+        }
+#endif
 
         instance = vk::createInstance(instance_info);
         VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
 
-        if (has_validation_layer && !found_debug_extension.empty() && config.validation_layer) {
+        if (!found_debug_extension.empty()) {
             // we support two debugging extensions
             if (found_debug_extension == VK_EXT_DEBUG_UTILS_EXTENSION_NAME) {
                 vk::DebugUtilsMessengerCreateInfoEXT debug_info{
                     .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
+                        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
                         | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
                     .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral
                         | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
                     .pfnUserCallback = debug_util_callback
                 };
                 debug_messenger = instance.createDebugUtilsMessengerEXT(debug_info);
+                LOG_INFO("Vulkan debug messenger installed ({})", debug_messenger_is_driver_only ? "driver diagnostics only, no validation layer" : "with validation layer");
 
             } else if (found_debug_extension == VK_EXT_DEBUG_REPORT_EXTENSION_NAME) {
                 vk::DebugReportCallbackCreateInfoEXT report_info{
-                    .flags = vk::DebugReportFlagBitsEXT::eError,
+                    .flags = vk::DebugReportFlagBitsEXT::eError | vk::DebugReportFlagBitsEXT::eWarning,
                     .pfnCallback = debug_report_callback
                 };
                 debug_report = instance.createDebugReportCallbackEXT(report_info);
+                LOG_INFO("Vulkan debug report callback installed");
             }
+        } else {
+            LOG_WARN("Neither VK_EXT_debug_utils nor VK_EXT_debug_report is available: driver errors will have no message");
         }
     }
 
@@ -606,12 +659,15 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
 
         // use these features (because they are used by the vita GPU) if they are available
         vk::PhysicalDeviceFeatures enabled_features{
+            .independentBlend = physical_device_features.independentBlend,
+            .depthClamp = enable_depth_clamp ? physical_device_features.depthClamp : VK_FALSE,
             .fillModeNonSolid = physical_device_features.fillModeNonSolid,
             .wideLines = physical_device_features.wideLines,
             .samplerAnisotropy = physical_device_features.samplerAnisotropy,
             .occlusionQueryPrecise = physical_device_features.occlusionQueryPrecise,
             .fragmentStoresAndAtomics = physical_device_features.fragmentStoresAndAtomics,
             .shaderStorageImageExtendedFormats = physical_device_features.shaderStorageImageExtendedFormats,
+            .shaderClipDistance = physical_device_features.shaderClipDistance,
             .shaderInt16 = physical_device_features.shaderInt16,
         };
 
@@ -646,8 +702,9 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             // Needed to create the MoltenVK device
             { vk::KHRPortabilitySubsetExtensionName, &temp_bool },
 #endif
-            // used for coherent framebuffer fetch
+            // used for coherent framebuffer fetch. Mali drivers predating the EXT promotion expose the original ARM name instead
             { VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, &support_rasterized_order_access },
+            { VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, &support_rasterized_order_access },
 #ifdef __ANDROID__
             // dependencies of VK_ANDROID_external_memory_android_hardware_buffer
             { VK_KHR_BIND_MEMORY_2_EXTENSION_NAME, &temp_bool },
@@ -659,13 +716,25 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
 #endif
         };
 
+        std::string available_extensions;
+        uint32_t available_extension_count = 0;
         for (const vk::ExtensionProperties &ext : physical_device.enumerateDeviceExtensionProperties()) {
+            available_extension_count++;
+            available_extensions += (available_extensions.empty() ? "" : ", ") + std::string(ext.extensionName.data());
             auto it = optional_extensions.find(ext.extensionName.data());
             if (it != optional_extensions.end()) {
                 // this extension is available on the GPU
                 *it->second = true;
                 device_extensions.push_back(it->first.data());
             }
+        }
+
+        {
+            std::string enabled;
+            for (const char *ext : device_extensions)
+                enabled += (enabled.empty() ? "" : ", ") + std::string(ext);
+            LOG_INFO("Device extensions: {} available, {} enabled: {}", available_extension_count, device_extensions.size(), enabled);
+            LOG_INFO("All available device extensions: {}", available_extensions);
         }
 
         bool support_memory_mapping = true;
@@ -746,11 +815,20 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         }
 
         support_shader_interlock &= static_cast<bool>(physical_device_features.fragmentStoresAndAtomics);
+
+        // support_shader_interlock = false; // Nick - Useful for testing as RenderDoc won't always let you debug a shader with this on
+
         if (support_shader_interlock) {
             auto props = physical_device.getFeatures2KHR<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT>();
             support_shader_interlock = static_cast<bool>(props.get<vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT>().fragmentShaderSampleInterlock);
             features.support_shader_interlock = support_shader_interlock;
         }
+
+        constexpr bool raw_preserve_needs_interlock = false;
+        features.preserve_f16_nan_as_u16 = static_cast<bool>(physical_device_features.independentBlend) && (!raw_preserve_needs_interlock || features.support_shader_interlock);
+
+        // depth clamp turns off z-clipping, so behind-the-eye primitives must be clipped in the shader instead
+        features.support_clip_distance = enable_depth_clamp && static_cast<bool>(physical_device_features.depthClamp) && static_cast<bool>(physical_device_features.shaderClipDistance);
 
         vk::StructureChain<vk::DeviceCreateInfo,
             vk::PhysicalDeviceBufferDeviceAddressFeatures,
@@ -873,6 +951,11 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         };
         cmd_buffer.clearColorImage(default_image.image, vk::ImageLayout::eTransferDstOptimal, white, vkutil::color_subresource_range);
         default_image.transition_to(cmd_buffer, vkutil::ImageLayout::StorageImage);
+
+        // dummy raw u16 storage image, bound at the raw-color slot when the current surface has no raw alias
+        default_raw_image = vkutil::Image(1, 1, vk::Format::eR16G16B16A16Uint);
+        default_raw_image.init_image(vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferDst);
+        default_raw_image.transition_to(cmd_buffer, vkutil::ImageLayout::StorageImage);
         vkutil::end_single_time_command(device, general_queue, general_command_pool, cmd_buffer);
 
         // create the default sampler
@@ -980,7 +1063,93 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
 
     pipeline_cache.init(support_rasterized_order_access);
 
-    texture_cache.init(true, texture_folder(), game_id);
+    texture_cache.init(true, texture_folder(), game_id); // Nick - Turning off hashless texture cache can be useful for debugging
+
+    log_gpu_configuration(cfg);
+}
+
+// Everything a rendering bug report needs about the host GPU, printed once
+void VKState::log_gpu_configuration(const Config &cfg) {
+    LOG_INFO("=== GPU CONFIGURATION ===");
+    LOG_INFO("  device: {} (type {}, vendor 0x{:X}, device 0x{:X})", physical_device_properties.deviceName.data(),
+        vk::to_string(physical_device_properties.deviceType), physical_device_properties.vendorID,
+        physical_device_properties.deviceID);
+    LOG_INFO("  api version: {}.{}.{}  driver version: 0x{:X}",
+        VK_API_VERSION_MAJOR(physical_device_properties.apiVersion),
+        VK_API_VERSION_MINOR(physical_device_properties.apiVersion),
+        VK_API_VERSION_PATCH(physical_device_properties.apiVersion), physical_device_properties.driverVersion);
+
+    // the instance is created as Vulkan 1.0, so the core 1.1 entry point may not be resolved;
+    // the rest of the renderer goes through the KHR alias for the same reason
+    if (physical_device_properties.apiVersion >= VK_API_VERSION_1_2
+        && VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceProperties2KHR) {
+        const auto chain = physical_device.getProperties2KHR<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceDriverProperties>();
+        const auto &driver = chain.get<vk::PhysicalDeviceDriverProperties>();
+        LOG_INFO("  driverID: {}  driverName: {}  driverInfo: {}  conformance: {}.{}.{}.{}",
+            vk::to_string(driver.driverID), driver.driverName.data(), driver.driverInfo.data(),
+            driver.conformanceVersion.major, driver.conformanceVersion.minor,
+            driver.conformanceVersion.subminor, driver.conformanceVersion.patch);
+    }
+
+    const vk::PhysicalDeviceLimits &l = physical_device_properties.limits;
+    LOG_INFO("  limits: maxColorAttachments={} maxFragmentOutputAttachments={} maxBoundDescriptorSets={} maxPushConstantsSize={}",
+        l.maxColorAttachments, l.maxFragmentOutputAttachments, l.maxBoundDescriptorSets, l.maxPushConstantsSize);
+    LOG_INFO("  limits: maxVertexInputAttributes={} maxVertexInputBindings={} maxVertexInputAttributeOffset={} maxVertexInputBindingStride={}",
+        l.maxVertexInputAttributes, l.maxVertexInputBindings, l.maxVertexInputAttributeOffset, l.maxVertexInputBindingStride);
+    LOG_INFO("  limits: maxPerStageDescriptorSampledImages={} maxPerStageDescriptorUniformBuffers={} maxPerStageDescriptorStorageBuffers={} maxImageDimension2D={}",
+        l.maxPerStageDescriptorSampledImages, l.maxPerStageDescriptorUniformBuffers,
+        l.maxPerStageDescriptorStorageBuffers, l.maxImageDimension2D);
+    LOG_INFO("  limits: maxFragmentCombinedOutputResources={} maxFragmentInputComponents={} maxVertexOutputComponents={} subPixelPrecisionBits={}",
+        l.maxFragmentCombinedOutputResources, l.maxFragmentInputComponents, l.maxVertexOutputComponents,
+        l.subPixelPrecisionBits);
+
+    const vk::PhysicalDeviceFeatures &f = physical_device_features;
+    LOG_INFO("  core features: independentBlend={} fragmentStoresAndAtomics={} vertexPipelineStoresAndAtomics={} dualSrcBlend={} logicOp={}",
+        static_cast<bool>(f.independentBlend), static_cast<bool>(f.fragmentStoresAndAtomics),
+        static_cast<bool>(f.vertexPipelineStoresAndAtomics), static_cast<bool>(f.dualSrcBlend),
+        static_cast<bool>(f.logicOp));
+    LOG_INFO("  core features: depthClamp={} depthBiasClamp={} depthBounds={} wideLines={} fillModeNonSolid={} largePoints={}",
+        static_cast<bool>(f.depthClamp), static_cast<bool>(f.depthBiasClamp), static_cast<bool>(f.depthBounds),
+        static_cast<bool>(f.wideLines), static_cast<bool>(f.fillModeNonSolid), static_cast<bool>(f.largePoints));
+    LOG_INFO("  core features: shaderInt16={} shaderInt64={} shaderFloat64={} shaderClipDistance={} shaderCullDistance={}",
+        static_cast<bool>(f.shaderInt16), static_cast<bool>(f.shaderInt64), static_cast<bool>(f.shaderFloat64),
+        static_cast<bool>(f.shaderClipDistance), static_cast<bool>(f.shaderCullDistance));
+    LOG_INFO("  core features: shaderStorageImageExtendedFormats={} shaderStorageImageWriteWithoutFormat={} shaderStorageImageReadWithoutFormat={} shaderImageGatherExtended={}",
+        static_cast<bool>(f.shaderStorageImageExtendedFormats), static_cast<bool>(f.shaderStorageImageWriteWithoutFormat),
+        static_cast<bool>(f.shaderStorageImageReadWithoutFormat), static_cast<bool>(f.shaderImageGatherExtended));
+    LOG_INFO("  core features: samplerAnisotropy={} textureCompressionBC={} textureCompressionETC2={} textureCompressionASTC_LDR={} geometryShader={}",
+        static_cast<bool>(f.samplerAnisotropy), static_cast<bool>(f.textureCompressionBC),
+        static_cast<bool>(f.textureCompressionETC2), static_cast<bool>(f.textureCompressionASTC_LDR),
+        static_cast<bool>(f.geometryShader));
+
+    LOG_INFO("  renderer flags: support_rasterized_order_access={} support_fsr={} support_standard_layout={} deep_stencil={}",
+        support_rasterized_order_access, support_fsr, support_standard_layout, vk::to_string(deep_stencil_use));
+    LOG_INFO("  FeatureState: support_shader_interlock={} support_texture_barrier={} direct_fragcolor={} preserve_f16_nan_as_u16={} independentBlend={}",
+        features.support_shader_interlock, features.support_texture_barrier, features.direct_fragcolor,
+        features.preserve_f16_nan_as_u16, static_cast<bool>(physical_device_features.independentBlend));
+    LOG_INFO("  FeatureState: use_mask_bit={} support_unknown_format={} support_rgb_attributes={} support_scaled_attribute_formats={}",
+        features.use_mask_bit, features.support_unknown_format, features.support_rgb_attributes,
+        features.support_scaled_attribute_formats);
+    LOG_INFO("  FeatureState: enable_memory_mapping={} use_texture_viewport={} spirv_shader={} features_mask=0x{:X}",
+        features.enable_memory_mapping, features.use_texture_viewport, features.spirv_shader, get_features_mask());
+    LOG_INFO("  derived: should_use_shader_interlock={} should_use_texture_barrier={} programmable_blending={}",
+        features.should_use_shader_interlock(), features.should_use_texture_barrier(),
+        features.is_programmable_blending_supported());
+    LOG_INFO("  build switches: enable_depth_clamp={} support_clip_distance={}", enable_depth_clamp, features.support_clip_distance);
+
+    const char *mapping_names[] = { "Disabled", "DoubleBuffer", "ExternalHost", "PageTable", "NativeBuffer" };
+    const int mapping_idx = static_cast<int>(mapping_method);
+    LOG_INFO("  session config: mapping_method={} screen_filter={} res_multiplier={} high_accuracy={} validation_layer={}",
+        (mapping_idx >= 0 && mapping_idx <= 4) ? mapping_names[mapping_idx] : "?",
+        screen_renderer.filter ? screen_renderer.filter->get_name() : "<not created yet>",
+        res_multiplier, cfg.current_config.high_accuracy, cfg.validation_layer);
+    LOG_INFO("  session config: fullscreen={} stretch_display_area={} hd_res_pixel_perfect={} swapchain={}x{} is_adreno_stock={} is_adreno_turnip={}",
+        fullscreen, stretch_the_display_area, fullscreen_hd_res_pixel_perfect,
+        screen_renderer.extent.width, screen_renderer.extent.height, is_adreno_stock, is_adreno_turnip);
+    // shaders_path is only filled in by set_app(), which runs after this, so it is reported by the
+    // pipeline failure dump instead
+    LOG_INFO("  shader version: vk{}", shader::CURRENT_VERSION);
+    LOG_INFO("=== END GPU CONFIGURATION ===");
 }
 
 void VKState::cleanup() {
@@ -1152,8 +1321,19 @@ void VKState::render_frame(DisplayState &display, const GxmState &gxm, MemState 
         viewport.height = static_cast<uint32_t>(frame.image_size.y * res_multiplier);
 
         vk::ImageLayout layout = vk::ImageLayout::eGeneral;
+        VKSurfaceCache::PresentSurfaceInfo present_surface{};
         vk::ImageView surface_handle = surface_cache.sourcing_color_surface_for_presentation(
-            frame.base, frame.pitch, viewport);
+            frame.base, frame.pitch, viewport, &present_surface);
+
+        // Stock Adreno drivers drop render passes under sustained GPU load
+        static int last_present_path = -1;
+        const int present_path = surface_handle ? 1 : 0;
+        if (present_path != last_present_path) {
+            last_present_path = present_path;
+            LOG_INFO("present path changed: {} (filter={})",
+                present_path == 1 ? "sampled draw" : "guest-memory fallback",
+                screen_renderer.filter ? screen_renderer.filter->get_name() : "none");
+        }
 
         if (!surface_handle) {
             vkutil::Image &vita_surface = screen_renderer.vita_surface[screen_renderer.swapchain_image_idx];
@@ -1195,6 +1375,18 @@ void VKState::render_frame(DisplayState &display, const GxmState &gxm, MemState 
             layout = vk::ImageLayout::eShaderReadOnlyOptimal;
         }
 
+        const bool need_present_order_barrier = (mapping_method == MappingMethod::PageTable || mapping_method == MappingMethod::NativeBuffer)
+            && surface_handle && screen_renderer.current_cmd_buffer;
+        if (need_present_order_barrier) {
+            const vk::MemoryBarrier order_barrier{
+                .srcAccessMask = vk::AccessFlagBits::eMemoryWrite,
+                .dstAccessMask = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eMemoryRead
+            };
+            screen_renderer.current_cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
+                vk::PipelineStageFlagBits::eFragmentShader | vk::PipelineStageFlagBits::eTransfer,
+                vk::DependencyFlags(), order_barrier, {}, {});
+        }
+
         screen_renderer.render(surface_handle, layout, viewport);
     } else if (has_overlays) {
         screen_renderer.begin_default_render_pass();
@@ -1214,6 +1406,19 @@ void VKState::swap_window() {
 
     // look once a frame if we need to save the pipeline cache
     const auto time_s = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+    // Renderer heartbeat. If the emulator ever appears frozen, this is what says whether frames are still being presented
+    static uint64_t frames_presented = 0;
+    static int64_t next_heartbeat = 0;
+    frames_presented++;
+    if (time_s >= next_heartbeat) {
+        if (next_heartbeat != 0) {
+            LOG_DEBUG("renderer heartbeat: {} frames presented, pipelines created={} failed={}",
+                frames_presented, pipeline_cache.pipelines_created.load(), pipeline_cache.pipelines_failed.load());
+        }
+        next_heartbeat = time_s + 5;
+    }
+
     if (time_s >= pipeline_cache.next_pipeline_cache_save) {
         pipeline_cache.save_pipeline_cache();
 
@@ -1241,6 +1446,12 @@ uint32_t VKState::get_features_mask() {
             bool use_memory_mapping : 1;
             bool use_rgb_attributes : 1;
             bool use_scaled_attributes : 1;
+            bool use_mask_bit : 1;
+            bool preserve_f16_nan_as_u16 : 1;
+            bool direct_fragcolor : 1;
+            bool support_texture_barrier : 1;
+            bool support_unknown_format : 1;
+            bool use_clip_distance : 1;
         };
         uint32_t value;
     } features_mask;
@@ -1252,6 +1463,12 @@ uint32_t VKState::get_features_mask() {
     features_mask.use_memory_mapping = features.enable_memory_mapping;
     features_mask.use_rgb_attributes = features.support_rgb_attributes;
     features_mask.use_scaled_attributes = pipeline_cache.support_scaled_vertex_attribute;
+    features_mask.use_mask_bit = features.use_mask_bit;
+    features_mask.preserve_f16_nan_as_u16 = features.preserve_f16_nan_as_u16;
+    features_mask.direct_fragcolor = features.direct_fragcolor;
+    features_mask.support_texture_barrier = features.support_texture_barrier;
+    features_mask.support_unknown_format = features.support_unknown_format;
+    features_mask.use_clip_distance = features.support_clip_distance;
 
     return features_mask.value;
 }
@@ -1273,10 +1490,36 @@ void VKState::set_screen_filter(const std::string_view &filter) {
     renderer::send_single_command(*this, nullptr, renderer::CommandOpcode::SetScreenFilter, false, new std::string(filter));
 }
 
+bool VKState::map_memory_page_table_fallback(MemState &mem, Ptr<void> address, uint32_t size) {
+    constexpr vk::BufferUsageFlags mapped_memory_flags = vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst;
+    vkutil::Buffer buffer(size + KiB(4));
+    constexpr vma::AllocationCreateInfo memory_mapped_alloc = {
+        .flags = vma::AllocationCreateFlagBits::eMapped | vma::AllocationCreateFlagBits::eHostAccessRandom,
+        .usage = vma::MemoryUsage::eAutoPreferHost,
+        .requiredFlags = vk::MemoryPropertyFlagBits::eHostCoherent,
+        .preferredFlags = vk::MemoryPropertyFlagBits::eHostCached,
+    };
+    buffer.init_buffer(mapped_memory_flags, memory_mapped_alloc);
+    const uint64_t buffer_ptr_val = std::bit_cast<uint64_t>(buffer.mapped_data);
+    const uint64_t buffer_offset = align(buffer_ptr_val, KiB(4)) - buffer_ptr_val;
+    buffer.mapped_data = std::bit_cast<void *>(buffer_ptr_val + buffer_offset);
+
+    vk::BufferDeviceAddressInfoKHR address_info{
+        .buffer = buffer.buffer
+    };
+    const uint64_t buffer_address = device.getBufferAddress(address_info) + buffer_offset;
+    const vk::Buffer mapped_buffer = buffer.buffer;
+
+    add_external_mapping(mem, address.address(), size, static_cast<uint8_t *>(buffer.mapped_data));
+    mapped_memories[address.address()] = { address.address(), std::move(buffer), mapped_buffer, size, buffer_address };
+    return true;
+}
+
 bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
     assert(features.enable_memory_mapping);
     // the address should be 4K aligned
     assert((address.address() & 4095) == 0);
+    LOG_INFO("map_memory: addr 0x{:X} size 0x{:X} method {}", address.address(), size, static_cast<int>(mapping_method));
     constexpr vk::BufferUsageFlags mapped_memory_flags = vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst;
 
     auto find_mem_type_with_flag = [&](const vk::MemoryPropertyFlags flags, uint32_t hardware_types) {
@@ -1317,78 +1560,104 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
             .height = 1,
             .layers = 1,
             .format = AHARDWAREBUFFER_FORMAT_BLOB,
-            .usage = AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER | AHARDWAREBUFFER_USAGE_CPU_READ_MASK | AHARDWAREBUFFER_USAGE_CPU_WRITE_MASK,
+            .usage = AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER | AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN,
         };
-        AHardwareBuffer *buffer;
+        AHardwareBuffer *buffer = nullptr;
+        void *mapped_location = nullptr;
         int err = _AHardwareBuffer_allocate(&buffer_desc, &buffer);
         if (err != 0) {
-            LOG_ERROR("Failed to allocate Android hardware buffer, error {}", err);
-            return false;
+            LOG_ERROR("Failed to allocate Android hardware buffer, error {} — falling back to page-table mapping for 0x{:X}", err, address.address());
+            return map_memory_page_table_fallback(mem, address, size);
         }
-        void *mapped_location;
-        err = _AHardwareBuffer_lock(buffer, AHARDWAREBUFFER_USAGE_CPU_READ_MASK | AHARDWAREBUFFER_USAGE_CPU_WRITE_MASK, -1, nullptr, &mapped_location);
+        err = _AHardwareBuffer_lock(buffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN, -1, nullptr, &mapped_location);
         if (err != 0) {
-            LOG_ERROR("Failed to lock Android hardware buffer, error {}", err);
-            return false;
+            LOG_ERROR("Failed to lock Android hardware buffer, error {} — falling back to page-table mapping for 0x{:X}", err, address.address());
+            _AHardwareBuffer_release(buffer);
+            return map_memory_page_table_fallback(mem, address, size);
         }
 
         vk::DeviceMemory device_memory;
-        // prefer this extension
-        if (support_android_buffer_import) {
-            const vk::AndroidHardwareBufferPropertiesANDROID hardware_props = device.getAndroidHardwareBufferPropertiesANDROID(*buffer);
+        // vulkan.hpp throws on failure: degrade to the fallback mapping, never terminate the process
+        try {
+            // prefer this extension
+            if (support_android_buffer_import) {
+                const vk::AndroidHardwareBufferPropertiesANDROID hardware_props = device.getAndroidHardwareBufferPropertiesANDROID(*buffer);
 
-            uint32_t mapped_memory_type = find_suitable_mapped_type(hardware_props.memoryTypeBits);
-            vk::StructureChain<vk::MemoryAllocateInfo, vk::ImportAndroidHardwareBufferInfoANDROID, vk::MemoryAllocateFlagsInfo> alloc_info{
-                vk::MemoryAllocateInfo{
-                    .allocationSize = size + KiB(4),
-                    .memoryTypeIndex = mapped_memory_type },
-                vk::ImportAndroidHardwareBufferInfoANDROID{
-                    .buffer = buffer },
-                vk::MemoryAllocateFlagsInfo{
-                    .flags = vk::MemoryAllocateFlagBits::eDeviceAddress }
-            };
-            device_memory = device.allocateMemory(alloc_info.get());
-        } else {
-            const native_handle_t *handle = _AHardwareBuffer_getNativeHandle(buffer);
-            if (handle == nullptr || handle->numFds == 0 || handle->data[0] == -1) {
-                LOG_ERROR("Failed to get native handle");
-                return false;
+                uint32_t mapped_memory_type = find_suitable_mapped_type(hardware_props.memoryTypeBits);
+                vk::StructureChain<vk::MemoryAllocateInfo, vk::ImportAndroidHardwareBufferInfoANDROID, vk::MemoryAllocateFlagsInfo> alloc_info{
+                    vk::MemoryAllocateInfo{
+                        .allocationSize = hardware_props.allocationSize,
+                        .memoryTypeIndex = mapped_memory_type },
+                    vk::ImportAndroidHardwareBufferInfoANDROID{
+                        .buffer = buffer },
+                    vk::MemoryAllocateFlagsInfo{
+                        .flags = vk::MemoryAllocateFlagBits::eDeviceAddress }
+                };
+                device_memory = device.allocateMemory(alloc_info.get());
+            } else {
+                const native_handle_t *handle = _AHardwareBuffer_getNativeHandle(buffer);
+                if (handle == nullptr || handle->numFds == 0 || handle->data[0] == -1) {
+                    LOG_ERROR("Failed to get native handle — falling back to page-table mapping for 0x{:X}", address.address());
+                    _AHardwareBuffer_unlock(buffer, nullptr);
+                    _AHardwareBuffer_release(buffer);
+                    return map_memory_page_table_fallback(mem, address, size);
+                }
+
+                int fd = handle->data[0];
+                const vk::MemoryFdPropertiesKHR fd_props = device.getMemoryFdPropertiesKHR(vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd, fd);
+                uint32_t mapped_memory_type = find_suitable_mapped_type(fd_props.memoryTypeBits);
+                vk::StructureChain<vk::MemoryAllocateInfo, vk::ImportMemoryFdInfoKHR, vk::MemoryAllocateFlagsInfo> alloc_info{
+                    vk::MemoryAllocateInfo{
+                        .allocationSize = size + KiB(4),
+                        .memoryTypeIndex = mapped_memory_type },
+                    vk::ImportMemoryFdInfoKHR{
+                        .handleType = vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd,
+                        .fd = fd },
+                    vk::MemoryAllocateFlagsInfo{
+                        .flags = vk::MemoryAllocateFlagBits::eDeviceAddress }
+                };
+                device_memory = device.allocateMemory(alloc_info.get());
             }
 
-            int fd = handle->data[0];
-            const vk::MemoryFdPropertiesKHR fd_props = device.getMemoryFdPropertiesKHR(vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd, fd);
-            uint32_t mapped_memory_type = find_suitable_mapped_type(fd_props.memoryTypeBits);
-            vk::StructureChain<vk::MemoryAllocateInfo, vk::ImportMemoryFdInfoKHR, vk::MemoryAllocateFlagsInfo> alloc_info{
-                vk::MemoryAllocateInfo{
-                    .allocationSize = size + KiB(4),
-                    .memoryTypeIndex = mapped_memory_type },
-                vk::ImportMemoryFdInfoKHR{
-                    .handleType = vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd,
-                    .fd = fd },
-                vk::MemoryAllocateFlagsInfo{
-                    .flags = vk::MemoryAllocateFlagBits::eDeviceAddress }
+            vk::StructureChain<vk::BufferCreateInfo, vk::ExternalMemoryBufferCreateInfoKHR> buffer_info{
+                vk::BufferCreateInfo{
+                    .size = size + KiB(4),
+                    .usage = mapped_memory_flags,
+                    .sharingMode = vk::SharingMode::eExclusive },
+                vk::ExternalMemoryBufferCreateInfoKHR{
+                    .handleTypes = support_android_buffer_import ? vk::ExternalMemoryHandleTypeFlagBits::eAndroidHardwareBufferANDROID : vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd }
             };
-            device_memory = device.allocateMemory(alloc_info.get());
+            const vk::Buffer mapped_buffer = device.createBuffer(buffer_info.get());
+            device.bindBufferMemory(mapped_buffer, device_memory, 0);
+
+            vk::BufferDeviceAddressInfoKHR address_info{
+                .buffer = mapped_buffer
+            };
+            const uint64_t buffer_address = device.getBufferAddress(address_info);
+
+            // CPU-speed probe: one line per mapping makes slow write-combined gralloc memory visible in the log
+            if (size >= MiB(1)) {
+                static std::vector<uint8_t> probe_buf;
+                probe_buf.resize(MiB(1));
+                const auto t0 = std::chrono::steady_clock::now();
+                memcpy(probe_buf.data(), reinterpret_cast<uint8_t *>(mapped_location), MiB(1));
+                const auto t1 = std::chrono::steady_clock::now();
+                memcpy(reinterpret_cast<uint8_t *>(mapped_location), probe_buf.data(), MiB(1));
+                const auto t2 = std::chrono::steady_clock::now();
+                const auto us_read = std::max<int64_t>(1, std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count());
+                const auto us_write = std::max<int64_t>(1, std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+                LOG_INFO("NativeBuffer 0x{:X}: CPU read {} MB/s, write {} MB/s ({})", address.address(),
+                    1'000'000 / us_read, 1'000'000 / us_write, (1'000'000 / us_read) < 200 ? "WRITE-COMBINED? SLOW!" : "cached, OK");
+            }
+
+            add_external_mapping(mem, address.address(), size, reinterpret_cast<uint8_t *>(mapped_location));
+            mapped_memories[address.address()] = { address.address(), ExternalBuffer{ device_memory, buffer }, mapped_buffer, size, buffer_address };
+        } catch (const vk::SystemError &err) {
+            LOG_ERROR("Native buffer Vulkan import failed ({}) — falling back to page-table mapping for 0x{:X}", err.what(), address.address());
+            _AHardwareBuffer_unlock(buffer, nullptr);
+            _AHardwareBuffer_release(buffer);
+            return map_memory_page_table_fallback(mem, address, size);
         }
-
-        vk::StructureChain<vk::BufferCreateInfo, vk::ExternalMemoryBufferCreateInfoKHR> buffer_info{
-            vk::BufferCreateInfo{
-                .size = size + KiB(4),
-                .usage = mapped_memory_flags,
-                .sharingMode = vk::SharingMode::eExclusive },
-            vk::ExternalMemoryBufferCreateInfoKHR{
-                .handleTypes = support_android_buffer_import ? vk::ExternalMemoryHandleTypeFlagBits::eAndroidHardwareBufferANDROID : vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd }
-        };
-        const vk::Buffer mapped_buffer = device.createBuffer(buffer_info.get());
-        device.bindBufferMemory(mapped_buffer, device_memory, 0);
-
-        vk::BufferDeviceAddressInfoKHR address_info{
-            .buffer = mapped_buffer
-        };
-        const uint64_t buffer_address = device.getBufferAddress(address_info);
-
-        add_external_mapping(mem, address.address(), size, reinterpret_cast<uint8_t *>(mapped_location));
-        mapped_memories[address.address()] = { address.address(), ExternalBuffer{ device_memory, buffer }, mapped_buffer, size, buffer_address };
 #else
         LOG_CRITICAL("Native buffer is only supported on Android!\n");
 #endif
@@ -1399,12 +1668,19 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
         // also make sure later the mapped address is 4K aligned
         vkutil::Buffer buffer(size + KiB(4));
         constexpr vma::AllocationCreateInfo memory_mapped_alloc = {
-            .flags = vma::AllocationCreateFlagBits::eMapped | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+            .flags = vma::AllocationCreateFlagBits::eMapped | vma::AllocationCreateFlagBits::eHostAccessRandom,
             .usage = vma::MemoryUsage::eAutoPreferHost,
             .requiredFlags = vk::MemoryPropertyFlagBits::eHostCoherent,
             .preferredFlags = vk::MemoryPropertyFlagBits::eHostCached,
         };
         buffer.init_buffer(mapped_memory_flags, memory_mapped_alloc);
+        {
+            const vk::MemoryPropertyFlags got = allocator.getAllocationMemoryProperties(buffer.allocation);
+            LOG_INFO("PageTable mapping memory: HostCached={} HostCoherent={} DeviceLocal={}",
+                static_cast<bool>(got & vk::MemoryPropertyFlagBits::eHostCached),
+                static_cast<bool>(got & vk::MemoryPropertyFlagBits::eHostCoherent),
+                static_cast<bool>(got & vk::MemoryPropertyFlagBits::eDeviceLocal));
+        }
         const uint64_t buffer_ptr_val = std::bit_cast<uint64_t>(buffer.mapped_data);
         const uint64_t buffer_offset = align(buffer_ptr_val, KiB(4)) - buffer_ptr_val;
         buffer.mapped_data = std::bit_cast<void *>(buffer_ptr_val + buffer_offset);
@@ -1485,7 +1761,13 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
 
     case MappingMethod::DoubleBuffer: {
         vkutil::Buffer buffer(size + KiB(4));
-        buffer.init_buffer(mapped_memory_flags, vkutil::vma_mapped_alloc);
+        constexpr vma::AllocationCreateInfo double_buffer_alloc = {
+            .flags = vma::AllocationCreateFlagBits::eHostAccessRandom | vma::AllocationCreateFlagBits::eMapped,
+            .usage = vma::MemoryUsage::eAutoPreferHost,
+            .requiredFlags = vk::MemoryPropertyFlagBits::eHostCoherent,
+            .preferredFlags = vk::MemoryPropertyFlagBits::eHostCached,
+        };
+        buffer.init_buffer(mapped_memory_flags, double_buffer_alloc);
 
         vk::BufferDeviceAddressInfoKHR address_info{
             .buffer = buffer.buffer
@@ -1515,6 +1797,19 @@ void VKState::unmap_memory(MemState &mem, Ptr<void> address) {
 
     // we need to wait in case the buffer is being used
     device.waitIdle();
+
+    // Drain the GPU wait thread's queue too
+    {
+        auto promise = std::make_shared<std::promise<void>>();
+        std::future<void> future = promise->get_future();
+        request_queue.push(CallbackRequest{
+            new CallbackRequestFunction([promise]() { promise->set_value(); }),
+            /* wait_for_gpu = */ false });
+        while (future.wait_for(std::chrono::milliseconds(5)) != std::future_status::ready) {
+            if (render_abort.load(std::memory_order_relaxed) || request_queue.is_aborted())
+                break;
+        }
+    }
 
     switch (mapping_method) {
     case MappingMethod::ExernalHost:

@@ -27,8 +27,11 @@
 #include <renderer/vulkan/state.h>
 
 #include <gxm/functions.h>
+#include <kernel/state.h>
 #include <renderer/functions.h>
 #include <util/align.h>
+
+#include <chrono>
 #include <util/log.h>
 #include <util/tracy.h>
 
@@ -152,13 +155,39 @@ COMMAND(handle_destroy_render_target) {
     complete_command(renderer, helper, 0);
 }
 
+inline constexpr bool enable_world_stop_for_transitions = true;
+
+struct WorldStopScope {
+    KernelState *kernel = nullptr;
+    WorldStopScope(renderer::State &renderer, MemState &mem, SceUID except_thread, Address addr, uint32_t size) {
+        if (!enable_world_stop_for_transitions || !mem.use_page_table || !renderer.kernel)
+            return;
+        kernel = renderer.kernel;
+        const auto start = std::chrono::steady_clock::now();
+        const int not_parked = kernel->stop_world(except_thread, std::chrono::milliseconds(50));
+        const auto took_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+        LOG_INFO("memory transition 0x{:X} size 0x{:X}: world stopped in {} ms, {} thread(s) not parked", addr, size, took_ms, not_parked);
+    }
+    ~WorldStopScope() {
+        if (kernel) {
+            kernel->resume_world();
+            LOG_DEBUG("memory transition: world resumed");
+        }
+    }
+};
+
 COMMAND(handle_memory_map) {
     TRACY_FUNC_COMMANDS(handle_memory_map);
     const Ptr<void> addr = helper.pop<Ptr<void>>();
     const uint32_t size = helper.pop<uint32_t>();
+    const SceUID caller_thread = static_cast<SceUID>(helper.pop<uint32_t>());
 
-    if (renderer.current_backend == Backend::Vulkan) {
-        dynamic_cast<vulkan::VKState &>(renderer).map_memory(mem, addr, size);
+    {
+        const WorldStopScope world_stop(renderer, mem, caller_thread, addr.address(), size);
+
+        if (renderer.current_backend == Backend::Vulkan) {
+            dynamic_cast<vulkan::VKState &>(renderer).map_memory(mem, addr, size);
+        }
     }
 
     complete_command(renderer, helper, 0);
@@ -168,9 +197,14 @@ COMMAND(handle_memory_unmap) {
     TRACY_FUNC_COMMANDS(handle_memory_unmap);
 
     const Ptr<void> addr = helper.pop<Ptr<void>>();
+    const SceUID caller_thread = static_cast<SceUID>(helper.pop<uint32_t>());
 
-    if (renderer.current_backend == Backend::Vulkan) {
-        dynamic_cast<vulkan::VKState &>(renderer).unmap_memory(mem, addr);
+    {
+        const WorldStopScope world_stop(renderer, mem, caller_thread, addr.address(), 0);
+
+        if (renderer.current_backend == Backend::Vulkan) {
+            dynamic_cast<vulkan::VKState &>(renderer).unmap_memory(mem, addr);
+        }
     }
 
     complete_command(renderer, helper, 0);
@@ -249,8 +283,14 @@ void create(SceGxmSyncObject *sync, State &state) {
     sync->being_deleted = false;
 }
 
-void destroy(SceGxmSyncObject *sync, State &state) {
-    // nothing to do right now
+void destroy(SceGxmSyncObject *sync, State &state, std::function<void()> dealloc) {
+    if (dealloc && state.current_backend == Backend::Vulkan && state.features.enable_memory_mapping) {
+        auto *vk_state = static_cast<vulkan::VKState *>(&state);
+        vk_state->request_queue.push(vulkan::CallbackRequest{
+            new vulkan::CallbackRequestFunction(std::move(dealloc)) });
+    } else if (dealloc) {
+        dealloc();
+    }
 }
 
 bool init(FrameHost &frame, std::unique_ptr<State> &state, Backend backend, const Config &config, const Root &root_paths) {
