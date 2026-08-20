@@ -88,7 +88,7 @@ bool initialize_session(
         Config cfg{};
         char arg0[] = "vita3k";
         char *argv[] = { arg0, nullptr };
-        if (config::init_config(cfg, 1, argv, root_paths) != Success) {
+        if (config::init_config(cfg, 1, argv, root_paths, false) != Success) {
             LOG_ERROR("Failed to initialise config.");
             emuenv.reset();
             return false;

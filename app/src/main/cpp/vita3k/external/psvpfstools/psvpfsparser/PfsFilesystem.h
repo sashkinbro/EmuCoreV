@@ -8,6 +8,7 @@
 #include "FilesDbParser.h"
 #include "UnicvDbParser.h"
 #include "PfsPageMapper.h"
+#include "PfsProgress.h"
 
 class PfsFilesystem
 {
@@ -30,5 +31,5 @@ public:
 public:
    int mount();
 
-   int decrypt_files(const psvpfs::path& destTitleIdPath) const;
+   int decrypt_files(const psvpfs::path& destTitleIdPath, PfsProgressCallback progress = nullptr) const;
 };
