@@ -197,6 +197,9 @@ private:
 
     bool m_second_program{ false };
 
+    std::map<uint32_t, std::uint8_t> m_vpck_written_bytes;
+    bool m_store_from_vpck{ false };
+
     spv::Id do_alu_op(Instruction &inst, const Imm4 source_mask, const Imm4 possible_dest_mask);
 
 public:

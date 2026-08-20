@@ -22,9 +22,11 @@
 #include <util/log.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstring>
 #include <mutex>
+#include <shared_mutex>
 #include <utility>
 
 #ifdef _WIN32
@@ -148,6 +150,14 @@ bool is_valid_addr(const MemState &state, Address addr) {
     return addr && state.allocator.free_slot_count(page_num, page_num + 1) == 0;
 }
 
+// re-check under the allocator's writer lock
+bool is_valid_addr_synced(MemState &state, Address addr) {
+    if (is_valid_addr(state, addr))
+        return true;
+    const std::lock_guard<std::mutex> lock(state.generation_mutex);
+    return is_valid_addr(state, addr);
+}
+
 bool is_valid_addr_range(const MemState &state, Address start, Address end) {
     const uint32_t start_page = start / STANDARD_PAGE_SIZE;
     const uint32_t end_page = (end + STANDARD_PAGE_SIZE - 1) / STANDARD_PAGE_SIZE;
@@ -227,35 +237,10 @@ static void align_to_page(MemState &state, Address &addr, Address &size) {
     size = end - addr;
 }
 
-void unprotect_inner(MemState &state, Address addr, uint32_t size) {
-    if (LOG_PROTECT) {
-        fmt::print("Unprotect: {} {}\n", log_hex(addr), size);
-    }
-    uint8_t *addr_ptr = state.use_page_table ? state.page_table[addr / KiB(4)] : state.memory.get();
-
-    uint8_t *target = &addr_ptr[addr];
+static void apply_host_protect(uint8_t *target, size_t size, const MemPerm perm, size_t host_page_size) {
     uint8_t *aligned_start = reinterpret_cast<uint8_t *>(
-        align_down(reinterpret_cast<uintptr_t>(target), state.host_page_size));
-    uint8_t *aligned_end = reinterpret_cast<uint8_t *>(align(reinterpret_cast<uintptr_t>(target + size), state.host_page_size));
-    size_t aligned_size = aligned_end - aligned_start;
-
-#ifdef _WIN32
-    DWORD old_protect = 0;
-    const BOOL ret = VirtualProtect(aligned_start, aligned_size, PAGE_READWRITE, &old_protect);
-    LOG_CRITICAL_IF(!ret, "VirtualAlloc failed: {}", get_error_msg());
-#else
-    const int ret = mprotect(aligned_start, aligned_size, PROT_READ | PROT_WRITE);
-    LOG_CRITICAL_IF(ret == -1, "mprotect failed: {}", get_error_msg());
-#endif
-}
-
-void protect_inner(MemState &state, Address addr, uint32_t size, const MemPerm perm) {
-    uint8_t *addr_ptr = state.use_page_table ? state.page_table[addr / KiB(4)] : state.memory.get();
-
-    uint8_t *target = &addr_ptr[addr];
-    uint8_t *aligned_start = reinterpret_cast<uint8_t *>(
-        align_down(reinterpret_cast<uintptr_t>(target), state.host_page_size));
-    uint8_t *aligned_end = reinterpret_cast<uint8_t *>(align(reinterpret_cast<uintptr_t>(target + size), state.host_page_size));
+        align_down(reinterpret_cast<uintptr_t>(target), host_page_size));
+    uint8_t *aligned_end = reinterpret_cast<uint8_t *>(align(reinterpret_cast<uintptr_t>(target + size), host_page_size));
     size_t aligned_size = aligned_end - aligned_start;
 
 #ifdef _WIN32
@@ -266,6 +251,25 @@ void protect_inner(MemState &state, Address addr, uint32_t size, const MemPerm p
     const int ret = mprotect(aligned_start, aligned_size, (perm == MemPerm::None) ? PROT_NONE : ((perm == MemPerm::ReadOnly) ? PROT_READ : (PROT_READ | PROT_WRITE)));
     LOG_CRITICAL_IF(ret == -1, "mprotect failed: {}", get_error_msg());
 #endif
+}
+
+void unprotect_inner(MemState &state, Address addr, uint32_t size) {
+    if (LOG_PROTECT) {
+        fmt::print("Unprotect: {} {}\n", log_hex(addr), size);
+    }
+    uint8_t *addr_ptr = state.use_page_table ? state.page_table[addr / KiB(4)] : state.memory.get();
+    apply_host_protect(&addr_ptr[addr], size, MemPerm::ReadWrite, state.host_page_size);
+}
+
+void protect_inner(MemState &state, Address addr, uint32_t size, const MemPerm perm) {
+    uint8_t *addr_ptr = state.use_page_table ? state.page_table[addr / KiB(4)] : state.memory.get();
+    apply_host_protect(&addr_ptr[addr], size, perm, state.host_page_size);
+}
+
+std::string (*g_fault_context_provider)() = nullptr;
+
+void set_fault_context_provider(std::string (*provider)()) {
+    g_fault_context_provider = provider;
 }
 
 bool handle_access_violation(MemState &state, uint8_t *addr, bool write) noexcept {
@@ -298,19 +302,34 @@ bool handle_access_violation(MemState &state, uint8_t *addr, bool write) noexcep
         fmt::print("Access: {}\n", log_hex(vaddr));
     }
 
+    // never allow accesses to the null guard page - letting them through silently corrupts low memory
+    if (vaddr < 0x1000) {
+        return false;
+    }
+
+    // HACK: keep going recovery for faults with no covering protect_tree entry
+    const auto unhandled_but_valid = [&]() {
+        apply_host_protect(reinterpret_cast<uint8_t *>(align_down(fault_addr, state.host_page_size)),
+            state.host_page_size, MemPerm::ReadWrite, state.host_page_size);
+        static std::atomic<uint32_t> count{ 0 };
+        const uint32_t n = count.fetch_add(1, std::memory_order_relaxed);
+        if (n < 8) {
+            LOG_CRITICAL("Unhandled {} to protected-but-valid region. vaddr=0x{:X} host=0x{:X}{}",
+                write ? "write" : "read", vaddr, fault_addr,
+                g_fault_context_provider ? g_fault_context_provider() : std::string());
+        } else if (n == 8)
+            LOG_CRITICAL("Further unhandled protected-region accesses will be suppressed");
+    };
+
     auto it = state.protect_tree.lower_bound(vaddr);
     if (it == state.protect_tree.end()) {
-        // HACK: keep going
-        unprotect_inner(state, align_down(vaddr, state.host_page_size), state.host_page_size);
-        LOG_CRITICAL("Unhandled write protected region was valid. Address=0x{:X}", vaddr);
+        unhandled_but_valid();
         return true;
     }
 
     ProtectSegmentInfo &info = it->second;
     if (vaddr < it->first || vaddr >= it->first + info.size) {
-        // HACK: keep going
-        unprotect_inner(state, align_down(vaddr, state.host_page_size), state.host_page_size);
-        LOG_CRITICAL("Unhandled write protected region was valid. Address=0x{:X}", vaddr);
+        unhandled_but_valid();
         return true;
     }
 
@@ -323,6 +342,29 @@ bool handle_access_violation(MemState &state, uint8_t *addr, bool write) noexcep
     state.protect_tree.erase(it);
 
     return true;
+}
+
+Address host_to_guest(const MemState &state, const void *host) {
+    if (host == nullptr)
+        return 0;
+
+    const uint64_t host_val = std::bit_cast<uint64_t>(host);
+    const uint64_t memory_base = std::bit_cast<uint64_t>(state.memory.get());
+
+    // Fast path: the pointer is inside the linear guest-RAM window. Covers most conversions and takes no lock
+    if (host_val >= memory_base && host_val < memory_base + TOTAL_MEM_SIZE)
+        return static_cast<Address>(host_val - memory_base);
+
+    // Otherwise the pointer lives inside an external GPU mapping whose pages were pointed away
+    if (state.use_page_table) {
+        const std::lock_guard<std::mutex> ext_lock(state.external_mapping_mutex);
+        auto it = state.external_mapping.lower_bound(host_val);
+        if (it != state.external_mapping.end() && host_val < it->first + it->second.size)
+            return it->second.address + static_cast<Address>(host_val - it->first);
+    }
+
+    // Fallback: linear (likely a bogus pointer?)
+    return static_cast<Address>(host_val - memory_base);
 }
 
 bool add_protect(MemState &state, Address addr, const uint32_t size, const MemPerm perm, const ProtectCallback &callback) {
@@ -388,18 +430,33 @@ void add_external_mapping(MemState &mem, Address addr, uint32_t size, uint8_t *a
     uint64_t addr_value = std::bit_cast<uint64_t>(addr_ptr);
     uint8_t *page_table_entry = addr_ptr - addr;
     uint8_t *original_address = &mem.memory[addr];
-    for (int block = 0; block < size / KiB(4); block++) {
-        // this is not thread write safe, but hopefully not other thread is busy copying while this happens
-        memcpy(addr_ptr + block * KiB(4), original_address + block * KiB(4), KiB(4));
-        mem.page_table[addr / KiB(4) + block] = page_table_entry;
+
+    const std::unique_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
+
+    memcpy(addr_ptr, original_address, size);
+
+    int verify_pass = 0;
+    for (; verify_pass < 4; verify_pass++) {
+        int recopied = 0;
+        for (uint32_t off = 0; off < size; off += KiB(4)) {
+            if (memcmp(addr_ptr + off, original_address + off, KiB(4)) != 0) {
+                memcpy(addr_ptr + off, original_address + off, KiB(4));
+                recopied++;
+            }
+        }
+        if (recopied == 0)
+            break;
+        LOG_WARN("add_external_mapping 0x{:X} size 0x{:X}: verify pass {} re-copied {} page(s) changed by a concurrent writer", addr, size, verify_pass, recopied);
     }
 
-    // set the first page table entry to the original value to be able to call protect_inner
-    mem.page_table[addr / KiB(4)] = mem.memory.get();
-    protect_inner(mem, addr, size, MemPerm::None);
-    mem.page_table[addr / KiB(4)] = page_table_entry;
+    std::atomic_thread_fence(std::memory_order_release);
+    for (uint32_t block = 0; block < size / KiB(4); block++)
+        mem.page_table[addr / KiB(4) + block] = page_table_entry;
+
+    apply_host_protect(original_address, size, MemPerm::None, mem.host_page_size);
 
     const std::unique_lock<std::mutex> lock(mem.protect_mutex);
+    const std::lock_guard<std::mutex> ext_lock(mem.external_mapping_mutex);
     mem.external_mapping[addr_value] = { addr, size };
 }
 
@@ -408,6 +465,7 @@ void remove_external_mapping(MemState &mem, uint8_t *addr_ptr, uint32_t size) {
     MemExternalMapping mapping;
     if (mem.use_page_table) {
         const std::unique_lock<std::mutex> lock(mem.protect_mutex);
+        const std::lock_guard<std::mutex> ext_lock(mem.external_mapping_mutex);
         auto it = mem.external_mapping.find(addr_value);
         assert(it != mem.external_mapping.end());
 
@@ -441,15 +499,28 @@ void remove_external_mapping(MemState &mem, uint8_t *addr_ptr, uint32_t size) {
     }
 
     if (mem.use_page_table) {
-        // unprotect the original memory range
-        mem.page_table[mapping.address / KiB(4)] = mem.memory.get();
-        unprotect_inner(mem, mapping.address, mapping.size);
-        // copy back and reset the page table
-        for (int block = 0; block < mapping.size / KiB(4); block++) {
-            // this is not thread write safe, but hopefully not other thread is busy copying while this happens
-            memcpy(&mem.memory[mapping.address] + block * KiB(4), addr_ptr + block * KiB(4), KiB(4));
-            mem.page_table[mapping.address / KiB(4) + block] = mem.memory.get();
+        const std::unique_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
+
+        uint8_t *arena = &mem.memory[mapping.address];
+        apply_host_protect(arena, mapping.size, MemPerm::ReadWrite, mem.host_page_size);
+
+        memcpy(arena, addr_ptr, mapping.size);
+        for (int verify_pass = 0; verify_pass < 4; verify_pass++) {
+            int recopied = 0;
+            for (uint32_t off = 0; off < mapping.size; off += KiB(4)) {
+                if (memcmp(arena + off, addr_ptr + off, KiB(4)) != 0) {
+                    memcpy(arena + off, addr_ptr + off, KiB(4));
+                    recopied++;
+                }
+            }
+            if (recopied == 0)
+                break;
+            LOG_WARN("remove_external_mapping 0x{:X} size 0x{:X}: verify pass {} re-copied {} page(s) changed by a concurrent writer", mapping.address, mapping.size, verify_pass, recopied);
         }
+
+        std::atomic_thread_fence(std::memory_order_release);
+        for (uint32_t block = 0; block < mapping.size / KiB(4); block++)
+            mem.page_table[mapping.address / KiB(4) + block] = mem.memory.get();
     }
 }
 
@@ -487,9 +558,16 @@ void free(MemState &state, Address address) {
     const uint32_t page_num = address / STANDARD_PAGE_SIZE;
     assert(page_num >= 0);
 
+    if (state.alloc_table == nullptr) {
+        LOG_CRITICAL("Freeing unallocated alloc_table");
+        return;
+    }
+
     AllocMemPage &page = state.alloc_table[page_num];
     if (!page.allocated) {
-        LOG_CRITICAL("Freeing unallocated page");
+        // continuing would free page.size stale pages in the bitmap, wiping ranges that may since have been re-allocated
+        LOG_CRITICAL("Freeing unallocated page at addr 0x{:X} (stale size {} pages) — ignored", address, static_cast<uint32_t>(page.size));
+        return;
     }
     page.allocated = 0;
 

@@ -17,10 +17,13 @@
 
 #include <renderer/functions.h>
 
+#include <chrono>
+#include <cpu/functions.h>
 #include <renderer/profile.h>
 #include <renderer/texture_cache.h>
 
 #include <gxm/functions.h>
+#include <mem/functions.h>
 #include <mem/ptr.h>
 #include <util/align.h>
 #include <util/log.h>
@@ -38,6 +41,9 @@
 namespace renderer {
 namespace texture {
 
+// GPU writes don't trip write-protection, so keep hashing large textures
+static constexpr bool protect_only_is_sufficient = true;
+
 static uint64_t hash_data(const void *data, size_t size) {
     return XXH3_64bits(data, size);
 }
@@ -52,6 +58,12 @@ uint64_t hash_texture_data(const SceGxmTexture &texture, uint32_t texture_size, 
     const SceGxmTextureBaseFormat base_format = gxm::get_base_format(format);
     const Ptr<const void> data(texture.data_addr << 2);
     uint64_t data_hash = 0;
+
+    // the texture memory may have been freed by the game while this bind was queued
+    if (data.address() && !is_valid_addr_range(mem, data.address(), data.address() + texture_size)) {
+        LOG_WARN_ONCE("Texture data not in valid memory (addr=0x{:08X} size={}), not hashing", data.address(), texture_size);
+        return 0;
+    }
 
     if (data.address()) {
         data_hash = hash_data(data.get(mem), texture_size);
@@ -436,6 +448,17 @@ void TextureCache::upload_texture(const SceGxmTexture &gxm_texture, MemState &me
         pixels_per_stride = align(pixels_per_stride, align_width);
         memory_height = align(memory_height, align_height);
 
+        // A queued bind can be processed after the game released the staging memory, and reading it crashes on decommitted
+        {
+            const uint32_t src_nb_pixels = align(layout_width, align_width) * align(layout_height, align_height);
+            const uint32_t src_mip_size = (src_nb_pixels >> block_shift) * block_size;
+            const Address src_address = (gxm_texture.data_addr << 2) + total_source_so_far;
+            if (src_mip_size > 0 && !is_valid_addr_range(mem, src_address, src_address + src_mip_size)) {
+                LOG_WARN("Texture upload source is not in valid memory (addr=0x{:08X} size={}), skipping upload", src_address, src_mip_size);
+                break;
+            }
+        }
+
         // perform all needed conversions (formats not supported by modern GPUs)
         switch (base_format) {
         case SCE_GXM_TEXTURE_BASE_FORMAT_P4:
@@ -665,8 +688,10 @@ void TextureCache::cache_and_bind_texture(const SceGxmTexture &gxm_texture, MemS
 
         configure = true;
         upload = true;
-        // only hash the first mips, assume no game would modify other mips (and faces) without modifying the first one
-        info->texture_size = gxm::texture_size_first_mip(gxm_texture);
+        // track the WHOLE mip chain, not just the first level
+        info->texture_size = gxm::texture_size(gxm_texture);
+        if (info->texture_size > 0 && !is_valid_addr_range(mem, gxm_texture.data_addr << 2, (gxm_texture.data_addr << 2) + info->texture_size))
+            info->texture_size = gxm::texture_size_first_mip(gxm_texture);
         // use the texture_repr representation, it contains everything we need and we can use it to erase the key
         // from texture_lookup later
         info->texture = std::bit_cast<SceGxmTexture>(texture_repr);
@@ -681,11 +706,12 @@ void TextureCache::cache_and_bind_texture(const SceGxmTexture &gxm_texture, MemS
             range_protect_end = align_down((gxm_texture.data_addr << 2) + info->texture_size, mem.host_page_size);
 
             if (range_protect_end - range_protect_begin >= mem.host_page_size * 4) {
-                should_use_hash = false;
+                should_use_hash = protect_only_is_sufficient;
             }
         }
 
         info->use_hash = should_use_hash;
+        info->last_hash_scene = current_scene;
         if (info->use_hash) {
             if (import_textures || export_textures)
                 info->hash = hash_texture_nostride(gxm_texture, mem);
@@ -699,13 +725,18 @@ void TextureCache::cache_and_bind_texture(const SceGxmTexture &gxm_texture, MemS
         info = gxm_it->second;
         configure = false;
         if (info->use_hash) {
-            const uint64_t previous_hash = info->hash;
-            if (import_textures || export_textures)
-                info->hash = hash_texture_nostride(gxm_texture, mem);
-            else
-                info->hash = hash_texture_data(gxm_texture, info->texture_size, mem) ^ 1;
+            if (current_scene != 0 && info->last_hash_scene == current_scene) {
+                upload = false;
+            } else {
+                info->last_hash_scene = current_scene;
+                const uint64_t previous_hash = info->hash;
+                if (import_textures || export_textures)
+                    info->hash = hash_texture_nostride(gxm_texture, mem);
+                else
+                    info->hash = hash_texture_data(gxm_texture, info->texture_size, mem) ^ 1;
 
-            upload = previous_hash != info->hash;
+                upload = previous_hash != info->hash;
+            }
         } else {
             range_protect_begin = align(gxm_texture.data_addr << 2, mem.host_page_size);
             range_protect_end = align_down((gxm_texture.data_addr << 2) + info->texture_size, mem.host_page_size);
@@ -809,8 +840,6 @@ int TextureCache::cache_and_bind_sampler(const SceGxmTexture &gxm_texture, bool 
             | (gxm_texture.mag_filter << 8);
     }
 
-    // the depth part only matters if we can't apply linear filtering to it
-    is_depth &= !support_depth_linear_filtering;
     compact_repr |= (static_cast<uint32_t>(is_depth) << 23);
 
     auto it = sampler_lookup.find(compact_repr);

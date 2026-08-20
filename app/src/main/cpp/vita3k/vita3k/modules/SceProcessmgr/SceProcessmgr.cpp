@@ -19,6 +19,7 @@
 
 #include <io/functions.h>
 #include <kernel/state.h>
+#include <modules/module_parent.h>
 #include <rtc/rtc.h>
 
 #include <util/safe_time.h>
@@ -101,6 +102,13 @@ EXPORT(int, sceKernelCDialogSetLeaseLimit) {
 
 EXPORT(int, sceKernelCallAbortHandler, uint32_t param1, uint32_t param2) {
     TRACY_FUNC(sceKernelCallAbortHandler, param1, param2);
+    static std::atomic<bool> dumped{ false };
+    const ThreadStatePtr abort_thread = emuenv.kernel.get_thread(thread_id);
+    LOG_ERROR("sceKernelCallAbortHandler called by thread {} - the guest is aborting. param1={} param2={} LR={}",
+        thread_id, log_hex(param1), log_hex(param2),
+        abort_thread ? log_hex(read_lr(*abort_thread->cpu)) : std::string("?"));
+    if (abort_thread && !dumped.exchange(true))
+        LOG_ERROR("Guest call chain at first abort:\n{}", abort_thread->log_stack_traceback());
     return UNIMPLEMENTED();
 }
 

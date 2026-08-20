@@ -18,6 +18,7 @@
 #include <renderer/vulkan/functions.h>
 
 #include <gxm/functions.h>
+#include <renderer/functions.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
 
 #include <config/state.h>
@@ -35,8 +36,9 @@ void set_uniform_buffer(VKContext &context, MemState &mem, const ShaderProgram *
 
     const uint32_t data_size_upload = std::min<uint32_t>(size, program->uniform_buffer_sizes.at(block_num) * 4);
     if (context.state.features.enable_memory_mapping) {
-        if (context.state.mapping_method == MappingMethod::DoubleBuffer) {
-            // we must always cover everything as some small part of the buffer may get changed only
+        const bool aliases_surface = context.state.surface_cache.sync_surface_for_gpu_read(data.address(), data_size_upload);
+
+        if (!aliases_surface && context.state.mapping_method == MappingMethod::DoubleBuffer) {
             context.state.buffer_trapping.access_buffer(data.address(), data_size_upload, mem, false, true);
         }
 
@@ -97,6 +99,7 @@ void mid_scene_flush(VKContext &context, const SceGxmNotification notification) 
         context.stop_recording(notification, empty_notification, submit);
         context.start_recording();
         context.scene_timestamp++;
+        context.scene_has_drawn = false;
     }
 }
 
@@ -326,23 +329,47 @@ static void bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
 
 void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format,
     Ptr<void> indices, size_t count, uint32_t instance_count, MemState &mem, const Config &config) {
+    // the mask bit is not emulated here, so a mask-update program would just paint writing_mask over the whole target (gl/draw.cpp skips these too)
+    if (!context.state.features.use_mask_bit && context.record.fragment_program.get(mem)->is_maskupdate)
+        return;
+
     void *indices_ptr = indices.get(mem);
+
+    if (context.record.front_depth_write_mode == SCE_GXM_DEPTH_WRITE_ENABLED)
+        context.scene_wrote_depth = true;
+
+    // record queued casted-texture copies BEFORE marking the draw, so the placement decision
+    // sees whether this scene had drawn prior to this draw
+    {
+        const uint16_t vert_texture_count = context.record.vertex_program.get(mem)->renderer_data->texture_count;
+        const uint16_t frag_texture_count = context.record.fragment_program.get(mem)->renderer_data->texture_count;
+        context.state.surface_cache.perform_pending_casts(context, vert_texture_count, frag_texture_count);
+    }
+    context.scene_has_drawn = true;
 
     context.check_for_macroblock_change(true);
 
     if (!context.in_renderpass)
         context.start_render_pass();
 
-    // when we do multiple render pass for one scene (shader interlock or slow macroblock),
-    // we need to always load the depth-stencil after the first draw
-    if (context.is_first_scene_draw && (context.state.features.support_shader_interlock || context.ignore_macroblock)) {
+    // when the render pass restarts within one scene (shader interlock or slow macroblock
+    // multi-pass, or a mid-scene interruption such as a casted-texture copy), the re-begin
+    // must load the depth-stencil, never re-run the scene-begin clear
+    if (context.is_first_scene_draw && (context.state.features.support_shader_interlock || context.ignore_macroblock || !context.render_target->has_macroblock_sync)) {
         // update the render pass to load and store the depth and stencil
-        context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(context.current_color_format, true, true, !context.record.color_surface.data);
+        context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(context.current_color_format, true, true, true, !context.record.color_surface.data, false,
+            context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16);
         context.is_first_scene_draw = false;
     }
 
     const SceGxmFragmentProgram &gxm_fragment_program = *context.record.fragment_program.get(mem);
     const SceGxmProgram &fragment_program_gxp = *gxm_fragment_program.program.get(mem);
+
+    if (context.state.features.preserve_f16_nan_as_u16) {
+        const VKFragmentProgram &vk_frag_program = *reinterpret_cast<VKFragmentProgram *>(gxm_fragment_program.renderer_data.get());
+        if (vk_frag_program.blending.blendEnable)
+            context.state.surface_cache.mark_current_surface_blended();
+    }
     if (context.state.features.direct_fragcolor && fragment_program_gxp.is_frag_color_used()) {
         // the fragment shader is using programmable blending with a subpass input
         vk::ImageMemoryBarrier barrier{
@@ -454,12 +481,32 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     auto &frag_ublock = context.curr_frag_ublock.base_block;
     frag_ublock.writing_mask = context.record.writing_mask;
     frag_ublock.res_multiplier = context.state.res_multiplier;
+    frag_ublock.use_raw_image = (context.state.features.preserve_f16_nan_as_u16
+                                    && context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16
+                                    && context.state.surface_cache.current_surface_raw_is_valid())
+        ? 1.0f
+        : 0.0f;
     const bool has_msaa = context.render_target->multisample_mode;
     const bool has_downscale = context.record.color_surface.downscale;
     if (has_msaa && !has_downscale)
         frag_ublock.res_multiplier *= 2;
     else if (!has_msaa && has_downscale)
         frag_ublock.res_multiplier /= 2;
+
+    // Cast-sampler UV re-anchor inputs
+    frag_ublock.cast_sampler_mask = static_cast<float>(context.curr_frag_ublock.cast_sampler_bits);
+    frag_ublock.cast_phase_mask = static_cast<float>(context.curr_frag_ublock.cast_phase_bits);
+    frag_ublock.inv_frag_width = 1.0f / static_cast<float>(context.render_target->width);
+    frag_ublock.inv_frag_height = 1.0f / static_cast<float>(context.render_target->height);
+    if (context.curr_frag_ublock.cast_sampler_bits != 0) {
+        static uint64_t reanchor_log_n = 0;
+        if (reanchor_log_n < 16 || (reanchor_log_n % 512) == 0)
+            LOG_INFO("UV re-anchor: mask=0x{:X} phase=0x{:X} rt={}x{} res_mult={} surface_orig={}x{}",
+                context.curr_frag_ublock.cast_sampler_bits, context.curr_frag_ublock.cast_phase_bits,
+                context.render_target->width, context.render_target->height,
+                frag_ublock.res_multiplier, context.record.color_surface.width, context.record.color_surface.height);
+        reanchor_log_n++;
+    }
 
     if (context.curr_frag_ublock.changed || memcmp(&context.prev_frag_ublock, &frag_ublock, sizeof(frag_ublock)) != 0) {
         // TODO: this intermediate step can be avoided

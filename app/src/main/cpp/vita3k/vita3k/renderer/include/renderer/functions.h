@@ -20,6 +20,7 @@
 #include <renderer/commands.h>
 #include <renderer/types.h>
 
+#include <functional>
 #include <string>
 
 struct MemState;
@@ -40,7 +41,7 @@ struct YUVConversionCache;
 bool create(std::unique_ptr<FragmentProgram> &fp, State &state, const SceGxmProgram &program, const SceGxmBlendInfo *blend, GXPPtrMap &gxp_ptr_map);
 bool create(std::unique_ptr<VertexProgram> &vp, State &state, const SceGxmProgram &program, GXPPtrMap &gxp_ptr_map, const std::vector<SceGxmVertexAttribute> &attributes);
 void create(SceGxmSyncObject *sync, State &state);
-void destroy(SceGxmSyncObject *sync, State &state);
+void destroy(SceGxmSyncObject *sync, State &state, std::function<void()> dealloc = nullptr);
 void finish(State &state, Context *context);
 
 enum class SyncWaitResult {

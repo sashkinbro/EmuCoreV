@@ -48,6 +48,7 @@ enum class ExtPredicate : uint8_t {
     P3,
     NEGP0,
     NEGP1,
+    NEGP2,
     PN
 };
 
@@ -99,10 +100,7 @@ inline ExtPredicate ext_vec_predicate_to_ext(ExtVecPredicate pred) {
     case ExtVecPredicate::NEGP1:
         return ExtPredicate::NEGP1;
     case ExtVecPredicate::NEGP2:
-        // TODO
-        assert(false);
-        LOG_CRITICAL("ExtVecPredicate::NEGP2 case hit, report this to devs.");
-        [[fallthrough]];
+        return ExtPredicate::NEGP2;
     default:
         return ExtPredicate::NONE;
     }
@@ -389,6 +387,9 @@ struct AttributeInputSource {
     std::uint16_t semantic;
     bool regformat;
 };
+
+// Face-flag register index in the USSE GLOBAL bank (non-zero = front-facing)
+constexpr uint32_t GLOBAL_REG_FRONT_FACING = 16;
 
 struct LiteralInputSource {
     // The constant data

@@ -15,6 +15,8 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <vector>
+
 #include <gxm/functions.h>
 #include <gxm/types.h>
 #include <renderer/commands.h>
@@ -26,6 +28,7 @@
 #include <util/tracy.h>
 
 #include <renderer/vulkan/state.h>
+#include <renderer/vulkan/surface_cache.h>
 
 // keywords.h must be after tracy.h for msvc compiler
 #include <util/keywords.h>
@@ -36,17 +39,50 @@ extern "C" {
 
 namespace renderer {
 
+// Perform a depth-to-depth sceGxmTransferCopy on the GPU (false = old behaviour i.e. transfer does nothing)
+static constexpr bool use_gpu_depth_transfer = true;
+
 template <typename T, SceGxmTransferColorKeyMode mode, SceGxmTransferType src_type, SceGxmTransferType dst_type>
 static void perform_transfer_copy_impl(MemState &mem, const SceGxmTransferImage &src, const SceGxmTransferImage &dst, uint32_t key_value, uint32_t key_mask) {
     T *__restrict__ src_ptr = src.address.cast<T>().get(mem);
     T *__restrict__ dst_ptr = dst.address.cast<T>().get(mem);
+
+    // Fast path: LINEAR→LINEAR, no color key, contiguous rows → use memmove
+    // (handles overlapping src/dst correctly, which the per-element loop does not)
+    if constexpr (src_type == SCE_GXM_TRANSFER_LINEAR && dst_type == SCE_GXM_TRANSFER_LINEAR && mode == SCE_GXM_TRANSFER_COLORKEY_NONE) {
+        const int32_t src_stride_pixel = src.stride / sizeof(T);
+        const int32_t dst_stride_pixel = dst.stride / sizeof(T);
+        if (src.x == 0 && src.y == 0 && dst.x == 0 && dst.y == 0
+            && src_stride_pixel == static_cast<int32_t>(src.width)
+            && dst_stride_pixel == static_cast<int32_t>(dst.width)) {
+            memmove(dst_ptr, src_ptr, static_cast<size_t>(src.width) * src.height * sizeof(T));
+            return;
+        }
+        // Row-by-row memmove for strided LINEAR→LINEAR (handles overlap within each row)
+        if (src.x == 0 && dst.x == 0
+            && src_stride_pixel >= static_cast<int32_t>(src.width)
+            && dst_stride_pixel >= static_cast<int32_t>(dst.width)) {
+            const uint8_t *s = reinterpret_cast<const uint8_t *>(src_ptr) + src.y * src.stride;
+            uint8_t *d = reinterpret_cast<uint8_t *>(dst_ptr) + dst.y * dst.stride;
+            const size_t row_bytes = static_cast<size_t>(src.width) * sizeof(T);
+            if (reinterpret_cast<uintptr_t>(d) <= reinterpret_cast<uintptr_t>(s)) {
+                for (uint32_t dy = 0; dy < src.height; dy++) {
+                    memmove(d + dy * dst.stride, s + dy * src.stride, row_bytes);
+                }
+            } else {
+                for (int32_t dy = static_cast<int32_t>(src.height) - 1; dy >= 0; dy--) {
+                    memmove(d + dy * dst.stride, s + dy * src.stride, row_bytes);
+                }
+            }
+            return;
+        }
+    }
 
     auto compute_offset = [&](uint32_t dx, uint32_t dy, const SceGxmTransferImage &img, SceGxmTransferType type) -> int32_t {
         const int32_t stride_pixel = img.stride / sizeof(T);
         if (type == SCE_GXM_TRANSFER_LINEAR) {
             return dy * stride_pixel + dx;
         } else if (type == SCE_GXM_TRANSFER_TILED) {
-            // tiles are 32x32, you have the offset within the tile then the offset of the tile
             const uint32_t texel_offset_in_tile = ((dy % 32) * 32) + (dx % 32);
             const int32_t tile_address = (stride_pixel / 32) * (dy / 32) + (dx / 32);
 
@@ -56,14 +92,27 @@ static void perform_transfer_copy_impl(MemState &mem, const SceGxmTransferImage 
         }
     };
 
-    for (uint32_t dx = 0; dx < src.width; dx++) {
-        for (uint32_t dy = 0; dy < src.height; dy++) {
-            // compute offset depending on the texture type used
-            // the function compute_offset gets inlined
+    // Check for overlap and use a snapshot of source data if needed
+    const uintptr_t src_start = reinterpret_cast<uintptr_t>(src_ptr);
+    const uintptr_t dst_start = reinterpret_cast<uintptr_t>(dst_ptr);
+    const size_t src_span = (src.y + src.height) * (src.stride ? src.stride : src.width * sizeof(T));
+    const size_t dst_span = (dst.y + dst.height) * (dst.stride ? dst.stride : dst.width * sizeof(T));
+    const bool overlaps = src_start < dst_start + dst_span && dst_start < src_start + src_span;
+
+    std::vector<T> src_copy;
+    const T *safe_src = src_ptr;
+    if (overlaps) {
+        const size_t src_elements = src_span / sizeof(T);
+        src_copy.assign(src_ptr, src_ptr + src_elements);
+        safe_src = src_copy.data();
+    }
+
+    for (uint32_t dy = 0; dy < src.height; dy++) {
+        for (uint32_t dx = 0; dx < src.width; dx++) {
             uint32_t src_offset = compute_offset(src.x + dx, src.y + dy, src, src_type);
             uint32_t dst_offset = compute_offset(dst.x + dx, dst.y + dy, dst, dst_type);
 
-            T value = src_ptr[src_offset];
+            T value = safe_src[src_offset];
             if constexpr (mode == SCE_GXM_TRANSFER_COLORKEY_PASS) {
                 if ((value & key_mask) != key_value)
                     continue;
@@ -142,6 +191,14 @@ COMMAND(handle_transfer_copy) {
     SceGxmTransferType src_type = helper.pop<SceGxmTransferType>();
     SceGxmTransferType dst_type = helper.pop<SceGxmTransferType>();
 
+    if (use_gpu_depth_transfer && renderer.current_backend == Backend::Vulkan) {
+        auto &vk_state = dynamic_cast<vulkan::VKState &>(renderer);
+        if (vk_state.surface_cache.try_transfer_depth_gpu(images[0].address.address(), images[1].address.address(), images[0].width, images[0].height)) {
+            delete[] images;
+            return;
+        }
+    }
+
     if (src_fmt != dst_fmt) {
         LOG_ERROR_ONCE("Unhandled format conversion from 0x{:0X} to 0x{:0X}", fmt::underlying(src_fmt), fmt::underlying(dst_fmt));
         delete[] images;
@@ -185,9 +242,19 @@ COMMAND(handle_transfer_copy) {
     };
 
     if (renderer.current_backend == Backend::Vulkan && renderer.features.enable_memory_mapping && !renderer.disable_surface_sync) {
-        if (dynamic_cast<vulkan::VKState &>(renderer).surface_cache.check_for_surface(mem, images[0].address.address(), copy_operation, images[1].address.address()))
-            // let the vulkan surface cache handle it
+        const uint32_t src_read_size = images[0].stride * (images[0].y + images[0].height);
+        const uint32_t dst_write_size = images[1].stride * (images[1].y + images[1].height);
+        if (dynamic_cast<vulkan::VKState &>(renderer).surface_cache.check_for_surface(mem, images[0].address.address(), copy_operation, images[1].address.address() /*, src_read_size, dst_write_size*/)) {
+            LOG_WARN_ONCE("transfer_copy: surface-synced src=0x{:08X}→dst=0x{:08X} fmt=0x{:X} {}x{} srcXY=({},{}) dstXY=({},{})",
+                images[0].address.address(), images[1].address.address(),
+                fmt::underlying(src_fmt), images[0].width, images[0].height,
+                images[0].x, images[0].y, images[1].x, images[1].y);
             return;
+        }
+
+        LOG_WARN_ONCE("transfer_copy: no surface sync for src=0x{:08X}→dst=0x{:08X} fmt=0x{:X} {}x{}",
+            images[0].address.address(), images[1].address.address(),
+            fmt::underlying(src_fmt), images[0].width, images[0].height);
     }
 
     copy_operation();
@@ -277,7 +344,10 @@ COMMAND(handle_transfer_downscale) {
     };
 
     if (renderer.current_backend == Backend::Vulkan && renderer.features.enable_memory_mapping && !renderer.disable_surface_sync) {
-        if (dynamic_cast<vulkan::VKState &>(renderer).surface_cache.check_for_surface(mem, src->address.address(), downscale_operation, dst->address.address()))
+        // src->address has already been adjusted to the first read byte above
+        const uint32_t src_read_size = src->stride * src->height;
+        const uint32_t dst_write_size = dst->stride * dst->height;
+        if (dynamic_cast<vulkan::VKState &>(renderer).surface_cache.check_for_surface(mem, src->address.address(), downscale_operation, dst->address.address() /*, src_read_size, dst_write_size*/))
             // let the vulkan surface cache handle it
             return;
     }

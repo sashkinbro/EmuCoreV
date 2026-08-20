@@ -35,6 +35,7 @@
 #include <io/types.h>
 #include <kernel/types.h>
 #include <rtc/rtc.h>
+#include <set>
 #include <util/lock_and_find.h>
 #include <util/log.h>
 #include <util/tracy.h>
@@ -629,10 +630,12 @@ EXPORT(SceUID, sceIoOpen, const char *file, const int flags, const SceMode mode)
     }
 
     if (emuenv.cfg.current_config.file_loading_delay > 0)
-        std::this_thread::sleep_for(std::chrono::milliseconds(emuenv.cfg.current_config.file_loading_delay));
+        guest_sched_release_for_block();
+    std::this_thread::sleep_for(std::chrono::milliseconds(emuenv.cfg.current_config.file_loading_delay));
 
-    LOG_INFO("Opening file: {}", file);
-    return open_file(emuenv.io, file, flags, emuenv.vita_fs_path, export_name);
+    const SceUID opened_fd = open_file(emuenv.io, file, flags, emuenv.vita_fs_path, export_name);
+    LOG_INFO("Opening file: {} flags=0x{:X} -> {}", file, flags, opened_fd < 0 ? fmt::format("FAILED {}", log_hex(static_cast<uint32_t>(opened_fd))) : fmt::format("fd {}", opened_fd));
+    return opened_fd;
 }
 
 EXPORT(int, sceIoOpenAsync) {
@@ -642,14 +645,12 @@ EXPORT(int, sceIoOpenAsync) {
 
 EXPORT(SceSSize, sceIoPread, SceUID fd, void *buf, SceSize nbyte, SceOff offset) {
     TRACY_FUNC(sceIoPread, fd, buf, nbyte, offset);
-    auto pos = tell_file(emuenv.io, fd, export_name);
-    if (pos < 0) {
-        return static_cast<SceSSize>(pos);
+    if (emuenv.cfg.current_config.file_loading_delay > 0) {
+        const uint32_t delay_us = emuenv.cfg.current_config.file_loading_delay * 1000 + nbyte / 20;
+        guest_sched_release_for_block();
+        std::this_thread::sleep_for(std::chrono::microseconds(delay_us));
     }
-    seek_file(fd, offset, SCE_SEEK_SET, emuenv.io, export_name);
-    const auto res = read_file(buf, emuenv.io, fd, nbyte, export_name);
-    seek_file(fd, pos, SCE_SEEK_SET, emuenv.io, export_name);
-    return res;
+    return read_file_at(buf, emuenv.io, fd, nbyte, offset, export_name);
 }
 
 EXPORT(int, sceIoPreadAsync) {
@@ -659,14 +660,7 @@ EXPORT(int, sceIoPreadAsync) {
 
 EXPORT(SceSSize, sceIoPwrite, SceUID fd, const void *buf, SceSize nbyte, SceOff offset) {
     TRACY_FUNC(sceIoPwrite, fd, buf, nbyte, offset);
-    auto pos = tell_file(emuenv.io, fd, export_name);
-    if (pos < 0) {
-        return static_cast<SceSSize>(pos);
-    }
-    seek_file(fd, offset, SCE_SEEK_SET, emuenv.io, export_name);
-    const auto res = write_file(fd, buf, nbyte, emuenv.io, export_name);
-    seek_file(fd, pos, SCE_SEEK_SET, emuenv.io, export_name);
-    return res;
+    return write_file_at(fd, buf, nbyte, offset, emuenv.io, export_name);
 }
 
 EXPORT(int, sceIoPwriteAsync) {
@@ -1099,9 +1093,42 @@ EXPORT(int, sceKernelBacktrace) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceKernelBacktraceSelf) {
-    TRACY_FUNC(sceKernelBacktraceSelf);
-    return UNIMPLEMENTED();
+struct SceKernelCallFrame {
+    SceUInt32 sp;
+    SceUInt32 pc;
+};
+
+EXPORT(int, sceKernelBacktraceSelf, Ptr<SceKernelCallFrame> pFrames, SceSize maxFrames, Ptr<SceUInt32> pFrameCount, SceUInt32 flags) {
+    TRACY_FUNC(sceKernelBacktraceSelf, pFrames, maxFrames, pFrameCount, flags);
+    const ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
+    if (!thread)
+        return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
+
+    uint32_t written = 0;
+    const uint32_t frame_cap = std::min<uint32_t>(std::max<uint32_t>(maxFrames, 1), 64);
+    SceKernelCallFrame *const frames = pFrames.get(emuenv.mem);
+    const Address sp = read_sp(*thread->cpu);
+    const Address stack_end = thread->stack_top();
+
+    if (frames) {
+        for (Address addr = sp; addr + 4 <= stack_end && written < frame_cap; addr += 4) {
+            if (!Ptr<uint32_t>(addr).valid(emuenv.mem))
+                break;
+            const Address value = *Ptr<uint32_t>(addr).get(emuenv.mem);
+            if (value < 0x80000000)
+                continue;
+            if (!emuenv.kernel.find_module_by_addr(value))
+                continue;
+            frames[written].sp = addr;
+            frames[written].pc = value;
+            written++;
+        }
+    }
+
+    if (SceUInt32 *const count = pFrameCount.get(emuenv.mem))
+        *count = written;
+
+    return 0;
 }
 
 EXPORT(int, sceKernelCallModuleExit) {
@@ -1795,7 +1822,7 @@ EXPORT(int, sceKernelUnloadModule, SceUID uid, SceUInt32 flags, const void *pOpt
 EXPORT(int, sceKernelUnlockLwMutex, Ptr<SceKernelLwMutexWork> workarea, int unlock_count) {
     TRACY_FUNC(sceKernelUnlockLwMutex, workarea, unlock_count);
     const auto lwmutexid = workarea.get(emuenv.mem)->uid;
-    return mutex_unlock(emuenv.kernel, export_name, thread_id, lwmutexid, unlock_count, SyncWeight::Light);
+    return mutex_unlock(emuenv.kernel, emuenv.mem, export_name, thread_id, lwmutexid, unlock_count, SyncWeight::Light);
 }
 
 EXPORT(int, sceKernelUnlockLwMutex_0, Ptr<SceKernelLwMutexWork> workarea, int unlock_count) {
@@ -1806,7 +1833,7 @@ EXPORT(int, sceKernelUnlockLwMutex_0, Ptr<SceKernelLwMutexWork> workarea, int un
 EXPORT(int, sceKernelUnlockLwMutex2, Ptr<SceKernelLwMutexWork> workarea, int unlock_count) {
     TRACY_FUNC(sceKernelUnlockLwMutex2, workarea, unlock_count);
     const auto lwmutexid = workarea.get(emuenv.mem)->uid;
-    return mutex_unlock(emuenv.kernel, export_name, thread_id, lwmutexid, unlock_count, SyncWeight::Light);
+    return mutex_unlock(emuenv.kernel, emuenv.mem, export_name, thread_id, lwmutexid, unlock_count, SyncWeight::Light);
 }
 
 EXPORT(SceInt32, sceKernelWaitCond, SceUID condId, SceUInt32 *pTimeout) {

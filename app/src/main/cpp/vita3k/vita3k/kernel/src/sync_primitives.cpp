@@ -15,10 +15,13 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <chrono>
 #include <cpu/functions.h>
 #include <kernel/state.h>
 #include <kernel/sync_primitives.h>
+#include <kernel/thread/thread_state.h>
 
+#include <array>
 #include <kernel/types.h>
 #include <util/lock_and_find.h>
 #include <util/log.h>
@@ -49,12 +52,36 @@ inline static CondvarPtrs &get_condvars(KernelState &kernel, SyncWeight weight) 
     return weight == SyncWeight::Light ? kernel.lwcondvars : kernel.condvars;
 }
 
+namespace {
+struct MutexCacheEntry {
+    SceUID uid = 0;
+    SyncWeight weight = SyncWeight::Light;
+    MutexPtr ptr;
+};
+thread_local std::array<MutexCacheEntry, 8> g_mutex_cache;
+thread_local uint32_t g_mutex_cache_next = 0;
+} // namespace
+
 inline static int find_mutex(MutexPtr &mutex_out, MutexPtrs **mutexes_out, KernelState &kernel, const char *export_name, SceUID mutexid, SyncWeight weight) {
     MutexPtrs &mutexes = get_mutexes(kernel, weight);
+
+    for (auto &entry : g_mutex_cache) {
+        if (entry.uid == mutexid && entry.weight == weight && entry.ptr
+            && !entry.ptr->deleted.load(std::memory_order_relaxed)) {
+            mutex_out = entry.ptr;
+            if (mutexes_out)
+                *mutexes_out = &mutexes;
+            return SCE_KERNEL_OK;
+        }
+    }
+
     mutex_out = lock_and_find(mutexid, mutexes, kernel.mutex);
     if (!mutex_out) {
         return unknown_mutex_id(export_name, weight);
     }
+
+    auto &slot = g_mutex_cache[g_mutex_cache_next++ % g_mutex_cache.size()];
+    slot = { mutexid, weight, mutex_out };
 
     if (mutexes_out)
         *mutexes_out = &mutexes;
@@ -81,6 +108,8 @@ inline static int handle_timeout(KernelState &kernel, const ThreadStatePtr &thre
     std::unique_lock<std::mutex> &primitive_lock, WaitingThreadQueuePtr &queue,
     const ThreadDataQueueInterator<WaitingThreadData> &data_it, const char *export_name,
     SceUInt *const timeout) {
+    guest_sched_release_for_block();
+
     if (timeout) {
         bool status = false;
         auto start = std::chrono::steady_clock::now();
@@ -668,7 +697,17 @@ inline static int mutex_lock_impl(KernelState &kernel, MemState &mem, const char
         const auto data_it = mutex->waiting_threads->push(data);
         thread_lock.unlock();
 
-        int res = handle_timeout(kernel, thread, thread_lock, mutex_lock, mutex->waiting_threads, data_it, export_name, timeout);
+        int res;
+        while (true) {
+            res = handle_timeout(kernel, thread, thread_lock, mutex_lock, mutex->waiting_threads, data_it, export_name, timeout);
+
+            if (res != SCE_KERNEL_OK || mutex->owner == thread || thread->is_delete_requested())
+                break;
+
+            thread_lock.lock();
+            thread->update_status(ThreadStatus::wait, ThreadStatus::run);
+            thread_lock.unlock();
+        }
 
         if (weight == SyncWeight::Light) {
             mutex->workarea.get(mem)->lockCount = mutex->lock_count;
@@ -715,7 +754,7 @@ int mutex_try_lock(KernelState &kernel, MemState &mem, const char *export_name, 
     return mutex_lock_impl(kernel, mem, export_name, thread_id, lock_count, mutex, weight, nullptr, true);
 }
 
-inline static int mutex_unlock_impl(KernelState &kernel, const char *export_name, SceUID thread_id, int unlock_count, MutexPtr &mutex) {
+inline static int mutex_unlock_impl(KernelState &kernel, MemState &mem, const char *export_name, SceUID thread_id, int unlock_count, MutexPtr &mutex) {
     const ThreadStatePtr current_thread = kernel.get_thread(thread_id);
 
     const std::lock_guard<std::mutex> mutex_lock(mutex->mutex);
@@ -743,12 +782,19 @@ inline static int mutex_unlock_impl(KernelState &kernel, const char *export_name
                 mutex->owner = waiting_thread;
             }
         }
+
+        // keep the lwmutex workarea in sync
+        if (mutex->workarea) {
+            SceKernelLwMutexWork *workarea_mem = mutex->workarea.get(mem);
+            workarea_mem->lockCount = mutex->lock_count;
+            workarea_mem->owner = mutex->owner ? mutex->owner->id : 0;
+        }
     }
 
     return SCE_KERNEL_OK;
 }
 
-int mutex_unlock(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID mutexid, int unlock_count, SyncWeight weight) {
+int mutex_unlock(KernelState &kernel, MemState &mem, const char *export_name, SceUID thread_id, SceUID mutexid, int unlock_count, SyncWeight weight) {
     assert(mutexid >= 0);
 
     MutexPtr mutex;
@@ -761,7 +807,7 @@ int mutex_unlock(KernelState &kernel, const char *export_name, SceUID thread_id,
             mutex->waiting_threads->size());
     }
 
-    return mutex_unlock_impl(kernel, export_name, thread_id, unlock_count, mutex);
+    return mutex_unlock_impl(kernel, mem, export_name, thread_id, unlock_count, mutex);
 }
 
 int mutex_delete(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID mutexid, SyncWeight weight) {
@@ -779,6 +825,7 @@ int mutex_delete(KernelState &kernel, const char *export_name, SceUID thread_id,
     }
 
     if (mutex->waiting_threads->empty()) {
+        mutex->deleted.store(true, std::memory_order_relaxed);
         const std::lock_guard<std::mutex> kernel_guard(kernel.mutex);
         mutexes->erase(mutexid);
     } else {
@@ -1246,7 +1293,7 @@ int condvar_wait(KernelState &kernel, MemState &mem, const char *export_name, Sc
 
     std::unique_lock<std::mutex> condition_variable_lock(condvar->mutex);
 
-    if (auto error = mutex_unlock_impl(kernel, export_name, thread_id, 1, condvar->associated_mutex))
+    if (auto error = mutex_unlock_impl(kernel, mem, export_name, thread_id, 1, condvar->associated_mutex))
         return error;
 
     std::unique_lock<std::mutex> thread_lock(thread->mutex);
@@ -1706,13 +1753,21 @@ SceSize msgpipe_recv(KernelState &kernel, const char *export_name, SceUID thread
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_MSG_PIPE_ID);
     }
 
+    const auto wake_up = [&](const ThreadStatePtr &target) {
+        if (target == thread) {
+            target->update_status(ThreadStatus::run); // our own mutex is already held
+        } else {
+            const std::lock_guard<std::mutex> target_lock(target->mutex);
+            target->update_status(ThreadStatus::run);
+        }
+    };
+
     const auto wakeup_senders = [&] {
         if (!msgpipe->senders->empty()) {
             for (auto it = msgpipe->senders->begin(); it != msgpipe->senders->end(); ++it) {
                 auto threadInfo = (*it);
                 if (threadInfo.mp.request_size <= msgpipe->data_buffer.Free()) { // Found a thread we can service
-                    threadInfo.thread->status = ThreadStatus::run;
-                    threadInfo.thread->status_cond.notify_one();
+                    wake_up(threadInfo.thread);
 
                     msgpipe->senders->erase(it); // Erase other thread's info - done here to avoid race
                     break; // Should we try to signal other threads, too?
@@ -1759,14 +1814,27 @@ SceSize msgpipe_recv(KernelState &kernel, const char *export_name, SceUID thread
                     std::atomic_fetch_add(&msgpipe->remainingThreads, static_cast<size_t>(-1));
                     return SCE_KERNEL_ERROR_WAIT_DELETE;
                 }
+                thread_lock.unlock();
                 msgpipe_lock.lock(); // Lock message pipe again
+                thread_lock.lock();
                 availableSize = msgpipe->data_buffer.Used();
+                if (!((availableSize >= recvSize) || (ASAP && (availableSize > 0)))) {
+                    if (thread->is_delete_requested()) {
+                        auto it = msgpipe->receivers->find(thread);
+                        if (it != msgpipe->receivers->end())
+                            msgpipe->receivers->erase(it);
+                        return 0;
+                    }
+                    if (msgpipe->receivers->find(thread) == msgpipe->receivers->end())
+                        msgpipe->receivers->push(wait_data);
+                    thread->update_status(ThreadStatus::wait, ThreadStatus::run);
+                }
             } while (!((availableSize >= recvSize) || (ASAP && (availableSize > 0))));
 
             return finish();
         } else { // There's a timeout - wait until we can fill buffer or timeout
             msgpipe_lock.unlock(); // Unlock message pipe object, else we'll deadlock
-            auto status = thread->status_cond.wait_for(thread_lock, std::chrono::microseconds{ *pTimeout }, [&] {
+            thread->status_cond.wait_for(thread_lock, std::chrono::microseconds{ *pTimeout }, [&] {
                 return thread->status == ThreadStatus::run;
             });
             if (msgpipe->beingDeleted) {
@@ -1774,12 +1842,21 @@ SceSize msgpipe_recv(KernelState &kernel, const char *export_name, SceUID thread
                 return SCE_KERNEL_ERROR_WAIT_DELETE;
             }
 
-            if (!status) { // Timed out and buffer hasn't been touched
-                thread->update_status(ThreadStatus::run, ThreadStatus::wait);
-                return RET_ERROR(SCE_KERNEL_ERROR_WAIT_TIMEOUT);
+            thread_lock.unlock();
+            msgpipe_lock.lock();
+            thread_lock.lock();
+
+            availableSize = msgpipe->data_buffer.Used();
+            if ((availableSize >= recvSize) || (ASAP && (availableSize > 0)))
+                return finish();
+
+            {
+                auto it = msgpipe->receivers->find(thread);
+                if (it != msgpipe->receivers->end())
+                    msgpipe->receivers->erase(it);
             }
-            msgpipe_lock.lock(); // Lock message pipe again
-            return finish();
+            thread->update_status(ThreadStatus::run);
+            return RET_ERROR(SCE_KERNEL_ERROR_WAIT_TIMEOUT);
         }
     }
 }
@@ -1805,11 +1882,22 @@ SceSize msgpipe_send(KernelState &kernel, const char *export_name, SceUID thread
     if (sendSize > msgpipe->data_buffer.Capacity())
         return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_SIZE);
 
+    const ThreadStatePtr thread = kernel.get_thread(thread_id);
+
+    const auto wake_up = [&](const ThreadStatePtr &target) {
+        if (target == thread) {
+            target->update_status(ThreadStatus::run); // our own mutex is already held
+        } else {
+            const std::lock_guard<std::mutex> target_lock(target->mutex);
+            target->update_status(ThreadStatus::run);
+        }
+    };
+
     const auto wakeup_receivers = [&] { // TODO is this correct?
         if (!msgpipe->receivers->empty()) {
             for (auto it = msgpipe->receivers->begin(); it != msgpipe->receivers->end(); ++it) {
                 if ((*it).mp.request_size <= msgpipe->data_buffer.Used()) { // Found a thread we can service
-                    (*it).thread->update_status(ThreadStatus::run, ThreadStatus::wait);
+                    wake_up((*it).thread);
 
                     msgpipe->receivers->erase(it); // Erase other thread's info - done here to avoid race
                     break; // Should we try to signal other threads, too?
@@ -1817,8 +1905,6 @@ SceSize msgpipe_send(KernelState &kernel, const char *export_name, SceUID thread
             }
         }
     };
-
-    const ThreadStatePtr thread = kernel.get_thread(thread_id);
     std::unique_lock<std::mutex> msgpipe_lock(msgpipe->mutex);
     // check in case of delete happens while waiting (un)lock
     if (msgpipe->beingDeleted) {
@@ -1866,15 +1952,28 @@ SceSize msgpipe_send(KernelState &kernel, const char *export_name, SceUID thread
                     std::atomic_fetch_add(&msgpipe->remainingThreads, static_cast<size_t>(-1));
                     return SCE_KERNEL_ERROR_WAIT_DELETE;
                 }
+                thread_lock.unlock();
                 msgpipe_lock.lock(); // Lock message pipe before read from data_buffer
+                thread_lock.lock();
                 freeSize = msgpipe->data_buffer.Free();
+                if (!((freeSize >= sendSize) || (ASAP && (freeSize >= 1)))) {
+                    if (thread->is_delete_requested()) {
+                        auto it = msgpipe->senders->find(thread);
+                        if (it != msgpipe->senders->end())
+                            msgpipe->senders->erase(it);
+                        return 0;
+                    }
+                    if (msgpipe->senders->find(thread) == msgpipe->senders->end())
+                        msgpipe->senders->push(wait_data);
+                    thread->update_status(ThreadStatus::wait, ThreadStatus::run);
+                }
             } while (!((freeSize >= sendSize) || (ASAP && (freeSize >= 1))));
 
             // Message pipe is still locked here, so we can read from data_buffer in finish()
             return finish();
         } else { // There's a timeout - wait until we can fill buffer or timeout
             msgpipe_lock.unlock(); // Unlock message pipe object, else we'll deadlock
-            auto status = thread->status_cond.wait_for(thread_lock, std::chrono::microseconds{ *pTimeout }, [&] {
+            thread->status_cond.wait_for(thread_lock, std::chrono::microseconds{ *pTimeout }, [&] {
                 return thread->status == ThreadStatus::run;
             });
             if (msgpipe->beingDeleted) {
@@ -1882,12 +1981,21 @@ SceSize msgpipe_send(KernelState &kernel, const char *export_name, SceUID thread
                 return SCE_KERNEL_ERROR_WAIT_DELETE;
             }
 
-            if (!status) { // Timed out and buffer hasn't been touched
-                thread->update_status(ThreadStatus::run, ThreadStatus::wait);
-                return RET_ERROR(SCE_KERNEL_ERROR_WAIT_TIMEOUT);
+            thread_lock.unlock();
+            msgpipe_lock.lock();
+            thread_lock.lock();
+
+            freeSize = msgpipe->data_buffer.Free();
+            if ((freeSize >= sendSize) || (ASAP && (freeSize >= 1)))
+                return finish();
+
+            {
+                auto it = msgpipe->senders->find(thread);
+                if (it != msgpipe->senders->end())
+                    msgpipe->senders->erase(it);
             }
-            msgpipe_lock.lock(); // Lock message pipe before read from data_buffer in finish()
-            return finish();
+            thread->update_status(ThreadStatus::run);
+            return RET_ERROR(SCE_KERNEL_ERROR_WAIT_TIMEOUT);
         }
     }
 }

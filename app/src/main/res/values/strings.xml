@@ -345,6 +345,8 @@
     <string name="settings_core_anisotropic_value">%1$dx</string>
     <string name="settings_core_texture_cache">Texture cache</string>
     <string name="settings_core_async_pipeline">Async pipeline compilation</string>
+    <string name="settings_core_accurate_thread_scheduling">Accurate thread scheduling</string>
+    <string name="settings_core_guest_cores">Guest CPU cores</string>
     <string name="settings_core_shader_compilation_notice">Show shader compilation notice</string>
     <string name="settings_core_shader_caching_warn">Show shader caching warning</string>
     <string name="settings_core_disable_surface_sync">Disable surface sync</string>
@@ -445,6 +447,8 @@
     <string name="settings_help_anisotropic">Improves texture clarity at angles, but can cost performance.\n\nUse this to improve image clarity, scaling, or visual stability in games that already run well. Reduce it or restore the default if FPS drops, the phone heats up, or graphics become unstable.</string>
     <string name="settings_help_texture_cache">Keeps textures in cache to reduce repeated work.\n\nUse this to reduce shader or texture stutter after the first run. Disable it only when a game shows corrupted textures, black screens, or repeatable crashes after caching.</string>
     <string name="settings_help_async_pipeline">Compiles graphics pipelines in the background to reduce stutter.\n\nUse this to reduce shader or texture stutter after the first run. Disable it only when a game shows corrupted textures, black screens, or repeatable crashes after caching.</string>
+    <string name="settings_help_accurate_thread_scheduling">Limits simultaneous guest execution and honors Vita thread priorities more strictly.\n\nEnable this per game when startup hangs, timing bugs, or unstable loading occur. It can reduce performance, so leave it off unless a game needs it.</string>
+    <string name="settings_help_guest_cores">Sets how many guest threads may execute at once when accurate thread scheduling is enabled. One core is the safest default; higher values may improve speed but can reintroduce timing issues.</string>
     <string name="settings_help_shader_compilation_notice">Shows when new shaders are compiling.\n\nUse this when you want the emulator interface or in-game system presentation to match your preference. Leave it default if you do not need the extra information or visual change.</string>
     <string name="settings_help_shader_caching_warn">Shows a message in the corner during the initial shader caching phase at game startup.\n\nUse this when you want the emulator interface or in-game system presentation to match your preference. Leave it default if you do not need the extra information or visual change.</string>
     <string name="settings_help_disable_surface_sync">Can improve speed on some devices, but may cause instability.\n\nUse this when a game is slow, stutters, or your device has enough CPU/GPU headroom to try a faster path. Turn it back off or lower it if you see crashes, audio crackle, overheating, battery drain, or broken timing.</string>

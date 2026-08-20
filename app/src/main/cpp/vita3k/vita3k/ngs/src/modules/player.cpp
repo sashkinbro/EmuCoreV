@@ -46,6 +46,7 @@ void PlayerModule::on_state_change(const MemState &mem, ModuleData &data, const 
         logical->decoded_pcm.clear();
         logical->rate_resampler.reset();
         logical->adpcm_buffer.clear();
+        logical->requested_initial_buffer = false;
 
         std::memset(&logical->adpcm_history, 0, sizeof(logical->adpcm_history));
     } else if (data.parent->is_keyed_off) {
@@ -123,10 +124,74 @@ bool PlayerModule::process(KernelState &kern, const MemState &mem, const SceUID 
 
     logical->decoded_pcm.compact();
 
+    const auto prefer_live_params_before_first_consume = [&]() {
+        if (!(data.flags & ModuleData::PARAMS_LOCK) || state->bytes_consumed_since_key_on != 0)
+            return;
+        SceNgsPlayerParams *live = data.info.data.cast<SceNgsPlayerParams>().get(mem);
+        if (!live)
+            return;
+        const int buf = state->current_buffer;
+        if (buf < 0 || buf >= SCE_NGS_PLAYER_MAX_BUFFERS)
+            return;
+        const auto &snapshot = params->buffer_params[buf];
+        const auto &live_buf = live->buffer_params[buf];
+        if ((!snapshot.buffer || snapshot.bytes_count <= 0) && live_buf.buffer && live_buf.bytes_count > 0)
+            params = live;
+    };
+
+    const auto request_initial_buffer = [&]() {
+        if (state->bytes_consumed_since_key_on != 0 || logical->requested_initial_buffer)
+            return false;
+        logical->requested_initial_buffer = true;
+        const int buf = state->current_buffer;
+        const uint32_t buf_addr = (buf >= 0 && buf < SCE_NGS_PLAYER_MAX_BUFFERS)
+            ? params->buffer_params[buf].buffer.address()
+            : 0;
+
+        if (buf_addr && params->type == ParameterAudioTypePCM
+            && params->buffer_params[buf].bytes_count == 0) {
+            constexpr uint32_t peek_frames = 4096;
+            const uint32_t peek_bytes = peek_frames * sizeof(int16_t);
+            const int16_t *p = Ptr<int16_t>(buf_addr).get(mem);
+            if (p && Ptr<uint8_t>(buf_addr + peek_bytes - 1).valid(mem)) {
+                int16_t peak = 0;
+                for (uint32_t i = 0; i < peek_frames; ++i)
+                    peak = std::max<int16_t>(peak, static_cast<int16_t>(std::abs(p[i])));
+                if (peak > 8) {
+                    const int ch = std::max<int>(1, params->channels);
+                    params->buffer_params[buf].bytes_count = peek_frames * static_cast<int32_t>(sizeof(int16_t)) * ch;
+                    LOG_WARN_ONCE("NGS player: adopted {} bytes of pre-written PCM in an unpublished buffer (FMOD stream race)", params->buffer_params[buf].bytes_count);
+                    return true;
+                }
+            }
+        }
+
+        if (!data.callback || !buf_addr)
+            return false;
+        voice_lock.unlock();
+        scheduler_lock.unlock();
+        data.invoke_callback(kern, mem, thread_id, SCE_NGS_PLAYER_SWAPPED_BUFFER, buf, buf_addr);
+        scheduler_lock.lock();
+        voice_lock.lock();
+        params = data.get_parameters<SceNgsPlayerParams>(mem);
+        prefer_live_params_before_first_consume();
+        return true;
+    };
+
+    prefer_live_params_before_first_consume();
+
     while (static_cast<int>(logical->decoded_pcm.available_frames()) < granularity) {
         if ((state->current_buffer == -1)
             || !params->buffer_params[state->current_buffer].buffer
             || (params->buffer_params[state->current_buffer].bytes_count == 0)) {
+            if (state->bytes_consumed_since_key_on == 0) {
+                if (request_initial_buffer()
+                    && state->current_buffer != -1
+                    && params->buffer_params[state->current_buffer].buffer
+                    && params->buffer_params[state->current_buffer].bytes_count > 0)
+                    continue;
+                break; // wait for the next tick — do NOT finish/key off
+            }
             // Stop processing if no valid buffer is available or if the buffer is empty
             finished = true;
             break;

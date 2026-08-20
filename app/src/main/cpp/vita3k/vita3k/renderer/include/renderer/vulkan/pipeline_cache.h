@@ -22,9 +22,11 @@
 #include <vkutil/vkutil.h>
 
 #include <array>
+#include <atomic>
 #include <limits>
 #include <map>
 #include <set>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -79,9 +81,12 @@ private:
     vk::PipelineCache pipeline_cache;
 
     // first index: 0 if color is backed by memory, 1 otherwise
-    // second index: 1 if depth-stencil is force loaded, 0 otherwise
-    // third index: 1 if depth-stencil is force stored, 0 otherwise
-    std::map<vk::Format, vk::RenderPass> render_passes[2][2][2];
+    // second index: 1 if the depth aspect is loaded at scene start, 0 if cleared
+    // third index: 1 if the stencil aspect is loaded at scene start, 0 if cleared
+    // fourth index: 1 if depth-stencil is force stored, 0 otherwise
+    std::map<vk::Format, vk::RenderPass> render_passes[2][2][2][2];
+    // variants carrying the raw u16 attachment
+    std::map<vk::Format, vk::RenderPass> render_passes_with_raw[2][2][2];
     // render passes used along shader interlock
     std::map<vk::Format, vk::RenderPass> shader_interlock_pass;
 
@@ -90,6 +95,27 @@ private:
     // because of multithreading, we want the pointers to remain stable
     unordered_map_stable<Sha256Hash, vk::ShaderModule> shaders;
     unordered_map_stable<uint64_t, vk::Pipeline> pipelines;
+
+    // --- diagnostics -------------------------------------------------------------------------
+    // Everything below only exists so that a single run produces enough information to explain a
+    // pipeline creation failure without having to rebuild and ask for another log.
+
+    // human readable description of every render pass we have created, keyed by the handle, so a
+    // failing pipeline can report the exact subpass it was being created against
+    std::map<uint64_t, std::string> render_pass_descriptions;
+    std::mutex diagnostics_mutex;
+    std::atomic<uint32_t> pipelines_created{ 0 };
+    std::atomic<uint32_t> pipelines_failed{ 0 };
+    // the full state dump and the knockout bisect are expensive, only do them for the first few
+    std::atomic<uint32_t> failures_dumped{ 0 };
+    static constexpr uint32_t max_failures_dumped = 3;
+
+    // reads the module back off disk and summarises it; only called when a pipeline is refused, so
+    // that shader creation itself carries no diagnostic cost
+    std::string describe_shader(const Sha256Hash &hash);
+    // retries the failing pipeline with one piece of state neutralised at a time and logs which
+    // variant the driver accepts. This is what turns "ErrorOutOfHostMemory" into an actual answer.
+    void bisect_pipeline_failure(const vk::GraphicsPipelineCreateInfo &failing_info);
 
     vk::PipelineShaderStageCreateInfo retrieve_shader(const SceGxmProgram *program, const Sha256Hash &hash, bool is_vertex, bool maskupdate, MemState &mem, const shader::Hints &hints, bool is_srgb = false);
     vk::PipelineVertexInputStateCreateInfo get_vertex_input_state(const SceGxmVertexProgram &vertex_program, MemState &mem);
@@ -129,7 +155,7 @@ public:
     void read_pipeline_cache();
     void save_pipeline_cache();
 
-    vk::RenderPass retrieve_render_pass(vk::Format format, bool force_load, bool force_store, bool is_color_transient, bool no_color = false);
+    vk::RenderPass retrieve_render_pass(vk::Format format, bool depth_load, bool stencil_load, bool force_store, bool is_color_transient, bool no_color = false, bool has_raw_attachment = false);
     vk::Pipeline retrieve_pipeline(VKContext &context, SceGxmPrimitiveType &type, bool consider_for_async, MemState &mem);
 
     vk::ShaderModule precompile_shader(const Sha256Hash &hash, bool search_first = true);

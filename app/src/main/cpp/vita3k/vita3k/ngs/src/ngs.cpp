@@ -41,7 +41,7 @@ bool Patch::is_active() const {
 }
 
 void VoiceInputManager::init(const uint32_t granularity, const uint16_t total_input) {
-    inputs.resize(total_input);
+    inputs.resize(std::max<uint16_t>(1, total_input));
 
     for (auto &input : inputs) {
         // FLTP and maximum channel count
@@ -162,7 +162,14 @@ void Voice::init(Rack *mama) {
     for (uint32_t i = 0; i < MAX_OUTPUT_PORT; i++)
         patches[i].resize(mama->patches_per_output);
 
-    inputs.init(rack->system->granularity, 1);
+    uint16_t input_count = 0;
+    if (size_inputs_by_input_mixer_count) {
+        for (const auto &module : mama->modules) {
+            if (module && module->module_id() == input_mixer_module_id)
+                input_count++;
+        }
+    }
+    inputs.init(rack->system->granularity, std::max<uint16_t>(1, input_count));
     voice_mutex = std::make_unique<std::mutex>();
 }
 
@@ -208,6 +215,10 @@ Ptr<Patch> Voice::patch(const MemState &mem, const int32_t index, int32_t subind
 
     // Initialize the matrix
     memset(patch->volume_matrix, 0, sizeof(patch->volume_matrix));
+    if (default_patch_volume_is_unity) {
+        patch->volume_matrix[0][0] = 1.0f;
+        patch->volume_matrix[1][1] = 1.0f;
+    }
 
     return patches[index][subindex];
 }

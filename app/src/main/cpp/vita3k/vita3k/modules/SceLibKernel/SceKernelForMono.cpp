@@ -49,8 +49,12 @@ EXPORT(int, sceKernelWaitExceptionCBForMono) {
 
 EXPORT(int, sceKernelWaitExceptionForMono) {
     TRACY_FUNC(sceKernelWaitExceptionForMono);
-    STUBBED("Inifinite wait");
-    ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
-    thread->suspend();
+    STUBBED("Blocks forever (no exception delivery)");
+    const ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
+    std::unique_lock<std::mutex> lock(thread->mutex);
+    thread->update_status(ThreadStatus::wait, ThreadStatus::run);
+    thread->status_cond.wait(lock, [&] {
+        return thread->status == ThreadStatus::run || thread->is_delete_requested();
+    });
     return 0;
 }

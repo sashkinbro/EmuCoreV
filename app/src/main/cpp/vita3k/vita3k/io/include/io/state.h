@@ -125,6 +125,8 @@ struct IOState {
     bool case_isens_find_enabled = false;
 
     std::mutex overlay_mutex;
+    std::mutex file_mutex;
+    std::atomic<uint64_t> concurrent_positional_io{ 0 };
     SceUID next_overlay_id = 1;
     // overlay in the order they should be applied
     std::vector<FiosOverlay> overlays;

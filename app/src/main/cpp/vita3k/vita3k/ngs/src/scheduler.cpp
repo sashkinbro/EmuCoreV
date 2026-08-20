@@ -22,6 +22,8 @@
 
 #include <algorithm>
 #include <cstring>
+#include <unordered_map>
+#include <unordered_set>
 #include <util/vector_utils.h>
 
 namespace ngs {
@@ -132,6 +134,92 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
         voice->inputs.reset_inputs();
     }
 
+    ngs::Voice *implicit_master = nullptr;
+    if (use_implicit_master_routing) {
+        ngs::Voice *master = nullptr;
+        bool several_masters = false;
+        for (ngs::Voice *voice : queue_copy) {
+            if (voice->rack->vdef && voice->rack->vdef->type == BussType::BUSS_MASTER) {
+                if (master)
+                    several_masters = true;
+                master = voice;
+            }
+        }
+
+        if (master && !several_masters) {
+            bool master_has_explicit_source = false;
+            for (ngs::Voice *voice : queue_copy) {
+                if (voice == master)
+                    continue;
+                for (const auto &patches : voice->patches) {
+                    for (const auto &patch_ptr : patches) {
+                        if (!patch_ptr)
+                            continue;
+                        const Patch *patch = patch_ptr.get(mem);
+                        if (patch && patch->is_active() && patch->dest.get(mem) == master)
+                            master_has_explicit_source = true;
+                    }
+                }
+            }
+
+            if (!master_has_explicit_source)
+                implicit_master = master;
+        }
+    }
+
+    // Games mute voices by disconnecting them so only fed dead-end submixes fall back to the master
+    std::vector<ngs::Voice *> implicit_sources;
+    if (implicit_master) {
+        std::unordered_map<ngs::Voice *, uint32_t> incoming_count;
+        std::unordered_set<ngs::Voice *> has_outgoing;
+
+        for (ngs::Voice *voice : queue_copy) {
+            for (const auto &patches : voice->patches) {
+                for (const auto &patch_ptr : patches) {
+                    if (!patch_ptr)
+                        continue;
+                    const Patch *patch = patch_ptr.get(mem);
+                    if (!patch || !patch->is_active())
+                        continue;
+                    ngs::Voice *dest = patch->dest.get(mem);
+                    if (!dest)
+                        continue;
+
+                    // an all-zero volume matrix carries nothing, so it does not count as "routed"
+                    const bool carries_audio = patch->volume_matrix[0][0] != 0.0f
+                        || patch->volume_matrix[0][1] != 0.0f
+                        || patch->volume_matrix[1][0] != 0.0f
+                        || patch->volume_matrix[1][1] != 0.0f;
+                    if (carries_audio)
+                        has_outgoing.insert(voice);
+
+                    incoming_count[dest]++;
+                }
+            }
+        }
+
+        for (ngs::Voice *voice : queue_copy) {
+            if (voice == implicit_master || has_outgoing.contains(voice))
+                continue;
+            if (incoming_count[voice] == 0)
+                continue;
+            implicit_sources.push_back(voice);
+        }
+
+        std::stable_sort(implicit_sources.begin(), implicit_sources.end(),
+            [&incoming_count](ngs::Voice *a, ngs::Voice *b) { return incoming_count[a] > incoming_count[b]; });
+
+        constexpr size_t sanity_cap = 8;
+        if (implicit_sources.size() > sanity_cap)
+            implicit_sources.resize(sanity_cap);
+    }
+
+    if (implicit_master) {
+        // the master must run after the voices that implicitly feed it
+        if (vector_utils::erase_first(queue_copy, implicit_master))
+            queue_copy.push_back(implicit_master);
+    }
+
     for (ngs::Voice *voice : queue_copy) {
         // Modify the state, in peace....
         std::unique_lock<std::mutex> voice_lock(*voice->voice_mutex);
@@ -163,9 +251,15 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
             stop(mem, voice);
         }
 
+        const bool can_route_to_master = implicit_master && std::ranges::contains(implicit_sources, voice);
+
         for (size_t i = 0; i < voice->rack->vdef->output_count; i++) {
-            if (voice->products[i].data)
-                deliver_data(mem, queue_copy, voice, static_cast<uint8_t>(i), voice->products[i]);
+            if (voice->products[i].data) {
+                const bool delivered = deliver_data(mem, queue_copy, voice, static_cast<uint8_t>(i), voice->products[i]);
+
+                if (!delivered && can_route_to_master && i == 0)
+                    deliver_data_to_master(mem, implicit_master, voice, voice->products[i]);
+            }
         }
 
         voice->frame_count++;

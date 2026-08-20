@@ -120,7 +120,8 @@ EXPORT(int, sceCommonDialogSetConfigParam) {
 
 EXPORT(int, sceCommonDialogUpdate) {
     TRACY_FUNC(sceCommonDialogUpdate);
-    return UNIMPLEMENTED();
+    STUBBED("Return 0");
+    return 0;
 }
 
 EXPORT(int, sceCompanionUtilDialogAbort) {

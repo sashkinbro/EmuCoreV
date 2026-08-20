@@ -19,12 +19,16 @@
 
 #include "../SceProcessmgr/SceProcessmgr.h"
 
+#include <kernel/thread/thread_state.h>
 #include <ngs/state.h>
 #include <ngs/system.h>
 #include <util/log.h>
 #include <util/tracy.h>
 
 TRACY_MODULE_NAME(SceNgs);
+
+// Voice whose sceNgsVoiceGetOutputPatch just came up empty; the paired SetVolumesMatrix follows on this thread.
+static thread_local ngs::Voice *last_missing_output_patch_voice = nullptr;
 
 struct SceNgsVolumeMatrix {
     SceFloat32 matrix[SCE_NGS_MAX_SYSTEM_CHANNELS][SCE_NGS_MAX_SYSTEM_CHANNELS];
@@ -335,6 +339,7 @@ EXPORT(SceInt32, sceNgsRackRelease, ngs::Rack *rack, Ptr<void> callback) {
         // but I don't think this is allowed (and if it is I don't know how to prevent this)
         LOG_WARN_ONCE("sceNgsRackRelease called in a synchronous way during a ngs update, contact devs if your game softlocks now.");
 
+        guest_sched_release_for_block();
         rack->system->voice_scheduler.condvar.wait(lock);
         ngs::release_rack(emuenv.ngs, emuenv.mem, rack->system, rack);
     } else {
@@ -401,6 +406,7 @@ EXPORT(SceInt32, sceNgsSystemRelease, ngs::System *system) {
         if (system->voice_scheduler.is_updating) {
             LOG_WARN_ONCE("sceNgsSystemRelease called during a ngs update, contact devs if your game softlocks now.");
 
+            guest_sched_release_for_block();
             system->voice_scheduler.condvar.wait(lock);
         }
     }
@@ -728,10 +734,14 @@ EXPORT(SceInt32, sceNgsVoiceGetOutputPatch, ngs::Voice *voice, const SceInt32 ou
     }
 
     *patch = voice->patches[output_index][output_subindex];
-    if (!(*patch) || (patch->get(emuenv.mem))->output_sub_index == -1) {
+    const bool patch_missing = !(*patch) || (patch->get(emuenv.mem))->output_sub_index == -1;
+    if (patch_missing) {
         LOG_WARN_ONCE("Getting non-existen output patch port {}:{}", output_index, output_subindex);
         *patch = Ptr<ngs::Patch>(0);
     }
+
+    // Remember the voice so the paired SetVolumesMatrix can capture the implicit master-routing gain.
+    last_missing_output_patch_voice = patch_missing ? voice : nullptr;
 
     return 0;
 }
@@ -909,6 +919,17 @@ EXPORT(SceInt32, sceNgsVoicePatchSetVolumesMatrix, ngs::Patch *patch, const SceN
     TRACY_FUNC(sceNgsVoicePatchSetVolumesMatrix, patch, matrix);
     if (!emuenv.cfg.current_config.ngs_enable)
         return 0;
+
+    // Gain for a routing GetOutputPatch could not hand back: capture it as the voice's implicit master-mix volume.
+    if ((!patch || patch->output_sub_index == -1) && matrix && last_missing_output_patch_voice) {
+        ngs::Voice *voice = last_missing_output_patch_voice;
+        last_missing_output_patch_voice = nullptr;
+
+        const std::lock_guard<std::mutex> guard(*voice->voice_mutex);
+        memcpy(voice->implicit_volume_matrix, matrix->matrix, sizeof(voice->implicit_volume_matrix));
+
+        return SCE_NGS_OK;
+    }
 
     if (!patch || patch->output_sub_index == -1)
         return RET_ERROR(SCE_NGS_ERROR_INVALID_ARG);

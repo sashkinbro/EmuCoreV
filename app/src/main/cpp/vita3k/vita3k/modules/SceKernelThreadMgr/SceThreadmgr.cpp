@@ -446,9 +446,9 @@ EXPORT(int, _sceKernelGetThreadContextForVM, SceUID threadId, Ptr<SceKernelThrea
 
         infoCpu->cpsr = context.cpsr;
         memcpy(infoCpu->reg, context.cpu_registers.data(), 16 * 4);
-        infoCpu->sb = 100000; // Todo
-        infoCpu->st = 100000; // Todo
-        infoCpu->teehbr = 100000; // Todo
+        infoCpu->st = context.cpu_registers[13];
+        infoCpu->sb = thread->stack.get() + thread->stack_size;
+        infoCpu->teehbr = 0; // ThumbEE handler base: unused by the GC.
         infoCpu->tpidrurw = read_tpidruro(*thread->cpu);
     }
 
@@ -1335,13 +1335,12 @@ EXPORT(int, sceKernelRegisterCallbackToEvent) {
 
 EXPORT(int, sceKernelResumeThreadForVM, SceUID threadId) {
     TRACY_FUNC(sceKernelResumeThreadForVM, threadId);
-    STUBBED("STUB");
 
     const ThreadStatePtr thread = emuenv.kernel.get_thread(threadId);
     if (!thread)
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
 
-    thread->resume();
+    thread->resume_if_suspended();
 
     return 0;
 }
@@ -1413,13 +1412,17 @@ EXPORT(int, sceKernelStopTimer, SceUID timer_handle) {
 
 EXPORT(int, sceKernelSuspendThreadForVM, SceUID threadId) {
     TRACY_FUNC(sceKernelSuspendThreadForVM, threadId);
-    STUBBED("STUB");
 
     const ThreadStatePtr thread = emuenv.kernel.get_thread(threadId);
     if (!thread)
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
 
-    thread->suspend();
+    if (threadId == thread_id) {
+        thread->suspend();
+        return 0;
+    }
+
+    thread->suspend_and_wait();
 
     return 0;
 }
@@ -1441,7 +1444,7 @@ EXPORT(int, sceKernelTryLockWriteRWLock) {
 
 EXPORT(int, sceKernelUnlockMutex, SceUID mutexid, int unlock_count) {
     TRACY_FUNC(sceKernelUnlockMutex, mutexid, unlock_count);
-    return mutex_unlock(emuenv.kernel, export_name, thread_id, mutexid, unlock_count, SyncWeight::Heavy);
+    return mutex_unlock(emuenv.kernel, emuenv.mem, export_name, thread_id, mutexid, unlock_count, SyncWeight::Heavy);
 }
 
 EXPORT(int, sceKernelUnlockReadRWLock, SceUID lock_id) {

@@ -51,10 +51,23 @@ struct SceNgsCompressorStates {
 
 namespace ngs {
 
+inline constexpr bool implement_compressor = true;
+inline constexpr bool compressor_never_amplifies = true;
+inline constexpr bool interpret_ratio_below_one_as_reciprocal = true;
+
+struct CompressorLogicalState : public ModuleLogicalState {
+    float envelope[2] = { 0.0f, 0.0f };
+    float applied_gain[2] = { 1.0f, 1.0f };
+};
+
 struct CompressorModule : public Module {
 public:
     bool process(KernelState &kern, const MemState &mem, const SceUID thread_id, ModuleData &data, std::unique_lock<std::recursive_mutex> &scheduler_lock, std::unique_lock<std::mutex> &voice_lock) override;
     uint32_t module_id() const override { return 0x5CE1; }
+
+    std::unique_ptr<ModuleLogicalState> create_logical_state() const override {
+        return std::make_unique<CompressorLogicalState>();
+    }
 
     static constexpr uint32_t get_max_parameter_size() {
         return sizeof(SceNgsCompressorParams);

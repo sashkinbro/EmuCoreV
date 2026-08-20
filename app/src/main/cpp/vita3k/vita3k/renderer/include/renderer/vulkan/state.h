@@ -26,11 +26,13 @@
 #include <renderer/vulkan/surface_cache.h>
 #include <renderer/vulkan/types.h>
 
-#include <chrono>
+#include <mutex>
 
 struct Config;
 
 namespace renderer::vulkan {
+
+inline constexpr bool enable_depth_clamp = true; // Warning: also disables near clipping (Vulkan couples them)
 
 enum class LinuxSurfaceType {
     Unknown,
@@ -109,6 +111,7 @@ struct VKState : public renderer::State {
     Queue<WaitThreadRequest> request_queue;
 
     vkutil::Image default_image;
+    vkutil::Image default_raw_image;
     vkutil::Buffer default_buffer;
 
     bool support_fsr = false;
@@ -146,6 +149,7 @@ struct VKState : public renderer::State {
     void set_async_compilation(bool enable) override;
 
     bool map_memory(MemState &mem, Ptr<void> address, uint32_t size) override;
+    bool map_memory_page_table_fallback(MemState &mem, Ptr<void> address, uint32_t size);
     void unmap_memory(MemState &mem, Ptr<void> address) override;
     // return the matching buffer and offset for the memory location
     std::tuple<vk::Buffer, uint32_t> get_matching_mapping(const Ptr<void> address);
@@ -160,6 +164,9 @@ struct VKState : public renderer::State {
 
     void precompile_shader(const ShadersHash &hash) override;
     void preclose_action() override;
+
+    // dumps the resolved device/driver/feature configuration to the log, once, from late_init
+    void log_gpu_configuration(const Config &cfg);
 
     inline FrameObject &frame() {
         return frames[current_frame_idx];

@@ -95,7 +95,9 @@ void SinglePassScreenFilter::create_layout_sync() {
 
     // create vao
     vao.size = sizeof(screen_vertices_t) * screen.swapchain_size;
-    vao.init_buffer(vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst);
+    vao.init_buffer(vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vkutil::vma_mapped_alloc);
+    if (!vao.mapped_data)
+        LOG_ERROR("screen filter vao is not host-mappable on this device; falling back to updateBuffer");
 
     // create and zero-fill uvs
     last_uvs.resize(screen.swapchain_size);
@@ -222,8 +224,9 @@ void SinglePassScreenFilter::render(bool is_pre_renderpass, vk::ImageView src_im
             (viewport.offset_y + viewport.height) / (float)(viewport.texture_height)
         };
 
-        // if necessary update vao (should not happen often)
-        if (uvs != last_uvs[screen.swapchain_image_idx]) {
+        // write the quad every frame via the mapped pointer
+        const bool host_write = vao.mapped_data != nullptr;
+        if (host_write || uvs != last_uvs[screen.swapchain_image_idx]) {
             screen_vertices_t vertex_buffer_data = {
                 { { 1.f, -1.f, 0.0f }, { 1.f, 0.f } },
                 { { -1.f, -1.f, 0.0f }, { 0.f, 0.f } },
@@ -242,7 +245,11 @@ void SinglePassScreenFilter::render(bool is_pre_renderpass, vk::ImageView src_im
             vertex_buffer_data[3].uv[0] = uvs[0];
             vertex_buffer_data[3].uv[1] = uvs[3];
 
-            screen.current_cmd_buffer.updateBuffer(vao.buffer, screen.swapchain_image_idx * sizeof(screen_vertices_t), sizeof(screen_vertices_t), &vertex_buffer_data);
+            if (host_write)
+                memcpy(static_cast<uint8_t *>(vao.mapped_data) + screen.swapchain_image_idx * sizeof(screen_vertices_t),
+                    &vertex_buffer_data, sizeof(screen_vertices_t));
+            else
+                screen.current_cmd_buffer.updateBuffer(vao.buffer, screen.swapchain_image_idx * sizeof(screen_vertices_t), sizeof(screen_vertices_t), &vertex_buffer_data);
             last_uvs[screen.swapchain_image_idx] = uvs;
         }
 

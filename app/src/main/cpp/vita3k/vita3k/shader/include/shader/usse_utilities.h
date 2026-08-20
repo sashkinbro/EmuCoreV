@@ -61,6 +61,7 @@ spv::Id convert_to_float(spv::Builder &b, const SpirvUtilFunctions &utils, spv::
 spv::Id convert_to_int(spv::Builder &b, const SpirvUtilFunctions &utils, spv::Id opr, DataType type, bool normal);
 
 spv::Id add_uvec2_uint(spv::Builder &b, spv::Id vec, spv::Id to_add);
+spv::Id add_uvec2_int(spv::Builder &b, spv::Id vec, spv::Id to_add_signed);
 
 size_t dest_mask_to_comp_count(shader::usse::Imm4 dest_mask);
 

@@ -17,11 +17,15 @@
 
 #include <cpu/disasm/functions.h>
 #include <cpu/functions.h>
+
+#include <algorithm>
 #include <cpu/impl/dynarmic_cpu.h>
 #include <cpu/impl/interface.h>
 #include <cpu/state.h>
 #include <mem/ptr.h>
+#include <string>
 #include <util/types.h>
+#include <vector>
 
 #include <memory>
 #include <string>
@@ -208,4 +212,17 @@ void set_current_cpu_state(CPUState *state) {
 
 CPUState *get_current_cpu_state() {
     return current_cpu_state;
+}
+
+static thread_local uint32_t last_import_nid = 0;
+static thread_local uint32_t last_import_lr = 0;
+
+void set_last_import_call(uint32_t nid, uint32_t lr) {
+    last_import_nid = nid;
+    last_import_lr = lr;
+}
+
+void get_last_import_call(uint32_t &nid, uint32_t &lr) {
+    nid = last_import_nid;
+    lr = last_import_lr;
 }

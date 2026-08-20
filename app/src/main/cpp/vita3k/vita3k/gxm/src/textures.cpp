@@ -18,6 +18,7 @@
 #include <gxm/types.h>
 #include <util/align.h>
 
+#include <algorithm>
 #include <bit>
 #include <cassert>
 #include <map>
@@ -319,6 +320,54 @@ uint32_t texture_size_first_mip(const SceGxmTexture &texture) {
     const uint32_t block_shift = std::bit_width(block_width * block_height) - 1;
 
     return ((width * height) >> block_shift) * block_size;
+}
+
+uint32_t texture_size(const SceGxmTexture &texture) {
+    const SceGxmTextureType type = texture.texture_type();
+    const SceGxmTextureBaseFormat format = get_base_format(get_format(texture));
+
+    // no mip chain possible (or multiplane layout): the existing first-mip logic is exact
+    if (type == SCE_GXM_TEXTURE_LINEAR_STRIDED
+        || format == SCE_GXM_TEXTURE_BASE_FORMAT_YUV420P2 || format == SCE_GXM_TEXTURE_BASE_FORMAT_YUV420P3
+        || texture.true_mip_count() <= 1)
+        return texture_size_first_mip(texture);
+
+    const uint32_t mip_count = texture.true_mip_count();
+    const bool is_cube = (type == SCE_GXM_TEXTURE_CUBE || type == SCE_GXM_TEXTURE_CUBE_ARBITRARY);
+    const uint32_t face_count = is_cube ? 6 : 1;
+
+    // mip-mapped layouts store levels at power-of-two extents
+    const uint32_t layout_width = next_power_of_two(get_width(texture));
+    const uint32_t layout_height = next_power_of_two(get_height(texture));
+
+    const auto [block_width, block_height] = get_block_size(format);
+    const uint32_t bpp = bits_per_pixel(format);
+    const uint32_t block_size = (block_width * block_height * bpp) / 8;
+    const uint32_t block_shift = std::bit_width(block_width * block_height) - 1;
+
+    uint32_t align_width = block_width;
+    uint32_t align_height = block_height;
+    if (type == SCE_GXM_TEXTURE_LINEAR) {
+        align_width = std::max(align_width, 8U);
+    } else if (type == SCE_GXM_TEXTURE_TILED) {
+        align_width = std::max(align_width, 32U);
+        align_height = std::max(align_height, 32U);
+    }
+
+    uint32_t total = 0;
+    for (uint32_t face = 0; face < face_count; face++) {
+        uint32_t lw = layout_width;
+        uint32_t lh = layout_height;
+        uint32_t level = 0;
+        // cube faces are spaced as if the full possible chain were present (mirrors the uploader)
+        while (lw > 0 && lh > 0 && (level < mip_count || is_cube)) {
+            total += ((align(lw, align_width) * align(lh, align_height)) >> block_shift) * block_size;
+            lw /= 2;
+            lh /= 2;
+            level++;
+        }
+    }
+    return total;
 }
 
 bool is_paletted_format(SceGxmTextureBaseFormat base_format) {
