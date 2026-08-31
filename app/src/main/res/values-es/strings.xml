@@ -1032,4 +1032,5 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 y muchos modelos Snapdragon de las series 6/7</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, modelos recientes de la serie Snapdragon 7 y 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 y 6 Gen 4</string>
+    <string name="game_manager_fifa_compatibility">FIFA usa automáticamente Vulkan y Native Buffer por compatibilidad. Los ajustes de otros juegos no cambian.</string>
 </resources>

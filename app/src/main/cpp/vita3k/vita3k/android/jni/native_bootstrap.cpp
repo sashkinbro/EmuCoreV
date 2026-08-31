@@ -27,10 +27,12 @@
 #include <modules/module_parent.h>
 #include <renderer/functions.h>
 #include <util/log.h>
+#include <util/mem_snapshot.h>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
+#include <cstdlib>
 #include <filesystem>
 #include <span>
 #include <vector>
@@ -95,6 +97,19 @@ bool initialize_session(
         }
 
         fs::create_directories(cfg.get_vita_fs_path());
+
+#ifdef NDEBUG
+        const char *build_kind = "release/optimized (NDEBUG)";
+#else
+        const char *build_kind = "debug/unoptimized";
+#endif
+        LOG_INFO("BUILD IDENTITY: {} | compiled {} {} (this TU)", build_kind, __DATE__, __TIME__);
+        mem_diag::log_memory_snapshot("session-start");
+
+        if (!cfg.tu_debug.empty()) {
+            setenv("TU_DEBUG", cfg.tu_debug.c_str(), 1);
+            LOG_INFO("TU_DEBUG set to '{}' for the Turnip driver", cfg.tu_debug);
+        }
 
         if (!app::init(*emuenv, cfg, root_paths)) {
             LOG_ERROR("Failed to initialise emulated environment.");
@@ -177,6 +192,23 @@ Vita3K_initWithPaths(JNIEnv *env, jstring storage_path_str, jstring vita_path_st
     session.emuenv = std::move(emuenv);
     session.app_session_controller = std::make_unique<app::AppSessionController>(*session.emuenv);
 
+    if (jclass diag_class = env->FindClass("com/sbro/emucorev/core/AndroidDiagnostics")) {
+        const jmethodID diag_method = env->GetStaticMethodID(diag_class, "logStartupDiagnostics", "()V");
+        if (diag_method != nullptr)
+            env->CallStaticVoidMethod(diag_class, diag_method);
+        else
+            LOG_ERROR("[ANDROID DIAG] logStartupDiagnostics method not found - exit-reason reporting is broken");
+        if (env->ExceptionCheck()) {
+            LOG_ERROR("[ANDROID DIAG] logStartupDiagnostics threw - exit-reason reporting is broken");
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(diag_class);
+    } else {
+        LOG_ERROR("[ANDROID DIAG] AndroidDiagnostics class not found (R8-stripped? check proguard-rules.pro) - exit-reason reporting is broken");
+        if (env->ExceptionCheck())
+            env->ExceptionClear();
+    }
+
     LOG_INFO("Vita3K Android initialised.");
     return JNI_TRUE;
 }
@@ -184,6 +216,41 @@ Vita3K_initWithPaths(JNIEnv *env, jstring storage_path_str, jstring vita_path_st
 JNIEXPORT jboolean JNICALL
 Java_org_vita3k_emulator_NativeLib_prepareFrontend(JNIEnv *, jclass) {
     return prepare_frontend_runtime() ? JNI_TRUE : JNI_FALSE;
+}
+JNIEXPORT void JNICALL
+Java_org_vita3k_emulator_NativeLib_onTrimMemory(JNIEnv *, jclass, jint level) {
+    // Android is warning it may reclaim memory and/or kill us
+    LOG_WARN("[ANDROID MEMORY] onTrimMemory level={} - OS under memory pressure, an OOM kill may follow", static_cast<int>(level));
+    mem_diag::log_memory_snapshot("onTrimMemory");
+    logging::flush();
+
+    constexpr int trim_running_low = 10;
+    if (static_cast<int>(level) < trim_running_low)
+        return;
+
+    // Hand the request to the render thread - it owns every GPU object involved. Keep the highest
+    // level seen until it is serviced.
+    std::atomic<int> &pending = mem_diag::pending_trim_level;
+    int seen = pending.load(std::memory_order_relaxed);
+    while (static_cast<int>(level) > seen
+        && !pending.compare_exchange_weak(seen, static_cast<int>(level), std::memory_order_relaxed))
+        ;
+}
+
+JNIEXPORT void JNICALL
+Java_org_vita3k_emulator_NativeLib_logDiagnostics(JNIEnv *env, jclass, jstring text_str) {
+    const std::string text = jstring_to_string(env, text_str);
+    size_t start = 0;
+    while (start <= text.size()) {
+        const size_t end = text.find('\n', start);
+        const std::string line = text.substr(start, (end == std::string::npos) ? std::string::npos : end - start);
+        if (!line.empty())
+            LOG_INFO("[ANDROID DIAG] {}", line);
+        if (end == std::string::npos)
+            break;
+        start = end + 1;
+    }
+    logging::flush();
 }
 
 JNIEXPORT jboolean JNICALL

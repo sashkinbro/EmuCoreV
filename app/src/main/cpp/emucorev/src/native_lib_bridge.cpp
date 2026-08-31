@@ -8,6 +8,22 @@
 
 extern "C" {
 
+JNIEXPORT void JNICALL
+Java_org_vita3k_emulator_NativeLib_onTrimMemory(JNIEnv *env, jclass clazz, jint level);
+
+JNIEXPORT void JNICALL
+Java_org_vita3k_emulator_NativeLib_logDiagnostics(JNIEnv *env, jclass clazz, jstring text);
+
+JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_core_NativeLib_onTrimMemory(JNIEnv *env, jobject, jint level) {
+    Java_org_vita3k_emulator_NativeLib_onTrimMemory(env, nullptr, level);
+}
+
+JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_core_NativeLib_logDiagnostics(JNIEnv *env, jobject, jstring text) {
+    Java_org_vita3k_emulator_NativeLib_logDiagnostics(env, nullptr, text);
+}
+
 JNIEXPORT jboolean JNICALL
 Java_org_vita3k_emulator_NativeLib_prepareFrontend(JNIEnv *env, jclass clazz);
 

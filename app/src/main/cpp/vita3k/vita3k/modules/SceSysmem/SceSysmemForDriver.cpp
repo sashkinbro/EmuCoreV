@@ -20,6 +20,8 @@
 
 #include <kernel/state.h>
 #include <mem/functions.h>
+#include <renderer/commands.h>
+#include <renderer/functions.h>
 #include <util/align.h>
 
 #include <util/log.h>
@@ -254,6 +256,10 @@ EXPORT(int, ksceKernelFreeHeapMemoryFromGlobalHeap) {
 }
 
 EXPORT(int, ksceKernelFreeMemBlock, SceUID uid) {
+    // If a GPU unmap is still deferred, complete it before we decommit this block's pages
+    if (emuenv.renderer && renderer::has_pending_deferred_unmap())
+        renderer::send_single_command(*emuenv.renderer, nullptr, renderer::CommandOpcode::MemoryUnmapFlush, true, static_cast<uint32_t>(thread_id));
+
     const auto state = emuenv.kernel.obj_store.get<SysmemState>();
     const auto guard = std::lock_guard<std::mutex>(state->mutex);
 

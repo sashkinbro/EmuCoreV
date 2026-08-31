@@ -453,7 +453,8 @@ vk::Format translate_format(SceGxmColorBaseFormat format) {
     case SCE_GXM_COLOR_BASE_FORMAT_F11F11F10:
         return vk::Format::eB10G11R11UfloatPack32;
     case SCE_GXM_COLOR_BASE_FORMAT_SE5M9M9M9:
-        return vk::Format::eE5B9G9R9UfloatPack32;
+        // RGB9E5 is sample only on desktop GPUs (color writes silently dropped) so emulate like U2F10F10F10
+        return vk::Format::eR16G16B16A16Sfloat;
     case SCE_GXM_COLOR_BASE_FORMAT_U8U8U8:
         // 24 bit packed RGB is not supported (on many GPUs), use rgba8 instead
         return vk::Format::eR8G8B8A8Unorm;

@@ -750,8 +750,23 @@ bool USSETranslatorVisitor::vldst(
         if (offset % 4 != 0)
             continue;
 
+        // The slot a texture occupies in the texture buffer is chosen by the shader compiler and is not the texture unit
+        const int slot = offset / 4;
+        int texture_unit = slot;
+        const SceGxmDependentSampler *tb_layout = m_program.texture_buffer_dependent_sampler();
+        for (uint32_t i = 0; i < m_program.texture_buffer_dependent_sampler_count; i++) {
+            if (tb_layout[i].resource_index_layout_offset % 4 != 0)
+                continue;
+            if (tb_layout[i].sa_offset / 4 == slot) {
+                texture_unit = tb_layout[i].resource_index_layout_offset / 4;
+                break;
+            }
+        }
+        if (texture_unit != slot)
+            LOG_INFO("Texture buffer slot {} holds texture unit {}", slot, texture_unit);
+
         to_store.type = DataType::INT32;
-        store(to_store, m_b.makeIntConstant(offset / 4), 0b1);
+        store(to_store, m_b.makeIntConstant(texture_unit), 0b1);
         continue;
     } else if (inst.opr.src0.bank == RegisterBank::SECATTR && inst.opr.src0.num == m_spirv_params.literal_buffer_sa_offset) {
         // We are reading the literal buffer

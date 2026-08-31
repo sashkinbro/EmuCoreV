@@ -88,6 +88,7 @@ static void process_batch(renderer::State &state, const FeatureState &features, 
         { CommandOpcode::CreateRenderTarget, cmd_handle_create_render_target },
         { CommandOpcode::MemoryMap, cmd_handle_memory_map },
         { CommandOpcode::MemoryUnmap, cmd_handle_memory_unmap },
+        { CommandOpcode::MemoryUnmapFlush, cmd_handle_memory_unmap_flush },
         { CommandOpcode::Draw, cmd_handle_draw },
         { CommandOpcode::TransferCopy, cmd_handle_transfer_copy },
         { CommandOpcode::TransferDownscale, cmd_handle_transfer_downscale },
@@ -127,6 +128,8 @@ static void process_batch(renderer::State &state, const FeatureState &features, 
             CommandHelper helper(cmd);
             handler_fn(state, mem, config, helper, features, command_list.context);
         }
+
+        state.progress_counter.fetch_add(1, std::memory_order_relaxed);
 
         Command *last_cmd = cmd;
         cmd = cmd->next;

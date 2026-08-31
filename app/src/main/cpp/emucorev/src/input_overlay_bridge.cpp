@@ -19,7 +19,7 @@ JNIEXPORT void JNICALL
 Java_org_vita3k_emulator_overlay_InputOverlay_setButton(JNIEnv *env, jobject thiz, jint button, jboolean value);
 
 JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_overlay_InputOverlay_setTouchState(JNIEnv *env, jobject thiz, jboolean is_back);
+Java_org_vita3k_emulator_overlay_InputOverlay_setTouchState(JNIEnv *env, jobject thiz, jint mode);
 
 JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorev_core_vita_overlay_InputOverlay_attachController(JNIEnv *env, jobject thiz) {
@@ -42,8 +42,8 @@ Java_com_sbro_emucorev_core_vita_overlay_InputOverlay_setButton(JNIEnv *env, job
 }
 
 JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_core_vita_overlay_InputOverlay_setTouchState(JNIEnv *env, jobject thiz, jboolean is_back) {
-    Java_org_vita3k_emulator_overlay_InputOverlay_setTouchState(env, thiz, is_back);
+Java_com_sbro_emucorev_core_vita_overlay_InputOverlay_setTouchState(JNIEnv *env, jobject thiz, jint mode) {
+    Java_org_vita3k_emulator_overlay_InputOverlay_setTouchState(env, thiz, mode);
 }
 
 } // extern "C"

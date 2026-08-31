@@ -136,6 +136,8 @@ class FSRScreenFilter : public ScreenFilter {
 private:
     // dst of the easu shader, src of the rcas shader
     std::vector<vkutil::Image> intermediate_images;
+    // dst of the rcas shader when the swapchain has no storage usage
+    std::vector<vkutil::Image> rcas_images;
 
     vk::ShaderModule easu_shader;
     vk::ShaderModule rcas_shader;

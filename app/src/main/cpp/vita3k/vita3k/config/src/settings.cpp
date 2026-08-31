@@ -18,6 +18,7 @@
 #include <config/settings.h>
 
 #include <config/functions.h>
+#include <config/game_compatibility.h>
 
 #include <util/log.h>
 #include <util/vector_utils.h>
@@ -151,6 +152,7 @@ std::vector<RestartRequiredSetting> get_restart_required_settings(
     append_if_changed(before.memory_mapping != after.memory_mapping, RestartRequiredSetting::MemoryMapping);
     append_if_changed(before.audio_backend != after.audio_backend, RestartRequiredSetting::AudioBackend);
     append_if_changed(before.validation_layer != after.validation_layer, RestartRequiredSetting::ValidationLayer);
+    append_if_changed(before.accurate_thread_scheduling != after.accurate_thread_scheduling, RestartRequiredSetting::AccurateThreadScheduling);
 
     return changed;
 }
@@ -390,6 +392,13 @@ void set_current_config(Config &cfg, const fs::path &config_path, const std::str
     copy_global_to_current(cfg.current_config, cfg);
     if (!app_path.empty())
         load_custom_config(cfg.current_config, config_path, app_path);
+#ifdef __ANDROID__
+    // Apply after custom XML too, so old per-game profiles cannot bypass it.
+    if (game_compatibility::is_fifa(app_path)) {
+        cfg.current_config.memory_mapping = "native-buffer";
+        cfg.current_config.backend_renderer = "Vulkan";
+    }
+#endif
 }
 
 void copy_current_config_to_global(Config &cfg) {

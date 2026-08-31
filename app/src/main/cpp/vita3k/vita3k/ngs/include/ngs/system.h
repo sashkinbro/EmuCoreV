@@ -235,6 +235,7 @@ public:
     virtual std::unique_ptr<ModuleRuntimeState> create_runtime_state() const { return nullptr; }
     virtual void on_state_change(const MemState &mem, ModuleData &v, const VoiceState previous) {}
     virtual void on_param_change(const MemState &mem, ModuleData &data) {}
+    virtual void on_key_on(const MemState &mem, ModuleData &data) {}
     virtual void cleanup_voice_state(ModuleData &data) {}
 
     virtual void initialize_voice_data(ModuleData &data) const {

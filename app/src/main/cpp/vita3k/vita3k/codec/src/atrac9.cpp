@@ -93,7 +93,18 @@ bool Atrac9DecoderState::send(const uint8_t *data, uint32_t size) {
 
     const int res = Atrac9Decode(decoder_handle, data, reinterpret_cast<short *>(result.data()), &decode_used);
     if (res != At9Status::ERR_SUCCESS) {
-        LOG_ERROR("Decode failure with code {}", log_hex(res));
+        static uint64_t failure_count = 0;
+        ++failure_count;
+        if (failure_count <= 4 || (failure_count & 0x3FF) == 0) {
+            uint8_t head[8] = {};
+            if (data)
+                memcpy(head, data, std::min<uint32_t>(size, 8));
+            LOG_ERROR("Decode failure with code {} (failure #{}, size {}, superframe frame {}/{} data_left {}, config {:#010x}, head {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x})",
+                log_hex(res), failure_count, size, superframe_frame_idx, info->framesInSuperframe, superframe_data_left, config_data,
+                head[0], head[1], head[2], head[3], head[4], head[5], head[6], head[7]);
+        } else {
+            LOG_ERROR("Decode failure with code {}", log_hex(res));
+        }
         return false;
     }
 

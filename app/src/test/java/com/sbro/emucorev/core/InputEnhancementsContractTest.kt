@@ -103,6 +103,38 @@ class InputEnhancementsContractTest {
     }
 
     @Test
+    fun frontBackAndBothModesUseTheSameIntegerJniContract() {
+        val app = appModule()
+        val root = sourceRoot()
+        val overlay = root.resolve("ui/emulation/EmulationOverlay.kt").readText()
+        val bridge = root.resolve("core/vita/overlay/InputOverlay.kt").readText()
+        val nativeBridge = app.resolve("src/main/cpp/emucorev/src/input_overlay_bridge.cpp").readText()
+        val nativeInput = app.resolve("src/main/cpp/vita3k/vita3k/android/jni/input_overlay.cpp").readText()
+        val touch = app.resolve("src/main/cpp/vita3k/vita3k/touch/src/touch.cpp").readText()
+
+        assertTrue("The switch must cycle front/back/both", "(touchMode + 1) % 3" in overlay)
+        assertTrue("Kotlin must not narrow the mode to Boolean", "setTouchState(mode: Int)" in bridge)
+        assertTrue("Our JNI bridge must preserve all three modes", "jint" in nativeBridge)
+        assertTrue("Core JNI must accept an integer mode", "jint" in nativeInput)
+        assertTrue("Both mode must be explicit", "state.touchscreen_both = (mode == 2)" in touch)
+        assertTrue("Both panels must receive separate coordinate conversion", "recover_touch_events(emuenv, touch_port)" in touch)
+        assertTrue("Both panels must honor their own force setting", "touch.force_touch_enabled[port]" in touch)
+    }
+
+    @Test
+    fun memoryPressureCallbacksDoNotDereferenceSessionObjects() {
+        val nativeRoot = appModule().resolve("src/main/cpp/vita3k/vita3k")
+        val bootstrap = nativeRoot.resolve("android/jni/native_bootstrap.cpp").readText()
+        val callback = bootstrap.substringAfter("NativeLib_onTrimMemory(")
+            .substringBefore("JNIEXPORT")
+        val renderer = nativeRoot.resolve("renderer/src/vulkan/renderer.cpp").readText()
+
+        assertTrue("Trim must use the process-lifetime mailbox", "mem_diag::pending_trim_level" in callback)
+        assertTrue("A session may be destroyed while Android requests trim", "session." !in callback)
+        assertTrue("GPU trim must be consumed on the render thread", "pending_trim_level.exchange" in renderer)
+    }
+
+    @Test
     fun everySupportedLocaleContainsTheInputEnhancementStrings() {
         val resourceRoot = resourceRoot()
         val requiredKeys = requiredKeys(resourceRoot.resolve("values/strings.xml"))

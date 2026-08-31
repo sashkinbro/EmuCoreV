@@ -21,6 +21,8 @@
 #include <kernel/state.h>
 #include <kernel/types.h>
 #include <modules/sysmem_state.h>
+#include <renderer/commands.h>
+#include <renderer/functions.h>
 
 #include <packages/sfo.h>
 
@@ -153,6 +155,10 @@ EXPORT(int, sceKernelFreeMemBlock, SceUID uid) {
 
 EXPORT(int, sceKernelFreeMemBlockForVM, SceUID uid) {
     TRACY_FUNC(sceKernelFreeMemBlockForVM, uid);
+    // Complete any pending deferred GPU unmap before decommitting
+    if (emuenv.renderer && renderer::has_pending_deferred_unmap())
+        renderer::send_single_command(*emuenv.renderer, nullptr, renderer::CommandOpcode::MemoryUnmapFlush, true, static_cast<uint32_t>(thread_id));
+
     const auto state = emuenv.kernel.obj_store.get<SysmemState>();
     const auto guard = std::lock_guard<std::mutex>(state->mutex);
 

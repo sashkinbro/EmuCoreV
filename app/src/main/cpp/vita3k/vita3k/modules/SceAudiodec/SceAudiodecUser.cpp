@@ -353,7 +353,10 @@ EXPORT(int, sceAudiodecGetContextSize, SceAudiodecCtrl *pCtrl, SceAudiodecCodec 
 
     switch (codecType) {
     case SCE_AUDIODEC_TYPE_AT9: {
-        const std::uint32_t at9Factor = getAt9Factor(reinterpret_cast<std::uint8_t *>(&pCtrl->info.get(emuenv.mem)->at9.config_data));
+        auto *info = pCtrl->info.get(emuenv.mem);
+        if (!info)
+            return SCE_AUDIODEC_ERROR_INVALID_PTR;
+        const std::uint32_t at9Factor = getAt9Factor(reinterpret_cast<std::uint8_t *>(&info->at9.config_data));
         if (at9Factor == 1 || at9Factor == 2) {
             return 0x400 * at9Factor + 0x400;
         }

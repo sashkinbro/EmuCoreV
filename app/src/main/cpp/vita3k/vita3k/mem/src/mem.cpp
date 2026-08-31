@@ -34,8 +34,11 @@
 #include <Windows.h>
 #else
 #include <csignal>
+#include <dlfcn.h>
+#include <setjmp.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <unwind.h>
 #endif
 
 constexpr uint32_t STANDARD_PAGE_SIZE = KiB(4);
@@ -164,6 +167,42 @@ bool is_valid_addr_range(const MemState &state, Address start, Address end) {
     return state.allocator.free_slot_count(start_page, end_page) == 0;
 }
 
+bool debug_safe_copy_guest(const MemState &state, Address addr, void *dst, uint32_t size) {
+    if (!addr || addr + size < addr)
+        return false;
+#ifdef _WIN32
+    __try {
+        memcpy(dst, &state.memory[addr], size);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+#else
+    if (!is_valid_addr_range(state, addr, addr + size))
+        return false;
+    memcpy(dst, &state.memory[addr], size);
+    return true;
+#endif
+}
+
+bool debug_safe_write_guest(MemState &state, Address addr, const void *src, uint32_t size) {
+    if (!addr || addr + size < addr)
+        return false;
+#ifdef _WIN32
+    __try {
+        memcpy(&state.memory[addr], src, size);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+#else
+    if (!is_valid_addr_range(state, addr, addr + size))
+        return false;
+    memcpy(&state.memory[addr], src, size);
+    return true;
+#endif
+}
+
 static Address alloc_inner(MemState &state, uint32_t start_page, uint32_t page_count, const char *name, const bool force) {
     int page_num;
     if (force) {
@@ -237,7 +276,7 @@ static void align_to_page(MemState &state, Address &addr, Address &size) {
     size = end - addr;
 }
 
-static void apply_host_protect(uint8_t *target, size_t size, const MemPerm perm, size_t host_page_size) {
+static bool apply_host_protect(uint8_t *target, size_t size, const MemPerm perm, size_t host_page_size) {
     uint8_t *aligned_start = reinterpret_cast<uint8_t *>(
         align_down(reinterpret_cast<uintptr_t>(target), host_page_size));
     uint8_t *aligned_end = reinterpret_cast<uint8_t *>(align(reinterpret_cast<uintptr_t>(target + size), host_page_size));
@@ -246,10 +285,42 @@ static void apply_host_protect(uint8_t *target, size_t size, const MemPerm perm,
 #ifdef _WIN32
     DWORD old_protect = 0;
     const BOOL ret = VirtualProtect(aligned_start, aligned_size, (perm == MemPerm::None) ? PAGE_NOACCESS : ((perm == MemPerm::ReadOnly) ? PAGE_READONLY : PAGE_READWRITE), &old_protect);
-    LOG_CRITICAL_IF(!ret, "VirtualAlloc failed: {}", get_error_msg());
+    LOG_CRITICAL_IF(!ret, "VirtualProtect failed: {}", get_error_msg());
+    return ret != 0;
 #else
     const int ret = mprotect(aligned_start, aligned_size, (perm == MemPerm::None) ? PROT_NONE : ((perm == MemPerm::ReadOnly) ? PROT_READ : (PROT_READ | PROT_WRITE)));
     LOG_CRITICAL_IF(ret == -1, "mprotect failed: {}", get_error_msg());
+    return ret != -1;
+#endif
+}
+
+static void release_external_shadow_pages(uint8_t *target, size_t size, size_t host_page_size) {
+    constexpr bool release_shadow_pages_when_mapped = true;
+    if (!release_shadow_pages_when_mapped)
+        return;
+#ifndef _WIN32
+    // Windows deliberately excluded here
+    uint8_t *inner_start = reinterpret_cast<uint8_t *>(align(reinterpret_cast<uintptr_t>(target), host_page_size));
+    uint8_t *inner_end = reinterpret_cast<uint8_t *>(align_down(reinterpret_cast<uintptr_t>(target + size), host_page_size));
+    if (inner_end <= inner_start)
+        return;
+
+    const size_t inner_size = static_cast<size_t>(inner_end - inner_start);
+    if (madvise(inner_start, inner_size, MADV_DONTNEED) == -1) {
+        LOG_WARN_ONCE("madvise(MADV_DONTNEED) failed releasing externally mapped pages: {}", get_error_msg());
+        return;
+    }
+
+    static std::atomic<uint64_t> released_total{ 0 };
+    const uint64_t before = released_total.fetch_add(inner_size, std::memory_order_relaxed);
+    const uint64_t after = before + inner_size;
+    constexpr uint64_t step = MiB(64);
+    if ((before / step) != (after / step))
+        LOG_INFO("Released {} MiB of arena pages shadowed by external mappings", after / MiB(1));
+#else
+    (void)target;
+    (void)size;
+    (void)host_page_size;
 #endif
 }
 
@@ -454,6 +525,7 @@ void add_external_mapping(MemState &mem, Address addr, uint32_t size, uint8_t *a
         mem.page_table[addr / KiB(4) + block] = page_table_entry;
 
     apply_host_protect(original_address, size, MemPerm::None, mem.host_page_size);
+    release_external_shadow_pages(original_address, size, mem.host_page_size);
 
     const std::unique_lock<std::mutex> lock(mem.protect_mutex);
     const std::lock_guard<std::mutex> ext_lock(mem.external_mapping_mutex);
@@ -467,7 +539,18 @@ void remove_external_mapping(MemState &mem, uint8_t *addr_ptr, uint32_t size) {
         const std::unique_lock<std::mutex> lock(mem.protect_mutex);
         const std::lock_guard<std::mutex> ext_lock(mem.external_mapping_mutex);
         auto it = mem.external_mapping.find(addr_value);
-        assert(it != mem.external_mapping.end());
+        if (it == mem.external_mapping.end()) {
+            LOG_ERROR("[EXTMAP] remove MISS key=0x{:X} size=0x{:X}: entry already gone (was crashing via end() deref); {} live entries:", addr_value, size, mem.external_mapping.size());
+            int shown = 0;
+            for (const auto &kv : mem.external_mapping) {
+                if (shown++ >= 16) {
+                    LOG_ERROR("[EXTMAP]   ... ({} more)", mem.external_mapping.size() - 16);
+                    break;
+                }
+                LOG_ERROR("[EXTMAP]   live key=0x{:X} guest=0x{:X} size=0x{:X}", kv.first, kv.second.address, kv.second.size);
+            }
+            return;
+        }
 
         mapping = it->second;
         mem.external_mapping.erase(it);
@@ -502,20 +585,23 @@ void remove_external_mapping(MemState &mem, uint8_t *addr_ptr, uint32_t size) {
         const std::unique_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
 
         uint8_t *arena = &mem.memory[mapping.address];
-        apply_host_protect(arena, mapping.size, MemPerm::ReadWrite, mem.host_page_size);
-
-        memcpy(arena, addr_ptr, mapping.size);
-        for (int verify_pass = 0; verify_pass < 4; verify_pass++) {
-            int recopied = 0;
-            for (uint32_t off = 0; off < mapping.size; off += KiB(4)) {
-                if (memcmp(arena + off, addr_ptr + off, KiB(4)) != 0) {
-                    memcpy(arena + off, addr_ptr + off, KiB(4));
-                    recopied++;
+        // The guest can free this memblock while the unmap is still deferred
+        if (apply_host_protect(arena, mapping.size, MemPerm::ReadWrite, mem.host_page_size)) {
+            memcpy(arena, addr_ptr, mapping.size);
+            for (int verify_pass = 0; verify_pass < 4; verify_pass++) {
+                int recopied = 0;
+                for (uint32_t off = 0; off < mapping.size; off += KiB(4)) {
+                    if (memcmp(arena + off, addr_ptr + off, KiB(4)) != 0) {
+                        memcpy(arena + off, addr_ptr + off, KiB(4));
+                        recopied++;
+                    }
                 }
+                if (recopied == 0)
+                    break;
+                LOG_WARN("remove_external_mapping 0x{:X} size 0x{:X}: verify pass {} re-copied {} page(s) changed by a concurrent writer", mapping.address, mapping.size, verify_pass, recopied);
             }
-            if (recopied == 0)
-                break;
-            LOG_WARN("remove_external_mapping 0x{:X} size 0x{:X}: verify pass {} re-copied {} page(s) changed by a concurrent writer", mapping.address, mapping.size, verify_pass, recopied);
+        } else {
+            LOG_WARN("remove_external_mapping 0x{:X} size 0x{:X}: arena decommitted (guest freed it under a deferred unmap) — skipping copy-back", mapping.address, mapping.size);
         }
 
         std::atomic_thread_fence(std::memory_order_release);
@@ -580,20 +666,37 @@ void free(MemState &state, Address address) {
     const Address region_start = page_num * STANDARD_PAGE_SIZE;
     const Address region_end = region_start + page.size * STANDARD_PAGE_SIZE;
 
-    Address host_page = align_down(region_start, state.host_page_size);
-    Address batch_start = 0;
-    uint32_t batch_size = 0;
+    if (!state.preserve_freed_pages) {
+        Address host_page = align_down(region_start, state.host_page_size);
+        Address batch_start = 0;
+        uint32_t batch_size = 0;
 
-    while (host_page < region_end) {
-        Address host_page_end = host_page + state.host_page_size;
-        uint32_t first_guest = host_page / STANDARD_PAGE_SIZE;
-        uint32_t last_guest = host_page_end / STANDARD_PAGE_SIZE;
+        while (host_page < region_end) {
+            Address host_page_end = host_page + state.host_page_size;
+            uint32_t first_guest = host_page / STANDARD_PAGE_SIZE;
+            uint32_t last_guest = host_page_end / STANDARD_PAGE_SIZE;
 
-        if (state.allocator.free_slot_count(first_guest, last_guest) == (last_guest - first_guest)) {
-            if (batch_size == 0)
-                batch_start = host_page;
-            batch_size += state.host_page_size;
-        } else if (batch_size > 0) {
+            if (state.allocator.free_slot_count(first_guest, last_guest) == (last_guest - first_guest)) {
+                if (batch_size == 0)
+                    batch_start = host_page;
+                batch_size += state.host_page_size;
+            } else if (batch_size > 0) {
+                uint8_t *memory = &state.memory[batch_start];
+#ifdef _WIN32
+                const BOOL ret = VirtualFree(memory, batch_size, MEM_DECOMMIT);
+                LOG_CRITICAL_IF(!ret, "VirtualFree failed: {}", get_error_msg());
+#else
+                int ret = mprotect(memory, batch_size, PROT_NONE);
+                LOG_CRITICAL_IF(ret == -1, "mprotect failed: {}", get_error_msg());
+                ret = madvise(memory, batch_size, MADV_DONTNEED);
+                LOG_CRITICAL_IF(ret == -1, "madvise failed: {}", get_error_msg());
+#endif
+                batch_size = 0;
+            }
+            host_page = host_page_end;
+        }
+
+        if (batch_size > 0) {
             uint8_t *memory = &state.memory[batch_start];
 #ifdef _WIN32
             const BOOL ret = VirtualFree(memory, batch_size, MEM_DECOMMIT);
@@ -604,22 +707,7 @@ void free(MemState &state, Address address) {
             ret = madvise(memory, batch_size, MADV_DONTNEED);
             LOG_CRITICAL_IF(ret == -1, "madvise failed: {}", get_error_msg());
 #endif
-            batch_size = 0;
         }
-        host_page = host_page_end;
-    }
-
-    if (batch_size > 0) {
-        uint8_t *memory = &state.memory[batch_start];
-#ifdef _WIN32
-        const BOOL ret = VirtualFree(memory, batch_size, MEM_DECOMMIT);
-        LOG_CRITICAL_IF(!ret, "VirtualFree failed: {}", get_error_msg());
-#else
-        int ret = mprotect(memory, batch_size, PROT_NONE);
-        LOG_CRITICAL_IF(ret == -1, "mprotect failed: {}", get_error_msg());
-        ret = madvise(memory, batch_size, MADV_DONTNEED);
-        LOG_CRITICAL_IF(ret == -1, "madvise failed: {}", get_error_msg());
-#endif
     }
 }
 
@@ -680,49 +768,175 @@ static void register_access_violation_handler(const AccessViolationHandler &hand
 
 #else
 
+static thread_local sigjmp_buf t_fault_probe_jmp;
+static thread_local volatile bool t_fault_probe_active = false;
+
+static uintptr_t extract_fault_pc(ucontext_t *context) {
+#if defined(__aarch64__)
+#if defined(__APPLE__)
+    return static_cast<uintptr_t>(context->uc_mcontext->__ss.__pc);
+#else
+    return static_cast<uintptr_t>(context->uc_mcontext.pc);
+#endif
+#elif defined(__x86_64__)
+#if defined(__APPLE__)
+    return static_cast<uintptr_t>(context->uc_mcontext->__ss.__rip);
+#else
+    return static_cast<uintptr_t>(context->uc_mcontext.gregs[REG_RIP]);
+#endif
+#else
+    (void)context;
+    return 0;
+#endif
+}
+
+static uintptr_t extract_fault_lr(ucontext_t *context) {
+#if defined(__aarch64__)
+#if defined(__APPLE__)
+    return static_cast<uintptr_t>(context->uc_mcontext->__ss.__lr);
+#else
+    return static_cast<uintptr_t>(context->uc_mcontext.regs[30]);
+#endif
+#else
+    (void)context;
+    return 0;
+#endif
+}
+
 static void signal_handler(int sig, siginfo_t *info, void *uct) noexcept {
     auto context = static_cast<ucontext_t *>(uct);
 
+    if (t_fault_probe_active)
+        siglongjmp(t_fault_probe_jmp, sig);
+
+    static thread_local int handler_depth = 0;
+    if (handler_depth >= 1) {
+        signal(sig, SIG_DFL);
+        return;
+    }
+    handler_depth++;
+    struct DepthGuard {
+        int &depth;
+        ~DepthGuard() { --depth; }
+    } depth_guard{ handler_depth };
+
+#ifdef __ANDROID__
+    if (sig == SIGBUS) {
+        const uintptr_t pc = extract_fault_pc(context);
+        const uintptr_t lr = extract_fault_lr(context);
+        const char *pc_module = "?";
+        uintptr_t pc_offset = 0;
+        Dl_info dl_pc{};
+        if (pc != 0 && dladdr(reinterpret_cast<void *>(pc), &dl_pc) != 0 && dl_pc.dli_fname != nullptr) {
+            pc_module = dl_pc.dli_fname;
+            pc_offset = pc - reinterpret_cast<uintptr_t>(dl_pc.dli_fbase);
+        }
+        LOG_CRITICAL("[SIGBUS] si_code {} at address 0x{:X} - pc 0x{:X} = {}+0x{:X} lr 0x{:X} - reported BEFORE recovery; if the log ends here, recovery re-faulted",
+            info->si_code, reinterpret_cast<uintptr_t>(info->si_addr), pc, pc_module, pc_offset, lr);
+        logging::flush();
+    }
+#endif
+
+    if (sig != SIGABRT && sig != SIGILL) {
 #ifdef __aarch64__
 #ifdef __APPLE__
-    const uint32_t esr = context->uc_mcontext->__es.__esr;
+        const uint32_t esr = context->uc_mcontext->__es.__esr;
 #else
-    _aarch64_ctx *ctx = reinterpret_cast<_aarch64_ctx *>(context->uc_mcontext.__reserved);
-    // get the ESR register
-    while (ctx->magic != ESR_MAGIC) {
-        if (ctx->magic == 0)
-            [[unlikely]]
-            raise(SIGTRAP);
-        else
-            [[likely]]
+        uint64_t esr = 0;
+        bool have_esr = false;
+        _aarch64_ctx *ctx = reinterpret_cast<_aarch64_ctx *>(context->uc_mcontext.__reserved);
+        while (ctx->magic != 0) {
+            if (ctx->magic == ESR_MAGIC) {
+                esr = reinterpret_cast<esr_context *>(ctx)->esr;
+                have_esr = true;
+                break;
+            }
             ctx = reinterpret_cast<_aarch64_ctx *>(reinterpret_cast<uint8_t *>(ctx) + ctx->size);
-    }
-
-    const uint64_t esr = reinterpret_cast<esr_context *>(ctx)->esr;
+        }
 #endif
-    // https://developer.arm.com/documentation/ddi0595/2021-03/AArch64-Registers/ESR-EL1--Exception-Syndrome-Register--EL1-
-    const uint32_t exception_class = static_cast<uint32_t>(esr) >> 26;
-    const bool is_executing = (exception_class == 0b100000) || (exception_class == 0b100001);
-    const bool is_data_abort = (exception_class == 0b100100) || (exception_class == 0b100101);
-    const bool is_writing = is_data_abort && (esr & (1 << 6));
+        // https://developer.arm.com/documentation/ddi0595/2021-03/AArch64-Registers/ESR-EL1--Exception-Syndrome-Register--EL1-
+#ifdef __APPLE__
+        constexpr bool have_esr = true;
+#endif
+        const uint32_t exception_class = have_esr ? (static_cast<uint32_t>(esr) >> 26) : 0;
+        const bool is_executing = have_esr && ((exception_class == 0b100000) || (exception_class == 0b100001));
+        const bool is_data_abort = (exception_class == 0b100100) || (exception_class == 0b100101);
+        const bool is_writing = is_data_abort && (esr & (1 << 6));
 #else
 #ifdef __APPLE__
-    const uint64_t err = context->uc_mcontext->__es.__err;
+        const uint64_t err = context->uc_mcontext->__es.__err;
 #else
-    const uint64_t err = context->uc_mcontext.gregs[REG_ERR];
+        const uint64_t err = context->uc_mcontext.gregs[REG_ERR];
 #endif
-    const bool is_executing = err & 0x10;
-    const bool is_writing = err & 0x2;
+        const bool is_executing = err & 0x10;
+        const bool is_writing = err & 0x2;
 #endif
 
-    if (!is_executing) {
-        if (access_violation_handler(reinterpret_cast<uint8_t *>(info->si_addr), is_writing)) {
-            return;
+        if (!is_executing) {
+            if (access_violation_handler(reinterpret_cast<uint8_t *>(info->si_addr), is_writing)) {
+                return;
+            }
         }
     }
 
-    LOG_CRITICAL("Unhandled access to 0x{:X}", reinterpret_cast<uintptr_t>(info->si_addr));
-    raise(SIGTRAP);
+    // Genuine crash so record it in our log and flush as users can rarely logcat.
+    uintptr_t crash_pc = 0;
+#if defined(__aarch64__)
+#if defined(__APPLE__)
+    crash_pc = static_cast<uintptr_t>(context->uc_mcontext->__ss.__pc);
+#else
+    crash_pc = static_cast<uintptr_t>(context->uc_mcontext.pc);
+#endif
+#elif defined(__x86_64__)
+#if defined(__APPLE__)
+    crash_pc = static_cast<uintptr_t>(context->uc_mcontext->__ss.__rip);
+#else
+    crash_pc = static_cast<uintptr_t>(context->uc_mcontext.gregs[REG_RIP]);
+#endif
+#endif
+
+    uintptr_t crash_lr = 0;
+#if defined(__aarch64__) && !defined(__APPLE__)
+    crash_lr = static_cast<uintptr_t>(context->uc_mcontext.regs[30]);
+#elif defined(__aarch64__)
+    crash_lr = static_cast<uintptr_t>(context->uc_mcontext->__ss.__lr);
+#endif
+
+    auto describe = [](uintptr_t addr) -> std::string {
+        if (addr == 0)
+            return "null";
+        Dl_info info{};
+        if (dladdr(reinterpret_cast<void *>(addr), &info) == 0 || info.dli_fname == nullptr)
+            return fmt::format("0x{:X} (unmapped)", addr);
+        const uintptr_t off = addr - reinterpret_cast<uintptr_t>(info.dli_fbase);
+        if (info.dli_sname != nullptr)
+            return fmt::format("0x{:X} = {}+0x{:X} ({})", addr, info.dli_fname, off, info.dli_sname);
+        return fmt::format("0x{:X} = {}+0x{:X}", addr, info.dli_fname, off);
+    };
+
+    LOG_CRITICAL("[CRASH] fatal signal {} (si_code {}) at address 0x{:X} - pc {} - lr {} - flushing log and aborting",
+        sig, info->si_code, reinterpret_cast<uintptr_t>(info->si_addr), describe(crash_pc), describe(crash_lr));
+#ifndef _WIN32
+    {
+        struct Bt {
+            uintptr_t pcs[28];
+            int n = 0;
+        } bt;
+        _Unwind_Backtrace([](struct _Unwind_Context *uctx, void *arg) -> _Unwind_Reason_Code {
+            Bt *b = static_cast<Bt *>(arg);
+            const uintptr_t pc = _Unwind_GetIP(uctx);
+            if (pc && b->n < 28)
+                b->pcs[b->n++] = pc;
+            return b->n >= 28 ? _URC_END_OF_STACK : _URC_NO_REASON;
+        },
+            &bt);
+        for (int i = 0; i < bt.n; i++)
+            LOG_CRITICAL("[CRASH] frame #{:02}: {}", i, describe(bt.pcs[i]));
+    }
+#endif
+    logging::flush();
+    signal(sig, SIG_DFL);
+    raise(sig);
     return;
 }
 
@@ -735,12 +949,46 @@ static void register_access_violation_handler(const AccessViolationHandler &hand
     if (sigaction(SIGSEGV, &sa, NULL) == -1) {
         LOG_CRITICAL("Failed to register an exception handler");
     }
-#ifdef __APPLE__
-    // When accessing memory region which is PROT_NONE on macOS, it is raising SIGBUS not SIGSEGV.
-    // So apply same signal handler to SIGBUS
+    // SIGBUS: on macOS a PROT_NONE access raises it instead of SIGSEGV.
+    // on Android an ARM64 atomic against non-cacheable memory raises it.
+    // Handle it on both so it is logged and not silent.
     if (sigaction(SIGBUS, &sa, NULL) == -1) {
         LOG_CRITICAL("Failed to register an exception handler to SIGBUS");
     }
+    if (sigaction(SIGABRT, &sa, NULL) == -1) {
+        LOG_CRITICAL("Failed to register an exception handler to SIGABRT");
+    }
+    if (sigaction(SIGILL, &sa, NULL) == -1) {
+        LOG_CRITICAL("Failed to register an exception handler to SIGILL");
+    }
+    if (sigaction(SIGTRAP, &sa, NULL) == -1) {
+        LOG_CRITICAL("Failed to register an exception handler to SIGTRAP");
+    }
+}
+
+bool test_arm64_atomics_on(void *ptr) {
+#if defined(__ANDROID__) && defined(__aarch64__)
+    volatile uint32_t *word = static_cast<volatile uint32_t *>(ptr);
+    t_fault_probe_active = true;
+    const int faulted = sigsetjmp(t_fault_probe_jmp, 1);
+    if (faulted == 0) {
+        __atomic_fetch_add(const_cast<uint32_t *>(word), 0u, __ATOMIC_SEQ_CST);
+        uint32_t value, status;
+        asm volatile(
+            "1: ldaxr %w0, [%2]\n"
+            "   stlxr %w1, %w0, [%2]\n"
+            "   cbnz  %w1, 1b\n"
+            : "=&r"(value), "=&r"(status)
+            : "r"(word)
+            : "memory");
+    }
+    t_fault_probe_active = false;
+    if (faulted != 0)
+        LOG_ERROR("ARM64 atomic probe faulted with signal {} on mapping at {}", faulted, ptr);
+    return faulted == 0;
+#else
+    (void)ptr;
+    return true;
 #endif
 }
 

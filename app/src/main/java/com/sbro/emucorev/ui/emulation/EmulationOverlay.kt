@@ -124,7 +124,7 @@ fun EmulationOverlayHost(
     var menuOpen by remember { mutableStateOf(false) }
     var menuButtonVisible by remember { mutableStateOf(true) }
     var userPaused by remember { mutableStateOf(false) }
-    var backTouchEnabled by remember { mutableStateOf(false) }
+    var touchMode by remember { mutableIntStateOf(0) }
     var exitDialogVisible by remember { mutableStateOf(false) }
     var sessionElapsedMs by remember(activity) { mutableLongStateOf(activity.currentPlayTimeElapsedMs()) }
     val gameTitle = remember(activity, gameId) {
@@ -319,7 +319,7 @@ fun EmulationOverlayHost(
                 overlayScale = config.overlayScale,
                 overlayOpacity = config.overlayOpacity,
                 showTouchSwitch = config.overlayShowTouchSwitch,
-                backTouchEnabled = backTouchEnabled,
+                touchMode = touchMode,
                 visualStyle = customization.touchControlVisualStyle,
                 pressEffect = customization.touchControlPressEffect,
                 touchHaptics = config.touchHaptics,
@@ -341,8 +341,8 @@ fun EmulationOverlayHost(
                     persistConfig { it.copy(overlayScale = 0.9f, overlayOpacity = 100) }
                 },
                 onBackTouchToggle = {
-                    backTouchEnabled = !backTouchEnabled
-                    overlayBridge.setTouchState(backTouchEnabled)
+                    touchMode = (touchMode + 1) % 3
+                    overlayBridge.setTouchState(touchMode)
                 },
                 onButtonChange = { button, pressed -> overlayBridge.setButton(button, pressed) },
                 onAxisChange = { axis, value -> overlayBridge.setAxis(axis, value) }
@@ -388,14 +388,14 @@ fun EmulationOverlayHost(
                         overlayOpacity = 100
                     )
                 }
-                backTouchEnabled = false
-                overlayBridge.setTouchState(false)
+                touchMode = 0
+                overlayBridge.setTouchState(0)
             },
             onTouchSwitch = { enabled ->
                 persistConfig { it.copy(overlayShowTouchSwitch = enabled) }
                 if (!enabled) {
-                    backTouchEnabled = false
-                    overlayBridge.setTouchState(false)
+                    touchMode = 0
+                    overlayBridge.setTouchState(0)
                 }
             },
             onOverlayScale = { value -> persistConfig { it.copy(overlayScale = value) } },
@@ -527,9 +527,9 @@ fun EmulationOverlayHost(
     }
 
     LaunchedEffect(hasPhysicalGamepad) {
-        if (hasPhysicalGamepad && backTouchEnabled) {
-            backTouchEnabled = false
-            overlayBridge.setTouchState(false)
+        if (hasPhysicalGamepad && touchMode != 0) {
+            touchMode = 0
+            overlayBridge.setTouchState(0)
         }
     }
 }
@@ -540,7 +540,7 @@ private fun OnScreenControls(
     overlayScale: Float,
     overlayOpacity: Int,
     showTouchSwitch: Boolean,
-    backTouchEnabled: Boolean,
+    touchMode: Int,
     visualStyle: TouchControlVisualStyle,
     pressEffect: TouchControlPressEffect,
     touchHaptics: Boolean,
@@ -792,7 +792,7 @@ private fun OnScreenControls(
                 editMode = editMode,
                 inputHandledByGroup = !editMode && element.id in groupHandledControlIds,
                 externallyPressed = descriptor.controlId?.let { it in pressedGroupControlIds } == true,
-                backTouchEnabled = backTouchEnabled,
+                touchMode = touchMode,
                 visualStyle = visualStyle,
                 pressEffect = pressEffect,
                 onSelected = { selectedId = element.id },
@@ -1098,7 +1098,7 @@ private fun TouchControlCanvasItem(
     editMode: Boolean,
     inputHandledByGroup: Boolean,
     externallyPressed: Boolean,
-    backTouchEnabled: Boolean,
+    touchMode: Int,
     visualStyle: TouchControlVisualStyle,
     pressEffect: TouchControlPressEffect,
     onSelected: () -> Unit,
@@ -1268,7 +1268,7 @@ private fun TouchControlCanvasItem(
             TouchControlType.Button,
             TouchControlType.TouchSwitch -> {
                 AssetButton(
-                    drawableRes = if (descriptor.type == TouchControlType.TouchSwitch && backTouchEnabled) {
+                    drawableRes = if (descriptor.type == TouchControlType.TouchSwitch && touchMode == 1) {
                         R.drawable.button_touch_b
                     } else {
                         descriptor.drawableRes
@@ -1281,6 +1281,17 @@ private fun TouchControlCanvasItem(
                     visualStyle = visualStyle,
                     pressEffect = pressEffect
                 )
+                if (descriptor.type == TouchControlType.TouchSwitch && touchMode == 2) {
+                    Text(
+                        text = "F+B",
+                        color = Color.White.copy(alpha = alpha),
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 3.dp)
+                    )
+                }
             }
         }
     }

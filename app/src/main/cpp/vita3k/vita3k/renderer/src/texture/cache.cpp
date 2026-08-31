@@ -349,6 +349,7 @@ void TextureCache::upload_texture(const SceGxmTexture &gxm_texture, MemState &me
     uint8_t *texture_data = data.get(mem);
 
     if (!texture_data) {
+        LOG_ERROR_ONCE("Texture data at 0x{:X} is not mapped ({}x{} format 0x{:X}) - keeping the previous texture content", gxm_texture.data_addr << 2, width, height, fmt::underlying(fmt));
         return;
     }
 
@@ -448,13 +449,12 @@ void TextureCache::upload_texture(const SceGxmTexture &gxm_texture, MemState &me
         pixels_per_stride = align(pixels_per_stride, align_width);
         memory_height = align(memory_height, align_height);
 
-        // A queued bind can be processed after the game released the staging memory, and reading it crashes on decommitted
+        // A queued bind can be processed after the game released the staging memory, and reading it crashes on decommitted.
         {
-            const uint32_t src_nb_pixels = align(layout_width, align_width) * align(layout_height, align_height);
-            const uint32_t src_mip_size = (src_nb_pixels >> block_shift) * block_size;
+            const uint32_t src_read_size = (pixels_per_stride * memory_height * gxm::bits_per_pixel(base_format)) / 8;
             const Address src_address = (gxm_texture.data_addr << 2) + total_source_so_far;
-            if (src_mip_size > 0 && !is_valid_addr_range(mem, src_address, src_address + src_mip_size)) {
-                LOG_WARN("Texture upload source is not in valid memory (addr=0x{:08X} size={}), skipping upload", src_address, src_mip_size);
+            if (src_read_size > 0 && !is_valid_addr_range(mem, src_address, src_address + src_read_size)) {
+                LOG_WARN("Texture upload source is not in valid memory (addr=0x{:08X} size={}), skipping upload", src_address, src_read_size);
                 break;
             }
         }

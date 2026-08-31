@@ -253,6 +253,37 @@ spv::Id shader::usse::USSETranslatorVisitor::do_fetch_texture(const spv::Id tex,
 
     image_sample = m_b.createOp(op, type_f32_v[4], params);
 
+    if (m_spirv_params.frag_coord_id != spv::NoResult && m_spirv_params.render_info_id != spv::NoResult
+        && texture_index >= 0 && texture_index < 16) {
+        const spv::Id type_u32 = m_b.makeUintType(32);
+        const spv::Id type_u32_v4 = m_b.makeVectorType(type_u32, 4);
+        const spv::Id type_bool = m_b.makeBoolType();
+
+        spv::Id mask_ptr = utils::create_access_chain(m_b, spv::StorageClassUniform, m_spirv_params.render_info_id, { m_b.makeIntConstant(FRAG_UNIFORM_raw_cast_mask) });
+        spv::Id mask_u = m_b.createUnaryOp(spv::OpConvertFToU, type_u32, m_b.createLoad(mask_ptr, spv::NoPrecision));
+        spv::Id bit = m_b.createBinOp(spv::OpShiftRightLogical, type_u32, mask_u, m_b.makeUintConstant(texture_index));
+        bit = m_b.createBinOp(spv::OpBitwiseAnd, type_u32, bit, m_b.makeUintConstant(1));
+        spv::Id unit_is_raw = m_b.createBinOp(spv::OpINotEqual, type_bool, bit, m_b.makeUintConstant(0));
+
+        spv::Id scaled = m_b.createBinOp(spv::OpVectorTimesScalar, type_f32_v[4], image_sample, m_b.makeFloatConstant(65535.0f));
+        spv::Id rounded = m_b.createBuiltinCall(type_f32_v[4], std_builtins, GLSLstd450Round, { scaled });
+        spv::Id halves = m_b.createUnaryOp(spv::OpConvertFToU, type_u32_v4, rounded);
+
+        auto word = [&](int lo, int hi) {
+            spv::Id l = m_b.createCompositeExtract(halves, type_u32, lo);
+            spv::Id h = m_b.createCompositeExtract(halves, type_u32, hi);
+            h = m_b.createBinOp(spv::OpShiftLeftLogical, type_u32, h, m_b.makeUintConstant(16));
+            spv::Id w = m_b.createBinOp(spv::OpBitwiseOr, type_u32, l, h);
+            return m_b.createUnaryOp(spv::OpBitcast, type_f32, w);
+        };
+        spv::Id zero_f = m_b.makeFloatConstant(0.0f);
+        spv::Id rebuilt = m_b.createCompositeConstruct(type_f32_v[4], { word(0, 1), word(2, 3), zero_f, zero_f });
+
+        const spv::Id type_bool_v4 = m_b.makeVectorType(type_bool, 4);
+        const spv::Id unit_is_raw_v4 = m_b.createCompositeConstruct(type_bool_v4, { unit_is_raw, unit_is_raw, unit_is_raw, unit_is_raw });
+        image_sample = m_b.createTriOp(spv::OpSelect, type_f32_v[4], unit_is_raw_v4, rebuilt, image_sample);
+    }
+
     if (get_data_type_size(dest_type) < 4 && dest_type != DataType::UINT16 && dest_type != DataType::INT16)
         m_b.setPrecision(image_sample, spv::DecorationRelaxedPrecision);
 
@@ -286,7 +317,8 @@ void shader::usse::USSETranslatorVisitor::do_texture_queries(const NonDependentT
         spv::Id fetch_result = do_fetch_texture(m_b.createLoad(texture_query.sampler, spv::NoPrecision), texture_query.sampler_index, texture_query.dim, coord_inst, store_op.type, proj ? 4 : 0, 0);
         store_op.num = texture_query.dest_offset;
 
-        const Imm4 mask = (1U << texture_query.component_count) - 1;
+        const uint8_t stored_components = texture_query.store_component_count ? texture_query.store_component_count : texture_query.component_count;
+        const Imm4 mask = (1U << stored_components) - 1;
 
         store(store_op, fetch_result, mask);
     }
@@ -336,7 +368,7 @@ bool USSETranslatorVisitor::smp(
             return true;
         }
 
-        if (sb_mode != 0 || lod_mode != 2) {
+        if (sb_mode != 0) {
             LOG_ERROR("Unhandled load using texture buffer with sb mode {} and lod mode {}", sb_mode, lod_mode);
             return true;
         }
@@ -350,7 +382,7 @@ bool USSETranslatorVisitor::smp(
     const SamplerInfo &sampler = is_texture_buffer_load ? m_spirv_params.samplers.begin()->second : m_spirv_params.samplers.at(inst.opr.src1.num);
 
     constexpr DataType tb_dest_fmt[] = {
-        DataType::F32,
+        DataType::UNK, // As per: https://github.com/Vita3K/Vita3K/pull/4097 (The texel stays in the texture's integral format, packed - previously: F32)
         DataType::UNK,
         DataType::F16,
         DataType::F32
@@ -493,18 +525,26 @@ bool USSETranslatorVisitor::smp(
             std::vector<int> sampler_indices;
             std::vector<int> index_to_segment;
             constexpr int sa_count = 32 * 4;
-            // if dim is 2, do not look for cubes and if dim is 3, only look for cubes
-            const bool request_cube = dim == 3;
+            // the instruction dim is only the coord count the compiler allocated, so a 2D texture can still turn up in an SMP3d switch
+            spv::Id coords_2d = coords;
+            if (dim == 3)
+                coords_2d = m_b.createOp(spv::OpVectorShuffle, type_f32_v[2], { { true, coords }, { true, coords }, { false, 0 }, { false, 1 } });
             for (auto &smp : m_spirv_params.samplers) {
                 if (smp.first < sa_count)
                     continue;
 
-                if (request_cube != smp.second.is_cube)
+                if (dim == 2 && smp.second.is_cube)
                     continue;
 
                 samplers.push_back(&smp.second);
                 index_to_segment.push_back(sampler_indices.size());
                 sampler_indices.push_back(smp.first - sa_count);
+            }
+
+            if (samplers.empty()) {
+                LOG_ERROR("Texture buffer load with dim {} has no compatible sampler", dim);
+                store(inst.opr.dest, utils::make_uniform_vector_from_type(m_b, type_f32_v[4], 0.0f), 0b1111);
+                return true;
             }
 
             std::vector<spv::Block *> segment_blocks;
@@ -516,7 +556,8 @@ bool USSETranslatorVisitor::smp(
                 if (tb_dest_fmt[fconv_type] == DataType::UNK)
                     inst.opr.dest.type = smp->component_type;
 
-                spv::Id result = do_fetch_texture(m_b.createLoad(smp->id, spv::NoPrecision), smp->index, dim, { coords, static_cast<int>(DataType::F32) }, inst.opr.dest.type, lod_mode, extra1);
+                const int case_dim = smp->is_cube ? 3 : 2;
+                spv::Id result = do_fetch_texture(m_b.createLoad(smp->id, spv::NoPrecision), smp->index, case_dim, { smp->is_cube ? coords : coords_2d, static_cast<int>(DataType::F32) }, inst.opr.dest.type, lod_mode, extra1, extra2);
                 const Imm4 dest_mask = (1U << smp->component_count) - 1;
                 store(inst.opr.dest, result, dest_mask);
 

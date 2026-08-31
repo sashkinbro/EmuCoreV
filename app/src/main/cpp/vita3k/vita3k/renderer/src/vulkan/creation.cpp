@@ -167,6 +167,8 @@ VKRenderTarget::VKRenderTarget(VKState &state, const SceGxmRenderTargetParams &p
     , depthstencil(static_cast<uint32_t>(params.width * state.res_multiplier), static_cast<uint32_t>(params.height * state.res_multiplier), state.deep_stencil_use) {
     width = static_cast<uint32_t>(params.width * state.res_multiplier);
     height = static_cast<uint32_t>(params.height * state.res_multiplier);
+    base_width = width;
+    base_height = height;
 
     vk::ImageUsageFlags color_usage = vk::ImageUsageFlagBits::eColorAttachment;
     if (state.features.support_shader_interlock)
@@ -279,13 +281,16 @@ bool create(std::unique_ptr<FragmentProgram> &fp, VKState &state, const SceGxmPr
         if (blend->colorMask & SCE_GXM_COLOR_MASK_A)
             color_mask |= vk::ColorComponentFlagBits::eA;
 
+        const bool color_is_blended = blend->colorFunc != SCE_GXM_BLEND_FUNC_NONE;
+        const bool alpha_is_blended = blend->alphaFunc != SCE_GXM_BLEND_FUNC_NONE;
+
         fp_vk->blending = vk::PipelineColorBlendAttachmentState{
-            .blendEnable = (blend->colorFunc != SCE_GXM_BLEND_FUNC_NONE) || (blend->alphaFunc != SCE_GXM_BLEND_FUNC_NONE),
-            .srcColorBlendFactor = translate_blend_factor(blend->colorSrc),
-            .dstColorBlendFactor = translate_blend_factor(blend->colorDst),
+            .blendEnable = color_is_blended || alpha_is_blended,
+            .srcColorBlendFactor = color_is_blended ? translate_blend_factor(blend->colorSrc) : vk::BlendFactor::eOne,
+            .dstColorBlendFactor = color_is_blended ? translate_blend_factor(blend->colorDst) : vk::BlendFactor::eZero,
             .colorBlendOp = translate_blend_func(blend->colorFunc),
-            .srcAlphaBlendFactor = translate_blend_factor(blend->alphaSrc),
-            .dstAlphaBlendFactor = translate_blend_factor(blend->alphaDst),
+            .srcAlphaBlendFactor = alpha_is_blended ? translate_blend_factor(blend->alphaSrc) : vk::BlendFactor::eOne,
+            .dstAlphaBlendFactor = alpha_is_blended ? translate_blend_factor(blend->alphaDst) : vk::BlendFactor::eZero,
             .alphaBlendOp = translate_blend_func(blend->alphaFunc),
             .colorWriteMask = color_mask
         };

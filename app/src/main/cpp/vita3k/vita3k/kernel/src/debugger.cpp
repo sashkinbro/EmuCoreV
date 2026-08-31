@@ -46,6 +46,25 @@ void Debugger::remove_breakpoint(MemState &mem, uint32_t addr) {
     }
 }
 
+void Debugger::add_probe(MemState &mem, uint32_t addr_with_thumb_bit) {
+    const uint32_t addr = addr_with_thumb_bit & ~1u;
+    const bool thumb = (addr_with_thumb_bit & 1u) != 0;
+    {
+        const auto lock = std::lock_guard(mutex);
+        probes[addr] = thumb;
+    }
+    add_breakpoint(mem, addr, thumb);
+}
+
+bool Debugger::is_probe(uint32_t addr, bool &thumb_mode) {
+    const auto lock = std::lock_guard(mutex);
+    const auto it = probes.find(addr);
+    if (it == probes.end())
+        return false;
+    thumb_mode = it->second;
+    return true;
+}
+
 Debugger::Debugger(KernelState &kernel)
     : parent(kernel) {
 }
@@ -79,4 +98,5 @@ void Debugger::deinit() {
     std::lock_guard<std::mutex> lock(mutex);
     breakpoints.clear();
     watch_memory_addrs.clear();
+    probes.clear();
 }

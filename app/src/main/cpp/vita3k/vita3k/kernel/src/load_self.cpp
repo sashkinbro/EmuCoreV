@@ -124,8 +124,9 @@ static bool unload_var_imports(const uint32_t *nids, const Ptr<uint32_t> *entrie
     return true;
 }
 
-static bool load_func_imports(const uint32_t *nids, const Ptr<uint32_t> *entries, size_t count, const SegmentInfosForReloc &segments, KernelState &kernel, const MemState &mem, const std::string &lib_name) {
+static bool load_func_imports(const uint32_t *nids, const Ptr<uint32_t> *entries, size_t count, uint32_t library_nid, const SegmentInfosForReloc &segments, KernelState &kernel, const MemState &mem, const std::string &lib_name) {
     const std::lock_guard<std::mutex> guard(kernel.export_nids_mutex);
+    size_t by_lib = 0, fallback = 0, unbound = 0;
     for (size_t i = 0; i < count; ++i) {
         const uint32_t nid = nids[i];
         const Ptr<uint32_t> entry = entries[i];
@@ -138,16 +139,26 @@ static bool load_func_imports(const uint32_t *nids, const Ptr<uint32_t> *entries
             LOG_DEBUG("\tNID {} ({}) at {}", log_hex(nid), name, log_hex(entry.address()));
         }
 
-        const ExportNids::iterator export_address = kernel.export_nids.find(nid);
+        Address func_address = 0;
+        if (const auto it = kernel.export_nids_by_lib.find(lib_export_key(library_nid, nid)); it != kernel.export_nids_by_lib.end()) {
+            func_address = it->second;
+            by_lib++;
+        } else if (const auto nid_it = kernel.export_nids.find(nid); nid_it != kernel.export_nids.end()) {
+            func_address = nid_it->second;
+            LOG_WARN("[LIBNID] import 0x{:08X} ({}) from lib '{}' (nid 0x{:08X}) bound by plain-NID FALLBACK to 0x{:X}",
+                nid, import_name(nid), lib_name, library_nid, nid_it->second);
+            fallback++;
+        } else {
+            unbound++;
+        }
         uint32_t *const stub = entry.get(mem);
 
-        kernel.func_binding_infos.emplace(nid, entry.address());
-        if (export_address == kernel.export_nids.end()) {
+        kernel.func_binding_infos.emplace(nid, FuncBindingInfo{ entry.address(), library_nid });
+        if (!func_address) {
             stub[0] = 0xef000000; // svc #0 - Call our interrupt hook.
             stub[1] = 0xe1a0f00e; // mov pc, lr - Return to the caller.
             stub[2] = nid; // Our interrupt hook will read this.
         } else {
-            Address func_address = export_address->second;
             stub[0] = encode_arm_inst(INSTRUCTION_MOVW, (uint16_t)func_address, 12);
             stub[1] = encode_arm_inst(INSTRUCTION_MOVT, (uint16_t)(func_address >> 16), 12);
             stub[2] = encode_arm_inst(INSTRUCTION_BRANCH, 0, 12);
@@ -163,6 +174,9 @@ static bool load_func_imports(const uint32_t *nids, const Ptr<uint32_t> *entries
             }
         }
     }
+    if (count && (fallback || unbound))
+        LOG_WARN("[LIBNID] lib '{}' (nid 0x{:08X}): {} imports = {} by-lib, {} fallback, {} unbound(HLE)",
+            lib_name, library_nid, count, by_lib, fallback, unbound);
     return true;
 }
 
@@ -175,7 +189,7 @@ static bool unload_func_imports(const uint32_t *nids, const Ptr<uint32_t> *entri
         // remove the stub from the table
         auto range = kernel.func_binding_infos.equal_range(nid);
         for (auto it = range.first; it != range.second; ++it) {
-            if (it->second == entry.address()) {
+            if (it->second.entry_address == entry.address()) {
                 kernel.func_binding_infos.erase(it);
                 break;
             }
@@ -193,6 +207,7 @@ static bool load_imports(const sce_module_info_raw &module, Ptr<const void> segm
         assert(imports->num_syms_tls_vars == 0);
 
         Address library_name{};
+        uint32_t library_nid{};
         Address func_nid_table{};
         Address func_entry_table{};
         Address var_nid_table{};
@@ -200,6 +215,7 @@ static bool load_imports(const sce_module_info_raw &module, Ptr<const void> segm
 
         if (imports->size == 0x24) {
             auto short_imports = reinterpret_cast<const sce_module_imports_short_raw *>(imports);
+            library_nid = short_imports->library_nid;
             library_name = short_imports->library_name;
             func_nid_table = short_imports->func_nid_table;
             func_entry_table = short_imports->func_entry_table;
@@ -207,6 +223,7 @@ static bool load_imports(const sce_module_info_raw &module, Ptr<const void> segm
             var_entry_table = short_imports->var_entry_table;
         } else if (imports->size == 0x34) {
             auto long_imports = imports;
+            library_nid = long_imports->library_nid;
             library_name = long_imports->library_name;
             func_nid_table = long_imports->func_nid_table;
             func_entry_table = long_imports->func_entry_table;
@@ -226,7 +243,7 @@ static bool load_imports(const sce_module_info_raw &module, Ptr<const void> segm
         const Ptr<uint32_t> *const entries = Ptr<Ptr<uint32_t>>(func_entry_table).get(mem);
 
         const size_t num_syms_funcs = imports->num_syms_funcs;
-        if (!is_unload && !load_func_imports(nids, entries, num_syms_funcs, segments, kernel, mem, lib_name))
+        if (!is_unload && !load_func_imports(nids, entries, num_syms_funcs, library_nid, segments, kernel, mem, lib_name))
             return false;
         if (is_unload && !unload_func_imports(nids, entries, num_syms_funcs, kernel))
             return false;
@@ -248,7 +265,7 @@ static bool load_imports(const sce_module_info_raw &module, Ptr<const void> segm
     return true;
 }
 
-static bool load_func_exports(SceKernelModuleInfo *kernel_module_info, const uint32_t *nids, const Ptr<uint32_t> *entries, size_t count, KernelState &kernel, MemState &mem) {
+static bool load_func_exports(SceKernelModuleInfo *kernel_module_info, const uint32_t *nids, const Ptr<uint32_t> *entries, size_t count, uint32_t library_nid, KernelState &kernel, MemState &mem) {
     const std::lock_guard<std::mutex> guard(kernel.export_nids_mutex);
     for (size_t i = 0; i < count; ++i) {
         const uint32_t nid = nids[i];
@@ -269,10 +286,13 @@ static bool load_func_exports(SceKernelModuleInfo *kernel_module_info, const uin
         }
 
         kernel.export_nids.emplace(nid, entry.address());
+        kernel.export_nids_by_lib.insert_or_assign(lib_export_key(library_nid, nid), entry.address());
         // substitute supervisor calls to direct function calls in loaded modules
         auto range = kernel.func_binding_infos.equal_range(nid);
         for (auto it = range.first; it != range.second; ++it) {
-            auto address = it->second;
+            if (it->second.library_nid != library_nid)
+                continue;
+            auto address = it->second.entry_address;
             uint32_t *const stub = Ptr<uint32_t>(address).get(mem);
             stub[0] = encode_arm_inst(INSTRUCTION_MOVW, (uint16_t)entry.address(), 12);
             stub[1] = encode_arm_inst(INSTRUCTION_MOVT, (uint16_t)(entry.address() >> 16), 12);
@@ -290,7 +310,7 @@ static bool load_func_exports(SceKernelModuleInfo *kernel_module_info, const uin
     return true;
 }
 
-static bool unload_func_exports(const uint32_t *nids, size_t count, KernelState &kernel, MemState &mem) {
+static bool unload_func_exports(const uint32_t *nids, size_t count, uint32_t library_nid, KernelState &kernel, MemState &mem) {
     const std::lock_guard<std::mutex> guard(kernel.export_nids_mutex);
     for (size_t i = 0; i < count; ++i) {
         const uint32_t nid = nids[i];
@@ -299,10 +319,13 @@ static bool unload_func_exports(const uint32_t *nids, size_t count, KernelState 
             continue;
 
         kernel.export_nids.erase(nid);
+        kernel.export_nids_by_lib.erase(lib_export_key(library_nid, nid));
         // invalidate all lle nid calls
         auto range = kernel.func_binding_infos.equal_range(nid);
         for (auto it = range.first; it != range.second; ++it) {
-            Address entry = it->second;
+            if (it->second.library_nid != library_nid)
+                continue;
+            Address entry = it->second.entry_address;
             uint32_t *stub = Ptr<uint32_t>(entry).get(mem);
 
             stub[0] = 0xef000000; // svc #0 - Call our interrupt hook.
@@ -453,9 +476,9 @@ static bool load_exports(SceKernelModuleInfo *kernel_module_info, const sce_modu
 
         const uint32_t *const nids = Ptr<const uint32_t>(exports->nid_table).get(mem);
         const Ptr<uint32_t> *const entries = Ptr<Ptr<uint32_t>>(exports->entry_table).get(mem);
-        if (!is_unload && !load_func_exports(kernel_module_info, nids, entries, exports->num_syms_funcs, kernel, mem))
+        if (!is_unload && !load_func_exports(kernel_module_info, nids, entries, exports->num_syms_funcs, exports->library_nid, kernel, mem))
             return false;
-        if (is_unload && !unload_func_exports(nids, exports->num_syms_funcs, kernel, mem))
+        if (is_unload && !unload_func_exports(nids, exports->num_syms_funcs, exports->library_nid, kernel, mem))
             return false;
 
         const auto var_count = exports->num_syms_vars;

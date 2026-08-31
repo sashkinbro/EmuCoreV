@@ -21,6 +21,7 @@
 #include <mem/ptr.h>
 #include <threads/queue.h>
 
+#include <atomic>
 #include <map>
 #include <mutex>
 #include <thread>
@@ -58,6 +59,8 @@ struct GxmState {
     SceGxmInitializeParams params;
 
     Queue<DisplayCallback> display_queue;
+    std::atomic<int> display_worker_state{ 0 };
+    std::atomic<uint32_t> display_entries_done{ 0 };
     SceUID display_queue_thread;
     std::thread display_host_thread;
 

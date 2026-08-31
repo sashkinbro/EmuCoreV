@@ -25,6 +25,7 @@ extern "C" {
 }
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 
 namespace ngs {
@@ -57,6 +58,10 @@ bool create_stereo_rate_resampler(StereoRateResamplerRuntimeState &runtime, cons
 
     runtime.source_rate = source_rate;
     runtime.dest_rate = dest_rate;
+    static std::atomic<uint64_t> created{ 0 };
+    const uint64_t n = created.fetch_add(1, std::memory_order_relaxed) + 1;
+    if (n == 1 || (n % 4096) == 0)
+        LOG_WARN("[NGSRATE] stereo rate resampler churn: {} creations so far (latest {} -> {} Hz)", n, source_rate, dest_rate);
     return true;
 }
 

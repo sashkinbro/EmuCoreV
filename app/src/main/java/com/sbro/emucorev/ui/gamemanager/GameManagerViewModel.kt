@@ -8,6 +8,7 @@ import com.sbro.emucorev.core.InstallStateBus
 import com.sbro.emucorev.core.GpuDriverManager
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.VitaCoreConfig
+import com.sbro.emucorev.core.FifaCompatibilityPolicy
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.data.InstalledGameRepository
@@ -103,7 +104,9 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun updateSelected(transform: (VitaCoreConfig) -> VitaCoreConfig) {
         val titleId = _uiState.value.selectedTitleId ?: return
-        val updated = transform(_uiState.value.config)
+        val updated = FifaCompatibilityPolicy.apply(
+            transform(_uiState.value.config), titleId, _uiState.value.selectedGame?.title.orEmpty()
+        )
         val driverOverride = _uiState.value.customDriverOverride
         _uiState.value = _uiState.value.copy(
             config = updated,
@@ -126,7 +129,9 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun resetSelectedToGlobal() {
         val titleId = _uiState.value.selectedTitleId ?: return
-        val defaults = _uiState.value.defaults
+        val defaults = FifaCompatibilityPolicy.apply(
+            _uiState.value.defaults, titleId, _uiState.value.selectedGame?.title.orEmpty()
+        )
         _uiState.value = _uiState.value.copy(
             config = defaults,
             customDriverOverride = null,

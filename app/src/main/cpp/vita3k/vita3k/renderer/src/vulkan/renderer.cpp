@@ -27,15 +27,19 @@
 
 #include <chrono>
 #include <future>
+#include <thread>
 #include <vector>
 
 #include <config/state.h>
 #include <config/version.h>
 #include <display/state.h>
+#include <kernel/state.h>
+#include <mem/functions.h>
 #include <shader/spirv_recompiler.h>
 #include <util/align.h>
 #include <util/android_driver.h>
 #include <util/log.h>
+#include <util/mem_snapshot.h>
 #include <util/warning.h>
 #include <vkutil/vkutil.h>
 
@@ -58,6 +62,7 @@
 #ifdef USE_ADRENO_TOOLS
 #include <adrenotools/bcenabler.h>
 #include <adrenotools/driver.h>
+#include <cstdlib>
 #endif
 
 #include <android/hardware_buffer.h>
@@ -535,10 +540,10 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         instance_info.setPEnabledLayerNames(instance_layers);
         instance_info.setPEnabledExtensionNames(instance_extensions);
 #ifndef __APPLE__
-        if (use_validation_layer && has_validation_features_ext) {
+        if (use_validation_layer && has_validation_features_ext && std::getenv("VITA3K_SYNC_VALIDATION")) {
             validation_features.pNext = instance_info.pNext;
             instance_info.pNext = &validation_features;
-            LOG_INFO("Synchronization validation + best-practices enabled");
+            LOG_INFO("Synchronization validation + best-practices enabled (VITA3K_SYNC_VALIDATION)");
         }
 #endif
 
@@ -738,14 +743,17 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         }
 
         bool support_memory_mapping = true;
+        const bool has_features2_khr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceFeatures2KHR != nullptr;
+        support_buffer_device_address &= has_features2_khr;
+        support_standard_layout &= has_features2_khr;
         if (support_buffer_device_address) {
-            auto features = physical_device.getFeatures2<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceBufferDeviceAddressFeatures>();
+            auto features = physical_device.getFeatures2KHR<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceBufferDeviceAddressFeatures>();
             support_buffer_device_address &= static_cast<bool>(features.get<vk::PhysicalDeviceBufferDeviceAddressFeatures>().bufferDeviceAddress);
         }
         support_memory_mapping &= support_buffer_device_address;
 
         if (support_standard_layout) {
-            auto features = physical_device.getFeatures2<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceUniformBufferStandardLayoutFeatures>();
+            auto features = physical_device.getFeatures2KHR<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceUniformBufferStandardLayoutFeatures>();
             support_standard_layout &= static_cast<bool>(features.get<vk::PhysicalDeviceUniformBufferStandardLayoutFeatures>().uniformBufferStandardLayout);
         }
         support_memory_mapping &= support_standard_layout;
@@ -760,13 +768,27 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         support_unix_fd_import &= SDL_GetAndroidSDKVersion() >= 26;
 #endif
 
+        bool has_cached_host_memory = false;
+        for (uint32_t i = 0; i < physical_device_memory.memoryTypeCount; i++) {
+            const vk::MemoryPropertyFlags f = physical_device_memory.memoryTypes[i].propertyFlags;
+            const bool visible = static_cast<bool>(f & vk::MemoryPropertyFlagBits::eHostVisible);
+            const bool coherent = static_cast<bool>(f & vk::MemoryPropertyFlagBits::eHostCoherent);
+            const bool cached = static_cast<bool>(f & vk::MemoryPropertyFlagBits::eHostCached);
+            LOG_INFO("memory type {}: heap {} visible={} coherent={} cached={} device_local={}", i, physical_device_memory.memoryTypes[i].heapIndex, visible, coherent, cached, static_cast<bool>(f & vk::MemoryPropertyFlagBits::eDeviceLocal));
+            if (visible && coherent && cached)
+                has_cached_host_memory = true;
+        }
+        if (!has_cached_host_memory)
+            LOG_WARN("No host-cached memory type: guest atomics would fault (SIGBUS) on remapped memory, so only Double Buffer mapping is offered");
+
         // Find which memory mapping methods are supported by the GPU
         supported_mapping_methods_mask = (1 << static_cast<int>(MappingMethod::Disabled));
         if (support_memory_mapping) {
             // No additional check needed for these methods
             mapping_method = MappingMethod::DoubleBuffer;
             supported_mapping_methods_mask |= (1 << static_cast<int>(MappingMethod::DoubleBuffer));
-            supported_mapping_methods_mask |= (1 << static_cast<int>(MappingMethod::PageTable));
+            if (has_cached_host_memory)
+                supported_mapping_methods_mask |= (1 << static_cast<int>(MappingMethod::PageTable));
 
             if (support_external_memory) {
                 // disable this extension on GPUs with an alignment requirement higher than 4096 (should only
@@ -779,7 +801,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                 supported_mapping_methods_mask |= (1 << static_cast<int>(MappingMethod::ExernalHost));
 
 #ifdef __ANDROID__
-            if (support_android_buffer_import || support_unix_fd_import)
+            if ((support_android_buffer_import || support_unix_fd_import) && has_cached_host_memory)
                 supported_mapping_methods_mask |= (1 << static_cast<int>(MappingMethod::NativeBuffer));
 #endif
         }
@@ -807,6 +829,11 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             support_fsr = static_cast<bool>(props.get<vk::PhysicalDeviceShaderFloat16Int8Features>().shaderFloat16);
         }
 
+        constexpr bool force_disable_raster_order = false;
+        if (support_rasterized_order_access && (config.disable_raster_order || force_disable_raster_order)) {
+            LOG_INFO("Rasterization order attachment access disabled by {}", config.disable_raster_order ? "config" : "debug force");
+            support_rasterized_order_access = false;
+        }
         if (support_rasterized_order_access) {
             auto props = physical_device.getFeatures2KHR<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT>();
             support_rasterized_order_access = static_cast<bool>(props.get<vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT>().rasterizationOrderColorAttachmentAccess);
@@ -1005,6 +1032,13 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
     this->mem = &mem;
 
     bool use_high_accuracy = cfg.current_config.high_accuracy;
+    surface_sync_clamp_rt = cfg.surface_sync_clamp_rt;
+
+    constexpr bool force_direct_fragcolor_variant = false;
+    if (force_direct_fragcolor_variant && features.support_shader_interlock) {
+        LOG_WARN("FORCING direct_fragcolor (subpass-input fetch) shader variant for debugging - interlock disabled");
+        features.support_shader_interlock = false;
+    }
 
     // shader interlock is more accurate but slower
     if (features.support_shader_interlock && use_high_accuracy) {
@@ -1013,6 +1047,15 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
         // We use subpass input to get something similar to direct fragcolor access (there is no difference for the shader)
         features.direct_fragcolor = true;
         features.support_shader_interlock = false;
+    }
+
+    // Diagnostic/workaround: without VK_EXT/ARM_rasterization_order_attachment_access, overlapping
+    // primitives inside ONE draw have no defined order when the shader reads the colour attachment
+    // (the per-draw barrier in scene.cpp only orders BETWEEN draws). On such devices this can corrupt
+    // framebuffer-fetch draws; turning the emulation off loses blending accuracy but removes the race.
+    if (cfg.disable_programmable_blending && features.direct_fragcolor) {
+        LOG_INFO("Programmable blending emulation disabled by config (framebuffer fetch will read nothing)");
+        features.direct_fragcolor = false;
     }
 
     // texture viewport is faster but not entirely accurate
@@ -1201,9 +1244,13 @@ void VKState::cleanup() {
         }
     }
     mapped_memories.clear();
+#ifdef __ANDROID__
+    trim_native_buffer_cache(0);
+#endif
     buffer_trapping.trapped_buffers.clear();
 
     default_image.destroy();
+    default_raw_image.destroy();
     default_buffer.destroy();
 
     for (auto &pool : frame_descriptor_pools)
@@ -1404,6 +1451,16 @@ void VKState::render_frame(DisplayState &display, const GxmState &gxm, MemState 
 void VKState::swap_window() {
     screen_renderer.swap_window();
 
+    // Android asked us to give memory back!
+    const int trim_level = mem_diag::pending_trim_level.exchange(-1, std::memory_order_relaxed);
+    if (trim_level >= 0) {
+        device.waitIdle();
+        const uint64_t freed = texture_cache.release_all_cached_textures();
+        LOG_WARN("[ANDROID MEMORY] trim level {}: released {} MiB of cached textures", trim_level, freed / (1024 * 1024));
+        mem_diag::log_memory_snapshot("post-trim");
+        logging::flush();
+    }
+
     // look once a frame if we need to save the pipeline cache
     const auto time_s = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
@@ -1415,6 +1472,7 @@ void VKState::swap_window() {
         if (next_heartbeat != 0) {
             LOG_DEBUG("renderer heartbeat: {} frames presented, pipelines created={} failed={}",
                 frames_presented, pipeline_cache.pipelines_created.load(), pipeline_cache.pipelines_failed.load());
+            mem_diag::log_memory_snapshot("heartbeat");
         }
         next_heartbeat = time_s + 5;
     }
@@ -1452,6 +1510,7 @@ uint32_t VKState::get_features_mask() {
             bool support_texture_barrier : 1;
             bool support_unknown_format : 1;
             bool use_clip_distance : 1;
+            bool force_full_precision : 1;
         };
         uint32_t value;
     } features_mask;
@@ -1469,6 +1528,7 @@ uint32_t VKState::get_features_mask() {
     features_mask.support_texture_barrier = features.support_texture_barrier;
     features_mask.support_unknown_format = features.support_unknown_format;
     features_mask.use_clip_distance = features.support_clip_distance;
+    features_mask.force_full_precision = features.force_full_precision;
 
     return features_mask.value;
 }
@@ -1489,6 +1549,26 @@ void VKState::set_screen_filter(const std::string_view &filter) {
 
     renderer::send_single_command(*this, nullptr, renderer::CommandOpcode::SetScreenFilter, false, new std::string(filter));
 }
+
+#ifdef __ANDROID__
+[[maybe_unused]] static bool range_overlaps_module_segment(KernelState *kernel, Address addr, uint32_t size) {
+    if (!kernel)
+        return true;
+    const std::lock_guard<std::mutex> lock(kernel->mutex);
+    for (const auto &[modid, module] : kernel->loaded_modules) {
+        if (!module)
+            continue;
+        for (const auto &segment : module->info.segments) {
+            if (segment.memsz == 0)
+                continue;
+            const Address seg_start = segment.vaddr.address();
+            if (addr < seg_start + segment.memsz && seg_start < addr + size)
+                return true;
+        }
+    }
+    return false;
+}
+#endif
 
 bool VKState::map_memory_page_table_fallback(MemState &mem, Ptr<void> address, uint32_t size) {
     constexpr vk::BufferUsageFlags mapped_memory_flags = vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst;
@@ -1534,26 +1614,55 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
         return -1;
     };
 
-    auto find_suitable_mapped_type = [&](uint32_t hardware_types) {
-        // first try to find a memory that is both coherent and cached
-        int mapped_memory_type = find_mem_type_with_flag(vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostCached, hardware_types);
-        if (mapped_memory_type == -1)
-            // then only coherent (lower performance)
-            mapped_memory_type = find_mem_type_with_flag(vk::MemoryPropertyFlagBits::eHostCoherent, hardware_types);
-
-        if (mapped_memory_type == -1) {
-            static bool has_happened = false;
-            LOG_CRITICAL_IF(!has_happened, "No coherent memory available for memory mapping!");
-            has_happened = true;
-            mapped_memory_type = std::countr_zero(hardware_types);
+    // returns -1 when the imported memory has no host-coherent type: the caller must NOT import it.
+    // Memory mapping writes guest data straight through the mapped pointer and expects the GPU to
+    // observe it without any flush, so a non-coherent import silently feeds the GPU stale
+    // vertex/index/uniform data (broken geometry). Mali-G52 driver 27.0.0 reports exactly this for
+    // AHardwareBuffer imports, hence the page-table fallback at the call sites.
+    auto find_suitable_mapped_type = [&](uint32_t hardware_types) -> int {
+        if (hardware_types == 0) {
+            LOG_ERROR("Imported memory reports no compatible memory types");
+            return -1;
         }
+        return find_mem_type_with_flag(vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostCached, hardware_types);
+    };
 
-        return static_cast<uint32_t>(mapped_memory_type);
+    // counted, not one-shot: this fires per mapping and the count is what tells us it is systemic
+    auto report_no_coherent = [](const char *kind) {
+        static std::atomic<uint32_t> no_coherent_count{ 0 };
+        const uint32_t n = no_coherent_count.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (n <= 3 || (n % 100) == 0)
+            LOG_WARN("No host-coherent+cached memory type for {} import ({} so far): using page-table mapping for this range instead", kind, n);
     };
 
     switch (mapping_method) {
     case MappingMethod::NativeBuffer: {
 #ifdef __ANDROID__
+        static std::atomic<bool> ahb_atomics_broken{ false };
+        const bool device_atomics_broken = ahb_atomics_broken.load(std::memory_order_relaxed);
+        // Once a device is known to fault atomics on AHB mappings all ranges go page-table
+        if (device_atomics_broken) {
+            LOG_INFO_ONCE("This device's AHardwareBuffer mappings fault ARM64 atomics - using page-table mapping for every range");
+            return map_memory_page_table_fallback(mem, address, size);
+        }
+
+        // reuse a previously allocated buffer for this exact range if we kept one
+        constexpr bool cache_native_buffers = true;
+        const uint64_t cache_key = (static_cast<uint64_t>(address.address()) << 32) | size;
+        if (cache_native_buffers) {
+            auto cached = native_buffer_cache.find(cache_key);
+            if (cached != native_buffer_cache.end()) {
+                uint8_t *cached_location = reinterpret_cast<uint8_t *>(cached->second.mapped_location);
+                const uint32_t cached_size = cached->second.mapping.size;
+                mapped_memories[address.address()] = std::move(cached->second.mapping);
+                add_external_mapping(mem, address.address(), size, cached_location);
+                native_buffer_cache_bytes -= cached_size;
+                native_buffer_cache.erase(cached);
+                LOG_INFO_ONCE("Reusing cached AHardwareBuffers across unmap/remap (avoids repeated dma-buf allocation)");
+                break;
+            }
+        }
+
         // if we get there, this means we support the hardware buffer extension
         AHardwareBuffer_Desc buffer_desc{
             .width = static_cast<uint32_t>(size + KiB(4)),
@@ -1576,6 +1685,16 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
             return map_memory_page_table_fallback(mem, address, size);
         }
 
+        if (!device_atomics_broken && !test_arm64_atomics_on(mapped_location)) {
+            static std::atomic<uint32_t> atomic_probe_failures{ 0 };
+            const uint32_t n = atomic_probe_failures.fetch_add(1, std::memory_order_relaxed) + 1;
+            LOG_ERROR("ARM64 atomics fault on the AHardwareBuffer mapping for 0x{:X} ({} so far) — falling back to page-table mapping for this range", address.address(), n);
+            ahb_atomics_broken.store(true, std::memory_order_relaxed);
+            _AHardwareBuffer_unlock(buffer, nullptr);
+            _AHardwareBuffer_release(buffer);
+            return map_memory_page_table_fallback(mem, address, size);
+        }
+
         vk::DeviceMemory device_memory;
         // vulkan.hpp throws on failure: degrade to the fallback mapping, never terminate the process
         try {
@@ -1583,11 +1702,21 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
             if (support_android_buffer_import) {
                 const vk::AndroidHardwareBufferPropertiesANDROID hardware_props = device.getAndroidHardwareBufferPropertiesANDROID(*buffer);
 
-                uint32_t mapped_memory_type = find_suitable_mapped_type(hardware_props.memoryTypeBits);
+                const int mapped_memory_type = find_suitable_mapped_type(hardware_props.memoryTypeBits);
+                if (mapped_memory_type >= 0)
+                    LOG_INFO("NativeBuffer 0x{:X}: import memoryTypeBits=0x{:X} chose type {} ({})", address.address(),
+                        hardware_props.memoryTypeBits, mapped_memory_type,
+                        vk::to_string(physical_device_memory.memoryTypes[mapped_memory_type].propertyFlags));
+                if (mapped_memory_type < 0) {
+                    report_no_coherent("AHardwareBuffer");
+                    _AHardwareBuffer_unlock(buffer, nullptr);
+                    _AHardwareBuffer_release(buffer);
+                    return map_memory_page_table_fallback(mem, address, size);
+                }
                 vk::StructureChain<vk::MemoryAllocateInfo, vk::ImportAndroidHardwareBufferInfoANDROID, vk::MemoryAllocateFlagsInfo> alloc_info{
                     vk::MemoryAllocateInfo{
                         .allocationSize = hardware_props.allocationSize,
-                        .memoryTypeIndex = mapped_memory_type },
+                        .memoryTypeIndex = static_cast<uint32_t>(mapped_memory_type) },
                     vk::ImportAndroidHardwareBufferInfoANDROID{
                         .buffer = buffer },
                     vk::MemoryAllocateFlagsInfo{
@@ -1605,11 +1734,17 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
 
                 int fd = handle->data[0];
                 const vk::MemoryFdPropertiesKHR fd_props = device.getMemoryFdPropertiesKHR(vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd, fd);
-                uint32_t mapped_memory_type = find_suitable_mapped_type(fd_props.memoryTypeBits);
+                const int mapped_memory_type = find_suitable_mapped_type(fd_props.memoryTypeBits);
+                if (mapped_memory_type < 0) {
+                    report_no_coherent("dma-buf fd");
+                    _AHardwareBuffer_unlock(buffer, nullptr);
+                    _AHardwareBuffer_release(buffer);
+                    return map_memory_page_table_fallback(mem, address, size);
+                }
                 vk::StructureChain<vk::MemoryAllocateInfo, vk::ImportMemoryFdInfoKHR, vk::MemoryAllocateFlagsInfo> alloc_info{
                     vk::MemoryAllocateInfo{
                         .allocationSize = size + KiB(4),
-                        .memoryTypeIndex = mapped_memory_type },
+                        .memoryTypeIndex = static_cast<uint32_t>(mapped_memory_type) },
                     vk::ImportMemoryFdInfoKHR{
                         .handleType = vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd,
                         .fd = fd },
@@ -1667,11 +1802,11 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
         // add 4 KiB because we can as an easy way to prevent crashes due to memory accesses right after the memory boundary
         // also make sure later the mapped address is 4K aligned
         vkutil::Buffer buffer(size + KiB(4));
+        // HostCached is required, not preferred
         constexpr vma::AllocationCreateInfo memory_mapped_alloc = {
             .flags = vma::AllocationCreateFlagBits::eMapped | vma::AllocationCreateFlagBits::eHostAccessRandom,
             .usage = vma::MemoryUsage::eAutoPreferHost,
-            .requiredFlags = vk::MemoryPropertyFlagBits::eHostCoherent,
-            .preferredFlags = vk::MemoryPropertyFlagBits::eHostCached,
+            .requiredFlags = vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostCached,
         };
         buffer.init_buffer(mapped_memory_flags, memory_mapped_alloc);
         {
@@ -1783,8 +1918,34 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
         break;
     }
 
+    // memory state right after every mapping - if an LMK kill follows one, the last snapshot is the evidence
+    mem_diag::log_memory_snapshot("map_memory");
     return true;
 }
+
+#ifdef __ANDROID__
+void VKState::release_cached_native_buffer(CachedNativeBuffer &cached) {
+    device.destroyBuffer(cached.mapping.buffer);
+    if (auto *ext = std::get_if<ExternalBuffer>(&cached.mapping.buffer_impl)) {
+        device.freeMemory(ext->memory);
+        if (ext->extra) {
+            AHardwareBuffer *hardware_buffer = reinterpret_cast<AHardwareBuffer *>(ext->extra);
+            _AHardwareBuffer_unlock(hardware_buffer, nullptr);
+            if (support_android_buffer_import)
+                _AHardwareBuffer_release(hardware_buffer);
+        }
+    }
+}
+
+void VKState::trim_native_buffer_cache(uint64_t budget) {
+    while (native_buffer_cache_bytes > budget && !native_buffer_cache.empty()) {
+        auto victim = native_buffer_cache.begin();
+        native_buffer_cache_bytes -= victim->second.mapping.size;
+        release_cached_native_buffer(victim->second);
+        native_buffer_cache.erase(victim);
+    }
+}
+#endif
 
 void VKState::unmap_memory(MemState &mem, Ptr<void> address) {
     assert(features.enable_memory_mapping);
@@ -1811,6 +1972,14 @@ void VKState::unmap_memory(MemState &mem, Ptr<void> address) {
         }
     }
 
+    // A range that fell back to page-table holds a vkutil::Buffer
+    if ((mapping_method == MappingMethod::NativeBuffer || mapping_method == MappingMethod::ExernalHost)
+        && std::holds_alternative<vkutil::Buffer>(ite->second.buffer_impl)) {
+        remove_external_mapping(mem, address.cast<uint8_t>().get(mem), ite->second.size);
+        mapped_memories.erase(ite);
+        return;
+    }
+
     switch (mapping_method) {
     case MappingMethod::ExernalHost:
         device.destroyBuffer(ite->second.buffer);
@@ -1825,7 +1994,22 @@ void VKState::unmap_memory(MemState &mem, Ptr<void> address) {
 
 #ifdef __ANDROID__
     case MappingMethod::NativeBuffer: {
-        remove_external_mapping(mem, address.cast<uint8_t>().get(mem), ite->second.size);
+        uint8_t *mapped_location = address.cast<uint8_t>().get(mem);
+        remove_external_mapping(mem, mapped_location, ite->second.size);
+
+        constexpr uint64_t native_buffer_cache_budget = MiB(256);
+        constexpr bool cache_native_buffers = true;
+        const uint64_t cache_key = (static_cast<uint64_t>(address.address()) << 32) | ite->second.size;
+        if (cache_native_buffers && !native_buffer_cache.contains(cache_key)) {
+            const uint32_t cached_size = ite->second.size;
+            CachedNativeBuffer entry{ std::move(ite->second), mapped_location };
+            native_buffer_cache.insert_or_assign(cache_key, std::move(entry));
+            native_buffer_cache_bytes += cached_size;
+            mapped_memories.erase(ite);
+            trim_native_buffer_cache(native_buffer_cache_budget);
+            return;
+        }
+
         device.destroyBuffer(ite->second.buffer);
         ExternalBuffer &buffer = std::get<ExternalBuffer>(ite->second.buffer_impl);
         device.freeMemory(buffer.memory);
@@ -1848,6 +2032,7 @@ void VKState::unmap_memory(MemState &mem, Ptr<void> address) {
         break;
     }
     mapped_memories.erase(ite);
+    mem_diag::log_memory_snapshot("unmap_memory");
 }
 
 std::tuple<vk::Buffer, uint32_t> VKState::get_matching_mapping(const Ptr<void> address) {

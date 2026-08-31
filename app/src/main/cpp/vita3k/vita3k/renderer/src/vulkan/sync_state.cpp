@@ -30,7 +30,7 @@ void sync_clipping(VKContext &context) {
     if (!context.render_target)
         return;
 
-    const float res_multiplier = context.state.res_multiplier;
+    const float res_multiplier = context.state.res_multiplier * context.surface_downscale;
 
     const int scissor_x = context.record.region_clip_min.x;
     const int scissor_y = context.record.region_clip_min.y;
@@ -169,6 +169,12 @@ void sync_viewport_flat(VKContext &context) {
 
     if (!context.is_recording)
         return;
+    constexpr bool log_gxm_scene_viewport = false; // pairs with log_gxm_scene_state in context.cpp
+    if (log_gxm_scene_viewport && !context.gxmscene_viewport_logged) {
+        context.gxmscene_viewport_logged = true;
+        LOG_INFO("[GXMSCENE]   FLAT viewport x={} y={} w={} h={}",
+            context.viewport.x, context.viewport.y, context.viewport.width, context.viewport.height);
+    }
     context.render_cmd.setViewport(0, context.viewport);
 }
 
@@ -182,7 +188,7 @@ void sync_viewport_real(VKContext &context, const float xOffset, const float yOf
     const float x = xOffset - std::abs(xScale);
     const float y = yOffset - yScale;
 
-    const float res_multiplier = context.state.res_multiplier;
+    const float res_multiplier = context.state.res_multiplier * context.surface_downscale;
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkViewport.html
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#vertexpostproc-viewport
@@ -200,6 +206,15 @@ void sync_viewport_real(VKContext &context, const float xOffset, const float yOf
 
     if (!context.is_recording)
         return;
+    constexpr bool log_gxm_scene_viewport = false; // pairs with log_gxm_scene_state in context.cpp
+    if (log_gxm_scene_viewport && !context.gxmscene_viewport_logged) {
+        context.gxmscene_viewport_logged = true;
+        LOG_INFO("[GXMSCENE]   GUEST viewport x={} y={} w={} h={} (xOffset={} yOffset={} xScale={} yScale={}) rt extent={}x{}",
+            context.viewport.x, context.viewport.y, context.viewport.width, context.viewport.height,
+            xOffset, yOffset, xScale, yScale,
+            context.render_target ? context.render_target->width : 0,
+            context.render_target ? context.render_target->height : 0);
+    }
     context.render_cmd.setViewport(0, context.viewport);
 }
 
