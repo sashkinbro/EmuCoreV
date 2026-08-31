@@ -53,6 +53,7 @@ public:
     std::vector<vk::Fence> fences;
     std::vector<vk::Semaphore> image_acquired_semaphores;
     std::vector<vk::Semaphore> image_ready_semaphores;
+    bool swapchain_has_storage = false;
 
     // renderpass used when no effect is done previously (clear the swapchain content)
     vk::RenderPass default_render_pass;

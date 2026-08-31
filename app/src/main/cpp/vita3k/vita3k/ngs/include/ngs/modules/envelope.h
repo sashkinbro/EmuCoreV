@@ -53,10 +53,24 @@ struct SceNgsEnvelopeStates {
 
 namespace ngs {
 
+struct EnvelopeLogicalState : public ModuleLogicalState {
+    double position_in_segment_ms = 0.0;
+    double total_position_ms = 0.0;
+    int32_t current_point = 0;
+    bool releasing = false;
+    float release_start_height = 0.0f;
+    float release_height = 0.0f;
+    double release_position_ms = 0.0;
+    double completed_at_zero_ms = 0.0;
+};
+
 struct EnvelopeModule : public Module {
 public:
     bool process(KernelState &kern, const MemState &mem, const SceUID thread_id, ModuleData &data, std::unique_lock<std::recursive_mutex> &scheduler_lock, std::unique_lock<std::mutex> &voice_lock) override;
+    void on_param_change(const MemState &mem, ModuleData &data) override;
+    void on_key_on(const MemState &mem, ModuleData &data) override;
     uint32_t module_id() const override { return 0x5CE3; }
+    uint32_t get_guest_state_size() const override { return sizeof(SceNgsEnvelopeStates); }
 
     static constexpr uint32_t get_max_parameter_size() {
         return sizeof(SceNgsEnvelopeParams);

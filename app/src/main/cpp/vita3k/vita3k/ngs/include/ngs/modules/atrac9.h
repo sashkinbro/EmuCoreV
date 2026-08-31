@@ -72,12 +72,31 @@ struct Atrac9LogicalState : public ModuleLogicalState {
     // preserve enough recent resampler input to rebuild the swresample state later
     StereoRateResamplerLogicalState rate_resampler;
     std::vector<uint8_t> superframe_staging;
+    // diagnostics
+    uint32_t diag_superframes = 0;
+    uint32_t diag_silent_streak = 0;
+    bool diag_reported_silent = false;
+    bool diag_reported_onset = false;
+    bool heal_done_this_episode = false;
+    // last 16 superframe records
+    struct DiagSf {
+        uint32_t index;
+        int32_t pos;
+        int32_t buf;
+        uint8_t staged;
+        uint64_t head;
+        float peak;
+    };
+    DiagSf diag_ring[16] = {};
+    uint32_t diag_ring_next = 0;
     // INTERNAL
     int8_t current_loop_count = 0;
     // tracks which config the saved decoder history belongs to
     uint32_t decoder_config = 0;
     // preserve the decoder's MDCT history so the runtime decoder can be rebuilt
     Atrac9DecoderSavedState saved_state{};
+    int8_t starved_ticks = 0;
+    bool in_underrun_wait = false;
 };
 
 struct Atrac9RuntimeState : public ModuleRuntimeState {

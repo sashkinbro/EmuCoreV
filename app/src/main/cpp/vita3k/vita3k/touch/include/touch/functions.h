@@ -18,5 +18,5 @@ int toggle_touchscreen(TouchState &state);
 int touch_get(const SceUID thread_id, EmuEnvState &emuenv, const SceUInt32 &port, SceTouchData *pData, SceUInt32 count, bool is_peek);
 void touch_set_force_mode(TouchState &state, int port, bool mode);
 #ifdef __ANDROID__
-void set_rear_touchscreen(TouchState &state, bool is_back);
+void set_touch_mode(TouchState &state, int mode); // 0 = front, 1 = back, 2 = front + back mirrored
 #endif

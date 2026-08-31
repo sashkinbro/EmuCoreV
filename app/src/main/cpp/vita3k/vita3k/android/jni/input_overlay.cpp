@@ -113,12 +113,12 @@ Java_org_vita3k_emulator_overlay_InputOverlay_setButton(JNIEnv *env, jobject thi
 }
 
 JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_overlay_InputOverlay_setTouchState(JNIEnv *env, jobject thiz, jboolean is_back) {
+Java_org_vita3k_emulator_overlay_InputOverlay_setTouchState(JNIEnv *env, jobject thiz, jint mode) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return;
 
-    set_rear_touchscreen(emuenv->touch, static_cast<bool>(is_back));
+    set_touch_mode(emuenv->touch, static_cast<int>(mode));
 }
 
 } // extern "C"

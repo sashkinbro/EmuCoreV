@@ -1036,4 +1036,5 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: ‏Snapdragon 845/855/865/888 والعديد من طرز سلسلتي Snapdragon 6/7</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: ‏Snapdragon 8 Gen 1/2/3 و8s Gen 3 وطرازات Snapdragon 7 الحديثة و6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: ‏Snapdragon 8 Elite Gen 5 و8 Gen 5 و8 Elite و8s Gen 4 و6 Gen 4</string>
+    <string name="game_manager_fifa_compatibility">تستخدم FIFA تلقائيًا Vulkan وNative Buffer للتوافق. لا تتغير إعدادات الألعاب الأخرى.</string>
 </resources>

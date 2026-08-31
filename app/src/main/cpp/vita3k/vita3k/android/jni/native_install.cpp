@@ -78,11 +78,15 @@ Java_org_vita3k_emulator_NativeLib_installPkg(JNIEnv *env, jclass, jstring path_
 
 JNIEXPORT jboolean JNICALL
 Java_org_vita3k_emulator_NativeLib_installArchive(JNIEnv *env, jclass, jstring path_str, jobject callback, jboolean force_reinstall) {
-    auto *emuenv = get_emuenv();
-    if (!emuenv)
-        return JNI_FALSE;
-
     const std::string path = jstring_to_string(env, path_str);
+    LOG_INFO("installArchive: '{}' force_reinstall={}", path, static_cast<bool>(force_reinstall));
+
+    auto *emuenv = get_emuenv();
+    if (!emuenv) {
+        LOG_ERROR("installArchive: no emulator session initialised - cannot install");
+        return JNI_FALSE;
+    }
+
     ScopedJniCallback progress_callback(env, callback, "onProgress", "(ILjava/lang/String;)V");
 
     auto progress_fn = [&progress_callback](ArchiveContents contents) {
@@ -97,10 +101,15 @@ Java_org_vita3k_emulator_NativeLib_installArchive(JNIEnv *env, jclass, jstring p
 
     const auto reinstall_fn = [force_reinstall](const std::string &, const std::string &) -> bool { return static_cast<bool>(force_reinstall); };
     const auto result = install_archive(*emuenv, fs::path(path), progress_fn, reinstall_fn);
-    if (!result.empty())
+    bool any_installed = false;
+    for (const auto &content : result) {
+        LOG_INFO("installArchive: content '{}' [{}] -> {}", content.title, content.title_id, content.state ? "installed" : "FAILED");
+        any_installed |= content.state;
+    }
+    if (any_installed)
         app::scan_apps(*emuenv);
 
-    return result.empty() ? JNI_FALSE : JNI_TRUE;
+    return any_installed ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL

@@ -29,6 +29,7 @@
 #include <kernel/state.h>
 #include <kernel/sync_primitives.h>
 #include <packages/functions.h>
+#include <string_view>
 
 #include <io/device.h>
 #include <io/io.h>
@@ -645,6 +646,7 @@ EXPORT(int, sceIoOpenAsync) {
 
 EXPORT(SceSSize, sceIoPread, SceUID fd, void *buf, SceSize nbyte, SceOff offset) {
     TRACY_FUNC(sceIoPread, fd, buf, nbyte, offset);
+
     if (emuenv.cfg.current_config.file_loading_delay > 0) {
         const uint32_t delay_us = emuenv.cfg.current_config.file_loading_delay * 1000 + nbyte / 20;
         guest_sched_release_for_block();

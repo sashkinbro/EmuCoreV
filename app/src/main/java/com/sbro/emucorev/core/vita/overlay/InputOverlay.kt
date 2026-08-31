@@ -143,7 +143,7 @@ class InputOverlay(context: Context) {
 
     external fun setButton(button: Int, value: Boolean)
 
-    external fun setTouchState(isBack: Boolean)
+    external fun setTouchState(mode: Int)
 
     companion object {
         const val OVERLAY_MASK_BASIC = 1

@@ -19,9 +19,11 @@
 #include "interface.h"
 
 #include <app/functions.h>
+#include <codec/state.h>
 #include <config/functions.h>
 #include <config/version.h>
 #include <emuenv/state.h>
+#include <fstream>
 #include <gui-qt/gui_language.h>
 #include <gui-qt/gui_settings.h>
 #include <gui-qt/log_widget.h>
@@ -35,6 +37,7 @@
 #include <packages/license.h>
 #include <packages/pkg.h>
 #include <packages/sfo.h>
+#include <regex>
 #include <shader/spirv_recompiler.h>
 #include <util/log.h>
 #include <util/string_utils.h>
@@ -129,6 +132,64 @@ int main(int argc, char *argv[]) {
             if (cfg.recompile_shader_path.has_value()) {
                 LOG_INFO("Recompiling {}", *cfg.recompile_shader_path);
                 shader::convert_gxp_to_glsl_from_filepath(*cfg.recompile_shader_path);
+            }
+            if (cfg.decode_at9_path.has_value()) {
+                const std::string &tap_path = *cfg.decode_at9_path;
+                uint32_t config_data = 0;
+                std::smatch cfg_match;
+                if (std::regex_search(tap_path, cfg_match, std::regex("_c([0-9A-Fa-f]{8})")))
+                    config_data = static_cast<uint32_t>(std::stoul(cfg_match[1].str(), nullptr, 16));
+                std::ifstream tap_in(tap_path, std::ios::binary);
+                if (!tap_in || !config_data) {
+                    LOG_ERROR("decode-at9: cannot open {} or no _c<config> in the name", tap_path);
+                    return 1;
+                }
+                std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(tap_in)), std::istreambuf_iterator<char>());
+                Atrac9DecoderState decoder(config_data);
+                const uint32_t superframe_size = decoder.get(DecoderQuery::AT9_SUPERFRAME_SIZE);
+                const uint32_t frames_in_sf = decoder.get(DecoderQuery::AT9_FRAMES_IN_SUPERFRAME);
+                const uint32_t samples_per_frame = decoder.get(DecoderQuery::AT9_SAMPLE_PER_FRAME);
+                const uint32_t channels = decoder.get(DecoderQuery::CHANNELS);
+                LOG_INFO("decode-at9: {} bytes, config=0x{:08X} superframe={} frames={} samples/frame={} ch={}",
+                    bytes.size(), config_data, superframe_size, frames_in_sf, samples_per_frame, channels);
+                std::vector<uint8_t> pcm(static_cast<size_t>(samples_per_frame) * sizeof(int16_t) * channels);
+                std::string row;
+                uint32_t sf_index = 0, errors = 0, silent_run = 0, transitions = 0;
+                for (size_t off = 0; off + superframe_size <= bytes.size(); off += superframe_size, sf_index++) {
+                    const uint8_t *in = bytes.data() + off;
+                    float sf_peak = 0.0f;
+                    for (uint32_t f = 0; f < frames_in_sf; f++) {
+                        if (!decoder.send(in, 0)) {
+                            errors++;
+                            break;
+                        }
+                        DecoderSize dsz;
+                        decoder.receive(pcm.data(), &dsz);
+                        const int16_t *sp = reinterpret_cast<const int16_t *>(pcm.data());
+                        for (uint32_t k = 0; k < samples_per_frame * channels; k++)
+                            sf_peak = std::max(sf_peak, std::abs(sp[k]) / 32768.0f);
+                        in += decoder.get_es_size();
+                    }
+                    const bool silent = sf_peak <= 0.0001f;
+                    if (silent)
+                        silent_run++;
+                    else {
+                        if (silent_run >= 12) {
+                            LOG_INFO("decode-at9: silent run of {} superframes ended at sf#{}", silent_run, sf_index);
+                            transitions++;
+                        }
+                        silent_run = 0;
+                    }
+                    row += fmt::format(" {:.4f}", sf_peak);
+                    if ((sf_index % 16) == 15) {
+                        LOG_INFO("decode-at9: sf#{:6}:{}", sf_index - 15, row);
+                        row.clear();
+                    }
+                }
+                if (!row.empty())
+                    LOG_INFO("decode-at9: sf#{:6}:{}", (sf_index / 16) * 16, row);
+                LOG_INFO("decode-at9: DONE {} superframes, {} decode errors, final silent run {}, {} long-silence->audio transitions",
+                    sf_index, errors, silent_run, transitions);
             }
             if (cfg.delete_title_id.has_value()) {
                 LOG_INFO("Deleting title id {}", *cfg.delete_title_id);

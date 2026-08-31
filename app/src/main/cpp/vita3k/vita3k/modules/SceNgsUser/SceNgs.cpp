@@ -19,9 +19,11 @@
 
 #include "../SceProcessmgr/SceProcessmgr.h"
 
+#include <kernel/state.h>
 #include <kernel/thread/thread_state.h>
 #include <ngs/state.h>
 #include <ngs/system.h>
+#include <unordered_map>
 #include <util/log.h>
 #include <util/tracy.h>
 
@@ -332,7 +334,15 @@ EXPORT(SceInt32, sceNgsRackRelease, ngs::Rack *rack, Ptr<void> callback) {
 
     std::unique_lock<std::recursive_mutex> lock(rack->system->voice_scheduler.mutex);
     if (!rack->system->voice_scheduler.is_updating) {
+        const Address released_handle = Ptr<void>(rack, emuenv.mem).address();
+        const Address release_cb = callback.address();
         ngs::release_rack(emuenv.ngs, emuenv.mem, rack->system, rack);
+        if (release_cb) {
+            lock.unlock();
+            const ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
+            if (thread)
+                thread->run_callback(release_cb, { released_handle });
+        }
     } else if (!callback) {
         // wait for the update to finish
         // if this is called in an interrupt handler it will softlock ngs
@@ -672,6 +682,21 @@ EXPORT(SceInt32, sceNgsVoiceGetInfo, ngs::Voice *voice, SceNgsVoiceInfo *info) {
     const std::lock_guard<std::mutex> guard(*voice->voice_mutex);
 
     info->voice_state = ngsVoiceStateFromHLEState(voice);
+    constexpr bool NGS_GETINFO_WATCH = false;
+    if (NGS_GETINFO_WATCH) {
+        static std::unordered_map<const ngs::Voice *, SceUInt32> last_answer;
+        static std::mutex last_answer_mutex;
+        const std::lock_guard<std::mutex> lg(last_answer_mutex);
+        auto [it, inserted] = last_answer.try_emplace(voice, ~0u);
+        if (it->second != info->voice_state) {
+            const bool stale = info->voice_state != 0 && voice->state == ngs::VoiceState::VOICE_STATE_AVAILABLE;
+            LOG_WARN("[NGSLIFE] GetInfo voice={} answer 0x{:X} (was 0x{:X}) hle_state={} pending={} paused={} keyed_off={}{}",
+                fmt::ptr(voice), info->voice_state, it->second == ~0u ? 0xFFFFFFFF : it->second,
+                static_cast<int>(voice->state), voice->is_pending ? 1 : 0, voice->is_paused ? 1 : 0, voice->is_keyed_off ? 1 : 0,
+                stale ? "  *** NONZERO WHILE SCHEDULER-AVAILABLE - THIS SLOT CAN NEVER BE RECLAIMED ***" : "");
+            it->second = info->voice_state;
+        }
+    }
     info->num_modules = static_cast<SceUInt32>(voice->datas.size());
     info->num_inputs = static_cast<SceUInt32>(voice->inputs.inputs.size());
     info->num_outputs = voice->rack->vdef->output_count;
@@ -767,6 +792,20 @@ EXPORT(SceInt32, sceNgsVoiceGetStateData, ngs::Voice *voice, const SceUInt32 mod
     if (mem) {
         memset(mem, 0, mem_size);
         memcpy(mem, storage->guest_state_data.data(), std::min<std::size_t>(mem_size, storage->guest_state_data.size()));
+        constexpr bool NGS_ENVELOPE_STATE_WATCH = false;
+        if (NGS_ENVELOPE_STATE_WATCH && voice->rack->modules[module] && voice->rack->modules[module]->module_id() == 0x5CE3 && mem_size >= 8) {
+            static std::unordered_map<const void *, uint64_t> last_state;
+            static std::mutex last_state_mutex;
+            uint64_t head;
+            memcpy(&head, mem, sizeof(head));
+            const std::lock_guard<std::mutex> lg(last_state_mutex);
+            auto [it, fresh] = last_state.try_emplace(storage, ~0ull);
+            if (it->second != head) {
+                it->second = head;
+                const float *f = static_cast<const float *>(mem);
+                LOG_WARN("[NGSSTATE] envelope state read voice={} height={:.4f} pos={:.1f} size={}", fmt::ptr(voice), f[0], f[1], mem_size);
+            }
+        }
     }
 
     return SCE_NGS_OK;
@@ -781,13 +820,21 @@ EXPORT(SceInt32, sceNgsVoiceInit, ngs::Voice *voice, const SceNgsVoicePreset *pr
     if (!voice)
         return RET_ERROR(SCE_NGS_ERROR_INVALID_ARG);
 
-    if (voice->state == ngs::VoiceState::VOICE_STATE_ACTIVE)
+    if (voice->state == ngs::VoiceState::VOICE_STATE_ACTIVE) {
+        LOG_ERROR("[NGSLIFE] VoiceInit REFUSED: voice={} is ACTIVE", fmt::ptr(voice));
         return RET_ERROR(SCE_NGS_ERROR_INVALID_STATE);
+    }
 
     std::lock_guard<std::mutex> guard(*voice->voice_mutex);
 
     if (init_flags == SCE_NGS_VOICE_INIT_BASE || init_flags == SCE_NGS_VOICE_INIT_ALL) {
+        if (voice->is_paused || voice->is_pending || voice->is_keyed_off)
+            LOG_ERROR("[NGSLIFE] VoiceInit voice={} clearing STALE flags (paused={} pending={} keyed_off={}) - these survived from before the re-init",
+                fmt::ptr(voice), voice->is_paused ? 1 : 0, voice->is_pending ? 1 : 0, voice->is_keyed_off ? 1 : 0);
         voice->state = ngs::VoiceState::VOICE_STATE_AVAILABLE;
+        voice->is_paused = false;
+        voice->is_pending = false;
+        voice->is_keyed_off = false;
     }
 
     if (init_flags & SCE_NGS_VOICE_INIT_ROUTING) {
@@ -834,12 +881,11 @@ EXPORT(SceInt32, sceNgsVoiceKeyOff, ngs::Voice *voice) {
 
     voice->is_keyed_off = true;
     voice->rack->system->voice_scheduler.off(emuenv.mem, voice);
+    voice->is_keyed_off = false;
+    voice->rack->system->voice_scheduler.stop(emuenv.mem, voice);
 
     // call the finish callback, I got no idea what the module id should be in this case
     voice->invoke_callback(emuenv.kernel, emuenv.mem, thread_id, voice->finished_callback, voice->finished_callback_user_data, 0);
-
-    voice->is_keyed_off = false;
-    voice->rack->system->voice_scheduler.stop(emuenv.mem, voice);
     return SCE_NGS_OK;
 }
 
@@ -949,8 +995,13 @@ EXPORT(int, sceNgsVoicePause, ngs::Voice *voice) {
         return RET_ERROR(SCE_NGS_ERROR_INVALID_ARG);
     }
 
-    if (voice->is_paused)
-        return RET_ERROR(SCE_NGS_ERROR_INVALID_STATE);
+    if (voice->is_paused) {
+        static std::atomic<uint64_t> n{ 0 };
+        const uint64_t c = n.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (c <= 3 || (c % 1024) == 0)
+            LOG_WARN("[NGSLIFE] pause of ALREADY-PAUSED voice={} ({} so far) - returning OK (was INVALID_STATE)", fmt::ptr(voice), c);
+        return SCE_NGS_OK;
+    }
 
     if (!voice->rack->system->voice_scheduler.pause(emuenv.mem, voice)) {
         return RET_ERROR(SCE_NGS_ERROR);
@@ -971,6 +1022,8 @@ EXPORT(SceUInt32, sceNgsVoicePlay, ngs::Voice *voice) {
 
     voice->is_pending = true;
     if (!voice->rack->system->voice_scheduler.play(emuenv.mem, voice)) {
+        // A refused play left is_pending set forever, so GetInfo could never report this voice AVAILABLE again.
+        voice->is_pending = false;
         return RET_ERROR(SCE_NGS_ERROR);
     }
     voice->is_pending = false;

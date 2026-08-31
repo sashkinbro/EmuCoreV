@@ -19,6 +19,7 @@
 #include <kernel/thread/thread_state.h>
 
 #include <kernel/state.h>
+#include <mem/functions.h>
 #include <mem/ptr.h>
 #include <util/align.h>
 
@@ -455,9 +456,12 @@ void guest_sched_forget_cpu(CPUState *cpu) {
         g_sched_cv.notify_all();
 }
 
+thread_local ThreadState *g_tls_guest_thread = nullptr;
+
 void ThreadState::run_loop() {
     bool guest_returned = false;
 
+    g_tls_guest_thread = this;
     struct TokenGuard {
         ~TokenGuard() { guest_sched_release_for_block(); }
     } token_guard;
@@ -569,9 +573,48 @@ void ThreadState::run_loop() {
             if (cpu->abort_pending.exchange(false))
                 dispatch_abort(*cpu);
 
+            // Cue Probe
+            bool probe_handled = false;
+            bool probe_thumb = false;
+            if (!do_step && hit_breakpoint(*cpu) && kernel.debugger.is_probe(read_pc(*cpu) & ~1u, probe_thumb)) {
+                const uint32_t probe_pc = read_pc(*cpu) & ~1u;
+                std::string ctx = fmt::format("[CUEPROBE] pc=0x{:08X} thread='{}' ({})", probe_pc, name, id);
+                for (int ri = 0; ri <= 12; ri++)
+                    ctx += fmt::format(" r{}=0x{:08X}", ri, read_reg(*cpu, ri));
+                ctx += fmt::format(" sp=0x{:08X} lr=0x{:08X}", read_sp(*cpu), read_lr(*cpu));
+                std::set<uint32_t> dump_bases;
+                for (const int ri : { 0, 1, 4, 5, 6, 7 })
+                    dump_bases.insert(read_reg(*cpu, ri) & ~3u);
+                dump_bases.insert(read_sp(*cpu) & ~3u);
+                for (const uint32_t base : dump_bases) {
+                    // Bitmap validity != host accessibility
+                    uint32_t words[48];
+                    if (!debug_safe_copy_guest(mem, base, words, sizeof(words)))
+                        continue;
+                    ctx += fmt::format("\n[CUEPROBE] mem 0x{:08X}:", base);
+                    for (const uint32_t w : words)
+                        ctx += fmt::format(" {:08X}", w);
+                }
+                LOG_ERROR("{}\n{}", ctx, log_stack_traceback());
+                {
+                    const std::lock_guard<std::mutex> probe_guard(kernel.debugger.probe_step_mutex);
+                    kernel.debugger.remove_breakpoint(mem, probe_pc);
+                    step(*cpu);
+                    kernel.debugger.add_breakpoint(mem, probe_pc, probe_thumb);
+                }
+                if (cpu->svc_called) {
+                    const uint32_t nid = *Ptr<uint32_t>(read_pc(*cpu) + 4).get(mem);
+                    last_import_nid = nid;
+                    last_import_lr = read_lr(*cpu);
+                    kernel.call_import(*cpu, nid, id);
+                    clear_exclusive(*cpu);
+                }
+                probe_handled = true;
+            }
+
             lock.lock();
 
-            if (do_step || suspend_requested || vm_suspended || world_stop_requested || hit_breakpoint(*cpu)) {
+            if (do_step || suspend_requested || vm_suspended || world_stop_requested || (hit_breakpoint(*cpu) && !probe_handled)) {
                 suspend_requested = false;
                 if (world_stop_requested)
                     world_stopped = true;
@@ -711,6 +754,9 @@ void ThreadState::update_status(ThreadStatus status, std::optional<ThreadStatus>
     if (status == ThreadStatus::wait && delete_requested)
         return;
 
+    if (status == ThreadStatus::run)
+        kernel.thread_wake_counter.fetch_add(1, std::memory_order_relaxed);
+
     this->status = status;
     status_cond.notify_all();
 
@@ -724,6 +770,7 @@ Address ThreadState::stack_top() const {
 }
 
 void ThreadState::suspend() {
+    LOG_WARN("[SUSPLOG] suspend thread '{}' ({}) current status {}", name, id, static_cast<int>(status));
     assert(status == ThreadStatus::run);
     {
         const std::lock_guard<std::mutex> lock(mutex);
@@ -750,6 +797,7 @@ void ThreadState::suspend_and_wait() {
 }
 
 void ThreadState::resume(bool step) {
+    LOG_WARN("[SUSPLOG] resume thread '{}' ({}) from status {}", name, id, static_cast<int>(status));
     assert(status == ThreadStatus::suspend || status == ThreadStatus::dormant);
     {
         const std::lock_guard<std::mutex> lock(mutex);
@@ -804,13 +852,16 @@ std::string ThreadState::log_stack_traceback() const {
     constexpr Address END_OFFSET = 1024;
     std::string str;
     const Address sp = read_sp(*cpu);
+    // A thread whose sp is near null (i.e. never started, or a non-guest/host thread) has no walkable stack
+    if (sp < 0x1000)
+        return str;
     for (Address addr = sp - START_OFFSET; addr <= sp + END_OFFSET; addr += 4) {
-        if (Ptr<uint32_t>(addr).valid(mem)) {
-            const Address value = *Ptr<uint32_t>(addr).get(mem);
-            const auto mod = kernel.find_module_by_addr(value);
-            if (mod)
-                fmt::format_to(std::back_inserter(str), "0x{:X} (module: {})\n", value, mod->module_name);
-        }
+        uint32_t value;
+        if (!debug_safe_copy_guest(mem, addr, &value, sizeof(value)))
+            continue;
+        const auto mod = kernel.find_module_by_addr(value);
+        if (mod)
+            fmt::format_to(std::back_inserter(str), "0x{:X} (module: {})\n", value, mod->module_name);
     }
     return str;
 }

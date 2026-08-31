@@ -29,6 +29,7 @@ struct Config {
     std::optional<fs::path> content_path;
     std::optional<std::string> run_app_path;
     std::optional<std::string> recompile_shader_path;
+    std::optional<std::string> decode_at9_path;
     std::optional<std::string> delete_title_id;
     std::optional<std::string> pkg_path;
     std::optional<std::string> pkg_zrif;

@@ -47,6 +47,7 @@ void PlayerModule::on_state_change(const MemState &mem, ModuleData &data, const 
         logical->rate_resampler.reset();
         logical->adpcm_buffer.clear();
         logical->requested_initial_buffer = false;
+        logical->starved_ticks = 0;
 
         std::memset(&logical->adpcm_history, 0, sizeof(logical->adpcm_history));
     } else if (data.parent->is_keyed_off) {
@@ -180,6 +181,8 @@ bool PlayerModule::process(KernelState &kern, const MemState &mem, const SceUID 
 
     prefer_live_params_before_first_consume();
 
+    constexpr int8_t max_starved_ticks = 16;
+
     while (static_cast<int>(logical->decoded_pcm.available_frames()) < granularity) {
         if ((state->current_buffer == -1)
             || !params->buffer_params[state->current_buffer].buffer
@@ -192,7 +195,18 @@ bool PlayerModule::process(KernelState &kern, const MemState &mem, const SceUID 
                     continue;
                 break; // wait for the next tick — do NOT finish/key off
             }
-            // Stop processing if no valid buffer is available or if the buffer is empty
+            if (state->current_buffer != -1 && logical->starved_ticks < max_starved_ticks) {
+                logical->starved_ticks++;
+                LOG_WARN_ONCE("NGS player: stream underrun mid-voice, waiting for the game to publish the next buffer (was previously treated as end-of-stream)");
+                break;
+            }
+            if (state->current_buffer != -1) {
+                voice_lock.unlock();
+                scheduler_lock.unlock();
+                data.invoke_callback(kern, mem, thread_id, SCE_NGS_PLAYER_END_OF_DATA, 0, 0);
+                scheduler_lock.lock();
+                voice_lock.lock();
+            }
             finished = true;
             break;
         } else if (state->current_byte_position_in_buffer >= params->buffer_params[state->current_buffer].bytes_count) {
@@ -209,9 +223,7 @@ bool PlayerModule::process(KernelState &kern, const MemState &mem, const SceUID 
                 state->current_buffer = params->buffer_params[state->current_buffer].next_buffer_index;
                 logical->current_loop_count = 0;
 
-                if ((state->current_buffer == -1)
-                    || !params->buffer_params[state->current_buffer].buffer
-                    || (params->buffer_params[state->current_buffer].bytes_count == 0)) {
+                if (state->current_buffer == -1) {
                     data.invoke_callback(kern, mem, thread_id, SCE_NGS_PLAYER_END_OF_DATA, 0, 0);
 
                     // we are done
@@ -230,7 +242,11 @@ bool PlayerModule::process(KernelState &kern, const MemState &mem, const SceUID 
 
             scheduler_lock.lock();
             voice_lock.lock();
+            params = data.get_parameters<SceNgsPlayerParams>(mem);
+            continue;
         }
+
+        logical->starved_ticks = 0;
 
         runtime->decoder->source_channels = params->channels;
         runtime->decoder->source_frequency = params->playback_frequency;

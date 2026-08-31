@@ -17,6 +17,9 @@
 
 #include <renderer/vulkan/functions.h>
 
+#include <algorithm>
+#include <cmath>
+
 #include <gxm/functions.h>
 #include <renderer/functions.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
@@ -43,6 +46,7 @@ void set_uniform_buffer(VKContext &context, MemState &mem, const ShaderProgram *
         }
 
         const uint64_t buffer_address = context.state.get_matching_device_address(data.address());
+
         if (vertex_shader) {
             context.curr_vert_ublock.set_buffer_address(block_num, buffer_address);
         } else {
@@ -333,6 +337,40 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     if (!context.state.features.use_mask_bit && context.record.fragment_program.get(mem)->is_maskupdate)
         return;
 
+    // DOA5 black clothes fix:
+    {
+        const SceGxmVertexProgram *gxm_vp = context.record.vertex_program.get(mem);
+        if (gxm_vp && gxm_vp->renderer_data) {
+            VertexProgram *vp_data = gxm_vp->renderer_data.get();
+            if (vp_data->varying_location_mask == 0xFFFFFFFFu) {
+                uint32_t written_mask = 0;
+                const SceGxmProgram *vp_gxp = gxm_vp->program.get(mem);
+                if (vp_gxp) {
+                    const SceGxmVertexProgramOutputs vo_mask = gxp::get_vertex_outputs(*vp_gxp);
+                    static constexpr struct {
+                        SceGxmVertexProgramOutputs vo;
+                        int location;
+                    } vo_locations[] = {
+                        { SCE_GXM_VERTEX_PROGRAM_OUTPUT_POSITION, 0 }, { SCE_GXM_VERTEX_PROGRAM_OUTPUT_COLOR0, 1 },
+                        { SCE_GXM_VERTEX_PROGRAM_OUTPUT_COLOR1, 2 }, { SCE_GXM_VERTEX_PROGRAM_OUTPUT_FOG, 3 },
+                        { SCE_GXM_VERTEX_PROGRAM_OUTPUT_TEXCOORD0, 4 }, { SCE_GXM_VERTEX_PROGRAM_OUTPUT_TEXCOORD1, 5 },
+                        { SCE_GXM_VERTEX_PROGRAM_OUTPUT_TEXCOORD2, 6 }, { SCE_GXM_VERTEX_PROGRAM_OUTPUT_TEXCOORD3, 7 },
+                        { SCE_GXM_VERTEX_PROGRAM_OUTPUT_TEXCOORD4, 8 }, { SCE_GXM_VERTEX_PROGRAM_OUTPUT_TEXCOORD5, 9 },
+                        { SCE_GXM_VERTEX_PROGRAM_OUTPUT_TEXCOORD6, 10 }, { SCE_GXM_VERTEX_PROGRAM_OUTPUT_TEXCOORD7, 11 },
+                        { SCE_GXM_VERTEX_PROGRAM_OUTPUT_TEXCOORD8, 12 }, { SCE_GXM_VERTEX_PROGRAM_OUTPUT_TEXCOORD9, 13 },
+                        { SCE_GXM_VERTEX_PROGRAM_OUTPUT_PSIZE, 14 }
+                    };
+                    for (const auto &e : vo_locations)
+                        if (vo_mask & e.vo)
+                            written_mask |= 1u << e.location;
+                }
+                vp_data->varying_location_mask = written_mask;
+                LOG_INFO("[ITERMASK] vertex program varying mask = 0x{:04X}", written_mask);
+            }
+            context.curr_frag_ublock.set_iterator_written_mask(vp_data->varying_location_mask);
+        }
+    }
+
     void *indices_ptr = indices.get(mem);
 
     if (context.record.front_depth_write_mode == SCE_GXM_DEPTH_WRITE_ENABLED)
@@ -344,6 +382,23 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         const uint16_t vert_texture_count = context.record.vertex_program.get(mem)->renderer_data->texture_count;
         const uint16_t frag_texture_count = context.record.fragment_program.get(mem)->renderer_data->texture_count;
         context.state.surface_cache.perform_pending_casts(context, vert_texture_count, frag_texture_count);
+    }
+    {
+        // scissor x viewport bounds what this draw can rasterize
+        const int32_t sx0 = context.scissor.offset.x, sy0 = context.scissor.offset.y;
+        const int32_t sx1 = sx0 + static_cast<int32_t>(context.scissor.extent.width), sy1 = sy0 + static_cast<int32_t>(context.scissor.extent.height);
+        const int32_t vx0 = static_cast<int32_t>(std::floor(std::min(context.viewport.x, context.viewport.x + context.viewport.width)));
+        const int32_t vy0 = static_cast<int32_t>(std::floor(std::min(context.viewport.y, context.viewport.y + context.viewport.height)));
+        const int32_t vx1 = static_cast<int32_t>(std::ceil(std::max(context.viewport.x, context.viewport.x + context.viewport.width)));
+        const int32_t vy1 = static_cast<int32_t>(std::ceil(std::max(context.viewport.y, context.viewport.y + context.viewport.height)));
+        const int32_t x0 = std::max(sx0, vx0), y0 = std::max(sy0, vy0);
+        const int32_t x1 = std::min(sx1, vx1), y1 = std::min(sy1, vy1);
+        if (x1 > x0 && y1 > y0) {
+            context.draw_rect_x0 = std::min(context.draw_rect_x0, x0);
+            context.draw_rect_y0 = std::min(context.draw_rect_y0, y0);
+            context.draw_rect_x1 = std::max(context.draw_rect_x1, x1);
+            context.draw_rect_y1 = std::max(context.draw_rect_y1, y1);
+        }
     }
     context.scene_has_drawn = true;
 
@@ -496,6 +551,7 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     // Cast-sampler UV re-anchor inputs
     frag_ublock.cast_sampler_mask = static_cast<float>(context.curr_frag_ublock.cast_sampler_bits);
     frag_ublock.cast_phase_mask = static_cast<float>(context.curr_frag_ublock.cast_phase_bits);
+    frag_ublock.raw_cast_mask = static_cast<float>(context.curr_frag_ublock.raw_cast_bits);
     frag_ublock.inv_frag_width = 1.0f / static_cast<float>(context.render_target->width);
     frag_ublock.inv_frag_height = 1.0f / static_cast<float>(context.render_target->height);
     if (context.curr_frag_ublock.cast_sampler_bits != 0) {
