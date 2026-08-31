@@ -12,8 +12,12 @@
 #include <config/state.h>
 #include <emuenv/state.h>
 #include <ime/keyboard.h>
+#include <ime/functions.h>
+#include <dialog/state.h>
 
 #include <jni.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_keycode.h>
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_vita_Emulator_setPerformanceOverlayState(
@@ -127,6 +131,53 @@ Java_com_sbro_emucorev_core_vita_Emulator_dismissNativeIme(
         ime::notify_ime_state_changed();
     }
     return dismissed ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorev_core_vita_Emulator_submitNativeIme(JNIEnv *, jobject) {
+    auto *emuenv = get_emuenv();
+    auto *controller = get_app_session_controller();
+    if (!emuenv || !controller || !controller->is_running() || !is_any_ime_active(*emuenv))
+        return JNI_FALSE;
+    // Queue Enter behind Android's pending SDL text events. Completing directly
+    // on the UI thread can return the old string before the final character arrives.
+    SDL_Event event{};
+    event.type = SDL_EVENT_KEY_DOWN;
+    event.key.key = SDLK_RETURN;
+    event.key.down = true;
+    return SDL_PushEvent(&event) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorev_core_vita_Emulator_editNativeIme(JNIEnv *env, jobject, jstring text, jint action) {
+    auto *emuenv = get_emuenv();
+    auto *controller = get_app_session_controller();
+    if (!emuenv || !controller || !controller->is_running() || !text || action < 0 || action > 3)
+        return JNI_FALSE;
+    const jchar *chars = env->GetStringChars(text, nullptr);
+    if (!chars)
+        return JNI_FALSE;
+    std::u16string input(reinterpret_cast<const char16_t *>(chars), env->GetStringLength(text));
+    env->ReleaseStringChars(text, chars);
+    {
+        // Same lock order as the native snapshot/finish paths. Never callback to
+        // Java while holding these locks: updates are posted to the UI thread.
+        std::lock_guard<std::recursive_mutex> dialog_lock(emuenv->common_dialog.mutex);
+        std::lock_guard<std::mutex> ime_lock(emuenv->ime.mutex);
+        if (!is_any_ime_active(*emuenv))
+            return JNI_FALSE;
+        const bool multiline = is_ime_dialog_active(*emuenv) ? emuenv->common_dialog.ime.multiline
+            : (emuenv->ime.param.option & SCE_IME_OPTION_MULTILINE) != 0;
+        std::erase_if(input, [multiline](char16_t ch) { return ch == 0 || ch == u'\r' || (!multiline && ch == u'\n'); });
+        switch (action) {
+        case 0: ime_commit_text(emuenv->ime, input); break;
+        case 1: ime_backspace(emuenv->ime); break;
+        case 2: ime_cursor_left(emuenv->ime); break;
+        case 3: ime_cursor_right(emuenv->ime); break;
+        }
+    }
+    ime::notify_ime_state_changed();
+    return JNI_TRUE;
 }
 
 extern "C" JNIEXPORT jstring JNICALL

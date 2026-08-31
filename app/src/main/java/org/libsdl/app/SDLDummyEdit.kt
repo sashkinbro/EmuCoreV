@@ -5,6 +5,8 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import android.view.inputmethod.InputMethodManager
+import android.text.InputType
 
 class SDLDummyEdit(context: Context) : View(context), View.OnKeyListener {
     private var inputConnection: InputConnection? = null
@@ -17,7 +19,9 @@ class SDLDummyEdit(context: Context) : View(context), View.OnKeyListener {
     }
 
     fun setInputType(inputType: Int) {
+        if (inputTypeValue == inputType) return
         inputTypeValue = inputType
+        (context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.restartInput(this)
     }
 
     override fun onCheckIsTextEditor(): Boolean = true
@@ -43,7 +47,8 @@ class SDLDummyEdit(context: Context) : View(context), View.OnKeyListener {
         val connection = SDLInputConnection(this, true)
         inputConnection = connection
         outAttrs.inputType = inputTypeValue
-        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN
+        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN or
+            if (inputTypeValue and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0) EditorInfo.IME_ACTION_NONE else EditorInfo.IME_ACTION_DONE
         return connection
     }
 }

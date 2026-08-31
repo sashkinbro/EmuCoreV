@@ -73,7 +73,6 @@ bool handle_ime_keydown(EmuEnvState &emuenv, const SDL_KeyboardEvent &event) {
         return false;
 
     auto &ime = emuenv.ime;
-    const bool dialog_ime_active = is_ime_dialog_active(emuenv);
 
     switch (event.key) {
     case SDLK_BACKSPACE: {
@@ -87,23 +86,13 @@ bool handle_ime_keydown(EmuEnvState &emuenv, const SDL_KeyboardEvent &event) {
 
     case SDLK_RETURN:
     case SDLK_KP_ENTER:
-        if (dialog_ime_active) {
-            finish_ime_dialog(emuenv);
-        } else {
-            std::lock_guard<std::mutex> lock(ime.mutex);
-            ime.event_id = SCE_IME_EVENT_PRESS_ENTER;
-        }
-        ime::notify_ime_state_changed();
+        submit_current_ime(emuenv);
+        ime::set_keyboard_active(false);
         return true;
 
     case SDLK_ESCAPE:
-        if (dialog_ime_active) {
-            cancel_ime_dialog(emuenv);
-        } else {
-            std::lock_guard<std::mutex> lock(ime.mutex);
-            ime.event_id = SCE_IME_EVENT_PRESS_CLOSE;
-        }
-        ime::notify_ime_state_changed();
+        if (dismiss_current_ime(emuenv))
+            ime::set_keyboard_active(false);
         return true;
 
     case SDLK_LEFT: {
@@ -146,8 +135,15 @@ void handle_ime_text_input(EmuEnvState &emuenv, const char *text) {
 
     std::string filtered_text;
     filtered_text.reserve(std::strlen(text));
+    bool multiline;
+    {
+        std::lock_guard<std::recursive_mutex> dialog_lock(emuenv.common_dialog.mutex);
+        std::lock_guard<std::mutex> ime_lock(emuenv.ime.mutex);
+        multiline = is_ime_dialog_active(emuenv) ? emuenv.common_dialog.ime.multiline
+            : (emuenv.ime.param.option & SCE_IME_OPTION_MULTILINE) != 0;
+    }
     for (const char *ch = text; *ch != '\0'; ++ch) {
-        if (*ch != '\n' && *ch != '\r')
+        if (*ch != '\r' && (*ch != '\n' || multiline))
             filtered_text.push_back(*ch);
     }
 

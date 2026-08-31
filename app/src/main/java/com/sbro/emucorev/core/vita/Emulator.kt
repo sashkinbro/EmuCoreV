@@ -9,11 +9,14 @@ import android.hardware.input.InputManager
 import android.net.Uri
 import android.os.Bundle
 import android.system.Os
+import android.text.InputType
 import android.content.pm.ActivityInfo
 import android.util.Log
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.ViewGroup
+import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.annotation.Keep
 import androidx.compose.runtime.getValue
@@ -25,6 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -77,6 +83,13 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var playTimeSessionId: String? = null
     private var playTimeSessionTitleId: String = ""
     private var playTimeSessionStartedAt: Long = 0L
+    var nativeImeState by mutableStateOf<NativeImeState?>(null)
+        private set
+    var nativeKeyboardRequested by mutableStateOf(false)
+        private set
+    var useBuiltInKeyboard by mutableStateOf(false)
+        private set
+    private var keyboardRequestGeneration = 0
 
     var hasPhysicalGamepad by mutableStateOf(false)
         private set
@@ -188,17 +201,20 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         refreshGamepadRuntimeInputSettings()
         refreshPhysicalGamepadState()
         hideSystemBars()
+        if (nativeKeyboardRequested && !useBuiltInKeyboard) requestSystemKeyboard()
         if (menuPaused) {
             applyMenuPauseState(true)
         }
     }
 
     override fun onPause() {
+        keyboardRequestGeneration++ // Invalidate delayed show/fallback work while backgrounded.
         composeOwners.handlePause()
         super.onPause()
     }
 
     override fun onDestroy() {
+        keyboardRequestGeneration++
         finishPlayTimeSessionIfNeeded()
         inputManager?.unregisterInputDeviceListener(this)
         inputManager = null
@@ -219,6 +235,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         if (hasFocus) {
             attachComposeOverlay()
             hideSystemBars()
+            if (nativeKeyboardRequested && !useBuiltInKeyboard) requestSystemKeyboard()
         }
     }
 
@@ -322,29 +339,19 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
-    /**
-     * JNI callback used by Vita3K's Android IME bridge.
-     *
-     * SDL owns the actual soft-keyboard lifecycle in this activity through
-     * SDL_StartTextInput/SDL_StopTextInput. Keeping this callback available is
-     * nevertheless part of the native Activity ABI; upstream uses it for
-     * additional keyboard-related UI bookkeeping.
-     */
+    /** SDL starts text input; Android owns retries, visibility and the fallback UI. */
     @Keep
     fun setKeyboardActive(active: Boolean) {
-        Log.d(TAG, "Native keyboard active=$active")
+        runOnUiThread {
+            nativeKeyboardRequested = active
+            useBuiltInKeyboard = false
+            keyboardRequestGeneration++
+            if (active) requestSystemKeyboard(resetEditor = true) else hideSystemKeyboard()
+        }
     }
 
-    /**
-     * Receives the native IME snapshot for upstream UI integrations.
-     *
-     * EmuCoreV currently renders the game's own IME and routes text through
-     * SDL, so there is no separate Android preview to update. The exact method
-     * signature must still be exposed because the native bridge resolves it
-     * dynamically with GetMethodID.
-     */
+    /** Both sceIme and sceImeDialog need a visible editor, even without a game UI. */
     @Keep
-    @Suppress("UNUSED_PARAMETER")
     fun updateNativeImeState(
         sceImeActive: Boolean,
         dialogActive: Boolean,
@@ -354,11 +361,90 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         caretIndex: Int,
         multiline: Boolean,
         enterLabel: String
-    ) = Unit
+    ) {
+        val snapshot = NativeImeState(sceImeActive, dialogActive, text, preeditStart, preeditLength, caretIndex, multiline, enterLabel)
+        runOnUiThread {
+            if (snapshot.active) nativeImeState = snapshot else clearNativeImeState()
+        }
+    }
 
-    /** Clears the optional Android-side IME snapshot. See [updateNativeImeState]. */
+    /** Invalidates pending retries so a closed dialog cannot reopen the keyboard. */
     @Keep
-    fun clearNativeImeState() = Unit
+    fun clearNativeImeState() {
+        runOnUiThread {
+            nativeImeState = null
+            nativeKeyboardRequested = false
+            useBuiltInKeyboard = false
+            keyboardRequestGeneration++
+            hideSystemKeyboard()
+        }
+    }
+
+    fun requestSystemKeyboard(resetEditor: Boolean = false) {
+        if (!nativeKeyboardRequested || isFinishing || isDestroyed) return
+        useBuiltInKeyboard = false
+        val generation = ++keyboardRequestGeneration
+        val decor = window.decorView
+        // Focus and attachment can arrive after SDL's first showSoftInput call.
+        listOf(0L, 200L, 650L).forEach { delay ->
+            decor.postDelayed({
+                if (generation != keyboardRequestGeneration || !nativeKeyboardRequested ||
+                    isFinishing || isDestroyed || !hasWindowFocus()) return@postDelayed
+                val editor = mTextEdit
+                if (editor == null || !editor.isAttachedToWindow ||
+                    editor.layoutParams.width <= 0 || editor.layoutParams.height <= 0) {
+                    val inputType = InputType.TYPE_CLASS_TEXT or
+                        if (nativeImeState?.multiline == true) InputType.TYPE_TEXT_FLAG_MULTI_LINE else 0
+                    SDLActivity.showTextInput(inputType, 0, 0, 1, 1)
+                } else {
+                    editor.setInputType(InputType.TYPE_CLASS_TEXT or
+                        if (nativeImeState?.multiline == true) InputType.TYPE_TEXT_FLAG_MULTI_LINE else 0)
+                    editor.visibility = View.VISIBLE
+                    editor.requestFocus()
+                    if (resetEditor && delay == 0L) {
+                        (getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.restartInput(editor)
+                    }
+                    WindowInsetsControllerCompat(window, editor).show(WindowInsetsCompat.Type.ime())
+                }
+            }, delay)
+        }
+        decor.postDelayed({
+            if (generation != keyboardRequestGeneration || !nativeKeyboardRequested ||
+                isFinishing || isDestroyed || !hasWindowFocus()) return@postDelayed
+            val visible = ViewCompat.getRootWindowInsets(decor)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            if (!visible) showBuiltInKeyboard()
+        }, 1_100L)
+    }
+
+    fun showBuiltInKeyboard() {
+        if (!nativeKeyboardRequested) return
+        keyboardRequestGeneration++
+        useBuiltInKeyboard = true
+        hideSystemKeyboard()
+    }
+
+    private fun hideSystemKeyboard() {
+        (getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
+            ?.hideSoftInputFromWindow(window.decorView.windowToken, 0)
+        WindowInsetsControllerCompat(window, window.decorView).hide(WindowInsetsCompat.Type.ime())
+    }
+
+    fun completeNativeIme(cancel: Boolean = false): Boolean {
+        val completed = if (cancel) dismissNativeIme() else submitNativeIme()
+        if (completed) clearNativeImeState()
+        return completed
+    }
+
+    override fun onScreenKeyboardSubmit(): Boolean =
+        nativeKeyboardRequested && completeNativeIme()
+
+    override fun onScreenKeyboardReturn(): Boolean =
+        if (nativeKeyboardRequested && nativeImeState?.multiline == true) editNativeIme("\n", 0)
+        else onScreenKeyboardSubmit()
+
+    /** action: 0 insert text, 1 backspace, 2 left, 3 right. */
+    external fun editNativeIme(text: String, action: Int): Boolean
+    external fun submitNativeIme(): Boolean
 
     @Keep
     fun setControllerOverlayScale(scale: Float) {
@@ -470,11 +556,13 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     @Deprecated("Deprecated in Java")
     @SuppressLint("GestureBackNavigation")
     override fun onBackPressed() {
+        if (nativeKeyboardRequested) { onScreenKeyboardFocusLost(); return }
         if (overlayBackHandler?.invoke() == true) return
         super.onBackPressed()
     }
 
     override fun superOnBackPressed() {
+        if (nativeKeyboardRequested) { onScreenKeyboardFocusLost(); return }
         if (overlayBackHandler?.invoke() == true) return
         super.superOnBackPressed()
     }
@@ -484,6 +572,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             event.action == KeyEvent.ACTION_UP &&
             !event.isCanceled
         ) {
+            if (nativeKeyboardRequested) { onScreenKeyboardFocusLost(); return true }
             if (overlayBackHandler?.invoke() == true) return true
         }
         return super.dispatchKeyEvent(event)
@@ -492,8 +581,10 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun onScreenKeyboardFocusLost(): Boolean {
         if (!isNativeImeActive()) return false
 
-        if (dismissNativeIme()) {
+        if (completeNativeIme(cancel = true)) {
             SDLActivity.onNativeKeyboardFocusLost()
+        } else if (!useBuiltInKeyboard) {
+            requestSystemKeyboard()
         }
         // A non-cancelable Vita dialog must keep the Android IME open. Either
         // way, SDL must not independently consume the Back press afterward.
