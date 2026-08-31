@@ -1036,4 +1036,13 @@
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, новые модели серии Snapdragon 7 и 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 и 6 Gen 4</string>
     <string name="game_manager_fifa_compatibility">Для совместимости FIFA автоматически использует Vulkan и Native Buffer. Настройки других игр не меняются.</string>
+    <string name="emulation_ime_done">Готово</string>
+    <string name="emulation_ime_system">Клавиатура Android</string>
+    <string name="emulation_ime_builtin">Встроенная клавиатура</string>
+    <string name="emulation_ime_left">Курсор влево</string>
+    <string name="emulation_ime_right">Курсор вправо</string>
+    <string name="emulation_ime_delete">Удалить символ</string>
+    <string name="emulation_ime_shift">Изменить регистр</string>
+    <string name="emulation_ime_space">Пробел</string>
+    <string name="emulation_ime_newline">Новая строка</string>
 </resources>

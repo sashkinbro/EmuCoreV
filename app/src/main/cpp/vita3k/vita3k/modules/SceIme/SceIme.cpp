@@ -88,7 +88,8 @@ EXPORT(SceInt32, sceImeOpen, SceImeParam *param) {
         emuenv.ime.param.maxTextLength = MAX_SAFE_TEXT_LENGTH;
 
     emuenv.ime.edit_text.str = emuenv.ime.param.inputTextBuffer;
-    emuenv.ime.param.inputTextBuffer = Ptr<SceWChar16>(alloc(emuenv.mem, SCE_IME_MAX_PREEDIT_LENGTH + emuenv.ime.param.maxTextLength + 1, "ime_str"));
+    emuenv.ime.param.inputTextBuffer = Ptr<SceWChar16>(alloc(emuenv.mem,
+        (SCE_IME_MAX_PREEDIT_LENGTH + emuenv.ime.param.maxTextLength + 1) * sizeof(SceWChar16), "ime_str"));
 
     // Safely read initialText: walk the guest buffer up to maxTextLength chars
     // instead of relying on an unbounded reinterpret_cast that may read past

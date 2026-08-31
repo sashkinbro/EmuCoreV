@@ -1,5 +1,6 @@
 #include <config/game_compatibility.h>
 #include <packages/sfo.h>
+#include <ime/functions.h>
 
 #include <cstring>
 #include <iostream>
@@ -83,6 +84,54 @@ int main() {
         check(!is_fifa("", "NotFIFA"), "Do not match an unrelated word");
         check(!is_fifa("", "FIFAworld"), "Do not match an unrelated suffix");
         check(!is_fifa(""), "Global settings must not be overridden");
+        Ime ime{};
+        ime.param.maxTextLength = 6;
+        ime_commit_text(ime, u"Ab");
+        check(ime.str == u"Ab" && ime.edit_text.caretIndex == 2, "IME appends text and moves caret");
+        ime_cursor_left(ime);
+        ime_commit_text(ime, u"X");
+        check(ime.str == u"AXb", "IME inserts at caret");
+        ime_backspace(ime);
+        check(ime.str == u"Ab", "IME removes the preceding character");
+        ime_cursor_right(ime);
+        ime_commit_text(ime, u"123456789");
+        check(ime.str == u"Ab1234", "IME enforces game length limit");
+        ime.param.maxTextLength = 1;
+        ime_commit_text(ime, u"Z");
+        check(ime.str == u"Ab1234", "Reduced game limit must not underflow remaining length");
+        ime_set_preedit(ime, u"Z");
+        check(ime.str == u"Ab1234", "Preedit also respects a reduced length limit");
+        ime.deinit();
+        ime.param.maxTextLength = 8;
+        ime_commit_text(ime, u"A\U0001F600B");
+        ime_cursor_left(ime);
+        check(ime.edit_text.caretIndex == 3, "IME cursor moves before B");
+        ime_cursor_left(ime);
+        check(ime.edit_text.caretIndex == 1, "IME left skips a complete surrogate pair");
+        ime_cursor_right(ime);
+        check(ime.edit_text.caretIndex == 3, "IME right skips a complete surrogate pair");
+        ime_backspace(ime);
+        check(ime.str == u"AB", "IME backspace cannot leave half a surrogate pair");
+        ime.edit_text.caretIndex = 999;
+        ime_commit_text(ime, u"C");
+        check(ime.str == u"ABC", "Out-of-range caret is safely clamped");
+        ime.deinit();
+        ime.param.maxTextLength = 1;
+        ime_commit_text(ime, u"\U0001F600");
+        check(ime.str.empty(), "Length truncation cannot split a surrogate pair");
+        ime_set_preedit(ime, u"\U0001F600");
+        check(ime.str.empty(), "Preedit truncation cannot split a surrogate pair");
+        ime.param.maxTextLength = 8;
+        ime_set_preedit(ime, u"ab");
+        ime_commit_text(ime, u"\u0416");
+        check(ime.str == u"\u0416" && ime.edit_text.preeditLength == 0, "Committing replaces preedit with Unicode text");
+        ime_commit_text(ime, u"\n");
+        check(ime.str == u"\u0416\n", "IME helper accepts multiline text");
+        ime.deinit();
+        ime_backspace(ime);
+        ime_cursor_left(ime);
+        ime_cursor_right(ime);
+        check(ime.str.empty() && ime.edit_text.caretIndex == 0, "Empty IME edits are safe");
         std::cout << checks << " native regression checks passed\n";
         return 0;
     } catch (const std::exception &error) {
