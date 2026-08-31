@@ -15,27 +15,16 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-#include <util/log.h>
+#pragma once
 
-#include <cstdarg>
-#include <cstdio>
+#include <atomic>
 
-// Route VMA's leak report into our log
-#ifndef NDEBUG
-static void vma_debug_log(const char *format, ...) {
-    char buf[1024];
-    va_list args;
-    va_start(args, format);
-    vsnprintf(buf, sizeof(buf), format, args);
-    va_end(args);
-    LOG_ERROR("[VMA] {}", buf);
-}
-#define VMA_DEBUG_LOG_FORMAT(format, ...) vma_debug_log(format, __VA_ARGS__)
-#endif
+namespace mem_diag {
 
-// Build allocator implementations.
-#define VMA_IMPLEMENTATION
-#include <renderer/vulkan/types.h>
+// Process-lifetime mailbox: Android callbacks must not dereference a renderer
+// which the emulation thread may be destroying between game sessions.
+extern std::atomic<int> pending_trim_level;
 
-// Provide storage for the dynamic loader
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+void log_memory_snapshot(const char *tag);
+
+} // namespace mem_diag

@@ -8,6 +8,7 @@ add_library(
 	src/hash.cpp
 	src/instrset_detect.cpp
 	src/logging.cpp
+	src/mem_snapshot.cpp
 	src/net_utils.cpp
 	src/string_utils.cpp
 	src/tracy.cpp

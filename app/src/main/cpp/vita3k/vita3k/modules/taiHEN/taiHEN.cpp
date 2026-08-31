@@ -191,7 +191,7 @@ static Address find_import_stub_in_module(EmuEnvState &emuenv, const char *modul
     }
 
     for (auto it = range.first; it != range.second; ++it) {
-        Address addr = it->second;
+        Address addr = it->second.entry_address;
         // Check if this stub address falls within the module's segments
         for (int seg = 0; seg < MODULE_INFO_NUM_SEGMENTS; seg++) {
             Address seg_start = mod->info.segments[seg].vaddr.address();
@@ -447,7 +447,7 @@ static SceUID create_export_hook(EmuEnvState &emuenv, TaihenState *state, SceUID
     int patched_count = 0;
     auto range = emuenv.kernel.func_binding_infos.equal_range(func_nid);
     for (auto it = range.first; it != range.second; ++it) {
-        Address stub_addr = it->second;
+        Address stub_addr = it->second.entry_address;
         uint32_t *stub = Ptr<uint32_t>(stub_addr).get(emuenv.mem);
         if (!is_svc_stub(stub)) {
             Address current = decode_lle_stub_target(stub);
@@ -731,12 +731,12 @@ EXPORT(int, taiHookRelease, SceUID tai_uid, uint32_t hook_ref) {
             // Re-patch import stubs back to original
             auto range = emuenv.kernel.func_binding_infos.equal_range(hook->func_nid);
             for (auto bi = range.first; bi != range.second; ++bi) {
-                uint32_t *stub = Ptr<uint32_t>(bi->second).get(emuenv.mem);
+                uint32_t *stub = Ptr<uint32_t>(bi->second.entry_address).get(emuenv.mem);
                 if (!is_svc_stub(stub)) {
                     Address current = decode_lle_stub_target(stub);
                     if (current == hook->hook_func) {
                         write_arm_stub(stub, original_addr);
-                        emuenv.kernel.invalidate_jit_cache(bi->second, 12);
+                        emuenv.kernel.invalidate_jit_cache(bi->second.entry_address, 12);
                     }
                 }
             }
@@ -1307,7 +1307,7 @@ static void register_hle_override(EmuEnvState &emuenv, uint32_t nid) {
     // Re-patch any existing import stubs that already point to kubridge's ARM code
     auto range = kernel.func_binding_infos.equal_range(nid);
     for (auto it = range.first; it != range.second; ++it) {
-        auto address = it->second;
+        const Address address = it->second.entry_address;
         uint32_t *caller_stub = Ptr<uint32_t>(address).get(mem);
         caller_stub[0] = encode_arm_inst(INSTRUCTION_MOVW, (uint16_t)stub_addr, 12);
         caller_stub[1] = encode_arm_inst(INSTRUCTION_MOVT, (uint16_t)(stub_addr >> 16), 12);

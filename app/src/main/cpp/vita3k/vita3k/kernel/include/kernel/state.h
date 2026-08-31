@@ -61,6 +61,10 @@ typedef std::map<SceUID, ThreadStatePtr> ThreadStatePtrs;
 typedef std::map<SceUID, SceKernelModulePtr> SceKernelModuleInfoPtrs;
 typedef std::map<SceUID, CallbackPtr> CallbackPtrs;
 typedef unordered_map_fast<uint32_t, Address> ExportNids;
+typedef unordered_map_fast<uint64_t, Address> LibExportNids;
+constexpr uint64_t lib_export_key(uint32_t library_nid, uint32_t nid) {
+    return (static_cast<uint64_t>(library_nid) << 32) | nid;
+}
 
 typedef std::map<Address, uint32_t> NotFoundVars;
 typedef std::function<void(CPUState &cpu, uint32_t nid, SceUID thread_id)> CallImportFunc;
@@ -89,8 +93,13 @@ struct VarBindingInfo {
     uint32_t module_nid;
 };
 
+struct FuncBindingInfo {
+    Address entry_address;
+    uint32_t library_nid;
+};
+
 typedef std::multimap<uint32_t, VarBindingInfo> VarBindingInfos;
-typedef std::multimap<uint32_t, Address> FuncBindingInfos;
+typedef std::multimap<uint32_t, FuncBindingInfo> FuncBindingInfos;
 
 typedef std::map<uint32_t, uint32_t> ModuleUidByNid;
 
@@ -134,6 +143,7 @@ struct KernelState {
     // the variables in this block must be accessed by first locking export_nids_mutex
     std::mutex export_nids_mutex;
     ExportNids export_nids;
+    LibExportNids export_nids_by_lib;
     FuncBindingInfos func_binding_infos;
     std::unordered_map<uint32_t, std::string> nid_libraries;
     VarBindingInfos var_binding_infos;
@@ -184,6 +194,13 @@ struct KernelState {
     void resume_world();
 
     void log_thread_hang_dump();
+    void log_eventflag_history();
+    int try_break_provable_evf_cycle(bool dry_run = false);
+    std::atomic<int64_t> last_world_stop_epoch_ms{ 0 };
+    // Last resort recovery for a full deadlock (called by the hang watchdog)
+    int try_break_frame_sync_deadlock(std::vector<SceUID> &already_nudged);
+
+    std::atomic<uint64_t> thread_wake_counter{ 0 };
 
     // Kill all guest threads and block until they have exited. Must only be called from a host thread.
     void process_exit();

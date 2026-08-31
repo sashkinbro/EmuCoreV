@@ -46,7 +46,7 @@ EmuCoreV currently targets Android with:
 - `minSdk 28`
 - `targetSdk 37`
 - package id `com.sbro.emucorev`
-- version `0.1.6`
+- version `0.2.0` (build `71`)
 - ABI `arm64-v8a`
 
 ## Building Locally

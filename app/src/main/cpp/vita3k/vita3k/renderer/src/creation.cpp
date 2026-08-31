@@ -15,6 +15,8 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <atomic>
+
 #include <gxm/types.h>
 #include <renderer/commands.h>
 #include <renderer/driver_functions.h>
@@ -176,11 +178,54 @@ struct WorldStopScope {
     }
 };
 
+inline constexpr bool DEFER_IDENTICAL_REMAP = true;
+static Address deferred_unmap_addr = 0;
+static std::atomic<bool> g_pending_deferred_unmap{ false };
+
+bool has_pending_deferred_unmap() {
+    return g_pending_deferred_unmap.load(std::memory_order_acquire);
+}
+
+static void note_memory_transition(renderer::State &renderer, const char *kind, Address addr, uint32_t size) {
+    renderer.last_mem_transition_epoch_ms.store(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(), std::memory_order_relaxed);
+    static uint64_t transitions = 0;
+    if (((++transitions) & 1023) == 1)
+        LOG_INFO("[MEMTRANS] transition #{}: {} 0x{:X} size 0x{:X}", transitions, kind, addr, size);
+}
+
+static void flush_deferred_unmap(renderer::State &renderer, MemState &mem, SceUID caller_thread) {
+    if (!deferred_unmap_addr)
+        return;
+    const Address flush_addr = deferred_unmap_addr;
+    deferred_unmap_addr = 0;
+    g_pending_deferred_unmap.store(false, std::memory_order_release);
+    const WorldStopScope world_stop(renderer, mem, caller_thread, flush_addr, 0);
+    if (renderer.current_backend == Backend::Vulkan)
+        dynamic_cast<vulkan::VKState &>(renderer).unmap_memory(mem, Ptr<void>(flush_addr));
+}
+
 COMMAND(handle_memory_map) {
     TRACY_FUNC_COMMANDS(handle_memory_map);
     const Ptr<void> addr = helper.pop<Ptr<void>>();
     const uint32_t size = helper.pop<uint32_t>();
     const SceUID caller_thread = static_cast<SceUID>(helper.pop<uint32_t>());
+
+    note_memory_transition(renderer, "map", addr.address(), size);
+
+    if (DEFER_IDENTICAL_REMAP && renderer.current_backend == Backend::Vulkan && deferred_unmap_addr) {
+        auto &vk = dynamic_cast<vulkan::VKState &>(renderer);
+        const auto ite = vk.mapped_memories.find(addr.address());
+        if (deferred_unmap_addr == addr.address() && ite != vk.mapped_memories.end() && ite->second.size == size) {
+            deferred_unmap_addr = 0;
+            g_pending_deferred_unmap.store(false, std::memory_order_release);
+            static uint64_t revived = 0;
+            if (((++revived) % 1024) == 1)
+                LOG_INFO("[NBCACHE] identical remap collapsed to a no-op ({} so far)", revived);
+            complete_command(renderer, helper, 0);
+            return;
+        }
+        flush_deferred_unmap(renderer, mem, caller_thread);
+    }
 
     {
         const WorldStopScope world_stop(renderer, mem, caller_thread, addr.address(), size);
@@ -199,6 +244,17 @@ COMMAND(handle_memory_unmap) {
     const Ptr<void> addr = helper.pop<Ptr<void>>();
     const SceUID caller_thread = static_cast<SceUID>(helper.pop<uint32_t>());
 
+    note_memory_transition(renderer, "unmap", addr.address(), 0);
+
+    if (DEFER_IDENTICAL_REMAP && renderer.current_backend == Backend::Vulkan
+        && dynamic_cast<vulkan::VKState &>(renderer).mapped_memories.contains(addr.address())) {
+        flush_deferred_unmap(renderer, mem, caller_thread);
+        deferred_unmap_addr = addr.address();
+        g_pending_deferred_unmap.store(true, std::memory_order_release);
+        complete_command(renderer, helper, 0);
+        return;
+    }
+
     {
         const WorldStopScope world_stop(renderer, mem, caller_thread, addr.address(), 0);
 
@@ -207,6 +263,13 @@ COMMAND(handle_memory_unmap) {
         }
     }
 
+    complete_command(renderer, helper, 0);
+}
+
+COMMAND(handle_memory_unmap_flush) {
+    TRACY_FUNC_COMMANDS(handle_memory_unmap_flush);
+    const SceUID caller_thread = static_cast<SceUID>(helper.pop<uint32_t>());
+    flush_deferred_unmap(renderer, mem, caller_thread);
     complete_command(renderer, helper, 0);
 }
 

@@ -169,6 +169,10 @@ void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const Fe
     context.rendered_rect_y0 = INT32_MAX;
     context.rendered_rect_x1 = 0;
     context.rendered_rect_y1 = 0;
+    context.draw_rect_x0 = INT32_MAX;
+    context.draw_rect_y0 = INT32_MAX;
+    context.draw_rect_x1 = 0;
+    context.draw_rect_y1 = 0;
 
     context.render_target = rt;
     context.scene_timestamp++;
@@ -196,10 +200,53 @@ void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const Fe
     }
     context.current_color_format = vk_format;
 
+    rt->width = rt->base_width;
+    rt->height = rt->base_height;
+    bool msaa_expanded = false;
     if (rt->multisample_mode && !context.record.color_surface.downscale) {
         // using MSAA without downscaling, emulate this as best as we can by multiplying the width and height of the render target by 2
         rt->width *= 2;
         rt->height *= 2;
+        msaa_expanded = true;
+    }
+
+    constexpr bool apply_color_surface_downscale = true;
+    context.surface_downscale = 1.0f;
+    if (apply_color_surface_downscale && color_surface_fin != nullptr
+        && context.record.color_surface.downscale && !msaa_expanded
+        && color_surface_fin->width > 0 && color_surface_fin->height > 0) {
+        const float res_multiplier = context.state.res_multiplier;
+        const uint32_t color_width_scaled = static_cast<uint32_t>(color_surface_fin->width * res_multiplier);
+        const uint32_t color_height_scaled = static_cast<uint32_t>(color_surface_fin->height * res_multiplier);
+        if (color_width_scaled > 0 && color_height_scaled > 0
+            && rt->base_width >= color_width_scaled * 2
+            && rt->base_height >= color_height_scaled * 2) {
+            context.surface_downscale = 0.5f;
+            rt->width /= 2;
+            rt->height /= 2;
+            LOG_INFO_ONCE("Colour surface downscale: rendering a {}x{} target at the surface's {}x{} scale "
+                          "(guest {}x{}, res_multiplier {})",
+                rt->base_width, rt->base_height, color_width_scaled, color_height_scaled,
+                color_surface_fin->width, color_surface_fin->height, res_multiplier);
+        }
+    }
+
+    constexpr bool log_gxm_scene_state = false; // ~600 lines/sec - only for guest-state investigations
+    context.gxmscene_viewport_logged = false;
+    if constexpr (log_gxm_scene_state) {
+        const SceGxmColorSurface &cs = context.record.color_surface;
+        const SceGxmDepthStencilSurface &ds = context.record.depth_stencil_surface;
+        LOG_INFO("[GXMSCENE] rt base={}x{} msaa={} -> extent={}x{} expanded={} | color addr=0x{:08X} "
+                 "{}x{} stride={} downscale={} gamma={} disabled={} fmt=0x{:08X} type={} | "
+                 "ds depth=0x{:08X} stencil=0x{:08X} force_load={} force_store={} | res_mult={}",
+            rt->base_width, rt->base_height, static_cast<int>(rt->multisample_mode),
+            rt->width, rt->height, msaa_expanded,
+            cs.data.address(), cs.width, cs.height, cs.strideInPixels,
+            static_cast<uint32_t>(cs.downscale), static_cast<uint32_t>(cs.gamma),
+            static_cast<uint32_t>(cs.disabled), static_cast<uint32_t>(cs.colorFormat),
+            static_cast<int>(cs.surfaceType),
+            ds.depth_data.address(), ds.stencil_data.address(),
+            ds.force_load, ds.force_store, context.state.res_multiplier);
     }
 
     SceGxmDepthStencilSurface *ds_surface_fin = &context.record.depth_stencil_surface;
@@ -549,6 +596,8 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
         current_visibility_buffer->queries_used.assign(current_visibility_buffer->size, false);
     }
 
+    // remember which part of the colour surface this scene's draws could have touched (for write-back bounds)
+    state.surface_cache.note_scene_draw_rect(draw_rect_x0, draw_rect_y0, draw_rect_x1, draw_rect_y1);
     ColorSurfaceCacheInfo *surface_info = nullptr;
     if (state.features.enable_memory_mapping && !state.disable_surface_sync && submit)
         surface_info = state.surface_cache.perform_surface_sync();
@@ -618,8 +667,8 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
             }
         }
 
-        // U2F10F10F10 guest write-back is throttled so run it after the notifications
-        const bool post_sync_after_notifications = surface_info && surface_info->need_post_surface_sync && surface_info->format == SCE_GXM_COLOR_BASE_FORMAT_U2F10F10F10;
+        // U2F10F10F10/SE5M9M9M9 guest write-back is throttled so run it after the notifications
+        const bool post_sync_after_notifications = surface_info && surface_info->need_post_surface_sync && (surface_info->format == SCE_GXM_COLOR_BASE_FORMAT_U2F10F10F10 || surface_info->format == SCE_GXM_COLOR_BASE_FORMAT_SE5M9M9M9);
 
         if (surface_info && surface_info->need_post_surface_sync && !post_sync_after_notifications) {
             state.request_queue.push(PostSurfaceSyncRequest{ surface_info });

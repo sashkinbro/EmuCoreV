@@ -150,6 +150,8 @@ static void check_members(Config &self, const Config &rhs) {
         self.run_app_path = rhs.run_app_path;
     if (rhs.recompile_shader_path.has_value())
         self.recompile_shader_path = rhs.recompile_shader_path;
+    if (rhs.decode_at9_path.has_value())
+        self.decode_at9_path = rhs.decode_at9_path;
     if (rhs.delete_title_id.has_value())
         self.delete_title_id = rhs.delete_title_id;
     if (rhs.pkg_path.has_value())
@@ -355,6 +357,8 @@ ExitCode init_config(Config &cfg, int argc, char **argv, const Root &root_paths,
         ->default_str({})->check(CLI::IsMember(get_file_set(cfg.get_vita_fs_path() / "ux0/app")))->group("Input");
     input->add_option("--recompile-shader,-s", command_line.recompile_shader_path, "Recompile the given PS Vita shader (GXP format) to SPIR_V / GLSL and quit")
         ->default_str({})->group("Input");
+    input->add_option("--decode-at9", command_line.decode_at9_path, "Replay an at9tap dump (v<ptr>_c<config>.at9raw) through the AT9 decoder, print per-superframe peaks and quit")
+        ->default_str({})->group("Input");
     input->add_option("--deleted-id,-d", command_line.delete_title_id, "Title ID of installed app to delete")
         ->default_str({})->check(CLI::IsMember(get_file_set(cfg.get_vita_fs_path() / "ux0/app")))->group("Input");
     input->add_option("--firmware", command_line.pup_path, "Path to the firmware file (.pup extension) to install");
@@ -413,6 +417,10 @@ ExitCode init_config(Config &cfg, int argc, char **argv, const Root &root_paths,
 
     if (command_line.recompile_shader_path.has_value()) {
         cfg.recompile_shader_path = std::move(command_line.recompile_shader_path);
+        return QuitRequested;
+    }
+    if (command_line.decode_at9_path.has_value()) {
+        cfg.decode_at9_path = std::move(command_line.decode_at9_path);
         return QuitRequested;
     }
     if (command_line.delete_title_id.has_value()) {

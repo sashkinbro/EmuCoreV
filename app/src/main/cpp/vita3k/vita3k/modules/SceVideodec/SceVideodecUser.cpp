@@ -228,7 +228,8 @@ EXPORT(int, sceAvcdecDecode, SceAvcdecCtrl *decoder, const SceAvcdecAu *au, SceA
     decoder_info->configure(&options);
     const auto send = decoder_info->send(au->es.pBuf.cast<uint8_t>().get(emuenv.mem), au->es.size);
     decoder_info->set_res(pPicture->frame.frameWidth, pPicture->frame.frameHeight);
-    if (send && decoder_info->receive(output)) {
+    const bool got_frame = send && decoder_info->receive(output);
+    if (got_frame) {
         decoder_info->get_res(pPicture->frame.horizontalSize, pPicture->frame.verticalSize);
         decoder_info->get_pts(pPicture->info.pts.upper, pPicture->info.pts.lower);
         picture->numOfOutput++;
@@ -588,8 +589,8 @@ EXPORT(int, sceVideodecQueryInstanceNongameapp) {
 
 EXPORT(int, sceVideodecQueryMemSize) {
     TRACY_FUNC(sceVideodecQueryMemSize);
-    STUBBED("fake size");
-    return 53;
+    STUBBED("estimated size, real one is unknown");
+    return 0x40000;
 }
 
 EXPORT(int, sceVideodecQueryMemSizeInternal) {

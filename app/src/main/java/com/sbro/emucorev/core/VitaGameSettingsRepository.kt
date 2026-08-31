@@ -38,8 +38,14 @@ class VitaGameSettingsRepository(private val context: Context) {
         val base = globalRepository.ensureDefaultsPersisted()
         if (titleId.isBlank()) return VitaGameSettingsProfile(base, null)
         val file = customConfigFile(titleId)
-        if (!file.exists()) return VitaGameSettingsProfile(base, null)
-        return runCatching { readCustomConfig(file, base) }.getOrDefault(VitaGameSettingsProfile(base, null))
+        val profile = if (file.exists()) {
+            runCatching { readCustomConfig(file, base) }.getOrDefault(VitaGameSettingsProfile(base, null))
+        } else {
+            VitaGameSettingsProfile(base, null)
+        }
+        val title = runCatching { VitaSfoParser.parse(EmulatorStorage.paramSfoPath(context, titleId)).title.orEmpty() }
+            .getOrDefault("")
+        return profile.copy(config = FifaCompatibilityPolicy.apply(profile.config, titleId, title))
     }
 
     fun save(titleId: String, config: VitaCoreConfig) {

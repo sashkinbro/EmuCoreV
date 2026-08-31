@@ -97,6 +97,7 @@ struct VarToReg {
     uint32_t size;
     DataType dtype;
     bool convert_to_float; // is the the an integer that has to be seen as a float?
+    int32_t location = -1; // interface location (diagnostics)
 };
 
 struct TranslationState {
@@ -144,6 +145,7 @@ static spv::Id create_array_if_needed(spv::Builder &b, const spv::Id param_id, c
 static spv::Id get_type_basic(spv::Builder &b, const Input &input) {
     switch (input.type) {
         // clang-format off
+    case DataType::C10:
     case DataType::F16:
     case DataType::F32:
          return b.makeFloatType(32);
@@ -512,7 +514,7 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
 
                 pa_iter_var = b.createBinOp(spv::OpFDiv, v4, pa_iter_var, res_multiplier);
             } else {
-                spv::Decoration precision = get_data_type_size(pa_dtype) < 4 ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
+                spv::Decoration precision = (get_data_type_size(pa_dtype) < 4 && !features.force_full_precision) ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
                 pa_iter_var = b.createVariable(precision, spv::StorageClassInput, pa_iter_type, pa_name.c_str());
                 b.addDecoration(pa_iter_var, spv::DecorationLocation, pa_loc);
 
@@ -525,7 +527,9 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
                     pa_offset,
                     pa_iter_size,
                     pa_dtype,
-                    false });
+                    false,
+                    // 0xD000 (frag coord) is a computed value, not an iterator fed by the vertex
+                    (input_id == 0xD000) ? -1 : static_cast<int32_t>(pa_loc) });
             LOG_DEBUG("Iterator: pa{} = ({}{}) {}", pa_offset, pa_type, num_comp, pa_name);
 
             bool do_coord = false;
@@ -673,6 +677,82 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
             // Size of this extra pa occupied
             // Force this to be PRIVATE
             const auto size = ((descriptor->size >> 6) & 3) + 1;
+
+            constexpr bool derive_query_component_count_from_program = true;
+            const DataType hint_type = tex_query_info.component_type;
+            const uint8_t hint_count = tex_query_info.component_count;
+            const bool program_pins_component_count = ((descriptor->component_info & 0x40) != 0x40);
+
+            const DataType effective_store_type = (store_type == DataType::UNK) ? hint_type : store_type;
+            uint32_t components_per_register = 0;
+            switch (effective_store_type) {
+            case DataType::F32:
+            case DataType::UINT32:
+            case DataType::INT32:
+                components_per_register = 1;
+                break;
+            case DataType::F16:
+            case DataType::UINT16:
+            case DataType::INT16:
+                components_per_register = 2;
+                break;
+            case DataType::UINT8:
+            case DataType::INT8:
+            case DataType::C10:
+                components_per_register = 4;
+                break;
+            default:
+                break;
+            }
+
+            constexpr bool use_derived_query_component_count = true;
+            const char *count_source = " <- from hint";
+            if (derive_query_component_count_from_program && components_per_register != 0) {
+                const uint32_t from_regs = static_cast<uint32_t>(size) * components_per_register;
+                uint8_t derived_count = 0;
+                if (program_pins_component_count && num_component > 0) {
+                    derived_count = static_cast<uint8_t>(std::min(from_regs, num_component));
+                    count_source = " <- from program registers";
+                } else if (hint_count > from_regs) {
+                    derived_count = static_cast<uint8_t>(from_regs);
+                    count_source = " <- hint clamped to program registers";
+                }
+                if (use_derived_query_component_count && derived_count != 0)
+                    tex_query_info.store_component_count = derived_count;
+                else if (derived_count != 0 && derived_count != hint_count)
+                    LOG_WARN("[TEXQUERY] derived count {} differs from hint count {} (NOT applied this build){}",
+                        derived_count, hint_count, count_source);
+            }
+
+            auto dt_name = [](DataType t) -> const char * {
+                switch (t) {
+                case DataType::INT8: return "I8";
+                case DataType::INT16: return "I16";
+                case DataType::INT32: return "I32";
+                case DataType::C10: return "C10";
+                case DataType::F16: return "F16";
+                case DataType::F32: return "F32";
+                case DataType::UINT8: return "U8";
+                case DataType::UINT16: return "U16";
+                case DataType::UINT32: return "U32";
+                case DataType::O8: return "O8";
+                default: return "UNK";
+                }
+            };
+            constexpr bool log_texture_queries = false; // per shader compile; on for sample-layout work
+            if (log_texture_queries)
+                LOG_INFO("[TEXQUERY] {} tex={} sampler={} pa{} regs={} num_component={} pin={} "
+                         "desc(attr=0x{:08X} size=0x{:08X} comp=0x{:08X}) component_type={} store={} | "
+                         "hint fmt=0x{:08X} -> {}x{} | STORING {}x{}{}",
+                    translation_state.is_fragment ? "FRAG" : "VERT", tex_name, sampler_resource_index,
+                    pa_offset, size, num_component, program_pins_component_count,
+                    descriptor->attribute_info, descriptor->size, descriptor->component_info,
+                    component_type, dt_name(store_type),
+                    static_cast<uint32_t>(texture_format), dt_name(hint_type), hint_count,
+                    dt_name(effective_store_type),
+                    tex_query_info.store_component_count ? tex_query_info.store_component_count : hint_count,
+                    count_source);
+
             tex_query_info.dest_offset = pa_offset;
 
             tex_query_info.coord_index = tex_coord_index;
@@ -760,7 +840,7 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
                 target_to_store.type = DataType::F32;
         }
 
-        spv::Decoration precision = get_data_type_size(target_to_store.type) < 4 ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
+        spv::Decoration precision = (get_data_type_size(target_to_store.type) < 4 && !features.force_full_precision) ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
         if (target_to_store.type == DataType::INT16 || target_to_store.type == DataType::UINT16)
             // a F16 cannot hold a INT16 or UINT16
             precision = spv::NoPrecision;
@@ -899,6 +979,8 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
 
         store_source_result();
     }
+
+    parameters.frag_input_pa_regs = pa_offset;
 }
 
 // For uniform buffer resigned in registers
@@ -954,7 +1036,8 @@ static SpirvShaderParameters create_parameters(spv::Builder &b, const SceGxmProg
     spv::Id pa_arr_type = b.makeArrayType(f32_v4_type, b.makeIntConstant(REG_PA_COUNT / 4), 0);
     spv::Id sa_arr_type = b.makeArrayType(f32_v4_type, b.makeIntConstant(REG_SA_COUNT / 4), 0);
     spv::Id i_arr_type = b.makeArrayType(f32_v4_type, b.makeIntConstant(REG_I_COUNT / 4), 0);
-    spv::Id temp_arr_type = b.makeArrayType(f32_v4_type, b.makeIntConstant(REG_TEMP_COUNT / 4), 0);
+    const int temp_reg_words = std::min(512, std::max<int>(REG_TEMP_COUNT, (static_cast<int>(program.temp_reg_count1) + 3) & ~3));
+    spv::Id temp_arr_type = b.makeArrayType(f32_v4_type, b.makeIntConstant(temp_reg_words / 4), 0);
     spv::Id index_arr_type = b.makeArrayType(i32_type, b.makeIntConstant(REG_INDEX_COUNT / 4), 0);
     spv::Id pred_arr_type = b.makeArrayType(b_type, b.makeIntConstant(REG_PRED_COUNT / 4), 0);
     spv::Id o_arr_type = b.makeArrayType(f32_v4_type, b.makeIntConstant(REG_O_COUNT / 4), 0);
@@ -1124,7 +1207,7 @@ static SpirvShaderParameters create_parameters(spv::Builder &b, const SceGxmProg
     }
 
     if (program_type == SceGxmProgramType::Fragment) {
-        std::vector<spv::Id> uniform_composition = { f32, f32, f32, f32, f32, f32, f32, f32, f32 };
+        std::vector<spv::Id> uniform_composition = { f32, f32, f32, f32, f32, f32, f32, f32, f32, f32, f32 };
         if (uniform_buffer_count > 0)
             uniform_composition.push_back(buffer_addresses_type);
         if (uniform_texture_count > 0) {
@@ -1152,6 +1235,8 @@ static SpirvShaderParameters create_parameters(spv::Builder &b, const SceGxmProg
         ADD_FRAG_UNIFORM_MEMBER(cast_phase_mask);
         ADD_FRAG_UNIFORM_MEMBER(inv_frag_width);
         ADD_FRAG_UNIFORM_MEMBER(inv_frag_height);
+        ADD_FRAG_UNIFORM_MEMBER(raw_cast_mask);
+        ADD_FRAG_UNIFORM_MEMBER(iterator_written_mask);
 
 #undef ADD_FRAG_UNIFORM_MEMBER
         // the resolution multiplier does not require a high precision
@@ -1293,6 +1378,7 @@ static SpirvShaderParameters create_parameters(spv::Builder &b, const SceGxmProg
         }
 
         var_to_reg.var = var;
+        var_to_reg.location = location;
         translation_state.var_to_regs.push_back(var_to_reg);
 
         switch (semantic) {
@@ -1552,7 +1638,7 @@ static spv::Function *make_frag_finalize_function(spv::Builder &b, const SpirvSh
             color_val_operand.type = DataType::F32;
     }
 
-    spv::Decoration precision = get_data_type_size(color_val_operand.type) < 4 ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
+    spv::Decoration precision = (get_data_type_size(color_val_operand.type) < 4 && !features.force_full_precision) ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
     if (color_val_operand.type == DataType::INT16 || color_val_operand.type == DataType::UINT16)
         // a F16 cannot hold a INT16 or UINT16
         precision = spv::NoPrecision;
@@ -1793,12 +1879,11 @@ static spv::Function *make_vert_finalize_function(spv::Builder &b, const SpirvSh
 
                 b.createStore(o_val2, out_var);
 
-                // Note: Depth range and user clip planes are ineffective in this mode
-                // However, that can't be directly translated, so we just gonna set it to w here
                 spv::Id z_ref = utils::create_access_chain(b, spv::StorageClassOutput, out_var, { b.makeIntConstant(2) });
                 spv::Id w_ref = utils::create_access_chain(b, spv::StorageClassOutput, out_var, { b.makeIntConstant(3) });
 
-                b.createStore(b.createLoad(w_ref, spv::NoPrecision), z_ref);
+                if (!translation_state.is_vulkan)
+                    b.createStore(b.createLoad(w_ref, spv::NoPrecision), z_ref);
 
                 cond_builder.makeBeginElse();
 
@@ -2042,9 +2127,28 @@ static SpirvCode convert_gxp_to_spirv_impl(const SceGxmProgram &program, const s
             end_hook_func = make_vert_finalize_function(b, parameters, program, utils, features, translation_state);
         }
 
+        // DOA5 black clothes root cause
+        spv::Id iterator_mask_u = spv::NoResult;
+        if (program.is_fragment() && translation_state.render_info_id != spv::NoResult) {
+            const spv::Id mask_ptr = utils::create_access_chain(b, spv::StorageClassUniform, translation_state.render_info_id, { b.makeIntConstant(FRAG_UNIFORM_iterator_written_mask) });
+            iterator_mask_u = b.createUnaryOp(spv::OpConvertFToU, b.makeUintType(32), b.createLoad(mask_ptr, spv::NoPrecision));
+        }
         for (auto &var_to_reg : translation_state.var_to_regs) {
-            create_input_variable(b, parameters, utils, features, translation_state, "", var_to_reg.pa ? RegisterBank::PRIMATTR : RegisterBank::SECATTR,
-                var_to_reg.offset, spv::NoResult, var_to_reg.size, var_to_reg.var, var_to_reg.dtype, var_to_reg.convert_to_float);
+            spv::Id source = var_to_reg.var;
+            if (program.is_fragment() && iterator_mask_u != spv::NoResult && var_to_reg.location >= 0 && var_to_reg.location < 24) {
+                const spv::Id u32 = b.makeUintType(32);
+                const spv::Id f32 = b.makeFloatType(32);
+                const spv::Id v4 = b.makeVectorType(f32, 4);
+                const spv::Id bool_t = b.makeBoolType();
+                const spv::Id loaded = b.createLoad(var_to_reg.var, spv::NoPrecision);
+                const spv::Id bit = b.createBinOp(spv::OpBitwiseAnd, u32, iterator_mask_u, b.makeUintConstant(1u << var_to_reg.location));
+                const spv::Id written = b.createBinOp(spv::OpINotEqual, bool_t, bit, b.makeUintConstant(0));
+                const spv::Id written_v4 = b.createCompositeConstruct(b.makeVectorType(bool_t, 4), { written, written, written, written });
+                const spv::Id zero_c = b.makeFloatConstant(0.0f);
+                const spv::Id fallback = b.makeCompositeConstant(v4, { zero_c, zero_c, zero_c, b.makeFloatConstant(1.0f) });
+                source = b.createTriOp(spv::OpSelect, v4, written_v4, loaded, fallback);
+            }
+            create_input_variable(b, parameters, utils, features, translation_state, "", var_to_reg.pa ? RegisterBank::PRIMATTR : RegisterBank::SECATTR, var_to_reg.offset, spv::NoResult, var_to_reg.size, source, var_to_reg.dtype, var_to_reg.convert_to_float);
         }
 
         // Initialize vertex output to 0
@@ -2199,6 +2303,32 @@ GeneratedShader convert_gxp(const SceGxmProgram &program, const std::string &sha
     GeneratedShader shader{};
     shader.spirv = convert_gxp_to_spirv_impl(program, shader_hash, features, translation_state, force_shader_debug, dumper);
 
+    constexpr bool strip_relaxed_precision = false;
+    if (strip_relaxed_precision && !shader.spirv.empty() && shader.spirv.size() > 5) {
+        constexpr uint32_t OpDecorate = 71, OpMemberDecorate = 72, DecorationRelaxedPrecision = 0;
+        std::vector<uint32_t> filtered;
+        filtered.reserve(shader.spirv.size());
+        filtered.insert(filtered.end(), shader.spirv.begin(), shader.spirv.begin() + 5);
+        size_t i = 5, stripped = 0;
+        while (i < shader.spirv.size()) {
+            const uint32_t word_count = shader.spirv[i] >> 16;
+            const uint32_t opcode = shader.spirv[i] & 0xFFFF;
+            if (word_count == 0 || i + word_count > shader.spirv.size())
+                break; // malformed so keep the rest untouched
+            const bool is_relaxed = (opcode == OpDecorate && word_count >= 3 && shader.spirv[i + 2] == DecorationRelaxedPrecision)
+                || (opcode == OpMemberDecorate && word_count >= 4 && shader.spirv[i + 3] == DecorationRelaxedPrecision);
+            if (is_relaxed)
+                stripped++;
+            else
+                filtered.insert(filtered.end(), shader.spirv.begin() + i, shader.spirv.begin() + i + word_count);
+            i += word_count;
+        }
+        if (stripped > 0) {
+            LOG_INFO("[PRECISION] stripped {} RelaxedPrecision decorations from {}", stripped, shader_hash);
+            shader.spirv = std::move(filtered);
+        }
+    }
+
     if (translation_state.is_target_glsl) {
         // also generate the glsl file
         // this destroys shader.spirv
@@ -2240,6 +2370,22 @@ void convert_gxp_to_glsl_from_filepath(const std::string &shader_filepath_utf8) 
     std::fill_n(hints.fragment_textures, SCE_GXM_MAX_TEXTURE_UNITS, SCE_GXM_TEXTURE_FORMAT_U8U8U8U8_ABGR);
 
     convert_gxp(*reinterpret_cast<SceGxmProgram *>(gxp_program.data()), shader_filepath_str.filename().string(), features, shader::Target::GLSLOpenGL, hints, false, true);
+
+    FeatureState vk_features = features;
+    vk_features.enable_memory_mapping = true;
+    const GeneratedShader vk_shader = convert_gxp(*reinterpret_cast<SceGxmProgram *>(gxp_program.data()), shader_filepath_str.filename().string(), vk_features, shader::Target::SpirVVulkan, hints, false, false);
+    if (!vk_shader.spirv.empty()) {
+        fs::path spv_path = shader_filepath_str;
+        spv_path.replace_extension(".vk.spv");
+        fs::ofstream spv_file(spv_path, std::ios::binary);
+        if (spv_file) {
+            spv_file.write(reinterpret_cast<const char *>(vk_shader.spirv.data()), static_cast<std::streamsize>(vk_shader.spirv.size() * sizeof(uint32_t)));
+            spv_file.close();
+            LOG_INFO("Wrote Vulkan SPIR-V to {} ({} words) - check it with: spirv-val --target-env vulkan1.1 <file>", spv_path.string(), vk_shader.spirv.size());
+        } else {
+            LOG_ERROR("Could not write {}", spv_path.string());
+        }
+    }
 }
 
 } // namespace shader

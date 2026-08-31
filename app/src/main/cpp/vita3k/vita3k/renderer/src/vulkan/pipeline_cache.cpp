@@ -31,8 +31,11 @@
 #include <util/hash.h>
 #include <util/log.h>
 
+#include <array>
 #include <bit>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 
 #include <SDL3/SDL_cpuinfo.h>
 
@@ -1420,6 +1423,40 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
     // update the shader hints
     context.shader_hints.color_format = record.color_surface.colorFormat;
     context.shader_hints.attributes = &vertex_program_gxm.attributes;
+
+    constexpr bool log_texture_hint_changes = false; // costs a mutex + map lookup per draw
+    if constexpr (log_texture_hint_changes) {
+        static std::mutex texhint_mutex;
+        static std::unordered_map<const SceGxmProgram *, std::array<SceGxmTextureFormat, SCE_GXM_MAX_TEXTURE_UNITS>> texhint_seen;
+        static uint32_t texhint_stale_count = 0;
+        std::array<SceGxmTextureFormat, SCE_GXM_MAX_TEXTURE_UNITS> now{};
+        for (uint32_t i = 0; i < SCE_GXM_MAX_TEXTURE_UNITS; i++)
+            now[i] = context.shader_hints.fragment_textures[i];
+
+        std::lock_guard<std::mutex> texhint_lock(texhint_mutex);
+        auto [texhint_it, texhint_inserted] = texhint_seen.try_emplace(gxm_fragment_shader, now);
+        if (texhint_inserted) {
+            std::string fmts;
+            for (uint32_t i = 0; i < SCE_GXM_MAX_TEXTURE_UNITS; i++)
+                fmts += fmt::format(" [{}]=0x{:08X}", i, static_cast<uint32_t>(now[i]));
+            LOG_INFO("[TEXHINT] first draw of fragment program {}:{}", fmt::ptr(gxm_fragment_shader), fmts);
+        } else if (texhint_it->second != now) {
+            texhint_stale_count++;
+            if (texhint_stale_count <= 500) {
+                std::string diff;
+                for (uint32_t i = 0; i < SCE_GXM_MAX_TEXTURE_UNITS; i++)
+                    if (texhint_it->second[i] != now[i])
+                        diff += fmt::format(" [{}] 0x{:08X} -> 0x{:08X}", i,
+                            static_cast<uint32_t>(texhint_it->second[i]), static_cast<uint32_t>(now[i]));
+                LOG_WARN("[TEXHINT] STALE #{}: fragment program {} is being drawn with texture formats "
+                         "different from the ones its cached shader was generated for:{}",
+                    texhint_stale_count, fmt::ptr(gxm_fragment_shader), diff);
+                if (texhint_stale_count == 500)
+                    LOG_WARN("[TEXHINT] (further STALE lines suppressed)");
+            }
+            texhint_it->second = now;
+        }
+    }
 
     // note: the flag can_use_deferred_compilation is not considered here because it causes way too many false positives
     const bool compile_pipeline_async = !already_in_cache && consider_for_async && use_async_compilation;

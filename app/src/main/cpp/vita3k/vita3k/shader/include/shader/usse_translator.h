@@ -119,6 +119,11 @@ public:
         reset_repeat_increase();
     }
 
+    void seed_entry_populated_pa(std::uint32_t reg_count) {
+        for (std::uint32_t r = 0; r < reg_count; r++)
+            m_vpck_written_bytes[(static_cast<std::uint32_t>(RegisterBank::PRIMATTR) << 24) | (r & 0xFFFFFF)] = 0xF;
+    }
+
 private:
     //
     // Translation helpers
@@ -197,6 +202,7 @@ private:
 
     bool m_second_program{ false };
 
+    // per 32-bit register word - a mask of bytes a VPCK has written (a f16 lane covers 2 bytes, u8 lane 1)
     std::map<uint32_t, std::uint8_t> m_vpck_written_bytes;
     bool m_store_from_vpck{ false };
 

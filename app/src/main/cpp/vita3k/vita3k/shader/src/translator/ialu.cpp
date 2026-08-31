@@ -562,9 +562,20 @@ bool USSETranslatorVisitor::i32mad2(
         inst.opr.src2.flags |= RegisterFlags::Negative;
     }
 
-    spv::Id vsrc0 = load(inst.opr.src0, 0b1, 0);
-    spv::Id vsrc1 = load(inst.opr.src1, 0b1, 0);
-    spv::Id vsrc2 = load(inst.opr.src2, 0b1, 0);
+    // SMLSI repeat slots: src0/src1/src2/dest are indices 0/1/2/3 in repeat_increase.
+    inst.opr.src0.index = 0;
+    inst.opr.src1.index = 1;
+    inst.opr.src2.index = 2;
+    inst.opr.dest.index = 3;
+
+    set_repeat_multiplier(1, 1, 1, 1);
+
+    BEGIN_REPEAT(count)
+    GET_REPEAT(inst, RepeatMode::SLMSI);
+
+    spv::Id vsrc0 = load(inst.opr.src0, 0b1, src0_repeat_offset);
+    spv::Id vsrc1 = load(inst.opr.src1, 0b1, src1_repeat_offset);
+    spv::Id vsrc2 = load(inst.opr.src2, 0b1, src2_repeat_offset);
 
     auto mul_result = m_b.createBinOp(spv::OpIMul, m_b.getTypeId(vsrc0), vsrc0, vsrc1);
     auto add_result = m_b.createBinOp(spv::OpIAdd, m_b.getTypeId(mul_result), mul_result, vsrc2);
@@ -576,13 +587,17 @@ bool USSETranslatorVisitor::i32mad2(
     // - pa = x * y + z (sn = 1) => crash
     // TODO: properly implement this when we get more powerful fuzzer that can handle fpinternal.
     if (sn == 0) {
-        store(inst.opr.dest, add_result, 0b1, 0);
+        store(inst.opr.dest, add_result, 0b1, dest_repeat_offset);
     } else {
-        store(inst.opr.dest, vsrc2, 0b1, 0);
+        store(inst.opr.dest, vsrc2, 0b1, dest_repeat_offset);
     }
 
-    LOG_DISASM("{:016x}: {}{} {} {} {} {} [sn={}]", m_instr, disasm::e_predicate_str(pred), "IMAD", disasm::operand_to_str(inst.opr.dest, 0b1),
-        disasm::operand_to_str(inst.opr.src0, 0b1), disasm::operand_to_str(inst.opr.src1, 0b1), disasm::operand_to_str(inst.opr.src2, 0b1), sn);
+    LOG_DISASM("{:016x}: {}{} {} {} {} {} [sn={} rpt={}]", m_instr, disasm::e_predicate_str(pred), "IMAD", disasm::operand_to_str(inst.opr.dest, 0b1, dest_repeat_offset),
+        disasm::operand_to_str(inst.opr.src0, 0b1, src0_repeat_offset), disasm::operand_to_str(inst.opr.src1, 0b1, src1_repeat_offset), disasm::operand_to_str(inst.opr.src2, 0b1, src2_repeat_offset), sn, current_repeat);
+
+    END_REPEAT();
+
+    reset_repeat_multiplier();
 
     return true;
 }

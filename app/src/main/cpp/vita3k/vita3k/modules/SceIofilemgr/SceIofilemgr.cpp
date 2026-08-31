@@ -19,8 +19,11 @@
 
 #include <cpu/functions.h>
 #include <io/functions.h>
+#include <kernel/state.h>
 #include <kernel/thread/thread_state.h>
 #include <kernel/types.h>
+
+#include <string_view>
 
 #include <chrono>
 #include <thread>
@@ -131,8 +134,20 @@ EXPORT(int, _sceIoOpenAsync) {
     return UNIMPLEMENTED();
 }
 
+// guest call stack for reads of one filename
+static constexpr const char *watched_read_file_fragment = nullptr;
+
 EXPORT(SceSSize, _sceIoPread, SceUID fd, void *buf, SceSize nbyte, SceOff offset) {
     TRACY_FUNC(_sceIoPread, fd, buf, nbyte, offset);
+    if (watched_read_file_fragment && *watched_read_file_fragment) {
+        const auto file = emuenv.io.std_files.find(fd);
+        if (file != emuenv.io.std_files.end() && std::string_view(file->second.get_vita_loc()).find(watched_read_file_fragment) != std::string_view::npos) {
+            const ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
+            LOG_ERROR("[CUESTACK] pread {} off={} size={} thread='{}' guest stack:\n{}",
+                watched_read_file_fragment, offset, nbyte, thread ? thread->name : "?",
+                thread ? thread->log_stack_traceback() : std::string("?"));
+        }
+    }
     return read_file_at(buf, emuenv.io, fd, nbyte, offset, export_name);
 }
 

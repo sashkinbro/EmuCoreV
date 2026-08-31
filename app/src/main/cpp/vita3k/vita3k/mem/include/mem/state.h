@@ -68,6 +68,8 @@ struct MemState {
     std::mutex protect_mutex;
 
     uint32_t host_page_size = 0;
+    // keep freed guest pages committed instead of decommitting
+    bool preserve_freed_pages = false;
     Memory memory;
     AllocPageTable alloc_table;
     BitmapAllocator allocator;

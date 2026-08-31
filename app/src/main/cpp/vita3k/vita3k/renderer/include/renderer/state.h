@@ -119,6 +119,9 @@ struct State {
     uint32_t shaders_count_compiled = 0;
     uint32_t programs_count_pre_compiled = 0;
 
+    std::atomic<uint64_t> progress_counter{ 0 };
+    std::atomic<int64_t> last_mem_transition_epoch_ms{ 0 };
+
     bool should_display;
 
     std::atomic<bool> async_flip_requested{ false };
