@@ -84,6 +84,7 @@ EmuCoreV currently targets Android with:
 - Firmware files, licenses, keys, and game content are not distributed with this repository.
 - Use only your own legally obtained firmware and game dumps.
 - Compatibility data shown in the catalog and detail screens is derived from Vita3K's public compatibility data.
+- Releases marked as "parallel" are identical to the primary build but use an alternate package ID to allow side-by-side installation.
 
 ## Credits
 
