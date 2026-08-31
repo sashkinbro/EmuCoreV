@@ -1033,4 +1033,13 @@
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, aktuelle Snapdragon-7-Serie und 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 und 6 Gen 4</string>
     <string name="game_manager_fifa_compatibility">FIFA verwendet automatisch Vulkan und Native Buffer für bessere Kompatibilität. Die Einstellungen anderer Spiele bleiben unverändert.</string>
+    <string name="emulation_ime_done">Fertig</string>
+    <string name="emulation_ime_system">Android-Tastatur</string>
+    <string name="emulation_ime_builtin">Integrierte Tastatur</string>
+    <string name="emulation_ime_left">Cursor nach links</string>
+    <string name="emulation_ime_right">Cursor nach rechts</string>
+    <string name="emulation_ime_delete">Zeichen löschen</string>
+    <string name="emulation_ime_shift">Groß-/Kleinschreibung</string>
+    <string name="emulation_ime_space">Leertaste</string>
+    <string name="emulation_ime_newline">Neue Zeile</string>
 </resources>

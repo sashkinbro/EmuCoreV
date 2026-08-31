@@ -23,5 +23,9 @@ class EmulatorImeContractTest {
             String::class.java
         )
         activityClass.getDeclaredMethod("clearNativeImeState")
+        activityClass.getDeclaredMethod("editNativeIme", String::class.java, Int::class.javaPrimitiveType)
+        activityClass.getDeclaredMethod("submitNativeIme")
+        activityClass.getDeclaredMethod("onScreenKeyboardSubmit")
+        activityClass.getDeclaredMethod("onScreenKeyboardReturn")
     }
 }

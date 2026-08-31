@@ -5,21 +5,38 @@ import android.text.Editable
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.BaseInputConnection
+import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 
 class SDLInputConnection(targetView: View, fullEditor: Boolean) : BaseInputConnection(targetView, fullEditor) {
     private val editText = EditText(SDL.getContext())
     private var committedText = ""
+    private var handledReturnDown = false
 
     override fun getEditable(): Editable {
         return editText.editableText
     }
 
     override fun sendKeyEvent(event: KeyEvent): Boolean {
-        if (event.keyCode == KeyEvent.KEYCODE_ENTER && SDLActivity.onNativeSoftReturnKey()) {
-            return true
+        if (event.keyCode == KeyEvent.KEYCODE_ENTER) {
+            if (event.action == KeyEvent.ACTION_DOWN && SDLActivity.mSingleton?.onScreenKeyboardReturn() == true) {
+                handledReturnDown = true
+                return true
+            }
+            if (event.action == KeyEvent.ACTION_UP && handledReturnDown) {
+                handledReturnDown = false
+                return true
+            }
+            if (SDLActivity.onNativeSoftReturnKey()) return true
         }
         return super.sendKeyEvent(event)
+    }
+
+    override fun performEditorAction(editorAction: Int): Boolean {
+        if (editorAction in listOf(EditorInfo.IME_ACTION_DONE, EditorInfo.IME_ACTION_GO,
+                EditorInfo.IME_ACTION_SEND, EditorInfo.IME_ACTION_SEARCH) &&
+            SDLActivity.mSingleton?.onScreenKeyboardSubmit() == true) return true
+        return super.performEditorAction(editorAction)
     }
 
     override fun commitText(text: CharSequence, newCursorPosition: Int): Boolean {
@@ -76,14 +93,17 @@ class SDLInputConnection(targetView: View, fullEditor: Boolean) : BaseInputConne
 
         if (matchLength < text.length) {
             val pendingText = text.substring(matchLength)
+            if (pendingText == "\n" && SDLActivity.mSingleton?.onScreenKeyboardReturn() == true) {
+                committedText = text
+                return
+            }
             if (!SDLActivity.dispatchingKeyEvent()) {
                 var pendingOffset = 0
                 while (pendingOffset < pendingText.length) {
                     val codePoint = pendingText.codePointAt(pendingOffset)
-                    if (codePoint == '\n'.code && SDLActivity.onNativeSoftReturnKey()) {
-                        return
-                    }
-                    if (codePoint in 1..127) {
+                    // A pasted newline is text, not Enter: generating a scancode
+                    // here would submit before nativeCommitText queues the paste.
+                    if (codePoint in 1..127 && codePoint != '\n'.code && codePoint != '\r'.code) {
                         nativeGenerateScancodeForUnichar(codePoint.toChar())
                     }
                     pendingOffset += Character.charCount(codePoint)

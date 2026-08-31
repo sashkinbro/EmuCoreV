@@ -1037,4 +1037,13 @@
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: ‏Snapdragon 8 Gen 1/2/3 و8s Gen 3 وطرازات Snapdragon 7 الحديثة و6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: ‏Snapdragon 8 Elite Gen 5 و8 Gen 5 و8 Elite و8s Gen 4 و6 Gen 4</string>
     <string name="game_manager_fifa_compatibility">تستخدم FIFA تلقائيًا Vulkan وNative Buffer للتوافق. لا تتغير إعدادات الألعاب الأخرى.</string>
+    <string name="emulation_ime_done">تم</string>
+    <string name="emulation_ime_system">لوحة مفاتيح Android</string>
+    <string name="emulation_ime_builtin">لوحة مفاتيح مدمجة</string>
+    <string name="emulation_ime_left">تحريك المؤشر لليسار</string>
+    <string name="emulation_ime_right">تحريك المؤشر لليمين</string>
+    <string name="emulation_ime_delete">حذف حرف</string>
+    <string name="emulation_ime_shift">تغيير حالة الأحرف</string>
+    <string name="emulation_ime_space">مسافة</string>
+    <string name="emulation_ime_newline">سطر جديد</string>
 </resources>

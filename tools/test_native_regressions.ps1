@@ -8,11 +8,12 @@ $buildTools = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.
 if (!$buildTools) { throw 'Visual Studio C++ toolchain was not found.' }
 $vcvars = Join-Path $buildTools 'VC/Auxiliary/Build/vcvars64.bat'
 New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
-$includes = @('vita3k/config/include', 'vita3k/packages/include', 'vita3k/io/include', 'vita3k/util/include', 'external/boost', 'external/fmt/include', 'external/spdlog/include')
+$includes = @('vita3k/config/include', 'vita3k/packages/include', 'vita3k/ime/include', 'vita3k/mem/include', 'vita3k/io/include', 'vita3k/util/include', 'external/boost', 'external/fmt/include', 'external/spdlog/include')
 $includeArgs = ($includes | ForEach-Object { '/I"' + (Join-Path $vendor $_) + '"' }) -join ' '
 $testSource = Join-Path $PSScriptRoot 'tests/native_core_regressions.cpp'
 $sfoSource = Join-Path $vendor 'vita3k/packages/src/sfo.cpp'
-$compileCommand = 'call "' + $vcvars + '" >nul && cl.exe /nologo /std:c++20 /EHsc /utf-8 /Zc:__cplusplus /DFMT_HEADER_ONLY /DSPDLOG_FMT_EXTERNAL /DBOOST_ALL_NO_LIB ' + $includeArgs + ' "' + $testSource + '" "' + $sfoSource + '" /Fe:native_core_regressions.exe'
+$imeSource = Join-Path $vendor 'vita3k/ime/src/ime.cpp'
+$compileCommand = 'call "' + $vcvars + '" >nul && cl.exe /nologo /std:c++20 /EHsc /utf-8 /Zc:__cplusplus /DFMT_HEADER_ONLY /DSPDLOG_FMT_EXTERNAL /DBOOST_ALL_NO_LIB ' + $includeArgs + ' "' + $testSource + '" "' + $sfoSource + '" "' + $imeSource + '" /Fe:native_core_regressions.exe'
 Push-Location $outputDir
 try {
     & cmd.exe /d /s /c $compileCommand

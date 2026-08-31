@@ -1200,6 +1200,10 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
      */
     open fun onScreenKeyboardFocusLost(): Boolean = false
 
+    /** Lets the emulator deliver Enter to the Vita service before hiding the IME. */
+    open fun onScreenKeyboardSubmit(): Boolean = false
+    open fun onScreenKeyboardReturn(): Boolean = onScreenKeyboardSubmit()
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (mBrokenLibraries) {
             return false

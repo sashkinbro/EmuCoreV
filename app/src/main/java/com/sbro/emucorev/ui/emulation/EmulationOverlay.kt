@@ -136,8 +136,9 @@ fun EmulationOverlayHost(
             ?: gameId
     }
     val hasPhysicalGamepad = activity.hasPhysicalGamepad
-    val touchControlsActive = controlsEditMode || config.enableGamepadOverlay
-    val showTouchControls = !menuOpen &&
+    val nativeImeActive = activity.nativeKeyboardRequested && activity.nativeImeState?.active == true
+    val touchControlsActive = !nativeImeActive && (controlsEditMode || config.enableGamepadOverlay)
+    val showTouchControls = !nativeImeActive && !menuOpen &&
         (
             controlsEditMode ||
                 (
@@ -209,6 +210,7 @@ fun EmulationOverlayHost(
     DisposableEffect(
         lifecycleOwner,
         effectivePaused,
+        nativeImeActive,
         config.gyroMode,
         config.gyroSensitivity,
         config.gyroSmoothing,
@@ -216,7 +218,7 @@ fun EmulationOverlayHost(
         config.gyroInvertY
     ) {
         fun startGyroscope() {
-            if (!effectivePaused && config.gyroMode != VitaCoreConfig.GYRO_MODE_OFF) {
+            if (!effectivePaused && !nativeImeActive && config.gyroMode != VitaCoreConfig.GYRO_MODE_OFF) {
                 gyroController.start(
                     mode = config.gyroMode,
                     sensitivityPercent = config.gyroSensitivity,
@@ -246,6 +248,15 @@ fun EmulationOverlayHost(
 
     LaunchedEffect(effectivePaused) {
         activity.setMenuPaused(effectivePaused)
+    }
+
+    LaunchedEffect(nativeImeActive) {
+        if (nativeImeActive) {
+            menuOpen = false
+            controlsEditMode = false
+            userPaused = false // Vita must keep running to consume text/Enter callbacks.
+            overlayBridge.setIsInEditMode(false)
+        }
     }
 
     LaunchedEffect(touchControlsActive) {
@@ -444,7 +455,7 @@ fun EmulationOverlayHost(
         )
 
         AnimatedVisibility(
-            visible = !controlsEditMode && menuButtonVisible,
+            visible = !nativeImeActive && !controlsEditMode && menuButtonVisible,
             enter = fadeIn(tween(180)),
             exit = fadeOut(tween(140)),
             modifier = Modifier.align(Alignment.TopCenter)
@@ -497,6 +508,8 @@ fun EmulationOverlayHost(
                 callbacks = menuCallbacks
             )
         }
+
+        NativeImeOverlay(activity)
 
         if (exitDialogVisible) {
             AlertDialog(
