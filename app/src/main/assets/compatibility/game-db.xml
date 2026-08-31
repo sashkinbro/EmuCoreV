@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Recommendations only: global defaults -> Game DB -> explicit per-game settings.
+     Shared by the Android settings UI and the native core. Never select a driver here. -->
+<game-db version="1">
+    <profile id="fifa-native-buffer" title-word="FIFA">
+        <!-- FIFA Football/Soccer, demos, FIFA 13/14/15 and mods retaining these IDs.
+             Source: https://github.com/Vita3K/compatibility/issues?q=FIFA -->
+        <title-id>PCSB00051</title-id>
+        <title-id>PCSB00052</title-id>
+        <title-id>PCSG00039</title-id>
+        <title-id>PCSB00082</title-id>
+        <title-id>PCSB00083</title-id>
+        <title-id>PCSB00084</title-id>
+        <title-id>PCSB00085</title-id>
+        <title-id>PCSB00086</title-id>
+        <title-id>PCSE00055</title-id>
+        <title-id>PCSE00059</title-id>
+        <title-id>PCSE00060</title-id>
+        <title-id>PCSG90012</title-id>
+        <title-id>PCSB00170</title-id>
+        <title-id>PCSB00171</title-id>
+        <title-id>PCSB00174</title-id>
+        <title-id>PCSE00093</title-id>
+        <title-id>PCSE00096</title-id>
+        <title-id>PCSG00107</title-id>
+        <title-id>PCSB00339</title-id>
+        <title-id>PCSB00340</title-id>
+        <title-id>PCSE00263</title-id>
+        <title-id>PCSG00201</title-id>
+        <title-id>PCSB00603</title-id>
+        <title-id>PCSB00604</title-id>
+        <title-id>PCSB00605</title-id>
+        <title-id>PCSB00606</title-id>
+        <title-id>PCSB00607</title-id>
+        <title-id>PCSE00481</title-id>
+        <title-id>PCSE00482</title-id>
+        <title-id>PCSE00483</title-id>
+        <title-id>PCSG00404</title-id>
+        <gpu backend-renderer="Vulkan" memory-mapping="native-buffer" use-angle="false" />
+    </profile>
+</game-db>

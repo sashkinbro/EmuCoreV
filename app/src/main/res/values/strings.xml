@@ -1039,7 +1039,7 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 and many Snapdragon 6/7 series</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, recent Snapdragon 7 series, and 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4, and 6 Gen 4</string>
-    <string name="game_manager_fifa_compatibility">FIFA automatically uses Vulkan and Native Buffer for compatibility. Other games keep their settings.</string>
+    <string name="game_manager_db_recommendation">Game DB recommends %1$s / %2$s for this game. You can change either option; saved per-game settings take priority.</string>
     <string name="emulation_ime_done">Done</string>
     <string name="emulation_ime_system">Android keyboard</string>
     <string name="emulation_ime_builtin">Built-in keyboard</string>

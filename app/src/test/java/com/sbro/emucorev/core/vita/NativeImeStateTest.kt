@@ -38,7 +38,10 @@ class NativeImeStateTest {
         assertTrue("Retries need real window focus", "!hasWindowFocus()" in activity)
         assertTrue("A stopped SDL editor has zero size and needs relayout", "editor.layoutParams.width <= 0" in activity)
         assertTrue("Closing or replacing IME must invalidate delayed shows", "generation != keyboardRequestGeneration" in activity)
-        assertTrue("Backgrounding must cancel delayed UI work", "override fun onPause() {\n        keyboardRequestGeneration++" in activity.replace("\r\n", "\n"))
+        val pause = activity.substringAfter("override fun onPause() {").substringBefore("override fun onDestroy()")
+        assertTrue("Backgrounding must cancel delayed UI work before pausing SDL",
+            "keyboardRequestGeneration++" in pause &&
+                pause.indexOf("keyboardRequestGeneration++") < pause.indexOf("super.onPause()"))
         val submit = appModule().resolve("src/main/cpp/emucorev/src/runtime_bridge.cpp").readText()
             .substringAfter("Emulator_submitNativeIme").substringBefore("extern \"C\"")
         assertTrue("Enter must follow queued Android text", "SDL_PushEvent" in submit)
