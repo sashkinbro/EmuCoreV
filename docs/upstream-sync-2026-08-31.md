@@ -23,12 +23,15 @@ Front/back/both touch mode is wired through EmuCoreV's JNI bridge and Compose ov
 - Desktop branding/resources and fork-specific release metadata are intentionally not imported. Required native build changes (codec linkage and return-type errors) are included.
 - Removed the fork's unavailable `util/fork_build.h` dependency and fork-build log metadata; kept crash diagnostics with a single terminate handler, avoiding handler chaining across repeated launches.
 
-## FIFA automatic compatibility policy
+## FIFA Game DB recommendations (corrected after regression report)
 
 - FIFA Football/Soccer, FIFA 13/14/15, demos, and renamed mods retaining a known FIFA title ID request **Vulkan + native-buffer** at launch.
 - 31 regional/demo IDs are sourced from [Vita3K compatibility reports](https://github.com/Vita3K/compatibility/issues?q=FIFA). Case-insensitive FIFA-name matching covers other regions/series names not yet listed, without matching unrelated words.
-- Applied after global settings and custom XML. The Android effective profile and game-manager UI show the same override; reset-to-global does not remove it.
+- Stored in `app/src/main/assets/compatibility/game-db.xml`, shared by Android and the native core. Order: global settings → Game DB defaults → explicit per-game XML. All renderer/buffer choices remain available; recommendations never select or replace a driver.
+- The initial integration incorrectly applied a hard override after user XML and hid other choices. That behavior has been removed. Existing saved profiles are preserved, not reset: previously overwritten choices cannot be reliably reconstructed. Removing a custom profile restores the Game DB defaults on top of global settings.
 - Global settings and other per-game options are unchanged. Backend capability checks and the upstream safe fallback remain active on devices that cannot support Native Buffer; this is not a guarantee that every GPU can execute that mode or that every FIFA game is fully playable.
+
+See [the follow-up regression audit](fifa-input-launch-regressions-2026-08-31.md) for the targeted stock-driver compatibility correction, touch input and launch preparation changes. The game-specific core fixes listed below are retained.
 
 ## Reviewed Plus commits
 

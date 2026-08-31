@@ -48,7 +48,7 @@ bool save_custom_config(const Config::CurrentConfig &cc, const fs::path &config_
 bool delete_custom_config(const fs::path &config_path, const std::string &app_path);
 int delete_all_custom_configs(const fs::path &config_path);
 bool has_custom_config(const fs::path &config_path, const std::string &app_path);
-void set_current_config(Config &cfg, const fs::path &config_path, const std::string &app_path);
+void set_current_config(Config &cfg, const fs::path &config_path, const std::string &app_path, const std::string &app_title = {});
 void copy_current_config_to_global(Config &cfg);
 void save_current_config(Config &cfg, const fs::path &config_path, const std::string &app_path, bool create_custom_if_missing = false);
 std::vector<std::pair<std::string, bool>> get_modules_list(

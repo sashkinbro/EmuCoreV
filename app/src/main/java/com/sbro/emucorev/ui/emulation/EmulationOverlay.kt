@@ -148,6 +148,16 @@ fun EmulationOverlayHost(
             )
     val effectivePaused = userPaused || menuOpen || controlsEditMode
     val lifecycleOwner = LocalLifecycleOwner.current
+    var inputResumed by remember(lifecycleOwner) {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, _ ->
+            inputResumed = lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val gyroController = remember(activity, overlayBridge) {
         AndroidGyroscopeInput(activity) { emittedMode, x, y ->
             val rightStick = emittedMode == VitaCoreConfig.GYRO_MODE_AIM
@@ -263,8 +273,8 @@ fun EmulationOverlayHost(
         overlayBridge.setTouchControlsActive(touchControlsActive)
     }
 
-    LaunchedEffect(showTouchControls) {
-        if (showTouchControls) {
+    LaunchedEffect(showTouchControls, inputResumed) {
+        if (showTouchControls && inputResumed) {
             while (!overlayBridge.ensureControllerAttached()) {
                 kotlinx.coroutines.delay(350)
             }
@@ -324,7 +334,7 @@ fun EmulationOverlayHost(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        if (showTouchControls) {
+        if (showTouchControls && inputResumed) {
             OnScreenControls(
                 modifier = Modifier.fillMaxSize(),
                 overlayScale = config.overlayScale,
@@ -992,8 +1002,7 @@ private fun TouchControlGroupInputCapture(
 ) {
     val density = LocalDensity.current
     val currentOnButtonChange by rememberUpdatedState(onButtonChange)
-    val pointerButtons = remember(groupElements) { mutableMapOf<Int, Int>() }
-    val buttonPressCounts = remember(groupElements) { mutableMapOf<Int, Int>() }
+    val buttonTracker = remember(groupElements, canvasWidth, canvasHeight) { TouchButtonTracker() }
     val bounds = groupElements.groupBounds()
     val paddingPx = with(density) { TouchGroupDragCapturePadding.toPx() }
     val paddedX = (bounds.x * canvasWidth - paddingPx).coerceAtLeast(0f)
@@ -1003,30 +1012,12 @@ private fun TouchControlGroupInputCapture(
     val widthPx = (paddedRight - paddedX).coerceAtLeast(1f)
     val heightPx = (paddedBottom - paddedY).coerceAtLeast(1f)
 
-    fun press(controlId: Int) {
-        val count = buttonPressCounts[controlId] ?: 0
-        buttonPressCounts[controlId] = count + 1
-        if (count == 0) {
-            currentOnButtonChange(controlId, true)
-        }
-    }
-
-    fun release(controlId: Int) {
-        val count = buttonPressCounts[controlId] ?: return
-        if (count <= 1) {
-            buttonPressCounts.remove(controlId)
-            currentOnButtonChange(controlId, false)
-        } else {
-            buttonPressCounts[controlId] = count - 1
-        }
-    }
-
     fun releasePointer(pointerId: Int) {
-        pointerButtons.remove(pointerId)?.let(::release)
+        buttonTracker.release(pointerId, currentOnButtonChange)
     }
 
     fun releaseAll() {
-        pointerButtons.keys.toList().forEach(::releasePointer)
+        buttonTracker.cancel(currentOnButtonChange)
     }
 
     fun controlAt(localX: Float, localY: Float): Int? {
@@ -1048,18 +1039,10 @@ private fun TouchControlGroupInputCapture(
     fun updatePointer(event: MotionEvent, pointerIndex: Int) {
         val pointerId = event.getPointerId(pointerIndex)
         val nextControl = controlAt(event.getX(pointerIndex), event.getY(pointerIndex))
-        val previousControl = pointerButtons[pointerId]
-        if (previousControl == nextControl) return
-        previousControl?.let(::release)
-        if (nextControl != null) {
-            pointerButtons[pointerId] = nextControl
-            press(nextControl)
-        } else {
-            pointerButtons.remove(pointerId)
-        }
+        buttonTracker.update(pointerId, nextControl, currentOnButtonChange)
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(buttonTracker) {
         onDispose { releaseAll() }
     }
 

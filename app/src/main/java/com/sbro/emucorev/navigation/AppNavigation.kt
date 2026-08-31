@@ -17,6 +17,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,9 +26,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -64,6 +68,7 @@ import com.sbro.emucorev.ui.setup.InstallGameChoiceDialog
 import com.sbro.emucorev.ui.setup.SetupInstallDialog
 import com.sbro.emucorev.ui.setup.SetupInstallViewModel
 import com.sbro.emucorev.ui.setup.SetupScreen
+import kotlinx.coroutines.launch
 
 private const val ROUTE_ONBOARDING = "onboarding"
 private const val ROUTE_HOME = "home"
@@ -103,6 +108,8 @@ private fun gpuDriverRoute(titleId: String? = null): String =
 
 @Composable
 fun AppNavigation(navController: NavHostController = rememberNavController()) {
+    val launchScope = rememberCoroutineScope()
+    val preparingLaunch by VitaLaunchBridge.isPreparingLaunch.collectAsState()
     val context = LocalContext.current
     val preferences = remember(context) { AppPreferences(context) }
     val installViewModel: SetupInstallViewModel = viewModel()
@@ -200,11 +207,13 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
 
 
     val launchInstalledGame: (String) -> Unit = { titleId ->
-        when (VitaLaunchBridge.launchInstalledTitle(context, titleId)) {
-            VitaLaunchBridge.LaunchResult.Success -> Unit
-            VitaLaunchBridge.LaunchResult.MissingFirmware -> Toast.makeText(context, launchRequiresFirmwareMessage, Toast.LENGTH_SHORT).show()
-            VitaLaunchBridge.LaunchResult.MissingFirmwareUpdate -> Toast.makeText(context, launchRequiresFirmwareUpdateMessage, Toast.LENGTH_SHORT).show()
-            VitaLaunchBridge.LaunchResult.Failure -> Toast.makeText(context, gameLaunchFailed, Toast.LENGTH_SHORT).show()
+        launchScope.launch {
+            when (VitaLaunchBridge.launchInstalledTitle(context, titleId)) {
+                VitaLaunchBridge.LaunchResult.Success -> Unit
+                VitaLaunchBridge.LaunchResult.MissingFirmware -> Toast.makeText(context, launchRequiresFirmwareMessage, Toast.LENGTH_SHORT).show()
+                VitaLaunchBridge.LaunchResult.MissingFirmwareUpdate -> Toast.makeText(context, launchRequiresFirmwareUpdateMessage, Toast.LENGTH_SHORT).show()
+                VitaLaunchBridge.LaunchResult.Failure -> Toast.makeText(context, gameLaunchFailed, Toast.LENGTH_SHORT).show()
+            }
         }
     }
     val navigateGameManager: (String?) -> Unit = { titleId ->
@@ -821,6 +830,12 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onBack = { navController.popBackStack() }
                 )
             }
+        }
+    }
+
+    if (preparingLaunch) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
     }
 

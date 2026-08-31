@@ -251,8 +251,13 @@ bool setup_game_launch(EmuEnvState &emuenv, const std::string &app_path, const b
     if (!ensure_current_user(emuenv))
         return false;
 
-    if (!set_app_info(emuenv, app_path))
-        return false;
+    // The frontend and installers maintain the cached list. Refresh only on a
+    // miss, so manually copied games still launch without scanning every game
+    // on every press of the Android launch button.
+    if (!set_app_info(emuenv, app_path)) {
+        if (!scan_apps(emuenv) || !set_app_info(emuenv, app_path))
+            return false;
+    }
 
     get_license(emuenv, emuenv.io.title_id, emuenv.io.content_id);
     if (update_last_time_used)

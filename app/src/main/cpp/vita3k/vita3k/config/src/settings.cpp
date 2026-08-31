@@ -18,9 +18,10 @@
 #include <config/settings.h>
 
 #include <config/functions.h>
-#include <config/game_compatibility.h>
+#include <config/game_database.h>
 
 #include <util/log.h>
+#include <util/fs.h>
 #include <util/vector_utils.h>
 
 #include <pugixml.hpp>
@@ -191,7 +192,7 @@ bool load_custom_config(Config::CurrentConfig &out, const fs::path &config_path,
 
     if (!config_child.child("gpu").empty()) {
         const auto gpu = config_child.child("gpu");
-        out.backend_renderer = gpu.attribute("backend-renderer").as_string();
+        game_database::apply_gpu_settings(out, gpu);
         out.gpu_idx = gpu.attribute("gpu-idx").as_int();
 #ifdef __ANDROID__
         out.custom_driver_name = gpu.attribute("custom-driver-name").as_string();
@@ -200,7 +201,6 @@ bool load_custom_config(Config::CurrentConfig &out, const fs::path &config_path,
         out.resolution_multiplier = gpu.attribute("resolution-multiplier").as_float();
         out.disable_surface_sync = gpu.attribute("disable-surface-sync").as_bool();
         out.screen_filter = gpu.attribute("screen-filter").as_string();
-        out.memory_mapping = gpu.attribute("memory-mapping").as_string();
         out.v_sync = gpu.attribute("v-sync").as_bool();
         out.anisotropic_filtering = gpu.attribute("anisotropic-filtering").as_int();
         out.async_pipeline_compilation = gpu.attribute("async-pipeline-compilation").as_bool();
@@ -388,17 +388,24 @@ bool has_custom_config(const fs::path &config_path, const std::string &app_path)
     return fs::exists(get_custom_config_path(config_path, app_path));
 }
 
-void set_current_config(Config &cfg, const fs::path &config_path, const std::string &app_path) {
+void set_current_config(Config &cfg, const fs::path &config_path, const std::string &app_path, const std::string &app_title) {
     copy_global_to_current(cfg.current_config, cfg);
-    if (!app_path.empty())
-        load_custom_config(cfg.current_config, config_path, app_path);
 #ifdef __ANDROID__
-    // Apply after custom XML too, so old per-game profiles cannot bypass it.
-    if (game_compatibility::is_fifa(app_path)) {
-        cfg.current_config.memory_mapping = "native-buffer";
-        cfg.current_config.backend_renderer = "Vulkan";
+    if (!app_path.empty()) {
+        // SDL reads the shared, read-only Game DB directly from APK assets.
+        static const pugi::xml_document database = [] {
+            pugi::xml_document doc;
+            std::vector<uint8_t> bytes;
+            if (!fs_utils::read_data("compatibility/game-db.xml", bytes) || !doc.load_buffer(bytes.data(), bytes.size()))
+                LOG_ERROR("Could not load bundled Game DB; using global and user settings");
+            return doc;
+        }();
+        game_database::apply_gpu_settings(cfg.current_config, game_database::recommendation(database, app_path, app_title));
     }
 #endif
+    // Explicit per-game choices always take precedence over recommendations.
+    if (!app_path.empty())
+        load_custom_config(cfg.current_config, config_path, app_path);
 }
 
 void copy_current_config_to_global(Config &cfg) {

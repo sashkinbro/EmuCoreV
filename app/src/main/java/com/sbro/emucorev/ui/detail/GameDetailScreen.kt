@@ -144,6 +144,8 @@ fun GameDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val launchScope = rememberCoroutineScope()
+    val preparingLaunch by VitaLaunchBridge.isPreparingLaunch.collectAsState()
     val configuration = LocalConfiguration.current
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val backClick = rememberDebouncedClick(onClick = onBack)
@@ -261,11 +263,13 @@ fun GameDetailScreen(
                     val description = catalog?.summary?.takeIf { it.isNotBlank() }
                     val launchGameClick = game?.let {
                         rememberDebouncedClick {
-                            when (VitaLaunchBridge.launchInstalledTitle(context, it.titleId)) {
-                                LaunchResult.Success -> Unit
-                                LaunchResult.MissingFirmware -> Toast.makeText(context, launchRequiresFirmwareMessage, Toast.LENGTH_SHORT).show()
-                                LaunchResult.MissingFirmwareUpdate -> Toast.makeText(context, launchRequiresFirmwareUpdateMessage, Toast.LENGTH_SHORT).show()
-                                LaunchResult.Failure -> Toast.makeText(context, launchFailedMessage, Toast.LENGTH_SHORT).show()
+                            launchScope.launch {
+                                when (VitaLaunchBridge.launchInstalledTitle(context, it.titleId)) {
+                                    LaunchResult.Success -> Unit
+                                    LaunchResult.MissingFirmware -> Toast.makeText(context, launchRequiresFirmwareMessage, Toast.LENGTH_SHORT).show()
+                                    LaunchResult.MissingFirmwareUpdate -> Toast.makeText(context, launchRequiresFirmwareUpdateMessage, Toast.LENGTH_SHORT).show()
+                                    LaunchResult.Failure -> Toast.makeText(context, launchFailedMessage, Toast.LENGTH_SHORT).show()
+                                }
                             }
                         }
                     }
@@ -336,11 +340,12 @@ fun GameDetailScreen(
                                 if (launchGameClick != null) {
                                     Button(
                                         onClick = launchGameClick,
+                                        enabled = !preparingLaunch,
                                         modifier = Modifier.widthIn(min = 240.dp, max = 320.dp)
                                     ) {
                                         Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                                         Text(
-                                            text = stringResource(R.string.detail_launch),
+                                            text = stringResource(if (preparingLaunch) R.string.common_loading else R.string.detail_launch),
                                             modifier = Modifier.padding(start = 6.dp)
                                         )
                                     }
@@ -451,11 +456,12 @@ fun GameDetailScreen(
                             ) {
                                 Button(
                                     onClick = launchGameClick,
+                                    enabled = !preparingLaunch,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                                     Text(
-                                        text = stringResource(R.string.detail_launch),
+                                        text = stringResource(if (preparingLaunch) R.string.common_loading else R.string.detail_launch),
                                         modifier = Modifier.padding(start = 6.dp)
                                     )
                                 }
