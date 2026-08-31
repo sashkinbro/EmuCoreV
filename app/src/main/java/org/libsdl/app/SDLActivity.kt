@@ -27,6 +27,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.LocaleList
+import android.os.Looper
 import android.os.Message
 import android.os.ParcelFileDescriptor
 import android.util.DisplayMetrics
@@ -1233,7 +1234,15 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         }
         val result = commandHandler.sendMessage(msg)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT && command == COMMAND_CHANGE_WINDOW_STYLE) {
+        // Lifecycle/fullscreen requests also arrive on this Handler's UI thread.
+        // Waiting there blocks both the queued command and surfaceChanged(), so
+        // every request pays the full 500 ms timeout before the first frame.
+        // Keep SDL's bounded resize wait for native callers only; UI commands
+        // remain queued in their original order and return to the Looper.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT &&
+            command == COMMAND_CHANGE_WINDOW_STYLE &&
+            Looper.myLooper() != commandHandler.looper
+        ) {
             var shouldWait = false
 
             if (data is Int) {
