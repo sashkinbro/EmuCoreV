@@ -1,4 +1,5 @@
-#include <config/game_compatibility.h>
+#include <config/game_database.h>
+#include <renderer/vulkan/native_buffer_memory.h>
 #include <packages/sfo.h>
 #include <ime/functions.h>
 
@@ -36,7 +37,7 @@ static std::vector<uint8_t> valid_sfo() {
     return bytes;
 }
 
-int main() {
+int main(int argc, char **argv) {
     try {
         const auto valid = valid_sfo();
         SfoFile file{};
@@ -74,16 +75,62 @@ int main() {
         corrupt.back() = 'X';
         check(!sfo::load(file, corrupt), "Unterminated value must fail");
 
-        using config::game_compatibility::is_fifa;
-        for (const auto id : config::game_compatibility::fifa_title_ids)
-            check(is_fifa(id, "EA SPORTS FC mod"), "Every known FIFA ID must match renamed mods");
-        check(is_fifa("pcse00483"), "Case-insensitive IDs");
-        check(is_fifa("UNKNOWN", "EA SPORTS FIFA Football Demo"), "Name fallback for other regions");
-        check(is_fifa("UNKNOWN", "fifa15"), "Compact lowercase names");
-        check(!is_fifa("PCSA00107", "Killzone"), "Other games must not be overridden");
-        check(!is_fifa("", "NotFIFA"), "Do not match an unrelated word");
-        check(!is_fifa("", "FIFAworld"), "Do not match an unrelated suffix");
-        check(!is_fifa(""), "Global settings must not be overridden");
+        using namespace config::game_database;
+        pugi::xml_document database;
+        check(argc == 2 && database.load_file(argv[1]), "Load the actual shared Game DB asset");
+        unsigned id_count = 0;
+        for (auto id : database.child("game-db").child("profile").children("title-id")) {
+            ++id_count;
+            check(bool(recommendation(database, id.text().as_string(), "EA SPORTS FC mod")), "All regional IDs match renamed mods");
+        }
+        check(id_count == 31, "All 31 regional and demo IDs retained");
+        check(bool(recommendation(database, " pcse00483 ")), "Case-insensitive trimmed IDs");
+        check(bool(recommendation(database, "UNKNOWN", "EA SPORTS FIFA Football Demo")), "Family-name fallback");
+        check(bool(recommendation(database, "UNKNOWN", "fifa15")), "Compact lowercase names");
+        check(!recommendation(database, "OTHER", "Killzone"), "Unrelated games unchanged");
+        check(!recommendation(database, "OTHER", "NotFIFA"), "Unrelated word prefix");
+        check(!recommendation(database, "OTHER", "FIFAworld"), "Unrelated word suffix");
+        check(!recommendation(database, "", "FIFA 15"), "Global settings unchanged");
+        struct GpuConfig { std::string backend_renderer = "OpenGL", memory_mapping = "double-buffer"; };
+        GpuConfig effective;
+        apply_gpu_settings(effective, recommendation(database, "PCSE00481"));
+        check(effective.backend_renderer == "Vulkan" && effective.memory_mapping == "native-buffer", "Apply DB default");
+        for (const char *mapping : { "disabled", "double-buffer", "external-host", "page-table", "native-buffer" }) {
+            pugi::xml_document user;
+            auto gpu = user.append_child("gpu");
+            gpu.append_attribute("memory-mapping") = mapping;
+            gpu.append_attribute("backend-renderer") = "OpenGL";
+            apply_gpu_settings(effective, recommendation(database, "PCSE00481"));
+            apply_gpu_settings(effective, gpu);
+            check(effective.memory_mapping == mapping && effective.backend_renderer == "OpenGL", "User config wins for EVERY buffer option");
+        }
+        pugi::xml_document partial;
+        auto gpu = partial.append_child("gpu");
+        gpu.append_attribute("backend-renderer") = "OpenGL";
+        apply_gpu_settings(effective, recommendation(database, "PCSE00481"));
+        apply_gpu_settings(effective, gpu);
+        check(effective.backend_renderer == "OpenGL" && effective.memory_mapping == "native-buffer", "Sparse user XML inherits missing keys");
+        database.child("game-db").attribute("version") = "99";
+        check(!recommendation(database, "PCSE00481"), "Unknown DB version ignored");
+
+        using renderer::vulkan::native_buffer_memory_type;
+        using renderer::vulkan::native_buffer_supported;
+        VkPhysicalDeviceMemoryProperties memory{};
+        memory.memoryTypeCount = 3;
+        memory.memoryTypes[0].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        memory.memoryTypes[1].propertyFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        memory.memoryTypes[2].propertyFlags = memory.memoryTypes[1].propertyFlags | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+        check(native_buffer_memory_type(memory, 7) == 2, "Prefer coherent cached import when available");
+        check(native_buffer_memory_type(memory, 3) == 1, "Coherent noncached import must not be rejected");
+        check(native_buffer_memory_type(memory, 1) == -1, "Reject noncoherent imports");
+        check(native_buffer_memory_type(memory, 0) == -1, "Reject empty import mask");
+        check(native_buffer_memory_type(memory, 8) == -1, "Ignore bits outside memoryTypeCount");
+        memory.memoryTypes[2].propertyFlags = VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+        check(native_buffer_memory_type(memory, 7) == 1, "Cached alone is insufficient without coherence");
+        check(native_buffer_supported(true, true, false), "AHB import supported independently of Vulkan host-cache flags");
+        check(native_buffer_supported(true, false, true), "FD import capability retained");
+        check(!native_buffer_supported(false, true, true), "Memory mapping features required");
+        check(!native_buffer_supported(true, false, false), "Import extension required");
         Ime ime{};
         ime.param.maxTextLength = 6;
         ime_commit_text(ime, u"Ab");

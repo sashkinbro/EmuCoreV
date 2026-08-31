@@ -1,6 +1,7 @@
 package com.sbro.emucorev.core
 
 import android.content.Context
+import android.util.Log
 import org.w3c.dom.Element
 import java.io.File
 import java.io.StringWriter
@@ -17,6 +18,14 @@ data class VitaGameSettingsProfile(
 
 class VitaGameSettingsRepository(private val context: Context) {
     private val globalRepository = VitaCoreConfigRepository(context)
+    private val gameDatabase by lazy {
+        runCatching { context.assets.open(GameCompatibilityDatabase.ASSET_PATH).use(GameCompatibilityDatabase::parse) }
+            .onFailure { Log.e("GameCompatibilityDB", "Could not load bundled recommendations", it) }
+            .getOrDefault(GameCompatibilityDatabase.EMPTY)
+    }
+
+    fun recommendationFor(titleId: String, title: String = ""): GameGpuRecommendation? =
+        gameDatabase.recommendationFor(titleId, title)
 
     private val configDirectory: File
         get() {
@@ -35,17 +44,18 @@ class VitaGameSettingsRepository(private val context: Context) {
     }
 
     fun loadProfile(titleId: String): VitaGameSettingsProfile {
-        val base = globalRepository.ensureDefaultsPersisted()
-        if (titleId.isBlank()) return VitaGameSettingsProfile(base, null)
+        val global = globalRepository.ensureDefaultsPersisted()
+        if (titleId.isBlank()) return VitaGameSettingsProfile(global, null)
+        val title = runCatching { VitaSfoParser.parse(EmulatorStorage.paramSfoPath(context, titleId)).title.orEmpty() }
+            .getOrDefault("")
+        val base = gameDatabase.applyDefaults(global, titleId, title)
         val file = customConfigFile(titleId)
         val profile = if (file.exists()) {
             runCatching { readCustomConfig(file, base) }.getOrDefault(VitaGameSettingsProfile(base, null))
         } else {
             VitaGameSettingsProfile(base, null)
         }
-        val title = runCatching { VitaSfoParser.parse(EmulatorStorage.paramSfoPath(context, titleId)).title.orEmpty() }
-            .getOrDefault("")
-        return profile.copy(config = FifaCompatibilityPolicy.apply(profile.config, titleId, title))
+        return profile
     }
 
     fun save(titleId: String, config: VitaCoreConfig) {
@@ -68,10 +78,12 @@ class VitaGameSettingsRepository(private val context: Context) {
         }
     }
 
-    fun syncEffectiveDriverForLaunch(titleId: String) {
-        if (titleId.isBlank() || !customConfigFile(titleId).exists()) return
+    fun syncEffectiveDriverForLaunch(titleId: String): VitaCoreConfig {
         val profile = loadProfile(titleId)
-        saveProfile(titleId, profile.config, profile.customDriverOverride)
+        if (titleId.isNotBlank() && customConfigFile(titleId).exists()) {
+            saveProfile(titleId, profile.config, profile.customDriverOverride)
+        }
+        return profile.config
     }
 
     fun update(titleId: String, transform: (VitaCoreConfig) -> VitaCoreConfig): VitaCoreConfig {

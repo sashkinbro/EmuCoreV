@@ -31,6 +31,7 @@
 #include <vector>
 
 #include <config/state.h>
+#include <renderer/vulkan/native_buffer_memory.h>
 #include <config/version.h>
 #include <display/state.h>
 #include <kernel/state.h>
@@ -779,7 +780,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                 has_cached_host_memory = true;
         }
         if (!has_cached_host_memory)
-            LOG_WARN("No host-cached memory type: guest atomics would fault (SIGBUS) on remapped memory, so only Double Buffer mapping is offered");
+            LOG_WARN("No host-cached Vulkan memory type: Page Table is unavailable; Native Buffer checks the actual AHardwareBuffer CPU mapping");
 
         // Find which memory mapping methods are supported by the GPU
         supported_mapping_methods_mask = (1 << static_cast<int>(MappingMethod::Disabled));
@@ -801,7 +802,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                 supported_mapping_methods_mask |= (1 << static_cast<int>(MappingMethod::ExernalHost));
 
 #ifdef __ANDROID__
-            if ((support_android_buffer_import || support_unix_fd_import) && has_cached_host_memory)
+            if (native_buffer_supported(support_memory_mapping, support_android_buffer_import, support_unix_fd_import))
                 supported_mapping_methods_mask |= (1 << static_cast<int>(MappingMethod::NativeBuffer));
 #endif
         }
@@ -1082,6 +1083,9 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
     if ((1 << static_cast<int>(request_mapping)) & supported_mapping_methods_mask)
         // we support the requested mapping method
         mapping_method = request_mapping;
+    else
+        LOG_WARN("Requested memory mapping '{}' is unavailable on this driver (supported mask 0x{:X}); using {}",
+            config_mapping, supported_mapping_methods_mask, mapping_string[static_cast<int>(mapping_method)]);
 
     features.enable_memory_mapping = mapping_method != MappingMethod::Disabled;
 
@@ -1580,6 +1584,13 @@ bool VKState::map_memory_page_table_fallback(MemState &mem, Ptr<void> address, u
         .preferredFlags = vk::MemoryPropertyFlagBits::eHostCached,
     };
     buffer.init_buffer(mapped_memory_flags, memory_mapped_alloc);
+#ifdef __ANDROID__
+    if (!test_arm64_atomics_on(buffer.mapped_data)) {
+        LOG_ERROR("Page-table fallback memory cannot safely execute guest atomics for 0x{:X}", address.address());
+        buffer.destroy();
+        return false;
+    }
+#endif
     const uint64_t buffer_ptr_val = std::bit_cast<uint64_t>(buffer.mapped_data);
     const uint64_t buffer_offset = align(buffer_ptr_val, KiB(4)) - buffer_ptr_val;
     buffer.mapped_data = std::bit_cast<void *>(buffer_ptr_val + buffer_offset);
@@ -1602,18 +1613,6 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
     LOG_INFO("map_memory: addr 0x{:X} size 0x{:X} method {}", address.address(), size, static_cast<int>(mapping_method));
     constexpr vk::BufferUsageFlags mapped_memory_flags = vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst;
 
-    auto find_mem_type_with_flag = [&](const vk::MemoryPropertyFlags flags, uint32_t hardware_types) {
-        while (hardware_types != 0) {
-            // try to find a cached memory type
-            int mapped_memory_type = std::countr_zero(hardware_types);
-            hardware_types -= (1 << mapped_memory_type);
-
-            if ((physical_device_memory.memoryTypes[mapped_memory_type].propertyFlags & flags) == flags)
-                return mapped_memory_type;
-        }
-        return -1;
-    };
-
     // returns -1 when the imported memory has no host-coherent type: the caller must NOT import it.
     // Memory mapping writes guest data straight through the mapped pointer and expects the GPU to
     // observe it without any flush, so a non-coherent import silently feeds the GPU stale
@@ -1624,7 +1623,7 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
             LOG_ERROR("Imported memory reports no compatible memory types");
             return -1;
         }
-        return find_mem_type_with_flag(vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostCached, hardware_types);
+        return native_buffer_memory_type(physical_device_memory, hardware_types);
     };
 
     // counted, not one-shot: this fires per mapping and the count is what tells us it is systemic
@@ -1632,7 +1631,7 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
         static std::atomic<uint32_t> no_coherent_count{ 0 };
         const uint32_t n = no_coherent_count.fetch_add(1, std::memory_order_relaxed) + 1;
         if (n <= 3 || (n % 100) == 0)
-            LOG_WARN("No host-coherent+cached memory type for {} import ({} so far): using page-table mapping for this range instead", kind, n);
+            LOG_WARN("No host-coherent memory type for {} import ({} so far): using page-table mapping for this range instead", kind, n);
     };
 
     switch (mapping_method) {

@@ -23,7 +23,6 @@
 #include <camera/state.h>
 #include <compat/state.h>
 #include <config/settings.h>
-#include <config/game_compatibility.h>
 #include <config/state.h>
 #include <config/version.h>
 #include <cpu/functions.h>
@@ -242,17 +241,8 @@ static Config::CurrentConfig get_runtime_current_config_after_save(
 }
 
 void set_current_config(EmuEnvState &emuenv, const std::string &app_path) {
-    config::set_current_config(emuenv.cfg, emuenv.config_path, app_path);
-#ifdef __ANDROID__
-    // Metadata is available at setup_game_launch; the ID path also handles
-    // initial configuration before app metadata has been loaded.
     const auto title = app_path == emuenv.io.app_path ? emuenv.current_app_title : std::string();
-    if (!app_path.empty() && config::game_compatibility::is_fifa(app_path, title)) {
-        emuenv.cfg.current_config.memory_mapping = "native-buffer";
-        emuenv.cfg.current_config.backend_renderer = "Vulkan";
-        LOG_INFO("FIFA compatibility override for {}: Vulkan / native-buffer (global settings unchanged)", app_path);
-    }
-#endif
+    config::set_current_config(emuenv.cfg, emuenv.config_path, app_path, title);
     set_backend_renderer(emuenv, emuenv.cfg.current_config.backend_renderer);
     emuenv.audio.set_global_volume(emuenv.cfg.current_config.audio_volume / 100.f);
     lang::set_locale(emuenv.cfg.current_config.sys_lang);

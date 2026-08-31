@@ -29,6 +29,25 @@ class InstalledGameRepository {
     }
 
     fun findByTitleId(context: Context, titleId: String): InstalledVitaGame? {
+        val safeId = titleId.trim().takeIf(::isSafePathSegment) ?: return null
+        val directory = File(EmulatorStorage.ux0AppRoot(context), safeId)
+        if (directory.isDirectory) {
+            val metadata = VitaSfoParser.parse(File(directory, "sce_sys/param.sfo"))
+            val resolvedId = metadata.titleId ?: safeId
+            if (resolvedId.equals(safeId, ignoreCase = true)) {
+                return InstalledVitaGame(
+                    titleId = resolvedId,
+                    title = metadata.title ?: safeId,
+                    contentId = metadata.contentId,
+                    saveDataId = metadata.saveDataId ?: resolvedId,
+                    version = metadata.version,
+                    category = metadata.category,
+                    iconPath = File(directory, "sce_sys/icon0.png").takeIf(File::exists)?.absolutePath,
+                    installPath = directory.absolutePath
+                )
+            }
+        }
+        // Preserve support for nonstandard install folders and case variants.
         return loadInstalledGames(context).firstOrNull { it.titleId.equals(titleId, ignoreCase = true) }
     }
 

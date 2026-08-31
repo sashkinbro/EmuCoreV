@@ -14,6 +14,7 @@ import android.content.pm.ActivityInfo
 import android.util.Log
 import android.view.InputDevice
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.ViewGroup
 import android.view.View
 import android.view.inputmethod.InputMethodManager
@@ -72,6 +73,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private lateinit var surfaceView: EmuSurface
     private lateinit var inputOverlay: InputOverlay
     private var composeOverlayAttached = false
+    private var activeTouchSnapshot: MotionEvent? = null
     private var exitRequested = false
     private lateinit var composeOwners: ComposeOwners
     private var inputManager: InputManager? = null
@@ -208,12 +210,14 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onPause() {
+        cancelActiveTouches()
         keyboardRequestGeneration++ // Invalidate delayed show/fallback work while backgrounded.
         composeOwners.handlePause()
         super.onPause()
     }
 
     override fun onDestroy() {
+        cancelActiveTouches()
         keyboardRequestGeneration++
         finishPlayTimeSessionIfNeeded()
         inputManager?.unregisterInputDeviceListener(this)
@@ -228,6 +232,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
+        if (!hasFocus) cancelActiveTouches()
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus && menuPaused) {
             applyMenuPauseState(true)
@@ -657,6 +662,33 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     external fun filedialogReturn(resultPath: String)
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP -> {
+                activeTouchSnapshot?.recycle()
+                activeTouchSnapshot = MotionEvent.obtainNoHistory(event)
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                activeTouchSnapshot?.recycle()
+                activeTouchSnapshot = null
+            }
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    private fun cancelActiveTouches() {
+        val event = activeTouchSnapshot ?: return
+        activeTouchSnapshot = null
+        try {
+            // Cancel the whole pointer stream in both Compose and SDL immediately.
+            // Waiting for recomposition on pause can leave held controls stuck.
+            event.action = MotionEvent.ACTION_CANCEL
+            super.dispatchTouchEvent(event)
+        } finally {
+            event.recycle()
+        }
+    }
 
     private fun attachComposeOverlay() {
         val layout = mLayout ?: return

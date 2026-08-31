@@ -105,10 +105,10 @@ Java_org_vita3k_emulator_overlay_InputOverlay_setButton(JNIEnv *env, jobject thi
     if (!virtual_joystick)
         return;
 
-    if (button < 0)
+    if (button == -SDL_GAMEPAD_AXIS_LEFT_TRIGGER || button == -SDL_GAMEPAD_AXIS_RIGHT_TRIGGER)
         // l2/r2
-        SDL_SetJoystickVirtualAxis(virtual_joystick, -button, value ? SDL_MAX_SINT16 : 0);
-    else
+        SDL_SetJoystickVirtualAxis(virtual_joystick, -button, value ? SDL_MAX_SINT16 : SDL_MIN_SINT16);
+    else if (button >= 0 && button < SDL_GAMEPAD_BUTTON_COUNT)
         SDL_SetJoystickVirtualButton(virtual_joystick, button, value);
 }
 

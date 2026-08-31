@@ -60,7 +60,7 @@ import com.sbro.emucorev.core.FrameLimit
 import com.sbro.emucorev.core.GpuDriverCompatibility
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.VitaCoreConfig
-import com.sbro.emucorev.core.FifaCompatibilityPolicy
+import com.sbro.emucorev.core.GameGpuRecommendation
 import com.sbro.emucorev.data.InstalledVitaGame
 import com.sbro.emucorev.ui.common.LocalImage
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
@@ -154,9 +154,7 @@ fun GameManagerScreen(
                 when (selectedTab) {
                     GameManagerTab.Graphics -> GraphicsProfileSection(
                         config = uiState.config,
-                        fifaCompatibility = FifaCompatibilityPolicy.appliesTo(
-                            uiState.selectedTitleId.orEmpty(), uiState.selectedGame?.title.orEmpty()
-                        ),
+                        gameDbRecommendation = uiState.gameDbRecommendation,
                         defaults = uiState.defaults,
                         installedGpuDrivers = uiState.installedGpuDrivers,
                         customDriverOverride = uiState.customDriverOverride,
@@ -348,7 +346,7 @@ private fun GamePicker(
 @Composable
 private fun GraphicsProfileSection(
     config: VitaCoreConfig,
-    fifaCompatibility: Boolean,
+    gameDbRecommendation: GameGpuRecommendation?,
     defaults: VitaCoreConfig,
     installedGpuDrivers: List<InstalledGpuDriver>,
     customDriverOverride: String?,
@@ -357,14 +355,15 @@ private fun GraphicsProfileSection(
     onDriverOverrideSelected: (String?) -> Unit
 ) {
     SectionCard(title = stringResource(R.string.settings_tab_graphics)) {
-        if (fifaCompatibility) {
+        if (gameDbRecommendation != null) {
             Text(
-                text = stringResource(R.string.game_manager_fifa_compatibility),
+                text = stringResource(R.string.game_manager_db_recommendation,
+                    gameDbRecommendation.backendRenderer, gameDbRecommendation.memoryMapping),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary
             )
         }
-        ChoiceRow(stringResource(R.string.settings_core_renderer_label), stringResource(R.string.settings_help_renderer), config.backendRenderer, if (fifaCompatibility) listOf("Vulkan") else listOf("Vulkan", "OpenGL"), { onUpdate { it.copy(backendRenderer = defaults.backendRenderer) } }) {
+        ChoiceRow(stringResource(R.string.settings_core_renderer_label), stringResource(R.string.settings_help_renderer), config.backendRenderer, listOf("Vulkan", "OpenGL"), { onUpdate { it.copy(backendRenderer = defaults.backendRenderer) } }) {
             onUpdate { cfg -> cfg.copy(backendRenderer = it) }
         }
         ToggleRow(stringResource(R.string.settings_use_angle), config.useAngle, stringResource(R.string.settings_help_use_angle), { onUpdate { it.copy(useAngle = defaults.useAngle) } }, enabled = config.backendRenderer == "OpenGL") { onUpdate { cfg -> cfg.copy(useAngle = it) } }
@@ -403,7 +402,7 @@ private fun GraphicsProfileSection(
         ChoiceRow(stringResource(R.string.settings_core_screen_filter_label), stringResource(R.string.settings_help_screen_filter), config.screenFilter, listOf("Bilinear", "Nearest"), { onUpdate { it.copy(screenFilter = defaults.screenFilter) } }) {
             onUpdate { cfg -> cfg.copy(screenFilter = it) }
         }
-        ChoiceRow(stringResource(R.string.settings_memory_mapping), stringResource(R.string.settings_help_memory_mapping), config.memoryMapping, if (fifaCompatibility) listOf("native-buffer") else listOf("disabled", "double-buffer", "external-host", "page-table", "native-buffer"), { onUpdate { it.copy(memoryMapping = defaults.memoryMapping) } }) {
+        ChoiceRow(stringResource(R.string.settings_memory_mapping), stringResource(R.string.settings_help_memory_mapping), config.memoryMapping, listOf("disabled", "double-buffer", "external-host", "page-table", "native-buffer"), { onUpdate { it.copy(memoryMapping = defaults.memoryMapping) } }) {
             onUpdate { cfg -> cfg.copy(memoryMapping = it) }
         }
         ToggleRow(stringResource(R.string.settings_core_high_accuracy), config.highAccuracy, stringResource(R.string.settings_help_high_accuracy), { onUpdate { it.copy(highAccuracy = defaults.highAccuracy) } }) { onUpdate { cfg -> cfg.copy(highAccuracy = it) } }
