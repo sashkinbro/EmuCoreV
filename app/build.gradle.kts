@@ -82,8 +82,8 @@ android {
         applicationId = "com.sbro.emucorev"
         minSdk = 28
         targetSdk = 37
-        versionCode = 71
-        versionName = "0.2.0"
+        versionCode = 72
+        versionName = "0.2.1"
 
         buildConfigField("String", "FEEDBACK_ENDPOINT", buildConfigString(feedbackEndpoint))
         buildConfigField("String", "FEEDBACK_API_KEY", buildConfigString(feedbackApiKey))
@@ -124,6 +124,17 @@ android {
                 "proguard-rules.pro",
                 "src/main/cpp/vita3k/android/proguard-rules.pro"
             )
+            externalNativeBuild {
+                cmake {
+                    // Release native ships as RelWithDebInfo (symbols for Play),
+                    // which enables Tracy profiler threads + verbose spdlog
+                    // (flush_on trace) upstream. Both starve the UI thread on
+                    // low-end GPUs and trip the Vitals ANR grouped under
+                    // condition_variable::wait. Keep symbols, drop the profiler.
+                    // No-op with a warning when upstream builds as Release.
+                    arguments += "-DTRACY_ENABLE_ON_CORE_COMPONENTS=OFF"
+                }
+            }
         }
     }
 

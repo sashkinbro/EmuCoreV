@@ -19,7 +19,16 @@ class EmuCoreVApp : Application() {
             VitaCoreConfigRepository(this).ensureDefaultsPersisted()
         }
         if (AppPreferences(this).onboardingCompleted) {
-            NativeLibraryLoader.ensureLoaded(this)
+            // Native init (Vulkan enumeration, app-list scan, compat DB) blocks for
+            // seconds on low-end devices. Running it on the UI thread stalls
+            // Choreographer/HWUI (syncAndDrawFrame) and trips the Vitals ANR
+            // grouped under condition_variable::wait. Pre-warm off-thread;
+            // ensureLoaded() is synchronized/idempotent so IO-thread callers
+            // (launch/install) safely join the same init.
+            val app = this
+            Thread({
+                runCatching { NativeLibraryLoader.ensureLoaded(app) }
+            }, "EmuCoreV-Init").apply { isDaemon = true; start() }
         }
     }
 

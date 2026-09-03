@@ -6,6 +6,8 @@
 
 #include <jni.h>
 
+#include <util/log.h>
+
 extern "C" {
 
 JNIEXPORT void JNICALL
@@ -58,6 +60,15 @@ Java_com_sbro_emucorev_core_NativeLib_isInitialized(JNIEnv *env, jobject /*thiz*
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_NativeLib_refreshAppsList(JNIEnv *env, jobject /*thiz*/) {
     Java_org_vita3k_emulator_NativeLib_refreshAppsList(env, nullptr);
+}
+
+// Release builds ship native as RelWithDebInfo (Play symbols), where upstream
+// leaves spdlog verbose with flush_on(trace): every log hits logcat + file and
+// starves the UI thread (Vitals ANR under condition_variable::wait). Silence
+// the logger at runtime; debug builds never call this and stay verbose.
+JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_core_NativeLib_applyReleaseLogging(JNIEnv *, jobject /*thiz*/) {
+    logging::set_level(spdlog::level::off);
 }
 
 } // extern "C"

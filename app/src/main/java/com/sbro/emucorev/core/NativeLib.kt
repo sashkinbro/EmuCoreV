@@ -7,4 +7,6 @@ object NativeLib {
     external fun init(runtimePath: String, vitaPath: String): Boolean
     external fun isInitialized(): Boolean
     external fun refreshAppsList()
+    /** Silence verbose upstream spdlog in release (see native_lib_bridge.cpp). */
+    external fun applyReleaseLogging()
 }

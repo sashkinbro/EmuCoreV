@@ -2,6 +2,7 @@ package com.sbro.emucorev.core
 
 import android.content.Context
 import android.util.Log
+import com.sbro.emucorev.BuildConfig
 import org.libsdl.app.SDL
 
 object NativeLibraryLoader {
@@ -47,6 +48,11 @@ object NativeLibraryLoader {
                     initialized = true
                 }
             }
+        }
+        // Silence verbose upstream spdlog (flush_on trace) in release. Debug
+        // keeps full logs. Cheap + idempotent, safe to re-apply on every call.
+        if (!BuildConfig.DEBUG) {
+            runCatching { NativeLib.applyReleaseLogging() }
         }
     }
 }
