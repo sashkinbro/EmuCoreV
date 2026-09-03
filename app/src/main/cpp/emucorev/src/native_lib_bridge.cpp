@@ -64,11 +64,12 @@ Java_com_sbro_emucorev_core_NativeLib_refreshAppsList(JNIEnv *env, jobject /*thi
 
 // Release builds ship native as RelWithDebInfo (Play symbols), where upstream
 // leaves spdlog verbose with flush_on(trace): every log hits logcat + file and
-// starves the UI thread (Vitals ANR under condition_variable::wait). Silence
-// the logger at runtime; debug builds never call this and stay verbose.
+// starves the UI thread (Vitals ANR under condition_variable::wait). Keep only
+// critical logs: steady state stays silent (no per-log flush), while the
+// [CRASH]/fatal diagnostics emitted before an abort still reach vita3k.log.
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_NativeLib_applyReleaseLogging(JNIEnv *, jobject /*thiz*/) {
-    logging::set_level(spdlog::level::off);
+    logging::set_level(spdlog::level::critical);
 }
 
 } // extern "C"

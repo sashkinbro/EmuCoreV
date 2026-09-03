@@ -13,9 +13,11 @@
 #include <packages/functions.h>
 #include <packages/license.h>
 #include <packages/pkg.h>
+#include <util/log.h>
 #include <util/string_utils.h>
 
 #include <algorithm>
+#include <exception>
 #include <string>
 
 namespace {
@@ -64,6 +66,24 @@ private:
     jmethodID callback_;
 };
 
+// JNI must never let C++ exceptions escape: upstream install entry points
+// throw on malformed input (e.g. std::out_of_range from copy_license when a
+// truncated .rif yields a short content_id for substr(7, 9)). An uncaught
+// throw across the JNI boundary terminates the process (Vitals abort inside
+// copy_license via installLicense). Log and convert to the entry point's
+// failure value instead; Kotlin already surfaces install errors for those.
+template <typename Failure, typename Fn>
+Failure guard_install(const char *op, Failure failure, Fn &&fn) {
+    try {
+        return fn();
+    } catch (const std::exception &e) {
+        LOG_ERROR("Install '{}' failed with exception: {}", op, e.what());
+    } catch (...) {
+        LOG_ERROR("Install '{}' failed with unknown exception", op);
+    }
+    return failure;
+}
+
 void configure_install_env(EmuEnvState &emuenv, const fs::path &vita_root, const fs::path &cache_root, jint system_language) {
     emuenv.default_path = vita_root;
     emuenv.vita_fs_path = vita_root;
@@ -90,12 +110,14 @@ Java_com_sbro_emucorev_core_VitaInstallBridge_nativeInstallFirmware(
     jstring vita_root_path,
     jstring firmware_path,
     jint /*system_language*/) {
-    const auto vita_root = fs_utils::utf8_to_path(from_jstring(env, vita_root_path));
-    const auto firmware = fs_utils::utf8_to_path(from_jstring(env, firmware_path));
-    JavaProgressReporter reporter(env, thiz);
+    const auto version = guard_install("firmware", std::string{}, [&]() {
+        const auto vita_root = fs_utils::utf8_to_path(from_jstring(env, vita_root_path));
+        const auto firmware = fs_utils::utf8_to_path(from_jstring(env, firmware_path));
+        JavaProgressReporter reporter(env, thiz);
 
-    const auto version = install_pup(vita_root, firmware, [&](uint32_t progress) {
-        reporter.report("firmware", static_cast<float>(progress), 0.f, 0.f);
+        return install_pup(vita_root, firmware, [&](uint32_t progress) {
+            reporter.report("firmware", static_cast<float>(progress), 0.f, 0.f);
+        });
     });
 
     return version.empty() ? nullptr : env->NewStringUTF(version.c_str());
@@ -109,39 +131,41 @@ Java_com_sbro_emucorev_core_VitaInstallBridge_nativeInstallContent(
     jstring cache_root_path,
     jstring content_path,
     jint system_language) {
-    EmuEnvState emuenv;
-    configure_install_env(
-        emuenv,
-        fs_utils::utf8_to_path(from_jstring(env, vita_root_path)),
-        fs_utils::utf8_to_path(from_jstring(env, cache_root_path)),
-        system_language);
-    const auto path = fs_utils::utf8_to_path(from_jstring(env, content_path));
-    const auto extension = string_utils::tolower(path.extension().string());
-    JavaProgressReporter reporter(env, thiz);
+    return guard_install("content", 0, [&]() -> jint {
+        EmuEnvState emuenv;
+        configure_install_env(
+            emuenv,
+            fs_utils::utf8_to_path(from_jstring(env, vita_root_path)),
+            fs_utils::utf8_to_path(from_jstring(env, cache_root_path)),
+            system_language);
+        const auto path = fs_utils::utf8_to_path(from_jstring(env, content_path));
+        const auto extension = string_utils::tolower(path.extension().string());
+        JavaProgressReporter reporter(env, thiz);
 
-    if ((extension == ".rif") || (extension == ".bin") || (path.filename() == "work.bin")) {
-        return copy_license(emuenv, path) ? 1 : 0;
-    }
+        if ((extension == ".rif") || (extension == ".bin") || (path.filename() == "work.bin")) {
+            return copy_license(emuenv, path) ? 1 : 0;
+        }
 
-    if (fs::is_directory(path)) {
-        reporter.report("content", 0.f, 0.f, 0.f);
-        return static_cast<jint>(install_contents(emuenv, path));
-    }
+        if (fs::is_directory(path)) {
+            reporter.report("content", 0.f, 0.f, 0.f);
+            return static_cast<jint>(install_contents(emuenv, path));
+        }
 
-    if ((extension == ".vpk") || (extension == ".zip")) {
-        const auto installed = install_archive(emuenv, path, [&](ArchiveContents contents) {
-            reporter.report(
-                "content",
-                contents.progress.value_or(0.f),
-                contents.current.value_or(0.f),
-                contents.count.value_or(0.f));
-        });
-        return static_cast<jint>(std::count_if(installed.begin(), installed.end(), [](const ContentInfo &item) {
-            return item.state;
-        }));
-    }
+        if ((extension == ".vpk") || (extension == ".zip")) {
+            const auto installed = install_archive(emuenv, path, [&](ArchiveContents contents) {
+                reporter.report(
+                    "content",
+                    contents.progress.value_or(0.f),
+                    contents.current.value_or(0.f),
+                    contents.count.value_or(0.f));
+            });
+            return static_cast<jint>(std::count_if(installed.begin(), installed.end(), [](const ContentInfo &item) {
+                return item.state;
+            }));
+        }
 
-    return 0;
+        return 0;
+    });
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -152,19 +176,21 @@ Java_com_sbro_emucorev_core_VitaInstallBridge_nativeInstallLicense(
     jstring cache_root_path,
     jstring license_path,
     jint system_language) {
-    EmuEnvState emuenv;
-    configure_install_env(
-        emuenv,
-        fs_utils::utf8_to_path(from_jstring(env, vita_root_path)),
-        fs_utils::utf8_to_path(from_jstring(env, cache_root_path)),
-        system_language);
-    const auto path = fs_utils::utf8_to_path(from_jstring(env, license_path));
-    JavaProgressReporter reporter(env, thiz);
+    return guard_install("license", JNI_FALSE, [&]() -> jboolean {
+        EmuEnvState emuenv;
+        configure_install_env(
+            emuenv,
+            fs_utils::utf8_to_path(from_jstring(env, vita_root_path)),
+            fs_utils::utf8_to_path(from_jstring(env, cache_root_path)),
+            system_language);
+        const auto path = fs_utils::utf8_to_path(from_jstring(env, license_path));
+        JavaProgressReporter reporter(env, thiz);
 
-    reporter.report("license", 0.f, 0.f, 0.f);
-    const auto success = copy_license(emuenv, path);
-    reporter.report("license", success ? 100.f : 0.f, 0.f, 0.f);
-    return static_cast<jboolean>(success);
+        reporter.report("license", 0.f, 0.f, 0.f);
+        const auto success = copy_license(emuenv, path);
+        reporter.report("license", success ? 100.f : 0.f, 0.f, 0.f);
+        return static_cast<jboolean>(success);
+    });
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -176,22 +202,24 @@ Java_com_sbro_emucorev_core_VitaInstallBridge_nativeInstallPkg(
     jstring pkg_path,
     jstring zrif,
     jint system_language) {
-    EmuEnvState emuenv;
-    configure_install_env(
-        emuenv,
-        fs_utils::utf8_to_path(from_jstring(env, vita_root_path)),
-        fs_utils::utf8_to_path(from_jstring(env, cache_root_path)),
-        system_language);
-    const auto path = fs_utils::utf8_to_path(from_jstring(env, pkg_path));
-    auto zrif_value = from_jstring(env, zrif);
-    JavaProgressReporter reporter(env, thiz);
+    return guard_install("pkg", JNI_FALSE, [&]() -> jboolean {
+        EmuEnvState emuenv;
+        configure_install_env(
+            emuenv,
+            fs_utils::utf8_to_path(from_jstring(env, vita_root_path)),
+            fs_utils::utf8_to_path(from_jstring(env, cache_root_path)),
+            system_language);
+        const auto path = fs_utils::utf8_to_path(from_jstring(env, pkg_path));
+        auto zrif_value = from_jstring(env, zrif);
+        JavaProgressReporter reporter(env, thiz);
 
-    if (zrif_value.empty()) {
-        zrif_value = find_pkg_zrif(path, emuenv.vita_fs_path);
-    }
+        if (zrif_value.empty()) {
+            zrif_value = find_pkg_zrif(path, emuenv.vita_fs_path);
+        }
 
-    const auto success = install_pkg(path, emuenv, zrif_value, [&](float progress) {
-        reporter.report("pkg", progress, 0.f, 0.f);
+        const auto success = install_pkg(path, emuenv, zrif_value, [&](float progress) {
+            reporter.report("pkg", progress, 0.f, 0.f);
+        });
+        return static_cast<jboolean>(success);
     });
-    return static_cast<jboolean>(success);
 }
