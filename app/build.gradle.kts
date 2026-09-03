@@ -157,7 +157,18 @@ android {
                     vita3kAssetsDir
                 )
             )
-            jniLibs.setSrcDirs(listOf("src/main/cpp/vita3k/android/prebuilt", "src/main/jniLibs"))
+            jniLibs.setSrcDirs(listOf("src/main/jniLibs"))
+        }
+        // The vendored Khronos validation layer (downloaded into
+        // src/main/cpp/vita3k/android/prebuilt for non-Release CMake builds)
+        // is a debug-only tool: the Vulkan loader auto-discovers
+        // libVkLayer_*.so from the app library dir, so shipping it in release
+        // routes every vkCreateInstance through stale validation code (Vitals
+        // SIGSEGV in VKState::create during layer/extension enumeration).
+        // Keep it for debug, drop it (~24 MB) from release; the in-app
+        // validation setting disables itself gracefully when absent.
+        getByName("debug") {
+            jniLibs.srcDir("src/main/cpp/vita3k/android/prebuilt")
         }
     }
 
