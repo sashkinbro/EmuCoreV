@@ -26,6 +26,16 @@ object NativeLibraryLoader {
                     SDL.setContext(appContext)
                     SDL.loadLibrary("Vita3K", appContext)
                     loaded = true
+                    // Seed SDL's cached JNI globals (activity class, getContext,
+                    // AssetManager) before any native call. Native init scans the
+                    // app list and reads files via SDL IO; a missing file falls
+                    // back to the asset path, which aborts in JniAbort when
+                    // SDLActivity.onCreate (the normal setupJNI site) hasn't run
+                    // yet (app pre-warm, library/install flows from MainActivity).
+                    // With an app context the fallback fails gracefully instead.
+                    // SDLActivity re-runs setupJNI on creation as usual.
+                    runCatching { SDL.setupJNI() }
+                        .onFailure { Log.w(TAG, "SDL.setupJNI() pre-warm failed", it) }
                 }
             }
         }
