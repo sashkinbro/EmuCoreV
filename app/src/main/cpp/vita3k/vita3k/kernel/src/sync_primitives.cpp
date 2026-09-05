@@ -1361,11 +1361,14 @@ int condvar_wait(KernelState &kernel, MemState &mem, const char *export_name, Sc
     const auto data_it = condvar->waiting_threads->push(data);
     thread_lock.unlock();
 
-    if (auto error = handle_timeout(kernel, thread, thread_lock, condition_variable_lock, condvar->waiting_threads, data_it, export_name, timeout))
-        return error;
-
+    const int wait_result = handle_timeout(kernel, thread, thread_lock, condition_variable_lock, condvar->waiting_threads, data_it, export_name, timeout);
     condition_variable_lock.unlock();
-    return mutex_lock_impl(kernel, mem, export_name, thread_id, 1, condvar->associated_mutex, weight, timeout, false);
+
+    // A condvar wait returns with its associated mutex owned even when it times
+    // out. Reacquisition is intentionally untimed; reusing the expired timeout
+    // can return to the guest without ownership and corrupt the next unlock.
+    const int lock_result = mutex_lock_impl(kernel, mem, export_name, thread_id, 1, condvar->associated_mutex, weight, nullptr, false);
+    return wait_result == SCE_KERNEL_OK ? lock_result : wait_result;
 }
 
 int condvar_signal(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID condid, Condvar::SignalTarget signal_target, SyncWeight weight) {

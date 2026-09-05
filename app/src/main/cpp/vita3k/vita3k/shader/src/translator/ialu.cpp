@@ -245,6 +245,12 @@ bool USSETranslatorVisitor::i8mad(
         LOG_ERROR("Custom modifiers for components not handled!");
     }
 
+    inst.opr.src0.index = 0;
+    inst.opr.src1.index = 1;
+    inst.opr.src2.index = 2;
+    inst.opr.dest.index = 3;
+    set_repeat_multiplier(1, 1, 1, 1);
+
     BEGIN_REPEAT(repeat_count);
     GET_REPEAT(inst, RepeatMode::SLMSI);
 
@@ -333,6 +339,8 @@ bool USSETranslatorVisitor::i8mad(
 
     END_REPEAT();
 
+    reset_repeat_multiplier();
+
     return true;
 }
 
@@ -407,12 +415,18 @@ bool USSETranslatorVisitor::i16mad(
         }
     }
 
+    inst.opr.src0.index = 0;
+    inst.opr.src1.index = 1;
+    inst.opr.src2.index = 2;
+    inst.opr.dest.index = 3;
+    set_repeat_multiplier(1, 1, 1, 1);
+
     BEGIN_REPEAT(repeat_count);
     GET_REPEAT(inst, RepeatMode::SLMSI);
 
-    LOG_DISASM("{:016x}: {}{} {} {} {} {}", m_instr, disasm::s_predicate_str(pred), "IMAD16", disasm::operand_to_str(inst.opr.dest, 0b1),
-        disasm::operand_to_str(inst.opr.src0, 0b1), disasm::operand_to_str(inst.opr.src1, mask_src1) + ((src1_format != 0) ? "-8bits" : ""),
-        disasm::operand_to_str(inst.opr.src2, mask_src2) + ((src2_format != 0) ? "-8bits" : ""));
+    LOG_DISASM("{:016x}: {}{} {} {} {} {}", m_instr, disasm::s_predicate_str(pred), "IMAD16", disasm::operand_to_str(inst.opr.dest, 0b1, dest_repeat_offset),
+        disasm::operand_to_str(inst.opr.src0, 0b1, src0_repeat_offset), disasm::operand_to_str(inst.opr.src1, mask_src1, src1_repeat_offset) + ((src1_format != 0) ? "-8bits" : ""),
+        disasm::operand_to_str(inst.opr.src2, mask_src2, src2_repeat_offset) + ((src2_format != 0) ? "-8bits" : ""));
 
     inst.opr.src0.swizzle = SWIZZLE_CHANNEL_4_DEFAULT;
     spv::Id source0 = load(inst.opr.src0, 0b1, src0_repeat_offset);
@@ -429,6 +443,8 @@ bool USSETranslatorVisitor::i16mad(
     }
 
     END_REPEAT();
+
+    reset_repeat_multiplier();
 
     return true;
 }

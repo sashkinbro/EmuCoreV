@@ -613,8 +613,11 @@ SceUID load_self(KernelState &kernel, MemState &mem, const void *self, const std
 
     for (Elf_Half seg_index = 0; seg_index < elf.e_phnum; ++seg_index) {
         const Elf32_Phdr &seg_header = segments[seg_index];
+        // Segment info addresses bytes in the SELF. p_offset addresses the ELF
+        // the SELF was created from, and only older fake SELFs embedded that ELF
+        // at header_len. New vita-make-fself output therefore needs this offset.
         const uint8_t *const seg_bytes = is_self
-            ? (image_bytes + self_header.header_len + seg_header.p_offset)
+            ? (image_bytes + seg_infos[seg_index].offset)
             : (elf_bytes + seg_header.p_offset);
 
         const auto uncompress_segment = [&](void *dst) {

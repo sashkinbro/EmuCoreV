@@ -942,13 +942,11 @@ static void display_entry_thread(EmuEnvState &emuenv) {
         }
         emuenv.gxm.display_worker_state.store(3, std::memory_order_relaxed);
 
-        // now we can remove the thread from the display queue
-        display_queue.pop();
-        emuenv.gxm.display_entries_done.fetch_add(1, std::memory_order_relaxed);
-
         // check if we're shutting down before calling run_guest_function to avoid deadlock
         if (emuenv.display.abort.load()) {
-            LOG_DEBUG("Abort detected after pop, freeing callback data and exiting");
+            LOG_DEBUG("Abort detected, removing display callback data and exiting");
+            display_queue.pop();
+            emuenv.gxm.display_entries_done.fetch_add(1, std::memory_order_relaxed);
             free(emuenv.mem, display_callback->data);
             break;
         }
@@ -967,6 +965,8 @@ static void display_entry_thread(EmuEnvState &emuenv) {
             renderer::subject_done(new_sync, display_callback->new_sync_timestamp + 1);
 
         free(emuenv.mem, display_callback->data);
+        display_queue.pop();
+        emuenv.gxm.display_entries_done.fetch_add(1, std::memory_order_relaxed);
     }
 }
 
@@ -2738,14 +2738,21 @@ EXPORT(int, sceGxmExecuteCommandList, SceGxmContext *context, SceGxmCommandList 
 
 EXPORT(int, sceGxmFinish, SceGxmContext *context) {
     TRACY_FUNC(sceGxmFinish, context);
-    assert(context);
 
     if (!context)
-        return RET_ERROR(SCE_GXM_ERROR_INVALID_THREAD);
+        return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
+
+    const Address context_addr = Ptr<SceGxmContext>(context, emuenv.mem).address();
+    if (context_addr != emuenv.gxm.immediate_context || context->state.type != SCE_GXM_CONTEXT_TYPE_IMMEDIATE)
+        return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
+
+    renderer::Context *renderer_context = context->renderer.get();
+    if (!renderer_context || renderer_context != emuenv.renderer->context)
+        return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
 
     // Wait on this context's rendering finish code.
     guest_sched_release_for_block();
-    renderer::finish(*emuenv.renderer, context->renderer.get());
+    renderer::finish(*emuenv.renderer, renderer_context);
 
     return 0;
 }

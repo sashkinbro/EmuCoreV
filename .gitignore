@@ -49,20 +49,9 @@ emulog.txt
 # Local tooling and extracted dependencies
 .tmp_repo_style/
 third_party/vcpkg/
-tools/msys64/
-tools/msys2-base-*.exe
-tools/apktool.jar
-tools/build_parallel_release_apks.ps1
-tools/clone_emucorev_apk.ps1
-tools/openssl-test/
-tools/openssl-test/out/
-tools/openssl-test/openssl-*/
-tools/openssl-test/*.tar.gz
-tools/update_vita3k_core.ps1
-tools/vita3k-core-update-manifest.json
-tools/vita3k-core-update.README.md
-tools/vita3k-upstream/
-tools/vita3k-update-work/
+release/
+tools/
+docs/
 app/src/main/cpp/vita3k/android/app/assets/*
 !app/src/main/cpp/vita3k/android/app/assets/.gitignore
 app/src/main/jniLibs/
