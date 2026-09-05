@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.library
 
+import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -24,12 +26,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.Close
@@ -49,6 +53,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -65,6 +70,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -86,6 +92,7 @@ import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.LocalCustomizationSettings
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
+import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
 
 private enum class LibraryLayoutMode {
     LIST,
@@ -108,6 +115,7 @@ fun LibraryScreen(
     val windowInfo = LocalWindowInfo.current
     val density = LocalDensity.current
     val customization = LocalCustomizationSettings.current
+    val neon = LocalNeonTheme.current
     val refreshClick = rememberDebouncedClick(onClick = viewModel::refresh)
     var layoutMode by rememberSaveable { mutableStateOf(LibraryLayoutMode.LIST) }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
@@ -168,85 +176,118 @@ fun LibraryScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            ScreenTopBarSurface {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (onMenuClick != null) {
-                        NavigationMenuButton(
-                            onClick = onMenuClick,
-                            modifier = Modifier.padding(end = 14.dp)
-                        )
+            Column {
+                ScreenTopBarSurface {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (onMenuClick != null) {
+                            NavigationMenuButton(
+                                onClick = onMenuClick,
+                                modifier = Modifier.padding(end = if (neon) 12.dp else 14.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.nav_library),
+                                style = (if (neon) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineSmall)
+                                    .copy(fontWeight = FontWeight.Bold),
+                                color = if (neon) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onBackground,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = gameCountSubtitle,
+                                style = if (neon) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.nav_library),
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            text = gameCountSubtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = {
-                            if (searchExpanded) {
-                                searchExpanded = false
-                                viewModel.updateQuery("")
-                            } else {
-                                searchExpanded = true
+                    val headerActions: @Composable () -> Unit = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                modifier = Modifier.size(42.dp),
+                                onClick = {
+                                    if (searchExpanded) {
+                                        searchExpanded = false
+                                        viewModel.updateQuery("")
+                                    } else {
+                                        searchExpanded = true
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = if (searchExpanded) Icons.Rounded.Close else Icons.Rounded.Search,
+                                    contentDescription = stringResource(R.string.library_search_hint),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (neon) LibraryHeaderActionDivider()
+                            IconButton(
+                                modifier = Modifier.size(42.dp),
+                                onClick = { layoutMode = if (layoutMode == LibraryLayoutMode.LIST) LibraryLayoutMode.GRID else LibraryLayoutMode.LIST }
+                            ) {
+                                Icon(
+                                    imageVector = if (layoutMode == LibraryLayoutMode.LIST) Icons.Rounded.ViewModule else Icons.AutoMirrored.Rounded.ViewList,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (neon) LibraryHeaderActionDivider()
+                            IconButton(
+                                modifier = Modifier.size(42.dp),
+                                onClick = refreshClick
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Refresh,
+                                    contentDescription = stringResource(R.string.library_refresh),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
-                    ) {
-                        Icon(
-                            imageVector = if (searchExpanded) Icons.Rounded.Close else Icons.Rounded.Search,
-                            contentDescription = stringResource(R.string.library_search_hint),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
-                    IconButton(onClick = { layoutMode = if (layoutMode == LibraryLayoutMode.LIST) LibraryLayoutMode.GRID else LibraryLayoutMode.LIST }) {
-                        Icon(
-                            imageVector = if (layoutMode == LibraryLayoutMode.LIST) Icons.Rounded.ViewModule else Icons.AutoMirrored.Rounded.ViewList,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    if (neon) {
+                        Surface(
+                            shape = neonShape(18.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
+                            border = BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)
+                            )
+                        ) {
+                            headerActions()
+                        }
+                    } else {
+                        headerActions()
                     }
-                    IconButton(onClick = refreshClick) {
-                        Icon(
-                            imageVector = Icons.Rounded.Refresh,
-                            contentDescription = stringResource(R.string.library_refresh),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                }
+
+                AnimatedVisibility(
+                    visible = searchExpanded,
+                    enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                    exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+                ) {
+                    Column {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        OutlinedTextField(
+                            value = uiState.query,
+                            onValueChange = viewModel::updateQuery,
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text(stringResource(R.string.library_search_hint)) },
+                            singleLine = true,
+                            shape = neonShape(20.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                            )
                         )
                     }
                 }
-            }
-        }
-
-        item {
-            AnimatedVisibility(
-                visible = searchExpanded,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                OutlinedTextField(
-                    value = uiState.query,
-                    onValueChange = viewModel::updateQuery,
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(stringResource(R.string.library_search_hint)) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(20.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    )
-                )
             }
         }
 
@@ -285,7 +326,7 @@ fun LibraryScreen(
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f),
                             textAlign = TextAlign.Center
                         )
-                        Button(onClick = refreshClick) {
+                        Button(shape = neonButtonShape(), onClick = refreshClick) {
                             Icon(Icons.Rounded.FolderOpen, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(stringResource(R.string.library_refresh))
@@ -296,7 +337,7 @@ fun LibraryScreen(
         } else if (layoutMode == LibraryLayoutMode.LIST) {
             items(uiState.items, key = { it.titleId }) { game ->
                 val selectGameClick = rememberDebouncedClick { onLaunchGame(game.titleId) }
-                val shape = RoundedCornerShape(24.dp)
+                val shape = neonShape(24.dp)
                 var menuExpanded by remember(game.titleId) { mutableStateOf(false) }
                 Box {
                     Surface(
@@ -345,94 +386,45 @@ fun LibraryScreen(
                             }
                         }
                     }
-                    DropdownMenu(
+                    LibraryGameContextMenu(
                         expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(addShortcutLabel) },
-                            onClick = {
-                                val message = when (GameShortcutInstaller.requestPinnedShortcut(context, game.titleId, game.title, game.iconPath)) {
-                                    GameShortcutInstaller.Result.Requested -> shortcutRequestedMessage
-                                    GameShortcutInstaller.Result.Unsupported -> shortcutUnsupportedMessage
-                                    GameShortcutInstaller.Result.Failed -> shortcutFailedMessage
-                                }
-                                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                                menuExpanded = false
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Add,
-                                    contentDescription = null
-                                )
+                        onDismiss = { menuExpanded = false },
+                        addShortcutLabel = addShortcutLabel,
+                        onAddShortcut = {
+                            val message = when (GameShortcutInstaller.requestPinnedShortcut(context, game.titleId, game.title, game.iconPath)) {
+                                GameShortcutInstaller.Result.Requested -> shortcutRequestedMessage
+                                GameShortcutInstaller.Result.Unsupported -> shortcutUnsupportedMessage
+                                GameShortcutInstaller.Result.Failed -> shortcutFailedMessage
                             }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(manageGameSettingsLabel) },
-                            onClick = {
-                                onOpenGameManager(game.titleId)
-                                menuExpanded = false
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Tune,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(playTimeLabel) },
-                            onClick = {
-                                onOpenPlayTime(game.titleId)
-                                menuExpanded = false
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.QueryStats,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(achievementsLabel) },
-                            onClick = {
-                                onOpenAchievements(game.titleId)
-                                menuExpanded = false
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.EmojiEvents,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(manageSaveDataLabel) },
-                            onClick = {
-                                onOpenSaveManager(game.titleId)
-                                menuExpanded = false
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Save,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(deleteGameLabel) },
-                            onClick = {
-                                deleteGameId = game.titleId
-                                menuExpanded = false
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Delete,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-                    }
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                            menuExpanded = false
+                        },
+                        manageGameSettingsLabel = manageGameSettingsLabel,
+                        onManageGameSettings = {
+                            onOpenGameManager(game.titleId)
+                            menuExpanded = false
+                        },
+                        playTimeLabel = playTimeLabel,
+                        onOpenPlayTime = {
+                            onOpenPlayTime(game.titleId)
+                            menuExpanded = false
+                        },
+                        achievementsLabel = achievementsLabel,
+                        onOpenAchievements = {
+                            onOpenAchievements(game.titleId)
+                            menuExpanded = false
+                        },
+                        manageSaveDataLabel = manageSaveDataLabel,
+                        onManageSaveData = {
+                            onOpenSaveManager(game.titleId)
+                            menuExpanded = false
+                        },
+                        deleteGameLabel = deleteGameLabel,
+                        onDeleteGame = {
+                            deleteGameId = game.titleId
+                            menuExpanded = false
+                        }
+                    )
                 }
             }
         } else {
@@ -446,7 +438,7 @@ fun LibraryScreen(
                 ) {
                     rowItems.forEach { game ->
                         val selectGameClick = rememberDebouncedClick { onLaunchGame(game.titleId) }
-                        val shape = RoundedCornerShape(24.dp)
+                        val shape = neonShape(24.dp)
                         var menuExpanded by remember(game.titleId) { mutableStateOf(false) }
                         Box(modifier = Modifier.weight(1f)) {
                             Surface(
@@ -490,94 +482,45 @@ fun LibraryScreen(
                                     }
                                 }
                             }
-                            DropdownMenu(
+                            LibraryGameContextMenu(
                                 expanded = menuExpanded,
-                                onDismissRequest = { menuExpanded = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text(addShortcutLabel) },
-                                    onClick = {
-                                        val message = when (GameShortcutInstaller.requestPinnedShortcut(context, game.titleId, game.title, game.iconPath)) {
-                                            GameShortcutInstaller.Result.Requested -> shortcutRequestedMessage
-                                            GameShortcutInstaller.Result.Unsupported -> shortcutUnsupportedMessage
-                                            GameShortcutInstaller.Result.Failed -> shortcutFailedMessage
-                                        }
-                                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                                        menuExpanded = false
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Add,
-                                            contentDescription = null
-                                        )
+                                onDismiss = { menuExpanded = false },
+                                addShortcutLabel = addShortcutLabel,
+                                onAddShortcut = {
+                                    val message = when (GameShortcutInstaller.requestPinnedShortcut(context, game.titleId, game.title, game.iconPath)) {
+                                        GameShortcutInstaller.Result.Requested -> shortcutRequestedMessage
+                                        GameShortcutInstaller.Result.Unsupported -> shortcutUnsupportedMessage
+                                        GameShortcutInstaller.Result.Failed -> shortcutFailedMessage
                                     }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(manageGameSettingsLabel) },
-                                    onClick = {
-                                        onOpenGameManager(game.titleId)
-                                        menuExpanded = false
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Tune,
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(playTimeLabel) },
-                                    onClick = {
-                                        onOpenPlayTime(game.titleId)
-                                        menuExpanded = false
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.QueryStats,
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(achievementsLabel) },
-                                    onClick = {
-                                        onOpenAchievements(game.titleId)
-                                        menuExpanded = false
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.EmojiEvents,
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(manageSaveDataLabel) },
-                                    onClick = {
-                                        onOpenSaveManager(game.titleId)
-                                        menuExpanded = false
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Save,
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(deleteGameLabel) },
-                                    onClick = {
-                                        deleteGameId = game.titleId
-                                        menuExpanded = false
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Delete,
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                            }
+                                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                    menuExpanded = false
+                                },
+                                manageGameSettingsLabel = manageGameSettingsLabel,
+                                onManageGameSettings = {
+                                    onOpenGameManager(game.titleId)
+                                    menuExpanded = false
+                                },
+                                playTimeLabel = playTimeLabel,
+                                onOpenPlayTime = {
+                                    onOpenPlayTime(game.titleId)
+                                    menuExpanded = false
+                                },
+                                achievementsLabel = achievementsLabel,
+                                onOpenAchievements = {
+                                    onOpenAchievements(game.titleId)
+                                    menuExpanded = false
+                                },
+                                manageSaveDataLabel = manageSaveDataLabel,
+                                onManageSaveData = {
+                                    onOpenSaveManager(game.titleId)
+                                    menuExpanded = false
+                                },
+                                deleteGameLabel = deleteGameLabel,
+                                onDeleteGame = {
+                                    deleteGameId = game.titleId
+                                    menuExpanded = false
+                                }
+                            )
                         }
                     }
                     repeat(gridColumns - rowItems.size) {
@@ -621,6 +564,133 @@ fun LibraryScreen(
 }
 
 @Composable
+private fun LibraryHeaderActionDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(20.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+    )
+}
+
+@Composable
+private fun LibraryGameContextMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    addShortcutLabel: String,
+    onAddShortcut: () -> Unit,
+    manageGameSettingsLabel: String,
+    onManageGameSettings: () -> Unit,
+    playTimeLabel: String,
+    onOpenPlayTime: () -> Unit,
+    achievementsLabel: String,
+    onOpenAchievements: () -> Unit,
+    manageSaveDataLabel: String,
+    onManageSaveData: () -> Unit,
+    deleteGameLabel: String,
+    onDeleteGame: () -> Unit
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        modifier = Modifier.widthIn(min = 248.dp, max = 310.dp),
+        shape = neonShape(20.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        shadowElevation = 12.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+    ) {
+        LibraryGameContextMenuItem(
+            text = addShortcutLabel,
+            icon = Icons.Rounded.Add,
+            onClick = onAddShortcut
+        )
+        LibraryGameContextMenuDivider()
+        LibraryGameContextMenuItem(
+            text = manageGameSettingsLabel,
+            icon = Icons.Rounded.Tune,
+            onClick = onManageGameSettings
+        )
+        LibraryGameContextMenuItem(
+            text = playTimeLabel,
+            icon = Icons.Rounded.QueryStats,
+            onClick = onOpenPlayTime
+        )
+        LibraryGameContextMenuItem(
+            text = achievementsLabel,
+            icon = Icons.Rounded.EmojiEvents,
+            onClick = onOpenAchievements
+        )
+        LibraryGameContextMenuItem(
+            text = manageSaveDataLabel,
+            icon = Icons.Rounded.Save,
+            onClick = onManageSaveData
+        )
+        LibraryGameContextMenuDivider()
+        LibraryGameContextMenuItem(
+            text = deleteGameLabel,
+            icon = Icons.Rounded.Delete,
+            onClick = onDeleteGame,
+            destructive = true
+        )
+    }
+}
+
+@Composable
+private fun LibraryGameContextMenuItem(
+    text: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    destructive: Boolean = false
+) {
+    val itemColor = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    val iconContainerColor = if (destructive) {
+        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.78f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)
+    }
+    val iconColor = if (destructive) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
+
+    DropdownMenuItem(
+        text = {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                color = itemColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        onClick = onClick,
+        leadingIcon = {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(neonShape(11.dp))
+                    .background(iconContainerColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(19.dp),
+                    tint = iconColor
+                )
+            }
+        },
+        contentPadding = PaddingValues(horizontal = 12.dp)
+    )
+}
+
+@Composable
+private fun LibraryGameContextMenuDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
+    )
+}
+
+@Composable
 private fun LibraryGameArtwork(
     path: String?,
     title: String,
@@ -629,7 +699,7 @@ private fun LibraryGameArtwork(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {

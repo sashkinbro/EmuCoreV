@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.achievements
 
+import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,7 +27,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
+import com.sbro.emucorev.ui.theme.neon.neonPillShape
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -177,6 +180,7 @@ private fun AchievementsTopBar(
 ) {
     ScreenTopBar(
         title = stringResource(R.string.achievements_title),
+        showNeonDivider = true,
         onBackClick = onBackClick,
         onMenuClick = onMenuClick,
         modifier = modifier,
@@ -212,6 +216,7 @@ private fun TrophySetSelector(
             items(sets, key = { it.communicationId }) { set ->
                 val selected = set.communicationId.equals(selectedCommunicationId, ignoreCase = true)
                 FilterChip(
+                    shape = neonChipShape(),
                     selected = selected,
                     onClick = { onSelect(set.communicationId) },
                     colors = FilterChipDefaults.filterChipColors(
@@ -243,7 +248,7 @@ private fun TrophySetHeader(
     val progress = if (set.trophyCount > 0) set.unlockedCount / set.trophyCount.toFloat() else 0f
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
@@ -254,7 +259,7 @@ private fun TrophySetHeader(
         ) {
             Surface(
                 modifier = Modifier.size(64.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = neonShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh
             ) {
                 LocalImage(
@@ -311,7 +316,7 @@ private fun TrophyGroupCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
@@ -380,7 +385,7 @@ private fun TrophyRow(
     val hiddenLocked = trophy.hidden && !trophy.unlocked
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.52f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f))
     ) {
@@ -395,8 +400,8 @@ private fun TrophyRow(
                 Surface(
                     modifier = Modifier
                         .size(56.dp)
-                        .clip(RoundedCornerShape(14.dp)),
-                    shape = RoundedCornerShape(14.dp),
+                        .clip(neonShape(14.dp)),
+                    shape = neonShape(14.dp),
                     color = if (trophy.unlocked) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)
                 ) {
                     if (hiddenLocked) {
@@ -560,11 +565,11 @@ private fun AssistActionChip(
     onClick: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(50),
+        shape = neonPillShape(),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(neonPillShape())
             .clickable(enabled = !loading, onClick = onClick)
     ) {
         Row(
@@ -687,7 +692,7 @@ private fun ShimmerLine(
     Box(
         modifier = lineModifier
             .height(11.dp)
-            .clip(RoundedCornerShape(50))
+            .clip(neonPillShape())
             .background(
                 Brush.linearGradient(
                     colors = listOf(base, highlight, base),
@@ -763,7 +768,7 @@ private fun EmptyAchievementsState(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 220.dp),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {

@@ -892,6 +892,14 @@
     <string name="settings_pro_restore">استعادة الشراء</string>
     <string name="settings_pro_support_more">دعم التطوير بشكل أكبر</string>
     <string name="settings_pro_support_more_short">دعم أكبر</string>
+    <string name="settings_pro_support_dialog_eyebrow">دعم اختياري</string>
+    <string name="settings_pro_support_dialog_title">اختر مستوى الدعم</string>
+    <string name="settings_pro_support_dialog_desc">تفتح عملية شراء Pro القياسية جميع الميزات بالفعل. توفر هذه المستويات الاختيارية دعماً إضافياً لأعمال التوافق والتطوير المستمر.</string>
+    <string name="settings_pro_supporter_title">Pro داعم</string>
+    <string name="settings_pro_supporter_desc">جميع ميزات Pro مع دعم إضافي للمشروع.</string>
+    <string name="settings_pro_patron_title">Pro راعٍ</string>
+    <string name="settings_pro_patron_desc">جميع ميزات Pro مع أقصى دعم للمشروع.</string>
+    <string name="settings_pro_support_same_features">تفتح جميع المستويات ميزات Pro نفسها بشكل دائم. اختر مستوى أعلى فقط إذا كنت تريد تقديم دعم أكبر للتطوير.</string>
     <string name="pro_price_loading">جاري تحميل السعر</string>
     <string name="pro_price_unavailable">Pro غير متوفر بعد</string>
     <string name="settings_pro_feature_crimson_title">مظهر Crimson</string>
@@ -911,6 +919,7 @@
     <string name="settings_theme_system">النظام</string>
     <string name="settings_theme_light">فاتح</string>
     <string name="settings_theme_dark">داكن</string>
+    <string name="settings_theme_neon">نيون</string>
     <string name="settings_theme_pro">Crimson Pro</string>
     <string name="settings_theme_pro_locked">فتح باستخدام Pro</string>
     <string name="profile_pro_badge">PRO</string>

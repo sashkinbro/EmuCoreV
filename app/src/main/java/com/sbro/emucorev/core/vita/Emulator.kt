@@ -707,7 +707,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             translationZ = EMULATION_OVERLAY_ELEVATION
             setContent {
                 val themeMode by preferences.themeModeFlow.collectAsState(initial = preferences.themeMode)
-                EmuCoreVTheme(themeMode = themeMode) {
+                EmuCoreVTheme(themeMode = themeMode, enableCrtOverlay = false) {
                     EmulationOverlayHost(activity = this@Emulator)
                 }
             }

@@ -19,7 +19,8 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -141,7 +142,7 @@ private fun VitaLanguageOptionRow(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = containerColor,
         tonalElevation = if (selected) 4.dp else 1.dp,
         shadowElevation = if (selected) 5.dp else 2.dp,
@@ -165,7 +166,7 @@ private fun VitaLanguageOptionRow(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(neonShape(14.dp))
                     .background(
                         if (selected) {
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)

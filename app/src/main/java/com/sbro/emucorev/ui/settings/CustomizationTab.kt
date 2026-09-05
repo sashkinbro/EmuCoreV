@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.settings
 
+import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -19,7 +20,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
+import com.sbro.emucorev.ui.theme.neon.neonPillShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -56,6 +59,7 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppFont
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.CustomizationSettings
+import com.sbro.emucorev.data.TouchControlVisualStyle
 import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.theme.ThemeMode
 import com.sbro.emucorev.ui.library.LibraryGridSizing
@@ -121,6 +125,16 @@ fun CustomizationTab(
                     selected = themeMode == ThemeMode.DARK,
                     label = stringResource(R.string.settings_theme_dark),
                     onClick = { preferences.themeMode = ThemeMode.DARK }
+                )
+                ThemeChip(
+                    selected = themeMode == ThemeMode.NEON,
+                    label = stringResource(R.string.settings_theme_neon),
+                    onClick = {
+                        if (themeMode != ThemeMode.NEON) {
+                            viewModel.updateTouchControlVisualStyle(TouchControlVisualStyle.MODERN)
+                            preferences.themeMode = ThemeMode.NEON
+                        }
+                    }
                 )
                 ThemeChip(
                     selected = themeMode == ThemeMode.PRO,
@@ -290,6 +304,7 @@ private fun ThemeChip(
     onClick: () -> Unit
 ) {
     FilterChip(
+        shape = neonChipShape(),
         selected = selected,
         onClick = onClick,
         enabled = enabled,
@@ -317,7 +332,7 @@ private fun CustomizationPreview(settings: CustomizationSettings) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(210.dp),
-            shape = RoundedCornerShape(26.dp),
+            shape = neonShape(26.dp),
             color = MaterialTheme.colorScheme.background,
             border = BorderStroke(
                 1.dp,
@@ -334,20 +349,15 @@ private fun CustomizationPreview(settings: CustomizationSettings) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.app_name_emucorev),
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                        )
-                        Text(
-                            text = stringResource(R.string.customization_preview_subtitle),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = stringResource(R.string.app_name_emucorev),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                     Surface(
-                        shape = RoundedCornerShape(50),
+                        shape = neonPillShape(),
                         color = MaterialTheme.colorScheme.primaryContainer
                     ) {
                         Text(
@@ -362,6 +372,13 @@ private fun CustomizationPreview(settings: CustomizationSettings) {
                         )
                     }
                 }
+                Text(
+                    text = stringResource(R.string.customization_preview_subtitle),
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Row(
                     modifier = Modifier
                         .weight(1f)
@@ -383,7 +400,7 @@ private fun CustomizationPreview(settings: CustomizationSettings) {
                             modifier = Modifier
                                 .width(52.dp * coverScale)
                                 .aspectRatio(0.72f),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = neonShape(12.dp),
                             color = colors[index % colors.size]
                         ) {}
                     }
@@ -436,6 +453,7 @@ private fun FontChip(
     onClick: () -> Unit
 ) {
     FilterChip(
+        shape = neonChipShape(),
         selected = selected,
         onClick = onClick,
         label = { Text(label) }
@@ -455,7 +473,7 @@ private fun CustomizationActionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = if (selected) {
             accent.copy(alpha = 0.12f)
         } else {
@@ -473,7 +491,7 @@ private fun CustomizationActionRow(
         ) {
             Surface(
                 modifier = Modifier.size(48.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = neonShape(16.dp),
                 color = accent.copy(alpha = 0.14f)
             ) {
                 Box(contentAlignment = Alignment.Center) {

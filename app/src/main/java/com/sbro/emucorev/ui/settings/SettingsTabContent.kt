@@ -1,5 +1,9 @@
 package com.sbro.emucorev.ui.settings
 
+import com.sbro.emucorev.ui.theme.neon.neonButtonShape
+import com.sbro.emucorev.ui.theme.neon.neonChipShape
+import com.sbro.emucorev.ui.theme.neon.neonAccentColor
+import com.sbro.emucorev.ui.theme.neon.neonCornerAccent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -17,7 +21,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Favorite
@@ -234,11 +239,13 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
                 onResetDefault = { viewModel.updateCoreSettings { it.copy(customDriverName = defaults.customDriverName) } }
             ) {
                 FilterChip(
+                    shape = neonChipShape(),
                     selected = uiState.coreConfig.customDriverName.isBlank(),
                     onClick = { viewModel.updateCoreSettings { it.copy(customDriverName = "") } },
                     label = { Text(stringResource(R.string.settings_gpu_driver_system)) }
                 )
                 FilterChip(
+                    shape = neonChipShape(),
                     selected = uiState.coreConfig.customDriverName.isNotBlank(),
                     onClick = {
                         val firstDriver = uiState.installedGpuDrivers.firstOrNull()
@@ -257,6 +264,7 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
                 modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
             )
             Button(
+                shape = neonButtonShape(),
                 onClick = onOpenGpuDriverSettings,
                 modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
             ) {
@@ -336,7 +344,7 @@ private fun GpuDriverStatus(
         modifier = modifier
             .fillMaxWidth()
             .padding(top = 4.dp),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
     ) {
         Column(modifier = Modifier.padding(horizontal = SettingsCardInnerPadding, vertical = SettingsCardInnerPadding)) {
@@ -378,6 +386,7 @@ private fun AudioTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMod
         }
         Toggle(stringResource(R.string.settings_core_ngs_enable), stringResource(R.string.settings_help_ngs_enable), uiState.coreConfig.ngsEnable, { enabled -> viewModel.updateCoreSettings { it.copy(ngsEnable = enabled) } }, { viewModel.updateCoreSettings { it.copy(ngsEnable = defaults.ngsEnable) } })
         Button(
+            shape = neonButtonShape(),
             onClick = refreshCoreSettingsClick,
             modifier = Modifier
                 .padding(horizontal = SettingsSectionRowPadding, vertical = 12.dp)
@@ -666,6 +675,7 @@ private fun SystemTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMo
         Chips(stringResource(R.string.settings_frame_limit), stringResource(R.string.settings_help_frame_limit), { viewModel.updateCoreSettings { it.copy(frameLimit = defaults.frameLimit) } }) {
             FrameLimit.supportedValues.forEach { limit ->
                 FilterChip(
+                    shape = neonChipShape(),
                     selected = uiState.coreConfig.frameLimit == limit,
                     onClick = { viewModel.updateCoreSettings { it.copy(frameLimit = limit) } },
                     label = {
@@ -747,6 +757,7 @@ private fun StorageTab(
             )
         }
         Button(
+            shape = neonButtonShape(),
             onClick = { storagePickerVisible = true },
             enabled = !uiState.storageChangeInProgress,
             modifier = Modifier.padding(top = 12.dp)
@@ -787,10 +798,10 @@ private fun StorageTab(
             text = stringResource(R.string.settings_backup_body),
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
         )
-        Button(onClick = restoreBackupClick, modifier = Modifier.padding(top = 12.dp)) {
+        Button(shape = neonButtonShape(), onClick = restoreBackupClick, modifier = Modifier.padding(top = 12.dp)) {
             Text(stringResource(R.string.settings_backup_restore))
         }
-        Button(onClick = createBackupClick, modifier = Modifier.padding(top = 8.dp)) {
+        Button(shape = neonButtonShape(), onClick = createBackupClick, modifier = Modifier.padding(top = 8.dp)) {
             Text(stringResource(R.string.settings_backup_create))
         }
     }
@@ -828,6 +839,7 @@ private fun ClearCacheSection(
             modifier = Modifier.padding(top = 8.dp)
         )
         Button(
+            shape = neonButtonShape(),
             onClick = { confirmVisible = true },
             enabled = !clearing && cacheSizeBytes > 0L,
             modifier = Modifier.padding(top = 12.dp)
@@ -851,6 +863,7 @@ private fun ClearCacheSection(
             text = { Text(stringResource(R.string.settings_clear_cache_confirm_message, formattedSize)) },
             confirmButton = {
                 Button(
+                    shape = neonButtonShape(),
                     enabled = !clearing,
                     onClick = {
                         clearing = true
@@ -903,7 +916,7 @@ private fun StorageChangeConfirmDialog(
             }
         },
         confirmButton = {
-            Button(onClick = onConfirm) {
+            Button(shape = neonButtonShape(), onClick = onConfirm) {
                 Text(stringResource(R.string.settings_storage_confirm_action))
             }
         },
@@ -946,7 +959,7 @@ private fun StorageMigrationDialog(
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp, vertical = 18.dp)
                 .heightIn(max = maxDialogHeight),
-            shape = RoundedCornerShape(30.dp),
+            shape = neonShape(30.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp,
             shadowElevation = 16.dp,
@@ -999,6 +1012,7 @@ private fun StorageMigrationDialog(
                 }
                 if (!inProgress) {
                     Button(
+                        shape = neonButtonShape(),
                         onClick = onDismiss,
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -1028,7 +1042,7 @@ private fun SettingsStorageDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp),
-            shape = RoundedCornerShape(28.dp),
+            shape = neonShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
             shadowElevation = 10.dp
@@ -1054,7 +1068,7 @@ private fun SettingsStorageDialog(
                 storageLocations.forEachIndexed { index, location ->
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
+                        shape = neonShape(18.dp),
                         color = if (location.selected) {
                             MaterialTheme.colorScheme.secondaryContainer
                         } else {
@@ -1233,8 +1247,13 @@ private fun LinkItem(
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .neonCornerAccent(
+                accent = neonAccentColor(title.hashCode().mod(3)),
+                markSize = 9.dp
+            ),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 1.dp,
         shadowElevation = 2.dp,
@@ -1248,7 +1267,7 @@ private fun LinkItem(
             Box(
                 modifier = Modifier
                     .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(neonShape(12.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -1298,8 +1317,12 @@ private fun VibrationTestRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = SettingsSectionRowPadding),
-        shape = RoundedCornerShape(18.dp),
+            .padding(horizontal = SettingsSectionRowPadding)
+            .neonCornerAccent(
+                accent = neonAccentColor(title.hashCode().mod(3)),
+                markSize = 9.dp
+            ),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 1.dp,
         shadowElevation = 2.dp,
@@ -1323,6 +1346,7 @@ private fun VibrationTestRow(
                 )
             }
             Button(
+                shape = neonButtonShape(),
                 onClick = onClick,
                 enabled = enabled
             ) {
@@ -1342,8 +1366,12 @@ private fun AppLanguageSettingRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = SettingsSectionRowPadding),
-        shape = RoundedCornerShape(18.dp),
+            .padding(horizontal = SettingsSectionRowPadding)
+            .neonCornerAccent(
+                accent = neonAccentColor(stringResource(R.string.settings_app_language).hashCode().mod(3)),
+                markSize = 9.dp
+            ),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 1.dp,
         shadowElevation = 2.dp,
@@ -1360,7 +1388,7 @@ private fun AppLanguageSettingRow(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(neonShape(14.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -1395,8 +1423,12 @@ private fun VitaLanguageSettingRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = SettingsSectionRowPadding),
-        shape = RoundedCornerShape(18.dp),
+            .padding(horizontal = SettingsSectionRowPadding)
+            .neonCornerAccent(
+                accent = neonAccentColor(stringResource(R.string.settings_system_language).hashCode().mod(3)),
+                markSize = 9.dp
+            ),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 1.dp,
         shadowElevation = 2.dp,
@@ -1413,7 +1445,7 @@ private fun VitaLanguageSettingRow(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(neonShape(14.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -1471,6 +1503,7 @@ private fun ButtonChip(
     viewModel: SettingsViewModel
 ) {
     FilterChip(
+        shape = neonChipShape(),
         selected = uiState.coreConfig.sysButton == value,
         onClick = { viewModel.updateCoreSettings { it.copy(sysButton = value) } },
         colors = appFilterChipColors(),
@@ -1486,6 +1519,7 @@ private fun ModeChip(
     viewModel: SettingsViewModel
 ) {
     FilterChip(
+        shape = neonChipShape(),
         selected = uiState.coreConfig.modulesMode == value,
         onClick = { viewModel.updateCoreSettings { it.copy(modulesMode = value) } },
         colors = appFilterChipColors(),
@@ -1503,6 +1537,7 @@ private fun IntChip(
     transform: (VitaCoreConfig, Int) -> VitaCoreConfig
 ) {
     FilterChip(
+        shape = neonChipShape(),
         selected = current == value,
         enabled = enabled,
         onClick = { viewModel.updateCoreSettings { config -> transform(config, value) } },
@@ -1535,6 +1570,7 @@ private fun TextChip(
     transform: (VitaCoreConfig, String) -> VitaCoreConfig
 ) {
     FilterChip(
+        shape = neonChipShape(),
         selected = current == value,
         onClick = { viewModel.updateCoreSettings { config -> transform(config, value) } },
         enabled = enabled,

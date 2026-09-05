@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.setup
 
+import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Build
@@ -117,6 +119,7 @@ fun SetupScreen(
                     body = stringResource(R.string.setup_pkg_license_step_body)
                 ) {
                     FilledTonalButton(
+                        shape = neonButtonShape(),
                         onClick = onInstallLicense,
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -136,7 +139,7 @@ fun SetupScreen(
                         label = { Text(stringResource(R.string.setup_pkg_zrif_label)) },
                         placeholder = { Text(stringResource(R.string.setup_pkg_zrif_placeholder)) },
                         minLines = 2,
-                        shape = RoundedCornerShape(22.dp)
+                        shape = neonShape(22.dp)
                     )
                 }
                 SetupStep(
@@ -146,6 +149,7 @@ fun SetupScreen(
                     body = stringResource(R.string.setup_pkg_file_step_body)
                 ) {
                     Button(
+                        shape = neonButtonShape(),
                         onClick = { onInstallPkg(zrif.trim()) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -183,7 +187,7 @@ private fun SetupInfoRow(
         verticalAlignment = Alignment.Top
     ) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = neonShape(16.dp),
             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
         ) {
             Box(
@@ -222,12 +226,14 @@ private fun SetupContentActionCard(
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             SetupInfoRow(icon = icon, text = body)
             Button(
+                shape = neonButtonShape(),
                 onClick = onClick,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(buttonLabel)
             }
             FilledTonalButton(
+                shape = neonButtonShape(),
                 onClick = onRepairClick,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -256,7 +262,7 @@ private fun SetupStep(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Column(
@@ -269,7 +275,7 @@ private fun SetupStep(
             ) {
                 Surface(
                     modifier = Modifier.size(40.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = neonShape(14.dp),
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                 ) {
                     Box(contentAlignment = Alignment.Center) {

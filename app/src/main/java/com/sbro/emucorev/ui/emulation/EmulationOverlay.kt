@@ -38,6 +38,9 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.TouchApp
@@ -504,7 +507,14 @@ fun EmulationOverlayHost(
             } else {
                 androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) + fadeOut(tween(180))
             },
-            modifier = Modifier.align(if (useSidePanel) Alignment.CenterEnd else Alignment.BottomCenter)
+            modifier = Modifier
+                .align(if (useSidePanel) Alignment.CenterEnd else Alignment.BottomCenter)
+                .padding(
+                    start = if (useSidePanel) 0.dp else 16.dp,
+                    top = 16.dp,
+                    end = 16.dp,
+                    bottom = 16.dp
+                )
         ) {
             EmulationGameMenu(
                 gameTitle = gameTitle,
@@ -1361,25 +1371,36 @@ private fun TouchControlEditorChrome(
     onDone: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val neon = LocalNeonTheme.current
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 8.dp),
+            .padding(
+                top = if (neon) 6.dp else 8.dp,
+                start = if (neon) 16.dp else 0.dp,
+                end = if (neon) 16.dp else 0.dp
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(if (neon) 8.dp else 6.dp)
     ) {
         Surface(
-            shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+            shape = neonShape(if (neon) 16.dp else 18.dp),
+            color = if (neon) {
+                Color(0xFF2B3F93).copy(alpha = 0.88f)
+            } else {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
+            },
+            border = if (neon) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 22.dp, vertical = 7.dp),
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = stringResource(R.string.emulation_controls_editor_title),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = if (neon) FontWeight.SemiBold else FontWeight.Bold
+                    ),
                     color = Color.White
                 )
                 Text(
@@ -1391,7 +1412,8 @@ private fun TouchControlEditorChrome(
         }
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = if (neon) Modifier.padding(top = 2.dp) else Modifier,
+            horizontalArrangement = Arrangement.spacedBy(if (neon) 8.dp else 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             EditorToolbarButton(
@@ -1413,9 +1435,11 @@ private fun TouchControlEditorChrome(
                 EditorIconButton(
                     onClick = onAnalogModeToggle,
                     containerColor = if (analogMode == TouchAnalogMode.TouchArea) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.94f)
+                        if (neon) Color(0xFF3565FF).copy(alpha = 0.78f)
+                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.94f)
                     } else {
-                        Color(0xFF17171D).copy(alpha = 0.94f)
+                        if (neon) Color.White.copy(alpha = 0.06f)
+                        else Color(0xFF17171D).copy(alpha = 0.94f)
                     }
                 ) {
                     Icon(
@@ -1428,19 +1452,20 @@ private fun TouchControlEditorChrome(
             EditorToolbarButton(
                 label = stringResource(R.string.emulation_controls_editor_done),
                 onClick = onDone,
-                containerColor = MaterialTheme.colorScheme.primary,
+                containerColor = if (neon) Color(0xFF3565FF) else MaterialTheme.colorScheme.primary,
                 minWidth = 82.dp
             )
         }
 
         Surface(
-            shape = RoundedCornerShape(18.dp),
-            color = Color(0xFF171B27).copy(alpha = 0.94f),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
+            shape = neonShape(if (neon) 16.dp else 18.dp),
+            color = if (neon) Color(0xFF111827).copy(alpha = 0.82f)
+            else Color(0xFF171B27).copy(alpha = 0.94f),
+            border = if (neon) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (neon) 8.dp else 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 EditorSizeButton("-", onClick = onSizeDecrease)
@@ -1457,9 +1482,10 @@ private fun TouchControlEditorChrome(
 
         if (analogMode == TouchAnalogMode.TouchArea) {
             Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = Color(0xFF171B27).copy(alpha = 0.94f),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
+                shape = neonShape(if (neon) 16.dp else 18.dp),
+                color = if (neon) Color(0xFF111827).copy(alpha = 0.82f)
+                else Color(0xFF171B27).copy(alpha = 0.94f),
+                border = if (neon) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
             ) {
                 Column(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -1518,15 +1544,20 @@ private fun EditorToolbarButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    containerColor: Color = Color(0xFF17171D).copy(alpha = 0.94f),
+    containerColor: Color? = null,
     minWidth: Dp = 74.dp
 ) {
+    val neon = LocalNeonTheme.current
     Surface(
         modifier = modifier
             .width(minWidth)
             .height(42.dp),
-        shape = RoundedCornerShape(14.dp),
-        color = containerColor,
+        shape = neonShape(if (neon) 16.dp else 14.dp),
+        color = containerColor ?: if (neon) {
+            Color.White.copy(alpha = 0.08f)
+        } else {
+            Color(0xFF17171D).copy(alpha = 0.94f)
+        },
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
         onClick = onClick
     ) {
@@ -1544,13 +1575,18 @@ private fun EditorToolbarButton(
 private fun EditorIconButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
-    containerColor: Color = Color(0xFF17171D).copy(alpha = if (enabled) 0.94f else 0.54f),
+    containerColor: Color? = null,
     content: @Composable () -> Unit
 ) {
+    val neon = LocalNeonTheme.current
     Surface(
         modifier = Modifier.size(width = 54.dp, height = 42.dp),
-        shape = RoundedCornerShape(14.dp),
-        color = containerColor,
+        shape = neonShape(if (neon) 16.dp else 14.dp),
+        color = containerColor ?: if (neon) {
+            Color.White.copy(alpha = if (enabled) 0.08f else 0.03f)
+        } else {
+            Color(0xFF17171D).copy(alpha = if (enabled) 0.94f else 0.54f)
+        },
         border = BorderStroke(1.dp, Color.White.copy(alpha = if (enabled) 0.08f else 0.03f)),
         onClick = onClick
     ) {
@@ -1565,11 +1601,15 @@ private fun EditorSizeButton(
     label: String,
     onClick: () -> Unit
 ) {
+    val neon = LocalNeonTheme.current
     Surface(
         modifier = Modifier.size(width = 62.dp, height = 40.dp),
-        shape = RoundedCornerShape(13.dp),
-        color = Color(0xFF252A36),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
+        shape = neonShape(if (neon) 14.dp else 13.dp),
+        color = if (neon) Color.White.copy(alpha = 0.08f) else Color(0xFF252A36),
+        border = BorderStroke(
+            1.dp,
+            Color.White.copy(alpha = if (neon) 0.08f else 0.05f)
+        ),
         onClick = onClick
     ) {
         Box(contentAlignment = Alignment.Center) {

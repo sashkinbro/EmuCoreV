@@ -63,6 +63,7 @@ class AppPreferences(context: Context) {
             1 -> ThemeMode.LIGHT
             2 -> ThemeMode.DARK
             3 -> if (proUnlocked) ThemeMode.PRO else ThemeMode.SYSTEM
+            4 -> ThemeMode.NEON
             else -> ThemeMode.SYSTEM
         }
         set(value) {
@@ -75,6 +76,7 @@ class AppPreferences(context: Context) {
                         ThemeMode.LIGHT -> 1
                         ThemeMode.DARK -> 2
                         ThemeMode.PRO -> 3
+                        ThemeMode.NEON -> 4
                     }
                 )
             }

@@ -3,7 +3,7 @@ package com.sbro.emucorev.ui.common
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.Icon
@@ -19,17 +19,25 @@ import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
 
 @Composable
+private fun defaultMenuContainer(): Color =
+    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f)
+
+@Composable
+private fun defaultMenuContent(): Color =
+    MaterialTheme.colorScheme.onSurfaceVariant
+
+@Composable
 fun NavigationMenuButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
-    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    containerColor: Color = defaultMenuContainer(),
+    contentColor: Color = defaultMenuContent(),
     tonalElevation: Dp = 0.dp,
     shadowElevation: Dp = 0.dp
 ) {
     Surface(
         modifier = modifier.size(44.dp),
-        shape = RoundedCornerShape(14.dp),
+        shape = neonShape(14.dp),
         color = containerColor,
         tonalElevation = tonalElevation,
         shadowElevation = shadowElevation,

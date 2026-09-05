@@ -1,19 +1,30 @@
 package com.sbro.emucorev.ui.pro
 
+import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
+import com.sbro.emucorev.ui.theme.neon.neonAccentColor
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Apps
@@ -46,6 +57,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.ProProductOffer
 import com.sbro.emucorev.core.ProPurchaseManager
@@ -69,7 +82,7 @@ fun ProPurchasePanel(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(26.dp),
+        shape = neonShape(26.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 4.dp,
         border = BorderStroke(
@@ -123,7 +136,7 @@ fun ProPurchasePanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 56.dp),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = neonShape(18.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = ProGold,
                         contentColor = Color(0xFF291D00),
@@ -155,6 +168,7 @@ fun ProPurchasePanel(
 
             if (supportOffers.isNotEmpty()) {
                 OutlinedButton(
+                    shape = neonButtonShape(),
                     onClick = { supportDialogVisible = true },
                     enabled = !state.isPurchaseInProgress,
                     modifier = Modifier.fillMaxWidth()
@@ -230,7 +244,7 @@ private fun ProBenefitCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
         tonalElevation = 3.dp,
         border = BorderStroke(
@@ -244,7 +258,7 @@ private fun ProBenefitCard(
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Surface(
-                shape = RoundedCornerShape(14.dp),
+                shape = neonShape(14.dp),
                 color = ProGold.copy(alpha = 0.14f)
             ) {
                 Icon(
@@ -301,6 +315,16 @@ private fun ProSupportDialog(
     onPurchase: (ProPurchaseTier) -> Unit,
     onDismiss: () -> Unit
 ) {
+    if (LocalNeonTheme.current) {
+        NeonProSupportDialog(
+            offers = offers,
+            purchaseInProgress = purchaseInProgress,
+            onPurchase = onPurchase,
+            onDismiss = onDismiss
+        )
+        return
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Rounded.Star, contentDescription = null, tint = ProGold) },
@@ -310,6 +334,7 @@ private fun ProSupportDialog(
                 Text(stringResource(R.string.settings_pro_feature_support_desc))
                 offers.forEach { offer ->
                     OutlinedButton(
+                        shape = neonButtonShape(),
                         onClick = { onPurchase(offer.tier) },
                         enabled = !purchaseInProgress,
                         modifier = Modifier.fillMaxWidth()
@@ -324,6 +349,205 @@ private fun ProSupportDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
         }
     )
+}
+
+@Composable
+private fun NeonProSupportDialog(
+    offers: List<ProProductOffer>,
+    purchaseInProgress: Boolean,
+    onPurchase: (ProPurchaseTier) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 560.dp)
+                    .heightIn(max = maxHeight),
+                shape = neonShape(28.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
+                ),
+                tonalElevation = 0.dp,
+                shadowElevation = 18.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(neonShape(16.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Star,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_pro_support_dialog_eyebrow),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = stringResource(R.string.settings_pro_support_dialog_title),
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = stringResource(R.string.settings_pro_support_dialog_desc),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    offers.forEachIndexed { index, offer ->
+                        NeonSupportOfferCard(
+                            offer = offer,
+                            accent = neonAccentColor(index),
+                            enabled = !purchaseInProgress,
+                            onClick = { onPurchase(offer.tier) }
+                        )
+                    }
+
+                    Text(
+                        text = stringResource(R.string.settings_pro_support_same_features),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Button(
+                        shape = neonButtonShape(),
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.common_close),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NeonSupportOfferCard(
+    offer: ProProductOffer,
+    accent: Color,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val titleRes = when (offer.tier) {
+        ProPurchaseTier.SUPPORTER -> R.string.settings_pro_supporter_title
+        ProPurchaseTier.PATRON -> R.string.settings_pro_patron_title
+        ProPurchaseTier.BASE -> R.string.pro_title
+    }
+    val descriptionRes = when (offer.tier) {
+        ProPurchaseTier.SUPPORTER -> R.string.settings_pro_supporter_desc
+        ProPurchaseTier.PATRON -> R.string.settings_pro_patron_desc
+        ProPurchaseTier.BASE -> R.string.settings_pro_feature_support_desc
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        enabled = enabled,
+        onClick = onClick,
+        shape = neonShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.48f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(neonShape(14.dp))
+                        .background(accent.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Star,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = stringResource(titleRes),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(descriptionRes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Surface(
+                modifier = Modifier.align(Alignment.End),
+                shape = neonShape(10.dp),
+                color = accent.copy(alpha = 0.12f),
+                border = BorderStroke(1.dp, accent.copy(alpha = 0.34f))
+            ) {
+                Text(
+                    text = offer.formattedPrice,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = accent,
+                    maxLines = 1
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -363,6 +587,7 @@ fun ProWelcomeDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
+                    shape = neonButtonShape(),
                     onClick = {
                         if (state.isProUnlocked) {
                             onContinue()
@@ -382,6 +607,7 @@ fun ProWelcomeDialog(
                 }
                 if (!state.isProUnlocked && supportOffers.isNotEmpty()) {
                     OutlinedButton(
+                        shape = neonButtonShape(),
                         onClick = { supportDialogVisible = true },
                         enabled = !state.isPurchaseInProgress,
                         modifier = Modifier.fillMaxWidth()

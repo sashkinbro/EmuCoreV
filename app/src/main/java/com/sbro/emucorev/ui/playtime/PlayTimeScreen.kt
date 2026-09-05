@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.playtime
 
+import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +24,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonPillShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+import com.sbro.emucorev.ui.theme.neon.neonShapeCorners
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.QueryStats
 import androidx.compose.material.icons.rounded.Refresh
@@ -219,6 +222,7 @@ private fun GameSelector(
             if (showAllGames) {
                 item {
                     FilterChip(
+                        shape = neonChipShape(),
                         selected = selectedTitleId == null,
                         onClick = { onSelect(null) },
                         colors = FilterChipDefaults.filterChipColors(
@@ -251,7 +255,7 @@ private fun GameSelectorCard(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             1.dp,
@@ -265,7 +269,7 @@ private fun GameSelectorCard(
         ) {
             Surface(
                 modifier = Modifier.size(46.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = neonShape(12.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh
             ) {
                 LocalImage(
@@ -327,7 +331,7 @@ private fun SummaryTile(
 ) {
     Surface(
         modifier = modifier.heightIn(min = 92.dp),
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
@@ -377,7 +381,7 @@ private fun PlayTimeSection(
         )
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
+            shape = neonShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 3.dp,
             shadowElevation = 6.dp,
@@ -420,7 +424,7 @@ private fun DayChart(days: List<PlayTimeDayStats>) {
                         modifier = Modifier
                             .fillMaxWidth(0.68f)
                             .fillMaxHeight(if (day.totalMs > 0L) fraction.coerceAtLeast(0.06f) else 0.02f)
-                            .clip(RoundedCornerShape(topStart = 7.dp, topEnd = 7.dp))
+                            .clip(neonShapeCorners(topStart = 7.dp, topEnd = 7.dp))
                             .background(
                                 if (day.totalMs > 0L) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
@@ -470,14 +474,14 @@ private fun GameTotalsChart(games: List<PlayTimeGameStats>) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(10.dp)
-                        .clip(RoundedCornerShape(999.dp))
+                        .clip(neonPillShape())
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(fraction)
                             .fillMaxHeight()
-                            .clip(RoundedCornerShape(999.dp))
+                            .clip(neonPillShape())
                             .background(MaterialTheme.colorScheme.primary)
                     )
                 }
@@ -493,7 +497,7 @@ private fun SessionRow(session: PlayTimeSession) {
     val dateFormat = remember(locale) { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale) }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
     ) {
@@ -539,7 +543,7 @@ private fun EmptyPlayTimeState(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))

@@ -888,6 +888,14 @@
     <string name="settings_pro_restore">खरीदारी पुनर्स्थापित करें</string>
     <string name="settings_pro_support_more">विकास को और सहयोग दें</string>
     <string name="settings_pro_support_more_short">और सहयोग दें</string>
+    <string name="settings_pro_support_dialog_eyebrow">वैकल्पिक सहयोग</string>
+    <string name="settings_pro_support_dialog_title">सहयोग स्तर चुनें</string>
+    <string name="settings_pro_support_dialog_desc">मानक Pro खरीद पहले से सभी सुविधाएँ खोलती है। ये वैकल्पिक स्तर संगतता कार्य और निरंतर विकास के लिए अतिरिक्त सहयोग देते हैं।</string>
+    <string name="settings_pro_supporter_title">Pro समर्थक</string>
+    <string name="settings_pro_supporter_desc">सभी Pro सुविधाएँ और परियोजना के लिए अतिरिक्त सहयोग।</string>
+    <string name="settings_pro_patron_title">Pro संरक्षक</string>
+    <string name="settings_pro_patron_desc">सभी Pro सुविधाएँ और परियोजना के लिए अधिकतम सहयोग।</string>
+    <string name="settings_pro_support_same_features">सभी स्तर हमेशा के लिए समान Pro सुविधाएँ खोलते हैं। ऊँचा स्तर तभी चुनें जब आप विकास को अधिक सहयोग देना चाहते हों।</string>
     <string name="pro_price_loading">मूल्य लोड हो रहा है</string>
     <string name="pro_price_unavailable">Pro अभी उपलब्ध नहीं है</string>
     <string name="settings_pro_feature_crimson_title">Crimson थीम</string>
@@ -907,6 +915,7 @@
     <string name="settings_theme_system">सिस्टम</string>
     <string name="settings_theme_light">लाइट</string>
     <string name="settings_theme_dark">डार्क</string>
+    <string name="settings_theme_neon">नियॉन</string>
     <string name="settings_theme_pro">Crimson Pro</string>
     <string name="settings_theme_pro_locked">Pro के साथ अनलॉक करें</string>
     <string name="profile_pro_badge">PRO</string>

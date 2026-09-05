@@ -15,7 +15,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -100,14 +101,14 @@ fun PremiumLoadingAnimation(
                 modifier = Modifier
                     .size(size * 0.82f)
                     .graphicsLayer { rotationZ = rotation }
-                    .border(3.5.dp, color.copy(alpha = 0.85f), RoundedCornerShape(14.dp))
+                    .border(3.5.dp, color.copy(alpha = 0.85f), neonShape(14.dp))
             )
 
             Box(
                 modifier = Modifier
                     .size(size * 0.62f)
                     .graphicsLayer { rotationZ = -rotation * 1.8f }
-                    .border(2.5.dp, color.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                    .border(2.5.dp, color.copy(alpha = 0.55f), neonShape(10.dp))
             )
 
             Text(

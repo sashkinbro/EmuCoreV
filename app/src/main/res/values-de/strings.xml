@@ -888,6 +888,14 @@
     <string name="settings_pro_restore">Kauf wiederherstellen</string>
     <string name="settings_pro_support_more">Entwicklung stärker unterstützen</string>
     <string name="settings_pro_support_more_short">Mehr unterstützen</string>
+    <string name="settings_pro_support_dialog_eyebrow">OPTIONALE UNTERSTÜTZUNG</string>
+    <string name="settings_pro_support_dialog_title">Unterstützungsstufe wählen</string>
+    <string name="settings_pro_support_dialog_desc">Der normale Pro-Kauf schaltet bereits alle Funktionen frei. Diese optionalen Stufen unterstützen zusätzlich die weitere Kompatibilitätsarbeit und Entwicklung.</string>
+    <string name="settings_pro_supporter_title">Pro Supporter</string>
+    <string name="settings_pro_supporter_desc">Alle Pro-Funktionen mit zusätzlicher Projektunterstützung.</string>
+    <string name="settings_pro_patron_title">Pro Patron</string>
+    <string name="settings_pro_patron_desc">Alle Pro-Funktionen mit maximaler Projektunterstützung.</string>
+    <string name="settings_pro_support_same_features">Alle Stufen schalten dauerhaft dieselben Pro-Funktionen frei. Wähle eine höhere Stufe nur, wenn du die Entwicklung stärker unterstützen möchtest.</string>
     <string name="pro_price_loading">Preis wird geladen</string>
     <string name="pro_price_unavailable">Pro ist noch nicht verfügbar</string>
     <string name="settings_pro_feature_crimson_title">Crimson-Design</string>
@@ -907,6 +915,7 @@
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Hell</string>
     <string name="settings_theme_dark">Dunkel</string>
+    <string name="settings_theme_neon">Neon</string>
     <string name="settings_theme_pro">Crimson Pro</string>
     <string name="settings_theme_pro_locked">Mit Pro freischalten</string>
     <string name="profile_pro_badge">PRO</string>

@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.profile
 
+import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -43,7 +44,9 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonPillShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Logout
@@ -384,7 +387,7 @@ private fun ProfileHeader(
                 )
                 if (isProUnlocked) {
                     Surface(
-                        shape = RoundedCornerShape(999.dp),
+                        shape = neonPillShape(),
                         color = Color(0xFFFFC857).copy(alpha = 0.18f),
                         border = BorderStroke(1.dp, Color(0xFFFFC857).copy(alpha = 0.65f))
                     ) {
@@ -481,7 +484,7 @@ private fun ProfileAccountCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(
@@ -506,7 +509,7 @@ private fun ProfileAccountCard(
                         Surface(
                             onClick = onChangeAvatar,
                             enabled = !uiState.isCloudBusy,
-                            shape = RoundedCornerShape(999.dp),
+                            shape = neonPillShape(),
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.64f),
                             contentColor = MaterialTheme.colorScheme.primary,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
@@ -597,7 +600,7 @@ private fun ProfileAccountCard(
             uiState.cloudMessage?.let { message ->
                 Surface(
                     modifier = Modifier.widthIn(max = 360.dp),
-                    shape = RoundedCornerShape(999.dp),
+                    shape = neonPillShape(),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
                     onClick = onDismissMessage
@@ -636,7 +639,7 @@ private fun ProfileAvatar(
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(42.dp)
+    val shape = neonShape(42.dp)
     val color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
     val border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
     val content: @Composable () -> Unit = {
@@ -728,7 +731,7 @@ private fun ProfileBackupAction(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.heightIn(min = 58.dp),
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         color = if (enabled) containerColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
         contentColor = if (enabled) contentColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
     ) {
@@ -761,7 +764,7 @@ private fun ProfileSignInAction(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.widthIn(min = 176.dp),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = if (enabled) {
             MaterialTheme.colorScheme.primary
         } else {
@@ -812,7 +815,7 @@ private fun ProfileRoundAction(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.size(38.dp),
-        shape = RoundedCornerShape(999.dp),
+        shape = neonPillShape(),
         color = Color.Transparent,
         contentColor = if (enabled) contentColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
     ) {
@@ -830,7 +833,7 @@ private fun ProfileRoundAction(
 private fun ProfileEmptyState() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(
@@ -842,7 +845,7 @@ private fun ProfileEmptyState() {
         ) {
             Surface(
                 modifier = Modifier.size(62.dp),
-                shape = RoundedCornerShape(22.dp),
+                shape = neonShape(22.dp),
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
             ) {
@@ -902,7 +905,7 @@ private fun ProfileEmailDialog(
                     .fillMaxWidth()
                     .widthIn(max = 620.dp)
                     .heightIn(max = maxHeight),
-                shape = RoundedCornerShape(28.dp),
+                shape = neonShape(28.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 tonalElevation = 10.dp,
                 shadowElevation = 18.dp,
@@ -921,7 +924,7 @@ private fun ProfileEmailDialog(
                     ) {
                         Surface(
                             modifier = Modifier.size(48.dp),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = neonShape(16.dp),
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -984,7 +987,7 @@ private fun ProfileEmailDialog(
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.profile_email)) },
                         singleLine = true,
-                        shape = RoundedCornerShape(18.dp)
+                        shape = neonShape(18.dp)
                     )
                     AnimatedVisibility(
                         visible = createAccount,
@@ -997,7 +1000,7 @@ private fun ProfileEmailDialog(
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text(stringResource(R.string.profile_user_name)) },
                             singleLine = true,
-                            shape = RoundedCornerShape(18.dp)
+                            shape = neonShape(18.dp)
                         )
                     }
                     OutlinedTextField(
@@ -1007,7 +1010,7 @@ private fun ProfileEmailDialog(
                         label = { Text(stringResource(R.string.profile_password)) },
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
-                        shape = RoundedCornerShape(18.dp)
+                        shape = neonShape(18.dp)
                     )
                     AnimatedVisibility(
                         visible = !createAccount,
@@ -1029,6 +1032,7 @@ private fun ProfileEmailDialog(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Button(
+                            shape = neonButtonShape(),
                             onClick = { onSubmit(email, password, displayName, createAccount) },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -1041,6 +1045,7 @@ private fun ProfileEmailDialog(
                             )
                         }
                         OutlinedButton(
+                            shape = neonButtonShape(),
                             onClick = { createAccount = !createAccount },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -1078,7 +1083,7 @@ private fun ProfileSignOutDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 520.dp),
-                shape = RoundedCornerShape(28.dp),
+                shape = neonShape(28.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 tonalElevation = 10.dp,
                 shadowElevation = 18.dp,
@@ -1094,7 +1099,7 @@ private fun ProfileSignOutDialog(
                     ) {
                         Surface(
                             modifier = Modifier.size(52.dp),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = neonShape(16.dp),
                             color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -1139,12 +1144,14 @@ private fun ProfileSignOutDialog(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         OutlinedButton(
+                            shape = neonButtonShape(),
                             onClick = onDismiss,
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(stringResource(R.string.common_cancel))
                         }
                         Button(
+                            shape = neonButtonShape(),
                             onClick = onConfirm,
                             modifier = Modifier.weight(1f)
                         ) {
@@ -1177,7 +1184,7 @@ private fun ProfileBackupActionsDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 520.dp),
-                shape = RoundedCornerShape(28.dp),
+                shape = neonShape(28.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 tonalElevation = 10.dp,
                 shadowElevation = 18.dp,
@@ -1193,7 +1200,7 @@ private fun ProfileBackupActionsDialog(
                     ) {
                         Surface(
                             modifier = Modifier.size(52.dp),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = neonShape(16.dp),
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -1281,7 +1288,7 @@ private fun ProfileGameCardMenuDialog(
                     .fillMaxWidth()
                     .widthIn(max = 620.dp)
                     .heightIn(max = maxHeight),
-                shape = RoundedCornerShape(28.dp),
+                shape = neonShape(28.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 tonalElevation = 10.dp,
                 shadowElevation = 18.dp,
@@ -1300,7 +1307,7 @@ private fun ProfileGameCardMenuDialog(
                     ) {
                         Surface(
                             modifier = Modifier.size(52.dp),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = neonShape(16.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                         ) {
                             UrlImage(
@@ -1360,6 +1367,7 @@ private fun ProfileGameCardMenuDialog(
 
                     if (profileStatus != null) {
                         OutlinedButton(
+                            shape = neonButtonShape(),
                             onClick = onClearStatus,
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -1391,7 +1399,7 @@ private fun ProfileMenuOption(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = if (selected) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
         } else {
@@ -1447,7 +1455,7 @@ private fun ProfileGridGameCard(
     var showProfileMenu by remember { mutableStateOf(false) }
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         onClick = openClick
     ) {
@@ -1524,7 +1532,7 @@ private fun ProfileListGameCard(
     var showProfileMenu by remember { mutableStateOf(false) }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         onClick = openClick
     ) {
@@ -1535,7 +1543,7 @@ private fun ProfileListGameCard(
         ) {
             Surface(
                 modifier = Modifier.size(width = 58.dp, height = 86.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = neonShape(12.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
             ) {
                 UrlImage(

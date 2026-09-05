@@ -23,7 +23,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+import com.sbro.emucorev.ui.theme.neon.neonShapeCorners
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
@@ -255,10 +256,10 @@ private fun CompactAdaptiveShell(
                     .fillMaxWidth(drawerWidthFraction)
                     .widthIn(min = 292.dp, max = 360.dp),
                 drawerShape = when (drawerVisualStyle) {
-                    DrawerVisualStyle.COMPACT -> RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp)
-                    DrawerVisualStyle.GLASS -> RoundedCornerShape(topEnd = 38.dp, bottomEnd = 38.dp)
-                    DrawerVisualStyle.CONSOLE -> RoundedCornerShape(0.dp)
-                    DrawerVisualStyle.CLASSIC -> RoundedCornerShape(topEnd = 30.dp, bottomEnd = 30.dp)
+                    DrawerVisualStyle.COMPACT -> neonShapeCorners(topEnd = 12.dp, bottomEnd = 12.dp)
+                    DrawerVisualStyle.GLASS -> neonShapeCorners(topEnd = 38.dp, bottomEnd = 38.dp)
+                    DrawerVisualStyle.CONSOLE -> neonShape(0.dp)
+                    DrawerVisualStyle.CLASSIC -> neonShapeCorners(topEnd = 30.dp, bottomEnd = 30.dp)
                 },
                 drawerContainerColor = when (drawerVisualStyle) {
                     DrawerVisualStyle.GLASS -> MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
@@ -579,10 +580,10 @@ private fun SideNavigation(
             Surface(
                 modifier = Modifier.fillMaxHeight(),
                 shape = when (drawerVisualStyle) {
-                    DrawerVisualStyle.COMPACT -> RoundedCornerShape(14.dp)
-                    DrawerVisualStyle.GLASS -> RoundedCornerShape(36.dp)
-                    DrawerVisualStyle.CONSOLE -> RoundedCornerShape(8.dp)
-                    DrawerVisualStyle.CLASSIC -> RoundedCornerShape(30.dp)
+                    DrawerVisualStyle.COMPACT -> neonShape(14.dp)
+                    DrawerVisualStyle.GLASS -> neonShape(36.dp)
+                    DrawerVisualStyle.CONSOLE -> neonShape(8.dp)
+                    DrawerVisualStyle.CLASSIC -> neonShape(30.dp)
                 },
                 color = when (drawerVisualStyle) {
                     DrawerVisualStyle.GLASS -> MaterialTheme.colorScheme.surface.copy(alpha = 0.86f)
@@ -614,10 +615,10 @@ private fun ShellAction(
             .fillMaxWidth()
             .focusable(),
         shape = when (style) {
-            DrawerVisualStyle.COMPACT -> RoundedCornerShape(9.dp)
-            DrawerVisualStyle.GLASS -> RoundedCornerShape(22.dp)
-            DrawerVisualStyle.CONSOLE -> RoundedCornerShape(6.dp)
-            DrawerVisualStyle.CLASSIC -> RoundedCornerShape(18.dp)
+            DrawerVisualStyle.COMPACT -> neonShape(9.dp)
+            DrawerVisualStyle.GLASS -> neonShape(22.dp)
+            DrawerVisualStyle.CONSOLE -> neonShape(6.dp)
+            DrawerVisualStyle.CLASSIC -> neonShape(18.dp)
         },
         color = when (style) {
             DrawerVisualStyle.COMPACT -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.08f)
@@ -667,10 +668,10 @@ private fun ShellItem(
             .fillMaxWidth()
             .focusable(),
         shape = when (style) {
-            DrawerVisualStyle.COMPACT -> RoundedCornerShape(9.dp)
-            DrawerVisualStyle.GLASS -> RoundedCornerShape(22.dp)
-            DrawerVisualStyle.CONSOLE -> RoundedCornerShape(6.dp)
-            DrawerVisualStyle.CLASSIC -> RoundedCornerShape(18.dp)
+            DrawerVisualStyle.COMPACT -> neonShape(9.dp)
+            DrawerVisualStyle.GLASS -> neonShape(22.dp)
+            DrawerVisualStyle.CONSOLE -> neonShape(6.dp)
+            DrawerVisualStyle.CLASSIC -> neonShape(18.dp)
         },
         color = when {
             selected && style == DrawerVisualStyle.CONSOLE -> MaterialTheme.colorScheme.primaryContainer

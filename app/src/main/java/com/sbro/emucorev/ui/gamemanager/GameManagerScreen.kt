@@ -1,5 +1,7 @@
 package com.sbro.emucorev.ui.gamemanager
 
+import com.sbro.emucorev.ui.theme.neon.neonButtonShape
+import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -22,7 +24,8 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.SportsEsports
@@ -191,6 +194,7 @@ private fun GameManagerTabs(
     ) {
         items(GameManagerTab.entries, key = { it.name }) { tab ->
             FilterChip(
+                shape = neonChipShape(),
                 selected = selectedTab == tab,
                 onClick = { onSelected(tab) },
                 colors = FilterChipDefaults.filterChipColors(
@@ -296,7 +300,7 @@ private fun GamePicker(
                 val selected = game.titleId == selectedTitleId
                 Surface(
                     onClick = { onSelect(game.titleId) },
-                    shape = RoundedCornerShape(18.dp),
+                    shape = neonShape(18.dp),
                     color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
                     border = BorderStroke(
                         1.dp,
@@ -310,7 +314,7 @@ private fun GamePicker(
                     ) {
                         Surface(
                             modifier = Modifier.size(48.dp),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = neonShape(12.dp),
                             color = MaterialTheme.colorScheme.surfaceContainerHighest,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
                         ) {
@@ -475,6 +479,7 @@ private fun GpuDriverChoiceRow(
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
+                shape = neonChipShape(),
                 selected = true,
                 onClick = onOpenGpuDriverManager,
                 colors = FilterChipDefaults.filterChipColors(
@@ -498,6 +503,7 @@ private fun GpuDriverChoiceRow(
             )
         }
         OutlinedButton(
+            shape = neonButtonShape(),
             onClick = onOpenGpuDriverManager,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -759,6 +765,7 @@ private fun ChoiceRow(
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { option ->
                 FilterChip(
+                    shape = neonChipShape(),
                     selected = selected == option,
                     onClick = { onSelected(option) },
                     colors = FilterChipDefaults.filterChipColors(
@@ -795,6 +802,7 @@ private fun IntChoiceRow(
         ) {
             options.forEach { (value, label) ->
                 FilterChip(
+                    shape = neonChipShape(),
                     selected = selected == value,
                     enabled = enabled,
                     onClick = { onSelected(value) },
@@ -872,7 +880,7 @@ private fun SettingContainer(
                 onClick = {},
                 onLongClick = { onReset?.invoke() }
             ),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 1.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))

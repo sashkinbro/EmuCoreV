@@ -2,6 +2,8 @@
 
 package com.sbro.emucorev.ui.onboarding
 
+import com.sbro.emucorev.ui.theme.neon.neonButtonShape
+import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
@@ -38,7 +40,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -327,7 +330,7 @@ fun OnboardingScreen(
                         if (pagerState.currentPage > 0) {
                             OutlinedButton(
                                 onClick = backClick,
-                                shape = RoundedCornerShape(12.dp)
+                                shape = neonShape(12.dp)
                             ) {
                                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -340,7 +343,7 @@ fun OnboardingScreen(
                         if (pagerState.currentPage < uiState.totalPages - 1) {
                             Button(
                                 onClick = nextClick,
-                                shape = RoundedCornerShape(12.dp)
+                                shape = neonShape(12.dp)
                             ) {
                                 Text(stringResource(R.string.onboarding_next))
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -350,7 +353,7 @@ fun OnboardingScreen(
                             Button(
                                 onClick = completeClick,
                                 enabled = canComplete,
-                                shape = RoundedCornerShape(12.dp)
+                                shape = neonShape(12.dp)
                             ) {
                                 Text(stringResource(R.string.onboarding_get_started))
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -369,7 +372,7 @@ fun OnboardingScreen(
             exit = fadeOut(tween(120)) + scaleOut(targetScale = 1.02f, animationSpec = tween(120))
         ) {
             Surface(
-                shape = RoundedCornerShape(28.dp),
+                shape = neonShape(28.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
                 tonalElevation = 12.dp
             ) {
@@ -431,7 +434,7 @@ private fun OnboardingHero(
         Box(
             modifier = Modifier
                 .size(112.dp)
-                .clip(RoundedCornerShape(32.dp))
+                .clip(neonShape(32.dp))
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
@@ -637,6 +640,7 @@ private fun OnboardingStorageChip(
     onSelected: () -> Unit
 ) {
     FilterChip(
+        shape = neonChipShape(),
         selected = location.selected,
         enabled = enabled,
         onClick = onSelected,
@@ -669,7 +673,7 @@ private fun OnboardingStorageDialog(
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp)
                 .widthIn(max = 560.dp),
-            shape = RoundedCornerShape(28.dp),
+            shape = neonShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
             shadowElevation = 10.dp
@@ -695,7 +699,7 @@ private fun OnboardingStorageDialog(
                 storageLocations.forEachIndexed { index, location ->
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
+                        shape = neonShape(18.dp),
                         color = if (location.selected) {
                             MaterialTheme.colorScheme.secondaryContainer
                         } else {
@@ -791,7 +795,7 @@ private fun SetupCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 3.dp),
-        shape = RoundedCornerShape(26.dp),
+        shape = neonShape(26.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
         tonalElevation = 2.dp,
         onClick = onClick,
@@ -808,7 +812,7 @@ private fun SetupCard(
                 Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(neonShape(16.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -861,6 +865,7 @@ private fun SetupCard(
                             Spacer(modifier = Modifier.width(48.dp))
                         }
                         Button(
+                            shape = neonButtonShape(),
                             onClick = onSecondaryAction,
                             enabled = secondaryActionEnabled,
                             modifier = Modifier.align(Alignment.CenterVertically),
@@ -979,7 +984,7 @@ private fun FirmwareDownloadInfoDialog(
                     .fillMaxWidth()
                     .widthIn(max = 560.dp)
                     .heightIn(max = maxHeight),
-                shape = RoundedCornerShape(28.dp),
+                shape = neonShape(28.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 6.dp,
                 shadowElevation = 12.dp,

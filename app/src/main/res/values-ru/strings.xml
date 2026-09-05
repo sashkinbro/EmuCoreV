@@ -891,6 +891,14 @@
     <string name="settings_pro_restore">Восстановить покупку</string>
     <string name="settings_pro_support_more">Поддержать разработку сильнее</string>
     <string name="settings_pro_support_more_short">Поддержать больше</string>
+    <string name="settings_pro_support_dialog_eyebrow">ДОПОЛНИТЕЛЬНАЯ ПОДДЕРЖКА</string>
+    <string name="settings_pro_support_dialog_title">Выберите уровень поддержки</string>
+    <string name="settings_pro_support_dialog_desc">Стандартная покупка Pro уже открывает все функции. Дополнительные уровни позволяют сильнее поддержать работу над совместимостью и дальнейшую разработку.</string>
+    <string name="settings_pro_supporter_title">Pro Supporter</string>
+    <string name="settings_pro_supporter_desc">Все функции Pro и дополнительная поддержка проекта.</string>
+    <string name="settings_pro_patron_title">Pro Patron</string>
+    <string name="settings_pro_patron_desc">Все функции Pro и максимальная поддержка проекта.</string>
+    <string name="settings_pro_support_same_features">Все уровни навсегда открывают одинаковые функции Pro. Выбирайте более высокий уровень, только если хотите сильнее поддержать разработку.</string>
     <string name="pro_price_loading">Загрузка цены</string>
     <string name="pro_price_unavailable">Версия Pro пока недоступна</string>
     <string name="settings_pro_feature_crimson_title">Тема Crimson</string>
@@ -910,6 +918,7 @@
     <string name="settings_theme_system">Системная</string>
     <string name="settings_theme_light">Светлая</string>
     <string name="settings_theme_dark">Темная</string>
+    <string name="settings_theme_neon">Неон</string>
     <string name="settings_theme_pro">Crimson Pro</string>
     <string name="settings_theme_pro_locked">Разблокировать с Pro</string>
     <string name="profile_pro_badge">PRO</string>

@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.saves
 
+import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,7 +30,8 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
@@ -213,7 +215,7 @@ fun SaveDataScreen(
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text(stringResource(R.string.save_manager_search_hint)) },
                     singleLine = true,
-                    shape = RoundedCornerShape(20.dp),
+                    shape = neonShape(20.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
@@ -334,7 +336,7 @@ private fun SaveBackupCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp,
         shadowElevation = 8.dp,
@@ -362,6 +364,7 @@ private fun SaveBackupCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Button(
+                    shape = neonButtonShape(),
                     onClick = onBackupAll,
                     enabled = exportEnabled,
                     modifier = Modifier.weight(1f)
@@ -370,6 +373,7 @@ private fun SaveBackupCard(
                     Text(stringResource(R.string.save_manager_backup_all), modifier = Modifier.padding(start = 8.dp))
                 }
                 OutlinedButton(
+                    shape = neonButtonShape(),
                     onClick = onRestoreAll,
                     enabled = restoreEnabled,
                     modifier = Modifier.weight(1f)
@@ -420,7 +424,7 @@ private fun SaveDataCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp,
         shadowElevation = 8.dp,
@@ -436,7 +440,7 @@ private fun SaveDataCard(
             ) {
                 Surface(
                     modifier = Modifier.size(64.dp),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = neonShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHigh
                 ) {
                     LocalImage(
@@ -480,6 +484,7 @@ private fun SaveDataCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Button(
+                    shape = neonButtonShape(),
                     onClick = onExport,
                     enabled = !busy,
                     modifier = Modifier.weight(1f)
@@ -488,6 +493,7 @@ private fun SaveDataCard(
                     Text(stringResource(R.string.save_manager_export), modifier = Modifier.padding(start = 8.dp))
                 }
                 OutlinedButton(
+                    shape = neonButtonShape(),
                     onClick = onImport,
                     enabled = !busy,
                     modifier = Modifier.weight(1f)
@@ -497,6 +503,7 @@ private fun SaveDataCard(
                 }
             }
             OutlinedButton(
+                shape = neonButtonShape(),
                 onClick = onDelete,
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth()
@@ -543,7 +550,7 @@ private fun EmptySaveState(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-            Button(onClick = onImportClick) {
+            Button(shape = neonButtonShape(), onClick = onImportClick) {
                 Icon(Icons.Rounded.FolderOpen, contentDescription = null)
                 Text(stringResource(R.string.save_manager_import), modifier = Modifier.padding(start = 8.dp))
             }

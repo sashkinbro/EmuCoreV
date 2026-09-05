@@ -888,6 +888,14 @@
     <string name="settings_pro_restore">Restaurar compra</string>
     <string name="settings_pro_support_more">Apoyar más el desarrollo</string>
     <string name="settings_pro_support_more_short">Apoyar más</string>
+    <string name="settings_pro_support_dialog_eyebrow">APOYO OPCIONAL</string>
+    <string name="settings_pro_support_dialog_title">Elige un nivel de apoyo</string>
+    <string name="settings_pro_support_dialog_desc">La compra Pro estándar ya desbloquea todas las funciones. Estos niveles opcionales aportan apoyo adicional al trabajo de compatibilidad y al desarrollo continuo.</string>
+    <string name="settings_pro_supporter_title">Pro Supporter</string>
+    <string name="settings_pro_supporter_desc">Todas las funciones Pro con apoyo adicional al proyecto.</string>
+    <string name="settings_pro_patron_title">Pro Patron</string>
+    <string name="settings_pro_patron_desc">Todas las funciones Pro con el máximo apoyo al proyecto.</string>
+    <string name="settings_pro_support_same_features">Todos los niveles desbloquean permanentemente las mismas funciones Pro. Elige uno superior solo si quieres apoyar más el desarrollo.</string>
     <string name="pro_price_loading">Cargando precio</string>
     <string name="pro_price_unavailable">Pro aún no está disponible</string>
     <string name="settings_pro_feature_crimson_title">Tema Crimson</string>
@@ -907,6 +915,7 @@
     <string name="settings_theme_system">Sistema</string>
     <string name="settings_theme_light">Claro</string>
     <string name="settings_theme_dark">Oscuro</string>
+    <string name="settings_theme_neon">Neón</string>
     <string name="settings_theme_pro">Crimson Pro</string>
     <string name="settings_theme_pro_locked">Desbloquear con Pro</string>
     <string name="profile_pro_badge">PRO</string>

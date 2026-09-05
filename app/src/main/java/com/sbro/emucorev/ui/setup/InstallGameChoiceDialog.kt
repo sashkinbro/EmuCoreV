@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.setup
 
+import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Build
@@ -57,7 +59,7 @@ fun InstallGameChoiceDialog(
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp)
                 .widthIn(max = 560.dp),
-            shape = RoundedCornerShape(28.dp),
+            shape = neonShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
             shadowElevation = 10.dp
@@ -85,12 +87,14 @@ fun InstallGameChoiceDialog(
                     body = stringResource(R.string.install_choice_archive_body)
                 ) {
                     Button(
+                        shape = neonButtonShape(),
                         onClick = onInstallArchive,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(stringResource(R.string.setup_content_button))
                     }
                     FilledTonalButton(
+                        shape = neonButtonShape(),
                         onClick = onRepairArchive,
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -108,6 +112,7 @@ fun InstallGameChoiceDialog(
                     body = stringResource(R.string.install_choice_pkg_body)
                 ) {
                     FilledTonalButton(
+                        shape = neonButtonShape(),
                         onClick = onInstallLicense,
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -127,9 +132,10 @@ fun InstallGameChoiceDialog(
                         label = { Text(stringResource(R.string.setup_pkg_zrif_label)) },
                         placeholder = { Text(stringResource(R.string.setup_pkg_zrif_placeholder)) },
                         minLines = 2,
-                        shape = RoundedCornerShape(22.dp)
+                        shape = neonShape(22.dp)
                     )
                     OutlinedButton(
+                        shape = neonButtonShape(),
                         onClick = { onInstallPkg(zrif.trim()) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -166,7 +172,7 @@ private fun InstallChoiceCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Column(
@@ -179,7 +185,7 @@ private fun InstallChoiceCard(
             ) {
                 Surface(
                     modifier = Modifier.size(42.dp),
-                    shape = RoundedCornerShape(15.dp),
+                    shape = neonShape(15.dp),
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                 ) {
                     Box(contentAlignment = Alignment.Center) {

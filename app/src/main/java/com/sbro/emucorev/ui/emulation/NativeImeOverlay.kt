@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.emulation
 
+import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -52,7 +53,7 @@ internal fun NativeImeOverlay(activity: Emulator) {
                     TextButton(onClick = { activity.completeNativeIme(cancel = true) }) {
                         Text(stringResource(R.string.common_cancel))
                     }
-                    Button(onClick = { activity.completeNativeIme() }) {
+                    Button(shape = neonButtonShape(), onClick = { activity.completeNativeIme() }) {
                         Text(if (state.dialogActive) stringResource(R.string.emulation_ime_done)
                             else state.enterLabel.ifBlank { stringResource(R.string.emulation_ime_done) })
                     }

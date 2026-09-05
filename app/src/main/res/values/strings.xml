@@ -895,6 +895,14 @@
     <string name="settings_pro_restore">Restore purchase</string>
     <string name="settings_pro_support_more">Support development more</string>
     <string name="settings_pro_support_more_short">Support more</string>
+    <string name="settings_pro_support_dialog_eyebrow">OPTIONAL SUPPORT</string>
+    <string name="settings_pro_support_dialog_title">Choose a support level</string>
+    <string name="settings_pro_support_dialog_desc">The standard Pro purchase already unlocks every feature. These optional levels provide extra support for continued compatibility work and development.</string>
+    <string name="settings_pro_supporter_title">Pro Supporter</string>
+    <string name="settings_pro_supporter_desc">All Pro features with additional project support.</string>
+    <string name="settings_pro_patron_title">Pro Patron</string>
+    <string name="settings_pro_patron_desc">All Pro features with maximum project support.</string>
+    <string name="settings_pro_support_same_features">All levels permanently unlock the same Pro features. Choose a higher level only if you want to support development more.</string>
     <string name="pro_price_loading">Loading price</string>
     <string name="pro_price_unavailable">Pro is not available yet</string>
     <string name="settings_pro_feature_crimson_title">Crimson theme</string>
@@ -914,6 +922,7 @@
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_neon">Neon</string>
     <string name="settings_theme_pro">Crimson Pro</string>
     <string name="settings_theme_pro_locked">Unlock with Pro</string>
     <string name="profile_pro_badge">PRO</string>

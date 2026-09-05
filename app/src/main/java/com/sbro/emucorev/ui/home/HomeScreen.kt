@@ -1,11 +1,14 @@
 package com.sbro.emucorev.ui.home
 
+import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,10 +21,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sbro.emucorev.ui.theme.neon.neonPillShape
+import com.sbro.emucorev.ui.theme.neon.neonShape
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesomeMotion
 import androidx.compose.material.icons.rounded.Games
@@ -46,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -163,7 +170,7 @@ fun HomeScreen(
 
             item {
                 Surface(
-                    shape = RoundedCornerShape(32.dp),
+                    shape = neonShape(32.dp),
                     color = MaterialTheme.colorScheme.surface
                 ) {
                     Column(
@@ -214,15 +221,15 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            FilledTonalButton(onClick = openSetupClick) {
+                            FilledTonalButton(shape = neonButtonShape(), onClick = openSetupClick) {
                                 Icon(Icons.Rounded.Memory, contentDescription = null)
                                 Text(stringResource(R.string.home_open_setup))
                             }
-                            FilledTonalButton(onClick = openLibraryClick) {
+                            FilledTonalButton(shape = neonButtonShape(), onClick = openLibraryClick) {
                                 Icon(Icons.Rounded.SportsEsports, contentDescription = null)
                                 Text(stringResource(R.string.home_open_library))
                             }
-                            FilledTonalButton(onClick = openCatalogClick) {
+                            FilledTonalButton(shape = neonButtonShape(), onClick = openCatalogClick) {
                                 Icon(Icons.Rounded.AutoAwesomeMotion, contentDescription = null)
                                 Text(stringResource(R.string.home_open_catalog))
                             }
@@ -268,7 +275,7 @@ private fun HomeStatPill(
     label: String
 ) {
     Surface(
-        shape = RoundedCornerShape(999.dp),
+        shape = neonPillShape(),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
     ) {
         Row(
@@ -307,7 +314,7 @@ private fun FeaturedGameCard(
                     onClick = guardedClick,
                     onLongClick = { menuExpanded = true }
                 ),
-            shape = RoundedCornerShape(18.dp),
+            shape = neonShape(18.dp),
             color = MaterialTheme.colorScheme.surface
         ) {
             Column {
@@ -341,28 +348,67 @@ private fun FeaturedGameCard(
         }
         DropdownMenu(
             expanded = menuExpanded,
-            onDismissRequest = { menuExpanded = false }
+            onDismissRequest = { menuExpanded = false },
+            modifier = Modifier.widthIn(min = 248.dp, max = 310.dp),
+            shape = neonShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            shadowElevation = 12.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
         ) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.game_manager_open_for_game)) },
+            HomeGameContextMenuItem(
+                text = stringResource(R.string.game_manager_open_for_game),
+                icon = Icons.Rounded.Tune,
                 onClick = {
                     onOpenGameManager()
                     menuExpanded = false
-                },
-                leadingIcon = {
-                    Icon(Icons.Rounded.Tune, contentDescription = null)
                 }
             )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.play_time_open_for_game)) },
+            HomeGameContextMenuItem(
+                text = stringResource(R.string.play_time_open_for_game),
+                icon = Icons.Rounded.QueryStats,
                 onClick = {
                     onOpenPlayTime()
                     menuExpanded = false
-                },
-                leadingIcon = {
-                    Icon(Icons.Rounded.QueryStats, contentDescription = null)
                 }
             )
         }
     }
+}
+
+@Composable
+private fun HomeGameContextMenuItem(
+    text: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    DropdownMenuItem(
+        text = {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        onClick = onClick,
+        leadingIcon = {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(neonShape(11.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(19.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        contentPadding = PaddingValues(horizontal = 12.dp)
+    )
 }

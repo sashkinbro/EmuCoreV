@@ -888,6 +888,14 @@
     <string name="settings_pro_restore">Satın alımı geri yükle</string>
     <string name="settings_pro_support_more">Geliştirmeyi daha fazla destekle</string>
     <string name="settings_pro_support_more_short">Daha fazla destekle</string>
+    <string name="settings_pro_support_dialog_eyebrow">İSTEĞE BAĞLI DESTEK</string>
+    <string name="settings_pro_support_dialog_title">Destek düzeyi seçin</string>
+    <string name="settings_pro_support_dialog_desc">Standart Pro satın alımı zaten tüm özellikleri açar. Bu isteğe bağlı düzeyler uyumluluk çalışmalarına ve devam eden geliştirmeye ek destek sağlar.</string>
+    <string name="settings_pro_supporter_title">Pro Destekçi</string>
+    <string name="settings_pro_supporter_desc">Tüm Pro özellikleri ve projeye ek destek.</string>
+    <string name="settings_pro_patron_title">Pro Hami</string>
+    <string name="settings_pro_patron_desc">Tüm Pro özellikleri ve projeye en yüksek destek.</string>
+    <string name="settings_pro_support_same_features">Tüm düzeyler aynı Pro özelliklerini kalıcı olarak açar. Yalnızca geliştirmeyi daha fazla desteklemek istiyorsanız daha yüksek bir düzey seçin.</string>
     <string name="pro_price_loading">Fiyat yükleniyor</string>
     <string name="pro_price_unavailable">Pro henüz kullanılamıyor</string>
     <string name="settings_pro_feature_crimson_title">Crimson teması</string>
@@ -907,6 +915,7 @@
     <string name="settings_theme_system">Sistem</string>
     <string name="settings_theme_light">Açık</string>
     <string name="settings_theme_dark">Koyu</string>
+    <string name="settings_theme_neon">Neon</string>
     <string name="settings_theme_pro">Crimson Pro</string>
     <string name="settings_theme_pro_locked">Pro ile kilit aç</string>
     <string name="profile_pro_badge">PRO</string>

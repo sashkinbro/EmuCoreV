@@ -33,8 +33,25 @@ class ImmersiveInsetsContractTest {
             .resolve("com/sbro/emucorev/ui/emulation/EmulationMenu.kt")
             .readText()
         assertTrue(
-            "The in-game menu must keep its 4 dp spacing outside the panel",
-            ".padding(vertical = 4.dp)" in emulationMenu
+            "The sidebar must render its content and navigation rail as separate surfaces",
+            "Spacer(modifier = Modifier.width(12.dp))" in emulationMenu &&
+                ".width(74.dp)" in emulationMenu &&
+                ".widthIn(min = 300.dp, max = 420.dp)" in emulationMenu
+        )
+        val emulationOverlay = sourceRoot
+            .resolve("com/sbro/emucorev/ui/emulation/EmulationOverlay.kt")
+            .readText()
+        assertTrue(
+            "The game menu must keep fixed compact spacing from the top, right and bottom edges",
+            "start = if (useSidePanel) 0.dp else 16.dp" in emulationOverlay &&
+                "top = 16.dp" in emulationOverlay &&
+                "end = 16.dp" in emulationOverlay &&
+                "bottom = 16.dp" in emulationOverlay
+        )
+        assertTrue(
+            "The game menu spacing must not expand with system safe-area insets",
+            "menuSafePadding" !in emulationOverlay &&
+                "GameMenuMinimumEdgePadding" !in emulationOverlay
         )
         assertTrue(
             "The quick-bar island must stay at its original 12 dp top position",
