@@ -132,6 +132,17 @@ fun EmulationOverlayHost(
     val customizationPreferences = remember(activity) { CustomizationPreferences(activity) }
     val customization by customizationPreferences.settings.collectAsState()
     val overlayBridge = remember(activity) { activity.getmOverlay() }
+
+    // A finger can be lifted while the controls are being hidden (menu opens,
+    // IME shows, activity pauses); Android then never delivers ACTION_UP to the
+    // stick and the axis would stay where it was. Zero both sticks on every
+    // such edge so the game never keeps a direction pressed.
+    fun resetOverlayAxes() {
+        overlayBridge.sendAxis(InputOverlay.ControlId.axis_left_x, 0.toShort())
+        overlayBridge.sendAxis(InputOverlay.ControlId.axis_left_y, 0.toShort())
+        overlayBridge.sendAxis(InputOverlay.ControlId.axis_right_x, 0.toShort())
+        overlayBridge.sendAxis(InputOverlay.ControlId.axis_right_y, 0.toShort())
+    }
     var config by remember(activity, gameId) { mutableStateOf(repository.loadEffective(gameId)) }
     var controlLayout by remember(activity) { mutableStateOf(controlLayoutRepository.load()) }
     var controlsEditMode by remember { mutableStateOf(false) }
@@ -170,11 +181,17 @@ fun EmulationOverlayHost(
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
     }
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, _ ->
+        val observer = LifecycleEventObserver { _, event ->
             inputResumed = lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                resetOverlayAxes()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(showTouchControls, menuOpen, nativeImeActive) {
+        if (!showTouchControls || menuOpen || nativeImeActive) resetOverlayAxes()
     }
     LaunchedEffect(menuOpen, gameId) {
         if (menuOpen && gameId.isNotBlank()) cheatSnapshot = CheatBridge.snapshot(gameId)
