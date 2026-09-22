@@ -25,7 +25,8 @@ enum class InstallOperation {
     Firmware,
     License,
     Content,
-    Pkg
+    Pkg,
+    Dlc
 }
 
 enum class InstallStatus {
@@ -181,6 +182,40 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                 finishSuccess(appContext.getString(R.string.install_dialog_pkg_done))
             } else {
                 finishError(appContext.getString(R.string.install_dialog_pkg_failed))
+            }
+        }
+    }
+
+    /**
+     * Installs add-on content. DLC packages are placed in the game's addcont
+     * folder by the core; the header is inspected first so a game or update
+     * package picked by mistake gets a clear error instead of a surprise.
+     */
+    fun installDlc(uriString: String, zrif: String, expectedTitleId: String? = null) {
+        runInstall(InstallOperation.Dlc) {
+            val path = resolveInstallSource(uriString)
+            if (path == null) {
+                finishError(appContext.getString(R.string.install_dialog_dlc_failed))
+                return@runInstall
+            }
+            val info = VitaInstallBridge.inspectPkg(appContext, path)
+            if (!info.isDlc) {
+                finishError(appContext.getString(R.string.install_dialog_dlc_not_dlc))
+                return@runInstall
+            }
+            val expected = expectedTitleId?.trim()?.takeIf(String::isNotBlank)
+            val actual = info.titleId
+            if (expected != null && actual != null && !actual.equals(expected, ignoreCase = true)) {
+                finishError(
+                    appContext.getString(R.string.install_dialog_dlc_wrong_game, actual, expected)
+                )
+                return@runInstall
+            }
+            val success = VitaInstallBridge.installPkg(appContext, path, zrif.trim(), systemLanguage())
+            if (success) {
+                finishSuccess(appContext.getString(R.string.install_dialog_dlc_done))
+            } else {
+                finishError(appContext.getString(R.string.install_dialog_dlc_failed))
             }
         }
     }

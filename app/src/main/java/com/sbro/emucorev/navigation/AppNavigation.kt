@@ -130,6 +130,8 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     val launchRequiresFirmwareMessage = stringResource(R.string.game_launch_requires_firmware)
     val launchRequiresFirmwareUpdateMessage = stringResource(R.string.game_launch_requires_firmware_update)
     var pendingPkgZrif by rememberSaveable { mutableStateOf("") }
+    var pendingDlcZrif by rememberSaveable { mutableStateOf("") }
+    var pendingDlcTitleId by rememberSaveable { mutableStateOf("") }
     var pendingContentRepair by rememberSaveable { mutableStateOf(false) }
     var installChoiceZrif by rememberSaveable { mutableStateOf("") }
     var showInstallChoiceDialog by rememberSaveable { mutableStateOf(false) }
@@ -180,6 +182,25 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         }
     }
 
+    val dlcPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        val zrif = pendingDlcZrif
+        val expectedTitleId = pendingDlcTitleId
+        pendingDlcZrif = ""
+        pendingDlcTitleId = ""
+        uri ?: return@rememberLauncherForActivityResult
+        val fileName = DocumentPathResolver.getDisplayName(context, uri.toString())
+        val extension = fileName.substringAfterLast('.', "").lowercase()
+        if (extension != "pkg") {
+            Toast.makeText(context, unsupportedPkg, Toast.LENGTH_SHORT).show()
+        } else {
+            installViewModel.installDlc(
+                uri.toString(),
+                zrif,
+                expectedTitleId.takeIf { it.isNotBlank() }
+            )
+        }
+    }
+
     val openFirmwareInstall = { firmwarePicker.launch(arrayOf("*/*")) }
     val openContentInstall = {
         pendingContentRepair = false
@@ -193,6 +214,11 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     val openPkgInstall: (String) -> Unit = { zrif ->
         pendingPkgZrif = zrif
         pkgPicker.launch(arrayOf("*/*"))
+    }
+    val openDlcInstall: (String, String?) -> Unit = { zrif, titleId ->
+        pendingDlcZrif = zrif
+        pendingDlcTitleId = titleId.orEmpty()
+        dlcPicker.launch(arrayOf("*/*"))
     }
     val openInstallChoiceDialog = {
         showInstallChoiceDialog = true
@@ -818,7 +844,8 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onBack = { navController.popBackStack() },
                     onOpenSaveManager = { titleId ->
                         navController.navigate(saveManagerRoute(titleId)) { launchSingleTop = true }
-                    }
+                    },
+                    onInstallDlc = { titleId -> openDlcInstall("", titleId) }
                 )
             }
             composable(
@@ -862,6 +889,11 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 showInstallChoiceDialog = false
                 installChoiceZrif = ""
                 openPkgInstall(zrif)
+            },
+            onInstallDlc = { zrif ->
+                showInstallChoiceDialog = false
+                installChoiceZrif = ""
+                openDlcInstall(zrif, null)
             }
         )
     }

@@ -73,6 +73,7 @@
     <string name="detail_delete_game_confirm_title">Delete installed game?</string>
     <string name="detail_delete_game_confirm_body">This will remove the installed game files from your library.</string>
     <string name="detail_delete_game_failed">Failed to delete the game.</string>
+    <string name="detail_install_dlc">Install DLC</string>
     <string name="save_manager_title">Saves</string>
     <string name="save_manager_subtitle">Import, export, and remove PS Vita save data.</string>
     <string name="save_manager_open_for_game">Saves</string>
@@ -741,6 +742,11 @@
     <string name="install_dialog_license_done">License installed successfully.</string>
     <string name="install_dialog_firmware_default_version">selected build</string>
     <string name="install_dialog_pkg_done">PKG installed successfully.</string>
+    <string name="install_dialog_title_dlc">Installing DLC</string>
+    <string name="install_dialog_dlc_done">DLC installed successfully.</string>
+    <string name="install_dialog_dlc_failed">DLC installation failed.</string>
+    <string name="install_dialog_dlc_not_dlc">This file is not a DLC package. Use PKG install for games and updates.</string>
+    <string name="install_dialog_dlc_wrong_game">This DLC is for %1$s, but the selected game is %2$s.</string>
     <string name="setup_title">Install games</string>
     <string name="setup_subtitle">Install VPK, ZIP, and PKG games. For PKG games, add the license first, then select the PKG file.</string>
     <string name="setup_hero_title">Install firmware and games</string>
@@ -780,6 +786,10 @@
     <string name="install_choice_pkg_title">PKG install</string>
     <string name="install_choice_pkg_body">Install the matching license first, paste a zRIF key, or choose the PKG directly if the license is already installed.</string>
     <string name="install_choice_pkg_without_license_note">You can choose a PKG without pasting a zRIF if the matching license was already installed.</string>
+    <string name="install_choice_dlc_title">DLC and add-ons</string>
+    <string name="install_choice_dlc_body">Install add-on content for a game. The DLC package is placed in the game\'s addcont folder automatically.</string>
+    <string name="install_choice_dlc_button">Install DLC (PKG)</string>
+    <string name="install_choice_dlc_note">Encrypted DLC may need its license: add it above or paste a zRIF in the PKG section.</string>
     <string name="common_back">Back</string>
     <string name="common_not_available">Not available</string>
     <string name="common_unknown">Unknown</string>

@@ -16,6 +16,7 @@ import com.sbro.emucorev.ui.theme.neon.neonShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.VpnKey
@@ -48,7 +49,8 @@ fun InstallGameChoiceDialog(
     onInstallArchive: () -> Unit,
     onRepairArchive: () -> Unit,
     onInstallLicense: () -> Unit,
-    onInstallPkg: (String) -> Unit
+    onInstallPkg: (String) -> Unit,
+    onInstallDlc: (String) -> Unit
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -147,6 +149,29 @@ fun InstallGameChoiceDialog(
                     }
                     Text(
                         text = stringResource(R.string.install_choice_pkg_without_license_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                InstallChoiceCard(
+                    icon = Icons.Rounded.Extension,
+                    title = stringResource(R.string.install_choice_dlc_title),
+                    body = stringResource(R.string.install_choice_dlc_body)
+                ) {
+                    OutlinedButton(
+                        shape = neonButtonShape(),
+                        onClick = { onInstallDlc(zrif.trim()) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Rounded.FileOpen, contentDescription = null)
+                        Text(
+                            text = stringResource(R.string.install_choice_dlc_button),
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.install_choice_dlc_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

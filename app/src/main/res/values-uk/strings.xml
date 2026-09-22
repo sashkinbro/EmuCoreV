@@ -394,6 +394,16 @@
     <string name="install_dialog_firmware_done">Пакет прошивки успішно встановлено.</string>
     <string name="install_dialog_firmware_default_version">вибрана збірка</string>
     <string name="install_dialog_pkg_done">PKG успішно встановлено.</string>
+    <string name="install_dialog_title_dlc">Встановлення DLC</string>
+    <string name="install_dialog_dlc_done">DLC успішно встановлено.</string>
+    <string name="install_dialog_dlc_failed">Не вдалося встановити DLC.</string>
+    <string name="install_dialog_dlc_not_dlc">Цей файл не є пакетом DLC. Для ігор і оновлень використовуйте встановлення PKG.</string>
+    <string name="install_dialog_dlc_wrong_game">Це DLC для %1$s, а вибрана гра — %2$s.</string>
+    <string name="install_choice_dlc_title">DLC та доповнення</string>
+    <string name="install_choice_dlc_body">Встановлення додаткового вмісту для гри. Пакет DLC автоматично потрапляє до теки addcont цієї гри.</string>
+    <string name="install_choice_dlc_button">Встановити DLC (PKG)</string>
+    <string name="install_choice_dlc_note">Зашифроване DLC може потребувати ліцензії: додайте її вище або вставте zRIF у розділі PKG.</string>
+    <string name="detail_install_dlc">Встановити DLC</string>
     <string name="setup_title">Встановлення ігор</string>
     <string name="setup_subtitle">Встановлення VPK, ZIP та PKG ігор.</string>
     <string name="setup_hero_title">Встановіть прошивку та ігри</string>

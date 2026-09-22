@@ -10,6 +10,24 @@ data class NativeInstallProgress(
     val detail: String?
 )
 
+data class VitaPkgInfo(
+    val kind: Int,
+    val contentId: String
+) {
+    val isDlc: Boolean get() = kind == KIND_DLC
+
+    /** Title id encoded in the package content id, when it follows the standard layout. */
+    val titleId: String?
+        get() = contentId.takeIf { it.length >= 16 }?.substring(7, 16)?.takeIf { it.isNotBlank() }
+
+    companion object {
+        const val KIND_UNKNOWN = 0
+        const val KIND_APP = 1
+        const val KIND_DLC = 2
+        const val KIND_THEME = 3
+    }
+}
+
 object VitaInstallBridge {
     fun interface Listener {
         fun onProgress(progress: NativeInstallProgress)
@@ -87,6 +105,19 @@ object VitaInstallBridge {
         return success
     }
 
+    /**
+     * Reads the unencrypted PKG header. Used to keep DLC installs separate from
+     * game/update installs so the UI can show a precise result and error.
+     */
+    fun inspectPkg(context: Context, pkgPath: String): VitaPkgInfo {
+        NativeLibraryLoader.ensureLoaded(context)
+        val raw = runCatching { nativeInspectPkg(pkgPath) }.getOrNull().orEmpty()
+        val separator = raw.indexOf('|')
+        if (separator <= 0) return VitaPkgInfo(VitaPkgInfo.KIND_UNKNOWN, "")
+        val kind = raw.substring(0, separator).toIntOrNull() ?: VitaPkgInfo.KIND_UNKNOWN
+        return VitaPkgInfo(kind, raw.substring(separator + 1))
+    }
+
     @JvmStatic
     fun onNativeProgress(
         stage: String,
@@ -133,4 +164,6 @@ object VitaInstallBridge {
         zrif: String,
         systemLanguage: Int
     ): Boolean
+
+    private external fun nativeInspectPkg(pkgPath: String): String
 }

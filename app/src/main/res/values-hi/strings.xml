@@ -394,6 +394,16 @@
     <string name="install_dialog_firmware_done">फ़र्मवेयर पैकेज सफलतापूर्वक इंस्टॉल हो गया।</string>
     <string name="install_dialog_firmware_default_version">चयनित बिल्ड</string>
     <string name="install_dialog_pkg_done">PKG सफलतापूर्वक इंस्टॉल हो गया।</string>
+    <string name="install_dialog_title_dlc">DLC इंस्टॉल हो रहा है</string>
+    <string name="install_dialog_dlc_done">DLC सफलतापूर्वक इंस्टॉल हो गया।</string>
+    <string name="install_dialog_dlc_failed">DLC इंस्टॉल नहीं हो सका।</string>
+    <string name="install_dialog_dlc_not_dlc">यह फ़ाइल DLC पैकेज नहीं है। गेम और अपडेट के लिए PKG इंस्टॉल का उपयोग करें।</string>
+    <string name="install_dialog_dlc_wrong_game">यह DLC %1$s के लिए है, लेकिन चुना गया गेम %2$s है।</string>
+    <string name="install_choice_dlc_title">DLC और ऐड-ऑन</string>
+    <string name="install_choice_dlc_body">किसी गेम के लिए अतिरिक्त सामग्री इंस्टॉल करें। DLC पैकेज अपने आप गेम के addcont फ़ोल्डर में रखा जाता है।</string>
+    <string name="install_choice_dlc_button">DLC इंस्टॉल करें (PKG)</string>
+    <string name="install_choice_dlc_note">एन्क्रिप्टेड DLC के लिए उसका लाइसेंस चाहिए हो सकता है: उसे ऊपर जोड़ें या PKG अनुभाग में zRIF पेस्ट करें।</string>
+    <string name="detail_install_dlc">DLC इंस्टॉल करें</string>
     <string name="setup_title">गेम इंस्टॉल करें</string>
     <string name="setup_subtitle">फ़र्मवेयर, गेम और PKG पैकेज इंस्टॉल करें।</string>
     <string name="setup_hero_title">फ़र्मवेयर और गेम इंस्टॉल करें</string>

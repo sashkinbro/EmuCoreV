@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.SystemUpdateAlt
 import androidx.compose.material.icons.rounded.VpnKey
@@ -62,6 +63,7 @@ fun SetupInstallDialog(
         InstallOperation.Content -> Icons.Rounded.Inventory2
         InstallOperation.License -> Icons.Rounded.VpnKey
         InstallOperation.Pkg -> Icons.Rounded.VpnKey
+        InstallOperation.Dlc -> Icons.Rounded.Extension
         null -> Icons.Rounded.Inventory2
     }
     val statusIcon = when (uiState.status) {
@@ -75,6 +77,7 @@ fun SetupInstallDialog(
         InstallOperation.Content -> stringResource(R.string.install_dialog_title_content)
         InstallOperation.License -> stringResource(R.string.install_dialog_title_license)
         InstallOperation.Pkg -> stringResource(R.string.install_dialog_title_pkg)
+        InstallOperation.Dlc -> stringResource(R.string.install_dialog_title_dlc)
         null -> stringResource(R.string.install_dialog_title_generic)
     }
     val itemProgress = if (uiState.status == InstallStatus.Running && uiState.current != null && uiState.total != null) {

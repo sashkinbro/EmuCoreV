@@ -394,6 +394,16 @@
     <string name="install_dialog_firmware_done">韌體套件安裝成功。</string>
     <string name="install_dialog_firmware_default_version">所選版本</string>
     <string name="install_dialog_pkg_done">PKG 安裝成功。</string>
+    <string name="install_dialog_title_dlc">正在安裝 DLC</string>
+    <string name="install_dialog_dlc_done">DLC 安裝成功。</string>
+    <string name="install_dialog_dlc_failed">DLC 安裝失敗。</string>
+    <string name="install_dialog_dlc_not_dlc">此檔案不是 DLC 套件。遊戲與更新請使用 PKG 安裝。</string>
+    <string name="install_dialog_dlc_wrong_game">此 DLC 屬於 %1$s，但目前已選擇的遊戲是 %2$s。</string>
+    <string name="install_choice_dlc_title">DLC 與附加內容</string>
+    <string name="install_choice_dlc_body">為遊戲安裝附加內容。DLC 套件會自動放入該遊戲的 addcont 資料夾。</string>
+    <string name="install_choice_dlc_button">安裝 DLC（PKG）</string>
+    <string name="install_choice_dlc_note">加密的 DLC 可能需要其授權：請在上方加入，或在 PKG 區塊貼上 zRIF。</string>
+    <string name="detail_install_dlc">安裝 DLC</string>
     <string name="setup_title">安裝遊戲</string>
     <string name="setup_subtitle">安裝韌體、遊戲與 PKG 封裝檔。</string>
     <string name="setup_hero_title">安裝韌體與遊戲</string>

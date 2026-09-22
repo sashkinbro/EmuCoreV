@@ -13,10 +13,14 @@
 #include <packages/functions.h>
 #include <packages/license.h>
 #include <packages/pkg.h>
+#include <util/bytes.h>
+#include <util/fs.h>
 #include <util/log.h>
 #include <util/string_utils.h>
 
 #include <algorithm>
+#include <cstdio>
+#include <cstring>
 #include <exception>
 #include <string>
 
@@ -221,5 +225,47 @@ Java_com_sbro_emucorev_core_VitaInstallBridge_nativeInstallPkg(
             reporter.report("pkg", progress, 0.f, 0.f);
         });
         return static_cast<jboolean>(success);
+    });
+}
+
+// Reads the unencrypted PKG header so the UI can tell a DLC package from a game,
+// update or theme before installing. Returns "<kind>|<content_id>" where kind is
+// 0 unknown, 1 app, 2 DLC, 3 theme.
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_sbro_emucorev_core_VitaInstallBridge_nativeInspectPkg(
+    JNIEnv *env,
+    jobject /*thiz*/,
+    jstring pkg_path) {
+    return guard_install("inspect pkg", env->NewStringUTF("0|"), [&]() -> jstring {
+        const auto path = fs_utils::utf8_to_path(from_jstring(env, pkg_path));
+        FILE *infile = FOPEN(path.c_str(), "rb");
+        if (!infile)
+            return env->NewStringUTF("0|");
+
+        PkgHeader header{};
+        if (fread(&header, sizeof(PkgHeader), 1, infile) != 1 || byte_swap(header.magic) != 0x7F504b47) {
+            fclose(infile);
+            return env->NewStringUTF("0|");
+        }
+
+        uint32_t content_type = 0;
+        uint32_t info_offset = byte_swap(header.info_offset);
+        for (uint32_t i = 0; i < byte_swap(header.info_count); i++) {
+            uint32_t block[4]{};
+            fseek(infile, info_offset, SEEK_SET);
+            if (fread(block, sizeof(block), 1, infile) != 1)
+                break;
+            const auto block_type = byte_swap(block[0]);
+            const auto block_size = byte_swap(block[1]);
+            if (block_type == 2)
+                content_type = byte_swap(block[2]);
+            info_offset += 2 * sizeof(uint32_t) + block_size;
+        }
+        fclose(infile);
+
+        const int kind = content_type == 0x15 ? 1 : (content_type == 0x16 ? 2 : (content_type == 0x1F ? 3 : 0));
+        const std::string content_id(header.content_id, strnlen(header.content_id, sizeof(header.content_id)));
+        const std::string result = std::to_string(kind) + "|" + content_id;
+        return env->NewStringUTF(result.c_str());
     });
 }

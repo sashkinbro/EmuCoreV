@@ -394,6 +394,16 @@
     <string name="install_dialog_firmware_done">Firmware-Paket erfolgreich installiert.</string>
     <string name="install_dialog_firmware_default_version">ausgewählter Build</string>
     <string name="install_dialog_pkg_done">PKG erfolgreich installiert.</string>
+    <string name="install_dialog_title_dlc">DLC wird installiert</string>
+    <string name="install_dialog_dlc_done">DLC erfolgreich installiert.</string>
+    <string name="install_dialog_dlc_failed">DLC-Installation fehlgeschlagen.</string>
+    <string name="install_dialog_dlc_not_dlc">Diese Datei ist kein DLC-Paket. Verwende die PKG-Installation für Spiele und Updates.</string>
+    <string name="install_dialog_dlc_wrong_game">Dieses DLC ist für %1$s, ausgewählt ist aber %2$s.</string>
+    <string name="install_choice_dlc_title">DLC und Erweiterungen</string>
+    <string name="install_choice_dlc_body">Installiert Zusatzinhalte für ein Spiel. Das DLC-Paket wird automatisch im addcont-Ordner des Spiels abgelegt.</string>
+    <string name="install_choice_dlc_button">DLC installieren (PKG)</string>
+    <string name="install_choice_dlc_note">Verschlüsselte DLC benötigen eventuell ihre Lizenz: füge sie oben hinzu oder gib einen zRIF im PKG-Bereich ein.</string>
+    <string name="detail_install_dlc">DLC installieren</string>
     <string name="setup_title">Spiele installieren</string>
     <string name="setup_subtitle">Installiere Firmware, Spiele und PKG-Pakete.</string>
     <string name="setup_hero_title">Firmware und Spiele installieren</string>

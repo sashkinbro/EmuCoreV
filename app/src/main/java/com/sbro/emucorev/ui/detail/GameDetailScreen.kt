@@ -55,6 +55,7 @@ import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ConfirmationNumber
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Save
@@ -143,6 +144,7 @@ fun GameDetailScreen(
     igdbId: Long?,
     onBack: () -> Unit,
     onOpenSaveManager: (String) -> Unit = {},
+    onInstallDlc: (String) -> Unit = {},
     viewModel: GameDetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -156,6 +158,7 @@ fun GameDetailScreen(
     val launchRequiresFirmwareMessage = stringResource(R.string.game_launch_requires_firmware)
     val launchRequiresFirmwareUpdateMessage = stringResource(R.string.game_launch_requires_firmware_update)
     val deleteGameLabel = stringResource(R.string.detail_delete_game)
+    val installDlcLabel = stringResource(R.string.detail_install_dlc)
     val manageSaveDataLabel = stringResource(R.string.save_manager_open_for_game)
     val deleteGameConfirmTitle = stringResource(R.string.detail_delete_game_confirm_title)
     val deleteGameConfirmBody = stringResource(R.string.detail_delete_game_confirm_body)
@@ -228,6 +231,19 @@ fun GameDetailScreen(
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Rounded.Save,
+                                    contentDescription = null
+                                )
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(installDlcLabel) },
+                            onClick = {
+                                showOverflowMenu = false
+                                onInstallDlc(game.titleId)
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Extension,
                                     contentDescription = null
                                 )
                             }

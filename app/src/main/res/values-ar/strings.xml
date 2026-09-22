@@ -593,6 +593,16 @@
     <string name="install_dialog_firmware_done">تم تثبيت حزمة البرامج الثابتة بنجاح.</string>
     <string name="install_dialog_firmware_default_version">البنية المحددة</string>
     <string name="install_dialog_pkg_done">تم تثبيت PKG بنجاح.</string>
+    <string name="install_dialog_title_dlc">جارٍ تثبيت DLC</string>
+    <string name="install_dialog_dlc_done">تم تثبيت DLC بنجاح.</string>
+    <string name="install_dialog_dlc_failed">فشل تثبيت DLC.</string>
+    <string name="install_dialog_dlc_not_dlc">هذا الملف ليس حزمة DLC. استخدم تثبيت PKG للألعاب والتحديثات.</string>
+    <string name="install_dialog_dlc_wrong_game">هذا الـ DLC مخصص لـ %1$s، لكن اللعبة المحددة هي %2$s.</string>
+    <string name="install_choice_dlc_title">DLC والإضافات</string>
+    <string name="install_choice_dlc_body">تثبيت محتوى إضافي للعبة. تُوضع حزمة DLC تلقائيًا في مجلد addcont الخاص باللعبة.</string>
+    <string name="install_choice_dlc_button">تثبيت DLC (PKG)</string>
+    <string name="install_choice_dlc_note">قد يحتاج DLC المشفَّر إلى ترخيصه: أضِفه بالأعلى أو الصق مفتاح zRIF في قسم PKG.</string>
+    <string name="detail_install_dlc">تثبيت DLC</string>
     <string name="setup_title">تثبيت الألعاب</string>
     <string name="setup_subtitle">تثبيت البرامج الثابتة، الألعاب، وحزم PKG.</string>
     <string name="setup_hero_title">تثبيت البرامج الثابتة والألعاب</string>
