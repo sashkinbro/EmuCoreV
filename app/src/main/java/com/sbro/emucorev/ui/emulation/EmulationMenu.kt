@@ -892,28 +892,33 @@ private fun GamepadTab(
 @Composable
 private fun AchievementsTab(gameId: String) {
     val context = LocalContext.current
-    var trophySets by remember(gameId) { mutableStateOf<List<VitaTrophySet>>(emptyList()) }
-    var isLoading by remember(gameId) { mutableStateOf(true) }
+    val repository = remember { TrophyRepository() }
+    // Show the last loaded sets immediately; the poll below refreshes only when the
+    // trophy files actually changed (repository fingerprint), so re-opening the tab
+    // no longer re-parses every game from scratch.
+    var trophySets by remember(gameId) {
+        mutableStateOf(gameId.takeIf(String::isNotBlank)?.let { repository.cachedForTitle(context, it) })
+    }
+    var isLoading by remember(gameId) { mutableStateOf(trophySets == null) }
 
     LaunchedEffect(context, gameId) {
-        val repository = TrophyRepository()
-        var firstLoad = true
         while (true) {
-            if (firstLoad) {
-                isLoading = true
-            }
-            trophySets = if (gameId.isBlank()) {
+            val loaded = if (gameId.isBlank()) {
                 emptyList()
             } else {
                 withContext(Dispatchers.IO) {
                     repository.loadForTitle(context, gameId)
                 }
             }
-            firstLoad = false
+            if (loaded != trophySets) {
+                trophySets = loaded
+            }
             isLoading = false
             delay(2_500)
         }
     }
+
+    val sets = trophySets.orEmpty()
 
     if (isLoading) {
         MenuSection(
@@ -928,7 +933,7 @@ private fun AchievementsTab(gameId: String) {
         return
     }
 
-    if (trophySets.isEmpty()) {
+    if (sets.isEmpty()) {
         MenuSection(
             title = stringResource(R.string.achievements_title),
             subtitle = stringResource(R.string.emulation_achievements_empty),
@@ -939,7 +944,7 @@ private fun AchievementsTab(gameId: String) {
         return
     }
 
-    trophySets.forEach { set ->
+    sets.forEach { set ->
         MenuSection(
             title = set.setName.ifBlank { set.gameTitle.ifBlank { stringResource(R.string.achievements_title) } },
             subtitle = stringResource(R.string.achievements_progress_count, set.unlockedCount, set.trophyCount),

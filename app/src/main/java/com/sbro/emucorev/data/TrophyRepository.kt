@@ -76,16 +76,98 @@ class TrophyRepository {
         return commIds.mapNotNull { commId ->
             val installedPackage = installedByCommId[commId]
             loadSet(context, commId, installedPackage)
-        }.sortedWith(
-            compareByDescending<VitaTrophySet> { it.unlockedCount > 0 }
-                .thenBy { it.gameTitle.lowercase() }
-                .thenBy { it.communicationId.lowercase() }
-        )
+        }.sortedWith(TROPHY_SET_ORDER)
     }
 
     fun loadForTitle(context: Context, titleId: String): List<VitaTrophySet> {
         val normalized = titleId.lowercase()
-        return list(context).filter { it.titleId?.lowercase() == normalized }
+        if (normalized.isBlank()) return emptyList()
+
+        val game = InstalledGameRepository().findByTitleId(context, titleId)
+        val packages = game?.trophyPackages().orEmpty()
+        val commIds = linkedSetOf<String>()
+        val packageByCommId = mutableMapOf<String, File>()
+        packages.forEach { packageDir ->
+            commIdForPackage(packageDir)?.let { commId ->
+                commIds += commId
+                packageByCommId[commId] = packageDir
+            }
+        }
+
+        val fingerprint = titleFingerprint(context, game, packages, commIds)
+        titleCache[normalized]?.let { cached ->
+            if (cached.fingerprint == fingerprint) return cached.sets
+        }
+
+        val sets = commIds.mapNotNull { commId ->
+            val packageDir = packageByCommId[commId]
+            val installedPackage = if (packageDir != null && game != null) {
+                InstalledTrophyPackage(commId, packageDir, game)
+            } else {
+                null
+            }
+            loadSet(context, commId, installedPackage)
+        }.sortedWith(TROPHY_SET_ORDER)
+
+        titleCache[normalized] = TitleCacheEntry(fingerprint, sets)
+        return sets
+    }
+
+    /** Last loaded sets for a title, if any, for instant display while refreshing. */
+    fun cachedForTitle(context: Context, titleId: String): List<VitaTrophySet>? =
+        titleCache[titleId.lowercase()]?.sets
+
+    private fun commIdForPackage(packageDir: File): String? {
+        val cached = commIdByPackageDir[packageDir.absolutePath]
+        if (cached != null) return cached
+        val commId = packageDir.name.takeIf { it.isLikelyTrophyCommunicationId() }
+            ?: File(packageDir, TROPHY_TRP_NAME)
+                .takeIf { it.isFile }
+                ?.let { runCatching { TrpArchive(it).readTextEntry(TROPCONF_NAME) }.getOrNull() }
+                ?.let(::parseCommunicationId)
+        if (commId != null) {
+            commIdByPackageDir[packageDir.absolutePath] = commId
+        }
+        return commId
+    }
+
+    /**
+     * Cheap change detector for one game's trophies: package files, config XMLs and
+     * the progress file. Unlocks update TROPUSR.DAT, so the tab only re-parses when
+     * something actually changed.
+     */
+    private fun titleFingerprint(
+        context: Context,
+        game: InstalledVitaGame?,
+        packages: List<File>,
+        commIds: Set<String>
+    ): Long {
+        var fingerprint = 17L
+        game?.let {
+            fingerprint = fingerprint * 31 + it.titleId.hashCode()
+            fingerprint = fingerprint * 31 + File(it.installPath, "sce_sys/param.sfo").lastModified()
+        }
+        packages.sortedBy { it.absolutePath }.forEach { packageDir ->
+            fingerprint = fingerprint * 31 + packageDir.absolutePath.hashCode()
+            fingerprint = fingerprint.mixFile(File(packageDir, TROPHY_TRP_NAME))
+        }
+        commIds.sorted().forEach { commId ->
+            trophyConfRoots(context).forEach { root ->
+                val confDir = File(root, commId)
+                fingerprint = fingerprint.mixFile(File(confDir, "TROPCONF.SFM"))
+                fingerprint = fingerprint.mixFile(File(confDir, "TROP.SFM"))
+                fingerprint = fingerprint.mixFile(File(confDir, "TROP_00.SFM"))
+            }
+            trophyDataRoots(context).forEach { root ->
+                fingerprint = fingerprint.mixFile(File(File(root, commId), "TROPUSR.DAT"))
+            }
+        }
+        return fingerprint
+    }
+
+    private fun Long.mixFile(file: File): Long {
+        if (!file.isFile) return this
+        return this * 31 + file.lastModified() * 31 + file.length()
     }
 
     private fun loadSet(
@@ -486,5 +568,16 @@ class TrophyRepository {
     private companion object {
         const val TROPHY_TRP_NAME = "TROPHY.TRP"
         const val TROPCONF_NAME = "TROPCONF.SFM"
+
+        val TROPHY_SET_ORDER = compareByDescending<VitaTrophySet> { it.unlockedCount > 0 }
+            .thenBy { it.gameTitle.lowercase() }
+            .thenBy { it.communicationId.lowercase() }
+
+        data class TitleCacheEntry(val fingerprint: Long, val sets: List<VitaTrophySet>)
+
+        // Process-wide caches so re-opening the in-game achievements tab is instant
+        // and only re-parses when the underlying trophy files changed.
+        val titleCache = java.util.concurrent.ConcurrentHashMap<String, TitleCacheEntry>()
+        val commIdByPackageDir = java.util.concurrent.ConcurrentHashMap<String, String>()
     }
 }
