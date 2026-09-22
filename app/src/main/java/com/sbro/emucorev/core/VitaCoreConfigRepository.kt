@@ -77,7 +77,7 @@ data class VitaCoreConfig(
     val cpuPoolSize: Int = 10,
     val modulesMode: Int = 0,
     val archiveLog: Boolean = false,
-    val logLevel: Int = if (BuildConfig.DEBUG) 3 else 6,
+    val logLevel: Int = if (BuildConfig.DEBUG) 5 else 6,
     val discordRichPresence: Boolean = false,
     val checkForUpdates: Boolean = false,
     val fileLoadingDelay: Int = 0,
@@ -634,9 +634,10 @@ class VitaCoreConfigRepository(private val context: Context) {
     private companion object {
         private val CONFIG_IO_LOCK = Any()
         // 0 = TRACE (upstream Vita3K default). EmuCoreV keeps debug gameplay at
-        // WARN and release at OFF; explicit diagnostics can opt into DEBUG.
+        // CRITICAL so logcat/file flushing does not make debug builds untestable;
+        // the Settings diagnostics toggles opt into DEBUG when needed.
         private const val DIAGNOSTIC_LOG_LEVEL = 1
-        private const val DEFAULT_DEBUG_LOG_LEVEL = 3
+        private const val DEFAULT_DEBUG_LOG_LEVEL = 5
         private const val RELEASE_LOG_LEVEL = 6
         // Bump whenever an old non-upstream default needs to be snapped to vanilla
         // for users who already wrote a stale config.yml. applyMigrations() rewrites

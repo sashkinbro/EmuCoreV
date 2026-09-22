@@ -6,11 +6,15 @@
 #include <jni.h>
 
 bool attach_overlay_virtual_controller();
+bool overlay_virtual_controller_attached();
 
 extern "C" {
 
 JNIEXPORT void JNICALL
 Java_org_vita3k_emulator_overlay_InputOverlay_detachController(JNIEnv *env, jobject thiz);
+
+JNIEXPORT jboolean JNICALL
+Java_org_vita3k_emulator_overlay_InputOverlay_isControllerAttached(JNIEnv *env, jobject thiz);
 
 JNIEXPORT void JNICALL
 Java_org_vita3k_emulator_overlay_InputOverlay_setAxis(JNIEnv *env, jobject thiz, jint axis, jshort value);
@@ -24,6 +28,11 @@ Java_org_vita3k_emulator_overlay_InputOverlay_setTouchState(JNIEnv *env, jobject
 JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorev_core_vita_overlay_InputOverlay_attachController(JNIEnv *env, jobject thiz) {
     return attach_overlay_virtual_controller() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorev_core_vita_overlay_InputOverlay_isControllerAttached(JNIEnv *env, jobject thiz) {
+    return Java_org_vita3k_emulator_overlay_InputOverlay_isControllerAttached(env, thiz);
 }
 
 JNIEXPORT void JNICALL

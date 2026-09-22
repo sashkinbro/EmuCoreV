@@ -69,7 +69,7 @@ class InputEnhancementsContractTest {
         val vectorControls = root.resolve("ui/common/VectorTouchControls.kt").readText()
         val gyro = root.resolve("core/AndroidGyroscopeInput.kt").readText()
 
-        assertTrue("Gyroscope must feed native analog axes", "overlayBridge.setAxis(axisX" in overlay)
+        assertTrue("Gyroscope must feed native analog axes", "overlayBridge.sendAxis(axisX" in overlay)
         assertTrue("Gyroscope must stop while paused", "effectivePaused" in overlay)
         assertTrue("Gyroscope must stop on lifecycle pause", "Lifecycle.Event.ON_PAUSE" in overlay)
         assertTrue("Stopping gyro must release its stick", "onAnalog(mode, 0f, 0f)" in gyro)
@@ -132,6 +132,19 @@ class InputEnhancementsContractTest {
         assertTrue("Trim must use the process-lifetime mailbox", "mem_diag::pending_trim_level" in callback)
         assertTrue("A session may be destroyed while Android requests trim", "session." !in callback)
         assertTrue("GPU trim must be consumed on the render thread", "pending_trim_level.exchange" in renderer)
+    }
+
+    @Test
+    fun physicalGamepadHidesTouchControlsAndDroppedControllersReattach() {
+        val overlay = sourceRoot().resolve("ui/emulation/EmulationOverlay.kt").readText()
+        val bridge = sourceRoot().resolve("core/vita/overlay/InputOverlay.kt").readText()
+
+        assertTrue("Touch controls must hide while a physical gamepad is connected", "controlsSuppressedByGamepad" in overlay)
+        assertTrue("Gamepad auto-hide must keep a session override", "showControlsWithGamepad" in overlay)
+        assertTrue("Disconnecting a gamepad must restore the persisted preference", "showControlsWithGamepad = false" in overlay)
+        assertTrue("The menu must reflect the effective controls visibility", "controlsVisible = controlsVisible" in overlay)
+        assertTrue("A dropped native controller must be detected", "external fun isControllerAttached" in bridge)
+        assertTrue("Stale attachment state must be forgotten", "forgetAttachment()" in bridge)
     }
 
     @Test

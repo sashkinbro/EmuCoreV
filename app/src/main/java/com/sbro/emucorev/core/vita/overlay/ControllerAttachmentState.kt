@@ -10,6 +10,15 @@ internal class ControllerAttachmentState {
     var isAttached: Boolean = false
         private set
 
+    /**
+     * The native session can drop the virtual controller behind our back (in-process
+     * relaunch, e.g. the God of War Collection disc menu). Forgetting the cached
+     * state lets the next synchronize() attach it again.
+     */
+    fun forgetAttachment() {
+        isAttached = false
+    }
+
     fun synchronize(
         shouldAttach: Boolean,
         attach: () -> Boolean,

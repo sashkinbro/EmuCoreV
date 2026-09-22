@@ -56,7 +56,6 @@ bool attach_overlay_virtual_controller() {
 
     if (!SDL_WasInit(SDL_INIT_GAMEPAD))
         return false;
-
     SDL_VirtualJoystickDesc desc;
     SDL_INIT_INTERFACE(&desc);
     desc.type = SDL_JOYSTICK_TYPE_GAMEPAD;
@@ -80,11 +79,20 @@ bool attach_overlay_virtual_controller() {
     return refresh_overlay_controllers();
 }
 
+bool overlay_virtual_controller_attached() {
+    return virtual_joystick != nullptr;
+}
+
 extern "C" {
 
 JNIEXPORT void JNICALL
 Java_org_vita3k_emulator_overlay_InputOverlay_attachController(JNIEnv *env, jobject thiz) {
     attach_overlay_virtual_controller();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_org_vita3k_emulator_overlay_InputOverlay_isControllerAttached(JNIEnv *env, jobject thiz) {
+    return overlay_virtual_controller_attached() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL

@@ -66,4 +66,22 @@ class ControllerAttachmentStateTest {
         assertTrue(state.isAttached)
         assertEquals(3, attachCalls)
     }
+
+    @Test
+    fun forgettingADroppedNativeControllerAllowsReattach() {
+        val state = ControllerAttachmentState()
+        var attachCalls = 0
+        var detachCalls = 0
+
+        state.synchronize(true, { attachCalls++; true }, { detachCalls++ })
+        assertTrue(state.isAttached)
+
+        // The native session dropped the virtual controller behind our back (relaunch).
+        state.forgetAttachment()
+        state.synchronize(true, { attachCalls++; true }, { detachCalls++ })
+
+        assertTrue(state.isAttached)
+        assertEquals(2, attachCalls)
+        assertEquals(0, detachCalls)
+    }
 }

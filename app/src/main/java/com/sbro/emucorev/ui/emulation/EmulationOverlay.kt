@@ -140,7 +140,10 @@ fun EmulationOverlayHost(
     }
     val hasPhysicalGamepad = activity.hasPhysicalGamepad
     val nativeImeActive = activity.nativeKeyboardRequested && activity.nativeImeState?.active == true
-    val touchControlsActive = !nativeImeActive && (controlsEditMode || config.enableGamepadOverlay)
+    var showControlsWithGamepad by remember { mutableStateOf(false) }
+    val controlsSuppressedByGamepad = hasPhysicalGamepad && !showControlsWithGamepad
+    val controlsVisible = config.enableGamepadOverlay && !controlsSuppressedByGamepad
+    val touchControlsActive = !nativeImeActive && (controlsEditMode || (config.enableGamepadOverlay && !controlsSuppressedByGamepad))
     val showTouchControls = !nativeImeActive && !menuOpen &&
         (
             controlsEditMode ||
@@ -178,8 +181,8 @@ fun EmulationOverlayHost(
                 .roundToInt()
                 .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
                 .toShort()
-            overlayBridge.setAxis(axisX, quantize(x))
-            overlayBridge.setAxis(axisY, quantize(y))
+            overlayBridge.sendAxis(axisX, quantize(x))
+            overlayBridge.sendAxis(axisY, quantize(y))
         }
     }
 
@@ -277,10 +280,11 @@ fun EmulationOverlayHost(
     }
 
     LaunchedEffect(showTouchControls, inputResumed) {
-        if (showTouchControls && inputResumed) {
-            while (!overlayBridge.ensureControllerAttached()) {
-                kotlinx.coroutines.delay(350)
-            }
+        while (showTouchControls && inputResumed) {
+            // The native session drops the virtual controller on an in-process relaunch
+            // (LoadExec, e.g. the God of War Collection menu), so keep watching instead
+            // of attaching once and assuming it stays attached.
+            kotlinx.coroutines.delay(if (overlayBridge.ensureControllerAttached()) 1_000 else 350)
         }
     }
 
@@ -366,10 +370,10 @@ fun EmulationOverlayHost(
                 },
                 onBackTouchToggle = {
                     touchMode = (touchMode + 1) % 3
-                    overlayBridge.setTouchState(touchMode)
+                    overlayBridge.sendTouchState(touchMode)
                 },
-                onButtonChange = { button, pressed -> overlayBridge.setButton(button, pressed) },
-                onAxisChange = { axis, value -> overlayBridge.setAxis(axis, value) }
+                onButtonChange = { button, pressed -> overlayBridge.sendButton(button, pressed) },
+                onAxisChange = { axis, value -> overlayBridge.sendAxis(axis, value) }
             )
         }
 
@@ -399,7 +403,20 @@ fun EmulationOverlayHost(
                 overlayBridge.setIsInEditMode(true)
             },
             onControlsVisibility = {
-                persistConfig { it.copy(enableGamepadOverlay = !it.enableGamepadOverlay) }
+                if (controlsVisible) {
+                    // A gamepad caused the auto-hide, so only clear the session override
+                    // and keep the user's persisted preference for when it disconnects.
+                    if (hasPhysicalGamepad) {
+                        showControlsWithGamepad = false
+                    } else {
+                        persistConfig { it.copy(enableGamepadOverlay = false) }
+                    }
+                } else {
+                    showControlsWithGamepad = true
+                    if (!config.enableGamepadOverlay) {
+                        persistConfig { it.copy(enableGamepadOverlay = true) }
+                    }
+                }
             },
             onResetOverlay = {
                 controlLayoutRepository.reset()
@@ -413,13 +430,13 @@ fun EmulationOverlayHost(
                     )
                 }
                 touchMode = 0
-                overlayBridge.setTouchState(0)
+                overlayBridge.sendTouchState(0)
             },
             onTouchSwitch = { enabled ->
                 persistConfig { it.copy(overlayShowTouchSwitch = enabled) }
                 if (!enabled) {
                     touchMode = 0
-                    overlayBridge.setTouchState(0)
+                    overlayBridge.sendTouchState(0)
                 }
             },
             onOverlayScale = { value -> persistConfig { it.copy(overlayScale = value) } },
@@ -525,6 +542,7 @@ fun EmulationOverlayHost(
                 expandHorizontally = useSidePanel,
                 layoutStyle = customization.gameMenuLayoutStyle,
                 physicalGamepadConnected = hasPhysicalGamepad,
+                controlsVisible = controlsVisible,
                 callbacks = menuCallbacks
             )
         }
@@ -560,9 +578,13 @@ fun EmulationOverlayHost(
     }
 
     LaunchedEffect(hasPhysicalGamepad) {
+        if (!hasPhysicalGamepad) {
+            // Reconnects fall back to the persisted preference instead of the override.
+            showControlsWithGamepad = false
+        }
         if (hasPhysicalGamepad && touchMode != 0) {
             touchMode = 0
-            overlayBridge.setTouchState(0)
+            overlayBridge.sendTouchState(0)
         }
     }
 }

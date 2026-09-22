@@ -221,6 +221,7 @@ fun EmulationGameMenu(
     expandHorizontally: Boolean,
     layoutStyle: GameMenuLayoutStyle,
     physicalGamepadConnected: Boolean,
+    controlsVisible: Boolean,
     callbacks: EmulationMenuCallbacks,
     modifier: Modifier = Modifier
 ) {
@@ -266,6 +267,7 @@ fun EmulationGameMenu(
                         paused = paused,
                         sessionElapsedMs = sessionElapsedMs,
                         physicalGamepadConnected = physicalGamepadConnected,
+                        controlsVisible = controlsVisible,
                         callbacks = callbacks,
                         selectedTab = selectedTab,
                         showHorizontalTabs = false,
@@ -370,6 +372,7 @@ fun EmulationGameMenu(
                         paused = paused,
                         sessionElapsedMs = sessionElapsedMs,
                         physicalGamepadConnected = physicalGamepadConnected,
+                        controlsVisible = controlsVisible,
                         callbacks = callbacks,
                         selectedTab = selectedTab,
                         showHorizontalTabs = false,
@@ -386,6 +389,7 @@ fun EmulationGameMenu(
                     paused = paused,
                     sessionElapsedMs = sessionElapsedMs,
                     physicalGamepadConnected = physicalGamepadConnected,
+                    controlsVisible = controlsVisible,
                     callbacks = callbacks,
                     selectedTab = selectedTab,
                     showHorizontalTabs = true,
@@ -410,6 +414,7 @@ private fun MenuScrollableContent(
     paused: Boolean,
     sessionElapsedMs: Long,
     physicalGamepadConnected: Boolean,
+    controlsVisible: Boolean,
     callbacks: EmulationMenuCallbacks,
     selectedTab: EmulationMenuTab,
     showHorizontalTabs: Boolean,
@@ -453,6 +458,7 @@ private fun MenuScrollableContent(
             config = config,
             sessionElapsedMs = sessionElapsedMs,
             physicalGamepadConnected = physicalGamepadConnected,
+            controlsVisible = controlsVisible,
             callbacks = callbacks
         )
     }
@@ -465,6 +471,7 @@ private fun MenuSelectedContent(
     config: VitaCoreConfig,
     sessionElapsedMs: Long,
     physicalGamepadConnected: Boolean,
+    controlsVisible: Boolean,
     callbacks: EmulationMenuCallbacks
 ) {
     Column(
@@ -477,7 +484,7 @@ private fun MenuSelectedContent(
                 sessionElapsedMs = sessionElapsedMs,
                 callbacks = callbacks
             )
-            EmulationMenuTab.Controls -> ControlsTab(config = config, callbacks = callbacks)
+            EmulationMenuTab.Controls -> ControlsTab(config = config, controlsVisible = controlsVisible, callbacks = callbacks)
             EmulationMenuTab.Display -> DisplayTab(config = config, callbacks = callbacks)
             EmulationMenuTab.System -> SystemTab(config = config, callbacks = callbacks)
             EmulationMenuTab.Achievements -> AchievementsTab(gameId = gameId)
@@ -627,7 +634,7 @@ private fun formatPlayDuration(durationMs: Long): String {
 }
 
 @Composable
-private fun ControlsTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks) {
+private fun ControlsTab(config: VitaCoreConfig, controlsVisible: Boolean, callbacks: EmulationMenuCallbacks) {
     MenuSection(
         title = stringResource(R.string.emulation_menu_section_touch),
         subtitle = stringResource(R.string.emulation_menu_section_touch_desc),
@@ -640,9 +647,9 @@ private fun ControlsTab(config: VitaCoreConfig, callbacks: EmulationMenuCallback
             onClick = callbacks.onEditControls
         )
         MenuActionRow(
-            icon = if (config.enableGamepadOverlay) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+            icon = if (controlsVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
             title = stringResource(
-                if (config.enableGamepadOverlay) R.string.emulation_menu_hide_controls
+                if (controlsVisible) R.string.emulation_menu_hide_controls
                 else R.string.emulation_menu_show_controls
             ),
             subtitle = stringResource(R.string.emulation_menu_controls_desc),

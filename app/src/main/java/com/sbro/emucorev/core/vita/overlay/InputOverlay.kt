@@ -67,6 +67,19 @@ class InputOverlay(context: Context) {
         return controllerAttachment.isAttached
     }
 
+    /** Input wrappers used by the on-screen controls so a dropped native controller self-heals. */
+    fun sendButton(button: Int, pressed: Boolean) {
+        if (ensureControllerAttached()) setButton(button, pressed)
+    }
+
+    fun sendAxis(axis: Int, value: Short) {
+        if (ensureControllerAttached()) setAxis(axis, value)
+    }
+
+    fun sendTouchState(mode: Int) {
+        if (ensureControllerAttached()) setTouchState(mode)
+    }
+
     fun setTouchControlsActive(active: Boolean) {
         if (touchControlsRuntimeActive == active) return
         touchControlsRuntimeActive = active
@@ -114,6 +127,11 @@ class InputOverlay(context: Context) {
     }
 
     private fun syncControllerAttachment() {
+        // The native session drops the virtual controller on an in-process relaunch
+        // (LoadExec), which Kotlin cannot see; reconcile before deciding to attach.
+        if (controllerAttachment.isAttached && !isControllerAttached()) {
+            controllerAttachment.forgetAttachment()
+        }
         controllerAttachment.synchronize(
             shouldAttach = effectiveOverlayMask != 0,
             attach = ::attachController,
@@ -138,6 +156,8 @@ class InputOverlay(context: Context) {
     external fun attachController(): Boolean
 
     external fun detachController()
+
+    external fun isControllerAttached(): Boolean
 
     external fun setAxis(axis: Int, value: Short)
 

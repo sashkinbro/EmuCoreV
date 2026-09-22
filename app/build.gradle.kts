@@ -114,6 +114,17 @@ android {
     buildTypes {
         debug {
             isJniDebuggable = true
+            externalNativeBuild {
+                cmake {
+                    // CMake Debug compiles the whole emulator at -O0 and instruments
+                    // every core component with Tracy, which makes on-device testing
+                    // painfully slow (multi-minute game startup). Keep symbols and
+                    // native debugging, but optimize and drop the profiler.
+                    arguments += "-DCMAKE_CXX_FLAGS_DEBUG=-O2 -g"
+                    arguments += "-DCMAKE_C_FLAGS_DEBUG=-O2 -g"
+                    arguments += "-DTRACY_ENABLE_ON_CORE_COMPONENTS=OFF"
+                }
+            }
         }
         release {
             isMinifyEnabled = true
