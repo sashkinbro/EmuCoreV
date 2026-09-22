@@ -66,6 +66,9 @@ app/src/main/jniLibs/
 node_modules/
 workers/
 
+# Local IGDB tooling and credentials
+IGDB/
+
 # OS / temp files
 .DS_Store
 Thumbs.db

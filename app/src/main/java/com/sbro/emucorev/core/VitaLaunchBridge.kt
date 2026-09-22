@@ -7,6 +7,7 @@ import android.system.Os
 import android.os.SystemClock
 import com.jakewharton.processphoenix.ProcessPhoenix
 import com.sbro.emucorev.core.vita.Emulator
+import com.sbro.emucorev.data.SaveDataRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +40,11 @@ object VitaLaunchBridge {
             return withContext(Dispatchers.IO) {
                 if (!EmulatorStorage.hasInstalledFirmware(context)) return@withContext LaunchResult.MissingFirmware
                 if (!EmulatorStorage.hasInstalledFirmwareUpdate(context)) return@withContext LaunchResult.MissingFirmwareUpdate
+                // Saves imported by older builds sit in ux0:user/savedata, which
+                // the mounted savedata0: never reads. Relocate them before the
+                // game starts so transferred saves are actually picked up.
+                runCatching { SaveDataRepository().migrateLegacySaveData(context) }
+                    .onFailure { error -> Log.w(TAG, "Save data migration failed", error) }
                 val config = VitaGameSettingsRepository(context).syncEffectiveDriverForLaunch(titleId)
                 val shouldAngle = config.useAngle && config.backendRenderer == "OpenGL"
                 launchWithArgs(context, "LAUNCH_$titleId", arrayOf("-r", titleId), shouldAngle)

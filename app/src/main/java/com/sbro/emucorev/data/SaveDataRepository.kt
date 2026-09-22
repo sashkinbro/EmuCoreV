@@ -48,6 +48,7 @@ class SaveDataRepository {
     private val installedGameRepository = InstalledGameRepository()
 
     fun list(context: Context): List<VitaSaveDataEntry> {
+        migrateLegacySaveData(context)
         val installedGames = installedGameRepository.loadInstalledGames(context)
         val gamesBySaveId = installedGames
             .mapNotNull { game -> game.saveDataId?.takeIf(String::isNotBlank)?.let { it to game } }
@@ -136,14 +137,19 @@ class SaveDataRepository {
             if (!safe) return SaveDataImportResult.UnsafeArchive
             if (extractedRoot.walkTopDown().none { it.isFile }) return SaveDataImportResult.EmptyArchive
 
+            val locatedSaves = SaveArchiveLayout.locateSavedataDirectories(extractedRoot)
+            val located = locatedSaves.singleOrNull()
             val singleRoot = extractedRoot.listFiles().orEmpty().singleOrNull { it.isDirectory }
                 ?.takeIf { root -> extractedRoot.listFiles().orEmpty().all { it == root } }
+            val fallbackSaveId = if (locatedSaves.isEmpty()) singleRoot?.name?.takeIf(::isSafeSaveId) else null
             val saveId = targetSaveId?.takeIf(String::isNotBlank)
-                ?: singleRoot?.name?.takeIf(String::isNotBlank)
+                ?: located?.name?.takeIf(::isSafeSaveId)
+                ?: fallbackSaveId
                 ?: return SaveDataImportResult.UnknownTarget
             val contentRoot = when {
-                targetSaveId != null && singleRoot != null -> singleRoot
-                singleRoot != null && targetSaveId == null -> singleRoot
+                located != null -> located
+                locatedSaves.isNotEmpty() -> locatedSaves.first()
+                singleRoot != null -> singleRoot
                 else -> extractedRoot
             }
             replaceSaveDirectory(context, saveId, contentRoot)
@@ -170,9 +176,14 @@ class SaveDataRepository {
             val contentRoot = extractedRoot.listFiles().orEmpty().singleOrNull { it.isDirectory && it.name == "saves" }
                 ?.takeIf { root -> extractedRoot.listFiles().orEmpty().all { it == root } }
                 ?: extractedRoot
-            val saveDirectories = contentRoot.listFiles().orEmpty()
-                .filter { it.isDirectory && it.walkTopDown().any(File::isFile) }
-                .filter { isSafeSaveId(it.name) }
+            val locatedSaves = SaveArchiveLayout.locateSavedataDirectories(contentRoot)
+            val saveDirectories = if (locatedSaves.isNotEmpty()) {
+                locatedSaves.filter { isSafeSaveId(it.name) }
+            } else {
+                contentRoot.listFiles().orEmpty()
+                    .filter { it.isDirectory && it.walkTopDown().any(File::isFile) }
+                    .filter { isSafeSaveId(it.name) }
+            }
             if (saveDirectories.isEmpty()) return SaveDataBulkImportResult.EmptyArchive
 
             replaceSaveDirectories(context, saveDirectories.associateBy { it.name })
@@ -240,11 +251,54 @@ class SaveDataRepository {
         }
     }
 
-    private fun saveRoots(context: Context): List<File> =
-        listOf(
-            EmulatorStorage.ux0SaveDataRoot(context),
-            EmulatorStorage.ux0SaveDataRoot(context, "00")
-        ).distinctBy { it.absolutePath }
+    /**
+     * Active user's savedata first: it is the only root the emulator mounts as
+     * savedata0:. The remaining roots are kept so saves misplaced by older
+     * builds (or belonging to other users) stay visible and can be recovered.
+     */
+    private fun saveRoots(context: Context): List<File> {
+        val userRoot = EmulatorStorage.ux0UserRoot(context)
+        val roots = linkedMapOf<String, File>()
+        val activeRoot = EmulatorStorage.ux0SaveDataRoot(context)
+        roots[activeRoot.absolutePath] = activeRoot
+        val legacyRoot = File(userRoot, EmulatorStorage.LEGACY_SAVE_DATA_SEGMENT)
+        if (legacyRoot.isDirectory) {
+            roots[legacyRoot.absolutePath] = legacyRoot
+        }
+        userRoot.listFiles().orEmpty()
+            .filter { it.isDirectory && it.name != EmulatorStorage.LEGACY_SAVE_DATA_SEGMENT }
+            .sortedBy { it.name }
+            .forEach { userDirectory ->
+                val root = File(userDirectory, EmulatorStorage.LEGACY_SAVE_DATA_SEGMENT)
+                if (root.isDirectory) roots[root.absolutePath] = root
+            }
+        return roots.values.toList()
+    }
+
+    /**
+     * Older builds imported saves into ux0:user/savedata, which the emulator
+     * never reads. Move those saves into the active user's folder so already
+     * imported games start working again. Existing active saves win.
+     */
+    fun migrateLegacySaveData(context: Context) {
+        val legacyRoot = File(EmulatorStorage.ux0UserRoot(context), EmulatorStorage.LEGACY_SAVE_DATA_SEGMENT)
+        if (!legacyRoot.isDirectory) return
+        val activeRoot = EmulatorStorage.ux0SaveDataRoot(context)
+        if (legacyRoot.absolutePath == activeRoot.absolutePath) return
+        legacyRoot.listFiles().orEmpty()
+            .filter { it.isDirectory && isSafeSaveId(it.name) && it.walkTopDown().any(File::isFile) }
+            .forEach { legacySave ->
+                val target = File(activeRoot, legacySave.name)
+                if (target.exists()) return@forEach
+                runCatching {
+                    legacySave.copyRecursively(target, overwrite = true)
+                    legacySave.deleteRecursively()
+                }.onFailure {
+                    target.deleteRecursively()
+                }
+            }
+        runCatching { legacyRoot.delete() }
+    }
 
     private fun isSafeSaveId(value: String): Boolean {
         return value.isNotBlank() &&
@@ -294,4 +348,32 @@ class SaveDataRepository {
 
     private fun File.latestModified(): Long =
         walkTopDown().maxOfOrNull { it.lastModified() } ?: lastModified()
+}
+
+/**
+ * Recognizes PlayStation Vita archive layouts such as
+ * `ux0/user/00/savedata/<save id>/...` so raw console/Vita3K folders can be
+ * imported without the user having to rebuild the zip by hand.
+ */
+internal object SaveArchiveLayout {
+    private const val MAX_SEARCH_DEPTH = 8
+
+    fun locateSavedataDirectories(root: File): List<File> {
+        val savedataRoot = root.walkTopDown()
+            .maxDepth(MAX_SEARCH_DEPTH)
+            .firstOrNull { directory -> isSavedataSegment(directory, root) }
+            ?: return emptyList()
+        return savedataRoot.listFiles().orEmpty()
+            .filter { it.isDirectory && it.walkTopDown().any(File::isFile) }
+    }
+
+    private fun isSavedataSegment(directory: File, root: File): Boolean {
+        if (!directory.isDirectory) return false
+        if (!directory.name.equals(EmulatorStorage.LEGACY_SAVE_DATA_SEGMENT, ignoreCase = true)) return false
+        val parent = directory.parentFile ?: return false
+        return parent == root ||
+            parent.name.equals("user", ignoreCase = true) ||
+            parent.parentFile?.name?.equals("user", ignoreCase = true) == true ||
+            parent.parentFile == root
+    }
 }

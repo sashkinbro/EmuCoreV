@@ -29,6 +29,9 @@ data class StorageMigrationProgress(
 )
 
 object EmulatorStorage {
+    const val DEFAULT_USER_ID = "00"
+    const val LEGACY_SAVE_DATA_SEGMENT = "savedata"
+
     /**
      * Stable location for configuration, logs, patches and transient cache.
      * Only the large Vita filesystem is allowed to move to removable storage.
@@ -249,15 +252,51 @@ object EmulatorStorage {
         }.toList()
     }
 
-    fun ux0SaveDataRoot(context: Context, userId: String? = null): File {
-        val userSegment = userId?.takeIf(String::isNotBlank)
-        val relativePath = if (userSegment == null) {
-            "ux0/user/savedata"
-        } else {
-            "ux0/user/$userSegment/savedata"
-        }
-        return File(vitaRoot(context), relativePath).apply { mkdirs() }
+    fun ux0UserRoot(context: Context): File = File(vitaRoot(context), "ux0/user").apply { mkdirs() }
+
+    /**
+     * The emulator mounts savedata0: at ux0:user/<active user>/savedata and only
+     * reads that directory, so saves must live under the active user. Without a
+     * user.xml the native core creates user [DEFAULT_USER_ID] on first launch.
+     */
+    fun activeUserId(context: Context): String {
+        val userDirectories = ux0UserRoot(context).listFiles().orEmpty()
+            .filter { it.isDirectory && it.name != LEGACY_SAVE_DATA_SEGMENT }
+            .filter { File(it, "user.xml").isFile }
+            .map(File::getName)
+        return resolveActiveUserId(readConfiguredUserId(context), userDirectories)
     }
+
+    /**
+     * Mirrors the native core: the configured user wins while it still exists,
+     * otherwise the first (sorted) user with a user.xml is activated, matching
+     * std::map iteration order in app::ensure_current_user. With no users at
+     * all the core creates [DEFAULT_USER_ID].
+     */
+    internal fun resolveActiveUserId(configuredId: String?, userDirectories: List<String>): String {
+        val configured = configuredId?.takeIf(String::isNotBlank)
+        if (configured != null && userDirectories.contains(configured)) return configured
+        return userDirectories.minOrNull() ?: DEFAULT_USER_ID
+    }
+
+    fun ux0SaveDataRoot(context: Context, userId: String? = null): File {
+        val userSegment = userId?.takeIf(String::isNotBlank) ?: activeUserId(context)
+        return File(ux0UserRoot(context), "$userSegment/savedata").apply { mkdirs() }
+    }
+
+    private fun readConfiguredUserId(context: Context): String? {
+        val configFile = File(runtimeRoot(context), "config.yml")
+        if (!configFile.isFile) return null
+        return runCatching { parseConfiguredUserId(configFile.readLines()) }.getOrNull()
+    }
+
+    internal fun parseConfiguredUserId(lines: List<String>): String? =
+        lines.map(String::trim)
+            .firstOrNull { it.startsWith("user-id:") }
+            ?.substringAfter(':')
+            ?.trim()
+            ?.trim('"', '\'')
+            ?.takeIf { it.isNotBlank() && it != "." && it != ".." && it.none(::isPathSeparatorChar) }
 
     fun hasInstalledFirmware(context: Context): Boolean {
         val firmwareRoot = File(vitaRoot(context), "vs0")
@@ -394,5 +433,8 @@ object EmulatorStorage {
         target.parentFile?.mkdirs()
         source.copyTo(target, overwrite = true)
     }
+
+    private fun isPathSeparatorChar(value: Char): Boolean =
+        value == '/' || value == '\\' || value == File.separatorChar
 
 }
