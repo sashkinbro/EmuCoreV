@@ -78,6 +78,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.CHEATS_ENABLED
 import com.sbro.emucorev.core.VitaCheatSnapshot
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.data.TrophyRepository
@@ -499,7 +500,7 @@ private fun MenuSelectedContent(
             )
             EmulationMenuTab.Controls -> ControlsTab(config = config, controlsVisible = controlsVisible, callbacks = callbacks)
             EmulationMenuTab.Display -> DisplayTab(config = config, callbacks = callbacks)
-            EmulationMenuTab.Cheats -> CheatsTab(cheats = cheats, callbacks = callbacks)
+            EmulationMenuTab.Cheats -> if (CHEATS_ENABLED) CheatsTab(cheats = cheats, callbacks = callbacks)
             EmulationMenuTab.System -> SystemTab(config = config, callbacks = callbacks)
             EmulationMenuTab.Achievements -> AchievementsTab(gameId = gameId)
             EmulationMenuTab.Gamepad -> GamepadTab(
@@ -1474,7 +1475,7 @@ private fun emulationMenuTabs(): List<EmulationMenuTabItem> = listOf(
         stringResource(R.string.emulation_tab_gamepad),
         Icons.Rounded.SportsEsports
     )
-)
+).filter { CHEATS_ENABLED || it.tab != EmulationMenuTab.Cheats }
 
 /** Callbacks bag — keeps `EmulationGameMenu` signature compact and testable. */
 data class EmulationMenuCallbacks(

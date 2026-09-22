@@ -71,6 +71,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.CHEATS_ENABLED
 import com.sbro.emucorev.core.ProPurchaseManager
 import com.sbro.emucorev.data.DrawerVisualStyle
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
@@ -560,12 +561,14 @@ private fun SideNavigation(
                     selected = selected == PrimaryDestination.SaveData,
                     onClick = navigateSaveData
                 )
-                ShellItem(
-                    icon = Icons.Rounded.AutoFixHigh,
-                    label = stringResource(R.string.nav_cheat_manager),
-                    selected = selected == PrimaryDestination.CheatManager,
-                    onClick = navigateCheatManager
-                )
+                if (CHEATS_ENABLED) {
+                    ShellItem(
+                        icon = Icons.Rounded.AutoFixHigh,
+                        label = stringResource(R.string.nav_cheat_manager),
+                        selected = selected == PrimaryDestination.CheatManager,
+                        onClick = navigateCheatManager
+                    )
+                }
             }
 
             HorizontalDivider(
