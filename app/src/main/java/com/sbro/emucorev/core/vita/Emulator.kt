@@ -296,6 +296,24 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         startActivityForResult(Intent.createChooser(pickerIntent, getString(R.string.emulator_choose_folder)), FOLDER_DIALOG_CODE)
     }
 
+    private var cheatImportHandler: ((Uri) -> Unit)? = null
+
+    fun setCheatImportHandler(handler: ((Uri) -> Unit)?) {
+        cheatImportHandler = handler
+    }
+
+    fun requestCheatImport() {
+        val pickerIntent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+
+        @Suppress("DEPRECATION")
+        startActivityForResult(
+            Intent.createChooser(pickerIntent, getString(R.string.emulation_cheats_import)),
+            CHEAT_IMPORT_CODE
+        )
+    }
+
     private fun resolveUriToPath(resultUri: Uri): String {
         return try {
             contentResolver.openFileDescriptor(resultUri, "r")?.use { descriptor ->
@@ -315,6 +333,11 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         when (requestCode) {
+            CHEAT_IMPORT_CODE -> {
+                if (resultCode == RESULT_OK) {
+                    data?.data?.let { uri -> cheatImportHandler?.invoke(uri) }
+                }
+            }
             FILE_DIALOG_CODE, FOLDER_DIALOG_CODE -> {
                 if (resultCode != RESULT_OK) {
                     filedialogReturn("")
@@ -846,6 +869,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         const val EXTRA_GAME_ID = "gameId"
         const val FILE_DIALOG_CODE = 545
         const val FOLDER_DIALOG_CODE = 546
+        const val CHEAT_IMPORT_CODE = 547
         const val EXTRA_REBIRTH_HANDLED = "emu_rebirth_handled"
         const val EMULATION_OVERLAY_ELEVATION = 64f
     }

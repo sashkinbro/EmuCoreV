@@ -28,6 +28,7 @@ import com.sbro.emucorev.ui.theme.neon.neonShapeCorners
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.Feedback
 import androidx.compose.material.icons.rounded.Forum
@@ -78,7 +79,7 @@ import com.sbro.emucorev.ui.theme.shouldUseExpandedShell
 import kotlinx.coroutines.launch
 
 enum class PrimaryDestination {
-    Home, Setup, Library, GameManager, PlayTime, Achievements, SaveData, Search, Settings, Profile, Feedback
+    Home, Setup, Library, GameManager, PlayTime, Achievements, SaveData, CheatManager, Search, Settings, Profile, Feedback
 }
 
 private enum class MobileLeadingAction {
@@ -99,6 +100,7 @@ fun AdaptiveShell(
     onNavigatePlayTime: () -> Unit,
     onNavigateAchievements: () -> Unit,
     onNavigateSaveData: () -> Unit,
+    onNavigateCheatManager: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateProfile: () -> Unit = {},
@@ -119,6 +121,7 @@ fun AdaptiveShell(
             onNavigatePlayTime = onNavigatePlayTime,
             onNavigateAchievements = onNavigateAchievements,
             onNavigateSaveData = onNavigateSaveData,
+            onNavigateCheatManager = onNavigateCheatManager,
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
             onNavigateProfile = onNavigateProfile,
@@ -170,6 +173,7 @@ fun AdaptiveShell(
             onNavigatePlayTime = onNavigatePlayTime,
             onNavigateAchievements = onNavigateAchievements,
             onNavigateSaveData = onNavigateSaveData,
+            onNavigateCheatManager = onNavigateCheatManager,
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
             onNavigateProfile = onNavigateProfile,
@@ -195,6 +199,7 @@ private fun CompactAdaptiveShell(
     onNavigatePlayTime: () -> Unit,
     onNavigateAchievements: () -> Unit,
     onNavigateSaveData: () -> Unit,
+    onNavigateCheatManager: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateProfile: () -> Unit,
@@ -278,6 +283,7 @@ private fun CompactAdaptiveShell(
                     onNavigatePlayTime = onNavigatePlayTime,
                     onNavigateAchievements = onNavigateAchievements,
                     onNavigateSaveData = onNavigateSaveData,
+            onNavigateCheatManager = onNavigateCheatManager,
                     onNavigateSearch = onNavigateSearch,
                     onNavigateSettings = onNavigateSettings,
                     onNavigateProfile = onNavigateProfile,
@@ -311,6 +317,7 @@ private fun SideNavigation(
     onNavigatePlayTime: () -> Unit,
     onNavigateAchievements: () -> Unit,
     onNavigateSaveData: () -> Unit,
+    onNavigateCheatManager: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateProfile: () -> Unit,
@@ -366,6 +373,10 @@ private fun SideNavigation(
     val navigateSaveData = rememberDebouncedClick {
         onCloseDrawer()
         onNavigateSaveData()
+    }
+    val navigateCheatManager = rememberDebouncedClick {
+        onCloseDrawer()
+        onNavigateCheatManager()
     }
     val navigateSettings = rememberDebouncedClick {
         onCloseDrawer()
@@ -548,6 +559,12 @@ private fun SideNavigation(
                     label = stringResource(R.string.nav_save_manager),
                     selected = selected == PrimaryDestination.SaveData,
                     onClick = navigateSaveData
+                )
+                ShellItem(
+                    icon = Icons.Rounded.AutoFixHigh,
+                    label = stringResource(R.string.nav_cheat_manager),
+                    selected = selected == PrimaryDestination.CheatManager,
+                    onClick = navigateCheatManager
                 )
             }
 

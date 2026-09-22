@@ -85,6 +85,7 @@ data class VitaCoreConfig(
     val spirvShader: Boolean = false,
     val psnSignedIn: Boolean = false,
     val httpEnable: Boolean = true,
+    val enableCheats: Boolean = true,
     val colorSurfaceDebug: Boolean = false,
     val showShaderCacheWarn: Boolean = true,
     // Camera — type 2 uses the real camera; opaque white is the upstream fallback.
@@ -157,6 +158,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         "gyro-invert-y",
         "disable-surface-sync",
         "discord-rich-presence",
+        "enable-cheats",
         "enable-gamepad-overlay",
         "export-as-png",
         "export-textures",
@@ -321,6 +323,7 @@ class VitaCoreConfigRepository(private val context: Context) {
                 spirvShader = values["spirv-shader"]?.toBooleanStrictOrNull() ?: defaults.spirvShader,
                 psnSignedIn = values["psn-signed-in"].toBooleanLikeOrNull() ?: defaults.psnSignedIn,
                 httpEnable = values["http-enable"]?.toBooleanStrictOrNull() ?: defaults.httpEnable,
+                enableCheats = values["enable-cheats"]?.toBooleanStrictOrNull() ?: defaults.enableCheats,
                 colorSurfaceDebug = values["color-surface-debug"]?.toBooleanStrictOrNull() ?: defaults.colorSurfaceDebug,
                 showShaderCacheWarn = values["show-shader-cache-warn"]?.toBooleanStrictOrNull() ?: defaults.showShaderCacheWarn,
                 frontCameraType = values["front-camera-type"]?.toIntOrNull() ?: defaults.frontCameraType,
@@ -461,6 +464,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["spirv-shader"] = config.spirvShader.toString()
         values["psn-signed-in"] = if (config.psnSignedIn) "1" else "0"
         values["http-enable"] = config.httpEnable.toString()
+        values["enable-cheats"] = config.enableCheats.toString()
         values["color-surface-debug"] = config.colorSurfaceDebug.toString()
         values["show-shader-cache-warn"] = config.showShaderCacheWarn.toString()
 

@@ -200,6 +200,7 @@ class SettingsBackupRepository(
         .put("spirvShader", spirvShader)
         .put("psnSignedIn", psnSignedIn)
         .put("httpEnable", httpEnable)
+        .put("enableCheats", enableCheats)
         .put("colorSurfaceDebug", colorSurfaceDebug)
         .put("showShaderCacheWarn", showShaderCacheWarn)
         .put("frontCameraType", frontCameraType)
@@ -298,6 +299,7 @@ class SettingsBackupRepository(
         spirvShader = optBoolean("spirvShader", defaults.spirvShader),
         psnSignedIn = optBoolean("psnSignedIn", defaults.psnSignedIn),
         httpEnable = optBoolean("httpEnable", defaults.httpEnable),
+        enableCheats = optBoolean("enableCheats", defaults.enableCheats),
         colorSurfaceDebug = optBoolean("colorSurfaceDebug", defaults.colorSurfaceDebug),
         showShaderCacheWarn = optBoolean("showShaderCacheWarn", defaults.showShaderCacheWarn),
         frontCameraType = optInt("frontCameraType", defaults.frontCameraType),

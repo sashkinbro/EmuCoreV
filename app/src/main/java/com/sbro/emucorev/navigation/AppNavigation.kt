@@ -47,6 +47,7 @@ import com.sbro.emucorev.core.VitaLaunchBridge
 import com.sbro.emucorev.ui.achievements.AchievementsScreen
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.ui.catalog.CatalogScreen
+import com.sbro.emucorev.ui.cheats.CheatManagerScreen
 import com.sbro.emucorev.ui.detail.GameDetailScreen
 import com.sbro.emucorev.ui.feedback.FeedbackScreen
 import com.sbro.emucorev.ui.gamemanager.GameManagerScreen
@@ -83,6 +84,7 @@ private const val ROUTE_ACHIEVEMENTS = "achievements"
 private const val ROUTE_ACHIEVEMENTS_WITH_TITLE = "achievements/{titleId}"
 private const val ROUTE_SAVE_MANAGER = "save-manager"
 private const val ROUTE_SAVE_MANAGER_WITH_TITLE = "save-manager/{titleId}"
+private const val ROUTE_CHEAT_MANAGER = "cheat-manager"
 private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_PROFILE = "profile"
 private const val ROUTE_FEEDBACK = "feedback"
@@ -318,6 +320,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
@@ -367,6 +370,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
@@ -404,6 +408,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
                     onInstallFirmware = null,
                     onInstallContent = openInstallChoiceDialog
@@ -448,6 +453,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
@@ -485,6 +491,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateSettings = { },
                     onNavigateProfile = navigateProfile,
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
@@ -532,6 +539,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateSettings = { },
                     onNavigateProfile = navigateProfile,
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
@@ -578,6 +586,43 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     viewModel = settingsViewModel
                 )
             }
+            composable(ROUTE_CHEAT_MANAGER) {
+                val navigateHome = {
+                    navController.navigate(ROUTE_LIBRARY) {
+                        launchSingleTop = true
+                        popUpTo(ROUTE_LIBRARY) { inclusive = false }
+                    }
+                }
+                AdaptiveShell(
+                    selected = PrimaryDestination.CheatManager,
+                    onNavigateSetup = {
+                        navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
+                    },
+                    onNavigateLibrary = {
+                        navController.navigate(ROUTE_LIBRARY) { launchSingleTop = true }
+                    },
+                    onNavigateGameManager = { navigateGameManager(null) },
+                    onNavigatePlayTime = { navigatePlayTime(null) },
+                    onNavigateAchievements = navigateAchievementsRoot,
+                    onNavigateSaveData = {
+                        navController.navigate(saveManagerRoute()) { launchSingleTop = true }
+                    },
+                    onNavigateCheatManager = { },
+                    onNavigateSearch = {
+                        navController.navigate(ROUTE_CATALOG) { launchSingleTop = true }
+                    },
+                    onNavigateSettings = {
+                        navController.navigate(settingsRoute()) { launchSingleTop = true }
+                    },
+                    onNavigateProfile = navigateProfile,
+                    onNavigateFeedback = navigateFeedback,
+                    onBackClick = navigateHome,
+                    onInstallFirmware = null,
+                    onInstallContent = openInstallChoiceDialog
+                ) { openDrawer ->
+                    CheatManagerScreen(onBackClick = navigateHome, onMenuClick = openDrawer)
+                }
+            }
             composable(ROUTE_SAVE_MANAGER) {
                 val navigateHome = {
                     navController.navigate(ROUTE_LIBRARY) {
@@ -604,6 +649,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
@@ -649,6 +695,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
@@ -688,6 +735,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
@@ -741,6 +789,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = { },
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,
@@ -775,6 +824,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = {},
                     onBackClick = { navController.popBackStack() },
                     onInstallFirmware = null,
@@ -811,6 +861,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
                     onInstallFirmware = null,

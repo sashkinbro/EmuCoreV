@@ -32,14 +32,17 @@ import com.sbro.emucorev.ui.theme.neon.neonShapeCorners
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
+import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Tune
@@ -75,6 +78,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.VitaCheatSnapshot
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.data.TrophyRepository
 import com.sbro.emucorev.data.GameMenuLayoutStyle
@@ -82,6 +86,7 @@ import com.sbro.emucorev.data.VitaTrophy
 import com.sbro.emucorev.data.VitaTrophyGrade
 import com.sbro.emucorev.data.VitaTrophySet
 import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.cheats.groupCheatEntries
 import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
 import com.sbro.emucorev.ui.theme.neon.NeonCrtOverlay
 import com.sbro.emucorev.ui.theme.neon.neonAccentColor
@@ -93,6 +98,7 @@ import kotlin.math.roundToInt
 
 private val LiveBadgeColor = Color(0xFF34D27A)
 private val RestartBadgeColor = Color(0xFFE0A82E)
+private val BrokenBadgeColor = Color(0xFFE0575B)
 
 private data class EmulationMenuPalette(
     val panel: Color,
@@ -216,6 +222,7 @@ fun EmulationGameMenu(
     gameTitle: String,
     gameId: String,
     config: VitaCoreConfig,
+    cheats: VitaCheatSnapshot,
     paused: Boolean,
     sessionElapsedMs: Long,
     expandHorizontally: Boolean,
@@ -264,6 +271,7 @@ fun EmulationGameMenu(
                         gameTitle = gameTitle,
                         gameId = gameId,
                         config = config,
+                        cheats = cheats,
                         paused = paused,
                         sessionElapsedMs = sessionElapsedMs,
                         physicalGamepadConnected = physicalGamepadConnected,
@@ -369,6 +377,7 @@ fun EmulationGameMenu(
                         gameTitle = gameTitle,
                         gameId = gameId,
                         config = config,
+                        cheats = cheats,
                         paused = paused,
                         sessionElapsedMs = sessionElapsedMs,
                         physicalGamepadConnected = physicalGamepadConnected,
@@ -386,6 +395,7 @@ fun EmulationGameMenu(
                     gameTitle = gameTitle,
                     gameId = gameId,
                     config = config,
+                    cheats = cheats,
                     paused = paused,
                     sessionElapsedMs = sessionElapsedMs,
                     physicalGamepadConnected = physicalGamepadConnected,
@@ -411,6 +421,7 @@ private fun MenuScrollableContent(
     gameTitle: String,
     gameId: String,
     config: VitaCoreConfig,
+    cheats: VitaCheatSnapshot,
     paused: Boolean,
     sessionElapsedMs: Long,
     physicalGamepadConnected: Boolean,
@@ -456,6 +467,7 @@ private fun MenuScrollableContent(
             selectedTab = selectedTab,
             gameId = gameId,
             config = config,
+            cheats = cheats,
             sessionElapsedMs = sessionElapsedMs,
             physicalGamepadConnected = physicalGamepadConnected,
             controlsVisible = controlsVisible,
@@ -469,6 +481,7 @@ private fun MenuSelectedContent(
     selectedTab: EmulationMenuTab,
     gameId: String,
     config: VitaCoreConfig,
+    cheats: VitaCheatSnapshot,
     sessionElapsedMs: Long,
     physicalGamepadConnected: Boolean,
     controlsVisible: Boolean,
@@ -486,6 +499,7 @@ private fun MenuSelectedContent(
             )
             EmulationMenuTab.Controls -> ControlsTab(config = config, controlsVisible = controlsVisible, callbacks = callbacks)
             EmulationMenuTab.Display -> DisplayTab(config = config, callbacks = callbacks)
+            EmulationMenuTab.Cheats -> CheatsTab(cheats = cheats, callbacks = callbacks)
             EmulationMenuTab.System -> SystemTab(config = config, callbacks = callbacks)
             EmulationMenuTab.Achievements -> AchievementsTab(gameId = gameId)
             EmulationMenuTab.Gamepad -> GamepadTab(
@@ -502,6 +516,7 @@ private enum class EmulationMenuTab {
     Game,
     Controls,
     Display,
+    Cheats,
     System,
     Achievements,
     Gamepad
@@ -630,6 +645,76 @@ private fun formatPlayDuration(durationMs: Long): String {
         hours > 0L -> "${hours}h ${minutes.toString().padStart(2, '0')}m"
         minutes > 0L -> "${minutes}m ${seconds.toString().padStart(2, '0')}s"
         else -> "${seconds}s"
+    }
+}
+
+@Composable
+private fun CheatsTab(cheats: VitaCheatSnapshot, callbacks: EmulationMenuCallbacks) {
+    val palette = emulationMenuPalette()
+    val groups = remember(cheats.cheats) { groupCheatEntries(cheats.cheats) }
+    MenuSection(
+        title = stringResource(R.string.emulation_menu_section_cheats),
+        subtitle = stringResource(R.string.emulation_menu_section_cheats_desc),
+        badge = MenuBadge.Live
+    ) {
+        MenuToggleRow(
+            label = stringResource(R.string.emulation_cheats_master),
+            checked = cheats.masterEnabled,
+            onCheckedChange = callbacks.onCheatsMaster
+        )
+        if (!cheats.masterEnabled) {
+            Text(
+                text = stringResource(R.string.emulation_cheats_disabled_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = palette.textSecondary
+            )
+        }
+        if (cheats.cheats.isEmpty()) {
+            Text(
+                text = stringResource(R.string.emulation_cheats_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = palette.textPrimary
+            )
+            Text(
+                text = stringResource(R.string.emulation_cheats_empty_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = palette.textSecondary
+            )
+        } else {
+            groups.forEach { (category, entries) ->
+                Text(
+                    text = stringResource(category.titleRes),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                )
+                entries.forEach { cheat ->
+                    MenuToggleRow(
+                        label = cheat.name,
+                        checked = cheat.enabled,
+                        enabled = cheats.masterEnabled,
+                        badge = if (cheat.broken) MenuBadge.Broken else null,
+                        onCheckedChange = { enabled ->
+                            callbacks.onCheatToggle(cheats.cheats.indexOf(cheat), enabled)
+                        }
+                    )
+                }
+                MenuToggleRow(
+                    label = stringResource(R.string.emulation_cheats_group_enable),
+                    checked = entries.all { it.enabled },
+                    enabled = cheats.masterEnabled,
+                    onCheckedChange = { enabled ->
+                        callbacks.onCheatsGroupToggle(entries.map { cheats.cheats.indexOf(it) }, enabled)
+                    }
+                )
+            }
+        }
+        MenuActionRow(
+            icon = Icons.Rounded.FileOpen,
+            title = stringResource(R.string.emulation_cheats_import),
+            subtitle = stringResource(R.string.emulation_cheats_import_desc),
+            onClick = callbacks.onCheatsImport
+        )
     }
 }
 
@@ -1377,6 +1462,7 @@ private fun emulationMenuTabs(): List<EmulationMenuTabItem> = listOf(
     EmulationMenuTabItem(EmulationMenuTab.Game, stringResource(R.string.emulation_tab_game), Icons.Rounded.PlayArrow),
     EmulationMenuTabItem(EmulationMenuTab.Controls, stringResource(R.string.emulation_tab_controls), Icons.Rounded.Tune),
     EmulationMenuTabItem(EmulationMenuTab.Display, stringResource(R.string.emulation_tab_display), Icons.Rounded.Visibility),
+    EmulationMenuTabItem(EmulationMenuTab.Cheats, stringResource(R.string.emulation_tab_cheats), Icons.Rounded.AutoFixHigh),
     EmulationMenuTabItem(EmulationMenuTab.System, stringResource(R.string.emulation_tab_system), Icons.Rounded.Settings),
     EmulationMenuTabItem(
         EmulationMenuTab.Achievements,
@@ -1428,10 +1514,14 @@ data class EmulationMenuCallbacks(
     val onDeviceVibrationFallback: (Boolean) -> Unit,
     val onGamepadSwapSticks: (Boolean) -> Unit,
     val onGamepadInvertLeftY: (Boolean) -> Unit,
-    val onGamepadInvertRightY: (Boolean) -> Unit
+    val onGamepadInvertRightY: (Boolean) -> Unit,
+    val onCheatsMaster: (Boolean) -> Unit,
+    val onCheatToggle: (Int, Boolean) -> Unit,
+    val onCheatsGroupToggle: (List<Int>, Boolean) -> Unit,
+    val onCheatsImport: () -> Unit
 )
 
-private enum class MenuBadge { Live, Restart }
+private enum class MenuBadge { Live, Restart, Broken }
 
 @Composable
 private fun SheetHandle() {
@@ -1542,6 +1632,10 @@ private fun MenuSection(
                     MenuBadge.Restart -> Badge(
                         text = stringResource(R.string.emulation_menu_badge_restart),
                         color = RestartBadgeColor
+                    )
+                    MenuBadge.Broken -> Badge(
+                        text = stringResource(R.string.emulation_cheats_broken),
+                        color = BrokenBadgeColor
                     )
                     null -> Unit
                 }
@@ -1679,6 +1773,10 @@ private fun RowBadge(badge: MenuBadge?) {
                 MenuBadge.Restart -> Badge(
                     text = stringResource(R.string.emulation_menu_badge_restart),
                     color = RestartBadgeColor
+                )
+                MenuBadge.Broken -> Badge(
+                    text = stringResource(R.string.emulation_cheats_broken),
+                    color = BrokenBadgeColor
                 )
             }
         }

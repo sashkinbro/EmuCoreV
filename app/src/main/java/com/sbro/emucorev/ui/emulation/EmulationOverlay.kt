@@ -3,7 +3,9 @@
 package com.sbro.emucorev.ui.emulation
 
 import android.annotation.SuppressLint
+import android.provider.OpenableColumns
 import android.view.MotionEvent
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -61,6 +63,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -92,7 +95,10 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.core.AndroidGyroscopeInput
 import com.sbro.emucorev.core.AndroidTouchHaptics
 import com.sbro.emucorev.core.AndroidTouchHaptics.ButtonPhase
+import com.sbro.emucorev.core.CheatBridge
+import com.sbro.emucorev.core.VitaCheatSnapshot
 import com.sbro.emucorev.core.VitaCoreConfig
+import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.core.vita.Emulator
 import com.sbro.emucorev.core.vita.overlay.InputOverlay
@@ -102,6 +108,10 @@ import com.sbro.emucorev.data.TouchControlPressEffect
 import com.sbro.emucorev.data.TouchControlVisualStyle
 import com.sbro.emucorev.ui.common.VectorAnalogStick
 import com.sbro.emucorev.ui.common.VectorOverlayButton
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -117,6 +127,7 @@ fun EmulationOverlayHost(
     val nativeGameId = activity.currentGameId
     val gameId = nativeGameId.ifBlank { activity.currentGameIdOrIntent() }
     val repository = remember(activity) { VitaGameSettingsRepository(activity) }
+    val coreConfigRepository = remember(activity) { VitaCoreConfigRepository(activity) }
     val controlLayoutRepository = remember(activity) { TouchControlLayoutRepository(activity) }
     val customizationPreferences = remember(activity) { CustomizationPreferences(activity) }
     val customization by customizationPreferences.settings.collectAsState()
@@ -129,6 +140,7 @@ fun EmulationOverlayHost(
     var userPaused by remember { mutableStateOf(false) }
     var touchMode by remember { mutableIntStateOf(0) }
     var exitDialogVisible by remember { mutableStateOf(false) }
+    var cheatSnapshot by remember(activity) { mutableStateOf(VitaCheatSnapshot.EMPTY) }
     var sessionElapsedMs by remember(activity) { mutableLongStateOf(activity.currentPlayTimeElapsedMs()) }
     val gameTitle = remember(activity, gameId) {
         val installedTitle = InstalledGameRepository().findByTitleId(activity, gameId)
@@ -163,6 +175,35 @@ fun EmulationOverlayHost(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(menuOpen, gameId) {
+        if (menuOpen && gameId.isNotBlank()) cheatSnapshot = CheatBridge.snapshot(gameId)
+    }
+    val overlayScope = rememberCoroutineScope()
+    DisposableEffect(activity, gameId) {
+        activity.setCheatImportHandler { uri ->
+            overlayScope.launch {
+                val imported = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val displayName = activity.contentResolver
+                            .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+                        val temp = File(activity.cacheDir, "cheat_import.tmp")
+                        activity.contentResolver.openInputStream(uri)?.use { input ->
+                            temp.outputStream().use { output -> input.copyTo(output) }
+                        }
+                        CheatBridge.importFile(gameId, temp.absolutePath, displayName ?: "cheats.psv")
+                    }.getOrDefault(VitaCheatSnapshot.EMPTY)
+                }
+                if (imported.cheats.isNotEmpty()) {
+                    cheatSnapshot = imported
+                    Toast.makeText(activity, R.string.emulation_cheats_import_success, Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(activity, R.string.emulation_cheats_import_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        onDispose { activity.setCheatImportHandler(null) }
     }
     val gyroController = remember(activity, overlayBridge) {
         AndroidGyroscopeInput(activity) { emittedMode, x, y ->
@@ -481,7 +522,23 @@ fun EmulationOverlayHost(
             onDeviceVibrationFallback = { enabled -> persistConfig { it.copy(deviceVibrationFallback = enabled) } },
             onGamepadSwapSticks = { enabled -> persistConfig { it.copy(gamepadSwapSticks = enabled) } },
             onGamepadInvertLeftY = { enabled -> persistConfig { it.copy(gamepadInvertLeftY = enabled) } },
-            onGamepadInvertRightY = { enabled -> persistConfig { it.copy(gamepadInvertRightY = enabled) } }
+            onGamepadInvertRightY = { enabled -> persistConfig { it.copy(gamepadInvertRightY = enabled) } },
+            onCheatsMaster = { enabled ->
+                CheatBridge.setCheatsEnabled(enabled)
+                coreConfigRepository.save(coreConfigRepository.load().copy(enableCheats = enabled))
+                cheatSnapshot = CheatBridge.snapshot(gameId)
+            },
+            onCheatToggle = { index, enabled ->
+                CheatBridge.setCheatEnabled(gameId, index, enabled)
+                CheatBridge.saveCheats(gameId)
+                cheatSnapshot = CheatBridge.snapshot(gameId)
+            },
+            onCheatsGroupToggle = { indices, enabled ->
+                indices.forEach { index -> CheatBridge.setCheatEnabled(gameId, index, enabled) }
+                CheatBridge.saveCheats(gameId)
+                cheatSnapshot = CheatBridge.snapshot(gameId)
+            },
+            onCheatsImport = { activity.requestCheatImport() }
         )
 
         AnimatedVisibility(
@@ -537,6 +594,7 @@ fun EmulationOverlayHost(
                 gameTitle = gameTitle,
                 gameId = gameId,
                 config = config,
+                cheats = cheatSnapshot,
                 paused = effectivePaused,
                 sessionElapsedMs = sessionElapsedMs,
                 expandHorizontally = useSidePanel,
