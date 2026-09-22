@@ -20,8 +20,9 @@
 #include <cstdarg>
 #include <cstdio>
 
-// Route VMA's leak report into our log
-#ifndef NDEBUG
+// VMA's per-allocation debug log floods the log file on debug builds
+// (multi-gigabyte logs on Android), so it stays disabled.
+#if 0
 static void vma_debug_log(const char *format, ...) {
     char buf[1024];
     va_list args;

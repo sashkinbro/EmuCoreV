@@ -20,6 +20,8 @@
 #include <util/log.h>
 #include <util/string_utils.h>
 
+#include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <optional>
 #include <sstream>
@@ -201,6 +203,13 @@ CheatFile parse_cheat_file(const fs::path &path, const std::string &title_id) {
             Cheat cheat;
             cheat.enabled_on_boot = line[2] == '1';
             cheat.name = string_utils::trim_copy(std::string_view(line).substr(3));
+            // Databases often write "中文//English"; show the latin part.
+            const auto separator = cheat.name.find("//");
+            if (separator != std::string::npos) {
+                std::string english = string_utils::trim_copy(cheat.name.substr(separator + 2));
+                if (!english.empty() && std::any_of(english.begin(), english.end(), [](unsigned char c) { return std::isalpha(c) != 0; }))
+                    cheat.name = english;
+            }
             cheat.line_number = line_number;
             if (cheat.name.empty())
                 cheat.name = fmt::format("Cheat {}", file.cheats.size() + 1);

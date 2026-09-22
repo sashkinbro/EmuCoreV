@@ -50,7 +50,24 @@ uint32_t width_mask(CodeWidth width) {
 
 // `is_valid_addr_range()` takes an end that is one past the last byte of the access.
 bool is_accessible(const MemState &mem, uint32_t address, uint32_t size) {
-    return (address != 0) && is_valid_addr_range(mem, address, address + size);
+    // The first page is the null guard page: reserved but never mapped, so a
+    // cheat pointer chain that resolves to 0 would otherwise fault here.
+    if ((address < KiB(4)) || (address + size < address))
+        return false;
+
+    if (!is_valid_addr_range(mem, address, address + size))
+        return false;
+
+    // With the page table the allocator can report a page as allocated while
+    // its host entry is not installed yet; dereferencing it would fault.
+    if (mem.use_page_table) {
+        for (uint32_t offset = 0; offset < size; ++offset) {
+            if (mem.page_table[(address + offset) / KiB(4)] == nullptr)
+                return false;
+        }
+    }
+
+    return true;
 }
 
 // The guest pages a value spans are not necessarily contiguous in host memory, so go byte by byte.
@@ -129,6 +146,9 @@ private:
         return m_relative_base + address;
     }
 
+    bool write(uint32_t address, CodeWidth width, uint32_t value) {
+        return write_value(m_mem, address, width, value);
+    }
     size_t code_line_count(size_t index) const {
         if (index >= m_cheat.lines.size())
             return 0;
@@ -158,14 +178,11 @@ private:
     static size_t pointer_block_lines(const CodeLine &head) {
         return std::min<size_t>(head.param(), max_pointer_level);
     }
-
-    // A related count is a number of codes, not of lines, and a pointer write spans several.
-    void skip_related_codes(uint8_t related) {
-        size_t remaining = std::max<size_t>(related, 1);
-        while ((remaining > 0) && (m_index < m_cheat.lines.size())) {
-            m_index += std::max<size_t>(code_line_count(m_index), 1);
-            --remaining;
-        }
+    // A related count is a number of code lines below the identifier, the
+    // original plugin skips line by line so a pointer block is skipped whole.
+    void skip_related_lines(uint8_t related) {
+        const size_t remaining = std::max<size_t>(related, 1);
+        m_index = std::min(m_index + remaining, m_cheat.lines.size());
     }
 
     bool execute(const CodeLine &line) {
@@ -199,7 +216,7 @@ private:
     // `$0X00 <address> <value>`
     bool execute_write(const CodeLine &line) {
         ++m_index;
-        write_value(m_mem, resolve(line.first), static_cast<CodeWidth>(line.op()), line.second);
+        write(resolve(line.first), static_cast<CodeWidth>(line.op()), line.second);
         return true;
     }
 
@@ -210,7 +227,7 @@ private:
         const auto width = static_cast<CodeWidth>(line.op());
         uint32_t value = 0;
         if (read_value(m_mem, resolve(line.second), width, value))
-            write_value(m_mem, resolve(line.first), width, value);
+            write(resolve(line.first), width, value);
 
         return true;
     }
@@ -229,7 +246,7 @@ private:
         // The whole control word of the second line is the iteration count.
         const uint32_t count = gaps.control;
         for (uint32_t i = 0; i < count; ++i)
-            write_value(m_mem, resolve(line.first) + (i * gaps.first), width, line.second + (i * gaps.second));
+            write(resolve(line.first) + (i * gaps.first), width, line.second + (i * gaps.second));
 
         return true;
     }
@@ -242,7 +259,7 @@ private:
 
         uint32_t address = 0;
         if (follow_pointers(block, address))
-            write_value(m_mem, address, static_cast<CodeWidth>(line.op()), block.closing.second);
+            write(address, static_cast<CodeWidth>(line.op()), block.closing.second);
 
         return true;
     }
@@ -375,7 +392,7 @@ private:
         // The pad type selects between the Vita pad and a DualShock, Vita3K only exposes one pad.
         const uint32_t mask = line.second;
         if ((m_buttons & mask) != mask)
-            skip_related_codes(line.param());
+            skip_related_lines(line.param());
 
         return true;
     }
@@ -406,7 +423,7 @@ private:
         }
 
         if (!satisfied)
-            skip_related_codes(line.param());
+            skip_related_lines(line.param());
 
         return true;
     }
