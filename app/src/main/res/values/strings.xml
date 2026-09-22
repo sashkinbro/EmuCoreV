@@ -1121,4 +1121,6 @@
     <string name="cheat_manager_category_hotkeys">Button combinations</string>
     <string name="cheat_manager_category_other">Other</string>
     <string name="emulation_cheats_group_enable">Enable all in group</string>
+    <string name="settings_experimental_cheats">Experimental cheats</string>
+    <string name="settings_help_experimental_cheats">Shows the cheat manager and the in-game Cheats tab. Cheats are made for specific game versions: most packs do nothing or can crash the game, so this is not recommended for regular use.</string>
 </resources>

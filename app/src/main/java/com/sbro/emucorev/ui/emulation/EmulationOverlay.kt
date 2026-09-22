@@ -95,6 +95,7 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.core.AndroidGyroscopeInput
 import com.sbro.emucorev.core.AndroidTouchHaptics
 import com.sbro.emucorev.core.AndroidTouchHaptics.ButtonPhase
+import com.sbro.emucorev.core.CHEATS_ENABLED
 import com.sbro.emucorev.core.CheatBridge
 import com.sbro.emucorev.core.VitaCheatSnapshot
 import com.sbro.emucorev.core.VitaCoreConfig
@@ -612,6 +613,7 @@ fun EmulationOverlayHost(
                 gameId = gameId,
                 config = config,
                 cheats = cheatSnapshot,
+                cheatsAvailable = CHEATS_ENABLED || customization.experimentalCheats,
                 paused = effectivePaused,
                 sessionElapsedMs = sessionElapsedMs,
                 expandHorizontally = useSidePanel,

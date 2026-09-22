@@ -1114,4 +1114,6 @@
     <string name="cheat_manager_category_hotkeys">Combinaciones de botones</string>
     <string name="cheat_manager_category_other">Otros</string>
     <string name="emulation_cheats_group_enable">Activar todo el grupo</string>
+    <string name="settings_experimental_cheats">Trucos experimentales</string>
+    <string name="settings_help_experimental_cheats">Muestra el gestor de trucos y la pestaña «Trucos» durante el juego. Los trucos están hechos para versiones concretas de los juegos: la mayoría de los paquetes no hacen nada o pueden bloquear el juego, así que no se recomienda su uso habitual.</string>
 </resources>

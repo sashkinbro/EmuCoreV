@@ -210,6 +210,13 @@ private fun GeneralTab(
         SliderRow(title = stringResource(R.string.settings_cpu_pool_size), description = stringResource(R.string.settings_help_cpu_pool_size), valueText = stringResource(R.string.settings_cpu_pool_size_value, uiState.coreConfig.cpuPoolSize), onResetDefault = { viewModel.updateCoreSettings { it.copy(cpuPoolSize = defaults.cpuPoolSize) } }) {
             Slider(value = uiState.coreConfig.cpuPoolSize.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(cpuPoolSize = value.roundToInt().coerceIn(1, 32)) } }, valueRange = 1f..32f, steps = 30)
         }
+        Toggle(
+            title = stringResource(R.string.settings_experimental_cheats),
+            description = stringResource(R.string.settings_help_experimental_cheats),
+            checked = uiState.customization.experimentalCheats,
+            onCheckedChange = { enabled -> viewModel.updateExperimentalCheats(enabled) },
+            onResetDefault = { viewModel.updateExperimentalCheats(false) }
+        )
     }
 
 }

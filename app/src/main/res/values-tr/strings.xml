@@ -1114,4 +1114,6 @@
     <string name="cheat_manager_category_hotkeys">Tuş kombinasyonları</string>
     <string name="cheat_manager_category_other">Diğer</string>
     <string name="emulation_cheats_group_enable">Gruptakilerin tümünü etkinleştir</string>
+    <string name="settings_experimental_cheats">Deneysel hileler</string>
+    <string name="settings_help_experimental_cheats">Hile yöneticisini ve oyun içi «Hileler» sekmesini gösterir. Hileler belirli oyun sürümleri için yapılmıştır: çoğu paket hiçbir şey yapmaz veya oyunu çökertir, bu yüzden normal kullanım için önerilmez.</string>
 </resources>

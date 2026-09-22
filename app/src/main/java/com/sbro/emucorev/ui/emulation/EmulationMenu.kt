@@ -89,6 +89,7 @@ import com.sbro.emucorev.data.VitaTrophySet
 import com.sbro.emucorev.ui.common.LocalImage
 import com.sbro.emucorev.ui.cheats.groupCheatEntries
 import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
+import com.sbro.emucorev.ui.theme.LocalCustomizationSettings
 import com.sbro.emucorev.ui.theme.neon.NeonCrtOverlay
 import com.sbro.emucorev.ui.theme.neon.neonAccentColor
 import com.sbro.emucorev.ui.theme.neon.neonPillShape
@@ -224,6 +225,7 @@ fun EmulationGameMenu(
     gameId: String,
     config: VitaCoreConfig,
     cheats: VitaCheatSnapshot,
+    cheatsAvailable: Boolean,
     paused: Boolean,
     sessionElapsedMs: Long,
     expandHorizontally: Boolean,
@@ -273,6 +275,7 @@ fun EmulationGameMenu(
                         gameId = gameId,
                         config = config,
                         cheats = cheats,
+                        cheatsAvailable = cheatsAvailable,
                         paused = paused,
                         sessionElapsedMs = sessionElapsedMs,
                         physicalGamepadConnected = physicalGamepadConnected,
@@ -379,6 +382,7 @@ fun EmulationGameMenu(
                         gameId = gameId,
                         config = config,
                         cheats = cheats,
+                        cheatsAvailable = cheatsAvailable,
                         paused = paused,
                         sessionElapsedMs = sessionElapsedMs,
                         physicalGamepadConnected = physicalGamepadConnected,
@@ -397,6 +401,7 @@ fun EmulationGameMenu(
                     gameId = gameId,
                     config = config,
                     cheats = cheats,
+                    cheatsAvailable = cheatsAvailable,
                     paused = paused,
                     sessionElapsedMs = sessionElapsedMs,
                     physicalGamepadConnected = physicalGamepadConnected,
@@ -423,6 +428,7 @@ private fun MenuScrollableContent(
     gameId: String,
     config: VitaCoreConfig,
     cheats: VitaCheatSnapshot,
+    cheatsAvailable: Boolean,
     paused: Boolean,
     sessionElapsedMs: Long,
     physicalGamepadConnected: Boolean,
@@ -469,6 +475,7 @@ private fun MenuScrollableContent(
             gameId = gameId,
             config = config,
             cheats = cheats,
+            cheatsAvailable = cheatsAvailable,
             sessionElapsedMs = sessionElapsedMs,
             physicalGamepadConnected = physicalGamepadConnected,
             controlsVisible = controlsVisible,
@@ -483,6 +490,7 @@ private fun MenuSelectedContent(
     gameId: String,
     config: VitaCoreConfig,
     cheats: VitaCheatSnapshot,
+    cheatsAvailable: Boolean,
     sessionElapsedMs: Long,
     physicalGamepadConnected: Boolean,
     controlsVisible: Boolean,
@@ -500,7 +508,7 @@ private fun MenuSelectedContent(
             )
             EmulationMenuTab.Controls -> ControlsTab(config = config, controlsVisible = controlsVisible, callbacks = callbacks)
             EmulationMenuTab.Display -> DisplayTab(config = config, callbacks = callbacks)
-            EmulationMenuTab.Cheats -> if (CHEATS_ENABLED) CheatsTab(cheats = cheats, callbacks = callbacks)
+            EmulationMenuTab.Cheats -> if (cheatsAvailable) CheatsTab(cheats = cheats, callbacks = callbacks)
             EmulationMenuTab.System -> SystemTab(config = config, callbacks = callbacks)
             EmulationMenuTab.Achievements -> AchievementsTab(gameId = gameId)
             EmulationMenuTab.Gamepad -> GamepadTab(
@@ -1475,7 +1483,7 @@ private fun emulationMenuTabs(): List<EmulationMenuTabItem> = listOf(
         stringResource(R.string.emulation_tab_gamepad),
         Icons.Rounded.SportsEsports
     )
-).filter { CHEATS_ENABLED || it.tab != EmulationMenuTab.Cheats }
+).filter { it.tab != EmulationMenuTab.Cheats || CHEATS_ENABLED || LocalCustomizationSettings.current.experimentalCheats }
 
 /** Callbacks bag — keeps `EmulationGameMenu` signature compact and testable. */
 data class EmulationMenuCallbacks(

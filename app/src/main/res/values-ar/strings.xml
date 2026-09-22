@@ -1118,4 +1118,6 @@
     <string name="cheat_manager_category_hotkeys">مجموعات الأزرار</string>
     <string name="cheat_manager_category_other">أخرى</string>
     <string name="emulation_cheats_group_enable">تفعيل الكل في المجموعة</string>
+    <string name="settings_experimental_cheats">أكواد غش تجريبية</string>
+    <string name="settings_help_experimental_cheats">يُظهر مدير أكواد الغش وتبويب «أكواد الغش» داخل اللعبة. الأكواد مصممة لإصدارات محددة من الألعاب: معظم الحزم لا تفعل شيئًا أو قد تُعطّل اللعبة، لذا لا يُنصح بالاستخدام العادي.</string>
 </resources>

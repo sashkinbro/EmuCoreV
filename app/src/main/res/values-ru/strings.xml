@@ -1117,4 +1117,6 @@
     <string name="cheat_manager_category_hotkeys">Комбинации кнопок</string>
     <string name="cheat_manager_category_other">Другое</string>
     <string name="emulation_cheats_group_enable">Включить все в группе</string>
+    <string name="settings_experimental_cheats">Экспериментальные читы</string>
+    <string name="settings_help_experimental_cheats">Показывает менеджер читов и вкладку «Читы» в игровом меню. Читы сделаны под конкретные версии игр: большинство паков не работают или могут сломать игру, поэтому не рекомендуется для обычного использования.</string>
 </resources>

@@ -286,6 +286,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         customizationPreferences.setCoverSizePercent(value)
     }
 
+    fun updateExperimentalCheats(enabled: Boolean) {
+        customizationPreferences.setExperimentalCheats(enabled)
+    }
+
     fun updateTextSizePercent(value: Int) {
         customizationPreferences.setTextSizePercent(value)
     }

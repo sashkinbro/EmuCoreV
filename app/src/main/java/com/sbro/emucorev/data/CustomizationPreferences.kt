@@ -66,7 +66,9 @@ data class CustomizationSettings(
     val touchControlVisualStyle: TouchControlVisualStyle = TouchControlVisualStyle.CLASSIC,
     val touchControlPressEffect: TouchControlPressEffect = TouchControlPressEffect.GROW,
     val gameMenuLayoutStyle: GameMenuLayoutStyle = GameMenuLayoutStyle.SIDEBAR,
-    val drawerVisualStyle: DrawerVisualStyle = DrawerVisualStyle.CLASSIC
+    val drawerVisualStyle: DrawerVisualStyle = DrawerVisualStyle.CLASSIC,
+    /** Shows the cheat manager and the in-game Cheats tab. Experimental. */
+    val experimentalCheats: Boolean = false
 ) {
     companion object {
         const val DEFAULT_COVER_SIZE_PERCENT = 100
@@ -168,6 +170,10 @@ class CustomizationPreferences(context: Context) : Closeable {
         prefs.edit { putString(KEY_DRAWER_VISUAL_STYLE, style.name) }
     }
 
+    fun setExperimentalCheats(enabled: Boolean) {
+        prefs.edit { putBoolean(KEY_EXPERIMENTAL_CHEATS, enabled) }
+    }
+
     fun reset() {
         prefs.edit {
             CUSTOMIZATION_KEYS.forEach(::remove)
@@ -223,7 +229,8 @@ class CustomizationPreferences(context: Context) : Closeable {
             drawerVisualStyle = prefs.enumValue(
                 KEY_DRAWER_VISUAL_STYLE,
                 DrawerVisualStyle.CLASSIC
-            )
+            ),
+            experimentalCheats = prefs.getBoolean(KEY_EXPERIMENTAL_CHEATS, false)
         )
     }
 
@@ -246,6 +253,7 @@ class CustomizationPreferences(context: Context) : Closeable {
         const val KEY_TOUCH_CONTROL_PRESS_EFFECT = "touch_control_press_effect"
         const val KEY_GAME_MENU_LAYOUT_STYLE = "game_menu_layout_style"
         const val KEY_DRAWER_VISUAL_STYLE = "drawer_visual_style"
+        const val KEY_EXPERIMENTAL_CHEATS = "experimental_cheats"
         val CUSTOMIZATION_KEYS = setOf(
             KEY_BACKGROUND_PATH,
             KEY_BACKGROUND_MIME_TYPE,
@@ -256,7 +264,8 @@ class CustomizationPreferences(context: Context) : Closeable {
             KEY_TOUCH_CONTROL_VISUAL_STYLE,
             KEY_TOUCH_CONTROL_PRESS_EFFECT,
             KEY_GAME_MENU_LAYOUT_STYLE,
-            KEY_DRAWER_VISUAL_STYLE
+            KEY_DRAWER_VISUAL_STYLE,
+            KEY_EXPERIMENTAL_CHEATS
         )
     }
 }

@@ -1113,4 +1113,6 @@
     <string name="cheat_manager_category_hotkeys">按键组合</string>
     <string name="cheat_manager_category_other">其他</string>
     <string name="emulation_cheats_group_enable">启用组内全部</string>
+    <string name="settings_experimental_cheats">实验性金手指</string>
+    <string name="settings_help_experimental_cheats">显示金手指管理器和游戏内「金手指」标签页。金手指是为特定游戏版本制作的：大多数代码包不起作用，甚至可能导致游戏崩溃，因此不建议日常使用。</string>
 </resources>

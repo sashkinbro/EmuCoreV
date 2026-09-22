@@ -1114,4 +1114,6 @@
     <string name="cheat_manager_category_hotkeys">Combinaisons de boutons</string>
     <string name="cheat_manager_category_other">Autres</string>
     <string name="emulation_cheats_group_enable">Tout activer dans le groupe</string>
+    <string name="settings_experimental_cheats">Codes expérimentaux</string>
+    <string name="settings_help_experimental_cheats">Affiche le gestionnaire de codes et l\'onglet « Codes » en jeu. Les codes sont faits pour des versions précises des jeux : la plupart des packs ne font rien ou peuvent planter le jeu, donc déconseillé en usage normal.</string>
 </resources>

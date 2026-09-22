@@ -1114,4 +1114,6 @@
     <string name="cheat_manager_category_hotkeys">Tastenkombinationen</string>
     <string name="cheat_manager_category_other">Sonstiges</string>
     <string name="emulation_cheats_group_enable">Alle in der Gruppe aktivieren</string>
+    <string name="settings_experimental_cheats">Experimentelle Cheats</string>
+    <string name="settings_help_experimental_cheats">Zeigt den Cheat-Manager und den In-Game-Tab „Cheats“. Cheats sind für bestimmte Spielversionen gemacht: Die meisten Pakete bewirken nichts oder können das Spiel zum Absturz bringen, daher nicht für den normalen Gebrauch empfohlen.</string>
 </resources>
