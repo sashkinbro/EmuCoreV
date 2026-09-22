@@ -17,6 +17,10 @@
 -keep class com.sbro.emucorev.core.vita.EmuSurface { *; }
 -keep class com.sbro.emucorev.core.vita.provider.VitaDocumentsProvider { *; }
 -keep class com.sbro.emucorev.core.vita.overlay.** { *; }
+# The cheat bridge resolves its native entry points by JNI symbol name, and the
+# cheat manager ViewModel is created reflectively by the ViewModel factory.
+-keep class com.sbro.emucorev.core.CheatBridge { *; }
+-keep class com.sbro.emucorev.ui.cheats.CheatManagerViewModel { *; }
 # Bundled SDL/HID classes live in org.libsdl.app to match SDL's own JNI
 # expectations. SDL_android.c looks them up by FQN via FindClass at JNI_OnLoad
 # and SDL3 callbacks resolve their static methods by name through reflection.
