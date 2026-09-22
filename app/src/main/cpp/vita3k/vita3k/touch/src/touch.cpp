@@ -25,6 +25,8 @@
 #include <touch/state.h>
 #include <touch/touch.h>
 
+#include <util/log.h>
+
 #include <SDL3/SDL_events.h>
 
 #include <cmath>
@@ -344,8 +346,9 @@ int toggle_touchscreen(TouchState &state) {
 
 int touch_get(const SceUID thread_id, EmuEnvState &emuenv, const SceUInt32 &port, SceTouchData *pData, SceUInt32 count, bool is_peek) {
     memset(pData, 0, sizeof(SceTouchData) * count);
+    // sceTouchRead with count > 0 must report at least one (empty) sample, otherwise a guest loop can stall
     if (emuenv.drop_inputs || emuenv.ctrl.overlay_input_intercepted.load(std::memory_order_relaxed))
-        return 0;
+        return count > 0 ? 1 : 0;
 
     const int port_idx = static_cast<int>(port);
 
@@ -366,6 +369,10 @@ int touch_get(const SceUID thread_id, EmuEnvState &emuenv, const SceUInt32 &port
         uint64_t vblank_count = emuenv.display.vblank_count.load();
         nb_returned_data = std::min<int>(count, vblank_count - emuenv.touch.last_vcount[port_idx]);
         emuenv.touch.last_vcount[port_idx] = vblank_count;
+        if ((count > 0) && (nb_returned_data < 1)) {
+            LOG_WARN_ONCE("sceTouchRead port {} had no buffer to return; answering 1 empty one", port_idx);
+            nb_returned_data = 1;
+        }
     }
 
     int corr_buffer_idx;

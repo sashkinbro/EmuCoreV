@@ -25,6 +25,7 @@
 #include <io/functions.h>
 #include <io/vfs.h>
 #include <lang/state.h>
+#include <mem/functions.h>
 #include <net/state.h>
 #include <packages/functions.h>
 #include <util/log.h>
@@ -559,12 +560,32 @@ EXPORT(int, sceNetCheckDialogGetPS3ConnectInfo) {
     return UNIMPLEMENTED();
 }
 
+// Only the modes that need PSN or a PS3 are refused and only when the user has not asked us to pretend to be signed in
+static bool netcheck_mode_needs_psn(SceNetCheckDialogMode mode) {
+    switch (mode) {
+    case SCE_NETCHECK_DIALOG_MODE_PSN:
+    case SCE_NETCHECK_DIALOG_MODE_PSN_ONLINE:
+    case SCE_NETCHECK_DIALOG_MODE_PS3_CONNECT:
+        return true;
+    default:
+        // ADHOC_CONN and the three PSP adhoc modes, plus INVALID
+        return false;
+    }
+}
+
 EXPORT(int, sceNetCheckDialogGetResult, SceNetCheckDialogResult *result) {
     TRACY_FUNC(sceNetCheckDialogGetResult, result);
+    if (!result)
+        return RET_ERROR(SCE_COMMON_DIALOG_ERROR_NULL);
+
+    *result = {};
     result->result = emuenv.common_dialog.result;
 
-    if (emuenv.common_dialog.netcheck.mode != SCE_NETCHECK_DIALOG_MODE_ADHOC_CONN)
-        STUBBED("result->result = 0");
+    if (netcheck_mode_needs_psn(emuenv.common_dialog.netcheck.mode)) {
+        const bool pretend_signed_in = emuenv.cfg.current_config.psn_signed_in;
+        result->result = pretend_signed_in ? SCE_COMMON_DIALOG_RESULT_OK : SCE_COMMON_DIALOG_RESULT_USER_CANCELED;
+        result->psnModeSucceeded = pretend_signed_in;
+    }
 
     return 0;
 }
@@ -926,7 +947,12 @@ static void check_save_file(const uint32_t index, EmuEnvState &emuenv, const cha
                 const auto thumbnail_path = translate_path(empty_param->iconPath.get(emuenv.mem), device, emuenv.io.device_paths);
                 vfs::read_file(VitaIoDevice::ux0, icon_buf_tmp, emuenv.vita_fs_path, thumbnail_path);
             } else if (iconBuf && (iconBufSize > 0)) {
-                icon_buf_tmp.insert(icon_buf_tmp.end(), iconBuf, iconBuf + iconBufSize);
+                const Address icon_start = empty_param->iconBuf.address();
+                if (is_valid_addr_range(emuenv.mem, icon_start, icon_start + iconBufSize - 1)) {
+                    icon_buf_tmp.insert(icon_buf_tmp.end(), iconBuf, iconBuf + iconBufSize);
+                } else {
+                    LOG_WARN("Save slot {} empty-param iconBuf 0x{:X} size 0x{:X} is not mapped - icon skipped", index, icon_start, iconBufSize);
+                }
             }
         }
     } else {

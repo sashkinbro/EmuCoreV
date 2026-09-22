@@ -2020,7 +2020,31 @@ Framebuffer &VKSurfaceCache::retrieve_framebuffer_handle(MemState &mem, SceGxmCo
     return (framebuffer_array[key] = { fb_standard, fb_interlock, color_result.base_image, framebuffer_width, framebuffer_height, color_result.raw_image });
 }
 
-bool VKSurfaceCache::check_for_surface(MemState &mem, Address source_address, CallbackRequestFunction &callback, Address target_address) {
+std::map<Address, ColorSurfaceCacheInfo *>::iterator VKSurfaceCache::find_color_surface_containing(Address address, uint32_t size) {
+    // the guard keeps small transfers on their existing exact-match path
+    constexpr uint32_t min_surface_read_size = KiB(16);
+    if (size < min_surface_read_size)
+        return color_address_lookup.end();
+
+    auto it = color_address_lookup.upper_bound(address);
+    if (it == color_address_lookup.begin())
+        return color_address_lookup.end();
+    --it;
+
+    const auto contains = [&](const std::map<Address, ColorSurfaceCacheInfo *>::iterator &i) {
+        return address >= i->first
+            && static_cast<uint64_t>(address) + size <= static_cast<uint64_t>(i->first) + i->second->total_bytes;
+    };
+
+    if (contains(it))
+        return it;
+    if (it == color_address_lookup.begin())
+        return color_address_lookup.end();
+    --it;
+    return contains(it) ? it : color_address_lookup.end();
+}
+
+bool VKSurfaceCache::check_for_surface(MemState &mem, Address source_address, CallbackRequestFunction &callback, Address target_address, uint32_t source_size) {
     if (!state.features.enable_memory_mapping || state.disable_surface_sync)
         return false;
 
@@ -2033,10 +2057,13 @@ bool VKSurfaceCache::check_for_surface(MemState &mem, Address source_address, Ca
         return true;
     }
 
-    // for now, only look if the address matches exactly a color surface
     auto it = color_address_lookup.find(source_address);
-    if (it == color_address_lookup.end())
-        return false;
+    if (it == color_address_lookup.end()) {
+        it = find_color_surface_containing(source_address, source_size);
+        if (it == color_address_lookup.end())
+            return false;
+        LOG_INFO_ONCE("[XFER] transfer source 0x{:08X} is a sub-rectangle of the surface at 0x{:08X}; syncing it before the CPU read", source_address, it->first);
+    }
 
     auto &surface = *it->second;
     VKContext &context = *static_cast<VKContext *>(state.context);

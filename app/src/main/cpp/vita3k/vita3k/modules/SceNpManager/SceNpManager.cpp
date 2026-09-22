@@ -79,6 +79,21 @@ EXPORT(int, sceNpCheckCallback) {
         thread->run_callback(np_callback.pc, { static_cast<uint32_t>(state), 0, np_callback.data });
     }
 
+    std::vector<SceNpMatching2ContextEvent> events;
+    Address context_cb_pc = 0;
+    Address context_cb_arg = 0;
+    {
+        NpMatching2State &matching2 = emuenv.np.matching2;
+        std::lock_guard<std::mutex> lock(matching2.mutex);
+        if (matching2.context_cb_pc && !matching2.pending.empty()) {
+            events.swap(matching2.pending);
+            context_cb_pc = matching2.context_cb_pc;
+            context_cb_arg = matching2.context_cb_arg;
+        }
+    }
+    for (const SceNpMatching2ContextEvent &event : events)
+        thread->run_callback(context_cb_pc, { event.ctx_id, event.event, event.cause, event.error_code, context_cb_arg });
+
     return STUBBED("Stub");
 }
 

@@ -305,6 +305,8 @@ int ctrl_get(const SceUID thread_id, EmuEnvState &emuenv, int port, SceCtrlData2
         uint64_t vblank_count = emuenv.display.vblank_count.load();
         nb_returned_data = std::min<int32_t>(count, vblank_count - state.last_vcount[port]);
         state.last_vcount[port] = vblank_count;
+        if ((count > 0) && (nb_returned_data < 1))
+            nb_returned_data = 1;
     }
 
     std::chrono::time_point<std::chrono::steady_clock> ts = std::chrono::steady_clock::now();

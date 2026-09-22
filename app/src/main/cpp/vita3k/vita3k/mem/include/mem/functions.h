@@ -69,6 +69,8 @@ bool debug_safe_write_guest(MemState &state, Address addr, const void *src, uint
 bool handle_access_violation(MemState &state, uint8_t *addr, bool write) noexcept;
 bool test_arm64_atomics_on(void *ptr);
 void set_fault_context_provider(std::string (*provider)());
+void memcpy_to_guest(MemState &mem, Address dst, const void *src, uint32_t size);
+void memcpy_from_guest(MemState &mem, void *dst, Address src, uint32_t size);
 Block alloc_block(MemState &mem, uint32_t size, const char *name, Address start_addr = user_main_memory_start);
 Address alloc_at(MemState &state, Address address, uint32_t size, const char *name);
 Address try_alloc_at(MemState &state, Address address, uint32_t size, const char *name);

@@ -1795,25 +1795,68 @@ static spv::Function *make_vert_finalize_function(spv::Builder &b, const SpirvSh
     add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_TEXCOORD9, "v_TexCoord9", calculate_copy_comp_count(coord_infos[9]), 13);
 
     add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_PSIZE, "v_Psize", 1, 14);
-    // TODO: these should be translated to gl_ClipDistance
-    // add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP0, "v_Clip0", 1);
-    // add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP1, "v_Clip1", 1);
-    // add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP2, "v_Clip2", 1);
-    // add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP3, "v_Clip3", 1);
-    // add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP4, "v_Clip4", 1);
-    // add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP5, "v_Clip5", 1);
-    // add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP6, "v_Clip6", 1);
-    // add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP7, "v_Clip7", 1);
+    // Each clip plane is one scalar distance, written straight into gl_ClipDistance rather than to a varying
+    add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP0, "v_Clip0", 1, 15);
+    add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP1, "v_Clip1", 1, 16);
+    add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP2, "v_Clip2", 1, 17);
+    add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP3, "v_Clip3", 1, 18);
+    add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP4, "v_Clip4", 1, 19);
+    add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP5, "v_Clip5", 1, 20);
+    add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP6, "v_Clip6", 1, 21);
+    add_vertex_output_info(SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP7, "v_Clip7", 1, 22);
 
     Operand o_op;
     o_op.bank = RegisterBank::OUTPUT;
     o_op.num = 0;
     o_op.swizzle = SWIZZLE_CHANNEL_4_DEFAULT;
 
+    // gl_ClipDistance carries the two eye-plane guards first, then whatever clip planes the program declares
+    // the guards are derived from the position output, so without one there is nothing to guard
+    const bool emit_eye_clip = translation_state.is_vulkan && features.support_clip_distance && (vertex_outputs & SCE_GXM_VERTEX_PROGRAM_OUTPUT_POSITION);
+    const uint32_t eye_clip_count = emit_eye_clip ? 2 : 0;
+    uint32_t gxm_clip_count = 0;
+    if (translation_state.is_vulkan && features.support_gxm_clip_planes) {
+        for (uint32_t i = 0; i < 8; i++) {
+            if (vertex_outputs & (SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP0 << i))
+                gxm_clip_count++;
+        }
+        // Vulkan only guarantees eight clip distances and the eye-plane guards already claim two
+        if (eye_clip_count + gxm_clip_count > 8) {
+            LOG_WARN("Vertex program declares {} clip planes, only {} can be translated", gxm_clip_count, 8 - eye_clip_count);
+            gxm_clip_count = 8 - eye_clip_count;
+        }
+    }
+
+    const uint32_t clip_distance_count = eye_clip_count + gxm_clip_count;
+    spv::Id clip_var = spv::NoResult;
+    if (clip_distance_count > 0) {
+        b.addCapability(spv::CapabilityClipDistance);
+        const spv::Id clip_type = b.makeArrayType(b.makeFloatType(32), b.makeUintConstant(clip_distance_count), 0);
+        clip_var = b.createVariable(spv::NoPrecision, spv::StorageClassOutput, clip_type, "gl_ClipDistance");
+        b.addDecoration(clip_var, spv::DecorationBuiltIn, spv::BuiltInClipDistance);
+        translation_state.interfaces.push_back(clip_var);
+    }
+    uint32_t gxm_clip_written = 0;
+    if (gxm_clip_count > 0)
+        LOG_INFO("[CLIPPLANE] vertex program {} declares {} clip plane(s), written to gl_ClipDistance[{}..{}]",
+            translation_state.hash, gxm_clip_count, eye_clip_count, eye_clip_count + gxm_clip_count - 1);
+
     for (const auto vo : vertex_outputs_list) {
         if (vertex_outputs & vo) {
             const auto vo_typed = static_cast<SceGxmVertexProgramOutputs>(vo);
             const VertexProgramOutputProperties &properties = vertex_properties_map.at(vo_typed);
+
+            if (vo >= SCE_GXM_VERTEX_PROGRAM_OUTPUT_CLIP0) {
+                // A clip plane is a distance for the rasteriser, not a varying, so it gets no output variable
+                if (gxm_clip_written < gxm_clip_count) {
+                    const spv::Id distance = utils::load(b, parameters, utils, features, o_op, 0b1, 0);
+                    const spv::Id slot = utils::create_access_chain(b, spv::StorageClassOutput, clip_var, { b.makeIntConstant(eye_clip_count + gxm_clip_written) });
+                    b.createStore(distance, slot);
+                    gxm_clip_written++;
+                }
+                o_op.num += properties.component_count;
+                continue;
+            }
 
             // TODO: use real component_count, for now only force PSIZE to have a component count of 1 and other to 4
             const int32_t used_component_count = (vo == SCE_GXM_VERTEX_PROGRAM_OUTPUT_PSIZE) ? 1 : 4;
@@ -1936,13 +1979,7 @@ static spv::Function *make_vert_finalize_function(spv::Builder &b, const SpirvSh
                 // depth clamp disables z-clipping, so clip eye-plane-crossing primitives ourselves:
                 // [0] w <= 0 is behind the eye; [1] z/w < -1 kills the near-infinity wedge that
                 // survives an exact w=0 clip (clamped-z geometry like KZ sits at z/w ~ -0.001)
-                if (translation_state.is_vulkan && features.support_clip_distance) {
-                    b.addCapability(spv::CapabilityClipDistance);
-                    const spv::Id clip_type = b.makeArrayType(f32, b.makeUintConstant(2), 0);
-                    const spv::Id clip_var = b.createVariable(spv::NoPrecision, spv::StorageClassOutput, clip_type, "gl_ClipDistance");
-                    b.addDecoration(clip_var, spv::DecorationBuiltIn, spv::BuiltInClipDistance);
-                    translation_state.interfaces.push_back(clip_var);
-
+                if (emit_eye_clip) {
                     const spv::Id clip_z_ref = utils::create_access_chain(b, spv::StorageClassOutput, out_var, { b.makeIntConstant(2) });
                     const spv::Id clip_w_ref = utils::create_access_chain(b, spv::StorageClassOutput, out_var, { b.makeIntConstant(3) });
                     const spv::Id clip_z = b.createLoad(clip_z_ref, spv::NoPrecision);
@@ -2356,10 +2393,13 @@ void convert_gxp_to_glsl_from_filepath(const std::string &shader_filepath_utf8) 
     if (!fs_utils::read_data(shader_filepath_str, gxp_program))
         return;
 
+    // match what a real Vulkan device gives us, otherwise the offline dump never exercises the clip paths
     FeatureState features{
         .support_shader_interlock = true,
         .direct_fragcolor = false
     };
+    features.support_clip_distance = true;
+    features.support_gxm_clip_planes = true;
 
     // use some default hints because we don't have them available
     Hints hints{

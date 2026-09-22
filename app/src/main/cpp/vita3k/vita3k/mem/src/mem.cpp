@@ -343,6 +343,57 @@ void set_fault_context_provider(std::string (*provider)()) {
     g_fault_context_provider = provider;
 }
 
+static inline uint8_t *guest_host_ptr(const MemState &mem, Address addr) {
+    return mem.use_page_table ? mem.page_table[addr / KiB(4)] + addr : mem.memory.get() + addr;
+}
+
+static inline bool guest_range_contiguous(const MemState &mem, Address addr, uint32_t size) {
+    if (!mem.use_page_table || size <= 1)
+        return true;
+    const uint8_t *const base = mem.page_table[addr / KiB(4)];
+    for (Address page = (addr | 0xFFFu) + 1; page < addr + size; page += KiB(4)) {
+        if (mem.page_table[page / KiB(4)] != base)
+            return false;
+    }
+    return true;
+}
+
+void memcpy_to_guest(MemState &mem, Address dst, const void *src, uint32_t size) {
+    if (!dst || size == 0)
+        return;
+    if (guest_range_contiguous(mem, dst, size)) {
+        memcpy(guest_host_ptr(mem, dst), src, size);
+        return;
+    }
+    const std::shared_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
+    const uint8_t *s = static_cast<const uint8_t *>(src);
+    uint32_t off = 0;
+    while (off < size) {
+        const Address cur = dst + off;
+        const uint32_t chunk = std::min<uint32_t>(size - off, static_cast<uint32_t>(KiB(4) - (cur & 0xFFFu)));
+        memcpy(guest_host_ptr(mem, cur), s + off, chunk);
+        off += chunk;
+    }
+}
+
+void memcpy_from_guest(MemState &mem, void *dst, Address src, uint32_t size) {
+    if (!src || size == 0)
+        return;
+    if (guest_range_contiguous(mem, src, size)) {
+        memcpy(dst, guest_host_ptr(mem, src), size);
+        return;
+    }
+    const std::shared_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
+    uint8_t *d = static_cast<uint8_t *>(dst);
+    uint32_t off = 0;
+    while (off < size) {
+        const Address cur = src + off;
+        const uint32_t chunk = std::min<uint32_t>(size - off, static_cast<uint32_t>(KiB(4) - (cur & 0xFFFu)));
+        memcpy(d + off, guest_host_ptr(mem, cur), chunk);
+        off += chunk;
+    }
+}
+
 bool handle_access_violation(MemState &state, uint8_t *addr, bool write) noexcept {
     const uintptr_t memory_addr = reinterpret_cast<uintptr_t>(state.memory.get());
     const uintptr_t fault_addr = reinterpret_cast<uintptr_t>(addr);

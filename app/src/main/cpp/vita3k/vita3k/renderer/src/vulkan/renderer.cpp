@@ -858,6 +858,9 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         // depth clamp turns off z-clipping, so behind-the-eye primitives must be clipped in the shader instead
         features.support_clip_distance = enable_depth_clamp && static_cast<bool>(physical_device_features.depthClamp) && static_cast<bool>(physical_device_features.shaderClipDistance);
 
+        // a vertex program's own clip planes are unrelated to the depth clamp so they only need the device feature
+        features.support_gxm_clip_planes = static_cast<bool>(physical_device_features.shaderClipDistance);
+
         vk::StructureChain<vk::DeviceCreateInfo,
             vk::PhysicalDeviceBufferDeviceAddressFeatures,
             vk::PhysicalDeviceUniformBufferStandardLayoutFeatures,
@@ -1183,7 +1186,7 @@ void VKState::log_gpu_configuration(const Config &cfg) {
     LOG_INFO("  derived: should_use_shader_interlock={} should_use_texture_barrier={} programmable_blending={}",
         features.should_use_shader_interlock(), features.should_use_texture_barrier(),
         features.is_programmable_blending_supported());
-    LOG_INFO("  build switches: enable_depth_clamp={} support_clip_distance={}", enable_depth_clamp, features.support_clip_distance);
+    LOG_INFO("  build switches: enable_depth_clamp={} support_clip_distance={} gxm_clip_planes={}", enable_depth_clamp, features.support_clip_distance, features.support_gxm_clip_planes);
 
     const char *mapping_names[] = { "Disabled", "DoubleBuffer", "ExternalHost", "PageTable", "NativeBuffer" };
     const int mapping_idx = static_cast<int>(mapping_method);
@@ -1515,6 +1518,7 @@ uint32_t VKState::get_features_mask() {
             bool support_texture_barrier : 1;
             bool support_unknown_format : 1;
             bool use_clip_distance : 1;
+            bool use_gxm_clip_planes : 1;
             bool force_full_precision : 1;
         };
         uint32_t value;
@@ -1533,6 +1537,7 @@ uint32_t VKState::get_features_mask() {
     features_mask.support_texture_barrier = features.support_texture_barrier;
     features_mask.support_unknown_format = features.support_unknown_format;
     features_mask.use_clip_distance = features.support_clip_distance;
+    features_mask.use_gxm_clip_planes = features.support_gxm_clip_planes;
     features_mask.force_full_precision = features.force_full_precision;
 
     return features_mask.value;

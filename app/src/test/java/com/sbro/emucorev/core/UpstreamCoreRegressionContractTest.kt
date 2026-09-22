@@ -35,10 +35,12 @@ class UpstreamCoreRegressionContractTest {
         val finish = native("modules/SceGxm/SceGxm.cpp")
             .substringAfter("EXPORT(int, sceGxmFinish")
             .substringBefore("EXPORT(SceGxmPassType")
-        assertTrue(finish.contains("context_addr != emuenv.gxm.immediate_context"))
+        assertTrue(finish.contains("const auto immediate_context = emuenv.gxm.immediate_contexts.find(context)"))
+        assertTrue(finish.contains("immediate_context == emuenv.gxm.immediate_contexts.end()"))
+        assertTrue(finish.contains("immediate_context->second != context_addr"))
         assertTrue(finish.contains("context->state.type != SCE_GXM_CONTEXT_TYPE_IMMEDIATE"))
-        assertTrue(finish.contains("renderer_context != emuenv.renderer->context"))
-        assertTrue(finish.indexOf("renderer_context !=") < finish.indexOf("renderer::finish"))
+        assertTrue(finish.contains("if (!renderer_context)"))
+        assertTrue(finish.indexOf("if (!renderer_context)") < finish.indexOf("renderer::finish"))
     }
 
     @Test fun selfLoaderUsesSelfSegmentInfoAndJpegAcceptsBgra() {

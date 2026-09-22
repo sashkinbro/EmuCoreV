@@ -350,7 +350,8 @@ public:
     // synchronize the surface back to the RAM then only call the callback
     // if this call is used for a copy or similar operation set the changed address to the destination
     // so that subsequent calls to check_for_surface with the target destination also get delayed
-    bool check_for_surface(MemState &mem, Address source_address, CallbackRequestFunction &callback, Address target_address);
+    bool check_for_surface(MemState &mem, Address source_address, CallbackRequestFunction &callback, Address target_address, uint32_t source_size = 0);
+    std::map<Address, ColorSurfaceCacheInfo *>::iterator find_color_surface_containing(Address address, uint32_t size);
     // Called when a guest address is about to be read by the GPU through raw buffer
     // accesses (e.g. a uniform buffer aliasing a rendered surface, like Killzone Mercenary's
     // bloom chain reading its HDR render target). If the address lies inside a

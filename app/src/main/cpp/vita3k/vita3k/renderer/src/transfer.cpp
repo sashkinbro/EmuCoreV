@@ -15,10 +15,12 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <algorithm>
 #include <vector>
 
 #include <gxm/functions.h>
 #include <gxm/types.h>
+#include <mem/functions.h>
 #include <renderer/commands.h>
 #include <renderer/driver_functions.h>
 #include <renderer/functions.h>
@@ -260,6 +262,12 @@ COMMAND(handle_transfer_copy) {
     copy_operation();
 }
 
+static uint64_t transfer_region_bytes(const SceGxmTransferImage &img, uint32_t pixel_bytes) {
+    if (img.height == 0 || img.width == 0 || img.stride <= 0)
+        return 0;
+    return static_cast<uint64_t>(img.stride) * (img.height - 1) + static_cast<uint64_t>(img.width) * pixel_bytes;
+}
+
 COMMAND(handle_transfer_downscale) {
     TRACY_FUNC_COMMANDS(handle_transfer_downscale);
     SceGxmTransferImage *src = helper.pop<SceGxmTransferImage *>();
@@ -272,11 +280,12 @@ COMMAND(handle_transfer_downscale) {
 
     // adjust the x/y value
     const uint32_t pixel_bytes = gxm::get_bits_per_pixel(src->format) / 8;
+    const Address src_surface_base = src->address.address();
     src->address = (src->address.cast<uint8_t>() + src->y * src->stride + src->x * pixel_bytes).cast<void>();
     dst->address = (dst->address.cast<uint8_t>() + dst->y * dst->stride + dst->x * pixel_bytes).cast<void>();
 
     // only rgb formats are supported by the PS Vita for downscaling
-    vulkan::CallbackRequestFunction downscale_operation = [&mem, src, dst]() {
+    vulkan::CallbackRequestFunction downscale_operation = [&mem, src, dst, pixel_bytes]() {
         AVPixelFormat pixel_fmt = AV_PIX_FMT_NONE;
         switch (src->format) {
         case SCE_GXM_TRANSFER_FORMAT_U5U6U5_BGR:
@@ -292,8 +301,39 @@ COMMAND(handle_transfer_downscale) {
             break;
         }
 
-        uint8_t *src_ptr = src->address.cast<uint8_t>().get(mem);
-        uint8_t *dst_ptr = dst->address.cast<uint8_t>().get(mem);
+        // In Page Table mode a range can span and libswscale can read past the last row of its input
+        const uint64_t src_bytes = transfer_region_bytes(*src, pixel_bytes);
+        const uint64_t dst_bytes = transfer_region_bytes(*dst, pixel_bytes);
+        const bool can_stage = src_bytes > 0 && dst_bytes > 0;
+        const Address src_addr = src->address.address();
+        const Address dst_addr = dst->address.address();
+
+        if (can_stage
+            && (!is_valid_addr_range(mem, src_addr, static_cast<Address>(src_addr + src_bytes))
+                || !is_valid_addr_range(mem, dst_addr, static_cast<Address>(dst_addr + dst_bytes)))) {
+            LOG_WARN_ONCE("[XFER] downscale skipped: src 0x{:08X}+{} or dst 0x{:08X}+{} is not fully allocated guest memory",
+                src_addr, src_bytes, dst_addr, dst_bytes);
+            delete src;
+            delete dst;
+            return;
+        }
+
+        constexpr uint32_t sws_input_padding = 64;
+        std::vector<uint8_t> src_staging, dst_staging;
+        uint8_t *src_ptr = nullptr;
+        uint8_t *dst_ptr = nullptr;
+        if (can_stage) {
+            src_staging.assign(static_cast<size_t>(src_bytes) + sws_input_padding, 0);
+            memcpy_from_guest(mem, src_staging.data(), src_addr, static_cast<uint32_t>(src_bytes));
+            // read-modify-write: whatever the scaler does not touch (inter-row padding) must survive
+            dst_staging.resize(static_cast<size_t>(dst_bytes));
+            memcpy_from_guest(mem, dst_staging.data(), dst_addr, static_cast<uint32_t>(dst_bytes));
+            src_ptr = src_staging.data();
+            dst_ptr = dst_staging.data();
+        } else {
+            src_ptr = src->address.cast<uint8_t>().get(mem);
+            dst_ptr = dst->address.cast<uint8_t>().get(mem);
+        }
 
         if (pixel_fmt != AV_PIX_FMT_NONE && src->stride > 0 && dst->stride > 0) {
             // use ffmpeg with the avg filter
@@ -301,7 +341,11 @@ COMMAND(handle_transfer_downscale) {
             if (ctx == nullptr) {
                 LOG_ERROR("Failed to get ffmpeg context for format 0x{:0X}", fmt::underlying(src->format));
             } else {
-                sws_scale(ctx, &src_ptr, &src->stride, 0, src->height, &dst_ptr, &dst->stride);
+                const uint8_t *const src_planes[4] = { src_ptr, nullptr, nullptr, nullptr };
+                uint8_t *const dst_planes[4] = { dst_ptr, nullptr, nullptr, nullptr };
+                const int src_strides[4] = { src->stride, 0, 0, 0 };
+                const int dst_strides[4] = { dst->stride, 0, 0, 0 };
+                sws_scale(ctx, src_planes, src_strides, 0, src->height, dst_planes, dst_strides);
                 sws_freeContext(ctx);
             }
 
@@ -339,18 +383,32 @@ COMMAND(handle_transfer_downscale) {
             }
         }
 
+        if (can_stage)
+            memcpy_to_guest(mem, dst_addr, dst_staging.data(), static_cast<uint32_t>(dst_bytes));
+
         delete src;
         delete dst;
     };
 
+    const auto log_src = *src;
+    const auto log_dst = *dst;
+
+    bool gpu_path = false;
     if (renderer.current_backend == Backend::Vulkan && renderer.features.enable_memory_mapping && !renderer.disable_surface_sync) {
         // src->address has already been adjusted to the first read byte above
-        const uint32_t src_read_size = src->stride * src->height;
-        const uint32_t dst_write_size = dst->stride * dst->height;
-        if (dynamic_cast<vulkan::VKState &>(renderer).surface_cache.check_for_surface(mem, src->address.address(), downscale_operation, dst->address.address() /*, src_read_size, dst_write_size*/))
-            // let the vulkan surface cache handle it
-            return;
+        gpu_path = dynamic_cast<vulkan::VKState &>(renderer).surface_cache.check_for_surface(mem, src->address.address(), downscale_operation, dst->address.address(), static_cast<uint32_t>(std::min<uint64_t>(transfer_region_bytes(*src, pixel_bytes), UINT32_MAX)));
     }
+
+    static std::atomic<uint32_t> downscales{ 0 };
+    const uint32_t n = downscales.fetch_add(1, std::memory_order_relaxed) + 1;
+    if (n <= 4 || (n & 1023) == 0)
+        LOG_INFO("[XFER] downscale #{}: fmt 0x{:X} src 0x{:08X} (surface base 0x{:08X}) xy=({},{}) {}x{} stride {} -> dst 0x{:08X} xy=({},{}) {}x{} stride {} | {}",
+            n, fmt::underlying(log_src.format), log_src.address.address(), src_surface_base, log_src.x, log_src.y, log_src.width, log_src.height, log_src.stride,
+            log_dst.address.address(), log_dst.x, log_dst.y, log_dst.width, log_dst.height, log_dst.stride, gpu_path ? "GPU surface path" : "CPU path (staged)");
+
+    if (gpu_path)
+        // let the vulkan surface cache handle it
+        return;
 
     downscale_operation();
 }

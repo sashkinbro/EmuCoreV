@@ -161,6 +161,9 @@ private:
         if (repeat_mode == RepeatMode::EXTERNAL && bank != RegisterBank::FPINTERNAL) {
             return repeat_index * 4;
         }
+        if (repeat_mode == RepeatMode::EXTERNAL) {
+            return repeat_index;
+        }
         if (repeat_mode == RepeatMode::SLMSI) {
             auto inc = repeat_increase[op.index][repeat_index];
 
