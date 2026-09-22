@@ -333,8 +333,20 @@ static void bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
 
 void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format,
     Ptr<void> indices, size_t count, uint32_t instance_count, MemState &mem, const Config &config) {
+    // A save-state load can leave the record pointing at a program whose guest
+    // memory was freed: skip such draws instead of dereferencing garbage.
+    const SceGxmFragmentProgram *frag_program = context.record.fragment_program.get(mem);
+    const SceGxmVertexProgram *vert_program = context.record.vertex_program.get(mem);
+    if (!frag_program || !frag_program->renderer_data || !vert_program || !vert_program->renderer_data) {
+        static std::atomic<uint64_t> diag_dropped{ 0 };
+        const uint64_t n = diag_dropped.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (n <= 8 || (n % 256) == 0)
+            LOG_CRITICAL("[savestate-diag] draw dropped: frag={} vert={} (total {})", fmt::ptr(frag_program), fmt::ptr(vert_program), n);
+        return;
+    }
+
     // the mask bit is not emulated here, so a mask-update program would just paint writing_mask over the whole target (gl/draw.cpp skips these too)
-    if (!context.state.features.use_mask_bit && context.record.fragment_program.get(mem)->is_maskupdate)
+    if (!context.state.features.use_mask_bit && frag_program->is_maskupdate)
         return;
 
     // DOA5 black clothes fix:

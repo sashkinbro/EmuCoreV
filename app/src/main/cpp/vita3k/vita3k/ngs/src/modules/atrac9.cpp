@@ -99,6 +99,14 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
 
     if (state->current_byte_position_in_buffer >= bufparam.bytes_count) {
         const int32_t prev_index = state->current_buffer;
+        {
+            static std::atomic<uint64_t> diag_wraps{ 0 };
+            const uint64_t n = diag_wraps.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (n <= 8 || (n % 256) == 0)
+                LOG_CRITICAL("[savestate-ngs] AT9 buffer wrap voice={} buf={} loop_count={} loop_now={} next={} bytes={} total_wraps={}",
+                    fmt::ptr(data.parent), state->current_buffer, bufparam.loop_count, logical->current_loop_count,
+                    bufparam.next_buffer_index, bufparam.bytes_count, n);
+        }
 
         voice_lock.unlock();
         scheduler_lock.unlock();
@@ -286,6 +294,13 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
         else
             logical->diag_silent_streak = 0;
         {
+            static std::atomic<uint64_t> diag_sf_total{ 0 };
+            const uint64_t sf_total = diag_sf_total.fetch_add(1, std::memory_order_relaxed) + 1;
+            if ((sf_total % 8192) == 0)
+                LOG_CRITICAL("[savestate-ngs] AT9 superframes total={} voice_sf={} peak={:.4f} silent_streak={} staged={} err={}",
+                    sf_total, logical->diag_superframes, sf_peak, logical->diag_silent_streak, diag_staged ? 1 : 0, got_decode_error ? 1 : 0);
+        }
+        {
             auto &r = logical->diag_ring[logical->diag_ring_next++ % 16];
             r = { logical->diag_superframes, state->current_byte_position_in_buffer, state->current_buffer,
                 static_cast<uint8_t>(diag_staged ? 1 : 0), diag_in_head, sf_peak };
@@ -381,6 +396,16 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
 }
 
 bool Atrac9Module::process(KernelState &kern, const MemState &mem, const SceUID thread_id, ModuleData &data, std::unique_lock<std::recursive_mutex> &scheduler_lock, std::unique_lock<std::mutex> &voice_lock) {
+    {
+        static std::atomic<uint64_t> diag_process_calls{ 0 };
+        const uint64_t n = diag_process_calls.fetch_add(1, std::memory_order_relaxed) + 1;
+        if ((n % 4096) == 0)
+            LOG_CRITICAL("[savestate-ngs] AT9 process calls={} thread={}", n, thread_id);
+    }
+    // Restored voices are not decoded until the game re-arms them.
+    if (data.needs_reinit)
+        return true;
+
     const SceNgsAT9Params *params = data.get_parameters<SceNgsAT9Params>(mem);
     SceNgsAT9States *state = data.get_state<SceNgsAT9States>();
     Atrac9LogicalState *logical = data.get_logical_state<Atrac9LogicalState>();
@@ -453,6 +478,111 @@ bool Atrac9Module::process(KernelState &kern, const MemState &mem, const SceUID 
     }
 
     return is_finished;
+}
+
+void Atrac9Module::capture_logical_state(ModuleData &data, std::vector<uint8_t> &out) const {
+    Atrac9LogicalState *logical = static_cast<Atrac9LogicalState *>(data.logical_state.get());
+    if (!logical) {
+        out.clear();
+        return;
+    }
+
+    std::vector<uint8_t> buffer;
+    auto append = [&buffer](const void *src, size_t size) {
+        const size_t old = buffer.size();
+        buffer.resize(old + size);
+        std::memcpy(buffer.data() + old, src, size);
+    };
+    auto append_u32 = [&append](uint32_t value) { append(&value, sizeof(value)); };
+    auto append_u8 = [&append](uint8_t value) { append(&value, sizeof(value)); };
+    auto append_blob = [&append, &append_u32](const void *src, size_t size) {
+        append_u32(static_cast<uint32_t>(size));
+        if (size)
+            append(src, size);
+    };
+    auto append_pcm_queue = [&append_u32, &append_blob](const PCMFrameQueue &queue) {
+        append_u32(queue.read_offset_frames);
+        append_blob(queue.samples.data(), queue.samples.size() * sizeof(float));
+    };
+
+    append_u32(logical->decoder_config);
+    append(&logical->saved_state, sizeof(logical->saved_state));
+    append_u8(static_cast<uint8_t>(logical->current_loop_count));
+    append_u8(static_cast<uint8_t>(logical->starved_ticks));
+    append_u8(logical->in_underrun_wait ? 1 : 0);
+    append_blob(logical->superframe_staging.data(), logical->superframe_staging.size());
+    append_pcm_queue(logical->decoded_pcm);
+    append_pcm_queue(logical->rate_resampler.input_history);
+    append_u8(logical->rate_resampler.needs_reset ? 1 : 0);
+
+    out = std::move(buffer);
+}
+
+void Atrac9Module::restore_logical_state(ModuleData &data, const std::vector<uint8_t> &in) const {
+    Atrac9LogicalState *logical = static_cast<Atrac9LogicalState *>(data.logical_state.get());
+    if (!logical || in.empty())
+        return;
+
+    size_t offset = 0;
+    auto read_bytes = [&in, &offset](void *dst, size_t size) {
+        if (offset + size > in.size())
+            return false;
+        std::memcpy(dst, in.data() + offset, size);
+        offset += size;
+        return true;
+    };
+    auto read_u32 = [&read_bytes](uint32_t &value) { return read_bytes(&value, sizeof(value)); };
+    auto read_u8 = [&read_bytes](uint8_t &value) { return read_bytes(&value, sizeof(value)); };
+    auto read_blob = [&in, &offset](std::vector<uint8_t> &dst, size_t element_size) {
+        uint32_t size = 0;
+        if (offset + sizeof(size) > in.size())
+            return false;
+        std::memcpy(&size, in.data() + offset, sizeof(size));
+        offset += sizeof(size);
+        if (offset + size > in.size() || (element_size && (size % element_size) != 0))
+            return false;
+        dst.resize(size);
+        if (size)
+            std::memcpy(dst.data(), in.data() + offset, size);
+        offset += size;
+        return true;
+    };
+    auto read_pcm_queue = [&read_u32, &read_blob](PCMFrameQueue &queue) {
+        std::vector<uint8_t> samples;
+        if (!read_u32(queue.read_offset_frames) || !read_blob(samples, sizeof(float)))
+            return false;
+        queue.samples.resize(samples.size() / sizeof(float));
+        if (!samples.empty())
+            std::memcpy(queue.samples.data(), samples.data(), samples.size());
+        return true;
+    };
+
+    uint32_t decoder_config = 0;
+    uint8_t loop_count = 0;
+    uint8_t starved_ticks = 0;
+    uint8_t in_underrun = 0;
+    uint8_t needs_reset = 0;
+    if (!read_u32(decoder_config) ||
+        !read_bytes(&logical->saved_state, sizeof(logical->saved_state)) ||
+        !read_u8(loop_count) ||
+        !read_u8(starved_ticks) ||
+        !read_u8(in_underrun) ||
+        !read_blob(logical->superframe_staging, 1) ||
+        !read_pcm_queue(logical->decoded_pcm) ||
+        !read_pcm_queue(logical->rate_resampler.input_history) ||
+        !read_u8(needs_reset)) {
+        return;
+    }
+
+    logical->decoder_config = decoder_config;
+    logical->current_loop_count = static_cast<int8_t>(loop_count);
+    logical->starved_ticks = static_cast<int8_t>(starved_ticks);
+    logical->in_underrun_wait = in_underrun != 0;
+    logical->rate_resampler.needs_reset = needs_reset != 0;
+    // The runtime decoder is rebuilt on demand from decoder_config + saved_state.
+    if (auto *runtime = static_cast<Atrac9RuntimeState *>(data.runtime_state.get())) {
+        runtime->decoder.reset();
+    }
 }
 
 void Atrac9Module::free_swr_contexts() {

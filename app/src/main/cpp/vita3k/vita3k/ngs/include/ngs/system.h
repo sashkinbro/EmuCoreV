@@ -155,6 +155,11 @@ struct ModuleData {
 
     bool is_bypassed;
 
+    // Set for voices rebuilt by a save-state load: the guest parameters may not
+    // match the freshly created host state, so processing is skipped until the
+    // game changes the voice state (key-on / params) again.
+    bool needs_reinit = false;
+
     std::vector<uint8_t> guest_state_data; ///< guest-visible voice state
     std::vector<uint8_t> scratch_data; ///< temp local data storage for module
     std::unique_ptr<ModuleLogicalState> logical_state; ///< non-guest state needed to resume processing later
@@ -237,6 +242,10 @@ public:
     virtual void on_param_change(const MemState &mem, ModuleData &data) {}
     virtual void on_key_on(const MemState &mem, ModuleData &data) {}
     virtual void cleanup_voice_state(ModuleData &data) {}
+
+    /// Save-state support: opaque serialization of the module logical state.
+    virtual void capture_logical_state(ModuleData &data, std::vector<uint8_t> &out) const {}
+    virtual void restore_logical_state(ModuleData &data, const std::vector<uint8_t> &in) const {}
 
     virtual void initialize_voice_data(ModuleData &data) const {
         const uint32_t guest_state_size = get_guest_state_size();

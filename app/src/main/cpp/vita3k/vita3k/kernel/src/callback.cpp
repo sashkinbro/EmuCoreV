@@ -98,6 +98,22 @@ void Callback::execute(KernelState &kernel, const std::function<void()> &deleter
     this->reset(); // Callbacks return to their default state after running
 }
 
+Callback::Snapshot Callback::capture_snapshot() {
+    std::lock_guard lock(this->_mutex);
+    Snapshot snapshot;
+    snapshot.num_notifications = num_notifications;
+    snapshot.notification_arg = notification_arg;
+    snapshot.notifier_id = notifier_id;
+    return snapshot;
+}
+
+void Callback::apply_snapshot(const Snapshot &snapshot) {
+    std::lock_guard lock(this->_mutex);
+    this->num_notifications = snapshot.num_notifications;
+    this->notification_arg = snapshot.notification_arg;
+    this->notifier_id = snapshot.notifier_id;
+}
+
 /** Private methods **/
 
 /**

@@ -268,7 +268,9 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
         if (!state.set_current())
             break;
 
+        state.render_phase.store(1, std::memory_order_relaxed);
         process_batches(state, state.features, mem, config, 500);
+        state.render_phase.store(0, std::memory_order_relaxed);
 
         if (state.render_abort.load(std::memory_order_relaxed))
             break;
@@ -295,8 +297,14 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
         }
         const bool should_present = frame_limit <= 0 || now >= next_presentation;
         if (should_present) {
+            state.render_phase.store(2, std::memory_order_relaxed);
             state.render_frame(display, gxm, mem);
+            state.render_phase.store(3, std::memory_order_relaxed);
             state.swap_window();
+            state.render_phase.store(0, std::memory_order_relaxed);
+            static std::atomic<uint32_t> present_count{ 0 };
+            if ((present_count.fetch_add(1, std::memory_order_relaxed) + 1) % 120 == 1)
+                LOG_CRITICAL("[fliptrace] renderer presented frame #{} should_display={} next_base=0x{:X}", present_count.load(), state.should_display, display.next_rendered_frame.base.address());
             if (frame_limit > 0) {
                 const auto interval = std::chrono::nanoseconds(1'000'000'000LL / frame_limit);
                 next_presentation += interval;

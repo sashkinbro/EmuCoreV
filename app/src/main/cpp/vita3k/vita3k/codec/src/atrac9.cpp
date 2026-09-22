@@ -39,6 +39,8 @@ struct FFMPEGAtrac9Info {
 
 uint32_t Atrac9DecoderState::get(DecoderQuery query) {
     Atrac9CodecInfo *info = static_cast<Atrac9CodecInfo *>(atrac9_info);
+    if (!valid)
+        return 0;
 
     switch (query) {
     case DecoderQuery::CHANNELS: return info->channels;
@@ -58,6 +60,8 @@ uint32_t Atrac9DecoderState::get_es_size() {
 }
 
 void Atrac9DecoderState::flush() {
+    if (!valid)
+        return;
     Atrac9CodecInfo *info = static_cast<Atrac9CodecInfo *>(atrac9_info);
     superframe_frame_idx = 0;
     superframe_data_left = info->superframeSize;
@@ -71,6 +75,8 @@ void Atrac9DecoderState::flush() {
 }
 
 void Atrac9DecoderState::export_state(Atrac9DecoderSavedState *dest) {
+    if (!valid)
+        return;
     Frame &frame = static_cast<Atrac9Handle *>(decoder_handle)->Frame;
     if (frame.Channels[0])
         std::copy_n(frame.Channels[0]->Mdct.ImdctPrevious, 256, dest->prev_values[0]);
@@ -79,6 +85,8 @@ void Atrac9DecoderState::export_state(Atrac9DecoderSavedState *dest) {
 }
 
 void Atrac9DecoderState::load_state(const Atrac9DecoderSavedState *src) {
+    if (!valid)
+        return;
     Frame &frame = static_cast<Atrac9Handle *>(decoder_handle)->Frame;
     if (frame.Channels[0])
         std::copy_n(src->prev_values[0], 256, frame.Channels[0]->Mdct.ImdctPrevious);
@@ -87,6 +95,8 @@ void Atrac9DecoderState::load_state(const Atrac9DecoderSavedState *src) {
 }
 
 bool Atrac9DecoderState::send(const uint8_t *data, uint32_t size) {
+    if (!valid)
+        return false;
     Atrac9CodecInfo *info = static_cast<Atrac9CodecInfo *>(atrac9_info);
 
     int decode_used = 0;
@@ -122,6 +132,8 @@ bool Atrac9DecoderState::send(const uint8_t *data, uint32_t size) {
 }
 
 bool Atrac9DecoderState::receive(uint8_t *data, DecoderSize *size) {
+    if (!valid)
+        return false;
     Atrac9CodecInfo *info = static_cast<Atrac9CodecInfo *>(atrac9_info);
 
     if (data) {
@@ -139,8 +151,9 @@ Atrac9DecoderState::Atrac9DecoderState(uint32_t config_data)
     : config_data(config_data) {
     decoder_handle = Atrac9GetHandle();
     const int err = Atrac9InitDecoder(decoder_handle, reinterpret_cast<uint8_t *>(&config_data));
+    valid = (err == At9Status::ERR_SUCCESS);
 
-    if (err != At9Status::ERR_SUCCESS) {
+    if (!valid) {
         LOG_ERROR("Error initializing decoder. Error code: {}", log_hex(err));
     }
 

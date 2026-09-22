@@ -832,6 +832,13 @@ void GLState::precompile_shader(const ShadersHash &hash) {
 
 void GLState::preclose_action() {}
 
+void GLState::reset_caches() {
+    if (!set_current())
+        return;
+    texture_cache.cleanup();
+    surface_cache.cleanup();
+}
+
 void GLState::cleanup() {
     set_current();
 

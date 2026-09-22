@@ -111,6 +111,14 @@ struct Callback {
      */
     void execute(KernelState &kernel, const std::function<void()> &deleter);
 
+    struct Snapshot {
+        uint32_t num_notifications = 0;
+        SceInt32 notification_arg = 0;
+        SceUID notifier_id = SCE_UID_INVALID_UID;
+    };
+    Snapshot capture_snapshot();
+    void apply_snapshot(const Snapshot &snapshot);
+
 private:
     void reset();
     bool is_notified() const;

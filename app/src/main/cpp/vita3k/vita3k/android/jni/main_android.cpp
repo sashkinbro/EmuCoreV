@@ -23,6 +23,7 @@
 #include <config/settings.h>
 #include <ctrl/functions.h>
 #include <dialog/state.h>
+#include <emucorev/savestate/savestate.h>
 #include <ime/functions.h>
 #include <ime/keyboard.h>
 #include <io/state.h>
@@ -246,10 +247,14 @@ extern "C" {
 // argv is populated from Emulator.getArguments(), e.g. {"-r", "PCSE00000"}.
 SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
     std::string title_id;
+    std::string load_state_path;
     for (int i = 0; i < argc; i++) {
         if (std::string(argv[i]) == "-r" && i + 1 < argc) {
             title_id = argv[i + 1];
-            break;
+            i++;
+        } else if (std::string(argv[i]) == "-loadstate" && i + 1 < argc) {
+            load_state_path = argv[i + 1];
+            i++;
         }
     }
 
@@ -459,6 +464,17 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
             exit_code = -1;
             cleanup_launch(app::AppSessionStopReason::LaunchFailure);
             break;
+        }
+
+        if (!load_state_path.empty()) {
+            LOG_CRITICAL("[savestate-error] launch: applying state {}", load_state_path);
+            const auto state_result = emucorev::savestate::load_state(*emuenv, load_state_path, true);
+            if (state_result.ok()) {
+                LOG_INFO("Loaded save state from {}", load_state_path);
+            } else {
+                LOG_ERROR("Failed to load save state {}: {}", load_state_path, state_result.error);
+            }
+            LOG_CRITICAL("[savestate-error] launch: state apply finished ok={}", state_result.ok());
         }
 
         if (auto request = emuenv->take_app_launch_request())

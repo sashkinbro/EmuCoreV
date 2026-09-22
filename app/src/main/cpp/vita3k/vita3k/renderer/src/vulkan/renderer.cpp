@@ -1952,6 +1952,29 @@ void VKState::trim_native_buffer_cache(uint64_t budget) {
 }
 #endif
 
+void VKState::reset_caches() {
+    texture_cache.reset();
+    surface_cache.reset();
+}
+
+void VKState::flush_surfaces(MemState &mem) {
+    surface_cache.flush_all_surfaces(mem);
+}
+
+void VKState::wait_gpu_idle() {
+    device.waitIdle();
+
+    auto promise = std::make_shared<std::promise<void>>();
+    std::future<void> future = promise->get_future();
+    request_queue.push(CallbackRequest{
+        new CallbackRequestFunction([promise]() { promise->set_value(); }), /* wait_for_gpu = */ false });
+
+    while (future.wait_for(std::chrono::milliseconds(5)) != std::future_status::ready) {
+        if (request_queue.is_aborted())
+            return;
+    }
+}
+
 void VKState::unmap_memory(MemState &mem, Ptr<void> address) {
     assert(features.enable_memory_mapping);
 

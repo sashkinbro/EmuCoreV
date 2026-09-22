@@ -243,6 +243,11 @@ static Address alloc_inner(MemState &state, uint32_t start_page, uint32_t page_c
         state.page_name_map.emplace(page_num, name);
     }
 
+    // [savestate-diag] watch the streaming buffer ranges
+    if ((page_num <= 0x86064 && page_num + page_count > 0x86064) ||
+        (page_num <= 0x857a4 && page_num + page_count > 0x857a4))
+        LOG_CRITICAL("[savestate-diag] alloc name={} addr=0x{:X} pages={}", name ? name : "?", addr, page_count);
+
     return addr;
 }
 
@@ -707,6 +712,11 @@ void free(MemState &state, Address address) {
         return;
     }
     page.allocated = 0;
+
+    // [savestate-diag] watch the streaming buffer ranges
+    if ((page_num <= 0x86064 && page_num + page.size > 0x86064) ||
+        (page_num <= 0x857a4 && page_num + page.size > 0x857a4))
+        LOG_CRITICAL("[savestate-diag] free addr=0x{:X} pages={}", address, static_cast<uint32_t>(page.size));
 
     state.allocator.free(page_num, page.size);
     if (PAGE_NAME_TRACKING) {

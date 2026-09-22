@@ -78,14 +78,55 @@ COMMAND_SET_STATE(region_clip) {
     }
 }
 
+// A guest program struct can go stale after a save-state load: the memory may
+// have been freed and reused, leaving garbage in the struct. Validate the
+// fields the renderer is about to dereference.
+static bool is_sane_fragment_program(const MemState &mem, const SceGxmFragmentProgram *program) {
+    if (!program || !program->renderer_data)
+        return false;
+    const uint32_t refs = program->reference_count.load();
+    if (refs == 0 || refs > 100000)
+        return false;
+    const SceGxmProgram *gxp = program->program.get(mem);
+    return gxp && gxp->magic == 0x00505847; // "GXP\0"
+}
+
+static bool is_sane_vertex_program(const MemState &mem, const SceGxmVertexProgram *program) {
+    if (!program || !program->renderer_data)
+        return false;
+    const uint32_t refs = program->reference_count.load();
+    if (refs == 0 || refs > 100000)
+        return false;
+    const SceGxmProgram *gxp = program->program.get(mem);
+    return gxp && gxp->magic == 0x00505847 && gxp->is_vertex();
+}
+
 COMMAND_SET_STATE(program) {
     TRACY_FUNC_COMMANDS_SET_STATE(program);
     const Ptr<void> program = helper.pop<Ptr<void>>();
     const bool is_fragment = helper.pop<bool>();
 
     if (is_fragment) {
+        const SceGxmFragmentProgram *gxm_program = program.cast<SceGxmFragmentProgram>().get(mem);
+        if (!is_sane_fragment_program(mem, gxm_program)) {
+            static std::atomic<uint64_t> diag_missing{ 0 };
+            const uint64_t n = diag_missing.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (n <= 8 || (n % 256) == 0)
+                LOG_CRITICAL("[savestate-diag] set_state_program: fragment program {:#x} rejected (struct={}, program_field={:#x}, refs={}, total {})",
+                    program.address(), fmt::ptr(gxm_program), gxm_program ? gxm_program->program.address() : 0,
+                    gxm_program ? gxm_program->reference_count.load() : 0, n);
+            return;
+        }
         render_context->record.fragment_program = program.cast<SceGxmFragmentProgram>();
-        const SceGxmFragmentProgram *gxm_program = render_context->record.fragment_program.get(mem);
+        {
+            static Address diag_last_addr = 0;
+            if (program.address() != diag_last_addr) {
+                diag_last_addr = program.address();
+                LOG_CRITICAL("[savestate-diag] cmd frag program switch addr={:#x} program_field={:#x} rd={} refs={} maskupdate={}",
+                    program.address(), gxm_program->program.address(), fmt::ptr(gxm_program->renderer_data.get()),
+                    gxm_program->reference_count.load(), gxm_program->is_maskupdate);
+            }
+        }
         render_context->record.fragment_program_hash = gxm_program->renderer_data->hash;
         render_context->record.is_maskupdate = gxm_program->is_maskupdate;
 
@@ -102,9 +143,18 @@ COMMAND_SET_STATE(program) {
             break;
         }
     } else {
+        const SceGxmVertexProgram *gxm_program = program.cast<SceGxmVertexProgram>().get(mem);
+        if (is_sane_vertex_program(mem, gxm_program))
+            render_context->record.vertex_program_hash = gxm_program->renderer_data->hash;
+        else {
+            static std::atomic<uint64_t> diag_missing_vert{ 0 };
+            const uint64_t n = diag_missing_vert.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (n <= 8 || (n % 256) == 0)
+                LOG_CRITICAL("[savestate-diag] set_state_program: vertex program {:#x} rejected (struct={}, total {})",
+                    program.address(), fmt::ptr(gxm_program), n);
+            return;
+        }
         render_context->record.vertex_program = program.cast<SceGxmVertexProgram>();
-        const SceGxmVertexProgram *gxm_program = render_context->record.vertex_program.get(mem);
-        render_context->record.vertex_program_hash = gxm_program->renderer_data->hash;
     }
 
     if (renderer.current_backend == Backend::Vulkan) {
@@ -119,8 +169,18 @@ COMMAND_SET_STATE(uniform_buffer) {
     const int block_num = helper.pop<int>();
     const std::uint32_t size = helper.pop<std::uint32_t>();
 
-    renderer::ShaderProgram *program = is_vertex ? reinterpret_cast<ShaderProgram *>(render_context->record.vertex_program.get(mem)->renderer_data.get())
-                                                 : reinterpret_cast<ShaderProgram *>(render_context->record.fragment_program.get(mem)->renderer_data.get());
+    ShaderProgram *program = nullptr;
+    if (is_vertex) {
+        const SceGxmVertexProgram *gxm_program = render_context->record.vertex_program.get(mem);
+        if (gxm_program)
+            program = reinterpret_cast<ShaderProgram *>(gxm_program->renderer_data.get());
+    } else {
+        const SceGxmFragmentProgram *gxm_program = render_context->record.fragment_program.get(mem);
+        if (gxm_program)
+            program = reinterpret_cast<ShaderProgram *>(gxm_program->renderer_data.get());
+    }
+    if (!program || !data)
+        return;
 
     switch (renderer.current_backend) {
     case Backend::OpenGL:

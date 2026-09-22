@@ -44,6 +44,10 @@ struct CPUContext {
     std::array<float, 64> fpu_registers{};
     uint32_t cpsr = 0;
     uint32_t fpscr = 0;
+    // CP15 state used for save states; tpidruro is guest-visible thread-local storage.
+    uint32_t tpidruro = 0;
+    uint32_t sctlr = 0;
+    uint32_t dacr = 0;
 
     bool thumb() const {
         return cpsr & 0x20;

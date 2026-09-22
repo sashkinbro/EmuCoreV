@@ -197,6 +197,47 @@ ThreadStatePtr KernelState::create_thread(MemState &mem, const char *name, Ptr<c
     return thread;
 }
 
+ThreadStatePtr KernelState::create_thread_from_snapshot(MemState &mem, const ThreadState::Snapshot &snapshot, bool defer_start) {
+    ThreadStatePtr thread = std::make_shared<ThreadState>(snapshot.id, *this, mem);
+
+    thread->name = snapshot.name;
+    thread->entry_point = snapshot.entry_point;
+    thread->stack_size = snapshot.stack_size;
+    if (snapshot.stack_addr)
+        thread->stack = Block(snapshot.stack_addr, [&mem](Address addr) { free(mem, addr); });
+    if (snapshot.tls_addr)
+        thread->tls = Block(snapshot.tls_addr, [&mem](Address addr) { free(mem, addr); });
+    thread->priority = snapshot.priority;
+    thread->affinity_mask = snapshot.affinity_mask;
+    thread->start_tick = snapshot.start_tick;
+    thread->last_vblank_waited = snapshot.last_vblank_waited;
+    thread->status = ThreadStatus::dormant;
+    thread->returned_value = snapshot.returned_value;
+
+    thread->cpu = init_cpu(cpu_opt, snapshot.id, corenum_allocator.new_corenum(), mem);
+    if (!thread->cpu)
+        return nullptr;
+
+    if (!defer_start)
+        thread->apply_private_snapshot(snapshot);
+
+    {
+        const std::lock_guard<std::mutex> lock(mutex);
+        threads.emplace(thread->id, thread);
+    }
+
+    ThreadParams params;
+    params.kernel = this;
+    params.thid = thread->id;
+
+    params.host_may_destroy_params = SDL_CreateSemaphore(0);
+    SDL_DetachThread(SDL_CreateThread(&thread_function, thread->name.c_str(), &params));
+    SDL_WaitSemaphore(params.host_may_destroy_params);
+    SDL_DestroySemaphore(params.host_may_destroy_params);
+
+    return thread;
+}
+
 Ptr<Ptr<void>> KernelState::get_thread_tls_addr(MemState &mem, SceUID thread_id, int key) {
     Ptr<Ptr<void>> address(0);
     // magic numbers taken from decompiled source. There is 0x400 unused bytes of unknown usage
@@ -243,6 +284,16 @@ void KernelState::resume_threads() {
             thread->resume();
     }
     paused_threads_status.clear();
+}
+
+void KernelState::clear_paused_threads_state() {
+    const std::lock_guard<std::mutex> lock(mutex);
+    paused_threads_status.clear();
+}
+
+void KernelState::reset_world_stop_state() {
+    const std::lock_guard<std::mutex> lock(mutex);
+    world_stopped_threads.clear();
 }
 
 int KernelState::stop_world(SceUID except_id, std::chrono::milliseconds budget) {

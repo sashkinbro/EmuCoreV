@@ -163,6 +163,8 @@ EXPORT(SceInt32, _sceDisplaySetFrameBuf, const SceDisplayFrameBuf *pFrameBuf, Sc
     if (nflip <= 8)
         LOG_INFO("[FLIPTRACE] flip #{}: base=0x{:X} {}x{} pitch={} sync={} at vblank {}", nflip, pFrameBuf->base.address(),
             pFrameBuf->width, pFrameBuf->height, pFrameBuf->pitch, static_cast<int>(sync), emuenv.display.vblank_count.load());
+    if (nflip % 120 == 1)
+        LOG_CRITICAL("[fliptrace] accepting flip #{}: base=0x{:X} vblank={} predicting={}", nflip, pFrameBuf->base.address(), emuenv.display.vblank_count.load(), emuenv.display.predicting.load());
 
 #ifdef TRACY_ENABLE
     FrameMarkNamed("SCE frame buffer"); // Tracy - Secondary frame end mark for the emulated frame buffer

@@ -60,6 +60,14 @@ struct ThreadSignal {
     void wait();
     bool send();
 
+    bool is_signaled() const {
+        return signaled;
+    }
+
+    void set_signaled(bool value) {
+        signaled = value;
+    }
+
 private:
     std::mutex mutex;
     std::condition_variable recv_cond;
@@ -137,6 +145,52 @@ struct ThreadState {
     bool resume_from_world();
 
     std::string log_stack_traceback() const;
+
+    // Plain-data view of this thread used by the save-state writer/reader.
+    struct Snapshot {
+        SceUID id = 0;
+        std::string name;
+        Address entry_point = 0;
+        Address stack_addr = 0;
+        int stack_size = 0;
+        Address tls_addr = 0;
+        int priority = 0;
+        SceInt32 affinity_mask = 0;
+        uint64_t start_tick = 0;
+        uint64_t last_vblank_waited = 0;
+        ThreadStatus status = ThreadStatus::dormant;
+        uint32_t returned_value = 0;
+        CPUContext context;
+        CPUContext init_context;
+
+        enum class WaitKind : uint8_t {
+            none = 0,
+            event,
+            mutex,
+            sema,
+            cond,
+            evf,
+            other,
+        };
+        WaitKind wait_kind = WaitKind::none;
+        SceUID wait_prim_uid = 0;
+        uint32_t wait_extra = 0;
+
+        bool signal_pending = false;
+        bool exit_requested = false;
+        bool delete_requested = false;
+        bool vm_suspended = false;
+        bool single_stepping = false;
+        bool run_start_callback = false;
+        bool run_end_callback = false;
+        bool is_processing_callbacks = false;
+        int call_level = 0;
+        std::vector<SceUID> callback_uids;
+        std::vector<SceUID> waiting_thread_uids;
+    };
+
+    Snapshot capture_snapshot() const;
+    void apply_private_snapshot(const Snapshot &snapshot);
 
 private:
     void push_arguments(const std::vector<uint32_t> &args);

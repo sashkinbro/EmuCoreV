@@ -56,6 +56,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ConfirmationNumber
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Save
@@ -144,6 +145,7 @@ fun GameDetailScreen(
     igdbId: Long?,
     onBack: () -> Unit,
     onOpenSaveManager: (String) -> Unit = {},
+    onOpenSaveStates: (String) -> Unit = {},
     onInstallDlc: (String) -> Unit = {},
     viewModel: GameDetailViewModel = viewModel()
 ) {
@@ -160,6 +162,7 @@ fun GameDetailScreen(
     val deleteGameLabel = stringResource(R.string.detail_delete_game)
     val installDlcLabel = stringResource(R.string.detail_install_dlc)
     val manageSaveDataLabel = stringResource(R.string.save_manager_open_for_game)
+    val manageSaveStatesLabel = stringResource(R.string.savestate_manager_open_for_game)
     val deleteGameConfirmTitle = stringResource(R.string.detail_delete_game_confirm_title)
     val deleteGameConfirmBody = stringResource(R.string.detail_delete_game_confirm_body)
     val deleteGameFailedMessage = stringResource(R.string.detail_delete_game_failed)
@@ -231,6 +234,19 @@ fun GameDetailScreen(
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Rounded.Save,
+                                    contentDescription = null
+                                )
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(manageSaveStatesLabel) },
+                            onClick = {
+                                showOverflowMenu = false
+                                onOpenSaveStates(game.titleId)
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.History,
                                     contentDescription = null
                                 )
                             }

@@ -303,6 +303,12 @@ private:
     void submit_immediate_surface_sync(ColorSurfaceCacheInfo &surface, MemState *mem, Address sync_addr = 0, uint32_t sync_size = 0);
 
 public:
+    // destroys every cached surface/framebuffer and clears the host-side tables
+    void reset();
+
+    // write back every cached surface's GPU content into guest RAM (save states)
+    void flush_all_surfaces(MemState &mem);
+
     // fold the scene's drawn rect into the current colour surface's written region
     void note_scene_draw_rect(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
 

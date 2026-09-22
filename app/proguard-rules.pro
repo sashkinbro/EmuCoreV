@@ -21,6 +21,9 @@
 # cheat manager ViewModel is created reflectively by the ViewModel factory.
 -keep class com.sbro.emucorev.core.CheatBridge { *; }
 -keep class com.sbro.emucorev.ui.cheats.CheatManagerViewModel { *; }
+# Save-state JNI bridge resolves its entry points by symbol name.
+-keep class com.sbro.emucorev.core.SaveStateBridge { *; }
+-keep class com.sbro.emucorev.ui.savestates.SaveStatesViewModel { *; }
 # Bundled SDL/HID classes live in org.libsdl.app to match SDL's own JNI
 # expectations. SDL_android.c looks them up by FQN via FindClass at JNI_OnLoad
 # and SDL3 callbacks resolve their static methods by name through reflection.

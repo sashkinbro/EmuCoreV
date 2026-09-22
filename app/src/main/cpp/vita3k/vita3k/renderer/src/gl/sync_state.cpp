@@ -283,6 +283,10 @@ void sync_depth_bias(const int factor, const int unit, const bool is_front) {
 
 void sync_texture(GLState &state, GLContext &context, MemState &mem, std::size_t index, SceGxmTexture texture,
     const Config &config) {
+    // A save-state load can resume mid-scene with no render target yet.
+    if (!context.current_render_target)
+        return;
+
     Address data_addr = texture.data_addr << 2;
 
     if (!is_valid_addr(mem, data_addr)) {

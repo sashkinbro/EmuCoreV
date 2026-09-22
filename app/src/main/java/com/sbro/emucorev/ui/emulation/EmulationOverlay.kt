@@ -92,11 +92,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sbro.emucorev.R
+import com.sbro.emucorev.BuildConfig
 import com.sbro.emucorev.core.AndroidGyroscopeInput
 import com.sbro.emucorev.core.AndroidTouchHaptics
 import com.sbro.emucorev.core.AndroidTouchHaptics.ButtonPhase
 import com.sbro.emucorev.core.CHEATS_ENABLED
 import com.sbro.emucorev.core.CheatBridge
+import com.sbro.emucorev.core.SaveStateRepository
+import com.sbro.emucorev.core.SaveStateSlot
 import com.sbro.emucorev.core.VitaCheatSnapshot
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
@@ -115,6 +118,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.roundToInt
+
+private sealed interface SaveStateAction {
+    val slot: Int
+
+    data class Save(override val slot: Int, val overwrite: Boolean) : SaveStateAction
+    data class Load(override val slot: Int) : SaveStateAction
+    data class Delete(override val slot: Int) : SaveStateAction
+}
 
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
@@ -197,7 +208,64 @@ fun EmulationOverlayHost(
     LaunchedEffect(menuOpen, gameId) {
         if (menuOpen && gameId.isNotBlank()) cheatSnapshot = CheatBridge.snapshot(gameId)
     }
+
+    val saveStateRepository = remember(activity) { SaveStateRepository(activity) }
+    var saveStateSlots by remember(activity, gameId) { mutableStateOf(emptyList<SaveStateSlot>()) }
+    var selectedSaveStateSlot by remember(activity) { mutableIntStateOf(SaveStateRepository.QUICK_SLOT) }
+    var saveStateBusy by remember { mutableStateOf(false) }
+    var saveStateBusySaving by remember { mutableStateOf(false) }
+    var pendingSaveStateAction by remember { mutableStateOf<SaveStateAction?>(null) }
+    var saveStatesRefreshKey by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(gameId, saveStatesRefreshKey) {
+        if (gameId.isBlank()) {
+            saveStateSlots = emptyList()
+            return@LaunchedEffect
+        }
+        saveStateSlots = withContext(Dispatchers.IO) { saveStateRepository.listSlots(gameId) }
+    }
+
+    fun saveStateSlotName(slot: Int): String =
+        if (slot == SaveStateRepository.QUICK_SLOT) {
+            activity.getString(R.string.emulation_savestate_quick_label)
+        } else {
+            activity.getString(R.string.emulation_savestate_slot_label, slot)
+        }
+
     val overlayScope = rememberCoroutineScope()
+
+    fun performSaveStateAction(action: SaveStateAction) {
+        if (saveStateBusy || gameId.isBlank()) return
+        overlayScope.launch {
+            saveStateBusy = true
+            saveStateBusySaving = action is SaveStateAction.Save
+            val result = withContext(Dispatchers.IO) {
+                when (action) {
+                    is SaveStateAction.Save -> saveStateRepository.save(gameId, action.slot, BuildConfig.VERSION_NAME)
+                    is SaveStateAction.Load -> saveStateRepository.load(gameId, action.slot)
+                    is SaveStateAction.Delete -> saveStateRepository.delete(gameId, action.slot)
+                }
+            }
+            saveStateBusy = false
+            saveStatesRefreshKey++
+            val messageRes = when {
+                result.isOk -> when (action) {
+                    is SaveStateAction.Save -> R.string.emulation_savestate_saved_toast
+                    is SaveStateAction.Load -> R.string.emulation_savestate_loaded_toast
+                    is SaveStateAction.Delete -> R.string.emulation_savestate_deleted_toast
+                }
+                result.isSessionMismatch -> R.string.emulation_savestate_session_mismatch_toast
+                result.isTitleMismatch -> R.string.emulation_savestate_title_mismatch_toast
+                else -> R.string.emulation_savestate_failed_toast
+            }
+            Toast.makeText(activity, messageRes, Toast.LENGTH_SHORT).show()
+            if (result.isOk && action is SaveStateAction.Load) {
+                menuOpen = false
+                userPaused = false
+            }
+        }
+    }
+
     DisposableEffect(activity, gameId) {
         activity.setCheatImportHandler { uri ->
             overlayScope.launch {
@@ -556,7 +624,34 @@ fun EmulationOverlayHost(
                 CheatBridge.saveCheats(gameId)
                 cheatSnapshot = CheatBridge.snapshot(gameId)
             },
-            onCheatsImport = { activity.requestCheatImport() }
+            onCheatsImport = { activity.requestCheatImport() },
+            onSaveStateSlotSelected = { slot -> selectedSaveStateSlot = slot },
+            onSaveStateSave = { slot ->
+                val exists = saveStateSlots.firstOrNull { it.slot == slot }?.exists == true
+                if (exists) {
+                    pendingSaveStateAction = SaveStateAction.Save(slot, overwrite = true)
+                } else {
+                    performSaveStateAction(SaveStateAction.Save(slot, overwrite = false))
+                }
+            },
+            onSaveStateLoad = { slot ->
+                val target = saveStateSlots.firstOrNull { it.slot == slot }
+                if (target != null && target.exists) {
+                    pendingSaveStateAction = SaveStateAction.Load(slot)
+                }
+            },
+            onSaveStateDelete = { slot -> pendingSaveStateAction = SaveStateAction.Delete(slot) },
+            onQuickSaveState = {
+                performSaveStateAction(SaveStateAction.Save(SaveStateRepository.QUICK_SLOT, overwrite = false))
+            },
+            onQuickLoadState = {
+                val quick = saveStateSlots.firstOrNull { it.slot == SaveStateRepository.QUICK_SLOT }
+                if (quick == null || !quick.exists) {
+                    Toast.makeText(activity, R.string.emulation_savestate_empty, Toast.LENGTH_SHORT).show()
+                } else {
+                    performSaveStateAction(SaveStateAction.Load(SaveStateRepository.QUICK_SLOT))
+                }
+            }
         )
 
         AnimatedVisibility(
@@ -567,7 +662,10 @@ fun EmulationOverlayHost(
         ) {
             EmulationQuickBar(
                 paused = effectivePaused,
+                quickActionsEnabled = !saveStateBusy && gameId.isNotBlank(),
                 onPauseToggle = menuCallbacks.onPauseToggle,
+                onQuickSave = menuCallbacks.onQuickSaveState,
+                onQuickLoad = menuCallbacks.onQuickLoadState,
                 onScreenshot = { activity.requestScreenshot() },
                 onOpenMenu = {
                     menuOpen = !menuOpen
@@ -614,6 +712,12 @@ fun EmulationOverlayHost(
                 config = config,
                 cheats = cheatSnapshot,
                 cheatsAvailable = CHEATS_ENABLED || customization.experimentalCheats,
+                saveStates = SaveStateMenuState(
+                    slots = saveStateSlots,
+                    selectedSlot = selectedSaveStateSlot,
+                    busy = saveStateBusy,
+                    busySaving = saveStateBusySaving
+                ),
                 paused = effectivePaused,
                 sessionElapsedMs = sessionElapsedMs,
                 expandHorizontally = useSidePanel,
@@ -625,6 +729,44 @@ fun EmulationOverlayHost(
         }
 
         NativeImeOverlay(activity)
+
+        pendingSaveStateAction?.let { action ->
+            val titleRes = when (action) {
+                is SaveStateAction.Save -> R.string.emulation_savestate_confirm_save_title
+                is SaveStateAction.Load -> R.string.emulation_savestate_confirm_load_title
+                is SaveStateAction.Delete -> R.string.emulation_savestate_confirm_delete_title
+            }
+            val bodyRes = when (action) {
+                is SaveStateAction.Save -> R.string.emulation_savestate_confirm_save_body
+                is SaveStateAction.Load -> R.string.emulation_savestate_confirm_load_body
+                is SaveStateAction.Delete -> R.string.emulation_savestate_confirm_delete_body
+            }
+            val confirmRes = when (action) {
+                is SaveStateAction.Save -> R.string.emulation_savestate_save_action
+                is SaveStateAction.Load -> R.string.emulation_savestate_load_action
+                is SaveStateAction.Delete -> R.string.emulation_savestate_delete_action
+            }
+            AlertDialog(
+                onDismissRequest = { pendingSaveStateAction = null },
+                title = { Text(text = stringResource(titleRes)) },
+                text = { Text(text = stringResource(bodyRes, saveStateSlotName(action.slot))) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            pendingSaveStateAction = null
+                            performSaveStateAction(action)
+                        }
+                    ) {
+                        Text(text = stringResource(confirmRes))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingSaveStateAction = null }) {
+                        Text(text = stringResource(R.string.common_cancel))
+                    }
+                }
+            )
+        }
 
         if (exitDialogVisible) {
             AlertDialog(

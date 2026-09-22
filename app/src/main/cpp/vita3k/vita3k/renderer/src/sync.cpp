@@ -36,6 +36,7 @@
 namespace renderer {
 COMMAND(handle_nop) {
     TRACY_FUNC_COMMANDS(handle_nop);
+    LOG_CRITICAL("[renderer-debug] handle_nop");
     // Signal back to client
     int code_to_finish = helper.pop<int>();
     complete_command(renderer, helper, code_to_finish);
@@ -92,6 +93,10 @@ COMMAND(handle_set_screen_filter) {
 
 COMMAND(new_frame) {
     TRACY_FUNC_COMMANDS(new_frame);
+    static std::atomic<uint32_t> new_frame_count{ 0 };
+    const uint32_t frame_number = new_frame_count.fetch_add(1, std::memory_order_relaxed) + 1;
+    if (frame_number % 120 == 1)
+        LOG_CRITICAL("[fliptrace] renderer new_frame #{}", frame_number);
     DisplayFrameInfo *next_frame = helper.pop<DisplayFrameInfo *>();
     DisplayState *display = helper.pop<DisplayState *>();
 
@@ -114,8 +119,10 @@ COMMAND(new_frame) {
 
 // Client side function
 void finish(State &state, Context *context) {
+    LOG_CRITICAL("[renderer-debug] finish: queue={} display={} abort={}", state.command_buffer_queue.size(), state.should_display, state.render_abort.load());
     // Add NOP then wait for it
     renderer::send_single_command(state, context, renderer::CommandOpcode::Nop, true, 1);
+    LOG_CRITICAL("[renderer-debug] finish: nop processed");
 
     // unblock game threads if shutting down
     if (state.render_abort.load(std::memory_order_relaxed))
@@ -124,6 +131,7 @@ void finish(State &state, Context *context) {
     // Wait for the VK wait thread to finish processing all pending requests.
     // Push a callback request on the queue and wait for it to be treated
     if (state.current_backend == Backend::Vulkan && state.features.enable_memory_mapping) {
+        LOG_CRITICAL("[renderer-debug] finish: draining vk wait queue");
         auto &vk_state = static_cast<vulkan::VKState &>(state);
         auto promise = std::make_shared<std::promise<void>>();
         std::future<void> future = promise->get_future();
@@ -134,6 +142,7 @@ void finish(State &state, Context *context) {
             if (state.render_abort.load(std::memory_order_relaxed) || vk_state.request_queue.is_aborted())
                 return;
         }
+        LOG_CRITICAL("[renderer-debug] finish: vk wait queue drained");
     }
 }
 

@@ -39,6 +39,7 @@ void AudioState::stop_all_ports() {
         for (auto &[_, port] : out_ports) {
             port->stopping = true;
         }
+        LOG_CRITICAL("[savestate-audio] stop_all_ports: {} ports stopped", out_ports.size());
     }
     if (adapter)
         adapter->wake_all_ports();
@@ -94,11 +95,19 @@ AudioOutPortPtr AudioState::open_port(int nb_channels, int freq, int nb_sample) 
     if (!port)
         return nullptr;
 
+    LOG_CRITICAL("[savestate-audio] open_port channels={} freq={} samples={} len_us={}", nb_channels, freq, nb_sample, port->len_microseconds);
     set_volume(*port, port->volume);
     return port;
 }
 
 void AudioState::audio_output(AudioOutPort &out_port, const void *buffer) {
+    {
+        static std::atomic<uint64_t> diag_calls{ 0 };
+        const uint64_t n = diag_calls.fetch_add(1, std::memory_order_relaxed) + 1;
+        if ((n % 256) == 0)
+            LOG_CRITICAL("[savestate-audio] output calls={} stopping={} len_us={} last_output={} rest_samples={}",
+                n, out_port.stopping.load(), out_port.len_microseconds, out_port.last_output, get_rest_sample(out_port));
+    }
     if (out_port.stopping)
         return;
 

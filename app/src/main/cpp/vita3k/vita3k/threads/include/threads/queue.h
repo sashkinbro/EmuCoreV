@@ -95,6 +95,19 @@ public:
         return queue_.size();
     }
 
+    // Copy the pending items in order (used by save states).
+    std::vector<T> snapshot_items() {
+        std::unique_lock<std::mutex> mlock(mutex_);
+        std::vector<T> items;
+        std::queue<T> copy = queue_;
+        items.reserve(copy.size());
+        while (!copy.empty()) {
+            items.push_back(copy.front());
+            copy.pop();
+        }
+        return items;
+    }
+
     void wake() {
         condempty_.notify_all();
     }

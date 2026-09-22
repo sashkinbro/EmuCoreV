@@ -193,21 +193,23 @@ void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const Fe
 
         // set back default values
         vk_format = vk::Format::eR8G8B8A8Unorm;
-        context.record.color_surface.downscale = static_cast<bool>(rt->multisample_mode);
+        context.record.color_surface.downscale = rt && static_cast<bool>(rt->multisample_mode);
         context.record.is_gamma_corrected = false;
         context.record.is_maskupdate = false;
         context.record.color_base_format = SCE_GXM_COLOR_BASE_FORMAT_U8U8U8U8;
     }
     context.current_color_format = vk_format;
 
-    rt->width = rt->base_width;
-    rt->height = rt->base_height;
     bool msaa_expanded = false;
-    if (rt->multisample_mode && !context.record.color_surface.downscale) {
-        // using MSAA without downscaling, emulate this as best as we can by multiplying the width and height of the render target by 2
-        rt->width *= 2;
-        rt->height *= 2;
-        msaa_expanded = true;
+    if (rt) {
+        rt->width = rt->base_width;
+        rt->height = rt->base_height;
+        if (rt->multisample_mode && !context.record.color_surface.downscale) {
+            // using MSAA without downscaling, emulate this as best as we can by multiplying the width and height of the render target by 2
+            rt->width *= 2;
+            rt->height *= 2;
+            msaa_expanded = true;
+        }
     }
 
     constexpr bool apply_color_surface_downscale = true;
@@ -218,7 +220,7 @@ void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const Fe
         const float res_multiplier = context.state.res_multiplier;
         const uint32_t color_width_scaled = static_cast<uint32_t>(color_surface_fin->width * res_multiplier);
         const uint32_t color_height_scaled = static_cast<uint32_t>(color_surface_fin->height * res_multiplier);
-        if (color_width_scaled > 0 && color_height_scaled > 0
+        if (rt && color_width_scaled > 0 && color_height_scaled > 0
             && rt->base_width >= color_width_scaled * 2
             && rt->base_height >= color_height_scaled * 2) {
             context.surface_downscale = 0.5f;
@@ -688,7 +690,7 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
 }
 
 void VKContext::check_for_macroblock_change(bool is_draw) {
-    if (!render_target->has_macroblock_sync)
+    if (!render_target || !render_target->has_macroblock_sync)
         return;
 
     if (!ignore_macroblock && (scissor.extent.width > render_target->macroblock_width || scissor.extent.height > render_target->macroblock_height)) {

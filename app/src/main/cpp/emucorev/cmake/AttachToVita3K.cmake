@@ -24,6 +24,7 @@ target_include_directories(vita3k PRIVATE
     "${VITA3K_CORE_DIR}"
     "${VITA3K_CORE_DIR}/android/jni"
     "${VITA3K_CORE_DIR}/dialog/include"
+    "${VITA3K_CORE_DIR}/ngs/include"
 )
 
 target_compile_definitions(vita3k PRIVATE EMUCOREV_ANDROID_BRIDGE=1)
@@ -58,6 +59,9 @@ set(EMUCOREV_BRIDGE_SOURCES
     "${EMUCOREV_BRIDGE_DIR}/src/input_overlay_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/emu_surface_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/native_lib_bridge.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate_bridge.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/archive.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/savestate.cpp"
 )
 
 target_sources(vita3k PRIVATE ${EMUCOREV_BRIDGE_SOURCES})

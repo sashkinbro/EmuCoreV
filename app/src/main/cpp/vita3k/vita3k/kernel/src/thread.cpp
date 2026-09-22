@@ -121,6 +121,9 @@ int ThreadState::init(const char *name, Ptr<const void> entry_point, int init_pr
 
     CPUContext ctx;
     ctx.set_sp(stack_top());
+    // load_context() restores the CP15 state, so the initial context must carry
+    // the TLS pointer written above or thread start would clear TPIDRURO.
+    ctx.tpidruro = user_tls_ptr.address();
     if (option) {
         ctx.cpu_registers[0] = option->attr;
         ctx.cpu_registers[1] = option->size;
@@ -845,6 +848,101 @@ bool ThreadState::resume_from_world() {
         }
     }
     return false;
+}
+
+ThreadState::Snapshot ThreadState::capture_snapshot() const {
+    Snapshot snapshot;
+    snapshot.id = id;
+    snapshot.name = name;
+    snapshot.entry_point = entry_point;
+    snapshot.stack_addr = stack.get();
+    snapshot.stack_size = stack_size;
+    snapshot.tls_addr = tls.get();
+    snapshot.priority = priority;
+    snapshot.affinity_mask = affinity_mask;
+    snapshot.start_tick = start_tick;
+    snapshot.last_vblank_waited = last_vblank_waited;
+    snapshot.status = status;
+    snapshot.returned_value = returned_value;
+    snapshot.context = save_context(*cpu);
+    snapshot.init_context = init_cpu_ctx;
+
+    if (wait_prim_kind) {
+        if (std::strcmp(wait_prim_kind, "event") == 0)
+            snapshot.wait_kind = Snapshot::WaitKind::event;
+        else if (std::strcmp(wait_prim_kind, "mutex") == 0)
+            snapshot.wait_kind = Snapshot::WaitKind::mutex;
+        else if (std::strcmp(wait_prim_kind, "sema") == 0)
+            snapshot.wait_kind = Snapshot::WaitKind::sema;
+        else if (std::strcmp(wait_prim_kind, "cond") == 0)
+            snapshot.wait_kind = Snapshot::WaitKind::cond;
+        else if (std::strcmp(wait_prim_kind, "evf") == 0)
+            snapshot.wait_kind = Snapshot::WaitKind::evf;
+        else
+            snapshot.wait_kind = Snapshot::WaitKind::other;
+    }
+    snapshot.wait_prim_uid = wait_prim_uid;
+    snapshot.wait_extra = wait_extra;
+
+    snapshot.signal_pending = signal.is_signaled();
+    snapshot.exit_requested = exit_requested;
+    snapshot.delete_requested = delete_requested;
+    snapshot.vm_suspended = vm_suspended;
+    snapshot.single_stepping = single_stepping;
+    snapshot.run_start_callback = run_start_callback;
+    snapshot.run_end_callback = run_end_callback;
+    snapshot.is_processing_callbacks = is_processing_callbacks;
+    snapshot.call_level = call_level;
+
+    for (const CallbackPtr &callback : callbacks) {
+        for (const auto &[uid, known] : kernel.callbacks) {
+            if (known == callback) {
+                snapshot.callback_uids.push_back(uid);
+                break;
+            }
+        }
+    }
+
+    for (const std::shared_ptr<ThreadState> &waiter : waiting_threads) {
+        if (waiter)
+            snapshot.waiting_thread_uids.push_back(waiter->id);
+    }
+
+    return snapshot;
+}
+
+void ThreadState::apply_private_snapshot(const Snapshot &snapshot) {
+    const std::lock_guard<std::mutex> lock(mutex);
+
+    init_cpu_ctx = snapshot.init_context;
+    exit_requested = snapshot.exit_requested;
+    delete_requested = snapshot.delete_requested;
+    vm_suspended = snapshot.vm_suspended;
+    single_stepping = snapshot.single_stepping;
+    run_start_callback = snapshot.run_start_callback;
+    run_end_callback = snapshot.run_end_callback;
+    is_processing_callbacks = snapshot.is_processing_callbacks;
+    call_level = snapshot.call_level;
+
+    switch (snapshot.wait_kind) {
+    case Snapshot::WaitKind::event: wait_prim_kind = "event"; break;
+    case Snapshot::WaitKind::mutex: wait_prim_kind = "mutex"; break;
+    case Snapshot::WaitKind::sema: wait_prim_kind = "sema"; break;
+    case Snapshot::WaitKind::cond: wait_prim_kind = "cond"; break;
+    case Snapshot::WaitKind::evf: wait_prim_kind = "evf"; break;
+    case Snapshot::WaitKind::other: wait_prim_kind = "other"; break;
+    case Snapshot::WaitKind::none: wait_prim_kind = nullptr; break;
+    }
+    wait_prim_uid = snapshot.wait_prim_uid;
+    wait_extra = snapshot.wait_extra;
+
+    signal.set_signaled(snapshot.signal_pending);
+
+    if (cpu)
+        load_context(*cpu, snapshot.context);
+
+    if (status != snapshot.status)
+        update_status(snapshot.status);
 }
 
 std::string ThreadState::log_stack_traceback() const {

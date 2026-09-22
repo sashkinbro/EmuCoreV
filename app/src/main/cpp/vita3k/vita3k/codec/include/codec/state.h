@@ -163,6 +163,7 @@ struct Atrac9DecoderState : public DecoderState {
     std::vector<uint8_t> result;
     int superframe_frame_idx;
     int superframe_data_left;
+    bool valid = false;
 
     uint32_t get(DecoderQuery query) override;
     uint32_t get_es_size() override;

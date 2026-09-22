@@ -22,6 +22,7 @@
 #include <kernel/debugger.h>
 #include <kernel/object_store.h>
 #include <kernel/sync_primitives.h>
+#include <kernel/thread/thread_state.h>
 #include <kernel/types.h>
 #include <mem/allocator.h>
 #include <mem/block.h>
@@ -180,11 +181,22 @@ struct KernelState {
         return next_uid++;
     }
 
+    SceUID peek_next_uid() const {
+        return next_uid.load();
+    }
+
+    void set_next_uid(SceUID value) {
+        next_uid.store(value);
+    }
+
     bool init(MemState &mem, const CallImportFunc &call_import, bool cpu_opt);
     void deinit(MemState &mem);
     void load_process_param(MemState &mem, Ptr<uint32_t> ptr);
     ThreadStatePtr create_thread(MemState &mem, const char *name, Ptr<const void> entry_point = Ptr<const void>(0));
     ThreadStatePtr create_thread(MemState &mem, const char *name, Ptr<const void> entry_point, int init_priority, SceInt32 affinity_mask, int stack_size, const SceKernelThreadOptParam *option);
+    // Save-state support: recreate a thread from a snapshot without allocating its stack/TLS again.
+    // With defer_start the thread is parked dormant until apply_private_snapshot() is called.
+    ThreadStatePtr create_thread_from_snapshot(MemState &mem, const struct ThreadState::Snapshot &snapshot, bool defer_start = false);
 
     ThreadStatePtr get_thread(SceUID thread_id);
     Ptr<Ptr<void>> get_thread_tls_addr(MemState &mem, SceUID thread_id, int key);
@@ -192,6 +204,9 @@ struct KernelState {
     bool is_threads_paused() { return !paused_threads_status.empty(); }
     void pause_threads();
     void resume_threads();
+    // Save-state support: drop pause bookkeeping after guest threads were replaced.
+    void clear_paused_threads_state();
+    void reset_world_stop_state();
 
     int stop_world(SceUID except_id, std::chrono::milliseconds budget);
     void resume_world();

@@ -19,6 +19,7 @@
 
 #include <gxm/types.h>
 #include <mem/ptr.h>
+#include <renderer/gxm_types.h>
 #include <threads/queue.h>
 
 #include <atomic>
@@ -55,6 +56,22 @@ struct MemoryMapInfo {
     std::uint32_t perm;
 };
 
+// Host-side creation parameters for objects whose host data cannot survive a
+// process restart. The save-state engine rebuilds renderer objects from these.
+struct FragmentProgramInfo {
+    Ptr<const SceGxmProgram> program;
+    bool has_blend = false;
+    SceGxmBlendInfo blend{};
+    bool is_mask_update = false;
+};
+
+struct VertexProgramInfo {
+    Ptr<const SceGxmProgram> program;
+    std::vector<SceGxmVertexAttribute> attributes;
+    std::vector<SceGxmVertexStream> streams;
+    uint64_t key_hash = 0;
+};
+
 struct GxmState {
     SceGxmInitializeParams params;
 
@@ -81,6 +98,13 @@ struct GxmState {
     std::unordered_map<SceGxmContext *, Address> deferred_contexts;
     std::unordered_map<SceGxmRenderTarget *, Address> render_targets;
 
+    std::unordered_map<Address, FragmentProgramInfo> fragment_programs;
+    std::unordered_map<Address, VertexProgramInfo> vertex_programs;
+    std::unordered_map<Address, SceGxmShaderPatcherParams> shader_patchers;
+
+    // Pending display queue entries restored by a save-state load.
+    std::vector<DisplayCallback> restored_display_queue;
+
     void deinit() {
         if (display_host_thread.joinable())
             display_host_thread.join();
@@ -101,5 +125,8 @@ struct GxmState {
         last_immediate_context = 0;
         deferred_contexts.clear();
         render_targets.clear();
+        fragment_programs.clear();
+        vertex_programs.clear();
+        shader_patchers.clear();
     }
 };

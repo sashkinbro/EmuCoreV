@@ -165,6 +165,9 @@ struct VKState : public renderer::State {
     bool map_memory(MemState &mem, Ptr<void> address, uint32_t size) override;
     bool map_memory_page_table_fallback(MemState &mem, Ptr<void> address, uint32_t size);
     void unmap_memory(MemState &mem, Ptr<void> address) override;
+    void wait_gpu_idle() override;
+    void reset_caches() override;
+    void flush_surfaces(MemState &mem) override;
     // return the matching buffer and offset for the memory location
     std::tuple<vk::Buffer, uint32_t> get_matching_mapping(const Ptr<void> address);
     // return the GPU buffer device address matching this one

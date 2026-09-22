@@ -185,11 +185,30 @@ EXPORT(int, sceAudioOutOpenPort, SceAudioOutPortType type, int len, int freq, Sc
     const int port_id = emuenv.audio.next_port_id++;
     emuenv.audio.out_ports.emplace(port_id, port);
 
+    LOG_CRITICAL("[savestate-audio] sceAudioOutOpenPort -> id={} type={} len={} freq={} mode={} thread={}", port_id, static_cast<int>(type), len, freq, static_cast<int>(mode), thread_id);
     return port_id;
 }
 
 EXPORT(int, sceAudioOutOutput, int port, const void *buf) {
     TRACY_FUNC(sceAudioOutOutput, port, buf);
+    {
+        static std::atomic<uint64_t> diag_calls{ 0 };
+        const uint64_t n = diag_calls.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (n <= 4 || (n % 256) == 0) {
+            const int16_t *samples = static_cast<const int16_t *>(buf);
+            int nonzero = 0;
+            int32_t min_value = 0, max_value = 0;
+            for (int i = 0; i < 256; i++) {
+                const int32_t v = samples[i];
+                if (v != 0)
+                    nonzero++;
+                min_value = std::min(min_value, v);
+                max_value = std::max(max_value, v);
+            }
+            LOG_CRITICAL("[savestate-audio] sceAudioOutOutput calls={} port={} buf={} thread={} nonzero={}/256 min={} max={}",
+                n, port, fmt::ptr(buf), thread_id, nonzero, min_value, max_value);
+        }
+    }
     const AudioOutPortPtr prt = lock_and_find(port, emuenv.audio.out_ports, emuenv.audio.mutex);
     if (!prt) {
         return RET_ERROR(SCE_AUDIO_OUT_ERROR_INVALID_PORT);

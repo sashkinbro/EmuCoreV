@@ -65,6 +65,18 @@ void VoiceScheduler::deque_insert(const MemState &mem, Voice *voice) {
     queue.insert(queue.begin() + lowest_dest_pos, voice);
 }
 
+bool VoiceScheduler::requeue_voice(const MemState &mem, Voice *voice) {
+    if (!voice)
+        return false;
+
+    const std::lock_guard<std::recursive_mutex> guard(mutex);
+    if (std::ranges::contains(queue, voice))
+        return false;
+
+    deque_insert(mem, voice);
+    return true;
+}
+
 bool VoiceScheduler::play(const MemState &mem, Voice *voice) {
     if (voice->state != VOICE_STATE_AVAILABLE) {
         static std::atomic<uint64_t> refused{ 0 };
@@ -333,6 +345,11 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
 
         for (size_t i = 0; i < voice->rack->modules.size(); i++) {
             if (voice->rack->modules[i]) {
+                // Voices rebuilt by a save-state load stay silent until the game
+                // re-creates their module state; running them would decode from
+                // inconsistent host state.
+                if (voice->datas[i].needs_reinit)
+                    continue;
                 if (voice->rack->modules[i]->process(kern, mem, thread_id, voice->datas[i], scheduler_lock, voice_lock)) {
                     finished = true;
                     finished_module = voice->rack->modules[i]->module_id();

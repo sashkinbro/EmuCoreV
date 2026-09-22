@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.Feedback
 import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.Games
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.QueryStats
 import androidx.compose.material.icons.rounded.Refresh
@@ -80,7 +81,7 @@ import com.sbro.emucorev.ui.theme.shouldUseExpandedShell
 import kotlinx.coroutines.launch
 
 enum class PrimaryDestination {
-    Home, Setup, Library, GameManager, PlayTime, Achievements, SaveData, CheatManager, Search, Settings, Profile, Feedback
+    Home, Setup, Library, GameManager, PlayTime, Achievements, SaveData, SaveStates, CheatManager, Search, Settings, Profile, Feedback
 }
 
 private enum class MobileLeadingAction {
@@ -101,6 +102,7 @@ fun AdaptiveShell(
     onNavigatePlayTime: () -> Unit,
     onNavigateAchievements: () -> Unit,
     onNavigateSaveData: () -> Unit,
+    onNavigateSaveStates: () -> Unit = {},
     onNavigateCheatManager: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
@@ -122,6 +124,7 @@ fun AdaptiveShell(
             onNavigatePlayTime = onNavigatePlayTime,
             onNavigateAchievements = onNavigateAchievements,
             onNavigateSaveData = onNavigateSaveData,
+            onNavigateSaveStates = onNavigateSaveStates,
             onNavigateCheatManager = onNavigateCheatManager,
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
@@ -174,6 +177,7 @@ fun AdaptiveShell(
             onNavigatePlayTime = onNavigatePlayTime,
             onNavigateAchievements = onNavigateAchievements,
             onNavigateSaveData = onNavigateSaveData,
+            onNavigateSaveStates = onNavigateSaveStates,
             onNavigateCheatManager = onNavigateCheatManager,
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
@@ -200,6 +204,7 @@ private fun CompactAdaptiveShell(
     onNavigatePlayTime: () -> Unit,
     onNavigateAchievements: () -> Unit,
     onNavigateSaveData: () -> Unit,
+    onNavigateSaveStates: () -> Unit,
     onNavigateCheatManager: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
@@ -284,6 +289,7 @@ private fun CompactAdaptiveShell(
                     onNavigatePlayTime = onNavigatePlayTime,
                     onNavigateAchievements = onNavigateAchievements,
                     onNavigateSaveData = onNavigateSaveData,
+                    onNavigateSaveStates = onNavigateSaveStates,
             onNavigateCheatManager = onNavigateCheatManager,
                     onNavigateSearch = onNavigateSearch,
                     onNavigateSettings = onNavigateSettings,
@@ -318,6 +324,7 @@ private fun SideNavigation(
     onNavigatePlayTime: () -> Unit,
     onNavigateAchievements: () -> Unit,
     onNavigateSaveData: () -> Unit,
+    onNavigateSaveStates: () -> Unit,
     onNavigateCheatManager: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
@@ -374,6 +381,10 @@ private fun SideNavigation(
     val navigateSaveData = rememberDebouncedClick {
         onCloseDrawer()
         onNavigateSaveData()
+    }
+    val navigateSaveStates = rememberDebouncedClick {
+        onCloseDrawer()
+        onNavigateSaveStates()
     }
     val navigateCheatManager = rememberDebouncedClick {
         onCloseDrawer()
@@ -560,6 +571,12 @@ private fun SideNavigation(
                     label = stringResource(R.string.nav_save_manager),
                     selected = selected == PrimaryDestination.SaveData,
                     onClick = navigateSaveData
+                )
+                ShellItem(
+                    icon = Icons.Rounded.History,
+                    label = stringResource(R.string.nav_save_states),
+                    selected = selected == PrimaryDestination.SaveStates,
+                    onClick = navigateSaveStates
                 )
                 if (CHEATS_ENABLED || LocalCustomizationSettings.current.experimentalCheats) {
                     ShellItem(

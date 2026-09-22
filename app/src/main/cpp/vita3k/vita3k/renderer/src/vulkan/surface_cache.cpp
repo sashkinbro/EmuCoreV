@@ -377,6 +377,36 @@ VKSurfaceCache::VKSurfaceCache(VKState &state)
     ds_surface_queue.init(max_surfaces_allowed);
 }
 
+void VKSurfaceCache::reset() {
+    cleanup();
+    color_address_lookup.clear();
+    depth_address_lookup.clear();
+    stencil_address_lookup.clear();
+    color_surface_queue.init(max_surfaces_allowed);
+    ds_surface_queue.init(max_surfaces_allowed);
+    cpu_surfaces_changed.clear();
+    target = nullptr;
+    last_written_surface = nullptr;
+    pending_ds_scene = nullptr;
+    pending_ds_scene_stores = false;
+    pending_casts.clear();
+}
+
+void VKSurfaceCache::flush_all_surfaces(MemState &mem) {
+    if (!state.features.enable_memory_mapping)
+        return;
+
+    uint32_t flushed = 0;
+    for (auto &item : color_surface_queue.items) {
+        ColorSurfaceCacheInfo &info = item.content;
+        if (!info.texture.image || info.total_bytes == 0)
+            continue;
+        submit_immediate_surface_sync(info, &mem);
+        flushed++;
+    }
+    LOG_CRITICAL("[savestate-diag] flushed {} color surfaces to guest memory", flushed);
+}
+
 void VKSurfaceCache::cleanup() {
     for (auto &[key, fb] : framebuffer_array) {
         state.device.destroy(fb.standard);
@@ -573,6 +603,15 @@ void VKSurfaceCache::note_scene_draw_rect(int32_t x0, int32_t y0, int32_t x1, in
 SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(MemState &mem, SceGxmColorSurface *color) {
     // Create the key to access the cache struct
     const uint32_t address = color->data.address();
+
+    // [savestate-diag] a framebuffer surface in unmapped memory renders black
+    if (address != 0 && !is_valid_addr(mem, address)) {
+        static std::atomic<uint64_t> bad_surfaces{ 0 };
+        const uint64_t n = bad_surfaces.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (n <= 20 || (n % 256) == 0)
+            LOG_CRITICAL("[savestate-diag] color surface with unmapped address {:#010x} ({}x{}, format {:#010x}, total {})",
+                address, color->width, color->height, static_cast<uint32_t>(color->colorFormat), n);
+    }
 
     const uint32_t original_width = color->width;
     const uint32_t original_height = color->height;
