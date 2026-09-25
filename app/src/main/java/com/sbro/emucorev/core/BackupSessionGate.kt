@@ -42,6 +42,9 @@ object BackupSessionGate {
         } finally { starting = false }
     }
 
+    /** The Emulator marks the gameplay window without holding the mutex for the whole session. */
+    fun gameStarted() { running = true }
+
     fun stopped() { running = false }
     fun checkpoint() {
         if (gameBusy) throw DriveBackupException("busy")

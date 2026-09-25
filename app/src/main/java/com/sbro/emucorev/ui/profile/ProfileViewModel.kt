@@ -536,18 +536,20 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     private fun observeProfile(uid: String) {
         profileJob = viewModelScope.launch {
-            repository.observeProfile(uid).collect { profile ->
-                val previousTotal = _uiState.value.profile?.totalPlayTimeMs
-                _uiState.update {
-                    it.copy(
-                        profile = profile,
-                        games = profile?.games.orEmpty(),
-                        isProfileLoading = false
-                    )
-                }
-                if (profile != null && profile.totalPlayTimeMs != previousTotal) {
-                    loadRankInsights(profile.totalPlayTimeMs)
-                    refreshTrophies()
+            runCatching {
+                repository.observeProfile(uid).collect { profile ->
+                    val previousTotal = _uiState.value.profile?.totalPlayTimeMs
+                    _uiState.update {
+                        it.copy(
+                            profile = profile,
+                            games = profile?.games.orEmpty(),
+                            isProfileLoading = false
+                        )
+                    }
+                    if (profile != null && profile.totalPlayTimeMs != previousTotal) {
+                        loadRankInsights(profile.totalPlayTimeMs)
+                        refreshTrophies()
+                    }
                 }
             }
         }

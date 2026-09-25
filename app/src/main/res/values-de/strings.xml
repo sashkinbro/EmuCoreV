@@ -1322,4 +1322,8 @@
     <string name="profile_trophy_progress_format">%1$d von %2$d freigeschaltet</string>
     <string name="nav_my_lists">Meine Listen</string>
     <string name="drive_category_save_data">Speicherdaten</string>
+    <string name="settings_core_accurate_thread_scheduling">Genaue Thread-Planung</string>
+    <string name="settings_core_guest_cores">Gast-CPU-Kerne</string>
+    <string name="settings_help_accurate_thread_scheduling">Begrenzt die gleichzeitige Ausführung von Gast-Threads und beachtet Vita-Thread-Prioritäten strikter.\n\nAktiviere dies pro Spiel, wenn der Start hängt, Timing-Probleme oder instabiles Laden auftreten. Es kann die Leistung verringern – lass es aus, außer ein Spiel benötigt es.</string>
+    <string name="settings_help_guest_cores">Legt fest, wie viele Gast-Threads bei aktivierter genauer Thread-Planung gleichzeitig ausgeführt werden dürfen. Ein Kern ist die sicherste Voreinstellung; höhere Werte können die Geschwindigkeit verbessern, aber Timing-Probleme zurückbringen.</string>
 </resources>

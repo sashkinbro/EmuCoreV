@@ -1322,4 +1322,8 @@
     <string name="profile_trophy_progress_format">%1$d de %2$d desbloqueados</string>
     <string name="nav_my_lists">Mis listas</string>
     <string name="drive_category_save_data">Datos guardados</string>
+    <string name="settings_core_accurate_thread_scheduling">Planificación precisa de hilos</string>
+    <string name="settings_core_guest_cores">Núcleos de CPU invitados</string>
+    <string name="settings_help_accurate_thread_scheduling">Limita la ejecución simultánea de hilos invitados y respeta con más rigor las prioridades de hilos de Vita.\n\nActívalo por juego si el arranque se cuelga, hay fallos de sincronización o la carga es inestable. Puede reducir el rendimiento, así que déjalo desactivado salvo que un juego lo necesite.</string>
+    <string name="settings_help_guest_cores">Define cuántos hilos invitados pueden ejecutarse a la vez cuando la planificación precisa de hilos está activada. Un núcleo es el valor más seguro; valores más altos pueden mejorar la velocidad, pero pueden reintroducir fallos de sincronización.</string>
 </resources>

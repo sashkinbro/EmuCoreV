@@ -1322,4 +1322,8 @@
     <string name="profile_trophy_progress_format">%2$d में से %1$d अनलॉक</string>
     <string name="nav_my_lists">मेरी सूचियाँ</string>
     <string name="drive_category_save_data">सेव डेटा</string>
+    <string name="settings_core_accurate_thread_scheduling">सटीक थ्रेड शेड्यूलिंग</string>
+    <string name="settings_core_guest_cores">गेस्ट CPU कोर</string>
+    <string name="settings_help_accurate_thread_scheduling">गेस्ट थ्रेड्स के एक साथ निष्पादन को सीमित करता है और Vita थ्रेड प्राथमिकताओं का अधिक कड़ाई से पालन करता है।\n\nयदि स्टार्टअप अटकता है, टाइमिंग समस्याएँ या अस्थिर लोडिंग होती है, तो इसे प्रति-गेम चालू करें। यह प्रदर्शन घटा सकता है, इसलिए किसी गेम को ज़रूरत हो तभी चालू रखें।</string>
+    <string name="settings_help_guest_cores">सटीक थ्रेड शेड्यूलिंग चालू होने पर एक बार में कितने गेस्ट थ्रेड चल सकते हैं, यह तय करता है। एक कोर सबसे सुरक्षित डिफ़ॉल्ट है; अधिक मान गति बढ़ा सकते हैं, पर टाइमिंग समस्याएँ लौटा सकते हैं।</string>
 </resources>

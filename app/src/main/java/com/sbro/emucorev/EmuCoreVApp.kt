@@ -2,6 +2,7 @@ package com.sbro.emucorev
 
 import android.app.Application
 import com.sbro.emucorev.core.AndroidDiagnostics
+import com.sbro.emucorev.core.BackupSessionGate
 import com.sbro.emucorev.core.NativeLib
 import com.sbro.emucorev.core.AppIconManager
 import com.sbro.emucorev.core.EmulatorStorage
@@ -9,6 +10,9 @@ import com.sbro.emucorev.core.NativeLibraryLoader
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.ProfilePlayTimeSyncer
+import com.sbro.emucorev.data.drive.DriveBackupArchive
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.runBlocking
 
 class EmuCoreVApp : Application() {
     override fun onCreate() {
@@ -16,6 +20,7 @@ class EmuCoreVApp : Application() {
         AndroidDiagnostics.initialize(this)
         AppIconManager.applyProIcon(this, AppPreferences(this).proUnlocked)
         ProfilePlayTimeSyncer.syncPendingAsync(this)
+        recoverPendingDriveRestore()
         runCatching {
             EmulatorStorage.prepareRuntime(this)
             VitaCoreConfigRepository(this).ensureDefaultsPersisted()
@@ -32,6 +37,21 @@ class EmuCoreVApp : Application() {
                 runCatching { NativeLibraryLoader.ensureLoaded(app) }
             }, "EmuCoreV-Init").apply { isDaemon = true; start() }
         }
+    }
+
+    private fun recoverPendingDriveRestore() {
+        if (!DriveBackupArchive.hasPendingRecovery(this)) return
+        Thread({
+            runBlocking {
+                try {
+                    BackupSessionGate.whileStopped { DriveBackupArchive(this@EmuCoreVApp).recoverPending() }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // The next create/restore call retries the same recovery under the gate.
+                }
+            }
+        }, "EmuCoreV-DriveRecovery").apply { isDaemon = true; start() }
     }
 
     override fun onTrimMemory(level: Int) {

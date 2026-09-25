@@ -18,7 +18,10 @@ class ProfilePlayTimeSyncer(private val context: Context) {
 
     suspend fun recordSession(titleId: String, title: String, durationMs: Long) {
         if (titleId.isBlank() || durationMs <= 0L) return
-        val coverUrl = runCatching { catalogRepository.findBySerial(titleId)?.coverUrl }.getOrNull()
+        val coverUrl = runCatching {
+            catalogRepository.findBySerial(titleId)?.coverUrl
+                ?: catalogRepository.findBestMatch(title)?.coverUrl
+        }.getOrNull()
         cache.add(
             PlayerPlayTimeDelta(
                 titleId = titleId,

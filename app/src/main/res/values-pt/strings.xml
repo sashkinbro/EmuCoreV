@@ -1322,4 +1322,8 @@
     <string name="profile_trophy_progress_format">%1$d de %2$d desbloqueados</string>
     <string name="nav_my_lists">Minhas listas</string>
     <string name="drive_category_save_data">Dados salvos</string>
+    <string name="settings_core_accurate_thread_scheduling">Agendamento preciso de threads</string>
+    <string name="settings_core_guest_cores">Núcleos de CPU convidados</string>
+    <string name="settings_help_accurate_thread_scheduling">Limita a execução simultânea de threads convidados e respeita com mais rigor as prioridades de threads da Vita.\n\nAtive por jogo se a inicialização travar, houver problemas de sincronização ou carregamento instável. Pode reduzir o desempenho, então deixe desativado a menos que um jogo precise.</string>
+    <string name="settings_help_guest_cores">Define quantos threads convidados podem ser executados ao mesmo tempo quando o agendamento preciso de threads está ativado. Um núcleo é o valor mais seguro; valores maiores podem melhorar a velocidade, mas podem reintroduzir problemas de sincronização.</string>
 </resources>

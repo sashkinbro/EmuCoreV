@@ -1399,7 +1399,14 @@ private fun ProfileFriendsDialog(
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { pendingRemove = null },
             title = { Text(stringResource(R.string.profile_friend_remove_title)) },
-            text = { Text(stringResource(R.string.profile_friend_remove_confirm)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.profile_friend_remove_confirm,
+                        profiles[friendship.otherUid]?.displayName ?: friendship.otherUid.take(8)
+                    )
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     onRemove(friendship.id)
@@ -1556,27 +1563,27 @@ private fun ProfileDevicesDialog(
                         }
                     }
                     Text(
-                        text = stringResource(R.string.profile_device_soc, device.soc.ifBlank { "—" }),
+                        text = "${stringResource(R.string.profile_device_soc)}: ${device.soc.ifBlank { "—" }}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = stringResource(R.string.profile_device_gpu, device.gpuFamily.ifBlank { "—" }),
+                        text = "${stringResource(R.string.profile_device_gpu)}: ${device.gpuFamily.ifBlank { "—" }}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = stringResource(R.string.profile_device_ram, device.ramMb),
+                        text = "${stringResource(R.string.profile_device_ram)}: ${device.ramMb}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = stringResource(R.string.profile_device_android, device.androidVersion),
+                        text = "${stringResource(R.string.profile_device_android)}: ${device.androidVersion}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = stringResource(R.string.profile_device_app_core, device.appVersion, device.coreVersion),
+                        text = "${stringResource(R.string.profile_device_app_core)}: ${device.appVersion} • ${device.coreVersion}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1730,27 +1737,27 @@ private fun PublicDeviceDialog(device: PublicPlayerDevice, onDismiss: () -> Unit
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
         )
         Text(
-            text = stringResource(R.string.profile_device_soc, device.soc.ifBlank { "—" }),
+            text = "${stringResource(R.string.profile_device_soc)}: ${device.soc.ifBlank { "—" }}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            text = stringResource(R.string.profile_device_gpu, device.gpuFamily.ifBlank { "—" }),
+            text = "${stringResource(R.string.profile_device_gpu)}: ${device.gpuFamily.ifBlank { "—" }}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            text = stringResource(R.string.profile_device_ram, device.ramMb),
+            text = "${stringResource(R.string.profile_device_ram)}: ${device.ramMb}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            text = stringResource(R.string.profile_device_android, device.androidVersion),
+            text = "${stringResource(R.string.profile_device_android)}: ${device.androidVersion}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            text = stringResource(R.string.profile_device_app_core, device.appVersion, device.coreVersion),
+            text = "${stringResource(R.string.profile_device_app_core)}: ${device.appVersion} • ${device.coreVersion}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -1948,11 +1955,6 @@ private fun ProfileOverview(
                                 ),
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                 modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                text = stringResource(R.string.profile_total_players, rank.totalPlayers),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -2551,7 +2553,8 @@ private fun AdvancedStatsContent(
                     }
                     val bestStreak = calculateStreaks(activity).second
                     Text(
-                        text = stringResource(R.string.profile_stats_best_streak, bestStreak),
+                        text = "${stringResource(R.string.profile_stats_best_streak)}: " +
+                            stringResource(R.string.profile_stats_days_format, bestStreak),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

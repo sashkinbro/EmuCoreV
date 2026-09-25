@@ -1325,4 +1325,8 @@
     <string name="profile_trophy_progress_format">%1$d з %2$d відкрито</string>
     <string name="nav_my_lists">Мої списки</string>
     <string name="drive_category_save_data">Збереження</string>
+    <string name="settings_core_accurate_thread_scheduling">Точне планування потоків</string>
+    <string name="settings_core_guest_cores">Ядра гостьового ЦП</string>
+    <string name="settings_help_accurate_thread_scheduling">Обмежує одночасне виконання гостьових потоків і суворіше дотримується пріоритетів потоків Vita.\n\nУвімкніть це для конкретної гри, якщо запуск зависає, виникають проблеми з таймінгами або нестабільне завантаження. Це може знизити продуктивність, тож залишайте вимкненим, якщо гра цього не потребує.</string>
+    <string name="settings_help_guest_cores">Визначає, скільки гостьових потоків можуть виконуватися одночасно, коли ввімкнено точне планування потоків. Одне ядро — найбезпечніший варіант; більші значення можуть підвищити швидкість, але повернути проблеми з таймінгами.</string>
 </resources>

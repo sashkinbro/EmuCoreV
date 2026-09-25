@@ -125,6 +125,7 @@ class PlayerProfileRepository(context: Context) {
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
     private val catalogRepository = VitaCatalogRepository(appContext)
+    private val coverUrlCache = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     fun observeAuthState(): Flow<PlayerAccount?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
@@ -456,7 +457,7 @@ class PlayerProfileRepository(context: Context) {
                     put(GAME_SESSIONS, existingGame.longValue(GAME_SESSIONS) + entry.sessionCount)
                     put(GAME_LAST_PLAYED_AT_MS, entry.lastPlayedAtMs)
                     entry.titleId.takeIf { it.isNotBlank() }?.let { put(GAME_SERIAL, it.take(MAX_SERIAL_LENGTH)) }
-                    buildShareableCoverPath(entry.coverArtPath, entry.titleId)?.let {
+                    buildShareableCoverPath(entry.coverArtPath, entry.titleId, cleanTitle)?.let {
                         put(GAME_COVER_ART_PATH, it.take(MAX_COVER_PATH_LENGTH))
                     }
                 }
@@ -722,7 +723,7 @@ class PlayerProfileRepository(context: Context) {
             gameKey = gameKey,
             title = title,
             serial = serial,
-            coverArtPath = resolveReadableCoverPath(map.stringValue(GAME_COVER_ART_PATH), serial),
+            coverArtPath = resolveReadableCoverPath(map.stringValue(GAME_COVER_ART_PATH), serial, title),
             totalPlayTimeMs = map.longValue(GAME_TOTAL_MS),
             sessions = map.longValue(GAME_SESSIONS).toInt(),
             lastPlayedAtMs = map.longValue(GAME_LAST_PLAYED_AT_MS).takeIf { it > 0L }
@@ -818,22 +819,31 @@ class PlayerProfileRepository(context: Context) {
         return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(timestampMs))
     }
 
-    private fun buildShareableCoverPath(coverArtPath: String?, titleId: String?): String? {
+    private fun buildShareableCoverPath(coverArtPath: String?, titleId: String?, title: String?): String? {
         val cover = coverArtPath?.trim().orEmpty()
         return when {
             cover.startsWith("http://") || cover.startsWith("https://") -> cover
-            else -> catalogRepository.findBySerial(titleId.orEmpty())?.coverUrl
+            else -> catalogCoverUrl(titleId, title)
         }
     }
 
-    private fun resolveReadableCoverPath(coverArtPath: String, titleId: String?): String? {
+    private fun resolveReadableCoverPath(coverArtPath: String, titleId: String?, title: String?): String? {
         val cover = coverArtPath.trim()
         return when {
             cover.startsWith("http://") || cover.startsWith("https://") -> cover
             cover.startsWith("content://") -> cover
             File(cover).exists() -> cover
-            else -> catalogRepository.findBySerial(titleId.orEmpty())?.coverUrl
+            else -> catalogCoverUrl(titleId, title)
         }
+    }
+
+    private fun catalogCoverUrl(titleId: String?, title: String?): String? {
+        val key = "${titleId.orEmpty()}|${title.orEmpty()}"
+        coverUrlCache[key]?.let { return it.ifEmpty { null } }
+        val resolved = catalogRepository.findBySerial(titleId.orEmpty())?.coverUrl
+            ?: title?.takeIf { it.isNotBlank() }?.let { name -> catalogRepository.findBestMatch(name)?.coverUrl }
+        coverUrlCache[key] = resolved.orEmpty()
+        return resolved
     }
 
     private fun String.sha256(): String {

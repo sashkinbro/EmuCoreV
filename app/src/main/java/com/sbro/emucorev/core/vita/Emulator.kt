@@ -45,6 +45,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.sbro.emucorev.MainActivity
+import com.sbro.emucorev.core.BackupSessionGate
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.PlayTimeRepository
 import com.sbro.emucorev.core.VitaCoreConfig
@@ -60,6 +61,7 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.ProfilePlayTimeSyncer
+import com.sbro.emucorev.data.drive.DriveBackupWork
 import com.sbro.emucorev.ui.common.ImmersiveMode
 import com.sbro.emucorev.ui.emulation.EmulationOverlayHost
 import com.sbro.emucorev.ui.theme.EmuCoreVTheme
@@ -755,7 +757,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         val gameId = currentGameIdOrIntent().trim()
         if (gameId.isBlank()) return
         if (playTimeSessionId != null && playTimeSessionTitleId.equals(gameId, ignoreCase = true)) return
-        finishPlayTimeSessionIfNeeded()
+        finishPlayTimeSessionIfNeeded(scheduleBackup = false)
 
         val title = InstalledGameRepository().findByTitleId(this, gameId)
             ?.title
@@ -769,9 +771,10 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         playTimeSessionId = session.id
         playTimeSessionTitleId = gameId
         playTimeSessionStartedAt = session.startedAt
+        BackupSessionGate.gameStarted()
     }
 
-    private fun finishPlayTimeSessionIfNeeded() {
+    private fun finishPlayTimeSessionIfNeeded(scheduleBackup: Boolean = true) {
         val sessionId = playTimeSessionId ?: return
         PlayTimeRepository(this).finishSession(sessionId)
         val durationMs = (System.currentTimeMillis() - playTimeSessionStartedAt).coerceAtLeast(0L)
@@ -785,6 +788,10 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         playTimeSessionId = null
         playTimeSessionTitleId = ""
         playTimeSessionStartedAt = 0L
+        if (scheduleBackup) {
+            BackupSessionGate.stopped()
+            DriveBackupWork.afterGame(applicationContext)
+        }
     }
 
     private fun hideSystemBars() {

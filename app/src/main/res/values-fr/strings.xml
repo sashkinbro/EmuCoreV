@@ -1322,4 +1322,8 @@
     <string name="profile_trophy_progress_format">%1$d sur %2$d débloqués</string>
     <string name="nav_my_lists">Mes listes</string>
     <string name="drive_category_save_data">Sauvegardes</string>
+    <string name="settings_core_accurate_thread_scheduling">Ordonnancement précis des threads</string>
+    <string name="settings_core_guest_cores">Cœurs du CPU invité</string>
+    <string name="settings_help_accurate_thread_scheduling">Limite l\'exécution simultanée des threads invités et respecte plus strictement les priorités de threads de la Vita.\n\nActivez ceci par jeu si le démarrage se bloque, en cas de problèmes de synchronisation ou de chargement instable. Cela peut réduire les performances ; laissez-le désactivé sauf si un jeu en a besoin.</string>
+    <string name="settings_help_guest_cores">Définit combien de threads invités peuvent s\'exécuter en même temps lorsque l\'ordonnancement précis des threads est activé. Un cœur est la valeur la plus sûre ; des valeurs plus élevées peuvent améliorer la vitesse mais réintroduire des problèmes de synchronisation.</string>
 </resources>

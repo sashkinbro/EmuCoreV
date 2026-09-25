@@ -1322,4 +1322,8 @@
     <string name="profile_trophy_progress_format">%1$d/%2$d açıldı</string>
     <string name="nav_my_lists">Listelerim</string>
     <string name="drive_category_save_data">Kayıt verileri</string>
+    <string name="settings_core_accurate_thread_scheduling">Hassas iş parçacığı zamanlaması</string>
+    <string name="settings_core_guest_cores">Misafir CPU çekirdekleri</string>
+    <string name="settings_help_accurate_thread_scheduling">Misafir yürütmeyi aynı anda sınırlar ve Vita iş parçacığı önceliklerini daha katı uygular.\n\nBaşlatma takılırsa, zamanlama hataları veya kararsız yükleme olursa bunu oyun başına etkinleştirin. Performansı düşürebilir; bir oyun gerektirmedikçe kapalı bırakın.</string>
+    <string name="settings_help_guest_cores">Hassas iş parçacığı zamanlaması etkinken aynı anda kaç misafir iş parçacığının çalışabileceğini belirler. Tek çekirdek en güvenli varsayılandır; yüksek değerler hızı artırabilir ancak zamanlama sorunlarını geri getirebilir.</string>
 </resources>

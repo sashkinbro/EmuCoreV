@@ -223,9 +223,11 @@ class DriveBackupArchive(private val context: Context) {
                 val change = changes.getJSONObject(i)
                 replaceFile(File(stage, change.getString("name")), File(change.getString("target")))
             }
-            settingsRepository.restoreJson(JSONObject(File(stage, "settings.json").readText()),
+            settingsRepository.restoreJson(
+                rebaseCustomizationPaths(JSONObject(File(stage, "settings.json").readText()), categories),
                 applyApp = "settings" in categories, applyCore = "settings" in categories,
-                applyCustomization = "customization" in categories)
+                applyCustomization = "customization" in categories
+            )
             writeAtomic(journal.baseFile, record.put("committed", true))
         } catch (error: Throwable) {
             withContext(NonCancellable) { recoverPending() }
@@ -250,6 +252,29 @@ class DriveBackupArchive(private val context: Context) {
             settingsRepository.restoreJson(JSONObject(File(transaction, "settings.json").readText()))
         }
         journal.delete()
+    }
+
+    /** Archive paths come from the source device, so they must point at the restored local files. */
+    private fun rebaseCustomizationPaths(settings: JSONObject, categories: Set<String>): JSONObject {
+        if ("customization" !in categories) return settings
+        val customizationDir = File(context.filesDir, "customization")
+        settings.optJSONObject("customization")?.let { customization ->
+            customization.optString("backgroundPath").takeIf { it.isNotBlank() }?.let { stored ->
+                val restored = File(customizationDir, stored.substringAfterLast('/'))
+                if (restored.isFile) {
+                    customization.put("backgroundPath", restored.absolutePath)
+                } else {
+                    customization.remove("backgroundPath")
+                    customization.remove("backgroundMimeType")
+                }
+            }
+            customization.optString("customFontPath").takeIf { it.isNotBlank() }?.let { stored ->
+                val restored = File(customizationDir, stored.substringAfterLast('/'))
+                if (restored.isFile) customization.put("customFontPath", restored.absolutePath)
+                else customization.remove("customFontPath")
+            }
+        }
+        return settings
     }
 
     private fun replaceFile(source: File, target: File) {

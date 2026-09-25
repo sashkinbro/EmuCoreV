@@ -1321,4 +1321,8 @@
     <string name="profile_trophy_progress_format">已解锁 %1$d/%2$d</string>
     <string name="nav_my_lists">我的列表</string>
     <string name="drive_category_save_data">存档数据</string>
+    <string name="settings_core_accurate_thread_scheduling">精确线程调度</string>
+    <string name="settings_core_guest_cores">来宾 CPU 核心</string>
+    <string name="settings_help_accurate_thread_scheduling">限制来宾线程的并发执行，并更严格地遵循 Vita 线程优先级。\n\n当游戏启动卡住、出现时序问题或加载不稳定时，可为该游戏启用。它可能降低性能，因此除非某个游戏需要，否则请保持关闭。</string>
+    <string name="settings_help_guest_cores">设置在启用精确线程调度时允许同时执行的来宾线程数量。单核心是最安全的默认值；更高的值可能提升速度，但可能重新引入时序问题。</string>
 </resources>

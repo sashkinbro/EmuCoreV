@@ -1322,4 +1322,8 @@
     <string name="profile_trophy_progress_format">%1$d di %2$d sbloccati</string>
     <string name="nav_my_lists">Le mie liste</string>
     <string name="drive_category_save_data">Dati di salvataggio</string>
+    <string name="settings_core_accurate_thread_scheduling">Pianificazione precisa dei thread</string>
+    <string name="settings_core_guest_cores">Core CPU guest</string>
+    <string name="settings_help_accurate_thread_scheduling">Limita l\'esecuzione simultanea dei thread guest e rispetta con più rigore le priorità dei thread Vita.\n\nAttivalo per singolo gioco se l\'avvio si blocca, ci sono problemi di timing o caricamenti instabili. Può ridurre le prestazioni, quindi lascialo disattivato a meno che un gioco non lo richieda.</string>
+    <string name="settings_help_guest_cores">Stabilisce quanti thread guest possono essere eseguiti contemporaneamente quando la pianificazione precisa dei thread è attiva. Un core è il valore più sicuro; valori più alti possono migliorare la velocità ma reintrodurre problemi di timing.</string>
 </resources>
