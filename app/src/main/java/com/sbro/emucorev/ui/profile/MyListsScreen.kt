@@ -1,5 +1,11 @@
 package com.sbro.emucorev.ui.profile
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +48,7 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.ViewModule
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -57,12 +64,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -99,11 +108,22 @@ fun MyListsScreen(
     viewModel: MyListsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val useDenseCards = configuration.useMultiColumnLayout()
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val guardedBackClick = rememberDebouncedClick(onClick = onBackClick)
     val gridState = rememberLazyGridState()
+    val cloudPreferences = remember(context) {
+        context.getSharedPreferences("my_lists_preferences", android.content.Context.MODE_PRIVATE)
+    }
+    var cloudCardHidden by rememberSaveable {
+        mutableStateOf(cloudPreferences.getBoolean("cloud_card_hidden", false))
+    }
+    val setCloudCardHidden: (Boolean) -> Unit = { hidden ->
+        cloudCardHidden = hidden
+        cloudPreferences.edit().putBoolean("cloud_card_hidden", hidden).apply()
+    }
 
     Box(
         modifier = Modifier
@@ -133,22 +153,32 @@ fun MyListsScreen(
                         MyListsHeader(
                             totalCount = uiState.totalCount,
                             layoutMode = uiState.layoutMode,
+                            cloudCardVisible = !cloudCardHidden,
                             onBackClick = guardedBackClick,
                             onMenuClick = onMenuClick,
+                            onToggleCloudCard = { setCloudCardHidden(!cloudCardHidden) },
                             onRefresh = viewModel::refresh,
                             onLayoutMode = viewModel::setLayoutMode
                         )
                     }
                     item {
-                        MyListsCloudCard(
-                            isSignedIn = uiState.isSignedIn,
-                            accountEmail = uiState.accountEmail,
-                            isBusy = uiState.isCloudBusy,
-                            message = uiState.cloudMessage,
-                            onBackup = viewModel::backup,
-                            onRestore = viewModel::restore,
-                            onDismissMessage = viewModel::clearCloudMessage
-                        )
+                        AnimatedVisibility(
+                            visible = !cloudCardHidden,
+                            enter = fadeIn(animationSpec = tween(180)) +
+                                expandVertically(animationSpec = tween(240)),
+                            exit = fadeOut(animationSpec = tween(140)) +
+                                shrinkVertically(animationSpec = tween(240))
+                        ) {
+                            MyListsCloudCard(
+                                isSignedIn = uiState.isSignedIn,
+                                accountEmail = uiState.accountEmail,
+                                isBusy = uiState.isCloudBusy,
+                                message = uiState.cloudMessage,
+                                onBackup = viewModel::backup,
+                                onRestore = viewModel::restore,
+                                onDismissMessage = viewModel::clearCloudMessage
+                            )
+                        }
                     }
                     if (uiState.totalCount == 0) {
                         item { MyListsEmptyState() }
@@ -211,22 +241,32 @@ fun MyListsScreen(
                         MyListsHeader(
                             totalCount = uiState.totalCount,
                             layoutMode = uiState.layoutMode,
+                            cloudCardVisible = !cloudCardHidden,
                             onBackClick = guardedBackClick,
                             onMenuClick = onMenuClick,
+                            onToggleCloudCard = { setCloudCardHidden(!cloudCardHidden) },
                             onRefresh = viewModel::refresh,
                             onLayoutMode = viewModel::setLayoutMode
                         )
                     }
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        MyListsCloudCard(
-                            isSignedIn = uiState.isSignedIn,
-                            accountEmail = uiState.accountEmail,
-                            isBusy = uiState.isCloudBusy,
-                            message = uiState.cloudMessage,
-                            onBackup = viewModel::backup,
-                            onRestore = viewModel::restore,
-                            onDismissMessage = viewModel::clearCloudMessage
-                        )
+                        AnimatedVisibility(
+                            visible = !cloudCardHidden,
+                            enter = fadeIn(animationSpec = tween(180)) +
+                                expandVertically(animationSpec = tween(240)),
+                            exit = fadeOut(animationSpec = tween(140)) +
+                                shrinkVertically(animationSpec = tween(240))
+                        ) {
+                            MyListsCloudCard(
+                                isSignedIn = uiState.isSignedIn,
+                                accountEmail = uiState.accountEmail,
+                                isBusy = uiState.isCloudBusy,
+                                message = uiState.cloudMessage,
+                                onBackup = viewModel::backup,
+                                onRestore = viewModel::restore,
+                                onDismissMessage = viewModel::clearCloudMessage
+                            )
+                        }
                     }
                     if (uiState.totalCount == 0) {
                         item(span = { GridItemSpan(maxLineSpan) }) { MyListsEmptyState() }
@@ -280,8 +320,10 @@ fun MyListsScreen(
 private fun MyListsHeader(
     totalCount: Int,
     layoutMode: MyListsLayoutMode,
+    cloudCardVisible: Boolean,
     onBackClick: () -> Unit,
     onMenuClick: (() -> Unit)?,
+    onToggleCloudCard: () -> Unit,
     onRefresh: () -> Unit,
     onLayoutMode: (MyListsLayoutMode) -> Unit
 ) {
@@ -305,6 +347,14 @@ private fun MyListsHeader(
                 text = stringResource(R.string.profile_game_count, totalCount),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        IconButton(onClick = onToggleCloudCard) {
+            Icon(
+                imageVector = if (cloudCardVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.CloudUpload,
+                contentDescription = stringResource(
+                    if (cloudCardVisible) R.string.profile_hide_backup else R.string.profile_show_backup
+                )
             )
         }
         IconButton(onClick = onRefresh) {
