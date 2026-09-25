@@ -236,6 +236,10 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.work.runtime)
     implementation(libs.google.play.review.ktx)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.google.identity)
+    implementation(libs.google.auth)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

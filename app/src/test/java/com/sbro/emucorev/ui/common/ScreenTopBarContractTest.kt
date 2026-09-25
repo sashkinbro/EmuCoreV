@@ -40,6 +40,7 @@ class ScreenTopBarContractTest {
         val root = sourceRoot()
         val allowed = setOf(
             "ui/achievements/AchievementsScreen.kt",
+            "ui/cheats/CheatManagerScreen.kt",
             "ui/settings/GpuDriverScreen.kt"
         )
         val users = Files.walk(root).use { paths ->

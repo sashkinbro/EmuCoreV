@@ -71,6 +71,7 @@ import com.sbro.emucorev.ui.common.LocalImage
 import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
+import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import com.sbro.emucorev.ui.theme.neon.neonShape
 
 @Composable
@@ -734,6 +735,7 @@ private fun CheatCatalogCard(
             Button(
                 onClick = onDownload,
                 enabled = !busy,
+                shape = neonButtonShape(),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (busy) {

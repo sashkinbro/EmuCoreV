@@ -59,6 +59,7 @@ import com.jakewharton.processphoenix.ProcessPhoenix
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.InstalledGameRepository
+import com.sbro.emucorev.data.ProfilePlayTimeSyncer
 import com.sbro.emucorev.ui.common.ImmersiveMode
 import com.sbro.emucorev.ui.emulation.EmulationOverlayHost
 import com.sbro.emucorev.ui.theme.EmuCoreVTheme
@@ -773,6 +774,14 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private fun finishPlayTimeSessionIfNeeded() {
         val sessionId = playTimeSessionId ?: return
         PlayTimeRepository(this).finishSession(sessionId)
+        val durationMs = (System.currentTimeMillis() - playTimeSessionStartedAt).coerceAtLeast(0L)
+        val titleId = playTimeSessionTitleId
+        if (titleId.isNotBlank() && durationMs > 0L) {
+            val title = runCatching {
+                InstalledGameRepository().findByTitleId(this, titleId)?.title
+            }.getOrNull().orEmpty().ifBlank { titleId }
+            ProfilePlayTimeSyncer.recordAndSync(applicationContext, titleId, title, durationMs)
+        }
         playTimeSessionId = null
         playTimeSessionTitleId = ""
         playTimeSessionStartedAt = 0L

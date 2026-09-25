@@ -118,6 +118,37 @@ class VitaCatalogRepository(private val context: Context) {
         }.orEmpty()
     }
 
+    fun findBySerial(serial: String): VitaCatalogEntry? {
+        val value = serial.trim()
+        if (value.isBlank()) return null
+        return openDatabase()?.use { database ->
+            database.rawQuery(
+                """
+                SELECT g.igdb_id, g.name, g.year, g.rating, g.summary, g.cover_url, g.hero_url
+                FROM games g
+                INNER JOIN game_serials s ON s.igdb_id = g.igdb_id
+                WHERE s.serial = ? COLLATE NOCASE
+                LIMIT 1
+                """.trimIndent(),
+                arrayOf(value)
+            ).use { cursor ->
+                if (!cursor.moveToFirst()) return@use null
+                val igdbId = cursor.getLong(0)
+                VitaCatalogEntry(
+                    igdbId = igdbId,
+                    name = cursor.getString(1).orEmpty(),
+                    year = cursor.takeIf { !it.isNull(2) }?.getInt(2),
+                    rating = cursor.takeIf { !it.isNull(3) }?.getFloat(3),
+                    summary = cursor.getString(4),
+                    coverUrl = cursor.getString(5),
+                    heroUrl = cursor.getString(6),
+                    genres = loadGenres(database, igdbId),
+                    serials = loadSerials(database, igdbId)
+                )
+            }
+        }
+    }
+
     fun findBestMatch(gameName: String): VitaCatalogEntry? {
         val query = gameName.trim()
         if (query.isBlank()) return null

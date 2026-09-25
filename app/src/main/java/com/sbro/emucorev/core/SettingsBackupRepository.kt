@@ -6,6 +6,7 @@ import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.AppFont
 import com.sbro.emucorev.data.CustomizationPreferences
 import org.json.JSONObject
+import java.io.File
 
 class SettingsBackupRepository(
     private val context: Context,
@@ -13,9 +14,9 @@ class SettingsBackupRepository(
     private val coreConfigRepository: VitaCoreConfigRepository,
     private val customizationPreferences: CustomizationPreferences
 ) {
-    fun exportTo(uri: Uri) {
+    fun exportJson(): JSONObject {
         val config = coreConfigRepository.ensureDefaultsPersisted()
-        val root = JSONObject()
+        return JSONObject()
             .put("format", BACKUP_FORMAT_VERSION)
             .put(
                 "app",
@@ -43,45 +44,59 @@ class SettingsBackupRepository(
                     .put("touchControlPressEffect", customizationPreferences.current.touchControlPressEffect.name)
                     .put("gameMenuLayoutStyle", customizationPreferences.current.gameMenuLayoutStyle.name)
                     .put("drawerVisualStyle", customizationPreferences.current.drawerVisualStyle.name)
+                    .putNullable("customFontPath", customizationPreferences.current.customFontPath)
+                    .putNullable("backgroundPath", customizationPreferences.current.backgroundPath)
+                    .putNullable("backgroundMimeType", customizationPreferences.current.backgroundMimeType)
             )
+    }
 
+    fun exportTo(uri: Uri) {
+        val root = exportJson()
         context.contentResolver.openOutputStream(uri)?.use { output ->
             output.write(root.toString(2).toByteArray(Charsets.UTF_8))
         } ?: error("Could not open backup destination")
     }
 
-    fun restoreFrom(uri: Uri): VitaCoreConfig {
-        val text = context.contentResolver.openInputStream(uri)?.use { input ->
-            input.bufferedReader(Charsets.UTF_8).readText()
-        } ?: error("Could not open backup file")
-
-        val root = JSONObject(text)
-        require(root.optInt("format", -1) == BACKUP_FORMAT_VERSION) {
-            "Unsupported settings backup format"
-        }
-
-        root.optJSONObject("app")?.let { app ->
-            preferences.packagesFolderUri = app.optNullableString("packagesFolderUri")
-            preferences.vitaStorageRootPath = app.optNullableString("vitaStorageRootPath")
-            preferences.onboardingCompleted = app.optBoolean(
-                "onboardingCompleted",
-                preferences.onboardingCompleted
-            )
+    fun restoreJson(
+        root: JSONObject,
+        applyApp: Boolean = true,
+        applyCore: Boolean = true,
+        applyCustomization: Boolean = true
+    ): VitaCoreConfig {
+        if (applyApp) root.optJSONObject("app")?.let { app ->
             preferences.themeMode = app.optEnum("themeMode", preferences.themeMode)
             preferences.appLanguage = app.optEnum("appLanguage", preferences.appLanguage)
-            preferences.skippedUpdateTag = app.optNullableString("skippedUpdateTag")
             preferences.applyAppLanguage()
         }
-        root.optJSONObject("customization")?.let { customization ->
+        if (applyCustomization) root.optJSONObject("customization")?.let { customization ->
             customizationPreferences.setCoverSizePercent(
                 customization.optInt(
                     "coverSizePercent",
                     customizationPreferences.current.coverSizePercent
                 )
             )
-            customizationPreferences.setAppFont(
-                customization.optEnum("appFont", AppFont.SYSTEM)
-            )
+            if (customization.has("customFontPath")) {
+                val customFontPath = customization.optNullableString("customFontPath")
+                val requestedFont = customization.optEnum("appFont", AppFont.SYSTEM)
+                if (requestedFont == AppFont.CUSTOM && customFontPath != null && File(customFontPath).isFile) {
+                    customizationPreferences.setAppFont(AppFont.CUSTOM, customFontPath)
+                } else {
+                    customizationPreferences.setAppFont(AppFont.SYSTEM, null)
+                }
+            } else {
+                customizationPreferences.setAppFont(
+                    customization.optEnum("appFont", AppFont.SYSTEM)
+                )
+            }
+            if (customization.has("backgroundPath")) {
+                val backgroundPath = customization.optNullableString("backgroundPath")
+                val backgroundMimeType = customization.optNullableString("backgroundMimeType")
+                if (backgroundPath != null && backgroundMimeType != null && File(backgroundPath).isFile) {
+                    customizationPreferences.setBackground(backgroundPath, backgroundMimeType)
+                } else {
+                    customizationPreferences.clearBackground()
+                }
+            }
             customizationPreferences.setTextSizePercent(
                 customization.optInt(
                     "textSizePercent",
@@ -114,10 +129,25 @@ class SettingsBackupRepository(
             )
         }
 
-        val restoredConfig = root.optJSONObject("core")
-            ?.toVitaCoreConfig(coreConfigRepository.ensureDefaultsPersisted())
-            ?: coreConfigRepository.ensureDefaultsPersisted()
-        coreConfigRepository.save(restoredConfig)
+        if (applyCore) {
+            val restoredConfig = root.optJSONObject("core")
+                ?.toVitaCoreConfig(coreConfigRepository.ensureDefaultsPersisted())
+                ?: coreConfigRepository.ensureDefaultsPersisted()
+            coreConfigRepository.save(restoredConfig)
+        }
+        return coreConfigRepository.ensureDefaultsPersisted()
+    }
+
+    fun restoreFrom(uri: Uri): VitaCoreConfig {
+        val text = context.contentResolver.openInputStream(uri)?.use { input ->
+            input.bufferedReader(Charsets.UTF_8).readText()
+        } ?: error("Could not open backup file")
+
+        val root = JSONObject(text)
+        require(root.optInt("format", -1) == BACKUP_FORMAT_VERSION) {
+            "Unsupported settings backup format"
+        }
+        restoreJson(root)
         return coreConfigRepository.ensureDefaultsPersisted()
     }
 

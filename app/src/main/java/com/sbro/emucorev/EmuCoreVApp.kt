@@ -8,12 +8,14 @@ import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.NativeLibraryLoader
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.data.AppPreferences
+import com.sbro.emucorev.data.ProfilePlayTimeSyncer
 
 class EmuCoreVApp : Application() {
     override fun onCreate() {
         super.onCreate()
         AndroidDiagnostics.initialize(this)
         AppIconManager.applyProIcon(this, AppPreferences(this).proUnlocked)
+        ProfilePlayTimeSyncer.syncPendingAsync(this)
         runCatching {
             EmulatorStorage.prepareRuntime(this)
             VitaCoreConfigRepository(this).ensureDefaultsPersisted()

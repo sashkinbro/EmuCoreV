@@ -1,6 +1,6 @@
 [versions]
 agp = "9.4.1"
-coreKtx = "1.19.0"
+coreKtx = "1.19.1"
 junit = "4.13.2"
 robolectric = "4.17"
 junitVersion = "1.3.0"
@@ -10,7 +10,7 @@ lifecycleViewmodelCompose = "2.11.0"
 activityCompose = "1.13.0"
 kotlin = "2.4.20"
 composeBom = "2026.09.00"
-navigationCompose = "2.10.1"
+navigationCompose = "2.10.2"
 documentfile = "1.1.0"
 appcompat = "1.8.0"
 material = "1.14.0"
@@ -25,8 +25,11 @@ firebaseBom = "34.19.0"
 googleServices = "4.5.0"
 billing = "9.1.0"
 kotlinxSerializationJson = "1.11.0"
-workManager = "2.11.2"
+workManager = "2.12.0"
 playReview = "2.0.2"
+credentials = "1.6.0"
+googleId = "1.2.1"
+googleAuth = "22.0.0"
 
 [libraries]
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
@@ -65,6 +68,10 @@ google-play-review = { group = "com.google.android.play", name = "review", versi
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 androidx-work-runtime = { group = "androidx.work", name = "work-runtime", version.ref = "workManager" }
 google-play-review-ktx = { group = "com.google.android.play", name = "review-ktx", version.ref = "playReview" }
+androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
+androidx-credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
+google-identity = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleId" }
+google-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "googleAuth" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
