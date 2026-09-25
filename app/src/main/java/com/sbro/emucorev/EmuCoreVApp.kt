@@ -17,6 +17,9 @@ import kotlinx.coroutines.runBlocking
 class EmuCoreVApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        // ProcessPhoenix restarts the app through a helper process where Firebase providers
+        // are not initialized; that process must not build the emulator-side graph.
+        if (Application.getProcessName().endsWith(PHOENIX_PROCESS_SUFFIX)) return
         AndroidDiagnostics.initialize(this)
         AppIconManager.applyProIcon(this, AppPreferences(this).proUnlocked)
         ProfilePlayTimeSyncer.syncPendingAsync(this)
@@ -66,5 +69,9 @@ class EmuCoreVApp : Application() {
         if (NativeLibraryLoader.isNativeSessionInitialized()) {
             NativeLib.onTrimMemory(80)
         }
+    }
+
+    private companion object {
+        const val PHOENIX_PROCESS_SUFFIX = ":phoenix"
     }
 }

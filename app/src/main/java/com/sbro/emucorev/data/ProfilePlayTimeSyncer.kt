@@ -53,15 +53,17 @@ class ProfilePlayTimeSyncer(private val context: Context) {
         fun recordAndSync(context: Context, titleId: String, title: String, durationMs: Long) {
             val applicationContext = context.applicationContext
             scope.launch {
-                val syncer = ProfilePlayTimeSyncer(applicationContext)
-                syncer.recordSession(titleId, title, durationMs)
-                syncer.syncPending()
+                runCatching {
+                    val syncer = ProfilePlayTimeSyncer(applicationContext)
+                    syncer.recordSession(titleId, title, durationMs)
+                    syncer.syncPending()
+                }
             }
         }
 
         fun syncPendingAsync(context: Context) {
             val applicationContext = context.applicationContext
-            scope.launch { ProfilePlayTimeSyncer(applicationContext).syncPending() }
+            scope.launch { runCatching { ProfilePlayTimeSyncer(applicationContext).syncPending() } }
         }
     }
 }

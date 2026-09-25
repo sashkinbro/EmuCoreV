@@ -202,7 +202,7 @@ class TrophyCloudRepository(context: Context) {
 
         fun syncAsync(context: Context) {
             val applicationContext = context.applicationContext
-            scope.launch { TrophyCloudRepository(applicationContext).sync() }
+            scope.launch { runCatching { TrophyCloudRepository(applicationContext).sync() } }
         }
     }
 }
