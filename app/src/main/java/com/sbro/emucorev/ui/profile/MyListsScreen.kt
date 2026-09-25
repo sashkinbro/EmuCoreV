@@ -34,12 +34,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.ViewModule
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -81,6 +85,7 @@ import com.sbro.emucorev.ui.theme.CompactCardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
+import com.sbro.emucorev.ui.theme.neon.neonPillShape
 import com.sbro.emucorev.ui.theme.neon.neonShape
 import com.sbro.emucorev.ui.theme.useMultiColumnLayout
 import java.util.Locale
@@ -132,6 +137,17 @@ fun MyListsScreen(
                             onMenuClick = onMenuClick,
                             onRefresh = viewModel::refresh,
                             onLayoutMode = viewModel::setLayoutMode
+                        )
+                    }
+                    item {
+                        MyListsCloudCard(
+                            isSignedIn = uiState.isSignedIn,
+                            accountEmail = uiState.accountEmail,
+                            isBusy = uiState.isCloudBusy,
+                            message = uiState.cloudMessage,
+                            onBackup = viewModel::backup,
+                            onRestore = viewModel::restore,
+                            onDismissMessage = viewModel::clearCloudMessage
                         )
                     }
                     if (uiState.totalCount == 0) {
@@ -199,6 +215,17 @@ fun MyListsScreen(
                             onMenuClick = onMenuClick,
                             onRefresh = viewModel::refresh,
                             onLayoutMode = viewModel::setLayoutMode
+                        )
+                    }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        MyListsCloudCard(
+                            isSignedIn = uiState.isSignedIn,
+                            accountEmail = uiState.accountEmail,
+                            isBusy = uiState.isCloudBusy,
+                            message = uiState.cloudMessage,
+                            onBackup = viewModel::backup,
+                            onRestore = viewModel::restore,
+                            onDismissMessage = viewModel::clearCloudMessage
                         )
                     }
                     if (uiState.totalCount == 0) {
@@ -318,6 +345,117 @@ private fun MyListsSectionTitle(title: String, count: Int) {
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             color = MaterialTheme.colorScheme.primary
         )
+    }
+}
+
+@Composable
+private fun MyListsCloudCard(
+    isSignedIn: Boolean,
+    accountEmail: String?,
+    isBusy: Boolean,
+    message: String?,
+    onBackup: () -> Unit,
+    onRestore: () -> Unit,
+    onDismissMessage: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = neonShape(22.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = profileCardBorder()
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.size(42.dp),
+                    shape = neonShape(14.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.CloudUpload,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = stringResource(R.string.my_lists_cloud_title),
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Text(
+                        text = stringResource(
+                            if (isSignedIn) R.string.my_lists_cloud_synced else R.string.my_lists_cloud_hint
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (isSignedIn && !accountEmail.isNullOrBlank()) {
+                        Text(
+                            text = accountEmail,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+            if (isSignedIn) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        shape = neonButtonShape(),
+                        enabled = !isBusy,
+                        onClick = onBackup,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (isBusy) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Rounded.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.width(7.dp))
+                        Text(stringResource(R.string.profile_backup), maxLines = 1)
+                    }
+                    OutlinedButton(
+                        shape = neonButtonShape(),
+                        enabled = !isBusy,
+                        onClick = onRestore,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Rounded.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(7.dp))
+                        Text(stringResource(R.string.profile_restore), maxLines = 1)
+                    }
+                }
+            }
+            message?.let { text ->
+                Surface(
+                    shape = neonPillShape(),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                    onClick = onDismissMessage
+                ) {
+                    Text(
+                        text = text,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
     }
 }
 

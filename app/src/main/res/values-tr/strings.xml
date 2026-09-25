@@ -1326,4 +1326,18 @@
     <string name="settings_core_guest_cores">Misafir CPU çekirdekleri</string>
     <string name="settings_help_accurate_thread_scheduling">Misafir yürütmeyi aynı anda sınırlar ve Vita iş parçacığı önceliklerini daha katı uygular.\n\nBaşlatma takılırsa, zamanlama hataları veya kararsız yükleme olursa bunu oyun başına etkinleştirin. Performansı düşürebilir; bir oyun gerektirmedikçe kapalı bırakın.</string>
     <string name="settings_help_guest_cores">Hassas iş parçacığı zamanlaması etkinken aynı anda kaç misafir iş parçacığının çalışabileceğini belirler. Tek çekirdek en güvenli varsayılandır; yüksek değerler hızı artırabilir ancak zamanlama sorunlarını geri getirebilir.</string>
+    <string name="settings_pro_feature_stats_title">Gelişmiş istatistikler</string>
+    <string name="settings_pro_feature_stats_desc">Profilinde haftalık etkinlik, seriler, oyun süresi geçmişi ve küresel sıralama.</string>
+    <string name="settings_pro_feature_custom_title">Profil kişiselleştirme</string>
+    <string name="settings_pro_feature_custom_desc">Profil vurgusu seç ve en fazla üç favori oyunu göster.</string>
+    <string name="settings_pro_feature_share_title">Oyuncu kartı paylaşımı</string>
+    <string name="settings_pro_feature_share_desc">Oyun süresi, oyunlar ve sıralamanla paylaşılabilir bir kart dışa aktar.</string>
+    <string name="profile_pro_upsell_title">EmuCoreV Pro\'nun kilidini aç</string>
+    <string name="profile_pro_upsell_body">Gelişmiş istatistikler, profil kişiselleştirme ve oyuncu kartı Pro ile kullanılabilir.</string>
+    <string name="my_lists_cloud_title">Bulut yedekleme</string>
+    <string name="my_lists_cloud_synced">Listelerin hesabında saklanır ve başka bir cihazda geri yüklenebilir.</string>
+    <string name="my_lists_cloud_hint">Listelerini hesaba kaydetmek için profiline giriş yap.</string>
+    <string name="profile_backup_done">Listeler kaydedildi</string>
+    <string name="profile_restore_done">Listeler geri yüklendi</string>
+    <string name="my_lists_cloud_failed">Yedekleme başarısız. Bağlantını kontrol edip tekrar dene.</string>
 </resources>

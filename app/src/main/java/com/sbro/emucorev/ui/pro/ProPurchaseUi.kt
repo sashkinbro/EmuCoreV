@@ -28,8 +28,11 @@ import com.sbro.emucorev.ui.theme.neon.neonShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.QueryStats
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -122,6 +125,9 @@ fun ProPurchasePanel(
                 ProFeatureRow(Icons.Rounded.Palette, R.string.settings_pro_feature_crimson_title, R.string.settings_pro_feature_crimson_desc)
                 ProFeatureRow(Icons.Rounded.Apps, R.string.settings_pro_feature_icon_title, R.string.settings_pro_feature_icon_desc)
                 ProFeatureRow(Icons.Rounded.AccountCircle, R.string.settings_pro_feature_profile_title, R.string.settings_pro_feature_badge_desc)
+                ProFeatureRow(Icons.Rounded.QueryStats, R.string.settings_pro_feature_stats_title, R.string.settings_pro_feature_stats_desc)
+                ProFeatureRow(Icons.Rounded.Brush, R.string.settings_pro_feature_custom_title, R.string.settings_pro_feature_custom_desc)
+                ProFeatureRow(Icons.Rounded.Share, R.string.settings_pro_feature_share_title, R.string.settings_pro_feature_share_desc)
             }
 
             if (!state.isProUnlocked) {
@@ -232,6 +238,21 @@ fun ProBenefitCards(modifier: Modifier = Modifier) {
             icon = Icons.Rounded.AccountCircle,
             titleRes = R.string.settings_pro_feature_profile_title,
             descriptionRes = R.string.settings_pro_feature_badge_desc
+        )
+        ProBenefitCard(
+            icon = Icons.Rounded.QueryStats,
+            titleRes = R.string.settings_pro_feature_stats_title,
+            descriptionRes = R.string.settings_pro_feature_stats_desc
+        )
+        ProBenefitCard(
+            icon = Icons.Rounded.Brush,
+            titleRes = R.string.settings_pro_feature_custom_title,
+            descriptionRes = R.string.settings_pro_feature_custom_desc
+        )
+        ProBenefitCard(
+            icon = Icons.Rounded.Share,
+            titleRes = R.string.settings_pro_feature_share_title,
+            descriptionRes = R.string.settings_pro_feature_share_desc
         )
     }
 }

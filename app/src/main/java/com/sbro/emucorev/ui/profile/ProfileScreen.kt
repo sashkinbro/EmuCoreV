@@ -53,6 +53,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.Login
 import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.automirrored.rounded.Logout
@@ -144,6 +145,7 @@ import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.UrlImage
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
+import com.sbro.emucorev.ui.pro.ProPurchasePanel
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
@@ -1017,13 +1019,66 @@ private fun MyListsActionCard(onClick: () -> Unit) {
                 Text(
                     text = stringResource(R.string.my_lists_subtitle),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            Text(
-                text = stringResource(R.string.my_lists_open),
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.primary
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileProUpsellCard(onClick: () -> Unit) {
+    val gold = Color(0xFFFFC857)
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = neonShape(20.dp),
+        color = gold.copy(alpha = 0.10f),
+        border = BorderStroke(1.dp, gold.copy(alpha = 0.5f))
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(42.dp),
+                shape = neonShape(14.dp),
+                color = gold.copy(alpha = 0.18f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Rounded.WorkspacePremium,
+                        contentDescription = null,
+                        tint = gold
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = stringResource(R.string.profile_pro_upsell_title),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stringResource(R.string.profile_pro_upsell_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = gold
             )
         }
     }
@@ -1813,6 +1868,7 @@ private fun ProfileOverview(
     onSignOut: () -> Unit
 ) {
     var showEditName by rememberSaveable { mutableStateOf(false) }
+    var showProDialog by rememberSaveable { mutableStateOf(false) }
     val avatarUrl = photoURL ?: profile?.photoURL
     val accent = profileAccentColor(profile?.profileAccent ?: "gold")
     if (showEditName) {
@@ -1823,6 +1879,11 @@ private fun ProfileOverview(
             onDismiss = { showEditName = false },
             onSave = { showEditName = false }
         )
+    }
+    if (showProDialog) {
+        ProfileFeatureDialog(title = stringResource(R.string.pro_title), onDismiss = { showProDialog = false }) {
+            ProPurchasePanel()
+        }
     }
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1960,30 +2021,34 @@ private fun ProfileOverview(
                     }
                 }
                 FavoriteGamesShowcase(profile = profile)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedButton(
-                        shape = neonButtonShape(),
-                        enabled = isProUnlocked && profile != null,
-                        onClick = onCustomizePro,
-                        modifier = Modifier.weight(1f)
+                if (isProUnlocked) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(Icons.Rounded.Palette, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(7.dp))
-                        Text(stringResource(R.string.profile_customize_pro), maxLines = 1)
+                        OutlinedButton(
+                            shape = neonButtonShape(),
+                            enabled = profile != null,
+                            onClick = onCustomizePro,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Rounded.Palette, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text(stringResource(R.string.profile_customize_pro), maxLines = 1)
+                        }
+                        OutlinedButton(
+                            shape = neonButtonShape(),
+                            enabled = profile != null,
+                            onClick = onShareCard,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text(stringResource(R.string.profile_player_card_share), maxLines = 1)
+                        }
                     }
-                    OutlinedButton(
-                        shape = neonButtonShape(),
-                        enabled = isProUnlocked && profile != null,
-                        onClick = onShareCard,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(7.dp))
-                        Text(stringResource(R.string.profile_player_card_share), maxLines = 1)
-                    }
+                } else {
+                    ProfileProUpsellCard(onClick = { showProDialog = true })
                 }
                 OutlinedButton(
                     shape = neonButtonShape(),

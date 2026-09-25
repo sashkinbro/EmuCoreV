@@ -1330,4 +1330,18 @@
     <string name="settings_core_guest_cores">أنوية المعالج للضيف</string>
     <string name="settings_help_accurate_thread_scheduling">يحدّ من التنفيذ المتزامن لخيوط الضيف ويلتزم بأولويات خيوط Vita بشكل أكثر صرامة.\n\nفعّل هذا لكل لعبة عند تعليق بدء التشغيل أو مشاكل التوقيت أو التحميل غير المستقر. قد يقلل الأداء، لذا اتركه معطلاً إلا إذا كانت اللعبة تحتاجه.</string>
     <string name="settings_help_guest_cores">يحدد عدد خيوط الضيف التي يمكن تنفيذها في وقت واحد عند تفعيل الجدولة الدقيقة للخيوط. نواة واحدة هي الإعداد الأكثر أمانًا؛ قد تؤدي القيم الأعلى إلى تحسين السرعة لكنها قد تعيد مشاكل التوقيت.</string>
+    <string name="settings_pro_feature_stats_title">إحصائيات موسّعة</string>
+    <string name="settings_pro_feature_stats_desc">النشاط الأسبوعي والسلاسل وسجل وقت اللعب والترتيب العالمي في ملفك.</string>
+    <string name="settings_pro_feature_custom_title">تخصيص الملف الشخصي</string>
+    <string name="settings_pro_feature_custom_desc">اختر لونًا للملف واعرض حتى ثلاثة ألعاب مفضلة.</string>
+    <string name="settings_pro_feature_share_title">مشاركة بطاقة اللاعب</string>
+    <string name="settings_pro_feature_share_desc">صدّر بطاقة تحتوي على وقت اللعب والألعاب والترتيب.</string>
+    <string name="profile_pro_upsell_title">افتح EmuCoreV Pro</string>
+    <string name="profile_pro_upsell_body">الإحصائيات الموسّعة وتخصيص الملف وبطاقة اللاعب متاحة مع Pro.</string>
+    <string name="my_lists_cloud_title">نسخة سحابية</string>
+    <string name="my_lists_cloud_synced">تُحفظ قوائمك في حسابك ويمكن استعادتها على جهاز آخر.</string>
+    <string name="my_lists_cloud_hint">سجّل الدخول إلى ملفك لحفظ قوائمك في الحساب.</string>
+    <string name="profile_backup_done">تم حفظ القوائم</string>
+    <string name="profile_restore_done">تمت استعادة القوائم</string>
+    <string name="my_lists_cloud_failed">فشل الحفظ. تحقق من الاتصال وحاول مرة أخرى.</string>
 </resources>

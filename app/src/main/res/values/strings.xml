@@ -1329,4 +1329,18 @@
     <string name="profile_trophy_progress_format">%1$d of %2$d unlocked</string>
     <string name="nav_my_lists">My lists</string>
     <string name="drive_category_save_data">Save data</string>
+    <string name="settings_pro_feature_stats_title">Extended statistics</string>
+    <string name="settings_pro_feature_stats_desc">Weekly activity, streaks, play-time history and global rank insights in your profile.</string>
+    <string name="settings_pro_feature_custom_title">Profile customization</string>
+    <string name="settings_pro_feature_custom_desc">Pick a profile accent and showcase up to three favorite games.</string>
+    <string name="settings_pro_feature_share_title">Player card sharing</string>
+    <string name="settings_pro_feature_share_desc">Export a shareable player card with your play time, games and rank.</string>
+    <string name="profile_pro_upsell_title">Unlock EmuCoreV Pro</string>
+    <string name="profile_pro_upsell_body">Extended statistics, profile customization and player card sharing are available with Pro.</string>
+    <string name="my_lists_cloud_title">Cloud backup</string>
+    <string name="my_lists_cloud_synced">Your lists are stored on your account and can be restored on another device.</string>
+    <string name="my_lists_cloud_hint">Sign in to your profile to back up your lists.</string>
+    <string name="profile_backup_done">Lists backed up</string>
+    <string name="profile_restore_done">Lists restored</string>
+    <string name="my_lists_cloud_failed">Backup failed. Check your connection and try again.</string>
 </resources>

@@ -1326,4 +1326,18 @@
     <string name="settings_core_guest_cores">गेस्ट CPU कोर</string>
     <string name="settings_help_accurate_thread_scheduling">गेस्ट थ्रेड्स के एक साथ निष्पादन को सीमित करता है और Vita थ्रेड प्राथमिकताओं का अधिक कड़ाई से पालन करता है।\n\nयदि स्टार्टअप अटकता है, टाइमिंग समस्याएँ या अस्थिर लोडिंग होती है, तो इसे प्रति-गेम चालू करें। यह प्रदर्शन घटा सकता है, इसलिए किसी गेम को ज़रूरत हो तभी चालू रखें।</string>
     <string name="settings_help_guest_cores">सटीक थ्रेड शेड्यूलिंग चालू होने पर एक बार में कितने गेस्ट थ्रेड चल सकते हैं, यह तय करता है। एक कोर सबसे सुरक्षित डिफ़ॉल्ट है; अधिक मान गति बढ़ा सकते हैं, पर टाइमिंग समस्याएँ लौटा सकते हैं।</string>
+    <string name="settings_pro_feature_stats_title">विस्तृत आँकड़े</string>
+    <string name="settings_pro_feature_stats_desc">आपकी प्रोफ़ाइल में साप्ताहिक गतिविधि, स्ट्रीक, खेल समय इतिहास और वैश्विक रैंक।</string>
+    <string name="settings_pro_feature_custom_title">प्रोफ़ाइल अनुकूलन</string>
+    <string name="settings_pro_feature_custom_desc">प्रोफ़ाइल रंग चुनें और तीन पसंदीदा गेम तक दिखाएँ।</string>
+    <string name="settings_pro_feature_share_title">प्लेयर कार्ड साझा करना</string>
+    <string name="settings_pro_feature_share_desc">खेल समय, गेम और रैंक के साथ साझा करने योग्य कार्ड निर्यात करें।</string>
+    <string name="profile_pro_upsell_title">EmuCoreV Pro अनलॉक करें</string>
+    <string name="profile_pro_upsell_body">विस्तृत आँकड़े, प्रोफ़ाइल अनुकूलन और प्लेयर कार्ड Pro के साथ उपलब्ध हैं।</string>
+    <string name="my_lists_cloud_title">क्लाउड बैकअप</string>
+    <string name="my_lists_cloud_synced">आपकी सूचियाँ खाते में सहेजी जाती हैं और किसी अन्य डिवाइस पर पुनर्स्थापित की जा सकती हैं।</string>
+    <string name="my_lists_cloud_hint">सूचियाँ खाते में सहेजने के लिए प्रोफ़ाइल में साइन इन करें।</string>
+    <string name="profile_backup_done">सूचियाँ सहेजी गईं</string>
+    <string name="profile_restore_done">सूचियाँ पुनर्स्थापित हुईं</string>
+    <string name="my_lists_cloud_failed">सहेजना विफल। कनेक्शन जाँचें और फिर प्रयास करें।</string>
 </resources>

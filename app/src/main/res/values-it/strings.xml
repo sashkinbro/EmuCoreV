@@ -1326,4 +1326,18 @@
     <string name="settings_core_guest_cores">Core CPU guest</string>
     <string name="settings_help_accurate_thread_scheduling">Limita l\'esecuzione simultanea dei thread guest e rispetta con più rigore le priorità dei thread Vita.\n\nAttivalo per singolo gioco se l\'avvio si blocca, ci sono problemi di timing o caricamenti instabili. Può ridurre le prestazioni, quindi lascialo disattivato a meno che un gioco non lo richieda.</string>
     <string name="settings_help_guest_cores">Stabilisce quanti thread guest possono essere eseguiti contemporaneamente quando la pianificazione precisa dei thread è attiva. Un core è il valore più sicuro; valori più alti possono migliorare la velocità ma reintrodurre problemi di timing.</string>
+    <string name="settings_pro_feature_stats_title">Statistiche avanzate</string>
+    <string name="settings_pro_feature_stats_desc">Attività settimanale, serie, cronologia di gioco e classifica globale nel tuo profilo.</string>
+    <string name="settings_pro_feature_custom_title">Personalizzazione del profilo</string>
+    <string name="settings_pro_feature_custom_desc">Scegli un accento del profilo e mostra fino a tre giochi preferiti.</string>
+    <string name="settings_pro_feature_share_title">Condivisione della scheda giocatore</string>
+    <string name="settings_pro_feature_share_desc">Esporta una scheda con tempo di gioco, giochi e posizione.</string>
+    <string name="profile_pro_upsell_title">Sblocca EmuCoreV Pro</string>
+    <string name="profile_pro_upsell_body">Statistiche avanzate, personalizzazione del profilo e scheda giocatore sono disponibili con Pro.</string>
+    <string name="my_lists_cloud_title">Backup cloud</string>
+    <string name="my_lists_cloud_synced">Le tue liste sono salvate sull\'account e possono essere ripristinate su un altro dispositivo.</string>
+    <string name="my_lists_cloud_hint">Accedi al profilo per salvare le liste sull\'account.</string>
+    <string name="profile_backup_done">Liste salvate</string>
+    <string name="profile_restore_done">Liste ripristinate</string>
+    <string name="my_lists_cloud_failed">Backup non riuscito. Controlla la connessione e riprova.</string>
 </resources>

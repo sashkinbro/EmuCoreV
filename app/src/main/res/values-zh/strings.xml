@@ -1325,4 +1325,18 @@
     <string name="settings_core_guest_cores">来宾 CPU 核心</string>
     <string name="settings_help_accurate_thread_scheduling">限制来宾线程的并发执行，并更严格地遵循 Vita 线程优先级。\n\n当游戏启动卡住、出现时序问题或加载不稳定时，可为该游戏启用。它可能降低性能，因此除非某个游戏需要，否则请保持关闭。</string>
     <string name="settings_help_guest_cores">设置在启用精确线程调度时允许同时执行的来宾线程数量。单核心是最安全的默认值；更高的值可能提升速度，但可能重新引入时序问题。</string>
+    <string name="settings_pro_feature_stats_title">扩展统计</string>
+    <string name="settings_pro_feature_stats_desc">在你的个人资料中查看每周活动、连续天数、游戏时长历史和全球排名。</string>
+    <string name="settings_pro_feature_custom_title">个人资料自定义</string>
+    <string name="settings_pro_feature_custom_desc">选择个人资料强调色并展示最多三款最爱游戏。</string>
+    <string name="settings_pro_feature_share_title">玩家卡片分享</string>
+    <string name="settings_pro_feature_share_desc">导出包含游戏时长、游戏和排名的可分享卡片。</string>
+    <string name="profile_pro_upsell_title">解锁 EmuCoreV Pro</string>
+    <string name="profile_pro_upsell_body">扩展统计、个人资料自定义和玩家卡片分享均随 Pro 提供。</string>
+    <string name="my_lists_cloud_title">云备份</string>
+    <string name="my_lists_cloud_synced">你的列表保存在账户中，可在其他设备上恢复。</string>
+    <string name="my_lists_cloud_hint">登录个人资料即可将列表保存到账户。</string>
+    <string name="profile_backup_done">列表已保存</string>
+    <string name="profile_restore_done">列表已恢复</string>
+    <string name="my_lists_cloud_failed">保存失败。请检查网络连接后重试。</string>
 </resources>

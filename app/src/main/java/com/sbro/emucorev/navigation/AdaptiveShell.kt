@@ -27,7 +27,6 @@ import com.sbro.emucorev.ui.theme.neon.neonShape
 import com.sbro.emucorev.ui.theme.neon.neonShapeCorners
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.EmojiEvents
@@ -106,7 +105,7 @@ fun AdaptiveShell(
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateProfile: () -> Unit = {},
-    onNavigateMyLists: () -> Unit = {},
+
     onNavigateFeedback: () -> Unit = {},
     onBackClick: (() -> Unit)? = null,
     onInstallFirmware: (() -> Unit)? = null,
@@ -128,7 +127,7 @@ fun AdaptiveShell(
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
             onNavigateProfile = onNavigateProfile,
-            onNavigateMyLists = onNavigateMyLists,
+
             onNavigateFeedback = onNavigateFeedback,
             onInstallFirmware = onInstallFirmware,
             onInstallContent = onInstallContent,
@@ -181,7 +180,7 @@ fun AdaptiveShell(
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
             onNavigateProfile = onNavigateProfile,
-            onNavigateMyLists = onNavigateMyLists,
+
             onNavigateFeedback = onNavigateFeedback,
             onBackClick = onBackClick,
             onInstallFirmware = onInstallFirmware,
@@ -208,7 +207,7 @@ private fun CompactAdaptiveShell(
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateProfile: () -> Unit,
-    onNavigateMyLists: () -> Unit,
+
     onNavigateFeedback: () -> Unit,
     onBackClick: (() -> Unit)?,
     onInstallFirmware: (() -> Unit)?,
@@ -293,7 +292,7 @@ private fun CompactAdaptiveShell(
                     onNavigateSearch = onNavigateSearch,
                     onNavigateSettings = onNavigateSettings,
                     onNavigateProfile = onNavigateProfile,
-                    onNavigateMyLists = onNavigateMyLists,
+
                     onNavigateFeedback = onNavigateFeedback,
                     onInstallFirmware = onInstallFirmware,
                     onInstallContent = onInstallContent,
@@ -328,7 +327,7 @@ private fun SideNavigation(
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateProfile: () -> Unit,
-    onNavigateMyLists: () -> Unit,
+
     onNavigateFeedback: () -> Unit,
     onInstallFirmware: (() -> Unit)?,
     onInstallContent: (() -> Unit)?,
@@ -393,10 +392,6 @@ private fun SideNavigation(
     val navigateProfile = rememberDebouncedClick {
         onCloseDrawer()
         onNavigateProfile()
-    }
-    val navigateMyLists = rememberDebouncedClick {
-        onCloseDrawer()
-        onNavigateMyLists()
     }
     val navigateFeedback = rememberDebouncedClick {
         onCloseDrawer()
@@ -484,12 +479,6 @@ private fun SideNavigation(
                 label = stringResource(R.string.nav_catalog),
                 selected = selected == PrimaryDestination.Search,
                 onClick = navigateSearch
-            )
-            ShellItem(
-                icon = Icons.AutoMirrored.Rounded.ViewList,
-                label = stringResource(R.string.nav_my_lists),
-                selected = selected == PrimaryDestination.MyLists,
-                onClick = navigateMyLists
             )
             ShellItem(
                 icon = Icons.Rounded.Settings,

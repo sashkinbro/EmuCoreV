@@ -1329,4 +1329,18 @@
     <string name="settings_core_guest_cores">Ядра гостьового ЦП</string>
     <string name="settings_help_accurate_thread_scheduling">Обмежує одночасне виконання гостьових потоків і суворіше дотримується пріоритетів потоків Vita.\n\nУвімкніть це для конкретної гри, якщо запуск зависає, виникають проблеми з таймінгами або нестабільне завантаження. Це може знизити продуктивність, тож залишайте вимкненим, якщо гра цього не потребує.</string>
     <string name="settings_help_guest_cores">Визначає, скільки гостьових потоків можуть виконуватися одночасно, коли ввімкнено точне планування потоків. Одне ядро — найбезпечніший варіант; більші значення можуть підвищити швидкість, але повернути проблеми з таймінгами.</string>
+    <string name="settings_pro_feature_stats_title">Розширена статистика</string>
+    <string name="settings_pro_feature_stats_desc">Тижнева активність, серії, історія часу гри та світовий рейтинг у профілі.</string>
+    <string name="settings_pro_feature_custom_title">Кастомізація профілю</string>
+    <string name="settings_pro_feature_custom_desc">Обирайте акцент профілю та показуйте до трьох улюблених ігор.</string>
+    <string name="settings_pro_feature_share_title">Поділитися карткою гравця</string>
+    <string name="settings_pro_feature_share_desc">Експортуйте картку з часом гри, іграми та місцем у рейтингу.</string>
+    <string name="profile_pro_upsell_title">Відкрийте EmuCoreV Pro</string>
+    <string name="profile_pro_upsell_body">Розширена статистика, кастомізація профілю та картка гравця доступні з Pro.</string>
+    <string name="my_lists_cloud_title">Хмарна копія</string>
+    <string name="my_lists_cloud_synced">Ваші списки зберігаються на акаунті та відновлюються на іншому пристрої.</string>
+    <string name="my_lists_cloud_hint">Увійдіть у профіль, щоб зберігати списки в акаунт.</string>
+    <string name="profile_backup_done">Списки збережено</string>
+    <string name="profile_restore_done">Списки відновлено</string>
+    <string name="my_lists_cloud_failed">Не вдалося зберегти. Перевірте з\'єднання та спробуйте ще раз.</string>
 </resources>

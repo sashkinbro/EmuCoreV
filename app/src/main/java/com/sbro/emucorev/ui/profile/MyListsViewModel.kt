@@ -3,6 +3,9 @@ package com.sbro.emucorev.ui.profile
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
+import com.sbro.emucorev.R
+import com.sbro.emucorev.data.FirebaseProfileBackupRepository
 import com.sbro.emucorev.data.ProfileCatalogGame
 import com.sbro.emucorev.data.ProfileGameListRepository
 import com.sbro.emucorev.data.ProfileGameStatus
@@ -21,7 +24,11 @@ data class MyListsUiState(
     val isLoading: Boolean = true,
     val layoutMode: MyListsLayoutMode = MyListsLayoutMode.GRID,
     val gamesByStatus: Map<ProfileGameStatus, List<ProfileCatalogGame>> = emptyMap(),
-    val favoriteGames: List<ProfileCatalogGame> = emptyList()
+    val favoriteGames: List<ProfileCatalogGame> = emptyList(),
+    val isSignedIn: Boolean = false,
+    val accountEmail: String? = null,
+    val isCloudBusy: Boolean = false,
+    val cloudMessage: String? = null
 ) {
     val totalCount: Int
         get() = (gamesByStatus.values.flatten() + favoriteGames).distinctBy { it.catalog.igdbId }.size
@@ -32,12 +39,56 @@ data class MyListsUiState(
 
 class MyListsViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ProfileGameListRepository(application)
+    private val cloudRepository = FirebaseProfileBackupRepository()
+    private val auth = FirebaseAuth.getInstance()
+    private val authListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        _uiState.value = _uiState.value.copy(
+            isSignedIn = firebaseAuth.currentUser != null,
+            accountEmail = firebaseAuth.currentUser?.email
+        )
+    }
 
     private val _uiState = MutableStateFlow(MyListsUiState())
     val uiState: StateFlow<MyListsUiState> = _uiState.asStateFlow()
 
     init {
+        auth.addAuthStateListener(authListener)
         refresh()
+    }
+
+    fun backup() = runCloudAction {
+        cloudRepository.backup(repository.loadEntries())
+        getApplication<Application>().getString(R.string.profile_backup_done)
+    }
+
+    fun restore() = runCloudAction {
+        val entries = cloudRepository.restore()
+        repository.replaceAll(entries)
+        refreshGames()
+        getApplication<Application>().getString(R.string.profile_restore_done)
+    }
+
+    fun clearCloudMessage() {
+        _uiState.value = _uiState.value.copy(cloudMessage = null)
+    }
+
+    private fun runCloudAction(action: suspend () -> String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.value = _uiState.value.copy(isCloudBusy = true, cloudMessage = null)
+            val message = runCatching { action() }.fold(
+                onSuccess = { it.takeIf(String::isNotBlank) },
+                onFailure = {
+                    it.localizedMessage
+                        ?: getApplication<Application>().getString(R.string.my_lists_cloud_failed)
+                }
+            )
+            _uiState.value = _uiState.value.copy(isCloudBusy = false, cloudMessage = message)
+        }
+    }
+
+    override fun onCleared() {
+        auth.removeAuthStateListener(authListener)
+        super.onCleared()
     }
 
     fun refresh() {

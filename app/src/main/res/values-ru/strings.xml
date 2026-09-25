@@ -1329,4 +1329,18 @@
     <string name="settings_core_guest_cores">Ядра гостевого ЦП</string>
     <string name="settings_help_accurate_thread_scheduling">Ограничивает одновременное выполнение гостевых потоков и строже соблюдает приоритеты потоков Vita.\n\nВключайте для конкретной игры, если запуск зависает, возникают проблемы с таймингами или нестабильная загрузка. Это может снизить производительность, поэтому оставляйте выключенным, если игра этого не требует.</string>
     <string name="settings_help_guest_cores">Задаёт, сколько гостевых потоков могут выполняться одновременно при включённом точном планировании потоков. Одно ядро — самый безопасный вариант; большие значения могут повысить скорость, но вернуть проблемы с таймингами.</string>
+    <string name="settings_pro_feature_stats_title">Расширенная статистика</string>
+    <string name="settings_pro_feature_stats_desc">Недельная активность, серии, история времени игры и мировой рейтинг в профиле.</string>
+    <string name="settings_pro_feature_custom_title">Кастомизация профиля</string>
+    <string name="settings_pro_feature_custom_desc">Выбирайте акцент профиля и показывайте до трёх любимых игр.</string>
+    <string name="settings_pro_feature_share_title">Поделиться карточкой игрока</string>
+    <string name="settings_pro_feature_share_desc">Экспортируйте карточку со временем игры, играми и местом в рейтинге.</string>
+    <string name="profile_pro_upsell_title">Откройте EmuCoreV Pro</string>
+    <string name="profile_pro_upsell_body">Расширенная статистика, кастомизация профиля и карточка игрока доступны с Pro.</string>
+    <string name="my_lists_cloud_title">Облачная копия</string>
+    <string name="my_lists_cloud_synced">Ваши списки хранятся на аккаунте и восстанавливаются на другом устройстве.</string>
+    <string name="my_lists_cloud_hint">Войдите в профиль, чтобы сохранять списки в аккаунт.</string>
+    <string name="profile_backup_done">Списки сохранены</string>
+    <string name="profile_restore_done">Списки восстановлены</string>
+    <string name="my_lists_cloud_failed">Не удалось сохранить. Проверьте соединение и попробуйте ещё раз.</string>
 </resources>

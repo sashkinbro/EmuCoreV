@@ -1326,4 +1326,18 @@
     <string name="settings_core_guest_cores">Gast-CPU-Kerne</string>
     <string name="settings_help_accurate_thread_scheduling">Begrenzt die gleichzeitige Ausführung von Gast-Threads und beachtet Vita-Thread-Prioritäten strikter.\n\nAktiviere dies pro Spiel, wenn der Start hängt, Timing-Probleme oder instabiles Laden auftreten. Es kann die Leistung verringern – lass es aus, außer ein Spiel benötigt es.</string>
     <string name="settings_help_guest_cores">Legt fest, wie viele Gast-Threads bei aktivierter genauer Thread-Planung gleichzeitig ausgeführt werden dürfen. Ein Kern ist die sicherste Voreinstellung; höhere Werte können die Geschwindigkeit verbessern, aber Timing-Probleme zurückbringen.</string>
+    <string name="settings_pro_feature_stats_title">Erweiterte Statistik</string>
+    <string name="settings_pro_feature_stats_desc">Wöchentliche Aktivität, Serien, Spielzeitverlauf und globales Ranking in deinem Profil.</string>
+    <string name="settings_pro_feature_custom_title">Profil-Anpassung</string>
+    <string name="settings_pro_feature_custom_desc">Wähle einen Profil-Akzent und zeige bis zu drei Lieblingsspiele.</string>
+    <string name="settings_pro_feature_share_title">Spielerkarte teilen</string>
+    <string name="settings_pro_feature_share_desc">Exportiere eine Karte mit Spielzeit, Spielen und Rang.</string>
+    <string name="profile_pro_upsell_title">EmuCoreV Pro freischalten</string>
+    <string name="profile_pro_upsell_body">Erweiterte Statistik, Profil-Anpassung und Spielerkarte sind mit Pro verfügbar.</string>
+    <string name="my_lists_cloud_title">Cloud-Backup</string>
+    <string name="my_lists_cloud_synced">Deine Listen liegen im Konto und lassen sich auf einem anderen Gerät wiederherstellen.</string>
+    <string name="my_lists_cloud_hint">Melde dich im Profil an, um deine Listen im Konto zu sichern.</string>
+    <string name="profile_backup_done">Listen gesichert</string>
+    <string name="profile_restore_done">Listen wiederhergestellt</string>
+    <string name="my_lists_cloud_failed">Sicherung fehlgeschlagen. Prüfe die Verbindung und versuche es erneut.</string>
 </resources>

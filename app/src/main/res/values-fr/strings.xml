@@ -1326,4 +1326,18 @@
     <string name="settings_core_guest_cores">Cœurs du CPU invité</string>
     <string name="settings_help_accurate_thread_scheduling">Limite l\'exécution simultanée des threads invités et respecte plus strictement les priorités de threads de la Vita.\n\nActivez ceci par jeu si le démarrage se bloque, en cas de problèmes de synchronisation ou de chargement instable. Cela peut réduire les performances ; laissez-le désactivé sauf si un jeu en a besoin.</string>
     <string name="settings_help_guest_cores">Définit combien de threads invités peuvent s\'exécuter en même temps lorsque l\'ordonnancement précis des threads est activé. Un cœur est la valeur la plus sûre ; des valeurs plus élevées peuvent améliorer la vitesse mais réintroduire des problèmes de synchronisation.</string>
+    <string name="settings_pro_feature_stats_title">Statistiques avancées</string>
+    <string name="settings_pro_feature_stats_desc">Activité hebdomadaire, séries, historique de jeu et classement mondial dans votre profil.</string>
+    <string name="settings_pro_feature_custom_title">Personnalisation du profil</string>
+    <string name="settings_pro_feature_custom_desc">Choisissez un accent de profil et affichez jusqu\'à trois jeux favoris.</string>
+    <string name="settings_pro_feature_share_title">Partage de la carte de joueur</string>
+    <string name="settings_pro_feature_share_desc">Exportez une carte avec votre temps de jeu, vos jeux et votre rang.</string>
+    <string name="profile_pro_upsell_title">Débloquez EmuCoreV Pro</string>
+    <string name="profile_pro_upsell_body">Les statistiques avancées, la personnalisation du profil et la carte de joueur sont disponibles avec Pro.</string>
+    <string name="my_lists_cloud_title">Sauvegarde cloud</string>
+    <string name="my_lists_cloud_synced">Vos listes sont stockées sur votre compte et peuvent être restaurées sur un autre appareil.</string>
+    <string name="my_lists_cloud_hint">Connectez-vous à votre profil pour sauvegarder vos listes sur le compte.</string>
+    <string name="profile_backup_done">Listes sauvegardées</string>
+    <string name="profile_restore_done">Listes restaurées</string>
+    <string name="my_lists_cloud_failed">Échec de la sauvegarde. Vérifiez la connexion et réessayez.</string>
 </resources>

@@ -1326,4 +1326,18 @@
     <string name="settings_core_guest_cores">Núcleos de CPU invitados</string>
     <string name="settings_help_accurate_thread_scheduling">Limita la ejecución simultánea de hilos invitados y respeta con más rigor las prioridades de hilos de Vita.\n\nActívalo por juego si el arranque se cuelga, hay fallos de sincronización o la carga es inestable. Puede reducir el rendimiento, así que déjalo desactivado salvo que un juego lo necesite.</string>
     <string name="settings_help_guest_cores">Define cuántos hilos invitados pueden ejecutarse a la vez cuando la planificación precisa de hilos está activada. Un núcleo es el valor más seguro; valores más altos pueden mejorar la velocidad, pero pueden reintroducir fallos de sincronización.</string>
+    <string name="settings_pro_feature_stats_title">Estadísticas ampliadas</string>
+    <string name="settings_pro_feature_stats_desc">Actividad semanal, rachas, historial de juego y clasificación global en tu perfil.</string>
+    <string name="settings_pro_feature_custom_title">Personalización del perfil</string>
+    <string name="settings_pro_feature_custom_desc">Elige un acento de perfil y muestra hasta tres juegos favoritos.</string>
+    <string name="settings_pro_feature_share_title">Compartir tarjeta de jugador</string>
+    <string name="settings_pro_feature_share_desc">Exporta una tarjeta con tu tiempo de juego, juegos y puesto.</string>
+    <string name="profile_pro_upsell_title">Desbloquea EmuCoreV Pro</string>
+    <string name="profile_pro_upsell_body">Las estadísticas ampliadas, la personalización del perfil y la tarjeta de jugador están disponibles con Pro.</string>
+    <string name="my_lists_cloud_title">Copia en la nube</string>
+    <string name="my_lists_cloud_synced">Tus listas se guardan en tu cuenta y se pueden restaurar en otro dispositivo.</string>
+    <string name="my_lists_cloud_hint">Inicia sesión en tu perfil para guardar tus listas en la cuenta.</string>
+    <string name="profile_backup_done">Listas guardadas</string>
+    <string name="profile_restore_done">Listas restauradas</string>
+    <string name="my_lists_cloud_failed">No se pudo guardar. Comprueba la conexión e inténtalo de nuevo.</string>
 </resources>
