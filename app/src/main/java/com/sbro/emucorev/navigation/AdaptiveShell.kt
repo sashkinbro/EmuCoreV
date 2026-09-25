@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.Feedback
+import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.Games
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.QueryStats
@@ -103,6 +104,7 @@ fun AdaptiveShell(
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateProfile: () -> Unit = {},
+    onNavigateDiscord: () -> Unit = {},
 
     onNavigateFeedback: () -> Unit = {},
     onBackClick: (() -> Unit)? = null,
@@ -125,6 +127,7 @@ fun AdaptiveShell(
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
             onNavigateProfile = onNavigateProfile,
+            onNavigateDiscord = onNavigateDiscord,
 
             onNavigateFeedback = onNavigateFeedback,
             onInstallFirmware = onInstallFirmware,
@@ -178,6 +181,7 @@ fun AdaptiveShell(
             onNavigateSearch = onNavigateSearch,
             onNavigateSettings = onNavigateSettings,
             onNavigateProfile = onNavigateProfile,
+            onNavigateDiscord = onNavigateDiscord,
 
             onNavigateFeedback = onNavigateFeedback,
             onBackClick = onBackClick,
@@ -205,7 +209,7 @@ private fun CompactAdaptiveShell(
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateProfile: () -> Unit,
-
+    onNavigateDiscord: () -> Unit,
     onNavigateFeedback: () -> Unit,
     onBackClick: (() -> Unit)?,
     onInstallFirmware: (() -> Unit)?,
@@ -290,6 +294,7 @@ private fun CompactAdaptiveShell(
                     onNavigateSearch = onNavigateSearch,
                     onNavigateSettings = onNavigateSettings,
                     onNavigateProfile = onNavigateProfile,
+            onNavigateDiscord = onNavigateDiscord,
 
                     onNavigateFeedback = onNavigateFeedback,
                     onInstallFirmware = onInstallFirmware,
@@ -325,7 +330,7 @@ private fun SideNavigation(
     onNavigateSearch: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateProfile: () -> Unit,
-
+    onNavigateDiscord: () -> Unit,
     onNavigateFeedback: () -> Unit,
     onInstallFirmware: (() -> Unit)?,
     onInstallContent: (() -> Unit)?,
@@ -389,6 +394,10 @@ private fun SideNavigation(
     val navigateProfile = rememberDebouncedClick {
         onCloseDrawer()
         onNavigateProfile()
+    }
+    val navigateDiscord = rememberDebouncedClick {
+        onCloseDrawer()
+        onNavigateDiscord()
     }
     val navigateFeedback = rememberDebouncedClick {
         onCloseDrawer()
@@ -579,6 +588,12 @@ private fun SideNavigation(
                 label = stringResource(R.string.nav_profile),
                 selected = selected == PrimaryDestination.Profile,
                 onClick = navigateProfile
+            )
+            ShellItem(
+                icon = Icons.Rounded.Forum,
+                label = stringResource(R.string.discord_title),
+                selected = selected == PrimaryDestination.Discord,
+                onClick = navigateDiscord
             )
             ShellItem(
                 icon = Icons.Rounded.Feedback,

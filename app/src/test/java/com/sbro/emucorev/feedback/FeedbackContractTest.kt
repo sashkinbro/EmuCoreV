@@ -40,6 +40,8 @@ class FeedbackContractTest {
         assertTrue("Feedback drawer destination is missing", "PrimaryDestination.Feedback" in shell)
         assertTrue("Feedback drawer item is missing", "R.string.feedback_title" in shell)
         assertFalse("The legacy Discord invite drawer action must stay removed", "shell_discord_server" in shell)
+        assertTrue("Discord drawer item is missing", "R.string.discord_title" in shell)
+        assertTrue("Discord drawer navigation is missing", "onNavigateDiscord = navigateDiscord" in navigation)
         assertTrue("Feedback route is missing", "composable(ROUTE_FEEDBACK)" in navigation)
         assertTrue("Feedback screen is not wired", "FeedbackScreen(" in navigation)
         assertTrue("Discord destination is missing", "Discord, Feedback" in shell)

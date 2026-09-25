@@ -330,6 +330,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
 
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
@@ -381,6 +382,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
 
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
@@ -420,6 +422,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
 
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
@@ -466,6 +469,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
 
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
@@ -505,6 +509,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateSettings = { },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
 
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
@@ -555,6 +560,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     },
                     onNavigateSettings = { },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
 
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
@@ -633,6 +639,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
 
                     onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
@@ -668,6 +675,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
 
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
@@ -715,6 +723,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
 
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
@@ -756,6 +765,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
 
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
@@ -811,7 +821,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = { },
-
+                    onNavigateDiscord = navigateDiscord,
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
                     onBackClick = navigateHome,
@@ -855,6 +865,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
 
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
@@ -891,6 +902,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = { },
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
                     onBackClick = { navController.popBackStack() },
@@ -922,6 +934,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
 
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = {},
@@ -960,6 +973,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(settingsRoute()) { launchSingleTop = true }
                     },
                     onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
 
                     onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
                     onNavigateFeedback = navigateFeedback,
