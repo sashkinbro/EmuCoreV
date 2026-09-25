@@ -206,8 +206,21 @@ class DriveBackupViewModel(application: Application) : AndroidViewModel(applicat
                     else -> error.javaClass.simpleName
                 }
                 Log.w("DriveBackup", "Account operation failed: $diagnostic")
-                mutable.update { it.copy(message = (error as? DriveBackupException)?.reason ?: "failed") }
-                if ((error as? DriveBackupException)?.reason == "auth") withContext(Dispatchers.IO) {
+                val reason = when (error) {
+                    is DriveBackupException -> error.reason
+                    is com.google.android.gms.common.api.ApiException -> when (error.statusCode) {
+                        10 -> "configuration" // DEVELOPER_ERROR: package/certificate not recognized
+                        7 -> "network"
+                        16 -> "auth" // CANCELED
+                        else -> "failed"
+                    }
+                    is androidx.credentials.exceptions.GetCredentialProviderConfigurationException -> "configuration"
+                    is androidx.credentials.exceptions.NoCredentialException -> "auth"
+                    is androidx.credentials.exceptions.GetCredentialException -> "auth"
+                    else -> "failed"
+                }
+                mutable.update { it.copy(message = reason) }
+                if (reason == "auth") withContext(Dispatchers.IO) {
                     store.update { it.copy(needsAuthorization = true) }
                 }
             } finally {
