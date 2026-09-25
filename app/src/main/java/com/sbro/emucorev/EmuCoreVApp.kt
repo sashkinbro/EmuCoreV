@@ -11,6 +11,7 @@ import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.ProfilePlayTimeSyncer
 import com.sbro.emucorev.data.drive.DriveBackupArchive
+import com.sbro.emucorev.data.drive.DriveBackupWork
 import com.sbro.emucorev.discord.DiscordIntegration
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
@@ -27,6 +28,7 @@ class EmuCoreVApp : Application() {
         AppIconManager.applyProIcon(this, AppPreferences(this).proUnlocked)
         ProfilePlayTimeSyncer.syncPendingAsync(this)
         recoverPendingDriveRestore()
+        DriveBackupWork.resumePending(this)
         DiscordIntegration.initialize(this)
         runCatching {
             EmulatorStorage.prepareRuntime(this)

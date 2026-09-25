@@ -1,14 +1,8 @@
 package com.sbro.emucorev.data.drive
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
-import android.content.pm.ServiceInfo
 import android.os.SystemClock
-import android.text.format.Formatter
-import androidx.core.app.NotificationCompat
 import androidx.work.*
-import com.sbro.emucorev.R
 import com.sbro.emucorev.core.BackupSessionGate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -80,6 +74,19 @@ object DriveBackupWork {
         if (settings.connected && settings.afterGame) enqueue(context, automatic = true)
     }
 
+    /**
+     * The backup runs without a foreground service, so the system may stop the worker and leave a
+     * pending snapshot behind. Resuming it on the next app start keeps long uploads moving.
+     */
+    fun resumePending(context: Context) {
+        val settings = DriveBackupState.get(context).value
+        if (!settings.connected) return
+        val archive = DriveBackupArchive(context)
+        val pending = File(archive.workDir, "snapshot.zip")
+        val pendingInfo = File(archive.workDir, "snapshot.json")
+        if (pending.isFile && pendingInfo.isFile) enqueue(context, automatic = true)
+    }
+
     fun enqueue(context: Context, automatic: Boolean = false, restoreId: String? = null,
                 categories: Set<String> = DriveBackupArchive.ALL_CATEGORIES) {
         val settings = DriveBackupState.get(context).value
@@ -110,7 +117,6 @@ class DriveScheduleWorker(context: Context, params: WorkerParameters) : Coroutin
 class DriveBackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     private val store = DriveBackupState.get(context)
     private var transferMeter = DriveTransferMeter()
-    private var lastNotificationTime = 0L
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         DriveBackupWork.mutex.withLock {
             val settings = store.value
@@ -118,7 +124,6 @@ class DriveBackupWorker(context: Context, params: WorkerParameters) : CoroutineW
             if (!settings.connected || settings.email != email) return@withLock Result.success()
             try {
                 BackupSessionGate.checkpoint()
-                setForeground(foreground())
                 store.update { it.copy(lastError = "") }
                 val archive = DriveBackupArchive(applicationContext)
                 val api = DriveBackupApi(applicationContext, settings.email)
@@ -192,7 +197,6 @@ class DriveBackupWorker(context: Context, params: WorkerParameters) : CoroutineW
         transferMeter = DriveTransferMeter()
         DriveBackupWork.operation.value = DriveOperation(value)
         setProgress(workDataOf("phase" to value))
-        setForeground(foreground(DriveBackupWork.operation.value))
     }
 
     private suspend fun progress(phase: String, done: Long, total: Long) {
@@ -201,40 +205,5 @@ class DriveBackupWorker(context: Context, params: WorkerParameters) : CoroutineW
         setProgress(workDataOf("phase" to phase, "percent" to value.percent,
             "transferredBytes" to value.transferredBytes, "totalBytes" to value.totalBytes,
             "bytesPerSecond" to value.bytesPerSecond, "remainingSeconds" to value.remainingSeconds))
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastNotificationTime >= 1500 || value.percent == 100) {
-            lastNotificationTime = now
-            setForeground(foreground(value))
-        }
-    }
-
-    override suspend fun getForegroundInfo(): ForegroundInfo = foreground()
-    private fun foreground(operation: DriveOperation = DriveOperation()): ForegroundInfo {
-        val context = applicationContext
-        context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel("drive-backup", context.getString(R.string.drive_title), NotificationManager.IMPORTANCE_LOW))
-        val phaseText = context.getString(when (operation.phase) {
-            "prepare" -> R.string.drive_preparing
-            "upload" -> R.string.drive_uploading
-            "download" -> R.string.drive_downloading
-            "verify" -> R.string.drive_verifying
-            "restore" -> R.string.drive_restoring
-            else -> R.string.drive_working
-        })
-        val detail = if (operation.totalBytes > 0) buildString {
-            append(context.getString(R.string.drive_transfer_amount,
-                Formatter.formatFileSize(context, operation.transferredBytes), Formatter.formatFileSize(context, operation.totalBytes)))
-            if (operation.bytesPerSecond > 0) {
-                append(" · ")
-                append(context.getString(R.string.drive_transfer_speed, Formatter.formatFileSize(context, operation.bytesPerSecond)))
-            }
-        } else phaseText
-        val notification = NotificationCompat.Builder(context, "drive-backup")
-            .setSmallIcon(android.R.drawable.stat_sys_upload).setContentTitle(context.getString(R.string.drive_title))
-            .setContentText(detail).setSubText(phaseText).setOngoing(true).setOnlyAlertOnce(true)
-            .setProgress(100, operation.percent.coerceAtLeast(0), operation.percent < 0)
-            .addAction(0, context.getString(R.string.drive_cancel), WorkManager.getInstance(context).createCancelPendingIntent(id))
-            .build()
-        return ForegroundInfo(24018, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
     }
 }
