@@ -31,17 +31,23 @@ class FeedbackContractTest {
     }
 
     @Test
-    fun feedbackNavigationAndDiscordAreAvailableFromTheDrawer() {
+    fun feedbackNavigationAndDiscordScreenAreWired() {
         val root = sourceRoot()
         val shell = root.resolve("navigation/AdaptiveShell.kt").readText()
         val navigation = root.resolve("navigation/AppNavigation.kt").readText()
+        val settings = root.resolve("ui/settings/SettingsTabContent.kt").readText()
 
         assertTrue("Feedback drawer destination is missing", "PrimaryDestination.Feedback" in shell)
         assertTrue("Feedback drawer item is missing", "R.string.feedback_title" in shell)
-        assertTrue("Discord drawer action is missing", "R.string.shell_discord_server" in shell)
-        assertTrue("Discord URL must match EmuCoreX", "https://discord.gg/82hhArvYwC" in shell)
+        assertFalse("The legacy Discord invite drawer action must stay removed", "shell_discord_server" in shell)
         assertTrue("Feedback route is missing", "composable(ROUTE_FEEDBACK)" in navigation)
         assertTrue("Feedback screen is not wired", "FeedbackScreen(" in navigation)
+        assertTrue("Discord destination is missing", "Discord, Feedback" in shell)
+        assertTrue("Discord selection is missing", "PrimaryDestination.Discord" in navigation)
+        assertTrue("Discord route is missing", "composable(ROUTE_DISCORD)" in navigation)
+        assertTrue("Discord screen is not wired", "DiscordScreen(" in navigation)
+        assertTrue("Settings must open the Discord screen", "onOpenDiscord = navigateDiscord" in navigation)
+        assertTrue("About tab must navigate to Discord", "onClick = onOpenDiscord" in settings)
     }
 
     private fun sourceRoot(): Path {

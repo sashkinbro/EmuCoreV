@@ -37,6 +37,14 @@
         tools:ignore="ForegroundServicesPolicy" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
+    <!-- The Discord Social SDK AAR declares voice permissions; presence-only integration strips them. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" tools:node="remove" />
+    <uses-permission android:name="android.permission.BLUETOOTH" tools:node="remove" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:node="remove" />
+
     <application
         android:name=".EmuCoreVApp"
         android:allowBackup="true"
@@ -136,6 +144,40 @@
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
+
+        <!-- Discord OAuth and SDK run only in the isolated :discord helper process. -->
+        <activity
+            android:name="com.discord.socialsdk.AuthenticationActivity"
+            android:process=":discord"
+            android:enabled="${discordSdkAvailable}"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:launchMode="singleTask"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="discord-1536775623287115786" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".discord.DiscordAuthActivity"
+            android:process=":discord"
+            android:enabled="${discordSdkAvailable}"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:exported="false" />
+
+        <service
+            android:name=".discord.DiscordService"
+            android:process=":discord"
+            android:enabled="${discordSdkAvailable}"
+            android:exported="false" />
+
+        <service
+            android:name="com.discord.socialsdk.ForegroundService"
+            tools:node="remove" />
 
     </application>
 

@@ -61,6 +61,7 @@ import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Devices
@@ -1841,12 +1842,24 @@ private fun ProfileFeatureDialog(
                 modifier = Modifier
                     .verticalScroll(rememberScrollState())
                     .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                content = {
-                    Text(title, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
-                    content()
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_close))
+                    }
                 }
-            )
+                content()
+            }
         }
     }
 }
@@ -3083,7 +3096,9 @@ private fun SkeletonBlock(modifier: Modifier = Modifier) {
 
 @Composable
 private fun RevealOnEnter(revealKey: Any?, content: @Composable () -> Unit) {
-    var visible by remember(revealKey) { mutableStateOf(false) }
+    // rememberSaveable keeps the revealed state when LazyColumn disposes off-screen
+    // items, so scrolling back does not replay the entrance like a screen reload.
+    var visible by rememberSaveable(revealKey) { mutableStateOf(false) }
     LaunchedEffect(revealKey) { visible = true }
     AnimatedVisibility(
         visible = visible,

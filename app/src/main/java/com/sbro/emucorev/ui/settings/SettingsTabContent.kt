@@ -130,6 +130,7 @@ fun SettingsTabContent(
     onOpenLanguageSettings: () -> Unit,
     onOpenVitaLanguageSettings: () -> Unit = {},
     onOpenGpuDriverSettings: () -> Unit = {},
+    onOpenDiscord: () -> Unit = {},
     refreshCoreSettingsClick: () -> Unit,
     createBackupClick: () -> Unit,
     restoreBackupClick: () -> Unit
@@ -159,7 +160,7 @@ fun SettingsTabContent(
             createBackupClick = createBackupClick,
             restoreBackupClick = restoreBackupClick
         )
-        SettingsTab.About -> AboutTab()
+        SettingsTab.About -> AboutTab(onOpenDiscord)
         SettingsTab.Updates -> AppUpdateTab(
             state = uiState.appUpdate,
             onLoadReleaseHistory = { forceRefresh ->
@@ -1139,7 +1140,7 @@ private fun storageLocationLabel(location: VitaStorageLocation, index: Int): Str
 }
 
 @Composable
-private fun AboutTab() {
+private fun AboutTab(onOpenDiscord: () -> Unit) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val packageInfo = remember {
@@ -1192,12 +1193,12 @@ private fun AboutTab() {
                 subtitle = stringResource(R.string.settings_about_repository_desc),
                 onClick = { uriHandler.openUri(EmuCoreRepositoryUrl) }
             )
-            LinkItem(
-                icon = Icons.Rounded.Groups,
-                title = stringResource(R.string.settings_about_discord),
-                subtitle = stringResource(R.string.settings_about_discord_desc),
-                onClick = { uriHandler.openUri(EmuCoreDiscordUrl) }
-            )
+    LinkItem(
+        icon = Icons.Rounded.Groups,
+        title = stringResource(R.string.settings_about_discord),
+        subtitle = stringResource(R.string.settings_about_discord_desc),
+        onClick = onOpenDiscord
+    )
             LinkItem(
                 icon = Icons.Rounded.Favorite,
                 title = stringResource(R.string.settings_about_support),

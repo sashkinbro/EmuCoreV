@@ -11,6 +11,7 @@ import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.ProfilePlayTimeSyncer
 import com.sbro.emucorev.data.drive.DriveBackupArchive
+import com.sbro.emucorev.discord.DiscordIntegration
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 
@@ -18,12 +19,15 @@ class EmuCoreVApp : Application() {
     override fun onCreate() {
         super.onCreate()
         // ProcessPhoenix restarts the app through a helper process where Firebase providers
-        // are not initialized; that process must not build the emulator-side graph.
-        if (Application.getProcessName().endsWith(PHOENIX_PROCESS_SUFFIX)) return
+        // are not initialized, and the Discord SDK runs in its own isolated process; neither
+        // helper may build the emulator-side graph.
+        val processName = Application.getProcessName()
+        if (processName.endsWith(PHOENIX_PROCESS_SUFFIX) || processName.endsWith(DISCORD_PROCESS_SUFFIX)) return
         AndroidDiagnostics.initialize(this)
         AppIconManager.applyProIcon(this, AppPreferences(this).proUnlocked)
         ProfilePlayTimeSyncer.syncPendingAsync(this)
         recoverPendingDriveRestore()
+        DiscordIntegration.initialize(this)
         runCatching {
             EmulatorStorage.prepareRuntime(this)
             VitaCoreConfigRepository(this).ensureDefaultsPersisted()
@@ -73,5 +77,6 @@ class EmuCoreVApp : Application() {
 
     private companion object {
         const val PHOENIX_PROCESS_SUFFIX = ":phoenix"
+        const val DISCORD_PROCESS_SUFFIX = ":discord"
     }
 }

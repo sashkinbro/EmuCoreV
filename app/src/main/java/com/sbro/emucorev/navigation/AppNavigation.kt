@@ -57,6 +57,7 @@ import com.sbro.emucorev.ui.onboarding.OnboardingScreen
 import com.sbro.emucorev.ui.playtime.PlayTimeScreen
 import com.sbro.emucorev.ui.profile.MyListsScreen
 import com.sbro.emucorev.ui.profile.ProfileScreen
+import com.sbro.emucorev.ui.discord.DiscordScreen
 import com.sbro.emucorev.ui.pro.ProWelcomeDialog
 import com.sbro.emucorev.ui.saves.SaveDataScreen
 import com.sbro.emucorev.ui.settings.AppLanguageScreen
@@ -78,6 +79,7 @@ private const val ROUTE_SETUP = "setup"
 private const val ROUTE_LIBRARY = "library"
 private const val ROUTE_CATALOG = "catalog"
 private const val ROUTE_MY_LISTS = "my-lists"
+private const val ROUTE_DISCORD = "discord"
 private const val ROUTE_GAME_MANAGER = "game-manager"
 private const val ROUTE_GAME_MANAGER_WITH_TITLE = "game-manager/{titleId}"
 private const val ROUTE_PLAY_TIME = "play-time"
@@ -261,6 +263,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     }
     val navigateMyLists = {
         navController.navigate(ROUTE_MY_LISTS) { launchSingleTop = true }
+    }
+    val navigateDiscord = {
+        navController.navigate(ROUTE_DISCORD) { launchSingleTop = true }
     }
     val navigateFeedback = {
         navController.navigate(ROUTE_FEEDBACK) { launchSingleTop = true }
@@ -516,9 +521,10 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         onOpenVitaLanguageSettings = {
                             navController.navigate(ROUTE_VITA_LANGUAGE) { launchSingleTop = true }
                         },
-                        onOpenGpuDriverSettings = {
-                            navController.navigate(ROUTE_GPU_DRIVER) { launchSingleTop = true }
-                        },
+                    onOpenGpuDriverSettings = {
+                        navController.navigate(ROUTE_GPU_DRIVER) { launchSingleTop = true }
+                    },
+                    onOpenDiscord = navigateDiscord,
                         viewModel = settingsViewModel
                     )
                 }
@@ -565,9 +571,10 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         onOpenVitaLanguageSettings = {
                             navController.navigate(ROUTE_VITA_LANGUAGE) { launchSingleTop = true }
                         },
-                        onOpenGpuDriverSettings = {
-                            navController.navigate(ROUTE_GPU_DRIVER) { launchSingleTop = true }
-                        },
+                    onOpenGpuDriverSettings = {
+                        navController.navigate(ROUTE_GPU_DRIVER) { launchSingleTop = true }
+                    },
+                    onOpenDiscord = navigateDiscord,
                         viewModel = settingsViewModel
                     )
                 }
@@ -860,6 +867,37 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         onMenuClick = openDrawer,
                         onGameClick = { igdbId -> navController.navigate("$ROUTE_CATALOG_DETAIL_PREFIX/$igdbId") }
                     )
+                }
+            }
+            composable(ROUTE_DISCORD) {
+                AdaptiveShell(
+                    selected = PrimaryDestination.Discord,
+                    onNavigateSetup = {
+                        navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
+                    },
+                    onNavigateLibrary = {
+                        navController.navigate(ROUTE_LIBRARY) { launchSingleTop = true }
+                    },
+                    onNavigateGameManager = { navigateGameManager(null) },
+                    onNavigatePlayTime = { navigatePlayTime(null) },
+                    onNavigateAchievements = navigateAchievementsRoot,
+                    onNavigateSaveData = {
+                        navController.navigate(saveManagerRoute()) { launchSingleTop = true }
+                    },
+                    onNavigateSearch = {
+                        navController.navigate(ROUTE_CATALOG) { launchSingleTop = true }
+                    },
+                    onNavigateSettings = {
+                        navController.navigate(settingsRoute()) { launchSingleTop = true }
+                    },
+                    onNavigateProfile = navigateProfile,
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
+                    onNavigateFeedback = navigateFeedback,
+                    onBackClick = { navController.popBackStack() },
+                    onInstallFirmware = null,
+                    onInstallContent = openInstallChoiceDialog
+                ) { _ ->
+                    DiscordScreen(onBackClick = { navController.popBackStack() })
                 }
             }
             composable(ROUTE_FEEDBACK) {

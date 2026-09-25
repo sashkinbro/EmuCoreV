@@ -63,6 +63,7 @@ import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.ProfilePlayTimeSyncer
 import com.sbro.emucorev.data.TrophyCloudRepository
 import com.sbro.emucorev.data.drive.DriveBackupWork
+import com.sbro.emucorev.discord.DiscordIntegration
 import com.sbro.emucorev.ui.common.ImmersiveMode
 import com.sbro.emucorev.ui.emulation.EmulationOverlayHost
 import com.sbro.emucorev.ui.theme.EmuCoreVTheme
@@ -202,6 +203,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun onResume() {
         super.onResume()
+        DiscordIntegration.setPaused(false)
         composeOwners.handleResume()
         attachComposeOverlay()
         refreshGamepadRuntimeInputSettings()
@@ -216,6 +218,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun onPause() {
         cancelActiveTouches()
         keyboardRequestGeneration++ // Invalidate delayed show/fallback work while backgrounded.
+        DiscordIntegration.setPaused(true)
         composeOwners.handlePause()
         super.onPause()
     }
@@ -547,6 +550,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private fun applyMenuPauseState(paused: Boolean) {
         if (nativeThreadPaused == paused) return
         nativeThreadPaused = paused
+        DiscordIntegration.setPaused(paused)
         setAppSessionMenuPaused(paused)
         if (paused) {
             pauseNativeThread()
@@ -773,6 +777,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         playTimeSessionTitleId = gameId
         playTimeSessionStartedAt = session.startedAt
         BackupSessionGate.gameStarted()
+        DiscordIntegration.setPlaying(title, gameId)
     }
 
     private fun finishPlayTimeSessionIfNeeded(scheduleBackup: Boolean = true) {
@@ -794,6 +799,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             DriveBackupWork.afterGame(applicationContext)
             TrophyCloudRepository.syncAsync(applicationContext)
         }
+        DiscordIntegration.clearGame()
     }
 
     private fun hideSystemBars() {

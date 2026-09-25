@@ -38,6 +38,11 @@
 # Emulator restarts itself through ProcessPhoenix.
 -keep class com.jakewharton.processphoenix.** { *; }
 
+# The Discord bridge resolves JNI symbols by class name, and the SDK is used
+# reflectively from the isolated :discord process.
+-keep,includedescriptorclasses class com.sbro.emucorev.discord.DiscordNative { *; }
+-keep class com.discord.socialsdk.** { *; }
+
 # Keep Kotlin metadata and annotations that Compose / reflection-adjacent code
 # may rely on when stack traces or external libraries inspect them.
 -keepattributes *Annotation*, InnerClasses, Signature, EnclosingMethod

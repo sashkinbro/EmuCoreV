@@ -31,7 +31,6 @@ import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.Feedback
-import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.Games
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.QueryStats
@@ -65,7 +64,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
@@ -80,7 +78,7 @@ import com.sbro.emucorev.ui.theme.shouldUseExpandedShell
 import kotlinx.coroutines.launch
 
 enum class PrimaryDestination {
-    Home, Setup, Library, MyLists, GameManager, PlayTime, Achievements, SaveData, CheatManager, Search, Settings, Profile, Feedback
+    Home, Setup, Library, MyLists, GameManager, PlayTime, Achievements, SaveData, CheatManager, Search, Settings, Profile, Discord, Feedback
 }
 
 private enum class MobileLeadingAction {
@@ -338,7 +336,6 @@ private fun SideNavigation(
     onCloseDrawer: () -> Unit
 ) {
     val context = LocalContext.current
-    val uriHandler = LocalUriHandler.current
     val proManager = remember(context) { ProPurchaseManager.getInstance(context) }
     val proState by proManager.state.collectAsState()
     val drawerInset = when (drawerVisualStyle) {
@@ -396,10 +393,6 @@ private fun SideNavigation(
     val navigateFeedback = rememberDebouncedClick {
         onCloseDrawer()
         onNavigateFeedback()
-    }
-    val openDiscord = rememberDebouncedClick {
-        onCloseDrawer()
-        runCatching { uriHandler.openUri(DISCORD_INVITE_URL) }
     }
     val installFirmware = onInstallFirmware?.let {
         rememberDebouncedClick {
@@ -593,11 +586,6 @@ private fun SideNavigation(
                 selected = selected == PrimaryDestination.Feedback,
                 onClick = navigateFeedback
             )
-            ShellAction(
-                icon = Icons.Rounded.Forum,
-                label = stringResource(R.string.shell_discord_server),
-                onClick = openDiscord
-            )
         }
     }
 
@@ -626,7 +614,7 @@ private fun SideNavigation(
     }
 }
 
-private const val DISCORD_INVITE_URL = "https://discord.gg/82hhArvYwC"
+
 
 @Composable
 private fun ShellAction(

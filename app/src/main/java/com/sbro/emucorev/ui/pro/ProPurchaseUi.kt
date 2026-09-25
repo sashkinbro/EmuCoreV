@@ -59,6 +59,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -581,75 +582,118 @@ fun ProWelcomeDialog(
     val state by manager.state.collectAsState()
     var supportDialogVisible by remember { mutableStateOf(false) }
     val supportOffers = availableProSupportOffers(state.products, state.ownedProductIds)
-    AlertDialog(
+    // A custom dialog keeps the content scrollable and readable in landscape,
+    // where the platform AlertDialog can clip its text.
+    Dialog(
         onDismissRequest = onContinue,
-        icon = {
-            Image(
-                painter = painterResource(
-                    if (state.isProUnlocked) {
-                        R.drawable.ic_drawer_app_pro
-                    } else {
-                        R.drawable.ic_drawer_app
-                    }
-                ),
-                contentDescription = null,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
                 modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-            )
-        },
-        title = { Text(stringResource(R.string.welcome_title)) },
-        text = { Text(stringResource(R.string.welcome_body)) },
-        confirmButton = {
-            // Laid out as a single full-width column so "support more" sits
-            // directly under the primary action instead of beside it.
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .fillMaxWidth()
+                    .widthIn(max = 560.dp)
+                    .heightIn(max = maxHeight),
+                shape = neonShape(28.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
+                ),
+                tonalElevation = 0.dp,
+                shadowElevation = 18.dp
             ) {
-                Button(
-                    shape = neonButtonShape(),
-                    onClick = {
-                        if (state.isProUnlocked) {
-                            onContinue()
-                        } else if (activity != null) {
-                            manager.purchase(activity, ProPurchaseTier.BASE)
-                        }
-                    },
-                    enabled = state.isProUnlocked ||
-                        (activity != null && state.isBillingReady && state.isProductAvailable && !state.isPurchaseInProgress),
-                    modifier = Modifier.fillMaxWidth()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text(
-                        stringResource(
-                            if (state.isProUnlocked) R.string.welcome_primary else R.string.settings_pro_buy
-                        )
+                    Image(
+                        painter = painterResource(
+                            if (state.isProUnlocked) {
+                                R.drawable.ic_drawer_app_pro
+                            } else {
+                                R.drawable.ic_drawer_app
+                            }
+                        ),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
                     )
-                }
-                if (!state.isProUnlocked && supportOffers.isNotEmpty()) {
-                    OutlinedButton(
-                        shape = neonButtonShape(),
-                        onClick = { supportDialogVisible = true },
-                        enabled = !state.isPurchaseInProgress,
+                    Text(
+                        text = stringResource(R.string.welcome_title),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = stringResource(R.string.welcome_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    // Laid out as a single full-width column so "support more" sits
+                    // directly under the primary action instead of beside it.
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Rounded.Star, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text(
-                            text = stringResource(R.string.settings_pro_support_more_short),
-                            maxLines = 1,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
+                        Button(
+                            shape = neonButtonShape(),
+                            onClick = {
+                                if (state.isProUnlocked) {
+                                    onContinue()
+                                } else if (activity != null) {
+                                    manager.purchase(activity, ProPurchaseTier.BASE)
+                                }
+                            },
+                            enabled = state.isProUnlocked ||
+                                (activity != null && state.isBillingReady && state.isProductAvailable && !state.isPurchaseInProgress),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                stringResource(
+                                    if (state.isProUnlocked) R.string.welcome_primary else R.string.settings_pro_buy
+                                )
+                            )
+                        }
+                        if (!state.isProUnlocked && supportOffers.isNotEmpty()) {
+                            OutlinedButton(
+                                shape = neonButtonShape(),
+                                onClick = { supportDialogVisible = true },
+                                enabled = !state.isPurchaseInProgress,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Rounded.Star, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text(
+                                    text = stringResource(R.string.settings_pro_support_more_short),
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(start = 8.dp)
+                                )
+                            }
+                        }
+                        TextButton(
+                            onClick = onContinue,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.welcome_secondary))
+                        }
                     }
-                }
-                TextButton(
-                    onClick = onContinue,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.welcome_secondary))
                 }
             }
         }
-    )
+    }
 
     if (supportDialogVisible) {
         ProSupportDialog(

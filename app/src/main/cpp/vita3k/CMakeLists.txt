@@ -9,6 +9,28 @@ endif()
 
 project(Vita3K)
 
+# Discord Social SDK is an optional local build input used by the isolated helper process.
+if(NOT DISCORD_SDK_DIR AND DEFINED ENV{DISCORD_SDK_DIR})
+	set(DISCORD_SDK_DIR "$ENV{DISCORD_SDK_DIR}")
+endif()
+
+set(DISCORD_SDK_SO "${DISCORD_SDK_DIR}/${ANDROID_ABI}/libdiscord_partner_sdk.so")
+set(DISCORD_SDK_INCLUDE "${DISCORD_SDK_DIR}/include")
+
+if(DISCORD_SDK_DIR AND EXISTS "${DISCORD_SDK_SO}" AND EXISTS "${DISCORD_SDK_INCLUDE}/discordpp.h")
+	add_library(discord_partner_sdk SHARED IMPORTED)
+	set_target_properties(discord_partner_sdk PROPERTIES
+		IMPORTED_LOCATION "${DISCORD_SDK_SO}"
+		INTERFACE_INCLUDE_DIRECTORIES "${DISCORD_SDK_INCLUDE}")
+
+	add_library(emucorev_discord SHARED "${CMAKE_CURRENT_LIST_DIR}/../discord_bridge.cpp")
+	target_link_libraries(emucorev_discord PRIVATE discord_partner_sdk log)
+	set_target_properties(emucorev_discord PROPERTIES OUTPUT_NAME "emucorev_discord")
+	message(STATUS "Discord Social SDK enabled: ${DISCORD_SDK_SO}")
+else()
+	message(STATUS "Discord Social SDK unavailable; Discord integration will report unavailable")
+endif()
+
 # Detects the amount of processors of the host machine and forwards the result to CPU_COUNT
 include(ProcessorCount)
 ProcessorCount(CPU_COUNT)
@@ -294,3 +316,4 @@ endif()
 add_subdirectory(external)
 add_subdirectory(vita3k)
 add_subdirectory(tools/gen-modules)
+

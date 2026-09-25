@@ -14,6 +14,14 @@ val localBuildProperties = Properties().apply {
         ?.inputStream()
         ?.use { input -> load(input) }
 }
+val discordApplicationId = "1536775623287115786"
+val discordSdkDirectory = localBuildProperties.getProperty("emucorev.discord.sdkDir")
+    ?.let(::File)
+    ?.takeIf { sdkDir ->
+        sdkDir.resolve("include/discordpp.h").isFile &&
+            sdkDir.resolve("arm64-v8a/libdiscord_partner_sdk.so").isFile &&
+            sdkDir.resolve("discord_partner_sdk.aar").isFile
+    }
 val python3Executable = sequenceOf(
     providers.gradleProperty("python3.path").orNull,
     localBuildProperties.getProperty("python3.path"),
@@ -87,6 +95,9 @@ android {
 
         buildConfigField("String", "FEEDBACK_ENDPOINT", buildConfigString(feedbackEndpoint))
         buildConfigField("String", "FEEDBACK_API_KEY", buildConfigString(feedbackApiKey))
+        buildConfigField("long", "DISCORD_APPLICATION_ID", "${discordApplicationId}L")
+        buildConfigField("boolean", "DISCORD_SDK_AVAILABLE", (discordSdkDirectory != null).toString())
+        manifestPlaceholders["discordSdkAvailable"] = (discordSdkDirectory != null).toString()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -104,6 +115,9 @@ android {
                 // Android dependencies are vendored by the Vita3K tree. Avoid vcpkg trying
                 // to build host tools with MSVC during ordinary Gradle/Android Studio builds.
                 arguments += "-DVCPKG_MANIFEST_INSTALL=OFF"
+                discordSdkDirectory?.let { sdkDir ->
+                    arguments += "-DDISCORD_SDK_DIR=${sdkDir.invariantSeparatorsPath}"
+                }
                 python3Executable?.let { python ->
                     arguments += "-DPython3_EXECUTABLE=${python.invariantSeparatorsPath}"
                 }
@@ -169,6 +183,7 @@ android {
                 )
             )
             jniLibs.setSrcDirs(listOf("src/main/jniLibs"))
+            discordSdkDirectory?.let(jniLibs::srcDir)
         }
         // The vendored Khronos validation layer (downloaded into
         // src/main/cpp/vita3k/android/prebuilt for non-Release CMake builds)
@@ -193,6 +208,7 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            pickFirsts += "**/libdiscord_partner_sdk.so"
         }
     }
 
@@ -240,6 +256,9 @@ dependencies {
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.google.identity)
     implementation(libs.google.auth)
+    discordSdkDirectory?.let { sdkDir ->
+        implementation(files(sdkDir.resolve("discord_partner_sdk.aar")))
+    }
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

@@ -124,6 +124,7 @@ fun SettingsScreen(
     onOpenLanguageSettings: () -> Unit,
     onOpenVitaLanguageSettings: () -> Unit = {},
     onOpenGpuDriverSettings: () -> Unit = {},
+    onOpenDiscord: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -225,11 +226,12 @@ fun SettingsScreen(
                             viewModel = viewModel,
                             onOpenLanguageSettings = onOpenLanguageSettings,
                             onOpenVitaLanguageSettings = onOpenVitaLanguageSettings,
-                            onOpenGpuDriverSettings = onOpenGpuDriverSettings,
-                            refreshCoreSettingsClick = refreshCoreSettingsClick,
-                            createBackupClick = createBackupClick,
-                            restoreBackupClick = { showRestoreBackupDialog = true }
-                        )
+        onOpenGpuDriverSettings = onOpenGpuDriverSettings,
+        onOpenDiscord = onOpenDiscord,
+        refreshCoreSettingsClick = refreshCoreSettingsClick,
+        createBackupClick = createBackupClick,
+        restoreBackupClick = { showRestoreBackupDialog = true }
+    )
                     }
                 }
             }
