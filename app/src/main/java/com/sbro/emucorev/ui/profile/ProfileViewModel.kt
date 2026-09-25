@@ -22,6 +22,7 @@ import com.sbro.emucorev.data.ProfileDeviceRepository
 import com.sbro.emucorev.data.ProfileFeedEvent
 import com.sbro.emucorev.data.ProfileFriendship
 import com.sbro.emucorev.data.ProfileSocialRepository
+import com.sbro.emucorev.data.TrophyCloudRepository
 import com.sbro.emucorev.data.VitaCatalogRepository
 import com.sbro.emucorev.data.VitaTrophyProfileRepository
 import kotlinx.coroutines.Dispatchers
@@ -147,7 +148,9 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                             if (proState.isProUnlocked || proState.isPurchaseStatusVerified) {
                                 repository.updateProMembership(proState.isProUnlocked)
                             }
+                            TrophyCloudRepository(application).sync()
                         }
+                        refreshTrophies()
                     }
                     observeProfile(account.uid)
                     observeProfileFeatures(account.uid)

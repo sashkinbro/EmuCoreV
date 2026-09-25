@@ -61,6 +61,7 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.ProfilePlayTimeSyncer
+import com.sbro.emucorev.data.TrophyCloudRepository
 import com.sbro.emucorev.data.drive.DriveBackupWork
 import com.sbro.emucorev.ui.common.ImmersiveMode
 import com.sbro.emucorev.ui.emulation.EmulationOverlayHost
@@ -791,6 +792,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         if (scheduleBackup) {
             BackupSessionGate.stopped()
             DriveBackupWork.afterGame(applicationContext)
+            TrophyCloudRepository.syncAsync(applicationContext)
         }
     }
 
