@@ -2,12 +2,14 @@ package com.sbro.emucorev.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
@@ -35,16 +37,23 @@ fun CoreUpdateResetDialog(
             }
         },
         confirmButton = {
-            Button(
-                shape = neonButtonShape(),
-                onClick = onReset
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(stringResource(R.string.core_update_reset_action))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onKeep) {
-                Text(stringResource(R.string.core_update_reset_keep))
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = neonButtonShape(),
+                    onClick = onReset
+                ) {
+                    Text(stringResource(R.string.core_update_reset_action))
+                }
+                TextButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onKeep
+                ) {
+                    Text(stringResource(R.string.core_update_reset_keep))
+                }
             }
         }
     )

@@ -1122,6 +1122,13 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     CoreMaintenanceRepository(context).resetGeneratedCoreState()
                     preferences.lastCoreBinaryFingerprint =
                         pendingCoreFingerprint.value ?: CoreBinaryFingerprint.current(context)
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            context,
+                            R.string.core_update_reset_done,
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
             },
             onKeep = {
