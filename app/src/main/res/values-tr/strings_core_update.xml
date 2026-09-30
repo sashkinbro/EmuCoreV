@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="core_update_reset_title">Yeni emülatör çekirdeği</string>
+    <string name="core_update_reset_body">Bu güncelleme emülatör çekirdeğinde değişiklikler içeriyor. Sorun yaşamamak için önbelleği ve yapılandırmayı sıfırlayın.</string>
+    <string name="core_update_reset_kept">BIOS, oyun klasörleri, kontroller, kayıtlar, hafıza kartları ve kapaklar korunur.</string>
+    <string name="core_update_reset_action">Emülatör ayarlarını sıfırla</string>
+    <string name="core_update_reset_keep">Ayarları koru</string>
+</resources>

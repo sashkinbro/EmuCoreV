@@ -40,13 +40,18 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.CoreBinaryFingerprint
+import com.sbro.emucorev.core.CoreMaintenanceRepository
+import com.sbro.emucorev.core.CoreUpdateResetAction
 import com.sbro.emucorev.core.DocumentPathResolver
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.InstallStateBus
 import com.sbro.emucorev.core.VitaLaunchBridge
+import com.sbro.emucorev.core.decideCoreUpdateResetAction
 import com.sbro.emucorev.ui.achievements.AchievementsScreen
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.ui.catalog.CatalogScreen
+import com.sbro.emucorev.ui.common.CoreUpdateResetDialog
 import com.sbro.emucorev.ui.cheats.CheatManagerScreen
 import com.sbro.emucorev.ui.detail.GameDetailScreen
 import com.sbro.emucorev.ui.feedback.FeedbackScreen
@@ -71,7 +76,9 @@ import com.sbro.emucorev.ui.setup.InstallGameChoiceDialog
 import com.sbro.emucorev.ui.setup.SetupInstallDialog
 import com.sbro.emucorev.ui.setup.SetupInstallViewModel
 import com.sbro.emucorev.ui.setup.SetupScreen
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val ROUTE_ONBOARDING = "onboarding"
 private const val ROUTE_HOME = "home"
@@ -143,6 +150,27 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     var showInstallChoiceDialog by rememberSaveable { mutableStateOf(false) }
     var showWelcomeDialog by rememberSaveable {
         mutableStateOf(preferences.onboardingCompleted && !preferences.welcomeDialogShown)
+    }
+    var showCoreResetDialog by rememberSaveable { mutableStateOf(false) }
+    val pendingCoreFingerprint = remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(preferences.onboardingCompleted) {
+        val currentFingerprint = withContext(Dispatchers.IO) {
+            CoreBinaryFingerprint.current(context)
+        }
+        pendingCoreFingerprint.value = currentFingerprint
+        when (
+            decideCoreUpdateResetAction(
+                preferences.lastCoreBinaryFingerprint,
+                currentFingerprint,
+                preferences.onboardingCompleted
+            )
+        ) {
+            CoreUpdateResetAction.STORE_SILENTLY ->
+                preferences.lastCoreBinaryFingerprint = currentFingerprint
+            CoreUpdateResetAction.PROMPT -> showCoreResetDialog = true
+            CoreUpdateResetAction.NONE -> Unit
+        }
     }
 
     val firmwarePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -1077,6 +1105,31 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             onContinue = {
                 preferences.welcomeDialogShown = true
                 showWelcomeDialog = false
+            }
+        )
+    }
+
+    if (
+        showCoreResetDialog &&
+        !showWelcomeDialog &&
+        preferences.onboardingCompleted &&
+        (currentRoute == ROUTE_LIBRARY || currentRoute == ROUTE_HOME)
+    ) {
+        CoreUpdateResetDialog(
+            onReset = {
+                showCoreResetDialog = false
+                launchScope.launch(Dispatchers.IO) {
+                    CoreMaintenanceRepository(context).resetGeneratedCoreState()
+                    preferences.lastCoreBinaryFingerprint =
+                        pendingCoreFingerprint.value ?: CoreBinaryFingerprint.current(context)
+                }
+            },
+            onKeep = {
+                showCoreResetDialog = false
+                launchScope.launch(Dispatchers.IO) {
+                    preferences.lastCoreBinaryFingerprint =
+                        pendingCoreFingerprint.value ?: CoreBinaryFingerprint.current(context)
+                }
             }
         )
     }

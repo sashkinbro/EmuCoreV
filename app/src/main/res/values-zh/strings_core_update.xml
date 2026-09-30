@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="core_update_reset_title">新模拟器核心</string>
+    <string name="core_update_reset_body">本次更新包含模拟器核心的更改。建议重置模拟器缓存和配置，以避免出现问题。</string>
+    <string name="core_update_reset_kept">BIOS、游戏文件夹、控制设置、存档、记忆卡和封面都会保留。</string>
+    <string name="core_update_reset_action">重置模拟器设置</string>
+    <string name="core_update_reset_keep">保留当前设置</string>
+</resources>
