@@ -1374,4 +1374,9 @@
     <string name="settings_discord_sdk_unavailable">इस बिल्ड में Discord Social SDK शामिल नहीं है।</string>
     <string name="settings_discord_service_error">Discord सहायक सेवा शुरू नहीं हो सकी।</string>
     <string name="settings_discord_token_error">Discord साइन-इन टोकन सुरक्षित नहीं किया जा सका।</string>
+    <string name="core_update_reset_title">नया एमुलेटर कोर</string>
+    <string name="core_update_reset_body">इस अपडेट में एमुलेटर कोर में बदलाव शामिल हैं। समस्याओं से बचने के लिए कैश और कॉन्फ़िगरेशन रीसेट करें।</string>
+    <string name="core_update_reset_kept">BIOS, गेम फ़ोल्डर, नियंत्रण, सेव, मेमोरी कार्ड और कवर सुरक्षित रहेंगे।</string>
+    <string name="core_update_reset_action">एमुलेटर सेटिंग्स रीसेट करें</string>
+    <string name="core_update_reset_keep">सेटिंग्स रखें</string>
 </resources>

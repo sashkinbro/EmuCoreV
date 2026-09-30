@@ -1374,4 +1374,9 @@
     <string name="settings_discord_sdk_unavailable">Das Discord Social SDK ist in diesem Build nicht enthalten.</string>
     <string name="settings_discord_service_error">Der Discord-Hilfsdienst konnte nicht gestartet werden.</string>
     <string name="settings_discord_token_error">Das Discord-Anmeldetoken konnte nicht geschützt werden.</string>
+    <string name="core_update_reset_title">Neuer Emulator-Core</string>
+    <string name="core_update_reset_body">Dieses Update enthält Änderungen am Emulator-Core. Setze Emulator-Cache und Konfiguration zurück, damit der neue Core ohne Fehler läuft.</string>
+    <string name="core_update_reset_kept">BIOS, Spielordner, Steuerung, Spielstände, Speicherkarten und Cover bleiben erhalten.</string>
+    <string name="core_update_reset_action">Emulator-Einstellungen zurücksetzen</string>
+    <string name="core_update_reset_keep">Einstellungen behalten</string>
 </resources>

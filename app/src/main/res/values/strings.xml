@@ -1377,4 +1377,9 @@
     <string name="settings_discord_sdk_unavailable">Discord Social SDK is not included in this build.</string>
     <string name="settings_discord_service_error">Could not start the Discord helper service.</string>
     <string name="settings_discord_token_error">Could not protect the Discord sign-in token.</string>
+    <string name="core_update_reset_title">New emulator core</string>
+    <string name="core_update_reset_body">This update includes changes to the emulator core. Reset the emulator cache and configuration so the new core runs without glitches.</string>
+    <string name="core_update_reset_kept">BIOS, game folders, controls, saves, memory cards and covers are kept.</string>
+    <string name="core_update_reset_action">Reset emulator settings</string>
+    <string name="core_update_reset_keep">Keep current settings</string>
 </resources>

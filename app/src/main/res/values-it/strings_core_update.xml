@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="core_update_reset_title">Nuovo core dell’emulatore</string>
-    <string name="core_update_reset_body">Questo aggiornamento contiene modifiche al core dell’emulatore. Reimposta cache e configurazione per evitare problemi.</string>
-    <string name="core_update_reset_kept">BIOS, cartelle dei giochi, controlli, salvataggi, memory card e copertine vengono conservati.</string>
-    <string name="core_update_reset_action">Ripristina impostazioni emulatore</string>
-    <string name="core_update_reset_keep">Mantieni impostazioni</string>
-</resources>

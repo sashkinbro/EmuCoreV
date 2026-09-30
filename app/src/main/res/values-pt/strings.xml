@@ -1374,4 +1374,9 @@
     <string name="settings_discord_sdk_unavailable">O Discord Social SDK não está incluído nesta compilação.</string>
     <string name="settings_discord_service_error">Não foi possível iniciar o serviço auxiliar do Discord.</string>
     <string name="settings_discord_token_error">Não foi possível proteger o token de início de sessão do Discord.</string>
+    <string name="core_update_reset_title">Novo núcleo do emulador</string>
+    <string name="core_update_reset_body">Esta atualização inclui alterações no núcleo do emulador. Redefina a cache e a configuração para evitar falhas.</string>
+    <string name="core_update_reset_kept">BIOS, pastas de jogos, controles, saves, cartões de memória e capas são mantidos.</string>
+    <string name="core_update_reset_action">Redefinir configurações do emulador</string>
+    <string name="core_update_reset_keep">Manter configurações</string>
 </resources>
