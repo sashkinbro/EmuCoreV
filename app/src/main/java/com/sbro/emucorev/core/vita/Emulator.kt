@@ -90,6 +90,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var playTimeSessionId: String? = null
     private var playTimeSessionTitleId: String = ""
     private var playTimeSessionStartedAt: Long = 0L
+    private var playTimeSessionLastSeenAt: Long = 0L
     var nativeImeState by mutableStateOf<NativeImeState?>(null)
         private set
     var nativeKeyboardRequested by mutableStateOf(false)
@@ -221,6 +222,16 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         DiscordIntegration.setPaused(true)
         composeOwners.handlePause()
         super.onPause()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        startPlayTimeSessionIfNeeded()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        finishPlayTimeSessionIfNeeded()
     }
 
     override fun onDestroy() {
@@ -585,6 +596,14 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
+    fun heartbeatPlayTimeSession() {
+        val sessionId = playTimeSessionId ?: return
+        val now = System.currentTimeMillis()
+        if (now - playTimeSessionLastSeenAt < PLAY_TIME_HEARTBEAT_INTERVAL_MS) return
+        playTimeSessionLastSeenAt = now
+        PlayTimeRepository(this).touchSession(sessionId, now)
+    }
+
     fun updateGamepadRuntimeInputSettings(config: VitaCoreConfig) {
         SDLControllerManager.updateRuntimeInputSettings(config)
     }
@@ -776,6 +795,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         playTimeSessionId = session.id
         playTimeSessionTitleId = gameId
         playTimeSessionStartedAt = session.startedAt
+        playTimeSessionLastSeenAt = session.lastSeenAt
         BackupSessionGate.gameStarted()
         DiscordIntegration.setPlaying(title, gameId)
     }
@@ -794,6 +814,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         playTimeSessionId = null
         playTimeSessionTitleId = ""
         playTimeSessionStartedAt = 0L
+        playTimeSessionLastSeenAt = 0L
         if (scheduleBackup) {
             BackupSessionGate.stopped()
             DriveBackupWork.afterGame(applicationContext)
@@ -896,6 +917,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         const val CHEAT_IMPORT_CODE = 547
         const val EXTRA_REBIRTH_HANDLED = "emu_rebirth_handled"
         const val EMULATION_OVERLAY_ELEVATION = 64f
+        const val PLAY_TIME_HEARTBEAT_INTERVAL_MS = 60_000L
     }
 }
 

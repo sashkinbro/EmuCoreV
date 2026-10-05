@@ -131,7 +131,7 @@ class PlayTimeViewModel(application: Application) : AndroidViewModel(application
         val totals = mutableMapOf<Long, Long>()
 
         sessions.forEach { session ->
-            val sessionEnd = session.endedAt ?: max(session.startedAt, now)
+            val sessionEnd = session.effectiveEndMs(now)
             var cursor = max(session.startedAt, firstDay)
             while (cursor < sessionEnd) {
                 val dayStart = startOfDay(cursor)

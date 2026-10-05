@@ -7,6 +7,7 @@ import com.sbro.emucorev.core.NativeLib
 import com.sbro.emucorev.core.AppIconManager
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.NativeLibraryLoader
+import com.sbro.emucorev.core.PlayTimeRepository
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.ProfilePlayTimeSyncer
@@ -26,6 +27,9 @@ class EmuCoreVApp : Application() {
         if (processName.endsWith(PHOENIX_PROCESS_SUFFIX) || processName.endsWith(DISCORD_PROCESS_SUFFIX)) return
         AndroidDiagnostics.initialize(this)
         AppIconManager.applyProIcon(this, AppPreferences(this).proUnlocked)
+        PlayTimeRepository(this).finishOpenSessions().forEach { session ->
+            ProfilePlayTimeSyncer.recordAndSync(this, session.titleId, session.title, session.durationMs)
+        }
         ProfilePlayTimeSyncer.syncPendingAsync(this)
         recoverPendingDriveRestore()
         DriveBackupWork.resumePending(this)

@@ -356,6 +356,7 @@ fun EmulationOverlayHost(
     LaunchedEffect(activity) {
         while (true) {
             sessionElapsedMs = activity.currentPlayTimeElapsedMs()
+            activity.heartbeatPlayTimeSession()
             kotlinx.coroutines.delay(1_000)
         }
     }
