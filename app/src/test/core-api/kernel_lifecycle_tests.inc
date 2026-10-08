@@ -12,7 +12,8 @@ struct LifecycleFuture {
     std::future<SceInt32> future;
     ~LifecycleFuture() {
         if (future.valid()) {
-            thread->exit_delete(false);
+            if (future.wait_for(0s) != std::future_status::ready)
+                thread->exit_delete(false);
             future.wait();
         }
     }
