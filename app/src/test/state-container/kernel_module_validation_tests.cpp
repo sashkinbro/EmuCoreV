@@ -81,6 +81,77 @@ TEST_F(ModuleValidationTests, AcceptsBoundedEmptyModuleTables) {
     EXPECT_TRUE(validate_kernel_modules(snapshot, *image, error)) << error;
 }
 
+TEST_F(ModuleValidationTests, RetainsNullFirmwareExportsButRejectsNonzeroUnmappedAddresses) {
+    auto image = make_image(std::vector<uint8_t>(kPage, 0));
+    ASSERT_NE(image, nullptr) << error;
+    KernelBaseSnapshot snapshot;
+    snapshot.next_uid = 10;
+    // These null variable exports are present in SceKernelBootimage's ELF
+    // descriptor in a real saved game, and load_var_exports retains them.
+    snapshot.export_nids.emplace(0xC08FC9B5, 0);
+    snapshot.export_nids.emplace(0xDF5E79B8, 0);
+    snapshot.export_nids_by_lib.emplace(lib_export_key(0x17E65BD7, 0xC08FC9B5), 0);
+    ASSERT_TRUE(validate_kernel_base(snapshot, *image, error)) << error;
+    EXPECT_EQ(snapshot.export_nids.at(0xC08FC9B5), 0u);
+    for (const Address invalid : {Address{1}, Address{0x80000000}}) {
+        snapshot.export_nids.at(0xC08FC9B5) = invalid;
+        EXPECT_FALSE(validate_kernel_base(snapshot, *image, error));
+        snapshot.export_nids.at(0xC08FC9B5) = 0;
+        snapshot.export_nids_by_lib.begin()->second = invalid;
+        EXPECT_FALSE(validate_kernel_base(snapshot, *image, error));
+        snapshot.export_nids_by_lib.begin()->second = 0;
+    }
+    snapshot.export_nids.at(0xC08FC9B5) = kBase | 1;
+    EXPECT_TRUE(validate_kernel_base(snapshot, *image, error)) << error;
+}
+
+TEST_F(ModuleValidationTests, AcceptsOnlyExactSyntheticHleModuleShape) {
+    auto image = make_image(std::vector<uint8_t>(kPage, 0));
+    ASSERT_NE(image, nullptr) << error;
+    KernelModule hle{};
+    hle.info.size = sizeof(hle.info);
+    hle.info.modid = 2;
+    std::strcpy(hle.info.module_name, "libnet");
+    std::strcpy(hle.info.path, "vs0:sys/external/libnet.suprx");
+    KernelBaseSnapshot snapshot;
+    snapshot.loaded_modules.emplace(2, hle);
+    ASSERT_TRUE(validate_kernel_modules(snapshot, *image, error)) << error;
+    // load_module derives the name from the stem for either Vita module
+    // extension; the metadata-only HLE producer does not require .suprx.
+    auto kernel_hle = hle;
+    std::strcpy(kernel_hle.info.path, "vs0:sys/external/libnet.skprx");
+    snapshot.loaded_modules.at(2) = kernel_hle;
+    EXPECT_TRUE(validate_kernel_modules(snapshot, *image, error)) << error;
+    const auto rejects = [&](KernelModule changed) {
+        snapshot.loaded_modules.at(2) = changed;
+        EXPECT_FALSE(validate_kernel_modules(snapshot, *image, error));
+    };
+    auto changed = hle;
+    changed.info.start_entry = Ptr<const void>(kBase);
+    rejects(changed);
+    changed = hle;
+    changed.info.tlsAreaSize = 4;
+    rejects(changed);
+    changed = hle;
+    changed.info.segments[0].memsz = kPage;
+    rejects(changed);
+    changed = hle;
+    changed.info_segment_address = Ptr<const uint8_t>(kBase);
+    rejects(changed);
+    changed = hle;
+    changed.info_offset = 4;
+    rejects(changed);
+    changed = hle;
+    std::strcpy(changed.info.path, "app0:libnet.suprx");
+    rejects(changed);
+    changed = hle;
+    std::strcpy(changed.info.path, "vs0:sys/external/../libnet.suprx");
+    rejects(changed);
+    changed = hle;
+    changed.info.state = 1;
+    rejects(changed);
+}
+
 TEST_F(ModuleValidationTests, AcceptsValidExportArraysAndShortAndLongImports) {
     for (const uint16_t import_size : {uint16_t{0x24}, uint16_t{0x34}}) {
         std::vector<uint8_t> guest(kPage, 0);

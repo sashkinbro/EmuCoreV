@@ -9,6 +9,7 @@
 #include <array>
 #include <cstring>
 #include <limits>
+#include <string_view>
 
 namespace emucorev::savestate {
 namespace {
@@ -21,6 +22,30 @@ constexpr uint64_t kMaxModuleSymbols = 1u << 20;
 constexpr uint32_t kMaxModuleDescriptors = 1u << 16;
 constexpr uint32_t kShortImportSize = 0x24;
 constexpr uint32_t kLongImportSize = 0x34;
+
+bool synthetic_hle_module(const KernelModule &module, SceUID uid) {
+    // load_module publishes a zeroed KernelModule for HLE system libraries,
+    // with only size/modid/name/path populated. It has no ELF header to read.
+    const auto &info = module.info;
+    if (module.info_segment_address || module.info_offset || info.modid != uid
+        || info.size != sizeof(info)
+        || !std::memchr(info.module_name, 0, sizeof(info.module_name))
+        || !std::memchr(info.path, 0, sizeof(info.path)) || !info.module_name[0])
+        return false;
+    const std::string_view name(info.module_name);
+    const std::string stem = std::string("vs0:sys/external/") + std::string(name);
+    const std::string_view path(info.path);
+    if (name.find_first_of("/\\") != std::string_view::npos || name == "." || name == ".."
+        || (path != stem + ".suprx" && path != stem + ".skprx"))
+        return false;
+    auto payload = info;
+    payload.size = 0;
+    payload.modid = 0;
+    std::memset(payload.module_name, 0, sizeof(payload.module_name));
+    std::memset(payload.path, 0, sizeof(payload.path));
+    const auto *bytes = reinterpret_cast<const unsigned char *>(&payload);
+    return std::all_of(bytes, bytes + sizeof(payload), [](unsigned char byte) { return byte == 0; });
+}
 
 bool read_name(const MemoryImage &memory, Address address, std::string &error) {
     if (!address)
@@ -237,6 +262,8 @@ bool validate_kernel_modules(const KernelBaseSnapshot &snapshot, const MemoryIma
         if (!module_ptr)
             continue;
         const KernelModule &module = *module_ptr;
+        if (synthetic_hle_module(module, uid))
+            continue;
         const Address base = module.info_segment_address.address();
         const uint64_t offset = module.info_offset;
         const SceKernelSegmentInfo *info_segment = nullptr;

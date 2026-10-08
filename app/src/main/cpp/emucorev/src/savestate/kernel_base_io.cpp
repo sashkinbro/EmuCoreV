@@ -160,8 +160,10 @@ bool validate_kernel_base(const KernelBaseSnapshot &s, const MemoryImage &memory
         for (auto uid : modules)
             if (!s.loaded_modules.contains(uid) || !unique.insert(uid).second) return fail();
     }
-    for (const auto &[nid, address] : s.export_nids) if (!memory.contains(address & ~Address{1}, 1)) return fail();
-    for (const auto &[nid, address] : s.export_nids_by_lib) if (!memory.contains(address & ~Address{1}, 1)) return fail();
+    // Firmware export descriptors can contain a null variable value. The
+    // loader retains that value; only nonnull entries refer to guest memory.
+    for (const auto &[nid, address] : s.export_nids) if (address && !memory.contains(address & ~Address{1}, 1)) return fail();
+    for (const auto &[nid, address] : s.export_nids_by_lib) if (address && !memory.contains(address & ~Address{1}, 1)) return fail();
     for (const auto &[nid, binding] : s.func_binding_infos) if (!memory.contains(binding.entry_address, 12)) return fail();
     for (const auto &[nid, binding] : s.var_binding_infos)
         if (binding.size && !memory.contains(binding.entries, binding.size)) return fail();
