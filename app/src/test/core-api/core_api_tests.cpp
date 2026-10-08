@@ -14,6 +14,21 @@
 
 #include <array>
 #include <cstring>
+#include <future>
+#include <thread>
+
+namespace {
+template <typename Predicate>
+bool await_waiter(Predicate ready) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    do {
+        if (ready())
+            return true;
+        std::this_thread::yield();
+    } while (std::chrono::steady_clock::now() < deadline);
+    return false;
+}
+}
 
 DECL_EXPORT(int, sceGxmColorSurfaceInit, SceGxmColorSurface *surface, SceGxmColorFormat colorFormat, SceGxmColorSurfaceType surfaceType, SceGxmColorSurfaceScaleMode scaleMode, SceGxmOutputRegisterSize outputRegisterSize, uint32_t width, uint32_t height, uint32_t strideInPixels, Ptr<void> data);
 DECL_EXPORT(void, sceGxmColorSurfaceGetClip, const SceGxmColorSurface *surface, uint32_t *xMin, uint32_t *yMin, uint32_t *xMax, uint32_t *yMax);
@@ -129,6 +144,69 @@ TEST(GuestSemaphore, cancel_validates_the_requested_count_and_preserves_state_on
     EXPECT_EQ(waiters, 0u);
     EXPECT_EQ(semaphore_cancel(env.kernel, "test", 0, id, -1, nullptr), 0);
     EXPECT_EQ(semaphore->val, 2);
+}
+
+TEST(GuestSemaphore, real_wait_queue_hands_over_counts_and_delivers_cancellation) {
+    EmuEnvState env;
+    const auto thread = std::make_shared<ThreadState>(10001, env.kernel, env.mem);
+    thread->priority = 100;
+    env.kernel.threads.emplace(thread->id, thread);
+    const auto id = semaphore_create(env.kernel, "test", "blocked-semaphore", 0, 0, 0, 4);
+    ASSERT_GT(id, 0);
+    const auto semaphore = env.kernel.semaphores.at(id);
+    const auto queued = [&] {
+        const std::lock_guard lock(semaphore->mutex);
+        return semaphore->waiters.size() == 1;
+    };
+
+    SceUInt32 timeout = 1000000;
+    auto waiting = std::async(std::launch::async, [&] {
+        return semaphore_wait(env.kernel, "test", thread->id, id, 2, &timeout, false);
+    });
+    const bool entered = await_waiter(queued);
+    EXPECT_EQ(semaphore_signal(env.kernel, "test", 0, id, 2), 0);
+    EXPECT_TRUE(entered);
+    EXPECT_EQ(waiting.get(), 0);
+    EXPECT_EQ(semaphore->val, 0);
+    EXPECT_GT(timeout, 0u);
+
+    timeout = 1000000;
+    waiting = std::async(std::launch::async, [&] {
+        return semaphore_wait(env.kernel, "test", thread->id, id, 3, &timeout, false);
+    });
+    const bool queued_for_cancel = await_waiter(queued);
+    SceUInt32 count = 0;
+    EXPECT_EQ(semaphore_cancel(env.kernel, "test", 0, id, 1, &count), 0);
+    EXPECT_TRUE(queued_for_cancel);
+    EXPECT_EQ(waiting.get(), SCE_KERNEL_ERROR_WAIT_CANCEL);
+    EXPECT_EQ(count, 1u);
+    EXPECT_EQ(semaphore->val, 1);
+}
+
+TEST(GuestThreadEnd, actual_thread_wait_delivers_the_target_exit_status) {
+    EmuEnvState env;
+    const auto target = std::make_shared<ThreadState>(10001, env.kernel, env.mem);
+    const auto waiter = std::make_shared<ThreadState>(10002, env.kernel, env.mem);
+    waiter->priority = 100;
+    target->status = ThreadStatus::running;
+    SceInt32 exit_status = -77;
+    auto waiting = std::async(std::launch::async, [&] {
+        return target->wait_for_thread_end(waiter, &exit_status, false);
+    });
+    const bool entered = await_waiter([&] {
+        const std::lock_guard lock(waiter->mutex);
+        return waiter->status == ThreadStatus::waiting;
+    });
+    target->exit(73);
+    {
+        const std::lock_guard lock(target->mutex);
+        target->update_status(ThreadStatus::dormant);
+    }
+    EXPECT_TRUE(entered);
+    const auto result = waiting.get();
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, 0);
+    EXPECT_EQ(exit_status, 73);
 }
 
 TEST(GuestColorSurface, initial_clip_covers_the_surface_and_changes_preserve_geometry) {

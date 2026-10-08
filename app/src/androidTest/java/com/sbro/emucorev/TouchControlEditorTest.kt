@@ -116,4 +116,3 @@ class TouchControlEditorTest {
         screenshot("controls-editor-combo.png")
     }
 }
-
