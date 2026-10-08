@@ -104,6 +104,15 @@ struct ColorSurfaceCacheInfo : public SurfaceCacheInfo {
     int32_t written_y0 = INT32_MAX;
     int32_t written_x1 = 0;
     int32_t written_y1 = 0;
+    int32_t scene_x0 = 0;
+    int32_t scene_y0 = 0;
+    int32_t scene_x1 = 0;
+    int32_t scene_y1 = 0;
+    int32_t post_sync_x0 = 0;
+    int32_t post_sync_y0 = 0;
+    uint32_t post_sync_width = 0;
+    uint32_t post_sync_height = 0;
+    bool partial_write_back = false;
 
     SceGxmColorBaseFormat format;
     vk::ComponentMapping swizzle;

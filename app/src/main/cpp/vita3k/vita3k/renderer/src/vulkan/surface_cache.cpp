@@ -19,6 +19,7 @@
 
 #include <gxm/functions.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
+#include <renderer/vulkan/surface_sync.h>
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/types.h>
 #include <vkutil/vkutil.h>
@@ -69,6 +70,13 @@ static bool format_need_additional_memory(SceGxmColorBaseFormat format) {
 }
 
 namespace renderer::vulkan {
+
+static bool is_small_linear_writeback_surface(const ColorSurfaceCacheInfo &surface) {
+    constexpr uint32_t small_surface_limit = 512;
+    return surface.tiling == SurfaceTiling::Linear
+        && surface.original_width <= small_surface_limit
+        && surface.original_height <= small_surface_limit;
+}
 
 static bool surface_sync_needs_u4u4u4u4_repack(const ColorSurfaceCacheInfo &surface) {
     return surface.format == SCE_GXM_COLOR_BASE_FORMAT_U4U4U4U4
@@ -549,11 +557,20 @@ bool VKSurfaceCache::try_upload_guest_content(ColorSurfaceCacheInfo &info, MemSt
 }
 
 void VKSurfaceCache::note_scene_draw_rect(int32_t x0, int32_t y0, int32_t x1, int32_t y1) {
-    if (!last_written_surface || x1 <= x0 || y1 <= y0)
+    if (!last_written_surface)
         return;
     ColorSurfaceCacheInfo &info = *last_written_surface;
-    // scaled -> unscaled, rounded outward to the 32px tile the hardware writes back as a whole
+    info.scene_x0 = info.scene_y0 = info.scene_x1 = info.scene_y1 = 0;
+    if (x1 <= x0 || y1 <= y0)
+        return;
     const float inv = 1.0f / state.res_multiplier;
+    info.scene_x0 = std::clamp<int32_t>(static_cast<int32_t>(std::floor(x0 * inv)), 0, info.original_width);
+    info.scene_y0 = std::clamp<int32_t>(static_cast<int32_t>(std::floor(y0 * inv)), 0, info.original_height);
+    info.scene_x1 = std::clamp<int32_t>(static_cast<int32_t>(std::ceil(x1 * inv)), 0, info.original_width);
+    info.scene_y1 = std::clamp<int32_t>(static_cast<int32_t>(std::ceil(y1 * inv)), 0, info.original_height);
+    if (info.scene_x1 <= info.scene_x0 || info.scene_y1 <= info.scene_y0)
+        return;
+    // scaled -> unscaled, rounded outward to the 32px tile the hardware writes back as a whole
     int32_t ux0 = static_cast<int32_t>(std::floor(x0 * inv / 32.0f)) * 32;
     int32_t uy0 = static_cast<int32_t>(std::floor(y0 * inv / 32.0f)) * 32;
     int32_t ux1 = static_cast<int32_t>(std::ceil(x1 * inv / 32.0f)) * 32;
@@ -2369,6 +2386,30 @@ ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {
             }
         }
     }
+    bool partial_scene_sync = false;
+    if (is_small_linear_writeback_surface(*last_written_surface)) {
+        const ColorSurfaceCacheInfo &surface = *last_written_surface;
+        const bool covers_surface = surface.written_x0 <= 0 && surface.written_y0 <= 0
+            && surface.written_x1 >= static_cast<int32_t>(surface.original_width)
+            && surface.written_y1 >= static_cast<int32_t>(surface.original_height);
+        const bool identity_swizzle = surface.swizzle.r == vk::ComponentSwizzle::eR;
+        if (surface_partial_writeback_eligible(true, needs_copy_buffer, covers_surface, identity_swizzle)) {
+            const auto rect = intersect_surface_rects(
+                { sync_x0, sync_y0, sync_x0 + static_cast<int32_t>(sync_w), sync_y0 + static_cast<int32_t>(sync_h) },
+                { surface.scene_x0, surface.scene_y0, surface.scene_x1, surface.scene_y1 },
+                surface.original_width,
+                surface.original_height);
+            if (!rect)
+                return nullptr;
+            sync_x0 = rect->x0;
+            sync_y0 = rect->y0;
+            sync_w = static_cast<uint32_t>(rect->x1 - rect->x0);
+            sync_h = static_cast<uint32_t>(rect->y1 - rect->y0);
+            clamp_sync = true;
+            rt_clamped = true;
+            partial_scene_sync = true;
+        }
+    }
     if (skip_writeback || sync_w == 0 || sync_h == 0)
         return nullptr;
 
@@ -2477,6 +2518,12 @@ ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {
         copy.imageOffset = { sync_x0, sync_y0, 0 };
         copy.imageExtent = { sync_w, sync_h, 1 };
     }
+
+    last_written_surface->post_sync_x0 = sync_x0;
+    last_written_surface->post_sync_y0 = sync_y0;
+    last_written_surface->post_sync_width = sync_w;
+    last_written_surface->post_sync_height = sync_h;
+    last_written_surface->partial_write_back = partial_scene_sync;
 
     cmd_buffer.copyImageToBuffer(image_to_copy, image_layout, buffer, copy);
 
