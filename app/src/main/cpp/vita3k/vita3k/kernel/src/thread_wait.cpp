@@ -107,7 +107,7 @@ SceInt32 ThreadState::send_signal() {
     return SCE_KERNEL_OK;
 }
 
-WaitResult ThreadState::wait_for_thread_end(const ThreadStatePtr &waiter, SceInt32 *exit_status, bool callbacks) {
+WaitResult ThreadState::wait_for_thread_end(const ThreadStatePtr &waiter, SceInt32 *exit_status, bool callbacks, SceUInt32 *timeout) {
     std::unique_lock<std::mutex> lock(mutex);
     if (status == ThreadStatus::dormant) {
         if (exit_status)
@@ -116,7 +116,10 @@ WaitResult ThreadState::wait_for_thread_end(const ThreadStatePtr &waiter, SceInt
     }
     std::unique_lock<std::mutex> end_lock(end_waiters_mutex);
     lock.unlock();
-    return end_waiters.wait(end_lock, waiter, { SCE_KERNEL_WAITTYPE_WAITTHEND, id }, { exit_status }, Deadline::max(), callbacks);
+    const Deadline deadline = deadline_from(timeout);
+    const WaitResult result = end_waiters.wait(end_lock, waiter, { SCE_KERNEL_WAITTYPE_WAITTHEND, id }, { exit_status }, deadline, callbacks);
+    writeback_timeout(timeout, deadline);
+    return result;
 }
 
 WaitResult ThreadState::wait(WaitTarget target, Deadline deadline, bool callbacks) {

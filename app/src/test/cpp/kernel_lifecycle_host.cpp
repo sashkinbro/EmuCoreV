@@ -15,3 +15,9 @@ struct KernelLifecycleEnv {
     MemState mem;
 };
 #include "../core-api/kernel_lifecycle_tests.inc"
+
+using KernelThreadEndEnv = KernelLifecycleEnv;
+SceInt32 thread_end_wait(KernelThreadEndEnv &, const ThreadStatePtr &waiter, const ThreadStatePtr &target, SceInt32 *status, SceUInt32 *timeout, bool callbacks) {
+    return guest_result(target->wait_for_thread_end(waiter, status, callbacks, timeout));
+}
+#include "../core-api/kernel_thread_end_tests.inc"

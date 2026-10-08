@@ -853,7 +853,7 @@ EXPORT(int, _sceKernelWaitThreadEnd, SceUID thid, int *stat, SceUInt *timeout) {
     if (!target) {
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
     }
-    return guest_result(target->wait_for_thread_end(waiter, stat, false));
+    return guest_result(target->wait_for_thread_end(waiter, stat, false, timeout));
 }
 
 EXPORT(int, _sceKernelWaitThreadEndCB, SceUID thid, int *stat, SceUInt *timeout) {
@@ -864,7 +864,7 @@ EXPORT(int, _sceKernelWaitThreadEndCB, SceUID thid, int *stat, SceUInt *timeout)
     if (!target) {
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
     }
-    return guest_result(target->wait_for_thread_end(waiter, stat, true));
+    return guest_result(target->wait_for_thread_end(waiter, stat, true, timeout));
 }
 
 EXPORT(SceInt32, sceKernelCancelCallback, SceUID callbackId) {

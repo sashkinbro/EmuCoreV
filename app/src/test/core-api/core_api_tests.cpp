@@ -250,3 +250,12 @@ using KernelLifecycleEnv = EmuEnvState;
 
 using KernelShutdownEnv = EmuEnvState;
 #include "kernel_shutdown_tests.inc"
+
+DECL_EXPORT(int, _sceKernelWaitThreadEnd, SceUID thid, int *stat, SceUInt *timeout);
+DECL_EXPORT(int, _sceKernelWaitThreadEndCB, SceUID thid, int *stat, SceUInt *timeout);
+using KernelThreadEndEnv = EmuEnvState;
+SceInt32 thread_end_wait(KernelThreadEndEnv &env, const ThreadStatePtr &waiter, const ThreadStatePtr &target, SceInt32 *status, SceUInt32 *timeout, bool callbacks) {
+    return callbacks ? export__sceKernelWaitThreadEndCB(env, waiter->id, "test", target->id, status, timeout)
+                     : export__sceKernelWaitThreadEnd(env, waiter->id, "test", target->id, status, timeout);
+}
+#include "kernel_thread_end_tests.inc"
