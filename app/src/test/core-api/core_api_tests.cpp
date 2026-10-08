@@ -259,3 +259,12 @@ SceInt32 thread_end_wait(KernelThreadEndEnv &env, const ThreadStatePtr &waiter, 
                      : export__sceKernelWaitThreadEnd(env, waiter->id, "test", target->id, status, timeout);
 }
 #include "kernel_thread_end_tests.inc"
+
+DECL_EXPORT(SceInt32, sceKernelGetThreadmgrUIDClass, SceUID uid);
+DECL_EXPORT(SceInt32, ksceKernelGetThreadmgrUIDClass, SceUID uid);
+using KernelUidClassEnv = EmuEnvState;
+SceInt32 uid_class_query(KernelUidClassEnv &env, SceUID uid, bool driver) {
+    return driver ? export_ksceKernelGetThreadmgrUIDClass(env, 0, "test", uid)
+                  : export_sceKernelGetThreadmgrUIDClass(env, 0, "test", uid);
+}
+#include "kernel_uid_class_tests.inc"

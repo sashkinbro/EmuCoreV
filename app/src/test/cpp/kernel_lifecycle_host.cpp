@@ -21,3 +21,10 @@ SceInt32 thread_end_wait(KernelThreadEndEnv &, const ThreadStatePtr &waiter, con
     return guest_result(target->wait_for_thread_end(waiter, status, callbacks, timeout));
 }
 #include "../core-api/kernel_thread_end_tests.inc"
+
+#include <kernel/uid_class.h>
+using KernelUidClassEnv = KernelLifecycleEnv;
+SceInt32 uid_class_query(KernelUidClassEnv &env, SceUID uid, bool) {
+    return get_threadmgr_uid_class(env.kernel, uid);
+}
+#include "../core-api/kernel_uid_class_tests.inc"

@@ -22,6 +22,7 @@
 #include <kernel/state.h>
 #include <kernel/sync_primitives.h>
 #include <kernel/types.h>
+#include <kernel/uid_class.h>
 #include <packages/functions.h>
 
 #include <util/lock_and_find.h>
@@ -1183,9 +1184,9 @@ EXPORT(Ptr<void>, sceKernelGetThreadTLSAddr, SceUID thid, int key) {
     return emuenv.kernel.get_thread_tls_addr(emuenv.mem, thid, key);
 }
 
-EXPORT(int, sceKernelGetThreadmgrUIDClass) {
-    TRACY_FUNC(sceKernelGetThreadmgrUIDClass);
-    return UNIMPLEMENTED();
+EXPORT(SceInt32, sceKernelGetThreadmgrUIDClass, SceUID uid) {
+    TRACY_FUNC(sceKernelGetThreadmgrUIDClass, uid);
+    return get_threadmgr_uid_class(emuenv.kernel, uid);
 }
 
 EXPORT(uint64_t, sceKernelGetTimerBaseWide, SceUID timer_handle) {

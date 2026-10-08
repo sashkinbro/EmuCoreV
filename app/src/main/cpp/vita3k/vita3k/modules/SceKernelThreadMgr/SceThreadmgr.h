@@ -86,3 +86,4 @@ DECL_EXPORT(SceInt32, _sceKernelCancelTimer, SceUID timer_id, SceUInt32 *num_wai
 DECL_EXPORT(SceInt32, _sceKernelCancelMutex, SceUID mutex_id, SceInt32 new_count, SceUInt32 *num_wait_threads);
 DECL_EXPORT(SceInt32, _sceKernelCancelRWLock, SceUID rwlock_id, SceUInt32 *num_readers, SceUInt32 *num_writers, SceInt32 flag);
 DECL_EXPORT(SceInt32, _sceKernelCancelMsgPipe, SceUID msgpipe_id, SceUInt32 *num_senders, SceUInt32 *num_receivers);
+DECL_EXPORT(SceInt32, sceKernelGetThreadmgrUIDClass, SceUID uid);

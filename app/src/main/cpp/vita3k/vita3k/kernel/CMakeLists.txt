@@ -1,6 +1,7 @@
 set(SOURCE_LIST
 	include/kernel/state.h
 	include/kernel/types.h
+	include/kernel/uid_class.h
 	include/kernel/thread/wait_queue.h
 	include/kernel/thread/thread_state.h
 	include/kernel/thread/wait.h
@@ -11,6 +12,7 @@ set(SOURCE_LIST
 	include/kernel/load_self.h
 	include/kernel/callback.h
 	src/kernel.cpp
+	src/uid_class.cpp
 	src/thread.cpp
 	src/thread_wait.cpp
 	src/thread_callback.cpp
