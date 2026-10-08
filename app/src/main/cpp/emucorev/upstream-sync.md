@@ -90,6 +90,16 @@ Verification: the Android arm64 native build passes with NDK 29/C++23. Host test
 
 The UID table/classes and remaining synchronization deletion/cancellation architecture are not part of this block. Independently integrated SimpleEvent/semaphore fixes must be retained when combining it with subsequent batches.
 
+## Archive installer and repair integrity
+
+VPK/ZIP installation now validates normalized entry paths and case-insensitive aliases before metadata discovery, reads metadata by exact ZIP index, and writes recognized SFO/theme metadata at canonical paths. Exact nested metadata declares a separate content boundary even when that child is invalid. One harmless explicit relative-root directory remains supported; marker-like backup assets remain ordinary files.
+
+Extraction and patch merging prepare a unique sibling stage before replacing the destination with backup/rename rollback. Failed extraction preserves the installed title. NoNpDrm's derived temporary directory cleanup is restricted to the owned archive stage. Title, theme and DLC identities must be safe filename components.
+
+Android archive repair now checks the original CRC and uncompressed size before accepting a repaired file, rejects ambiguous paths, uses independent temporary outputs and removes partial output after failure. BZip2 data is identified as requiring repair for the native installer and can be converted to supported deflate without changing its payload. Successful multi-content installation reports the actual count.
+
+Verification: all 18 real native installer instrumentation fixtures pass on Lenovo, including seven cases that failed against the previous installed APK. All 205 JVM tests and full debug/test APK assembly pass. Independent source review found no remaining actionable issue in this delta. Rename fault injection, interruption recovery, large ZIP64 archives and real NoNpDrm cryptographic content remain outside this verification.
+
 ## Remaining audit work
 
 - Review the remaining UID-table and synchronization cancellation/deletion series against the integrated WaitQueue block and local guest scheduler.

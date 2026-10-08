@@ -48,17 +48,17 @@ object VitaArchiveInspector {
 
                 zip.entries.asSequence().forEach { entry ->
                     val name = entry.name.replace('\\', '/').lowercase(Locale.US)
-                    if (name.contains(VITAMIN_MARKER)) {
+                    if (name == VITAMIN_MARKER || name.endsWith("/$VITAMIN_MARKER")) {
                         vitaminDump = true
                     }
-                    if (name.contains(SFO_MARKER) || name.endsWith(THEME_MARKER)) {
+                    if (name == SFO_MARKER || name.endsWith("/$SFO_MARKER") ||
+                        name == THEME_MARKER || name.endsWith("/$THEME_MARKER")) {
                         hasInstallMetadata = true
                     }
                     if (
                         !entry.isDirectory &&
                         entry.method != ZipEntry.STORED &&
-                        entry.method != ZipEntry.DEFLATED &&
-                        !zip.canReadEntryData(entry)
+                        entry.method != ZipEntry.DEFLATED
                     ) {
                         unsupportedCompressionEntries++
                     }

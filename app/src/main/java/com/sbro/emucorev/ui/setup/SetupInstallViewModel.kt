@@ -141,8 +141,8 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                 finishSuccess(
                     appContext.resources.getQuantityString(
                         R.plurals.install_dialog_content_done,
-                        1,
-                        1
+                        installedCount,
+                        installedCount
                     )
                 )
             } else {
