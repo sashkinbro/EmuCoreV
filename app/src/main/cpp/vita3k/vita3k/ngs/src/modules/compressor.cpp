@@ -142,7 +142,12 @@ bool CompressorModule::process(KernelState &kern, const MemState &mem, const Sce
                 detector_level = envelope;
             }
 
-            float target_gain = db_to_linear(reduction_db_for(detector_level)) * makeup_linear;
+            // attack and release also pace the gain so a new ratio or threshold glides in
+            const float target_db = reduction_db_for(detector_level);
+            float &reduction_db = logical->reduction_db[env_index];
+            const float gain_coef = (target_db < reduction_db) ? attack_coef : release_coef;
+            reduction_db = gain_coef * reduction_db + (1.0f - gain_coef) * target_db;
+            float target_gain = db_to_linear(reduction_db) * makeup_linear;
 
             if (compressor_never_amplifies)
                 target_gain = std::min(target_gain, 1.0f);

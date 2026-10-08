@@ -37,6 +37,12 @@ Additional local fix: clear the installer metadata for every directory/archive c
 
 This batch does not constitute a full game compatibility test of rendering, camera, sound or save dialogs.
 
+## AAC/SBR compatibility batch
+
+Plus `997654b3f` supplies requested AAC output layout/rate handling, SBR sample sizing, converter reconfiguration and compressor gain smoothing. Additional local correction: convert oversized decoded frames into full temporary PCM before copying the guest's permitted sample count. Simply limiting `swr_convert` output capacity buffers surplus input forever, growing latency and returning audio from old frames.
+
+Verification: five AAC conversion tests plus the 28 cheat tests pass on Lenovo (33 total). Baseline tests reproduced stereo/mono conversion and guest PCM overrun defects; the unmodified Plus patch failed the consecutive-frame backlog test with delay growing from 1024 to 4096 samples. SBR output rate/capacity and changing input channel layout are covered. APK assembly succeeds. These tests provide synthetic decoded frames to the real FFmpeg converter; they do not validate encoded AAC bitstreams or a particular game's sound.
+
 ## Remaining audit work
 
 - Review the official WaitQueue, callback-wait, UID-table and synchronization cancellation/deletion series together with the local Plus guest scheduler. They are coupled changes and cannot be copied as independent one-line fixes.

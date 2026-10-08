@@ -58,6 +58,7 @@ inline constexpr bool interpret_ratio_below_one_as_reciprocal = true;
 struct CompressorLogicalState : public ModuleLogicalState {
     float envelope[2] = { 0.0f, 0.0f };
     float applied_gain[2] = { 1.0f, 1.0f };
+    float reduction_db[2] = { 0.0f, 0.0f };
 };
 
 struct CompressorModule : public Module {
