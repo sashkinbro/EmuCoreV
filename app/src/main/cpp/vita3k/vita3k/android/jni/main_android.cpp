@@ -25,6 +25,7 @@
 #include <dialog/state.h>
 #include <emucorev/savestate/savestate.h>
 #include <emucorev/savestate/operation_mutex.h>
+#include <emucorev/savestate/session_pause.h>
 #include <ime/functions.h>
 #include <ime/keyboard.h>
 #include <io/state.h>
@@ -498,6 +499,15 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
 
         if (!load_state_path.empty()) {
             const auto requested_state_path = std::exchange(load_state_path, {});
+            emucorev::savestate::ScopedSaveStatePause pause(session_controller);
+            if (!pause) {
+                const std::string error = "Could not pause the session to load the save state";
+                LOG_ERROR("{}", error);
+                report_save_state_load_error(error);
+                exit_code = -1;
+                cleanup_launch(app::AppSessionStopReason::LaunchFailure);
+                break;
+            }
             LOG_INFO("Applying launch save state {}", requested_state_path);
             const auto state_result = emucorev::savestate::load_state(*emuenv, requested_state_path, true);
             if (state_result.ok()) {

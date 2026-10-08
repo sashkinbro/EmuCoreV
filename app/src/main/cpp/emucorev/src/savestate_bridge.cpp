@@ -9,6 +9,7 @@
 
 #include <emucorev/savestate/savestate.h>
 #include <emucorev/savestate/operation_mutex.h>
+#include <emucorev/savestate/session_pause.h>
 
 #include <display/state.h>
 #include <emuenv/state.h>
@@ -70,25 +71,7 @@ jstring ok_json(JNIEnv *env) {
     return result_to_json(env, result);
 }
 
-class ScopedSaveStatePause {
-public:
-    ScopedSaveStatePause() {
-        auto *controller = get_app_session_controller();
-        if (controller && controller->set_pause_reason(app::AppSessionPauseReason::SaveState, true)) {
-            controller_ = controller;
-        }
-    }
-
-    ~ScopedSaveStatePause() {
-        if (controller_)
-            controller_->set_pause_reason(app::AppSessionPauseReason::SaveState, false);
-    }
-
-    explicit operator bool() const { return controller_ != nullptr; }
-
-private:
-    app::AppSessionController *controller_ = nullptr;
-};
+using emucorev::savestate::ScopedSaveStatePause;
 
 class ScopedThumbnailRendererGate {
 public:
@@ -130,7 +113,7 @@ Java_com_sbro_emucorev_core_SaveStateBridge_nativeSaveState(JNIEnv *env, jobject
         return result_to_json(env, result);
     }
 
-    ScopedSaveStatePause pause;
+    ScopedSaveStatePause pause(get_app_session_controller());
     if (!pause) {
         emucorev::savestate::Result result;
         result.status = emucorev::savestate::Status::NotRunning;
@@ -164,7 +147,7 @@ Java_com_sbro_emucorev_core_SaveStateBridge_nativeLoadState(JNIEnv *env, jobject
         return result_to_json(env, result);
     }
 
-    ScopedSaveStatePause pause;
+    ScopedSaveStatePause pause(get_app_session_controller());
     if (!pause) {
         emucorev::savestate::Result result;
         result.status = emucorev::savestate::Status::NotRunning;
@@ -222,7 +205,7 @@ Java_com_sbro_emucorev_core_SaveStateBridge_nativeCaptureThumbnail(JNIEnv *env, 
     if (!emuenv || !emuenv->renderer)
         return JNI_FALSE;
 
-    ScopedSaveStatePause pause;
+    ScopedSaveStatePause pause(get_app_session_controller());
     if (!pause)
         return JNI_FALSE;
     // dump_frame uses the render worker's surface cache and Vulkan command pool.
