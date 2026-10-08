@@ -112,6 +112,11 @@ static bool is_nonpdrm(EmuEnvState &emuenv, const fs::path &output_path) {
 }
 
 static bool set_content_path(EmuEnvState &emuenv, const bool is_theme, fs::path &dest_path) {
+    if (emuenv.app_info.app_title_id.empty()) {
+        LOG_ERROR("param.sfo has no title ID, not installing it");
+        return false;
+    }
+
     const auto app_path = dest_path / "app" / emuenv.app_info.app_title_id;
 
     if (emuenv.app_info.app_category == "ac") {
@@ -168,6 +173,8 @@ static void set_theme_name(EmuEnvState &emuenv, const vfs::FileBuffer &buffer, c
 }
 
 static bool install_archive_content(EmuEnvState &emuenv, const ZipPtr &zip, const std::string &content_path, const std::function<void(ArchiveContents)> &progress_callback, const ReinstallCallback &reinstall_callback) {
+    // Each entry must supply its own identity, even in a multi-content archive.
+    emuenv.app_info = {};
     std::string sfo_path = "sce_sys/param.sfo";
     std::string theme_path = "theme.xml";
     vfs::FileBuffer buffer, theme;
@@ -369,6 +376,7 @@ static std::vector<fs::path> get_contents_path(const fs::path &path) {
 }
 
 static bool install_content(EmuEnvState &emuenv, const fs::path &content_path) {
+    emuenv.app_info = {};
     const auto sfo_path{ content_path / "sce_sys/param.sfo" };
     const auto theme_path{ content_path / "theme.xml" };
     vfs::FileBuffer buffer;
@@ -376,7 +384,10 @@ static bool install_content(EmuEnvState &emuenv, const fs::path &content_path) {
     const auto is_theme = fs::exists(theme_path);
     auto dst_path{ emuenv.vita_fs_path / "ux0" };
     if (fs_utils::read_data(sfo_path, buffer)) {
-        sfo::get_param_info(emuenv.app_info, buffer, emuenv.cfg.sys_lang);
+        if (!sfo::get_param_info(emuenv.app_info, buffer, emuenv.cfg.sys_lang)) {
+            LOG_ERROR("Rejecting content '{}': param.sfo failed to parse ({} bytes)", content_path, buffer.size());
+            return false;
+        }
         if (!set_content_path(emuenv, is_theme, dst_path))
             return false;
 

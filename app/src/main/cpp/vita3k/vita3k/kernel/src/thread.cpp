@@ -802,6 +802,7 @@ void ThreadState::resume(bool step) {
     {
         const std::lock_guard<std::mutex> lock(mutex);
         single_stepping = step;
+        suspend_requested = false;
         update_status(ThreadStatus::run);
     }
 }
