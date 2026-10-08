@@ -98,7 +98,7 @@ TEST(GuestSimpleEvent, named_open_and_delete_leave_unrelated_event_flags_intact)
     EmuEnvState env;
     const auto event = simple_event_create(env.kernel, env.mem, "test", "named-event", 0, 0, 1);
     ASSERT_GT(event, 0);
-    const auto flag = std::make_shared<EventFlag>();
+    const auto flag = std::make_shared<EventFlag>(0);
     env.kernel.eventflags.emplace(event, flag);
     EXPECT_EQ(simple_event_find(env.kernel, "test", "named-event"), event);
     EXPECT_EQ(simple_event_delete(env.kernel, "test", 0, event), 0);

@@ -32,7 +32,7 @@ void draw_condvars_dialog(GuiState &gui, EmuEnvState &emuenv) {
             id,
             sema_state->name,
             sema_state->attr,
-            sema_state->waiting_threads->size());
+            sema_state->waiters.size());
     }
     ImGui::End();
 }
@@ -48,7 +48,7 @@ void draw_lw_condvars_dialog(GuiState &gui, EmuEnvState &emuenv) {
             id,
             sema_state->name,
             sema_state->attr,
-            sema_state->waiting_threads->size());
+            sema_state->waiters.size());
     }
     ImGui::End();
 }

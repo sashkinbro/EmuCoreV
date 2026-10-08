@@ -52,9 +52,9 @@ EXPORT(int, sceKernelWaitExceptionForMono) {
     STUBBED("Blocks forever (no exception delivery)");
     const ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
     std::unique_lock<std::mutex> lock(thread->mutex);
-    thread->update_status(ThreadStatus::wait, ThreadStatus::run);
+    thread->update_status(ThreadStatus::waiting, ThreadStatus::running);
     thread->status_cond.wait(lock, [&] {
-        return thread->status == ThreadStatus::run || thread->is_delete_requested();
+        return thread->status == ThreadStatus::running || thread->is_delete_requested();
     });
     return 0;
 }

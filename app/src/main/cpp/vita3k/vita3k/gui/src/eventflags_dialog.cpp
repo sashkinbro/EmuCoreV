@@ -33,7 +33,7 @@ void draw_event_flags_dialog(GuiState &gui, EmuEnvState &emuenv) {
             event_state->name,
             event_state->flags,
             event_state->attr,
-            event_state->waiting_threads->size());
+            event_state->waiters.size());
     }
     ImGui::End();
 }

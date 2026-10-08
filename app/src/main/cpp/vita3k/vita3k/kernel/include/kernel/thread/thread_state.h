@@ -19,12 +19,14 @@
 
 #include <cpu/state.h>
 #include <kernel/callback.h>
+#include <kernel/thread/wait_queue.h>
 #include <kernel/types.h>
 #include <mem/block.h>
 #include <mem/ptr.h>
 
 #include <chrono>
 #include <condition_variable>
+#include <list>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -46,24 +48,12 @@ typedef std::unique_ptr<CPUState, std::function<void(CPUState *)>> CPUStatePtr;
 typedef std::function<void(CPUState &, uint32_t, SceUID)> CallImport;
 typedef std::function<std::string(Address)> ResolveNIDName;
 
-enum class ThreadStatus {
-    run, // Running
-    dormant, // Waiting for a job
-    suspend, // Suspended by debugger
-    wait, // Waiting to be awaken by sync object or operation
-};
-
-struct ThreadSignal {
-    ThreadSignal() = default;
-    ~ThreadSignal() = default;
-
-    void wait();
-    bool send();
-
-private:
-    std::mutex mutex;
-    std::condition_variable recv_cond;
-    bool signaled = false;
+// Values are what sceKernelGetThreadInfo reports
+enum class ThreadStatus : SceUInt32 {
+    running = SCE_KERNEL_THREAD_STATUS_RUNNING,
+    waiting = SCE_KERNEL_THREAD_STATUS_WAITING, // Waiting to be awaken by sync object or operation
+    dormant = SCE_KERNEL_THREAD_STATUS_DORMANT, // Waiting for a job
+    suspended = SCE_KERNEL_THREAD_STATUS_SUSPENDED, // Suspended by debugger
 };
 
 struct ThreadState {
@@ -91,15 +81,13 @@ struct ThreadState {
     SceInt32 affinity_mask;
     uint64_t start_tick;
     uint64_t last_vblank_waited;
-    // set to true if thread is processing kernel callbacks
-    bool is_processing_callbacks = false;
 
     CPUStatePtr cpu;
     ThreadStatus status = ThreadStatus::dormant;
-    ThreadSignal signal;
-    std::vector<CallbackPtr> callbacks;
+    // What the thread waits on while waiting, empty otherwise
+    WaitTarget wait_target;
+
     std::condition_variable status_cond;
-    std::vector<std::shared_ptr<ThreadState>> waiting_threads;
     uint32_t returned_value = 0;
 
     ThreadState() = delete;
@@ -116,7 +104,6 @@ struct ThreadState {
     Address stack_top() const;
 
     void run_loop();
-    void raise_waiting_threads();
 
     // this function must be called from the thread itself (inside a svc call)
     uint32_t run_callback(Address callback_address, const std::vector<uint32_t> &args);
@@ -125,6 +112,29 @@ struct ThreadState {
     // it is only used for module loading and gxm display queue right now
     // args and argp are passed to thread->start as is
     uint32_t run_guest_function(Address callback_address, SceSize args = 0, const Ptr<void> argp = Ptr<void>{});
+
+    // Blocks this thread until the deadline passes.
+    [[nodiscard]] WaitResult delay_until(Deadline deadline, bool callbacks);
+    // Blocks this thread until a signal is sent to it.
+    [[nodiscard]] WaitResult wait_for_signal(bool callbacks);
+    // Sends a signal to this thread. Fails if the previous one was not consumed yet.
+    SceInt32 send_signal();
+    // Blocks waiter until this thread becomes dormant, then writes its exit status to exit_status.
+    [[nodiscard]] WaitResult wait_for_thread_end(const ThreadStatePtr &waiter, SceInt32 *exit_status, bool callbacks);
+
+    // Waits on target until woken by wake(), the thread exits or is deleted, or the deadline passes.
+    // With callbacks, it also returns after running callbacks that were notified meanwhile.
+    // A stale wake or callbacks can end it early, so callers must recheck their condition.
+    [[nodiscard]] WaitResult wait(WaitTarget target, Deadline deadline, bool callbacks);
+    // Wakes this thread from wait().
+    void wake();
+
+    // Runs the notified callbacks of this thread and returns how many ran. Called by the thread itself.
+    SceUInt32 process_callbacks();
+    // Tells this thread that one of its callbacks was notified, so a wait with callbacks runs it.
+    void notify_callbacks();
+    // Adds a callback this thread created. Called by the thread itself.
+    void add_callback(const CallbackPtr &cb);
 
     void suspend();
     void suspend_and_wait();
@@ -139,6 +149,14 @@ struct ThreadState {
     std::string log_stack_traceback() const;
 
 private:
+    // Whether the thread is exiting or being deleted. Called with mutex held.
+    bool exiting() const { return exit_requested || delete_requested; }
+
+    // With mutex held, park before resuming guest work while either freeze reason is active.
+    bool wait_for_guest_resume(std::unique_lock<std::mutex> &lock);
+    // mutex stays held from callback notification acquisition through context preparation.
+    uint32_t run_callback_locked(std::unique_lock<std::mutex> &lock, Address address, const std::vector<uint32_t> &args);
+
     void push_arguments(const std::vector<uint32_t> &args);
     void dispatch_abort(CPUState &cpu);
 
@@ -149,13 +167,17 @@ private:
     bool exit_requested = false;
     // sceKernelExitDeleteThread (or external kill): will return from top-level run_loop(), then host thread joins.
     bool delete_requested = false;
-    // Set by suspend(), consumed in run_loop() to transition to ThreadStatus::suspend.
+    // Set by suspend(), consumed in run_loop() to transition to ThreadStatus::suspended.
     bool suspend_requested = false;
+    // Debugger suspension is independent of VM/world freezes and only resume() clears it.
+    bool debugger_suspended = false;
     // Suspended by sceKernelSuspendThreadForVM
     bool vm_suspended = false;
     // Stop-the-world
     bool world_stop_requested = false;
     bool world_stopped = false;
+    // A wait/callback is parked at the freeze gate, including overlapping VM/world freezes.
+    bool freeze_waiting = false;
     // Single stepping mode.
     bool single_stepping = false;
 
@@ -169,6 +191,30 @@ private:
     bool run_end_callback = false;
 
     MemState &mem;
+
+    // A sceKernelSendSignal is pending for this thread.
+    bool signal_pending = false;
+    // Set by wake() and consumed by the next wait().
+    bool wake_pending = false;
+    // Set by notify_callbacks() and cleared when the callbacks run.
+    bool callbacks_pending = false;
+    // Set while the thread runs its callbacks. They don't nest.
+    bool is_processing_callbacks = false;
+    // Callbacks this thread created, in creation order. The kernel owns them. Only this thread touches the list.
+    std::list<std::weak_ptr<Callback>> callbacks;
+
+    // Notified under mutex whenever a condition a wait may be blocked on changes.
+    std::condition_variable wait_cv;
+
+    struct EndWaitEntry {
+        // Where to write the exit status, or null
+        SceInt32 *exit_status;
+    };
+
+    // Guards end_waiters. Taken after mutex when both are needed.
+    std::mutex end_waiters_mutex;
+    // Threads blocked in sceKernelWaitThreadEnd on this one.
+    WaitQueue<EndWaitEntry> end_waiters;
 
 public:
     MemState &get_mem() { return mem; }

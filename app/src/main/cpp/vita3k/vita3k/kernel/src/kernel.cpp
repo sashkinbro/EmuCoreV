@@ -171,6 +171,25 @@ ThreadStatePtr KernelState::get_thread(SceUID thread_id) {
     return lock_and_find(thread_id, threads, mutex);
 }
 
+SceUID KernelState::create_callback(const ThreadStatePtr &thread, const char *name, Ptr<SceKernelCallbackFunction> func, Ptr<void> common) {
+    const std::lock_guard<std::mutex> lock(mutex);
+    const SceUID uid = get_next_uid();
+    const CallbackPtr cb = std::make_shared<Callback>(uid, thread, name, func, common);
+    callbacks.emplace(uid, cb);
+    thread->add_callback(cb);
+    return uid;
+}
+
+bool KernelState::delete_callback(SceUID id) {
+    const std::lock_guard<std::mutex> lock(mutex);
+    const auto it = callbacks.find(id);
+    if (it == callbacks.end())
+        return false;
+    it->second->mark_deleted();
+    callbacks.erase(it);
+    return true;
+}
+
 ThreadStatePtr KernelState::create_thread(MemState &mem, const char *name, Ptr<const void> entry_point) {
     return create_thread(mem, name, entry_point, SCE_KERNEL_DEFAULT_PRIORITY, SCE_KERNEL_THREAD_CPU_AFFINITY_MASK_DEFAULT, SCE_KERNEL_STACK_SIZE_USER_MAIN, nullptr);
 }
@@ -217,8 +236,6 @@ void KernelState::request_process_exit(int res, std::optional<AppLaunchRequest> 
 void KernelState::process_exit() {
     {
         std::lock_guard<std::mutex> lock(mutex);
-        for (auto &[_, timer] : timers)
-            timer->condvar.notify_all();
         for (auto &[_, thread] : threads)
             thread->exit_delete(false);
     }
@@ -231,7 +248,7 @@ void KernelState::pause_threads() {
     const std::lock_guard<std::mutex> lock(mutex);
     for (auto &[_, thread] : threads) {
         paused_threads_status[thread->id] = thread->status;
-        if (thread->status == ThreadStatus::run)
+        if (thread->status == ThreadStatus::running)
             thread->suspend();
     }
 }
@@ -239,7 +256,7 @@ void KernelState::pause_threads() {
 void KernelState::resume_threads() {
     const std::lock_guard<std::mutex> lock(mutex);
     for (auto &[_, thread] : threads) {
-        if (paused_threads_status[thread->id] == ThreadStatus::run)
+        if (paused_threads_status[thread->id] == ThreadStatus::running)
             thread->resume();
     }
     paused_threads_status.clear();
@@ -285,11 +302,11 @@ void KernelState::log_thread_hang_dump() {
     std::string dump = fmt::format("HANG DUMP: {} guest thread(s)\n", snapshot.size());
     for (const auto &t : snapshot) {
         const ThreadStatus status = t->status;
-        const char *status_str = (status == ThreadStatus::run) ? "run" : (status == ThreadStatus::wait) ? "wait"
-            : (status == ThreadStatus::suspend)                                                         ? "suspend"
+        const char *status_str = (status == ThreadStatus::running) ? "run" : (status == ThreadStatus::waiting) ? "wait"
+            : (status == ThreadStatus::suspended)                                                         ? "suspend"
                                                                                                         : "dormant";
         std::string line;
-        if (status == ThreadStatus::run) {
+        if (status == ThreadStatus::running) {
             const uint32_t run_pc = read_pc(*t->cpu) & ~1u;
             line = fmt::format("thread {} ({}) status=run pc~0x{:X} lr~0x{:X} last_import_nid=0x{:08X} import_lr=0x{:X}", t->name, t->id, run_pc, read_lr(*t->cpu), t->last_import_nid, t->last_import_lr);
             for (int ri = 0; ri <= 7; ri++)

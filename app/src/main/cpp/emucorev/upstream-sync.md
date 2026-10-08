@@ -69,9 +69,30 @@ Preflight simulates the complete draw's ring allocations, including alignment, w
 
 Verification: Android renderer/full APK builds, independent source review, and 49 standalone native tests on Lenovo pass. Six added cases cover byte preservation, partial records, mapped-path exclusion, crossing attributes, expanded capacity, and aggregate wrap/alignment. No affected game's rendering issue is claimed resolved by these synthetic checks.
 
+## Kernel unified wait and callback batch
+
+Adapted the following official Vita3K commits as one dependency block over local base `75d6df068b9dda8447da946614ed5d3dc14d5b74`:
+
+| Source revision | Change |
+| --- | --- |
+| `e9058c06fd3d2ef722c1c83043e774df97a45b59` | Introduce WaitQueue and unify thread waits. |
+| `ab71f829f0678323bcf3665cd8bea94197cb5832` | Deliver the exit status to threads waiting for thread end. |
+| `8da5ce5eb5d2691a0b42ea17358b371eb20aeb02` | Represent thread exit separately from guest wait error results. |
+| `ef105504e5ef610024f35477e3ad7f3b42b86cbe` | Match mutex and condition helpers to the other synchronization objects. |
+| `07936ba3b39be90ace6e268760902b12c9c854a0` | Unify the waiting place and report its type and UID. |
+| `722340b44c03b209afc320673837b335cf84f36d` | Service late callback notifications throughout callback-enabled waits, retaining self-notifications and handling callback deletion/exit. |
+
+Local adaptations preserve the Plus guest scheduler gate/token, priority and affinity behavior, wake counter, mutex cache, diagnostic breadcrumbs/probes, and the existing requirement to reacquire a condition variable's mutex after a timeout. Thread wait and callback context helpers are separated into production translation units so host tests can use the real implementation without the guest JIT.
+
+Additional local correction: a freeze that already accepted a waiting thread as quiescent must block later callback context preparation and restoration. The thread mutex serializes the freeze checks, notification consumption and context rewrite. World, VM and debugger suspension have independent resume conditions; guest execution also checks VM suspension before each quantum. Deletion bypasses a frozen gate without consuming a pending callback or restoring guest context while frozen.
+
+Verification: the Android arm64 native build passes with NDK 29/C++23. Host tests cover wait cleanup/results, priority/FIFO order, late and self-notifying callbacks, non-CB isolation, callback deletion/exit, thread-end exit status, scheduler token release, overlapping freezes in both resume orders, debugger independence, and callback preparation/restoration during freeze and deletion. All six behavioral mutation checks fail as expected. Independent review found no additional confirmed wake, lifetime or join-lock regression. CPU register operations, guest JIT execution and the unrelated registry boundary are substituted in these host tests; no device or in-game validation was performed for this batch.
+
+The UID table/classes and remaining synchronization deletion/cancellation architecture are not part of this block. Independently integrated SimpleEvent/semaphore fixes must be retained when combining it with subsequent batches.
+
 ## Remaining audit work
 
-- Review the official WaitQueue, callback-wait, UID-table and synchronization cancellation/deletion series together with the local Plus guest scheduler. They are coupled changes and cannot be copied as independent one-line fixes.
+- Review the remaining UID-table and synchronization cancellation/deletion series against the integrated WaitQueue block and local guest scheduler.
 - Review the remainder of Plus graphics/audio/controller changes against existing manual ports, including mapped double-buffer lifetime and Mali alignment.
 - Finish per-game cheat validation after games are available.
 - Merge `savestate-experimental` into `main` while retaining the verified fixes, then diagnose Save-only corruption separately from Load audio/graphics restoration. Verify long-running gameplay after each operation on the tablet.
