@@ -79,11 +79,12 @@ game's section, the other sections are left untouched.
 | `$8X<level>` + `$8<4\|5\|6><level>` | each block is a `$3`-style chain closed by a `$88` / `$89` line | Same as `$5`, with a pointer chain on both sides. The first block is the destination. |
 | `$AX00` | `<address> <instruction>` | Patch guest code (X is `1` for a 16-bit and `2` for a 32-bit instruction). The original instruction is restored when the cheat is turned off. |
 | `$B2<module>` | `0000000<segment> 00000000` | Make the addresses of the following codes relative to a segment of a loaded module, so that one cheat works across game versions. Module `0` is the main executable. |
-| `$C2<codes>` | `<pad type> <button mask>` | Run the next `codes` codes only while the buttons of `mask` are held. The mask uses the `SCE_CTRL_*` values, e.g. `0x300` for L+R. |
-| `$DX<codes>` | `<address> <value>` | Run the next `codes` codes only when the comparison holds. X selects both the comparison and the width: `0`-`2` `==`, `3`-`5` `!=`, `6`-`8` `>`, `9`-`B` `<`. |
+| `$C2<lines>` | `<pad type> <button mask>` | Run the next `lines` code lines only while the buttons of `mask` are held. The mask uses the `SCE_CTRL_*` values, e.g. `0x300` for L+R. |
+| `$DX<lines>` | `<address> <value>` | Run the next `lines` code lines only when the comparison holds. X selects both the comparison and the width: `0`-`2` `==`, `3`-`5` `!=`, `6`-`8` `>`, `9`-`B` `<`. |
 
-The related count is a number of **codes**, not of lines, so a multi-line pointer write below a
-condition is skipped as a whole. A count of `00` guards the single code right below.
+The related count is a number of **lines**, including continuation lines. For example, a
+two-level pointer write has three lines and requires a count of `03` to guard the whole block.
+A count of `00` guards the single line right below.
 
 ## Not supported
 

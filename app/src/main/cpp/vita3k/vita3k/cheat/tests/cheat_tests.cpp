@@ -32,8 +32,10 @@ constexpr uint32_t scratch_size = 0x1000;
 
 class CheatTest : public ::testing::Test {
 protected:
+    virtual bool use_page_table() const { return false; }
+
     void SetUp() override {
-        ASSERT_TRUE(init(mem, false));
+        ASSERT_TRUE(init(mem, use_page_table()));
 
         scratch = alloc(mem, scratch_size, "cheat-tests");
         ASSERT_NE(scratch, 0u);
@@ -98,6 +100,11 @@ protected:
     Address scratch = 0;
     fs::path directory;
     CheatState state;
+};
+
+class PageTableCheatTest : public CheatTest {
+protected:
+    bool use_page_table() const override { return true; }
 };
 
 } // namespace
@@ -346,7 +353,7 @@ TEST_F(CheatTest, condition_skips_every_line_of_the_pointer_write_it_guards) {
 
     // A failed condition must skip the whole pointer write, but not the code below it.
     run(fmt::format("_V1 Guarded pointer write\n"
-                    "$D201 {:08X} 12345678\n"
+                    "$D203 {:08X} 12345678\n"
                     "$3202 {:08X} 0000005C\n"
                     "$0000 {:08X} 000000AB\n"
                     "$0000 00000000 3F6F0000\n"
@@ -355,6 +362,79 @@ TEST_F(CheatTest, condition_skips_every_line_of_the_pointer_write_it_guards) {
 
     EXPECT_EQ(read32(0x400), 0xFFFFFFFFu);
     EXPECT_EQ(read32(0x500), 0x2Au);
+}
+
+TEST_F(CheatTest, condition_counts_physical_lines_including_pointer_continuations) {
+    write32(0x400, 0xFFFFFFFF);
+    run(fmt::format("_V1 Guard two lines\n"
+                    "$D202 {:08X} 12345678\n"
+                    "$3201 {:08X} 00000000\n"
+                    "$0000 {:08X} 000000AB\n"
+                    "$0200 {:08X} 0000002A\n",
+        at(0), at(0), at(0x400), at(0x500)));
+
+    EXPECT_EQ(read32(0x400), 0xFFFFFFFFu);
+    EXPECT_EQ(read32(0x500), 0x2Au);
+}
+
+TEST_F(CheatTest, saving_lowercase_declarations_preserves_the_enabled_selection) {
+    const auto path = write_file(title_id, "_v0 Lowercase\n$0200 81000000 0000002A\n");
+    ASSERT_TRUE(cheat::load(state, directory, title_id));
+    cheat::set_cheat_enabled(state, 0, true, mem, {});
+    ASSERT_TRUE(cheat::save(state));
+    const auto saved = cheat::parse_cheat_file(path, title_id);
+    ASSERT_EQ(saved.cheats.size(), 1u);
+    EXPECT_TRUE(saved.cheats[0].enabled_on_boot);
+}
+
+TEST_F(CheatTest, saving_declarations_accepts_every_parser_whitespace_prefix) {
+    const auto path = write_file(title_id,
+        "\v_V0 Vertical tab\n$0200 81000000 0000002A\n"
+        "\f_v0 Form feed\n$0200 81000004 0000002B\n");
+    ASSERT_TRUE(cheat::load(state, directory, title_id));
+    ASSERT_EQ(cheat::snapshot(state).cheats.size(), 2u);
+    cheat::set_all_cheats_enabled(state, true, mem, {});
+    ASSERT_TRUE(cheat::save(state));
+    const auto saved = cheat::parse_cheat_file(path, title_id);
+    ASSERT_EQ(saved.cheats.size(), 2u);
+    EXPECT_TRUE(saved.cheats[0].enabled_on_boot);
+    EXPECT_TRUE(saved.cheats[1].enabled_on_boot);
+}
+
+TEST_F(CheatTest, reloading_a_removed_database_clears_stale_cheats) {
+    const auto path = write_file(title_id, "_V1 Removed\n$0200 81000000 0000002A\n");
+    ASSERT_TRUE(cheat::load(state, directory, title_id));
+    ASSERT_TRUE(fs::remove(path));
+    EXPECT_FALSE(cheat::reload(state, directory, title_id, mem, {}));
+    EXPECT_TRUE(cheat::snapshot(state).cheats.empty());
+}
+
+TEST_F(PageTableCheatTest, writes_across_separately_mapped_guest_pages) {
+    const Address block = alloc(mem, 0x2000, "cheat-page-boundary");
+    ASSERT_NE(block, 0u);
+    std::vector<uint8_t> external(0x1000, 0);
+    add_external_mapping(mem, block + 0x1000, 0x1000, external.data());
+
+    run(fmt::format("_V1 Cross-page write\n$0200 {:08X} 12345678\n", block + 0xFFE));
+
+    EXPECT_EQ(*Ptr<uint8_t>(block + 0xFFE).get(mem), 0x78);
+    EXPECT_EQ(*Ptr<uint8_t>(block + 0xFFF).get(mem), 0x56);
+    EXPECT_EQ(external[0], 0x34);
+    EXPECT_EQ(external[1], 0x12);
+    remove_external_mapping(mem, external.data(), 0x1000);
+}
+
+TEST_F(PageTableCheatTest, missing_host_page_is_skipped_without_disabling_the_cheat) {
+    const Address address = at(0);
+    const PagePtr original = mem.page_table[address / 0x1000];
+    mem.page_table[address / 0x1000] = nullptr;
+    run(fmt::format("_V1 Deferred page\n$0200 {:08X} 0000002A\n", address));
+    mem.page_table[address / 0x1000] = original;
+
+    EXPECT_EQ(read32(0), 0u);
+    EXPECT_FALSE(cheat::snapshot(state).cheats[0].broken);
+    cheat::apply(state, mem, {});
+    EXPECT_EQ(read32(0), 42u);
 }
 
 TEST_F(CheatTest, pointer_mov_copies_through_both_chains) {

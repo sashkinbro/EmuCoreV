@@ -278,8 +278,9 @@ bool save_cheat_file(const CheatFile &file) {
         }
 
         std::string &line = lines[cheat.line_number - 1];
-        const auto marker = line.find("_V");
-        if ((marker == std::string::npos) || !is_cheat_declaration(std::string_view(line).substr(marker))) {
+        const std::string declaration = clean_line(line);
+        const auto marker = line.find(declaration);
+        if ((marker == std::string::npos) || !is_cheat_declaration(declaration)) {
             LOG_WARN("Cheat file {} changed on disk since it was loaded, not saving", file.path);
             return false;
         }
@@ -295,6 +296,12 @@ bool save_cheat_file(const CheatFile &file) {
 
     for (const auto &line : lines)
         out << line << '\n';
+
+    out.flush();
+    if (!out) {
+        LOG_ERROR("Failed to write cheat file {}", file.path);
+        return false;
+    }
 
     LOG_INFO("Saved the state of {} cheats to {}", file.cheats.size(), file.path);
 

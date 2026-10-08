@@ -499,6 +499,8 @@ bool load(CheatState &state, const fs::path &cheats_dir, const std::string &titl
     const auto path = find_cheat_file(cheats_dir, title_id);
     if (path.empty()) {
         LOG_DEBUG("No cheat file found for {} in {}", title_id, cheats_dir);
+        const std::lock_guard<std::mutex> lock(state.mutex);
+        state.file = {};
         return false;
     }
 
