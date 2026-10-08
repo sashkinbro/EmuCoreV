@@ -201,14 +201,18 @@ std::unique_ptr<MemoryImage> MemoryImage::preflight(
 
 bool MemoryImage::open_staging_file(const fs::path &directory, std::string &error) {
     boost::system::error_code ec;
-    if (!fs::exists(directory, ec)) {
-        if (ec || !fs::create_directories(directory, ec) || ec) {
-            error = "unable to create memory staging directory";
-            return false;
-        }
+    // Boost's exists(path, ec) can set ENOENT for a missing cache directory.
+    // create_directories handles missing parents and existing directories;
+    // its false return means no creation was needed, not failure.
+    fs::create_directories(directory, ec);
+    if (ec) {
+        error = "unable to create memory staging directory '" + directory.string()
+            + "' (error=" + std::to_string(ec.value()) + ": " + ec.message() + ")";
+        return false;
     }
     if (!fs::is_directory(directory, ec) || ec) {
-        error = "memory staging path is not a directory";
+        error = "memory staging path is not a directory '" + directory.string()
+            + "' (error=" + std::to_string(ec.value()) + ": " + ec.message() + ")";
         return false;
     }
 

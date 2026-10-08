@@ -314,3 +314,45 @@ TEST_F(MemoryImageTests, DisplayParserRejectsCountBombsDuplicateCallbacksAndTrai
 }
 
 } // namespace
+TEST_F(MemoryImageTests, PreflightCreatesMissingNestedStagingDirectoryAndReusesIt) {
+    BufferWriter writer;
+    write_header(writer, kMemoryImagePageSize, {{0x1000, 1}});
+    const auto raw = bytes(kMemoryImagePageSize, 0x6b);
+    write_raw_chunk(writer, 0x1000, raw);
+    write_archive(writer.data());
+    Reader reader;
+    ASSERT_TRUE(reader.open(archive_path, error)) << error;
+    ASSERT_TRUE(reader.validate_sections(error)) << error;
+    const auto staging = root / "new-cache" / "nested" / "savestate-staging";
+    ASSERT_FALSE(fs::exists(staging));
+    auto first = MemoryImage::preflight(reader, staging, error);
+    ASSERT_NE(first, nullptr) << error;
+    ASSERT_TRUE(fs::is_directory(staging));
+    auto second = MemoryImage::preflight(reader, staging, error);
+    ASSERT_NE(second, nullptr) << error;
+    std::vector<uint8_t> restored(raw.size());
+    ASSERT_TRUE(first->read_bytes(0x1000, restored.data(), restored.size(), error)) << error;
+    EXPECT_EQ(restored, raw);
+    std::fill(restored.begin(), restored.end(), 0);
+    ASSERT_TRUE(second->read_bytes(0x1000, restored.data(), restored.size(), error)) << error;
+    EXPECT_EQ(restored, raw);
+    EXPECT_EQ(std::distance(fs::directory_iterator(staging), fs::directory_iterator()), 2);
+    first.reset(); second.reset();
+    EXPECT_TRUE(fs::is_empty(staging));
+}
+
+TEST_F(MemoryImageTests, StagingDirectoryFailureIdentifiesPathAndFilesystemError) {
+    BufferWriter writer;
+    write_header(writer, kMemoryImagePageSize, {{0x1000, 1}});
+    write_raw_chunk(writer, 0x1000, bytes(kMemoryImagePageSize, 0x6b));
+    write_archive(writer.data());
+    Reader reader;
+    ASSERT_TRUE(reader.open(archive_path, error)) << error;
+    ASSERT_TRUE(reader.validate_sections(error)) << error;
+    const auto blocked = root / "blocked-parent";
+    { std::ofstream file(blocked.string()); file << "file"; }
+    const auto staging = blocked / "savestate-staging";
+    EXPECT_EQ(MemoryImage::preflight(reader, staging, error), nullptr);
+    EXPECT_NE(error.find(staging.string()), std::string::npos) << error;
+    EXPECT_NE(error.find("error="), std::string::npos) << error;
+}
