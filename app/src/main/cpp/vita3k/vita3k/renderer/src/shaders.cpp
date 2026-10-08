@@ -185,17 +185,27 @@ static shader::GeneratedShader load_shader_generic(shader::Target target, const 
 
     LOG_INFO("Generating {} shader {}", shader_type_str, hash_text);
 
-    fs::create_directories(shaderlog_path);
+#ifdef __ANDROID__
+    const bool write_shader_dumps = spdlog::should_log(spdlog::level::debug);
+#else
+    constexpr bool write_shader_dumps = true;
+#endif
 
     auto shader_log_path = get_shaderlog_path("gxp");
 
-    // Dump gxp binary
-    fs_utils::dump_data(shader_log_path, &program, program.size);
+    if (write_shader_dumps) {
+        fs::create_directories(shaderlog_path);
+
+        // Dump gxp binary
+        fs_utils::dump_data(shader_log_path, &program, program.size);
+    }
     const auto write_data_with_ext = [&](const std::string &ext, const std::string &data) {
         fs::path out_path;
         if (ext == shader_type_str) {
             out_path = shader_path;
         } else {
+            if (!write_shader_dumps)
+                return true;
             out_path = shader_log_path;
             out_path.replace_extension(ext);
         }

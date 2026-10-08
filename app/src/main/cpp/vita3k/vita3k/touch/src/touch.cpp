@@ -345,6 +345,8 @@ int toggle_touchscreen(TouchState &state) {
 }
 
 int touch_get(const SceUID thread_id, EmuEnvState &emuenv, const SceUInt32 &port, SceTouchData *pData, SceUInt32 count, bool is_peek) {
+    if (count == 0)
+        return 0;
     memset(pData, 0, sizeof(SceTouchData) * count);
     // sceTouchRead with count > 0 must report at least one (empty) sample, otherwise a guest loop can stall
     if (emuenv.drop_inputs || emuenv.ctrl.overlay_input_intercepted.load(std::memory_order_relaxed))
@@ -357,7 +359,7 @@ int touch_get(const SceUID thread_id, EmuEnvState &emuenv, const SceUInt32 &port
         if (emuenv.touch.touch_mode[port])
             nb_returned_data = count;
         else
-            nb_returned_data = 0;
+            nb_returned_data = 1;
     } else {
         const uint64_t current_vcount = emuenv.display.vblank_count.load();
         if (current_vcount <= emuenv.touch.last_vcount[port_idx]) {

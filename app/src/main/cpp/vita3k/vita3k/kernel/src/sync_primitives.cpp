@@ -212,6 +212,28 @@ SceUID simple_event_create(KernelState &kernel, MemState &mem, const char *expor
     return uid;
 }
 
+SceUID simple_event_find(KernelState &kernel, const char *export_name, const char *pName) {
+    if (!pName)
+        return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_ADDR);
+
+    if (strlen(pName) > KERNELOBJECT_MAX_NAME_LENGTH)
+        return RET_ERROR(SCE_KERNEL_ERROR_UID_NAME_TOO_LONG);
+
+    if (LOG_SYNC_PRIMITIVES)
+        LOG_DEBUG("{}: name: \"{}\"", export_name, pName);
+
+    const std::lock_guard<std::mutex> kernel_lock(kernel.mutex);
+
+    const auto it = std::find_if(kernel.simple_events.begin(), kernel.simple_events.end(), [=](const auto &event) {
+        return strncmp(event.second->name, pName, KERNELOBJECT_MAX_NAME_LENGTH) == 0;
+    });
+
+    if (it != kernel.simple_events.end())
+        return it->first;
+
+    return RET_ERROR(SCE_KERNEL_ERROR_UID_CANNOT_FIND_BY_NAME);
+}
+
 SceInt32 simple_event_waitorpoll(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID event_id, SceUInt32 wait_pattern, SceUInt32 *result_pattern, SceUInt64 *user_data, SceUInt32 *timeout, bool is_wait) {
     const SimpleEventPtr event = lock_and_find(event_id, kernel.simple_events, kernel.mutex);
     if (!event) {
@@ -361,7 +383,7 @@ SceInt32 simple_event_delete(KernelState &kernel, const char *export_name, SceUI
 
     if (event->waiting_threads->empty()) {
         const std::lock_guard<std::mutex> kernel_lock(kernel.mutex);
-        kernel.eventflags.erase(event_id);
+        kernel.simple_events.erase(event_id);
     } else {
         // TODO:
         LOG_WARN("Can't delete sync object, it has waiting threads.");
@@ -1268,6 +1290,9 @@ int semaphore_cancel(KernelState &kernel, const char *export_name, SceUID thread
 
     SceUInt32 nb_threads = 0;
     const std::lock_guard<std::mutex> semaphore_lock(semaphore->mutex);
+    if (setCount > semaphore->max) {
+        return SCE_KERNEL_ERROR_ILLEGAL_COUNT;
+    }
     while (!semaphore->waiting_threads->empty()) {
         const auto &waiting_thread_data = *semaphore->waiting_threads->begin();
         const auto waiting_thread = waiting_thread_data.thread;
@@ -1284,9 +1309,6 @@ int semaphore_cancel(KernelState &kernel, const char *export_name, SceUID thread
         nb_threads++;
     }
 
-    if (semaphore->val < setCount) {
-        return SCE_KERNEL_ERROR_ILLEGAL_COUNT;
-    }
     if (setCount < 0) {
         semaphore->val = semaphore->init_val;
     } else {

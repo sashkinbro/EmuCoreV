@@ -240,11 +240,13 @@ int main(int argc, char *argv[]) {
         SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_SWITCH, "1");
         SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_JOY_CONS, "1");
 
-        if (!SDL_Init(SDL_INIT_AUDIO | SDL_INIT_GAMEPAD | SDL_INIT_HAPTIC | SDL_INIT_SENSOR | SDL_INIT_CAMERA)) {
+        if (!SDL_Init(SDL_INIT_AUDIO | SDL_INIT_GAMEPAD | SDL_INIT_HAPTIC | SDL_INIT_SENSOR)) {
             LOG_ERROR("SDL initialisation failed: {}", SDL_GetError());
             QMessageBox::critical(nullptr, "Error", "SDL initialisation failed.");
             return SDLInitFailed;
         }
+        if (!SDL_InitSubSystem(SDL_INIT_CAMERA))
+            LOG_WARN("SDL camera initialisation failed, continuing without it: {}", SDL_GetError());
     }
 
     LOG_INFO("{}", window_title);

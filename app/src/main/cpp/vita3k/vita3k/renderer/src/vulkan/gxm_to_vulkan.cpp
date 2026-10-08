@@ -363,6 +363,25 @@ static vk::ComponentMapping translate_swizzle4_abgr(SceGxmColorSwizzle4Mode mode
     }
 }
 
+// Same as translate_swizzle4_abgr but for eA1R5G5B5UnormPack16
+static vk::ComponentMapping translate_swizzle4_a1rgb(SceGxmColorSwizzle4Mode mode) {
+    switch (mode) {
+    case SCE_GXM_COLOR_SWIZZLE4_ARGB:
+        return swizzle_rgba;
+    case SCE_GXM_COLOR_SWIZZLE4_ABGR:
+        return swizzle_bgra;
+    case SCE_GXM_COLOR_SWIZZLE4_RGBA:
+        LOG_WARN_ONCE("Unsupported color format U5U5U5U1_RGBA, colors will be wrong");
+        return swizzle_rgba;
+    case SCE_GXM_COLOR_SWIZZLE4_BGRA:
+        LOG_WARN_ONCE("Unsupported color format U5U5U5U1_BGRA, colors will be wrong");
+        return swizzle_bgra;
+    default:
+        LOG_ERROR("Unknown swizzle mode {}", log_hex(mode));
+        return {};
+    }
+}
+
 vk::ComponentMapping translate_swizzle(SceGxmColorFormat format) {
     const SceGxmColorBaseFormat base_format = gxm::get_base_format(format);
     const uint32_t swizzle = format & SCE_GXM_COLOR_SWIZZLE_MASK;
@@ -400,9 +419,10 @@ vk::ComponentMapping translate_swizzle(SceGxmColorFormat format) {
         return translate_swizzle4(static_cast<SceGxmColorSwizzle4Mode>(swizzle));
 
     case SCE_GXM_COLOR_BASE_FORMAT_U4U4U4U4:
-    // TODO: the swizzle for the following format is not fully supported
-    case SCE_GXM_COLOR_BASE_FORMAT_U1U5U5U5:
         return translate_swizzle4_abgr(static_cast<SceGxmColorSwizzle4Mode>(swizzle));
+
+    case SCE_GXM_COLOR_BASE_FORMAT_U1U5U5U5:
+        return translate_swizzle4_a1rgb(static_cast<SceGxmColorSwizzle4Mode>(swizzle));
 
     default:
         LOG_ERROR("Unknown format {}", log_hex(base_format));
@@ -640,6 +660,35 @@ static vk::ComponentMapping translate_swizzleyuv422(SceGxmTextureSwizzleYUV422Mo
     }
 }
 
+// Same as translate_swizzle4_abgr but for eA1R5G5B5UnormPack16
+static vk::ComponentMapping translate_swizzle4_a1rgb(SceGxmTextureSwizzle4Mode mode) {
+    switch (mode) {
+    case SCE_GXM_TEXTURE_SWIZZLE4_ARGB:
+        return swizzle_rgba;
+    case SCE_GXM_TEXTURE_SWIZZLE4_ABGR:
+        return swizzle_bgra;
+    case SCE_GXM_TEXTURE_SWIZZLE4_1RGB:
+        return swizzle_rgb1;
+    case SCE_GXM_TEXTURE_SWIZZLE4_1BGR:
+        return swizzle_bgr1;
+    case SCE_GXM_TEXTURE_SWIZZLE4_RGBA:
+        LOG_WARN_ONCE("Unsupported texture format U5U5U5U1_RGBA, colors will be wrong");
+        return swizzle_rgba;
+    case SCE_GXM_TEXTURE_SWIZZLE4_BGRA:
+        LOG_WARN_ONCE("Unsupported texture format U5U5U5U1_BGRA, colors will be wrong");
+        return swizzle_bgra;
+    case SCE_GXM_TEXTURE_SWIZZLE4_RGB1:
+        LOG_WARN_ONCE("Unsupported texture format U5U5U5X1_RGB1, colors will be wrong");
+        return swizzle_rgb1;
+    case SCE_GXM_TEXTURE_SWIZZLE4_BGR1:
+        LOG_WARN_ONCE("Unsupported texture format U5U5U5X1_BGR1, colors will be wrong");
+        return swizzle_bgr1;
+    default:
+        LOG_ERROR("Unknown swizzle mode {}", log_hex(mode));
+        return {};
+    }
+}
+
 vk::ComponentMapping translate_swizzle(SceGxmTextureFormat format) {
     const SceGxmTextureBaseFormat base_format = gxm::get_base_format(format);
     const uint32_t swizzle = format & SCE_GXM_TEXTURE_SWIZZLE_MASK;
@@ -705,9 +754,10 @@ vk::ComponentMapping translate_swizzle(SceGxmTextureFormat format) {
         return translate_swizzle4(static_cast<SceGxmTextureSwizzle4Mode>(swizzle));
 
     case SCE_GXM_TEXTURE_BASE_FORMAT_U4U4U4U4:
-    // TODO: the following is not fully supported
-    case SCE_GXM_TEXTURE_BASE_FORMAT_U1U5U5U5:
         return translate_swizzle4_abgr(static_cast<SceGxmTextureSwizzle4Mode>(swizzle));
+
+    case SCE_GXM_TEXTURE_BASE_FORMAT_U1U5U5U5:
+        return translate_swizzle4_a1rgb(static_cast<SceGxmTextureSwizzle4Mode>(swizzle));
 
     // YUV420.
     case SCE_GXM_TEXTURE_BASE_FORMAT_YUV420P2:

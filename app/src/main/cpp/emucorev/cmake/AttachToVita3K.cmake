@@ -61,3 +61,16 @@ set(EMUCOREV_BRIDGE_SOURCES
 )
 
 target_sources(vita3k PRIVATE ${EMUCOREV_BRIDGE_SOURCES})
+
+# Built only on explicit request; exercise real guest APIs against the same
+# shared core as the APK, without adding test entry points to the application.
+if(ANDROID)
+    add_executable(emucorev-core-tests EXCLUDE_FROM_ALL
+        "${EMUCOREV_BRIDGE_DIR}/../../../test/core-api/core_api_tests.cpp")
+    target_include_directories(emucorev-core-tests PRIVATE
+        "$<TARGET_PROPERTY:vita3k,INCLUDE_DIRECTORIES>"
+        "${VITA3K_CORE_DIR}/modules")
+    target_link_libraries(emucorev-core-tests PRIVATE vita3k googletest)
+    target_compile_definitions(emucorev-core-tests PRIVATE
+        "$<TARGET_PROPERTY:vita3k,COMPILE_DEFINITIONS>")
+endif()

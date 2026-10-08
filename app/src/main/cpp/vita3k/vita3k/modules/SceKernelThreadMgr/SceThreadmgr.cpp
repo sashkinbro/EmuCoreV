@@ -1297,9 +1297,9 @@ EXPORT(SceUID, sceKernelOpenSema, const char *pName) {
     return semaphore_find(emuenv.kernel, export_name, pName);
 }
 
-EXPORT(int, sceKernelOpenSimpleEvent) {
-    TRACY_FUNC(sceKernelOpenSimpleEvent);
-    return UNIMPLEMENTED();
+EXPORT(SceUID, sceKernelOpenSimpleEvent, const char *pName) {
+    TRACY_FUNC(sceKernelOpenSimpleEvent, pName);
+    return simple_event_find(emuenv.kernel, export_name, pName);
 }
 
 EXPORT(SceUID, sceKernelOpenTimer, const char *pName) {

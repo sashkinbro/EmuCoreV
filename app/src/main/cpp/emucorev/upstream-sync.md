@@ -53,6 +53,14 @@ Verification: 40 real native tests on Lenovo, including six selection/import reg
 
 The separate EmuCoreV-Cheat catalog now validates all 676 packs, counts 7,917 declarations with parseable code, and corrects four proven title-ID header copy errors without changing code addresses. Additional source mirrors supplied no verified new pack.
 
+## Guest API and graphics compatibility batch
+
+Integrated Plus `987bfea47` (named SimpleEvent lookup, correct SimpleEvent deletion map, packed A1R5G5B5 Vulkan swizzles), `f23e32346` (48-byte color-surface guest ABI and clip accessors, descriptor-pool destruction), `3576a5763` (Android debug shader dump gating), and `105331d90` (saturating half-float packing). The half-float adaptation preserves NaN classification, and shader cache version 16 invalidates earlier generated programs. Normal shader cache writes remain enabled.
+
+Integrated official `7ad9d0c33` (validate the requested semaphore cancellation count before mutation), and the relevant `29ffbcfe7` username, touch-sample count and optional-camera startup corrections. Adhoc completion now locks and checks the dialog type before changing a common dialog. Zero-count touch requests return without touching the supplied buffer.
+
+Verification: 43 standalone native tests and 11 tests against the actual shared core pass on Lenovo. The latter cover bounded/NUL-terminated username copies, touch sample counts and canaries, canceled-contact cleanup, named event lookup/deletion, semaphore count validation, and color-surface clip geometry. An ABI-compatible baseline shared library fails the username canary and inactive-peek count regressions; the corrected library passes. Android's event loop also routes finger cancellation to the existing cleanup helper and releases overlay mouse input. APK assembly and 187 JVM tests pass. These API checks do not establish that a reported game's graphical issue is resolved.
+
 ## Remaining audit work
 
 - Review the official WaitQueue, callback-wait, UID-table and synchronization cancellation/deletion series together with the local Plus guest scheduler. They are coupled changes and cannot be copied as independent one-line fixes.

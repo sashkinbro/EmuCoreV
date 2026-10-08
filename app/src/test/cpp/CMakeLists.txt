@@ -9,8 +9,9 @@ set(EXTERNAL "${VENDOR}/external")
 set(ARCHITECTURE arm64)
 add_subdirectory("${EXTERNAL}/ffmpeg" "external/ffmpeg-build")
 
-# Build the real interpreter, parser and guest allocator independently of the
-# renderer. Android normally excludes Vita3K's native unit test targets.
+# Build the real interpreter, parser, guest allocator and pure format
+# translations without a rendering context. Android normally excludes
+# Vita3K's native unit test targets.
 file(GLOB BOOST_FILESYSTEM_SOURCES "${EXTERNAL}/boost/libs/filesystem/src/*.cpp")
 add_executable(cheat-tests
     "${CORE}/cheat/tests/cheat_tests.cpp"
@@ -22,6 +23,10 @@ add_executable(cheat-tests
     "${CORE}/util/src/fs_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/test_logging.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/aac_tests.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gxm_tests.cpp"
+    "${CORE}/renderer/src/vulkan/gxm_to_vulkan.cpp"
+    "${CORE}/gxm/src/color.cpp"
+    "${CORE}/gxm/src/textures.cpp"
     "${CORE}/codec/src/aac.cpp"
     "${CORE}/codec/src/decoder.cpp"
     "${EXTERNAL}/googletest/googletest/src/gtest-all.cc"
@@ -31,6 +36,8 @@ add_executable(cheat-tests
 target_include_directories(cheat-tests PRIVATE
     "${CORE}/cheat/include" "${CORE}/mem/include" "${CORE}/util/include"
     "${CORE}/codec/include"
+    "${CORE}/renderer/include" "${CORE}/gxm/include"
+    "${EXTERNAL}/VulkanMemoryAllocator-Hpp/Vulkan-Headers/include"
     "${EXTERNAL}/boost" "${EXTERNAL}/fmt/include" "${EXTERNAL}/spdlog/include"
     "${EXTERNAL}/sdl/include" "${EXTERNAL}/googletest/googletest/include"
     "${EXTERNAL}/googletest/googletest"

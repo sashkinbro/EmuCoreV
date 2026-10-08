@@ -1810,7 +1810,14 @@ DECL_EXPORT(int, sceGxmTextureSetGammaMode, SceGxmTexture *texture, SceGxmTextur
 EXPORT(void, sceGxmColorSurfaceGetClip, const SceGxmColorSurface *surface, uint32_t *xMin, uint32_t *yMin, uint32_t *xMax, uint32_t *yMax) {
     TRACY_FUNC(sceGxmColorSurfaceGetClip, surface, xMin, yMin, xMax, yMax);
     assert(surface);
-    UNIMPLEMENTED();
+    if (xMin)
+        *xMin = surface->clip_x_min;
+    if (yMin)
+        *yMin = surface->clip_y_min;
+    if (xMax)
+        *xMax = surface->clip_x_max;
+    if (yMax)
+        *yMax = surface->clip_y_max;
 }
 
 EXPORT(Ptr<void>, sceGxmColorSurfaceGetData, const SceGxmColorSurface *surface) {
@@ -1877,8 +1884,10 @@ EXPORT(int, sceGxmColorSurfaceInit, SceGxmColorSurface *surface, SceGxmColorForm
     memset(surface, 0, sizeof(SceGxmColorSurface));
     surface->disabled = 0;
     surface->downscale = scaleMode == SCE_GXM_COLOR_SURFACE_SCALE_MSAA_DOWNSCALE;
-    surface->width = width;
-    surface->height = height;
+    surface->width = static_cast<uint16_t>(width);
+    surface->height = static_cast<uint16_t>(height);
+    surface->clip_x_max = width - 1;
+    surface->clip_y_max = height - 1;
     surface->strideInPixels = strideInPixels;
     surface->data = data;
     surface->colorFormat = colorFormat;
@@ -1928,7 +1937,10 @@ EXPORT(bool, sceGxmColorSurfaceIsEnabled, const SceGxmColorSurface *surface) {
 EXPORT(void, sceGxmColorSurfaceSetClip, SceGxmColorSurface *surface, uint32_t xMin, uint32_t yMin, uint32_t xMax, uint32_t yMax) {
     TRACY_FUNC(sceGxmColorSurfaceSetClip, surface, xMin, yMin, xMax, yMax);
     assert(surface);
-    UNIMPLEMENTED();
+    surface->clip_x_min = xMin;
+    surface->clip_y_min = yMin;
+    surface->clip_x_max = xMax;
+    surface->clip_y_max = yMax;
 }
 
 EXPORT(int, sceGxmColorSurfaceSetData, SceGxmColorSurface *surface, Ptr<void> data) {

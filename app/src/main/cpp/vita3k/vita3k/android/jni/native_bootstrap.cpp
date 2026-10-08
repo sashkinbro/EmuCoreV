@@ -152,8 +152,7 @@ bool prepare_frontend_runtime() {
         return true;
 
     if (!SDL_InitSubSystem(SDL_INIT_CAMERA)) {
-        LOG_ERROR("Failed to initialize SDL camera subsystem: {}", SDL_GetError());
-        return false;
+        LOG_WARN("SDL camera initialisation failed, continuing without it: {}", SDL_GetError());
     }
 
     return true;

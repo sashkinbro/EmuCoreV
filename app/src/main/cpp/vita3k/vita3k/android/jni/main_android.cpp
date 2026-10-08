@@ -340,12 +340,14 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
 
         LOG_INFO("Booting game '{}'", launch_request.app_path);
 
-        if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD | SDL_INIT_HAPTIC | SDL_INIT_SENSOR | SDL_INIT_CAMERA)) {
+        if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD | SDL_INIT_HAPTIC | SDL_INIT_SENSOR)) {
             LOG_ERROR("SDL_Init failed: {}", SDL_GetError());
             exit_code = -1;
             cleanup_launch(app::AppSessionStopReason::LaunchFailure);
             break;
         }
+        if (!SDL_InitSubSystem(SDL_INIT_CAMERA))
+            LOG_WARN("SDL camera initialisation failed, continuing without it: {}", SDL_GetError());
 
         refresh_controllers(emuenv->ctrl, *emuenv);
 
@@ -492,12 +494,13 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
 
                 case SDL_EVENT_FINGER_DOWN:
                 case SDL_EVENT_FINGER_MOTION:
-                case SDL_EVENT_FINGER_UP: {
+                case SDL_EVENT_FINGER_UP:
+                case SDL_EVENT_FINGER_CANCELED: {
                     handle_touch_event(emuenv->touch, event.tfinger);
                     auto &mouse = emuenv->ctrl.overlay_mouse;
                     mouse.x.store(event.tfinger.x * 960.f, std::memory_order_relaxed);
                     mouse.y.store(event.tfinger.y * 544.f, std::memory_order_relaxed);
-                    mouse.pressed.store(event.type != SDL_EVENT_FINGER_UP, std::memory_order_relaxed);
+                    mouse.pressed.store(event.type != SDL_EVENT_FINGER_UP && event.type != SDL_EVENT_FINGER_CANCELED, std::memory_order_relaxed);
                     break;
                 }
 

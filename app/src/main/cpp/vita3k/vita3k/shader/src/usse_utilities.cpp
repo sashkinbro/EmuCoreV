@@ -491,6 +491,14 @@ static spv::Function *make_f16_pack_func(spv::Builder &b, const SpirvUtilFunctio
     f16_pack_func->addParamPrecision(0, spv::DecorationRelaxedPrecision);
     spv::Id extracted = f16_pack_func->getParamId(0);
 
+    // saturate rather than overflow to Inf
+    const spv::Id half_max = b.makeFloatConstant(65504.0f);
+    const spv::Id half_min = b.makeFloatConstant(-65504.0f);
+    const spv::Id saturated = b.createBuiltinCall(type_f32_v2, utils.std_builtins, GLSLstd450FClamp,
+        { extracted, b.makeCompositeConstant(type_f32_v2, { half_min, half_min }), b.makeCompositeConstant(type_f32_v2, { half_max, half_max }) });
+    const spv::Id is_nan = b.createUnaryOp(spv::OpIsNan, b.makeVectorType(b.makeBoolType(), 2), extracted);
+    extracted = b.createTriOp(spv::OpSelect, type_f32_v2, is_nan, extracted, saturated);
+
     // use packHalf2x16
     extracted = b.createBuiltinCall(type_ui32, utils.std_builtins, GLSLstd450PackHalf2x16, { extracted });
     extracted = b.createUnaryOp(spv::OpBitcast, type_f32, extracted);
