@@ -247,3 +247,6 @@ TEST(GuestColorSurface, maximum_surface_has_representable_inclusive_clip_bounds)
 
 using KernelLifecycleEnv = EmuEnvState;
 #include "kernel_lifecycle_tests.inc"
+
+using KernelShutdownEnv = EmuEnvState;
+#include "kernel_shutdown_tests.inc"

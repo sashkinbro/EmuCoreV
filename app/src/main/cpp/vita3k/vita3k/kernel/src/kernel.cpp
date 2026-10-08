@@ -234,14 +234,15 @@ void KernelState::request_process_exit(int res, std::optional<AppLaunchRequest> 
 }
 
 void KernelState::process_exit() {
-    {
-        std::lock_guard<std::mutex> lock(mutex);
+    std::unique_lock<std::mutex> lock(mutex);
+    thread_deleted_cond.wait(lock, [this] {
+        // An in-flight guest CreateThread may publish a child after an earlier
+        // sweep. Its creator remains registered until the HLE call returns, and
+        // the creator's removal wakes this predicate to stop the late child too.
         for (auto &[_, thread] : threads)
             thread->exit_delete(false);
-    }
-
-    std::unique_lock<std::mutex> lock(mutex);
-    thread_deleted_cond.wait(lock, [this] { return threads.empty(); });
+        return threads.empty();
+    });
 }
 
 void KernelState::pause_threads() {
