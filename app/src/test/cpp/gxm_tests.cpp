@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 #include <renderer/gxm_types.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
+#include <renderer/vulkan/vertex_stream.h>
 
 #include <array>
 #include <cstddef>
 #include <cstring>
+#include <vector>
 
 // Games can copy or inspect the opaque guest surface. Keeping the total size
 // alone is insufficient: the width/height and clip fields share packed words.
@@ -47,6 +49,66 @@ void expect_mapping(vk::ComponentMapping actual, vk::ComponentSwizzle r,
     EXPECT_EQ(actual.a, a);
 }
 } // namespace
+
+TEST(GxmVertexStream, RepackingAlignsStrideAndPreservesVertexBytes) {
+    const std::array<uint8_t, 12> packed = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
+    const std::vector<uint8_t> repacked = renderer::vulkan::restride_vertex_stream(packed, 6);
+
+    EXPECT_EQ(repacked, (std::vector<uint8_t>{
+                            0, 1, 2, 3, 4, 5, 0, 0,
+                            6, 7, 8, 9, 10, 11, 0, 0,
+                        }));
+}
+
+TEST(GxmVertexStream, RepackingLeavesAlignedStreamsUnchanged) {
+    const std::array<uint8_t, 8> packed = { 0, 1, 2, 3, 4, 5, 6, 7 };
+
+    EXPECT_EQ(renderer::vulkan::restride_vertex_stream(packed, 8),
+        (std::vector<uint8_t>{ 0, 1, 2, 3, 4, 5, 6, 7 }));
+}
+
+TEST(GxmVertexStream, RepackingPadsPartialFinalVertexWithoutReadingPastInput) {
+    const std::array<uint8_t, 7> packed = { 1, 2, 3, 4, 5, 6, 7 };
+
+    EXPECT_EQ(renderer::vulkan::restride_vertex_stream(packed, 3),
+        (std::vector<uint8_t>{ 1, 2, 3, 0, 4, 5, 6, 0, 7, 0, 0, 0 }));
+}
+
+TEST(GxmVertexStream, RepackingRequiresEveryAttributeToStayInsideItsRecord) {
+    using renderer::vulkan::VertexAttributeRange;
+    const std::array<VertexAttributeRange, 2> safe = { VertexAttributeRange{ 0, 4 }, VertexAttributeRange{ 4, 2 } };
+    const std::array<VertexAttributeRange, 1> crossing = { VertexAttributeRange{ 4, 4 } };
+    const std::array<VertexAttributeRange, 1> beyond_stride = { VertexAttributeRange{ 8, 2 } };
+
+    EXPECT_TRUE(renderer::vulkan::should_restride_vertex_stream(false, 6, safe));
+    EXPECT_FALSE(renderer::vulkan::should_restride_vertex_stream(false, 6, crossing));
+    EXPECT_FALSE(renderer::vulkan::should_restride_vertex_stream(false, 6, beyond_stride));
+    EXPECT_FALSE(renderer::vulkan::should_restride_vertex_stream(false, 8, safe));
+    EXPECT_FALSE(renderer::vulkan::should_restride_vertex_stream(false, 0, safe));
+    EXPECT_FALSE(renderer::vulkan::should_restride_vertex_stream(true, 6, safe));
+}
+
+TEST(GxmVertexStream, RepackedStreamMustFitTheVertexRingCapacity) {
+    constexpr size_t ring_capacity = 64u * 1024u * 1024u;
+    EXPECT_TRUE(renderer::vulkan::restrided_vertex_stream_fits(48, 3, ring_capacity));
+    EXPECT_FALSE(renderer::vulkan::restrided_vertex_stream_fits(49u * 1024u * 1024u, 3, ring_capacity));
+    EXPECT_TRUE(renderer::vulkan::restrided_vertex_stream_fits(ring_capacity, 4, ring_capacity));
+}
+
+TEST(GxmVertexStream, AllStreamsInOneDrawMustNotWrapOverEarlierStreams) {
+    constexpr size_t ring_capacity = 64u * 1024u * 1024u;
+    constexpr size_t alignment = 16;
+    const std::array<size_t, 2> two_40_mib_streams = { 40u * 1024u * 1024u, 40u * 1024u * 1024u };
+    const std::array<size_t, 3> wrap_and_overlap = {
+        32u * 1024u * 1024u,
+        24u * 1024u * 1024u,
+        20u * 1024u * 1024u,
+    };
+
+    EXPECT_FALSE(renderer::vulkan::vertex_stream_batch_fits(0, ring_capacity, alignment, two_40_mib_streams));
+    EXPECT_FALSE(renderer::vulkan::vertex_stream_batch_fits(ring_capacity - 16, ring_capacity, alignment, wrap_and_overlap));
+    EXPECT_TRUE(renderer::vulkan::vertex_stream_batch_fits(0, ring_capacity, alignment, std::span<const size_t>(two_40_mib_streams).first(1)));
+}
 
 TEST(GxmPackedColor, A1RgbColorKeepsAlphaInTheHighBit) {
     using S = vk::ComponentSwizzle;

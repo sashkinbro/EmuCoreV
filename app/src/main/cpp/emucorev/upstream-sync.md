@@ -61,9 +61,17 @@ Integrated official `7ad9d0c33` (validate the requested semaphore cancellation c
 
 Verification: 43 standalone native tests and 11 tests against the actual shared core pass on Lenovo. The latter cover bounded/NUL-terminated username copies, touch sample counts and canaries, canceled-contact cleanup, named event lookup/deletion, semaphore count validation, and color-surface clip geometry. An ABI-compatible baseline shared library fails the username canary and inactive-peek count regressions; the corrected library passes. Android's event loop also routes finger cancellation to the existing cleanup helper and releases overlay mouse input. APK assembly and 187 JVM tests pass. These API checks do not establish that a reported game's graphical issue is resolved.
 
+## Non-mapped Vulkan vertex alignment
+
+Adapted Plus `35cbde8d869214483558d47576fd6cb52a144e1b` for non-mapped vertex streams. The upload and pipeline paths use the same attribute-range predicate: record padding is applied only when all active attributes fit inside the original stride. Partial final records are copied with bounded reads and zero padding. Mapped streams keep their existing GPU-visible buffer path until readback/synchronization can be established.
+
+Preflight simulates the complete draw's ring allocations, including alignment, wrap and overlapping ranges, before any allocation or stream mutation. This prevents expanded streams from exceeding the ring or overwriting another stream in the same draw. An oversized draw is skipped with a warning.
+
+Verification: Android renderer/full APK builds, independent source review, and 49 standalone native tests on Lenovo pass. Six added cases cover byte preservation, partial records, mapped-path exclusion, crossing attributes, expanded capacity, and aggregate wrap/alignment. No affected game's rendering issue is claimed resolved by these synthetic checks.
+
 ## Remaining audit work
 
 - Review the official WaitQueue, callback-wait, UID-table and synchronization cancellation/deletion series together with the local Plus guest scheduler. They are coupled changes and cannot be copied as independent one-line fixes.
 - Review the remainder of Plus graphics/audio/controller changes against existing manual ports, including mapped double-buffer lifetime and Mali alignment.
 - Finish per-game cheat validation after games are available.
-- Rebase/merge the verified main changes into `savestate-experimental`, then diagnose Save-only corruption separately from Load audio/graphics restoration. Verify long-running gameplay after each operation on the tablet.
+- Merge `savestate-experimental` into `main` while retaining the verified fixes, then diagnose Save-only corruption separately from Load audio/graphics restoration. Verify long-running gameplay after each operation on the tablet.

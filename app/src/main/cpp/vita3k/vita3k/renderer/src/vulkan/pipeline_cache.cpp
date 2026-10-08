@@ -20,6 +20,7 @@
 #include <renderer/functions.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
 #include <renderer/vulkan/state.h>
+#include <renderer/vulkan/vertex_stream.h>
 #include <renderer/vulkan/types.h>
 
 #include <gxm/functions.h>
@@ -29,6 +30,7 @@
 
 #include <util/fs.h>
 #include <util/hash.h>
+#include <util/align.h>
 #include <util/log.h>
 
 #include <array>
@@ -919,6 +921,7 @@ vk::PipelineVertexInputStateCreateInfo PipelineCache::get_vertex_input_state(con
     // and each thread needs one (hence the thread_local)
     static thread_local std::vector<vk::VertexInputBindingDescription> binding_descr;
     static thread_local std::vector<vk::VertexInputAttributeDescription> attr_descr;
+    std::array<std::vector<VertexAttributeRange>, SCE_GXM_MAX_VERTEX_STREAMS> stream_attribute_ranges;
     binding_descr.clear();
     attr_descr.clear();
 
@@ -932,6 +935,9 @@ vk::PipelineVertexInputStateCreateInfo PipelineCache::get_vertex_input_state(con
             continue;
 
         used_streams |= (1 << attribute.streamIndex);
+        stream_attribute_ranges[attribute.streamIndex].push_back({
+            attribute.offset,
+            gxm::attribute_format_size(static_cast<SceGxmAttributeFormat>(attribute.format)) * attribute.componentCount });
 
         SceGxmAttributeFormat attribute_format = attribute.format;
         shader::usse::AttributeInformation info = vkvert->attribute_infos.at(attribute.regIndex);
@@ -1012,11 +1018,9 @@ vk::PipelineVertexInputStateCreateInfo PipelineCache::get_vertex_input_state(con
 
         const bool is_instanced = gxm::is_stream_instancing(static_cast<SceGxmIndexSource>(stream.indexSource));
 
-#ifdef __APPLE__
-        const uint32_t stride = align(stream.stride, 4);
-#else
-        const uint32_t stride = stream.stride;
-#endif
+        const bool restride = should_restride_vertex_stream(
+            state.features.enable_memory_mapping, stream.stride, stream_attribute_ranges[stream_index]);
+        const uint32_t stride = restride ? align(stream.stride, 4) : stream.stride;
         binding_descr.push_back(vk::VertexInputBindingDescription{
             .binding = stream_index,
             .stride = stride,

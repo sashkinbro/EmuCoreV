@@ -18,11 +18,15 @@
 #include <renderer/vulkan/functions.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <span>
+#include <vector>
 
 #include <gxm/functions.h>
 #include <renderer/functions.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
+#include <renderer/vulkan/vertex_stream.h>
 
 #include <config/state.h>
 #include <spdlog/fmt/bin_to_hex.h>
@@ -106,23 +110,6 @@ void mid_scene_flush(VKContext &context, const SceGxmNotification notification) 
         context.scene_has_drawn = false;
     }
 }
-
-#ifdef __APPLE__
-// restride vertex attribute binding strides to multiple of 4
-// needed for metal because it only allows multiples of 4.
-void restride_stream(const uint8_t *&stream, uint32_t &size, uint32_t stride) {
-    const uint32_t new_stride = align(stride, 4);
-    const uint32_t nb_vertex_input = ((size + stride - 1) / stride);
-
-    uint8_t *new_data = new uint8_t[nb_vertex_input * new_stride];
-    for (uint32_t i = 0; i < nb_vertex_input; i++) {
-        memcpy(new_data + new_stride * i, stream + stride * i, stride);
-    }
-
-    stream = new_data;
-    size = nb_vertex_input * new_stride;
-}
-#endif
 
 // when needed, how many descriptor of the given size we allocate for each frame at once
 static constexpr uint32_t DESCRIPTOR_PACK_SIZE = 64;
@@ -257,17 +244,21 @@ static void draw_bind_descriptors(VKContext &context, MemState &mem) {
 }
 
 // vertex count is only used with double buffer mapping
-static void bind_vertex_streams(VKContext &context, MemState &mem, uint32_t instance_count, uint32_t max_index) {
+static bool bind_vertex_streams(VKContext &context, MemState &mem, uint32_t instance_count, uint32_t max_index) {
     GxmRecordState &state = context.record;
     const SceGxmVertexProgram &vertex_program = *state.vertex_program.get(mem);
     VertexProgram *vkvert = vertex_program.renderer_data.get();
 
     int max_stream_idx = -1;
+    std::array<std::vector<VertexAttributeRange>, SCE_GXM_MAX_VERTEX_STREAMS> stream_attribute_ranges;
 
     for (const SceGxmVertexAttribute &attribute : vertex_program.attributes) {
         if (!vkvert->attribute_infos.contains(attribute.regIndex))
             continue;
         max_stream_idx = std::max<int>(max_stream_idx, attribute.streamIndex);
+        stream_attribute_ranges[attribute.streamIndex].push_back({
+            attribute.offset,
+            gxm::attribute_format_size(static_cast<SceGxmAttributeFormat>(attribute.format)) * attribute.componentCount });
     }
     max_stream_idx++;
 
@@ -294,11 +285,37 @@ static void bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
     }
 
     if (max_stream_idx == 0)
-        return;
+        return true;
+
+    const bool mapped = context.state.features.enable_memory_mapping;
+    std::array<bool, SCE_GXM_MAX_VERTEX_STREAMS> restride_streams{};
+    std::array<size_t, SCE_GXM_MAX_VERTEX_STREAMS> batch_stream_sizes{};
+    size_t batch_stream_count = 0;
+    for (int i = 0; i < max_stream_idx; i++) {
+        if (!state.vertex_streams[i].data || mapped)
+            continue;
+
+        const uint32_t stride = vertex_program.streams[i].stride;
+        restride_streams[i] = should_restride_vertex_stream(mapped, stride, stream_attribute_ranges[i]);
+        const size_t upload_size = restride_streams[i]
+            ? restrided_vertex_stream_size(state.vertex_streams[i].size, stride)
+            : state.vertex_streams[i].size;
+        batch_stream_sizes[batch_stream_count++] = upload_size;
+    }
+
+    if (!mapped && !vertex_stream_batch_fits(
+                       context.vertex_stream_ring_buffer.cursor_bytes(),
+                       context.vertex_stream_ring_buffer.capacity_bytes(),
+                       context.vertex_stream_ring_buffer.alignment,
+                       std::span<const size_t>(batch_stream_sizes.data(), batch_stream_count))) {
+        LOG_WARN("Skipping draw: vertex stream allocations exceed available ring capacity");
+        return false;
+    }
 
     for (int i = 0; i < max_stream_idx; i++) {
         if (state.vertex_streams[i].data) {
-            if (context.state.features.enable_memory_mapping) {
+            const uint32_t stride = vertex_program.streams[i].stride;
+            if (mapped) {
                 auto [buffer, offset] = context.state.get_matching_mapping(state.vertex_streams[i].data.cast<void>());
 
                 context.vertex_stream_offsets[i] = offset;
@@ -306,21 +323,15 @@ static void bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
             } else {
                 const uint8_t *stream = state.vertex_streams[i].data.get(mem);
                 uint32_t stream_size = state.vertex_streams[i].size;
-#ifdef __APPLE__
-                // Vulkan allows any stride, but Metal only allows multiples of 4.
-                const bool restride = vertex_program.streams[i].stride % 4 != 0;
-                if (restride) {
-                    restride_stream(stream, stream_size, vertex_program.streams[i].stride);
+                std::vector<uint8_t> repacked;
+                if (restride_streams[i]) {
+                    repacked = restride_vertex_stream(
+                        std::span<const uint8_t>(stream, stream_size), stride);
+                    stream = repacked.data();
+                    stream_size = static_cast<uint32_t>(repacked.size());
                 }
-#endif
                 context.vertex_stream_ring_buffer.allocate(context.prerender_cmd, stream_size, stream);
                 context.vertex_stream_offsets[i] = context.vertex_stream_ring_buffer.data_offset;
-
-#ifdef __APPLE__
-                if (restride) {
-                    delete[] stream;
-                }
-#endif
             }
 
             state.vertex_streams[i].data = nullptr;
@@ -329,6 +340,7 @@ static void bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
     }
 
     context.render_cmd.bindVertexBuffers(0, max_stream_idx, context.vertex_stream_buffers, context.vertex_stream_offsets);
+    return true;
 }
 
 void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format,
@@ -603,7 +615,11 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     }
 
     // bind the vertex streams
-    bind_vertex_streams(context, mem, instance_count, max_index);
+    if (!bind_vertex_streams(context, mem, instance_count, max_index)) {
+        context.vertex_uniform_storage_allocated = false;
+        context.fragment_uniform_storage_allocated = false;
+        return;
+    }
 
     context.render_cmd.drawIndexed(count, instance_count, 0, 0, 0);
 
