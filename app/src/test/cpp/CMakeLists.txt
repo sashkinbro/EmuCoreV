@@ -25,6 +25,7 @@ add_executable(cheat-tests
     "${CMAKE_CURRENT_SOURCE_DIR}/aac_tests.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/gxm_tests.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/usse_analyzer_tests.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mempool_tests.cpp"
     "${CORE}/renderer/src/vulkan/gxm_to_vulkan.cpp"
     "${CORE}/shader/src/usse_dynamic_uniform.cpp"
     "${CORE}/shader/src/usse_decode_helpers.cpp"
