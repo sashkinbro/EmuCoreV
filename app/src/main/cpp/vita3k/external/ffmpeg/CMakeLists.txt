@@ -36,12 +36,11 @@ else ()
 	message(FATAL_ERROR "Unsupported architecture.")
 endif()
 
-# Compute current short git commit SHA
-execute_process(
-	COMMAND git rev-parse --short HEAD
-	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-	OUTPUT_VARIABLE FFMPEG_GIT_SHA
-	OUTPUT_STRIP_TRAILING_WHITESPACE)
+# This dependency is vendored in EmuCoreV, so a parent checkout's HEAD (or
+# a stale submodule .git file) cannot identify the matching prebuilt headers.
+# Pin the release belonging to the vendored ffmpeg-core revision
+# 02f4f2691b0efffff8923235baf146a87fc37263.
+set(FFMPEG_GIT_SHA "02f4f26")
 
 # Download prebuilt ffmpeg
 if(NOT EXISTS "${CMAKE_BINARY_DIR}/external/ffmpeg.zip")
