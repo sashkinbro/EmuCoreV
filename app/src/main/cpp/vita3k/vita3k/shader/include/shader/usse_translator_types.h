@@ -109,6 +109,7 @@ struct SpirvShaderParameters {
     int thread_buffer_sa_offset = -1;
     int thread_buffer_base;
     spv::Id thread_buffer;
+    uint32_t thread_buffer_f32_count = 0;
 
     spv::Id render_info_id;
 

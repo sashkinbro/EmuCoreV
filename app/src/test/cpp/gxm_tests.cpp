@@ -2,6 +2,7 @@
 #include <renderer/gxm_types.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
 #include <renderer/vulkan/surface_sync.h>
+#include <renderer/vulkan/uniform_slack.h>
 #include <renderer/vulkan/vertex_stream.h>
 
 #include <array>
@@ -164,6 +165,26 @@ TEST(GxmSurfaceSync, InvalidRowCopiesCannotExceedRequestOrMappedRanges) {
     EXPECT_FALSE(copy_surface_sync_rows(destination.data(), 10, source.data(), source.size(), 8, 3, 2));
     EXPECT_FALSE(copy_surface_sync_rows(destination.data(), destination.size(), source.data(), 10, 8, 3, 2));
     EXPECT_TRUE(copy_surface_sync_rows(destination.data(), destination.size(), source.data(), source.size(), 8, 3, 0));
+}
+
+TEST(GxmUniformSlack, CopyRangeStopsAtWindowMappingAndColorSurfaceBoundary) {
+    using renderer::vulkan::uniform_slack_copy_range;
+    const auto full = uniform_slack_copy_range(0x1000, 256, 64 * 1024, 0x100000, 16 * 1024);
+    ASSERT_TRUE(full.has_value());
+    EXPECT_EQ(full->offset, 256u);
+    EXPECT_EQ(full->size, 16 * 1024u - 256u);
+
+    const auto mapping_limited = uniform_slack_copy_range(0x1000, 256, 1024, 0x100000, 16 * 1024);
+    ASSERT_TRUE(mapping_limited.has_value());
+    EXPECT_EQ(mapping_limited->size, 1024u - 256u);
+
+    const auto surface_limited = uniform_slack_copy_range(0x1000, 256, 64 * 1024, 0x1400, 16 * 1024);
+    ASSERT_TRUE(surface_limited.has_value());
+    EXPECT_EQ(surface_limited->size, 0x400u - 256u);
+
+    EXPECT_FALSE(uniform_slack_copy_range(0x1000, 256, 64 * 1024, 0x1100, 16 * 1024).has_value());
+    EXPECT_FALSE(uniform_slack_copy_range(0x1000, 1025, 1024, 0x100000, 16 * 1024).has_value());
+    EXPECT_FALSE(uniform_slack_copy_range(0x1000, 0, 1024, 0x100000, 16 * 1024).has_value());
 }
 
 TEST(GxmPackedColor, A1RgbColorKeepsAlphaInTheHighBit) {

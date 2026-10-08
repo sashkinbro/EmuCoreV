@@ -28,6 +28,7 @@
 
 #include <atomic>
 #include <cmath>
+#include <limits>
 #include <mem/functions.h>
 #include <util/align.h>
 #include <util/log.h>
@@ -2264,6 +2265,22 @@ bool VKSurfaceCache::sync_surface_for_gpu_read(Address address, uint32_t size) {
     }
 
     return true;
+}
+
+Address VKSurfaceCache::color_surface_limit(const Address address) const {
+    auto it = color_address_lookup.upper_bound(address);
+    const Address next_surface = it == color_address_lookup.end()
+        ? std::numeric_limits<Address>::max()
+        : it->first;
+
+    for (auto previous = it; previous != color_address_lookup.begin();) {
+        --previous;
+        const uint64_t surface_begin = previous->first;
+        const uint64_t surface_end = surface_begin + previous->second->total_bytes;
+        if (static_cast<uint64_t>(address) >= surface_begin && static_cast<uint64_t>(address) < surface_end)
+            return address;
+    }
+    return next_surface;
 }
 
 ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {

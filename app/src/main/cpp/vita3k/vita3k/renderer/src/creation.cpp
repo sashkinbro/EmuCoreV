@@ -296,6 +296,7 @@ bool create(std::unique_ptr<FragmentProgram> &fp, State &state, const SceGxmProg
 
     fp->buffer_count = shader::usse::get_uniform_buffer_sizes(program, fp->uniform_buffer_sizes);
     layout_ssbo_offset_from_uniform_buffer_sizes(fp->uniform_buffer_sizes, fp->uniform_buffer_data_offsets, fp->max_total_uniform_buffer_storage);
+    fp->dynamic_uniform_buffers = shader::usse::get_dynamic_uniform_buffers(program);
     fp->textures_used = gxp::get_textures_used(program);
     fp->texture_count = std::bit_width(fp->textures_used.to_ulong());
 
@@ -324,6 +325,7 @@ bool create(std::unique_ptr<VertexProgram> &vp, State &state, const SceGxmProgra
     vp->buffer_count = shader::usse::get_uniform_buffer_sizes(program, vp->uniform_buffer_sizes);
     shader::usse::get_attribute_informations(program, vp->attribute_infos);
     layout_ssbo_offset_from_uniform_buffer_sizes(vp->uniform_buffer_sizes, vp->uniform_buffer_data_offsets, vp->max_total_uniform_buffer_storage);
+    vp->dynamic_uniform_buffers = shader::usse::get_dynamic_uniform_buffers(program);
     vp->textures_used = gxp::get_textures_used(program);
     vp->texture_count = std::bit_width(vp->textures_used.to_ulong());
 

@@ -368,6 +368,10 @@ public:
     // mapped memory buffer so the shader reads up-to-date data. Returns true if the address
     // belongs to such a surface.
     bool sync_surface_for_gpu_read(Address address, uint32_t size);
+    // Return the next color-surface boundary after address, or address itself
+    // when it already lies in a color surface. Uniform slack mirrors must not
+    // copy bytes through a surface owned by the surface cache.
+    Address color_surface_limit(Address address) const;
 
     // If non-null, the return value must be sent as a PostSurfaceSyncRequest
     ColorSurfaceCacheInfo *perform_surface_sync();
