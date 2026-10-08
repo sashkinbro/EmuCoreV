@@ -1393,4 +1393,15 @@
     <string name="core_update_reset_action">Reset settings</string>
     <string name="core_update_reset_keep">Keep current settings</string>
     <string name="core_update_reset_done">Settings have been reset</string>
+    <string name="controls_editor_duplicate">Duplicate</string>
+    <string name="controls_editor_combo">Combo</string>
+    <string name="controls_editor_create_combo">Add button</string>
+    <string name="controls_editor_delete">Delete</string>
+    <string name="controls_editor_reset_selected">Reset selected</string>
+    <string name="controls_editor_grid">Grid</string>
+    <string name="controls_editor_snap">Snap</string>
+    <string name="controls_editor_combo_description">Press both actions together while holding this button.</string>
+    <string name="controls_editor_primary_action">Primary action</string>
+    <string name="controls_editor_secondary_action">Second action</string>
+    <string name="controls_editor_none">None</string>
 </resources>

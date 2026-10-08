@@ -1393,4 +1393,15 @@
     <string name="core_update_reset_action">Скинути налаштування</string>
     <string name="core_update_reset_keep">Залишити як є</string>
     <string name="core_update_reset_done">Налаштування скинуто</string>
+    <string name="controls_editor_duplicate">Дублювати</string>
+    <string name="controls_editor_combo">Комбо</string>
+    <string name="controls_editor_create_combo">Додати кнопку</string>
+    <string name="controls_editor_delete">Видалити</string>
+    <string name="controls_editor_reset_selected">Скинути вибрану</string>
+    <string name="controls_editor_grid">Сітка</string>
+    <string name="controls_editor_snap">Прив’язка</string>
+    <string name="controls_editor_combo_description">Обидві дії натискаються одночасно, поки ви утримуєте цю кнопку.</string>
+    <string name="controls_editor_primary_action">Основна дія</string>
+    <string name="controls_editor_secondary_action">Друга дія</string>
+    <string name="controls_editor_none">Немає</string>
 </resources>

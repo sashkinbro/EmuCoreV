@@ -30,6 +30,9 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -57,6 +60,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -79,6 +84,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -667,7 +673,7 @@ fun EmulationOverlayHost(
 
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
-private fun OnScreenControls(
+internal fun OnScreenControls(
     overlayScale: Float,
     overlayOpacity: Int,
     showTouchSwitch: Boolean,
@@ -704,9 +710,9 @@ private fun OnScreenControls(
     )
 
     val alpha = overlayOpacity / 100f
-    val sidePadding = sideInset + if (isLandscape) 28.dp else 12.dp
-    val bottomPadding = bottomInset + if (isLandscape) 24.dp else 36.dp
-    val shoulderTopPadding = maxOf(40.dp, topInset + 4.dp)
+    val sidePadding = sideInset + if (isLandscape) 16.dp else 10.dp
+    val bottomPadding = bottomInset + if (isLandscape) 22.dp else 16.dp
+    val shoulderTopPadding = topInset + if (isLandscape) 22.dp else 16.dp
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val density = LocalDensity.current
@@ -742,8 +748,14 @@ private fun OnScreenControls(
         }
         val selected = controls.firstOrNull { it.id == selectedId } ?: controls.firstOrNull()
         val selectedIndex = selected?.let { controls.indexOfFirst { element -> element.id == it.id } } ?: -1
-        val selectedDescriptor = selected?.id?.let(::touchControlDescriptor)
-        val defaultSelected = selected?.id?.let { id -> defaultLayout.firstOrNull { it.id == id } }
+        var showGrid by rememberSaveable { mutableStateOf(false) }
+        var snapToGrid by rememberSaveable { mutableStateOf(false) }
+        var comboEditorOpen by remember { mutableStateOf(false) }
+        var createCombo by remember { mutableStateOf(false) }
+        val dragResiduals = remember { mutableMapOf<String, Pair<Float, Float>>() }
+        val gridStep = with(density) { 24.dp.toPx() }
+        val selectedDescriptor = selected?.actionId?.let(::touchControlDescriptor)
+        val defaultSelected = selected?.let { element -> defaultLayout.firstOrNull { it.id == element.actionId } }
         val selectedIsAnalog = selectedDescriptor?.type == TouchControlType.Analog
         val selectedAnalogMode = selected?.analogMode ?: TouchAnalogMode.Stick
         val selectedScalePercent = if (selected != null && defaultSelected != null) {
@@ -770,11 +782,26 @@ private fun OnScreenControls(
             onLayoutChange(updated)
         }
 
+        fun snapDrag(id: String, x: Float, y: Float, delta: Offset): Offset {
+            val snapped = snapTouchDrag(dragResiduals, id, x * canvasWidth, y * canvasHeight,
+                delta.x to delta.y, gridStep, snapToGrid)
+            return Offset(snapped.first, snapped.second)
+        }
+
+        fun duplicateSelected() {
+            val source = selected ?: return
+            if (selectedDescriptor?.type != TouchControlType.Button || controls.count { it.id.startsWith("custom_") } >= 32) return
+            val copy = source.copy(id = "custom_" + java.util.UUID.randomUUID(),
+                x = source.x + 0.04f, y = source.y + 0.04f).coerceToCanvas()
+            commitLayoutChange { it + copy }
+            selectedId = copy.id
+        }
+
         fun resizeAroundCenter(element: TouchControlElement, nextWidth: Float, nextHeight: Float): TouchControlElement {
             val centerX = element.x + element.width / 2f
             val centerY = element.y + element.height / 2f
-            val safeWidth = nextWidth.coerceIn(0.035f, 0.5f)
-            val safeHeight = nextHeight.coerceIn(0.035f, 0.5f)
+            val safeWidth = nextWidth.coerceIn(0.015f, 0.5f)
+            val safeHeight = nextHeight.coerceIn(0.015f, 0.5f)
             return element.copy(
                 width = safeWidth,
                 height = safeHeight,
@@ -786,13 +813,13 @@ private fun OnScreenControls(
         fun updateSelectedSize(percentDelta: Int) {
             val selectedElement = selected ?: return
             val target = controls.firstOrNull { it.id == selectedElement.id } ?: selectedElement
-            val baseline = defaultLayout.firstOrNull { it.id == target.id } ?: target
+            val baseline = defaultLayout.firstOrNull { it.id == target.actionId } ?: target
             val currentSize = maxOf(target.width * canvasWidth, target.height * canvasHeight)
             val defaultSize = maxOf(baseline.width * canvasWidth, baseline.height * canvasHeight).coerceAtLeast(1f)
             val currentPercent = ((currentSize / defaultSize) * 100f).roundToInt().coerceIn(25, 300)
             val nextPercent = (currentPercent + percentDelta).coerceIn(35, 250) / 100f
-            val nextWidth = (baseline.width * nextPercent).coerceIn(0.035f, 0.5f)
-            val nextHeight = (baseline.height * nextPercent).coerceIn(0.035f, 0.5f)
+            val nextWidth = (baseline.width * nextPercent).coerceIn(0.015f, 0.5f)
+            val nextHeight = (baseline.height * nextPercent).coerceIn(0.015f, 0.5f)
             commitLayoutChange { currentControls ->
                 currentControls.replaceElement(resizeAroundCenter(target, nextWidth, nextHeight))
             }
@@ -801,7 +828,7 @@ private fun OnScreenControls(
         fun updateSelectedWidth(percentDelta: Int) {
             val selectedElement = selected ?: return
             val target = controls.firstOrNull { it.id == selectedElement.id } ?: selectedElement
-            val baseline = defaultLayout.firstOrNull { it.id == target.id } ?: target
+            val baseline = defaultLayout.firstOrNull { it.id == target.actionId } ?: target
             val currentPercent = ((target.width / baseline.width.coerceAtLeast(0.001f)) * 100f).roundToInt().coerceIn(25, 300)
             val nextPercent = (currentPercent + percentDelta).coerceIn(50, 300) / 100f
             commitLayoutChange { currentControls ->
@@ -812,7 +839,7 @@ private fun OnScreenControls(
         fun updateSelectedHeight(percentDelta: Int) {
             val selectedElement = selected ?: return
             val target = controls.firstOrNull { it.id == selectedElement.id } ?: selectedElement
-            val baseline = defaultLayout.firstOrNull { it.id == target.id } ?: target
+            val baseline = defaultLayout.firstOrNull { it.id == target.actionId } ?: target
             val currentPercent = ((target.height / baseline.height.coerceAtLeast(0.001f)) * 100f).roundToInt().coerceIn(25, 300)
             val nextPercent = (currentPercent + percentDelta).coerceIn(50, 300) / 100f
             commitLayoutChange { currentControls ->
@@ -823,7 +850,7 @@ private fun OnScreenControls(
         fun toggleSelectedAnalogMode() {
             val selectedElement = selected ?: return
             val target = controls.firstOrNull { it.id == selectedElement.id } ?: selectedElement
-            val baseline = defaultLayout.firstOrNull { it.id == target.id } ?: target
+            val baseline = defaultLayout.firstOrNull { it.id == target.actionId } ?: target
             val nextMode = if (target.analogMode == TouchAnalogMode.TouchArea) {
                 TouchAnalogMode.Stick
             } else {
@@ -849,6 +876,21 @@ private fun OnScreenControls(
             selectedId = controls[nextIndex].id
         }
 
+        if (editMode && showGrid) {
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                var x = 0f
+                while (x <= size.width) {
+                    drawLine(Color.White.copy(alpha = 0.16f), Offset(x, 0f), Offset(x, size.height))
+                    x += gridStep
+                }
+                var y = 0f
+                while (y <= size.height) {
+                    drawLine(Color.White.copy(alpha = 0.16f), Offset(0f, y), Offset(size.width, y))
+                    y += gridStep
+                }
+            }
+        }
+
         if (editMode) {
             touchControlGroups.forEach { group ->
                 val groupElements = controls.filter { it.id in group.ids }
@@ -858,7 +900,8 @@ private fun OnScreenControls(
                         elements = groupElements,
                         canvasWidth = canvasWidth,
                         canvasHeight = canvasHeight,
-                        onDragStart = { selectedId = group.ids.firstOrNull() },
+                        onDragStart = { selectedId = group.ids.firstOrNull(); dragResiduals.clear() },
+                        snapDrag = ::snapDrag,
                         onGroupChange = { updatedElements ->
                             commitLayoutChange { currentControls ->
                                 currentControls.replaceElements(updatedElements)
@@ -869,7 +912,10 @@ private fun OnScreenControls(
             }
         }
 
-        val groupHandledControlIds = touchControlGroups.flatMap { it.ids }.toSet()
+        val activeInputGroups = touchControlGroups.filter { group ->
+            group.ids.all { id -> controls.any { it.id == id && it.visible } }
+        }
+        val groupHandledControlIds = activeInputGroups.flatMap { it.ids }.toSet()
         fun performTouchHaptic(phase: ButtonPhase) {
             if (touchHaptics) {
                 AndroidTouchHaptics.playButton(
@@ -899,8 +945,25 @@ private fun OnScreenControls(
             }
         }
 
-        fun handleGroupButtonChange(controlId: Int, pressed: Boolean) {
-            dispatchButtonChange(controlId, pressed)
+        val currentDispatch by rememberUpdatedState<(Int, Boolean) -> Unit>(::dispatchButtonChange)
+        val actionTracker = remember { TouchActionTracker { action, pressed -> currentDispatch(action, pressed) } }
+        DisposableEffect(actionTracker, editMode) {
+            onDispose { actionTracker.cancel() }
+        }
+        fun dispatchControlChange(id: String, pressed: Boolean) {
+            if (!pressed) {
+                actionTracker.release(id)
+                return
+            }
+            val element = controls.firstOrNull { it.id == id } ?: return
+            val actions = listOfNotNull(element.actionId, element.secondaryActionId)
+                .mapNotNull { touchControlDescriptor(it)?.controlId }.toSet()
+            actionTracker.press(id, actions)
+        }
+
+        fun handleGroupButtonChange(id: String, pressed: Boolean) {
+            dispatchControlChange(id, pressed)
+            val controlId = controls.firstOrNull { it.id == id }?.actionId?.let(::touchControlDescriptor)?.controlId ?: return
             pressedGroupControlIds = if (pressed) {
                 pressedGroupControlIds + controlId
             } else {
@@ -908,34 +971,8 @@ private fun OnScreenControls(
             }
         }
 
-        controls.forEach { element ->
-            val descriptor = touchControlDescriptor(element.id) ?: return@forEach
-            if (!editMode && (!element.visible || (element.id == TouchControlIds.TOUCH && !showTouchSwitch))) {
-                return@forEach
-            }
-            TouchControlCanvasItem(
-                element = element,
-                descriptor = descriptor,
-                canvasWidth = canvasWidth,
-                canvasHeight = canvasHeight,
-                alpha = if (editMode && !element.visible) 0.28f else alpha,
-                selected = editMode && selected?.id == element.id,
-                editMode = editMode,
-                inputHandledByGroup = !editMode && element.id in groupHandledControlIds,
-                externallyPressed = descriptor.controlId?.let { it in pressedGroupControlIds } == true,
-                touchMode = touchMode,
-                visualStyle = visualStyle,
-                pressEffect = pressEffect,
-                onSelected = { selectedId = element.id },
-                onElementChange = { updated -> commitLayoutChange { currentControls -> currentControls.replaceElement(updated) } },
-                onBackTouchToggle = onBackTouchToggle,
-                onButtonChange = ::dispatchButtonChange,
-                onAxisChange = onAxisChange
-            )
-        }
-
         if (!editMode) {
-            touchControlGroups.forEach { group ->
+            activeInputGroups.forEach { group ->
                 val groupElements = controls.filter { it.id in group.ids && it.visible }
                 if (groupElements.size == group.ids.size) {
                     TouchControlGroupInputCapture(
@@ -948,9 +985,38 @@ private fun OnScreenControls(
             }
         }
 
+        controls.forEach { element ->
+            val descriptor = touchControlDescriptor(element.actionId) ?: return@forEach
+            if (!editMode && (!element.visible || (element.id == TouchControlIds.TOUCH && !showTouchSwitch))) {
+                return@forEach
+            }
+            key(element.id) {
+              TouchControlCanvasItem(
+                element = element,
+                descriptor = descriptor,
+                canvasWidth = canvasWidth,
+                canvasHeight = canvasHeight,
+                alpha = if (editMode && !element.visible) 0.28f else alpha,
+                selected = editMode && selected?.id == element.id,
+                editMode = editMode,
+                inputHandledByGroup = !editMode && element.id in groupHandledControlIds,
+                externallyPressed = descriptor.controlId?.let { it in pressedGroupControlIds } == true,
+                touchMode = touchMode,
+                visualStyle = visualStyle,
+                pressEffect = pressEffect,
+                onSelected = { selectedId = element.id; dragResiduals.clear() },
+                snapDrag = ::snapDrag,
+                onElementChange = { updated -> commitLayoutChange { currentControls -> currentControls.replaceElement(updated) } },
+                onBackTouchToggle = onBackTouchToggle,
+                onButtonChange = { _, pressed -> dispatchControlChange(element.id, pressed) },
+                onAxisChange = onAxisChange
+              )
+            }
+        }
+
         if (editMode && selected != null && selectedDescriptor != null) {
             TouchControlEditorChrome(
-                selectedLabel = selectedDescriptor.label,
+                selectedLabel = listOfNotNull(selectedDescriptor.label, selected.secondaryActionId?.let(::touchControlDescriptor)?.label).joinToString(" + "),
                 selectedVisible = selected.visible,
                 selectedScalePercent = selectedScalePercent,
                 onSelectNext = ::selectNext,
@@ -972,7 +1038,51 @@ private fun OnScreenControls(
                 onTouchAreaHeightDecrease = { updateSelectedHeight(-10) },
                 onTouchAreaHeightIncrease = { updateSelectedHeight(10) },
                 onDone = onEditDone,
-                modifier = Modifier.align(Alignment.TopCenter)
+                showDimensions = !selectedIsAnalog || selectedAnalogMode == TouchAnalogMode.TouchArea,
+                editorActions = {
+                    TouchLayoutEditorActions(
+                        canDuplicate = selectedDescriptor.type == TouchControlType.Button && controls.count { it.id.startsWith("custom_") } < 32,
+                        canDelete = selected.id.startsWith("custom_"),
+                        canCombo = selectedDescriptor.type == TouchControlType.Button,
+                        canCreate = controls.count { it.id.startsWith("custom_") } < 32,
+                        showGrid = showGrid, snapToGrid = snapToGrid,
+                        onDuplicate = ::duplicateSelected,
+                        onDelete = { commitLayoutChange { it.filterNot { element -> element.id == selected.id } }; selectedId = null },
+                        onCombo = { createCombo = false; comboEditorOpen = true },
+                        onCreate = { createCombo = true; comboEditorOpen = true },
+                        onResetSelected = {
+                            val baseline = defaultSelected ?: return@TouchLayoutEditorActions
+                            commitLayoutChange { it.replaceElement(baseline.copy(id = selected.id)) }
+                        },
+                        onGridToggle = { showGrid = !showGrid },
+                        onSnapToggle = { snapToGrid = !snapToGrid; dragResiduals.clear(); if (snapToGrid) showGrid = true }
+                    )
+                },
+                modifier = Modifier.align(Alignment.TopCenter).heightIn(max = maxHeight * 0.55f)
+            )
+        }
+
+        if (editMode && comboEditorOpen) {
+            TouchComboEditorDialog(
+                actions = listOf(TouchControlIds.DPAD_UP, TouchControlIds.DPAD_DOWN, TouchControlIds.DPAD_LEFT,
+                    TouchControlIds.DPAD_RIGHT, TouchControlIds.TRIANGLE, TouchControlIds.CROSS, TouchControlIds.SQUARE,
+                    TouchControlIds.CIRCLE, TouchControlIds.L1, TouchControlIds.R1, TouchControlIds.L2, TouchControlIds.R2,
+                    TouchControlIds.SELECT, TouchControlIds.START).mapNotNull { id -> touchControlDescriptor(id)?.let { id to it.label } },
+                primary = if (createCombo) TouchControlIds.CROSS else selected?.actionId ?: TouchControlIds.CROSS,
+                secondary = if (createCombo) TouchControlIds.L1 else selected?.secondaryActionId,
+                onDismiss = { comboEditorOpen = false },
+                onConfirm = { primary, secondary ->
+                    if (createCombo) {
+                        val baseline = defaultLayout.first { it.id == primary }
+                        val created = baseline.copy(id = "custom_" + java.util.UUID.randomUUID(),
+                            x = 0.45f, y = 0.45f, visible = true, secondaryActionId = secondary)
+                        commitLayoutChange { it + created }
+                        selectedId = created.id
+                    } else if (selected != null) {
+                        commitLayoutChange { it.replaceElement(selected.copy(actionId = primary, secondaryActionId = secondary)) }
+                    }
+                    comboEditorOpen = false
+                }
             )
         }
     }
@@ -1055,6 +1165,7 @@ private fun TouchControlGroupFrame(
     canvasWidth: Float,
     canvasHeight: Float,
     onDragStart: () -> Unit,
+    snapDrag: (String, Float, Float, Offset) -> Offset,
     onGroupChange: (List<TouchControlElement>) -> Unit
 ) {
     val density = LocalDensity.current
@@ -1091,9 +1202,11 @@ private fun TouchControlGroupFrame(
                     }
                 ) { change, dragAmount ->
                     change.consume()
+                    val bounds = draggedElements.groupBounds()
+                    val delta = snapDrag("group:" + group.ids.joinToString(), bounds.x, bounds.y, dragAmount)
                     draggedElements = draggedElements.moveGroupBy(
-                        dx = dragAmount.x / canvasWidth,
-                        dy = dragAmount.y / canvasHeight
+                        dx = delta.x / canvasWidth,
+                        dy = delta.y / canvasHeight
                     )
                     onGroupChange(draggedElements)
                 }
@@ -1106,7 +1219,7 @@ private fun TouchControlGroupInputCapture(
     groupElements: List<TouchControlElement>,
     canvasWidth: Float,
     canvasHeight: Float,
-    onButtonChange: (Int, Boolean) -> Unit
+    onButtonChange: (String, Boolean) -> Unit
 ) {
     val density = LocalDensity.current
     val currentOnButtonChange by rememberUpdatedState(onButtonChange)
@@ -1121,33 +1234,30 @@ private fun TouchControlGroupInputCapture(
     val heightPx = (paddedBottom - paddedY).coerceAtLeast(1f)
 
     fun releasePointer(pointerId: Int) {
-        buttonTracker.release(pointerId, currentOnButtonChange)
+        buttonTracker.release(pointerId) { index, pressed -> currentOnButtonChange(groupElements[index].id, pressed) }
     }
 
     fun releaseAll() {
-        buttonTracker.cancel(currentOnButtonChange)
+        buttonTracker.cancel { index, pressed -> currentOnButtonChange(groupElements[index].id, pressed) }
     }
 
     fun controlAt(localX: Float, localY: Float): Int? {
         val absoluteX = paddedX + localX
         val absoluteY = paddedY + localY
-        return groupElements.firstNotNullOfOrNull { element ->
+        return groupElements.indices.firstOrNull { index ->
+            val element = groupElements[index]
             val left = element.x * canvasWidth
             val top = element.y * canvasHeight
             val right = left + element.width * canvasWidth
             val bottom = top + element.height * canvasHeight
-            if (absoluteX in left..right && absoluteY in top..bottom) {
-                touchControlDescriptor(element.id)?.controlId
-            } else {
-                null
-            }
+            absoluteX in left..right && absoluteY in top..bottom
         }
     }
 
     fun updatePointer(event: MotionEvent, pointerIndex: Int) {
         val pointerId = event.getPointerId(pointerIndex)
         val nextControl = controlAt(event.getX(pointerIndex), event.getY(pointerIndex))
-        buttonTracker.update(pointerId, nextControl, currentOnButtonChange)
+        buttonTracker.update(pointerId, nextControl) { index, pressed -> currentOnButtonChange(groupElements[index].id, pressed) }
     }
 
     DisposableEffect(buttonTracker) {
@@ -1206,6 +1316,7 @@ private fun TouchControlCanvasItem(
     visualStyle: TouchControlVisualStyle,
     pressEffect: TouchControlPressEffect,
     onSelected: () -> Unit,
+    snapDrag: (String, Float, Float, Offset) -> Offset,
     onElementChange: (TouchControlElement) -> Unit,
     onBackTouchToggle: () -> Unit,
     onButtonChange: (Int, Boolean) -> Unit,
@@ -1253,9 +1364,10 @@ private fun TouchControlCanvasItem(
                     }
                 ) { change, dragAmount ->
                     change.consume()
+                    val delta = snapDrag(element.id, draggedElement.x, draggedElement.y, dragAmount)
                     draggedElement = draggedElement.copy(
-                        x = (draggedElement.x + dragAmount.x / canvasWidth).coerceIn(0f, 1f - draggedElement.width),
-                        y = (draggedElement.y + dragAmount.y / canvasHeight).coerceIn(0f, 1f - draggedElement.height)
+                        x = (draggedElement.x + delta.x / canvasWidth).coerceIn(0f, 1f - draggedElement.width),
+                        y = (draggedElement.y + delta.y / canvasHeight).coerceIn(0f, 1f - draggedElement.height)
                     )
                     onElementChange(draggedElement)
                 }
@@ -1336,7 +1448,7 @@ private fun TouchControlCanvasItem(
         }
     }
 
-    Box(modifier = sizeModifier.then(inputModifier), contentAlignment = Alignment.Center) {
+    Box(modifier = sizeModifier.testTag("touch_control_${element.id}").then(inputModifier), contentAlignment = Alignment.Center) {
         when (descriptor.type) {
             TouchControlType.Analog -> {
                 if (editMode) {
@@ -1385,6 +1497,16 @@ private fun TouchControlCanvasItem(
                     visualStyle = visualStyle,
                     pressEffect = pressEffect
                 )
+                element.secondaryActionId?.let(::touchControlDescriptor)?.let { secondary ->
+                    Text(
+                        text = "+ " + secondary.label,
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                            .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 3.dp)
+                    )
+                }
                 if (descriptor.type == TouchControlType.TouchSwitch && touchMode == 2) {
                     Text(
                         text = "F+B",
@@ -1467,12 +1589,16 @@ private fun TouchControlEditorChrome(
     onTouchAreaHeightDecrease: () -> Unit,
     onTouchAreaHeightIncrease: () -> Unit,
     onDone: () -> Unit,
+    showDimensions: Boolean,
+    editorActions: @Composable () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val neon = LocalNeonTheme.current
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .testTag("controls_editor_panel")
+            .verticalScroll(rememberScrollState())
             .padding(
                 top = if (neon) 6.dp else 8.dp,
                 start = if (neon) 16.dp else 0.dp,
@@ -1578,7 +1704,9 @@ private fun TouchControlEditorChrome(
             }
         }
 
-        if (analogMode == TouchAnalogMode.TouchArea) {
+        editorActions()
+
+        if (showDimensions) {
             Surface(
                 shape = neonShape(if (neon) 16.dp else 18.dp),
                 color = if (neon) Color(0xFF111827).copy(alpha = 0.82f)
@@ -1600,7 +1728,8 @@ private fun TouchControlEditorChrome(
                         label = stringResource(R.string.emulation_controls_editor_height),
                         percent = touchAreaHeightPercent,
                         onDecrease = onTouchAreaHeightDecrease,
-                        onIncrease = onTouchAreaHeightIncrease
+                        onIncrease = onTouchAreaHeightIncrease,
+                        modifier = Modifier.testTag("controls_editor_height_row")
                     )
                 }
             }
@@ -1613,9 +1742,11 @@ private fun TouchAreaSizeRow(
     label: String,
     percent: Int,
     onDecrease: () -> Unit,
-    onIncrease: () -> Unit
+    onIncrease: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1623,7 +1754,8 @@ private fun TouchAreaSizeRow(
             text = label,
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
             color = Color.White,
-            modifier = Modifier.width(56.dp)
+            modifier = Modifier.width(72.dp),
+            maxLines = 1
         )
         EditorSizeButton("-", onClick = onDecrease)
         Text(
@@ -1720,12 +1852,22 @@ private fun EditorSizeButton(
     }
 }
 
-private fun mergeTouchLayout(
+internal fun mergeTouchLayout(
     defaults: List<TouchControlElement>,
     saved: List<TouchControlElement>?
 ): List<TouchControlElement> {
     val savedById = saved.orEmpty().associateBy { it.id }
-    return defaults.map { default -> savedById[default.id]?.coerceToCanvas() ?: default }
+    val standard = defaults.map { default ->
+        val element = savedById[default.id]
+        val descriptor = element?.actionId?.let(::touchControlDescriptor)
+        if (element != null && descriptor?.type == touchControlDescriptor(default.id)?.type)
+            element.coerceToCanvas()
+        else default
+    }
+    val custom = saved.orEmpty().filter {
+        it.id.startsWith("custom_") && touchControlDescriptor(it.actionId)?.type == TouchControlType.Button
+    }.distinctBy { it.id }.take(32).map { it.coerceToCanvas() }
+    return standard + custom
 }
 
 private fun List<TouchControlElement>.replaceElement(updated: TouchControlElement): List<TouchControlElement> {
@@ -1765,97 +1907,7 @@ private fun List<TouchControlElement>.moveGroupBy(dx: Float, dy: Float): List<To
 }
 
 private fun TouchControlElement.coerceToCanvas(): TouchControlElement {
-    val safeWidth = width.coerceIn(0.035f, 0.5f)
-    val safeHeight = height.coerceIn(0.035f, 0.5f)
-    return copy(
-        width = safeWidth,
-        height = safeHeight,
-        x = x.coerceIn(0f, 1f - safeWidth),
-        y = y.coerceIn(0f, 1f - safeHeight)
-    )
-}
-
-private fun buildDefaultTouchLayout(
-    canvasWidth: Float,
-    canvasHeight: Float,
-    isLandscape: Boolean,
-    overlayScale: Float,
-    density: Float,
-    sidePaddingPx: Float,
-    bottomPaddingPx: Float,
-    shoulderTopPaddingPx: Float
-): List<TouchControlElement> {
-    fun dp(value: Float): Float = value * density
-    fun element(id: String, x: Float, y: Float, width: Float, height: Float, visible: Boolean = true): TouchControlElement {
-        return TouchControlElement(
-            id = id,
-            x = (x / canvasWidth).coerceIn(0f, 1f),
-            y = (y / canvasHeight).coerceIn(0f, 1f),
-            width = (width / canvasWidth).coerceIn(0.035f, 0.5f),
-            height = (height / canvasHeight).coerceIn(0.035f, 0.5f),
-            visible = visible
-        ).coerceToCanvas()
-    }
-
-    val actionClusterSize = (if (isLandscape) 142f else 160f) * overlayScale * dp(1f)
-    val dpadClusterSize = (if (isLandscape) 136f else 154f) * overlayScale * dp(1f)
-    val analogSize = (if (isLandscape) 112f else 126f) * overlayScale * dp(1f)
-    val shoulderWidth = (if (isLandscape) 66f else 72f) * overlayScale * dp(1f)
-    val shoulderHeight = (if (isLandscape) 32f else 36f) * overlayScale * dp(1f)
-    val centerWidth = (if (isLandscape) 60f else 68f) * overlayScale * dp(1f)
-    val centerHeight = (if (isLandscape) 26f else 30f) * overlayScale * dp(1f)
-    val wideCenterWidth = centerWidth * 1.2f
-    val centerGap = (if (isLandscape) 10f else 12f) * overlayScale * dp(1f)
-    val centerBottomPadding = bottomPaddingPx - dp(6f)
-    val clusterSpacing = (if (isLandscape) 14f else 18f) * overlayScale * dp(1f)
-    val faceClusterDrop = (if (isLandscape) 18f else 14f) * overlayScale * dp(1f)
-    val buttonClusterLowerOffset = (if (isLandscape) 24f else 18f) * overlayScale * dp(1f)
-    val leftClusterHeight = maxOf(dpadClusterSize + faceClusterDrop, analogSize) + analogSize + clusterSpacing
-    val rightClusterWidth = actionClusterSize + analogSize + clusterSpacing
-    val rightClusterHeight = maxOf(actionClusterSize + faceClusterDrop, analogSize) + analogSize + clusterSpacing
-
-    val dpadButton = dpadClusterSize / 3.25f
-    val dpadStep = (dpadClusterSize - dpadButton) / 2f
-    val dpadCenter = dpadStep
-    val dpadY = canvasHeight - bottomPaddingPx - leftClusterHeight + faceClusterDrop + buttonClusterLowerOffset
-    val leftAnalogX = sidePaddingPx + dpadClusterSize + clusterSpacing
-    val leftAnalogY = canvasHeight - bottomPaddingPx - analogSize
-
-    val actionButton = actionClusterSize / 2.85f
-    val actionGap = if (isLandscape) dp(46f) else dp(52f)
-    val actionStep = actionButton + actionGap
-    val actionExtent = actionStep + actionButton
-    val actionCenter = (actionExtent - actionButton) / 2f
-    val rightGroupX = canvasWidth - sidePaddingPx - rightClusterWidth
-    val actionX = rightGroupX + rightClusterWidth - actionClusterSize
-    val actionY = canvasHeight - bottomPaddingPx - rightClusterHeight + faceClusterDrop + buttonClusterLowerOffset
-    val rightAnalogY = canvasHeight - bottomPaddingPx - analogSize
-
-    val centerGroupWidth = wideCenterWidth + centerGap + wideCenterWidth
-    val centerX = (canvasWidth - centerGroupWidth) / 2f
-    val centerY = canvasHeight - centerBottomPadding - centerHeight
-    val touchWidth = centerWidth * 1.2f
-    val touchHeight = centerHeight * 1.2f
-
-    return listOf(
-        element(TouchControlIds.L2, sidePaddingPx, shoulderTopPaddingPx, shoulderWidth, shoulderHeight),
-        element(TouchControlIds.L1, sidePaddingPx, shoulderTopPaddingPx + dp(40f), shoulderWidth, shoulderHeight),
-        element(TouchControlIds.R2, canvasWidth - sidePaddingPx - shoulderWidth, shoulderTopPaddingPx, shoulderWidth, shoulderHeight),
-        element(TouchControlIds.R1, canvasWidth - sidePaddingPx - shoulderWidth, shoulderTopPaddingPx + dp(40f), shoulderWidth, shoulderHeight),
-        element(TouchControlIds.DPAD_UP, sidePaddingPx + dpadCenter, dpadY, dpadButton, dpadButton),
-        element(TouchControlIds.DPAD_DOWN, sidePaddingPx + dpadCenter, dpadY + dpadStep * 2f, dpadButton, dpadButton),
-        element(TouchControlIds.DPAD_LEFT, sidePaddingPx, dpadY + dpadCenter, dpadButton, dpadButton),
-        element(TouchControlIds.DPAD_RIGHT, sidePaddingPx + dpadStep * 2f, dpadY + dpadCenter, dpadButton, dpadButton),
-        element(TouchControlIds.LEFT_STICK, leftAnalogX, leftAnalogY, analogSize, analogSize),
-        element(TouchControlIds.RIGHT_STICK, rightGroupX, rightAnalogY, analogSize, analogSize),
-        element(TouchControlIds.TRIANGLE, actionX + actionCenter, actionY, actionButton, actionButton),
-        element(TouchControlIds.CROSS, actionX + actionCenter, actionY + actionStep, actionButton, actionButton),
-        element(TouchControlIds.SQUARE, actionX, actionY + actionCenter, actionButton, actionButton),
-        element(TouchControlIds.CIRCLE, actionX + actionStep, actionY + actionCenter, actionButton, actionButton),
-        element(TouchControlIds.SELECT, centerX, centerY, wideCenterWidth, centerHeight),
-        element(TouchControlIds.START, centerX + wideCenterWidth + centerGap, centerY, wideCenterWidth, centerHeight),
-        element(TouchControlIds.TOUCH, (canvasWidth - touchWidth) / 2f, canvasHeight - touchHeight - dp(84f), touchWidth, touchHeight)
-    )
+    return normalized()
 }
 
 @Composable

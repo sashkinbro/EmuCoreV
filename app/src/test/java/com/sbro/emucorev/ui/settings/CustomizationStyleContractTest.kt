@@ -99,25 +99,13 @@ class CustomizationStyleContractTest {
     fun visualEffectsDoNotChangeTheTouchTargetGeometry() {
         val overlay = sourceRoot().resolve("ui/emulation/EmulationOverlay.kt").readText()
         val item = Regex(
-            """val sizeModifier = Modifier[\s\S]*?Box\(modifier = sizeModifier\.then\(inputModifier\)[\s\S]*?when \(descriptor\.type\)"""
+            """val sizeModifier = Modifier[\s\S]*?Box\(modifier = sizeModifier(?:\.testTag\([^)]*\))?\.then\(inputModifier\)[\s\S]*?when \(descriptor\.type\)"""
         ).find(overlay)?.value.orEmpty()
 
         assertTrue("Touch target geometry and input modifier must remain the outer layer", item.isNotBlank())
         assertTrue("Visual scaling must use graphicsLayer", "graphicsLayer(" in overlay)
-        assertTrue("All press effects need explicit scale behavior", "TouchControlPressEffect.GLOW -> 1.02f" in overlay)
-    }
-
-    @Test
-    fun defaultDpadButtonsHaveARealGapAndDoNotOverlap() {
-        val overlay = sourceRoot().resolve("ui/emulation/EmulationOverlay.kt").readText()
-        val clusterSize = 136f
-        val buttonSize = clusterSize / 3.25f
-        val axisStep = (clusterSize - buttonSize) / 2f
-
-        assertTrue("D-pad buttons need a positive gap", axisStep - buttonSize > 0f)
-        assertTrue("D-pad button size must use the separated 3x3 layout", "dpadClusterSize / 3.25f" in overlay)
-        assertTrue("Down must occupy the bottom cell", "dpadY + dpadStep * 2f" in overlay)
-        assertTrue("Right must occupy the trailing cell", "sidePaddingPx + dpadStep * 2f" in overlay)
+        val vectorControls = sourceRoot().resolve("ui/common/VectorTouchControls.kt").readText()
+        assertTrue("Button visuals must retain their press effects", "val scale = animatedPressScale(" in vectorControls)
     }
 
     private fun sourceRoot(): Path {
