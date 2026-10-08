@@ -24,6 +24,7 @@
 #include <ctrl/functions.h>
 #include <dialog/state.h>
 #include <emucorev/savestate/savestate.h>
+#include <emucorev/savestate/operation_mutex.h>
 #include <ime/functions.h>
 #include <ime/keyboard.h>
 #include <io/state.h>
@@ -43,6 +44,7 @@
 #include <cstdio>
 #include <cstring>
 #include <optional>
+#include <utility>
 
 namespace {
 
@@ -58,6 +60,28 @@ void clear_activity_callback_exception(JNIEnv *env) {
         env->ExceptionDescribe();
         env->ExceptionClear();
     }
+}
+
+void report_save_state_load_error(const std::string &reason) {
+    auto *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity)
+        return;
+    const auto clazz = env->GetObjectClass(activity);
+    const auto method = clazz
+        ? get_optional_activity_method(env, clazz, "showSaveStateLoadError", "(Ljava/lang/String;)V")
+        : nullptr;
+    if (method) {
+        const auto message = env->NewStringUTF(reason.c_str());
+        if (message) {
+            env->CallVoidMethod(activity, method, message);
+            env->DeleteLocalRef(message);
+        }
+    }
+    clear_activity_callback_exception(env);
+    if (clazz)
+        env->DeleteLocalRef(clazz);
+    env->DeleteLocalRef(activity);
 }
 
 void reset_android_session_audio(EmuEnvState &emuenv) {
@@ -461,6 +485,10 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
             break;
         }
 
+        std::unique_lock startup_state_operation(emucorev::savestate::save_state_operation_mutex(), std::defer_lock);
+        if (!load_state_path.empty())
+            startup_state_operation.lock();
+
         if (!session_controller->load_and_run()) {
             LOG_ERROR("Failed to load or start the app session.");
             exit_code = -1;
@@ -469,15 +497,22 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
         }
 
         if (!load_state_path.empty()) {
-            LOG_CRITICAL("[savestate-error] launch: applying state {}", load_state_path);
-            const auto state_result = emucorev::savestate::load_state(*emuenv, load_state_path, true);
+            const auto requested_state_path = std::exchange(load_state_path, {});
+            LOG_INFO("Applying launch save state {}", requested_state_path);
+            const auto state_result = emucorev::savestate::load_state(*emuenv, requested_state_path, true);
             if (state_result.ok()) {
-                LOG_INFO("Loaded save state from {}", load_state_path);
+                LOG_INFO("Loaded save state from {}", requested_state_path);
             } else {
-                LOG_ERROR("Failed to load save state {}: {}", load_state_path, state_result.error);
+                LOG_ERROR("Failed to load save state {}: {}", requested_state_path, state_result.error);
+                report_save_state_load_error(state_result.error);
+                exit_code = -1;
+                cleanup_launch(app::AppSessionStopReason::LaunchFailure);
+                break;
             }
-            LOG_CRITICAL("[savestate-error] launch: state apply finished ok={}", state_result.ok());
         }
+
+        if (startup_state_operation.owns_lock())
+            startup_state_operation.unlock();
 
         if (auto request = emuenv->take_app_launch_request())
             pending_launch_request = std::move(request);

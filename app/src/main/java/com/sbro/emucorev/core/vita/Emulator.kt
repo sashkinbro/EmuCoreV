@@ -106,6 +106,14 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     fun getmOverlay(): InputOverlay = inputOverlay
 
     @Keep
+    fun showSaveStateLoadError(reason: String) {
+        Log.e("SaveStateBridge", "Launch save state load failed: $reason")
+        runOnUiThread {
+            Toast.makeText(this, R.string.emulation_savestate_failed_toast, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    @Keep
     fun setCurrentGameId(gameId: String) {
         _currentGameId = gameId
         refreshGamepadRuntimeInputSettings()

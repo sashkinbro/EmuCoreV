@@ -8,6 +8,7 @@
 #include <app/session_controller.h>
 
 #include <emucorev/savestate/savestate.h>
+#include <emucorev/savestate/operation_mutex.h>
 
 #include <display/state.h>
 #include <emuenv/state.h>
@@ -29,10 +30,6 @@
 #include <vector>
 
 namespace {
-
-// The pause reason and renderer gates have a single owner. Acquire this before
-// reading session pointers; save/load acquire their own core snapshot gates.
-std::mutex save_state_bridge_mutex;
 
 std::string to_string_or_empty(JNIEnv *env, jstring value) {
     return value ? jstring_to_string(env, value) : std::string();
@@ -115,7 +112,7 @@ private:
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_sbro_emucorev_core_SaveStateBridge_nativeSaveState(JNIEnv *env, jobject, jstring path, jstring app_version) {
-    const std::lock_guard<std::mutex> operation(save_state_bridge_mutex);
+    const std::lock_guard<std::mutex> operation(emucorev::savestate::save_state_operation_mutex());
     const std::string path_str = to_string_or_empty(env, path);
     const std::string app_version_str = to_string_or_empty(env, app_version);
     if (path_str.empty()) {
@@ -150,7 +147,7 @@ Java_com_sbro_emucorev_core_SaveStateBridge_nativeSaveState(JNIEnv *env, jobject
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_sbro_emucorev_core_SaveStateBridge_nativeLoadState(JNIEnv *env, jobject, jstring path, jboolean allow_cross_session) {
-    const std::lock_guard<std::mutex> operation(save_state_bridge_mutex);
+    const std::lock_guard<std::mutex> operation(emucorev::savestate::save_state_operation_mutex());
     const std::string path_str = to_string_or_empty(env, path);
     if (path_str.empty()) {
         emucorev::savestate::Result result;
@@ -189,7 +186,7 @@ Java_com_sbro_emucorev_core_SaveStateBridge_nativeLoadState(JNIEnv *env, jobject
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_sbro_emucorev_core_SaveStateBridge_nativeInspectSaveState(JNIEnv *env, jobject, jstring path) {
-    const std::lock_guard<std::mutex> operation(save_state_bridge_mutex);
+    const std::lock_guard<std::mutex> operation(emucorev::savestate::save_state_operation_mutex());
     const std::string path_str = to_string_or_empty(env, path);
     auto result = emucorev::savestate::inspect_state(fs::path(path_str));
     if (auto *emuenv = get_emuenv())
@@ -199,7 +196,7 @@ Java_com_sbro_emucorev_core_SaveStateBridge_nativeInspectSaveState(JNIEnv *env, 
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_sbro_emucorev_core_SaveStateBridge_nativeDeleteSaveState(JNIEnv *env, jobject, jstring path) {
-    const std::lock_guard<std::mutex> operation(save_state_bridge_mutex);
+    const std::lock_guard<std::mutex> operation(emucorev::savestate::save_state_operation_mutex());
     const std::string path_str = to_string_or_empty(env, path);
     const auto result = emucorev::savestate::delete_state(fs::path(path_str));
     return result_to_json(env, result);
@@ -207,7 +204,7 @@ Java_com_sbro_emucorev_core_SaveStateBridge_nativeDeleteSaveState(JNIEnv *env, j
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_sbro_emucorev_core_SaveStateBridge_nativeGetRunningTitleId(JNIEnv *env, jobject) {
-    const std::lock_guard<std::mutex> operation(save_state_bridge_mutex);
+    const std::lock_guard<std::mutex> operation(emucorev::savestate::save_state_operation_mutex());
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return env->NewStringUTF("");
@@ -216,7 +213,7 @@ Java_com_sbro_emucorev_core_SaveStateBridge_nativeGetRunningTitleId(JNIEnv *env,
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorev_core_SaveStateBridge_nativeCaptureThumbnail(JNIEnv *env, jobject, jstring path, jint max_width) {
-    const std::lock_guard<std::mutex> operation(save_state_bridge_mutex);
+    const std::lock_guard<std::mutex> operation(emucorev::savestate::save_state_operation_mutex());
     const std::string path_str = to_string_or_empty(env, path);
     if (path_str.empty())
         return JNI_FALSE;

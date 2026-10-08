@@ -12,6 +12,8 @@ add_executable(state-container-tests
     kernel_base_io_tests.cpp
     kernel_module_validation_tests.cpp
     render_snapshot_gate_tests.cpp
+    save_state_operation_tests.cpp
+    save_state_operation_peer.cpp
     "${NATIVE}/emucorev/src/savestate/archive.cpp"
     "${NATIVE}/emucorev/src/savestate/memory_image.cpp"
     "${NATIVE}/emucorev/src/savestate/display_state_io.cpp"
