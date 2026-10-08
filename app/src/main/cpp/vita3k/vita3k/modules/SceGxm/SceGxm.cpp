@@ -1623,7 +1623,10 @@ bool capture_contexts(EmuEnvState &emuenv, std::vector<ContextSnapshot> &output,
             }
             snapshot.render_target_address = target->first;
         }
-        snapshot.state = context->state;
+        // Older contexts may contain an indeterminate representation in this
+        // unused legacy bool. Copy bytes and canonicalize it without reading it.
+        std::memcpy(&snapshot.state, &context->state, sizeof(snapshot.state));
+        snapshot.state.writing_mask = false;
         snapshot.last_precomputed = context->last_precomputed;
         snapshot.command_next_free_pos = deferred ? 0 : context->command_next_free_pos;
         snapshot.alloc_space = context->alloc_space;

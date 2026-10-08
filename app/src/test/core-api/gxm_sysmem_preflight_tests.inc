@@ -144,6 +144,36 @@ TEST(GxmPreflightParser, RejectsTruncatedTablesAndTrailingBytesWithoutPublishing
     EXPECT_EQ(output.global_timestamp, 42u);
 }
 
+TEST(GxmPreflightParser, CanonicalizesUnusedLegacyMaskButRejectsMeaningfulInvalidBools) {
+    using namespace emucorev::savestate;
+    BufferWriter writer;
+    writer.value(SceGxmInitializeParams{});
+    for (int i = 0; i < 8; ++i) writer.u32(0);
+    writer.u32(1); // context count
+    writer.u32(0x1000); writer.boolean(true); writer.u32(0);
+    writer.value(renderer::GxmRecordState{});
+    const size_t state_offset = writer.size();
+    writer.value(GxmContextState{});
+    writer.boolean(false); writer.u64(0);
+    for (int i = 0; i < 6; ++i) writer.u32(0);
+    writer.boolean(false); writer.boolean(false); writer.u32(0); // deferred lists
+    for (int i = 0; i < 11; ++i) writer.u32(0); // remaining tables
+    auto bytes = writer.data();
+    bytes[state_offset + offsetof(GxmContextState, writing_mask)] = 0xf0;
+    GxmSnapshot output;
+    std::string error;
+    ASSERT_TRUE(parse_gxm_state(bytes, output, error)) << error;
+    ASSERT_EQ(output.contexts.size(), 1u);
+    EXPECT_FALSE(output.contexts[0].state.writing_mask);
+    for (const size_t offset : {offsetof(GxmContextState, visibility_enable), offsetof(GxmContextState, visibility_is_increment), offsetof(GxmContextState, active)}) {
+        auto malformed = bytes;
+        malformed[state_offset + offset] = 0xf0;
+        output.global_timestamp = 42;
+        EXPECT_FALSE(parse_gxm_state(malformed, output, error));
+        EXPECT_EQ(output.global_timestamp, 42u);
+    }
+}
+
 TEST_F(GxmSysmemPreflight, PendingVisibilityAndSurfaceExtentsAreCheckedBeforeRestore) {
     auto memory = image(); ASSERT_TRUE(memory) << error;
     renderer::Command live{}; live.opcode = renderer::CommandOpcode::SetState;

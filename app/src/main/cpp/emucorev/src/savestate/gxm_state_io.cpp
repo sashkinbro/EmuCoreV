@@ -13,10 +13,12 @@
 namespace emucorev::savestate {
 namespace {
 template <typename T>
-T checked_struct(BufferReader &reader, std::initializer_list<size_t> bools, bool &malformed) {
+T checked_struct(BufferReader &reader, std::initializer_list<size_t> bools, bool &malformed,
+    std::initializer_list<size_t> reserved = {}) {
     std::array<uint8_t, sizeof(T)> raw{};
     T value{};
     if (!reader.bytes(raw.data(), raw.size())) return value;
+    for (const size_t offset : reserved) raw[offset] = 0;
     for (const size_t offset : bools) if (raw[offset] > 1) { malformed = true; return value; }
     std::memcpy(&value, raw.data(), raw.size());
     return value;
@@ -27,7 +29,10 @@ renderer::GxmRecordState read_record(BufferReader &reader, bool &bad) {
 }
 GxmContextState read_context(BufferReader &reader, bool &bad) {
     using T = GxmContextState;
-    return checked_struct<T>(reader, {offsetof(T, writing_mask), offsetof(T, visibility_enable), offsetof(T, visibility_is_increment), offsetof(T, active)}, bad);
+    // Engine 15 saved this unused, previously uninitialized frontend field.
+    // It is reserved, so normalize raw bytes before forming any bool value.
+    return checked_struct<T>(reader, {offsetof(T, visibility_enable), offsetof(T, visibility_is_increment), offsetof(T, active)}, bad,
+        {offsetof(T, writing_mask)});
 }
 DisplayCallback read_display(BufferReader &reader, bool &bad) {
     return checked_struct<DisplayCallback>(reader, {offsetof(DisplayCallback, frame_predicted)}, bad);

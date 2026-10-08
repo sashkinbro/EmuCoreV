@@ -1,9 +1,44 @@
 #include <gxm/savestate.h>
+#include <gxm/functions.h>
 #include <renderer/types.h>
 
 DECL_EXPORT(int, sceGxmDestroyDeferredContext, SceGxmContext *context);
+DECL_EXPORT(int, sceGxmCreateDeferredContext, SceGxmDeferredContextParams *params, Ptr<SceGxmContext> *context);
 struct SceGxmCommandList;
 DECL_EXPORT(int, sceGxmEndCommandList, SceGxmContext *context, SceGxmCommandList *list);
+
+TEST(GxmContextSnapshot, DefaultConstructionInitializesReservedMaskInPoisonedStorage) {
+    alignas(GxmContextState) uint8_t storage[sizeof(GxmContextState)];
+    std::memset(storage, 0xf0, sizeof(storage));
+    auto *state = new (storage) GxmContextState;
+    uint8_t raw_mask = 0xff;
+    std::memcpy(&raw_mask, storage + offsetof(GxmContextState, writing_mask), 1);
+    EXPECT_EQ(raw_mask, 0);
+    state->~GxmContextState();
+}
+
+TEST(GxmContextSnapshot, PoisonedGuestPlacementDoesNotLeakReservedMaskIntoCapture) {
+    EmuEnvState env;
+    env.mem.memory = Memory(new uint8_t[0x20000]{}, [](uint8_t *p) { delete[] p; });
+    SceGxmDeferredContextParams params{};
+    params.hostMem = Ptr<void>(0x1000);
+    params.hostMemSize = static_cast<uint32_t>(gxm::snapshot_object_sizes().context);
+    std::memset(params.hostMem.get(env.mem), 0xf0, params.hostMemSize);
+    Ptr<SceGxmContext> context;
+    ASSERT_EQ(export_sceGxmCreateDeferredContext(env, 0, "test", &params, &context), 0);
+    struct Cleanup { EmuEnvState &env; ~Cleanup() { gxm::destroy_all_contexts(env, true); } } cleanup{env};
+    // SceGxmContext starts with GxmContextState. Model a legacy live context
+    // after construction so this independently exercises capture normalization.
+    const uint8_t legacy_mask = 0xf0;
+    std::memcpy(env.mem.memory.get() + context.address() + offsetof(GxmContextState, writing_mask), &legacy_mask, 1);
+    std::vector<gxm::ContextSnapshot> snapshots;
+    std::string error;
+    ASSERT_TRUE(gxm::capture_contexts(env, snapshots, error)) << error;
+    ASSERT_EQ(snapshots.size(), 1u);
+    uint8_t raw_mask = 0xff;
+    std::memcpy(&raw_mask, reinterpret_cast<const uint8_t *>(&snapshots[0].state) + offsetof(GxmContextState, writing_mask), 1);
+    EXPECT_EQ(raw_mask, 0);
+}
 
 TEST(GxmContextSnapshot, DeferredRoundTripPreservesRendererStateAndAllocatorWithoutGuestCallbacks) {
     EmuEnvState env;

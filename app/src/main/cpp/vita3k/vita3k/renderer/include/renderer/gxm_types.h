@@ -261,8 +261,8 @@ struct GxmContextState {
     // Textures.
     std::array<TextureData, SCE_GXM_MAX_TEXTURE_UNITS * 2> textures;
 
-    // Mask
-    bool writing_mask;
+    // Reserved legacy frontend field; mask writes use GxmRecordState::writing_mask.
+    bool writing_mask = false;
 
     // Fragment Sync Object
     Ptr<SceGxmSyncObject> fragment_sync_object;
