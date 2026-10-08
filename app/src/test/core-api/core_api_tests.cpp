@@ -300,3 +300,4 @@ using KernelHostLifetimeEnv = EmuEnvState;
 #include "gpu_gxm_preflight_tests.inc"
 #include "gxm_sysmem_preflight_tests.inc"
 #include "gxm_finish_preflight_tests.inc"
+#include "memory_external_mapping_tests.inc"
