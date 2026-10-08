@@ -80,6 +80,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var composeOverlayAttached = false
     private var activeTouchSnapshot: MotionEvent? = null
     private var exitRequested = false
+    private var rebirthRequested = false
     private lateinit var composeOwners: ComposeOwners
     private var inputManager: InputManager? = null
     private var overlayBackHandler: (() -> Boolean)? = null
@@ -189,6 +190,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             inputOverlay = InputOverlay(this)
         }
         super.onCreate(savedInstanceState)
+        if (isFinishing) return
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         EmulatorStorage.prepareRuntime(this)
         VitaCoreConfigRepository(this).ensureDefaultsPersisted()
@@ -204,6 +206,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun onResume() {
         super.onResume()
+        if (rebirthRequested || isFinishing) return
         DiscordIntegration.setPaused(false)
         composeOwners.handleResume()
         attachComposeOverlay()
@@ -252,6 +255,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         if (!hasFocus) cancelActiveTouches()
         super.onWindowFocusChanged(hasFocus)
+        if (rebirthRequested || isFinishing) return
         if (hasFocus && menuPaused) {
             applyMenuPauseState(true)
         }
@@ -389,6 +393,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     @Keep
     fun setKeyboardActive(active: Boolean) {
         runOnUiThread {
+            if (rebirthRequested) return@runOnUiThread
             nativeKeyboardRequested = active
             useBuiltInKeyboard = false
             keyboardRequestGeneration++
@@ -410,6 +415,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     ) {
         val snapshot = NativeImeState(sceImeActive, dialogActive, text, preeditStart, preeditLength, caretIndex, multiline, enterLabel)
         runOnUiThread {
+            if (rebirthRequested) return@runOnUiThread
             if (snapshot.active) nativeImeState = snapshot else clearNativeImeState()
         }
     }
@@ -427,7 +433,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     fun requestSystemKeyboard(resetEditor: Boolean = false) {
-        if (!nativeKeyboardRequested || isFinishing || isDestroyed) return
+        if (rebirthRequested || !nativeKeyboardRequested || isFinishing || isDestroyed) return
         useBuiltInKeyboard = false
         val generation = ++keyboardRequestGeneration
         val decor = window.decorView
@@ -623,6 +629,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (rebirthRequested) return true
         if (event.keyCode == KeyEvent.KEYCODE_BACK &&
             event.action == KeyEvent.ACTION_UP &&
             !event.isCanceled
@@ -714,6 +721,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     external fun filedialogReturn(resultPath: String)
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (rebirthRequested) return true
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP -> {
                 activeTouchSnapshot?.recycle()
@@ -858,12 +866,19 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     private fun triggerRebirthAfterNativeShutdown(targetIntent: Intent) {
-        performNativeShutdown()
-        val sdlThread = SDLActivity.mSDLThread
-        if (sdlThread?.isAlive == true) {
-            Log.w(TAG, "Proceeding with process rebirth while SDLThread is still alive; shader cache may not be fully flushed")
+        runOnUiThread {
+            if (rebirthRequested) return@runOnUiThread
+            rebirthRequested = true
+            cancelActiveTouches()
+            keyboardRequestGeneration++
+            if (::inputOverlay.isInitialized) inputOverlay.setTouchControlsActive(false)
+            performNativeShutdown {
+                if (SDLActivity.mSDLThread?.isAlive == true) {
+                    Log.w(TAG, "Proceeding with process rebirth while SDLThread is still alive; shader cache may not be fully flushed")
+                }
+                ProcessPhoenix.triggerRebirth(applicationContext, targetIntent)
+            }
         }
-        ProcessPhoenix.triggerRebirth(applicationContext, targetIntent)
     }
 
     private fun isLaunchIntent(intent: Intent?): Boolean {

@@ -160,6 +160,8 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         @JvmField
         var mHasNativeShutdown = false
 
+        private var nativeShutdownInFlight = false
+
         private var mFileDialogState: SDLFileDialogState? = null
 
         @JvmField
@@ -890,6 +892,12 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         Log.v(TAG, "onCreate()")
         super.onCreate(savedInstanceState)
 
+        if (nativeShutdownInFlight) {
+            Log.w(TAG, "Ignoring SDL activity creation while the previous session shuts down")
+            finish()
+            return
+        }
+
         if (mSDLMainFinished || mActivityCreated) {
             val allowRecreate = nativeAllowRecreateActivity()
             if (mSDLMainFinished) {
@@ -1112,10 +1120,32 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         super.onDestroy()
     }
 
-    protected fun performNativeShutdown() {
-        if (mHasNativeShutdown) {
+    private var nativeShutdownStarted = false
+    private var nativeShutdownCompleted = false
+    private val nativeShutdownCallbacks = mutableListOf<() -> Unit>()
+    private val shutdownHandler = Handler(Looper.getMainLooper())
+
+    protected open fun sendQuitForShutdown() = nativeSendQuit()
+    protected open fun quitAfterShutdown() = nativeQuit()
+    protected open fun nativeShutdownTimeoutMs(): Long = 10_000L
+
+    protected fun performNativeShutdown(onComplete: (() -> Unit)? = null) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            shutdownHandler.post { performNativeShutdown(onComplete) }
             return
         }
+        if (mSingleton != null && mSingleton !== this) {
+            onComplete?.invoke()
+            return
+        }
+        if (nativeShutdownCompleted) {
+            onComplete?.invoke()
+            return
+        }
+        onComplete?.let(nativeShutdownCallbacks::add)
+        if (nativeShutdownStarted) return
+        nativeShutdownStarted = true
+        nativeShutdownInFlight = true
         mHasNativeShutdown = true
 
         mHIDDeviceManager?.let {
@@ -1124,27 +1154,36 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         }
         SDLAudioManager.release(this)
 
-        if (mBrokenLibraries) {
-            return
-        }
-
         val sdlThread = mSDLThread
-        if (sdlThread != null) {
-            nativeSendQuit()
+        val brokenLibraries = mBrokenLibraries
+        val timeoutMs = nativeShutdownTimeoutMs()
+        Thread({
             try {
-                sdlThread.join(10000)
-            } catch (e: Exception) {
-                Log.v(TAG, "Problem stopping SDLThread: $e")
+                if (!brokenLibraries) {
+                    if (sdlThread != null) {
+                        sendQuitForShutdown()
+                        sdlThread.join(timeoutMs)
+                    }
+                    if (sdlThread?.isAlive == true) {
+                        Log.w(TAG, "SDLThread did not stop in time; skipping nativeQuit() to avoid destroying native state while game threads are still running")
+                    } else {
+                        quitAfterShutdown()
+                    }
+                }
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                Log.w(TAG, "Interrupted while stopping SDLThread", e)
+            } finally {
+                shutdownHandler.post {
+                    if (mSDLThread === sdlThread && sdlThread?.isAlive != true) mSDLThread = null
+                    nativeShutdownInFlight = sdlThread?.isAlive == true
+                    nativeShutdownCompleted = true
+                    val callbacks = nativeShutdownCallbacks.toList()
+                    nativeShutdownCallbacks.clear()
+                    callbacks.forEach { it() }
+                }
             }
-            if (sdlThread.isAlive) {
-                Log.w(TAG, "SDLThread did not stop in time; skipping nativeQuit() to avoid destroying native state while game threads are still running")
-                return
-            } else {
-                mSDLThread = null
-            }
-        }
-
-        nativeQuit()
+        }, "SDLShutdown").start()
     }
 
     @SuppressLint("GestureBackNavigation")
