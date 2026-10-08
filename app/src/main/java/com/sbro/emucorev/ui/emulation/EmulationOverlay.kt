@@ -7,8 +7,6 @@ import android.provider.OpenableColumns
 import android.view.MotionEvent
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -2141,16 +2139,6 @@ private fun touchVisualPalette(style: TouchControlVisualStyle): TouchVisualPalet
     )
 }
 
-private fun touchPressScale(pressed: Boolean, effect: TouchControlPressEffect): Float {
-    if (!pressed) return 1f
-    return when (effect) {
-        TouchControlPressEffect.GROW -> 1.18f
-        TouchControlPressEffect.SHRINK -> 0.88f
-        TouchControlPressEffect.SPRING -> 1.14f
-        TouchControlPressEffect.GLOW -> 1.02f
-    }
-}
-
 @Composable
 private fun TouchControlVisualLayer(
     alpha: Float,
@@ -2161,18 +2149,9 @@ private fun TouchControlVisualLayer(
     modifier: Modifier = Modifier
 ) {
     val palette = touchVisualPalette(visualStyle)
-    val scale by animateFloatAsState(
-        targetValue = touchPressScale(pressed, pressEffect),
-        animationSpec = if (pressEffect == TouchControlPressEffect.SPRING) {
-            spring(dampingRatio = 0.42f, stiffness = 520f)
-        } else {
-            tween(90)
-        },
-        label = "overlay_touch_area_scale"
-    )
     Box(
         modifier = modifier
-            .graphicsLayer(alpha = alpha, scaleX = scale, scaleY = scale)
+            .graphicsLayer(alpha = alpha)
             .background(
                 if (pressed && pressEffect == TouchControlPressEffect.GLOW) {
                     palette.accent.copy(alpha = 0.30f)

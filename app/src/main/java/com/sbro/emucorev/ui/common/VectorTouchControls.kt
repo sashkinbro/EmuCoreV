@@ -758,12 +758,6 @@ fun VectorAnalogStick(
         }
     }
     val isActivelyPressed = pressed || activePointerId != null
-    val pressScale = animatedPressScale(
-        pressed = isActivelyPressed,
-        effect = pressEffect,
-        growScale = 1.12f,
-        label = "vector_analog_stick_scale"
-    )
     val glowProgress by animateFloatAsState(
         targetValue = if (isActivelyPressed && pressEffect == TouchControlPressEffect.GLOW) 1f else 0f,
         animationSpec = tween(durationMillis = 110),
@@ -773,7 +767,7 @@ fun VectorAnalogStick(
     Box(
         modifier = modifier
             .size(width = analogWidth, height = analogHeight)
-            .graphicsLayer(alpha = alpha, scaleX = pressScale, scaleY = pressScale)
+            .graphicsLayer(alpha = alpha)
             .then(
                 if (glowProgress > 0.01f) {
                     Modifier.border(
