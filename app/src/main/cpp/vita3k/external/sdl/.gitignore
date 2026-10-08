@@ -36,6 +36,7 @@ cmake_install.cmake
 cmake_uninstall.cmake
 install_manifest.txt
 *Targets.cmake
+!cmake/sdltargets.cmake
 *Config.cmake
 *ConfigVersion.cmake
 CTestTestfile.cmake
