@@ -16,6 +16,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include <ngs/modules/player.h>
+#include <ngs/modules/logical_state_io.h>
 #include <util/log.h>
 
 #include <algorithm>
@@ -393,6 +394,21 @@ void PlayerModule::cleanup_voice_state(ModuleData &data) {
         destroy_stereo_rate_resampler(runtime->rate_resampler);
     }
     data.runtime_state.reset();
+}
+
+void PlayerModule::capture_logical_state(const ModuleData &data, std::vector<uint8_t> &out) const {
+    logical_state_io::capture_player(static_cast<const PlayerLogicalState *>(data.logical_state.get()), out);
+}
+
+bool PlayerModule::restore_logical_state(ModuleData &data, const std::vector<uint8_t> &in) const {
+    std::unique_ptr<PlayerLogicalState> restored;
+    if (!logical_state_io::restore_player(in, restored))
+        return false;
+    if (auto *runtime = static_cast<PlayerRuntimeState *>(data.runtime_state.get()))
+        destroy_stereo_rate_resampler(runtime->rate_resampler);
+    data.runtime_state.reset();
+    data.logical_state = std::move(restored);
+    return true;
 }
 
 } // namespace ngs

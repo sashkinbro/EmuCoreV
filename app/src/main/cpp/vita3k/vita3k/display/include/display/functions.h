@@ -26,6 +26,22 @@ struct EmuEnvState;
 struct DisplayFrameInfo;
 
 void start_sync_thread(EmuEnvState &emuenv);
+void register_display_wait_continuations(DisplayState &display, KernelState &kernel);
+void clear_display_waiters_for_restore(DisplayState &display);
+
+// Freeze and drain the entire producer iteration, including callback/input/cheat
+// and watchdog mutations. Acquire before guest world-stop and release after it.
+class ScopedVblankFreeze {
+public:
+    ScopedVblankFreeze(DisplayState &display, std::chrono::milliseconds budget);
+    ~ScopedVblankFreeze();
+    ScopedVblankFreeze(const ScopedVblankFreeze &) = delete;
+    ScopedVblankFreeze &operator=(const ScopedVblankFreeze &) = delete;
+    explicit operator bool() const { return display != nullptr; }
+
+private:
+    DisplayState *display = nullptr;
+};
 void wait_vblank(DisplayState &display, const ThreadStatePtr &wait_thread, const uint64_t target_vcount, const bool is_cb);
 // if the result is not nullptr, contain the predicted frame (pointer needs to be freed later)
 DisplayFrameInfo *predict_next_image(EmuEnvState &emuenv, Address sync_object);

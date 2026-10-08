@@ -63,6 +63,8 @@ struct CompressorLogicalState : public ModuleLogicalState {
 
 struct CompressorModule : public Module {
 public:
+    void capture_logical_state(const ModuleData &data, std::vector<uint8_t> &out) const override;
+    bool restore_logical_state(ModuleData &data, const std::vector<uint8_t> &in) const override;
     bool process(KernelState &kern, const MemState &mem, const SceUID thread_id, ModuleData &data, std::unique_lock<std::recursive_mutex> &scheduler_lock, std::unique_lock<std::mutex> &voice_lock) override;
     uint32_t module_id() const override { return 0x5CE1; }
 

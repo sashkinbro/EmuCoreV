@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.FileOpen
@@ -42,6 +43,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SportsEsports
@@ -79,6 +81,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.CHEATS_ENABLED
+import com.sbro.emucorev.core.SaveStateRepository
+import com.sbro.emucorev.core.SaveStateSlot
 import com.sbro.emucorev.core.VitaCheatSnapshot
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.data.TrophyRepository
@@ -142,7 +146,10 @@ private fun emulationMenuPalette(): EmulationMenuPalette {
 @Composable
 fun EmulationQuickBar(
     paused: Boolean,
+    quickActionsEnabled: Boolean,
     onPauseToggle: () -> Unit,
+    onQuickSave: () -> Unit,
+    onQuickLoad: () -> Unit,
     onScreenshot: () -> Unit,
     onOpenMenu: () -> Unit,
     modifier: Modifier = Modifier
@@ -172,13 +179,29 @@ fun EmulationQuickBar(
             )
             QuickBarButton(
                 accentIndex = 1,
+                icon = Icons.Rounded.Save,
+                contentDescription = stringResource(R.string.emulation_quickbar_quick_save),
+                onClick = onQuickSave,
+                enabled = quickActionsEnabled,
+                palette = palette
+            )
+            QuickBarButton(
+                accentIndex = 2,
+                icon = Icons.Rounded.Restore,
+                contentDescription = stringResource(R.string.emulation_quickbar_quick_load),
+                onClick = onQuickLoad,
+                enabled = quickActionsEnabled,
+                palette = palette
+            )
+            QuickBarButton(
+                accentIndex = 3,
                 icon = Icons.Rounded.CameraAlt,
                 contentDescription = stringResource(R.string.emulation_quickbar_screenshot),
                 onClick = onScreenshot,
                 palette = palette
             )
             QuickBarButton(
-                accentIndex = 2,
+                accentIndex = 4,
                 icon = Icons.Rounded.Tune,
                 contentDescription = stringResource(R.string.emulation_quickbar_open_menu),
                 onClick = onOpenMenu,
@@ -194,6 +217,7 @@ private fun QuickBarButton(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
     palette: EmulationMenuPalette
 ) {
     val neon = LocalNeonTheme.current
@@ -208,13 +232,19 @@ private fun QuickBarButton(
                 if (neon) Modifier.border(1.dp, accent.copy(alpha = 0.42f), shape)
                 else Modifier
             )
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (neon) accent else palette.textPrimary,
+            tint = if (!enabled) {
+                palette.textSecondary.copy(alpha = 0.4f)
+            } else if (neon) {
+                accent
+            } else {
+                palette.textPrimary
+            },
             modifier = Modifier.size(22.dp)
         )
     }
@@ -226,6 +256,7 @@ fun EmulationGameMenu(
     config: VitaCoreConfig,
     cheats: VitaCheatSnapshot,
     cheatsAvailable: Boolean,
+    saveStates: SaveStateMenuState,
     paused: Boolean,
     sessionElapsedMs: Long,
     expandHorizontally: Boolean,
@@ -276,6 +307,7 @@ fun EmulationGameMenu(
                         config = config,
                         cheats = cheats,
                         cheatsAvailable = cheatsAvailable,
+                        saveStates = saveStates,
                         paused = paused,
                         sessionElapsedMs = sessionElapsedMs,
                         physicalGamepadConnected = physicalGamepadConnected,
@@ -383,6 +415,7 @@ fun EmulationGameMenu(
                         config = config,
                         cheats = cheats,
                         cheatsAvailable = cheatsAvailable,
+                        saveStates = saveStates,
                         paused = paused,
                         sessionElapsedMs = sessionElapsedMs,
                         physicalGamepadConnected = physicalGamepadConnected,
@@ -402,6 +435,7 @@ fun EmulationGameMenu(
                     config = config,
                     cheats = cheats,
                     cheatsAvailable = cheatsAvailable,
+                    saveStates = saveStates,
                     paused = paused,
                     sessionElapsedMs = sessionElapsedMs,
                     physicalGamepadConnected = physicalGamepadConnected,
@@ -429,6 +463,7 @@ private fun MenuScrollableContent(
     config: VitaCoreConfig,
     cheats: VitaCheatSnapshot,
     cheatsAvailable: Boolean,
+    saveStates: SaveStateMenuState,
     paused: Boolean,
     sessionElapsedMs: Long,
     physicalGamepadConnected: Boolean,
@@ -476,6 +511,7 @@ private fun MenuScrollableContent(
             config = config,
             cheats = cheats,
             cheatsAvailable = cheatsAvailable,
+            saveStates = saveStates,
             sessionElapsedMs = sessionElapsedMs,
             physicalGamepadConnected = physicalGamepadConnected,
             controlsVisible = controlsVisible,
@@ -491,6 +527,7 @@ private fun MenuSelectedContent(
     config: VitaCoreConfig,
     cheats: VitaCheatSnapshot,
     cheatsAvailable: Boolean,
+    saveStates: SaveStateMenuState,
     sessionElapsedMs: Long,
     physicalGamepadConnected: Boolean,
     controlsVisible: Boolean,
@@ -504,6 +541,10 @@ private fun MenuSelectedContent(
             EmulationMenuTab.Game -> GameTab(
                 config = config,
                 sessionElapsedMs = sessionElapsedMs,
+                callbacks = callbacks
+            )
+            EmulationMenuTab.SaveStates -> SaveStatesTab(
+                saveStates = saveStates,
                 callbacks = callbacks
             )
             EmulationMenuTab.Controls -> ControlsTab(config = config, controlsVisible = controlsVisible, callbacks = callbacks)
@@ -523,6 +564,7 @@ private fun MenuSelectedContent(
 
 private enum class EmulationMenuTab {
     Game,
+    SaveStates,
     Controls,
     Display,
     Cheats,
@@ -875,6 +917,160 @@ private fun SystemTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks)
             onCheckedChange = callbacks.onWarnMissingFirmware
         )
     }
+}
+
+@Composable
+private fun SaveStatesTab(saveStates: SaveStateMenuState, callbacks: EmulationMenuCallbacks) {
+    val palette = emulationMenuPalette()
+    val selected = saveStates.selectedSlot
+    val slot = saveStates.slots.firstOrNull { it.slot == selected }
+    MenuSection(
+        title = stringResource(R.string.emulation_menu_section_savestates),
+        subtitle = stringResource(R.string.emulation_menu_section_savestates_desc),
+        badge = null
+    ) {
+        MenuChipRow(
+            label = stringResource(R.string.emulation_savestate_slot_picker),
+            selected = selected,
+            options = saveStates.slots.map { it.slot to saveStateSlotLabel(it.slot) },
+            enabled = !saveStates.busy,
+            onSelected = callbacks.onSaveStateSlotSelected
+        )
+
+        Surface(
+            shape = neonShape(14.dp),
+            color = palette.row,
+            border = BorderStroke(1.dp, palette.border)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(
+                    shape = neonShape(10.dp),
+                    color = palette.panelSoft,
+                    border = BorderStroke(1.dp, palette.border)
+                ) {
+                    LocalImage(
+                        path = slot?.thumbnailPath,
+                        contentDescription = stringResource(R.string.emulation_savestate_preview),
+                        fallbackLabel = saveStateSlotLabel(selected),
+                        modifier = Modifier
+                            .width(132.dp)
+                            .height(74.dp)
+                            .clip(neonShape(10.dp))
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Text(
+                        text = saveStateSlotLabel(selected),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = palette.textPrimary
+                    )
+                    Text(
+                        text = if (slot?.exists == true) {
+                            stringResource(R.string.emulation_savestate_saved_at, formatSaveStateDate(slot.timestamp))
+                        } else {
+                            stringResource(R.string.emulation_savestate_empty)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = palette.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (slot?.exists == true) {
+                        Text(
+                            text = stringResource(R.string.emulation_savestate_size, formatSaveStateSize(slot.sizeBytes)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = palette.textSecondary
+                        )
+                        Text(
+                            text = stringResource(
+                                if (slot.sessionMatch) {
+                                    R.string.emulation_savestate_session_current
+                                } else {
+                                    R.string.emulation_savestate_session_other
+                                }
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (slot.sessionMatch) LiveBadgeColor else RestartBadgeColor
+                        )
+                    }
+                }
+            }
+        }
+
+        if (saveStates.busy) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        MenuActionRow(
+            icon = Icons.Rounded.Save,
+            title = stringResource(R.string.emulation_savestate_save_action),
+            subtitle = stringResource(
+                if (slot?.exists == true) {
+                    R.string.emulation_savestate_save_overwrite_desc
+                } else {
+                    R.string.emulation_savestate_save_desc
+                }
+            ),
+            enabled = !saveStates.busy,
+            onClick = { callbacks.onSaveStateSave(selected) }
+        )
+        MenuActionRow(
+            icon = Icons.Rounded.Restore,
+            title = stringResource(R.string.emulation_savestate_load_action),
+            subtitle = stringResource(R.string.emulation_savestate_load_desc),
+            enabled = slot?.exists == true && !saveStates.busy,
+            onClick = { callbacks.onSaveStateLoad(selected) }
+        )
+        if (slot?.exists == true) {
+            MenuActionRow(
+                icon = Icons.Rounded.DeleteOutline,
+                title = stringResource(R.string.emulation_savestate_delete_action),
+                subtitle = stringResource(R.string.emulation_savestate_delete_desc),
+                destructive = true,
+                enabled = !saveStates.busy,
+                onClick = { callbacks.onSaveStateDelete(selected) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun saveStateSlotLabel(slot: Int): String =
+    if (slot == SaveStateRepository.QUICK_SLOT) {
+        stringResource(R.string.emulation_savestate_quick_label)
+    } else {
+        stringResource(R.string.emulation_savestate_slot_label, slot)
+    }
+
+private fun formatSaveStateDate(timestamp: Long): String {
+    if (timestamp <= 0L) return ""
+    return java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+        .format(java.util.Date(timestamp))
+}
+
+private fun formatSaveStateSize(bytes: Long): String {
+    if (bytes <= 0L) return "0 B"
+    val units = listOf("B", "KB", "MB", "GB")
+    var value = bytes.toDouble()
+    var index = 0
+    while (value >= 1024.0 && index < units.lastIndex) {
+        value /= 1024.0
+        index++
+    }
+    return if (index == 0) "${value.toLong()} ${units[index]}"
+    else String.format(java.util.Locale.US, "%.1f %s", value, units[index])
 }
 
 @Composable
@@ -1469,6 +1665,7 @@ private data class EmulationMenuTabItem(
 @Composable
 private fun emulationMenuTabs(): List<EmulationMenuTabItem> = listOf(
     EmulationMenuTabItem(EmulationMenuTab.Game, stringResource(R.string.emulation_tab_game), Icons.Rounded.PlayArrow),
+    EmulationMenuTabItem(EmulationMenuTab.SaveStates, stringResource(R.string.emulation_tab_savestates), Icons.Rounded.Save),
     EmulationMenuTabItem(EmulationMenuTab.Controls, stringResource(R.string.emulation_tab_controls), Icons.Rounded.Tune),
     EmulationMenuTabItem(EmulationMenuTab.Display, stringResource(R.string.emulation_tab_display), Icons.Rounded.Visibility),
     EmulationMenuTabItem(EmulationMenuTab.Cheats, stringResource(R.string.emulation_tab_cheats), Icons.Rounded.AutoFixHigh),
@@ -1527,7 +1724,22 @@ data class EmulationMenuCallbacks(
     val onCheatsMaster: (Boolean) -> Unit,
     val onCheatToggle: (Int, Boolean) -> Unit,
     val onCheatsGroupToggle: (List<Int>, Boolean) -> Unit,
-    val onCheatsImport: () -> Unit
+    val onCheatsImport: () -> Unit,
+    val onSaveStateSlotSelected: (Int) -> Unit,
+    val onSaveStateSave: (Int) -> Unit,
+    val onSaveStateLoad: (Int) -> Unit,
+    val onSaveStateDelete: (Int) -> Unit,
+    val onQuickSaveState: () -> Unit,
+    val onQuickLoadState: () -> Unit
+)
+
+/** Slot list state rendered by the save-state tab and the quick bar. */
+data class SaveStateMenuState(
+    val slots: List<SaveStateSlot> = emptyList(),
+    val selectedSlot: Int = SaveStateRepository.QUICK_SLOT,
+    val busy: Boolean = false,
+    val busySaving: Boolean = false,
+    val canInteract: Boolean = true
 )
 
 private enum class MenuBadge { Live, Restart, Broken }
@@ -1827,7 +2039,8 @@ private fun MenuActionRow(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
-    destructive: Boolean = false
+    destructive: Boolean = false,
+    enabled: Boolean = true
 ) {
     val palette = emulationMenuPalette()
     val containerColor = if (destructive) {
@@ -1835,12 +2048,16 @@ private fun MenuActionRow(
     } else {
         palette.row
     }
-    val tint = if (destructive) MaterialTheme.colorScheme.error else palette.textPrimary
+    val tint = when {
+        !enabled -> palette.textSecondary.copy(alpha = 0.5f)
+        destructive -> MaterialTheme.colorScheme.error
+        else -> palette.textPrimary
+    }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clip(neonShape(14.dp))
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         shape = neonShape(14.dp),
         color = containerColor,
         border = BorderStroke(1.dp, palette.border)

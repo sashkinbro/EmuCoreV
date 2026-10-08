@@ -60,6 +60,9 @@ struct VKTextureCache : public TextureCache {
 
     uint64_t release_all_cached_textures();
 
+    // destroys every cached GPU image/sampler and clears the host-side lookup tables
+    void reset();
+
     TextureStagingBuffer staging_buffers[NB_TEXTURE_STAGING_BUFFERS];
     uint32_t staging_idx = 0;
     uint64_t last_waited_scene = 0;

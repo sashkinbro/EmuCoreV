@@ -20,8 +20,10 @@
 #include <cpu/common.h>
 #include <kernel/callback.h>
 #include <kernel/debugger.h>
+#include <kernel/host_threads.h>
 #include <kernel/object_store.h>
 #include <kernel/sync_primitives.h>
+#include <kernel/thread/thread_state.h>
 #include <kernel/types.h>
 #include <mem/allocator.h>
 #include <mem/block.h>
@@ -40,6 +42,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <thread>
 #include <vector>
 
 struct ThreadState;
@@ -109,6 +112,9 @@ struct KernelState {
     KernelState();
 
     std::mutex mutex;
+    HostThreadRegistry host_threads;
+    const uint64_t sync_cache_identity;
+    std::atomic<uint64_t> sync_cache_generation{ 0 };
     CodecEngineBlocks codec_blocks;
 
     bool accurate_thread_scheduling = false;
@@ -132,7 +138,40 @@ struct KernelState {
     RWLockPtrs rwlocks;
     EventFlagPtrs eventflags;
     MsgPipePtrs msgpipes;
+    struct WaitResumeHandler {
+        std::function<bool(ThreadState &, const std::shared_ptr<WaitContinuation> &)> restore_queue;
+        std::function<SceInt32(ThreadState &, const std::shared_ptr<WaitContinuation> &)> resume;
+    };
+    // Modules register typed host reconstruction/completion, never serialized closures.
+    std::map<WaitOperation, WaitResumeHandler> wait_resume_handlers;
+    // Register stable module completion tags at runtime, never serialize closures.
+    std::map<uint32_t, std::function<void(ThreadState &, const CallbackContinuationSnapshot &)>> callback_resume_handlers;
+    bool can_restore_callback_frame(const CallbackContinuationSnapshot &frame) const {
+        return frame.purpose != CallbackPurpose::direct
+            && (frame.purpose != CallbackPurpose::external || (frame.external_tag && callback_resume_handlers.contains(frame.external_tag)));
+    }
+    bool resume_external_callback(ThreadState &thread, const CallbackContinuationSnapshot &frame) {
+        const auto it = callback_resume_handlers.find(frame.external_tag);
+        if (it == callback_resume_handlers.end())
+            return false;
+        it->second(thread, frame);
+        return true;
+    }
     CallbackPtrs callbacks;
+    struct SavedCallback {
+        SceUID uid = 0;
+        SceUID owner = 0;
+        std::string name;
+        Address function = 0;
+        Address userdata = 0;
+        Callback::Snapshot notification;
+    };
+    std::vector<SavedCallback> snapshot_callbacks;
+    void restore_snapshot_callbacks();
+    // Retained deleted objects are continuation-owned, not visible to UID APIs.
+    std::map<SceUID, std::shared_ptr<SyncPrimitive>> snapshot_objects;
+    // Exited lock owners retain guest allocation lifetime without a worker or UID entry.
+    ThreadStatePtrs snapshot_thread_owners;
 
     ThreadStatePtrs threads;
     void *jni_env;
@@ -180,11 +219,23 @@ struct KernelState {
         return next_uid++;
     }
 
+    SceUID peek_next_uid() const {
+        return next_uid.load();
+    }
+
+    void set_next_uid(SceUID value) {
+        next_uid.store(value);
+    }
+
     bool init(MemState &mem, const CallImportFunc &call_import, bool cpu_opt);
     void deinit(MemState &mem);
     void load_process_param(MemState &mem, Ptr<uint32_t> ptr);
     ThreadStatePtr create_thread(MemState &mem, const char *name, Ptr<const void> entry_point = Ptr<const void>(0));
     ThreadStatePtr create_thread(MemState &mem, const char *name, Ptr<const void> entry_point, int init_priority, SceInt32 affinity_mask, int stack_size, const SceKernelThreadOptParam *option);
+    // Save-state support: recreate a thread from a snapshot without allocating its stack/TLS again.
+    // With defer_start the thread is parked dormant until apply_private_snapshot() is called.
+    ThreadStatePtr create_thread_from_snapshot(MemState &mem, const struct ThreadState::Snapshot &snapshot, bool defer_start = false);
+    ThreadStatePtr create_retained_thread_from_snapshot(MemState &mem, const ThreadState::Snapshot &snapshot);
 
     ThreadStatePtr get_thread(SceUID thread_id);
 
@@ -194,9 +245,28 @@ struct KernelState {
     bool delete_callback(SceUID id);
     Ptr<Ptr<void>> get_thread_tls_addr(MemState &mem, SceUID thread_id, int key);
 
-    bool is_threads_paused() { return !paused_threads_status.empty(); }
+    bool is_threads_paused() const { return session_pause_active.load(std::memory_order_acquire); }
+    std::optional<ThreadStatus> session_paused_thread_status(SceUID id) {
+        const std::lock_guard lock(mutex);
+        const auto entry = paused_threads_status.find(id);
+        return entry == paused_threads_status.end() ? std::nullopt : std::optional(entry->second);
+    }
     void pause_threads();
     void resume_threads();
+    // Save-state support: drop pause bookkeeping after guest threads were replaced.
+    void clear_paused_threads_state();
+    void reset_world_stop_state();
+
+    // Ordinary creators cannot allocate guest RAM during a capture. The capture
+    // owner may create restore shells, which inherit its world-stop gate.
+    bool begin_thread_creation();
+    void end_thread_creation();
+    bool is_capture_active();
+    struct CaptureClock {
+        Deadline steady;
+        uint64_t timer_us;
+    };
+    CaptureClock capture_clock();
 
     int stop_world(SceUID except_id, std::chrono::milliseconds budget);
     void resume_world();
@@ -222,7 +292,13 @@ struct KernelState {
     SceKernelModuleInfo *find_module_by_addr(Address address);
 
 private:
+    std::condition_variable creation_changed;
+    bool capture_active = false;
+    std::optional<CaptureClock> captured_clock;
+    std::thread::id capture_owner;
+    size_t initializing_threads = 0;
     std::atomic<SceUID> next_uid{ 1 };
     std::map<SceUID, ThreadStatus> paused_threads_status;
+    std::atomic<bool> session_pause_active{ false };
     std::vector<ThreadStatePtr> world_stopped_threads;
 };

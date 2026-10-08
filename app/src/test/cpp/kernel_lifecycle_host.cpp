@@ -28,3 +28,5 @@ SceInt32 uid_class_query(KernelUidClassEnv &env, SceUID uid, bool) {
     return get_threadmgr_uid_class(env.kernel, uid);
 }
 #include "../core-api/kernel_uid_class_tests.inc"
+
+#include "../core-api/kernel_mutex_cache_tests.inc"

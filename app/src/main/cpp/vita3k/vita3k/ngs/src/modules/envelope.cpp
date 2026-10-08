@@ -16,6 +16,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include <ngs/modules/envelope.h>
+#include <ngs/modules/logical_state_io.h>
 #include <util/log.h>
 
 #include <algorithm>
@@ -201,4 +202,16 @@ bool EnvelopeModule::process(KernelState &kern, const MemState &mem, const SceUI
 
     return false;
 }
+void EnvelopeModule::capture_logical_state(const ModuleData &data, std::vector<uint8_t> &out) const {
+    logical_state_io::capture_envelope(static_cast<const EnvelopeLogicalState *>(data.logical_state.get()), out);
+}
+
+bool EnvelopeModule::restore_logical_state(ModuleData &data, const std::vector<uint8_t> &in) const {
+    std::unique_ptr<EnvelopeLogicalState> restored;
+    if (!logical_state_io::restore_envelope(in, restored))
+        return false;
+    data.logical_state = std::move(restored);
+    return true;
+}
+
 } // namespace ngs

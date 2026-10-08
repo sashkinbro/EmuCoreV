@@ -6,7 +6,10 @@
 #include <kernel/sync_primitives.h>
 #include <map>
 #include <unordered_map>
+inline std::atomic<uint64_t> test_kernel_identity{ 1 };
 struct KernelState {
+    const uint64_t sync_cache_identity = test_kernel_identity++;
+    std::atomic<uint64_t> sync_cache_generation{ 0 };
     std::mutex mutex;
     SimpleEventPtrs simple_events;
     TimerPtrs timers;

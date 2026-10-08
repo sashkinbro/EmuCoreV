@@ -25,7 +25,7 @@ void ThreadState::push_arguments(const std::vector<uint32_t> &args) {
     write_sp(*cpu, sp);
 }
 
-uint32_t ThreadState::run_callback_locked(std::unique_lock<std::mutex> &thread_lock, Address callback_address, const std::vector<uint32_t> &args) {
+uint32_t ThreadState::run_callback_locked(std::unique_lock<std::mutex> &thread_lock, Address callback_address, const std::vector<uint32_t> &args, CallbackPurpose purpose, SceUID callback_uid, std::array<uint32_t, 4> completion, uint32_t external_tag) {
     assert(thread_lock.owns_lock());
     if (call_level == 0) {
         LOG_ERROR("run_callback should not be called as the first thread entry");
@@ -33,8 +33,15 @@ uint32_t ThreadState::run_callback_locked(std::unique_lock<std::mutex> &thread_l
     }
 
     // save the current context before overwriting PC/LR for the callback
-    const CPUContext previous_ctx = save_context(*cpu);
-    const uint32_t previous_tpidruro = read_tpidruro(*cpu);
+    auto frame = std::make_shared<CallbackContinuationSnapshot>();
+    frame->frame_sequence = next_continuation_sequence++;
+    frame->previous_context = save_context(*cpu);
+    frame->previous_tpidruro = read_tpidruro(*cpu);
+    frame->purpose = purpose;
+    frame->callback_uid = callback_uid;
+    frame->completion = completion;
+    frame->external_tag = external_tag;
+    callback_frames.push_back(frame);
 
     // we shouldn't have to clean the context I believe
     write_pc(*cpu, callback_address);
@@ -47,6 +54,8 @@ uint32_t ThreadState::run_callback_locked(std::unique_lock<std::mutex> &thread_l
     run_loop();
 
     thread_lock.lock();
+    frame->guest_returned = true;
+    frame->result = returned_value;
     // The nested frame may have parked while a freeze was accepted. Context
     // restoration is a guest-context mutation too, and must wait for resume.
     if (!wait_for_guest_resume(thread_lock))
@@ -56,8 +65,9 @@ uint32_t ThreadState::run_callback_locked(std::unique_lock<std::mutex> &thread_l
     // actually, in most case I don't think this is necessary as the caller
     // and the callee should respect the same calling convention
     // but do it just in case
-    load_context(*cpu, previous_ctx);
-    write_tpidruro(*cpu, previous_tpidruro);
+    load_context(*cpu, frame->previous_context);
+    write_tpidruro(*cpu, frame->previous_tpidruro);
+    std::erase(callback_frames, frame);
 
     return returned_value;
 }

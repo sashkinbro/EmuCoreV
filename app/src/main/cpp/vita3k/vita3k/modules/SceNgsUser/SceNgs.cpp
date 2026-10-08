@@ -821,6 +821,16 @@ EXPORT(SceInt32, sceNgsVoiceGetStateData, ngs::Voice *voice, const SceUInt32 mod
     if (mem) {
         memset(mem, 0, mem_size);
         memcpy(mem, storage->guest_state_data.data(), std::min<std::size_t>(mem_size, storage->guest_state_data.size()));
+        {
+            static std::atomic<uint64_t> diag_calls{ 0 };
+            const uint64_t n = diag_calls.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (n <= 4 || (n % 512) == 0) {
+                const int16_t *samples = static_cast<const int16_t *>(mem);
+                LOG_CRITICAL("[savestate-ngs] GetStateData calls={} voice={} module={} mem_size={} state_size={} first=({},{},{},{})",
+                    n, fmt::ptr(voice), module, mem_size, storage->guest_state_data.size(),
+                    samples[0], samples[1], samples[2], samples[3]);
+            }
+        }
         constexpr bool NGS_ENVELOPE_STATE_WATCH = false;
         if (NGS_ENVELOPE_STATE_WATCH && voice->rack->modules[module] && voice->rack->modules[module]->module_id() == 0x5CE3 && mem_size >= 8) {
             static std::unordered_map<const void *, uint64_t> last_state;

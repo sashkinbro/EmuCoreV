@@ -21,9 +21,13 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdint>
+#include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <vector>
 
 template <typename T>
 class Queue {
@@ -74,6 +78,7 @@ public:
             queue_.pop();
         }
         cond_.notify_all();
+        notify_changes();
         return std::make_unique<T>(item);
     }
 
@@ -91,8 +96,47 @@ public:
         condempty_.notify_one();
     }
 
+    // Guest waits use their kernel wait boundary instead of borrowing this
+    // queue's host condition variable across a save-state capture.
+    bool try_push(const T &item) {
+        {
+            const std::lock_guard lock(mutex_);
+            if (aborted || queue_.size() >= maxPendingCount_)
+                return false;
+            queue_.push(item);
+        }
+        condempty_.notify_one();
+        return true;
+    }
+
+    uint64_t subscribe_changes(std::function<void()> notify) {
+        const std::lock_guard lock(mutex_);
+        const uint64_t token = ++change_token_;
+        change_wakers_.emplace(token, std::move(notify));
+        return token;
+    }
+
+    void unsubscribe_changes(uint64_t token) {
+        const std::lock_guard lock(mutex_);
+        change_wakers_.erase(token);
+    }
+
     size_t size() {
+        const std::lock_guard<std::mutex> lock(mutex_);
         return queue_.size();
+    }
+
+    // Copy the pending items in order (used by save states).
+    std::vector<T> snapshot_items() {
+        std::unique_lock<std::mutex> mlock(mutex_);
+        std::vector<T> items;
+        std::queue<T> copy = queue_;
+        items.reserve(copy.size());
+        while (!copy.empty()) {
+            items.push_back(copy.front());
+            copy.pop();
+        }
+        return items;
     }
 
     void wake() {
@@ -103,6 +147,7 @@ public:
         aborted = true;
         condempty_.notify_all();
         cond_.notify_all();
+        notify_changes();
     }
 
     bool is_aborted() const {
@@ -129,6 +174,19 @@ public:
     }
 
 private:
+    void notify_changes() {
+        std::vector<std::function<void()>> callbacks;
+        {
+            const std::lock_guard lock(mutex_);
+            for (const auto &[_, callback] : change_wakers_)
+                callbacks.push_back(callback);
+        }
+        // Never acquire a guest thread mutex while the queue mutex is held.
+        for (const auto &callback : callbacks)
+            callback();
+    }
+    std::map<uint64_t, std::function<void()>> change_wakers_;
+    uint64_t change_token_ = 0;
     std::condition_variable cond_;
     std::condition_variable condempty_;
     std::queue<T> queue_;

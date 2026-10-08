@@ -1,9 +1,11 @@
 set(SOURCE_LIST
+	include/kernel/host_threads.h
 	include/kernel/state.h
 	include/kernel/types.h
 	include/kernel/uid_class.h
 	include/kernel/thread/wait_queue.h
 	include/kernel/thread/thread_state.h
+	include/kernel/thread/wait_continuation.h
 	include/kernel/thread/wait.h
 	include/kernel/sync_primitives.h
 	include/kernel/relocation.h
@@ -15,6 +17,7 @@ set(SOURCE_LIST
 	src/uid_class.cpp
 	src/thread.cpp
 	src/thread_wait.cpp
+	src/thread_continuation.cpp
 	src/thread_callback.cpp
 	src/debugger.cpp
 	src/load_self.cpp

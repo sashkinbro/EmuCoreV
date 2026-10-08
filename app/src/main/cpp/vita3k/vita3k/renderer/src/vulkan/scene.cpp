@@ -20,12 +20,14 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstring>
 #include <span>
 #include <vector>
 
 #include <gxm/functions.h>
 #include <renderer/functions.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
+#include <renderer/vulkan/uniform_slack.h>
 #include <renderer/vulkan/vertex_stream.h>
 
 #include <config/state.h>
@@ -34,6 +36,34 @@
 #include <util/log.h>
 
 namespace renderer::vulkan {
+
+// Some shaders index a uniform buffer beyond its declared span. Mirror a small,
+// bounded amount of adjacent guest data only for buffers identified by analysis.
+constexpr uint32_t uniform_slack_window = 16 * 1024;
+
+static void copy_uniform_slack(VKContext &context, MemState &mem, const Address address, const uint32_t declared) {
+    VKState &state = context.state;
+    const auto mapping = state.mapped_memories.lower_bound(address);
+    if (mapping == state.mapped_memories.end() || address < mapping->first)
+        return;
+
+    const vkutil::Buffer *buffer = std::get_if<vkutil::Buffer>(&mapping->second.buffer_impl);
+    const uint8_t *guest = Ptr<const uint8_t>(address).get(mem);
+    if (!buffer || !buffer->mapped_data || !guest)
+        return;
+
+    const uint64_t mapping_offset = static_cast<uint64_t>(address) - mapping->first;
+    if (mapping_offset > mapping->second.size)
+        return;
+
+    const auto copy_range = uniform_slack_copy_range(address, declared,
+        mapping->second.size - mapping_offset, state.surface_cache.color_surface_limit(address), uniform_slack_window);
+    if (!copy_range)
+        return;
+
+    uint8_t *mirror = reinterpret_cast<uint8_t *>(buffer->mapped_data) + mapping_offset;
+    std::memcpy(mirror + copy_range->offset, guest + copy_range->offset, static_cast<size_t>(copy_range->size));
+}
 
 void set_uniform_buffer(VKContext &context, MemState &mem, const ShaderProgram *program, const bool vertex_shader, const int block_num, const int size, Ptr<uint8_t> data) {
     auto offset = program->uniform_buffer_data_offsets.at(block_num);
@@ -47,6 +77,9 @@ void set_uniform_buffer(VKContext &context, MemState &mem, const ShaderProgram *
 
         if (!aliases_surface && context.state.mapping_method == MappingMethod::DoubleBuffer) {
             context.state.buffer_trapping.access_buffer(data.address(), data_size_upload, mem, false, true);
+            if (block_num >= 0 && block_num < 32
+                && (program->dynamic_uniform_buffers & (1u << block_num)) && !context.state.has_shader_store)
+                copy_uniform_slack(context, mem, data.address(), data_size_upload);
         }
 
         const uint64_t buffer_address = context.state.get_matching_device_address(data.address());
@@ -345,8 +378,20 @@ static bool bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
 
 void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format,
     Ptr<void> indices, size_t count, uint32_t instance_count, MemState &mem, const Config &config) {
+    // A save-state load can leave the record pointing at a program whose guest
+    // memory was freed: skip such draws instead of dereferencing garbage.
+    const SceGxmFragmentProgram *frag_program = context.record.fragment_program.get(mem);
+    const SceGxmVertexProgram *vert_program = context.record.vertex_program.get(mem);
+    if (!frag_program || !frag_program->renderer_data || !vert_program || !vert_program->renderer_data) {
+        static std::atomic<uint64_t> diag_dropped{ 0 };
+        const uint64_t n = diag_dropped.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (n <= 8 || (n % 256) == 0)
+            LOG_CRITICAL("[savestate-diag] draw dropped: frag={} vert={} (total {})", fmt::ptr(frag_program), fmt::ptr(vert_program), n);
+        return;
+    }
+
     // the mask bit is not emulated here, so a mask-update program would just paint writing_mask over the whole target (gl/draw.cpp skips these too)
-    if (!context.state.features.use_mask_bit && context.record.fragment_program.get(mem)->is_maskupdate)
+    if (!context.state.features.use_mask_bit && frag_program->is_maskupdate)
         return;
 
     // DOA5 black clothes fix:

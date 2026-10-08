@@ -23,6 +23,8 @@
 #include <util/types.h>
 
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -65,6 +67,14 @@ struct DisplayState {
 
     std::mutex mutex;
     std::unique_ptr<std::thread> vblank_thread;
+    std::mutex producer_mutex;
+    std::condition_variable producer_changed;
+    unsigned producer_freeze_count = 0;
+    bool producer_active = false;
+    bool begin_vblank_update();
+    void end_vblank_update();
+    bool freeze_vblank_producer(std::chrono::milliseconds budget);
+    void resume_vblank_producer();
     std::atomic<bool> abort{ false };
     std::atomic<bool> imgui_render{ true };
     std::atomic<bool> fullscreen{ false };

@@ -24,6 +24,7 @@
 
 #include "SDL_audioqueue.h"
 #include "SDL_audioresample.h"
+#include "SDL_audio_state.h"
 
 #ifndef SDL_INT_MAX
 #define SDL_INT_MAX ((int)(~0u>>1))
@@ -1378,4 +1379,192 @@ bool SDL_ConvertAudioSamples(const SDL_AudioSpec *src_spec, const Uint8 *src_dat
 
     SDL_DestroyAudioStream(stream);
     return result;
+}
+
+// EmuCoreV-local snapshot format. It captures source PCM tracks, conversion
+// state, and resampler history while rebuilding SDL-owned handles and locks.
+#define SDL_AUDIO_STREAM_SNAPSHOT_VERSION 1u
+#define SDL_AUDIO_STREAM_SNAPSHOT_LIMIT (16u * 1024u * 1024u + 256u)
+
+typedef struct SDL_AudioStreamSnapshot {
+    SDL_AudioSpec src, dst, input;
+    int src_map[SDL_MAX_CHANNELMAP_CHANNELS], dst_map[SDL_MAX_CHANNELMAP_CHANNELS], input_map[SDL_MAX_CHANNELMAP_CHANNELS];
+    Uint32 src_count, dst_count, input_count;
+    float ratio, gain;
+    Sint64 resample_offset;
+    const Uint8 *queue;
+    size_t queue_size;
+} SDL_AudioStreamSnapshot;
+
+static void StateWriteU32(Uint8 *dst, size_t *offset, Uint32 value)
+{
+    dst[(*offset)++] = (Uint8)value;
+    dst[(*offset)++] = (Uint8)(value >> 8);
+    dst[(*offset)++] = (Uint8)(value >> 16);
+    dst[(*offset)++] = (Uint8)(value >> 24);
+}
+
+static bool StateReadU32(const Uint8 *src, size_t size, size_t *offset, Uint32 *value)
+{
+    if (*offset > size || size - *offset < 4) return false;
+    *value = (Uint32)src[*offset] | ((Uint32)src[*offset + 1] << 8) |
+        ((Uint32)src[*offset + 2] << 16) | ((Uint32)src[*offset + 3] << 24);
+    *offset += 4;
+    return true;
+}
+
+static void StateWriteSpec(Uint8 *dst, size_t *offset, const SDL_AudioSpec *spec)
+{
+    StateWriteU32(dst, offset, (Uint32)spec->format);
+    StateWriteU32(dst, offset, (Uint32)spec->channels);
+    StateWriteU32(dst, offset, (Uint32)spec->freq);
+}
+
+static bool StateReadSpec(const Uint8 *src, size_t size, size_t *offset, SDL_AudioSpec *spec, bool empty_allowed)
+{
+    Uint32 format, channels, freq;
+    if (!StateReadU32(src, size, offset, &format) || !StateReadU32(src, size, offset, &channels) ||
+        !StateReadU32(src, size, offset, &freq)) return false;
+    spec->format = (SDL_AudioFormat)format;
+    spec->channels = (int)channels;
+    spec->freq = (int)freq;
+    if (empty_allowed && format == 0 && channels == 0 && freq == 0) return true;
+    return SDL_IsSupportedAudioFormat(spec->format) && SDL_IsSupportedChannelCount(spec->channels) && spec->freq > 0;
+}
+
+static Uint32 StateMapCount(const int *map, int channels)
+{
+    return map && channels > 0 ? (Uint32)channels : 0;
+}
+
+static void StateWriteMap(Uint8 *dst, size_t *offset, const int *map, Uint32 count)
+{
+    StateWriteU32(dst, offset, count);
+    for (Uint32 i = 0; i < count; ++i) StateWriteU32(dst, offset, (Uint32)map[i]);
+}
+
+static bool StateReadMap(const Uint8 *src, size_t size, size_t *offset, Uint32 channels, int *map, Uint32 *out_count)
+{
+    Uint32 count;
+    if (!StateReadU32(src, size, offset, &count) || count > SDL_MAX_CHANNELMAP_CHANNELS ||
+        (count != 0 && count != channels) || count > (size - *offset) / 4) return false;
+    for (Uint32 i = 0; i < count; ++i) {
+        Uint32 raw;
+        if (!StateReadU32(src, size, offset, &raw)) return false;
+        map[i] = (Sint32)raw;
+    }
+    if (count && SDL_ChannelMapIsBogus(map, (int)count)) return false;
+    *out_count = count;
+    return true;
+}
+
+static bool ParseAudioStreamSnapshot(const void *blob, size_t size, SDL_AudioStreamSnapshot *snapshot)
+{
+    const Uint8 *src = (const Uint8 *)blob;
+    size_t offset = 0;
+    Uint32 version, ratio_bits, gain_bits, resample_low, resample_high, queue_size;
+    SDL_zero(*snapshot);
+    if (!src || size < 64 || size > SDL_AUDIO_STREAM_SNAPSHOT_LIMIT ||
+        !StateReadU32(src, size, &offset, &version) || version != SDL_AUDIO_STREAM_SNAPSHOT_VERSION ||
+        !StateReadSpec(src, size, &offset, &snapshot->src, false) ||
+        !StateReadSpec(src, size, &offset, &snapshot->dst, false) ||
+        !StateReadSpec(src, size, &offset, &snapshot->input, true) ||
+        !StateReadMap(src, size, &offset, snapshot->src.channels, snapshot->src_map, &snapshot->src_count) ||
+        !StateReadMap(src, size, &offset, snapshot->dst.channels, snapshot->dst_map, &snapshot->dst_count) ||
+        !StateReadMap(src, size, &offset, snapshot->input.channels, snapshot->input_map, &snapshot->input_count) ||
+        !StateReadU32(src, size, &offset, &ratio_bits) || !StateReadU32(src, size, &offset, &gain_bits) ||
+        !StateReadU32(src, size, &offset, &resample_low) || !StateReadU32(src, size, &offset, &resample_high) ||
+        !StateReadU32(src, size, &offset, &queue_size) || queue_size != size - offset) return false;
+    SDL_memcpy(&snapshot->ratio, &ratio_bits, sizeof(ratio_bits));
+    SDL_memcpy(&snapshot->gain, &gain_bits, sizeof(gain_bits));
+    snapshot->resample_offset = (Sint64)(((Uint64)resample_high << 32) | resample_low);
+    if (SDL_isinff(snapshot->ratio) || SDL_isnanf(snapshot->ratio) || snapshot->ratio <= 0.0f ||
+        SDL_isinff(snapshot->gain) || SDL_isnanf(snapshot->gain) || snapshot->gain < 0.0f ||
+        snapshot->resample_offset < -0x100000000LL || snapshot->resample_offset >= 0x100000000LL ||
+        (snapshot->input.channels == 0 && (snapshot->input.format != SDL_AUDIO_UNKNOWN || snapshot->input.freq != 0 || snapshot->input_count != 0))) return false;
+    snapshot->queue = src + offset;
+    snapshot->queue_size = queue_size;
+    return SDL_ValidateAudioQueueSnapshot(snapshot->queue, snapshot->queue_size);
+}
+
+static size_t GetAudioStreamStateSizeLocked(SDL_AudioStream *stream)
+{
+    const size_t queue_size = SDL_GetAudioQueueSnapshotSize(stream->queue);
+    if (queue_size == 0 || queue_size > UINT32_MAX) return 0;
+    const size_t maps = 12 + 4 * (StateMapCount(stream->src_chmap, stream->src_spec.channels) +
+        StateMapCount(stream->dst_chmap, stream->dst_spec.channels) + StateMapCount(stream->input_chmap, stream->input_spec.channels));
+    const size_t size = 4 + 36 + maps + 20 + queue_size;
+    return size <= SDL_AUDIO_STREAM_SNAPSHOT_LIMIT ? size : 0;
+}
+
+size_t SDL_GetAudioStreamStateSize(SDL_AudioStream *stream)
+{
+    if (!stream) return 0;
+    SDL_LockMutex(stream->lock);
+    const size_t size = GetAudioStreamStateSizeLocked(stream);
+    SDL_UnlockMutex(stream->lock);
+    return size;
+}
+
+bool SDL_SaveAudioStreamState(SDL_AudioStream *stream, void *void_dst, size_t size)
+{
+    if (!stream || !void_dst) return false;
+    SDL_LockMutex(stream->lock);
+    if (size == 0 || size != GetAudioStreamStateSizeLocked(stream)) {
+        SDL_UnlockMutex(stream->lock);
+        return false;
+    }
+    Uint8 *dst = (Uint8 *)void_dst;
+    size_t offset = 0;
+    StateWriteU32(dst, &offset, SDL_AUDIO_STREAM_SNAPSHOT_VERSION);
+    StateWriteSpec(dst, &offset, &stream->src_spec);
+    StateWriteSpec(dst, &offset, &stream->dst_spec);
+    StateWriteSpec(dst, &offset, &stream->input_spec);
+    StateWriteMap(dst, &offset, stream->src_chmap, StateMapCount(stream->src_chmap, stream->src_spec.channels));
+    StateWriteMap(dst, &offset, stream->dst_chmap, StateMapCount(stream->dst_chmap, stream->dst_spec.channels));
+    StateWriteMap(dst, &offset, stream->input_chmap, StateMapCount(stream->input_chmap, stream->input_spec.channels));
+    Uint32 bits;
+    SDL_memcpy(&bits, &stream->freq_ratio, sizeof(bits)); StateWriteU32(dst, &offset, bits);
+    SDL_memcpy(&bits, &stream->gain, sizeof(bits)); StateWriteU32(dst, &offset, bits);
+    const Uint64 phase = (Uint64)stream->resample_offset;
+    StateWriteU32(dst, &offset, (Uint32)phase); StateWriteU32(dst, &offset, (Uint32)(phase >> 32));
+    const size_t queue_size = SDL_GetAudioQueueSnapshotSize(stream->queue);
+    StateWriteU32(dst, &offset, (Uint32)queue_size);
+    const bool ok = SDL_SaveAudioQueueSnapshot(stream->queue, dst + offset, queue_size) && offset + queue_size == size;
+    SDL_UnlockMutex(stream->lock);
+    return ok;
+}
+
+bool SDL_ValidateAudioStreamState(const void *blob, size_t size)
+{
+    SDL_AudioStreamSnapshot snapshot;
+    return ParseAudioStreamSnapshot(blob, size, &snapshot);
+}
+
+bool SDL_LoadAudioStreamState(SDL_AudioStream *stream, const void *blob, size_t size)
+{
+    SDL_AudioStreamSnapshot snapshot;
+    if (!stream || !ParseAudioStreamSnapshot(blob, size, &snapshot)) return false;
+    SDL_LockMutex(stream->lock);
+    if (!SDL_AudioSpecsEqual(&stream->src_spec, &snapshot.src, stream->src_chmap, snapshot.src_count ? snapshot.src_map : NULL) ||
+        !SDL_AudioSpecsEqual(&stream->dst_spec, &snapshot.dst, stream->dst_chmap, snapshot.dst_count ? snapshot.dst_map : NULL)) {
+        SDL_UnlockMutex(stream->lock);
+        return false;
+    }
+    if (!SDL_LoadAudioQueueSnapshot(stream->queue, snapshot.queue, snapshot.queue_size)) {
+        SDL_UnlockMutex(stream->lock);
+        return false;
+    }
+    stream->freq_ratio = snapshot.ratio;
+    stream->gain = snapshot.gain;
+    stream->resample_offset = snapshot.resample_offset;
+    stream->input_spec = snapshot.input;
+    if (snapshot.input_count) {
+        SDL_memcpy(stream->input_chmap_storage, snapshot.input_map, snapshot.input_count * sizeof(int));
+        stream->input_chmap = stream->input_chmap_storage;
+    } else {
+        stream->input_chmap = NULL;
+    }
+    SDL_UnlockMutex(stream->lock);
+    return true;
 }

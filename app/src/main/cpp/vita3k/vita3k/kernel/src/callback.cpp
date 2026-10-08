@@ -21,8 +21,11 @@
 #include <mutex>
 
 Callback::Callback(SceUID uid, const ThreadStatePtr &owner, const std::string &name, Ptr<SceKernelCallbackFunction> cb_func, Ptr<void> pCommon)
+    : Callback(uid, owner->id, owner, name, cb_func, pCommon) {}
+
+Callback::Callback(SceUID uid, SceUID owner_id, const ThreadStatePtr &owner, const std::string &name, Ptr<SceKernelCallbackFunction> cb_func, Ptr<void> pCommon)
     : uid(uid)
-    , thread_id(owner->id)
+    , thread_id(owner_id)
     , owner(owner)
     , name(name)
     , cb_func(cb_func)
@@ -83,6 +86,22 @@ std::optional<Callback::Notification> Callback::take_notification() {
     const Notification notification{ this->notifier_id, this->num_notifications, this->notification_arg };
     this->reset();
     return notification;
+}
+
+Callback::Snapshot Callback::capture_snapshot() {
+    std::lock_guard lock(this->_mutex);
+    Snapshot snapshot;
+    snapshot.num_notifications = num_notifications;
+    snapshot.notification_arg = notification_arg;
+    snapshot.notifier_id = notifier_id;
+    return snapshot;
+}
+
+void Callback::apply_snapshot(const Snapshot &snapshot) {
+    std::lock_guard lock(this->_mutex);
+    this->num_notifications = snapshot.num_notifications;
+    this->notification_arg = snapshot.notification_arg;
+    this->notifier_id = snapshot.notifier_id;
 }
 
 /** Private methods **/

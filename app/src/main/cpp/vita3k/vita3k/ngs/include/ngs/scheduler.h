@@ -74,6 +74,10 @@ protected:
 public:
     bool deque_voice(Voice *voice);
 
+    /// Put a voice back into the processing queue after a save-state load,
+    /// without re-keying it (its module state was restored).
+    bool requeue_voice(const MemState &mem, Voice *voice);
+
     bool play(const MemState &mem, Voice *voice);
     bool pause(const MemState &mem, Voice *voice);
     bool resume(const MemState &mem, Voice *voice);

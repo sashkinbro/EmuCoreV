@@ -268,3 +268,28 @@ SceInt32 uid_class_query(KernelUidClassEnv &env, SceUID uid, bool driver) {
                   : export_sceKernelGetThreadmgrUIDClass(env, 0, "test", uid);
 }
 #include "kernel_uid_class_tests.inc"
+
+using KernelHostLifetimeEnv = EmuEnvState;
+#include "kernel_host_lifetime_tests.inc"
+
+#include "kernel_mutex_cache_tests.inc"
+
+#include "kernel_capture_admission_tests.inc"
+#include "kernel_continuation_tests.inc"
+#include "kernel_state_preflight_tests.inc"
+#include "ngs_logical_codec_tests.inc"
+#include "ngs_logical_state_tests.inc"
+#include "ngs_resampler_tests.inc"
+#include "ngs_atrac9_decoder_tests.inc"
+#include "ngs_preflight_tests.inc"
+#include "audio_continuation_tests.inc"
+#include "kernel_timer_clock_tests.inc"
+#include "display_continuation_tests.inc"
+#include "kernel_import_preflight_tests.inc"
+#include "gxm_context_snapshot_tests.inc"
+#include "renderer_batch_snapshot_tests.inc"
+#include "gxm_display_queue_continuation_tests.inc"
+#include "gpu_state_tests.inc"
+#include "gpu_gxm_preflight_tests.inc"
+#include "gxm_sysmem_preflight_tests.inc"
+#include "gxm_finish_preflight_tests.inc"

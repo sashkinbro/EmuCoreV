@@ -18,12 +18,55 @@
 #include "audio/impl/cubeb_audio.h"
 #include "util/log.h"
 
+#include <cstring>
+
+namespace {
+
+constexpr uint32_t kCubebSnapshotVersion = 1;
+constexpr size_t kMaxCubebSnapshotBytes = 16u * 1024u * 1024u;
+
+void append_u32(std::vector<uint8_t> &bytes, uint32_t value) {
+    for (unsigned shift = 0; shift < 32; shift += 8)
+        bytes.push_back(static_cast<uint8_t>(value >> shift));
+}
+
+bool read_u32(const std::vector<uint8_t> &bytes, size_t &offset, uint32_t &value) {
+    if (offset > bytes.size() || bytes.size() - offset < 4)
+        return false;
+    value = 0;
+    for (unsigned shift = 0; shift < 32; shift += 8)
+        value |= static_cast<uint32_t>(bytes[offset++]) << shift;
+    return true;
+}
+
+} // namespace
+
+bool validate_cubeb_audio_snapshot(int len_bytes, const std::vector<uint8_t> &state) {
+    if (len_bytes <= 0 || state.size() > kMaxCubebSnapshotBytes)
+        return false;
+    size_t offset = 0;
+    uint32_t version = 0;
+    uint32_t count = 0;
+    if (!read_u32(state, offset, version) || version != kCubebSnapshotVersion || !read_u32(state, offset, count) ||
+        count > 4096 || count > (state.size() - offset) / 4)
+        return false;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t position = 0;
+        if (!read_u32(state, offset, position) || position >= static_cast<uint32_t>(len_bytes) ||
+            static_cast<size_t>(len_bytes) > state.size() - offset)
+            return false;
+        offset += static_cast<size_t>(len_bytes);
+    }
+    return offset == state.size();
+}
+
 static long impl_cubeb_audio_callback(cubeb_stream *stream, void *user_data, const void *input, void *output, long nframes) {
     assert(user_data != nullptr);
     assert(stream != nullptr);
     CubebAudioOutPort *port = static_cast<CubebAudioOutPort *>(user_data);
     uint8_t *output_buffer = static_cast<uint8_t *>(output);
 
+    std::unique_lock producer_lock(port->mutex);
     int bytes_given = 0;
     const int bytes_to_give = nframes * port->spec.channels * sizeof(uint16_t);
     while (bytes_given < bytes_to_give) {
@@ -41,16 +84,17 @@ static long impl_cubeb_audio_callback(cubeb_stream *stream, void *user_data, con
 
         if (audio_buffer.buffer_position == port->len_bytes) {
             // if we are done with this buffer, tell it
-            std::unique_lock<std::mutex> lock(port->mutex);
             port->next_audio_buffer = (port->next_audio_buffer + 1) % port->audio_buffers.size();
             port->nb_buffers_ready--;
-            lock.unlock();
-            port->cond_var.notify_one();
+
         }
 
         bytes_given += bytes_to_copy;
     }
 
+    producer_lock.unlock();
+    port->cond_var.notify_all();
+    port->notify_output_ready();
     return nframes;
 }
 
@@ -82,7 +126,7 @@ bool CubebAudioAdapter::init() {
     return true;
 }
 
-AudioOutPortPtr CubebAudioAdapter::open_port(int nb_channels, int freq, int nb_sample) {
+static AudioOutPortPtr create_cubeb_audio_port(cubeb *context, int nb_channels, int freq, int nb_sample, bool start_stream) {
     std::shared_ptr<CubebAudioOutPort> port = std::make_shared<CubebAudioOutPort>();
     port->spec = {
         // all the ps vita samples are signed 16 bits low edian
@@ -95,9 +139,9 @@ AudioOutPortPtr CubebAudioAdapter::open_port(int nb_channels, int freq, int nb_s
     };
 
     uint32_t latency;
-    cubeb_get_min_latency(cubeb_ctx, &port->spec, &latency);
+    cubeb_get_min_latency(context, &port->spec, &latency);
 
-    if (cubeb_stream_init(cubeb_ctx, &port->out_stream, "Vita3K audio out", nullptr, nullptr, nullptr,
+    if (cubeb_stream_init(context, &port->out_stream, "Vita3K audio out", nullptr, nullptr, nullptr,
             &port->spec, latency, impl_cubeb_audio_callback, impl_cubeb_state_callback, port.get())
         != CUBEB_OK) {
         LOG_ERROR("Could not initialize cubeb stream");
@@ -115,36 +159,35 @@ AudioOutPortPtr CubebAudioAdapter::open_port(int nb_channels, int freq, int nb_s
         audio_buffer.buffer_position = 0;
     }
 
-    cubeb_stream_start(port->out_stream);
+    if (start_stream && cubeb_stream_start(port->out_stream) != CUBEB_OK) {
+        LOG_ERROR("Could not start cubeb stream");
+        return nullptr;
+    }
+    port->stream_started = start_stream;
     return port;
 }
 
-void CubebAudioAdapter::audio_output(AudioOutPort &out_port, const void *buffer) {
-    CubebAudioOutPort &port = static_cast<CubebAudioOutPort &>(out_port);
+AudioOutPortPtr CubebAudioAdapter::open_port(int nb_channels, int freq, int nb_sample) {
+    return create_cubeb_audio_port(cubeb_ctx, nb_channels, freq, nb_sample, true);
+}
 
-    std::unique_lock<std::mutex> lock(port.mutex);
+AudioOutPortPtr CubebAudioAdapter::open_port_for_restore(int nb_channels, int freq, int nb_sample) {
+    return create_cubeb_audio_port(cubeb_ctx, nb_channels, freq, nb_sample, false);
+}
 
-    if (out_port.stopping)
-        return;
-
-    if (port.nb_buffers_ready == port.audio_buffers.size()) {
-        port.cond_var.wait(lock);
-        if (out_port.stopping)
-            return;
-    }
-
-    assert(port.nb_buffers_ready < port.audio_buffers.size());
-    if (buffer) {
-        // the buffer can be empty to drain the port
-        int next_buffer_pos = (port.next_audio_buffer + port.nb_buffers_ready) % port.audio_buffers.size();
-        // we could unlock the lock here and re-lock it right after, but will this be faster?
-        memcpy(port.audio_buffers[next_buffer_pos].buffer.data(), buffer, port.len_bytes);
-        port.audio_buffers[next_buffer_pos].buffer_position = 0;
-        port.nb_buffers_ready++;
-    }
-
-    lock.unlock();
-    port.cond_var.notify_one();
+AudioSubmitResult CubebAudioAdapter::try_audio_output(AudioOutPort &out_port, const void *buffer, bool allow_overflow) {
+    auto &port = static_cast<CubebAudioOutPort &>(out_port);
+    if (port.stopping)
+        return AudioSubmitResult::stopped;
+    if (port.audio_buffers.empty())
+        return AudioSubmitResult::error;
+    if (port.nb_buffers_ready == port.audio_buffers.size())
+        return AudioSubmitResult::would_block;
+    const size_t index = (port.next_audio_buffer + port.nb_buffers_ready) % port.audio_buffers.size();
+    memcpy(port.audio_buffers[index].buffer.data(), buffer, port.len_bytes);
+    port.audio_buffers[index].buffer_position = 0;
+    ++port.nb_buffers_ready;
+    return AudioSubmitResult::submitted;
 }
 
 void CubebAudioAdapter::set_volume(AudioOutPort &out_port, float volume) {
@@ -155,10 +198,13 @@ void CubebAudioAdapter::set_volume(AudioOutPort &out_port, float volume) {
 void CubebAudioAdapter::switch_state(const bool pause) {
     for (auto &[_, out_port] : state.out_ports) {
         CubebAudioOutPort &port = static_cast<CubebAudioOutPort &>(*out_port);
-        if (pause)
-            cubeb_stream_stop(port.out_stream);
-        else
-            cubeb_stream_start(port.out_stream);
+        if (pause && port.stream_started) {
+            if (cubeb_stream_stop(port.out_stream) == CUBEB_OK)
+                port.stream_started = false;
+        } else if (!pause && !port.stream_started) {
+            if (cubeb_stream_start(port.out_stream) == CUBEB_OK)
+                port.stream_started = true;
+        }
     }
 }
 
@@ -169,5 +215,85 @@ void CubebAudioAdapter::wake_all_ports() {
             std::lock_guard<std::mutex> lock(port.mutex);
         }
         port.cond_var.notify_all();
+        port.notify_output_ready();
     }
+}
+
+bool CubebAudioAdapter::save_port_state(AudioOutPort &out_port, std::vector<uint8_t> &state) {
+    auto &port = static_cast<CubebAudioOutPort &>(out_port);
+    const std::lock_guard<std::mutex> lock(port.mutex);
+    if (port.len_bytes <= 0 || port.next_audio_buffer < 0 || port.nb_buffers_ready < 0 ||
+        static_cast<size_t>(port.next_audio_buffer) >= port.audio_buffers.size() ||
+        static_cast<size_t>(port.nb_buffers_ready) > port.audio_buffers.size())
+        return false;
+
+    state.clear();
+    append_u32(state, kCubebSnapshotVersion);
+    append_u32(state, static_cast<uint32_t>(port.nb_buffers_ready));
+    for (int i = 0; i < port.nb_buffers_ready; ++i) {
+        const size_t index = (static_cast<size_t>(port.next_audio_buffer) + static_cast<size_t>(i)) % port.audio_buffers.size();
+        const AudioBuffer &buffer = port.audio_buffers[index];
+        if (buffer.buffer.size() != static_cast<size_t>(port.len_bytes) || buffer.buffer_position < 0 ||
+            buffer.buffer_position >= port.len_bytes)
+            return false;
+        const size_t length = static_cast<size_t>(port.len_bytes);
+        if (length > kMaxCubebSnapshotBytes - 4 || state.size() > kMaxCubebSnapshotBytes - 4 - length)
+            return false;
+        append_u32(state, static_cast<uint32_t>(buffer.buffer_position));
+        state.insert(state.end(), buffer.buffer.begin(), buffer.buffer.end());
+    }
+    return state.size() <= kMaxCubebSnapshotBytes;
+}
+
+bool CubebAudioAdapter::restore_port_state(AudioOutPort &out_port, const std::vector<uint8_t> &state) {
+    auto &port = static_cast<CubebAudioOutPort &>(out_port);
+    if (state.size() > kMaxCubebSnapshotBytes)
+        return false;
+
+    size_t offset = 0;
+    uint32_t version = 0;
+    uint32_t count = 0;
+    if (!read_u32(state, offset, version) || version != kCubebSnapshotVersion || !read_u32(state, offset, count) || count > 4096 || count > (state.size() - offset) / 4)
+        return false;
+
+    struct PendingBuffer {
+        uint32_t position = 0;
+        std::vector<uint8_t> bytes;
+    };
+    std::vector<PendingBuffer> pending;
+    pending.reserve(count);
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t position = 0;
+        if (!read_u32(state, offset, position) || port.len_bytes <= 0 || static_cast<size_t>(port.len_bytes) > state.size() - offset || position >= static_cast<uint32_t>(port.len_bytes))
+            return false;
+        PendingBuffer buffer;
+        buffer.position = position;
+        buffer.bytes.assign(state.begin() + offset, state.begin() + offset + port.len_bytes);
+        pending.emplace_back(std::move(buffer));
+        offset += static_cast<size_t>(port.len_bytes);
+    }
+    if (offset != state.size())
+        return false;
+
+    const std::lock_guard<std::mutex> lock(port.mutex);
+    if (port.len_bytes <= 0 || pending.size() > port.audio_buffers.size())
+        return false;
+    for (const AudioBuffer &buffer : port.audio_buffers) {
+        if (buffer.buffer.size() != static_cast<size_t>(port.len_bytes))
+            return false;
+    }
+
+    for (size_t i = 0; i < port.audio_buffers.size(); ++i) {
+        AudioBuffer &buffer = port.audio_buffers[i];
+        if (i < pending.size()) {
+            std::memcpy(buffer.buffer.data(), pending[i].bytes.data(), pending[i].bytes.size());
+            buffer.buffer_position = static_cast<int>(pending[i].position);
+        } else {
+            buffer.buffer_position = 0;
+        }
+    }
+    port.next_audio_buffer = 0;
+    port.nb_buffers_ready = static_cast<int>(pending.size());
+    port.cond_var.notify_one();
+    return true;
 }

@@ -28,6 +28,7 @@ private:
     SDL_AudioSpec dst_spec;
 
     static void SDLCALL thread_wakeup_callback(void *userdata, SDL_AudioStream *stream, int additional_amount, int total_amount);
+    AudioOutPortPtr open_port_internal(int nb_channels, int freq, int nb_sample, bool resume_device);
 
 public:
     explicit SDLAudioAdapter(AudioState &audio_state);
@@ -36,10 +37,15 @@ public:
     bool init() override;
     void switch_state(const bool pause) override;
     AudioOutPortPtr open_port(int nb_channels, int freq, int nb_sample) override;
-    void audio_output(AudioOutPort &out_port, const void *buffer) override;
+    AudioOutPortPtr open_port_for_restore(int nb_channels, int freq, int nb_sample) override;
+    uint64_t output_wait_timeout_us(const AudioOutPort &port) const override { return port.len_microseconds * 2; }
+    AudioSubmitResult try_audio_output(AudioOutPort &out_port, const void *buffer, bool allow_overflow) override;
     void set_volume(AudioOutPort &out_port, float volume) override;
     int get_rest_sample(AudioOutPort &out_port) override;
     void wake_all_ports() override;
+    bool save_port_state(AudioOutPort &out_port, std::vector<uint8_t> &state) override;
+    bool restore_port_state(AudioOutPort &out_port, const std::vector<uint8_t> &state) override;
+    uint32_t state_codec() const override { return 1; }
 };
 
 using AudioStreamPtr = std::shared_ptr<SDL_AudioStream>;
@@ -48,7 +54,6 @@ struct SDLAudioOutPort : public AudioOutPort {
     int channels = 2;
     AudioStreamPtr stream;
     SDLAudioAdapter &adapter;
-    std::mutex mutex;
     std::condition_variable cond_var;
     SDLAudioOutPort(AudioStreamPtr stream, AudioAdapter &adapter)
         : stream(std::move(stream))

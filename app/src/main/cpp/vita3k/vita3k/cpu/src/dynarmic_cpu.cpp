@@ -176,6 +176,22 @@ public:
     uint32_t get_tpidruro() const {
         return tpidruro;
     }
+
+    void set_sctlr(uint32_t sctlr) {
+        this->sctlr = sctlr;
+    }
+
+    uint32_t get_sctlr() const {
+        return sctlr;
+    }
+
+    void set_dacr(uint32_t dacr) {
+        this->dacr = dacr;
+    }
+
+    uint32_t get_dacr() const {
+        return dacr;
+    }
 };
 
 class ArmDynarmicCallback : public Dynarmic::A32::UserCallbacks {
@@ -404,7 +420,51 @@ public:
     T MemoryRead(Dynarmic::A32::VAddr addr) {
         Ptr<T> ptr{ addr };
         if (!ptr || !ptr.valid(*parent->mem) || ptr.address() < parent->mem->host_page_size) {
-            if (!confirm_invalid_access(addr, "read"))
+            const bool confirm = confirm_invalid_access(addr, "read");
+            {
+                static std::atomic<uint64_t> diag_invalid_reads{ 0 };
+                const uint64_t n = diag_invalid_reads.fetch_add(1, std::memory_order_relaxed) + 1;
+                if (n <= 16 || (n % 64) == 0) {
+                    const uint32_t pc = cpu->get_pc();
+                    const uint32_t lr = read_lr(*parent);
+                    LOG_CRITICAL("[savestate-diag] invalid read{} at 0x{:x} pc=0x{:x} lr=0x{:x} confirm={} (total {})",
+                        sizeof(T) * 8, addr, pc, lr, confirm, n);
+                    if (Ptr<uint32_t>{ pc }.valid(*parent->mem))
+                        LOG_CRITICAL("[savestate-diag]   pc code: {}", disassemble(*parent, pc, (pc & 1) != 0));
+                }
+                static std::atomic<bool> diag_dumped{ false };
+                if (n >= 1000 && !diag_dumped.exchange(true)) {
+                    const CPUContext ctx = cpu->save_context();
+                    std::string regs;
+                    for (int r = 0; r < 15; r++)
+                        regs += fmt::format(" r{}={:08X}", r, ctx.cpu_registers[r]);
+                    const uint32_t pc = cpu->get_pc();
+                    const uint32_t sp = read_sp(*parent);
+                    std::string stack;
+                    for (int w = 0; w < 32; w++) {
+                        const Ptr<uint32_t> wp{ sp + static_cast<uint32_t>(w * 4) };
+                        if (wp.valid(*parent->mem))
+                            stack += fmt::format(" {:08X}", *wp.get(*parent->mem));
+                    }
+                    std::string code;
+                    const bool thumb = ctx.thumb();
+                    uint32_t a = pc & ~1u;
+                    if (a > 64)
+                        a -= 64;
+                    for (int k = 0; k < 24; k++) {
+                        uint16_t insn_size = 2;
+                        code += fmt::format("\n  0x{:X}: {}", a, disassemble(*parent, a, thumb, &insn_size));
+                        a += insn_size ? insn_size : 2;
+                    }
+                    LOG_CRITICAL("[savestate-diag] SPIN dump addr=0x{:x} pc=0x{:X} thumb={}{}\nstack@0x{:X}:{}\ncode:{}", addr, pc, thumb ? 1 : 0, regs, sp, stack, code);
+                    const uint32_t fault_page = addr / KiB(4);
+                    const AllocMemPage &fault_entry = parent->mem->alloc_table[fault_page];
+                    LOG_CRITICAL("[savestate-diag] SPIN page 0x{:X}: allocated={} size={} valid={} name={}",
+                        fault_page * KiB(4), static_cast<uint32_t>(fault_entry.allocated), static_cast<uint32_t>(fault_entry.size),
+                        is_valid_addr(*parent->mem, addr), mem_name(addr, *parent->mem));
+                }
+            }
+            if (!confirm)
                 return *ptr.get(*parent->mem);
             if (should_log_invalid_access()) {
                 LOG_ERROR("Invalid read of uint{}_t at address: 0x{:x}\n{}", sizeof(T) * 8, addr, this->cpu->save_context().description());
@@ -779,6 +839,9 @@ CPUContext DynarmicCPU::save_context() {
     memcpy(ctx.fpu_registers.data(), jit->ExtRegs().data(), sizeof(ctx.fpu_registers));
     ctx.fpscr = jit->Fpscr();
     ctx.cpsr = jit->Cpsr();
+    ctx.tpidruro = cp15->get_tpidruro();
+    ctx.sctlr = cp15->get_sctlr();
+    ctx.dacr = cp15->get_dacr();
 
     return ctx;
 }
@@ -789,6 +852,9 @@ void DynarmicCPU::load_context(const CPUContext &ctx) {
     memcpy(jit->ExtRegs().data(), ctx.fpu_registers.data(), sizeof(ctx.fpu_registers));
     jit->SetCpsr(ctx.cpsr);
     jit->SetFpscr(ctx.fpscr);
+    cp15->set_tpidruro(ctx.tpidruro);
+    cp15->set_sctlr(ctx.sctlr);
+    cp15->set_dacr(ctx.dacr);
 }
 
 uint32_t DynarmicCPU::get_lr() {

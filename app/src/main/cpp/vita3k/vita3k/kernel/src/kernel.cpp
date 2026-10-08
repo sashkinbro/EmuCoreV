@@ -21,6 +21,7 @@
 
 #include <cpu/common.h>
 #include <kernel/state.h>
+#include <kernel/sync_primitives.h>
 #include <mem/functions.h>
 
 #include <kernel/thread/thread_state.h>
@@ -33,6 +34,7 @@
 #include <SDL3/SDL_mutex.h>
 #include <SDL3/SDL_thread.h>
 
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <iomanip>
@@ -61,6 +63,7 @@ void clear_current_thread_state();
 struct ThreadParams {
     KernelState *kernel = nullptr;
     SceUID thid = SCE_KERNEL_ERROR_ILLEGAL_THREAD_ID;
+    HostThreadRegistry::Token host_token = 0;
     SDL_Semaphore *host_may_destroy_params = nullptr;
 };
 
@@ -83,9 +86,13 @@ static int SDLCALL thread_function(void *data) {
     const uint32_t r0 = read_reg(*thread->cpu, 0);
     const SceUID id = thread->id;
     const int processor_id = get_processor_id(*thread->cpu);
-    // release our reference first so the erase below destroys the ThreadState before process_exit() is woken
+    // Drop known host-local owners before publishing guest completion. The
+    // retained host handle also covers any other C++ TLS destructors.
+    thread->clear_wait_continuations();
     thread.reset();
     clear_current_thread_state();
+    clear_sync_primitive_thread_cache();
+    params.kernel->host_threads.finished(params.host_token);
 
     {
         std::lock_guard<std::mutex> lock(params.kernel->mutex);
@@ -97,8 +104,11 @@ static int SDLCALL thread_function(void *data) {
     return r0;
 }
 
+static std::atomic<uint64_t> next_sync_cache_identity{ 1 };
+
 KernelState::KernelState()
-    : debugger(*this) {
+    : sync_cache_identity(next_sync_cache_identity.fetch_add(1, std::memory_order_relaxed))
+    , debugger(*this) {
 }
 
 bool KernelState::init(MemState &mem, const CallImportFunc &call_import, bool cpu_opt) {
@@ -195,24 +205,133 @@ ThreadStatePtr KernelState::create_thread(MemState &mem, const char *name, Ptr<c
 }
 
 ThreadStatePtr KernelState::create_thread(MemState &mem, const char *name, Ptr<const void> entry_point, int init_priority, SceInt32 affinity_mask, int stack_size, const SceKernelThreadOptParam *option) {
+    if (!begin_thread_creation())
+        return nullptr;
+    struct CreationGuard {
+        KernelState &kernel;
+        ~CreationGuard() { kernel.end_thread_creation(); }
+    } creation{ *this };
+    // Reap completed workers during ordinary operation, not just shutdown.
+    host_threads.join_finished();
     ThreadStatePtr thread = std::make_shared<ThreadState>(get_next_uid(), *this, mem);
     if (thread->init(name, entry_point, init_priority, affinity_mask, stack_size, option) < 0)
         return nullptr;
 
+    ThreadParams params;
+    params.kernel = this;
+    params.thid = thread->id;
+    params.host_token = host_threads.next_token();
+    params.host_may_destroy_params = SDL_CreateSemaphore(0);
+    if (!params.host_may_destroy_params) {
+        corenum_allocator.free_corenum(get_processor_id(*thread->cpu));
+        return nullptr;
+    }
     {
         const std::lock_guard<std::mutex> lock(mutex);
         threads.emplace(thread->id, thread);
+        if (is_threads_paused())
+            paused_threads_status.emplace(thread->id, thread->pause_for_session());
+        if (capture_active) {
+            thread->request_world_stop();
+            world_stopped_threads.push_back(thread);
+        }
+        // The worker's get_thread blocks on this lock, so it cannot disappear
+        // from the guest registry before its joinable host handle is retained.
+        SDL_Thread *host = SDL_CreateThread(&thread_function, thread->name.c_str(), &params);
+        if (!host) {
+            threads.erase(thread->id);
+            paused_threads_status.erase(thread->id);
+            std::erase(world_stopped_threads, thread);
+            corenum_allocator.free_corenum(get_processor_id(*thread->cpu));
+            thread_deleted_cond.notify_all();
+            SDL_DestroySemaphore(params.host_may_destroy_params);
+            return nullptr;
+        }
+        host_threads.add(params.host_token, [host] { SDL_WaitThread(host, nullptr); });
     }
+    SDL_WaitSemaphore(params.host_may_destroy_params);
+    SDL_DestroySemaphore(params.host_may_destroy_params);
+
+    return thread;
+}
+
+ThreadStatePtr KernelState::create_thread_from_snapshot(MemState &mem, const ThreadState::Snapshot &snapshot, bool defer_start) {
+    ThreadStatePtr thread = std::make_shared<ThreadState>(snapshot.id, *this, mem);
+
+    thread->name = snapshot.name;
+    thread->entry_point = snapshot.entry_point;
+    thread->stack_size = snapshot.stack_size;
+    if (snapshot.stack_addr)
+        thread->stack = Block(snapshot.stack_addr, [&mem](Address addr) { free(mem, addr); });
+    if (snapshot.tls_addr)
+        thread->tls = Block(snapshot.tls_addr, [&mem](Address addr) { free(mem, addr); });
+    thread->priority = snapshot.priority;
+    thread->affinity_mask = snapshot.affinity_mask;
+    thread->start_tick = snapshot.start_tick;
+    thread->last_vblank_waited = snapshot.last_vblank_waited;
+    thread->status = ThreadStatus::dormant;
+    thread->returned_value = snapshot.returned_value;
+
+    const int core = corenum_allocator.new_corenum();
+    thread->cpu = init_cpu(cpu_opt, snapshot.id, core, mem);
+    if (!thread->cpu) {
+        corenum_allocator.free_corenum(core);
+        return nullptr;
+    }
+
+    if (!defer_start)
+        thread->apply_private_snapshot(snapshot);
 
     ThreadParams params;
     params.kernel = this;
     params.thid = thread->id;
-
+    params.host_token = host_threads.next_token();
     params.host_may_destroy_params = SDL_CreateSemaphore(0);
-    SDL_DetachThread(SDL_CreateThread(&thread_function, thread->name.c_str(), &params));
+    if (!params.host_may_destroy_params) {
+        corenum_allocator.free_corenum(get_processor_id(*thread->cpu));
+        return nullptr;
+    }
+    {
+        const std::lock_guard<std::mutex> lock(mutex);
+        threads.emplace(thread->id, thread);
+        if (is_threads_paused())
+            paused_threads_status.emplace(thread->id, thread->pause_for_session());
+        if (capture_active) {
+            thread->request_world_stop();
+            world_stopped_threads.push_back(thread);
+        }
+        // The worker's get_thread blocks on this lock, so it cannot disappear
+        // from the guest registry before its joinable host handle is retained.
+        SDL_Thread *host = SDL_CreateThread(&thread_function, thread->name.c_str(), &params);
+        if (!host) {
+            threads.erase(thread->id);
+            paused_threads_status.erase(thread->id);
+            std::erase(world_stopped_threads, thread);
+            corenum_allocator.free_corenum(get_processor_id(*thread->cpu));
+            thread_deleted_cond.notify_all();
+            SDL_DestroySemaphore(params.host_may_destroy_params);
+            return nullptr;
+        }
+        host_threads.add(params.host_token, [host] { SDL_WaitThread(host, nullptr); });
+    }
     SDL_WaitSemaphore(params.host_may_destroy_params);
     SDL_DestroySemaphore(params.host_may_destroy_params);
 
+    return thread;
+}
+
+ThreadStatePtr KernelState::create_retained_thread_from_snapshot(MemState &mem, const ThreadState::Snapshot &snapshot) {
+    auto thread = std::make_shared<ThreadState>(snapshot.id, *this, mem);
+    thread->name = snapshot.name;
+    thread->entry_point = snapshot.entry_point;
+    thread->stack_size = snapshot.stack_size;
+    thread->stack = Block(snapshot.stack_addr, [&mem](Address addr) { free(mem, addr); });
+    thread->tls = Block(snapshot.tls_addr, [&mem](Address addr) { free(mem, addr); });
+    thread->priority = snapshot.priority;
+    thread->affinity_mask = snapshot.affinity_mask;
+    thread->start_tick = snapshot.start_tick;
+    thread->last_vblank_waited = snapshot.last_vblank_waited;
+    snapshot_thread_owners.emplace(snapshot.id, thread);
     return thread;
 }
 
@@ -241,26 +360,103 @@ void KernelState::process_exit() {
         // the creator's removal wakes this predicate to stop the late child too.
         for (auto &[_, thread] : threads)
             thread->exit_delete(false);
+        creation_changed.notify_all();
         return threads.empty();
     });
+    lock.unlock();
+    // Registry removal precedes host exit. Joining is the lifetime barrier for
+    // TLS owners whose destructors can still free guest stack/TLS allocations.
+    host_threads.join_all();
+    snapshot_objects.clear();
+    snapshot_thread_owners.clear();
+    sync_cache_generation.fetch_add(1, std::memory_order_acq_rel);
+    clear_sync_primitive_thread_cache();
 }
 
 void KernelState::pause_threads() {
     const std::lock_guard<std::mutex> lock(mutex);
+    session_pause_active.store(true, std::memory_order_release);
     for (auto &[_, thread] : threads) {
-        paused_threads_status[thread->id] = thread->status;
-        if (thread->status == ThreadStatus::running)
-            thread->suspend();
+        const auto previous_status = thread->pause_for_session();
+        paused_threads_status.try_emplace(thread->id, previous_status);
     }
 }
 
 void KernelState::resume_threads() {
     const std::lock_guard<std::mutex> lock(mutex);
     for (auto &[_, thread] : threads) {
-        if (paused_threads_status[thread->id] == ThreadStatus::running)
-            thread->resume();
+        const auto paused = paused_threads_status.find(thread->id);
+        if (paused != paused_threads_status.end())
+            thread->resume_after_session_pause();
     }
     paused_threads_status.clear();
+    session_pause_active.store(false, std::memory_order_release);
+}
+
+void KernelState::clear_paused_threads_state() {
+    const std::lock_guard<std::mutex> lock(mutex);
+    paused_threads_status.clear();
+    session_pause_active.store(false, std::memory_order_release);
+}
+
+void KernelState::reset_world_stop_state() {
+    const std::lock_guard<std::mutex> lock(mutex);
+    world_stopped_threads.clear();
+}
+
+bool KernelState::begin_thread_creation() {
+    ThreadState *caller = g_tls_guest_thread;
+    std::unique_lock lock(mutex);
+    const auto deleted = [&] {
+        if (!caller)
+            return false;
+        const std::lock_guard thread_lock(caller->mutex);
+        return caller->is_delete_requested();
+    };
+    while (capture_active && capture_owner != std::this_thread::get_id()) {
+        if (caller) {
+            // Serialize parking with resume_world: never install a freeze after
+            // the capture owner has already reopened admission.
+            caller->park_creation_for_capture();
+            if (std::find_if(world_stopped_threads.begin(), world_stopped_threads.end(),
+                    [&](const auto &thread) { return thread.get() == caller; })
+                == world_stopped_threads.end())
+                world_stopped_threads.push_back(threads.at(caller->id));
+        }
+        creation_changed.wait(lock, [&] { return !capture_active || deleted(); });
+        if (deleted())
+            return false;
+        if (caller) {
+            lock.unlock();
+            // Respect a VM/debugger freeze that overlaps capture. No allocation
+            // is in flight yet, so another capture need not drain this parking.
+            caller->resume_creation_after_capture();
+            lock.lock();
+        }
+    }
+    if (deleted())
+        return false;
+    ++initializing_threads;
+    return true;
+}
+
+void KernelState::end_thread_creation() {
+    const std::lock_guard lock(mutex);
+    assert(initializing_threads > 0);
+    --initializing_threads;
+    creation_changed.notify_all();
+}
+
+bool KernelState::is_capture_active() {
+    const std::lock_guard lock(mutex);
+    return capture_active;
+}
+
+KernelState::CaptureClock KernelState::capture_clock() {
+    const std::lock_guard lock(mutex);
+    if (captured_clock)
+        return *captured_clock;
+    return { std::chrono::steady_clock::now(), static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()) };
 }
 
 int KernelState::stop_world(SceUID except_id, std::chrono::milliseconds budget) {
@@ -268,8 +464,17 @@ int KernelState::stop_world(SceUID except_id, std::chrono::milliseconds budget) 
                                        std::chrono::steady_clock::now().time_since_epoch())
                                        .count(),
         std::memory_order_relaxed);
+    const auto deadline = std::chrono::steady_clock::now() + budget;
     {
-        const std::lock_guard<std::mutex> lock(mutex);
+        std::unique_lock<std::mutex> lock(mutex);
+        if (capture_active && capture_owner != std::this_thread::get_id())
+            return 1;
+        capture_active = true;
+        captured_clock.reset();
+        capture_owner = std::this_thread::get_id();
+        creation_changed.notify_all();
+        if (!creation_changed.wait_until(lock, deadline, [&] { return initializing_threads == 0; }))
+            return 1;
         world_stopped_threads.clear();
         world_stopped_threads.reserve(threads.size());
         for (auto &[tid, thread] : threads) {
@@ -283,11 +488,14 @@ int KernelState::stop_world(SceUID except_id, std::chrono::milliseconds budget) 
         thread->request_world_stop();
 
     // Phase 2: ...then wait for each to be provably outside the JIT, on a shared deadline.
-    const auto deadline = std::chrono::steady_clock::now() + budget;
     int not_parked = 0;
     for (const auto &thread : world_stopped_threads) {
         if (!thread->wait_world_stopped(deadline))
             ++not_parked;
+    }
+    if (!not_parked) {
+        const std::lock_guard lock(mutex);
+        captured_clock = CaptureClock{ std::chrono::steady_clock::now(), static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()) };
     }
     return not_parked;
 }
@@ -304,8 +512,8 @@ void KernelState::log_thread_hang_dump() {
     for (const auto &t : snapshot) {
         const ThreadStatus status = t->status;
         const char *status_str = (status == ThreadStatus::running) ? "run" : (status == ThreadStatus::waiting) ? "wait"
-            : (status == ThreadStatus::suspended)                                                         ? "suspend"
-                                                                                                        : "dormant";
+            : (status == ThreadStatus::suspended)                                                              ? "suspend"
+                                                                                                               : "dormant";
         std::string line;
         if (status == ThreadStatus::running) {
             const uint32_t run_pc = read_pc(*t->cpu) & ~1u;
@@ -336,9 +544,18 @@ void KernelState::log_thread_hang_dump() {
 }
 
 void KernelState::resume_world() {
+    const std::lock_guard<std::mutex> lock(mutex);
+    // A rejected competing stop still unwinds its RAII scope. Only the host
+    // that closed admission may release it, including after a partial stop.
+    if (!capture_active || capture_owner != std::this_thread::get_id())
+        return;
     for (const auto &thread : world_stopped_threads)
         thread->resume_from_world();
     world_stopped_threads.clear();
+    capture_active = false;
+    captured_clock.reset();
+    capture_owner = {};
+    creation_changed.notify_all();
 }
 
 void KernelState::deinit(MemState &mem) {
@@ -400,6 +617,7 @@ void KernelState::deinit(MemState &mem) {
     next_uid = 1;
 
     paused_threads_status.clear();
+    session_pause_active.store(false, std::memory_order_release);
 }
 
 SceKernelModuleInfo *KernelState::find_module_by_addr(Address address) {
@@ -414,4 +632,20 @@ SceKernelModuleInfo *KernelState::find_module_by_addr(Address address) {
         }
     }
     return nullptr;
+}
+
+void KernelState::restore_snapshot_callbacks() {
+    for (const auto &saved : snapshot_callbacks) {
+        auto owner = get_thread(saved.owner);
+        if (!owner) {
+            const auto it = snapshot_thread_owners.find(saved.owner);
+            if (it != snapshot_thread_owners.end())
+                owner = it->second;
+        }
+        auto cb = std::make_shared<Callback>(saved.uid, saved.owner, owner, saved.name,
+            Ptr<SceKernelCallbackFunction>(saved.function), Ptr<void>(saved.userdata));
+        cb->apply_snapshot(saved.notification);
+        callbacks.emplace(saved.uid, std::move(cb));
+    }
+    snapshot_callbacks.clear();
 }

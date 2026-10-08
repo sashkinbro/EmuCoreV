@@ -17,6 +17,8 @@
 
 #include <ngs/modules/output.h>
 
+#include <util/log.h>
+
 #include <algorithm>
 
 namespace ngs {
@@ -39,6 +41,14 @@ bool OutputModule::process(KernelState &kern, const MemState &mem, const SceUID 
     // Convert FLTP to S16
     for (int i = 0; i < data.parent->rack->system->granularity * 2; i++) {
         dest_data[i] = static_cast<std::int16_t>(std::clamp(source_data[i] * 32768.0f, -32768.0f, 32767.0f));
+    }
+
+    {
+        static std::atomic<uint64_t> diag_calls{ 0 };
+        const uint64_t n = diag_calls.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (n <= 4 || (n % 512) == 0)
+            LOG_CRITICAL("[savestate-ngs] OutputModule processed calls={} voice={} first=({},{},{},{})",
+                n, fmt::ptr(data.parent), dest_data[0], dest_data[1], dest_data[2], dest_data[3]);
     }
 
     return false;

@@ -19,6 +19,10 @@
 #include <kernel/state.h>
 
 #include <ngs/modules/atrac9.h>
+#include <ngs/modules/compressor.h>
+#include <ngs/modules/envelope.h>
+#include <ngs/modules/logical_state_io.h>
+#include <ngs/modules/player.h>
 #include <ngs/state.h>
 #include <ngs/system.h>
 #include <util/lock_and_find.h>
@@ -376,7 +380,301 @@ void deinit(State &ngs, MemState &mem) {
 
     Atrac9Module::free_swr_contexts();
 
+    ngs.system_infos.clear();
+    ngs.rack_infos.clear();
     ngs.definitions = Ptr<VoiceDefinition>(0);
+}
+
+bool capture_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> &out_definitions, std::vector<SystemInitInfo> &out_system_infos, std::vector<RackInitInfo> &out_rack_infos) {
+    // A guest callback can park the updater with these locks released. Blocking
+    // here after stopping the guest world would deadlock that callback. Retain
+    // all scheduler locks only if each updater is already between ticks.
+    std::vector<std::unique_lock<std::recursive_mutex>> locks;
+    locks.reserve(ngs.systems.size());
+    for (System *system : ngs.systems) {
+        if (!system)
+            return false;
+        locks.emplace_back(system->voice_scheduler.mutex, std::try_to_lock);
+        if (!locks.back().owns_lock() || system->voice_scheduler.is_updating
+            || !system->voice_scheduler.operations_pending.empty())
+            return false;
+    }
+    const Ptr<VoiceDefinition> definitions = ngs.definitions;
+    std::vector<SystemInitInfo> system_infos = ngs.system_infos;
+    std::vector<RackInitInfo> rack_infos = ngs.rack_infos;
+    for (SystemInitInfo &info : system_infos)
+        info.queued_voices.clear();
+
+    // Active voices of each scheduler, as (rack, voice) indices.
+    for (SystemInitInfo &info : system_infos) {
+        System *system = Ptr<System>(info.address).get(mem);
+        if (!system)
+            continue;
+        for (Voice *voice : system->voice_scheduler.queue) {
+            for (size_t r = 0; r < system->racks.size(); r++) {
+                Rack *rack = system->racks[r];
+                if (!rack)
+                    continue;
+                bool found = false;
+                for (size_t v = 0; v < rack->voices.size(); v++) {
+                    if (rack->voices[v].get(mem) == voice) {
+                        info.queued_voices.emplace_back(static_cast<uint32_t>(r), static_cast<uint32_t>(v));
+                        found = true;
+                        break;
+                    }
+                }
+                if (found)
+                    break;
+            }
+        }
+    }
+
+    for (RackInitInfo &info : rack_infos) {
+        Rack *rack = info.info.data.cast<Rack>().get(mem);
+        if (!rack)
+            continue;
+        info.blocks = rack->allocator.blocks;
+        info.voices.resize(rack->voices.size());
+        for (size_t v = 0; v < rack->voices.size(); v++) {
+            Voice *voice = rack->voices[v].get(mem);
+            if (!voice)
+                continue;
+            VoiceInfo &voice_info = info.voices[v];
+            voice_info.address = rack->voices[v].address();
+            voice_info.state = static_cast<uint32_t>(voice->state);
+            voice_info.is_pending = voice->is_pending;
+            voice_info.is_paused = voice->is_paused;
+            voice_info.is_keyed_off = voice->is_keyed_off;
+            voice_info.frame_count = voice->frame_count;
+            memcpy(voice_info.implicit_volume_matrix, voice->implicit_volume_matrix, sizeof(voice_info.implicit_volume_matrix));
+            voice_info.finished_callback = voice->finished_callback.address();
+            voice_info.finished_callback_user_data = voice->finished_callback_user_data.address();
+            voice_info.patches.resize(voice->patches.size());
+            for (size_t p = 0; p < voice->patches.size(); p++) {
+                voice_info.patches[p].reserve(voice->patches[p].size());
+                for (const Ptr<Patch> &patch : voice->patches[p])
+                    voice_info.patches[p].push_back(patch.address());
+            }
+            voice_info.modules.resize(voice->datas.size());
+            for (size_t m = 0; m < voice->datas.size(); m++) {
+                const ModuleData &data = voice->datas[m];
+                ModuleDataInfo &module_info = voice_info.modules[m];
+                module_info.guest_state_data = data.guest_state_data;
+                module_info.last_info = data.last_info;
+                module_info.callback = data.callback.address();
+                module_info.user_data = data.user_data.address();
+                module_info.is_bypassed = data.is_bypassed;
+                module_info.flags = data.flags;
+                if (data.info.data && data.info.size) {
+                    module_info.parameters.resize(data.info.size);
+                    memcpy(module_info.parameters.data(), data.info.data.get(mem), data.info.size);
+                }
+                if (m < rack->modules.size() && rack->modules[m]) {
+                    rack->modules[m]->capture_logical_state(voice->datas[m], module_info.logical_state);
+                }
+            }
+        }
+    }
+    out_definitions = definitions;
+    out_system_infos = std::move(system_infos);
+    out_rack_infos = std::move(rack_infos);
+    return true;
+}
+
+bool validate_logical_state_blob(const std::vector<uint8_t> &blob) {
+    if (blob.empty())
+        return true;
+    logical_state_io::Reader reader(blob);
+    uint32_t module;
+    if (!reader.scalar(module))
+        return false;
+    switch (module) {
+    case 0x5CE6: {
+        std::unique_ptr<PlayerLogicalState> state;
+        return logical_state_io::restore_player(blob, state);
+    }
+    case 0x5CE3: {
+        std::unique_ptr<EnvelopeLogicalState> state;
+        return logical_state_io::restore_envelope(blob, state);
+    }
+    case 0x5CE1: {
+        std::unique_ptr<CompressorLogicalState> state;
+        return logical_state_io::restore_compressor(blob, state);
+    }
+    case 0x5CAA: {
+        std::unique_ptr<Atrac9LogicalState> state;
+        return logical_state_io::restore_atrac9(blob, state);
+    }
+    default:
+        return false;
+    }
+}
+
+bool restore_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> definitions, const std::vector<SystemInitInfo> &system_infos, const std::vector<RackInitInfo> &rack_infos) {
+    ngs.definitions = definitions;
+    ngs.system_infos.clear();
+    ngs.rack_infos.clear();
+
+    for (const SystemInitInfo &info : system_infos) {
+        SceNgsSystemInitParams params = info.params;
+        if (!init_system(ngs, mem, &params, info.memspace, info.memspace_size))
+            return false;
+    }
+
+    static std::atomic<uint64_t> diag_restore_logs{ 0 };
+
+    for (const RackInitInfo &info : rack_infos) {
+        System *system = info.system.get(mem);
+        if (!system)
+            return false;
+        SceNgsBufferInfo buffer = info.info;
+        SceNgsRackDescription description = info.description;
+        if (!init_rack(ngs, mem, system, &buffer, &description))
+            return false;
+
+        Rack *rack = info.info.data.cast<Rack>().get(mem);
+        if (!rack)
+            return false;
+
+        // The mempool keeps dynamic allocations (patches) alive.
+        if (!info.blocks.empty())
+            rack->allocator.blocks = info.blocks;
+
+        uint32_t diag_voices = 0;
+        uint32_t diag_modules = 0;
+        uint32_t diag_logical = 0;
+        uint32_t diag_params = 0;
+        uint32_t diag_reinit = 0;
+        uint32_t diag_queued = 0;
+
+        // Rebuild the host-side voices in place, then re-link their patches.
+        for (size_t v = 0; v < rack->voices.size(); v++) {
+            if (v >= info.voices.size())
+                break;
+            const VoiceInfo &voice_info = info.voices[v];
+            if (voice_info.address == 0)
+                continue;
+            Ptr<Voice> voice_ptr(voice_info.address);
+            Voice *voice = voice_ptr.get(mem);
+            if (!voice)
+                continue;
+
+            // Remember the parameter buffers init_rack allocated for this voice:
+            // re-creating the Voice object resets its ModuleData.
+            std::vector<Ptr<void>> param_buffers;
+            std::vector<uint32_t> param_sizes;
+            if (voice == rack->voices[v].get(mem)) {
+                param_buffers.reserve(voice->datas.size());
+                param_sizes.reserve(voice->datas.size());
+                for (const ModuleData &old_data : voice->datas) {
+                    param_buffers.push_back(old_data.info.data);
+                    param_sizes.push_back(old_data.info.size);
+                }
+            }
+
+            rack->voices[v] = voice_ptr;
+            voice->~Voice();
+            new (voice) Voice();
+            voice->init(rack);
+            for (size_t m = 0; m < voice->datas.size(); m++) {
+                if (m < param_buffers.size()) {
+                    voice->datas[m].info.data = param_buffers[m];
+                    voice->datas[m].info.size = param_sizes[m];
+                } else if (m < rack->modules.size() && rack->modules[m]) {
+                    const uint32_t size = rack->modules[m]->get_buffer_parameter_size();
+                    if (size) {
+                        voice->datas[m].info.size = size;
+                        voice->datas[m].info.data = rack->alloc_raw(size);
+                        rack->alloc_raw(size);
+                    }
+                }
+            }
+            voice->state = static_cast<VoiceState>(voice_info.state);
+            voice->is_pending = voice_info.is_pending;
+            voice->is_paused = voice_info.is_paused;
+            voice->is_keyed_off = voice_info.is_keyed_off;
+            voice->frame_count = voice_info.frame_count;
+            memcpy(voice->implicit_volume_matrix, voice_info.implicit_volume_matrix, sizeof(voice->implicit_volume_matrix));
+            voice->finished_callback = Ptr<void>(voice_info.finished_callback);
+            voice->finished_callback_user_data = Ptr<void>(voice_info.finished_callback_user_data);
+            for (size_t p = 0; p < voice->patches.size() && p < voice_info.patches.size(); p++) {
+                voice->patches[p].resize(voice_info.patches[p].size());
+                for (size_t k = 0; k < voice_info.patches[p].size(); k++)
+                    voice->patches[p][k] = Ptr<Patch>(voice_info.patches[p][k]);
+            }
+
+            diag_voices++;
+            for (size_t m = 0; m < voice->datas.size() && m < voice_info.modules.size(); m++) {
+                ModuleData &data = voice->datas[m];
+                const ModuleDataInfo &module_info = voice_info.modules[m];
+                const Module *module = m < rack->modules.size() ? rack->modules[m].get() : nullptr;
+                if (!module || (module->get_guest_state_size() && module_info.guest_state_data.size() != module->get_guest_state_size())
+                    || module_info.parameters.size() != data.info.size
+                    || (module_info.flags & ~ModuleData::PARAMS_LOCK)
+                    || ((module_info.flags & ModuleData::PARAMS_LOCK) && module_info.last_info.size() != data.info.size))
+                    return false;
+                data.parent = voice;
+                data.index = static_cast<uint32_t>(m);
+                diag_modules++;
+                if (!module_info.logical_state.empty())
+                    diag_logical++;
+                if (!module_info.parameters.empty())
+                    diag_params++;
+                data.guest_state_data = module_info.guest_state_data;
+                data.last_info = module_info.last_info;
+                data.callback = Ptr<void>(module_info.callback);
+                data.user_data = Ptr<void>(module_info.user_data);
+                data.is_bypassed = module_info.is_bypassed;
+                data.flags = module_info.flags;
+                if (data.info.data && data.info.size && module_info.parameters.size() == data.info.size) {
+                    memcpy(data.info.data.get(mem), module_info.parameters.data(), data.info.size);
+                } else if (!module_info.parameters.empty()) {
+                    // Reject incompatible data instead of silently resuming stale parameters.
+                    return false;
+                }
+                if (m < rack->modules.size() && rack->modules[m]
+                    && !rack->modules[m]->restore_logical_state(data, module_info.logical_state))
+                    return false;
+            }
+        }
+
+        const uint64_t diag_n = diag_restore_logs.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (diag_n <= 8 || (diag_n % 64) == 0)
+            LOG_CRITICAL("[savestate-ngs] rack restored voices={} modules={} logical_blobs={} param_blobs={} needs_reinit={} saved_voices={} blocks={}",
+                diag_voices, diag_modules, diag_logical, diag_params, diag_reinit, info.voices.size(), info.blocks.size());
+
+        (void)diag_queued;
+    }
+
+    // Voices that were being mixed before the save must run again.
+    for (const SystemInitInfo &info : system_infos) {
+        System *system = Ptr<System>(info.address).get(mem);
+        if (!system)
+            return false;
+        std::vector<Voice *> restored_queue;
+        restored_queue.reserve(info.queued_voices.size());
+        for (const auto &[rack_index, voice_index] : info.queued_voices) {
+            if (rack_index >= system->racks.size())
+                return false;
+            Rack *rack = system->racks[rack_index];
+            if (!rack || voice_index >= rack->voices.size())
+                return false;
+            Voice *voice = rack->voices[voice_index].get(mem);
+            if (!voice || std::ranges::contains(restored_queue, voice))
+                return false;
+            restored_queue.push_back(voice);
+        }
+        // The saved order includes routing history, including cycles. Replaying
+        // deque_insert would sort dependencies again and alter that order.
+        const std::lock_guard<std::recursive_mutex> guard(system->voice_scheduler.mutex);
+        system->voice_scheduler.queue = std::move(restored_queue);
+        if (!info.queued_voices.empty()) {
+            const uint64_t diag_n = diag_restore_logs.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (diag_n <= 8 || (diag_n % 64) == 0)
+                LOG_CRITICAL("[savestate-ngs] system requeued {} voices (queue={})", info.queued_voices.size(), system->voice_scheduler.queue.size());
+        }
+    }
+    return true;
 }
 
 bool init_system(State &ngs, const MemState &mem, SceNgsSystemInitParams *parameters, Ptr<void> memspace, const uint32_t memspace_size) {
@@ -396,11 +694,21 @@ bool init_system(State &ngs, const MemState &mem, SceNgsSystemInitParams *parame
     }
 
     ngs.systems.push_back(sys);
+
+    SystemInitInfo info;
+    info.address = memspace.address();
+    info.memspace = memspace;
+    info.memspace_size = memspace_size;
+    info.params = *parameters;
+    ngs.system_infos.push_back(info);
+
     return true;
 }
 
 void release_system(State &ngs, const MemState &mem, System *system) {
     // this function assumes no ngs mutex is being held
+    const Address system_address = Ptr<const void>(system, mem).address();
+
     for (Rack *rack : system->racks) {
         if (!rack)
             continue;
@@ -414,6 +722,8 @@ void release_system(State &ngs, const MemState &mem, System *system) {
     system->racks.clear();
 
     vector_utils::erase_first(ngs.systems, system);
+    std::erase_if(ngs.system_infos, [system_address](const SystemInitInfo &info) { return info.address == system_address; });
+    std::erase_if(ngs.rack_infos, [system_address](const RackInitInfo &info) { return info.system_address == system_address; });
     system->~System();
 }
 
@@ -468,6 +778,14 @@ bool init_rack(State &ngs, const MemState &mem, System *system, SceNgsBufferInfo
 
     system->racks.push_back(rack);
 
+    RackInitInfo info;
+    info.address = init_info->data.address();
+    info.system_address = Ptr<const void>(system, mem).address();
+    info.system = Ptr<System>(system, mem);
+    info.info = *init_info;
+    info.description = *description;
+    ngs.rack_infos.push_back(info);
+
     return true;
 }
 
@@ -476,6 +794,9 @@ void release_rack(State &ngs, const MemState &mem, System *system, Rack *rack) {
     // this function should only be called outside of ngs update and with the scheduler mutex acquired (except when releasing the system)
     if (!rack)
         return;
+
+    const Address rack_address = Ptr<const void>(rack, mem).address();
+    std::erase_if(ngs.rack_infos, [rack_address](const RackInitInfo &info) { return info.address == rack_address; });
 
     // remove all queued voices
     for (const auto &voice : rack->voices) {

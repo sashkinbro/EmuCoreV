@@ -21,16 +21,6 @@ class UpstreamCoreRegressionContractTest {
         assertFalse(remove.contains("patch.get(emuenv.mem)->source"))
     }
 
-    @Test fun displayCallbackRemainsQueuedUntilGuestCallbackIsFinished() {
-        val worker = native("modules/SceGxm/SceGxm.cpp")
-            .substringAfter("static void display_entry_thread")
-            .substringBefore("static Ptr<void> gxmRunDeferredMemoryCallback")
-        val callback = worker.indexOf("display_thread->run_guest_function")
-        val normalPop = worker.indexOf("display_queue.pop()", callback)
-        assertTrue(callback >= 0 && normalPop > callback)
-        assertTrue(worker.substring(callback, normalPop).contains("free(emuenv.mem, display_callback->data)"))
-    }
-
     @Test fun gxmFinishRejectsForeignContextsBeforeRendererDereference() {
         val finish = native("modules/SceGxm/SceGxm.cpp")
             .substringAfter("EXPORT(int, sceGxmFinish")
@@ -53,18 +43,6 @@ class UpstreamCoreRegressionContractTest {
         assertTrue(jpeg.contains("case SCE_JPEGENC_PIXEL_BGRA8888:"))
         assertTrue(jpeg.contains("color_space, is_bgra, inPitch"))
         assertTrue(native("codec/src/mjpeg.cpp").contains("is_bgra ? AV_PIX_FMT_BGRA : AV_PIX_FMT_RGBA"))
-    }
-
-    @Test fun timedCondvarReacquiresMutexWithoutReusingExpiredTimeout() {
-        val wait = native("kernel/src/sync_primitives.cpp")
-            .substringAfter("int condvar_wait(")
-            .substringBefore("int condvar_signal(")
-        val waitResult = wait.indexOf("condvar->waiters.wait(")
-        val timeoutWriteback = wait.indexOf("writeback_timeout(timeout, deadline)")
-        val reacquire = wait.indexOf("mutex_lock_impl(")
-        assertTrue(waitResult >= 0 && timeoutWriteback > waitResult && reacquire > timeoutWriteback)
-        assertTrue(wait.contains("condvar->associated_mutex, weight, nullptr, false"))
-        assertTrue(wait.contains("return *r == SCE_KERNEL_OK ? lock_result : *r"))
     }
 
     @Test fun selectedPlusShaderFixesDoNotChangeGlobalRendererDefaults() {

@@ -19,6 +19,7 @@
 
 #include <gxm/functions.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
+#include <renderer/vulkan/surface_sync.h>
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/types.h>
 #include <vkutil/vkutil.h>
@@ -27,6 +28,7 @@
 
 #include <atomic>
 #include <cmath>
+#include <limits>
 #include <mem/functions.h>
 #include <util/align.h>
 #include <util/log.h>
@@ -69,6 +71,13 @@ static bool format_need_additional_memory(SceGxmColorBaseFormat format) {
 }
 
 namespace renderer::vulkan {
+
+static bool is_small_linear_writeback_surface(const ColorSurfaceCacheInfo &surface) {
+    constexpr uint32_t small_surface_limit = 512;
+    return surface.tiling == SurfaceTiling::Linear
+        && surface.original_width <= small_surface_limit
+        && surface.original_height <= small_surface_limit;
+}
 
 static bool surface_sync_needs_u4u4u4u4_repack(const ColorSurfaceCacheInfo &surface) {
     return surface.format == SCE_GXM_COLOR_BASE_FORMAT_U4U4U4U4
@@ -189,7 +198,7 @@ static void pack_rgba16f_to_u2f10f10f10(uint8_t *dst, const uint8_t *src, uint32
     }
 }
 
-static void protect_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
+static bool protect_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
     const bool trap_reads = (info.tiling == SurfaceTiling::Linear
         && format_support_surface_sync(info.format));
 
@@ -209,7 +218,7 @@ static void protect_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
     // Don't track dirty for small surfaces to avoid false positives from unrelated writes
     std::shared_ptr<bool> dirty = small_surface ? nullptr : info.dirty;
 
-    add_protect(mem, addr_start, addr_end - addr_start, perm,
+    return add_protect(mem, addr_start, addr_end - addr_start, perm,
         [dirty, need_sync](Address, bool write) {
             // ignore our own guest write-backs
             if (write && surface_sync_internal_write)
@@ -222,6 +231,10 @@ static void protect_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
                 *need_sync = true;
             return true;
         });
+}
+
+bool VKSurfaceCache::protect_cached_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
+    return protect_surface(mem, info);
 }
 
 ColorSurfaceCacheInfo::~ColorSurfaceCacheInfo() {
@@ -375,6 +388,36 @@ VKSurfaceCache::VKSurfaceCache(VKState &state)
     : state(state) {
     color_surface_queue.init(max_surfaces_allowed);
     ds_surface_queue.init(max_surfaces_allowed);
+}
+
+void VKSurfaceCache::reset() {
+    cleanup();
+    color_address_lookup.clear();
+    depth_address_lookup.clear();
+    stencil_address_lookup.clear();
+    color_surface_queue.init(max_surfaces_allowed);
+    ds_surface_queue.init(max_surfaces_allowed);
+    cpu_surfaces_changed.clear();
+    target = nullptr;
+    last_written_surface = nullptr;
+    pending_ds_scene = nullptr;
+    pending_ds_scene_stores = false;
+    pending_casts.clear();
+}
+
+void VKSurfaceCache::flush_all_surfaces(MemState &mem) {
+    if (!state.features.enable_memory_mapping)
+        return;
+
+    uint32_t flushed = 0;
+    for (auto &item : color_surface_queue.items) {
+        ColorSurfaceCacheInfo &info = item.content;
+        if (!info.texture.image || info.total_bytes == 0)
+            continue;
+        submit_immediate_surface_sync(info, &mem);
+        flushed++;
+    }
+    LOG_CRITICAL("[savestate-diag] flushed {} color surfaces to guest memory", flushed);
 }
 
 void VKSurfaceCache::cleanup() {
@@ -549,11 +592,20 @@ bool VKSurfaceCache::try_upload_guest_content(ColorSurfaceCacheInfo &info, MemSt
 }
 
 void VKSurfaceCache::note_scene_draw_rect(int32_t x0, int32_t y0, int32_t x1, int32_t y1) {
-    if (!last_written_surface || x1 <= x0 || y1 <= y0)
+    if (!last_written_surface)
         return;
     ColorSurfaceCacheInfo &info = *last_written_surface;
-    // scaled -> unscaled, rounded outward to the 32px tile the hardware writes back as a whole
+    info.scene_x0 = info.scene_y0 = info.scene_x1 = info.scene_y1 = 0;
+    if (x1 <= x0 || y1 <= y0)
+        return;
     const float inv = 1.0f / state.res_multiplier;
+    info.scene_x0 = std::clamp<int32_t>(static_cast<int32_t>(std::floor(x0 * inv)), 0, info.original_width);
+    info.scene_y0 = std::clamp<int32_t>(static_cast<int32_t>(std::floor(y0 * inv)), 0, info.original_height);
+    info.scene_x1 = std::clamp<int32_t>(static_cast<int32_t>(std::ceil(x1 * inv)), 0, info.original_width);
+    info.scene_y1 = std::clamp<int32_t>(static_cast<int32_t>(std::ceil(y1 * inv)), 0, info.original_height);
+    if (info.scene_x1 <= info.scene_x0 || info.scene_y1 <= info.scene_y0)
+        return;
+    // scaled -> unscaled, rounded outward to the 32px tile the hardware writes back as a whole
     int32_t ux0 = static_cast<int32_t>(std::floor(x0 * inv / 32.0f)) * 32;
     int32_t uy0 = static_cast<int32_t>(std::floor(y0 * inv / 32.0f)) * 32;
     int32_t ux1 = static_cast<int32_t>(std::ceil(x1 * inv / 32.0f)) * 32;
@@ -573,6 +625,15 @@ void VKSurfaceCache::note_scene_draw_rect(int32_t x0, int32_t y0, int32_t x1, in
 SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(MemState &mem, SceGxmColorSurface *color) {
     // Create the key to access the cache struct
     const uint32_t address = color->data.address();
+
+    // [savestate-diag] a framebuffer surface in unmapped memory renders black
+    if (address != 0 && !is_valid_addr(mem, address)) {
+        static std::atomic<uint64_t> bad_surfaces{ 0 };
+        const uint64_t n = bad_surfaces.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (n <= 20 || (n % 256) == 0)
+            LOG_CRITICAL("[savestate-diag] color surface with unmapped address {:#010x} ({}x{}, format {:#010x}, total {})",
+                address, color->width, color->height, static_cast<uint32_t>(color->colorFormat), n);
+    }
 
     const uint32_t original_width = color->width;
     const uint32_t original_height = color->height;
@@ -2249,6 +2310,22 @@ bool VKSurfaceCache::sync_surface_for_gpu_read(Address address, uint32_t size) {
     return true;
 }
 
+Address VKSurfaceCache::color_surface_limit(const Address address) const {
+    auto it = color_address_lookup.upper_bound(address);
+    const Address next_surface = it == color_address_lookup.end()
+        ? std::numeric_limits<Address>::max()
+        : it->first;
+
+    for (auto previous = it; previous != color_address_lookup.begin();) {
+        --previous;
+        const uint64_t surface_begin = previous->first;
+        const uint64_t surface_end = surface_begin + previous->second->total_bytes;
+        if (static_cast<uint64_t>(address) >= surface_begin && static_cast<uint64_t>(address) < surface_end)
+            return address;
+    }
+    return next_surface;
+}
+
 ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {
     // surface sync is supported only if memory mapping is enabled
     if (!state.features.enable_memory_mapping)
@@ -2369,6 +2446,30 @@ ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {
             }
         }
     }
+    bool partial_scene_sync = false;
+    if (is_small_linear_writeback_surface(*last_written_surface)) {
+        const ColorSurfaceCacheInfo &surface = *last_written_surface;
+        const bool covers_surface = surface.written_x0 <= 0 && surface.written_y0 <= 0
+            && surface.written_x1 >= static_cast<int32_t>(surface.original_width)
+            && surface.written_y1 >= static_cast<int32_t>(surface.original_height);
+        const bool identity_swizzle = surface.swizzle.r == vk::ComponentSwizzle::eR;
+        if (surface_partial_writeback_eligible(true, needs_copy_buffer, covers_surface, identity_swizzle)) {
+            const auto rect = intersect_surface_rects(
+                { sync_x0, sync_y0, sync_x0 + static_cast<int32_t>(sync_w), sync_y0 + static_cast<int32_t>(sync_h) },
+                { surface.scene_x0, surface.scene_y0, surface.scene_x1, surface.scene_y1 },
+                surface.original_width,
+                surface.original_height);
+            if (!rect)
+                return nullptr;
+            sync_x0 = rect->x0;
+            sync_y0 = rect->y0;
+            sync_w = static_cast<uint32_t>(rect->x1 - rect->x0);
+            sync_h = static_cast<uint32_t>(rect->y1 - rect->y0);
+            clamp_sync = true;
+            rt_clamped = true;
+            partial_scene_sync = true;
+        }
+    }
     if (skip_writeback || sync_w == 0 || sync_h == 0)
         return nullptr;
 
@@ -2477,6 +2578,12 @@ ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {
         copy.imageOffset = { sync_x0, sync_y0, 0 };
         copy.imageExtent = { sync_w, sync_h, 1 };
     }
+
+    last_written_surface->post_sync_x0 = sync_x0;
+    last_written_surface->post_sync_y0 = sync_y0;
+    last_written_surface->post_sync_width = sync_w;
+    last_written_surface->post_sync_height = sync_h;
+    last_written_surface->partial_write_back = partial_scene_sync;
 
     cmd_buffer.copyImageToBuffer(image_to_copy, image_layout, buffer, copy);
 

@@ -39,6 +39,8 @@ struct FFMPEGAtrac9Info {
 
 uint32_t Atrac9DecoderState::get(DecoderQuery query) {
     Atrac9CodecInfo *info = static_cast<Atrac9CodecInfo *>(atrac9_info);
+    if (!valid)
+        return 0;
 
     switch (query) {
     case DecoderQuery::CHANNELS: return info->channels;
@@ -58,6 +60,8 @@ uint32_t Atrac9DecoderState::get_es_size() {
 }
 
 void Atrac9DecoderState::flush() {
+    if (!valid)
+        return;
     Atrac9CodecInfo *info = static_cast<Atrac9CodecInfo *>(atrac9_info);
     superframe_frame_idx = 0;
     superframe_data_left = info->superframeSize;
@@ -70,23 +74,77 @@ void Atrac9DecoderState::flush() {
         std::fill_n(frame.Channels[1]->Mdct.ImdctPrevious, 256, 0.0);
 }
 
-void Atrac9DecoderState::export_state(Atrac9DecoderSavedState *dest) {
-    Frame &frame = static_cast<Atrac9Handle *>(decoder_handle)->Frame;
-    if (frame.Channels[0])
-        std::copy_n(frame.Channels[0]->Mdct.ImdctPrevious, 256, dest->prev_values[0]);
-    if (frame.Channels[1])
-        std::copy_n(frame.Channels[1]->Mdct.ImdctPrevious, 256, dest->prev_values[1]);
+void Atrac9DecoderState::export_state(Atrac9DecoderSavedState *dest) const {
+    *dest = {};
+    if (!valid)
+        return;
+    dest->has_history = true;
+    const Frame &frame = static_cast<Atrac9Handle *>(decoder_handle)->Frame;
+    for (int i = 0; i < frame.Config->ChannelCount; ++i) {
+        const Channel &channel = *frame.Channels[i];
+        std::copy_n(channel.Mdct.ImdctPrevious, 256, dest->prev_values[i]);
+        auto &history = dest->channels[i];
+        std::copy_n(channel.ScaleFactorsPrev, 31, history.scale_factors_prev);
+        history.rng_initialized = channel.Rng.Initialized != 0;
+        history.rng_state[0] = channel.Rng.StateA;
+        history.rng_state[1] = channel.Rng.StateB;
+        history.rng_state[2] = channel.Rng.StateC;
+        history.rng_state[3] = channel.Rng.StateD;
+    }
+    for (int i = 0; i < frame.Config->ChannelConfig.BlockCount; ++i) {
+        const Block &block = frame.Blocks[i];
+        dest->blocks[i] = { block.BandCount, block.StereoBand, block.ExtensionBand,
+            block.QuantizationUnitCount, block.StereoQuantizationUnit, block.ExtensionUnit,
+            block.QuantizationUnitsPrev, block.BandExtensionEnabled != 0 };
+    }
+    dest->frame_index = frame.IndexInSuperframe;
+    dest->superframe_frame_index = superframe_frame_idx;
+    dest->superframe_data_left = superframe_data_left;
 }
 
 void Atrac9DecoderState::load_state(const Atrac9DecoderSavedState *src) {
+    if (!valid)
+        return;
     Frame &frame = static_cast<Atrac9Handle *>(decoder_handle)->Frame;
-    if (frame.Channels[0])
-        std::copy_n(src->prev_values[0], 256, frame.Channels[0]->Mdct.ImdctPrevious);
-    if (frame.Channels[1])
-        std::copy_n(src->prev_values[1], 256, frame.Channels[1]->Mdct.ImdctPrevious);
+    if (!src->has_history) {
+        // Key-on/reset uses a zero logical overlap history even when the runtime
+        // decoder is reused. Leave its initialized superframe byte accounting
+        // and the other existing decoder history intact, as before.
+        for (int i = 0; i < frame.Config->ChannelCount; ++i)
+            std::fill_n(frame.Channels[i]->Mdct.ImdctPrevious, 256, 0.0);
+        return;
+    }
+    for (int i = 0; i < frame.Config->ChannelCount; ++i) {
+        Channel &channel = *frame.Channels[i];
+        std::copy_n(src->prev_values[i], 256, channel.Mdct.ImdctPrevious);
+        const auto &history = src->channels[i];
+        std::copy_n(history.scale_factors_prev, 31, channel.ScaleFactorsPrev);
+        channel.Rng.Initialized = history.rng_initialized;
+        channel.Rng.StateA = history.rng_state[0];
+        channel.Rng.StateB = history.rng_state[1];
+        channel.Rng.StateC = history.rng_state[2];
+        channel.Rng.StateD = history.rng_state[3];
+    }
+    for (int i = 0; i < frame.Config->ChannelConfig.BlockCount; ++i) {
+        Block &block = frame.Blocks[i];
+        const auto &history = src->blocks[i];
+        block.BandCount = history.band_count;
+        block.StereoBand = history.stereo_band;
+        block.ExtensionBand = history.extension_band;
+        block.QuantizationUnitCount = history.quantization_unit_count;
+        block.StereoQuantizationUnit = history.stereo_quantization_unit;
+        block.ExtensionUnit = history.extension_unit;
+        block.QuantizationUnitsPrev = history.quantization_units_prev;
+        block.BandExtensionEnabled = history.band_extension_enabled;
+    }
+    frame.IndexInSuperframe = src->frame_index;
+    superframe_frame_idx = src->superframe_frame_index;
+    superframe_data_left = src->superframe_data_left;
 }
 
 bool Atrac9DecoderState::send(const uint8_t *data, uint32_t size) {
+    if (!valid)
+        return false;
     Atrac9CodecInfo *info = static_cast<Atrac9CodecInfo *>(atrac9_info);
 
     int decode_used = 0;
@@ -122,6 +180,8 @@ bool Atrac9DecoderState::send(const uint8_t *data, uint32_t size) {
 }
 
 bool Atrac9DecoderState::receive(uint8_t *data, DecoderSize *size) {
+    if (!valid)
+        return false;
     Atrac9CodecInfo *info = static_cast<Atrac9CodecInfo *>(atrac9_info);
 
     if (data) {
@@ -139,8 +199,9 @@ Atrac9DecoderState::Atrac9DecoderState(uint32_t config_data)
     : config_data(config_data) {
     decoder_handle = Atrac9GetHandle();
     const int err = Atrac9InitDecoder(decoder_handle, reinterpret_cast<uint8_t *>(&config_data));
+    valid = (err == At9Status::ERR_SUCCESS);
 
-    if (err != At9Status::ERR_SUCCESS) {
+    if (!valid) {
         LOG_ERROR("Error initializing decoder. Error code: {}", log_hex(err));
     }
 

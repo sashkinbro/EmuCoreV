@@ -51,6 +51,10 @@ void generic_command_free(Command *cmd) {
 }
 
 void complete_command(State &state, CommandHelper &helper, const int code) {
+    if (helper.cmd->completion_id) {
+        complete_finish_command(state, helper.cmd->completion_id, code);
+        return;
+    }
     auto lock = std::unique_lock(state.command_finish_one_mutex);
     helper.complete(code);
     state.command_finish_one.notify_all();
@@ -77,7 +81,7 @@ static renderer::SyncWaitResult wait_cmd(MemState &mem, CommandList &command_lis
     return renderer::wishlist(sync, timestamp, 500);
 }
 
-static void process_batch(renderer::State &state, const FeatureState &features, MemState &mem, Config &config, CommandList &command_list) {
+bool process_batch_until_wait(renderer::State &state, const FeatureState &features, MemState &mem, Config &config, CommandList &command_list) {
     using CommandHandlerFunc = decltype(cmd_handle_set_context);
 
     const static std::map<CommandOpcode, CommandHandlerFunc *> handlers = {
@@ -123,6 +127,13 @@ static void process_batch(renderer::State &state, const FeatureState &features, 
             return table;
         }();
 
+        // A display callback may fulfill this sync after the renderer is
+        // frozen. Keep the exact remaining chain instead of blocking the host
+        // stack inside wishlist; already executed commands stay consumed.
+        if (cmd->opcode == CommandOpcode::WaitSyncObject) {
+            CommandList remaining{cmd, command_list.last, command_list.context};
+            if (!is_cmd_ready(mem, remaining)) return false;
+        }
         const size_t op_index = static_cast<size_t>(cmd->opcode);
         CommandHandlerFunc *handler_fn = op_index < handler_table.size() ? handler_table[op_index] : nullptr;
         if (!handler_fn) {
@@ -135,7 +146,8 @@ static void process_batch(renderer::State &state, const FeatureState &features, 
         state.progress_counter.fetch_add(1, std::memory_order_relaxed);
 
         Command *last_cmd = cmd;
-        cmd = cmd->next;
+        cmd = cmd == command_list.last ? nullptr : cmd->next;
+        command_list.first = cmd;
 
         if (command_list.context) {
             command_list.context->free_func(last_cmd);
@@ -143,6 +155,8 @@ static void process_batch(renderer::State &state, const FeatureState &features, 
             generic_command_free(last_cmd);
         }
     } while (true);
+    command_list.last = nullptr;
+    return true;
 }
 
 void process_batches(renderer::State &state, const FeatureState &features, MemState &mem, Config &config, int64_t max_wait_ms) {
@@ -157,7 +171,8 @@ void process_batches(renderer::State &state, const FeatureState &features, MemSt
             return;
 
         // Try to wait for a batch (about 2 or 3ms, game should be fast for this)
-        auto cmd_list = state.command_buffer_queue.top(3);
+        auto cmd_list = state.active_batch ? std::make_unique<CommandList>(*state.active_batch)
+                                           : state.command_buffer_queue.top(3);
 
         if (!cmd_list || !is_cmd_ready(mem, *cmd_list)) {
             // beginning of the game or homebrew not using gxm
@@ -188,8 +203,12 @@ void process_batches(renderer::State &state, const FeatureState &features, MemSt
             }
         }
 
-        state.command_buffer_queue.pop();
-        process_batch(state, features, mem, config, *cmd_list);
+        if (!state.active_batch) {
+            state.command_buffer_queue.pop();
+            state.active_batch = *cmd_list;
+        }
+        if (!process_batch_until_wait(state, features, mem, config, *state.active_batch)) return;
+        state.active_batch.reset();
     }
 }
 
@@ -262,13 +281,18 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
     auto next_presentation = std::chrono::steady_clock::now();
     int previous_frame_limit = 0;
     while (!state.render_abort.load(std::memory_order_relaxed)) {
+        state.snapshot_gate.boundary(true);
+        if (state.render_abort.load(std::memory_order_relaxed))
+            break;
 #ifdef TRACY_ENABLE
         ZoneScopedN("Game rendering");
 #endif
         if (!state.set_current())
             break;
 
+        state.render_phase.store(1, std::memory_order_relaxed);
         process_batches(state, state.features, mem, config, 500);
+        state.render_phase.store(0, std::memory_order_relaxed);
 
         if (state.render_abort.load(std::memory_order_relaxed))
             break;
@@ -295,8 +319,14 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
         }
         const bool should_present = frame_limit <= 0 || now >= next_presentation;
         if (should_present) {
+            state.render_phase.store(2, std::memory_order_relaxed);
             state.render_frame(display, gxm, mem);
+            state.render_phase.store(3, std::memory_order_relaxed);
             state.swap_window();
+            state.render_phase.store(0, std::memory_order_relaxed);
+            static std::atomic<uint32_t> present_count{ 0 };
+            if ((present_count.fetch_add(1, std::memory_order_relaxed) + 1) % 120 == 1)
+                LOG_CRITICAL("[fliptrace] renderer presented frame #{} should_display={} next_base=0x{:X}", present_count.load(), state.should_display, display.next_rendered_frame.base.address());
             if (frame_limit > 0) {
                 const auto interval = std::chrono::nanoseconds(1'000'000'000LL / frame_limit);
                 next_presentation += interval;
@@ -319,17 +349,40 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
 }
 
 void start_render_thread(State &state, DisplayState &display, GxmState &gxm, MemState &mem, Config &config) {
+    state.snapshot_gate.reset();
     state.render_abort = false;
     state.render_thread = std::make_unique<std::thread>(render_loop, std::ref(state), std::ref(display), std::ref(gxm), std::ref(mem), std::ref(config));
 }
 
+void discard_pending_batches(State &state) {
+    const auto discard = [](CommandList list) {
+        auto *command = list.first;
+        while (command) {
+            auto *next = command == list.last ? nullptr : command->next;
+            if (!(command->flags & Command::FLAG_NO_FREE)) {
+                destroy_command_payload(*command);
+                if (list.context) list.context->free_func(command); else generic_command_free(command);
+            }
+            command = next;
+        }
+    };
+    if (state.active_batch) discard(*state.active_batch);
+    state.active_batch.reset();
+    for (const auto &batch : state.command_buffer_queue.snapshot_items()) discard(batch);
+    state.command_buffer_queue.reset();
+    for (const auto &batch : state.snapshot_pending_batches) discard(batch);
+    state.snapshot_pending_batches.clear();
+}
+
 void stop_render_thread(State &state) {
+    abort_finish_operations(state);
     state.render_abort = true;
+    state.snapshot_gate.stop();
     state.command_buffer_queue.abort();
     if (state.render_thread && state.render_thread->joinable())
         state.render_thread->join();
     state.render_thread.reset();
-    state.command_buffer_queue.reset();
+    discard_pending_batches(state);
 }
 
 } // namespace renderer

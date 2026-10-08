@@ -53,6 +53,9 @@ void write_lr(CPUState &cpu,uint32_t value) {registers(cpu).context.set_lr(value
 void write_tpidruro(CPUState &cpu,uint32_t value) {registers(cpu).tpidruro=value;}
 CPUContext save_context(CPUState &cpu) {return registers(cpu).context;}
 void load_context(CPUState &cpu,const CPUContext &context) {++registers(cpu).restorations;registers(cpu).context=context;}
+// These regressions use host variables as output slots and never restore RAM.
+// Their logical guest addresses are outside this test boundary.
+Address host_to_guest(const MemState &, const void *) { return 0; }
 void stop(CPUState &) {}
 void guest_sched_release_for_block() {token_cpu=nullptr; ++releases;}
 CPUState *guest_sched_token_cpu() {return token_cpu;}

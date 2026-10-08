@@ -19,11 +19,22 @@
 
 #include <audio/impl/cubeb_audio.h>
 #include <audio/impl/sdl_audio.h>
+#include "SDL_audio_state.h"
 
 #include <util/log.h>
 
 #include <cassert>
 #include <cstring>
+
+bool validate_audio_port_snapshot(uint32_t codec, int len_bytes, const std::vector<uint8_t> &snapshot) {
+    if (snapshot.empty())
+        return false;
+    if (codec == 1)
+        return SDL_ValidateAudioStreamState(snapshot.data(), snapshot.size());
+    if (codec == 2)
+        return validate_cubeb_audio_snapshot(len_bytes, snapshot);
+    return false;
+}
 
 bool AudioState::init(const std::string &adapter_name) {
     set_backend(adapter_name);
@@ -38,7 +49,9 @@ void AudioState::stop_all_ports() {
         const std::lock_guard<std::mutex> lock(mutex);
         for (auto &[_, port] : out_ports) {
             port->stopping = true;
+            port->notify_output_ready();
         }
+        LOG_CRITICAL("[savestate-audio] stop_all_ports: {} ports stopped", out_ports.size());
     }
     if (adapter)
         adapter->wake_all_ports();
@@ -94,34 +107,19 @@ AudioOutPortPtr AudioState::open_port(int nb_channels, int freq, int nb_sample) 
     if (!port)
         return nullptr;
 
+    LOG_CRITICAL("[savestate-audio] open_port channels={} freq={} samples={} len_us={}", nb_channels, freq, nb_sample, port->len_microseconds);
     set_volume(*port, port->volume);
     return port;
 }
 
-void AudioState::audio_output(AudioOutPort &out_port, const void *buffer) {
-    if (out_port.stopping)
-        return;
-
-    adapter->audio_output(out_port, buffer);
-
-    if (out_port.stopping)
-        return;
-
-    uint64_t now = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    uint64_t diff = now - out_port.last_output;
-    uint64_t to_wait = out_port.len_microseconds - diff;
-    if (diff < out_port.len_microseconds && to_wait > 1000) {
-        // This is what we should be waiting to be perfectly accurate
-        // However, doing so would cause the host audio buffer to often lack samples to output
-        // This is because the PS Vita and the host audio parameters do not match exactly
-        // So instead only wait 50% of the time
-        // also don't sleep for less than 0.5 ms
-        to_wait /= 2;
-        std::this_thread::sleep_for(std::chrono::microseconds(to_wait));
-        out_port.last_output = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    } else {
-        out_port.last_output = now;
-    }
+AudioOutPortPtr AudioState::open_port_for_restore(int nb_channels, int freq, int nb_sample) {
+    if (!adapter)
+        return nullptr;
+    AudioOutPortPtr port = adapter->open_port_for_restore(nb_channels, freq, nb_sample);
+    if (!port)
+        return nullptr;
+    set_volume(*port, port->volume);
+    return port;
 }
 
 void AudioState::set_volume(AudioOutPort &out_port, float volume) {
@@ -150,6 +148,7 @@ void AudioState::wake_all_ports() {
     const std::lock_guard<std::mutex> lock(mutex);
     for (auto &[_, port] : out_ports) {
         port->stopping = true;
+        port->notify_output_ready();
     }
     if (adapter)
         adapter->wake_all_ports();

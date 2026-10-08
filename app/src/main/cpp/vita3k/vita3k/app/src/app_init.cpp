@@ -20,6 +20,7 @@
 #include <exception>
 
 #include <audio/state.h>
+#include <audio/continuation.h>
 #include <camera/state.h>
 #include <cheat/functions.h>
 #include <compat/state.h>
@@ -622,6 +623,7 @@ bool late_init(EmuEnvState &state) {
     if (!state.audio.init(state.cfg.current_config.audio_backend)) {
         LOG_WARN("Failed to initialize audio! Audio will not work.");
     }
+    register_audio_wait_handlers(state.kernel, state.audio, state.mem);
 
     if (!ngs::init(state.ngs, state.mem)) {
         LOG_ERROR("Failed to initialize ngs.");

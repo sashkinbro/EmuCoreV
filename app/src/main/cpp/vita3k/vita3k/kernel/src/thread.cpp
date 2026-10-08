@@ -105,6 +105,9 @@ int ThreadState::init(const char *name, Ptr<const void> entry_point, int init_pr
 
     CPUContext ctx;
     ctx.set_sp(stack_top());
+    // load_context() restores the CP15 state, so the initial context must carry
+    // the TLS pointer written above or thread start would clear TPIDRURO.
+    ctx.tpidruro = user_tls_ptr.address();
     if (option) {
         ctx.cpu_registers[0] = option->attr;
         ctx.cpu_registers[1] = option->size;
@@ -116,6 +119,10 @@ int ThreadState::init(const char *name, Ptr<const void> entry_point, int init_pr
 
 int ThreadState::start(SceSize arglen, const Ptr<void> argp, bool run_entry_callback) {
     std::unique_lock<std::mutex> thread_lock(mutex);
+    return start_locked(arglen, argp, run_entry_callback);
+}
+
+int ThreadState::start_locked(SceSize arglen, const Ptr<void> argp, bool run_entry_callback) {
     if (status != ThreadStatus::dormant)
         return SCE_KERNEL_ERROR_RUNNING;
 
@@ -437,7 +444,7 @@ void ThreadState::run_loop() {
         status = ThreadStatus::running;
 
         lock.unlock();
-        const int ret = run_callback(kernel.thread_event_end.address(), { SCE_KERNEL_THREAD_EVENT_TYPE_END, static_cast<uint32_t>(id), 0, kernel.thread_event_end_arg });
+        const int ret = run_callback(kernel.thread_event_end.address(), { SCE_KERNEL_THREAD_EVENT_TYPE_END, static_cast<uint32_t>(id), 0, kernel.thread_event_end_arg }, CallbackPurpose::thread_end, { static_cast<uint32_t>(old_status), old_returned_value });
         if (ret != 0)
             LOG_WARN("Thread end event handler returned {}", log_hex(ret));
         lock.lock();
@@ -447,6 +454,13 @@ void ThreadState::run_loop() {
     };
 
     while (true) {
+        if (top_level && restored_continuations_pending && !delete_requested) {
+            if (!wait_for_guest_resume(lock)) break;
+            update_status(ThreadStatus::running);
+            lock.unlock();
+            resume_restored_continuations();
+            lock.lock();
+        }
         // Check if this call-level is done (normal exit, guest return, or delete).
         if (exit_requested || guest_returned || delete_requested) {
             // Top-level fires the end callback and parks dormant
@@ -466,7 +480,7 @@ void ThreadState::run_loop() {
         if (status != ThreadStatus::running) {
             guest_sched_release_for_block();
             status_cond.wait(lock, [&] {
-                return status == ThreadStatus::running || delete_requested;
+                return status == ThreadStatus::running || delete_requested || (top_level && restored_continuations_pending);
             });
             continue;
         }
@@ -476,7 +490,7 @@ void ThreadState::run_loop() {
             run_start_callback = false;
             lock.unlock();
             if (kernel.thread_event_start) {
-                const int ret = run_callback(kernel.thread_event_start.address(), { SCE_KERNEL_THREAD_EVENT_TYPE_START, static_cast<uint32_t>(id), 0, kernel.thread_event_start_arg });
+                const int ret = run_callback(kernel.thread_event_start.address(), { SCE_KERNEL_THREAD_EVENT_TYPE_START, static_cast<uint32_t>(id), 0, kernel.thread_event_start_arg }, CallbackPurpose::thread_start);
                 if (ret != 0)
                     LOG_WARN("Thread start event handler returned {}", log_hex(ret));
             }
@@ -509,6 +523,7 @@ void ThreadState::run_loop() {
                 // breadcrumbs for the hang dump: free here, a global lock inside call_import
                 last_import_nid = nid;
                 last_import_lr = read_lr(*cpu);
+                last_import_context = save_context(*cpu);
                 kernel.call_import(*cpu, nid, id);
                 clear_exclusive(*cpu);
             }
@@ -553,6 +568,7 @@ void ThreadState::run_loop() {
                     const uint32_t nid = *Ptr<uint32_t>(read_pc(*cpu) + 4).get(mem);
                     last_import_nid = nid;
                     last_import_lr = read_lr(*cpu);
+                    last_import_context = save_context(*cpu);
                     kernel.call_import(*cpu, nid, id);
                     clear_exclusive(*cpu);
                 }
@@ -561,7 +577,7 @@ void ThreadState::run_loop() {
 
             lock.lock();
 
-            if (do_step || suspend_requested || vm_suspended || world_stop_requested || (hit_breakpoint(*cpu) && !probe_handled)) {
+            if (do_step || suspend_requested || vm_suspended || world_stop_requested || session_suspended || (hit_breakpoint(*cpu) && !probe_handled)) {
                 suspend_requested = false;
                 if (do_step || (hit_breakpoint(*cpu) && !probe_handled))
                     debugger_suspended = true;
@@ -616,7 +632,7 @@ void ThreadState::dispatch_abort(CPUState &cpu) {
         handler, fault_addr, ctx[15], sp_orig, sp_aligned);
 
     // run_callback saves/restores full CPU context internally
-    run_callback(handler, { sp_aligned });
+    run_callback(handler, { sp_aligned }, CallbackPurpose::abort_handler);
 }
 
 uint32_t ThreadState::run_guest_function(Address callback_address, SceSize args, const Ptr<void> argp) {
@@ -635,6 +651,33 @@ uint32_t ThreadState::run_guest_function(Address callback_address, SceSize args,
     return returned_value;
 }
 
+bool ThreadState::try_start_guest_function(Address callback_address, SceSize args, Address &previous_entry) {
+    // Session pause admission and callback start share the registry -> thread
+    // lock order, so a dormant callback cannot slip through a borrowed pause.
+    const std::lock_guard registry_lock(kernel.mutex);
+    const std::lock_guard lock(mutex);
+    if (kernel.is_threads_paused() || !cpu || status != ThreadStatus::dormant || delete_requested || exit_requested
+        || world_stop_requested || vm_suspended || debugger_suspended || session_suspended)
+        return false;
+    previous_entry = entry_point;
+    entry_point = callback_address;
+    return start_locked(args, {}, false) == SCE_KERNEL_OK;
+}
+
+bool ThreadState::guest_function_finished(std::chrono::milliseconds budget) {
+    std::unique_lock lock(mutex);
+    status_cond.wait_for(lock, budget, [&] { return status == ThreadStatus::dormant || delete_requested; });
+    return status == ThreadStatus::dormant;
+}
+
+bool ThreadState::finish_guest_function(Address previous_entry) {
+    const std::lock_guard lock(mutex);
+    if (status != ThreadStatus::dormant)
+        return false;
+    entry_point = previous_entry;
+    return true;
+}
+
 ThreadState::ThreadState(SceUID id, KernelState &kernel, MemState &mem)
     : id(id)
     , kernel(kernel)
@@ -647,6 +690,99 @@ ThreadState::~ThreadState() {
 
 Address ThreadState::stack_top() const {
     return stack.get() + stack_size;
+}
+
+ThreadState::Snapshot ThreadState::capture_snapshot() const {
+    // Obtain the registry clock before the thread lock (registry -> thread order).
+    const auto snapshot_time = kernel.capture_clock().steady;
+    const std::lock_guard lock(mutex);
+    Snapshot snapshot;
+    snapshot.id = id;
+    snapshot.name = name;
+    snapshot.entry_point = entry_point;
+    snapshot.stack_addr = stack.get();
+    snapshot.stack_size = stack_size;
+    snapshot.tls_addr = tls.get();
+    snapshot.priority = priority;
+    snapshot.affinity_mask = affinity_mask;
+    snapshot.start_tick = start_tick;
+    snapshot.last_vblank_waited = last_vblank_waited;
+    snapshot.status = status;
+    if ((world_stop_requested || session_suspended) && status == ThreadStatus::suspended && !vm_suspended && !debugger_suspended)
+        snapshot.status = wait_continuations.empty() || !callback_frames.empty() ? ThreadStatus::running : ThreadStatus::waiting;
+    snapshot.returned_value = returned_value;
+    snapshot.context = cpu ? save_context(*cpu) : retained_cpu_context;
+    snapshot.init_context = init_cpu_ctx;
+    snapshot.signal_pending = signal_pending;
+    snapshot.wake_pending = wake_pending;
+    snapshot.callbacks_pending = callbacks_pending;
+    snapshot.debugger_suspended = debugger_suspended;
+    snapshot.callback_cursor = callback_cursor;
+    snapshot.exit_requested = exit_requested;
+    snapshot.delete_requested = delete_requested;
+    snapshot.vm_suspended = vm_suspended;
+    snapshot.single_stepping = single_stepping;
+    snapshot.run_start_callback = run_start_callback;
+    snapshot.run_end_callback = run_end_callback;
+    snapshot.is_processing_callbacks = is_processing_callbacks;
+    snapshot.call_level = call_level; // diagnostic only: host frames are rebuilt
+    for (const auto &ref : callbacks) snapshot.callback_uids.push_back(ref.uid);
+    const auto now = snapshot_time;
+    for (const auto &record : wait_continuations) {
+        const std::lock_guard guard(record->mutex);
+        auto wait = record->state;
+        wait.infinite = record->deadline == Deadline::max();
+        const auto left = std::chrono::duration_cast<std::chrono::microseconds>(record->deadline - now).count();
+        wait.remaining_us = !wait.infinite && left > 0 ? static_cast<uint64_t>(left) : 0;
+        snapshot.waits.push_back(wait);
+    }
+    for (const auto &frame : callback_frames) snapshot.callback_frames.push_back(*frame);
+    return snapshot;
+}
+
+void ThreadState::apply_private_snapshot(const Snapshot &snapshot) {
+    const std::lock_guard lock(mutex);
+    init_cpu_ctx = snapshot.init_context;
+    retained_cpu_context = snapshot.context;
+    returned_value = snapshot.returned_value;
+    exit_requested = snapshot.exit_requested;
+    delete_requested = snapshot.delete_requested;
+    vm_suspended = snapshot.vm_suspended;
+    debugger_suspended = snapshot.debugger_suspended;
+    session_suspended = false;
+    single_stepping = snapshot.single_stepping;
+    run_start_callback = snapshot.run_start_callback;
+    run_end_callback = snapshot.run_end_callback;
+    is_processing_callbacks = snapshot.is_processing_callbacks;
+    callback_cursor = snapshot.callback_cursor;
+    signal_pending = snapshot.signal_pending;
+    wake_pending = snapshot.wake_pending;
+    callbacks_pending = snapshot.callbacks_pending;
+    callbacks.clear();
+    for (const auto uid : snapshot.callback_uids) {
+        const auto it = kernel.callbacks.find(uid);
+        callbacks.push_back({ uid, it == kernel.callbacks.end() ? std::weak_ptr<Callback>{} : it->second });
+        if (it != kernel.callbacks.end() && it->second->get_num_notifications() != 0)
+            callbacks_pending = true;
+    }
+    wait_continuations.clear();
+    callback_frames.clear();
+    next_continuation_sequence = 1;
+    for (const auto &saved : snapshot.waits) {
+        auto record = std::make_shared<WaitContinuation>();
+        record->state = saved;
+        record->resuming = true;
+        wait_continuations.push_back(record);
+        next_continuation_sequence = std::max(next_continuation_sequence, saved.frame_sequence + 1);
+    }
+    for (const auto &saved : snapshot.callback_frames) {
+        callback_frames.push_back(std::make_shared<CallbackContinuationSnapshot>(saved));
+        next_continuation_sequence = std::max(next_continuation_sequence, saved.frame_sequence + 1);
+    }
+    restored_continuations_pending = !wait_continuations.empty() || !callback_frames.empty();
+    if (cpu) load_context(*cpu, snapshot.context);
+    // call_level belongs to the live C++ stack, never to the serialized guest.
+    update_status(snapshot.status);
 }
 
 std::string ThreadState::log_stack_traceback() const {

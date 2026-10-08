@@ -47,6 +47,8 @@ struct Callback {
      */
     Callback(SceUID uid, const ThreadStatePtr &owner, const std::string &name, Ptr<SceKernelCallbackFunction> cb_func, Ptr<void> pCommon);
 
+    Callback(SceUID uid, SceUID owner_id, const ThreadStatePtr &owner, const std::string &name, Ptr<SceKernelCallbackFunction> cb_func, Ptr<void> pCommon);
+
     /**
      * @return UID of this callback
      */
@@ -121,6 +123,14 @@ struct Callback {
      * @return The notifications, or nothing if the callback was not notified
      */
     std::optional<Notification> take_notification();
+
+    struct Snapshot {
+        uint32_t num_notifications = 0;
+        SceInt32 notification_arg = 0;
+        SceUID notifier_id = SCE_UID_INVALID_UID;
+    };
+    Snapshot capture_snapshot();
+    void apply_snapshot(const Snapshot &snapshot);
 
 private:
     void reset();

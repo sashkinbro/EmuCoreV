@@ -24,6 +24,8 @@
 
 #include <span>
 #include <stack>
+#include <system_error>
+#include <thread>
 #if defined(__x86_64__) && !defined(__APPLE__)
 #include <xxh_x86dispatch.h>
 #else
@@ -34,6 +36,8 @@
 #include <display/functions.h>
 #include <display/state.h>
 #include <gxm/functions.h>
+#include <gxm/display_queue.h>
+#include <gxm/savestate.h>
 #include <gxm/state.h>
 #include <gxm/types.h>
 #include <kernel/state.h>
@@ -44,6 +48,8 @@
 #include <renderer/functions.h>
 #include <renderer/state.h>
 #include <renderer/types.h>
+#include <renderer/vulkan/types.h>
+#include <renderer/gl/types.h>
 #include <util/align.h>
 #include <util/bytes.h>
 #include <util/log.h>
@@ -898,76 +904,84 @@ std::string to_debug_str<SceGxmTransferFlags>(const MemState &mem, SceGxmTransfe
     return std::to_string(type);
 }
 
-static void display_entry_thread(EmuEnvState &emuenv) {
-    auto &display_queue = emuenv.gxm.display_queue;
-    const Address callback_address = emuenv.gxm.params.displayQueueCallback.address();
-    const ThreadStatePtr display_thread = emuenv.kernel.get_thread(emuenv.gxm.display_queue_thread);
-    if (!display_thread) {
-        LOG_CRITICAL("display_thread not found. thid:{}", emuenv.gxm.display_queue_thread);
-        return;
+namespace gxm {
+bool process_display_queue_step(EmuEnvState &emuenv) {
+    auto &gxm = emuenv.gxm;
+    auto &queue = gxm.display_queue;
+    if (queue.is_aborted() || emuenv.display.abort.load())
+        return false;
+    gxm.display_worker_state.store(static_cast<int>(gxm.display_phase), std::memory_order_relaxed);
+    const auto entry = queue.top(1000);
+    if (!entry)
+        return !queue.is_aborted();
+    if (gxm.display_phase == DisplayWorkerPhase::Idle) {
+        gxm.display_phase = DisplayWorkerPhase::WaitOldSync;
+        return true;
     }
+    auto *old_sync = entry->old_sync.get(emuenv.mem);
+    auto *new_sync = entry->new_sync.get(emuenv.mem);
+    if (gxm.display_phase == DisplayWorkerPhase::WaitOldSync
+        || gxm.display_phase == DisplayWorkerPhase::WaitNewSync) {
+        const bool old = gxm.display_phase == DisplayWorkerPhase::WaitOldSync;
+        const auto result = renderer::wishlist(old ? old_sync : new_sync,
+            old ? entry->old_sync_timestamp : entry->new_sync_timestamp, 10'000);
+        if (result == renderer::SyncWaitResult::Shutdown)
+            return false;
+        if (result == renderer::SyncWaitResult::TimedOut) {
+            if (++gxm.display_sync_wait_ticks == 500 || gxm.display_sync_wait_ticks % 3000 == 0)
+                LOG_ERROR("DISPLAY QUEUE STALLED: waiting on {} sync object for timestamp {}; producer remains parked in sceGxmDisplayQueueAddEntry",
+                    old ? "old" : "new", old ? entry->old_sync_timestamp : entry->new_sync_timestamp);
+            return true;
+        }
+        gxm.display_sync_wait_ticks = 0;
+        gxm.display_phase = old && old_sync != new_sync
+            ? DisplayWorkerPhase::WaitNewSync : DisplayWorkerPhase::StartCallback;
+        return true;
+    }
+    const auto thread = emuenv.kernel.get_thread(gxm.display_queue_thread);
+    if (!thread)
+        return false;
+    if (gxm.display_phase == DisplayWorkerPhase::StartCallback) {
+        emuenv.display.predicting = entry->frame_predicted;
+        emuenv.display.current_sync_object = entry->new_sync.address();
+        if (thread->try_start_guest_function(gxm.params.displayQueueCallback.address(), entry->data,
+                gxm.display_previous_entry_point)) {
+            gxm.display_phase = DisplayWorkerPhase::WaitCallback;
+        } else {
+            // A VM/debugger/world pause must not trap the host outside its gate
+            // or allow callback context preparation while the CPU is frozen.
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        return true;
+    }
+    if (gxm.display_phase == DisplayWorkerPhase::WaitCallback) {
+        if (thread->guest_function_finished(std::chrono::milliseconds(10)))
+            gxm.display_phase = DisplayWorkerPhase::Complete;
+        return true;
+    }
+    if (gxm.display_phase != DisplayWorkerPhase::Complete
+        || !thread->finish_guest_function(gxm.display_previous_entry_point))
+        return false;
+    // No capture boundary inside this commit: signals, free and queue removal
+    // cannot be replayed separately after a restore.
+    renderer::subject_done(old_sync, entry->old_sync_timestamp + 1);
+    if (old_sync != new_sync)
+        renderer::subject_done(new_sync, entry->new_sync_timestamp + 1);
+    if (entry->data)
+        free(emuenv.mem, entry->data);
+    queue.pop();
+    gxm.display_entries_done.fetch_add(1, std::memory_order_relaxed);
+    gxm.display_previous_entry_point = 0;
+    gxm.display_phase = DisplayWorkerPhase::Idle;
+    return true;
+}
+} // namespace gxm
 
+static void display_entry_thread(EmuEnvState &emuenv) {
     while (true) {
-        emuenv.gxm.display_worker_state.store(0, std::memory_order_relaxed);
-        auto display_callback = display_queue.top();
-        if (!display_callback)
+        emuenv.gxm.display_snapshot_gate.boundary(true);
+        if (!gxm::process_display_queue_step(emuenv))
             break;
-
-        SceGxmSyncObject *old_sync = display_callback->old_sync.get(emuenv.mem);
-        SceGxmSyncObject *new_sync = display_callback->new_sync.get(emuenv.mem);
-
-        const auto wait_sync = [&](SceGxmSyncObject *sync, uint32_t wanted, const char *which) {
-            uint32_t stalled_seconds = 0;
-            while (true) {
-                const renderer::SyncWaitResult res = renderer::wishlist(sync, wanted, 1'000'000);
-                if (res != renderer::SyncWaitResult::TimedOut)
-                    return res;
-                if (emuenv.display.abort.load())
-                    return renderer::SyncWaitResult::Shutdown;
-                stalled_seconds++;
-                if (stalled_seconds == 5 || (stalled_seconds % 30) == 0)
-                    LOG_ERROR("DISPLAY QUEUE STALLED {}s: waiting on {} sync object 0x{:X} for timestamp {}, current {} (ahead {}); the guest render thread is blocked in sceGxmDisplayQueueAddEntry",
-                        stalled_seconds, which, reinterpret_cast<uintptr_t>(sync), wanted,
-                        sync->timestamp_current.load(), sync->timestamp_ahead.load());
-            }
-        };
-        emuenv.gxm.display_worker_state.store(1, std::memory_order_relaxed);
-        if (wait_sync(old_sync, display_callback->old_sync_timestamp, "old") == renderer::SyncWaitResult::Shutdown) {
-            return;
-        }
-        if (old_sync != new_sync) {
-            emuenv.gxm.display_worker_state.store(2, std::memory_order_relaxed);
-            if (wait_sync(new_sync, display_callback->new_sync_timestamp, "new") == renderer::SyncWaitResult::Shutdown) {
-                return;
-            }
-        }
-        emuenv.gxm.display_worker_state.store(3, std::memory_order_relaxed);
-
-        // check if we're shutting down before calling run_guest_function to avoid deadlock
-        if (emuenv.display.abort.load()) {
-            LOG_DEBUG("Abort detected, removing display callback data and exiting");
-            display_queue.pop();
-            emuenv.gxm.display_entries_done.fetch_add(1, std::memory_order_relaxed);
-            free(emuenv.mem, display_callback->data);
-            break;
-        }
-
-        // specify whether the call to SceDisplaySetFrameBuf is expected to do something
-        emuenv.display.predicting = display_callback->frame_predicted;
-        emuenv.display.current_sync_object = display_callback->new_sync.address();
-
-        // Now run callback
-        display_thread->run_guest_function(callback_address, display_callback->data);
-
-        // Notifies the renderer of the completion of the callback for the display_entry.
-        // The last_display of the entry, when pushed into the queue, is guaranteed to be timestamp_ahead + 1 at the time of the call.
-        renderer::subject_done(old_sync, display_callback->old_sync_timestamp + 1);
-        if (old_sync != new_sync)
-            renderer::subject_done(new_sync, display_callback->new_sync_timestamp + 1);
-
-        free(emuenv.mem, display_callback->data);
-        display_queue.pop();
-        emuenv.gxm.display_entries_done.fetch_add(1, std::memory_order_relaxed);
     }
 }
 
@@ -1004,7 +1018,9 @@ struct CommandListRange {
 typedef std::set<CommandListRange>::iterator RangeIterator;
 
 struct SceGxmCommandList {
-    renderer::CommandList *list;
+    renderer::CommandList *list = nullptr;
+    Address guest_address = 0;
+    uint64_t identity = 0;
 
     // the locations on the vita memory that correspond to this command list
     // this part is not copied in the command list given to the game by endCommandList
@@ -1013,6 +1029,15 @@ struct SceGxmCommandList {
 
 // Seems on real vita, this is the maximum size, I got stack corrupt if try to write more
 static_assert(sizeof(SceGxmCommandList) - sizeof(std::stack<CommandListRange>) <= 32);
+
+static std::atomic<uint64_t> next_command_list_identity{1};
+static uint64_t allocate_command_list_identity() {
+    uint64_t current = next_command_list_identity.load(std::memory_order_relaxed);
+    for (;;) {
+        if (current > UINT64_MAX - 2) return 0;
+        if (next_command_list_identity.compare_exchange_weak(current, current + 2, std::memory_order_relaxed)) return current;
+    }
+}
 
 struct SceGxmContext {
     GxmContextState state;
@@ -1242,7 +1267,7 @@ static void destroy_pending_immediate_commands(SceGxmContext *context) {
 static void destroy_pending_deferred_command_chain(renderer::CommandList &command_list) {
     renderer::Command *cmd = command_list.first;
     while (cmd) {
-        renderer::Command *next = cmd->next;
+        renderer::Command *next = cmd == command_list.last ? nullptr : cmd->next;
         renderer::destroy_command_payload(*cmd);
         free(cmd);
         cmd = next;
@@ -1368,6 +1393,7 @@ void invalidate_sync_objects(GxmState &gxm) {
 void shutdown(EmuEnvState &emuenv) {
     emuenv.display.abort = true;
     emuenv.renderer->notification_ready.notify_all();
+    emuenv.gxm.display_snapshot_gate.stop();
     emuenv.gxm.display_queue.abort();
     emuenv.renderer->render_abort = true;
     invalidate_sync_objects(emuenv.gxm);
@@ -1385,6 +1411,7 @@ struct SceGxmRenderTarget {
     std::uint16_t height;
     std::uint16_t scenesPerFrame;
     SceUID driverMemBlock;
+    SceGxmRenderTargetParams params{};
 };
 
 static int destroy_gxm_render_target(EmuEnvState &emuenv, SceGxmRenderTarget *render_target, const Address render_target_addr, const bool force_backend_destroy) {
@@ -1431,6 +1458,686 @@ void destroy_all_render_targets(EmuEnvState &emuenv, const bool force_backend_de
 
 } // namespace gxm
 
+namespace gxm {
+
+std::vector<std::pair<Address, renderer::RenderTarget *>> runtime_render_targets(EmuEnvState &emuenv) {
+    std::vector<std::pair<Address, renderer::RenderTarget *>> result;
+    for (const auto &[target, address] : emuenv.gxm.render_targets)
+        result.emplace_back(address, target ? target->renderer.get() : nullptr);
+    return result;
+}
+
+std::vector<std::pair<Address, renderer::Context *>> runtime_contexts(EmuEnvState &emuenv) {
+    std::vector<std::pair<Address, renderer::Context *>> result;
+    for (const auto &[context, address] : emuenv.gxm.immediate_contexts)
+        result.emplace_back(address, context ? context->renderer.get() : nullptr);
+    for (const auto &[context, address] : emuenv.gxm.deferred_contexts)
+        result.emplace_back(address, context ? context->renderer.get() : nullptr);
+    return result;
+}
+
+renderer::CommandList *resolve_deferred_command_list(EmuEnvState &emuenv, uint64_t identity) {
+    if (!(identity & 1)) return nullptr;
+    for (const auto &[context, address] : emuenv.gxm.deferred_contexts)
+        for (const auto &range : context->command_list_ranges)
+            if (range.command_list && range.command_list->identity == identity)
+                return range.command_list->list;
+    return nullptr;
+}
+
+bool validate_command_graph(const std::vector<ContextSnapshot> &contexts,
+    const std::vector<renderer::CommandSnapshot> &commands, std::string &error) {
+    return validate_command_graph(contexts, commands, {}, error);
+}
+bool validate_command_graph(const std::vector<ContextSnapshot> &contexts,
+    const std::vector<renderer::CommandSnapshot> &commands, const std::vector<BatchSnapshot> &batches, std::string &error) {
+    const auto fail = [&] { error = "invalid pending GXM command graph ownership or ranges"; return false; };
+    if (commands.size() > 262144 || batches.size() > 65536 || contexts.size() > 4096) return fail();
+    std::vector<uint32_t> owners(commands.size() + 1), references(commands.size() + 1);
+    size_t traversal_budget = 1048576;
+    for (const auto &command : commands)
+        if (command.next > commands.size() || !renderer::validate_command_snapshot(command, error)) return false;
+    const auto visit = [&](uint32_t first, uint32_t last, bool deferred_owner, bool owns) {
+        if ((!first) != (!last) || first > commands.size() || last > commands.size()) return false;
+        if (!first) return true;
+        std::set<uint32_t> seen;
+        for (auto id = first;; id = commands[id - 1].next) {
+            if (!id || id > commands.size() || !seen.insert(id).second || !traversal_budget--) return false;
+            const auto &cmd = commands[id - 1];
+            ++references[id];
+            if (owns) {
+                if (deferred_owner != cmd.deferred_allocation && deferred_owner) return false;
+                if (deferred_owner == cmd.deferred_allocation) ++owners[id];
+            }
+            if (id == last) return true;
+        }
+    };
+    std::set<uint64_t> identities;
+    for (const auto &context : contexts) {
+        if (!visit(context.pending_first, context.pending_last, context.deferred, true)) return fail();
+        size_t current = 0;
+        std::map<Address, Address> ranges;
+        for (const auto &list : context.deferred_lists) {
+            if (!context.deferred || list.ranges.size() > 65536) return fail();
+            if (list.current) {
+                ++current;
+                if (list.guest_address || list.identity || list.first != context.pending_first || list.last != context.pending_last) return fail();
+            } else if (!list.guest_address || !(list.identity & 1) || list.identity > UINT64_MAX - 2
+                || !identities.insert(list.identity).second || list.ranges.empty() || !list.first
+                || !visit(list.first, list.last, true, true)) return fail();
+            for (const auto &[start, end] : list.ranges) {
+                if (!start || end < start || !ranges.emplace(start, end).second) return fail();
+            }
+        }
+        Address previous_end = 0;
+        for (const auto &[start, end] : ranges) {
+            if (start < previous_end) return fail();
+            previous_end = end;
+        }
+        if (context.deferred && (current > 1 || context.state.active != (current == 1))) return fail();
+        if (!context.deferred && !context.deferred_lists.empty()) return fail();
+    }
+    for (const auto &batch : batches) {
+        if (!batch.first || (batch.context_address && std::none_of(contexts.begin(), contexts.end(),
+            [&](const auto &c) { return c.address == batch.context_address && !c.deferred; }))
+            || !visit(batch.first, batch.last, false, true)) return fail();
+    }
+    for (size_t id = 1; id < owners.size(); ++id)
+        if (owners[id] != 1 || !references[id]) return fail();
+    return true;
+}
+
+bool capture_contexts(EmuEnvState &emuenv, std::vector<ContextSnapshot> &output, std::string &error) {
+    std::vector<ContextSnapshot> contexts;
+    std::vector<renderer::CommandSnapshot> commands;
+    if (!capture_contexts(emuenv, contexts, commands, error)) return false;
+    if (!commands.empty() || std::any_of(contexts.begin(), contexts.end(), [](const auto &c) { return c.state.active || !c.deferred_lists.empty(); })) {
+        error = "pending GXM commands require graph capture"; return false;
+    }
+    output = std::move(contexts); return true;
+}
+
+bool capture_contexts(EmuEnvState &emuenv, std::vector<ContextSnapshot> &output, std::vector<renderer::CommandSnapshot> &output_commands, std::string &error) {
+    std::vector<ContextSnapshot> contexts;
+    std::vector<renderer::CommandSnapshot> commands;
+    std::vector<BatchSnapshot> batches;
+    if (!capture_contexts(emuenv, contexts, commands, batches, error)) return false;
+    if (!batches.empty()) { error = "queued renderer commands require batch capture"; return false; }
+    output = std::move(contexts); output_commands = std::move(commands); return true;
+}
+
+bool capture_contexts(EmuEnvState &emuenv, std::vector<ContextSnapshot> &output, std::vector<renderer::CommandSnapshot> &output_commands, std::vector<BatchSnapshot> &output_batches, std::string &error) {
+    std::vector<renderer::CommandSnapshot> commands;
+    std::map<const renderer::Command *, uint32_t> ids;
+    std::vector<const renderer::Command *> originals;
+    size_t traversal_budget = 1048576;
+    const auto targets = runtime_render_targets(emuenv);
+    const auto target_address = [&](const renderer::RenderTarget *target) -> Address {
+        for (const auto &[address, pointer] : targets) if (pointer == target) return address;
+        return 0;
+    };
+    const auto capture_list = [&](const renderer::CommandList &list, uint32_t &first, uint32_t &last) {
+        if ((!list.first) != (!list.last)) { error = "invalid GXM command list endpoints"; return false; }
+        if (!list.first) return true;
+        std::set<const renderer::Command *> visited;
+        auto *node = list.first;
+        for (;;) {
+            if (!node || !visited.insert(node).second || visited.size() > 262144 || !traversal_budget--) {
+                error = "invalid or oversized GXM command chain"; return false;
+            }
+            if (!ids.contains(node)) {
+                if (commands.size() >= 262144) { error = "too many pending GXM commands"; return false; }
+                renderer::CommandSnapshot saved;
+                const auto context_address = [&](const renderer::Context *pointer) -> Address {
+                    for (const auto &[address, context] : runtime_contexts(emuenv)) if (context == pointer) return address;
+                    return 0;
+                };
+                if (!renderer::capture_command_snapshot(*node, target_address, context_address, &emuenv.display, saved, error)) return false;
+                ids[node] = static_cast<uint32_t>(commands.size() + 1);
+                commands.push_back(std::move(saved)); originals.push_back(node);
+            }
+            if (node == list.first) first = ids.at(node);
+            if (node == list.last) { last = ids.at(node); return true; }
+            node = node->next;
+        }
+    };
+    std::vector<ContextSnapshot> snapshots;
+    snapshots.reserve(emuenv.gxm.immediate_contexts.size() + emuenv.gxm.deferred_contexts.size());
+    const auto capture = [&](SceGxmContext *context, Address address, bool deferred) {
+        if (!context || !context->renderer) {
+            error = "GXM context has no live renderer state";
+            return false;
+        }
+        ContextSnapshot snapshot;
+        snapshot.address = address;
+        snapshot.deferred = deferred;
+        snapshot.renderer_record = context->renderer->record;
+        if (context->renderer->current_render_target) {
+            const auto targets = runtime_render_targets(emuenv);
+            const auto target = std::find_if(targets.begin(), targets.end(), [&](const auto &target) {
+                return target.second == context->renderer->current_render_target;
+            });
+            if (target == targets.end()) {
+                error = "GXM context refers to an untracked render target";
+                return false;
+            }
+            snapshot.render_target_address = target->first;
+        }
+        snapshot.state = context->state;
+        snapshot.last_precomputed = context->last_precomputed;
+        snapshot.command_next_free_pos = deferred ? 0 : context->command_next_free_pos;
+        snapshot.alloc_space = context->alloc_space;
+        snapshot.alloc_space_end = context->alloc_space_end;
+        snapshot.command_allocator_size = context->command_allocator_size;
+        snapshot.alloc_space_start = context->alloc_space_start.address();
+        snapshot.was_vert_default_uniform_reserved = context->was_vert_default_uniform_reserved;
+        snapshot.was_frag_default_uniform_reserved = context->was_frag_default_uniform_reserved;
+        if (!capture_list(context->renderer->command_list, snapshot.pending_first, snapshot.pending_last)) return false;
+        std::set<SceGxmCommandList *> lists;
+        if (context->curr_command_list) lists.insert(context->curr_command_list);
+        for (const auto &range : context->command_list_ranges) lists.insert(range.command_list);
+        for (const auto *list : lists) {
+            if (!deferred || !list) { error = "invalid GXM deferred list owner"; return false; }
+            DeferredListSnapshot saved;
+            saved.current = list == context->curr_command_list;
+            saved.guest_address = list->guest_address;
+            saved.identity = list->identity;
+            if (!saved.current && !list->list) { error = "GXM deferred list has no chain"; return false; }
+            const auto &chain = saved.current ? context->renderer->command_list : *list->list;
+            if (!capture_list(chain, saved.first, saved.last)) return false;
+            auto ranges = list->memory_ranges;
+            while (!ranges.empty()) {
+                const auto &range = *ranges.top();
+                if (range.command_list != list) { error = "inconsistent GXM deferred range owner"; return false; }
+                saved.ranges.emplace_back(range.start, range.end); ranges.pop();
+            }
+            std::reverse(saved.ranges.begin(), saved.ranges.end());
+            snapshot.deferred_lists.push_back(std::move(saved));
+        }
+        snapshots.push_back(std::move(snapshot));
+        return true;
+    };
+    for (const auto &[context, address] : emuenv.gxm.immediate_contexts)
+        if (!capture(context, address, false)) return false;
+    for (const auto &[context, address] : emuenv.gxm.deferred_contexts)
+        if (!capture(context, address, true)) return false;
+    std::vector<BatchSnapshot> batches;
+    const auto capture_batch = [&](const renderer::CommandList &list) {
+        BatchSnapshot batch;
+        if (list.context) {
+            for (const auto &[address, pointer] : runtime_contexts(emuenv))
+                if (pointer == list.context) batch.context_address = address;
+            if (!batch.context_address) { error = "queued renderer batch has untracked context"; return false; }
+        }
+        if (!capture_list(list, batch.first, batch.last)) return false;
+        if (batch.first) batches.push_back(batch);
+        return true;
+    };
+    if (emuenv.renderer) {
+        if (emuenv.renderer->active_batch && !capture_batch(*emuenv.renderer->active_batch)) return false;
+        for (const auto &list : emuenv.renderer->command_buffer_queue.snapshot_items())
+            if (!capture_batch(list)) return false;
+    }
+    // Deferred tails can have stale next pointers from a prior execution.
+    // Preserve an edge only when its node is part of a captured live chain.
+    for (size_t i = 0; i < commands.size(); ++i) {
+        const auto next = ids.find(originals[i]->next);
+        commands[i].next = next == ids.end() ? 0 : next->second;
+    }
+    if (!validate_command_graph(snapshots, commands, batches, error)) return false;
+    output = std::move(snapshots); output_commands = std::move(commands); output_batches = std::move(batches);
+    return true;
+}
+
+std::vector<SyncObjectSnapshot> capture_sync_objects(EmuEnvState &emuenv) {
+    std::vector<SyncObjectSnapshot> snapshots;
+    const std::lock_guard<std::mutex> lock(emuenv.gxm.sync_objects_mutex);
+
+    for (SceGxmSyncObject *sync : emuenv.gxm.sync_objects) {
+        if (!sync)
+            continue;
+        const Address address = host_to_guest(emuenv.mem, sync);
+        if (!address)
+            continue;
+
+        SyncObjectSnapshot snapshot;
+        snapshot.address = address;
+        snapshot.timestamp_current = sync->timestamp_current.load(std::memory_order_relaxed);
+        snapshot.timestamp_ahead = sync->timestamp_ahead.load(std::memory_order_relaxed);
+        snapshot.last_display = sync->last_display.load(std::memory_order_relaxed);
+        snapshot.last_operation_global = sync->last_operation_global;
+        snapshots.push_back(snapshot);
+    }
+
+    return snapshots;
+}
+
+std::vector<RenderTargetSnapshot> capture_render_targets(EmuEnvState &emuenv) {
+    std::vector<RenderTargetSnapshot> snapshots;
+    snapshots.reserve(emuenv.gxm.render_targets.size());
+
+    for (const auto &[render_target, address] : emuenv.gxm.render_targets) {
+        if (!render_target)
+            continue;
+        RenderTargetSnapshot snapshot;
+        snapshot.address = address;
+        snapshot.width = render_target->width;
+        snapshot.height = render_target->height;
+        snapshot.scenes_per_frame = render_target->scenesPerFrame;
+        snapshot.driver_mem_block = render_target->driverMemBlock;
+        snapshot.params = render_target->params;
+        snapshots.push_back(snapshot);
+    }
+
+    return snapshots;
+}
+
+void destroy_runtime_objects(EmuEnvState &emuenv) {
+    if (emuenv.renderer->features.enable_memory_mapping) {
+        for (const auto &[address, region] : emuenv.gxm.memory_mapped_regions) {
+            if (region.size > 0)
+                emuenv.renderer->unmap_memory(emuenv.mem, Ptr<void>(address));
+        }
+    }
+    emuenv.gxm.memory_mapped_regions.clear();
+
+    // Destructive load teardown has already discarded queued renderer work
+    // under its gate. Active frontend chains still need their host owners and
+    // payloads destroyed; use the normal backend destroy command path.
+    for (const auto &[context, address] : emuenv.gxm.immediate_contexts) context->state.active = false;
+    for (const auto &[context, address] : emuenv.gxm.deferred_contexts) context->state.active = false;
+    destroy_all_contexts(emuenv, false);
+    destroy_all_render_targets(emuenv, false);
+
+    {
+        const std::lock_guard<std::mutex> lock(emuenv.gxm.sync_objects_mutex);
+        for (SceGxmSyncObject *sync : emuenv.gxm.sync_objects) {
+            if (!sync)
+                continue;
+            {
+                const std::lock_guard<std::mutex> sync_lock(sync->lock);
+                sync->being_deleted = true;
+            }
+            sync->cond.notify_all();
+        }
+        emuenv.gxm.sync_objects.clear();
+    }
+
+    stop_display_queue_host(emuenv);
+    emuenv.gxm.display_queue.reset();
+    emuenv.gxm.last_immediate_context = 0;
+}
+
+void stop_display_queue_host(EmuEnvState &emuenv) {
+    emuenv.gxm.stop_display_host();
+}
+
+bool restart_display_queue(EmuEnvState &emuenv, bool hold) {
+    stop_display_queue_host(emuenv);
+    emuenv.gxm.display_queue.reset();
+    emuenv.gxm.display_worker_state.store(0, std::memory_order_relaxed);
+    emuenv.gxm.display_entries_done.store(0, std::memory_order_relaxed);
+
+    if (!emuenv.gxm.display_queue_thread) {
+        emuenv.gxm.display_snapshot_gate.reset();
+        return true;
+    }
+    if (!emuenv.kernel.get_thread(emuenv.gxm.display_queue_thread)) {
+        LOG_ERROR("Restored GXM display queue thread is missing");
+        return false;
+    }
+
+    emuenv.gxm.display_queue.maxPendingCount_ = std::max(
+        std::min(emuenv.gxm.params.displayQueueMaxPendingCount, 3U) - 1, 1U);
+
+    // Re-queue frames that were pending when the state was saved so the guest
+    // display callbacks (and their completion signals) are not lost.
+    for (const DisplayCallback &callback : emuenv.gxm.restored_display_queue) {
+        if (!emuenv.gxm.display_queue.try_push(callback)) {
+            LOG_ERROR("Restored display queue exceeds its capacity");
+            emuenv.gxm.display_queue.abort();
+            return false;
+        }
+    }
+    emuenv.gxm.restored_display_queue.clear();
+    emuenv.gxm.display_snapshot_gate.reset(hold);
+    try {
+        emuenv.gxm.display_host_thread = std::thread(display_entry_thread, std::ref(emuenv));
+    } catch (const std::system_error &error) {
+        LOG_ERROR("Could not restart restored display host: {}", error.what());
+        stop_display_queue_host(emuenv);
+        return false;
+    }
+    return true;
+}
+
+void restore_memory_regions(EmuEnvState &emuenv, const std::map<Address, MemoryMapInfo> &regions) {
+    for (const auto &[address, region] : regions) {
+        emuenv.gxm.memory_mapped_regions.emplace(address, region);
+        if (emuenv.renderer->features.enable_memory_mapping && region.size > 0)
+            emuenv.renderer->map_memory(emuenv.mem, Ptr<void>(address), region.size);
+    }
+}
+
+bool restore_contexts(EmuEnvState &emuenv, const std::vector<ContextSnapshot> &snapshots, std::string &error) {
+    if (std::any_of(snapshots.begin(), snapshots.end(), [](const auto &s) { return s.state.active; })) {
+        error = "active GXM context requires command graph restore"; return false;
+    }
+    return restore_contexts(emuenv, snapshots, {}, error);
+}
+bool restore_contexts(EmuEnvState &emuenv, const std::vector<ContextSnapshot> &snapshots, const std::vector<renderer::CommandSnapshot> &commands, std::string &error) {
+    return restore_contexts(emuenv, snapshots, commands, {}, error);
+}
+bool restore_contexts(EmuEnvState &emuenv, const std::vector<ContextSnapshot> &snapshots, const std::vector<renderer::CommandSnapshot> &commands, const std::vector<BatchSnapshot> &batches, std::string &error) {
+    if (!validate_command_graph(snapshots, commands, batches, error)) return false;
+    if (!batches.empty() && !emuenv.renderer) { error = "missing renderer for saved queued batches"; return false; }
+    const auto targets = runtime_render_targets(emuenv);
+    // Reject invalid associations before constructing any guest-resident objects.
+    for (const auto &snapshot : snapshots) {
+        if (snapshot.render_target_address && std::none_of(targets.begin(), targets.end(),
+                [&](const auto &target) { return target.first == snapshot.render_target_address && target.second; })) {
+            error = "saved GXM context has a missing render target";
+            return false;
+        }
+    }
+    // Materialize commands on the host; do not consume guest VDM space or
+    // invoke a guest allocation callback while rebuilding a saved graph.
+    std::vector<renderer::Command *> nodes(commands.size() + 1, nullptr);
+    struct GraphGuard {
+        std::vector<renderer::Command *> &nodes;
+        const std::vector<renderer::CommandSnapshot> &saved;
+        bool transferred = false;
+        ~GraphGuard() {
+            if (transferred) return;
+            for (size_t i = 1; i < nodes.size(); ++i) if (nodes[i]) {
+                renderer::destroy_command_payload(*nodes[i]);
+                if (saved[i - 1].deferred_allocation) std::free(nodes[i]); else delete nodes[i];
+            }
+        }
+    } guard{nodes, commands};
+    const auto target_pointer = [&](Address address) -> renderer::RenderTarget * {
+        for (const auto &[a, pointer] : targets) if (a == address) return pointer;
+        return nullptr;
+    };
+    for (const ContextSnapshot &snapshot : snapshots) {
+        SceGxmContext *context = Ptr<SceGxmContext>(snapshot.address).get(emuenv.mem);
+        new (context) SceGxmContext(emuenv.gxm.callback_lock);
+        context->state = snapshot.state;
+        context->last_precomputed = snapshot.last_precomputed;
+        context->alloc_space = snapshot.alloc_space.cast<uint8_t>();
+        context->alloc_space_end = snapshot.alloc_space_end.cast<uint8_t>();
+        context->alloc_space_start = Ptr<uint8_t>(snapshot.alloc_space_start);
+        context->command_allocator_size = snapshot.command_allocator_size;
+        context->command_next_free_pos = snapshot.command_allocator_size
+            ? snapshot.command_next_free_pos % snapshot.command_allocator_size : 0;
+        context->command_last_free_pos.store(context->command_next_free_pos
+            + (snapshot.command_allocator_size ? snapshot.command_allocator_size - 1 : 0), std::memory_order_relaxed);
+        context->was_vert_default_uniform_reserved = snapshot.was_vert_default_uniform_reserved;
+        context->was_frag_default_uniform_reserved = snapshot.was_frag_default_uniform_reserved;
+        context->is_vert_texture_dirty.set();
+        context->is_frag_texture_dirty.set();
+
+        if (snapshot.deferred) {
+            context->renderer = std::make_unique<renderer::Context>();
+        } else if (!renderer::create_context(*emuenv.renderer, context->renderer)) {
+            error = "failed to recreate GXM immediate renderer context";
+            context->~SceGxmContext();
+            return false;
+        }
+        context->renderer->record = snapshot.renderer_record;
+        renderer::RenderTarget *target = nullptr;
+        if (snapshot.render_target_address) {
+            target = std::find_if(targets.begin(), targets.end(), [&](const auto &target) {
+                return target.first == snapshot.render_target_address;
+            })->second;
+        }
+        context->renderer->current_render_target = target;
+        if (!snapshot.deferred) {
+            if (auto *vk = dynamic_cast<renderer::vulkan::VKContext *>(context->renderer.get()))
+                vk->render_target = static_cast<renderer::vulkan::VKRenderTarget *>(target);
+            if (auto *gl = dynamic_cast<renderer::gl::GLContext *>(context->renderer.get()))
+                gl->render_target = static_cast<renderer::gl::GLRenderTarget *>(target);
+        }
+        KernelState *kernel = &emuenv.kernel;
+        MemState *mem = &emuenv.mem;
+        const SceUID thread_id = emuenv.main_thread_id;
+        context->renderer->alloc_func = [context, kernel, mem, thread_id]() {
+            return context->allocate_new_command(*kernel, *mem, thread_id);
+        };
+        context->renderer->free_func = snapshot.deferred
+            ? renderer::CommandFreeFunc([](renderer::Command *) {})
+            : renderer::CommandFreeFunc([context](renderer::Command *command) { context->free_new_command(command); });
+        // Inactive contexts must stay inactive: SetContext starts a Vulkan
+        // recording. BeginScene/BeginCommandList perform their normal setup.
+        if (snapshot.deferred)
+            emuenv.gxm.deferred_contexts.emplace(context, snapshot.address);
+        else {
+            emuenv.gxm.immediate_contexts.emplace(context, snapshot.address);
+            if (emuenv.gxm.last_immediate_context == 0)
+                emuenv.gxm.last_immediate_context = snapshot.address;
+        }
+    }
+    for (size_t i = 0; i < commands.size(); ++i) {
+        void *allocation = commands[i].deferred_allocation ? std::malloc(sizeof(renderer::Command)) : nullptr;
+        nodes[i + 1] = commands[i].deferred_allocation
+            ? (allocation ? new (allocation) renderer::Command{} : nullptr)
+            : new (std::nothrow) renderer::Command{};
+        if (!nodes[i + 1]) { error = "failed to allocate pending GXM commands"; return false; }
+        const auto context_pointer = [&](Address address) -> renderer::Context * {
+            for (const auto &[a, context] : runtime_contexts(emuenv)) if (a == address) return context;
+            return nullptr;
+        };
+        if (!renderer::restore_command_snapshot(commands[i], target_pointer, context_pointer, &emuenv.display, *nodes[i + 1], error)) {
+            return false;
+        }
+    }
+    for (size_t i = 0; i < commands.size(); ++i) nodes[i + 1]->next = nodes[commands[i].next];
+    for (const auto &snapshot : snapshots) {
+        auto *context = Ptr<SceGxmContext>(snapshot.address).get(emuenv.mem);
+        context->renderer->command_list = {nodes[snapshot.pending_first], nodes[snapshot.pending_last], context->renderer.get()};
+        for (const auto &saved : snapshot.deferred_lists) {
+            auto *list = new SceGxmCommandList;
+            list->guest_address = saved.guest_address;
+            list->identity = saved.identity;
+            uint64_t expected = next_command_list_identity.load(std::memory_order_relaxed);
+            while (expected <= saved.identity && !next_command_list_identity.compare_exchange_weak(expected, saved.identity + 2, std::memory_order_relaxed)) {}
+            if (saved.current) context->curr_command_list = list;
+            else {
+                list->list = new (std::malloc(sizeof(renderer::CommandList))) renderer::CommandList{
+                    nodes[saved.first], nodes[saved.last], context->renderer.get()};
+                // Only the guest wrapper's first pointer is guest-visible.
+                // Guest RAM already contains the stable token. Do not rewrite
+                // reused output wrappers: they may now identify another list.
+            }
+            for (const auto &[start, end] : saved.ranges) {
+                const auto inserted = context->command_list_ranges.emplace(CommandListRange{start, end, list});
+                list->memory_ranges.push(inserted.first);
+            }
+        }
+    }
+    for (const auto &batch : batches) {
+        renderer::Context *context = nullptr;
+        for (const auto &[address, pointer] : runtime_contexts(emuenv)) if (address == batch.context_address) context = pointer;
+        emuenv.renderer->snapshot_pending_batches.push_back({nodes[batch.first], nodes[batch.last], context});
+    }
+    guard.transferred = true;
+    return true;
+}
+
+Address runtime_selected_context_address(EmuEnvState &emuenv) {
+    if (!emuenv.renderer || !emuenv.renderer->context) return 0;
+    for (const auto &[address, pointer] : runtime_contexts(emuenv))
+        if (pointer == emuenv.renderer->context) return address;
+    return 0;
+}
+
+bool activate_saved_batches(EmuEnvState &emuenv, Address selected_context, std::string &error) {
+    if (!emuenv.renderer) { error = "missing renderer for saved batch activation"; return false; }
+    renderer::Context *context = nullptr;
+    if (selected_context) {
+        for (const auto &[address, pointer] : runtime_contexts(emuenv)) if (address == selected_context) context = pointer;
+        if (!context) { error = "saved selected renderer context is missing"; return false; }
+    }
+    emuenv.renderer->context = context;
+    for (const auto &batch : emuenv.renderer->snapshot_pending_batches)
+        emuenv.renderer->command_buffer_queue.push(batch);
+    emuenv.renderer->snapshot_pending_batches.clear();
+    return true;
+}
+
+void restore_sync_objects(EmuEnvState &emuenv, const std::vector<SyncObjectSnapshot> &snapshots) {
+    const std::lock_guard<std::mutex> lock(emuenv.gxm.sync_objects_mutex);
+    for (const SyncObjectSnapshot &snapshot : snapshots) {
+        SceGxmSyncObject *sync = Ptr<SceGxmSyncObject>(snapshot.address).get(emuenv.mem);
+        new (sync) SceGxmSyncObject();
+        renderer::create(sync, *emuenv.renderer);
+        sync->timestamp_current.store(snapshot.timestamp_current, std::memory_order_relaxed);
+        sync->timestamp_ahead.store(snapshot.timestamp_ahead, std::memory_order_relaxed);
+        sync->last_display.store(snapshot.last_display, std::memory_order_relaxed);
+        sync->last_operation_global = snapshot.last_operation_global;
+        emuenv.gxm.sync_objects.insert(sync);
+    }
+}
+
+void restore_render_targets(EmuEnvState &emuenv, const std::vector<RenderTargetSnapshot> &snapshots) {
+    for (const RenderTargetSnapshot &snapshot : snapshots) {
+        SceGxmRenderTarget *render_target = Ptr<SceGxmRenderTarget>(snapshot.address).get(emuenv.mem);
+        new (render_target) SceGxmRenderTarget();
+        if (!renderer::create_render_target(*emuenv.renderer, render_target->renderer, &snapshot.params)) {
+            LOG_ERROR("Failed to recreate GXM render target at 0x{:X}", snapshot.address);
+            continue;
+        }
+        render_target->width = snapshot.width;
+        render_target->height = snapshot.height;
+        render_target->scenesPerFrame = snapshot.scenes_per_frame;
+        render_target->driverMemBlock = snapshot.driver_mem_block;
+        render_target->params = snapshot.params;
+        emuenv.gxm.render_targets.emplace(render_target, snapshot.address);
+    }
+}
+
+std::vector<FragmentProgramSnapshot> capture_fragment_programs(EmuEnvState &emuenv) {
+    std::vector<FragmentProgramSnapshot> snapshots;
+    snapshots.reserve(emuenv.gxm.fragment_programs.size());
+
+    for (const auto &[address, info] : emuenv.gxm.fragment_programs) {
+        FragmentProgramSnapshot snapshot;
+        snapshot.address = address;
+        snapshot.program = info.program;
+        snapshot.has_blend = info.has_blend;
+        snapshot.blend = info.blend;
+        snapshot.is_mask_update = info.is_mask_update;
+        if (const SceGxmFragmentProgram *program = Ptr<const SceGxmFragmentProgram>(address).get(emuenv.mem))
+            snapshot.reference_count = program->reference_count.load(std::memory_order_relaxed);
+        snapshots.push_back(snapshot);
+    }
+
+    return snapshots;
+}
+
+std::vector<VertexProgramSnapshot> capture_vertex_programs(EmuEnvState &emuenv) {
+    std::vector<VertexProgramSnapshot> snapshots;
+    snapshots.reserve(emuenv.gxm.vertex_programs.size());
+
+    for (const auto &[address, info] : emuenv.gxm.vertex_programs) {
+        VertexProgramSnapshot snapshot;
+        snapshot.address = address;
+        snapshot.program = info.program;
+        snapshot.attributes = info.attributes;
+        snapshot.streams = info.streams;
+        snapshot.key_hash = info.key_hash;
+        if (const SceGxmVertexProgram *program = Ptr<const SceGxmVertexProgram>(address).get(emuenv.mem))
+            snapshot.reference_count = program->reference_count.load(std::memory_order_relaxed);
+        snapshots.push_back(snapshot);
+    }
+
+    return snapshots;
+}
+
+std::vector<ShaderPatcherSnapshot> capture_shader_patchers(EmuEnvState &emuenv) {
+    std::vector<ShaderPatcherSnapshot> snapshots;
+    snapshots.reserve(emuenv.gxm.shader_patchers.size());
+
+    for (const auto &[address, params] : emuenv.gxm.shader_patchers) {
+        ShaderPatcherSnapshot snapshot;
+        snapshot.address = address;
+        snapshot.params = params;
+        snapshots.push_back(snapshot);
+    }
+
+    return snapshots;
+}
+
+void restore_fragment_programs(EmuEnvState &emuenv, const std::vector<FragmentProgramSnapshot> &snapshots) {
+    for (const FragmentProgramSnapshot &snapshot : snapshots) {
+        SceGxmFragmentProgram *program = Ptr<SceGxmFragmentProgram>(snapshot.address).get(emuenv.mem);
+        if (!program)
+            continue;
+
+        new (program) SceGxmFragmentProgram();
+        program->program = snapshot.program;
+        program->is_maskupdate = snapshot.is_mask_update;
+        program->reference_count.store(snapshot.reference_count);
+
+        if (!program->program)
+            continue;
+
+        const SceGxmBlendInfo *blend = snapshot.has_blend ? &snapshot.blend : nullptr;
+        if (!renderer::create(program->renderer_data, *emuenv.renderer, *program->program.get(emuenv.mem), blend, emuenv.renderer->gxp_ptr_map))
+            LOG_ERROR("Failed to rebuild GXM fragment program at 0x{:X}", snapshot.address);
+    }
+
+    emuenv.gxm.fragment_programs.clear();
+    for (const FragmentProgramSnapshot &snapshot : snapshots) {
+        FragmentProgramInfo info;
+        info.program = snapshot.program;
+        info.has_blend = snapshot.has_blend;
+        info.blend = snapshot.blend;
+        info.is_mask_update = snapshot.is_mask_update;
+        emuenv.gxm.fragment_programs.emplace(snapshot.address, info);
+    }
+
+    {
+        std::string addresses;
+        for (const FragmentProgramSnapshot &snapshot : snapshots)
+            addresses += fmt::format(" {:#x}", snapshot.address);
+        LOG_CRITICAL("[savestate-diag] restored {} fragment programs:{}", snapshots.size(), addresses);
+    }
+}
+
+void restore_vertex_programs(EmuEnvState &emuenv, const std::vector<VertexProgramSnapshot> &snapshots) {
+    for (const VertexProgramSnapshot &snapshot : snapshots) {
+        SceGxmVertexProgram *program = Ptr<SceGxmVertexProgram>(snapshot.address).get(emuenv.mem);
+        if (!program)
+            continue;
+
+        new (program) SceGxmVertexProgram();
+        program->program = snapshot.program;
+        program->key_hash = snapshot.key_hash;
+        program->reference_count.store(snapshot.reference_count);
+        program->attributes = snapshot.attributes;
+        program->streams = snapshot.streams;
+
+        if (!program->program)
+            continue;
+
+        if (!renderer::create(program->renderer_data, *emuenv.renderer, *program->program.get(emuenv.mem), emuenv.renderer->gxp_ptr_map, program->attributes))
+            LOG_ERROR("Failed to rebuild GXM vertex program at 0x{:X}", snapshot.address);
+    }
+
+    emuenv.gxm.vertex_programs.clear();
+    for (const VertexProgramSnapshot &snapshot : snapshots) {
+        VertexProgramInfo info;
+        info.program = snapshot.program;
+        info.attributes = snapshot.attributes;
+        info.streams = snapshot.streams;
+        info.key_hash = snapshot.key_hash;
+        emuenv.gxm.vertex_programs.emplace(snapshot.address, info);
+    }
+}
+
+} // namespace gxm
+
 typedef std::uint32_t VertexCacheHash;
 
 struct VertexProgramCacheKey {
@@ -1452,6 +2159,28 @@ struct SceGxmShaderPatcher {
     FragmentProgramCache fragment_program_cache;
     SceGxmShaderPatcherParams params;
 };
+
+namespace gxm {
+
+SnapshotObjectSizes snapshot_object_sizes() {
+    return {sizeof(SceGxmContext), sizeof(SceGxmRenderTarget), sizeof(SceGxmShaderPatcher)};
+}
+
+void restore_shader_patchers(EmuEnvState &emuenv, const std::vector<ShaderPatcherSnapshot> &snapshots) {
+    for (const ShaderPatcherSnapshot &snapshot : snapshots) {
+        SceGxmShaderPatcher *patcher = Ptr<SceGxmShaderPatcher>(snapshot.address).get(emuenv.mem);
+        if (!patcher)
+            continue;
+        new (patcher) SceGxmShaderPatcher();
+        patcher->params = snapshot.params;
+    }
+
+    emuenv.gxm.shader_patchers.clear();
+    for (const ShaderPatcherSnapshot &snapshot : snapshots)
+        emuenv.gxm.shader_patchers.emplace(snapshot.address, snapshot.params);
+}
+
+} // namespace gxm
 
 // clang-format off
 static const size_t size_mask_gxp = 228;
@@ -2119,6 +2848,7 @@ EXPORT(int, sceGxmCreateRenderTarget, const SceGxmRenderTargetParams *params, Pt
     rt->height = params->height;
     rt->scenesPerFrame = params->scenesPerFrame;
     rt->driverMemBlock = params->driverMemBlock;
+    rt->params = *params;
     emuenv.gxm.render_targets.emplace(rt, renderTarget->address());
 
     return 0;
@@ -2276,23 +3006,153 @@ EXPORT(int, sceGxmDestroyRenderTarget, Ptr<SceGxmRenderTarget> renderTarget) {
     return destroy_gxm_render_target(emuenv, renderTarget, false);
 }
 
+namespace gxm {
+namespace {
+void commit_display_frame(EmuEnvState &env, const PendingDisplaySubmission &submission) {
+    renderer::Context *active_context = nullptr;
+    if (env.gxm.last_immediate_context != 0) {
+        const auto it = std::ranges::find_if(env.gxm.immediate_contexts, [&](const auto &entry) {
+            return entry.second == env.gxm.last_immediate_context;
+        });
+        if (it != env.gxm.immediate_contexts.end())
+            active_context = it->first->renderer.get();
+    }
+    auto frame = submission.has_prediction ? new DisplayFrameInfo(submission.prediction) : nullptr;
+    renderer::send_single_command(*env.renderer, nullptr, renderer::CommandOpcode::NewFrame, false,
+        frame, &env.display, active_context);
+}
+struct DisplayQueueSubscription {
+    Queue<DisplayCallback> &queue;
+    uint64_t token;
+    DisplayQueueSubscription(Queue<DisplayCallback> &queue, const ThreadStatePtr &thread) : queue(queue) {
+        std::weak_ptr<ThreadState> weak = thread;
+        token = queue.subscribe_changes([weak] { if (const auto thread = weak.lock()) thread->wake(); });
+    }
+    ~DisplayQueueSubscription() { queue.unsubscribe_changes(token); }
+};
+}
+
+SceInt32 wait_display_queue(KernelState &kernel, GxmState &gxm, MemState &mem, ThreadState &thread,
+    bool finish, const DisplaySubmissionCommit &commit) {
+    const auto self = kernel.get_thread(thread.id);
+    if (!self)
+        return SCE_GXM_ERROR_DRIVER;
+    WaitContinuationScope scope(thread, WaitOperation::gxm_display_queue,
+        {uint32_t(thread.id), finish ? 1U : 0U, finish ? 1U : 0U, 1, 0, 0, 0, 0},
+        nullptr, false, Deadline::max());
+    auto &record = *scope.record;
+    uint32_t phase;
+    std::shared_ptr<PendingDisplaySubmission> pending;
+    {
+        const std::lock_guard lock(record.mutex);
+        record.state.target = {SCE_KERNEL_WAITTYPE_EVENT, thread.id};
+        phase = record.state.args[1];
+        finish = record.state.args[2] != 0;
+    }
+    if (!finish && phase == 0) {
+        const std::lock_guard lock(gxm.display_submissions_mutex);
+        const auto it = gxm.pending_display_submissions.find(thread.id);
+        if (it == gxm.pending_display_submissions.end())
+            return SCE_GXM_ERROR_DRIVER;
+        pending = it->second;
+        const std::lock_guard record_lock(record.mutex);
+        record.object = pending;
+    }
+    struct PendingCleanup {
+        GxmState &gxm;
+        MemState &mem;
+        SceUID id;
+        std::shared_ptr<PendingDisplaySubmission> &pending;
+        ~PendingCleanup() {
+            if (!pending)
+                return;
+            {
+                const std::lock_guard lock(gxm.display_submissions_mutex);
+                const auto it = gxm.pending_display_submissions.find(id);
+                if (it == gxm.pending_display_submissions.end() || it->second != pending)
+                    return;
+                gxm.pending_display_submissions.erase(it);
+            }
+            if (pending->callback.data)
+                free(mem, pending->callback.data);
+        }
+    } cleanup{gxm, mem, thread.id, pending};
+    DisplayQueueSubscription subscription(gxm.display_queue, self);
+    while (phase == 0) {
+        if (gxm.display_queue.is_aborted())
+            return SCE_GXM_ERROR_DRIVER;
+        if (gxm.display_queue.try_push(pending->callback)) {
+            // Enqueue, renderer submission and the durable phase commit happen
+            // while RUNNING; a snapshot cannot observe half a guest submission.
+            commit(*pending);
+            {
+                const std::lock_guard lock(gxm.display_submissions_mutex);
+                gxm.pending_display_submissions.erase(thread.id);
+            }
+            pending.reset(); // The display queue now owns callback.data.
+            {
+                const std::lock_guard lock(record.mutex);
+                phase = record.state.args[1] = 1;
+                record.object.reset();
+            }
+            if (gxm.params.displayQueueMaxPendingCount != 1)
+                return 0;
+            break;
+        }
+        const auto waited = thread.wait({SCE_KERNEL_WAITTYPE_EVENT, thread.id}, Deadline::max(), false);
+        if (!waited)
+            return guest_result(waited);
+    }
+    while (!gxm.display_queue.is_aborted() && gxm.display_queue.size() != 0) {
+        const auto waited = thread.wait({SCE_KERNEL_WAITTYPE_EVENT, thread.id}, Deadline::max(), false);
+        if (!waited)
+            return guest_result(waited);
+    }
+    return gxm.display_queue.is_aborted() ? SCE_GXM_ERROR_DRIVER : 0;
+}
+
+void register_display_queue_wait_handlers(EmuEnvState &env, DisplaySubmissionCommit commit) {
+    if (!commit)
+        commit = [&env](const PendingDisplaySubmission &submission) { commit_display_frame(env, submission); };
+    env.kernel.wait_resume_handlers[WaitOperation::gxm_display_queue] = {
+        [&env](ThreadState &thread, const std::shared_ptr<WaitContinuation> &record) {
+            const std::lock_guard lock(env.gxm.display_submissions_mutex);
+            const auto it = env.gxm.pending_display_submissions.find(thread.id);
+            const auto &a = record->state.args;
+            if (a[0] != uint32_t(thread.id) || a[1] > 1 || a[2] > 1 || a[3] != 1 || (a[2] && a[1] != 1))
+                return false;
+            if (a[1] == 0) {
+                if (it == env.gxm.pending_display_submissions.end())
+                    return false;
+                record->object = it->second;
+            } else if (it != env.gxm.pending_display_submissions.end()) {
+                return false;
+            }
+            return true;
+        },
+        [&env, commit = std::move(commit)](ThreadState &thread, const std::shared_ptr<WaitContinuation> &record) {
+            return wait_display_queue(env.kernel, env.gxm, env.mem, thread, record->state.args[2] != 0,
+                commit);
+        }
+    };
+}
+}
+
 EXPORT(int, sceGxmDisplayQueueAddEntry, Ptr<SceGxmSyncObject> oldBuffer, Ptr<SceGxmSyncObject> newBuffer, Ptr<const void> callbackData) {
     TRACY_FUNC(sceGxmDisplayQueueAddEntry, oldBuffer, newBuffer, callbackData);
     if (!oldBuffer || !newBuffer)
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
 
-    const auto queue_start = std::chrono::steady_clock::now();
-    struct QueueTimer {
-        std::chrono::steady_clock::time_point start;
-        ~QueueTimer() {
-        }
-    } queue_timer{ queue_start };
-
+    const auto thread = emuenv.kernel.get_thread(thread_id);
+    if (!thread)
+        return RET_ERROR(SCE_GXM_ERROR_DRIVER);
     const Address address = alloc(emuenv.mem, emuenv.gxm.params.displayQueueCallbackDataSize, __FUNCTION__);
+    if (!address)
+        return RET_ERROR(SCE_GXM_ERROR_OUT_OF_MEMORY);
     const Ptr<void> ptr(address);
     memcpy(ptr.get(emuenv.mem), callbackData.get(emuenv.mem), emuenv.gxm.params.displayQueueCallbackDataSize);
 
-    DisplayFrameInfo *frame = predict_next_image(emuenv, newBuffer.address());
+    const std::unique_ptr<DisplayFrameInfo> frame(predict_next_image(emuenv, newBuffer.address()));
 
     // Block future rendering by setting values of sync object
     SceGxmSyncObject *oldBufferSync = oldBuffer.get(emuenv.mem);
@@ -2312,36 +3172,25 @@ EXPORT(int, sceGxmDisplayQueueAddEntry, Ptr<SceGxmSyncObject> oldBuffer, Ptr<Sce
         newBufferSync->last_display = ++newBufferSync->timestamp_ahead;
     emuenv.gxm.last_display_global = emuenv.gxm.global_timestamp.fetch_add(1, std::memory_order_relaxed);
 
-    // function may be blocking here (expected behavior)
-    emuenv.gxm.display_queue.push(display_callback);
-
-    // TODO: I do this because the sync function does not have access to the display state, but this is not great
-    renderer::Context *active_renderer_context = nullptr;
-    if (emuenv.gxm.last_immediate_context != 0) {
-        const auto immediate_context = std::ranges::find_if(emuenv.gxm.immediate_contexts, [&](const auto &entry) {
-            return entry.second == emuenv.gxm.last_immediate_context;
-        });
-        if (immediate_context != emuenv.gxm.immediate_contexts.end())
-            active_renderer_context = immediate_context->first->renderer.get();
+    auto pending = std::make_shared<PendingDisplaySubmission>();
+    pending->callback = display_callback;
+    pending->has_prediction = frame != nullptr;
+    if (frame)
+        pending->prediction = *frame;
+    {
+        const std::lock_guard lock(emuenv.gxm.display_submissions_mutex);
+        emuenv.gxm.pending_display_submissions.emplace(thread_id, pending);
     }
-
-    renderer::send_single_command(*emuenv.renderer, nullptr, renderer::CommandOpcode::NewFrame, false, frame, &emuenv.display, active_renderer_context);
-
-    if (emuenv.gxm.params.displayQueueMaxPendingCount == 1) {
-        // double buffering, not handled by the queue configuration
-        guest_sched_release_for_block();
-        emuenv.gxm.display_queue.wait_empty();
-    }
-
-    return 0;
+    return gxm::wait_display_queue(emuenv.kernel, emuenv.gxm, emuenv.mem, *thread, false,
+        [&](const PendingDisplaySubmission &submission) { gxm::commit_display_frame(emuenv, submission); });
 }
 
 EXPORT(int, sceGxmDisplayQueueFinish) {
     TRACY_FUNC(sceGxmDisplayQueueFinish);
-    guest_sched_release_for_block();
-    emuenv.gxm.display_queue.wait_empty();
-
-    return 0;
+    const auto thread = emuenv.kernel.get_thread(thread_id);
+    if (!thread)
+        return RET_ERROR(SCE_GXM_ERROR_DRIVER);
+    return gxm::wait_display_queue(emuenv.kernel, emuenv.gxm, emuenv.mem, *thread, true, {});
 }
 
 static void gxmSetUniformBuffers(renderer::State &state, GxmState &gxm, SceGxmContext *context, const SceGxmProgram &program, std::span<UniformBuffer> buffers, const UniformBufferSizes &sizes, const MemState &mem) {
@@ -2671,14 +3520,21 @@ EXPORT(int, sceGxmEndCommandList, SceGxmContext *deferredContext, SceGxmCommandL
         return RET_ERROR(SCE_GXM_ERROR_NOT_WITHIN_COMMAND_LIST);
     }
 
+    const uint64_t identity = allocate_command_list_identity();
+    if (!identity) return RET_ERROR(SCE_GXM_ERROR_INVALID_VALUE);
     // only set the first two fields for commandList (its size is assumed to be 32 bytes by the game)
     commandList->list = deferredContext->linearly_allocate<renderer::CommandList>(emuenv.kernel, emuenv.mem,
         thread_id);
 
     // also update our own command list
     deferredContext->curr_command_list->list = commandList->list;
+    deferredContext->curr_command_list->guest_address = host_to_guest(emuenv.mem, commandList);
+    deferredContext->curr_command_list->identity = identity;
 
     *commandList->list = deferredContext->renderer->command_list;
+    // Guest wrappers are opaque and may be copied or reused. A stable token
+    // preserves each alias across load without exposing a host allocation.
+    commandList->list = reinterpret_cast<renderer::CommandList *>(deferredContext->curr_command_list->identity);
 
     // insert last memory range
     deferredContext->insert_new_memory_range();
@@ -2750,7 +3606,9 @@ EXPORT(int, sceGxmExecuteCommandList, SceGxmContext *context, SceGxmCommandList 
         return RET_ERROR(SCE_GXM_ERROR_NOT_WITHIN_SCENE);
     }
 
-    if (!commandList || !commandList->list)
+    auto *saved_list = commandList ? gxm::resolve_deferred_command_list(emuenv,
+        reinterpret_cast<uintptr_t>(commandList->list)) : nullptr;
+    if (!saved_list)
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
 
     // Emit a jump to the first command of given command list
@@ -2758,11 +3616,11 @@ EXPORT(int, sceGxmExecuteCommandList, SceGxmContext *context, SceGxmCommandList 
     renderer::CommandList &imm_cmds = context->renderer->command_list;
 
     if (imm_cmds.last) {
-        imm_cmds.last->next = commandList->list->first;
-        imm_cmds.last = commandList->list->last;
+        imm_cmds.last->next = saved_list->first;
+        imm_cmds.last = saved_list->last;
     } else {
-        imm_cmds.first = commandList->list->first;
-        imm_cmds.last = commandList->list->last;
+        imm_cmds.first = saved_list->first;
+        imm_cmds.last = saved_list->last;
     }
 
     // Restore back our GXM state
@@ -2790,9 +3648,9 @@ EXPORT(int, sceGxmFinish, SceGxmContext *context) {
 
     // Wait on this context's rendering finish code.
     guest_sched_release_for_block();
-    renderer::finish(*emuenv.renderer, renderer_context);
-
-    return 0;
+    const auto thread = emuenv.kernel.get_thread(thread_id);
+    return thread ? renderer::finish_guest(*emuenv.renderer, *thread, renderer_context, context_addr)
+                  : static_cast<int>(SCE_GXM_ERROR_DRIVER);
 }
 
 EXPORT(SceGxmPassType, sceGxmFragmentProgramGetPassType, const SceGxmFragmentProgram *fragmentProgram) {
@@ -2971,7 +3829,13 @@ EXPORT(int, sceGxmInitialize, const SceGxmInitializeParams *params) {
     emuenv.gxm.display_queue_thread = display_queue_thread->id;
 
     // Reset the queue in case sceGxmTerminate was called earlier
+    gxm::register_display_queue_wait_handlers(emuenv);
+    renderer::register_finish_wait_handlers(emuenv.kernel, *emuenv.renderer);
+    emuenv.gxm.display_phase = DisplayWorkerPhase::Idle;
+    emuenv.gxm.display_previous_entry_point = 0;
+    emuenv.gxm.display_sync_wait_ticks = 0;
     emuenv.gxm.display_queue.reset();
+    emuenv.gxm.display_snapshot_gate.reset();
     emuenv.gxm.display_host_thread = std::thread(display_entry_thread, std::ref(emuenv));
     emuenv.gxm.notification_region = Ptr<uint32_t>(alloc(emuenv.mem, MiB(1), "SceGxmNotificationRegion"));
     memset(emuenv.gxm.notification_region.get(emuenv.mem), 0, MiB(1));
@@ -4034,6 +4898,19 @@ EXPORT(void, sceGxmSetFragmentProgram, SceGxmContext *context, Ptr<const SceGxmF
     if (!context || !fragmentProgram)
         return;
 
+    {
+        const bool valid_address = is_valid_addr(emuenv.mem, fragmentProgram.address());
+        const bool registered = emuenv.gxm.fragment_programs.find(fragmentProgram.address()) != emuenv.gxm.fragment_programs.end();
+        if (!valid_address || !registered) {
+            static std::atomic<uint64_t> diag_bad{ 0 };
+            const uint64_t bad = diag_bad.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (bad <= 16 || (bad % 256) == 0)
+                LOG_CRITICAL("[savestate-diag] setFragmentProgram rejected addr={:#x} valid_addr={} registered={} (total {})",
+                    fragmentProgram.address(), valid_address, registered, bad);
+            return;
+        }
+    }
+
     context->state.fragment_program = fragmentProgram;
     renderer::set_program(*emuenv.renderer, context->renderer.get(), fragmentProgram, true);
 }
@@ -4418,6 +5295,17 @@ EXPORT(void, sceGxmSetVertexProgram, SceGxmContext *context, Ptr<const SceGxmVer
     if (!context || !vertexProgram)
         return;
 
+    if (!is_valid_addr(emuenv.mem, vertexProgram.address())
+        || emuenv.gxm.vertex_programs.find(vertexProgram.address()) == emuenv.gxm.vertex_programs.end()) {
+        static std::atomic<uint64_t> diag_bad{ 0 };
+        const uint64_t bad = diag_bad.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (bad <= 16 || (bad % 256) == 0)
+            LOG_CRITICAL("[savestate-diag] setVertexProgram rejected addr={:#x} valid_addr={} registered={} (total {})",
+                vertexProgram.address(), is_valid_addr(emuenv.mem, vertexProgram.address()),
+                emuenv.gxm.vertex_programs.find(vertexProgram.address()) != emuenv.gxm.vertex_programs.end(), bad);
+        return;
+    }
+
     context->state.vertex_program = vertexProgram;
     renderer::set_program(*emuenv.renderer, context->renderer.get(), vertexProgram, false);
 }
@@ -4623,6 +5511,7 @@ EXPORT(int, sceGxmShaderPatcherCreate, const SceGxmShaderPatcherParams *params, 
         return RET_ERROR(SCE_GXM_ERROR_OUT_OF_MEMORY);
     }
     shaderPatcher->get(emuenv.mem)->params = *params;
+    emuenv.gxm.shader_patchers[shaderPatcher->address()] = *params;
     return 0;
 }
 
@@ -4667,6 +5556,14 @@ EXPORT(int, sceGxmShaderPatcherCreateFragmentProgram, SceGxmShaderPatcher *shade
         return RET_ERROR(SCE_GXM_ERROR_DRIVER);
     }
 
+    FragmentProgramInfo program_info;
+    program_info.program = fp->program;
+    program_info.has_blend = blendInfo != nullptr;
+    if (blendInfo)
+        program_info.blend = *blendInfo;
+    program_info.is_mask_update = false;
+    emuenv.gxm.fragment_programs[fragmentProgram->address()] = program_info;
+
     shaderPatcher->fragment_program_cache.emplace(key, *fragmentProgram);
 
     return 0;
@@ -4693,6 +5590,12 @@ EXPORT(int, sceGxmShaderPatcherCreateMaskUpdateFragmentProgram, SceGxmShaderPatc
     if (!renderer::create(fp->renderer_data, *emuenv.renderer, *fp->program.get(mem), nullptr, emuenv.renderer->gxp_ptr_map)) {
         return RET_ERROR(SCE_GXM_ERROR_DRIVER);
     }
+
+    FragmentProgramInfo program_info;
+    program_info.program = fp->program;
+    program_info.has_blend = false;
+    program_info.is_mask_update = true;
+    emuenv.gxm.fragment_programs[fragmentProgram->address()] = program_info;
 
     return 0;
 }
@@ -4746,6 +5649,13 @@ EXPORT(int, sceGxmShaderPatcherCreateVertexProgram, SceGxmShaderPatcher *shaderP
         return RET_ERROR(SCE_GXM_ERROR_DRIVER);
     }
 
+    VertexProgramInfo program_info;
+    program_info.program = vp->program;
+    program_info.attributes = vp->attributes;
+    program_info.streams = vp->streams;
+    program_info.key_hash = key.hash;
+    emuenv.gxm.vertex_programs[vertexProgram->address()] = program_info;
+
     shaderPatcher->vertex_program_cache.emplace(key, *vertexProgram);
 
     return 0;
@@ -4757,6 +5667,7 @@ EXPORT(int, sceGxmShaderPatcherDestroy, Ptr<SceGxmShaderPatcher> shaderPatcher) 
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
 
     free_callbacked(emuenv, thread_id, shaderPatcher.get(emuenv.mem), shaderPatcher);
+    emuenv.gxm.shader_patchers.erase(shaderPatcher.address());
 
     return 0;
 }
@@ -4778,6 +5689,7 @@ EXPORT(int, sceGxmShaderPatcherForceUnregisterProgram, SceGxmShaderPatcher *shad
                     std::this_thread::yield();
 
                 free_callbacked(emuenv, thread_id, shaderPatcher, it->second.address());
+                emuenv.gxm.vertex_programs.erase(it->second.address());
                 it = shaderPatcher->vertex_program_cache.erase(it);
             } else {
                 ++it;
@@ -4791,6 +5703,7 @@ EXPORT(int, sceGxmShaderPatcherForceUnregisterProgram, SceGxmShaderPatcher *shad
                     std::this_thread::yield();
 
                 free_callbacked(emuenv, thread_id, shaderPatcher, it->second.address());
+                emuenv.gxm.fragment_programs.erase(it->second.address());
                 it = shaderPatcher->fragment_program_cache.erase(it);
             } else {
                 ++it;
@@ -4899,6 +5812,7 @@ EXPORT(int, sceGxmShaderPatcherReleaseFragmentProgram, SceGxmShaderPatcher *shad
             }
         }
         free_callbacked(emuenv, thread_id, shaderPatcher, fragmentProgram);
+        emuenv.gxm.fragment_programs.erase(fragmentProgram.address());
     }
 
     return 0;
@@ -4925,6 +5839,7 @@ EXPORT(int, sceGxmShaderPatcherReleaseVertexProgram, SceGxmShaderPatcher *shader
             }
         }
         free_callbacked(emuenv, thread_id, shaderPatcher, vertexProgram);
+        emuenv.gxm.vertex_programs.erase(vertexProgram.address());
     }
 
     return 0;
@@ -4999,10 +5914,8 @@ EXPORT(int, sceGxmTerminate) {
     emuenv.gxm.display_queue.wait_empty();
     gxm::destroy_all_contexts(emuenv, false);
     gxm::destroy_all_render_targets(emuenv, false);
-    emuenv.gxm.display_queue.abort();
-    // a later sceGxmInitialize reassigns this std::thread, which terminates if still joinable
-    if (emuenv.gxm.display_host_thread.joinable())
-        emuenv.gxm.display_host_thread.join();
+    // A later sceGxmInitialize must not overwrite a joinable host thread.
+    gxm::stop_display_queue_host(emuenv);
     emuenv.kernel.get_thread(emuenv.gxm.display_queue_thread)->exit_delete();
     return 0;
 }
@@ -5775,9 +6688,9 @@ EXPORT(int, sceGxmTransferFinish) {
     TRACY_FUNC(sceGxmTransferFinish);
     // same as sceGxmFinish
     guest_sched_release_for_block();
-    renderer::finish(*emuenv.renderer, nullptr);
-
-    return 0;
+    const auto thread = emuenv.kernel.get_thread(thread_id);
+    return thread ? renderer::finish_guest(*emuenv.renderer, *thread, nullptr, 0)
+                  : static_cast<int>(SCE_GXM_ERROR_DRIVER);
 }
 
 EXPORT(int, sceGxmUnmapFragmentUsseMemory, void *base) {

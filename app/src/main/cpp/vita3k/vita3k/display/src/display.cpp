@@ -16,6 +16,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include <algorithm>
+#include <cassert>
 #include <cpu/functions.h>
 #include <cstring>
 #include <thread>
@@ -131,6 +132,19 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
     };
 
     while (!display.abort.load()) {
+        struct ProducerIteration {
+            DisplayState &display;
+            bool entered;
+            explicit ProducerIteration(DisplayState &display)
+                : display(display)
+                , entered(display.begin_vblank_update()) {}
+            ~ProducerIteration() {
+                if (entered)
+                    display.end_vblank_update();
+            }
+        } iteration(display);
+        if (!iteration.entered)
+            break;
         {
             const std::lock_guard<std::mutex> guard(display.mutex);
 
@@ -313,6 +327,7 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
 }
 
 void start_sync_thread(EmuEnvState &emuenv) {
+    register_display_wait_continuations(emuenv.display, emuenv.kernel);
     emuenv.display.vblank_thread = std::make_unique<std::thread>(vblank_sync_thread, std::ref(emuenv));
 }
 
@@ -321,13 +336,85 @@ void wait_vblank(DisplayState &display, const ThreadStatePtr &wait_thread, const
         return;
     }
 
+    WaitContinuationScope continuation(*wait_thread, WaitOperation::display_vblank,
+        { static_cast<uint32_t>(target_vcount), static_cast<uint32_t>(target_vcount >> 32) }, nullptr, is_cb, Deadline::max());
     std::unique_lock<std::mutex> lock(display.mutex);
 
-    if (target_vcount <= display.vblank_count)
+    if (!continuation.resuming && target_vcount <= display.vblank_count)
         return;
 
     // Nothing runs after the wait, so a thread exiting during it needs no handling here
     (void)display.vblank_waiters.wait(lock, wait_thread, { SCE_KERNEL_WAITTYPE_EVENT }, { target_vcount }, Deadline::max(), is_cb);
+}
+
+void register_display_wait_continuations(DisplayState &display, KernelState &kernel) {
+    kernel.wait_resume_handlers[WaitOperation::display_vblank] = {
+        [&display, &kernel](ThreadState &thread, const std::shared_ptr<WaitContinuation> &record) {
+            const auto &args = record->state.args;
+            const uint64_t target = uint64_t(args[0]) | (uint64_t(args[1]) << 32);
+            auto self = kernel.get_thread(thread.id);
+            const std::lock_guard lock(display.mutex);
+            display.vblank_waiters.restore(self, { target }, record);
+            auto detach = std::move(record->detach_restored_waiter);
+            record->detach_restored_waiter = [&display, detach = std::move(detach)] {
+                const std::lock_guard lock(display.mutex);
+                detach();
+            };
+            return true;
+        },
+        [&display, &kernel](ThreadState &thread, const std::shared_ptr<WaitContinuation> &record) {
+            const auto &state = record->state;
+            const uint64_t target = uint64_t(state.args[0]) | (uint64_t(state.args[1]) << 32);
+            wait_vblank(display, kernel.get_thread(thread.id), target, state.callbacks);
+            // Matches display_wait's completion in modules/SceDisplay/SceDisplay.h.
+            return display.abort.load() ? static_cast<SceInt32>(0x80290008U) : SCE_KERNEL_OK;
+        }
+    };
+}
+
+void clear_display_waiters_for_restore(DisplayState &display) {
+    const std::lock_guard lock(display.mutex);
+    display.vblank_waiters = {};
+    display.vblank_callbacks.clear();
+}
+
+bool DisplayState::begin_vblank_update() {
+    std::unique_lock lock(producer_mutex);
+    producer_changed.wait(lock, [&] { return abort.load() || producer_freeze_count == 0; });
+    if (abort.load())
+        return false;
+    assert(!producer_active);
+    producer_active = true;
+    return true;
+}
+void DisplayState::end_vblank_update() {
+    const std::lock_guard lock(producer_mutex);
+    assert(producer_active);
+    producer_active = false;
+    producer_changed.notify_all();
+}
+bool DisplayState::freeze_vblank_producer(std::chrono::milliseconds budget) {
+    std::unique_lock lock(producer_mutex);
+    ++producer_freeze_count;
+    if (producer_changed.wait_for(lock, budget, [&] { return !producer_active; }))
+        return true;
+    --producer_freeze_count;
+    producer_changed.notify_all();
+    return false;
+}
+void DisplayState::resume_vblank_producer() {
+    const std::lock_guard lock(producer_mutex);
+    assert(producer_freeze_count != 0);
+    --producer_freeze_count;
+    producer_changed.notify_all();
+}
+ScopedVblankFreeze::ScopedVblankFreeze(DisplayState &display, std::chrono::milliseconds budget) {
+    if (display.freeze_vblank_producer(budget))
+        this->display = &display;
+}
+ScopedVblankFreeze::~ScopedVblankFreeze() {
+    if (display)
+        display->resume_vblank_producer();
 }
 
 static void reset_swapchain_cycle(DisplayState &display, Address sync_object) {
@@ -431,6 +518,7 @@ void update_prediction(EmuEnvState &emuenv, DisplayFrameInfo &frame) {
 
 void DisplayState::deinit() {
     abort = true;
+    producer_changed.notify_all();
     if (vblank_thread && vblank_thread->joinable())
         vblank_thread->join();
 

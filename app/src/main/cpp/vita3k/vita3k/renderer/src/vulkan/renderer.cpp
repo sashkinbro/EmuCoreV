@@ -24,6 +24,7 @@
 #include <renderer/types.h>
 #include <renderer/vulkan/functions.h>
 #include <renderer/vulkan/state.h>
+#include <renderer/vulkan/frame_runtime_reset.h>
 
 #include <chrono>
 #include <future>
@@ -1952,6 +1953,68 @@ void VKState::trim_native_buffer_cache(uint64_t budget) {
 }
 #endif
 
+void VKState::reset_caches() {
+    texture_cache.reset();
+    surface_cache.reset();
+}
+
+bool VKState::prepare_state_restore_teardown(std::string &error) {
+    try {
+        stop_gpu_requests_after_idle(request_queue, [&]() { wait_gpu_idle(); });
+        return true;
+    } catch (const std::exception &exception) {
+        error = std::string("GPU restore teardown failed: ") + exception.what();
+        return false;
+    }
+}
+
+bool VKState::reset_frame_runtime_for_restore(std::string &error) {
+    if (context || render_thread) {
+        error = "GPU frame reset requires destroyed contexts and a stopped renderer";
+        return false;
+    }
+    if (!request_queue.is_aborted()) {
+        error = "GPU frame reset requires stopped request workers";
+        return false;
+    }
+    try {
+        device.waitIdle();
+        reset_frame_runtime_after_idle(frames,
+            [](FrameObject &frame) { frame.destroy_queue.destroy_objects(); },
+            [&](FrameObject &frame) {
+                device.resetCommandPool(frame.prerender_pool);
+                device.resetCommandPool(frame.render_pool);
+            });
+        current_frame_idx = 1;
+        last_scene_id = 0;
+        reset_gpu_requests_after_join(request_queue);
+        return true;
+    } catch (const std::exception &exception) {
+        error = std::string("GPU frame reset failed: ") + exception.what();
+        return false;
+    }
+}
+
+void VKState::flush_surfaces(MemState &mem) {
+    surface_cache.flush_all_surfaces(mem);
+}
+
+void VKState::wait_gpu_idle() {
+    device.waitIdle();
+    if (!features.enable_memory_mapping || !context)
+        return;
+
+    auto promise = std::make_shared<std::promise<void>>();
+    std::future<void> future = promise->get_future();
+    request_queue.push(CallbackRequest{
+        new CallbackRequestFunction([promise]() { promise->set_value(); }), /* wait_for_gpu = */ false });
+
+    while (future.wait_for(std::chrono::milliseconds(5)) != std::future_status::ready) {
+        if (request_queue.is_aborted())
+            return;
+    }
+}
+
 void VKState::unmap_memory(MemState &mem, Ptr<void> address) {
     assert(features.enable_memory_mapping);
 
@@ -1964,13 +2027,18 @@ void VKState::unmap_memory(MemState &mem, Ptr<void> address) {
     // we need to wait in case the buffer is being used
     device.waitIdle();
 
-    // Drain the GPU wait thread's queue too
-    {
+    // Save-state teardown already joined every request reader before unmap.
+    // Do not allocate a callback for that aborted queue; ordinary unmaps still
+    // publish a drain marker while retaining ownership if publication races abort.
+    if (!request_queue.is_aborted()) {
         auto promise = std::make_shared<std::promise<void>>();
         std::future<void> future = promise->get_future();
-        request_queue.push(CallbackRequest{
-            new CallbackRequestFunction([promise]() { promise->set_value(); }),
-            /* wait_for_gpu = */ false });
+        if (!enqueue_gpu_request_callback(request_queue,
+                std::make_unique<CallbackRequestFunction>([promise]() { promise->set_value(); }), false)
+            && !request_queue.is_aborted()) {
+            LOG_ERROR("Could not enqueue GPU unmap completion barrier");
+            return;
+        }
         while (future.wait_for(std::chrono::milliseconds(5)) != std::future_status::ready) {
             if (render_abort.load(std::memory_order_relaxed) || request_queue.is_aborted())
                 break;

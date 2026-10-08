@@ -18,8 +18,10 @@
 #include <renderer/vulkan/types.h>
 
 #include <renderer/vulkan/functions.h>
+#include <renderer/vulkan/context_snapshot.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
 #include <renderer/vulkan/state.h>
+#include <renderer/vulkan/surface_sync.h>
 
 #include <cpu/functions.h>
 #include <gxm/functions.h>
@@ -29,6 +31,7 @@
 #include <util/overloaded.h>
 
 #include <algorithm>
+#include <limits>
 
 namespace renderer::vulkan {
 
@@ -113,24 +116,35 @@ void VKContext::wait_thread_function(const MemState &mem) {
                            wait_for_fences();
                            const std::shared_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
                            auto mem_it = state.mapped_memories.lower_bound(request.location);
-                           if (mem_it == state.mapped_memories.end() || mem_it->first + mem_it->second.size < request.location + request.size) {
-                               LOG_ERROR("Buffer Sync request for {}-{} is not fully mapped", log_hex(request.location), log_hex(request.location + request.size));
+                           if (mem_it == state.mapped_memories.end() || request.location < mem_it->first) {
+                               LOG_ERROR("Buffer Sync request at {} is not mapped", log_hex(request.location));
+                               return;
+                           }
+                           const uint64_t mapping_offset = static_cast<uint64_t>(request.location - mem_it->first);
+                           const uint64_t mapping_size = mem_it->second.size;
+                           const auto row_span = request.row_stride != 0
+                               ? surface_sync_rows_span(request.row_stride, request.row_bytes, request.row_count)
+                               : std::optional<size_t>{};
+                           if (mapping_offset > mapping_size || request.size > mapping_size - mapping_offset ||
+                               (request.row_stride != 0 && (!row_span || *row_span != request.size))) {
+                               LOG_ERROR("Buffer Sync request for {} bytes at {} exceeds its mapping", request.size, log_hex(request.location));
                                return;
                            }
                            uint8_t *src = reinterpret_cast<uint8_t *>(std::get<vkutil::Buffer>(mem_it->second.buffer_impl).mapped_data);
-                           src += request.location - mem_it->first;
+                           src += mapping_offset;
+                           uint8_t *dst = reinterpret_cast<uint8_t *>(Ptr<void>(request.location).get(mem));
                            renderer::vulkan::surface_sync_internal_write = true;
+                           bool copied = true;
                            if (request.row_stride != 0) {
-                               uint8_t *dst = reinterpret_cast<uint8_t *>(Ptr<void>(request.location).get(mem));
-                               for (uint32_t row = 0; row < request.row_count; row++) {
-                                   memcpy(dst, src, request.row_bytes);
-                                   src += request.row_stride;
-                                   dst += request.row_stride;
-                               }
+                               copied = copy_surface_sync_rows(dst, request.size, src,
+                                   static_cast<size_t>(mapping_size - mapping_offset), request.row_stride,
+                                   request.row_bytes, request.row_count);
                            } else {
-                               memcpy(Ptr<void>(request.location).get(mem), src, request.size);
+                               memcpy(dst, src, request.size);
                            }
                            renderer::vulkan::surface_sync_internal_write = false;
+                           if (!copied)
+                               LOG_ERROR("Invalid row layout in Buffer Sync request at {}", log_hex(request.location));
                        },
                        [&](PostSurfaceSyncRequest &request) {
                            const auto post_t0 = std::chrono::steady_clock::now();
@@ -159,23 +173,58 @@ void VKContext::wait_thread_function(const MemState &mem) {
     }
 }
 
-void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const FeatureState &features) {
-    context.state.surface_cache.resolve_ds_scene_end(context.scene_wrote_depth);
-    context.scene_wrote_depth = false;
-    context.scene_has_drawn = false;
-    context.scene_macroblock_flushed = false;
+static void configure_context_scene(VKContext &context, MemState &mem, VKRenderTarget *rt,
+    const FeatureState &features, const VKContextSnapshot *resume) {
+    const bool restoring = resume != nullptr;
+    if (!restoring) {
+        context.state.surface_cache.resolve_ds_scene_end(context.scene_wrote_depth);
+        context.scene_wrote_depth = false;
+        context.scene_has_drawn = false;
+        context.scene_macroblock_flushed = false;
 
-    context.rendered_rect_x0 = INT32_MAX;
-    context.rendered_rect_y0 = INT32_MAX;
-    context.rendered_rect_x1 = 0;
-    context.rendered_rect_y1 = 0;
-    context.draw_rect_x0 = INT32_MAX;
-    context.draw_rect_y0 = INT32_MAX;
-    context.draw_rect_x1 = 0;
-    context.draw_rect_y1 = 0;
+        context.rendered_rect_x0 = INT32_MAX;
+        context.rendered_rect_y0 = INT32_MAX;
+        context.rendered_rect_x1 = 0;
+        context.rendered_rect_y1 = 0;
+        context.draw_rect_x0 = INT32_MAX;
+        context.draw_rect_y0 = INT32_MAX;
+        context.draw_rect_x1 = 0;
+        context.draw_rect_y1 = 0;
+    } else {
+        context.scene_wrote_depth = resume->scene_wrote_depth;
+        context.scene_has_drawn = resume->scene_has_drawn;
+        context.scene_macroblock_flushed = resume->scene_macroblock_flushed;
+        context.is_first_scene_draw = resume->is_first_scene_draw;
+        context.surface_downscale = resume->surface_downscale;
+        context.viewport = vk::Viewport{
+            .x = resume->viewport_x,
+            .y = resume->viewport_y,
+            .width = resume->viewport_width,
+            .height = resume->viewport_height,
+            .minDepth = resume->viewport_min_depth,
+            .maxDepth = resume->viewport_max_depth,
+        };
+        context.scissor = vk::Rect2D{
+            .offset = { resume->scissor_x, resume->scissor_y },
+            .extent = { resume->scissor_width, resume->scissor_height },
+        };
+        context.last_macroblock_x = resume->last_macroblock_x;
+        context.last_macroblock_y = resume->last_macroblock_y;
+        context.ignore_macroblock = resume->ignore_macroblock;
+        context.rendered_rect_x0 = resume->rendered_rect_x0;
+        context.rendered_rect_y0 = resume->rendered_rect_y0;
+        context.rendered_rect_x1 = resume->rendered_rect_x1;
+        context.rendered_rect_y1 = resume->rendered_rect_y1;
+        context.draw_rect_x0 = resume->draw_rect_x0;
+        context.draw_rect_y0 = resume->draw_rect_y0;
+        context.draw_rect_x1 = resume->draw_rect_x1;
+        context.draw_rect_y1 = resume->draw_rect_y1;
+    }
 
     context.render_target = rt;
-    context.scene_timestamp++;
+    context.current_render_target = rt;
+    if (!restoring)
+        context.scene_timestamp++;
     context.state.texture_cache.current_scene_timestamp = context.scene_timestamp;
 
     SceGxmColorSurface *color_surface_fin = &context.record.color_surface;
@@ -193,21 +242,23 @@ void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const Fe
 
         // set back default values
         vk_format = vk::Format::eR8G8B8A8Unorm;
-        context.record.color_surface.downscale = static_cast<bool>(rt->multisample_mode);
+        context.record.color_surface.downscale = rt && static_cast<bool>(rt->multisample_mode);
         context.record.is_gamma_corrected = false;
         context.record.is_maskupdate = false;
         context.record.color_base_format = SCE_GXM_COLOR_BASE_FORMAT_U8U8U8U8;
     }
     context.current_color_format = vk_format;
 
-    rt->width = rt->base_width;
-    rt->height = rt->base_height;
     bool msaa_expanded = false;
-    if (rt->multisample_mode && !context.record.color_surface.downscale) {
-        // using MSAA without downscaling, emulate this as best as we can by multiplying the width and height of the render target by 2
-        rt->width *= 2;
-        rt->height *= 2;
-        msaa_expanded = true;
+    if (rt) {
+        rt->width = rt->base_width;
+        rt->height = rt->base_height;
+        if (rt->multisample_mode && !context.record.color_surface.downscale) {
+            // using MSAA without downscaling, emulate this as best as we can by multiplying the width and height of the render target by 2
+            rt->width *= 2;
+            rt->height *= 2;
+            msaa_expanded = true;
+        }
     }
 
     constexpr bool apply_color_surface_downscale = true;
@@ -218,7 +269,7 @@ void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const Fe
         const float res_multiplier = context.state.res_multiplier;
         const uint32_t color_width_scaled = static_cast<uint32_t>(color_surface_fin->width * res_multiplier);
         const uint32_t color_height_scaled = static_cast<uint32_t>(color_surface_fin->height * res_multiplier);
-        if (color_width_scaled > 0 && color_height_scaled > 0
+        if (rt && color_width_scaled > 0 && color_height_scaled > 0
             && rt->base_width >= color_width_scaled * 2
             && rt->base_height >= color_height_scaled * 2) {
             context.surface_downscale = 0.5f;
@@ -260,7 +311,7 @@ void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const Fe
     VKState &state = context.state;
     state.surface_cache.set_render_target(rt);
 
-    context.start_recording(true);
+    context.start_recording(!restoring);
 
     bool force_load = context.record.depth_stencil_surface.force_load;
     bool force_store = context.record.depth_stencil_surface.force_store;
@@ -272,9 +323,9 @@ void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const Fe
     // GXM force_store controls write-back to the depth surface memory, not whether the buffer keeps its contents
     force_store = true;
 
-    bool depth_load = force_load;
-    bool stencil_load = force_load;
-    if (ds_surface_fin != nullptr) {
+    bool depth_load = restoring ? true : force_load;
+    bool stencil_load = restoring ? true : force_load;
+    if (!restoring && ds_surface_fin != nullptr) {
         constexpr bool use_ds_depth_validity = true;
         const bool game_stores = context.record.depth_stencil_surface.force_store;
         const bool depth_content_valid = state.surface_cache.begin_ds_scene_depth_check(*ds_surface_fin, game_stores, context.record.color_surface.data.address());
@@ -304,10 +355,42 @@ void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const Fe
         context.fragment_textures[i].sampler = nullptr;
     }
 
-    context.is_first_scene_draw = true;
-    context.last_macroblock_x = ~0;
-    context.last_macroblock_y = ~0;
-    context.ignore_macroblock = false;
+    if (!restoring) {
+        context.is_first_scene_draw = true;
+        context.last_macroblock_x = ~0;
+        context.last_macroblock_y = ~0;
+        context.ignore_macroblock = false;
+    } else {
+        // A new command buffer has no bound pipeline or framebuffer-fetch pass.
+        context.last_draw_was_framebuffer_fetch = false;
+        context.refresh_pipeline = true;
+        context.current_pipeline = nullptr;
+        context.curr_vert_ublock.changed = true;
+        context.curr_frag_ublock.changed = true;
+
+        if (resume->visibility_buffer_address)
+            sync_visibility_buffer(context, Ptr<uint32_t>(resume->visibility_buffer_address), resume->visibility_stride);
+        else
+            sync_visibility_buffer(context, Ptr<uint32_t>(0), 0);
+        sync_visibility_index(context, resume->visibility_query_index >= 0,
+            resume->visibility_query_index >= 0 ? static_cast<uint32_t>(resume->visibility_query_index) : 0,
+            resume->visibility_query_increment);
+    }
+}
+
+void set_context(VKContext &context, MemState &mem, VKRenderTarget *rt, const FeatureState &features) {
+    configure_context_scene(context, mem, rt, features, nullptr);
+}
+
+bool restore_context_scene_checkpoint(VKContext &context, MemState &mem, VKRenderTarget *rt,
+    const VKContextSnapshot &snapshot, const FeatureState &features, std::string &error) {
+    if (!snapshot.recording_open || !rt || context.is_recording || context.in_renderpass
+        || context.is_in_query || !context.cmdbuffers_to_submit.empty()) {
+        error = "Vulkan context is not ready for an empty scene continuation";
+        return false;
+    }
+    configure_context_scene(context, mem, rt, features, &snapshot);
+    return context.is_recording && !context.in_renderpass;
 }
 
 void VKContext::start_recording(bool first_in_scene) {
@@ -644,23 +727,42 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
 
             // we must sync the two buffers
             if (surface_info && surface_info->need_buffer_sync) {
-                if (render_target->has_macroblock_sync && state.res_multiplier != 1.0f
-                    && rendered_rect_x1 > rendered_rect_x0 && rendered_rect_y1 > rendered_rect_y0) {
+                const bool partial_sync = surface_info->partial_write_back
+                    || surface_info->post_sync_x0 != 0 || surface_info->post_sync_y0 != 0
+                    || surface_info->post_sync_width < surface_info->original_width
+                    || surface_info->post_sync_height < surface_info->original_height;
+                if (partial_sync) {
                     const uint32_t bpp = gxm::bits_per_pixel(surface_info->format) / 8;
                     const uint32_t row_stride_bytes = surface_info->stride_bytes;
-                    const int32_t nx0 = static_cast<int32_t>(rendered_rect_x0 / state.res_multiplier);
-                    const int32_t ny0 = static_cast<int32_t>(rendered_rect_y0 / state.res_multiplier);
-                    const int32_t nx1 = static_cast<int32_t>(rendered_rect_x1 / state.res_multiplier);
-                    const int32_t ny1 = static_cast<int32_t>(rendered_rect_y1 / state.res_multiplier);
-                    const Address rect_start = surface_info->data.address() + ny0 * row_stride_bytes + nx0 * bpp;
-                    const uint32_t rect_row_bytes = static_cast<uint32_t>(nx1 - nx0) * bpp;
-                    const uint32_t rect_row_count = static_cast<uint32_t>(ny1 - ny0);
-                    state.request_queue.push(BufferSyncRequest{
-                        rect_start,
-                        static_cast<uint32_t>(surface_info->total_bytes),
-                        row_stride_bytes,
-                        rect_row_bytes,
-                        rect_row_count });
+                    const int32_t x0 = surface_info->post_sync_x0;
+                    const int32_t y0 = surface_info->post_sync_y0;
+                    const uint32_t width = surface_info->post_sync_width;
+                    const uint32_t height = surface_info->post_sync_height;
+                    const bool rect_in_bounds = bpp != 0 && x0 >= 0 && y0 >= 0
+                        && static_cast<uint32_t>(x0) <= surface_info->original_width
+                        && static_cast<uint32_t>(y0) <= surface_info->original_height
+                        && width <= surface_info->original_width - static_cast<uint32_t>(x0)
+                        && height <= surface_info->original_height - static_cast<uint32_t>(y0);
+                    const uint64_t row_bytes64 = static_cast<uint64_t>(width) * bpp;
+                    const uint64_t column_offset = static_cast<uint64_t>(x0) * bpp;
+                    const bool row_in_bounds = column_offset <= row_stride_bytes
+                        && row_bytes64 <= row_stride_bytes - column_offset;
+                    const uint64_t address_offset = static_cast<uint64_t>(y0) * row_stride_bytes + column_offset;
+                    const uint64_t address64 = static_cast<uint64_t>(surface_info->data.address()) + address_offset;
+                    const auto span = rect_in_bounds && row_in_bounds && row_bytes64 <= std::numeric_limits<uint32_t>::max()
+                        ? surface_sync_rows_span(row_stride_bytes, static_cast<size_t>(row_bytes64), height)
+                        : std::optional<size_t>{};
+                    if (span && *span > 0 && *span <= std::numeric_limits<uint32_t>::max()
+                        && address64 <= std::numeric_limits<Address>::max()) {
+                        state.request_queue.push(BufferSyncRequest{
+                            static_cast<Address>(address64),
+                            static_cast<uint32_t>(*span),
+                            row_stride_bytes,
+                            static_cast<uint32_t>(row_bytes64),
+                            height });
+                    } else {
+                        LOG_ERROR("Skipping invalid partial surface buffer sync");
+                    }
                 } else {
                     state.request_queue.push(BufferSyncRequest{ surface_info->data.address(), static_cast<uint32_t>(surface_info->total_bytes) });
                 }
@@ -688,7 +790,7 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
 }
 
 void VKContext::check_for_macroblock_change(bool is_draw) {
-    if (!render_target->has_macroblock_sync)
+    if (!render_target || !render_target->has_macroblock_sync)
         return;
 
     if (!ignore_macroblock && (scissor.extent.width > render_target->macroblock_width || scissor.extent.height > render_target->macroblock_height)) {

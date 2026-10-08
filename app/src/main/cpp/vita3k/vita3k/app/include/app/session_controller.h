@@ -39,6 +39,7 @@ enum class AppSessionPauseReason : uint32_t {
     User = 1u << 0,
     Menu = 1u << 1,
     Background = 1u << 2,
+    SaveState = 1u << 3,
 };
 
 enum class AppSessionStopReason {

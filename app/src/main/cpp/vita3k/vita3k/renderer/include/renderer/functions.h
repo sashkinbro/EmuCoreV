@@ -112,6 +112,10 @@ void destroy_render_target_during_shutdown(State &state, std::unique_ptr<RenderT
 
 Command *generic_command_allocate();
 void generic_command_free(Command *cmd);
+// Worker must be parked or joined; context allocation callbacks must be alive.
+void discard_pending_batches(State &state);
+// Consume the ready prefix, retaining an unsatisfied wait as the first command.
+bool process_batch_until_wait(State &, const FeatureState &, MemState &, Config &, CommandList &);
 void destroy_command_payload(Command &cmd);
 
 template <typename... Args>

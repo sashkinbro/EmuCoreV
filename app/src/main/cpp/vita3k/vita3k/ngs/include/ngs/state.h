@@ -17,8 +17,11 @@
 
 #pragma once
 
+#include <mem/mempool.h>
 #include <mem/ptr.h>
+#include <ngs/types.h>
 
+#include <utility>
 #include <vector>
 
 struct MemState;
@@ -27,11 +30,67 @@ namespace ngs {
 struct VoiceDefinition;
 struct System;
 
+struct SystemInitInfo {
+    Address address = 0;
+    Ptr<void> memspace;
+    uint32_t memspace_size = 0;
+    SceNgsSystemInitParams params{};
+    /// Active voices of the system's scheduler, as (rack index, voice index).
+    std::vector<std::pair<uint32_t, uint32_t>> queued_voices;
+};
+
+struct ModuleDataInfo {
+    std::vector<uint8_t> guest_state_data;
+    std::vector<uint8_t> parameters;
+    std::vector<uint8_t> last_info;
+    std::vector<uint8_t> logical_state;
+    Address callback = 0;
+    Address user_data = 0;
+    bool is_bypassed = false;
+    uint8_t flags = 0;
+};
+
+struct VoiceInfo {
+    Address address = 0;
+    uint32_t state = 0;
+    bool is_pending = false;
+    bool is_paused = false;
+    bool is_keyed_off = false;
+    uint32_t frame_count = 0;
+    float implicit_volume_matrix[2][2] = { { 1.0f, 0.0f }, { 0.0f, 1.0f } };
+    Address finished_callback = 0;
+    Address finished_callback_user_data = 0;
+    /// Patch addresses per output port (guest Patch objects).
+    std::vector<std::vector<Address>> patches;
+    std::vector<ModuleDataInfo> modules;
+};
+
+struct RackInitInfo {
+    Address address = 0;
+    Address system_address = 0;
+    Ptr<System> system;
+    SceNgsBufferInfo info{};
+    SceNgsRackDescription description{};
+    /// Host-side mempool allocator state, so restored patches stay allocated.
+    std::vector<MemspaceBlockAllocator::Block> blocks;
+    std::vector<VoiceInfo> voices;
+};
+
 struct State {
     Ptr<VoiceDefinition> definitions;
     std::vector<System *> systems;
+    std::vector<SystemInitInfo> system_infos;
+    std::vector<RackInitInfo> rack_infos;
 };
 
 bool init(State &ngs, MemState &mem);
 void deinit(State &ngs, MemState &mem);
+
+// Requires the guest world to be stopped. Returns false rather than waiting on a
+// scheduler inside an unfinished update/callback; outputs remain unchanged.
+bool capture_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> &definitions, std::vector<SystemInitInfo> &system_infos, std::vector<RackInitInfo> &rack_infos);
+// Pure preflight for the versioned module payload; does not construct decoders,
+// access guest memory, or change the live mixer. Empty means a stateless module.
+bool validate_logical_state_blob(const std::vector<uint8_t> &blob);
+bool restore_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> definitions, const std::vector<SystemInitInfo> &system_infos, const std::vector<RackInitInfo> &rack_infos);
 } // namespace ngs

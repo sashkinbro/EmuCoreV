@@ -109,7 +109,7 @@ static constexpr ImageLayoutTransition layout_transitions[] = {
     // DepthStencilAttachment
     {
         vk::ImageLayout::eDepthStencilAttachmentOptimal,
-        vk::PipelineStageFlagBits::eEarlyFragmentTests,
+        vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
         vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite },
     // ColorAttachmentReadWrite
     {

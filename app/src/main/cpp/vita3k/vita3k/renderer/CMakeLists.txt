@@ -18,6 +18,7 @@ add_library(
 
 	src/vulkan/allocator.cpp
 	src/vulkan/context.cpp
+	src/vulkan/context_snapshot.cpp
 	src/vulkan/creation.cpp
 	src/vulkan/gxm_to_vulkan.cpp
 	src/vulkan/pipeline_cache.cpp
@@ -27,6 +28,8 @@ add_library(
 	src/vulkan/screen_filters.cpp
 	src/vulkan/screen_renderer.cpp
 	src/vulkan/surface_cache.cpp
+	src/vulkan/surface_cache_snapshot.cpp
+	src/vulkan/surface_cache_snapshot_codec.cpp
 	src/vulkan/sync_state.cpp
 	src/vulkan/texture.cpp
 
@@ -37,6 +40,8 @@ add_library(
 	src/texture/replacement.cpp
 	src/texture/yuv.cpp
 
+	src/command_snapshot.cpp
+	src/finish.cpp
 	src/batch.cpp
 	src/creation.cpp
 	src/renderer.cpp

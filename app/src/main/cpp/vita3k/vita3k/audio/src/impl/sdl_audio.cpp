@@ -16,6 +16,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include "audio/impl/sdl_audio.h"
+#include "SDL_audio_state.h"
 #include "util/log.h"
 #include <SDL3/SDL_audio.h>
 #include <SDL3/SDL_hints.h>
@@ -43,6 +44,7 @@ void SDLCALL SDLAudioAdapter::thread_wakeup_callback(void *userdata, SDL_AudioSt
     const int samples_available = port->adapter.get_rest_sample(*port);
     if (samples_available < get_threshold_samples(port->adapter.device_buffer_samples) || additional_amount > 0) {
         port->cond_var.notify_one();
+        port->notify_output_ready();
     }
 }
 
@@ -73,6 +75,14 @@ void SDLAudioAdapter::switch_state(const bool pause) {
 }
 
 AudioOutPortPtr SDLAudioAdapter::open_port(int nb_channels, int freq, int nb_sample) {
+    return open_port_internal(nb_channels, freq, nb_sample, true);
+}
+
+AudioOutPortPtr SDLAudioAdapter::open_port_for_restore(int nb_channels, int freq, int nb_sample) {
+    return open_port_internal(nb_channels, freq, nb_sample, false);
+}
+
+AudioOutPortPtr SDLAudioAdapter::open_port_internal(int nb_channels, int freq, int nb_sample, bool resume_device) {
     SDL_AudioSpec src_spec = {
         .format = SDL_AUDIO_S16LE,
         .channels = nb_channels,
@@ -87,26 +97,22 @@ AudioOutPortPtr SDLAudioAdapter::open_port(int nb_channels, int freq, int nb_sam
     port->channels = nb_channels;
     port->len_microseconds = (nb_sample * 1'000'000ULL) / freq;
     port->len_bytes = nb_sample * nb_channels * sizeof(int16_t);
-    switch_state(false);
+    if (resume_device)
+        switch_state(false);
     return port;
 }
 
-void SDLAudioAdapter::audio_output(AudioOutPort &out_port, const void *buffer) {
+AudioSubmitResult SDLAudioAdapter::try_audio_output(AudioOutPort &out_port, const void *buffer, bool allow_overflow) {
     if (out_port.stopping)
-        return;
-
-    //  Put audio to the port's stream and see how much is left to play.
-    SDLAudioOutPort &port = static_cast<SDLAudioOutPort &>(out_port);
-    // If there's lots of audio left to play, stop this thread.
-    // The audio callback will wake it up later when it's running out of data.
+        return AudioSubmitResult::stopped;
+    auto &port = static_cast<SDLAudioOutPort &>(out_port);
     const int samples_available = get_rest_sample(port);
-    if (samples_available > get_threshold_samples(device_buffer_samples)) {
-        std::unique_lock<std::mutex> lock(port.mutex);
-        port.cond_var.wait_for(lock, std::chrono::microseconds(port.len_microseconds * 2));
-        if (out_port.stopping)
-            return;
-    }
-    SDL_CHECK_VOID(SDL_PutAudioStreamData(port.stream.get(), buffer, out_port.len_bytes));
+    if (samples_available < 0)
+        return AudioSubmitResult::error;
+    if (!allow_overflow && samples_available > get_threshold_samples(device_buffer_samples))
+        return AudioSubmitResult::would_block;
+    return SDL_PutAudioStreamData(port.stream.get(), buffer, port.len_bytes)
+        ? AudioSubmitResult::submitted : AudioSubmitResult::error;
 }
 
 void SDLAudioAdapter::set_volume(AudioOutPort &out_port, float volume) {
@@ -128,5 +134,24 @@ void SDLAudioAdapter::wake_all_ports() {
             std::lock_guard<std::mutex> lock(port.mutex);
         }
         port.cond_var.notify_all();
+        port.notify_output_ready();
     }
+}
+
+bool SDLAudioAdapter::save_port_state(AudioOutPort &out_port, std::vector<uint8_t> &state) {
+    auto &port = static_cast<SDLAudioOutPort &>(out_port);
+    const size_t size = SDL_GetAudioStreamStateSize(port.stream.get());
+    if (size == 0 || size > 16u * 1024u * 1024u + 256u)
+        return false;
+    state.resize(size);
+    if (!SDL_SaveAudioStreamState(port.stream.get(), state.data(), state.size())) {
+        state.clear();
+        return false;
+    }
+    return true;
+}
+
+bool SDLAudioAdapter::restore_port_state(AudioOutPort &out_port, const std::vector<uint8_t> &state) {
+    auto &port = static_cast<SDLAudioOutPort &>(out_port);
+    return !state.empty() && SDL_LoadAudioStreamState(port.stream.get(), state.data(), state.size());
 }

@@ -24,6 +24,9 @@ target_include_directories(vita3k PRIVATE
     "${VITA3K_CORE_DIR}"
     "${VITA3K_CORE_DIR}/android/jni"
     "${VITA3K_CORE_DIR}/dialog/include"
+    "${VITA3K_CORE_DIR}/ngs/include"
+    "${VITA3K_VENDOR_DIR}/external/vita-toolchain/src"
+    "${VITA3K_VENDOR_DIR}/external/concurrentqueue"
 )
 
 target_compile_definitions(vita3k PRIVATE EMUCOREV_ANDROID_BRIDGE=1)
@@ -58,6 +61,18 @@ set(EMUCOREV_BRIDGE_SOURCES
     "${EMUCOREV_BRIDGE_DIR}/src/input_overlay_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/emu_surface_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/native_lib_bridge.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate_bridge.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/archive.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/memory_image.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/gpu_state_io.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/gxm_state_io.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/sysmem_state_io.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/display_state_io.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/kernel_base_io.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/kernel_module_validation.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/ngs_state_io.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/ngs_state_validation.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/savestate.cpp"
 )
 
 target_sources(vita3k PRIVATE ${EMUCOREV_BRIDGE_SOURCES})
@@ -69,7 +84,9 @@ if(ANDROID)
         "${EMUCOREV_BRIDGE_DIR}/../../../test/core-api/core_api_tests.cpp")
     target_include_directories(emucorev-core-tests PRIVATE
         "$<TARGET_PROPERTY:vita3k,INCLUDE_DIRECTORIES>"
-        "${VITA3K_CORE_DIR}/modules")
+        "${VITA3K_CORE_DIR}/modules"
+        "$<TARGET_PROPERTY:cubeb,INCLUDE_DIRECTORIES>"
+        "${VITA3K_VENDOR_DIR}/external/LibAtrac9/C/src")
     target_link_libraries(emucorev-core-tests PRIVATE vita3k googletest)
     target_compile_definitions(emucorev-core-tests PRIVATE
         "$<TARGET_PROPERTY:vita3k,COMPILE_DEFINITIONS>")

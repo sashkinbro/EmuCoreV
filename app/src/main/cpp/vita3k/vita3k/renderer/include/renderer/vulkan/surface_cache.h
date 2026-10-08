@@ -104,6 +104,15 @@ struct ColorSurfaceCacheInfo : public SurfaceCacheInfo {
     int32_t written_y0 = INT32_MAX;
     int32_t written_x1 = 0;
     int32_t written_y1 = 0;
+    int32_t scene_x0 = 0;
+    int32_t scene_y0 = 0;
+    int32_t scene_x1 = 0;
+    int32_t scene_y1 = 0;
+    int32_t post_sync_x0 = 0;
+    int32_t post_sync_y0 = 0;
+    uint32_t post_sync_width = 0;
+    uint32_t post_sync_height = 0;
+    bool partial_write_back = false;
 
     SceGxmColorBaseFormat format;
     vk::ComponentMapping swizzle;
@@ -230,6 +239,8 @@ struct ReinterpretPushConstants {
 
 class VKSurfaceCache {
 private:
+    friend struct SurfaceCacheSnapshotAccess;
+
     VKState &state;
 
     // only have 20 color surfaces and 20 depth surfaces allocated at most at a given time
@@ -273,6 +284,8 @@ private:
 
     void destroy_surface(ColorSurfaceCacheInfo &info);
     void destroy_surface(DepthStencilSurfaceCacheInfo &info);
+    // Re-register a restored color surface's guest-memory trap after RAM is restored.
+    bool protect_cached_surface(MemState &mem, ColorSurfaceCacheInfo &info);
 
     // reload a surface's guest-memory content into its Vulkan image (recorded in prerender_cmd)
     bool try_upload_guest_content(ColorSurfaceCacheInfo &info, MemState &mem);
@@ -303,6 +316,12 @@ private:
     void submit_immediate_surface_sync(ColorSurfaceCacheInfo &surface, MemState *mem, Address sync_addr = 0, uint32_t sync_size = 0);
 
 public:
+    // destroys every cached surface/framebuffer and clears the host-side tables
+    void reset();
+
+    // write back every cached surface's GPU content into guest RAM (save states)
+    void flush_all_surfaces(MemState &mem);
+
     // fold the scene's drawn rect into the current colour surface's written region
     void note_scene_draw_rect(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
 
@@ -359,6 +378,10 @@ public:
     // mapped memory buffer so the shader reads up-to-date data. Returns true if the address
     // belongs to such a surface.
     bool sync_surface_for_gpu_read(Address address, uint32_t size);
+    // Return the next color-surface boundary after address, or address itself
+    // when it already lies in a color surface. Uniform slack mirrors must not
+    // copy bytes through a surface owned by the surface cache.
+    Address color_surface_limit(Address address) const;
 
     // If non-null, the return value must be sent as a PostSurfaceSyncRequest
     ColorSurfaceCacheInfo *perform_surface_sync();

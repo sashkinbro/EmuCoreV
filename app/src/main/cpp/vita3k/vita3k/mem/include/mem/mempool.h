@@ -21,6 +21,7 @@
 #include <util/align.h>
 
 #include <algorithm>
+#include <limits>
 
 struct MemspaceBlockAllocator {
     struct Block {
@@ -29,7 +30,7 @@ struct MemspaceBlockAllocator {
         bool free;
     };
 
-    std::vector<Block> blocks; /// All block sorted by size
+    std::vector<Block> blocks; /// Contiguous blocks sorted by address offset.
 
     explicit MemspaceBlockAllocator() = default;
     explicit MemspaceBlockAllocator(const std::uint32_t memspace_size) {
@@ -37,6 +38,9 @@ struct MemspaceBlockAllocator {
     }
 
     void init(const std::uint32_t memspace_size) {
+        blocks.clear();
+        if (!memspace_size)
+            return;
         Block main_block = {};
         main_block.offset = 0;
         main_block.size = memspace_size;
@@ -46,6 +50,8 @@ struct MemspaceBlockAllocator {
     }
 
     std::uint32_t alloc(const std::uint32_t size) {
+        if (!size || size > std::numeric_limits<std::uint32_t>::max() - 3)
+            return 0xFFFFFFFF;
         std::uint32_t aligned_size = align(size, 4);
         for (std::size_t i = 0; i < blocks.size(); i++) {
             if (blocks[i].free && blocks[i].size >= aligned_size) {
@@ -64,10 +70,6 @@ struct MemspaceBlockAllocator {
                     blocks[i].size = aligned_size;
 
                     const std::uint32_t offset = blocks[i].offset;
-
-                    if (blocks.capacity() == blocks.size()) {
-                        blocks.resize(blocks.size() + 1);
-                    }
 
                     blocks.insert(blocks.begin() + i + 1, division);
 

@@ -18,6 +18,7 @@
 #include <gxm/functions.h>
 #include <gxm/types.h>
 #include <renderer/commands.h>
+#include <renderer/command_snapshot.h>
 #include <renderer/driver_functions.h>
 #include <renderer/state.h>
 #include <renderer/types.h>
@@ -39,21 +40,6 @@
 #endif
 
 namespace renderer {
-void destroy_command_payload(Command &cmd) {
-    switch (cmd.opcode) {
-    case CommandOpcode::SetContext: {
-        auto *color_surface = reinterpret_cast<SceGxmColorSurface **>(&cmd.data[sizeof(RenderTarget *)]);
-        auto *depth_stencil_surface = reinterpret_cast<SceGxmDepthStencilSurface **>(&cmd.data[sizeof(RenderTarget *) + sizeof(SceGxmColorSurface *)]);
-        delete *color_surface;
-        delete *depth_stencil_surface;
-        break;
-    }
-
-    default:
-        break;
-    }
-}
-
 COMMAND(handle_set_context) {
     TRACY_FUNC_COMMANDS(handle_set_context);
     RenderTarget *rt = helper.pop<RenderTarget *>();
@@ -80,11 +66,21 @@ COMMAND(handle_set_context) {
 
     switch (renderer.current_backend) {
     case Backend::OpenGL:
-        gl::set_context(dynamic_cast<gl::GLState &>(renderer), *reinterpret_cast<gl::GLContext *>(render_context), mem, reinterpret_cast<const gl::GLRenderTarget *>(rt), features);
+        try {
+            gl::set_context(dynamic_cast<gl::GLState &>(renderer), *reinterpret_cast<gl::GLContext *>(render_context), mem, reinterpret_cast<const gl::GLRenderTarget *>(rt), features);
+        } catch (const std::exception &e) {
+            LOG_ERROR("set_context (OpenGL) failed: {}", e.what());
+            LOG_CRITICAL("[renderer-debug] set_context (OpenGL) failed: {}", e.what());
+        }
         break;
 
     case Backend::Vulkan:
-        vulkan::set_context(*reinterpret_cast<vulkan::VKContext *>(render_context), mem, reinterpret_cast<vulkan::VKRenderTarget *>(rt), features);
+        try {
+            vulkan::set_context(*reinterpret_cast<vulkan::VKContext *>(render_context), mem, reinterpret_cast<vulkan::VKRenderTarget *>(rt), features);
+        } catch (const std::exception &e) {
+            LOG_ERROR("set_context (Vulkan) failed: {}", e.what());
+            LOG_CRITICAL("[renderer-debug] set_context (Vulkan) failed: {}", e.what());
+        }
         break;
 
     default:
@@ -220,6 +216,15 @@ COMMAND(handle_mid_scene_flush) {
 
 COMMAND(handle_draw) {
     TRACY_FUNC_COMMANDS(handle_draw);
+    // After a save-state load the context can resume mid-scene before the guest
+    // begins the next one; skip draws that have no render target.
+    if (!render_context->current_render_target) {
+        static std::atomic<uint64_t> dropped_draws{ 0 };
+        const uint64_t n = dropped_draws.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (n <= 8 || (n % 512) == 0)
+            LOG_CRITICAL("[savestate-diag] dropped draw without render target (total {})", n);
+        return;
+    }
     SceGxmPrimitiveType type = helper.pop<SceGxmPrimitiveType>();
     SceGxmIndexFormat format = helper.pop<SceGxmIndexFormat>();
     Ptr<const void> indices = helper.pop<Ptr<const void>>();

@@ -32,13 +32,13 @@ struct CubebAudioOutPort : AudioOutPort {
     cubeb_stream *out_stream = nullptr;
     cubeb_stream_params spec;
     // sync variables used to wait for the buffer to be ready
-    std::mutex mutex;
     std::condition_variable cond_var;
     // buffer filled with audio data to pass to cubeb
     std::vector<AudioBuffer> audio_buffers;
     // position of the next audio buffer to put audio
     int next_audio_buffer = 0;
     int nb_buffers_ready = 0;
+    bool stream_started = false;
 
     // use the destructor to destroy the cubeb stream
     ~CubebAudioOutPort();
@@ -53,8 +53,14 @@ public:
 
     bool init() override;
     AudioOutPortPtr open_port(int nb_channels, int freq, int nb_sample) override;
-    void audio_output(AudioOutPort &out_port, const void *buffer) override;
+    AudioOutPortPtr open_port_for_restore(int nb_channels, int freq, int nb_sample) override;
+    AudioSubmitResult try_audio_output(AudioOutPort &out_port, const void *buffer, bool allow_overflow) override;
     void set_volume(AudioOutPort &out_port, float volume) override;
     void switch_state(const bool pause) override;
     void wake_all_ports() override;
+    bool save_port_state(AudioOutPort &out_port, std::vector<uint8_t> &state) override;
+    bool restore_port_state(AudioOutPort &out_port, const std::vector<uint8_t> &state) override;
+    uint32_t state_codec() const override { return 2; }
 };
+
+bool validate_cubeb_audio_snapshot(int len_bytes, const std::vector<uint8_t> &state);

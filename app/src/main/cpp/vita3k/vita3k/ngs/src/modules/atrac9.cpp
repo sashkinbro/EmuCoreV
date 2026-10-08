@@ -16,6 +16,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include <ngs/modules/atrac9.h>
+#include <ngs/modules/logical_state_io.h>
 #include <util/log.h>
 
 extern "C" {
@@ -99,6 +100,14 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
 
     if (state->current_byte_position_in_buffer >= bufparam.bytes_count) {
         const int32_t prev_index = state->current_buffer;
+        {
+            static std::atomic<uint64_t> diag_wraps{ 0 };
+            const uint64_t n = diag_wraps.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (n <= 8 || (n % 256) == 0)
+                LOG_CRITICAL("[savestate-ngs] AT9 buffer wrap voice={} buf={} loop_count={} loop_now={} next={} bytes={} total_wraps={}",
+                    fmt::ptr(data.parent), state->current_buffer, bufparam.loop_count, logical->current_loop_count,
+                    bufparam.next_buffer_index, bufparam.bytes_count, n);
+        }
 
         voice_lock.unlock();
         scheduler_lock.unlock();
@@ -286,6 +295,13 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
         else
             logical->diag_silent_streak = 0;
         {
+            static std::atomic<uint64_t> diag_sf_total{ 0 };
+            const uint64_t sf_total = diag_sf_total.fetch_add(1, std::memory_order_relaxed) + 1;
+            if ((sf_total % 8192) == 0)
+                LOG_CRITICAL("[savestate-ngs] AT9 superframes total={} voice_sf={} peak={:.4f} silent_streak={} staged={} err={}",
+                    sf_total, logical->diag_superframes, sf_peak, logical->diag_silent_streak, diag_staged ? 1 : 0, got_decode_error ? 1 : 0);
+        }
+        {
             auto &r = logical->diag_ring[logical->diag_ring_next++ % 16];
             r = { logical->diag_superframes, state->current_byte_position_in_buffer, state->current_buffer,
                 static_cast<uint8_t>(diag_staged ? 1 : 0), diag_in_head, sf_peak };
@@ -381,6 +397,16 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
 }
 
 bool Atrac9Module::process(KernelState &kern, const MemState &mem, const SceUID thread_id, ModuleData &data, std::unique_lock<std::recursive_mutex> &scheduler_lock, std::unique_lock<std::mutex> &voice_lock) {
+    {
+        static std::atomic<uint64_t> diag_process_calls{ 0 };
+        const uint64_t n = diag_process_calls.fetch_add(1, std::memory_order_relaxed) + 1;
+        if ((n % 4096) == 0)
+            LOG_CRITICAL("[savestate-ngs] AT9 process calls={} thread={}", n, thread_id);
+    }
+    // Restored voices are not decoded until the game re-arms them.
+    if (data.needs_reinit)
+        return true;
+
     const SceNgsAT9Params *params = data.get_parameters<SceNgsAT9Params>(mem);
     SceNgsAT9States *state = data.get_state<SceNgsAT9States>();
     Atrac9LogicalState *logical = data.get_logical_state<Atrac9LogicalState>();
@@ -453,6 +479,23 @@ bool Atrac9Module::process(KernelState &kern, const MemState &mem, const SceUID 
     }
 
     return is_finished;
+}
+
+void Atrac9Module::capture_logical_state(const ModuleData &data, std::vector<uint8_t> &out) const {
+    const auto *logical = static_cast<const Atrac9LogicalState *>(data.logical_state.get());
+    const auto *runtime = static_cast<const Atrac9RuntimeState *>(data.runtime_state.get());
+    logical_state_io::capture_atrac9_snapshot(logical, runtime ? runtime->decoder.get() : nullptr, out);
+}
+
+bool Atrac9Module::restore_logical_state(ModuleData &data, const std::vector<uint8_t> &in) const {
+    std::unique_ptr<Atrac9LogicalState> restored;
+    if (!logical_state_io::restore_atrac9(in, restored))
+        return false;
+    if (auto *runtime = static_cast<Atrac9RuntimeState *>(data.runtime_state.get()))
+        destroy_stereo_rate_resampler(runtime->rate_resampler);
+    data.runtime_state.reset();
+    data.logical_state = std::move(restored);
+    return true;
 }
 
 void Atrac9Module::free_swr_contexts() {

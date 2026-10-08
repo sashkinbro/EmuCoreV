@@ -1638,7 +1638,7 @@ EXPORT(int, sceKernelPulseEventWithNotifyCallback) {
 }
 
 static SceInt32 receive_msg_pipe(EmuEnvState &emuenv, const char *export_name, SceUID thread_id, SceUID msgPipeId, void *pRecvBuf, SceSize recvSize, SceUInt32 waitMode, SceSize *pResult, SceUInt32 *pTimeout, bool callbacks) {
-    const auto ret = msgpipe_recv(emuenv.kernel, export_name, thread_id, msgPipeId, waitMode, pRecvBuf, recvSize, pTimeout, callbacks);
+    const auto ret = msgpipe_recv(emuenv.kernel, export_name, thread_id, msgPipeId, waitMode, pRecvBuf, recvSize, pTimeout, callbacks, pResult, true);
     if (static_cast<int>(ret) < 0) {
         return ret;
     }
@@ -1679,7 +1679,7 @@ EXPORT(int, sceKernelRegisterThreadEventHandler, const char *name, SceUID thread
 }
 
 static SceInt32 send_msg_pipe(EmuEnvState &emuenv, const char *export_name, SceUID thread_id, SceUID msgPipeId, const void *pSendBuf, SceSize sendSize, SceUInt32 waitMode, SceSize *pResult, SceUInt32 *pTimeout, bool callbacks) {
-    const auto ret = msgpipe_send(emuenv.kernel, export_name, thread_id, msgPipeId, waitMode, pSendBuf, sendSize, pTimeout, callbacks);
+    const auto ret = msgpipe_send(emuenv.kernel, export_name, thread_id, msgPipeId, waitMode, pSendBuf, sendSize, pTimeout, callbacks, pResult, true);
     if (static_cast<int>(ret) < 0) {
         return ret;
     }

@@ -18,6 +18,7 @@
 #include <module/module.h>
 
 #include <audio/state.h>
+#include <audio/continuation.h>
 #include <kernel/state.h>
 #include <kernel/thread/thread_state.h>
 #include <util/lock_and_find.h>
@@ -185,32 +186,17 @@ EXPORT(int, sceAudioOutOpenPort, SceAudioOutPortType type, int len, int freq, Sc
     const int port_id = emuenv.audio.next_port_id++;
     emuenv.audio.out_ports.emplace(port_id, port);
 
+    LOG_CRITICAL("[savestate-audio] sceAudioOutOpenPort -> id={} type={} len={} freq={} mode={} thread={}", port_id, static_cast<int>(type), len, freq, static_cast<int>(mode), thread_id);
     return port_id;
 }
 
 EXPORT(int, sceAudioOutOutput, int port, const void *buf) {
     TRACY_FUNC(sceAudioOutOutput, port, buf);
-    const AudioOutPortPtr prt = lock_and_find(port, emuenv.audio.out_ports, emuenv.audio.mutex);
-    if (!prt) {
+    const auto thread = emuenv.kernel.get_thread(thread_id);
+    if (!thread)
         return RET_ERROR(SCE_AUDIO_OUT_ERROR_INVALID_PORT);
-    }
-
-    // Empty "buf" variable is valid. It mean wait until sound output is completed.
-    // Because this function always returns when all sound is out, then on empty buf it returns immediately.
-    // Return value is the number of samples (value of 0 or greater) registered to the audio driver for normal termination.
-    if (!buf)
-        return 0;
-
-    const ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
-    if (!thread) {
-        return RET_ERROR(SCE_AUDIO_OUT_ERROR_INVALID_PORT);
-    }
-    // is it really useful to update the thread status?
-    thread->update_status(ThreadStatus::waiting);
-    emuenv.audio.audio_output(*prt, buf);
-    thread->update_status(ThreadStatus::running);
-
-    return prt->len;
+    return audio_output_wait(emuenv.kernel, emuenv.audio, emuenv.mem, *thread, port,
+        buf ? host_to_guest(emuenv.mem, buf) : 0);
 }
 
 EXPORT(int, sceAudioOutGetRestSample, int port) {
@@ -239,10 +225,17 @@ EXPORT(int, sceAudioOutOpenExtPort) {
 
 EXPORT(int, sceAudioOutReleasePort, int port) {
     TRACY_FUNC(sceAudioOutReleasePort, port);
-    const std::lock_guard<std::mutex> guard(emuenv.audio.mutex);
-    if (!emuenv.audio.out_ports.erase(port)) {
-        return RET_ERROR(SCE_AUDIO_OUT_ERROR_INVALID_PORT);
+    AudioOutPortPtr removed;
+    {
+        const std::lock_guard guard(emuenv.audio.mutex);
+        const auto found = emuenv.audio.out_ports.find(port);
+        if (found == emuenv.audio.out_ports.end())
+            return RET_ERROR(SCE_AUDIO_OUT_ERROR_INVALID_PORT);
+        removed = std::move(found->second);
+        emuenv.audio.out_ports.erase(found);
+        removed->stopping = true;
     }
+    removed->notify_output_ready();
 
     return 0;
 }

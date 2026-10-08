@@ -27,6 +27,7 @@
 #include <variant>
 
 struct KernelState;
+void clear_sync_primitive_thread_cache();
 
 // NOTE: uid is copied to sync primitives here for debugging,
 //       not really needed since they are put in std::map's
@@ -53,6 +54,7 @@ struct SyncPrimitive {
         deleted.store(true, std::memory_order_relaxed);
         on_delete();
     }
+
 protected:
     virtual void on_delete() = 0;
 };
@@ -73,6 +75,7 @@ struct SimpleEvent : SyncPrimitive {
 
     bool auto_reset = false;
     bool cb_wakeup_only = false;
+
 protected:
     void on_delete() override;
 };
@@ -92,8 +95,17 @@ struct Timer : SyncPrimitive {
     bool is_pulse = false;
     bool event_set = false;
     uint64_t time = 0;
+    // Host epoch translation only; raw GetTimerBase/SetTimerTime values persist.
+    uint64_t elapsed_clock_bias = 0;
+    uint64_t elapsed_time_at(uint64_t now) const { return now - elapsed_clock_bias - time; }
+    void restore_elapsed_time(uint64_t now, uint64_t saved_elapsed) { elapsed_clock_bias = now - time - saved_elapsed; }
+    void reset_time_base(uint64_t now) {
+        time = now;
+        elapsed_clock_bias = 0;
+    }
     uint64_t next_event = 0;
     uint64_t event_interval = 0;
+
 protected:
     void on_delete() override;
 };
@@ -113,6 +125,7 @@ struct Semaphore : SyncPrimitive {
     int max = 0;
     int val = 0;
     int init_val = 0;
+
 protected:
     void on_delete() override;
 };
@@ -133,6 +146,7 @@ struct Mutex : SyncPrimitive {
     ThreadStatePtr owner;
     WaitQueue<WaitEntry> waiters;
     Ptr<SceKernelLwMutexWork> workarea;
+
 protected:
     void on_delete() override;
 };
@@ -160,6 +174,7 @@ struct RWLock : SyncPrimitive {
     RWLockState state = RWLockState::Unlocked;
     RWLockOwners owners;
     WaitQueue<WaitEntry> waiters;
+
 protected:
     void on_delete() override;
 };
@@ -179,6 +194,7 @@ struct EventFlag : SyncPrimitive {
 
     WaitQueue<WaitEntry> waiters;
     int flags = 0;
+
 protected:
     void on_delete() override;
 };
@@ -210,6 +226,7 @@ struct Condvar : SyncPrimitive {
     WaitQueue<std::monostate> waiters;
     MutexPtr associated_mutex;
     bool lightweight = false;
+
 protected:
     void on_delete() override;
 };
@@ -233,6 +250,7 @@ struct MsgPipe : SyncPrimitive {
     ByteRingBuffer data_buffer;
 
     ~MsgPipe() override = default;
+
 protected:
     void on_delete() override;
 };
@@ -304,8 +322,8 @@ int eventflag_delete(KernelState &kernel, const char *export_name, SceUID thread
 // Message Pipe
 SceUID msgpipe_create(KernelState &kernel, const char *export_name, const char *name, SceUID thread_id, SceUInt attr, SceSize bufSize);
 SceUID msgpipe_find(KernelState &kernel, const char *export_name, const char *pName);
-SceSize msgpipe_recv(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID msgPipeId, SceUInt32 waitMode, void *pRecvBuf, SceSize recvSize, SceUInt32 *pTimeout, bool callbacks);
-SceSize msgpipe_send(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID msgPipeId, SceUInt32 waitMode, const void *pSendBuf, SceSize sendSize, SceUInt32 *pTimeout, bool callbacks);
+SceSize msgpipe_recv(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID msgPipeId, SceUInt32 waitMode, void *pRecvBuf, SceSize recvSize, SceUInt32 *pTimeout, bool callbacks, SceSize *result_output = nullptr, bool bridge_result = false);
+SceSize msgpipe_send(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID msgPipeId, SceUInt32 waitMode, const void *pSendBuf, SceSize sendSize, SceUInt32 *pTimeout, bool callbacks, SceSize *result_output = nullptr, bool bridge_result = false);
 SceInt32 msgpipe_delete(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID msgpipe_id);
 
 // Cancellation and deletion retain the existing per-type UID maps.

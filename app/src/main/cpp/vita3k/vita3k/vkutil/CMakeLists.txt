@@ -6,6 +6,7 @@ add_library(
 	include/vkutil/vkutil.h
 
 	src/objects.cpp
+	src/image_snapshot.cpp
 	src/vkutil.cpp
 )
 

@@ -108,6 +108,7 @@ struct Command {
 
     std::uint8_t data[MAX_COMMAND_DATA_SIZE];
     int *status;
+    uint64_t completion_id = 0;
 
     Command *next = nullptr;
 };
@@ -180,6 +181,7 @@ Command *make_command(CommandAllocFunc alloc_func, CommandFreeFunc free_func, co
 
     new_command->opcode = opcode;
     new_command->status = status;
+    new_command->completion_id = 0;
     new_command->next = nullptr;
 
     CommandHelper helper(new_command);

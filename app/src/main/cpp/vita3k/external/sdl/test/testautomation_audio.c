@@ -13,6 +13,7 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_test.h>
+#include "../src/audio/SDL_audio_state.h"
 #include "testautomation_suites.h"
 
 /* ================= Test Case Implementation ================== */
@@ -1460,6 +1461,98 @@ cleanup:
 
     return status;
 }
+static int SDLCALL audio_saveStateRestoreAudioStream(void *arg)
+{
+    const SDL_AudioSpec src = { SDL_AUDIO_S16LE, 2, 44100 };
+    const SDL_AudioSpec dst = { SDL_AUDIO_S16LE, 2, 48000 };
+    SDL_AudioStream *original = NULL;
+    SDL_AudioStream *restored = NULL;
+    SDL_AudioStream *untouched = NULL;
+    SDL_AudioStream *reference = NULL;
+    Uint8 *snapshot = NULL;
+    Uint8 *original_output = NULL;
+    Uint8 *restored_output = NULL;
+    Uint8 *untouched_output = NULL;
+    Uint8 *reference_output = NULL;
+    Sint16 source[4096];
+    Sint16 continuation[2048];
+    Uint8 consumed_prefix[157 * 4];
+    size_t snapshot_size = 0;
+    int output_size = 0;
+    int result = TEST_ABORTED;
+
+    for (size_t i = 0; i < SDL_arraysize(source); ++i)
+        source[i] = (Sint16)(((int)i * 7919) ^ ((int)i << 5));
+    for (size_t i = 0; i < SDL_arraysize(continuation); ++i)
+        continuation[i] = (Sint16)(((int)i * 3571) ^ ((int)i << 3));
+
+    original = SDL_CreateAudioStream(&src, &dst);
+    if (!SDLTest_AssertCheck(original != NULL, "Create original 44.1 kHz audio stream")) goto cleanup;
+    if (!SDLTest_AssertCheck(SDL_PutAudioStreamData(original, source, sizeof(source)), "Queue source PCM")) goto cleanup;
+    if (!SDLTest_AssertCheck(SDL_GetAudioStreamData(original, consumed_prefix, sizeof(consumed_prefix)) == (int)sizeof(consumed_prefix),
+            "Consume a prefix before snapshot")) goto cleanup;
+
+    snapshot_size = SDL_GetAudioStreamStateSize(original);
+    if (!SDLTest_AssertCheck(snapshot_size > 0, "Get bounded stream snapshot size")) goto cleanup;
+    snapshot = (Uint8 *)SDL_malloc(snapshot_size);
+    if (!SDLTest_AssertCheck(snapshot != NULL, "Allocate stream snapshot")) goto cleanup;
+    if (!SDLTest_AssertCheck(SDL_SaveAudioStreamState(original, snapshot, snapshot_size), "Save nonempty stream state")) goto cleanup;
+    if (!SDLTest_AssertCheck(SDL_ValidateAudioStreamState(snapshot, snapshot_size), "Validate stream state")) goto cleanup;
+
+    restored = SDL_CreateAudioStream(&src, &dst);
+    if (!SDLTest_AssertCheck(restored != NULL, "Create restored 44.1 kHz stream")) goto cleanup;
+    if (!SDLTest_AssertCheck(SDL_LoadAudioStreamState(restored, snapshot, snapshot_size), "Restore queued PCM and resampler phase")) goto cleanup;
+    if (!SDLTest_AssertCheck(SDL_PutAudioStreamData(original, continuation, sizeof(continuation)), "Append continuation to original")) goto cleanup;
+    if (!SDLTest_AssertCheck(SDL_PutAudioStreamData(restored, continuation, sizeof(continuation)), "Append continuation to restored stream")) goto cleanup;
+
+    output_size = SDL_GetAudioStreamAvailable(original);
+    if (!SDLTest_AssertCheck(output_size > 0 && SDL_GetAudioStreamAvailable(restored) == output_size,
+            "Both streams expose the same pending output length")) goto cleanup;
+    original_output = (Uint8 *)SDL_malloc(output_size);
+    restored_output = (Uint8 *)SDL_malloc(output_size);
+    if (!SDLTest_AssertCheck(original_output != NULL && restored_output != NULL, "Allocate comparison output")) goto cleanup;
+    if (!SDLTest_AssertCheck(SDL_GetAudioStreamData(original, original_output, output_size) == output_size,
+            "Read uninterrupted stream output")) goto cleanup;
+    if (!SDLTest_AssertCheck(SDL_GetAudioStreamData(restored, restored_output, output_size) == output_size,
+            "Read restored stream output")) goto cleanup;
+    if (!SDLTest_AssertCheck(SDL_memcmp(original_output, restored_output, output_size) == 0,
+            "Restored PCM matches uninterrupted output after resampling")) goto cleanup;
+
+    untouched = SDL_CreateAudioStream(&src, &dst);
+    reference = SDL_CreateAudioStream(&src, &dst);
+    if (!SDLTest_AssertCheck(untouched != NULL && reference != NULL, "Create failed-restore control streams")) goto cleanup;
+    if (!SDLTest_AssertCheck(SDL_PutAudioStreamData(untouched, source, sizeof(source)) &&
+            SDL_PutAudioStreamData(reference, source, sizeof(source)), "Queue identical control PCM")) goto cleanup;
+    snapshot[0] ^= 0x80;
+    if (!SDLTest_AssertCheck(!SDL_LoadAudioStreamState(untouched, snapshot, snapshot_size),
+            "Reject malformed snapshot when loading into a live stream")) goto cleanup;
+    snapshot[0] ^= 0x80;
+    output_size = SDL_GetAudioStreamAvailable(untouched);
+    if (!SDLTest_AssertCheck(output_size > 0 && SDL_GetAudioStreamAvailable(reference) == output_size,
+            "A failed restore preserves queued output length")) goto cleanup;
+    untouched_output = (Uint8 *)SDL_malloc(output_size);
+    reference_output = (Uint8 *)SDL_malloc(output_size);
+    if (!SDLTest_AssertCheck(untouched_output != NULL && reference_output != NULL, "Allocate failed-restore output buffers")) goto cleanup;
+    if (!SDLTest_AssertCheck(SDL_GetAudioStreamData(untouched, untouched_output, output_size) == output_size &&
+            SDL_GetAudioStreamData(reference, reference_output, output_size) == output_size,
+            "Read failed-restore control output")) goto cleanup;
+    if (!SDLTest_AssertCheck(SDL_memcmp(untouched_output, reference_output, output_size) == 0,
+            "A failed restore leaves the live stream byte-identical")) goto cleanup;
+
+    result = TEST_COMPLETED;
+cleanup:
+    SDL_free(reference_output);
+    SDL_free(untouched_output);
+    SDL_free(restored_output);
+    SDL_free(original_output);
+    SDL_free(snapshot);
+    SDL_DestroyAudioStream(reference);
+    SDL_DestroyAudioStream(untouched);
+    SDL_DestroyAudioStream(restored);
+    SDL_DestroyAudioStream(original);
+    return result;
+}
+
 /* ================= Test Case References ================== */
 
 /* Audio test cases */
@@ -1541,13 +1634,17 @@ static const SDLTest_TestCaseReference audioTest18 = {
     audio_formatChange, "audio_formatChange", "Check handling of format changes.", TEST_ENABLED
 };
 
+static const SDLTest_TestCaseReference audioTest19 = {
+    audio_saveStateRestoreAudioStream, "audio_saveStateRestoreAudioStream", "Restores queued PCM and resampler phase without changing future output.", TEST_ENABLED
+};
+
 /* Sequence of Audio test cases */
 static const SDLTest_TestCaseReference *audioTests[] = {
     &audioTestGetAudioFormatName,
     &audioTest1, &audioTest2, &audioTest3, &audioTest4, &audioTest5, &audioTest6,
     &audioTest7, &audioTest8, &audioTest9, &audioTest10, &audioTest11,
     &audioTest12, &audioTest13, &audioTest14, &audioTest15, &audioTest16,
-    &audioTest17, &audioTest18, NULL
+    &audioTest17, &audioTest18, &audioTest19, NULL
 };
 
 /* Audio test suite (global) */

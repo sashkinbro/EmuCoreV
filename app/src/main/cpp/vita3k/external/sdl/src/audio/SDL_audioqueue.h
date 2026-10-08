@@ -76,4 +76,11 @@ extern size_t SDL_GetAudioQueueQueued(SDL_AudioQueue *queue);
 
 extern bool SDL_ResetAudioQueueHistory(SDL_AudioQueue *queue, int num_frames);
 
+// Internal save-state support. These operations preserve queue tracks and the
+// resampler's source history without consuming queued audio.
+extern size_t SDL_GetAudioQueueSnapshotSize(SDL_AudioQueue *queue);
+extern bool SDL_SaveAudioQueueSnapshot(SDL_AudioQueue *queue, Uint8 *buffer, size_t size);
+extern bool SDL_LoadAudioQueueSnapshot(SDL_AudioQueue *queue, const Uint8 *buffer, size_t size);
+extern bool SDL_ValidateAudioQueueSnapshot(const Uint8 *buffer, size_t size);
+
 #endif // SDL_audioqueue_h_

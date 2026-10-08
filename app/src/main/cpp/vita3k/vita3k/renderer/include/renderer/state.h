@@ -20,6 +20,8 @@
 #include <features/state.h>
 #include <renderer/commands.h>
 #include <renderer/frame_host.h>
+#include <renderer/snapshot_gate.h>
+#include <renderer/finish.h>
 #include <renderer/types.h>
 #include <threads/queue.h>
 
@@ -29,6 +31,8 @@
 #include <condition_variable>
 #include <functional>
 #include <mutex>
+#include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -103,8 +107,17 @@ struct State {
 
     GXPPtrMap gxp_ptr_map;
     Queue<CommandList> command_buffer_queue;
+    // Renderer-owned remainder, including a blocked mid-batch sync wait.
+    // Snapshot gate protects these from capture/restore observers.
+    std::optional<CommandList> active_batch;
+    std::vector<CommandList> snapshot_pending_batches;
     std::condition_variable command_finish_one;
     std::mutex command_finish_one_mutex;
+    std::mutex finish_operations_mutex;
+    std::map<uint64_t, std::shared_ptr<FinishOperation>> finish_operations;
+    uint64_t next_finish_id = 1;
+    // A backend barrier runs after the Nop fence and owns no guest stack state.
+    virtual void enqueue_finish_drain(std::function<void()> completion);
 
     std::condition_variable notification_ready;
     std::mutex notification_mutex;
@@ -130,6 +143,7 @@ struct State {
 
     std::unique_ptr<std::thread> render_thread;
     std::atomic<bool> render_abort{ false };
+    SnapshotGate snapshot_gate;
 
     std::vector<ShadersHash> precompile_queue;
     bool precompile_requested = false;
@@ -154,6 +168,8 @@ struct State {
     std::chrono::steady_clock::time_point m_shaders_compiled_time{};
 
     std::atomic<bool> paused{ false };
+    // Diagnostic: last phase reached by the render loop (0 idle, 1 batches, 2 frame, 3 swap).
+    std::atomic<int> render_phase{ 0 };
 
     // Non-owning pointer to dialog state for native common dialog overlays.
     DialogState *common_dialog = nullptr;
@@ -208,6 +224,14 @@ struct State {
         return true;
     }
     virtual void unmap_memory(MemState &mem, Ptr<void> address) {}
+    // Block until the GPU is idle and all host-side wait callbacks are drained.
+    // Used before guest memory is overwritten by a save-state load.
+    virtual void wait_gpu_idle() {}
+    // Drop all cached GPU resources whose contents were derived from guest RAM.
+    virtual void reset_caches() {}
+    // Write back GPU-written surface content into guest RAM so a save state
+    // captures the latest pixels.
+    virtual void flush_surfaces(MemState &mem) {}
 #ifdef __ANDROID__
     virtual bool support_custom_drivers() {
         return false;

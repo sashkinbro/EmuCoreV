@@ -152,7 +152,28 @@ struct MjpegDecoderState : public DecoderState {
 };
 
 struct Atrac9DecoderSavedState {
-    double prev_values[2][256]{};
+    bool has_history = false;
+    // LibAtrac9 permits up to eight channels and five blocks. These are typed
+    // logical values only; config-derived links and transform tables are rebuilt.
+    double prev_values[8][256]{};
+    struct ChannelHistory {
+        int32_t scale_factors_prev[31]{};
+        bool rng_initialized = false;
+        uint16_t rng_state[4]{};
+    } channels[8];
+    struct BlockHistory {
+        int32_t band_count = 0;
+        int32_t stereo_band = 0;
+        int32_t extension_band = 0;
+        int32_t quantization_unit_count = 0;
+        int32_t stereo_quantization_unit = 0;
+        int32_t extension_unit = 0;
+        int32_t quantization_units_prev = 0;
+        bool band_extension_enabled = false;
+    } blocks[5];
+    int32_t frame_index = 0;
+    int32_t superframe_frame_index = 0;
+    int32_t superframe_data_left = 0;
 };
 
 struct Atrac9DecoderState : public DecoderState {
@@ -163,6 +184,7 @@ struct Atrac9DecoderState : public DecoderState {
     std::vector<uint8_t> result;
     int superframe_frame_idx;
     int superframe_data_left;
+    bool valid = false;
 
     uint32_t get(DecoderQuery query) override;
     uint32_t get_es_size() override;
@@ -171,7 +193,7 @@ struct Atrac9DecoderState : public DecoderState {
     bool receive(uint8_t *data, DecoderSize *size) override;
     void flush() override;
 
-    void export_state(Atrac9DecoderSavedState *dest);
+    void export_state(Atrac9DecoderSavedState *dest) const;
     void load_state(const Atrac9DecoderSavedState *src);
 
     explicit Atrac9DecoderState(uint32_t config_data);

@@ -23,6 +23,7 @@
 #include <shader/usse_decoder_helpers.h>
 #include <shader/usse_disasm.h>
 #include <shader/usse_types.h>
+#include <shader/thread_buffer_bounds.h>
 #include <util/log.h>
 
 #include <numeric>
@@ -801,13 +802,18 @@ bool USSETranslatorVisitor::vldst(
     // Maybe that's just how the memory map operates. I'm not sure. However the literals on all shader so far is that
     // Another thing is that, when moe expand is not enable, there seems to be 4 bytes added before fetching... No absolute prove.
     // Maybe moe expand means it's not fetching after all? Dunno
-    // also for the thread buffer, this value is 128 times bigger
-    uint32_t REG_INDEX_BASE = is_thread_buffer_access ? 0x1000000 : 0x10000;
+    // Thread-buffer register offsets encode a per-thread stride in the upper
+    // half and a byte offset in the lower half. The shader's thread-local array
+    // is already sliced per pipeline, so use only that byte offset here.
+    constexpr uint32_t REG_INDEX_BASE = 0x10000;
     spv::Id reg_index_base_cst = m_b.makeIntConstant(REG_INDEX_BASE);
     spv::Id i32_type = m_b.makeIntType(32);
 
     if (inst.opr.src1.bank != shader::usse::RegisterBank::IMMEDIATE) {
-        source_1 = m_b.createBinOp(spv::OpISub, m_b.getTypeId(source_1), source_1, reg_index_base_cst);
+        if (is_thread_buffer_access)
+            source_1 = m_b.createBinOp(spv::OpBitwiseAnd, m_b.getTypeId(source_1), source_1, m_b.makeIntConstant(0xFFFF));
+        else
+            source_1 = m_b.createBinOp(spv::OpISub, m_b.getTypeId(source_1), source_1, reg_index_base_cst);
     }
 
     if (!moe_expand) {
@@ -833,10 +839,15 @@ bool USSETranslatorVisitor::vldst(
         }
 
         if (m_spirv_params.thread_buffer_base != 0)
-            source_1 = m_b.createBinOp(spv::OpIAdd, i32_type, source_1, m_spirv_params.thread_buffer_base);
+            source_1 = m_b.createBinOp(spv::OpIAdd, i32_type, source_1, m_b.makeIntConstant(m_spirv_params.thread_buffer_base));
 
-        // get the index in the float array
+        // get the index in the float array, clamped to its declared bounds
         spv::Id index = m_b.createBinOp(spv::OpShiftRightLogical, i32_type, source_1, m_b.makeUintConstant(2));
+        if (m_spirv_params.thread_buffer_f32_count > 0) {
+            const spv::Id last = m_b.makeIntConstant(static_cast<int>(shader::usse::thread_buffer_last_index(m_spirv_params.thread_buffer_f32_count)));
+            const spv::Id inside = m_b.createBinOp(spv::OpULessThanEqual, m_b.makeBoolType(), index, last);
+            index = m_b.createTriOp(spv::OpSelect, i32_type, inside, index, last);
+        }
         spv::Id float_ptr = utils::create_access_chain(m_b, spv::StorageClassPrivate, m_spirv_params.thread_buffer, { index });
         if (is_store) {
             spv::Id value = load(to_store, 0b1);

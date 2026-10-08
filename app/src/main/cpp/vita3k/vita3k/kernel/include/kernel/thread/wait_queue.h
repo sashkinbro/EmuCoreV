@@ -17,7 +17,9 @@
 
 #pragma once
 
+#include <atomic>
 #include <kernel/thread/wait.h>
+#include <kernel/thread/wait_continuation.h>
 #include <kernel/types.h>
 
 #include <algorithm>
@@ -30,6 +32,10 @@
 // Only declared here so ThreadState can hold a WaitQueue. The template bodies need the full type.
 struct ThreadState;
 using ThreadStatePtr = std::shared_ptr<ThreadState>;
+std::shared_ptr<void> take_restored_wait_node(const ThreadStatePtr &thread, WaitTarget target);
+std::shared_ptr<WaitContinuation> get_wait_continuation(const ThreadStatePtr &thread);
+
+inline std::atomic<uint64_t> next_wait_sequence{ 1 };
 
 // Threads blocked on a sync object, in FIFO or thread priority order.
 // Entry is the per-waiter data the object needs, such as a requested count.
@@ -44,6 +50,16 @@ public:
         Entry entry;
         // Set by a waker that decided the outcome of the wait
         std::optional<SceInt32> result;
+        std::weak_ptr<WaitContinuation> continuation;
+        uint64_t sequence = 0;
+        void set_result(SceInt32 value) {
+            result = value;
+            if (auto record = continuation.lock()) {
+                const std::lock_guard guard(record->mutex);
+                record->state.has_result = true;
+                record->state.result = value;
+            }
+        }
     };
 
     WaitQueue() = default;
@@ -54,10 +70,17 @@ public:
     // thread must be the guest thread making this HLE call. ready() is rechecked each time it is woken.
     // With callbacks, the thread runs its notified callbacks while it waits.
     [[nodiscard]] WaitResult wait_until_ready(std::unique_lock<std::mutex> &lock, const ThreadStatePtr &thread, WaitTarget target, Entry entry, Deadline deadline, bool callbacks, std::predicate<Waiter &> auto ready) {
-        Waiter waiter{ .thread = thread, .entry = std::move(entry) };
-        waiter.priority = waiter.thread->priority;
-        push(waiter);
+        auto restored = std::static_pointer_cast<Waiter>(take_restored_wait_node(thread, target));
+        Waiter local{ .thread = thread, .entry = std::move(entry) };
+        Waiter &waiter = restored ? *restored : local;
+        if (!restored) {
+            waiter.priority = waiter.thread->priority;
+            waiter.continuation = get_wait_continuation(thread);
+            push(waiter);
+        }
         while (true) {
+            if (waiter.result)
+                break;
             lock.unlock();
             const WaitResult r = waiter.thread->wait(target, deadline, callbacks);
             lock.lock();
@@ -113,7 +136,7 @@ public:
 
     // Ends a wait with result and takes the waiter off the queue.
     void wake(Waiter &waiter, SceInt32 result = SCE_KERNEL_OK) {
-        waiter.result = result;
+        waiter.set_result(result);
         remove(waiter);
         waiter.thread->wake();
     }
@@ -128,7 +151,8 @@ public:
                 continue;
             }
             it = waiters.erase(it);
-            waiter.result = result;
+            mark_queued(waiter, false);
+            waiter.set_result(result);
             waiter.thread->wake();
             ++woken;
         }
@@ -153,10 +177,20 @@ public:
 
     // Queues a waiter that the caller will block itself. Used by waits that need their own loop.
     void push(Waiter &waiter) {
+        if (!waiter.sequence)
+            waiter.sequence = next_wait_sequence.fetch_add(1, std::memory_order_relaxed);
+        auto next = next_wait_sequence.load(std::memory_order_relaxed);
+        while (next <= waiter.sequence && !next_wait_sequence.compare_exchange_weak(next, waiter.sequence + 1, std::memory_order_relaxed)) {
+        }
+        mark_queued(waiter, true);
         auto pos = waiters.end();
         if (by_priority) {
             // Lower value is higher priority, equal priorities keep FIFO order
-            pos = std::find_if(waiters.begin(), waiters.end(), [&](const Waiter *w) { return w->priority > waiter.priority; });
+            pos = std::find_if(waiters.begin(), waiters.end(), [&](const Waiter *w) {
+                return w->priority > waiter.priority || (w->priority == waiter.priority && w->sequence > waiter.sequence);
+            });
+        } else {
+            pos = std::find_if(waiters.begin(), waiters.end(), [&](const Waiter *w) { return w->sequence > waiter.sequence; });
         }
         waiters.insert(pos, &waiter);
     }
@@ -164,9 +198,42 @@ public:
     // Takes a waiter off the queue if it is still on it.
     void remove(Waiter &waiter) {
         std::erase(waiters, &waiter);
+        mark_queued(waiter, false);
+    }
+
+    // Install before any restored host worker is admitted to guest execution.
+    void restore(const ThreadStatePtr &thread, Entry entry, const std::shared_ptr<WaitContinuation> &record) {
+        auto waiter = std::make_shared<Waiter>();
+        waiter->thread = thread;
+        waiter->entry = std::move(entry);
+        waiter->continuation = record;
+        bool queued;
+        {
+            const std::lock_guard guard(record->mutex);
+            waiter->priority = record->state.priority;
+            waiter->sequence = record->state.sequence;
+            if (record->state.has_result)
+                waiter->result = record->state.result;
+            queued = record->state.queued;
+            record->restored_node = waiter;
+            record->detach_restored_waiter = [this, weak = std::weak_ptr<Waiter>(waiter)] {
+                if (auto node = weak.lock())
+                    remove(*node);
+            };
+        }
+        if (queued)
+            push(*waiter);
     }
 
 private:
+    static void mark_queued(Waiter &waiter, bool queued) {
+        if (auto record = waiter.continuation.lock()) {
+            const std::lock_guard guard(record->mutex);
+            record->state.queued = queued;
+            record->state.priority = waiter.priority;
+            record->state.sequence = waiter.sequence;
+        }
+    }
     bool by_priority = false;
     std::list<Waiter *> waiters;
 };

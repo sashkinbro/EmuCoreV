@@ -101,14 +101,15 @@ fun CheatManagerScreen(
     }
 
     val selectedGame = state.games.firstOrNull { it.titleId == state.selectedTitleId }
+    val indexedCheats = remember(state.snapshot.cheats) { indexCheatEntries(state.snapshot.cheats) }
     val categoryGroups = remember(state.snapshot.cheats) { groupCheatEntries(state.snapshot.cheats) }
-    val searchResults = remember(state.snapshot.cheats, cheatSearchQuery) {
-        if (cheatSearchQuery.isBlank()) state.snapshot.cheats
-        else state.snapshot.cheats.filter { it.name.contains(cheatSearchQuery, ignoreCase = true) }
+    val searchResults = remember(indexedCheats, cheatSearchQuery) {
+        if (cheatSearchQuery.isBlank()) indexedCheats
+        else indexedCheats.filter { it.entry.name.contains(cheatSearchQuery, ignoreCase = true) }
     }
     val visibleBlocks = when {
         cheatSearchVisible -> searchResults
-        selectedCategory != null -> state.snapshot.cheats.filter { it.category() == selectedCategory }
+        selectedCategory != null -> indexedCheats.filter { it.entry.category() == selectedCategory }
         else -> emptyList()
     }
     val allPacksForGame = state.catalog.filter { it.titleId.equals(state.selectedTitleId, ignoreCase = true) }
@@ -432,11 +433,11 @@ fun CheatManagerScreen(
                     CheatSearchEmptyState()
                 }
             } else {
-                items(visibleBlocks, key = { cheatKey(it) }) { cheat ->
+                items(visibleBlocks, key = { it.key }) { row ->
                     CheatToggleCard(
-                        entry = cheat,
+                        entry = row.entry,
                         masterEnabled = state.snapshot.masterEnabled,
-                        onToggle = { enabled -> viewModel.setCheatEnabled(indexOf(state.snapshot.cheats, cheat), enabled) }
+                        onToggle = { enabled -> viewModel.setCheatEnabled(row.sourceIndex, enabled) }
                     )
                 }
             }
@@ -464,11 +465,11 @@ fun CheatManagerScreen(
                     onBack = { selectedCategory = null }
                 )
             }
-            items(visibleBlocks, key = { cheatKey(it) }) { cheat ->
+            items(visibleBlocks, key = { it.key }) { row ->
                 CheatToggleCard(
-                    entry = cheat,
+                    entry = row.entry,
                     masterEnabled = state.snapshot.masterEnabled,
-                    onToggle = { enabled -> viewModel.setCheatEnabled(indexOf(state.snapshot.cheats, cheat), enabled) }
+                    onToggle = { enabled -> viewModel.setCheatEnabled(row.sourceIndex, enabled) }
                 )
             }
         }
@@ -510,10 +511,6 @@ fun CheatManagerScreen(
         )
     }
 }
-
-private fun cheatKey(entry: VitaCheatEntry): String = entry.name + entry.codes.hashCode()
-
-private fun indexOf(entries: List<VitaCheatEntry>, entry: VitaCheatEntry): Int = entries.indexOf(entry)
 
 @Composable
 private fun CheatListHeader(title: String, count: Int) {

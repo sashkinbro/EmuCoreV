@@ -112,7 +112,30 @@ void VKTextureCache::cleanup() {
     is_texture_transfer_ready = false;
 }
 
+void VKTextureCache::reset() {
+    const size_t sampler_cache_size = sampler_queue.items.size();
+    cleanup();
+    texture_lookup.clear();
+    texture_queue.init(TextureCacheSize);
+    for (size_t i = 0; i < TextureCacheSize; i++)
+        texture_queue.items[i].content.index = static_cast<int>(i);
+    sampler_lookup.clear();
+    if (sampler_cache_size > 0) {
+        sampler_queue.init(sampler_cache_size);
+        for (size_t i = 0; i < sampler_cache_size; i++)
+            sampler_queue.items[i].content.index = static_cast<int>(i);
+    }
+    available_textures_hash.clear();
+    exported_textures_hash.clear();
+    current_info = nullptr;
+}
+
 void sync_texture(VKContext &context, MemState &mem, std::size_t index, SceGxmTexture texture, const Config &config) {
+    // A save-state load can resume mid-scene: there is no render target until
+    // the guest starts its next scene, so skip the texture sync.
+    if (!context.render_target)
+        return;
+
     // why are we doing this here?
     // well textures are synced right before the draw
     // in particular, we know that the scissor is the correct one for the upcoming draw
@@ -127,6 +150,18 @@ void sync_texture(VKContext &context, MemState &mem, std::size_t index, SceGxmTe
     if (gxm::is_paletted_format(base_format) && texture.palette_addr == 0) {
         LOG_WARN("Ignoring null palette texture");
         return;
+    }
+
+    // [savestate-diag] textures pointing at unmapped memory would sample black
+    {
+        const Address texture_address = texture.data_addr << 2;
+        if (texture_address != 0 && !is_valid_addr(mem, texture_address)) {
+            static std::atomic<uint64_t> bad_textures{ 0 };
+            const uint64_t n = bad_textures.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (n <= 20 || (n % 256) == 0)
+                LOG_CRITICAL("[savestate-diag] texture with unmapped address {:#010x} (index {}, format {:#010x}, total {})",
+                    texture_address, index, static_cast<uint32_t>(format), n);
+        }
     }
 
     if (index >= SCE_GXM_MAX_TEXTURE_UNITS) {

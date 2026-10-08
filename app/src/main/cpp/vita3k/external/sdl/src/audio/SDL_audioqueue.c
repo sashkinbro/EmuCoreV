@@ -23,6 +23,8 @@
 #include "SDL_audioqueue.h"
 #include "SDL_sysaudio.h"
 
+#include <limits.h>
+
 typedef struct SDL_MemoryPool SDL_MemoryPool;
 
 struct SDL_MemoryPool
@@ -648,5 +650,345 @@ bool SDL_ResetAudioQueueHistory(SDL_AudioQueue *queue, int num_frames)
     queue->history_length = length;
     SDL_memset(history_buffer, SDL_GetSilenceValueForFormat(track->spec.format), length);
 
+    return true;
+}
+
+// Save-state queue snapshots deliberately store only the unconsumed bytes of
+// each track plus the source history used by the resampler. They never copy
+// SDL pointers, memory-pool state, or callback data.
+#define SDL_AUDIO_QUEUE_SNAPSHOT_VERSION 1u
+#define SDL_AUDIO_QUEUE_SNAPSHOT_LIMIT (16u * 1024u * 1024u)
+
+typedef struct SDL_AudioQueueSnapshotTrack {
+    SDL_AudioSpec spec;
+    int channel_map[SDL_MAX_CHANNELMAP_CHANNELS];
+    bool has_channel_map;
+    bool flushed;
+    size_t head_offset;
+    Uint8 *data;
+    size_t data_length;
+} SDL_AudioQueueSnapshotTrack;
+
+static void SnapshotWriteU32(Uint8 *buffer, size_t *offset, Uint32 value)
+{
+    buffer[(*offset)++] = (Uint8)(value & 0xff);
+    buffer[(*offset)++] = (Uint8)((value >> 8) & 0xff);
+    buffer[(*offset)++] = (Uint8)((value >> 16) & 0xff);
+    buffer[(*offset)++] = (Uint8)((value >> 24) & 0xff);
+}
+
+static bool SnapshotReadU32(const Uint8 *buffer, size_t size, size_t *offset, Uint32 *value)
+{
+    if (*offset > size || size - *offset < 4) {
+        return false;
+    }
+    *value = (Uint32)buffer[*offset] |
+             ((Uint32)buffer[*offset + 1] << 8) |
+             ((Uint32)buffer[*offset + 2] << 16) |
+             ((Uint32)buffer[*offset + 3] << 24);
+    *offset += 4;
+    return true;
+}
+
+static bool SnapshotQueueSize(SDL_AudioQueue *queue, size_t *out_size, Uint32 *out_track_count)
+{
+    size_t size = 12;
+    Uint32 count = 0;
+    if (queue->history_length > queue->history_capacity || queue->history_length > SDL_AUDIO_QUEUE_SNAPSHOT_LIMIT ||
+        (queue->history_length && !queue->history_buffer)) {
+        return false;
+    }
+    if (queue->history_length > SDL_AUDIO_QUEUE_SNAPSHOT_LIMIT - size) {
+        return false;
+    }
+    size += queue->history_length;
+    for (SDL_AudioTrack *track = queue->head; track; track = track->next) {
+        if (++count > 4096 || track->spec.channels <= 0 || track->spec.channels > SDL_MAX_CHANNELMAP_CHANNELS ||
+            track->spec.freq <= 0 || SDL_AUDIO_BYTESIZE(track->spec.format) <= 0 ||
+            track->head > track->tail || track->tail > track->capacity) {
+            return false;
+        }
+        // Keep the consumed prefix of the head track: the resampler can still
+        // read those frames as left-side history after a restore.
+        const size_t data_length = track->tail;
+        if (data_length > SDL_AUDIO_QUEUE_SNAPSHOT_LIMIT ||
+            track->head > data_length || track->head % SDL_AUDIO_FRAMESIZE(track->spec) != 0 ||
+            data_length % SDL_AUDIO_FRAMESIZE(track->spec) != 0) {
+            return false;
+        }
+        const size_t map_count = track->chmap ? (size_t)track->spec.channels : 0;
+        if (size > SDL_AUDIO_QUEUE_SNAPSHOT_LIMIT - 28 - map_count * 4 ||
+            data_length > SDL_AUDIO_QUEUE_SNAPSHOT_LIMIT - size - 28 - map_count * 4) {
+            return false;
+        }
+        const size_t record_size = 28 + map_count * 4 + data_length;
+        if (record_size > SDL_AUDIO_QUEUE_SNAPSHOT_LIMIT - size) {
+            return false;
+        }
+        if (track->chmap && SDL_ChannelMapIsBogus(track->chmap, track->spec.channels)) {
+            return false;
+        }
+        size += record_size;
+    }
+    *out_size = size;
+    *out_track_count = count;
+    return true;
+}
+
+size_t SDL_GetAudioQueueSnapshotSize(SDL_AudioQueue *queue)
+{
+    size_t size = 0;
+    Uint32 count = 0;
+    return SnapshotQueueSize(queue, &size, &count) ? size : 0;
+}
+
+bool SDL_SaveAudioQueueSnapshot(SDL_AudioQueue *queue, Uint8 *buffer, size_t size)
+{
+    size_t expected_size = 0;
+    Uint32 track_count = 0;
+    if (!buffer || !SnapshotQueueSize(queue, &expected_size, &track_count) || size != expected_size) {
+        return false;
+    }
+
+    size_t offset = 0;
+    SnapshotWriteU32(buffer, &offset, SDL_AUDIO_QUEUE_SNAPSHOT_VERSION);
+    SnapshotWriteU32(buffer, &offset, track_count);
+    SnapshotWriteU32(buffer, &offset, (Uint32)queue->history_length);
+    if (queue->history_length) {
+        SDL_memcpy(buffer + offset, queue->history_buffer, queue->history_length);
+        offset += queue->history_length;
+    }
+    for (SDL_AudioTrack *track = queue->head; track; track = track->next) {
+        const Uint32 map_count = track->chmap ? (Uint32)track->spec.channels : 0;
+        const Uint32 head_offset = (Uint32)track->head;
+        const Uint32 data_length = (Uint32)track->tail;
+        SnapshotWriteU32(buffer, &offset, (Uint32)track->spec.format);
+        SnapshotWriteU32(buffer, &offset, (Uint32)track->spec.channels);
+        SnapshotWriteU32(buffer, &offset, (Uint32)track->spec.freq);
+        SnapshotWriteU32(buffer, &offset, map_count);
+        SnapshotWriteU32(buffer, &offset, track->flushed ? 1u : 0u);
+        SnapshotWriteU32(buffer, &offset, head_offset);
+        SnapshotWriteU32(buffer, &offset, data_length);
+        for (Uint32 i = 0; i < map_count; ++i) {
+            SnapshotWriteU32(buffer, &offset, (Uint32)track->chmap[i]);
+        }
+        if (data_length) {
+            SDL_memcpy(buffer + offset, track->data, data_length);
+            offset += data_length;
+        }
+    }
+    return offset == size;
+}
+
+static void SDLCALL FreeSnapshotAudioData(void *userdata, const void *buffer, int size)
+{
+    SDL_aligned_free((void *)buffer);
+}
+
+static void FreeQueueSnapshotTracks(SDL_AudioQueueSnapshotTrack *tracks, Uint32 count)
+{
+    if (!tracks) {
+        return;
+    }
+    for (Uint32 i = 0; i < count; ++i) {
+        SDL_aligned_free(tracks[i].data);
+    }
+    SDL_free(tracks);
+}
+
+static bool ParseAudioQueueSnapshot(const Uint8 *buffer, size_t size, SDL_AudioQueueSnapshotTrack **out_tracks,
+                                    Uint32 *out_track_count, Uint8 **out_history, size_t *out_history_length)
+{
+    size_t offset = 0;
+    Uint32 version = 0;
+    Uint32 track_count = 0;
+    Uint32 history_length = 0;
+    SDL_AudioQueueSnapshotTrack *tracks = NULL;
+    Uint8 *history = NULL;
+
+    if (!buffer || size < 12 || size > SDL_AUDIO_QUEUE_SNAPSHOT_LIMIT ||
+        !SnapshotReadU32(buffer, size, &offset, &version) || version != SDL_AUDIO_QUEUE_SNAPSHOT_VERSION ||
+        !SnapshotReadU32(buffer, size, &offset, &track_count) || track_count > 4096 ||
+        !SnapshotReadU32(buffer, size, &offset, &history_length) || history_length > SDL_AUDIO_QUEUE_SNAPSHOT_LIMIT ||
+        history_length > size - offset) {
+        return false;
+    }
+
+    if (history_length) {
+        history = (Uint8 *)SDL_aligned_alloc(SDL_GetSIMDAlignment(), history_length);
+        if (!history) {
+            return false;
+        }
+        SDL_memcpy(history, buffer + offset, history_length);
+        offset += history_length;
+    }
+
+    if (track_count) {
+        tracks = (SDL_AudioQueueSnapshotTrack *)SDL_calloc(track_count, sizeof(*tracks));
+        if (!tracks) {
+            SDL_aligned_free(history);
+            return false;
+        }
+    }
+
+    for (Uint32 i = 0; i < track_count; ++i) {
+        Uint32 format = 0;
+        Uint32 channels = 0;
+        Uint32 freq = 0;
+        Uint32 map_count = 0;
+        Uint32 flushed = 0;
+        Uint32 head_offset = 0;
+        Uint32 data_length = 0;
+        if (!SnapshotReadU32(buffer, size, &offset, &format) || !SnapshotReadU32(buffer, size, &offset, &channels) ||
+            !SnapshotReadU32(buffer, size, &offset, &freq) || !SnapshotReadU32(buffer, size, &offset, &map_count) ||
+            !SnapshotReadU32(buffer, size, &offset, &flushed) || !SnapshotReadU32(buffer, size, &offset, &head_offset) ||
+            !SnapshotReadU32(buffer, size, &offset, &data_length) ||
+            channels == 0 || channels > SDL_MAX_CHANNELMAP_CHANNELS || freq == 0 || freq > INT_MAX ||
+            SDL_AUDIO_BYTESIZE(format) <= 0 ||
+            (map_count != 0 && map_count != channels) || flushed > 1 || map_count > (size - offset) / 4) {
+            FreeQueueSnapshotTracks(tracks, track_count);
+            SDL_aligned_free(history);
+            return false;
+        }
+
+        SDL_AudioQueueSnapshotTrack *track = &tracks[i];
+        track->spec.format = (SDL_AudioFormat)format;
+        track->spec.channels = (int)channels;
+        track->spec.freq = (int)freq;
+        track->has_channel_map = map_count != 0;
+        track->flushed = flushed != 0;
+        for (Uint32 ch = 0; ch < map_count; ++ch) {
+            Uint32 raw = 0;
+            if (!SnapshotReadU32(buffer, size, &offset, &raw)) {
+                FreeQueueSnapshotTracks(tracks, track_count);
+                SDL_aligned_free(history);
+                return false;
+            }
+            track->channel_map[ch] = (int32_t)raw;
+        }
+        const int frame_size = SDL_AUDIO_FRAMESIZE(track->spec);
+        if ((track->has_channel_map && SDL_ChannelMapIsBogus(track->channel_map, track->spec.channels)) ||
+            frame_size <= 0 || data_length % (Uint32)frame_size != 0 || head_offset > data_length ||
+            head_offset % (Uint32)frame_size != 0 || data_length > size - offset) {
+            FreeQueueSnapshotTracks(tracks, track_count);
+            SDL_aligned_free(history);
+            return false;
+        }
+        track->data_length = data_length;
+        track->head_offset = head_offset;
+        if (data_length) {
+            track->data = (Uint8 *)SDL_aligned_alloc(SDL_GetSIMDAlignment(), data_length);
+            if (!track->data) {
+                FreeQueueSnapshotTracks(tracks, track_count);
+                SDL_aligned_free(history);
+                return false;
+            }
+            SDL_memcpy(track->data, buffer + offset, data_length);
+            offset += data_length;
+        }
+        if (i > 0 && !tracks[i - 1].flushed &&
+            !SDL_AudioSpecsEqual(&tracks[i - 1].spec, &track->spec,
+                tracks[i - 1].has_channel_map ? tracks[i - 1].channel_map : NULL,
+                track->has_channel_map ? track->channel_map : NULL)) {
+            FreeQueueSnapshotTracks(tracks, track_count);
+            SDL_aligned_free(history);
+            return false;
+        }
+    }
+    if (offset != size) {
+        FreeQueueSnapshotTracks(tracks, track_count);
+        SDL_aligned_free(history);
+        return false;
+    }
+    if (history_length && (!track_count || history_length % (size_t)SDL_AUDIO_FRAMESIZE(tracks[0].spec) != 0)) {
+        FreeQueueSnapshotTracks(tracks, track_count);
+        SDL_aligned_free(history);
+        return false;
+    }
+    *out_tracks = tracks;
+    *out_track_count = track_count;
+    *out_history = history;
+    *out_history_length = history_length;
+    return true;
+}
+
+bool SDL_ValidateAudioQueueSnapshot(const Uint8 *buffer, size_t size)
+{
+    SDL_AudioQueueSnapshotTrack *tracks = NULL;
+    Uint32 track_count = 0;
+    Uint8 *history = NULL;
+    size_t history_length = 0;
+    if (!ParseAudioQueueSnapshot(buffer, size, &tracks, &track_count, &history, &history_length)) {
+        return false;
+    }
+    FreeQueueSnapshotTracks(tracks, track_count);
+    SDL_aligned_free(history);
+    return true;
+}
+
+bool SDL_LoadAudioQueueSnapshot(SDL_AudioQueue *queue, const Uint8 *buffer, size_t size)
+{
+    SDL_AudioQueueSnapshotTrack *tracks = NULL;
+    Uint32 track_count = 0;
+    Uint8 *history = NULL;
+    size_t history_length = 0;
+    if (!ParseAudioQueueSnapshot(buffer, size, &tracks, &track_count, &history, &history_length)) {
+        return false;
+    }
+
+    SDL_AudioQueue *replacement = SDL_CreateAudioQueue(queue->chunk_pool.block_size);
+    if (!replacement) {
+        FreeQueueSnapshotTracks(tracks, track_count);
+        SDL_aligned_free(history);
+        return false;
+    }
+    for (Uint32 i = 0; i < track_count; ++i) {
+        SDL_AudioQueueSnapshotTrack *saved = &tracks[i];
+        const size_t capacity = SDL_max(saved->data_length, (size_t)SDL_AUDIO_FRAMESIZE(saved->spec));
+        Uint8 *data = (Uint8 *)SDL_aligned_alloc(SDL_GetSIMDAlignment(), capacity);
+        if (!data) {
+            SDL_DestroyAudioQueue(replacement);
+            FreeQueueSnapshotTracks(tracks, track_count);
+            SDL_aligned_free(history);
+            return false;
+        }
+        if (saved->data_length) {
+            SDL_memcpy(data, saved->data, saved->data_length);
+        }
+        SDL_AudioTrack *track = SDL_CreateAudioTrack(replacement, &saved->spec,
+            saved->has_channel_map ? saved->channel_map : NULL, data, saved->data_length, capacity,
+            FreeSnapshotAudioData, NULL);
+        if (!track) {
+            SDL_aligned_free(data);
+            SDL_DestroyAudioQueue(replacement);
+            FreeQueueSnapshotTracks(tracks, track_count);
+            SDL_aligned_free(history);
+            return false;
+        }
+        SDL_AddTrackToAudioQueue(replacement, track);
+        track->head = saved->head_offset;
+        track->flushed = saved->flushed;
+    }
+    if (history_length) {
+        replacement->history_buffer = (Uint8 *)SDL_aligned_alloc(SDL_GetSIMDAlignment(), history_length);
+        if (!replacement->history_buffer) {
+            SDL_DestroyAudioQueue(replacement);
+            FreeQueueSnapshotTracks(tracks, track_count);
+            SDL_aligned_free(history);
+            return false;
+        }
+        SDL_memcpy(replacement->history_buffer, history, history_length);
+        replacement->history_length = history_length;
+        replacement->history_capacity = history_length;
+    }
+
+    SDL_ClearAudioQueue(queue);
+    DestroyMemoryPool(&queue->track_pool);
+    DestroyMemoryPool(&queue->chunk_pool);
+    SDL_aligned_free(queue->history_buffer);
+    *queue = *replacement;
+    SDL_free(replacement);
+    FreeQueueSnapshotTracks(tracks, track_count);
+    SDL_aligned_free(history);
     return true;
 }

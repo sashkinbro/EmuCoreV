@@ -27,6 +27,7 @@ extern "C" {
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <numeric>
 
 namespace ngs {
 namespace {
@@ -84,16 +85,21 @@ void trim_history(StereoRateResamplerRuntimeState &runtime, StereoRateResamplerL
     }
 
     const int64_t delay = swr_get_delay(runtime.context, runtime.source_rate);
-    const uint32_t keep_frames = static_cast<uint32_t>(std::max<int64_t>(delay, 0)) + history_safety_margin_frames;
+    // Delay includes the buffered right half of the FIR. Retain its left half
+    // too; delay+128 alone is insufficient for substantial downsampling and
+    // can replay as an unprimed filter with a different output count.
+    const uint64_t keep_frames = static_cast<uint64_t>(std::max<int64_t>(delay, 0)) * 2 + history_safety_margin_frames;
     const uint32_t available_frames = logical.input_history.available_frames();
 
     if (available_frames > keep_frames) {
-        logical.input_history.consume_frames(available_frames - keep_frames);
+        logical.input_history.consume_frames(static_cast<uint32_t>(available_frames - keep_frames));
         compact_history_if_needed(logical);
     }
 }
 
 bool replay_history(StereoRateResamplerRuntimeState &runtime, StereoRateResamplerLogicalState &logical) {
+    if (!logical.is_replayable())
+        return false;
     logical.input_history.compact();
 
     const uint32_t history_frames = logical.input_history.available_frames();
@@ -101,8 +107,30 @@ bool replay_history(StereoRateResamplerRuntimeState &runtime, StereoRateResample
         return true;
     }
 
+    if (logical.total_input_frames < history_frames)
+        return false;
+    // Dropping an integral source-rate/gcd period leaves the rational phase
+    // unchanged. Replay only the remainder as zeros, followed by the retained
+    // real FIR history. All replay output is discarded; the restored decoded
+    // PCM queue already contains the samples made available to the voice.
+    const uint64_t period = runtime.source_rate / std::gcd(runtime.source_rate, runtime.dest_rate);
+    uint64_t prefix_frames = (logical.total_input_frames - history_frames) % period;
+    std::array<float, 1024 * stereo_channels> zeros{};
+    while (prefix_frames) {
+        const int count = static_cast<int>(std::min<uint64_t>(prefix_frames, zeros.size() / stereo_channels));
+        const int output_capacity = swr_get_out_samples(runtime.context, count);
+        if (output_capacity < 0 || static_cast<uint64_t>(output_capacity) > max_rate_replay_output_frames)
+            return false;
+        runtime.scratch_buffer.resize(static_cast<size_t>(output_capacity) * sizeof(float) * stereo_channels);
+        uint8_t *discard = runtime.scratch_buffer.data();
+        const uint8_t *silence = reinterpret_cast<const uint8_t *>(zeros.data());
+        if (swr_convert(runtime.context, &discard, output_capacity, &silence, count) < 0)
+            return false;
+        prefix_frames -= count;
+    }
+
     const int out_samples = swr_get_out_samples(runtime.context, static_cast<int>(history_frames));
-    if (out_samples < 0) {
+    if (out_samples < 0 || static_cast<uint64_t>(out_samples) > max_rate_replay_output_frames) {
         LOG_ERROR("Failed to query stereo rate resampler replay output size for {} history frames (error {}).",
             history_frames, out_samples);
         return false;
@@ -152,6 +180,15 @@ bool ensure_stereo_rate_resampler(StereoRateResamplerRuntimeState &runtime, Ster
         return false;
     }
 
+    if (logical.source_rate != source_rate || logical.dest_rate != dest_rate) {
+        // A rate change starts a new filter/timebase, preserving the existing
+        // behavior of warming the new filter from recent input. Its absolute
+        // position starts with precisely that replay, not the previous rate.
+        logical.total_input_frames = logical.input_history.available_frames();
+        logical.source_rate = source_rate;
+        logical.dest_rate = dest_rate;
+    }
+
     if (!replay_history(runtime, logical)) {
         destroy_stereo_rate_resampler(runtime);
         return false;
@@ -192,6 +229,7 @@ uint32_t process_stereo_rate_resampler(StereoRateResamplerRuntimeState &runtime,
     output.samples.resize(old_samples + static_cast<size_t>(produced_samples) * stereo_channels);
 
     logical.input_history.append_bytes(input, input_frames);
+    logical.total_input_frames += input_frames;
     trim_history(runtime, logical);
 
     return static_cast<uint32_t>(produced_samples);

@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include <renderer/gxm_types.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
+#include <renderer/vulkan/surface_sync.h>
+#include <renderer/vulkan/uniform_slack.h>
 #include <renderer/vulkan/vertex_stream.h>
 
 #include <array>
@@ -108,6 +110,81 @@ TEST(GxmVertexStream, AllStreamsInOneDrawMustNotWrapOverEarlierStreams) {
     EXPECT_FALSE(renderer::vulkan::vertex_stream_batch_fits(0, ring_capacity, alignment, two_40_mib_streams));
     EXPECT_FALSE(renderer::vulkan::vertex_stream_batch_fits(ring_capacity - 16, ring_capacity, alignment, wrap_and_overlap));
     EXPECT_TRUE(renderer::vulkan::vertex_stream_batch_fits(0, ring_capacity, alignment, std::span<const size_t>(two_40_mib_streams).first(1)));
+}
+
+TEST(GxmSurfaceSync, PartialWritebackIntersectsCurrentSceneWithBoundedSyncRect) {
+    using renderer::vulkan::SurfaceRect;
+    const auto rect = renderer::vulkan::intersect_surface_rects(
+        SurfaceRect{ 5, 6, 40, 32 }, SurfaceRect{ 20, -4, 50, 18 }, 32, 24);
+
+    ASSERT_TRUE(rect.has_value());
+    EXPECT_EQ(*rect, (SurfaceRect{ 20, 6, 32, 18 }));
+}
+
+TEST(GxmSurfaceSync, EmptyOrNonlinearIntersectionDoesNotRequestWriteback) {
+    using renderer::vulkan::SurfaceRect;
+    EXPECT_TRUE(renderer::vulkan::surface_partial_writeback_eligible(true, false, false, true));
+    EXPECT_FALSE(renderer::vulkan::surface_partial_writeback_eligible(false, false, false, true));
+    EXPECT_FALSE(renderer::vulkan::surface_partial_writeback_eligible(true, true, false, true));
+    EXPECT_FALSE(renderer::vulkan::surface_partial_writeback_eligible(true, false, true, true));
+    // Post-sync swizzling still processes the full guest surface, so partial writes
+    // must remain disabled until that operation accepts the same rectangle.
+    EXPECT_FALSE(renderer::vulkan::surface_partial_writeback_eligible(true, false, false, false));
+    EXPECT_FALSE(renderer::vulkan::intersect_surface_rects(
+        SurfaceRect{ 0, 0, 4, 4 }, SurfaceRect{ 4, 0, 8, 4 }, 16, 16).has_value());
+    EXPECT_FALSE(renderer::vulkan::intersect_surface_rects(
+        SurfaceRect{ -8, -8, -1, -1 }, SurfaceRect{ 0, 0, 8, 8 }, 8, 8).has_value());
+}
+
+TEST(GxmSurfaceSync, MatchingBufferSyncCopiesOnlyFreshRowsAndPreservesCpuNewerBytes) {
+    using renderer::vulkan::copy_surface_sync_rows;
+    std::array<uint8_t, 22> mapped{};
+    for (size_t i = 0; i < mapped.size(); i++)
+        mapped[i] = static_cast<uint8_t>(i + 1);
+    std::array<uint8_t, 24> guest{};
+    guest.fill(0xCC);
+
+    ASSERT_TRUE(copy_surface_sync_rows(guest.data() + 4, 12, mapped.data() + 3, 12, 8, 3, 2));
+    EXPECT_EQ(guest[4], mapped[3]);
+    EXPECT_EQ(guest[5], mapped[4]);
+    EXPECT_EQ(guest[6], mapped[5]);
+    EXPECT_EQ(guest[12], mapped[11]);
+    EXPECT_EQ(guest[13], mapped[12]);
+    EXPECT_EQ(guest[14], mapped[13]);
+    EXPECT_EQ(guest[3], 0xCC);
+    EXPECT_EQ(guest[7], 0xCC);
+    EXPECT_EQ(guest[11], 0xCC);
+    EXPECT_EQ(guest[15], 0xCC);
+}
+
+TEST(GxmSurfaceSync, InvalidRowCopiesCannotExceedRequestOrMappedRanges) {
+    using renderer::vulkan::copy_surface_sync_rows;
+    std::array<uint8_t, 16> source{};
+    std::array<uint8_t, 16> destination{};
+    EXPECT_FALSE(copy_surface_sync_rows(destination.data(), destination.size(), source.data(), source.size(), 8, 9, 2));
+    EXPECT_FALSE(copy_surface_sync_rows(destination.data(), 10, source.data(), source.size(), 8, 3, 2));
+    EXPECT_FALSE(copy_surface_sync_rows(destination.data(), destination.size(), source.data(), 10, 8, 3, 2));
+    EXPECT_TRUE(copy_surface_sync_rows(destination.data(), destination.size(), source.data(), source.size(), 8, 3, 0));
+}
+
+TEST(GxmUniformSlack, CopyRangeStopsAtWindowMappingAndColorSurfaceBoundary) {
+    using renderer::vulkan::uniform_slack_copy_range;
+    const auto full = uniform_slack_copy_range(0x1000, 256, 64 * 1024, 0x100000, 16 * 1024);
+    ASSERT_TRUE(full.has_value());
+    EXPECT_EQ(full->offset, 256u);
+    EXPECT_EQ(full->size, 16 * 1024u - 256u);
+
+    const auto mapping_limited = uniform_slack_copy_range(0x1000, 256, 1024, 0x100000, 16 * 1024);
+    ASSERT_TRUE(mapping_limited.has_value());
+    EXPECT_EQ(mapping_limited->size, 1024u - 256u);
+
+    const auto surface_limited = uniform_slack_copy_range(0x1000, 256, 64 * 1024, 0x1400, 16 * 1024);
+    ASSERT_TRUE(surface_limited.has_value());
+    EXPECT_EQ(surface_limited->size, 0x400u - 256u);
+
+    EXPECT_FALSE(uniform_slack_copy_range(0x1000, 256, 64 * 1024, 0x1100, 16 * 1024).has_value());
+    EXPECT_FALSE(uniform_slack_copy_range(0x1000, 1025, 1024, 0x100000, 16 * 1024).has_value());
+    EXPECT_FALSE(uniform_slack_copy_range(0x1000, 0, 1024, 0x100000, 16 * 1024).has_value());
 }
 
 TEST(GxmPackedColor, A1RgbColorKeepsAlphaInTheHighBit) {

@@ -33,6 +33,14 @@ object VitaLaunchBridge {
     }
 
     suspend fun launchInstalledTitle(context: Context, titleId: String): LaunchResult {
+        return launchInstalledTitle(context, titleId, null)
+    }
+
+    suspend fun launchInstalledTitleWithSaveState(context: Context, titleId: String, statePath: String): LaunchResult {
+        return launchInstalledTitle(context, titleId, statePath)
+    }
+
+    private suspend fun launchInstalledTitle(context: Context, titleId: String, statePath: String?): LaunchResult {
         if (!launchInFlight.compareAndSet(false, true)) return LaunchResult.Success
         preparingLaunch.value = true
         val startedAt = SystemClock.elapsedRealtime()
@@ -47,7 +55,12 @@ object VitaLaunchBridge {
                     .onFailure { error -> Log.w(TAG, "Save data migration failed", error) }
                 val config = VitaGameSettingsRepository(context).syncEffectiveDriverForLaunch(titleId)
                 val shouldAngle = config.useAngle && config.backendRenderer == "OpenGL"
-                launchWithArgs(context, "LAUNCH_$titleId", arrayOf("-r", titleId), shouldAngle)
+                val args = if (statePath.isNullOrBlank()) {
+                    arrayOf("-r", titleId)
+                } else {
+                    arrayOf("-r", titleId, "-loadstate", statePath)
+                }
+                launchWithArgs(context, "LAUNCH_$titleId", args, shouldAngle)
                 LaunchResult.Success
             }
         } catch (cancelled: CancellationException) {

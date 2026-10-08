@@ -18,22 +18,46 @@
 #pragma once
 
 #include <ngs/system.h>
+#include <numeric>
 
 struct SwrContext;
 
 namespace ngs {
+// Bound reconstruction work/memory for untrusted archive rates and positions.
+inline constexpr uint64_t max_rate_replay_prefix_frames = 1 << 20;
+inline constexpr uint64_t max_rate_replay_output_frames = 8 << 20;
 
 struct StereoRateResamplerLogicalState {
     PCMFrameQueue input_history;
     bool needs_reset = false;
+    // Absolute input position is needed to reconstruct the rational sampling
+    // phase after old FIR history has been discarded.
+    uint64_t total_input_frames = 0;
+    int32_t source_rate = 0;
+    int32_t dest_rate = 0;
+
+    bool is_replayable() const {
+        const uint64_t history = input_history.available_frames();
+        if (source_rate == 0 && dest_rate == 0)
+            return total_input_frames == 0 && history == 0;
+        if (source_rate <= 0 || dest_rate <= 0 || total_input_frames < history || (total_input_frames && !history))
+            return false;
+        const uint64_t period = source_rate / std::gcd(source_rate, dest_rate);
+        const uint64_t prefix = (total_input_frames - history) % period;
+        return prefix <= max_rate_replay_prefix_frames
+            && (history + std::min<uint64_t>(prefix, 1024)) * static_cast<uint64_t>(dest_rate) / source_rate <= max_rate_replay_output_frames;
+    }
 
     void clear() {
         input_history.clear();
         needs_reset = false;
+        total_input_frames = 0;
+        source_rate = 0;
+        dest_rate = 0;
     }
 
     void reset() {
-        input_history.clear();
+        clear();
         needs_reset = true;
     }
 };

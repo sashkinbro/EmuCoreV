@@ -29,6 +29,8 @@ struct ThreadState {
     void wake() { std::lock_guard lock(mutex); pending = true; cv.notify_all(); }
 };
 #include <kernel/thread/wait_queue.h>
+std::shared_ptr<void> take_restored_wait_node(const ThreadStatePtr &, WaitTarget) { return {}; }
+std::shared_ptr<WaitContinuation> get_wait_continuation(const ThreadStatePtr &) { return {}; }
 using namespace std::chrono_literals;
 
 int main() {

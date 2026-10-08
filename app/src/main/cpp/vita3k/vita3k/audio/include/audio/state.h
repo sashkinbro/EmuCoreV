@@ -29,8 +29,21 @@
 #define SCE_AUDIO_OUT_MAX_VOL 32768 //!< Maximum output port volume
 #define SCE_AUDIO_VOLUME_0DB SCE_AUDIO_OUT_MAX_VOL //!< Maximum output port volume
 
+enum class AudioSubmitResult { submitted, would_block, stopped, error };
+
 struct AudioOutPort {
     virtual ~AudioOutPort() = default;
+
+    // Producer state and PCM submission commit share this lock.
+    std::mutex mutex;
+    // SDL invokes its callback with the stream lock held: wake subscribers must
+    // not take the producer mutex (producer calls SDL while holding it).
+    std::mutex output_wakers_mutex;
+    std::map<int, std::function<void()>> output_wakers;
+    void notify_output_ready() {
+        const std::lock_guard lock(output_wakers_mutex);
+        for (auto &[_, wake] : output_wakers) wake();
+    }
 
     // shutdown flag
     std::atomic<bool> stopping{ false };
@@ -76,11 +89,26 @@ public:
 
     virtual bool init() = 0;
     virtual AudioOutPortPtr open_port(int nb_channels, int freq, int nb_sample) { return nullptr; }
-    virtual void audio_output(AudioOutPort &out_port, const void *buffer) {}
+    virtual AudioOutPortPtr open_port_for_restore(int nb_channels, int freq, int nb_sample) {
+        return open_port(nb_channels, freq, nb_sample);
+    }
+    // Called with out_port.mutex held; must never block for capacity.
+    virtual AudioSubmitResult try_audio_output(AudioOutPort &out_port, const void *buffer, bool allow_overflow) { return AudioSubmitResult::error; }
+    virtual uint64_t output_wait_timeout_us(const AudioOutPort &out_port) const { return 0; }
     virtual void set_volume(AudioOutPort &out_port, float volume) {}
     virtual void switch_state(const bool pause) {}
     virtual int get_rest_sample(AudioOutPort &out_port) { return 0; };
     virtual void wake_all_ports() {}
+    virtual uint32_t state_codec() const { return 0; }
+    // Opaque, bounded adapter-owned playback queue state. The default adapter
+    // supports only empty queues; concrete adapters override both operations.
+    virtual bool save_port_state(AudioOutPort &out_port, std::vector<uint8_t> &state) {
+        state.clear();
+        return get_rest_sample(out_port) == 0;
+    }
+    virtual bool restore_port_state(AudioOutPort &out_port, const std::vector<uint8_t> &state) {
+        return state.empty();
+    }
     friend struct AudioState;
 };
 
@@ -99,10 +127,12 @@ struct AudioState {
     void stop_all_ports();
     void set_backend(const std::string &adapter_name);
     AudioOutPortPtr open_port(int nb_channels, int freq, int nb_sample);
-    void audio_output(AudioOutPort &out_port, const void *buffer);
+    AudioOutPortPtr open_port_for_restore(int nb_channels, int freq, int nb_sample);
     void set_volume(AudioOutPort &out_port, float volume);
     void set_global_volume(float volume);
     void switch_state(const bool pause);
     int get_rest_sample(AudioOutPort &out_port);
     void wake_all_ports();
 };
+
+bool validate_audio_port_snapshot(uint32_t codec, int len_bytes, const std::vector<uint8_t> &snapshot);

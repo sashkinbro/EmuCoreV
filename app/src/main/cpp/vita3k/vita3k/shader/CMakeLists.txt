@@ -10,6 +10,7 @@ add_library(
 	src/translator/texture.cpp
 	src/translator/utils.cpp
 	src/gxp_parser.cpp
+	src/usse_dynamic_uniform.cpp
 	src/usse_disasm.cpp
 	src/usse_program_analyzer.cpp
 	src/usse_decode_helpers.cpp
