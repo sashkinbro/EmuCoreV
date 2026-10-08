@@ -149,3 +149,9 @@ Verification: a shared test creates all twelve implemented object classes, check
 ## Real archive installation check
 
 The authorized 3 GB Mortal Kombat PCSE00023 ZIP on Lenovo installs through the production native archive installer in approximately 25 seconds. The opt-in setup test finds the installed executable, selects a catalog pack explicitly matching APP_VER, and verifies the imported receipt through native reload. Cheats remain disabled individually. The owned cache copy was removed after installation; the original archive and installed game remain. This verifies that archive installation, without establishing retail PKG/PFS success or an in-game cheat effect.
+
+## Partial DoubleBuffer surface synchronization
+
+Adapted Plus `e530c4e81f0e33263959c541f4464db57214f52d` while retaining local mapping, CPU-dirty upload, macroblock, and repack behavior. Small linear direct writebacks intersect the current scene rectangle with the pending sync rectangle. GPU readback and mapped-buffer copy use the same bounded rectangle; row span/address/mapping arithmetic is checked before copying. Nonidentity component swizzles are excluded because their existing postprocessing covers the whole surface.
+
+Verification: full debug/test APK assembly and all 53 native tests pass on Lenovo. Four new helper tests cover eligibility (including nonidentity exclusion), clipping/empty rectangles, row padding/canaries, and invalid layouts. Independent source review found the swizzle blocker and confirmed its correction. These synthetic checks do not establish NFS runtime correctness.
