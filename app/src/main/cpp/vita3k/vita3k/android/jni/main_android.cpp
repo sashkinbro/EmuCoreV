@@ -63,6 +63,23 @@ void clear_activity_callback_exception(JNIEnv *env) {
     }
 }
 
+void report_launch_state_progress(float progress, bool active) {
+    auto *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity)
+        return;
+    const auto clazz = env->GetObjectClass(activity);
+    const auto method = clazz
+        ? get_optional_activity_method(env, clazz, "onLaunchStateProgress", "(FZ)V")
+        : nullptr;
+    if (method)
+        env->CallVoidMethod(activity, method, progress, static_cast<jboolean>(active));
+    clear_activity_callback_exception(env);
+    if (clazz)
+        env->DeleteLocalRef(clazz);
+    env->DeleteLocalRef(activity);
+}
+
 void report_save_state_load_error(const std::string &reason) {
     auto *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
     auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
@@ -509,7 +526,8 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
                 break;
             }
             LOG_INFO("Applying launch save state {}", requested_state_path);
-            const auto state_result = emucorev::savestate::load_state(*emuenv, requested_state_path, true);
+            const auto state_result = emucorev::savestate::load_state(*emuenv, requested_state_path, true,
+                [](float progress, const char *) { report_launch_state_progress(progress, true); });
             if (state_result.ok()) {
                 LOG_INFO("Loaded save state from {}", requested_state_path);
             } else {
@@ -521,8 +539,12 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
             }
         }
 
-        if (startup_state_operation.owns_lock())
+        if (startup_state_operation.owns_lock()) {
+            // The pause scope has released restored threads/audio before input
+            // and the game surface are exposed to the frontend again.
+            report_launch_state_progress(1.0f, false);
             startup_state_operation.unlock();
+        }
 
         if (auto request = emuenv->take_app_launch_request())
             pending_launch_request = std::move(request);

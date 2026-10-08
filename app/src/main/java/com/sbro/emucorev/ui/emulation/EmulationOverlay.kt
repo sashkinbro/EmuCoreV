@@ -145,6 +145,7 @@ fun EmulationOverlayHost(
     // Fall back to the intent-carried ID until the native callback fires.
     val nativeGameId = activity.currentGameId
     val gameId = nativeGameId.ifBlank { activity.currentGameIdOrIntent() }
+    val launchStateLoading = activity.launchStateLoading
     val repository = remember(activity) { VitaGameSettingsRepository(activity) }
     val coreConfigRepository = remember(activity) { VitaCoreConfigRepository(activity) }
     val controlLayoutRepository = remember(activity) { TouchControlLayoutRepository(activity) }
@@ -485,8 +486,10 @@ fun EmulationOverlayHost(
             menuButtonVisible = true
         }
         activity.setOverlayPauseMenuOpenHandler {
-            menuOpen = true
-            menuButtonVisible = true
+            if (!activity.launchStateLoading.active) {
+                menuOpen = true
+                menuButtonVisible = true
+            }
         }
         onDispose {
             activity.setOverlayBackHandler(null)
@@ -823,6 +826,8 @@ fun EmulationOverlayHost(
                 }
             )
         }
+
+        LaunchStateLoadingOverlay(launchStateLoading)
     }
 
     LaunchedEffect(hasPhysicalGamepad) {

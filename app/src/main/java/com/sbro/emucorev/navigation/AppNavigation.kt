@@ -471,6 +471,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         onOpenSaveManager = { titleId ->
                             navController.navigate(saveManagerRoute(titleId)) { launchSingleTop = true }
                         },
+                        onOpenSaveStates = { titleId ->
+                            navController.navigate(saveStatesRoute(titleId)) { launchSingleTop = true }
+                        },
                         onOpenGameManager = { titleId -> navigateGameManager(titleId) },
                         onOpenPlayTime = { titleId -> navigatePlayTime(titleId) },
                         onOpenAchievements = { titleId -> navigateAchievements(titleId) },

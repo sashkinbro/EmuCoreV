@@ -1437,4 +1437,5 @@
     <string name="settings_trophy_sound_preview">Прослушать</string>
     <string name="settings_trophy_sound_unavailable">Не удаётся открыть сохранённый звук. Выберите его снова.</string>
     <string name="settings_trophy_sound_pick_error">Не удалось использовать этот аудиофайл.</string>
+    <string name="emulation_savestate_startup_loading">Загрузка сохранения состояния…</string>
 </resources>

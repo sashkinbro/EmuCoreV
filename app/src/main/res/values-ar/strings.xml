@@ -1438,4 +1438,5 @@
     <string name="settings_trophy_sound_preview">معاينة</string>
     <string name="settings_trophy_sound_unavailable">يتعذر الوصول إلى الصوت المحفوظ. اختره مرة أخرى.</string>
     <string name="settings_trophy_sound_pick_error">تعذر استخدام ملف الصوت هذا.</string>
+    <string name="emulation_savestate_startup_loading">جارٍ تحميل حالة الحفظ…</string>
 </resources>

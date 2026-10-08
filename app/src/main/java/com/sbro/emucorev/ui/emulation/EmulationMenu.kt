@@ -959,8 +959,8 @@ private fun SaveStatesTab(saveStates: SaveStateMenuState, callbacks: EmulationMe
                         contentDescription = stringResource(R.string.emulation_savestate_preview),
                         fallbackLabel = saveStateSlotLabel(selected),
                         modifier = Modifier
-                            .width(132.dp)
-                            .height(74.dp)
+                            .width(96.dp)
+                            .height(54.dp)
                             .clip(neonShape(10.dp))
                     )
                 }
@@ -990,17 +990,13 @@ private fun SaveStatesTab(saveStates: SaveStateMenuState, callbacks: EmulationMe
                             style = MaterialTheme.typography.bodySmall,
                             color = palette.textSecondary
                         )
-                        Text(
-                            text = stringResource(
-                                if (slot.sessionMatch) {
-                                    R.string.emulation_savestate_session_current
-                                } else {
-                                    R.string.emulation_savestate_session_other
-                                }
-                            ),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (slot.sessionMatch) LiveBadgeColor else RestartBadgeColor
-                        )
+                        if (slot.sessionMatch) {
+                            Text(
+                                text = stringResource(R.string.emulation_savestate_session_current),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = LiveBadgeColor
+                            )
+                        }
                     }
                 }
             }

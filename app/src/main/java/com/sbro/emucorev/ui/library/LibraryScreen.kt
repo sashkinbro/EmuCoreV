@@ -104,6 +104,7 @@ private enum class LibraryLayoutMode {
 fun LibraryScreen(
     onLaunchGame: (String) -> Unit,
     onOpenSaveManager: (String) -> Unit,
+    onOpenSaveStates: (String) -> Unit,
     onOpenGameManager: (String) -> Unit,
     onOpenPlayTime: (String) -> Unit,
     onOpenAchievements: (String) -> Unit,
@@ -128,6 +129,7 @@ fun LibraryScreen(
     )
     val deleteGameLabel = stringResource(R.string.detail_delete_game)
     val manageSaveDataLabel = stringResource(R.string.save_manager_open_for_game)
+    val manageSaveStatesLabel = stringResource(R.string.savestate_manager_open_for_game)
     val manageGameSettingsLabel = stringResource(R.string.game_manager_open_for_game)
     val playTimeLabel = stringResource(R.string.play_time_open_for_game)
     val achievementsLabel = stringResource(R.string.achievements_open_for_game)
@@ -414,6 +416,11 @@ fun LibraryScreen(
                             onOpenAchievements(game.titleId)
                             menuExpanded = false
                         },
+                        manageSaveStatesLabel = manageSaveStatesLabel,
+                        onOpenSaveStates = {
+                            onOpenSaveStates(game.titleId)
+                            menuExpanded = false
+                        },
                         manageSaveDataLabel = manageSaveDataLabel,
                         onManageSaveData = {
                             onOpenSaveManager(game.titleId)
@@ -510,6 +517,11 @@ fun LibraryScreen(
                                     onOpenAchievements(game.titleId)
                                     menuExpanded = false
                                 },
+                                manageSaveStatesLabel = manageSaveStatesLabel,
+                                onOpenSaveStates = {
+                                    onOpenSaveStates(game.titleId)
+                                    menuExpanded = false
+                                },
                                 manageSaveDataLabel = manageSaveDataLabel,
                                 onManageSaveData = {
                                     onOpenSaveManager(game.titleId)
@@ -585,6 +597,8 @@ private fun LibraryGameContextMenu(
     onOpenPlayTime: () -> Unit,
     achievementsLabel: String,
     onOpenAchievements: () -> Unit,
+    manageSaveStatesLabel: String,
+    onOpenSaveStates: () -> Unit,
     manageSaveDataLabel: String,
     onManageSaveData: () -> Unit,
     deleteGameLabel: String,
@@ -620,6 +634,11 @@ private fun LibraryGameContextMenu(
             text = achievementsLabel,
             icon = Icons.Rounded.EmojiEvents,
             onClick = onOpenAchievements
+        )
+        LibraryGameContextMenuItem(
+            text = manageSaveStatesLabel,
+            icon = Icons.Rounded.Save,
+            onClick = onOpenSaveStates
         )
         LibraryGameContextMenuItem(
             text = manageSaveDataLabel,

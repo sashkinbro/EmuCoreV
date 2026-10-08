@@ -1434,4 +1434,5 @@
     <string name="settings_trophy_sound_preview">Pré-visualizar</string>
     <string name="settings_trophy_sound_unavailable">Não é possível acessar o som salvo. Escolha-o novamente.</string>
     <string name="settings_trophy_sound_pick_error">Não foi possível usar esse arquivo de áudio.</string>
+    <string name="emulation_savestate_startup_loading">Carregando estado salvo…</string>
 </resources>

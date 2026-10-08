@@ -1459,4 +1459,5 @@
     <string name="settings_trophy_sound_preview">Preview</string>
     <string name="settings_trophy_sound_unavailable">The saved sound cannot be accessed. Choose it again.</string>
     <string name="settings_trophy_sound_pick_error">Could not use that audio file.</string>
+    <string name="emulation_savestate_startup_loading">Loading save state…</string>
 </resources>

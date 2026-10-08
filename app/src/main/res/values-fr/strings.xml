@@ -1434,4 +1434,5 @@
     <string name="settings_trophy_sound_preview">Aperçu</string>
     <string name="settings_trophy_sound_unavailable">Le son enregistré est inaccessible. Sélectionnez-le à nouveau.</string>
     <string name="settings_trophy_sound_pick_error">Impossible d’utiliser ce fichier audio.</string>
+    <string name="emulation_savestate_startup_loading">Chargement de l’état sauvegardé…</string>
 </resources>

@@ -1434,4 +1434,5 @@
     <string name="settings_trophy_sound_preview">Önizleme</string>
     <string name="settings_trophy_sound_unavailable">Kaydedilen sese erişilemiyor. Yeniden seçin.</string>
     <string name="settings_trophy_sound_pick_error">Bu ses dosyası kullanılamadı.</string>
+    <string name="emulation_savestate_startup_loading">Kayıt durumu yükleniyor…</string>
 </resources>

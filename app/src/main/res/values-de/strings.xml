@@ -1434,4 +1434,5 @@
     <string name="settings_trophy_sound_preview">Vorschau</string>
     <string name="settings_trophy_sound_unavailable">Auf den gespeicherten Klang kann nicht zugegriffen werden. Wähle ihn erneut aus.</string>
     <string name="settings_trophy_sound_pick_error">Diese Audiodatei kann nicht verwendet werden.</string>
+    <string name="emulation_savestate_startup_loading">Spielstand wird geladen…</string>
 </resources>

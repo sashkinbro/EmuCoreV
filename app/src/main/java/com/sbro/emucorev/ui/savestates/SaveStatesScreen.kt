@@ -253,22 +253,8 @@ private fun SaveStatesGameCard(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Surface(
-                    modifier = Modifier.size(44.dp),
-                    shape = neonShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
-                ) {
-                    LocalImage(
-                        path = game.iconPath,
-                        contentDescription = game.title,
-                        fallbackLabel = game.title,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(neonShape(12.dp))
-                    )
-                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = game.title,
@@ -333,8 +319,8 @@ private fun SaveStateSlotRow(
                         contentDescription = slotName,
                         fallbackLabel = slotName,
                         modifier = Modifier
-                            .width(116.dp)
-                            .height(66.dp)
+                            .width(96.dp)
+                            .height(54.dp)
                             .clip(neonShape(10.dp))
                     )
                 }
@@ -359,21 +345,13 @@ private fun SaveStateSlotRow(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text(
-                        text = stringResource(
-                            if (slot.sessionMatch) {
-                                R.string.emulation_savestate_session_current
-                            } else {
-                                R.string.emulation_savestate_session_other
-                            }
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (slot.sessionMatch) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.tertiary
-                        }
-                    )
+                    if (slot.sessionMatch) {
+                        Text(
+                            text = stringResource(R.string.emulation_savestate_session_current),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
 

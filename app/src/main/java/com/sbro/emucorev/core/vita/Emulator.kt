@@ -95,6 +95,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var playTimeSessionStartedAt: Long = 0L
     private var playTimeSessionLastSeenAt: Long = 0L
     private var trophySoundPlayer: TrophySoundPlayer? = null
+    var launchStateLoading by mutableStateOf(LaunchStateLoadingState())
+        private set
     var nativeImeState by mutableStateOf<NativeImeState?>(null)
         private set
     var nativeKeyboardRequested by mutableStateOf(false)
@@ -112,7 +114,15 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     fun showSaveStateLoadError(reason: String) {
         Log.e("SaveStateBridge", "Launch save state load failed: $reason")
         runOnUiThread {
+            launchStateLoading = launchStateLoading.onFailure()
             Toast.makeText(this, R.string.emulation_savestate_failed_toast, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    @Keep
+    fun onLaunchStateProgress(progress: Float, active: Boolean) {
+        runOnUiThread {
+            launchStateLoading = launchStateLoading.onNativeProgress(progress, active)
         }
     }
 
@@ -213,6 +223,9 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        launchStateLoading = LaunchStateLoadingState.fromArguments(
+            intent?.getStringArrayExtra(APP_RESTART_PARAMETERS)
+        )
         if (!::inputOverlay.isInitialized) {
             inputOverlay = InputOverlay(this)
         }
@@ -646,12 +659,14 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     @Deprecated("Deprecated in Java")
     @SuppressLint("GestureBackNavigation")
     override fun onBackPressed() {
+        if (launchStateLoading.active) return
         if (nativeKeyboardRequested) { onScreenKeyboardFocusLost(); return }
         if (overlayBackHandler?.invoke() == true) return
         super.onBackPressed()
     }
 
     override fun superOnBackPressed() {
+        if (launchStateLoading.active) return
         if (nativeKeyboardRequested) { onScreenKeyboardFocusLost(); return }
         if (overlayBackHandler?.invoke() == true) return
         super.superOnBackPressed()
@@ -659,6 +674,15 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (rebirthRequested) return true
+        if (launchStateLoading.active) {
+            return when (event.keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP,
+                KeyEvent.KEYCODE_VOLUME_DOWN,
+                KeyEvent.KEYCODE_VOLUME_MUTE,
+                KeyEvent.KEYCODE_POWER -> super.dispatchKeyEvent(event)
+                else -> true
+            }
+        }
         if (event.keyCode == KeyEvent.KEYCODE_BACK &&
             event.action == KeyEvent.ACTION_UP &&
             !event.isCanceled
@@ -667,6 +691,11 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             if (overlayBackHandler?.invoke() == true) return true
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (launchStateLoading.active) return true
+        return super.dispatchGenericMotionEvent(event)
     }
 
     override fun onScreenKeyboardFocusLost(): Boolean {
@@ -751,6 +780,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (rebirthRequested) return true
+        if (launchStateLoading.active) return true
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP -> {
                 activeTouchSnapshot?.recycle()

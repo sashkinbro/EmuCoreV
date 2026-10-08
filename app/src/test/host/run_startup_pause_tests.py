@@ -7,7 +7,7 @@ production markers so source refactors fail visibly instead of testing stale cod
 Run from any directory: python app/src/test/host/run_startup_pause_tests.py
 """
 from pathlib import Path
-import subprocess,os,shutil
+import subprocess,os,shutil,sys
 if os.name == "nt" and Path("C:/msys64/ucrt64/bin").is_dir():
  os.environ["PATH"]="C:/msys64/ucrt64/bin;"+os.environ["PATH"]
 root=Path(__file__).resolve().parents[4];out=root/'app/build/startup-pause-probe';out.mkdir(parents=True,exist_ok=True)
@@ -20,8 +20,14 @@ def block(s,marker):
  raise AssertionError(f'Unterminated production block: {marker}')
 controller=(root/'app/src/main/cpp/vita3k/vita3k/app/src/session_controller.cpp').read_text()
 android=(root/'app/src/main/cpp/vita3k/vita3k/android/jni/main_android.cpp').read_text()
+if '--baseline' in sys.argv:
+ android=subprocess.check_output(['git','show','HEAD:app/src/main/cpp/vita3k/vita3k/android/jni/main_android.cpp'],cwd=root,text=True)
 bridge=(root/'app/src/main/cpp/emucorev/src/savestate_bridge.cpp').read_text()
 startup=block(android,'        if (!load_state_path.empty()) {')
+completion_marker='        if (startup_state_operation.owns_lock())'
+assert android.count(completion_marker)==1
+completion_start=android.index(completion_marker)
+completion=android[completion_start:android.index('\n\n        if (auto request',completion_start)]
 guard=block((root/'app/src/main/cpp/emucorev/include/emucorev/savestate/session_pause.h').read_text(),'class ScopedSaveStatePause')+';'
 cpp=r'''
 #include <atomic>
@@ -30,6 +36,8 @@ cpp=r'''
 #include <utility>
 #include <cstdio>
 #include <cstdint>
+#include <functional>
+#include <vector>
 #define LOG_INFO(...) ((void)0)
 #define LOG_ERROR(...) ((void)0)
 struct Kernel {bool paused=false; bool is_threads_paused(){return paused;}void pause_threads(){paused=true;}void resume_threads(){paused=false;}};
@@ -46,23 +54,28 @@ cpp+=block(controller,'bool AppSessionController::set_pause_reason')+'\n'+block(
 cpp+='app::AppSessionController *global_controller=nullptr;auto *get_app_session_controller(){return global_controller;}\nnamespace emucorev::savestate { '+guard+' }\nusing emucorev::savestate::ScopedSaveStatePause;\n'
 cpp+=r'''
 bool restore_paused=false,restore_ok=true;int cleanup_count=0,cleanup_audio_calls=0,restore_calls=0;
+bool progress_active=false,finish_seen=false,completed_after_resume=false;std::vector<float> progress_values;
+void report_launch_state_progress(float progress,bool active){progress_active=active;if(active)progress_values.push_back(progress);else{finish_seen=true;completed_after_resume=!global_controller->emuenv.kernel.paused&&global_controller->emuenv.audio.new_port_started;}}
 struct Result {std::string error="deliberate restore failure";bool ok()const{return restore_ok;}};
-namespace emucorev::savestate { Result load_state(Env &env,const std::string &,bool){++restore_calls;restore_paused=env.kernel.paused&&env.audio.paused;env.audio.new_port_started=false;return {};} }
-void report_save_state_load_error(const std::string &){}
+namespace emucorev::savestate { Result load_state(Env &env,const std::string &,bool,const std::function<void(float,const char*)> &progress={}){++restore_calls;restore_paused=env.kernel.paused&&env.audio.paused;env.audio.new_port_started=false;if(progress){progress(.02f,"prepare");progress(.8f,"memory");progress(1.f,"done");}return {};} }
+void report_save_state_load_error(const std::string &){progress_active=false;}
 void startup(Env *emuenv,app::AppSessionController *session_controller) {
 std::string load_state_path="fixture";int exit_code=0;
+std::mutex operation_mutex;std::unique_lock startup_state_operation(operation_mutex);progress_active=true;
 auto cleanup_launch=[&](app::AppSessionStopReason){++cleanup_count;cleanup_audio_calls=emuenv->audio.calls;session_controller->current_phase=app::AppSessionPhase::Idle;emuenv->audio.adapter=false;};
 do {
-'''+startup+r'''
+'''+startup+'\n'+completion+r'''
 }while(false);
 }
 int main(){int failed=0;auto check=[&](bool ok,const char *name){std::printf("%s %s\n",ok?"PASS":"FAIL",name);failed+=!ok;};
 Env env;app::AppSessionController c{env};global_controller=&c;
 startup(&env,&c);check(restore_paused,"startup restore is inside kernel/audio pause");check(env.audio.new_port_started,"startup restored stopped audio port resumes");
+check(progress_values.size()==3&&progress_values.front()==.02f&&progress_values.back()==1.f,"startup forwards actual core progress");check(finish_seen&&!progress_active,"startup clears loading overlay on success");check(completed_after_resume,"loading overlay finishes after restored audio resumes");
 restore_paused=false;{ScopedSaveStatePause pause(get_app_session_controller());check(bool(pause),"JNI pause acquired");emucorev::savestate::load_state(env,"fixture",true);}check(restore_paused&&env.audio.new_port_started,"JNI restore paused and resumed");
 c.set_pause_reason(app::AppSessionPauseReason::Menu,true);c.set_pause_reason(app::AppSessionPauseReason::Background,true);startup(&env,&c);check(env.kernel.paused&&env.audio.paused&&!env.audio.new_port_started&&c.active_pause_reasons==6,"startup preserves Menu and Background reasons");
 c.set_pause_reason(app::AppSessionPauseReason::Menu,false);c.set_pause_reason(app::AppSessionPauseReason::Background,false);restore_ok=false;startup(&env,&c);const int calls=cleanup_audio_calls;check(cleanup_count==1&&c.current_phase==app::AppSessionPhase::Idle,"failed restore cleans stopped session");check(env.audio.calls==calls,"no resume after cleanup");
 const int old_restore_calls=restore_calls;startup(&env,&c);check(restore_calls==old_restore_calls,"inactive startup cannot invoke restore");
+check(!progress_active,"failed or inactive startup clears loading overlay");
 {ScopedSaveStatePause pause(nullptr);check(!pause,"null controller cannot acquire pause");}
 return failed?1:0;}
 '''

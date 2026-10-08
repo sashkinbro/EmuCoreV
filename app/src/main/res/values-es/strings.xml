@@ -1434,4 +1434,5 @@
     <string name="settings_trophy_sound_preview">Vista previa</string>
     <string name="settings_trophy_sound_unavailable">No se puede acceder al sonido guardado. Vuelve a elegirlo.</string>
     <string name="settings_trophy_sound_pick_error">No se pudo usar ese archivo de audio.</string>
+    <string name="emulation_savestate_startup_loading">Cargando estado guardado…</string>
 </resources>
