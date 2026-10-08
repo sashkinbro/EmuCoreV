@@ -22,6 +22,11 @@ off stops every cheat and puts back the instructions the ARM write codes replace
 
 Codes run once per vblank, the same way the plugins do on hardware.
 
+When multiple packs exist, `<title id>.psv` takes precedence over `<title id>.txt`,
+then named variants such as `<title id>-MP.psv` in filename order. Android imports
+for one game replace its canonical `.psv` only after the copied file contains
+usable cheats for that game. A failed import preserves the installed pack.
+
 ## File format
 
 ```

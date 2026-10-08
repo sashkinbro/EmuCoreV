@@ -87,6 +87,7 @@ fun CheatManagerScreen(
     var cheatSearchVisible by remember { mutableStateOf(false) }
     var cheatSearchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<CheatCategory?>(null) }
+    var showOtherVersions by remember(state.selectedTitleId) { mutableStateOf(false) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.importFromUri(uri)
@@ -110,7 +111,13 @@ fun CheatManagerScreen(
         selectedCategory != null -> state.snapshot.cheats.filter { it.category() == selectedCategory }
         else -> emptyList()
     }
-    val catalogForGame = state.catalog.filter { it.titleId == state.selectedTitleId }
+    val allPacksForGame = state.catalog.filter { it.titleId.equals(state.selectedTitleId, ignoreCase = true) }
+    val catalogForGame = remember(state.catalog, state.selectedTitleId, selectedGame?.version, showOtherVersions) {
+        visibleCheatPacks(state.catalog, state.selectedTitleId, selectedGame?.version, showOtherVersions)
+    }
+    val hasOtherVersions = allPacksForGame.any {
+        cheatVersionCompatibility(selectedGame?.version, it.version) == CheatVersionCompatibility.MISMATCH
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -285,6 +292,21 @@ fun CheatManagerScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Text(
+                        text = stringResource(R.string.cheat_catalog_game_version,
+                            selectedGame?.version?.takeIf { it.isNotBlank() } ?: stringResource(R.string.cheat_catalog_unknown_version)),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    if (hasOtherVersions) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = stringResource(R.string.cheat_catalog_show_other_versions),
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Switch(checked = showOtherVersions, onCheckedChange = { showOtherVersions = it })
+                        }
+                    }
                     when {
                         state.catalogLoading -> Box(
                             modifier = Modifier
@@ -297,7 +319,7 @@ fun CheatManagerScreen(
 
                         catalogForGame.isEmpty() -> {
                             Text(
-                                text = stringResource(R.string.cheat_catalog_empty),
+                                text = stringResource(if (allPacksForGame.isEmpty()) R.string.cheat_catalog_empty else R.string.cheat_catalog_no_version),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             if (state.catalogFailed) {
@@ -315,7 +337,9 @@ fun CheatManagerScreen(
             items(catalogForGame, key = { it.id }) { entry ->
                 CheatCatalogCard(
                     entry = entry,
-                    installed = state.installed,
+                    installed = state.installedCatalogId == entry.id,
+                    hasInstalledPack = state.installed,
+                    compatibility = cheatVersionCompatibility(selectedGame?.version, entry.version),
                     busy = state.busy,
                     onDownload = { viewModel.download(entry) }
                 )
@@ -676,9 +700,11 @@ private fun CheatSearchEmptyState() {
 }
 
 @Composable
-private fun CheatCatalogCard(
+internal fun CheatCatalogCard(
     entry: CheatCatalogEntry,
     installed: Boolean,
+    hasInstalledPack: Boolean,
+    compatibility: CheatVersionCompatibility,
     busy: Boolean,
     onDownload: () -> Unit
 ) {
@@ -714,6 +740,13 @@ private fun CheatCatalogCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    Text(
+                        text = stringResource(R.string.cheat_catalog_pack_version,
+                            entry.version.ifBlank { stringResource(R.string.cheat_catalog_unknown_version) },
+                            entry.region.ifBlank { stringResource(R.string.cheat_catalog_unknown_region) }),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 if (installed) {
                     Text(
@@ -723,6 +756,16 @@ private fun CheatCatalogCard(
                     )
                 }
             }
+            Text(
+                text = stringResource(when (compatibility) {
+                    CheatVersionCompatibility.MATCH -> R.string.cheat_catalog_version_matches
+                    CheatVersionCompatibility.UNKNOWN -> R.string.cheat_catalog_version_unverified
+                    CheatVersionCompatibility.MISMATCH -> R.string.cheat_catalog_version_mismatch
+                }),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (compatibility == CheatVersionCompatibility.MATCH) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+            )
             if (entry.description.isNotBlank()) {
                 Text(
                     text = entry.description,
@@ -734,7 +777,7 @@ private fun CheatCatalogCard(
             }
             Button(
                 onClick = onDownload,
-                enabled = !busy,
+                enabled = !busy && compatibility != CheatVersionCompatibility.MISMATCH,
                 shape = neonButtonShape(),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -746,8 +789,11 @@ private fun CheatCatalogCard(
                 Spacer(modifier = Modifier.width(7.dp))
                 Text(
                     text = stringResource(
-                        if (installed) R.string.cheat_catalog_reinstall
-                        else R.string.cheat_catalog_download
+                        when {
+                            installed -> R.string.cheat_catalog_reinstall
+                            hasInstalledPack -> R.string.cheat_catalog_replace
+                            else -> R.string.cheat_catalog_download
+                        }
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

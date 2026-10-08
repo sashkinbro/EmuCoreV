@@ -20,7 +20,8 @@ data class CheatCatalogEntry(
     val description: String,
     val blockCount: Int,
     val downloadUrl: String,
-    val sourceUrl: String
+    val sourceUrl: String,
+    val sha256: String = ""
 )
 
 class CheatCatalogRepository(private val context: Context) {
@@ -38,7 +39,16 @@ class CheatCatalogRepository(private val context: Context) {
     }
 
     private val cacheFile: File
-        get() = File(context.filesDir, "remote-content/cheats-v1.json")
+        get() = File(context.filesDir, "remote-content/cheats-v2.json")
+
+    private val installedPacks = context.getSharedPreferences("cheat-catalog-installations", Context.MODE_PRIVATE)
+
+    fun installedEntryId(titleId: String, snapshot: VitaCheatSnapshot): String? {
+        if (snapshot.cheats.isEmpty()) return null
+        val key = titleId.uppercase()
+        if (installedPacks.getString("$key.fingerprint", null) != cheatPackFingerprint(snapshot)) return null
+        return installedPacks.getString("$key.id", null)
+    }
 
     fun cached(): List<CheatCatalogEntry> {
         val file = cacheFile
@@ -68,11 +78,18 @@ class CheatCatalogRepository(private val context: Context) {
     suspend fun download(entry: CheatCatalogEntry): VitaCheatSnapshot? = withContext(Dispatchers.IO) {
         val bytes = downloadPack(entry) ?: return@withContext null
 
-        val temp = File(context.cacheDir, "cheat_download.tmp")
-        temp.writeBytes(bytes)
-        val snapshot = CheatBridge.importFile(entry.titleId, temp.absolutePath, "${entry.titleId}.psv")
-        temp.delete()
-        snapshot.takeIf { it.cheats.isNotEmpty() }
+        val temp = File.createTempFile("cheat_download_", ".tmp", context.cacheDir)
+        try {
+            temp.writeBytes(bytes)
+            val snapshot = CheatBridge.importFile(entry.titleId, temp.absolutePath, "${entry.titleId}.psv")
+            if (snapshot.cheats.isEmpty()) return@withContext null
+            val key = entry.titleId.uppercase()
+            installedPacks.edit().putString("$key.id", entry.id)
+                .putString("$key.fingerprint", cheatPackFingerprint(snapshot)).apply()
+            snapshot
+        } finally {
+            temp.delete()
+        }
     }
 
     private fun downloadPack(entry: CheatCatalogEntry): ByteArray? {
@@ -84,7 +101,7 @@ class CheatCatalogRepository(private val context: Context) {
         )
         for (url in urls) {
             val bytes = runCatching { httpGetBytes(url, MAX_PACK_BYTES) }.getOrNull()
-            if (bytes != null && bytes.isNotEmpty()) return bytes
+            if (bytes != null && bytes.isNotEmpty() && verifyCheatPack(bytes, entry.sha256)) return bytes
         }
         return null
     }
@@ -109,7 +126,8 @@ class CheatCatalogRepository(private val context: Context) {
                         description = item.optString("description"),
                         blockCount = item.optInt("blockCount"),
                         downloadUrl = downloadUrl,
-                        sourceUrl = item.optString("sourceUrl")
+                        sourceUrl = item.optString("sourceUrl"),
+                        sha256 = item.optString("sha256")
                     )
                 )
             }

@@ -43,6 +43,16 @@ Plus `997654b3f` supplies requested AAC output layout/rate handling, SBR sample 
 
 Verification: five AAC conversion tests plus the 28 cheat tests pass on Lenovo (33 total). Baseline tests reproduced stereo/mono conversion and guest PCM overrun defects; the unmodified Plus patch failed the consecutive-frame backlog test with delay growing from 1024 to 4096 samples. SBR output rate/capacity and changing input channel layout are covered. APK assembly succeeds. These tests provide synthetic decoded frames to the real FFmpeg converter; they do not validate encoded AAC bitstreams or a particular game's sound.
 
+## Cheat catalog and import corrections
+
+The manager filters by the selected title ID and compares the pack revision to the installed base/update `APP_VER`. Known mismatches are hidden by default and cannot be downloaded; unknown metadata is explicitly unverified. A content fingerprint identifies the actual installed catalog variant without being invalidated by enabled/disabled toggles. Downloads verify the catalog's SHA-256 with the same LF normalization as its builder.
+
+Native selection now prefers the canonical `<title>.psv`, then `<title>.txt`, then named variants in stable order. A similarly prefixed different title is not accepted. Per-game imports replace the canonical pack using a staged, validated copy and rename; invalid content and importing the active file itself preserve the current pack. Safe homebrew IDs remain supported.
+
+Verification: 40 real native tests on Lenovo, including six selection/import regressions and the homebrew-ID regression; 187 JVM tests; APK assembly; three Compose card tests on Lenovo covering revision/region labels, replacement action and disabled mismatched downloads. The AndroidX Test helper activities need matching MAIN/LAUNCHER filters in the test APK. These checks do not certify each community cheat's in-game addresses.
+
+The separate EmuCoreV-Cheat catalog now validates all 676 packs, counts 7,917 declarations with parseable code, and corrects four proven title-ID header copy errors without changing code addresses. Additional source mirrors supplied no verified new pack.
+
 ## Remaining audit work
 
 - Review the official WaitQueue, callback-wait, UID-table and synchronization cancellation/deletion series together with the local Plus guest scheduler. They are coupled changes and cannot be copied as independent one-line fixes.

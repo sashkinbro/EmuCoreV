@@ -255,6 +255,78 @@ TEST_F(CheatTest, a_file_named_after_the_title_wins_over_a_combined_database) {
     EXPECT_EQ(fs_utils::path_to_utf8(path.filename()), title_id + ".psv");
 }
 
+TEST_F(CheatTest, canonical_pack_replaces_an_older_text_or_variant_pack) {
+    write_named(title_id + ".txt", "_V0 Old text pack\n$0200 81000000 00000001\n");
+    write_named(title_id + "-MP.psv", "_V0 Multiplayer\n$0200 81000000 00000002\n");
+    const auto canonical = write_file(title_id, "_V0 Downloaded\n$0200 81000000 00000003\n");
+
+    EXPECT_EQ(cheat::find_cheat_file(directory, title_id), canonical);
+    ASSERT_TRUE(cheat::load(state, directory, title_id));
+    const auto loaded = cheat::snapshot(state);
+    ASSERT_EQ(loaded.cheats.size(), 1u);
+    EXPECT_EQ(loaded.cheats[0].name, "Downloaded");
+    EXPECT_EQ(loaded.cheats[0].lines[0].second, 3u);
+}
+
+TEST_F(CheatTest, a_title_prefix_does_not_match_a_different_title) {
+    write_named(title_id + "0.psv", "_V0 Wrong game\n$0200 81000000 00000001\n");
+    EXPECT_TRUE(cheat::find_cheat_file(directory, title_id).empty());
+}
+
+TEST_F(CheatTest, invalid_import_preserves_the_installed_pack) {
+    const auto target = write_file(title_id, "_V1 Keep me\n$0200 81000000 0000002A\n");
+    const auto invalid = write_named("download.tmp", "<html>Not a cheat pack</html>\n");
+
+    EXPECT_FALSE(cheat::import_cheat_file(invalid, target, title_id));
+    const auto file = cheat::parse_cheat_file(target, title_id);
+    ASSERT_EQ(file.cheats.size(), 1u);
+    EXPECT_EQ(file.cheats[0].name, "Keep me");
+}
+
+TEST_F(CheatTest, combined_import_without_the_selected_game_preserves_the_installed_pack) {
+    const auto target = write_file(title_id, "_V0 Keep me\n$0200 81000000 0000002A\n");
+    const auto source = write_named("download.db", "_S PCSA00002\n_V0 Other game\n$0200 81000000 00000001\n");
+
+    EXPECT_FALSE(cheat::import_cheat_file(source, target, title_id));
+    const auto file = cheat::parse_cheat_file(target, title_id);
+    ASSERT_EQ(file.cheats.size(), 1u);
+    EXPECT_EQ(file.cheats[0].name, "Keep me");
+}
+
+TEST_F(CheatTest, importing_the_installed_file_does_not_truncate_it) {
+    const auto target = write_file(title_id, "_V1 Keep me\n$0200 81000000 0000002A\n");
+
+    EXPECT_TRUE(cheat::import_cheat_file(target, target, title_id));
+    const auto file = cheat::parse_cheat_file(target, title_id);
+    ASSERT_EQ(file.cheats.size(), 1u);
+    EXPECT_EQ(file.cheats[0].name, "Keep me");
+}
+
+TEST_F(CheatTest, imported_text_pack_replaces_the_canonical_pack_and_reloads) {
+    const auto target = write_file(title_id, "_V0 Old\n$0200 81000000 00000001\n");
+    write_named(title_id + ".txt", "_V0 Older text\n$0200 81000000 00000002\n");
+    const auto source = write_named("download.tmp", "_V1 New pack\n$0200 81000000 0000002A\n");
+
+    ASSERT_TRUE(cheat::import_cheat_file(source, target, title_id));
+    ASSERT_TRUE(cheat::load(state, directory, title_id));
+    const auto file = cheat::snapshot(state);
+    ASSERT_EQ(file.cheats.size(), 1u);
+    EXPECT_EQ(file.cheats[0].name, "New pack");
+    EXPECT_EQ(file.cheats[0].lines[0].second, 42u);
+}
+
+TEST_F(CheatTest, safe_homebrew_ids_can_import_without_accepting_path_segments) {
+    EXPECT_TRUE(cheat::is_safe_title_id("VITASHELL"));
+    EXPECT_TRUE(cheat::is_safe_title_id("MY_APP-1"));
+    EXPECT_FALSE(cheat::is_safe_title_id(""));
+    EXPECT_FALSE(cheat::is_safe_title_id("../PCSA00001"));
+    EXPECT_FALSE(cheat::is_safe_title_id("..\\PCSA00001"));
+    const auto source = write_named("download.tmp", "_V0 Homebrew\n$0200 81000000 0000002A\n");
+    const auto target = directory / "VITASHELL.psv";
+    ASSERT_TRUE(cheat::import_cheat_file(source, target, "VITASHELL"));
+    EXPECT_EQ(cheat::find_cheat_file(directory, "VITASHELL"), target);
+}
+
 TEST_F(CheatTest, saving_a_combined_database_leaves_the_other_sections_alone) {
     const auto path = write_named("cheat.db",
         "_S PCSA00001\n"

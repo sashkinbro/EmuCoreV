@@ -12,6 +12,7 @@ import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.InstalledVitaGame
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,7 @@ class CheatManagerViewModel(application: Application) : AndroidViewModel(applica
         val catalogLoading: Boolean = false,
         val catalogFailed: Boolean = false,
         val installed: Boolean = false,
+        val installedCatalogId: String? = null,
         val busy: Boolean = false,
         val messageRes: Int? = null
     )
@@ -60,12 +62,12 @@ class CheatManagerViewModel(application: Application) : AndroidViewModel(applica
     fun refreshCheats() {
         val titleId = _state.value.selectedTitleId
         if (titleId.isBlank()) {
-            _state.update { it.copy(snapshot = VitaCheatSnapshot.EMPTY, installed = false) }
+            _state.update { it.copy(snapshot = VitaCheatSnapshot.EMPTY, installed = false, installedCatalogId = null) }
             return
         }
         val snapshot = CheatBridge.snapshot(titleId)
         val path = CheatBridge.getCheatFilePath(titleId)
-        _state.update { it.copy(snapshot = snapshot, installed = !path.isNullOrBlank()) }
+        _state.update { it.copy(snapshot = snapshot, installed = !path.isNullOrBlank(), installedCatalogId = catalogRepository.installedEntryId(titleId, snapshot)) }
     }
 
     fun setMasterEnabled(enabled: Boolean) {
@@ -86,31 +88,35 @@ class CheatManagerViewModel(application: Application) : AndroidViewModel(applica
         val titleId = _state.value.selectedTitleId
         if (titleId.isBlank()) return
         CheatBridge.setAllCheatsEnabled(titleId, enabled)
+        CheatBridge.saveCheats(titleId)
         refreshCheats()
     }
 
     fun importFromUri(uri: Uri) {
         val titleId = _state.value.selectedTitleId
-        if (titleId.isBlank()) return
+        if (titleId.isBlank() || _state.value.busy) return
+        _state.update { it.copy(busy = true) }
         viewModelScope.launch {
-            _state.update { it.copy(busy = true) }
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     val name = queryDisplayName(uri)
-                    val temp = File(getApplication<Application>().cacheDir, "cheat_import.tmp")
-                    getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
-                        temp.outputStream().use { output -> input.copyTo(output) }
+                    val temp = File.createTempFile("cheat_import_", ".tmp", getApplication<Application>().cacheDir)
+                    try {
+                        val input = getApplication<Application>().contentResolver.openInputStream(uri)
+                            ?: return@runCatching VitaCheatSnapshot.EMPTY
+                        input.use { stream ->
+                            temp.outputStream().use { output -> stream.copyTo(output) }
+                        }
+                        CheatBridge.importFile(titleId, temp.absolutePath, name ?: "$titleId.psv")
+                    } finally {
+                        temp.delete()
                     }
-                    val snapshot = CheatBridge.importFile(titleId, temp.absolutePath, name ?: "$titleId.psv")
-                    temp.delete()
-                    snapshot
                 }.getOrDefault(VitaCheatSnapshot.EMPTY)
             }
             val success = result.cheats.isNotEmpty()
             _state.update {
                 it.copy(
                     busy = false,
-                    installed = success || it.installed,
                     messageRes = if (success) R.string.emulation_cheats_import_success else R.string.emulation_cheats_import_failed
                 )
             }
@@ -119,9 +125,22 @@ class CheatManagerViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun download(entry: CheatCatalogEntry) {
+        val game = _state.value.games.firstOrNull { it.titleId.equals(_state.value.selectedTitleId, ignoreCase = true) }
+        if (game == null || !entry.titleId.equals(game.titleId, ignoreCase = true) ||
+            cheatVersionCompatibility(game.version, entry.version) == CheatVersionCompatibility.MISMATCH) {
+            _state.update { it.copy(messageRes = R.string.cheat_catalog_version_mismatch) }
+            return
+        }
+        if (_state.value.busy) return
+        _state.update { it.copy(busy = true) }
         viewModelScope.launch {
-            _state.update { it.copy(busy = true) }
-            val snapshot = catalogRepository.download(entry)
+            val snapshot = try {
+                catalogRepository.download(entry)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
             val success = snapshot != null
             _state.update {
                 it.copy(
@@ -130,10 +149,8 @@ class CheatManagerViewModel(application: Application) : AndroidViewModel(applica
                 )
             }
             if (!success) return@launch
-            if (entry.titleId == _state.value.selectedTitleId)
+            if (entry.titleId.equals(_state.value.selectedTitleId, ignoreCase = true))
                 refreshCheats()
-            else
-                selectGame(entry.titleId)
         }
     }
 

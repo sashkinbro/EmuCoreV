@@ -21,7 +21,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <fstream>
 #include <string>
 
 namespace {
@@ -264,7 +263,10 @@ Java_com_sbro_emucorev_core_CheatBridge_importCheatFile(
     if (!emuenv || !title_id || !source_path)
         return to_jstring(env, "{}");
 
-    const std::string title = jstring_to_string(env, title_id);
+    std::string title = jstring_to_string(env, title_id);
+    if (!cheat::is_safe_title_id(title))
+        return to_jstring(env, "{}");
+    std::transform(title.begin(), title.end(), title.begin(), [](unsigned char c) { return std::toupper(c); });
     const fs::path source = fs_utils::utf8_to_path(jstring_to_string(env, source_path));
     if (!fs::is_regular_file(source)) {
         LOG_ERROR("Cheat import source {} is not a file", source);
@@ -281,27 +283,13 @@ Java_com_sbro_emucorev_core_CheatBridge_importCheatFile(
     if (extension == ".db") {
         target = cheats_dir / "cheat.db";
     } else {
-        if (extension != ".psv" && extension != ".txt")
-            extension = ".psv";
-        target = cheats_dir / (title + extension);
+        // Every per-game import replaces the canonical pack, even if its source
+        // uses .txt. Otherwise an older .psv would keep taking precedence.
+        target = cheats_dir / (title + ".psv");
     }
 
-    try {
-        fs::create_directories(cheats_dir);
-        // boost::copy_file uses copy_file_range, which FUSE-based emulated
-        // storage rejects with EPERM; plain streams always work.
-        std::ifstream input(source.string(), std::ios::binary);
-        std::ofstream output(target.string(), std::ios::binary | std::ios::trunc);
-        if (!input.is_open() || !output.is_open())
-            throw std::runtime_error("failed to open the import streams");
-
-        output << input.rdbuf();
-        if (!output.good())
-            throw std::runtime_error("failed to write the cheat file");
-    } catch (const std::exception &e) {
-        LOG_ERROR("Failed to import cheat file {}: {}", source, e.what());
+    if (!cheat::import_cheat_file(source, target, title))
         return to_jstring(env, "{}");
-    }
 
     LOG_INFO("Imported cheat file {} as {}", source, target);
     if (is_live_title(emuenv, title))

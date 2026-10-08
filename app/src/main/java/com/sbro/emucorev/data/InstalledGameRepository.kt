@@ -12,7 +12,7 @@ class InstalledGameRepository {
             .filter(File::isDirectory)
             .map { directory ->
                 val titleId = directory.name
-                val metadata = VitaSfoParser.parse(EmulatorStorage.paramSfoPath(context, titleId))
+                val metadata = readInstalledGameMetadata(directory)
                 val iconFile = EmulatorStorage.iconPath(context, titleId)
                 InstalledVitaGame(
                     titleId = metadata.titleId ?: titleId,
@@ -32,7 +32,7 @@ class InstalledGameRepository {
         val safeId = titleId.trim().takeIf(::isSafePathSegment) ?: return null
         val directory = File(EmulatorStorage.ux0AppRoot(context), safeId)
         if (directory.isDirectory) {
-            val metadata = VitaSfoParser.parse(File(directory, "sce_sys/param.sfo"))
+            val metadata = readInstalledGameMetadata(directory)
             val resolvedId = metadata.titleId ?: safeId
             if (resolvedId.equals(safeId, ignoreCase = true)) {
                 return InstalledVitaGame(

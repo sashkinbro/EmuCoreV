@@ -131,6 +131,7 @@ fs::path find_cheat_file(const fs::path &cheats_dir, const std::string &title_id
         return {};
 
     const auto wanted = string_utils::toupper(title_id);
+    std::vector<fs::path> packs;
     std::vector<fs::path> databases;
 
     for (const auto &entry : fs::directory_iterator(cheats_dir)) {
@@ -140,15 +141,33 @@ fs::path find_cheat_file(const fs::path &cheats_dir, const std::string &title_id
         const auto filename = string_utils::toupper(fs_utils::path_to_utf8(entry.path().filename()));
         // The databases ship `<title id>.psv`, but plain `.txt` files are common too.
         const bool per_title = filename.ends_with(".PSV") || filename.ends_with(".TXT");
-        if (per_title && filename.starts_with(wanted))
-            return entry.path();
+        const auto stem = string_utils::toupper(fs_utils::path_to_utf8(entry.path().stem()));
+        const bool variant = stem.starts_with(wanted) && stem.size() > wanted.size()
+            && (stem[wanted.size()] == '-' || stem[wanted.size()] == '_' || stem[wanted.size()] == ' ');
+        if (per_title && (stem == wanted || variant))
+            packs.push_back(entry.path());
 
         // `cheat.db` and the like hold every game in one file, keyed by `_S <title id>`.
         if (filename.ends_with(".DB") || filename.ends_with(".TXT"))
             databases.push_back(entry.path());
     }
 
+    // Imports use the canonical .psv name. Old text/variant packs must not win
+    // simply because the filesystem happened to enumerate them first.
+    const auto rank = [&](const fs::path &path) {
+        const auto filename = string_utils::toupper(fs_utils::path_to_utf8(path.filename()));
+        return filename == wanted + ".PSV" ? 0 : filename == wanted + ".TXT" ? 1 : 2;
+    };
+    std::sort(packs.begin(), packs.end(), [&](const fs::path &a, const fs::path &b) {
+        if (rank(a) != rank(b))
+            return rank(a) < rank(b);
+        return a < b;
+    });
+    if (!packs.empty())
+        return packs.front();
+
     // Reading those is only worth it once no file is named after the title.
+    std::sort(databases.begin(), databases.end());
     for (const auto &database : databases) {
         if (has_section(database, wanted))
             return database;
@@ -250,6 +269,45 @@ CheatFile parse_cheat_file(const fs::path &path, const std::string &title_id) {
     LOG_INFO("Loaded {} cheats ({} codes) for {} from {}", file.cheats.size(), code_count, title_id, path);
 
     return file;
+}
+
+bool is_safe_title_id(std::string_view title_id) {
+    return !title_id.empty() && title_id.size() <= 128
+        && title_id.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-") == std::string_view::npos;
+}
+
+bool import_cheat_file(const fs::path &source, const fs::path &target, const std::string &title_id) {
+    fs::path temporary;
+    try {
+        if (!is_safe_title_id(title_id) || !fs::is_regular_file(source))
+            return false;
+        fs::create_directories(target.parent_path());
+        temporary = target.parent_path() / fs::unique_path(".cheat-import-%%%%-%%%%-%%%%.tmp");
+        {
+            // Stream copying also supports Android's FUSE storage, which can
+            // reject Boost's copy_file_range implementation with EPERM.
+            std::ifstream input(source.string(), std::ios::binary);
+            std::ofstream output(temporary.string(), std::ios::binary | std::ios::trunc);
+            if (!input.is_open() || !output.is_open())
+                throw std::runtime_error("failed to open the import streams");
+            output << input.rdbuf();
+            output.flush();
+            if (input.bad() || !output.good())
+                throw std::runtime_error("failed to copy the cheat file");
+        }
+        if (parse_cheat_file(temporary, title_id).cheats.empty())
+            throw std::runtime_error("the file contains no usable cheats for this title");
+        // Validate the staged bytes before replacing anything. A failed import
+        // or importing the active file itself must preserve the current pack.
+        fs::rename(temporary, target);
+        return true;
+    } catch (const std::exception &e) {
+        boost::system::error_code error;
+        if (!temporary.empty())
+            fs::remove(temporary, error);
+        LOG_ERROR("Failed to import cheat file {}: {}", source, e.what());
+        return false;
+    }
 }
 
 bool save_cheat_file(const CheatFile &file) {

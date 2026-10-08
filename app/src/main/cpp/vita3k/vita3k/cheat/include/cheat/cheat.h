@@ -21,6 +21,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // FinalCheat / VitaCheat `*.psv` cheat database format, described in cheat/README.md.
@@ -93,8 +94,14 @@ struct CheatFile {
 
 fs::path find_cheat_file(const fs::path &cheats_dir, const std::string &title_id);
 
+// Retail and homebrew IDs may differ; imports only require a safe filename.
+bool is_safe_title_id(std::string_view title_id);
+
 // Parse a cheat file. Malformed lines are logged and skipped, they never abort the parsing.
 CheatFile parse_cheat_file(const fs::path &path, const std::string &title_id);
+
+// Validate a staged copy, then atomically replace the selected destination.
+bool import_cheat_file(const fs::path &source, const fs::path &target, const std::string &title_id);
 
 // Rewrite only the `_V0`/`_V1` markers of `file`, so that cheats on now are on again at next boot.
 bool save_cheat_file(const CheatFile &file);
