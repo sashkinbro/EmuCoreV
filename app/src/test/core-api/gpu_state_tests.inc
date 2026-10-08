@@ -1,9 +1,57 @@
 #include <emucorev/savestate/gpu_state_io.h>
 #include <renderer/command_snapshot.h>
 #include <renderer/vulkan/context_snapshot.h>
+#include <renderer/vulkan/state.h>
 
 #include <algorithm>
 #include <limits>
+
+namespace renderer::vulkan {
+struct SurfaceCacheLifecycleTestAccess {
+    static ColorSurfaceCacheInfo &color(VKSurfaceCache &cache) {
+        return cache.color_surface_queue.items.front().content;
+    }
+    static DepthStencilSurfaceCacheInfo &depth(VKSurfaceCache &cache) {
+        return cache.ds_surface_queue.items.front().content;
+    }
+};
+} // namespace renderer::vulkan
+
+TEST(GpuSurfaceCacheLifecycle, CleanupReleasesOptionalImagesBeforeAllocatorDestruction) {
+    renderer::vulkan::VKState state(0);
+    auto &cache = state.surface_cache;
+    auto &color = renderer::vulkan::SurfaceCacheLifecycleTestAccess::color(cache);
+    auto &depth = renderer::vulkan::SurfaceCacheLifecycleTestAccess::depth(cache);
+    // These owners outlive cleanup unless it explicitly releases them. Empty
+    // images exercise ownership without requiring an initialized Vulkan device.
+    color.raw_image = std::make_unique<vkutil::Image>();
+    depth.sample_rate_copy = std::make_unique<vkutil::Image>();
+    cache.cleanup();
+    EXPECT_FALSE(color.raw_image);
+    EXPECT_FALSE(depth.sample_rate_copy);
+    cache.cleanup();
+    EXPECT_FALSE(color.raw_image);
+    EXPECT_FALSE(depth.sample_rate_copy);
+}
+
+TEST(GpuSurfaceCacheLifecycle, MissingDepthSceneAndSceneEndCaptureCanonicalEmptyAssociation) {
+    renderer::vulkan::VKState state(0);
+    SceGxmDepthStencilSurface depth{};
+    depth.depth_data = Ptr<void>(0x8000);
+    auto &cache = state.surface_cache;
+    const vkutil::ImageSnapshotDevice unused_device{};
+    renderer::vulkan::SurfaceCacheSnapshot snapshot;
+    std::string error;
+    ASSERT_TRUE(cache.begin_ds_scene_depth_check(depth, true, 0x10000));
+    ASSERT_TRUE(renderer::vulkan::capture_surface_cache_snapshot(cache, unused_device, snapshot, error)) << error;
+    EXPECT_EQ(snapshot.pending_depth_stencil_slot, 0xFF);
+    EXPECT_FALSE(snapshot.pending_depth_stencil_stores);
+    cache.resolve_ds_scene_end(true);
+    ASSERT_TRUE(renderer::vulkan::capture_surface_cache_snapshot(cache, unused_device, snapshot, error)) << error;
+    EXPECT_EQ(snapshot.pending_depth_stencil_slot, 0xFF);
+    EXPECT_FALSE(snapshot.pending_depth_stencil_stores);
+    EXPECT_TRUE(renderer::vulkan::validate_surface_cache_snapshot(snapshot, error)) << error;
+}
 
 namespace {
 emucorev::savestate::GpuSnapshot make_gpu_codec_snapshot() {

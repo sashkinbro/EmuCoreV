@@ -26,6 +26,7 @@
 #include <gxm/functions.h>
 #include <gxm/types.h>
 #include <renderer/shaders.h>
+#include <renderer/shader_variant.h>
 #include <shader/spirv_recompiler.h>
 
 #include <util/fs.h>
@@ -477,6 +478,7 @@ static const vk::SpecializationInfo srgb_info_false = {
 };
 
 vk::PipelineShaderStageCreateInfo PipelineCache::retrieve_shader(const SceGxmProgram *program, const Sha256Hash &hash, bool is_vertex, bool maskupdate, MemState &mem, const shader::Hints &hints, bool is_srgb) {
+    const auto variant_hash = is_vertex ? hash : fragment_shader_variant_hash(hash, hints.color_format);
     if (maskupdate)
         LOG_WARN_ONCE("Mask not implemented in the vulkan renderer!");
 
@@ -492,7 +494,7 @@ vk::PipelineShaderStageCreateInfo PipelineCache::retrieve_shader(const SceGxmPro
     {
         // look if it is in the cache
         std::unique_lock<std::mutex> lock(shaders_mutex);
-        shader_module = &shaders.insert({ hash, nullptr }).first->second;
+        shader_module = &shaders.insert({ variant_hash, nullptr }).first->second;
         if (*shader_module == shader_compiling) {
             // another thread is compiling the same exact shader at the same time
             // it's no use re-compiling it, so just wait for the other thread being done
@@ -509,7 +511,7 @@ vk::PipelineShaderStageCreateInfo PipelineCache::retrieve_shader(const SceGxmPro
     }
 
     if (*shader_module == shader_compiling) {
-        precompile_shader(hash, false);
+        precompile_shader(variant_hash, false);
     }
 
     if (*shader_module != shader_compiling) {
@@ -522,7 +524,7 @@ vk::PipelineShaderStageCreateInfo PipelineCache::retrieve_shader(const SceGxmPro
         return shader_stage_info;
     }
 
-    const std::string hash_text = hex_string(hash);
+    const std::string hash_text = hex_string(variant_hash);
 
     LOG_INFO("Generating vulkan spv shader {}", hash_text);
     const std::string shader_version = fmt::format("vk{}", shader::CURRENT_VERSION);
@@ -543,7 +545,7 @@ vk::PipelineShaderStageCreateInfo PipelineCache::retrieve_shader(const SceGxmPro
         if (is_vertex) {
             state.shaders_cache_hashs.push_back({ hash, empty_hash });
         } else {
-            state.shaders_cache_hashs.push_back({ empty_hash, hash });
+            state.shaders_cache_hashs.push_back({ empty_hash, variant_hash });
         }
     }
 
@@ -1138,6 +1140,8 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
         blend_attachments[1].colorWriteMask = vk::ColorComponentFlags();
     } else {
         blend_attachments[0] = fragment_program.blending;
+        if (hints.color_format == SCE_GXM_COLOR_FORMAT_U8_A)
+            blend_attachments[0] = translate_alpha_surface_blend(blend_attachments[0]);
     }
     const bool with_raw_attachment = state.features.preserve_f16_nan_as_u16 && !use_shader_interlock && record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16 && record.color_surface.data;
     color_blending.attachmentCount = with_raw_attachment ? 2 : 1;
@@ -1380,6 +1384,7 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
     const GxmRecordState &record = context.record;
     // get the hash of the current context
     uint64_t key = XXH3_64bits(&record, record_pipeline_len);
+    key = alpha_surface_pipeline_key(key, record.color_surface.colorFormat);
 
     // add the hash of the blending
     SceGxmFragmentProgram &fragment_program_gxm = *record.fragment_program.get(mem);

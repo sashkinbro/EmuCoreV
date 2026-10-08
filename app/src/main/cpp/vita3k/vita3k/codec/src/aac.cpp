@@ -32,6 +32,7 @@ extern "C" {
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <vector>
 
 AacDecoderState::AacDecoderState(uint32_t sample_rate, uint32_t channels, bool sbr) {
@@ -72,19 +73,27 @@ uint32_t AacDecoderState::get(DecoderQuery query) {
 }
 
 bool AacDecoderState::send(const uint8_t *data, uint32_t size) {
+    if (!data || size == 0 || size > std::numeric_limits<int>::max() - AV_INPUT_BUFFER_PADDING_SIZE)
+        return false;
+
     AVPacket *packet = av_packet_alloc();
-    packet->data = const_cast<uint8_t *>(data);
+    if (!packet)
+        return false;
+    // FFmpeg's bitstream reader may read past the packet's logical end.
+    // Keep both guest packets and reconstructed replay packets safely padded.
+    std::vector<uint8_t> padded_input(static_cast<size_t>(size) + AV_INPUT_BUFFER_PADDING_SIZE, 0);
+    std::memcpy(padded_input.data(), data, size);
+    packet->data = padded_input.data();
     packet->size = size;
 
     av_frame_unref(frame);
 
     const FFCodec *ff_codec = ffcodec(codec);
-    int got_frame;
+    int got_frame = 0;
     int len = ff_codec->cb.decode(context, frame, &got_frame, packet);
-    assert(got_frame);
 
     av_packet_free(&packet);
-    if (len < 0) {
+    if (len < 0 || !got_frame) {
         LOG_WARN("Error sending Aac packet: {}.", codec_error_name(len));
         return false;
     }

@@ -204,6 +204,10 @@ GLenum translate_type(SceGxmColorBaseFormat base_format) {
 }
 
 const GLint *translate_swizzle(SceGxmColorFormat fmt) {
+    // U8_A is canonicalized to host red by the shader recompiler.
+    if (fmt == SCE_GXM_COLOR_FORMAT_U8_A)
+        return swizzle_r;
+
     const SceGxmColorBaseFormat base_format = gxm::get_base_format(fmt);
     const uint32_t swizzle = fmt & SCE_GXM_COLOR_SWIZZLE_MASK;
     switch (base_format) {

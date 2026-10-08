@@ -286,7 +286,7 @@ struct SurfaceCacheSnapshotAccess {
             error = "surface-cache association points outside its LRU queue";
             return false;
         }
-        staged.pending_depth_stencil_stores = cache.pending_ds_scene_stores;
+        staged.pending_depth_stencil_stores = cache.pending_ds_scene != nullptr && cache.pending_ds_scene_stores;
         if (!validate_surface_cache_snapshot(staged, error))
             return false;
         snapshot = std::move(staged);

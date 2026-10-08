@@ -20,6 +20,60 @@
 #include <module/module.h>
 
 #include <boost/describe/enum.hpp>
+#include <cstdint>
+
+struct SceAudiodecInfoAt9 {
+    uint32_t config_data;
+    uint32_t channels;
+    uint32_t bit_rate;
+    uint32_t sample_rate;
+    uint32_t super_frame_size;
+    uint32_t frames_in_super_frame;
+};
+
+struct SceAudiodecInfoMp3 {
+    uint32_t channels;
+    uint32_t version;
+};
+
+struct SceAudiodecInfoAac {
+    uint32_t is_adts;
+    uint32_t channels;
+    uint32_t sample_rate;
+    uint32_t is_sbr;
+};
+
+struct SceAudiodecInfoCelp {
+    uint32_t excitation_mode;
+    uint32_t sample_rate;
+    uint32_t bit_rate;
+    uint32_t lost_count;
+};
+
+struct SceAudiodecInfo {
+    uint32_t size;
+    union {
+        SceAudiodecInfoAt9 at9;
+        SceAudiodecInfoMp3 mp3;
+        SceAudiodecInfoAac aac;
+        SceAudiodecInfoCelp celp;
+    };
+};
+
+struct SceAudiodecCtrl {
+    uint32_t size;
+    SceUID handle;
+    Ptr<uint8_t> es_data;
+    uint32_t es_size_used;
+    uint32_t es_size_max;
+    Ptr<uint8_t> pcm_data;
+    uint32_t pcm_size_given;
+    uint32_t pcm_size_max;
+    uint32_t word_length;
+    Ptr<SceAudiodecInfo> info;
+};
+
+static_assert(sizeof(SceAudiodecCtrl) == 0x28);
 
 enum SceAudiodecCodec : uint32_t {
     SCE_AUDIODEC_TYPE_AT9 = 0x1003,
@@ -49,3 +103,9 @@ union SceAudiodecInitParam {
 
 DECL_EXPORT(SceInt32, sceAudiodecInitLibrary, SceAudiodecCodec codecType, SceAudiodecInitParam *pInitParam);
 DECL_EXPORT(SceInt32, sceAudiodecTermLibrary, SceAudiodecCodec codecType);
+DECL_EXPORT(int, sceAudiodecCreateDecoder, SceAudiodecCtrl *ctrl, SceAudiodecCodec codec);
+DECL_EXPORT(int, sceAudiodecDecode, SceAudiodecCtrl *ctrl);
+DECL_EXPORT(int, sceAudiodecDecodeNFrames, SceAudiodecCtrl *ctrl, SceUInt32 nFrames);
+DECL_EXPORT(int, sceAudiodecPartlyDecode, SceAudiodecCtrl *ctrl, SceUInt32 samples_offset, SceUInt32 samples_to_decode);
+DECL_EXPORT(int, sceAudiodecClearContext, SceAudiodecCtrl *ctrl);
+DECL_EXPORT(int, sceAudiodecDeleteDecoder, SceAudiodecCtrl *ctrl);

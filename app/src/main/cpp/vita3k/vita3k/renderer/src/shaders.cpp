@@ -23,6 +23,7 @@
 #include <renderer/state.h>
 #include <renderer/types.h>
 #include <shader/spirv_recompiler.h>
+#include <renderer/shader_variant.h>
 #include <util/fs.h>
 #include <util/log.h>
 
@@ -159,7 +160,9 @@ static R load_shader_generic(const fs::path &shader_path) {
 
 static shader::GeneratedShader load_shader_generic(shader::Target target, const SceGxmProgram &program, const FeatureState &features, const shader::Hints &hints, bool maskupdate, const fs::path &shader_cache_path, const fs::path &shaderlog_path, const char *shader_type_str, const std::string &shader_version, bool shader_cache) {
     // TODO: no need to recompute the hash here
-    const std::string hash_text = hex_string(get_shader_hash(program));
+    const auto hash = get_shader_hash(program);
+    const std::string hash_text = hex_string(program.is_fragment()
+            ? fragment_shader_variant_hash(hash, hints.color_format) : hash);
     // Set Shader Hash with Version
     const std::string hash_hex_ver = fmt::format("{}-{}", shader_version, hash_text);
     const auto get_shader_path = [&](const char *ext) {

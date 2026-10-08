@@ -10,7 +10,11 @@ struct EmuEnvState;
 
 namespace emucorev::savestate {
 
-constexpr uint32_t kEngineVersion = 15;
+constexpr uint32_t kEngineVersion = 16;
+// Revision 15 remains readable for states that do not need guest audiodecoders.
+constexpr bool supports_engine_version(uint32_t version) {
+    return version == 15 || version == kEngineVersion;
+}
 
 struct Meta {
     uint32_t format_version = 0;

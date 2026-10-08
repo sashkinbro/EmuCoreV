@@ -39,6 +39,7 @@
 #include <mem/functions.h>
 #include <mem/state.h>
 #include <modules/sysmem_state.h>
+#include <modules/SceAudiodec/state_snapshot.h>
 #include <ngs/state.h>
 #include <renderer/functions.h>
 #include <renderer/state.h>
@@ -60,7 +61,7 @@ namespace emucorev::savestate {
 namespace {
 
 constexpr uint32_t kMemoryFormatVersion = 1;
-constexpr const char *kEngineRevision = "emucorev-savestate-15";
+constexpr const char *kEngineRevision = "emucorev-savestate-16";
 constexpr size_t kMemoryChunkSize = 1u << 20;
 
 class ScopedWorldStop {
@@ -412,7 +413,7 @@ bool read_memory(EmuEnvState &emuenv, const MemoryImage &image, const ProgressCa
         write_guest_chunk(mem, static_cast<Address>(address), data, size);
         processed += size;
         if (total_bytes)
-            report(progress, 0.75f + static_cast<float>(static_cast<double>(processed) / total_bytes) * 0.15f, "memory");
+            report(progress, 0.10f + static_cast<float>(static_cast<double>(processed) / total_bytes) * 0.70f, "memory");
         return true;
     }, error);
 }
@@ -1893,6 +1894,11 @@ Result save_state(EmuEnvState &emuenv, const fs::path &path, const std::string &
     if (!write_audio(emuenv, writer, error))
         return fail(Status::IoError, error);
 
+    std::vector<uint8_t> audiodec_data;
+    if (!audiodec::capture_state(emuenv, audiodec_data, error)
+        || !writer.write_section(SectionId::Audiodec, audiodec_data.data(), audiodec_data.size(), true, error))
+        return fail(Status::IoError, error);
+
     if (!write_input(emuenv, writer, error))
         return fail(Status::IoError, error);
 
@@ -1932,7 +1938,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         return result;
     }
 
-    if (result.meta.engine_version != kEngineVersion) {
+    if (!supports_engine_version(result.meta.engine_version)) {
         result.status = Status::UnsupportedVersion;
         result.error = "save state was created by an incompatible build";
         return result;
@@ -1979,6 +1985,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     std::vector<uint8_t> ngs_data;
     std::vector<uint8_t> objstore_data;
     std::vector<uint8_t> audio_data;
+    std::vector<uint8_t> audiodec_data;
     std::vector<uint8_t> input_data;
     std::vector<uint8_t> io_data;
 
@@ -1992,7 +1999,24 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         || !reader.read_section(SectionId::Ngs, ngs_data, error)
         || !reader.read_section(SectionId::Audio, audio_data, error)
         || !reader.read_section(SectionId::Input, input_data, error)
-        || !reader.read_section(SectionId::Io, io_data, error)) {
+        || !reader.read_section(SectionId::Io, io_data, error)
+        || (reader.has_section(SectionId::Audiodec)
+            && !reader.read_section(SectionId::Audiodec, audiodec_data, error))) {
+        result.status = Status::InvalidFile;
+        result.error = error;
+        return result;
+    }
+
+    if (result.meta.engine_version >= 16 && !reader.has_section(SectionId::Audiodec)) {
+        result.status = Status::InvalidFile;
+        result.error = "save state is missing guest audio decoders";
+        return result;
+    }
+    // Build host-only codecs during preflight so a corrupt history cannot
+    // destroy the running session before reconstruction fails.
+    std::shared_ptr<audiodec::PreparedState> prepared_audiodec;
+    if (reader.has_section(SectionId::Audiodec)
+        && !audiodec::prepare_state(audiodec_data, prepared_audiodec, error)) {
         result.status = Status::InvalidFile;
         result.error = error;
         return result;
@@ -2064,6 +2088,8 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         callback_ids.insert(callback.uid);
     }
     for (const auto &object : sync_snapshot.objects) valid_ids &= unique_uid(object.header.uid);
+    if (prepared_audiodec)
+        for (const auto uid : audiodec::decoder_handles(*prepared_audiodec)) valid_ids &= unique_uid(uid);
     for (const auto uid : display_snapshot.callbacks) valid_ids &= callback_ids.contains(uid);
     if (!valid_ids || !main_thread_found) {
         result.status = Status::InvalidFile;
@@ -2177,7 +2203,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     }
     LOG_DEBUG("[savestate] load: renderer caches and frame runtime reset");
 
-    report(progress, 0.88f, "kernel");
+    report(progress, 0.82f, "kernel");
     if (!read_kernel(emuenv, kernel_snapshot, error)) {
         result.status = Status::InvalidFile;
         result.error = error;
@@ -2194,7 +2220,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     renderer::start_render_thread(*emuenv.renderer, emuenv.display, emuenv.gxm, emuenv.mem, emuenv.cfg);
     LOG_DEBUG("[savestate] load: renderer restarted");
 
-    report(progress, 0.95f, "runtime");
+    report(progress, 0.86f, "runtime");
     if (!read_obj_store(emuenv, objstore_data, error)) {
         result.status = Status::InvalidFile;
         result.error = error;
@@ -2236,6 +2262,15 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     }
     LOG_DEBUG("[savestate] load: audio restored");
 
+    if (reader.has_section(SectionId::Audiodec)) {
+        audiodec::apply_state(emuenv, std::move(prepared_audiodec));
+    } else {
+        // Older files never captured these process-local objects. Keeping live
+        // decoders here would incorrectly reuse another timeline's history.
+        audiodec::clear_state(emuenv);
+    }
+    LOG_DEBUG("[savestate] load: guest audio decoders restored");
+
     if (!input_data.empty() && !read_input(emuenv, input_data, error)) {
         result.status = Status::InvalidFile;
         result.error = error;
@@ -2252,7 +2287,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
 
     // Create the guest threads parked, restore the kernel objects they depend
     // on, and only then let them run.
-    report(progress, 0.92f, "threads");
+    report(progress, 0.94f, "threads");
     std::vector<ThreadState::Snapshot> deferred_threads;
     if (!read_threads(emuenv, threads_data, deferred_threads, session_paused, error)) {
         result.status = Status::InvalidFile;

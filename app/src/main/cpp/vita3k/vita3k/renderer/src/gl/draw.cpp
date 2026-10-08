@@ -21,6 +21,7 @@
 #include <renderer/gl/state.h>
 
 #include <renderer/state.h>
+#include <renderer/shader_variant.h>
 #include <renderer/types.h>
 
 #include <gxm/types.h>
@@ -73,7 +74,8 @@ void draw(GLState &renderer, GLContext &context, const FeatureState &features, S
 
     // Trying to cache: the last time vs this time shader pair. Does it different somehow?
     // If it's different, we need to switch. Else just stick to it.
-    if (context.record.vertex_program.get(mem)->renderer_data->hash != context.last_draw_vertex_program_hash || context.record.fragment_program.get(mem)->renderer_data->hash != context.last_draw_fragment_program_hash) {
+    const auto fragment_hash = fragment_shader_variant_hash(context.record.fragment_program.get(mem)->renderer_data->hash, context.record.color_surface.colorFormat);
+    if (context.record.vertex_program.get(mem)->renderer_data->hash != context.last_draw_vertex_program_hash || fragment_hash != context.last_draw_fragment_program_hash) {
         // Need to recompile!
         SharedGLObject program = gl::compile_program(renderer, context, context.record, features, mem, config.shader_cache, config.spirv_shader, gxm_fragment_program.is_maskupdate);
 
@@ -82,6 +84,9 @@ void draw(GLState &renderer, GLContext &context, const FeatureState &features, S
         // Use it
         program_id = program ? (*program).get() : 0;
         context.last_draw_program = program_id;
+        // A surface change can select another alpha specialization of the same
+        // GXP, which also changes the stored channel's blend equation/mask.
+        sync_blending(context.record, mem);
     } else {
         program_id = context.last_draw_program;
     }
@@ -238,7 +243,7 @@ void draw(GLState &renderer, GLContext &context, const FeatureState &features, S
     }
 
     context.last_draw_vertex_program_hash = context.record.vertex_program.get(mem)->renderer_data->hash;
-    context.last_draw_fragment_program_hash = context.record.fragment_program.get(mem)->renderer_data->hash;
+    context.last_draw_fragment_program_hash = fragment_hash;
 
     context.vertex_stream_ring_buffer.draw_call_done();
     context.index_stream_ring_buffer.draw_call_done();

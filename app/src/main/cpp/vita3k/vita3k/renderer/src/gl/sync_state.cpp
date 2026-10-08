@@ -435,11 +435,27 @@ void sync_blending(const GxmRecordState &state, const MemState &mem) {
     const GLFragmentProgram &fragment_program = *reinterpret_cast<GLFragmentProgram *>(
         gxm_fragment_program.renderer_data.get());
 
-    glColorMask(fragment_program.color_mask_red, fragment_program.color_mask_green, fragment_program.color_mask_blue, fragment_program.color_mask_alpha);
+    const bool alpha_surface = state.color_surface.colorFormat == SCE_GXM_COLOR_FORMAT_U8_A;
+    glColorMask(alpha_surface ? fragment_program.color_mask_alpha : fragment_program.color_mask_red,
+        alpha_surface ? GL_FALSE : fragment_program.color_mask_green,
+        alpha_surface ? GL_FALSE : fragment_program.color_mask_blue,
+        alpha_surface ? GL_FALSE : fragment_program.color_mask_alpha);
     if (fragment_program.blend_enabled) {
         glEnable(GL_BLEND);
-        glBlendEquationSeparate(fragment_program.color_func, fragment_program.alpha_func);
-        glBlendFuncSeparate(fragment_program.color_src, fragment_program.color_dst, fragment_program.alpha_src, fragment_program.alpha_dst);
+        const auto alpha_factor = [](GLenum value) {
+            switch (value) {
+            case GL_SRC_COLOR: return GLenum(GL_SRC_ALPHA);
+            case GL_ONE_MINUS_SRC_COLOR: return GLenum(GL_ONE_MINUS_SRC_ALPHA);
+            case GL_DST_ALPHA: return GLenum(GL_DST_COLOR);
+            case GL_ONE_MINUS_DST_ALPHA: return GLenum(GL_ONE_MINUS_DST_COLOR);
+            case GL_SRC_ALPHA_SATURATE: return GLenum(GL_ONE);
+            default: return value;
+            }
+        };
+        glBlendEquationSeparate(alpha_surface ? fragment_program.alpha_func : fragment_program.color_func, fragment_program.alpha_func);
+        glBlendFuncSeparate(alpha_surface ? alpha_factor(fragment_program.alpha_src) : fragment_program.color_src,
+            alpha_surface ? alpha_factor(fragment_program.alpha_dst) : fragment_program.color_dst,
+            fragment_program.alpha_src, fragment_program.alpha_dst);
     } else {
         glDisable(GL_BLEND);
     }

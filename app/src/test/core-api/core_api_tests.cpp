@@ -276,6 +276,8 @@ SceInt32 uid_class_query(KernelUidClassEnv &env, SceUID uid, bool driver) {
 }
 #include "kernel_uid_class_tests.inc"
 
+#include "audiodec_state_tests.inc"
+
 using KernelHostLifetimeEnv = EmuEnvState;
 #include "kernel_host_lifetime_tests.inc"
 
@@ -301,3 +303,4 @@ using KernelHostLifetimeEnv = EmuEnvState;
 #include "gxm_sysmem_preflight_tests.inc"
 #include "gxm_finish_preflight_tests.inc"
 #include "memory_external_mapping_tests.inc"
+#include "gxm_alpha_surface_tests.inc"

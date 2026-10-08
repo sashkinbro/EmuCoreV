@@ -22,6 +22,26 @@
 
 namespace renderer::vulkan {
 
+vk::PipelineColorBlendAttachmentState translate_alpha_surface_blend(vk::PipelineColorBlendAttachmentState blend) {
+    const auto factor = [](vk::BlendFactor value) {
+        switch (value) {
+        case vk::BlendFactor::eSrcColor: return vk::BlendFactor::eSrcAlpha;
+        case vk::BlendFactor::eOneMinusSrcColor: return vk::BlendFactor::eOneMinusSrcAlpha;
+        case vk::BlendFactor::eDstAlpha: return vk::BlendFactor::eDstColor;
+        case vk::BlendFactor::eOneMinusDstAlpha: return vk::BlendFactor::eOneMinusDstColor;
+        // The alpha component of SRC_ALPHA_SATURATE's factor is always one.
+        case vk::BlendFactor::eSrcAlphaSaturate: return vk::BlendFactor::eOne;
+        default: return value;
+        }
+    };
+    blend.srcColorBlendFactor = factor(blend.srcAlphaBlendFactor);
+    blend.dstColorBlendFactor = factor(blend.dstAlphaBlendFactor);
+    blend.colorBlendOp = blend.alphaBlendOp;
+    blend.colorWriteMask = blend.colorWriteMask & vk::ColorComponentFlagBits::eA
+        ? vk::ColorComponentFlagBits::eR : vk::ColorComponentFlags{};
+    return blend;
+}
+
 vk::Format translate_attribute_format(SceGxmAttributeFormat format, unsigned int component_count, bool is_integer, bool is_signed) {
     if (component_count == 0 || component_count > 4 || format > SCE_GXM_ATTRIBUTE_FORMAT_UNTYPED)
         LOG_ERROR("Unsupported attribute format {}x{}", log_hex(format), component_count);
@@ -383,6 +403,11 @@ static vk::ComponentMapping translate_swizzle4_a1rgb(SceGxmColorSwizzle4Mode mod
 }
 
 vk::ComponentMapping translate_swizzle(SceGxmColorFormat format) {
+    // U8_A is canonicalized to host red by the shader recompiler. Keep
+    // cached storage and surface writeback identical to an ordinary R surface.
+    if (format == SCE_GXM_COLOR_FORMAT_U8_A)
+        return swizzle_r001;
+
     const SceGxmColorBaseFormat base_format = gxm::get_base_format(format);
     const uint32_t swizzle = format & SCE_GXM_COLOR_SWIZZLE_MASK;
     switch (base_format) {

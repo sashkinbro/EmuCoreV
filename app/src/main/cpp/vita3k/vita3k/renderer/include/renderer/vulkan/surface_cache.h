@@ -240,6 +240,7 @@ struct ReinterpretPushConstants {
 class VKSurfaceCache {
 private:
     friend struct SurfaceCacheSnapshotAccess;
+    friend struct SurfaceCacheLifecycleTestAccess;
 
     VKState &state;
 

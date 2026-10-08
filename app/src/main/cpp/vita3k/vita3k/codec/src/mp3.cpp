@@ -88,6 +88,9 @@ const uint16_t mpeg_frame_samples[4][4] = {
 const uint8_t mpeg_slot_size[4] = { 0, 1, 1, 4 }; // Rsvd, 3, 2, 1
 
 static uint32_t get_mp3_data_size(const uint8_t *data) {
+    if (!data)
+        return 0;
+
     // Quick validity check
     if (((data[0] & 0xFF) != 0xFF)
         || ((data[1] & 0xE0) != 0xE0) // 3 sync bits
@@ -104,6 +107,8 @@ static uint32_t get_mp3_data_size(const uint8_t *data) {
     uint8_t pad = (data[2] & 0x02) >> 1; // Padding? 0/1
     uint8_t brx = (data[2] & 0xf0) >> 4; // Bitrate index
     uint8_t srx = (data[2] & 0x0c) >> 2; // SampRate index
+    if (srx == 3)
+        return 0;
 
     // Lookup real values of these fields
     uint32_t bitrate = mpeg_bitrates[ver][lyr][brx] * 1000;
@@ -131,6 +136,9 @@ uint32_t Mp3DecoderState::get(DecoderQuery query) {
 }
 
 bool Mp3DecoderState::send(const uint8_t *data, uint32_t size) {
+    if (!data || size < 4)
+        return false;
+
     AVPacket *packet = av_packet_alloc();
 
     es_size_used = get_mp3_data_size(data);

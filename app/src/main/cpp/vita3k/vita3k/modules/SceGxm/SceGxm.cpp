@@ -2613,6 +2613,10 @@ EXPORT(int, sceGxmColorSurfaceInit, SceGxmColorSurface *surface, SceGxmColorForm
     if (surfaceType == SCE_GXM_COLOR_SURFACE_SWIZZLED && ((width & (width - 1)) || (height & (height - 1))))
         return RET_ERROR(SCE_GXM_ERROR_INVALID_ALIGNMENT);
 
+    SceGxmTextureFormat tex_format;
+    if (!gxm::convert_color_format_to_texture_format(colorFormat, tex_format))
+        return RET_ERROR(SCE_GXM_ERROR_INVALID_VALUE);
+
     memset(surface, 0, sizeof(SceGxmColorSurface));
     surface->disabled = 0;
     surface->downscale = scaleMode == SCE_GXM_COLOR_SURFACE_SCALE_MSAA_DOWNSCALE;
@@ -2625,11 +2629,6 @@ EXPORT(int, sceGxmColorSurfaceInit, SceGxmColorSurface *surface, SceGxmColorForm
     surface->colorFormat = colorFormat;
     surface->surfaceType = surfaceType;
     surface->outputRegisterSize = outputRegisterSize;
-
-    SceGxmTextureFormat tex_format;
-    if (!gxm::convert_color_format_to_texture_format(colorFormat, tex_format)) {
-        LOG_WARN("Unable to convert color surface type 0x{:X} to texture format enum for background texture of color surface!", static_cast<std::uint32_t>(colorFormat));
-    }
 
     // initialize the background texture
     switch (surfaceType) {
@@ -2704,12 +2703,11 @@ EXPORT(int, sceGxmColorSurfaceSetFormat, SceGxmColorSurface *surface, SceGxmColo
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
     }
 
-    surface->colorFormat = format;
-
     SceGxmTextureFormat tex_format;
-    if (!gxm::convert_color_format_to_texture_format(format, tex_format)) {
-        LOG_WARN("Unable to convert color surface type 0x{:X} to texture format enum for background texture of color surface!", static_cast<std::uint32_t>(format));
-    }
+    if (!gxm::convert_color_format_to_texture_format(format, tex_format))
+        return RET_ERROR(SCE_GXM_ERROR_INVALID_VALUE);
+
+    surface->colorFormat = format;
 
     return CALL_EXPORT(sceGxmTextureSetFormat, &surface->backgroundTex, tex_format);
 }

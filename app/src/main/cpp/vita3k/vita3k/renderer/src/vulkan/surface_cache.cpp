@@ -459,6 +459,8 @@ void VKSurfaceCache::cleanup() {
             info.copy_buffer->destroy();
         if (info.upload_buffer)
             info.upload_buffer->destroy();
+        // The cache outlives the allocator during renderer shutdown.
+        info.raw_image.reset();
 
         info.texture.destroy();
     }
@@ -480,6 +482,7 @@ void VKSurfaceCache::cleanup() {
             info.stencil_view = nullptr;
         }
 
+        info.sample_rate_copy.reset();
         info.texture.destroy();
     }
 
@@ -1493,7 +1496,7 @@ bool VKSurfaceCache::begin_ds_scene_depth_check(const SceGxmDepthStencilSurface 
     }
 
     pending_ds_scene = cached_info;
-    pending_ds_scene_stores = this_scene_stores;
+    pending_ds_scene_stores = cached_info != nullptr && this_scene_stores;
 
     if (cached_info == nullptr)
         // surface not created yet: it will be created cleared, loading that is fine
@@ -1583,6 +1586,7 @@ void VKSurfaceCache::resolve_ds_scene_end(bool scene_wrote_depth) {
     if (pending_ds_scene != nullptr && scene_wrote_depth)
         pending_ds_scene->depth_content_stored = pending_ds_scene_stores;
     pending_ds_scene = nullptr;
+    pending_ds_scene_stores = false;
 }
 
 SurfaceRetrieveResult VKSurfaceCache::retrieve_depth_stencil_for_framebuffer(SceGxmDepthStencilSurface *depth_stencil, const uint32_t width, const uint32_t height) {
