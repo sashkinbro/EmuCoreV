@@ -9,6 +9,7 @@
 #include <kernel/state.h>
 #include <kernel/sync_primitives.h>
 #include <renderer/gxm_types.h>
+#include <renderer/pause_overlay_policy.h>
 
 #include <gtest/gtest.h>
 
@@ -28,6 +29,12 @@ bool await_waiter(Predicate ready) {
     } while (std::chrono::steady_clock::now() < deadline);
     return false;
 }
+}
+
+TEST(PauseOverlayPolicy, EditorSuppressesOnlyBannerAndNormalPauseRestoresIt) {
+    EXPECT_FALSE(renderer::should_display_pause_overlay(false, true));
+    EXPECT_TRUE(renderer::should_display_pause_overlay(true, true));
+    EXPECT_FALSE(renderer::should_display_pause_overlay(true, false));
 }
 
 DECL_EXPORT(int, sceGxmColorSurfaceInit, SceGxmColorSurface *surface, SceGxmColorFormat colorFormat, SceGxmColorSurfaceType surfaceType, SceGxmColorSurfaceScaleMode scaleMode, SceGxmOutputRegisterSize outputRegisterSize, uint32_t width, uint32_t height, uint32_t strideInPixels, Ptr<void> data);

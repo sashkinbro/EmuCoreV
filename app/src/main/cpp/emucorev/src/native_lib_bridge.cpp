@@ -6,6 +6,8 @@
 
 #include <jni.h>
 
+#include <android_state.h>
+#include <renderer/state.h>
 #include <util/log.h>
 
 extern "C" {
@@ -70,6 +72,14 @@ Java_com_sbro_emucorev_core_NativeLib_refreshAppsList(JNIEnv *env, jobject /*thi
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_NativeLib_applyReleaseLogging(JNIEnv *, jobject /*thiz*/) {
     logging::set_level(spdlog::level::critical);
+}
+
+JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_core_NativeLib_setControlsEditorActive(JNIEnv *, jobject /*thiz*/, jboolean active) {
+    auto *emuenv = get_emuenv();
+    if (!emuenv || !emuenv->renderer)
+        return;
+    emuenv->renderer->show_pause_overlay.store(active == JNI_FALSE, std::memory_order_relaxed);
 }
 
 } // extern "C"

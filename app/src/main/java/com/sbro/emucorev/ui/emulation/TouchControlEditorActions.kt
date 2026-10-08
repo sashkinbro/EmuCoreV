@@ -29,43 +29,11 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.ui.theme.neon.neonPillShape
 
 @Composable
-internal fun TouchLayoutEditorActions(
-    canDuplicate: Boolean, canDelete: Boolean, canCombo: Boolean, canCreate: Boolean,
-    showGrid: Boolean, snapToGrid: Boolean,
-    onDuplicate: () -> Unit, onDelete: () -> Unit, onCombo: () -> Unit, onCreate: () -> Unit,
-    onResetSelected: () -> Unit, onGridToggle: () -> Unit, onSnapToggle: () -> Unit
-) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        TextButton(onClick = onDuplicate, enabled = canDuplicate, modifier = Modifier.testTag("controls_editor_duplicate")) {
-            Text(stringResource(R.string.controls_editor_duplicate))
-        }
-        TextButton(onClick = onCombo, enabled = canCombo, modifier = Modifier.testTag("controls_editor_combo")) {
-            Text(stringResource(R.string.controls_editor_combo))
-        }
-        TextButton(onClick = onCreate, enabled = canCreate, modifier = Modifier.testTag("controls_editor_create_combo")) {
-            Text(stringResource(R.string.controls_editor_create_combo))
-        }
-        TextButton(onClick = onDelete, enabled = canDelete, modifier = Modifier.testTag("controls_editor_delete")) {
-            Text(stringResource(R.string.controls_editor_delete))
-        }
-        TextButton(onClick = onResetSelected, modifier = Modifier.testTag("controls_editor_reset_selected")) {
-            Text(stringResource(R.string.controls_editor_reset_selected))
-        }
-        FilterChip(shape = neonPillShape(), selected = showGrid, onClick = onGridToggle, label = { Text(stringResource(R.string.controls_editor_grid)) },
-            modifier = Modifier.testTag("controls_editor_grid"))
-        FilterChip(shape = neonPillShape(), selected = snapToGrid, onClick = onSnapToggle, label = { Text(stringResource(R.string.controls_editor_snap)) },
-            modifier = Modifier.testTag("controls_editor_snap"))
-    }
-}
-
-@Composable
 internal fun TouchComboEditorDialog(
     actions: List<Pair<String, String>>,
     primary: String,
     secondary: String?,
+    primaryEditable: Boolean = true,
     onDismiss: () -> Unit,
     onConfirm: (String, String?) -> Unit
 ) {
@@ -80,9 +48,13 @@ internal fun TouchComboEditorDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.controls_editor_combo_description))
                 Text(stringResource(R.string.controls_editor_primary_action))
-                ActionChips(actions, selectedPrimary, "primary") {
-                    selectedPrimary = it
-                    if (selectedSecondary == it) selectedSecondary = null
+                if (primaryEditable) {
+                    ActionChips(actions, selectedPrimary, "primary") {
+                        selectedPrimary = it
+                        if (selectedSecondary == it) selectedSecondary = null
+                    }
+                } else {
+                    Text(actions.firstOrNull { it.first == selectedPrimary }?.second ?: selectedPrimary)
                 }
                 Text(stringResource(R.string.controls_editor_secondary_action))
                 FilterChip(shape = neonPillShape(), selected = selectedSecondary == null, onClick = { selectedSecondary = null },

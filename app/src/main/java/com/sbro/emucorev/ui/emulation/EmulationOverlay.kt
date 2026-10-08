@@ -881,6 +881,9 @@ internal fun OnScreenControls(
     val shoulderTopPadding = topInset + if (isLandscape) 22.dp else 16.dp
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        if (editMode) {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.34f)))
+        }
         val density = LocalDensity.current
         val canvasWidth = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
         val canvasHeight = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
@@ -913,7 +916,6 @@ internal fun OnScreenControls(
             controls = mergedLayout
         }
         val selected = controls.firstOrNull { it.id == selectedId } ?: controls.firstOrNull()
-        val selectedIndex = selected?.let { controls.indexOfFirst { element -> element.id == it.id } } ?: -1
         var showGrid by rememberSaveable { mutableStateOf(false) }
         var snapToGrid by rememberSaveable { mutableStateOf(false) }
         var comboEditorOpen by remember { mutableStateOf(false) }
@@ -1034,12 +1036,6 @@ internal fun OnScreenControls(
             commitLayoutChange { currentControls ->
                 currentControls.replaceElement(resized.copy(analogMode = nextMode))
             }
-        }
-
-        fun selectNext() {
-            if (controls.isEmpty()) return
-            val nextIndex = if (selectedIndex < 0) 0 else (selectedIndex + 1) % controls.size
-            selectedId = controls[nextIndex].id
         }
 
         if (editMode && showGrid) {
@@ -1185,7 +1181,6 @@ internal fun OnScreenControls(
                 selectedLabel = listOfNotNull(selectedDescriptor.label, selected.secondaryActionId?.let(::touchControlDescriptor)?.label).joinToString(" + "),
                 selectedVisible = selected.visible,
                 selectedScalePercent = selectedScalePercent,
-                onSelectNext = ::selectNext,
                 onReset = onEditReset,
                 onVisibilityToggle = {
                     val currentSelected = controls.firstOrNull { it.id == selected.id } ?: selected
@@ -1205,25 +1200,28 @@ internal fun OnScreenControls(
                 onTouchAreaHeightIncrease = { updateSelectedHeight(10) },
                 onDone = onEditDone,
                 showDimensions = !selectedIsAnalog || selectedAnalogMode == TouchAnalogMode.TouchArea,
-                editorActions = {
-                    TouchLayoutEditorActions(
-                        canDuplicate = selectedDescriptor.type == TouchControlType.Button && controls.count { it.id.startsWith("custom_") } < 32,
-                        canDelete = selected.id.startsWith("custom_"),
-                        canCombo = selectedDescriptor.type == TouchControlType.Button,
-                        canCreate = controls.count { it.id.startsWith("custom_") } < 32,
-                        showGrid = showGrid, snapToGrid = snapToGrid,
-                        onDuplicate = ::duplicateSelected,
-                        onDelete = { commitLayoutChange { it.filterNot { element -> element.id == selected.id } }; selectedId = null },
-                        onCombo = { createCombo = false; comboEditorOpen = true },
-                        onCreate = { createCombo = true; comboEditorOpen = true },
-                        onResetSelected = {
-                            val baseline = defaultSelected ?: return@TouchLayoutEditorActions
-                            commitLayoutChange { it.replaceElement(baseline.copy(id = selected.id)) }
-                        },
-                        onGridToggle = { showGrid = !showGrid },
-                        onSnapToggle = { snapToGrid = !snapToGrid; dragResiduals.clear(); if (snapToGrid) showGrid = true }
-                    )
+                canDuplicate = selectedDescriptor.type == TouchControlType.Button && controls.count { it.id.startsWith("custom_") } < 32,
+                canDelete = selected.id.startsWith("custom_"),
+                canCombo = selectedDescriptor.type == TouchControlType.Button,
+                canCreate = controls.count { it.id.startsWith("custom_") } < 32,
+                showGrid = showGrid,
+                snapToGrid = snapToGrid,
+                onDuplicate = ::duplicateSelected,
+                onDelete = { commitLayoutChange { it.filterNot { element -> element.id == selected.id } }; selectedId = null },
+                onCombo = { createCombo = false; comboEditorOpen = true },
+                onCreate = { createCombo = true; comboEditorOpen = true },
+                onResetSelected = {
+                    defaultSelected?.let { baseline ->
+                        val reset = if (selected.id.startsWith("custom_")) {
+                            baseline.copy(id = selected.id, x = 0.45f, y = 0.45f,
+                                actionId = selected.actionId, secondaryActionId = selected.secondaryActionId,
+                                visible = selected.visible)
+                        } else baseline
+                        commitLayoutChange { it.replaceElement(reset) }
+                    }
                 },
+                onGridToggle = { showGrid = !showGrid },
+                onSnapToggle = { snapToGrid = !snapToGrid; dragResiduals.clear() },
                 modifier = Modifier.align(Alignment.TopCenter).heightIn(max = maxHeight * 0.55f)
             )
         }
@@ -1236,6 +1234,7 @@ internal fun OnScreenControls(
                     TouchControlIds.SELECT, TouchControlIds.START).mapNotNull { id -> touchControlDescriptor(id)?.let { id to it.label } },
                 primary = if (createCombo) TouchControlIds.CROSS else selected?.actionId ?: TouchControlIds.CROSS,
                 secondary = if (createCombo) TouchControlIds.L1 else selected?.secondaryActionId,
+                primaryEditable = createCombo || selected?.id?.startsWith("custom_") == true,
                 onDismiss = { comboEditorOpen = false },
                 onConfirm = { primary, secondary ->
                     if (createCombo) {
@@ -1733,288 +1732,6 @@ private fun StaticAnalogStick(alpha: Float, visualStyle: TouchControlVisualStyle
             contentScale = ContentScale.Fit,
             colorFilter = palette.colorFilter
         )
-    }
-}
-
-@Composable
-private fun TouchControlEditorChrome(
-    selectedLabel: String,
-    selectedVisible: Boolean,
-    selectedScalePercent: Int,
-    analogMode: TouchAnalogMode?,
-    touchAreaWidthPercent: Int,
-    touchAreaHeightPercent: Int,
-    onSelectNext: () -> Unit,
-    onReset: () -> Unit,
-    onVisibilityToggle: () -> Unit,
-    onSizeDecrease: () -> Unit,
-    onSizeIncrease: () -> Unit,
-    onAnalogModeToggle: () -> Unit,
-    onTouchAreaWidthDecrease: () -> Unit,
-    onTouchAreaWidthIncrease: () -> Unit,
-    onTouchAreaHeightDecrease: () -> Unit,
-    onTouchAreaHeightIncrease: () -> Unit,
-    onDone: () -> Unit,
-    showDimensions: Boolean,
-    editorActions: @Composable () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val neon = LocalNeonTheme.current
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag("controls_editor_panel")
-            .verticalScroll(rememberScrollState())
-            .padding(
-                top = if (neon) 6.dp else 8.dp,
-                start = if (neon) 16.dp else 0.dp,
-                end = if (neon) 16.dp else 0.dp
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(if (neon) 8.dp else 6.dp)
-    ) {
-        Surface(
-            shape = neonShape(if (neon) 16.dp else 18.dp),
-            color = if (neon) {
-                Color(0xFF2B3F93).copy(alpha = 0.88f)
-            } else {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
-            },
-            border = if (neon) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = stringResource(R.string.emulation_controls_editor_title),
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = if (neon) FontWeight.SemiBold else FontWeight.Bold
-                    ),
-                    color = Color.White
-                )
-                Text(
-                    text = selectedLabel,
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = Color.White.copy(alpha = 0.78f)
-                )
-            }
-        }
-
-        Row(
-            modifier = if (neon) Modifier.padding(top = 2.dp) else Modifier,
-            horizontalArrangement = Arrangement.spacedBy(if (neon) 8.dp else 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            EditorToolbarButton(
-                label = selectedLabel,
-                onClick = onSelectNext,
-                minWidth = 86.dp
-            )
-            EditorIconButton(onClick = onReset) {
-                Icon(Icons.Rounded.Refresh, contentDescription = null, tint = Color.White)
-            }
-            EditorIconButton(onClick = onVisibilityToggle, enabled = selectedVisible) {
-                Icon(
-                    imageVector = if (selectedVisible) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = if (selectedVisible) 0.95f else 0.58f)
-                )
-            }
-            if (analogMode != null) {
-                EditorIconButton(
-                    onClick = onAnalogModeToggle,
-                    containerColor = if (analogMode == TouchAnalogMode.TouchArea) {
-                        if (neon) Color(0xFF3565FF).copy(alpha = 0.78f)
-                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.94f)
-                    } else {
-                        if (neon) Color.White.copy(alpha = 0.06f)
-                        else Color(0xFF17171D).copy(alpha = 0.94f)
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.TouchApp,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.95f)
-                    )
-                }
-            }
-            EditorToolbarButton(
-                label = stringResource(R.string.emulation_controls_editor_done),
-                onClick = onDone,
-                containerColor = if (neon) Color(0xFF3565FF) else MaterialTheme.colorScheme.primary,
-                minWidth = 82.dp
-            )
-        }
-
-        Surface(
-            shape = neonShape(if (neon) 16.dp else 18.dp),
-            color = if (neon) Color(0xFF111827).copy(alpha = 0.82f)
-            else Color(0xFF171B27).copy(alpha = 0.94f),
-            border = if (neon) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(if (neon) 8.dp else 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                EditorSizeButton("-", onClick = onSizeDecrease)
-                Text(
-                    text = stringResource(R.string.emulation_controls_editor_percent, selectedScalePercent),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White,
-                    modifier = Modifier.width(60.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-                EditorSizeButton("+", onClick = onSizeIncrease)
-            }
-        }
-
-        editorActions()
-
-        if (showDimensions) {
-            Surface(
-                shape = neonShape(if (neon) 16.dp else 18.dp),
-                color = if (neon) Color(0xFF111827).copy(alpha = 0.82f)
-                else Color(0xFF171B27).copy(alpha = 0.94f),
-                border = if (neon) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    TouchAreaSizeRow(
-                        label = stringResource(R.string.emulation_controls_editor_width),
-                        percent = touchAreaWidthPercent,
-                        onDecrease = onTouchAreaWidthDecrease,
-                        onIncrease = onTouchAreaWidthIncrease
-                    )
-                    TouchAreaSizeRow(
-                        label = stringResource(R.string.emulation_controls_editor_height),
-                        percent = touchAreaHeightPercent,
-                        onDecrease = onTouchAreaHeightDecrease,
-                        onIncrease = onTouchAreaHeightIncrease,
-                        modifier = Modifier.testTag("controls_editor_height_row")
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TouchAreaSizeRow(
-    label: String,
-    percent: Int,
-    onDecrease: () -> Unit,
-    onIncrease: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            color = Color.White,
-            modifier = Modifier.width(72.dp),
-            maxLines = 1
-        )
-        EditorSizeButton("-", onClick = onDecrease)
-        Text(
-            text = stringResource(R.string.emulation_controls_editor_percent, percent),
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-            color = Color.White,
-            modifier = Modifier.width(60.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-        EditorSizeButton("+", onClick = onIncrease)
-    }
-}
-
-@Composable
-private fun EditorToolbarButton(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    containerColor: Color? = null,
-    minWidth: Dp = 74.dp
-) {
-    val neon = LocalNeonTheme.current
-    Surface(
-        modifier = modifier
-            .width(minWidth)
-            .height(42.dp),
-        shape = neonShape(if (neon) 16.dp else 14.dp),
-        color = containerColor ?: if (neon) {
-            Color.White.copy(alpha = 0.08f)
-        } else {
-            Color(0xFF17171D).copy(alpha = 0.94f)
-        },
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
-        onClick = onClick
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                color = Color.White
-            )
-        }
-    }
-}
-
-@Composable
-private fun EditorIconButton(
-    onClick: () -> Unit,
-    enabled: Boolean = true,
-    containerColor: Color? = null,
-    content: @Composable () -> Unit
-) {
-    val neon = LocalNeonTheme.current
-    Surface(
-        modifier = Modifier.size(width = 54.dp, height = 42.dp),
-        shape = neonShape(if (neon) 16.dp else 14.dp),
-        color = containerColor ?: if (neon) {
-            Color.White.copy(alpha = if (enabled) 0.08f else 0.03f)
-        } else {
-            Color(0xFF17171D).copy(alpha = if (enabled) 0.94f else 0.54f)
-        },
-        border = BorderStroke(1.dp, Color.White.copy(alpha = if (enabled) 0.08f else 0.03f)),
-        onClick = onClick
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            content()
-        }
-    }
-}
-
-@Composable
-private fun EditorSizeButton(
-    label: String,
-    onClick: () -> Unit
-) {
-    val neon = LocalNeonTheme.current
-    Surface(
-        modifier = Modifier.size(width = 62.dp, height = 40.dp),
-        shape = neonShape(if (neon) 14.dp else 13.dp),
-        color = if (neon) Color.White.copy(alpha = 0.08f) else Color(0xFF252A36),
-        border = BorderStroke(
-            1.dp,
-            Color.White.copy(alpha = if (neon) 0.08f else 0.05f)
-        ),
-        onClick = onClick
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = Color.White
-            )
-        }
     }
 }
 

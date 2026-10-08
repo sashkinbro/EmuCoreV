@@ -20,6 +20,7 @@
 #include <features/state.h>
 #include <renderer/commands.h>
 #include <renderer/frame_host.h>
+#include <renderer/pause_overlay_policy.h>
 #include <renderer/snapshot_gate.h>
 #include <renderer/finish.h>
 #include <renderer/types.h>
@@ -168,6 +169,8 @@ struct State {
     std::chrono::steady_clock::time_point m_shaders_compiled_time{};
 
     std::atomic<bool> paused{ false };
+    // The controls editor overlays the Android UI while the game stays paused.
+    std::atomic<bool> show_pause_overlay{ true };
     // Diagnostic: last phase reached by the render loop (0 idle, 1 batches, 2 frame, 3 swap).
     std::atomic<int> render_phase{ 0 };
 

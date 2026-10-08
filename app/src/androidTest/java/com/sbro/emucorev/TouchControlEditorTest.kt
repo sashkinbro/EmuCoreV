@@ -34,10 +34,10 @@ class TouchControlEditorTest {
         }
     }
 
-    private fun showEditor(edit: Boolean, compact: Boolean = false) {
+    private fun showEditor(edit: Boolean, compact: Boolean = false, portrait: Boolean = false) {
         compose.setContent {
             EmuCoreVTheme {
-                Box(if (compact) Modifier.requiredSize(800.dp, 360.dp) else Modifier.fillMaxSize()) {
+                Box(if (portrait) Modifier.requiredSize(360.dp, 800.dp) else if (compact) Modifier.requiredSize(800.dp, 360.dp) else Modifier.fillMaxSize()) {
                 OnScreenControls(1f, 80, true, 0, TouchControlVisualStyle.CLASSIC,
                     TouchControlPressEffect.GLOW, false, 0, 100, edit, layout,
                     { layout = it }, {}, {}, {}, { id, held -> events += id to held }, { _, _ -> },
@@ -49,12 +49,45 @@ class TouchControlEditorTest {
 
     @Test fun shortLandscapeEditorCanScrollToItsHeightControls() {
         showEditor(true, compact = true)
+        compose.onNodeWithTag("controls_editor_adjust").performClick()
         compose.onNodeWithTag("controls_editor_height_row")
             .performScrollTo().assertIsDisplayed()
         val row = compose.onNodeWithTag("controls_editor_height_row").fetchSemanticsNode().boundsInRoot
         val panel = compose.onNodeWithTag("controls_editor_panel").fetchSemanticsNode().boundsInRoot
         assertTrue(row.bottom <= panel.bottom + 1f && row.top >= panel.top - 1f)
         screenshot("controls-editor-short-landscape.png")
+    }
+
+    @Test fun portraitToolbarWrapsAndKeepsEveryActionInsideThePanel() {
+        showEditor(true, portrait = true)
+        compose.onNodeWithTag("controls_editor_height_row").assertDoesNotExist()
+        val panel = compose.onNodeWithTag("controls_editor_panel").fetchSemanticsNode().boundsInRoot
+        listOf("reset_all", "reset_selected", "visibility", "create_combo", "duplicate", "adjust", "grid", "snap", "done").forEach {
+            val action = compose.onNodeWithTag("controls_editor_$it").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            assertTrue("$it extends outside editor", action.left >= panel.left && action.right <= panel.right && action.top >= panel.top && action.bottom <= panel.bottom)
+        }
+        compose.onNodeWithTag("controls_editor_adjust").performClick()
+        compose.onNodeWithTag("controls_editor_height_row").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("controls_editor_adjust_close").performScrollTo().performClick()
+        compose.onNodeWithTag("controls_editor_height_row").assertDoesNotExist()
+        screenshot("controls-editor-portrait.png")
+    }
+
+    @Test fun selectedHiddenControlCanBeShownAgainAndStandardPrimaryIsFixed() {
+        showEditor(true)
+        compose.onNodeWithTag("controls_editor_visibility").performClick()
+        compose.runOnIdle { assertFalse(layout!!.first { it.id == "l2" }.visible) }
+        compose.onNodeWithTag("controls_editor_visibility").performClick()
+        compose.runOnIdle { assertTrue(layout!!.first { it.id == "l2" }.visible) }
+        compose.onNodeWithTag("controls_editor_combo").performClick()
+        compose.onNodeWithTag("combo_primary_cross").assertDoesNotExist()
+        compose.onNodeWithTag("combo_secondary_l1").performScrollTo().performClick()
+        compose.onNodeWithTag("combo_confirm").performClick()
+        compose.runOnIdle {
+            val selected = layout!!.first { it.id == "l2" }
+            assertEquals("l2", selected.actionId)
+            assertEquals("l1", selected.secondaryActionId)
+        }
     }
 
     @Test fun hidingOneFaceButtonKeepsOtherFaceButtonsWorking() {
@@ -114,5 +147,16 @@ class TouchControlEditorTest {
             assertEquals("l1", layout!!.last().secondaryActionId)
         }
         screenshot("controls-editor-combo.png")
+        compose.onNodeWithTag("controls_editor_reset_selected").performClick()
+        compose.runOnIdle {
+            val custom = layout!!.last()
+            assertEquals("cross", custom.actionId)
+            assertEquals("l1", custom.secondaryActionId)
+            assertEquals(.45f, custom.x)
+        }
+        compose.onNodeWithTag("controls_editor_delete").performClick()
+        compose.runOnIdle { assertEquals(1, layout!!.count { it.id.startsWith("custom_") }) }
+        compose.onNodeWithTag("controls_editor_confirm_delete_custom").performClick()
+        compose.runOnIdle { assertEquals(0, layout!!.count { it.id.startsWith("custom_") }) }
     }
 }

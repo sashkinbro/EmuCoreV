@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.sbro.emucorev.core.NativeLib
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.core.vita.Emulator
@@ -88,6 +89,7 @@ class InputOverlay(context: Context) {
 
     fun setIsInEditMode(edit: Boolean) {
         overlayEditMode = edit
+        NativeLib.setControlsEditorActive(edit)
         if (edit) {
             emulator?.requestOverlayMenuButtonReveal()
         }
