@@ -133,7 +133,8 @@ fun SettingsTabContent(
     onOpenDiscord: () -> Unit = {},
     refreshCoreSettingsClick: () -> Unit,
     createBackupClick: () -> Unit,
-    restoreBackupClick: () -> Unit
+    restoreBackupClick: () -> Unit,
+    onOpenTrophySoundPicker: () -> Unit = {}
 ) {
     when (selectedTab) {
         SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings, onOpenVitaLanguageSettings)
@@ -146,7 +147,7 @@ fun SettingsTabContent(
             ProPurchasePanel(showFeatures = false)
         }
         SettingsTab.Graphics -> GraphicsTab(uiState, defaults, viewModel, onOpenGpuDriverSettings)
-        SettingsTab.Audio -> AudioTab(uiState, defaults, viewModel, refreshCoreSettingsClick)
+        SettingsTab.Audio -> AudioTab(uiState, defaults, viewModel, refreshCoreSettingsClick, onOpenTrophySoundPicker)
         SettingsTab.Overlay -> OverlayTab(uiState, defaults, viewModel)
         SettingsTab.Controls -> ControlsTab(uiState, defaults, viewModel)
         SettingsTab.Camera -> CameraTab(uiState, defaults, viewModel)
@@ -373,7 +374,7 @@ private fun GpuDriverStatus(
 }
 
 @Composable
-private fun AudioTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel, refreshCoreSettingsClick: () -> Unit) {
+private fun AudioTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel, refreshCoreSettingsClick: () -> Unit, onOpenTrophySoundPicker: () -> Unit) {
     SectionCard(title = stringResource(R.string.settings_core_audio_title), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Chips(stringResource(R.string.settings_core_audio_backend_label), stringResource(R.string.settings_help_audio_backend), { viewModel.updateCoreSettings { it.copy(audioBackend = defaults.audioBackend) } }) {
             TextChip(
@@ -394,6 +395,13 @@ private fun AudioTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMod
             Slider(value = uiState.coreConfig.bgmVolume.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(bgmVolume = value.roundToInt()) } }, valueRange = 0f..100f)
         }
         Toggle(stringResource(R.string.settings_core_ngs_enable), stringResource(R.string.settings_help_ngs_enable), uiState.coreConfig.ngsEnable, { enabled -> viewModel.updateCoreSettings { it.copy(ngsEnable = enabled) } }, { viewModel.updateCoreSettings { it.copy(ngsEnable = defaults.ngsEnable) } })
+        TrophySoundSettingsSection(
+            settings = uiState.trophySound,
+            selectionError = uiState.trophySoundError,
+            onModeSelected = viewModel::selectTrophySoundMode,
+            onChooseAudio = onOpenTrophySoundPicker,
+            onPreview = viewModel::previewTrophySound
+        )
         Button(
             shape = neonButtonShape(),
             onClick = refreshCoreSettingsClick,

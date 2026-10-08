@@ -1446,4 +1446,16 @@
     <string name="savestate_manager_empty_body">Створіть його в ігровому меню або кнопкою швидкого збереження.</string>
     <string name="nav_save_states">Швидкі збереження</string>
     <string name="emulation_savestate_load_starts_game">Гру буде запущено та відновлено на цьому стані.</string>
+
+    <!-- Trophy notification audio -->
+    <string name="settings_trophy_sound_title">Звук отримання трофея</string>
+    <string name="settings_trophy_sound_description">Виберіть звук, який відтворюватиметься після отримання трофея.</string>
+    <string name="settings_trophy_sound_system">Системний звук сповіщення</string>
+    <string name="settings_trophy_sound_off">Вимкнено</string>
+    <string name="settings_trophy_sound_custom">Власний</string>
+    <string name="settings_trophy_sound_selected">Вибрано: %1$s</string>
+    <string name="settings_trophy_sound_choose">Вибрати аудіо</string>
+    <string name="settings_trophy_sound_preview">Прослухати</string>
+    <string name="settings_trophy_sound_unavailable">Не вдається відкрити збережений звук. Виберіть його ще раз.</string>
+    <string name="settings_trophy_sound_pick_error">Не вдалося використати цей аудіофайл.</string>
 </resources>

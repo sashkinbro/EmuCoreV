@@ -1426,4 +1426,16 @@
     <string name="savestate_manager_empty_body">أنشئ واحدة من قائمة اللعبة أو بزر الحفظ السريع.</string>
     <string name="nav_save_states">الحفظ السريع</string>
     <string name="emulation_savestate_load_starts_game">سيتم تشغيل اللعبة واستعادتها إلى هذه الحالة.</string>
+
+    <!-- Trophy notification audio -->
+    <string name="settings_trophy_sound_title">صوت فتح الكأس</string>
+    <string name="settings_trophy_sound_description">اختر الصوت الذي يعمل عند فتح كأس.</string>
+    <string name="settings_trophy_sound_system">صوت إشعار النظام</string>
+    <string name="settings_trophy_sound_off">إيقاف</string>
+    <string name="settings_trophy_sound_custom">مخصص</string>
+    <string name="settings_trophy_sound_selected">المحدد: %1$s</string>
+    <string name="settings_trophy_sound_choose">اختيار ملف صوتي</string>
+    <string name="settings_trophy_sound_preview">معاينة</string>
+    <string name="settings_trophy_sound_unavailable">يتعذر الوصول إلى الصوت المحفوظ. اختره مرة أخرى.</string>
+    <string name="settings_trophy_sound_pick_error">تعذر استخدام ملف الصوت هذا.</string>
 </resources>

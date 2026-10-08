@@ -1422,4 +1422,16 @@
     <string name="savestate_manager_empty_body">Creane uno dal menu in gioco o con il pulsante di salvataggio rapido.</string>
     <string name="nav_save_states">Salvataggi rapidi</string>
     <string name="emulation_savestate_load_starts_game">Il gioco verrà avviato e ripristinato a questo stato.</string>
+
+    <!-- Trophy notification audio -->
+    <string name="settings_trophy_sound_title">Suono trofeo</string>
+    <string name="settings_trophy_sound_description">Scegli cosa riprodurre quando sblocchi un trofeo.</string>
+    <string name="settings_trophy_sound_system">Suono di notifica di sistema</string>
+    <string name="settings_trophy_sound_off">Disattivato</string>
+    <string name="settings_trophy_sound_custom">Personalizzato</string>
+    <string name="settings_trophy_sound_selected">Selezionato: %1$s</string>
+    <string name="settings_trophy_sound_choose">Scegli audio</string>
+    <string name="settings_trophy_sound_preview">Anteprima</string>
+    <string name="settings_trophy_sound_unavailable">Impossibile accedere al suono salvato. Selezionalo di nuovo.</string>
+    <string name="settings_trophy_sound_pick_error">Impossibile usare questo file audio.</string>
 </resources>

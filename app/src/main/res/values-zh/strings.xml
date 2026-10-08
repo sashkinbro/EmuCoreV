@@ -1421,4 +1421,16 @@
     <string name="savestate_manager_empty_body">可在游戏内菜单或使用快速保存按钮创建。</string>
     <string name="nav_save_states">快速存档</string>
     <string name="emulation_savestate_load_starts_game">将启动游戏并恢复到此状态。</string>
+
+    <!-- Trophy notification audio -->
+    <string name="settings_trophy_sound_title">獎盃解鎖音效</string>
+    <string name="settings_trophy_sound_description">選擇解鎖獎盃時播放的音效。</string>
+    <string name="settings_trophy_sound_system">系統通知音效</string>
+    <string name="settings_trophy_sound_off">關閉</string>
+    <string name="settings_trophy_sound_custom">自訂</string>
+    <string name="settings_trophy_sound_selected">已選取：%1$s</string>
+    <string name="settings_trophy_sound_choose">選擇音訊</string>
+    <string name="settings_trophy_sound_preview">試聽</string>
+    <string name="settings_trophy_sound_unavailable">無法存取已儲存的音效，請重新選取。</string>
+    <string name="settings_trophy_sound_pick_error">無法使用此音訊檔案。</string>
 </resources>

@@ -33,6 +33,11 @@ import com.sbro.emucorev.data.DrawerVisualStyle
 import com.sbro.emucorev.data.GameMenuLayoutStyle
 import com.sbro.emucorev.data.TouchControlPressEffect
 import com.sbro.emucorev.data.TouchControlVisualStyle
+import com.sbro.emucorev.data.TrophySoundMode
+import com.sbro.emucorev.data.TrophySoundRepository
+import com.sbro.emucorev.data.TrophySoundSettings
+import com.sbro.emucorev.data.TrophySoundSelectionResult
+import com.sbro.emucorev.core.TrophySoundPlayer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -43,6 +48,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
@@ -58,6 +64,8 @@ data class SettingsUiState(
     val storageMigration: StorageMigrationUiState = StorageMigrationUiState(),
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val customization: CustomizationSettings = CustomizationSettings(),
+    val trophySound: TrophySoundSettings = TrophySoundSettings(),
+    val trophySoundError: Boolean = false,
     val appUpdate: AppUpdateUiState = AppUpdateUiState(),
     val cacheSizeBytes: Long = 0L
 )
@@ -89,6 +97,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val preferences = AppPreferences(application)
     private val customizationPreferences = CustomizationPreferences(application)
     private val customizationFileStore = CustomizationFileStore(application)
+    private val trophySoundRepository = TrophySoundRepository(application)
+    private val trophySoundPlayer = TrophySoundPlayer(
+        context = application,
+        onCustomSoundFailure = { uri ->
+            trophySoundRepository.markCustomUnavailable(uri)
+            _uiState.update { it.copy(trophySound = trophySoundRepository.current()) }
+        }
+    )
     private val coreConfigRepository = VitaCoreConfigRepository(application)
     private val gpuDriverManager = GpuDriverManager(application)
     private val gpuDriverCatalogRepository = GpuDriverCatalogRepository(application)
@@ -110,12 +126,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             coreConfig = initialCoreConfig,
             installedGpuDrivers = gpuDriverManager.listInstalledDrivers(),
             appLanguage = preferences.appLanguage,
-            customization = customizationPreferences.current
+            customization = customizationPreferences.current,
+            trophySound = trophySoundRepository.current()
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch(Dispatchers.IO) {
+            trophySoundRepository.refreshCustomAvailability()
+            val settings = trophySoundRepository.current()
+            withContext(Dispatchers.Main) {
+                _uiState.value = _uiState.value.copy(trophySound = settings)
+            }
+        }
         viewModelScope.launch {
             customizationPreferences.settings.collect { customization ->
                 _uiState.value = _uiState.value.copy(customization = customization)
@@ -222,7 +246,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     storageLocations = EmulatorStorage.availableStorageLocations(context),
                     coreConfig = restoredConfig,
                     installedGpuDrivers = gpuDriverManager.listInstalledDrivers(),
-                    appLanguage = preferences.appLanguage
+                    appLanguage = preferences.appLanguage,
+                    trophySound = trophySoundRepository.current(),
+                    trophySoundError = false
                 )
             }
             withContext(Dispatchers.Main) {
@@ -290,6 +316,40 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         customizationPreferences.setExperimentalCheats(enabled)
     }
 
+    fun selectTrophySoundMode(mode: TrophySoundMode) {
+        trophySoundPlayer.stop()
+        val accepted = trophySoundRepository.selectMode(mode)
+        _uiState.value = _uiState.value.copy(
+            trophySound = trophySoundRepository.current(),
+            trophySoundError = !accepted
+        )
+    }
+
+    fun selectTrophyCustomSound(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            trophySoundPlayer.stop()
+            val result = runCatching { trophySoundRepository.selectCustomSound(uri) }
+                .getOrDefault(TrophySoundSelectionResult.REJECTED)
+            val settings = trophySoundRepository.current()
+            withContext(Dispatchers.Main) {
+                _uiState.update {
+                    it.copy(
+                        trophySound = settings,
+                        trophySoundError = result == TrophySoundSelectionResult.REJECTED
+                    )
+                }
+            }
+        }
+    }
+
+    fun previewTrophySound() {
+        trophySoundPlayer.play(_uiState.value.trophySound)
+    }
+
+    fun stopTrophyPreview() {
+        trophySoundPlayer.stop()
+    }
+
     fun updateTextSizePercent(value: Int) {
         customizationPreferences.setTextSizePercent(value)
     }
@@ -354,6 +414,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         runCatching { coreConfigRepository.save(_uiState.value.coreConfig) }
             .onFailure { error -> Log.e(TAG, "Could not flush core settings", error) }
         customizationPreferences.close()
+        trophySoundPlayer.close()
     }
 
     fun testVibration(): Boolean {

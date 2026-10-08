@@ -1422,4 +1422,16 @@
     <string name="savestate_manager_empty_body">इन-गेम मेनू या क्विक सेव बटन से एक बनाएँ।</string>
     <string name="nav_save_states">क्विक सेव</string>
     <string name="emulation_savestate_load_starts_game">गेम लॉन्च होकर इस स्टेट पर पुनर्स्थापित किया जाएगा।</string>
+
+    <!-- Trophy notification audio -->
+    <string name="settings_trophy_sound_title">ट्रॉफी अनलॉक ध्वनि</string>
+    <string name="settings_trophy_sound_description">ट्रॉफी अनलॉक होने पर बजने वाली ध्वनि चुनें।</string>
+    <string name="settings_trophy_sound_system">सिस्टम सूचना ध्वनि</string>
+    <string name="settings_trophy_sound_off">बंद</string>
+    <string name="settings_trophy_sound_custom">कस्टम</string>
+    <string name="settings_trophy_sound_selected">चुना गया: %1$s</string>
+    <string name="settings_trophy_sound_choose">ऑडियो चुनें</string>
+    <string name="settings_trophy_sound_preview">पूर्वावलोकन</string>
+    <string name="settings_trophy_sound_unavailable">सहेजी गई ध्वनि उपलब्ध नहीं है। इसे फिर से चुनें।</string>
+    <string name="settings_trophy_sound_pick_error">इस ऑडियो फ़ाइल का उपयोग नहीं हो सका।</string>
 </resources>

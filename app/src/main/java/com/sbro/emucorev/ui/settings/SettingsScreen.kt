@@ -72,6 +72,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -131,6 +132,12 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val defaults = remember { VitaCoreConfig() }
     var selectedTab by rememberSaveable(initialTab) { mutableStateOf(initialTab) }
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.stopTrophyPreview() }
+    }
+    LaunchedEffect(selectedTab) {
+        if (selectedTab != SettingsTab.Audio) viewModel.stopTrophyPreview()
+    }
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val backupCreatedMessage = stringResource(R.string.settings_backup_created)
     val backupFailedMessage = stringResource(R.string.settings_backup_failed)
@@ -156,6 +163,9 @@ fun SettingsScreen(
                 Toast.LENGTH_SHORT
             ).show()
         }
+    }
+    val trophySoundPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri?.let(viewModel::selectTrophyCustomSound)
     }
     val refreshCoreSettingsClick = rememberDebouncedClick(onClick = viewModel::refreshCoreSettings)
     val createBackupClick = rememberDebouncedClick { backupPicker.launch("emucorev-settings-backup.json") }
@@ -226,12 +236,13 @@ fun SettingsScreen(
                             viewModel = viewModel,
                             onOpenLanguageSettings = onOpenLanguageSettings,
                             onOpenVitaLanguageSettings = onOpenVitaLanguageSettings,
-        onOpenGpuDriverSettings = onOpenGpuDriverSettings,
-        onOpenDiscord = onOpenDiscord,
-        refreshCoreSettingsClick = refreshCoreSettingsClick,
-        createBackupClick = createBackupClick,
-        restoreBackupClick = { showRestoreBackupDialog = true }
-    )
+                            onOpenGpuDriverSettings = onOpenGpuDriverSettings,
+                            onOpenDiscord = onOpenDiscord,
+                            refreshCoreSettingsClick = refreshCoreSettingsClick,
+                            createBackupClick = createBackupClick,
+                            restoreBackupClick = { showRestoreBackupDialog = true },
+                            onOpenTrophySoundPicker = { trophySoundPicker.launch(arrayOf("audio/*")) }
+                        )
                     }
                 }
             }

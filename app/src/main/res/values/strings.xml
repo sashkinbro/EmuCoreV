@@ -1447,4 +1447,16 @@
     <string name="savestate_manager_empty_body">Create one from the in-game menu or with the quick save button.</string>
     <string name="nav_save_states">Quick saves</string>
     <string name="emulation_savestate_load_starts_game">The game will be launched and restored to this state.</string>
+
+    <!-- Trophy notification audio -->
+    <string name="settings_trophy_sound_title">Trophy unlock sound</string>
+    <string name="settings_trophy_sound_description">Choose what plays when a trophy is unlocked.</string>
+    <string name="settings_trophy_sound_system">System notification sound</string>
+    <string name="settings_trophy_sound_off">Off</string>
+    <string name="settings_trophy_sound_custom">Custom</string>
+    <string name="settings_trophy_sound_selected">Selected: %1$s</string>
+    <string name="settings_trophy_sound_choose">Choose audio</string>
+    <string name="settings_trophy_sound_preview">Preview</string>
+    <string name="settings_trophy_sound_unavailable">The saved sound cannot be accessed. Choose it again.</string>
+    <string name="settings_trophy_sound_pick_error">Could not use that audio file.</string>
 </resources>

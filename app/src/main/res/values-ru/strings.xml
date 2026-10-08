@@ -1425,4 +1425,16 @@
     <string name="savestate_manager_empty_body">Создайте его в игровом меню или кнопкой быстрого сохранения.</string>
     <string name="nav_save_states">Быстрые сохранения</string>
     <string name="emulation_savestate_load_starts_game">Игра будет запущена и восстановлена на этом состоянии.</string>
+
+    <!-- Trophy notification audio -->
+    <string name="settings_trophy_sound_title">Звук получения трофея</string>
+    <string name="settings_trophy_sound_description">Выберите звук при получении трофея.</string>
+    <string name="settings_trophy_sound_system">Системный звук уведомления</string>
+    <string name="settings_trophy_sound_off">Выкл.</string>
+    <string name="settings_trophy_sound_custom">Свой звук</string>
+    <string name="settings_trophy_sound_selected">Выбрано: %1$s</string>
+    <string name="settings_trophy_sound_choose">Выбрать аудио</string>
+    <string name="settings_trophy_sound_preview">Прослушать</string>
+    <string name="settings_trophy_sound_unavailable">Не удаётся открыть сохранённый звук. Выберите его снова.</string>
+    <string name="settings_trophy_sound_pick_error">Не удалось использовать этот аудиофайл.</string>
 </resources>

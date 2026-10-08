@@ -51,6 +51,7 @@ import com.sbro.emucorev.core.PlayTimeRepository
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.VitaGameSettingsRepository
+import com.sbro.emucorev.core.TrophySoundPlayer
 import com.sbro.emucorev.core.input.InputDeviceClassifier
 import org.libsdl.app.SDLActivity
 import org.libsdl.app.SDLControllerManager
@@ -62,6 +63,7 @@ import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.ProfilePlayTimeSyncer
 import com.sbro.emucorev.data.TrophyCloudRepository
+import com.sbro.emucorev.data.TrophySoundRepository
 import com.sbro.emucorev.data.drive.DriveBackupWork
 import com.sbro.emucorev.discord.DiscordIntegration
 import com.sbro.emucorev.ui.common.ImmersiveMode
@@ -92,6 +94,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var playTimeSessionTitleId: String = ""
     private var playTimeSessionStartedAt: Long = 0L
     private var playTimeSessionLastSeenAt: Long = 0L
+    private var trophySoundPlayer: TrophySoundPlayer? = null
     var nativeImeState by mutableStateOf<NativeImeState?>(null)
         private set
     var nativeKeyboardRequested by mutableStateOf(false)
@@ -118,6 +121,22 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         _currentGameId = gameId
         refreshGamepadRuntimeInputSettings()
         startPlayTimeSessionIfNeeded()
+    }
+
+    @Keep
+    fun playTrophyUnlockSound() {
+        runOnUiThread {
+            if (rebirthRequested || isFinishing) return@runOnUiThread
+            val repository = TrophySoundRepository(applicationContext)
+            val player = trophySoundPlayer ?: TrophySoundPlayer(
+                context = applicationContext,
+                onCustomSoundFailure = { uri ->
+                    repository.markCustomUnavailable(uri)
+                    Log.w("TrophySound", "Custom trophy sound became unavailable; using system notification sound")
+                }
+            ).also { trophySoundPlayer = it }
+            player.play(repository.current())
+        }
     }
 
     @Keep
@@ -257,6 +276,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         if (::composeOwners.isInitialized) {
             composeOwners.handleDestroy()
         }
+        trophySoundPlayer?.close()
+        trophySoundPlayer = null
         super.onDestroy()
     }
 

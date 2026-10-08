@@ -1422,4 +1422,16 @@
     <string name="savestate_manager_empty_body">Oyun içi menüden veya hızlı kaydet düğmesiyle bir tane oluşturun.</string>
     <string name="nav_save_states">Hızlı kayıtlar</string>
     <string name="emulation_savestate_load_starts_game">Oyun başlatılacak ve bu duruma geri yüklenecek.</string>
+
+    <!-- Trophy notification audio -->
+    <string name="settings_trophy_sound_title">Kupa açılma sesi</string>
+    <string name="settings_trophy_sound_description">Bir kupa açıldığında çalacak sesi seçin.</string>
+    <string name="settings_trophy_sound_system">Sistem bildirim sesi</string>
+    <string name="settings_trophy_sound_off">Kapalı</string>
+    <string name="settings_trophy_sound_custom">Özel</string>
+    <string name="settings_trophy_sound_selected">Seçildi: %1$s</string>
+    <string name="settings_trophy_sound_choose">Ses dosyası seç</string>
+    <string name="settings_trophy_sound_preview">Önizleme</string>
+    <string name="settings_trophy_sound_unavailable">Kaydedilen sese erişilemiyor. Yeniden seçin.</string>
+    <string name="settings_trophy_sound_pick_error">Bu ses dosyası kullanılamadı.</string>
 </resources>

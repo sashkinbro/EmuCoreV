@@ -5,6 +5,7 @@ import android.net.Uri
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.AppFont
 import com.sbro.emucorev.data.CustomizationPreferences
+import com.sbro.emucorev.data.TrophySoundRepository
 import org.json.JSONObject
 import java.io.File
 
@@ -12,7 +13,8 @@ class SettingsBackupRepository(
     private val context: Context,
     private val preferences: AppPreferences,
     private val coreConfigRepository: VitaCoreConfigRepository,
-    private val customizationPreferences: CustomizationPreferences
+    private val customizationPreferences: CustomizationPreferences,
+    private val trophySoundRepository: TrophySoundRepository = TrophySoundRepository(context)
 ) {
     fun exportJson(): JSONObject {
         val config = coreConfigRepository.ensureDefaultsPersisted()
@@ -48,6 +50,15 @@ class SettingsBackupRepository(
                     .putNullable("backgroundPath", customizationPreferences.current.backgroundPath)
                     .putNullable("backgroundMimeType", customizationPreferences.current.backgroundMimeType)
             )
+            .put(
+                "trophySound",
+                trophySoundRepository.current().let { sound ->
+                    JSONObject()
+                        .put("mode", sound.mode.name)
+                        .putNullable("uri", sound.customUri?.toString())
+                        .putNullable("name", sound.customName)
+                }
+            )
     }
 
     fun exportTo(uri: Uri) {
@@ -67,6 +78,14 @@ class SettingsBackupRepository(
             preferences.themeMode = app.optEnum("themeMode", preferences.themeMode)
             preferences.appLanguage = app.optEnum("appLanguage", preferences.appLanguage)
             preferences.applyAppLanguage()
+        }
+        if (applyApp) root.optJSONObject("trophySound")?.let { sound ->
+            check(trophySoundRepository.restoreBackup(
+                modeName = sound.optString("mode", "SYSTEM"),
+                uriText = sound.optNullableString("uri"),
+                name = sound.optNullableString("name")
+            )) { "Could not restore trophy sound preference" }
+            trophySoundRepository.refreshCustomAvailability()
         }
         if (applyCustomization) root.optJSONObject("customization")?.let { customization ->
             customizationPreferences.setCoverSizePercent(

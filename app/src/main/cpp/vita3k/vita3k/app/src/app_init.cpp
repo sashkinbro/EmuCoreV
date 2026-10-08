@@ -74,6 +74,7 @@
 
 #ifdef __ANDROID__
 #include <SDL3/SDL_system.h>
+#include <jni.h>
 #endif
 
 #ifdef __linux__
@@ -84,6 +85,27 @@
 #include <fstream>
 
 namespace app {
+
+#ifdef __ANDROID__
+static void notify_android_trophy_unlocked() {
+    auto *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity)
+        return;
+
+    const auto clazz = env->GetObjectClass(activity);
+    const auto method = clazz ? env->GetMethodID(clazz, "playTrophyUnlockSound", "()V") : nullptr;
+    if (!method && env->ExceptionCheck())
+        env->ExceptionClear();
+    if (method)
+        env->CallVoidMethod(activity, method);
+    if (env->ExceptionCheck())
+        env->ExceptionClear();
+    if (clazz)
+        env->DeleteLocalRef(clazz);
+    env->DeleteLocalRef(activity);
+}
+#endif
 
 static float sdl_axis_to_float(int16_t axis, float mult) {
     const float unsigned_axis = static_cast<float>(axis - INT16_MIN);
@@ -690,6 +712,9 @@ void apply_renderer_config(EmuEnvState &emuenv) {
         });
 
     emuenv.np.trophy_state.add_trophy_unlock_callback([&emuenv](NpTrophyUnlockCallbackData &data) {
+#ifdef __ANDROID__
+        notify_android_trophy_unlocked();
+#endif
         if (!emuenv.overlay_manager)
             return;
         auto notif = emuenv.overlay_manager->get<overlay::trophy_notification>();
