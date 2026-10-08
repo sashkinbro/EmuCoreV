@@ -20,6 +20,7 @@
 #include <cpu/common.h>
 #include <kernel/callback.h>
 #include <kernel/debugger.h>
+#include <kernel/host_threads.h>
 #include <kernel/object_store.h>
 #include <kernel/sync_primitives.h>
 #include <kernel/types.h>
@@ -109,6 +110,9 @@ struct KernelState {
     KernelState();
 
     std::mutex mutex;
+    HostThreadRegistry host_threads;
+    const uint64_t sync_cache_identity;
+    std::atomic<uint64_t> sync_cache_generation{ 0 };
     CodecEngineBlocks codec_blocks;
 
     bool accurate_thread_scheduling = false;

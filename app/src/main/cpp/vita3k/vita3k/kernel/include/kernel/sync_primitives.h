@@ -28,6 +28,9 @@
 
 struct KernelState;
 
+// Release this host thread's cached synchronization references.
+void clear_sync_primitive_thread_cache();
+
 // NOTE: uid is copied to sync primitives here for debugging,
 //       not really needed since they are put in std::map's
 struct SyncPrimitive {

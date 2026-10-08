@@ -268,3 +268,8 @@ SceInt32 uid_class_query(KernelUidClassEnv &env, SceUID uid, bool driver) {
                   : export_sceKernelGetThreadmgrUIDClass(env, 0, "test", uid);
 }
 #include "kernel_uid_class_tests.inc"
+
+using KernelHostLifetimeEnv = EmuEnvState;
+#include "kernel_host_lifetime_tests.inc"
+
+#include "kernel_mutex_cache_tests.inc"

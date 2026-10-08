@@ -1,4 +1,5 @@
 set(SOURCE_LIST
+	include/kernel/host_threads.h
 	include/kernel/state.h
 	include/kernel/types.h
 	include/kernel/uid_class.h

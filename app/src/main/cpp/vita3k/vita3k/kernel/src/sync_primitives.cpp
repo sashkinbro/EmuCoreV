@@ -86,22 +86,35 @@ void evf_record(SceUID evf, SceUID thread, uint8_t op, uint32_t bits, uint32_t f
 struct MutexCacheEntry {
     SceUID uid = 0;
     SyncWeight weight = SyncWeight::Light;
-    MutexPtr ptr;
+    uint64_t kernel_identity = 0;
+    uint64_t generation = 0;
+    std::weak_ptr<Mutex> ptr;
 };
 thread_local std::array<MutexCacheEntry, 8> g_mutex_cache;
 thread_local uint32_t g_mutex_cache_next = 0;
 } // namespace
 
-// Return a cached mutex while it is still registered.
+void clear_sync_primitive_thread_cache() {
+    g_mutex_cache = {};
+    g_mutex_cache_next = 0;
+}
+
+// Weak entries cannot retain a mutex owner (and its guest stack) after shutdown.
+// Identity distinguishes KernelState instances; generation invalidates reused
+// UIDs when the same kernel is restored or relaunched.
 inline static MutexPtr find_mutex(KernelState &kernel, SceUID mutexid, SyncWeight weight) {
+    const auto generation = kernel.sync_cache_generation.load(std::memory_order_acquire);
     for (const auto &entry : g_mutex_cache) {
-        if (entry.uid == mutexid && entry.weight == weight && entry.ptr
-            && !entry.ptr->deleted.load(std::memory_order_relaxed))
-            return entry.ptr;
+        if (entry.uid == mutexid && entry.weight == weight
+            && entry.kernel_identity == kernel.sync_cache_identity && entry.generation == generation) {
+            auto mutex = entry.ptr.lock();
+            if (mutex && !mutex->deleted.load(std::memory_order_relaxed))
+                return mutex;
+        }
     }
     auto mutex = lock_and_find(mutexid, get_mutexes(kernel, weight), kernel.mutex);
     if (mutex)
-        g_mutex_cache[g_mutex_cache_next++ % g_mutex_cache.size()] = { mutexid, weight, mutex };
+        g_mutex_cache[g_mutex_cache_next++ % g_mutex_cache.size()] = { mutexid, weight, kernel.sync_cache_identity, generation, mutex };
     return mutex;
 }
 

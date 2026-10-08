@@ -21,6 +21,7 @@
 
 #include <cpu/common.h>
 #include <kernel/state.h>
+#include <kernel/sync_primitives.h>
 #include <mem/functions.h>
 
 #include <kernel/thread/thread_state.h>
@@ -61,6 +62,7 @@ void clear_current_thread_state();
 struct ThreadParams {
     KernelState *kernel = nullptr;
     SceUID thid = SCE_KERNEL_ERROR_ILLEGAL_THREAD_ID;
+    HostThreadRegistry::Token host_token = 0;
     SDL_Semaphore *host_may_destroy_params = nullptr;
 };
 
@@ -83,9 +85,12 @@ static int SDLCALL thread_function(void *data) {
     const uint32_t r0 = read_reg(*thread->cpu, 0);
     const SceUID id = thread->id;
     const int processor_id = get_processor_id(*thread->cpu);
-    // release our reference first so the erase below destroys the ThreadState before process_exit() is woken
+    // Drop known host-local owners before publishing guest completion. The
+    // retained host handle also covers any other C++ TLS destructors.
     thread.reset();
     clear_current_thread_state();
+    clear_sync_primitive_thread_cache();
+    params.kernel->host_threads.finished(params.host_token);
 
     {
         std::lock_guard<std::mutex> lock(params.kernel->mutex);
@@ -97,8 +102,11 @@ static int SDLCALL thread_function(void *data) {
     return r0;
 }
 
+static std::atomic<uint64_t> next_sync_cache_identity{ 1 };
+
 KernelState::KernelState()
-    : debugger(*this) {
+    : sync_cache_identity(next_sync_cache_identity.fetch_add(1, std::memory_order_relaxed))
+    , debugger(*this) {
 }
 
 bool KernelState::init(MemState &mem, const CallImportFunc &call_import, bool cpu_opt) {
@@ -195,21 +203,36 @@ ThreadStatePtr KernelState::create_thread(MemState &mem, const char *name, Ptr<c
 }
 
 ThreadStatePtr KernelState::create_thread(MemState &mem, const char *name, Ptr<const void> entry_point, int init_priority, SceInt32 affinity_mask, int stack_size, const SceKernelThreadOptParam *option) {
+    // Reap completed workers during ordinary operation, not just shutdown.
+    host_threads.join_finished();
     ThreadStatePtr thread = std::make_shared<ThreadState>(get_next_uid(), *this, mem);
     if (thread->init(name, entry_point, init_priority, affinity_mask, stack_size, option) < 0)
         return nullptr;
 
-    {
-        const std::lock_guard<std::mutex> lock(mutex);
-        threads.emplace(thread->id, thread);
-    }
-
     ThreadParams params;
     params.kernel = this;
     params.thid = thread->id;
-
+    params.host_token = host_threads.next_token();
     params.host_may_destroy_params = SDL_CreateSemaphore(0);
-    SDL_DetachThread(SDL_CreateThread(&thread_function, thread->name.c_str(), &params));
+    if (!params.host_may_destroy_params) {
+        corenum_allocator.free_corenum(get_processor_id(*thread->cpu));
+        return nullptr;
+    }
+    {
+        const std::lock_guard<std::mutex> lock(mutex);
+        threads.emplace(thread->id, thread);
+        // The worker's get_thread blocks on this lock, so it cannot disappear
+        // from the guest registry before its joinable host handle is retained.
+        SDL_Thread *host = SDL_CreateThread(&thread_function, thread->name.c_str(), &params);
+        if (!host) {
+            threads.erase(thread->id);
+            corenum_allocator.free_corenum(get_processor_id(*thread->cpu));
+            thread_deleted_cond.notify_all();
+            SDL_DestroySemaphore(params.host_may_destroy_params);
+            return nullptr;
+        }
+        host_threads.add(params.host_token, [host] { SDL_WaitThread(host, nullptr); });
+    }
     SDL_WaitSemaphore(params.host_may_destroy_params);
     SDL_DestroySemaphore(params.host_may_destroy_params);
 
@@ -243,6 +266,12 @@ void KernelState::process_exit() {
             thread->exit_delete(false);
         return threads.empty();
     });
+    lock.unlock();
+    // Registry removal precedes host exit. Joining is the lifetime barrier for
+    // TLS owners whose destructors can still free guest stack/TLS allocations.
+    host_threads.join_all();
+    sync_cache_generation.fetch_add(1, std::memory_order_acq_rel);
+    clear_sync_primitive_thread_cache();
 }
 
 void KernelState::pause_threads() {
