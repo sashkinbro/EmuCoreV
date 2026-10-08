@@ -59,9 +59,12 @@ class UpstreamCoreRegressionContractTest {
         val wait = native("kernel/src/sync_primitives.cpp")
             .substringAfter("int condvar_wait(")
             .substringBefore("int condvar_signal(")
-        assertTrue(wait.indexOf("handle_timeout(") < wait.indexOf("mutex_lock_impl("))
+        val waitResult = wait.indexOf("condvar->waiters.wait(")
+        val timeoutWriteback = wait.indexOf("writeback_timeout(timeout, deadline)")
+        val reacquire = wait.indexOf("mutex_lock_impl(")
+        assertTrue(waitResult >= 0 && timeoutWriteback > waitResult && reacquire > timeoutWriteback)
         assertTrue(wait.contains("condvar->associated_mutex, weight, nullptr, false"))
-        assertTrue(wait.contains("return wait_result == SCE_KERNEL_OK ? lock_result : wait_result"))
+        assertTrue(wait.contains("return *r == SCE_KERNEL_OK ? lock_result : *r"))
     }
 
     @Test fun selectedPlusShaderFixesDoNotChangeGlobalRendererDefaults() {
