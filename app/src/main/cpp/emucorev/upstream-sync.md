@@ -149,3 +149,29 @@ Verification: a shared test creates all twelve implemented object classes, check
 ## Real archive installation check
 
 The authorized 3 GB Mortal Kombat PCSE00023 ZIP on Lenovo installs through the production native archive installer in approximately 25 seconds. The opt-in setup test finds the installed executable, selects a catalog pack explicitly matching APP_VER, and verifies the imported receipt through native reload. Cheats remain disabled individually. The owned cache copy was removed after installation; the original archive and installed game remain. This verifies that archive installation, without establishing retail PKG/PFS success or an in-game cheat effect.
+
+## Partial DoubleBuffer surface synchronization
+
+Adapted Plus `e530c4e81f0e33263959c541f4464db57214f52d` while retaining local mapping, CPU-dirty upload, macroblock, and repack behavior. Small linear direct writebacks intersect the current scene rectangle with the pending sync rectangle. GPU readback and mapped-buffer copy use the same bounded rectangle; row span/address/mapping arithmetic is checked before copying. Nonidentity component swizzles are excluded because their existing postprocessing covers the whole surface.
+
+Verification: full debug/test APK assembly and all 53 native tests pass on Lenovo. Four new helper tests cover eligibility (including nonidentity exclusion), clipping/empty rectangles, row padding/canaries, and invalid layouts. Independent source review found the swizzle blocker and confirmed its correction. These synthetic checks do not establish NFS runtime correctness.
+
+## Host thread lifetime barrier and mutex-cache ownership
+
+This is a local prerequisite for safely replacing guest memory, identified while reviewing experimental savestate commit `3bfe88f7e0ff3bd538a727ad3282e88c0d2b15e9`; it is not an upstream port or a claim of complete savestate correctness. A worker erased its guest registry entry before its host thread exited. C++ TLS destruction could subsequently release a cached mutex's strong ThreadState owner and free its guest stack/TLS after `process_exit` had returned.
+
+Guest workers now retain joinable SDL handles under monotonically allocated host tokens, independent of guest UID reuse. Creation publishes the guest entry and host handle under one kernel-lock interval, so a fast worker cannot disappear before its handle is retained. Failed semaphore/thread creation unwinds the guest/core allocation instead of waiting for a signal that cannot arrive. Ordinary creation reaps completed workers. Shutdown retains the existing repeated guest deletion sweep, releases the kernel lock, then joins every worker, including a join already claimed by another reaper. On Android the bundled SDL implementation uses `pthread_join`, which also waits for C++ TLS destruction.
+
+The host TLS mutex cache now uses weak references, a non-reused kernel identity, and a shutdown generation. It cannot keep mutex owners alive or return a different kernel/session's object when UIDs repeat. Workers clear their cache before publishing guest completion; shutdown also clears its caller's cache and advances the generation.
+
+Verification: before the fix, a behavioral test of the exact production shutdown body returned while a deliberately blocked TLS destructor still owned a guest Block; production synchronization tests also reproduced strong owner retention and cross-kernel UID aliasing. After the fix, three shutdown tests and eighteen production synchronization/wait tests pass on the host. All 34 tests against the actual Android core pass on Lenovo, including five new host-lifetime and mutex-cache cases. All 209 JVM tests and full debug/test APK assembly pass. Shutdown remains a host operation; existing host session sequencing must exclude unrelated unregistered native creation after shutdown has completed. Savestate loading must still drain subsystem workers and destroy old retained object graphs before replacing RAM, and must implement durable HLE wait/callback continuations rather than forcing waiting threads to run with a fabricated result.
+
+## Dynamic uniforms and thread-buffer translation
+
+Adapted the dynamic-uniform dependency block from Plus `092f3db62` with bounded DoubleBuffer slack copies. An encoded-USSE analyzer tracks dynamically addressed uniform buffers through primary and secondary programs. Slack copies are limited by the mapped allocation, a 16 KiB address window and cached color surfaces. Thread-buffer register offsets use their low 16 bits, the base is emitted as a SPIR-V constant, and indices are bounded by the declared private array. Shader cache version 17 invalidates older generated programs.
+
+Verification: all 62 standalone native tests pass on Lenovo, including encoded-USSE analysis, thread-buffer bounds and slack-range regressions. Full debug/test APK assembly and 209 JVM tests pass before the following UI fix. Mortal Kombat still reproduces the same Qualcomm vendor compiler SIGSEGV during pipeline creation with asynchronous compilation disabled; this port does not establish a fix for that crash.
+
+## Duplicate cheat-row identity
+
+Identical cheat declarations are retained as separate native entries, but the UI previously generated the same Compose key and recovered both indices with equality-based `indexOf`. Both search and category lists now carry each entry's original native index through filtering and use it for row identity and toggle callbacks. A regression with an excluded prefix and two equal entries fails with the former mapping and passes with distinct original indices. All 210 JVM tests and full debug/test APK assembly pass in the main checkout.
