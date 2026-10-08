@@ -244,3 +244,6 @@ TEST(GuestColorSurface, maximum_surface_has_representable_inclusive_clip_bounds)
     EXPECT_EQ(surface.clip_x_max, 4095u);
     EXPECT_EQ(surface.clip_y_max, 4095u);
 }
+
+using KernelLifecycleEnv = EmuEnvState;
+#include "kernel_lifecycle_tests.inc"

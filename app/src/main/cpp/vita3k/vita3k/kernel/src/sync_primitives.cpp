@@ -110,6 +110,39 @@ inline static CondvarPtr find_condvar(KernelState &kernel, SceUID condid, SyncWe
     return lock_and_find(condid, get_condvars(kernel, weight), kernel.mutex);
 }
 
+// Never wait for an object lock while holding the registry lock. A lookup
+// already in flight is serialized with deletion by the object's liveness check.
+template <typename T>
+static bool remove_sync_object(std::map<SceUID, std::shared_ptr<T>> &objects, std::mutex &registry_mutex, SceUID uid) {
+    std::shared_ptr<T> object;
+    {
+        const std::lock_guard<std::mutex> guard(registry_mutex);
+        const auto it = objects.find(uid);
+        if (it == objects.end())
+            return false;
+        object = std::move(objects.extract(it).mapped());
+    }
+    object->mark_deleted();
+    return true;
+}
+
+void SimpleEvent::on_delete() { waiters.wake_all(SCE_KERNEL_ERROR_WAIT_DELETE); }
+void Timer::on_delete() { waiters.wake_all(SCE_KERNEL_ERROR_WAIT_DELETE); }
+void Semaphore::on_delete() { waiters.wake_all(SCE_KERNEL_ERROR_WAIT_DELETE); }
+void Mutex::on_delete() {
+    waiters.wake_all(SCE_KERNEL_ERROR_WAIT_DELETE);
+    owner = nullptr;
+}
+void RWLock::on_delete() { waiters.wake_all(SCE_KERNEL_ERROR_WAIT_DELETE); }
+void EventFlag::on_delete() { waiters.wake_all(SCE_KERNEL_ERROR_WAIT_DELETE); }
+void Condvar::on_delete() {
+    waiters.wake_all(lightweight ? SCE_KERNEL_ERROR_WAIT_DELETE_LW_COND : SCE_KERNEL_ERROR_WAIT_DELETE_COND);
+}
+void MsgPipe::on_delete() {
+    senders.wake_all(SCE_KERNEL_ERROR_WAIT_DELETE);
+    receivers.wake_all(SCE_KERNEL_ERROR_WAIT_DELETE);
+}
+
 // *****************
 // * Simple events *
 // *****************
@@ -184,7 +217,9 @@ SceInt32 simple_event_waitorpoll(KernelState &kernel, const char *export_name, S
     if (!thread) // the thread is being torn down so fail its last import instead of crashing the process
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
 
-    std::unique_lock<std::mutex> event_lock(event->mutex);
+    auto event_lock = event->lock();
+    if (!event_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_EVENT_ID;
 
     if (result_pattern)
         *result_pattern = event->pattern;
@@ -231,7 +266,9 @@ SceInt32 simple_event_setorpulse(KernelState &kernel, const char *export_name, S
             event->waiters.size());
     }
 
-    const std::lock_guard<std::mutex> event_lock(event->mutex);
+    auto event_lock = event->lock();
+    if (!event_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_EVENT_ID;
 
     const SceUInt32 old_pattern = event->pattern;
     const SceUInt64 old_user_data = event->last_user_data;
@@ -278,7 +315,9 @@ SceInt32 simple_event_clear(KernelState &kernel, const char *export_name, SceUID
             export_name, event_id, thread_id, clear_pattern);
     }
 
-    const std::lock_guard<std::mutex> event_lock(event->mutex);
+    auto event_lock = event->lock();
+    if (!event_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_EVENT_ID;
 
     event->pattern &= clear_pattern;
 
@@ -286,25 +325,7 @@ SceInt32 simple_event_clear(KernelState &kernel, const char *export_name, SceUID
 }
 
 SceInt32 simple_event_delete(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID event_id) {
-    const SimpleEventPtr event = lock_and_find(event_id, kernel.simple_events, kernel.mutex);
-    if (!event) {
-        return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_EVENT_ID);
-    }
-
-    if (LOG_SYNC_PRIMITIVES) {
-        LOG_DEBUG("{}: uid: {} thread_id: {} name: \"{}\" attr: {} existing_pattern: {:#b} waiting_threads: {}",
-            export_name, event->uid, thread_id, event->name, event->attr, event->pattern, event->waiters.size());
-    }
-
-    if (event->waiters.empty()) {
-        const std::lock_guard<std::mutex> kernel_lock(kernel.mutex);
-        kernel.simple_events.erase(event_id);
-    } else {
-        // TODO:
-        LOG_WARN("Can't delete sync object, it has waiting threads.");
-    }
-
-    return SCE_KERNEL_OK;
+    return remove_sync_object(kernel.simple_events, kernel.mutex, event_id) ? SCE_KERNEL_OK : SCE_KERNEL_ERROR_UNKNOWN_EVENT_ID;
 }
 
 // *********
@@ -385,7 +406,9 @@ SceInt32 timer_set(KernelState &kernel, const char *export_name, SceUID thread_i
             repeats, timer->waiters.size());
     }
 
-    const std::lock_guard<std::mutex> timer_lock(timer->mutex);
+    auto timer_lock = timer->lock();
+    if (!timer_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_TIMER_ID;
     timer->is_pulse = type != 0;
     timer->is_repeat = repeats != 0;
     timer->event_interval = *interval;
@@ -418,7 +441,9 @@ SceInt32 timer_waitorpoll(KernelState &kernel, const char *export_name, SceUID t
     if (!thread) // the thread is being torn down so fail its last import instead of crashing the process
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
 
-    std::unique_lock<std::mutex> lock(timer->mutex);
+    auto lock = timer->lock();
+    if (!lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_EVENT_ID;
 
     if (result_pattern)
         *result_pattern = SCE_KERNEL_EVENT_TIMER;
@@ -455,6 +480,8 @@ SceInt32 timer_waitorpoll(KernelState &kernel, const char *export_name, SceUID t
         timer->waiters.push(waiter);
 
         while (true) {
+            if (waiter.result)
+                return *waiter.result;
             // only the first waiter waits for the event, the others wait until they are first
             const bool is_first = timer->waiters.front() == &waiter;
             Deadline deadline = Deadline::max();
@@ -502,7 +529,9 @@ SceInt32 timer_clear(KernelState &kernel, const char *export_name, SceUID thread
             export_name, event_id, thread_id);
     }
 
-    std::lock_guard<std::mutex> guard(timer->mutex);
+    auto guard = timer->lock();
+    if (!guard)
+        return SCE_KERNEL_ERROR_UNKNOWN_EVENT_ID;
     timer->event_set = false;
     return SCE_KERNEL_OK;
 }
@@ -512,10 +541,11 @@ SceInt32 timer_start(KernelState &kernel, const char *export_name, SceUID thread
     if (!timer)
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_TIMER_ID);
 
+    auto guard = timer->lock();
+    if (!guard)
+        return SCE_KERNEL_ERROR_UNKNOWN_TIMER_ID;
     if (timer->is_started)
         return 1;
-
-    const std::lock_guard<std::mutex> guard(timer->mutex);
     timer->is_started = true;
     timer->time = get_current_time();
 
@@ -530,7 +560,9 @@ SceInt32 timer_stop(KernelState &kernel, const char *export_name, SceUID thread_
     if (!timer)
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_TIMER_ID);
 
-    const std::lock_guard<std::mutex> timer_lock(timer->mutex);
+    auto timer_lock = timer->lock();
+    if (!timer_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_TIMER_ID;
     bool was_stopped = !timer->is_started;
     timer->is_started = false;
     timer->time = get_current_time();
@@ -611,18 +643,20 @@ SceUID mutex_find(KernelState &kernel, const char *export_name, const char *pNam
     return RET_ERROR(SCE_KERNEL_ERROR_UID_CANNOT_FIND_BY_NAME);
 }
 
-inline static int mutex_lock_impl(KernelState &kernel, MemState &mem, const char *export_name, SceUID thread_id, int lock_count, MutexPtr &mutex, SyncWeight weight, SceUInt *timeout, bool only_try, WaitTarget target, bool callbacks) {
+inline static int mutex_lock_impl(KernelState &kernel, MemState &mem, const char *export_name, SceUID thread_id, int lock_count, MutexPtr &mutex, SyncWeight weight, SceUInt *timeout, bool only_try, WaitTarget target, bool callbacks, const ThreadStatePtr &caller = nullptr) {
     if (LOG_SYNC_PRIMITIVES) {
         LOG_DEBUG("{}: uid: {} thread_id: {} name: \"{}\" attr: {} lock_count: {} timeout: {} waiting_threads: {}",
             export_name, mutex->uid, thread_id, mutex->name, mutex->attr, mutex->lock_count, timeout ? *timeout : 0,
             mutex->waiters.size());
     }
 
-    const ThreadStatePtr thread = kernel.get_thread(thread_id);
+    const ThreadStatePtr thread = caller ? caller : kernel.get_thread(thread_id);
     if (!thread) // the thread is being torn down so fail its last import instead of crashing the process
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
 
-    std::unique_lock<std::mutex> mutex_lock(mutex->mutex);
+    auto mutex_lock = mutex->lock();
+    if (!mutex_lock)
+        return unknown_mutex_id(export_name, weight);
     thread->set_wait_reason("mutex", mutex->uid, mutex->owner ? mutex->owner->id : 0);
 
     bool is_recursive = (mutex->attr & SCE_KERNEL_MUTEX_ATTR_RECURSIVE);
@@ -658,11 +692,10 @@ inline static int mutex_lock_impl(KernelState &kernel, MemState &mem, const char
         const WaitResult r = mutex->waiters.wait(mutex_lock, thread, target, { lock_count }, deadline, callbacks);
         writeback_timeout(timeout, deadline);
 
-        if (weight == SyncWeight::Light) {
+        // A deleted mutex has no owner and its work area may already be freed.
+        if (weight == SyncWeight::Light && mutex->owner == thread) {
             mutex->workarea.get(mem)->lockCount = mutex->lock_count;
-            if (mutex->owner == thread) {
-                mutex->workarea.get(mem)->owner = thread_id;
-            }
+            mutex->workarea.get(mem)->owner = thread_id;
         }
 
         return guest_result(r);
@@ -704,12 +737,14 @@ int mutex_try_lock(KernelState &kernel, MemState &mem, const char *export_name, 
     return mutex_lock_impl(kernel, mem, export_name, thread_id, lock_count, mutex, weight, nullptr, true, {}, false);
 }
 
-inline static int mutex_unlock_impl(KernelState &kernel, MemState &mem, const char *export_name, SceUID thread_id, int unlock_count, MutexPtr &mutex) {
-    const ThreadStatePtr current_thread = kernel.get_thread(thread_id);
+inline static int mutex_unlock_impl(KernelState &kernel, MemState &mem, const char *export_name, SceUID thread_id, int unlock_count, MutexPtr &mutex, const ThreadStatePtr &caller = nullptr) {
+    const ThreadStatePtr current_thread = caller ? caller : kernel.get_thread(thread_id);
     if (!current_thread) // the thread is being torn down so fail its last import instead of crashing the process
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
 
-    const std::lock_guard<std::mutex> mutex_lock(mutex->mutex);
+    auto mutex_lock = mutex->lock();
+    if (!mutex_lock)
+        return unknown_mutex_id(export_name, mutex->workarea ? SyncWeight::Light : SyncWeight::Heavy);
 
     if (current_thread == mutex->owner) {
         if (unlock_count > mutex->lock_count) {
@@ -756,28 +791,7 @@ int mutex_unlock(KernelState &kernel, MemState &mem, const char *export_name, Sc
 }
 
 int mutex_delete(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID mutexid, SyncWeight weight) {
-    assert(mutexid >= 0);
-
-    const MutexPtr mutex = find_mutex(kernel, mutexid, weight);
-    if (!mutex)
-        return unknown_mutex_id(export_name, weight);
-
-    if (LOG_SYNC_PRIMITIVES) {
-        LOG_DEBUG("{}: uid: {} thread_id: {} name: \"{}\" attr: {} lock_count: {} waiting_threads: {}",
-            export_name, mutexid, thread_id, mutex->name, mutex->attr, mutex->lock_count,
-            mutex->waiters.size());
-    }
-
-    if (mutex->waiters.empty()) {
-        mutex->deleted.store(true, std::memory_order_relaxed);
-        const std::lock_guard<std::mutex> kernel_guard(kernel.mutex);
-        get_mutexes(kernel, weight).erase(mutexid);
-    } else {
-        // TODO:
-        LOG_WARN("Can't delete sync object, it has waiting threads.");
-    }
-
-    return SCE_KERNEL_OK;
+    return remove_sync_object(get_mutexes(kernel, weight), kernel.mutex, mutexid) ? SCE_KERNEL_OK : unknown_mutex_id(export_name, weight);
 }
 
 MutexPtr mutex_get(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID mutexid, SyncWeight weight) {
@@ -838,7 +852,9 @@ SceInt32 rwlock_lock(KernelState &kernel, MemState &mem, const char *export_name
             rwlock->waiters.size());
     }
 
-    std::unique_lock<std::mutex> rwlock_lock(rwlock->mutex);
+    auto rwlock_lock = rwlock->lock();
+    if (!rwlock_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_RW_LOCK_ID;
 
     // if it is a read lock, it is always recursive
     bool is_recursive = !is_write || (rwlock->attr & SCE_KERNEL_MUTEX_ATTR_RECURSIVE);
@@ -885,7 +901,9 @@ SceInt32 rwlock_unlock(KernelState &kernel, MemState &mem, const char *export_na
             rwlock->waiters.size());
     }
 
-    const std::lock_guard<std::mutex> rwlock_lock(rwlock->mutex);
+    auto rwlock_lock = rwlock->lock();
+    if (!rwlock_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_RW_LOCK_ID;
 
     auto it = rwlock->owners.find(current_thread);
     if (it == rwlock->owners.end()) {
@@ -927,29 +945,7 @@ SceInt32 rwlock_unlock(KernelState &kernel, MemState &mem, const char *export_na
 }
 
 SceInt32 rwlock_delete(KernelState &kernel, MemState &mem, const char *export_name, SceUID thread_id, SceUID lock_id) {
-    const ThreadStatePtr thread = kernel.get_thread(thread_id);
-    if (!thread) // the thread is being torn down so fail its last import instead of crashing the process
-        return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
-    const RWLockPtr rwlock = lock_and_find(lock_id, kernel.rwlocks, kernel.mutex);
-
-    if (!rwlock)
-        return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_RW_LOCK_ID);
-
-    if (LOG_SYNC_PRIMITIVES) {
-        LOG_DEBUG("{}: uid: {} thread_id: {} name: \"{}\" attr: {} waiting_threads: {}",
-            export_name, lock_id, thread_id, rwlock->name, rwlock->attr,
-            rwlock->waiters.size());
-    }
-
-    if (rwlock->waiters.empty()) {
-        const std::lock_guard<std::mutex> kernel_guard(kernel.mutex);
-        kernel.rwlocks.erase(lock_id);
-    } else {
-        // TODO:
-        LOG_WARN("Can't delete sync object, it has waiting threads.");
-    }
-
-    return SCE_KERNEL_OK;
+    return remove_sync_object(kernel.rwlocks, kernel.mutex, lock_id) ? SCE_KERNEL_OK : SCE_KERNEL_ERROR_UNKNOWN_RW_LOCK_ID;
 }
 
 // **************
@@ -1022,7 +1018,9 @@ SceInt32 semaphore_wait(KernelState &kernel, const char *export_name, SceUID thr
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
 
     thread->set_wait_reason("sema", semaId, needCount);
-    std::unique_lock<std::mutex> semaphore_lock(semaphore->mutex);
+    auto semaphore_lock = semaphore->lock();
+    if (!semaphore_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_SEMA_ID;
 
     if (semaphore->val < needCount) {
         const Deadline deadline = deadline_from(pTimeout);
@@ -1051,7 +1049,9 @@ int semaphore_signal(KernelState &kernel, const char *export_name, SceUID thread
             semaphore->waiters.size());
     }
 
-    const std::lock_guard<std::mutex> semaphore_lock(semaphore->mutex);
+    auto semaphore_lock = semaphore->lock();
+    if (!semaphore_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_SEMA_ID;
 
     if (semaphore->val + signal > semaphore->max) {
         return RET_ERROR(SCE_KERNEL_ERROR_SEMA_OVF);
@@ -1072,29 +1072,7 @@ int semaphore_signal(KernelState &kernel, const char *export_name, SceUID thread
 }
 
 int semaphore_delete(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID semaid) {
-    assert(semaid >= 0);
-
-    // TODO: Don't lock twice
-    const SemaphorePtr semaphore = lock_and_find(semaid, kernel.semaphores, kernel.mutex);
-    if (!semaphore) {
-        return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_SEMA_ID);
-    }
-
-    if (LOG_SYNC_PRIMITIVES) {
-        LOG_DEBUG("{}: uid: {} thread_id: {} name: \"{}\" attr: {} val: {} waiting_threads: {}",
-            export_name, semaphore->uid, thread_id, semaphore->name, semaphore->attr, semaphore->val,
-            semaphore->waiters.size());
-    }
-
-    if (semaphore->waiters.empty()) {
-        const std::lock_guard<std::mutex> kernel_lock(kernel.mutex);
-        kernel.semaphores.erase(semaid);
-    } else {
-        // TODO:
-        LOG_WARN("Can't delete sync object, it has waiting threads.");
-    }
-
-    return SCE_KERNEL_OK;
+    return remove_sync_object(kernel.semaphores, kernel.mutex, semaid) ? SCE_KERNEL_OK : SCE_KERNEL_ERROR_UNKNOWN_SEMA_ID;
 }
 
 int semaphore_cancel(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID semaid, SceInt32 setCount, SceUInt32 *pNumWaitThreads) {
@@ -1112,7 +1090,9 @@ int semaphore_cancel(KernelState &kernel, const char *export_name, SceUID thread
             semaphore->waiters.size());
     }
 
-    const std::lock_guard<std::mutex> semaphore_lock(semaphore->mutex);
+    auto semaphore_lock = semaphore->lock();
+    if (!semaphore_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_SEMA_ID;
     if (setCount > semaphore->max) {
         return SCE_KERNEL_ERROR_ILLEGAL_COUNT;
     }
@@ -1153,6 +1133,7 @@ SceUID condvar_create(KernelState &kernel, MemState &mem, const char *export_nam
     condvar->uid = uid;
     condvar->attr = attr;
     condvar->associated_mutex = std::move(assoc_mutex);
+    condvar->lightweight = weight == SyncWeight::Light;
     strncpy(condvar->name, name, KERNELOBJECT_MAX_NAME_LENGTH);
 
     if (weight == SyncWeight::Light)
@@ -1183,22 +1164,29 @@ int condvar_wait(KernelState &kernel, MemState &mem, const char *export_name, Sc
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
 
     thread->set_wait_reason("cond", condvar->uid, condvar->associated_mutex ? condvar->associated_mutex->uid : 0);
-    std::unique_lock<std::mutex> condition_variable_lock(condvar->mutex);
+    auto condition_variable_lock = condvar->lock();
+    if (!condition_variable_lock)
+        return unknown_cond_id(export_name, weight);
 
-    if (auto error = mutex_unlock_impl(kernel, mem, export_name, thread_id, 1, condvar->associated_mutex))
+    if (auto error = mutex_unlock_impl(kernel, mem, export_name, thread_id, 1, condvar->associated_mutex, thread))
         return error;
 
     const Deadline deadline = deadline_from(timeout);
     const WaitResult r = condvar->waiters.wait(condition_variable_lock, thread, { weight == SyncWeight::Light ? SCE_KERNEL_WAITTYPE_LW_COND_SIGNAL : SCE_KERNEL_WAITTYPE_COND_SIGNAL, condid }, {}, deadline, callbacks);
     writeback_timeout(timeout, deadline);
     // A callback that exits the thread must not take back a mutex for it.
-    if (!r)
+    if (!r || (*r != SCE_KERNEL_OK && *r != SCE_KERNEL_ERROR_WAIT_TIMEOUT))
         return guest_result(r);
 
     condition_variable_lock.unlock();
     // Preserve local mutex ownership after a condition-variable timeout.
     // Reacquisition is untimed, because the original deadline may have expired.
-    const int lock_result = mutex_lock_impl(kernel, mem, export_name, thread_id, 1, condvar->associated_mutex, weight, nullptr, false, { weight == SyncWeight::Light ? SCE_KERNEL_WAITTYPE_LW_COND_LW_MUTEX : SCE_KERNEL_WAITTYPE_COND_MUTEX, condid }, callbacks);
+    const int lock_result = mutex_lock_impl(kernel, mem, export_name, thread_id, 1, condvar->associated_mutex, weight, nullptr, false, { weight == SyncWeight::Light ? SCE_KERNEL_WAITTYPE_LW_COND_LW_MUTEX : SCE_KERNEL_WAITTYPE_COND_MUTEX, condid }, callbacks, thread);
+    if (lock_result == SCE_KERNEL_ERROR_WAIT_DELETE ||
+        lock_result == SCE_KERNEL_ERROR_UNKNOWN_MUTEX_ID || lock_result == SCE_KERNEL_ERROR_UNKNOWN_LW_MUTEX_ID)
+        return weight == SyncWeight::Light ? SCE_KERNEL_ERROR_WAIT_DELETE_LW_MUTEX : SCE_KERNEL_ERROR_WAIT_DELETE_MUTEX;
+    if (lock_result == SCE_KERNEL_ERROR_WAIT_CANCEL)
+        return SCE_KERNEL_ERROR_WAIT_CANCEL_MUTEX;
     return *r == SCE_KERNEL_OK ? lock_result : *r;
 }
 
@@ -1217,7 +1205,9 @@ int condvar_signal(KernelState &kernel, const char *export_name, SceUID thread_i
 
     const auto target_type = signal_target.type;
 
-    const std::lock_guard<std::mutex> condvar_lock(condvar->mutex);
+    auto condvar_lock = condvar->lock();
+    if (!condvar_lock)
+        return unknown_cond_id(export_name, weight);
 
     if (target_type == Condvar::SignalTarget::Type::Specific) {
         // Search for specified waiting thread
@@ -1236,27 +1226,7 @@ int condvar_signal(KernelState &kernel, const char *export_name, SceUID thread_i
 }
 
 int condvar_delete(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID condid, SyncWeight weight) {
-    assert(condid >= 0);
-
-    const CondvarPtr condvar = find_condvar(kernel, condid, weight);
-    if (!condvar)
-        return unknown_cond_id(export_name, weight);
-
-    if (LOG_SYNC_PRIMITIVES) {
-        LOG_DEBUG("{}: uid: {} thread_id: {} name: \"{}\" attr: {} assoc_mutexid: {} waiting_threads: {}",
-            export_name, condvar->uid, thread_id, condvar->name, condvar->attr, condvar->associated_mutex->uid,
-            condvar->waiters.size());
-    }
-
-    if (condvar->waiters.empty()) {
-        const std::lock_guard<std::mutex> kernel_lock(kernel.mutex);
-        get_condvars(kernel, weight).erase(condid);
-    } else {
-        // TODO:
-        LOG_WARN("Can't delete sync object, it has waiting threads.");
-    }
-
-    return SCE_KERNEL_OK;
+    return remove_sync_object(get_condvars(kernel, weight), kernel.mutex, condid) ? SCE_KERNEL_OK : unknown_cond_id(export_name, weight);
 }
 
 // **************
@@ -1274,7 +1244,9 @@ SceUID eventflag_clear(KernelState &kernel, const char *export_name, SceUID evfI
             export_name, evfId, bitPattern);
     }
 
-    const std::lock_guard<std::mutex> event_lock(event->mutex);
+    auto event_lock = event->lock();
+    if (!event_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_EVF_ID;
 
     event->flags &= bitPattern;
     evf_record(evfId, 0, 1, bitPattern, event->flags, 0);
@@ -1346,7 +1318,9 @@ static int eventflag_waitorpoll(KernelState &kernel, const char *export_name, Sc
     if (!thread) // the thread is being torn down so fail its last import instead of crashing the process
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
 
-    std::unique_lock<std::mutex> event_lock(event->mutex);
+    auto event_lock = event->lock();
+    if (!event_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_EVF_ID;
 
     if ((event->attr & 0x1000) == 0 && !event->waiters.empty()) {
         return RET_ERROR(SCE_KERNEL_ERROR_EVF_MULTI);
@@ -1381,7 +1355,7 @@ static int eventflag_waitorpoll(KernelState &kernel, const char *export_name, Sc
         const WaitResult r = event->waiters.wait(event_lock, thread, { SCE_KERNEL_WAITTYPE_EVENTFLAG, event_id }, { wait, flags, outBits }, deadline, callbacks);
         writeback_timeout(timeout, deadline);
         const SceInt32 err = guest_result(r);
-        if (err == SCE_KERNEL_ERROR_WAIT_TIMEOUT && outBits) {
+        if ((err == SCE_KERNEL_ERROR_WAIT_TIMEOUT || err == SCE_KERNEL_ERROR_WAIT_DELETE) && outBits) {
             // set it only if a timeout occurs
             // otherwise set in eventflag_set or eventflag_cancel
             *outBits = event->flags;
@@ -1412,8 +1386,8 @@ int KernelState::try_break_provable_evf_cycle(bool dry_run) {
     {
         const std::lock_guard<std::mutex> lock(mutex);
         for (const auto &[uid, event] : eventflags) {
-            const std::lock_guard<std::mutex> evlock(event->mutex);
-            if (event->waiters.empty())
+            auto evlock = event->lock();
+            if (!evlock || event->waiters.empty())
                 continue;
             FlagInfo fi;
             fi.event = event;
@@ -1464,8 +1438,8 @@ void KernelState::log_eventflag_history() {
     {
         const std::lock_guard<std::mutex> lock(mutex);
         for (const auto &[uid, event] : eventflags) {
-            const std::lock_guard<std::mutex> evlock(event->mutex);
-            if (event->waiters.empty())
+            auto evlock = event->lock();
+            if (!evlock || event->waiters.empty())
                 continue;
             std::string waiters;
             event->waiters.for_each([&](const auto &w) {
@@ -1493,8 +1467,8 @@ int KernelState::try_break_frame_sync_deadlock(std::vector<SceUID> &already_nudg
         for (auto &[uid, event] : eventflags) {
             if (std::find(already_nudged.begin(), already_nudged.end(), uid) != already_nudged.end())
                 continue;
-            const std::lock_guard<std::mutex> ev_lock(event->mutex);
-            if (event->waiters.empty())
+            auto ev_lock = event->lock();
+            if (!ev_lock || event->waiters.empty())
                 continue;
             bool any_satisfiable = false;
             SceUInt32 need = 0;
@@ -1538,7 +1512,9 @@ SceInt32 eventflag_set(KernelState &kernel, const char *export_name, SceUID thre
             event->waiters.size());
     }
 
-    const std::lock_guard<std::mutex> event_lock(event->mutex);
+    auto event_lock = event->lock();
+    if (!event_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_EVF_ID;
     event->flags |= bitPattern;
     const auto woken_count = event->waiters.wake_if([&](auto &waiter) {
         const EventFlag::WaitEntry &wait = waiter.entry;
@@ -1586,7 +1562,9 @@ SceInt32 eventflag_cancel(KernelState &kernel, const char *export_name, SceUID t
             export_name, event->uid, thread_id, event->name, event->attr, event->flags, event->waiters.size());
     }
 
-    const std::lock_guard<std::mutex> event_lock(event->mutex);
+    auto event_lock = event->lock();
+    if (!event_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_EVF_ID;
 
     const auto set_out_bits = [&](auto &waiter) {
         if (waiter.entry.out_bits)
@@ -1604,27 +1582,7 @@ SceInt32 eventflag_cancel(KernelState &kernel, const char *export_name, SceUID t
 }
 
 int eventflag_delete(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID event_id) {
-    assert(event_id >= 0);
-
-    const EventFlagPtr event = lock_and_find(event_id, kernel.eventflags, kernel.mutex);
-    if (!event) {
-        return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_EVF_ID);
-    }
-
-    if (LOG_SYNC_PRIMITIVES) {
-        LOG_DEBUG("{}: uid: {} thread_id: {} name: \"{}\" attr: {} existing_flags: {:#b} waiting_threads: {}",
-            export_name, event->uid, thread_id, event->name, event->attr, event->flags, event->waiters.size());
-    }
-
-    if (event->waiters.empty()) {
-        const std::lock_guard<std::mutex> kernel_lock(kernel.mutex);
-        kernel.eventflags.erase(event_id);
-    } else {
-        // TODO:
-        LOG_WARN("Can't delete sync object, it has waiting threads.");
-    }
-
-    return SCE_KERNEL_OK;
+    return remove_sync_object(kernel.eventflags, kernel.mutex, event_id) ? SCE_KERNEL_OK : SCE_KERNEL_ERROR_UNKNOWN_EVF_ID;
 }
 
 // *************
@@ -1718,11 +1676,9 @@ SceSize msgpipe_recv(KernelState &kernel, const char *export_name, SceUID thread
     const ThreadStatePtr thread = kernel.get_thread(thread_id);
     if (!thread) // the thread is being torn down so fail its last import instead of crashing the process
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
-    std::unique_lock msgpipe_lock(msgpipe->mutex);
-    // check in case of delete happens while waiting (un)lock
-    if (msgpipe->beingDeleted) {
-        return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_MSG_PIPE_ID);
-    }
+    auto msgpipe_lock = msgpipe->lock();
+    if (!msgpipe_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_MSG_PIPE_ID;
 
     const auto can_receive = [&] {
         const std::size_t availableSize = msgpipe->data_buffer.Used();
@@ -1772,11 +1728,9 @@ SceSize msgpipe_send(KernelState &kernel, const char *export_name, SceUID thread
     const ThreadStatePtr thread = kernel.get_thread(thread_id);
     if (!thread) // fail a final import during thread teardown instead of dereferencing null
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
-    std::unique_lock<std::mutex> msgpipe_lock(msgpipe->mutex);
-    // check in case of delete happens while waiting (un)lock
-    if (msgpipe->beingDeleted) {
-        return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_MSG_PIPE_ID);
-    }
+    auto msgpipe_lock = msgpipe->lock();
+    if (!msgpipe_lock)
+        return SCE_KERNEL_ERROR_UNKNOWN_MSG_PIPE_ID;
 
     // If ASAP and there's at least 1 free byte, or FULL and there's enough space, copy and return directly.
     const auto can_send = [&] {
@@ -1804,29 +1758,98 @@ SceSize msgpipe_send(KernelState &kernel, const char *export_name, SceUID thread
 }
 
 SceInt32 msgpipe_delete(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID msgpipe_id) {
-    assert(msgpipe_id >= 0);
+    return remove_sync_object(kernel.msgpipes, kernel.mutex, msgpipe_id) ? SCE_KERNEL_OK : SCE_KERNEL_ERROR_UNKNOWN_MSG_PIPE_ID;
+}
 
-    const MsgPipePtr msgpipe = lock_and_find(msgpipe_id, kernel.msgpipes, kernel.mutex);
-    if (!msgpipe) {
-        return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_MSG_PIPE_ID);
+SceInt32 timer_delete(KernelState &kernel, const char *export_name, SceUID timer_id) {
+    return remove_sync_object(kernel.timers, kernel.mutex, timer_id) ? SCE_KERNEL_OK : SCE_KERNEL_ERROR_UNKNOWN_TIMER_ID;
+}
+
+SceInt32 timer_cancel(KernelState &kernel, const char *export_name, SceUID timer_id, SceUInt32 *num_wait_threads) {
+    const TimerPtr timer = lock_and_find(timer_id, kernel.timers, kernel.mutex);
+    auto guard = timer ? timer->lock() : std::unique_lock<std::mutex>();
+    if (!guard)
+        return SCE_KERNEL_ERROR_UNKNOWN_TIMER_ID;
+    const auto count = static_cast<SceUInt32>(timer->waiters.wake_all(SCE_KERNEL_ERROR_WAIT_CANCEL));
+    timer->is_repeat = false;
+    timer->is_pulse = false;
+    timer->event_interval = 0;
+    timer->next_event = std::numeric_limits<uint64_t>::max();
+    if (num_wait_threads)
+        *num_wait_threads = count;
+    return SCE_KERNEL_OK;
+}
+
+SceInt32 simple_event_cancel(KernelState &kernel, const char *export_name, SceUID event_id, SceUInt32 *num_wait_threads) {
+    const SimpleEventPtr event = lock_and_find(event_id, kernel.simple_events, kernel.mutex);
+    if (!event) {
+        const auto result = timer_cancel(kernel, export_name, event_id, num_wait_threads);
+        return result == SCE_KERNEL_ERROR_UNKNOWN_TIMER_ID ? SCE_KERNEL_ERROR_UNKNOWN_EVENT_ID : result;
     }
+    auto guard = event->lock();
+    if (!guard)
+        return SCE_KERNEL_ERROR_UNKNOWN_EVENT_ID;
+    const auto count = static_cast<SceUInt32>(event->waiters.wake_all(SCE_KERNEL_ERROR_WAIT_CANCEL));
+    if (num_wait_threads)
+        *num_wait_threads = count;
+    return SCE_KERNEL_OK;
+}
 
-    if (LOG_SYNC_PRIMITIVES) {
-        LOG_DEBUG("{}: uid: {} thread_id: {} name: \"{}\" attr: {}",
-            export_name, msgpipe->uid, thread_id, msgpipe->name, msgpipe->attr);
+SceInt32 mutex_cancel(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID mutex_id, SceInt32 new_count, SceUInt32 *num_wait_threads) {
+    const auto thread = kernel.get_thread(thread_id);
+    if (!thread)
+        return SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID;
+    const auto mutex = find_mutex(kernel, mutex_id, SyncWeight::Heavy);
+    auto guard = mutex ? mutex->lock() : std::unique_lock<std::mutex>();
+    if (!guard)
+        return SCE_KERNEL_ERROR_UNKNOWN_MUTEX_ID;
+    if (new_count == -1)
+        new_count = mutex->init_count;
+    if (new_count < 0 || (new_count > 1 && !(mutex->attr & SCE_KERNEL_MUTEX_ATTR_RECURSIVE)))
+        return SCE_KERNEL_ERROR_ILLEGAL_COUNT;
+    const auto count = static_cast<SceUInt32>(mutex->waiters.wake_all(SCE_KERNEL_ERROR_WAIT_CANCEL));
+    mutex->lock_count = new_count;
+    mutex->owner = new_count > 0 ? thread : nullptr;
+    if (num_wait_threads)
+        *num_wait_threads = count;
+    return SCE_KERNEL_OK;
+}
+
+SceInt32 rwlock_cancel(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID rwlock_id, SceUInt32 *num_readers, SceUInt32 *num_writers, SceInt32 flag) {
+    const auto thread = kernel.get_thread(thread_id);
+    if (!thread)
+        return SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID;
+    const auto rwlock = lock_and_find(rwlock_id, kernel.rwlocks, kernel.mutex);
+    auto guard = rwlock ? rwlock->lock() : std::unique_lock<std::mutex>();
+    if (!guard)
+        return SCE_KERNEL_ERROR_UNKNOWN_RW_LOCK_ID;
+    const auto writers = static_cast<SceUInt32>(rwlock->waiters.wake_if([](auto &waiter) { return waiter.entry.is_write; }, SCE_KERNEL_ERROR_WAIT_CANCEL));
+    const auto readers = static_cast<SceUInt32>(rwlock->waiters.wake_all(SCE_KERNEL_ERROR_WAIT_CANCEL));
+    rwlock->owners.clear();
+    if (flag & SCE_KERNEL_RW_LOCK_CANCEL_WITH_WRITE_LOCK) {
+        rwlock->owners.emplace(thread, 1);
+        rwlock->state = RWLockState::WriteLocked;
+    } else {
+        rwlock->state = RWLockState::Unlocked;
     }
+    if (num_readers)
+        *num_readers = readers;
+    if (num_writers)
+        *num_writers = writers;
+    return SCE_KERNEL_OK;
+}
 
-    {
-        const std::lock_guard<std::mutex> msgpipe_lock(msgpipe->mutex);
-        msgpipe->beingDeleted = true;
-
-        // Wake up every thread
-        msgpipe->senders.wake_all(SCE_KERNEL_ERROR_WAIT_DELETE);
-        msgpipe->receivers.wake_all(SCE_KERNEL_ERROR_WAIT_DELETE);
-    }
-
-    const std::lock_guard<std::mutex> kernel_lock(kernel.mutex);
-    kernel.msgpipes.erase(msgpipe->uid);
-
+SceInt32 msgpipe_cancel(KernelState &kernel, const char *export_name, SceUID msgpipe_id, SceUInt32 *num_senders, SceUInt32 *num_receivers) {
+    const auto pipe = lock_and_find(msgpipe_id, kernel.msgpipes, kernel.mutex);
+    auto guard = pipe ? pipe->lock() : std::unique_lock<std::mutex>();
+    if (!guard)
+        return SCE_KERNEL_ERROR_UNKNOWN_MSG_PIPE_ID;
+    const auto senders = static_cast<SceUInt32>(pipe->senders.wake_all(SCE_KERNEL_ERROR_WAIT_CANCEL));
+    const auto receivers = static_cast<SceUInt32>(pipe->receivers.wake_all(SCE_KERNEL_ERROR_WAIT_CANCEL));
+    pipe->data_buffer.Clear();
+    if (num_senders)
+        *num_senders = senders;
+    if (num_receivers)
+        *num_receivers = receivers;
     return SCE_KERNEL_OK;
 }

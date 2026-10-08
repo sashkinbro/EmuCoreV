@@ -246,6 +246,9 @@ void DebugWidget::refresh_mutexes() {
     const std::lock_guard<std::mutex> lock(emuenv.kernel.mutex);
 
     for (const auto &[id, mutex] : emuenv.kernel.mutexes) {
+        auto object_lock = mutex->lock();
+        if (!object_lock)
+            continue;
         auto *item = new QTreeWidgetItem(m_mutexes_tree);
         item->setText(0, QStringLiteral("0x%1").arg(id, 8, 16, QLatin1Char('0')).toUpper());
         item->setText(1, QString::fromUtf8(mutex->name));
@@ -262,6 +265,9 @@ void DebugWidget::refresh_lw_mutexes() {
     const std::lock_guard<std::mutex> lock(emuenv.kernel.mutex);
 
     for (const auto &[id, mutex] : emuenv.kernel.lwmutexes) {
+        auto object_lock = mutex->lock();
+        if (!object_lock)
+            continue;
         auto *item = new QTreeWidgetItem(m_lw_mutexes_tree);
         item->setText(0, QStringLiteral("0x%1").arg(id, 8, 16, QLatin1Char('0')).toUpper());
         item->setText(1, QString::fromUtf8(mutex->name));
@@ -278,6 +284,9 @@ void DebugWidget::refresh_condvars() {
     const std::lock_guard<std::mutex> lock(emuenv.kernel.mutex);
 
     for (const auto &[id, cv] : emuenv.kernel.condvars) {
+        auto object_lock = cv->lock();
+        if (!object_lock)
+            continue;
         auto *item = new QTreeWidgetItem(m_condvars_tree);
         item->setText(0, QStringLiteral("0x%1").arg(id, 8, 16, QLatin1Char('0')).toUpper());
         item->setText(1, QString::fromUtf8(cv->name));
@@ -292,6 +301,9 @@ void DebugWidget::refresh_lw_condvars() {
     const std::lock_guard<std::mutex> lock(emuenv.kernel.mutex);
 
     for (const auto &[id, cv] : emuenv.kernel.lwcondvars) {
+        auto object_lock = cv->lock();
+        if (!object_lock)
+            continue;
         auto *item = new QTreeWidgetItem(m_lw_condvars_tree);
         item->setText(0, QStringLiteral("0x%1").arg(id, 8, 16, QLatin1Char('0')).toUpper());
         item->setText(1, QString::fromUtf8(cv->name));
@@ -306,6 +318,9 @@ void DebugWidget::refresh_semaphores() {
     const std::lock_guard<std::mutex> lock(emuenv.kernel.mutex);
 
     for (const auto &[id, sema] : emuenv.kernel.semaphores) {
+        auto object_lock = sema->lock();
+        if (!object_lock)
+            continue;
         auto *item = new QTreeWidgetItem(m_semaphores_tree);
         item->setText(0, QStringLiteral("0x%1").arg(id, 8, 16, QLatin1Char('0')).toUpper());
         item->setText(1, QString::fromUtf8(sema->name));
@@ -321,6 +336,9 @@ void DebugWidget::refresh_event_flags() {
     const std::lock_guard<std::mutex> lock(emuenv.kernel.mutex);
 
     for (const auto &[id, ef] : emuenv.kernel.eventflags) {
+        auto object_lock = ef->lock();
+        if (!object_lock)
+            continue;
         auto *item = new QTreeWidgetItem(m_event_flags_tree);
         item->setText(0, QStringLiteral("0x%1").arg(id, 8, 16, QLatin1Char('0')).toUpper());
         item->setText(1, QString::fromUtf8(ef->name));

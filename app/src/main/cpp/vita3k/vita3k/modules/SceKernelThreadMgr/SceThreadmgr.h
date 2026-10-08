@@ -80,3 +80,9 @@ DECL_EXPORT(int, _sceKernelGetThreadContextForVM, SceUID threadId, Ptr<SceKernel
 DECL_EXPORT(int, sceKernelResumeThreadForVM, SceUID threadId);
 DECL_EXPORT(int, sceKernelSuspendThreadForVM, SceUID threadId);
 DECL_EXPORT(int, sceKernelUnlockMutex, SceUID mutexid, int unlock_count);
+
+DECL_EXPORT(SceInt32, _sceKernelCancelEvent, SceUID event_id, SceUInt32 *num_wait_threads);
+DECL_EXPORT(SceInt32, _sceKernelCancelTimer, SceUID timer_id, SceUInt32 *num_wait_threads);
+DECL_EXPORT(SceInt32, _sceKernelCancelMutex, SceUID mutex_id, SceInt32 new_count, SceUInt32 *num_wait_threads);
+DECL_EXPORT(SceInt32, _sceKernelCancelRWLock, SceUID rwlock_id, SceUInt32 *num_readers, SceUInt32 *num_writers, SceInt32 flag);
+DECL_EXPORT(SceInt32, _sceKernelCancelMsgPipe, SceUID msgpipe_id, SceUInt32 *num_senders, SceUInt32 *num_receivers);

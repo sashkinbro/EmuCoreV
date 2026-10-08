@@ -28,6 +28,9 @@ void draw_semaphores_dialog(GuiState &gui, EmuEnvState &emuenv) {
     const std::lock_guard<std::mutex> lock(emuenv.kernel.mutex);
 
     for (const auto &[id, sema_state] : emuenv.kernel.semaphores) {
+        auto object_lock = sema_state->lock();
+        if (!object_lock)
+            continue;
         ImGui::TextColored(GUI_COLOR_TEXT, "0x%08X       %-32s   %02d/%02d              %02zu",
             id,
             sema_state->name,

@@ -1143,9 +1143,9 @@ EXPORT(int, sceKernelCallWithChangeStack) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceKernelCancelEvent) {
-    TRACY_FUNC(sceKernelCancelEvent);
-    return UNIMPLEMENTED();
+EXPORT(SceInt32, sceKernelCancelEvent, SceUID event_id, SceUInt32 *num_wait_threads) {
+    TRACY_FUNC(sceKernelCancelEvent, event_id, num_wait_threads);
+    return CALL_EXPORT(_sceKernelCancelEvent, event_id, num_wait_threads);
 }
 
 EXPORT(SceInt32, sceKernelCancelEventFlag, SceUID event_id, SceUInt pattern, SceUInt32 *num_wait_thread) {
@@ -1158,19 +1158,19 @@ EXPORT(int, sceKernelCancelEventWithSetPattern) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceKernelCancelMsgPipe) {
-    TRACY_FUNC(sceKernelCancelMsgPipe);
-    return UNIMPLEMENTED();
+EXPORT(SceInt32, sceKernelCancelMsgPipe, SceUID msgpipe_id, SceUInt32 *num_senders, SceUInt32 *num_receivers) {
+    TRACY_FUNC(sceKernelCancelMsgPipe, msgpipe_id, num_senders, num_receivers);
+    return CALL_EXPORT(_sceKernelCancelMsgPipe, msgpipe_id, num_senders, num_receivers);
 }
 
-EXPORT(int, sceKernelCancelMutex) {
-    TRACY_FUNC(sceKernelCancelMutex);
-    return UNIMPLEMENTED();
+EXPORT(SceInt32, sceKernelCancelMutex, SceUID mutex_id, SceInt32 new_count, SceUInt32 *num_wait_threads) {
+    TRACY_FUNC(sceKernelCancelMutex, mutex_id, new_count, num_wait_threads);
+    return CALL_EXPORT(_sceKernelCancelMutex, mutex_id, new_count, num_wait_threads);
 }
 
-EXPORT(int, sceKernelCancelRWLock) {
-    TRACY_FUNC(sceKernelCancelRWLock);
-    return UNIMPLEMENTED();
+EXPORT(SceInt32, sceKernelCancelRWLock, SceUID rwlock_id, SceUInt32 *num_readers, SceUInt32 *num_writers, SceInt32 flag) {
+    TRACY_FUNC(sceKernelCancelRWLock, rwlock_id, num_readers, num_writers, flag);
+    return CALL_EXPORT(_sceKernelCancelRWLock, rwlock_id, num_readers, num_writers, flag);
 }
 
 EXPORT(int, sceKernelCancelSema, SceUID semaId, SceInt32 setCount, SceUInt32 *pNumWaitThreads) {
@@ -1178,9 +1178,9 @@ EXPORT(int, sceKernelCancelSema, SceUID semaId, SceInt32 setCount, SceUInt32 *pN
     return CALL_EXPORT(_sceKernelCancelSema, semaId, setCount, pNumWaitThreads);
 }
 
-EXPORT(int, sceKernelCancelTimer) {
-    TRACY_FUNC(sceKernelCancelTimer);
-    return UNIMPLEMENTED();
+EXPORT(SceInt32, sceKernelCancelTimer, SceUID timer_id, SceUInt32 *num_wait_threads) {
+    TRACY_FUNC(sceKernelCancelTimer, timer_id, num_wait_threads);
+    return CALL_EXPORT(_sceKernelCancelTimer, timer_id, num_wait_threads);
 }
 
 EXPORT(int, sceKernelChangeCurrentThreadAttr) {
@@ -1515,7 +1515,8 @@ EXPORT(int, sceKernelGetTimerBase, SceUID timer_handle, SceKernelSysClock *time)
     TRACY_FUNC(sceKernelGetTimerBase, timer_handle, time);
     const TimerPtr timer_info = lock_and_find(timer_handle, emuenv.kernel.timers, emuenv.kernel.mutex);
 
-    if (!timer_info)
+    auto object_lock = timer_info ? timer_info->lock() : std::unique_lock<std::mutex>();
+    if (!object_lock)
         return SCE_KERNEL_ERROR_UNKNOWN_TIMER_ID;
 
     *time = timer_info->time;
@@ -1537,7 +1538,8 @@ EXPORT(int, sceKernelGetTimerTime, SceUID timer_handle, SceKernelSysClock *time)
     TRACY_FUNC(sceKernelGetTimerTime, timer_handle, time);
     const TimerPtr timer_info = lock_and_find(timer_handle, emuenv.kernel.timers, emuenv.kernel.mutex);
 
-    if (!timer_info)
+    auto object_lock = timer_info ? timer_info->lock() : std::unique_lock<std::mutex>();
+    if (!object_lock)
         return SCE_KERNEL_ERROR_UNKNOWN_TIMER_ID;
 
     *time = get_current_time() - timer_info->time;

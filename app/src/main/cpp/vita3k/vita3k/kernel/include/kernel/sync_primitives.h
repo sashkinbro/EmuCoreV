@@ -36,6 +36,25 @@ struct SyncPrimitive {
     std::mutex mutex;
     char name[KERNELOBJECT_MAX_NAME_LENGTH + 1]{};
     virtual ~SyncPrimitive() = default;
+
+    // The cache may inspect this flag without the lock; operations must recheck
+    // through lock() before using any fields, including a guest work area.
+    std::atomic<bool> deleted{ false };
+    [[nodiscard]] std::unique_lock<std::mutex> lock() {
+        std::unique_lock<std::mutex> guard(mutex);
+        if (deleted.load(std::memory_order_relaxed))
+            guard.unlock();
+        return guard;
+    }
+    // Called once after extraction from the UID map, without the registry lock.
+    void mark_deleted() {
+        const std::lock_guard<std::mutex> guard(mutex);
+        assert(!deleted.load(std::memory_order_relaxed));
+        deleted.store(true, std::memory_order_relaxed);
+        on_delete();
+    }
+protected:
+    virtual void on_delete() = 0;
 };
 
 struct SimpleEvent : SyncPrimitive {
@@ -54,6 +73,8 @@ struct SimpleEvent : SyncPrimitive {
 
     bool auto_reset = false;
     bool cb_wakeup_only = false;
+protected:
+    void on_delete() override;
 };
 
 typedef std::shared_ptr<SimpleEvent> SimpleEventPtr;
@@ -73,6 +94,8 @@ struct Timer : SyncPrimitive {
     uint64_t time = 0;
     uint64_t next_event = 0;
     uint64_t event_interval = 0;
+protected:
+    void on_delete() override;
 };
 
 typedef std::shared_ptr<Timer> TimerPtr;
@@ -90,6 +113,8 @@ struct Semaphore : SyncPrimitive {
     int max = 0;
     int val = 0;
     int init_val = 0;
+protected:
+    void on_delete() override;
 };
 
 typedef std::shared_ptr<Semaphore> SemaphorePtr;
@@ -108,7 +133,8 @@ struct Mutex : SyncPrimitive {
     ThreadStatePtr owner;
     WaitQueue<WaitEntry> waiters;
     Ptr<SceKernelLwMutexWork> workarea;
-    std::atomic<bool> deleted{ false };
+protected:
+    void on_delete() override;
 };
 
 typedef std::shared_ptr<Mutex> MutexPtr;
@@ -134,6 +160,8 @@ struct RWLock : SyncPrimitive {
     RWLockState state = RWLockState::Unlocked;
     RWLockOwners owners;
     WaitQueue<WaitEntry> waiters;
+protected:
+    void on_delete() override;
 };
 
 typedef std::shared_ptr<RWLock> RWLockPtr;
@@ -151,6 +179,8 @@ struct EventFlag : SyncPrimitive {
 
     WaitQueue<WaitEntry> waiters;
     int flags = 0;
+protected:
+    void on_delete() override;
 };
 
 typedef std::shared_ptr<EventFlag> EventFlagPtr;
@@ -179,6 +209,9 @@ struct Condvar : SyncPrimitive {
 
     WaitQueue<std::monostate> waiters;
     MutexPtr associated_mutex;
+    bool lightweight = false;
+protected:
+    void on_delete() override;
 };
 typedef std::shared_ptr<Condvar> CondvarPtr;
 typedef std::map<SceUID, CondvarPtr> CondvarPtrs;
@@ -199,9 +232,9 @@ struct MsgPipe : SyncPrimitive {
     WaitQueue<WaitEntry> receivers;
     ByteRingBuffer data_buffer;
 
-    bool beingDeleted = false;
-
     ~MsgPipe() override = default;
+protected:
+    void on_delete() override;
 };
 
 typedef std::shared_ptr<MsgPipe> MsgPipePtr;
@@ -274,3 +307,11 @@ SceUID msgpipe_find(KernelState &kernel, const char *export_name, const char *pN
 SceSize msgpipe_recv(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID msgPipeId, SceUInt32 waitMode, void *pRecvBuf, SceSize recvSize, SceUInt32 *pTimeout, bool callbacks);
 SceSize msgpipe_send(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID msgPipeId, SceUInt32 waitMode, const void *pSendBuf, SceSize sendSize, SceUInt32 *pTimeout, bool callbacks);
 SceInt32 msgpipe_delete(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID msgpipe_id);
+
+// Cancellation and deletion retain the existing per-type UID maps.
+SceInt32 simple_event_cancel(KernelState &kernel, const char *export_name, SceUID event_id, SceUInt32 *num_wait_threads);
+SceInt32 timer_cancel(KernelState &kernel, const char *export_name, SceUID timer_id, SceUInt32 *num_wait_threads);
+SceInt32 timer_delete(KernelState &kernel, const char *export_name, SceUID timer_id);
+SceInt32 mutex_cancel(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID mutex_id, SceInt32 new_count, SceUInt32 *num_wait_threads);
+SceInt32 rwlock_cancel(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID rwlock_id, SceUInt32 *num_readers, SceUInt32 *num_writers, SceInt32 flag);
+SceInt32 msgpipe_cancel(KernelState &kernel, const char *export_name, SceUID msgpipe_id, SceUInt32 *num_senders, SceUInt32 *num_receivers);

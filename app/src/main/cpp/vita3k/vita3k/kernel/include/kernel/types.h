@@ -953,3 +953,5 @@ struct SceKernelCallbackInfo {
     SceInt32 notifyArg;
     Ptr<void> pCommon;
 };
+
+constexpr SceUInt32 SCE_KERNEL_RW_LOCK_CANCEL_WITH_WRITE_LOCK = 1;
