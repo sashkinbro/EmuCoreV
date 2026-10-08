@@ -1435,4 +1435,21 @@
     <string name="settings_trophy_sound_unavailable">सहेजी गई ध्वनि उपलब्ध नहीं है। इसे फिर से चुनें।</string>
     <string name="settings_trophy_sound_pick_error">इस ऑडियो फ़ाइल का उपयोग नहीं हो सका।</string>
     <string name="emulation_savestate_startup_loading">सेव स्टेट लोड हो रहा है…</string>
+    <string name="controls_button_l2">L2</string>
+    <string name="controls_button_l1">L1</string>
+    <string name="controls_button_r2">R2</string>
+    <string name="controls_button_r1">R1</string>
+    <string name="controls_button_up">ऊपर</string>
+    <string name="controls_button_down">नीचे</string>
+    <string name="controls_button_left">बाएँ</string>
+    <string name="controls_button_right">दाएँ</string>
+    <string name="controls_button_left_stick">बायाँ स्टिक</string>
+    <string name="controls_button_right_stick">दायाँ स्टिक</string>
+    <string name="controls_button_triangle">त्रिकोण</string>
+    <string name="controls_button_cross">क्रॉस</string>
+    <string name="controls_button_square">वर्ग</string>
+    <string name="controls_button_circle">वृत्त</string>
+    <string name="controls_button_select">चुनें</string>
+    <string name="controls_button_start">शुरू करें</string>
+    <string name="controls_button_touch">स्पर्श</string>
 </resources>

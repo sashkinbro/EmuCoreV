@@ -1439,4 +1439,21 @@
     <string name="settings_trophy_sound_unavailable">يتعذر الوصول إلى الصوت المحفوظ. اختره مرة أخرى.</string>
     <string name="settings_trophy_sound_pick_error">تعذر استخدام ملف الصوت هذا.</string>
     <string name="emulation_savestate_startup_loading">جارٍ تحميل حالة الحفظ…</string>
+    <string name="controls_button_l2">L2</string>
+    <string name="controls_button_l1">L1</string>
+    <string name="controls_button_r2">R2</string>
+    <string name="controls_button_r1">R1</string>
+    <string name="controls_button_up">أعلى</string>
+    <string name="controls_button_down">أسفل</string>
+    <string name="controls_button_left">يسار</string>
+    <string name="controls_button_right">يمين</string>
+    <string name="controls_button_left_stick">العصا اليسرى</string>
+    <string name="controls_button_right_stick">العصا اليمنى</string>
+    <string name="controls_button_triangle">مثلث</string>
+    <string name="controls_button_cross">علامة ×</string>
+    <string name="controls_button_square">مربع</string>
+    <string name="controls_button_circle">دائرة</string>
+    <string name="controls_button_select">اختيار</string>
+    <string name="controls_button_start">بدء</string>
+    <string name="controls_button_touch">لمس</string>
 </resources>

@@ -50,6 +50,9 @@ import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -926,7 +929,7 @@ private fun SaveStatesTab(saveStates: SaveStateMenuState, callbacks: EmulationMe
     val slot = saveStates.slots.firstOrNull { it.slot == selected }
     MenuSection(
         title = stringResource(R.string.emulation_menu_section_savestates),
-        subtitle = stringResource(R.string.emulation_menu_section_savestates_desc),
+        subtitle = "",
         badge = null
     ) {
         MenuChipRow(
@@ -936,108 +939,56 @@ private fun SaveStatesTab(saveStates: SaveStateMenuState, callbacks: EmulationMe
             enabled = !saveStates.busy,
             onSelected = callbacks.onSaveStateSlotSelected
         )
-
-        Surface(
-            shape = neonShape(14.dp),
-            color = palette.row,
-            border = BorderStroke(1.dp, palette.border)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Surface(
-                    shape = neonShape(10.dp),
-                    color = palette.panelSoft,
-                    border = BorderStroke(1.dp, palette.border)
-                ) {
-                    LocalImage(
-                        path = slot?.thumbnailPath,
-                        contentDescription = stringResource(R.string.emulation_savestate_preview),
-                        fallbackLabel = saveStateSlotLabel(selected),
-                        modifier = Modifier
-                            .width(96.dp)
-                            .height(54.dp)
-                            .clip(neonShape(10.dp))
-                    )
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Text(
-                        text = saveStateSlotLabel(selected),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = palette.textPrimary
-                    )
-                    Text(
-                        text = if (slot?.exists == true) {
-                            stringResource(R.string.emulation_savestate_saved_at, formatSaveStateDate(slot.timestamp))
-                        } else {
-                            stringResource(R.string.emulation_savestate_empty)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = palette.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (slot?.exists == true) {
-                        Text(
-                            text = stringResource(R.string.emulation_savestate_size, formatSaveStateSize(slot.sizeBytes)),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = palette.textSecondary
-                        )
-                        if (slot.sessionMatch) {
-                            Text(
-                                text = stringResource(R.string.emulation_savestate_session_current),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = LiveBadgeColor
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
+        Text(
+            text = if (slot?.exists == true) {
+                stringResource(R.string.emulation_savestate_saved_at, formatSaveStateDate(slot.timestamp)) +
+                    " · " + stringResource(R.string.emulation_savestate_size, formatSaveStateSize(slot.sizeBytes))
+            } else {
+                stringResource(R.string.emulation_savestate_empty)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = palette.textSecondary
+        )
         if (saveStates.busy) {
             LinearProgressIndicator(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.primary
             )
         }
-
-        MenuActionRow(
-            icon = Icons.Rounded.Save,
-            title = stringResource(R.string.emulation_savestate_save_action),
-            subtitle = stringResource(
-                if (slot?.exists == true) {
-                    R.string.emulation_savestate_save_overwrite_desc
-                } else {
-                    R.string.emulation_savestate_save_desc
-                }
-            ),
-            enabled = !saveStates.busy,
-            onClick = { callbacks.onSaveStateSave(selected) }
-        )
-        MenuActionRow(
-            icon = Icons.Rounded.Restore,
-            title = stringResource(R.string.emulation_savestate_load_action),
-            subtitle = stringResource(R.string.emulation_savestate_load_desc),
-            enabled = slot?.exists == true && !saveStates.busy,
-            onClick = { callbacks.onSaveStateLoad(selected) }
-        )
-        if (slot?.exists == true) {
-            MenuActionRow(
-                icon = Icons.Rounded.DeleteOutline,
-                title = stringResource(R.string.emulation_savestate_delete_action),
-                subtitle = stringResource(R.string.emulation_savestate_delete_desc),
-                destructive = true,
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            FilledTonalButton(
+                onClick = { callbacks.onSaveStateSave(selected) },
                 enabled = !saveStates.busy,
-                onClick = { callbacks.onSaveStateDelete(selected) }
-            )
+                shape = neonShape(12.dp)
+            ) {
+                Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.emulation_savestate_save_action))
+            }
+            OutlinedButton(
+                onClick = { callbacks.onSaveStateLoad(selected) },
+                enabled = slot?.exists == true && !saveStates.busy,
+                shape = neonShape(12.dp)
+            ) {
+                Icon(Icons.Rounded.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.emulation_savestate_load_action))
+            }
+            if (slot?.exists == true) {
+                IconButton(
+                    onClick = { callbacks.onSaveStateDelete(selected) },
+                    enabled = !saveStates.busy
+                ) {
+                    Icon(
+                        Icons.Rounded.DeleteOutline,
+                        contentDescription = stringResource(R.string.emulation_savestate_delete_action),
+                        tint = if (saveStates.busy) palette.textSecondary else MaterialTheme.colorScheme.error
+                    )
+                }
+            }
         }
     }
 }

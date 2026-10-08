@@ -1460,4 +1460,21 @@
     <string name="settings_trophy_sound_unavailable">The saved sound cannot be accessed. Choose it again.</string>
     <string name="settings_trophy_sound_pick_error">Could not use that audio file.</string>
     <string name="emulation_savestate_startup_loading">Loading save state…</string>
+    <string name="controls_button_l2">L2</string>
+    <string name="controls_button_l1">L1</string>
+    <string name="controls_button_r2">R2</string>
+    <string name="controls_button_r1">R1</string>
+    <string name="controls_button_up">Up</string>
+    <string name="controls_button_down">Down</string>
+    <string name="controls_button_left">Left</string>
+    <string name="controls_button_right">Right</string>
+    <string name="controls_button_left_stick">Left stick</string>
+    <string name="controls_button_right_stick">Right stick</string>
+    <string name="controls_button_triangle">Triangle</string>
+    <string name="controls_button_cross">Cross</string>
+    <string name="controls_button_square">Square</string>
+    <string name="controls_button_circle">Circle</string>
+    <string name="controls_button_select">Select</string>
+    <string name="controls_button_start">Start</string>
+    <string name="controls_button_touch">Touch</string>
 </resources>

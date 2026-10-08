@@ -1435,4 +1435,21 @@
     <string name="settings_trophy_sound_unavailable">Kaydedilen sese erişilemiyor. Yeniden seçin.</string>
     <string name="settings_trophy_sound_pick_error">Bu ses dosyası kullanılamadı.</string>
     <string name="emulation_savestate_startup_loading">Kayıt durumu yükleniyor…</string>
+    <string name="controls_button_l2">L2</string>
+    <string name="controls_button_l1">L1</string>
+    <string name="controls_button_r2">R2</string>
+    <string name="controls_button_r1">R1</string>
+    <string name="controls_button_up">Yukarı</string>
+    <string name="controls_button_down">Aşağı</string>
+    <string name="controls_button_left">Sol</string>
+    <string name="controls_button_right">Sağ</string>
+    <string name="controls_button_left_stick">Sol çubuk</string>
+    <string name="controls_button_right_stick">Sağ çubuk</string>
+    <string name="controls_button_triangle">Üçgen</string>
+    <string name="controls_button_cross">Çarpı</string>
+    <string name="controls_button_square">Kare</string>
+    <string name="controls_button_circle">Daire</string>
+    <string name="controls_button_select">Seç</string>
+    <string name="controls_button_start">Başlat</string>
+    <string name="controls_button_touch">Dokunma</string>
 </resources>

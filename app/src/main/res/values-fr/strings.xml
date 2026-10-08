@@ -1435,4 +1435,21 @@
     <string name="settings_trophy_sound_unavailable">Le son enregistré est inaccessible. Sélectionnez-le à nouveau.</string>
     <string name="settings_trophy_sound_pick_error">Impossible d’utiliser ce fichier audio.</string>
     <string name="emulation_savestate_startup_loading">Chargement de l’état sauvegardé…</string>
+    <string name="controls_button_l2">L2</string>
+    <string name="controls_button_l1">L1</string>
+    <string name="controls_button_r2">R2</string>
+    <string name="controls_button_r1">R1</string>
+    <string name="controls_button_up">Haut</string>
+    <string name="controls_button_down">Bas</string>
+    <string name="controls_button_left">Gauche</string>
+    <string name="controls_button_right">Droite</string>
+    <string name="controls_button_left_stick">Stick gauche</string>
+    <string name="controls_button_right_stick">Stick droit</string>
+    <string name="controls_button_triangle">Triangle</string>
+    <string name="controls_button_cross">Croix</string>
+    <string name="controls_button_square">Carré</string>
+    <string name="controls_button_circle">Cercle</string>
+    <string name="controls_button_select">Sélection</string>
+    <string name="controls_button_start">Démarrer</string>
+    <string name="controls_button_touch">Tactile</string>
 </resources>

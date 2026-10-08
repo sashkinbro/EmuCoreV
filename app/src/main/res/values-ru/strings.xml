@@ -1438,4 +1438,21 @@
     <string name="settings_trophy_sound_unavailable">Не удаётся открыть сохранённый звук. Выберите его снова.</string>
     <string name="settings_trophy_sound_pick_error">Не удалось использовать этот аудиофайл.</string>
     <string name="emulation_savestate_startup_loading">Загрузка сохранения состояния…</string>
+    <string name="controls_button_l2">L2</string>
+    <string name="controls_button_l1">L1</string>
+    <string name="controls_button_r2">R2</string>
+    <string name="controls_button_r1">R1</string>
+    <string name="controls_button_up">Вверх</string>
+    <string name="controls_button_down">Вниз</string>
+    <string name="controls_button_left">Влево</string>
+    <string name="controls_button_right">Вправо</string>
+    <string name="controls_button_left_stick">Левый стик</string>
+    <string name="controls_button_right_stick">Правый стик</string>
+    <string name="controls_button_triangle">Треугольник</string>
+    <string name="controls_button_cross">Крестик</string>
+    <string name="controls_button_square">Квадрат</string>
+    <string name="controls_button_circle">Круг</string>
+    <string name="controls_button_select">Выбор</string>
+    <string name="controls_button_start">Старт</string>
+    <string name="controls_button_touch">Касание</string>
 </resources>

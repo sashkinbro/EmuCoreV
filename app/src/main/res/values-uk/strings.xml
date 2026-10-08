@@ -1459,4 +1459,21 @@
     <string name="settings_trophy_sound_unavailable">Не вдається відкрити збережений звук. Виберіть його ще раз.</string>
     <string name="settings_trophy_sound_pick_error">Не вдалося використати цей аудіофайл.</string>
     <string name="emulation_savestate_startup_loading">Завантаження стану збереження…</string>
+    <string name="controls_button_l2">L2</string>
+    <string name="controls_button_l1">L1</string>
+    <string name="controls_button_r2">R2</string>
+    <string name="controls_button_r1">R1</string>
+    <string name="controls_button_up">Вгору</string>
+    <string name="controls_button_down">Вниз</string>
+    <string name="controls_button_left">Ліворуч</string>
+    <string name="controls_button_right">Праворуч</string>
+    <string name="controls_button_left_stick">Лівий стік</string>
+    <string name="controls_button_right_stick">Правий стік</string>
+    <string name="controls_button_triangle">Трикутник</string>
+    <string name="controls_button_cross">Хрестик</string>
+    <string name="controls_button_square">Квадрат</string>
+    <string name="controls_button_circle">Коло</string>
+    <string name="controls_button_select">Вибір</string>
+    <string name="controls_button_start">Старт</string>
+    <string name="controls_button_touch">Дотик</string>
 </resources>

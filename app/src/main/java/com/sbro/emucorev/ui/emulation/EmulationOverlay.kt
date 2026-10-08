@@ -1183,7 +1183,10 @@ internal fun OnScreenControls(
 
         if (editMode && selected != null && selectedDescriptor != null) {
             TouchControlEditorChrome(
-                selectedLabel = listOfNotNull(selectedDescriptor.label, selected.secondaryActionId?.let(::touchControlDescriptor)?.label).joinToString(" + "),
+                selectedLabel = listOfNotNull(
+                    stringResource(selectedDescriptor.labelRes),
+                    selected.secondaryActionId?.let(::touchControlDescriptor)?.let { stringResource(it.labelRes) }
+                ).joinToString(" + "),
                 selectedVisible = selected.visible,
                 selectedScalePercent = selectedScalePercent,
                 onReset = onEditReset,
@@ -1236,7 +1239,7 @@ internal fun OnScreenControls(
                 actions = listOf(TouchControlIds.DPAD_UP, TouchControlIds.DPAD_DOWN, TouchControlIds.DPAD_LEFT,
                     TouchControlIds.DPAD_RIGHT, TouchControlIds.TRIANGLE, TouchControlIds.CROSS, TouchControlIds.SQUARE,
                     TouchControlIds.CIRCLE, TouchControlIds.L1, TouchControlIds.R1, TouchControlIds.L2, TouchControlIds.R2,
-                    TouchControlIds.SELECT, TouchControlIds.START).mapNotNull { id -> touchControlDescriptor(id)?.let { id to it.label } },
+                    TouchControlIds.SELECT, TouchControlIds.START).mapNotNull { id -> touchControlDescriptor(id)?.let { id to stringResource(it.labelRes) } },
                 primary = if (createCombo) TouchControlIds.CROSS else selected?.actionId ?: TouchControlIds.CROSS,
                 secondary = if (createCombo) TouchControlIds.L1 else selected?.secondaryActionId,
                 primaryEditable = createCombo || selected?.id?.startsWith("custom_") == true,
@@ -1266,7 +1269,7 @@ private enum class TouchControlType {
 
 private data class TouchControlDescriptor(
     val id: String,
-    val label: String,
+    val labelRes: Int,
     val drawableRes: Int,
     val shape: Shape,
     val type: TouchControlType,
@@ -1308,23 +1311,23 @@ private val touchControlGroups = listOf(
 )
 
 private fun touchControlDescriptor(id: String): TouchControlDescriptor? = when (id) {
-    TouchControlIds.L2 -> TouchControlDescriptor(id, "L2", R.drawable.ic_controller_l2_button, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.l2)
-    TouchControlIds.L1 -> TouchControlDescriptor(id, "L1", R.drawable.ic_controller_l1_button, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.l1)
-    TouchControlIds.R2 -> TouchControlDescriptor(id, "R2", R.drawable.ic_controller_r2_button, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.r2)
-    TouchControlIds.R1 -> TouchControlDescriptor(id, "R1", R.drawable.ic_controller_r1_button, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.r1)
-    TouchControlIds.DPAD_UP -> TouchControlDescriptor(id, "Up", R.drawable.ic_controller_up_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.dup)
-    TouchControlIds.DPAD_DOWN -> TouchControlDescriptor(id, "Down", R.drawable.ic_controller_down_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.ddown)
-    TouchControlIds.DPAD_LEFT -> TouchControlDescriptor(id, "Left", R.drawable.ic_controller_left_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.dleft)
-    TouchControlIds.DPAD_RIGHT -> TouchControlDescriptor(id, "Right", R.drawable.ic_controller_right_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.dright)
-    TouchControlIds.LEFT_STICK -> TouchControlDescriptor(id, "Left stick", R.drawable.ic_controller_analog_base, CircleShape, TouchControlType.Analog, axisX = InputOverlay.ControlId.axis_left_x, axisY = InputOverlay.ControlId.axis_left_y)
-    TouchControlIds.RIGHT_STICK -> TouchControlDescriptor(id, "Right stick", R.drawable.ic_controller_analog_base, CircleShape, TouchControlType.Analog, axisX = InputOverlay.ControlId.axis_right_x, axisY = InputOverlay.ControlId.axis_right_y)
-    TouchControlIds.TRIANGLE -> TouchControlDescriptor(id, "Triangle", R.drawable.ic_controller_triangle_button, CircleShape, TouchControlType.Button, InputOverlay.ControlId.y)
-    TouchControlIds.CROSS -> TouchControlDescriptor(id, "Cross", R.drawable.ic_controller_cross_button, CircleShape, TouchControlType.Button, InputOverlay.ControlId.a)
-    TouchControlIds.SQUARE -> TouchControlDescriptor(id, "Square", R.drawable.ic_controller_square_button, CircleShape, TouchControlType.Button, InputOverlay.ControlId.x)
-    TouchControlIds.CIRCLE -> TouchControlDescriptor(id, "Circle", R.drawable.ic_controller_circle_button, CircleShape, TouchControlType.Button, InputOverlay.ControlId.b)
-    TouchControlIds.SELECT -> TouchControlDescriptor(id, "Select", R.drawable.ic_controller_select_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.select)
-    TouchControlIds.START -> TouchControlDescriptor(id, "Start", R.drawable.ic_controller_start_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.start)
-    TouchControlIds.TOUCH -> TouchControlDescriptor(id, "Touch", R.drawable.button_touch_f, RoundedCornerShape(8.dp), TouchControlType.TouchSwitch)
+    TouchControlIds.L2 -> TouchControlDescriptor(id, R.string.controls_button_l2, R.drawable.ic_controller_l2_button, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.l2)
+    TouchControlIds.L1 -> TouchControlDescriptor(id, R.string.controls_button_l1, R.drawable.ic_controller_l1_button, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.l1)
+    TouchControlIds.R2 -> TouchControlDescriptor(id, R.string.controls_button_r2, R.drawable.ic_controller_r2_button, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.r2)
+    TouchControlIds.R1 -> TouchControlDescriptor(id, R.string.controls_button_r1, R.drawable.ic_controller_r1_button, RoundedCornerShape(10.dp), TouchControlType.Button, InputOverlay.ControlId.r1)
+    TouchControlIds.DPAD_UP -> TouchControlDescriptor(id, R.string.controls_button_up, R.drawable.ic_controller_up_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.dup)
+    TouchControlIds.DPAD_DOWN -> TouchControlDescriptor(id, R.string.controls_button_down, R.drawable.ic_controller_down_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.ddown)
+    TouchControlIds.DPAD_LEFT -> TouchControlDescriptor(id, R.string.controls_button_left, R.drawable.ic_controller_left_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.dleft)
+    TouchControlIds.DPAD_RIGHT -> TouchControlDescriptor(id, R.string.controls_button_right, R.drawable.ic_controller_right_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.dright)
+    TouchControlIds.LEFT_STICK -> TouchControlDescriptor(id, R.string.controls_button_left_stick, R.drawable.ic_controller_analog_base, CircleShape, TouchControlType.Analog, axisX = InputOverlay.ControlId.axis_left_x, axisY = InputOverlay.ControlId.axis_left_y)
+    TouchControlIds.RIGHT_STICK -> TouchControlDescriptor(id, R.string.controls_button_right_stick, R.drawable.ic_controller_analog_base, CircleShape, TouchControlType.Analog, axisX = InputOverlay.ControlId.axis_right_x, axisY = InputOverlay.ControlId.axis_right_y)
+    TouchControlIds.TRIANGLE -> TouchControlDescriptor(id, R.string.controls_button_triangle, R.drawable.ic_controller_triangle_button, CircleShape, TouchControlType.Button, InputOverlay.ControlId.y)
+    TouchControlIds.CROSS -> TouchControlDescriptor(id, R.string.controls_button_cross, R.drawable.ic_controller_cross_button, CircleShape, TouchControlType.Button, InputOverlay.ControlId.a)
+    TouchControlIds.SQUARE -> TouchControlDescriptor(id, R.string.controls_button_square, R.drawable.ic_controller_square_button, CircleShape, TouchControlType.Button, InputOverlay.ControlId.x)
+    TouchControlIds.CIRCLE -> TouchControlDescriptor(id, R.string.controls_button_circle, R.drawable.ic_controller_circle_button, CircleShape, TouchControlType.Button, InputOverlay.ControlId.b)
+    TouchControlIds.SELECT -> TouchControlDescriptor(id, R.string.controls_button_select, R.drawable.ic_controller_select_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.select)
+    TouchControlIds.START -> TouchControlDescriptor(id, R.string.controls_button_start, R.drawable.ic_controller_start_button, RoundedCornerShape(8.dp), TouchControlType.Button, InputOverlay.ControlId.start)
+    TouchControlIds.TOUCH -> TouchControlDescriptor(id, R.string.controls_button_touch, R.drawable.button_touch_f, RoundedCornerShape(8.dp), TouchControlType.TouchSwitch)
     else -> null
 }
 
@@ -1669,7 +1672,7 @@ private fun TouchControlCanvasItem(
                 )
                 element.secondaryActionId?.let(::touchControlDescriptor)?.let { secondary ->
                     Text(
-                        text = "+ " + secondary.label,
+                        text = "+ " + stringResource(secondary.labelRes),
                         color = Color.White,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.align(Alignment.BottomCenter)

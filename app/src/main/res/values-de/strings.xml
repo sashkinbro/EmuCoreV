@@ -1435,4 +1435,21 @@
     <string name="settings_trophy_sound_unavailable">Auf den gespeicherten Klang kann nicht zugegriffen werden. Wähle ihn erneut aus.</string>
     <string name="settings_trophy_sound_pick_error">Diese Audiodatei kann nicht verwendet werden.</string>
     <string name="emulation_savestate_startup_loading">Spielstand wird geladen…</string>
+    <string name="controls_button_l2">L2</string>
+    <string name="controls_button_l1">L1</string>
+    <string name="controls_button_r2">R2</string>
+    <string name="controls_button_r1">R1</string>
+    <string name="controls_button_up">Oben</string>
+    <string name="controls_button_down">Unten</string>
+    <string name="controls_button_left">Links</string>
+    <string name="controls_button_right">Rechts</string>
+    <string name="controls_button_left_stick">Linker Stick</string>
+    <string name="controls_button_right_stick">Rechter Stick</string>
+    <string name="controls_button_triangle">Dreieck</string>
+    <string name="controls_button_cross">Kreuz</string>
+    <string name="controls_button_square">Quadrat</string>
+    <string name="controls_button_circle">Kreis</string>
+    <string name="controls_button_select">Auswahl</string>
+    <string name="controls_button_start">Start</string>
+    <string name="controls_button_touch">Berührung</string>
 </resources>

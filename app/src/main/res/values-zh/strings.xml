@@ -1434,4 +1434,21 @@
     <string name="settings_trophy_sound_unavailable">無法存取已儲存的音效，請重新選取。</string>
     <string name="settings_trophy_sound_pick_error">無法使用此音訊檔案。</string>
     <string name="emulation_savestate_startup_loading">正在加载即时存档…</string>
+    <string name="controls_button_l2">L2</string>
+    <string name="controls_button_l1">L1</string>
+    <string name="controls_button_r2">R2</string>
+    <string name="controls_button_r1">R1</string>
+    <string name="controls_button_up">上</string>
+    <string name="controls_button_down">下</string>
+    <string name="controls_button_left">左</string>
+    <string name="controls_button_right">右</string>
+    <string name="controls_button_left_stick">左摇杆</string>
+    <string name="controls_button_right_stick">右摇杆</string>
+    <string name="controls_button_triangle">三角</string>
+    <string name="controls_button_cross">叉</string>
+    <string name="controls_button_square">方块</string>
+    <string name="controls_button_circle">圆圈</string>
+    <string name="controls_button_select">选择</string>
+    <string name="controls_button_start">开始</string>
+    <string name="controls_button_touch">触摸</string>
 </resources>

@@ -1435,4 +1435,21 @@
     <string name="settings_trophy_sound_unavailable">No se puede acceder al sonido guardado. Vuelve a elegirlo.</string>
     <string name="settings_trophy_sound_pick_error">No se pudo usar ese archivo de audio.</string>
     <string name="emulation_savestate_startup_loading">Cargando estado guardado…</string>
+    <string name="controls_button_l2">L2</string>
+    <string name="controls_button_l1">L1</string>
+    <string name="controls_button_r2">R2</string>
+    <string name="controls_button_r1">R1</string>
+    <string name="controls_button_up">Arriba</string>
+    <string name="controls_button_down">Abajo</string>
+    <string name="controls_button_left">Izquierda</string>
+    <string name="controls_button_right">Derecha</string>
+    <string name="controls_button_left_stick">Stick izquierdo</string>
+    <string name="controls_button_right_stick">Stick derecho</string>
+    <string name="controls_button_triangle">Triángulo</string>
+    <string name="controls_button_cross">Cruz</string>
+    <string name="controls_button_square">Cuadrado</string>
+    <string name="controls_button_circle">Círculo</string>
+    <string name="controls_button_select">Seleccionar</string>
+    <string name="controls_button_start">Inicio</string>
+    <string name="controls_button_touch">Toque</string>
 </resources>
