@@ -705,6 +705,12 @@
     <string name="library_shortcut_unsupported">Этот лаунчер не поддерживает закрепленные ярлыки.</string>
     <string name="library_shortcut_failed">Не удалось создать ярлык.</string>
     <string name="settings_app_language_arabic">Арабский</string>
+    <string name="settings_app_language_czech">Чешский</string>
+    <string name="settings_app_language_polish">Польский</string>
+    <string name="settings_app_language_japanese">Японский</string>
+    <string name="settings_app_language_korean">Корейский</string>
+    <string name="settings_app_language_indonesian">Индонезийский</string>
+    <string name="settings_app_language_persian">Персидский</string>
     <string name="play_time_today">Сегодня</string>
     <string name="play_time_yesterday">Вчера</string>
     <string name="settings_gpu_driver_global">Использовать глобальный</string>

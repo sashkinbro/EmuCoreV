@@ -79,7 +79,7 @@ class NeonThemeContractTest {
                 .filter(Files::isRegularFile)
                 .toList()
         }
-        assertEquals(12, stringFiles.size)
+        assertEquals(18, stringFiles.size)
         stringFiles.forEach { file ->
             val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file.toFile())
             val nodes = document.getElementsByTagName("string")

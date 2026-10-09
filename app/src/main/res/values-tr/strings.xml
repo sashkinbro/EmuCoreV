@@ -705,6 +705,12 @@
     <string name="library_shortcut_unsupported">Bu başlatıcı sabitlenmiş kısayolları desteklemiyor.</string>
     <string name="library_shortcut_failed">Kısayol oluşturulamadı.</string>
     <string name="settings_app_language_arabic">Arapça</string>
+    <string name="settings_app_language_czech">Çekçe</string>
+    <string name="settings_app_language_polish">Lehçe</string>
+    <string name="settings_app_language_japanese">Japonca</string>
+    <string name="settings_app_language_korean">Korece</string>
+    <string name="settings_app_language_indonesian">Endonezce</string>
+    <string name="settings_app_language_persian">Farsça</string>
     <string name="play_time_today">Bugün</string>
     <string name="play_time_yesterday">Dün</string>
     <string name="settings_gpu_driver_global">Globali kullan</string>

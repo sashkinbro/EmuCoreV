@@ -704,6 +704,12 @@
     <string name="library_shortcut_unsupported">此启动器不支持固定快捷方式。</string>
     <string name="library_shortcut_failed">无法创建快捷方式。</string>
     <string name="settings_app_language_arabic">阿拉伯语</string>
+    <string name="settings_app_language_czech">捷克语</string>
+    <string name="settings_app_language_polish">波兰语</string>
+    <string name="settings_app_language_japanese">日语</string>
+    <string name="settings_app_language_korean">韩语</string>
+    <string name="settings_app_language_indonesian">印尼语</string>
+    <string name="settings_app_language_persian">波斯语</string>
     <string name="play_time_today">今天</string>
     <string name="play_time_yesterday">昨天</string>
     <string name="settings_gpu_driver_global">使用全局</string>

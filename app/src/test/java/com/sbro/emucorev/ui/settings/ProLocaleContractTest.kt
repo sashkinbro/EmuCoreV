@@ -20,7 +20,7 @@ class ProLocaleContractTest {
             }.toList()
         }
 
-        assertEquals(11, localizedDirectories.size)
+        assertEquals(17, localizedDirectories.size)
         assertTrue("Expected a complete Pro string contract", requiredKeys.size >= 39)
         val defaultValues = requiredValues(resourceRoot.resolve("values/strings.xml"))
         localizedDirectories.forEach { directory ->

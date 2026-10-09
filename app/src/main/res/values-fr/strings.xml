@@ -705,6 +705,12 @@
     <string name="library_shortcut_unsupported">Ce lanceur ne prend pas en charge les raccourcis épinglés.</string>
     <string name="library_shortcut_failed">Échec de la création du raccourci.</string>
     <string name="settings_app_language_arabic">Arabe</string>
+    <string name="settings_app_language_czech">Tchèque</string>
+    <string name="settings_app_language_polish">Polonais</string>
+    <string name="settings_app_language_japanese">Japonais</string>
+    <string name="settings_app_language_korean">Coréen</string>
+    <string name="settings_app_language_indonesian">Indonésien</string>
+    <string name="settings_app_language_persian">Persan</string>
     <string name="play_time_today">Aujourd\'hui</string>
     <string name="play_time_yesterday">Hier</string>
     <string name="settings_gpu_driver_global">Utiliser global</string>

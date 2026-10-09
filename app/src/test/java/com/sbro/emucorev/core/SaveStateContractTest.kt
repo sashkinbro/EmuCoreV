@@ -129,7 +129,7 @@ class SaveStateContractTest {
                 it.fileName.toString().startsWith("values-") && it.fileName.toString() != "values-night"
             }.toList()
         }
-        assertEquals(11, localizedDirectories.size)
+        assertEquals(17, localizedDirectories.size)
         val targets = listOf(resourceRoot.resolve("values/strings.xml")) +
             localizedDirectories.map { it.resolve("strings.xml") }
         targets.forEach { file ->

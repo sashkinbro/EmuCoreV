@@ -1582,6 +1582,12 @@ private fun appLanguageLabel(language: AppLanguage): String = when (language) {
     AppLanguage.ITALIAN -> stringResource(R.string.settings_app_language_italian)
     AppLanguage.TURKISH -> stringResource(R.string.settings_app_language_turkish)
     AppLanguage.ARABIC -> stringResource(R.string.settings_app_language_arabic)
+    AppLanguage.CZECH -> stringResource(R.string.settings_app_language_czech)
+    AppLanguage.POLISH -> stringResource(R.string.settings_app_language_polish)
+    AppLanguage.JAPANESE -> stringResource(R.string.settings_app_language_japanese)
+    AppLanguage.KOREAN -> stringResource(R.string.settings_app_language_korean)
+    AppLanguage.INDONESIAN -> stringResource(R.string.settings_app_language_indonesian)
+    AppLanguage.PERSIAN -> stringResource(R.string.settings_app_language_persian)
 }
 
 @Composable

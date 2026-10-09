@@ -22,7 +22,7 @@ class LaunchStateLoadingLocaleTest {
                     it.fileName.toString() != "values-night"
             }.toList()
         }
-        assertEquals("Expected the app's 11 localized resource directories", 11, locales.size)
+        assertEquals("Expected the app's 17 localized resource directories", 17, locales.size)
         locales.forEach { locale ->
             val localizedText = readLabel(locale.resolve("strings.xml"))
             assertTrue("Missing loading label in ${locale.fileName}", localizedText.isNotBlank())

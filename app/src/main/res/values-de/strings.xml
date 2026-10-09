@@ -705,6 +705,12 @@
     <string name="library_shortcut_unsupported">Dieser Launcher unterstützt keine angehefteten Verknüpfungen.</string>
     <string name="library_shortcut_failed">Verknüpfung konnte nicht erstellt werden.</string>
     <string name="settings_app_language_arabic">Arabisch</string>
+    <string name="settings_app_language_czech">Tschechisch</string>
+    <string name="settings_app_language_polish">Polnisch</string>
+    <string name="settings_app_language_japanese">Japanisch</string>
+    <string name="settings_app_language_korean">Koreanisch</string>
+    <string name="settings_app_language_indonesian">Indonesisch</string>
+    <string name="settings_app_language_persian">Persisch</string>
     <string name="play_time_today">Heute</string>
     <string name="play_time_yesterday">Gestern</string>
     <string name="settings_gpu_driver_global">Global verwenden</string>

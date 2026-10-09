@@ -694,6 +694,12 @@
     <string name="library_shortcut_unsupported">Цей лаунчер не підтримує закріплені ярлики.</string>
     <string name="library_shortcut_failed">Не вдалося створити ярлик.</string>
     <string name="settings_app_language_arabic">Арабська</string>
+    <string name="settings_app_language_czech">Чеська</string>
+    <string name="settings_app_language_polish">Польська</string>
+    <string name="settings_app_language_japanese">Японська</string>
+    <string name="settings_app_language_korean">Корейська</string>
+    <string name="settings_app_language_indonesian">Індонезійська</string>
+    <string name="settings_app_language_persian">Перська</string>
     <string name="play_time_today">Сьогодні</string>
     <string name="play_time_yesterday">Вчора</string>
     <string name="settings_gpu_driver_global">Використовувати глобальний</string>

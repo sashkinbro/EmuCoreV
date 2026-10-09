@@ -20,7 +20,7 @@ class CustomizationLocaleContractTest {
             }.toList()
         }
 
-        assertEquals(11, localizedDirectories.size)
+        assertEquals(17, localizedDirectories.size)
         localizedDirectories.forEach { directory ->
             val localizedKeys = customizationKeys(directory.resolve("strings.xml"))
             assertEquals(

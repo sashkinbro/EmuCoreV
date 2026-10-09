@@ -705,6 +705,12 @@
     <string name="library_shortcut_unsupported">Este lanzador no admite atajos anclados.</string>
     <string name="library_shortcut_failed">Error al crear el atajo.</string>
     <string name="settings_app_language_arabic">Árabe</string>
+    <string name="settings_app_language_czech">Checo</string>
+    <string name="settings_app_language_polish">Polaco</string>
+    <string name="settings_app_language_japanese">Japonés</string>
+    <string name="settings_app_language_korean">Coreano</string>
+    <string name="settings_app_language_indonesian">Indonesio</string>
+    <string name="settings_app_language_persian">Persa</string>
     <string name="play_time_today">Hoy</string>
     <string name="play_time_yesterday">Ayer</string>
     <string name="settings_gpu_driver_global">Usar global</string>

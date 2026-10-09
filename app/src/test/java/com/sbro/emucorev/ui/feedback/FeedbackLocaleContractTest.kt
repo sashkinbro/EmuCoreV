@@ -22,7 +22,7 @@ class FeedbackLocaleContractTest {
             }.toList()
         }
 
-        assertEquals(11, localizedDirectories.size)
+        assertEquals(17, localizedDirectories.size)
         assertTrue("Expected the complete feedback contract", requiredKeys.size >= 40)
         localizedDirectories.forEach { directory ->
             val values = requiredValues(directory.resolve("strings.xml"))

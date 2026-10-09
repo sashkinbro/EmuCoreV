@@ -705,6 +705,12 @@
     <string name="library_shortcut_unsupported">Este launcher não suporta atalhos fixados.</string>
     <string name="library_shortcut_failed">Falha ao criar o atalho.</string>
     <string name="settings_app_language_arabic">Árabe</string>
+    <string name="settings_app_language_czech">Tcheco</string>
+    <string name="settings_app_language_polish">Polonês</string>
+    <string name="settings_app_language_japanese">Japonês</string>
+    <string name="settings_app_language_korean">Coreano</string>
+    <string name="settings_app_language_indonesian">Indonésio</string>
+    <string name="settings_app_language_persian">Persa</string>
     <string name="play_time_today">Hoje</string>
     <string name="play_time_yesterday">Ontem</string>
     <string name="settings_gpu_driver_global">Usar global</string>

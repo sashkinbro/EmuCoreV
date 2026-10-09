@@ -56,7 +56,7 @@ class DlcInstallContractTest {
             }.toList()
         }
 
-        assertEquals(11, localizedDirectories.size)
+        assertEquals(17, localizedDirectories.size)
         assertEquals(10, requiredKeys.size)
         localizedDirectories.forEach { directory ->
             assertEquals(

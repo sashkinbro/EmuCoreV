@@ -705,6 +705,12 @@
     <string name="library_shortcut_unsupported">यह लॉन्चर पिन किए गए शॉर्टकट का समर्थन नहीं करता है।</string>
     <string name="library_shortcut_failed">शॉर्टकट बनाने में विफल।</string>
     <string name="settings_app_language_arabic">अरबी</string>
+    <string name="settings_app_language_czech">चेक</string>
+    <string name="settings_app_language_polish">पोलिश</string>
+    <string name="settings_app_language_japanese">जापानी</string>
+    <string name="settings_app_language_korean">कोरियाई</string>
+    <string name="settings_app_language_indonesian">इंडोनेशियाई</string>
+    <string name="settings_app_language_persian">फ़ारसी</string>
     <string name="play_time_today">आज</string>
     <string name="play_time_yesterday">कल</string>
     <string name="settings_gpu_driver_global">ग्लोबल का उपयोग करें</string>

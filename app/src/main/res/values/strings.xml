@@ -502,6 +502,12 @@
     <string name="settings_app_language_italian">Italian</string>
     <string name="settings_app_language_turkish">Turkish</string>
     <string name="settings_app_language_arabic">Arabic</string>
+    <string name="settings_app_language_czech">Czech</string>
+    <string name="settings_app_language_polish">Polish</string>
+    <string name="settings_app_language_japanese">Japanese</string>
+    <string name="settings_app_language_korean">Korean</string>
+    <string name="settings_app_language_indonesian">Indonesian</string>
+    <string name="settings_app_language_persian">Persian</string>
     <string name="settings_language_picker_title">Language</string>
     <string name="settings_system_language">Vita system language</string>
     <string name="settings_help_system_language">Sets the language reported to the emulated Vita system.\n\nUse this to match the app or emulated Vita language to the games you play. Leave System/default when you want Android or the game to choose automatically.</string>

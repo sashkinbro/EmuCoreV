@@ -705,6 +705,12 @@
     <string name="settings_vsync">المزامنة الرأسية (V-Sync)</string>
     <string name="settings_pstv_mode">وضع PSTV</string>
     <string name="settings_app_language_arabic">العربية</string>
+    <string name="settings_app_language_czech">التشيكية</string>
+    <string name="settings_app_language_polish">البولندية</string>
+    <string name="settings_app_language_japanese">اليابانية</string>
+    <string name="settings_app_language_korean">الكورية</string>
+    <string name="settings_app_language_indonesian">الإندونيسية</string>
+    <string name="settings_app_language_persian">الفارسية</string>
     <string name="play_time_today">اليوم</string>
     <string name="play_time_yesterday">أمس</string>
     <string name="settings_gpu_driver_global">استخدام العالمي</string>

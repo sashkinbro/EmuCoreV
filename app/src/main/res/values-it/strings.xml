@@ -705,6 +705,12 @@
     <string name="library_shortcut_unsupported">Questo launcher non supporta i collegamenti aggiunti.</string>
     <string name="library_shortcut_failed">Impossibile creare il collegamento.</string>
     <string name="settings_app_language_arabic">Arabo</string>
+    <string name="settings_app_language_czech">Ceco</string>
+    <string name="settings_app_language_polish">Polacco</string>
+    <string name="settings_app_language_japanese">Giapponese</string>
+    <string name="settings_app_language_korean">Coreano</string>
+    <string name="settings_app_language_indonesian">Indonesiano</string>
+    <string name="settings_app_language_persian">Persiano</string>
     <string name="play_time_today">Oggi</string>
     <string name="play_time_yesterday">Ieri</string>
     <string name="settings_gpu_driver_global">Usa globale</string>
