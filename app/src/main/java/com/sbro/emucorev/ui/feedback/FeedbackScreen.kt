@@ -2,6 +2,7 @@
 
 package com.sbro.emucorev.ui.feedback
 
+import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import android.net.Uri
@@ -11,10 +12,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import com.sbro.emucorev.ui.theme.neon.neonShape
 
 import androidx.compose.material.icons.Icons
@@ -222,9 +224,13 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                 title = stringResource(R.string.feedback_category_title),
                 modifier = Modifier.widthIn(max = 780.dp)
             ) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalBleed(16.dp)
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     categories.forEach { item ->
                         FilterChip(
@@ -275,9 +281,13 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalBleed(16.dp)
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         games.take(16).forEach { game ->
                             FilterChip(

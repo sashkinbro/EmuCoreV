@@ -1395,7 +1395,7 @@
     <string name="emulation_savestate_save_action">Salvar estado</string>
     <string name="emulation_savestate_save_desc">Criar um snapshot do momento atual</string>
     <string name="emulation_savestate_save_overwrite_desc">Substituir este slot pelo momento atual</string>
-    <string name="emulation_savestate_load_action">Carregar estado</string>
+    <string name="emulation_savestate_load_action">Carregar</string>
     <string name="emulation_savestate_load_desc">Restaurar o emulador para este snapshot</string>
     <string name="emulation_savestate_delete_action">Excluir</string>
     <string name="emulation_savestate_delete_desc">Remover este estado salvo</string>

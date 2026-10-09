@@ -28,8 +28,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -145,6 +145,7 @@ import com.sbro.emucorev.ui.common.LocalImage
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.UrlImage
+import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.pro.ProPurchasePanel
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
@@ -2357,9 +2358,13 @@ private fun ProProfileCustomizationDialog(
                         title = stringResource(R.string.profile_customize_pro_accent),
                         description = stringResource(R.string.profile_customize_pro_accent_help)
                     ) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalBleed(14.dp)
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 14.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             accents.forEach { item ->
                                 ProfileAccentChoice(

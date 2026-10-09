@@ -1395,7 +1395,7 @@
     <string name="emulation_savestate_save_action">Sauvegarder l\'état</string>
     <string name="emulation_savestate_save_desc">Créer un instantané du moment actuel</string>
     <string name="emulation_savestate_save_overwrite_desc">Remplacer cet emplacement par le moment actuel</string>
-    <string name="emulation_savestate_load_action">Charger l\'état</string>
+    <string name="emulation_savestate_load_action">Charger</string>
     <string name="emulation_savestate_load_desc">Rétablir l\'émulateur à cet instantané</string>
     <string name="emulation_savestate_delete_action">Supprimer</string>
     <string name="emulation_savestate_delete_desc">Supprimer cet état sauvegardé</string>

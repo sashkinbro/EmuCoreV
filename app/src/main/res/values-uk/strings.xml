@@ -1419,7 +1419,7 @@
     <string name="emulation_savestate_save_action">Зберегти стан</string>
     <string name="emulation_savestate_save_desc">Створити знімок поточного моменту</string>
     <string name="emulation_savestate_save_overwrite_desc">Перезаписати слот поточним моментом</string>
-    <string name="emulation_savestate_load_action">Завантажити стан</string>
+    <string name="emulation_savestate_load_action">Завантажити</string>
     <string name="emulation_savestate_load_desc">Повернути емулятор до цього знімка</string>
     <string name="emulation_savestate_delete_action">Видалити</string>
     <string name="emulation_savestate_delete_desc">Видалити цей стан</string>

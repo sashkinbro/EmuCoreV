@@ -5,6 +5,7 @@ import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import com.sbro.emucorev.ui.theme.neon.neonShape
 
 import androidx.compose.material.icons.Icons
@@ -69,6 +71,7 @@ import com.sbro.emucorev.ui.common.LocalImage
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.SectionCard
+import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.common.SettingHelpButton
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
@@ -751,7 +754,6 @@ private fun GamepadProfileSection(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChoiceRow(
     title: String,
@@ -762,7 +764,14 @@ private fun ChoiceRow(
     onSelected: (String) -> Unit
 ) {
     SettingContainer(title = title, description = description, onReset = onReset) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalBleed(CardContentPadding)
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = CardContentPadding),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             options.forEach { option ->
                 FilterChip(
                     shape = neonChipShape(),
@@ -779,7 +788,6 @@ private fun ChoiceRow(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun IntChoiceRow(
     title: String,
@@ -796,9 +804,13 @@ private fun IntChoiceRow(
         onReset = onReset,
         enabled = enabled
     ) {
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalBleed(CardContentPadding)
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = CardContentPadding),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             options.forEach { (value, label) ->
                 FilterChip(

@@ -1395,7 +1395,7 @@
     <string name="emulation_savestate_save_action">स्टेट सहेजें</string>
     <string name="emulation_savestate_save_desc">वर्तमान क्षण का स्नैपशॉट बनाएँ</string>
     <string name="emulation_savestate_save_overwrite_desc">इस स्लॉट को वर्तमान क्षण से बदलें</string>
-    <string name="emulation_savestate_load_action">स्टेट लोड करें</string>
+    <string name="emulation_savestate_load_action">लोड करें</string>
     <string name="emulation_savestate_load_desc">एमुलेटर को इस स्नैपशॉट पर लौटाएँ</string>
     <string name="emulation_savestate_delete_action">हटाएँ</string>
     <string name="emulation_savestate_delete_desc">यह सेव स्टेट हटाएँ</string>

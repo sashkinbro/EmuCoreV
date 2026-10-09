@@ -173,14 +173,16 @@ fun EmulationOverlayHost(
     var exitDialogVisible by remember { mutableStateOf(false) }
     var cheatSnapshot by remember(activity) { mutableStateOf(VitaCheatSnapshot.EMPTY) }
     var sessionElapsedMs by remember(activity) { mutableLongStateOf(activity.currentPlayTimeElapsedMs()) }
-    val gameTitle = remember(activity, gameId) {
-        val installedTitle = InstalledGameRepository().findByTitleId(activity, gameId)
-            ?.title
+    val installedGame = remember(activity, gameId) {
+        InstalledGameRepository().findByTitleId(activity, gameId)
+    }
+    val gameTitle = remember(activity, gameId, installedGame) {
+        installedGame?.title
             ?.takeIf { it.isNotBlank() && !it.equals(gameId, ignoreCase = true) }
-        installedTitle
             ?: activity.getRunningGameTitle().takeIf { it.isNotBlank() && !it.equals(gameId, ignoreCase = true) }
             ?: gameId
     }
+    val gameIconPath = installedGame?.iconPath
     val hasPhysicalGamepad = activity.hasPhysicalGamepad
     val nativeImeActive = activity.nativeKeyboardRequested && activity.nativeImeState?.active == true
     var showControlsWithGamepad by remember { mutableStateOf(false) }
@@ -741,6 +743,7 @@ fun EmulationOverlayHost(
             EmulationGameMenu(
                 gameTitle = gameTitle,
                 gameId = gameId,
+                gameIconPath = gameIconPath,
                 config = config,
                 cheats = cheatSnapshot,
                 cheatsAvailable = CHEATS_ENABLED || customization.experimentalCheats,

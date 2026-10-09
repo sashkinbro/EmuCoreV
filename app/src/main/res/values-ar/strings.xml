@@ -1399,7 +1399,7 @@
     <string name="emulation_savestate_save_action">حفظ الحالة</string>
     <string name="emulation_savestate_save_desc">إنشاء لقطة للحظة الحالية</string>
     <string name="emulation_savestate_save_overwrite_desc">استبدال هذه الفتحة باللحطة الحالية</string>
-    <string name="emulation_savestate_load_action">تحميل الحالة</string>
+    <string name="emulation_savestate_load_action">تحميل</string>
     <string name="emulation_savestate_load_desc">إعادة المحاكي إلى هذه اللقطة</string>
     <string name="emulation_savestate_delete_action">حذف</string>
     <string name="emulation_savestate_delete_desc">إزالة حالة الحفظ هذه</string>

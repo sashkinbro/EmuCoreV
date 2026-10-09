@@ -134,16 +134,9 @@ fun SaveStatesScreen(
                         .padding(horizontal = 12.dp)
                 ) {
                     Text(
-                        text = stringResource(R.string.savestate_manager_title),
+                        text = stringResource(R.string.nav_save_states),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.savestate_manager_subtitle),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 IconButton(onClick = { viewModel.refresh(focusTitleId) }) {

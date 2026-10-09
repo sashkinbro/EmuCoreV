@@ -7,10 +7,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import com.sbro.emucorev.ui.theme.neon.neonShape
 
 import com.sbro.emucorev.ui.theme.neon.neonPillShape
@@ -61,6 +62,7 @@ import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.CustomizationSettings
 import com.sbro.emucorev.data.TouchControlVisualStyle
 import com.sbro.emucorev.ui.common.SectionCard
+import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.theme.ThemeMode
 import com.sbro.emucorev.ui.library.LibraryGridSizing
 import java.io.File
@@ -107,9 +109,13 @@ fun CustomizationTab(
             title = stringResource(R.string.settings_theme),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp)
         ) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalBleed(14.dp)
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 ThemeChip(
                     selected = themeMode == ThemeMode.SYSTEM,
@@ -213,9 +219,13 @@ fun CustomizationTab(
                 text = stringResource(R.string.customization_app_font),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
             )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalBleed(14.dp)
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 FontChip(
                     selected = settings.appFont == AppFont.SYSTEM,

@@ -13,7 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRowScope
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -1320,7 +1320,7 @@ private fun Toggle(title: String, description: String, checked: Boolean, onCheck
     SettingToggleRow(title = title, description = description, checked = checked, onCheckedChange = onCheckedChange, onResetDefault = onResetDefault, enabled = enabled)
 
 @Composable
-private fun Chips(title: String, description: String, onResetDefault: () -> Unit, content: @Composable FlowRowScope.() -> Unit) =
+private fun Chips(title: String, description: String, onResetDefault: () -> Unit, content: @Composable RowScope.() -> Unit) =
     SettingChoiceRow(title = title, description = description, onResetDefault = onResetDefault, content = content)
 
 @Composable

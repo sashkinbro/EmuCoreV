@@ -1395,7 +1395,7 @@
     <string name="emulation_savestate_save_action">Guardar estado</string>
     <string name="emulation_savestate_save_desc">Crear una instantánea del momento actual</string>
     <string name="emulation_savestate_save_overwrite_desc">Sobrescribir esta ranura con el momento actual</string>
-    <string name="emulation_savestate_load_action">Cargar estado</string>
+    <string name="emulation_savestate_load_action">Cargar</string>
     <string name="emulation_savestate_load_desc">Restaurar el emulador a esta instantánea</string>
     <string name="emulation_savestate_delete_action">Eliminar</string>
     <string name="emulation_savestate_delete_desc">Quitar este estado guardado</string>

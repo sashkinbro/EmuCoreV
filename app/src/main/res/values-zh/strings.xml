@@ -1394,7 +1394,7 @@
     <string name="emulation_savestate_save_action">保存状态</string>
     <string name="emulation_savestate_save_desc">创建当前时刻的快照</string>
     <string name="emulation_savestate_save_overwrite_desc">用当前时刻覆盖此存档位</string>
-    <string name="emulation_savestate_load_action">读取状态</string>
+    <string name="emulation_savestate_load_action">读取</string>
     <string name="emulation_savestate_load_desc">将模拟器恢复到该快照</string>
     <string name="emulation_savestate_delete_action">删除</string>
     <string name="emulation_savestate_delete_desc">删除此即时存档</string>

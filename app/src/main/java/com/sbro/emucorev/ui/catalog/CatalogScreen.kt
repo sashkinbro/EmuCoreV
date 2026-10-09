@@ -184,63 +184,63 @@ fun CatalogScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        ScreenTopBar(
-                            title = stringResource(R.string.catalog_title),
-                            onBackClick = guardedBackClick,
-                            actions = {
-                                CatalogTopBarAction(
-                                    icon = Icons.Rounded.Search,
-                                    contentDescription = stringResource(R.string.catalog_toggle_search),
-                                    selected = isSearchPanelVisible,
-                                    onClick = { showSearchPanel = !showSearchPanel }
-                                )
-                                CatalogTopBarAction(
-                                    icon = Icons.Rounded.FilterList,
-                                    contentDescription = stringResource(R.string.catalog_toggle_filters),
-                                    selected = isFiltersPanelVisible,
-                                    onClick = { showFiltersPanel = !showFiltersPanel }
-                                )
+                        Column {
+                            ScreenTopBar(
+                                title = stringResource(R.string.catalog_title),
+                                onBackClick = guardedBackClick,
+                                actions = {
+                                    CatalogTopBarAction(
+                                        icon = Icons.Rounded.Search,
+                                        contentDescription = stringResource(R.string.catalog_toggle_search),
+                                        selected = isSearchPanelVisible,
+                                        onClick = { showSearchPanel = !showSearchPanel }
+                                    )
+                                    CatalogTopBarAction(
+                                        icon = Icons.Rounded.FilterList,
+                                        contentDescription = stringResource(R.string.catalog_toggle_filters),
+                                        selected = isFiltersPanelVisible,
+                                        onClick = { showFiltersPanel = !showFiltersPanel }
+                                    )
+                                }
+                            )
+                            AnimatedVisibility(
+                                visible = isSearchPanelVisible,
+                                enter = fadeIn(animationSpec = tween(160)) + expandVertically(animationSpec = tween(220)),
+                                exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
+                            ) {
+                                Box(modifier = Modifier.padding(top = 12.dp)) {
+                                    CatalogSearchPanel(
+                                        query = uiState.query,
+                                        onQueryChange = viewModel::updateQuery
+                                    )
+                                }
                             }
-                        )
-                    }
-
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        AnimatedVisibility(
-                            visible = isSearchPanelVisible,
-                            enter = fadeIn(animationSpec = tween(160)) + expandVertically(animationSpec = tween(220)),
-                            exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
-                        ) {
-                            CatalogSearchPanel(
-                                query = uiState.query,
-                                onQueryChange = viewModel::updateQuery
-                            )
-                        }
-                    }
-
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        AnimatedVisibility(
-                            visible = isFiltersPanelVisible,
-                            enter = fadeIn(animationSpec = tween(160)) + expandVertically(animationSpec = tween(220)),
-                            exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
-                        ) {
-                            CatalogFiltersPanel(
-                                hasActiveFilters = hasActiveFilters,
-                                selectedGenre = uiState.selectedGenre,
-                                selectedYear = uiState.selectedYear,
-                                minRating = uiState.minRating,
-                                availableGenres = uiState.availableGenres,
-                                availableYears = uiState.availableYears,
-                                showGenreMenu = showGenreMenu,
-                                showYearMenu = showYearMenu,
-                                showRatingMenu = showRatingMenu,
-                                onGenreMenu = { showGenreMenu = it },
-                                onYearMenu = { showYearMenu = it },
-                                onRatingMenu = { showRatingMenu = it },
-                                onGenre = viewModel::updateGenre,
-                                onYear = viewModel::updateYear,
-                                onMinRating = viewModel::updateMinRating,
-                                onClear = viewModel::clearFilters
-                            )
+                            AnimatedVisibility(
+                                visible = isFiltersPanelVisible,
+                                enter = fadeIn(animationSpec = tween(160)) + expandVertically(animationSpec = tween(220)),
+                                exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
+                            ) {
+                                Box(modifier = Modifier.padding(top = 12.dp)) {
+                                    CatalogFiltersPanel(
+                                        hasActiveFilters = hasActiveFilters,
+                                        selectedGenre = uiState.selectedGenre,
+                                        selectedYear = uiState.selectedYear,
+                                        minRating = uiState.minRating,
+                                        availableGenres = uiState.availableGenres,
+                                        availableYears = uiState.availableYears,
+                                        showGenreMenu = showGenreMenu,
+                                        showYearMenu = showYearMenu,
+                                        showRatingMenu = showRatingMenu,
+                                        onGenreMenu = { showGenreMenu = it },
+                                        onYearMenu = { showYearMenu = it },
+                                        onRatingMenu = { showRatingMenu = it },
+                                        onGenre = viewModel::updateGenre,
+                                        onYear = viewModel::updateYear,
+                                        onMinRating = viewModel::updateMinRating,
+                                        onClear = viewModel::clearFilters
+                                    )
+                                }
+                            }
                         }
                     }
 

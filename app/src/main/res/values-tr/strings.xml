@@ -1395,7 +1395,7 @@
     <string name="emulation_savestate_save_action">Durumu kaydet</string>
     <string name="emulation_savestate_save_desc">Geçerli anın anlık görüntüsünü oluştur</string>
     <string name="emulation_savestate_save_overwrite_desc">Bu yuvayı geçerli anla değiştir</string>
-    <string name="emulation_savestate_load_action">Durumu yükle</string>
+    <string name="emulation_savestate_load_action">Yükle</string>
     <string name="emulation_savestate_load_desc">Emülatörü bu anlık görüntüye döndür</string>
     <string name="emulation_savestate_delete_action">Sil</string>
     <string name="emulation_savestate_delete_desc">Bu kayıt durumunu kaldır</string>

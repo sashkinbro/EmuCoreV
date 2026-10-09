@@ -1,10 +1,10 @@
 package com.sbro.emucorev.ui.settings
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -19,10 +19,10 @@ import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.TrophySoundMode
 import com.sbro.emucorev.data.TrophySoundSettings
+import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun TrophySoundSettingsSection(
     settings: TrophySoundSettings,
@@ -38,7 +38,14 @@ internal fun TrophySoundSettingsSection(
     ) {
         Text(stringResource(R.string.settings_trophy_sound_title), style = MaterialTheme.typography.titleSmall)
         Text(stringResource(R.string.settings_trophy_sound_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalBleed(28.dp)
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 28.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             FilterChip(
                 selected = settings.mode == TrophySoundMode.SYSTEM,
                 onClick = { onModeSelected(TrophySoundMode.SYSTEM) },

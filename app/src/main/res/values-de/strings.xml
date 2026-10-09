@@ -1395,7 +1395,7 @@
     <string name="emulation_savestate_save_action">Spielstand speichern</string>
     <string name="emulation_savestate_save_desc">Snapshot des aktuellen Moments erstellen</string>
     <string name="emulation_savestate_save_overwrite_desc">Diesen Slot mit dem aktuellen Moment überschreiben</string>
-    <string name="emulation_savestate_load_action">Spielstand laden</string>
+    <string name="emulation_savestate_load_action">Laden</string>
     <string name="emulation_savestate_load_desc">Emulator auf diesen Snapshot zurücksetzen</string>
     <string name="emulation_savestate_delete_action">Löschen</string>
     <string name="emulation_savestate_delete_desc">Diesen Spielstand entfernen</string>

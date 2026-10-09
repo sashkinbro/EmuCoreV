@@ -187,42 +187,44 @@ fun SaveDataScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            SaveManagerHeader(
-                searchExpanded = searchExpanded,
-                onBackClick = backClick,
-                onSearchClick = {
-                    if (searchExpanded) {
-                        viewModel.updateQuery("")
+            Column {
+                SaveManagerHeader(
+                    searchExpanded = searchExpanded,
+                    onBackClick = backClick,
+                    onSearchClick = {
+                        if (searchExpanded) {
+                            viewModel.updateQuery("")
+                        }
+                        searchExpanded = !searchExpanded
+                    },
+                    onRefreshClick = { viewModel.refresh(focusTitleId) },
+                    onImportClick = {
+                        pendingImportSaveId = uiState.focusTarget?.saveId
+                        importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
                     }
-                    searchExpanded = !searchExpanded
-                },
-                onRefreshClick = { viewModel.refresh(focusTitleId) },
-                onImportClick = {
-                    pendingImportSaveId = uiState.focusTarget?.saveId
-                    importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
-                }
-            )
-        }
-        item {
-            AnimatedVisibility(
-                visible = searchExpanded,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                OutlinedTextField(
-                    value = uiState.query,
-                    onValueChange = viewModel::updateQuery,
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(stringResource(R.string.save_manager_search_hint)) },
-                    singleLine = true,
-                    shape = neonShape(20.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    )
                 )
+                AnimatedVisibility(
+                    visible = searchExpanded,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    OutlinedTextField(
+                        value = uiState.query,
+                        onValueChange = viewModel::updateQuery,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 14.dp),
+                        placeholder = { Text(stringResource(R.string.save_manager_search_hint)) },
+                        singleLine = true,
+                        shape = neonShape(20.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                        )
+                    )
+                }
             }
         }
         item {

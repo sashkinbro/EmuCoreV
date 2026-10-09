@@ -304,3 +304,4 @@ using KernelHostLifetimeEnv = EmuEnvState;
 #include "gxm_finish_preflight_tests.inc"
 #include "memory_external_mapping_tests.inc"
 #include "gxm_alpha_surface_tests.inc"
+#include "gxm_deferred_ownership_tests.inc"

@@ -1398,7 +1398,7 @@
     <string name="emulation_savestate_save_action">Сохранить состояние</string>
     <string name="emulation_savestate_save_desc">Создать снимок текущего момента</string>
     <string name="emulation_savestate_save_overwrite_desc">Перезаписать слот текущим моментом</string>
-    <string name="emulation_savestate_load_action">Загрузить состояние</string>
+    <string name="emulation_savestate_load_action">Загрузить</string>
     <string name="emulation_savestate_load_desc">Вернуть эмулятор к этому снимку</string>
     <string name="emulation_savestate_delete_action">Удалить</string>
     <string name="emulation_savestate_delete_desc">Удалить это состояние</string>

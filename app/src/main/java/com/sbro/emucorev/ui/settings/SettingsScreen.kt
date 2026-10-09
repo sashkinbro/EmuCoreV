@@ -22,6 +22,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -94,7 +95,9 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.ui.common.NavigationBackButton
 import com.sbro.emucorev.ui.common.SettingHelpButton
+import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
+import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 
 private val SettingsRowHorizontalPadding = ScreenHorizontalPadding
@@ -566,13 +569,13 @@ fun SettingToggleRow(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SettingChoiceRow(
     title: String,
     description: String,
     onResetDefault: () -> Unit,
-    content: @Composable androidx.compose.foundation.layout.FlowRowScope.() -> Unit
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit
 ) {
     val context = LocalContext.current
     val resetToastMessage = stringResource(R.string.settings_reset_toast, title)
@@ -602,12 +605,13 @@ fun SettingChoiceRow(
             )
             SettingHelpButton(title = title, description = description)
         }
-        androidx.compose.foundation.layout.FlowRow(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = SettingsRowHorizontalPadding),
+                .horizontalBleed(CardContentPadding)
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = CardContentPadding + SettingsRowHorizontalPadding),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
             content = content
         )
     }

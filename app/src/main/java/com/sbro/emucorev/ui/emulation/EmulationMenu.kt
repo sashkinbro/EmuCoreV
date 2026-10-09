@@ -10,7 +10,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import com.sbro.emucorev.ui.theme.neon.neonShape
@@ -32,6 +32,8 @@ import com.sbro.emucorev.ui.theme.neon.neonShapeCorners
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -50,9 +52,9 @@ import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -75,10 +77,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -94,6 +96,7 @@ import com.sbro.emucorev.data.VitaTrophy
 import com.sbro.emucorev.data.VitaTrophyGrade
 import com.sbro.emucorev.data.VitaTrophySet
 import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.cheats.groupCheatEntries
 import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
 import com.sbro.emucorev.ui.theme.LocalCustomizationSettings
@@ -256,6 +259,7 @@ private fun QuickBarButton(
 fun EmulationGameMenu(
     gameTitle: String,
     gameId: String,
+    gameIconPath: String?,
     config: VitaCoreConfig,
     cheats: VitaCheatSnapshot,
     cheatsAvailable: Boolean,
@@ -307,6 +311,7 @@ fun EmulationGameMenu(
                     MenuScrollableContent(
                         gameTitle = gameTitle,
                         gameId = gameId,
+                        gameIconPath = gameIconPath,
                         config = config,
                         cheats = cheats,
                         cheatsAvailable = cheatsAvailable,
@@ -354,9 +359,8 @@ fun EmulationGameMenu(
                         selectedTab = selectedTab,
                         onSelected = { selectedTab = it },
                         iconOnly = true,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(vertical = 14.dp, horizontal = 8.dp)
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 14.dp, horizontal = 8.dp)
                     )
                     if (LocalNeonTheme.current) {
                         NeonCrtOverlay()
@@ -409,12 +413,13 @@ fun EmulationGameMenu(
                         iconOnly = false,
                         modifier = Modifier
                             .width(188.dp)
-                            .fillMaxHeight()
-                            .padding(14.dp)
+                            .fillMaxHeight(),
+                        contentPadding = PaddingValues(14.dp)
                     )
                     MenuScrollableContent(
                         gameTitle = gameTitle,
                         gameId = gameId,
+                        gameIconPath = gameIconPath,
                         config = config,
                         cheats = cheats,
                         cheatsAvailable = cheatsAvailable,
@@ -435,6 +440,7 @@ fun EmulationGameMenu(
                 GameMenuLayoutStyle.COMPACT -> MenuScrollableContent(
                     gameTitle = gameTitle,
                     gameId = gameId,
+                    gameIconPath = gameIconPath,
                     config = config,
                     cheats = cheats,
                     cheatsAvailable = cheatsAvailable,
@@ -463,6 +469,7 @@ fun EmulationGameMenu(
 private fun MenuScrollableContent(
     gameTitle: String,
     gameId: String,
+    gameIconPath: String?,
     config: VitaCoreConfig,
     cheats: VitaCheatSnapshot,
     cheatsAvailable: Boolean,
@@ -493,7 +500,7 @@ private fun MenuScrollableContent(
         verticalArrangement = Arrangement.spacedBy(if (compact) 9.dp else 12.dp)
     ) {
         if (showSheetHandle) SheetHandle()
-        MenuHeader(gameTitle = gameTitle, gameId = gameId, paused = paused)
+        MenuHeader(gameTitle = gameTitle, gameId = gameId, gameIconPath = gameIconPath, paused = paused)
         MenuTopActions(paused = paused, callbacks = callbacks)
         if (showHorizontalTabs) {
             Column(
@@ -574,17 +581,6 @@ private enum class EmulationMenuTab {
     System,
     Achievements,
     Gamepad
-}
-
-private fun Modifier.horizontalBleed(horizontalPadding: Dp): Modifier = layout { measurable, constraints ->
-    val bleedPx = horizontalPadding.roundToPx()
-    val looseConstraints = constraints.copy(
-        maxWidth = (constraints.maxWidth + bleedPx * 2).coerceAtLeast(0)
-    )
-    val placeable = measurable.measure(looseConstraints)
-    layout(constraints.maxWidth, placeable.height) {
-        placeable.placeRelative(-bleedPx, 0)
-    }
 }
 
 @Composable
@@ -925,70 +921,206 @@ private fun SystemTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks)
 @Composable
 private fun SaveStatesTab(saveStates: SaveStateMenuState, callbacks: EmulationMenuCallbacks) {
     val palette = emulationMenuPalette()
-    val selected = saveStates.selectedSlot
+    val slotOrder = SaveStateRepository.SLOT_ORDER
+    val selectedIndex = slotOrder.indexOf(saveStates.selectedSlot).coerceAtLeast(0)
+    val selected = slotOrder[selectedIndex]
     val slot = saveStates.slots.firstOrNull { it.slot == selected }
-    MenuSection(
-        title = stringResource(R.string.emulation_menu_section_savestates),
-        subtitle = "",
-        badge = null
+    val hasState = slot?.exists == true
+    val busy = saveStates.busy
+    val statusText = if (slot?.exists == true) {
+        stringResource(R.string.emulation_savestate_saved_at, formatSaveStateDate(slot.timestamp)) +
+            " · " + stringResource(R.string.emulation_savestate_size, formatSaveStateSize(slot.sizeBytes))
+    } else {
+        stringResource(R.string.emulation_savestate_empty)
+    }
+
+    Surface(
+        shape = neonShape(16.dp),
+        color = palette.panelSoft,
+        border = BorderStroke(1.dp, palette.border)
     ) {
-        MenuChipRow(
-            label = stringResource(R.string.emulation_savestate_slot_picker),
-            selected = selected,
-            options = saveStates.slots.map { it.slot to saveStateSlotLabel(it.slot) },
-            enabled = !saveStates.busy,
-            onSelected = callbacks.onSaveStateSlotSelected
-        )
-        Text(
-            text = if (slot?.exists == true) {
-                stringResource(R.string.emulation_savestate_saved_at, formatSaveStateDate(slot.timestamp)) +
-                    " · " + stringResource(R.string.emulation_savestate_size, formatSaveStateSize(slot.sizeBytes))
-            } else {
-                stringResource(R.string.emulation_savestate_empty)
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = palette.textSecondary
-        )
-        if (saveStates.busy) {
-            LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            FilledTonalButton(
-                onClick = { callbacks.onSaveStateSave(selected) },
-                enabled = !saveStates.busy,
-                shape = neonShape(12.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.emulation_savestate_save_action))
+                Text(
+                    text = stringResource(R.string.emulation_menu_section_savestates),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = palette.textPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+                SaveStateSlotSwitcher(
+                    label = saveStateSlotLabel(selected),
+                    canGoPrevious = selectedIndex > 0 && !busy,
+                    canGoNext = selectedIndex < slotOrder.lastIndex && !busy,
+                    onPrevious = { callbacks.onSaveStateSlotSelected(slotOrder[selectedIndex - 1]) },
+                    onNext = { callbacks.onSaveStateSlotSelected(slotOrder[selectedIndex + 1]) }
+                )
             }
-            OutlinedButton(
-                onClick = { callbacks.onSaveStateLoad(selected) },
-                enabled = slot?.exists == true && !saveStates.busy,
-                shape = neonShape(12.dp)
-            ) {
-                Icon(Icons.Rounded.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.emulation_savestate_load_action))
+
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.bodySmall,
+                color = palette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            HorizontalDivider(color = palette.border)
+
+            if (busy) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
-            if (slot?.exists == true) {
-                IconButton(
-                    onClick = { callbacks.onSaveStateDelete(selected) },
-                    enabled = !saveStates.busy
-                ) {
-                    Icon(
-                        Icons.Rounded.DeleteOutline,
-                        contentDescription = stringResource(R.string.emulation_savestate_delete_action),
-                        tint = if (saveStates.busy) palette.textSecondary else MaterialTheme.colorScheme.error
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SaveStateActionButton(
+                    icon = Icons.Rounded.Save,
+                    contentDescription = stringResource(R.string.emulation_savestate_save_action),
+                    enabled = !busy,
+                    onClick = { callbacks.onSaveStateSave(selected) },
+                    modifier = Modifier.weight(1f)
+                )
+                SaveStateActionButton(
+                    icon = Icons.Rounded.Restore,
+                    contentDescription = stringResource(R.string.emulation_savestate_load_action),
+                    enabled = hasState && !busy,
+                    onClick = { callbacks.onSaveStateLoad(selected) },
+                    modifier = Modifier.weight(1f)
+                )
+                if (hasState) {
+                    SaveStateDeleteButton(
+                        enabled = !busy,
+                        onClick = { callbacks.onSaveStateDelete(selected) }
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SaveStateSlotSwitcher(
+    label: String,
+    canGoPrevious: Boolean,
+    canGoNext: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(
+            onClick = onPrevious,
+            enabled = canGoPrevious,
+            colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                contentDescription = stringResource(R.string.common_previous)
+            )
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(min = 44.dp)
+        )
+        IconButton(
+            onClick = onNext,
+            enabled = canGoNext,
+            colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = stringResource(R.string.common_next)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SaveStateActionButton(
+    icon: ImageVector,
+    contentDescription: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val palette = emulationMenuPalette()
+    val shape = neonShape(16.dp)
+    Surface(
+        modifier = modifier
+            .height(54.dp)
+            .clip(shape)
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = shape,
+        color = if (enabled) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        } else {
+            palette.row
+        },
+        border = BorderStroke(
+            1.dp,
+            if (enabled) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.26f)
+            } else {
+                palette.border
+            }
+        )
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = if (enabled) MaterialTheme.colorScheme.primary else palette.textSecondary.copy(alpha = 0.42f),
+                modifier = Modifier.size(22.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SaveStateDeleteButton(enabled: Boolean, onClick: () -> Unit) {
+    val palette = emulationMenuPalette()
+    val shape = neonShape(16.dp)
+    Surface(
+        modifier = Modifier
+            .size(54.dp)
+            .clip(shape)
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = shape,
+        color = if (enabled) {
+            MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+        } else {
+            palette.row
+        },
+        border = BorderStroke(
+            1.dp,
+            if (enabled) {
+                MaterialTheme.colorScheme.error.copy(alpha = 0.26f)
+            } else {
+                palette.border
+            }
+        )
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Rounded.DeleteOutline,
+                contentDescription = stringResource(R.string.emulation_savestate_delete_action),
+                tint = if (enabled) MaterialTheme.colorScheme.error else palette.textSecondary.copy(alpha = 0.42f),
+                modifier = Modifier.size(22.dp)
+            )
         }
     }
 }
@@ -1550,11 +1682,14 @@ private fun MenuVerticalTabs(
     selectedTab: EmulationMenuTab,
     onSelected: (EmulationMenuTab) -> Unit,
     iconOnly: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
     val palette = emulationMenuPalette()
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()),
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         emulationMenuTabs().forEach { item ->
@@ -1710,14 +1845,17 @@ private fun SheetHandle() {
 }
 
 @Composable
-private fun MenuHeader(gameTitle: String, gameId: String, paused: Boolean) {
+private fun MenuHeader(gameTitle: String, gameId: String, gameIconPath: String?, paused: Boolean) {
     val palette = emulationMenuPalette()
+    val displayTitle = gameTitle.ifBlank {
+        gameId.ifBlank { stringResource(R.string.emulation_menu_unknown_game) }
+    }
     Surface(
         shape = neonShape(16.dp),
         color = palette.row,
         border = BorderStroke(1.dp, palette.border)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
@@ -1728,36 +1866,55 @@ private fun MenuHeader(gameTitle: String, gameId: String, paused: Boolean) {
                         )
                     )
                 )
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            Surface(
+                modifier = Modifier.size(64.dp),
+                shape = neonShape(14.dp),
+                color = palette.panelSoft,
+                border = BorderStroke(1.dp, palette.border)
             ) {
-                Text(
-                    text = stringResource(R.string.emulation_menu_title),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = palette.textPrimary,
-                    modifier = Modifier.weight(1f)
+                LocalImage(
+                    path = gameIconPath,
+                    contentDescription = displayTitle,
+                    fallbackLabel = displayTitle,
+                    modifier = Modifier.fillMaxSize()
                 )
-                if (paused) {
-                    Badge(text = stringResource(R.string.emulation_menu_paused_badge), color = LiveBadgeColor)
-                }
             }
-            Text(
-                text = gameTitle.ifBlank {
-                    gameId.ifBlank { stringResource(R.string.emulation_menu_unknown_game) }
-                },
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                color = palette.textSecondary
-            )
-            if (gameId.isNotBlank() && !gameTitle.equals(gameId, ignoreCase = true)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.emulation_menu_title),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = palette.textPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (paused) {
+                        Badge(text = stringResource(R.string.emulation_menu_paused_badge), color = LiveBadgeColor)
+                    }
+                }
                 Text(
-                    text = gameId,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = palette.textSecondary.copy(alpha = 0.72f)
+                    text = displayTitle,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = palette.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
+                if (gameId.isNotBlank() && !gameTitle.equals(gameId, ignoreCase = true)) {
+                    Text(
+                        text = gameId,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = palette.textSecondary.copy(alpha = 0.72f)
+                    )
+                }
             }
         }
     }
@@ -1966,7 +2123,14 @@ private fun MenuChipRow(
             style = MaterialTheme.typography.labelLarge,
             color = palette.textSecondary
         )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalBleed(14.dp)
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             options.forEach { (value, text) ->
                 FilterChip(
                     shape = neonChipShape(),

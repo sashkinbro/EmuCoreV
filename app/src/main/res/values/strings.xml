@@ -1420,7 +1420,7 @@
     <string name="emulation_savestate_save_action">Save state</string>
     <string name="emulation_savestate_save_desc">Create a snapshot of the current moment</string>
     <string name="emulation_savestate_save_overwrite_desc">Overwrite this slot with the current moment</string>
-    <string name="emulation_savestate_load_action">Load state</string>
+    <string name="emulation_savestate_load_action">Load</string>
     <string name="emulation_savestate_load_desc">Restore the emulator to this snapshot</string>
     <string name="emulation_savestate_delete_action">Delete</string>
     <string name="emulation_savestate_delete_desc">Remove this save state</string>

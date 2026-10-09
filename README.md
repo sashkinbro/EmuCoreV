@@ -9,15 +9,6 @@
 
 EmuCoreV is a PlayStation Vita emulator for Android. It combines a custom Android interface, library and catalog UX, installer flows, and runtime controls with a Vita3K-based emulation core adapted for this app.
 
-![Status](https://img.shields.io/badge/Status-Early%20Development%20%2F%20Unstable-red)
-
-> [!WARNING]
-> EmuCoreV is still under active development. Expect instability, renderer-specific issues, incomplete compatibility, and device-to-device performance differences.
->
-> Current Android builds target `arm64-v8a` only. Firmware handling, game installation, compatibility sync, and mobile UX are still being refined.
->
-> Not all games boot or behave correctly yet. Compatibility, fixes, and performance work are ongoing.
-
 ## Highlights
 
 - Vita3K-based native core integrated into a Kotlin + Jetpack Compose Android app
@@ -62,7 +53,7 @@ EmuCoreV currently targets Android with:
 - `minSdk 28`
 - `targetSdk 37`
 - package id `com.sbro.emucorev`
-- version `0.2.1` (build `72`)
+- version `0.2.4` (build `84`)
 - ABI `arm64-v8a`
 
 ## Building Locally
