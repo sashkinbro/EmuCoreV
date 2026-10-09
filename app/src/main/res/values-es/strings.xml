@@ -465,6 +465,9 @@
     <string name="controls_editor_primary_action">Acción principal</string>
     <string name="controls_editor_secondary_action">Acción secundaria</string>
     <string name="controls_editor_none">Ninguna</string>
+    <string name="controls_editor_group_dpad">Cruceta</string>
+    <string name="controls_editor_group_buttons">Botones de acción</string>
+    <string name="controls_editor_opacity_value">Opacidad %1$d%%</string>
     <string name="emulation_menu_exit_game">Salir del juego</string>
     <string name="emulation_menu_exit_game_desc">Cierra la sesión actual y vuelve a la biblioteca.</string>
     <string name="emulation_exit_confirm_title">¿Salir del juego?</string>

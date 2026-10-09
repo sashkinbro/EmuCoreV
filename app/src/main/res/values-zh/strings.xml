@@ -465,6 +465,9 @@
     <string name="controls_editor_primary_action">主操作</string>
     <string name="controls_editor_secondary_action">次操作</string>
     <string name="controls_editor_none">无</string>
+    <string name="controls_editor_group_dpad">方向键</string>
+    <string name="controls_editor_group_buttons">操作按钮</string>
+    <string name="controls_editor_opacity_value">不透明度 %1$d%%</string>
     <string name="emulation_menu_exit_game">退出遊戲</string>
     <string name="emulation_menu_exit_game_desc">關閉目前的工作階段並返回收藏庫。</string>
     <string name="emulation_exit_confirm_title">確定要退出遊戲？</string>

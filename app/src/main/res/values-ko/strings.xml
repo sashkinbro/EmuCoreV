@@ -1413,6 +1413,9 @@
     <string name="controls_editor_primary_action">기본 동작</string>
     <string name="controls_editor_secondary_action">보조 동작</string>
     <string name="controls_editor_none">없음</string>
+    <string name="controls_editor_group_dpad">십자 키</string>
+    <string name="controls_editor_group_buttons">액션 버튼</string>
+    <string name="controls_editor_opacity_value">불투명도 %1$d%%</string>
     <!-- Save states -->
     <string name="emulation_tab_savestates">세이브 스테이트</string>
     <string name="emulation_menu_section_savestates">세이브 스테이트</string>

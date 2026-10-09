@@ -1413,6 +1413,9 @@
     <string name="controls_editor_primary_action">プライマリアクション</string>
     <string name="controls_editor_secondary_action">セカンドアクション</string>
     <string name="controls_editor_none">なし</string>
+    <string name="controls_editor_group_dpad">十字キー</string>
+    <string name="controls_editor_group_buttons">アクションボタン</string>
+    <string name="controls_editor_opacity_value">不透明度 %1$d%%</string>
     <!-- Save states -->
     <string name="emulation_tab_savestates">セーブステート</string>
     <string name="emulation_menu_section_savestates">セーブステート</string>

@@ -1413,6 +1413,9 @@
     <string name="controls_editor_primary_action">Hlavní akce</string>
     <string name="controls_editor_secondary_action">Vedlejší akce</string>
     <string name="controls_editor_none">Žádná</string>
+    <string name="controls_editor_group_dpad">Křížový ovladač</string>
+    <string name="controls_editor_group_buttons">Akční tlačítka</string>
+    <string name="controls_editor_opacity_value">Průhlednost %1$d%%</string>
     <!-- Save states -->
     <string name="emulation_tab_savestates">Uložené stavy</string>
     <string name="emulation_menu_section_savestates">Uložené stavy</string>

@@ -1413,6 +1413,9 @@
     <string name="controls_editor_primary_action">Основна дія</string>
     <string name="controls_editor_secondary_action">Друга дія</string>
     <string name="controls_editor_none">Немає</string>
+    <string name="controls_editor_group_dpad">Хрестовина</string>
+    <string name="controls_editor_group_buttons">Кнопки дій</string>
+    <string name="controls_editor_opacity_value">Прозорість %1$d%%</string>
     <string name="emulation_tab_savestates">Стани</string>
     <string name="emulation_menu_section_savestates">Стани</string>
     <string name="emulation_menu_section_savestates_desc">Знімки емулятора не залежать від внутрішньоігрових збережень. Швидке збереження та завантаження завжди доступні на панелі.</string>

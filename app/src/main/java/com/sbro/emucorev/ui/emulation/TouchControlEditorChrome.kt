@@ -3,8 +3,6 @@
 package com.sbro.emucorev.ui.emulation
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -34,24 +32,31 @@ internal fun TouchControlEditorChrome(
     showGrid: Boolean, snapToGrid: Boolean,
     onDuplicate: () -> Unit, onDelete: () -> Unit, onCombo: () -> Unit, onCreate: () -> Unit,
     onResetSelected: () -> Unit, onGridToggle: () -> Unit, onSnapToggle: () -> Unit,
+    selectedOpacityPercent: Int = 100,
+    onOpacityDecrease: () -> Unit = {},
+    onOpacityIncrease: () -> Unit = {},
+    groupSelected: Boolean = false,
+    groupScalePercent: Int = 100,
+    onGroupScaleDecrease: () -> Unit = {},
+    onGroupScaleIncrease: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showAdjust by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     Column(
-        modifier.widthIn(max = 760.dp).fillMaxWidth().testTag("controls_editor_panel")
-            .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 6.dp),
+        modifier.widthIn(max = 720.dp).fillMaxWidth().testTag("controls_editor_panel")
+            .padding(horizontal = 12.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Surface(color = Color(0xFF2B3F93).copy(alpha = .88f), shape = neonShape(16.dp)) {
-            Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(stringResource(R.string.emulation_controls_editor_title), color = Color.White,
-                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(stringResource(R.string.emulation_controls_editor_hint), color = Color.White.copy(alpha = .84f),
-                    style = MaterialTheme.typography.labelMedium)
-                Text(selectedLabel, color = Color.White.copy(alpha = .84f), style = MaterialTheme.typography.labelMedium)
-            }
+            Text(
+                text = stringResource(R.string.emulation_controls_editor_title),
+                color = Color.White,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
         }
         // Wrap rather than scroll sideways, so Done and every tool remain reachable in portrait.
         FlowRow(
@@ -61,10 +66,12 @@ internal fun TouchControlEditorChrome(
         ) {
             EditorTool(Icons.Rounded.Refresh, stringResource(R.string.emulation_controls_editor_reset), "reset_all", onReset)
             EditorTool(Icons.Rounded.RestartAlt, stringResource(R.string.controls_editor_reset_selected), "reset_selected", onResetSelected)
-            EditorTool(if (selectedVisible) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
-                stringResource(R.string.emulation_controls_editor_visible), "visibility", onVisibilityToggle)
-            EditorTool(Icons.Rounded.Add, stringResource(R.string.controls_editor_create_combo), "create_combo", onCreate, canCreate)
-            EditorTool(Icons.Rounded.ContentCopy, stringResource(R.string.controls_editor_duplicate), "duplicate", onDuplicate, canDuplicate)
+            if (!groupSelected) {
+                EditorTool(if (selectedVisible) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                    stringResource(R.string.emulation_controls_editor_visible), "visibility", onVisibilityToggle)
+                EditorTool(Icons.Rounded.Add, stringResource(R.string.controls_editor_create_combo), "create_combo", onCreate, canCreate)
+                EditorTool(Icons.Rounded.ContentCopy, stringResource(R.string.controls_editor_duplicate), "duplicate", onDuplicate, canDuplicate)
+            }
             EditorTool(Icons.Rounded.Tune, stringResource(R.string.emulation_controls_editor_size), "adjust", { showAdjust = !showAdjust }, active = showAdjust)
             if (analogMode != null) {
                 EditorTool(Icons.Rounded.TouchApp, stringResource(R.string.emulation_controls_editor_touch_area_mode), "analog_mode", onAnalogModeToggle,
@@ -73,30 +80,41 @@ internal fun TouchControlEditorChrome(
             EditorTool(Icons.Rounded.GridOn, stringResource(R.string.controls_editor_grid), "grid", onGridToggle, active = showGrid)
             EditorTool(Icons.Rounded.Grid4x4, stringResource(R.string.controls_editor_snap), "snap", onSnapToggle, active = snapToGrid)
             Button(onClick = onDone, modifier = Modifier.testTag("controls_editor_done"), shape = neonShape(16.dp),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3565FF), contentColor = Color.White)) {
                 Text(stringResource(R.string.emulation_controls_editor_done))
             }
         }
         if (showAdjust) {
             Surface(color = Color(0xFF111827).copy(alpha = .92f), shape = neonShape(16.dp)) {
-                Column(Modifier.widthIn(max = 420.dp).fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.widthIn(max = 340.dp).fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(selectedLabel, Modifier.weight(1f), color = Color.White, maxLines = 1,
-                            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                        IconButton(onClick = { showAdjust = false }, modifier = Modifier.size(28.dp).testTag("controls_editor_adjust_close")) {
+                            style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                        IconButton(onClick = { showAdjust = false }, modifier = Modifier.size(26.dp).testTag("controls_editor_adjust_close")) {
                             Icon(Icons.Rounded.Close, stringResource(R.string.emulation_controls_editor_done), tint = Color.White)
                         }
                     }
-                    EditorStepper(stringResource(R.string.emulation_controls_editor_percent, selectedScalePercent),
-                        onSizeDecrease, onSizeIncrease, minusEnabled = selectedScalePercent > 35, plusEnabled = selectedScalePercent < 250)
-                    if (showDimensions) {
-                        EditorStepper(stringResource(R.string.emulation_controls_editor_width) + " $touchAreaWidthPercent%",
-                            onTouchAreaWidthDecrease, onTouchAreaWidthIncrease, minusEnabled = touchAreaWidthPercent > 50, plusEnabled = touchAreaWidthPercent < 300)
-                        EditorStepper(stringResource(R.string.emulation_controls_editor_height) + " $touchAreaHeightPercent%",
-                            onTouchAreaHeightDecrease, onTouchAreaHeightIncrease, Modifier.testTag("controls_editor_height_row"),
-                            minusEnabled = touchAreaHeightPercent > 50, plusEnabled = touchAreaHeightPercent < 300)
+                    if (groupSelected) {
+                        EditorStepper(stringResource(R.string.emulation_controls_editor_percent, groupScalePercent),
+                            onGroupScaleDecrease, onGroupScaleIncrease,
+                            minusEnabled = groupScalePercent > GROUP_SCALE_MIN_PERCENT,
+                            plusEnabled = groupScalePercent < GROUP_SCALE_MAX_PERCENT)
+                    } else {
+                        EditorStepper(stringResource(R.string.emulation_controls_editor_percent, selectedScalePercent),
+                            onSizeDecrease, onSizeIncrease, minusEnabled = selectedScalePercent > 35, plusEnabled = selectedScalePercent < 250)
+                        if (showDimensions) {
+                            EditorStepper(stringResource(R.string.emulation_controls_editor_width) + " $touchAreaWidthPercent%",
+                                onTouchAreaWidthDecrease, onTouchAreaWidthIncrease, minusEnabled = touchAreaWidthPercent > 50, plusEnabled = touchAreaWidthPercent < 300)
+                            EditorStepper(stringResource(R.string.emulation_controls_editor_height) + " $touchAreaHeightPercent%",
+                                onTouchAreaHeightDecrease, onTouchAreaHeightIncrease, Modifier.testTag("controls_editor_height_row"),
+                                minusEnabled = touchAreaHeightPercent > 50, plusEnabled = touchAreaHeightPercent < 300)
+                        }
+                        EditorStepper(stringResource(R.string.controls_editor_opacity_value, selectedOpacityPercent),
+                            onOpacityDecrease, onOpacityIncrease,
+                            minusEnabled = selectedOpacityPercent > CONTROL_OPACITY_MIN,
+                            plusEnabled = selectedOpacityPercent < CONTROL_OPACITY_MAX)
                     }
                 }
             }
@@ -131,8 +149,8 @@ private fun editorButtonColors(active: Boolean = false) = ButtonDefaults.outline
 @Composable
 private fun EditorTool(icon: ImageVector, label: String, tag: String, onClick: () -> Unit, enabled: Boolean = true, active: Boolean = false) {
     OutlinedButton(onClick = onClick, enabled = enabled, modifier = Modifier.testTag("controls_editor_$tag"),
-        shape = neonShape(16.dp), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp), colors = editorButtonColors(active)) {
-        Icon(icon, contentDescription = label, modifier = Modifier.size(24.dp))
+        shape = neonShape(16.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp), colors = editorButtonColors(active)) {
+        Icon(icon, contentDescription = label, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -140,13 +158,15 @@ private fun EditorTool(icon: ImageVector, label: String, tag: String, onClick: (
 private fun EditorStepper(value: String, onMinus: () -> Unit, onPlus: () -> Unit, modifier: Modifier = Modifier,
                           minusEnabled: Boolean = true, plusEnabled: Boolean = true) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        OutlinedButton(onClick = onMinus, enabled = minusEnabled, shape = neonShape(14.dp), colors = editorButtonColors()) {
-            Icon(Icons.Rounded.Remove, contentDescription = "−", modifier = Modifier.size(18.dp))
+        OutlinedButton(onClick = onMinus, enabled = minusEnabled, shape = neonShape(14.dp), colors = editorButtonColors(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
+            Icon(Icons.Rounded.Remove, contentDescription = "−", modifier = Modifier.size(16.dp))
         }
-        Text(value, Modifier.weight(1f).padding(horizontal = 10.dp), color = Color.White,
-            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        OutlinedButton(onClick = onPlus, enabled = plusEnabled, shape = neonShape(14.dp), colors = editorButtonColors()) {
-            Icon(Icons.Rounded.Add, contentDescription = "+", modifier = Modifier.size(18.dp))
+        Text(value, Modifier.weight(1f).padding(horizontal = 8.dp), color = Color.White,
+            style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        OutlinedButton(onClick = onPlus, enabled = plusEnabled, shape = neonShape(14.dp), colors = editorButtonColors(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
+            Icon(Icons.Rounded.Add, contentDescription = "+", modifier = Modifier.size(16.dp))
         }
     }
 }

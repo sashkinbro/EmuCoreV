@@ -691,6 +691,9 @@
     <string name="controls_editor_primary_action">الإجراء الأساسي</string>
     <string name="controls_editor_secondary_action">الإجراء الثانوي</string>
     <string name="controls_editor_none">لا شيء</string>
+    <string name="controls_editor_group_dpad">الأسهم الاتجاهية</string>
+    <string name="controls_editor_group_buttons">أزرار الإجراءات</string>
+    <string name="controls_editor_opacity_value">الشفافية %1$d%%</string>
     <string name="emulation_menu_exit_game">الخروج من اللعبة</string>
     <string name="emulation_menu_exit_game_desc">إغلاق الجلسة الحالية والعودة إلى المكتبة.</string>
     <string name="emulation_exit_confirm_title">الخروج من اللعبة؟</string>

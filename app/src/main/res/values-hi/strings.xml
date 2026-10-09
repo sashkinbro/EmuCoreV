@@ -465,6 +465,9 @@
     <string name="controls_editor_primary_action">प्राथमिक क्रिया</string>
     <string name="controls_editor_secondary_action">द्वितीयक क्रिया</string>
     <string name="controls_editor_none">कोई नहीं</string>
+    <string name="controls_editor_group_dpad">डी-पैड</string>
+    <string name="controls_editor_group_buttons">एक्शन बटन</string>
+    <string name="controls_editor_opacity_value">अपारदर्शिता %1$d%%</string>
     <string name="emulation_menu_exit_game">गेम से बाहर निकलें</string>
     <string name="emulation_menu_exit_game_desc">वर्तमान सत्र बंद करें और लाइब्रेरी में वापस जाएँ।</string>
     <string name="emulation_exit_confirm_title">गेम से बाहर निकलें?</string>

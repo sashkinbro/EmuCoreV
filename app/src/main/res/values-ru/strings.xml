@@ -465,6 +465,9 @@
     <string name="controls_editor_primary_action">Основное действие</string>
     <string name="controls_editor_secondary_action">Второе действие</string>
     <string name="controls_editor_none">Нет</string>
+    <string name="controls_editor_group_dpad">Крестовина</string>
+    <string name="controls_editor_group_buttons">Кнопки действий</string>
+    <string name="controls_editor_opacity_value">Прозрачность %1$d%%</string>
     <string name="emulation_menu_exit_game">Выйти из игры</string>
     <string name="emulation_menu_exit_game_desc">Закрыть текущую сессию и вернуться в библиотеку.</string>
     <string name="emulation_exit_confirm_title">Выйти из игры?</string>

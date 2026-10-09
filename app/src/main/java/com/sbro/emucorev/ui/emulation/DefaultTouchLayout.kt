@@ -53,13 +53,21 @@ internal fun buildDefaultTouchLayout(
         else shoulderTopPaddingPx
     val centerGroupWidth = centerWidth * 2 + touchSize + centerGap * 2
     val centerX = (canvasWidth - centerGroupWidth) / 2
-    fun element(id: String, x: Float, y: Float, width: Float, height: Float) = TouchControlElement(
-        id, x / canvasWidth, y / canvasHeight, width / canvasWidth, height / canvasHeight
+    fun element(
+        id: String,
+        x: Float,
+        y: Float,
+        width: Float,
+        height: Float,
+        visible: Boolean = true
+    ) = TouchControlElement(
+        id, x / canvasWidth, y / canvasHeight, width / canvasWidth, height / canvasHeight,
+        visible = visible
     ).normalized()
     return listOf(
-        element(TouchControlIds.L2, leftX, shoulderY, shoulderWidth, shoulderHeight),
+        element(TouchControlIds.L2, leftX, shoulderY, shoulderWidth, shoulderHeight, visible = false),
         element(TouchControlIds.L1, leftX, shoulderY + shoulderHeight + shoulderGap, shoulderWidth, shoulderHeight),
-        element(TouchControlIds.R2, canvasWidth - sidePaddingPx - shoulderWidth, shoulderY, shoulderWidth, shoulderHeight),
+        element(TouchControlIds.R2, canvasWidth - sidePaddingPx - shoulderWidth, shoulderY, shoulderWidth, shoulderHeight, visible = false),
         element(TouchControlIds.R1, canvasWidth - sidePaddingPx - shoulderWidth, shoulderY + shoulderHeight + shoulderGap, shoulderWidth, shoulderHeight),
         element(TouchControlIds.DPAD_UP, leftX + dpadStep / 2, dpadY, dpadButton, dpadButton),
         element(TouchControlIds.DPAD_DOWN, leftX + dpadStep / 2, dpadY + dpadStep, dpadButton, dpadButton),

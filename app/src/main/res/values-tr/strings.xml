@@ -496,6 +496,9 @@
     <string name="controls_editor_primary_action">Birincil eylem</string>
     <string name="controls_editor_secondary_action">İkincil eylem</string>
     <string name="controls_editor_none">Hiçbiri</string>
+    <string name="controls_editor_group_dpad">Yön tuşları</string>
+    <string name="controls_editor_group_buttons">Eylem düğmeleri</string>
+    <string name="controls_editor_opacity_value">Saydamlık %1$d%%</string>
     <string name="emulation_menu_exit_game">Oyundan çık</string>
     <string name="emulation_menu_exit_game_desc">Mevcut oturumu kapatın ve kütüphaneye dönün.</string>
     <string name="emulation_exit_confirm_title">Oyundan çıkılsın mı?</string>

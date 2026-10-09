@@ -1413,6 +1413,9 @@
     <string name="controls_editor_primary_action">Akcja podstawowa</string>
     <string name="controls_editor_secondary_action">Druga akcja</string>
     <string name="controls_editor_none">Brak</string>
+    <string name="controls_editor_group_dpad">Krzyżak</string>
+    <string name="controls_editor_group_buttons">Przyciski akcji</string>
+    <string name="controls_editor_opacity_value">Krycie %1$d%%</string>
     <!-- Save states -->
     <string name="emulation_tab_savestates">Stany zapisu</string>
     <string name="emulation_menu_section_savestates">Stany zapisu</string>

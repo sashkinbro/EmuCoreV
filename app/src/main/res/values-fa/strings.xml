@@ -1413,6 +1413,9 @@
     <string name="controls_editor_primary_action">عمل اصلی</string>
     <string name="controls_editor_secondary_action">عمل دوم</string>
     <string name="controls_editor_none">هیچ‌کدام</string>
+    <string name="controls_editor_group_dpad">دیپد</string>
+    <string name="controls_editor_group_buttons">دکمه‌های عملکرد</string>
+    <string name="controls_editor_opacity_value">شفافیت %1$d%%</string>
     <!-- Save states -->
     <string name="emulation_tab_savestates">سیو استیت‌ها</string>
     <string name="emulation_menu_section_savestates">سیو استیت‌ها</string>

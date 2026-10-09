@@ -465,6 +465,9 @@
     <string name="controls_editor_primary_action">Primäre Aktion</string>
     <string name="controls_editor_secondary_action">Sekundäre Aktion</string>
     <string name="controls_editor_none">Keine</string>
+    <string name="controls_editor_group_dpad">Steuerkreuz</string>
+    <string name="controls_editor_group_buttons">Aktionstasten</string>
+    <string name="controls_editor_opacity_value">Deckkraft %1$d%%</string>
     <string name="emulation_menu_exit_game">Spiel beenden</string>
     <string name="emulation_menu_exit_game_desc">Aktuelle Sitzung schließen und zur Bibliothek zurückkehren.</string>
     <string name="emulation_exit_confirm_title">Spiel beenden?</string>

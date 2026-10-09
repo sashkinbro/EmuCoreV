@@ -1413,6 +1413,9 @@
     <string name="controls_editor_primary_action">Primary action</string>
     <string name="controls_editor_secondary_action">Second action</string>
     <string name="controls_editor_none">None</string>
+    <string name="controls_editor_group_dpad">D-pad</string>
+    <string name="controls_editor_group_buttons">Action buttons</string>
+    <string name="controls_editor_opacity_value">Opacity %1$d%%</string>
     <!-- Save states -->
     <string name="emulation_tab_savestates">Save states</string>
     <string name="emulation_menu_section_savestates">Save states</string>

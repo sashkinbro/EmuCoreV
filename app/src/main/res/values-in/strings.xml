@@ -1413,6 +1413,9 @@
     <string name="controls_editor_primary_action">Aksi utama</string>
     <string name="controls_editor_secondary_action">Aksi kedua</string>
     <string name="controls_editor_none">Tidak ada</string>
+    <string name="controls_editor_group_dpad">D-pad</string>
+    <string name="controls_editor_group_buttons">Tombol aksi</string>
+    <string name="controls_editor_opacity_value">Opasitas %1$d%%</string>
     <!-- Save states -->
     <string name="emulation_tab_savestates">Save state</string>
     <string name="emulation_menu_section_savestates">Save state</string>

@@ -19,6 +19,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -918,6 +919,8 @@ internal fun OnScreenControls(
         val mergedLayout = remember(defaultLayout, savedLayout) { mergeTouchLayout(defaultLayout, savedLayout) }
         var controls by remember(defaultLayout) { mutableStateOf(mergedLayout) }
         var selectedId by remember(editMode) { mutableStateOf<String?>(null) }
+        var selectedGroupIds by remember(editMode) { mutableStateOf<Set<String>?>(null) }
+        var groupScalePercent by remember(editMode) { mutableIntStateOf(100) }
         var pressedGroupControlIds by remember { mutableStateOf(emptySet<Int>()) }
         var hapticPressedControlIds by remember { mutableStateOf(emptySet<Int>()) }
         LaunchedEffect(mergedLayout) {
@@ -1023,6 +1026,68 @@ internal fun OnScreenControls(
             }
         }
 
+        fun updateSelectedOpacity(percentDelta: Int) {
+            val selectedElement = selected ?: return
+            val target = controls.firstOrNull { it.id == selectedElement.id } ?: selectedElement
+            val nextOpacity = (target.opacity + percentDelta)
+                .coerceIn(CONTROL_OPACITY_MIN, CONTROL_OPACITY_MAX)
+            if (nextOpacity == target.opacity) return
+            commitLayoutChange { currentControls ->
+                currentControls.replaceElement(target.copy(opacity = nextOpacity))
+            }
+        }
+
+        fun selectElementControl(id: String) {
+            selectedId = id
+            selectedGroupIds = null
+            groupScalePercent = 100
+            dragResiduals.clear()
+        }
+
+        fun selectControlGroup(ids: Set<String>) {
+            if (selectedGroupIds != ids) {
+                groupScalePercent = 100
+            }
+            selectedId = null
+            selectedGroupIds = ids
+            dragResiduals.clear()
+        }
+
+        fun updateGroupScale(percentDelta: Int) {
+            val groupIds = selectedGroupIds ?: return
+            val nextPercent = (groupScalePercent + percentDelta)
+                .coerceIn(GROUP_SCALE_MIN_PERCENT, GROUP_SCALE_MAX_PERCENT)
+            if (nextPercent == groupScalePercent) return
+            val members = controls.filter { it.id in groupIds }
+            if (members.size != groupIds.size) return
+            val factor = nextPercent.toFloat() / groupScalePercent.toFloat()
+            commitLayoutChange { currentControls ->
+                currentControls.replaceElements(members.scaleGroupAroundCenter(factor))
+            }
+            groupScalePercent = nextPercent
+        }
+
+        fun resetSelectedElementOrGroup() {
+            val groupIds = selectedGroupIds
+            if (groupIds != null) {
+                val defaults = defaultLayout.filter { it.id in groupIds }
+                if (defaults.size == groupIds.size) {
+                    commitLayoutChange { currentControls -> currentControls.replaceElements(defaults) }
+                }
+                groupScalePercent = 100
+                return
+            }
+            val currentSelected = selected ?: return
+            defaultSelected?.let { baseline ->
+                val reset = if (currentSelected.id.startsWith("custom_")) {
+                    baseline.copy(id = currentSelected.id, x = 0.45f, y = 0.45f,
+                        actionId = currentSelected.actionId, secondaryActionId = currentSelected.secondaryActionId,
+                        visible = currentSelected.visible)
+                } else baseline
+                commitLayoutChange { it.replaceElement(reset) }
+            }
+        }
+
         fun toggleSelectedAnalogMode() {
             val selectedElement = selected ?: return
             val target = controls.firstOrNull { it.id == selectedElement.id } ?: selectedElement
@@ -1070,7 +1135,9 @@ internal fun OnScreenControls(
                         elements = groupElements,
                         canvasWidth = canvasWidth,
                         canvasHeight = canvasHeight,
-                        onDragStart = { selectedId = group.ids.firstOrNull(); dragResiduals.clear() },
+                        selected = selectedGroupIds == group.ids,
+                        onSelected = { selectControlGroup(group.ids) },
+                        onDragStart = { selectControlGroup(group.ids) },
                         snapDrag = ::snapDrag,
                         onGroupChange = { updatedElements ->
                             commitLayoutChange { currentControls ->
@@ -1166,15 +1233,15 @@ internal fun OnScreenControls(
                 descriptor = descriptor,
                 canvasWidth = canvasWidth,
                 canvasHeight = canvasHeight,
-                alpha = if (editMode && !element.visible) 0.28f else alpha,
-                selected = editMode && selected?.id == element.id,
+                alpha = if (editMode && !element.visible) 0.28f else alpha * (element.opacity / 100f),
+                selected = editMode && selectedGroupIds == null && selected?.id == element.id,
                 editMode = editMode,
                 inputHandledByGroup = !editMode && element.id in groupHandledControlIds,
                 externallyPressed = descriptor.controlId?.let { it in pressedGroupControlIds } == true,
                 touchMode = touchMode,
                 visualStyle = visualStyle,
                 pressEffect = pressEffect,
-                onSelected = { selectedId = element.id; dragResiduals.clear() },
+                onSelected = { selectElementControl(element.id) },
                 snapDrag = ::snapDrag,
                 onElementChange = { updated -> commitLayoutChange { currentControls -> currentControls.replaceElement(updated) } },
                 onBackTouchToggle = onBackTouchToggle,
@@ -1185,11 +1252,20 @@ internal fun OnScreenControls(
         }
 
         if (editMode && selected != null && selectedDescriptor != null) {
+            val groupActive = selectedGroupIds != null
             TouchControlEditorChrome(
-                selectedLabel = listOfNotNull(
-                    stringResource(selectedDescriptor.labelRes),
-                    selected.secondaryActionId?.let(::touchControlDescriptor)?.let { stringResource(it.labelRes) }
-                ).joinToString(" + "),
+                selectedLabel = if (groupActive) {
+                    if (TouchControlIds.DPAD_UP in selectedGroupIds.orEmpty()) {
+                        stringResource(R.string.controls_editor_group_dpad)
+                    } else {
+                        stringResource(R.string.controls_editor_group_buttons)
+                    }
+                } else {
+                    listOfNotNull(
+                        stringResource(selectedDescriptor.labelRes),
+                        selected.secondaryActionId?.let(::touchControlDescriptor)?.let { stringResource(it.labelRes) }
+                    ).joinToString(" + ")
+                },
                 selectedVisible = selected.visible,
                 selectedScalePercent = selectedScalePercent,
                 onReset = onEditReset,
@@ -1201,7 +1277,10 @@ internal fun OnScreenControls(
                 },
                 onSizeDecrease = { updateSelectedSize(-10) },
                 onSizeIncrease = { updateSelectedSize(10) },
-                analogMode = if (selectedIsAnalog) selectedAnalogMode else null,
+                selectedOpacityPercent = selected.opacity,
+                onOpacityDecrease = { updateSelectedOpacity(-CONTROL_OPACITY_STEP) },
+                onOpacityIncrease = { updateSelectedOpacity(CONTROL_OPACITY_STEP) },
+                analogMode = if (!groupActive && selectedIsAnalog) selectedAnalogMode else null,
                 touchAreaWidthPercent = selectedWidthPercent,
                 touchAreaHeightPercent = selectedHeightPercent,
                 onAnalogModeToggle = ::toggleSelectedAnalogMode,
@@ -1210,30 +1289,31 @@ internal fun OnScreenControls(
                 onTouchAreaHeightDecrease = { updateSelectedHeight(-10) },
                 onTouchAreaHeightIncrease = { updateSelectedHeight(10) },
                 onDone = onEditDone,
-                showDimensions = !selectedIsAnalog || selectedAnalogMode == TouchAnalogMode.TouchArea,
-                canDuplicate = selectedDescriptor.type == TouchControlType.Button && controls.count { it.id.startsWith("custom_") } < 32,
-                canDelete = selected.id.startsWith("custom_"),
-                canCombo = selectedDescriptor.type == TouchControlType.Button,
+                showDimensions = !groupActive && (!selectedIsAnalog || selectedAnalogMode == TouchAnalogMode.TouchArea),
+                canDuplicate = !groupActive && selectedDescriptor.type == TouchControlType.Button && controls.count { it.id.startsWith("custom_") } < 32,
+                canDelete = !groupActive && selected.id.startsWith("custom_"),
+                canCombo = !groupActive && selectedDescriptor.type == TouchControlType.Button,
                 canCreate = controls.count { it.id.startsWith("custom_") } < 32,
                 showGrid = showGrid,
                 snapToGrid = snapToGrid,
                 onDuplicate = ::duplicateSelected,
-                onDelete = { commitLayoutChange { it.filterNot { element -> element.id == selected.id } }; selectedId = null },
+                onDelete = {
+                    commitLayoutChange { it.filterNot { element -> element.id == selected.id } }
+                    selectedId = null
+                    selectedGroupIds = null
+                },
                 onCombo = { createCombo = false; comboEditorOpen = true },
                 onCreate = { createCombo = true; comboEditorOpen = true },
-                onResetSelected = {
-                    defaultSelected?.let { baseline ->
-                        val reset = if (selected.id.startsWith("custom_")) {
-                            baseline.copy(id = selected.id, x = 0.45f, y = 0.45f,
-                                actionId = selected.actionId, secondaryActionId = selected.secondaryActionId,
-                                visible = selected.visible)
-                        } else baseline
-                        commitLayoutChange { it.replaceElement(reset) }
-                    }
-                },
+                onResetSelected = { resetSelectedElementOrGroup() },
                 onGridToggle = { showGrid = !showGrid },
                 onSnapToggle = { snapToGrid = !snapToGrid; dragResiduals.clear() },
-                modifier = Modifier.align(Alignment.TopCenter).heightIn(max = maxHeight * 0.55f)
+                groupSelected = groupActive,
+                groupScalePercent = groupScalePercent,
+                onGroupScaleDecrease = { updateGroupScale(-GROUP_SCALE_STEP_PERCENT) },
+                onGroupScaleIncrease = { updateGroupScale(GROUP_SCALE_STEP_PERCENT) },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .heightIn(max = maxHeight * 0.62f)
             )
         }
 
@@ -1340,6 +1420,8 @@ private fun TouchControlGroupFrame(
     elements: List<TouchControlElement>,
     canvasWidth: Float,
     canvasHeight: Float,
+    selected: Boolean,
+    onSelected: () -> Unit,
     onDragStart: () -> Unit,
     snapDrag: (String, Float, Float, Offset) -> Offset,
     onGroupChange: (List<TouchControlElement>) -> Unit
@@ -1363,12 +1445,15 @@ private fun TouchControlGroupFrame(
                 height = with(density) { heightPx.toDp() }
             )
             .clip(RoundedCornerShape(18.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = if (selected) 0.16f else 0.08f))
             .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.42f),
+                width = if (selected) 2.dp else 1.dp,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = if (selected) 0.75f else 0.42f),
                 shape = RoundedCornerShape(18.dp)
             )
+            .pointerInput(group.ids, selected) {
+                detectTapGestures { onSelected() }
+            }
             .pointerInput(group.ids, canvasWidth, canvasHeight) {
                 var draggedElements = latestElements
                 detectDragGestures(

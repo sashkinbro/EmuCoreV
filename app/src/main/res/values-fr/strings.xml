@@ -465,6 +465,9 @@
     <string name="controls_editor_primary_action">Action principale</string>
     <string name="controls_editor_secondary_action">Action secondaire</string>
     <string name="controls_editor_none">Aucune</string>
+    <string name="controls_editor_group_dpad">Croix directionnelle</string>
+    <string name="controls_editor_group_buttons">Boutons d\'action</string>
+    <string name="controls_editor_opacity_value">Opacité %1$d%%</string>
     <string name="emulation_menu_exit_game">Quitter le jeu</string>
     <string name="emulation_menu_exit_game_desc">Fermer la session actuelle et retourner à la bibliothèque.</string>
     <string name="emulation_exit_confirm_title">Quitter le jeu ?</string>
