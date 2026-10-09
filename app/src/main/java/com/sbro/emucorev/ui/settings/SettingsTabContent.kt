@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import com.sbro.emucorev.ui.theme.neon.neonShape
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Groups
@@ -77,6 +78,7 @@ import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.pro.ProBenefitCards
 import com.sbro.emucorev.ui.pro.ProPurchasePanel
+import com.sbro.emucorev.ui.profile.CloudProfilesDialog
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import kotlin.math.roundToInt
 
@@ -755,6 +757,7 @@ private fun StorageTab(
 ) {
     var storagePickerVisible by rememberSaveable { mutableStateOf(false) }
     var pendingStorageRootPath by rememberSaveable { mutableStateOf<String?>(null) }
+    var showDriveBackupDialog by rememberSaveable { mutableStateOf(false) }
     val pendingStorageLocation = uiState.storageLocations.firstOrNull { it.rootPath == pendingStorageRootPath }
 
     SectionCard(title = stringResource(R.string.settings_storage_title), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
@@ -825,7 +828,79 @@ private fun StorageTab(
             Text(stringResource(R.string.settings_backup_create))
         }
     }
+    SettingsActionRow(
+        icon = Icons.Rounded.CloudSync,
+        title = stringResource(R.string.drive_title),
+        subtitle = stringResource(R.string.drive_private),
+        onClick = { showDriveBackupDialog = true }
+    )
+    if (showDriveBackupDialog) {
+        CloudProfilesDialog(
+            onDismiss = { showDriveBackupDialog = false },
+            firebaseAvailable = false,
+            initialDrive = true
+        )
+    }
     ClearCacheSection(cacheSizeBytes = uiState.cacheSizeBytes, viewModel = viewModel)
+}
+
+@Composable
+private fun SettingsActionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = SettingsSectionRowPadding)
+            .neonCornerAccent(
+                accent = neonAccentColor(title.hashCode().mod(3)),
+                markSize = 9.dp
+            ),
+        shape = neonShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 1.dp,
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = SettingsCardInnerPadding, vertical = SettingsCardInnerPadding),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(neonShape(14.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }
 
 @Composable

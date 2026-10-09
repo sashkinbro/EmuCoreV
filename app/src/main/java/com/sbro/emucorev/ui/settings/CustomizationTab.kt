@@ -106,6 +106,23 @@ fun CustomizationTab(
         CustomizationPreview(settings)
 
         SectionCard(
+            title = stringResource(R.string.customization_library_layout),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp)
+        ) {
+            CustomizationSlider(
+                title = stringResource(R.string.customization_cover_size),
+                valueLabel = stringResource(
+                    R.string.customization_percent_value,
+                    settings.coverSizePercent
+                ),
+                value = settings.coverSizePercent,
+                range = CustomizationSettings.MIN_COVER_SIZE_PERCENT..
+                    CustomizationSettings.MAX_COVER_SIZE_PERCENT,
+                onValueChange = viewModel::updateCoverSizePercent
+            )
+        }
+
+        SectionCard(
             title = stringResource(R.string.settings_theme),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp)
         ) {
@@ -175,23 +192,6 @@ fun CustomizationTab(
                     ?: stringResource(R.string.customization_background_default),
                 selected = settings.backgroundPath != null,
                 onClick = { backgroundPicker.launch(arrayOf("image/*", "video/*")) }
-            )
-        }
-
-        SectionCard(
-            title = stringResource(R.string.customization_library_layout),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp)
-        ) {
-            CustomizationSlider(
-                title = stringResource(R.string.customization_cover_size),
-                valueLabel = stringResource(
-                    R.string.customization_percent_value,
-                    settings.coverSizePercent
-                ),
-                value = settings.coverSizePercent,
-                range = CustomizationSettings.MIN_COVER_SIZE_PERCENT..
-                    CustomizationSettings.MAX_COVER_SIZE_PERCENT,
-                onValueChange = viewModel::updateCoverSizePercent
             )
         }
 
