@@ -125,7 +125,10 @@
     <string name="game_manager_invert_right_x">Invert right stick X</string>
     <string name="play_time_title">Play Time</string>
     <string name="play_time_open_for_game">Play time</string>
-    <string name="play_time_current_session">Current session</string>
+    <string name="play_time_current_session">Play time %1$s</string>
+    <string name="play_time_duration_hours_minutes">%1$dh %2$dm</string>
+    <string name="play_time_duration_minutes_seconds">%1$dm %2$ds</string>
+    <string name="play_time_duration_seconds">%1$ds</string>
     <string name="play_time_filter_game">Choose game</string>
     <string name="play_time_all_games">All games</string>
     <string name="play_time_total_time">Total time</string>

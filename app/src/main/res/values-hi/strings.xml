@@ -674,7 +674,10 @@
     <string name="nav_play_time">खेलने का समय</string>
     <string name="play_time_title">खेलने का समय</string>
     <string name="play_time_open_for_game">खेलने का समय</string>
-    <string name="play_time_current_session">वर्तमान सत्र</string>
+    <string name="play_time_current_session">खेल का समय %1$s</string>
+    <string name="play_time_duration_hours_minutes">%1$dघं %2$dमि</string>
+    <string name="play_time_duration_minutes_seconds">%1$dमि %2$dसे</string>
+    <string name="play_time_duration_seconds">%1$dसे</string>
     <string name="play_time_filter_game">गेम चुनें</string>
     <string name="play_time_all_games">सभी गेम</string>
     <string name="play_time_total_time">कुल समय</string>

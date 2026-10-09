@@ -109,7 +109,10 @@
     <string name="game_manager_invert_right_x">عكس المحور X للعصا اليمنى</string>
     <string name="play_time_title">وقت اللعب</string>
     <string name="play_time_open_for_game">وقت اللعب</string>
-    <string name="play_time_current_session">الجلسة الحالية</string>
+    <string name="play_time_current_session">وقت اللعب %1$s</string>
+    <string name="play_time_duration_hours_minutes">%1$d س %2$d د</string>
+    <string name="play_time_duration_minutes_seconds">%1$d د %2$d ث</string>
+    <string name="play_time_duration_seconds">%1$d ث</string>
     <string name="play_time_filter_game">اختيار اللعبة</string>
     <string name="play_time_all_games">كل الألعاب</string>
     <string name="play_time_total_time">الوقت الإجمالي</string>

@@ -673,7 +673,10 @@
     <string name="nav_play_time">游玩时间</string>
     <string name="play_time_title">游玩时间</string>
     <string name="play_time_open_for_game">游玩时间</string>
-    <string name="play_time_current_session">当前会话</string>
+    <string name="play_time_current_session">游玩时间 %1$s</string>
+    <string name="play_time_duration_hours_minutes">%1$d小时%2$d分</string>
+    <string name="play_time_duration_minutes_seconds">%1$d分%2$d秒</string>
+    <string name="play_time_duration_seconds">%1$d秒</string>
     <string name="play_time_filter_game">选择游戏</string>
     <string name="play_time_all_games">所有游戏</string>
     <string name="play_time_total_time">总时间</string>

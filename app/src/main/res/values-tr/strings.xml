@@ -674,7 +674,10 @@
     <string name="nav_play_time">Oynama Süresi</string>
     <string name="play_time_title">Oynama Süresi</string>
     <string name="play_time_open_for_game">Oynama süresi</string>
-    <string name="play_time_current_session">Geçerli oturum</string>
+    <string name="play_time_current_session">Oyun süresi %1$s</string>
+    <string name="play_time_duration_hours_minutes">%1$dsa %2$ddk</string>
+    <string name="play_time_duration_minutes_seconds">%1$ddk %2$dsn</string>
+    <string name="play_time_duration_seconds">%1$dsn</string>
     <string name="play_time_filter_game">Oyun seç</string>
     <string name="play_time_all_games">Tüm oyunlar</string>
     <string name="play_time_total_time">Toplam süre</string>

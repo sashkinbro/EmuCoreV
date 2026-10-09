@@ -96,6 +96,7 @@ import com.sbro.emucorev.data.VitaTrophy
 import com.sbro.emucorev.data.VitaTrophyGrade
 import com.sbro.emucorev.data.VitaTrophySet
 import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.formatPlayDuration
 import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.cheats.groupCheatEntries
 import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
@@ -500,7 +501,12 @@ private fun MenuScrollableContent(
         verticalArrangement = Arrangement.spacedBy(if (compact) 9.dp else 12.dp)
     ) {
         if (showSheetHandle) SheetHandle()
-        MenuHeader(gameTitle = gameTitle, gameId = gameId, gameIconPath = gameIconPath, paused = paused)
+        MenuHeader(
+            gameTitle = gameTitle,
+            gameId = gameId,
+            gameIconPath = gameIconPath,
+            sessionElapsedMs = sessionElapsedMs
+        )
         MenuTopActions(paused = paused, callbacks = callbacks)
         if (showHorizontalTabs) {
             Column(
@@ -522,7 +528,6 @@ private fun MenuScrollableContent(
             cheats = cheats,
             cheatsAvailable = cheatsAvailable,
             saveStates = saveStates,
-            sessionElapsedMs = sessionElapsedMs,
             physicalGamepadConnected = physicalGamepadConnected,
             controlsVisible = controlsVisible,
             callbacks = callbacks
@@ -538,7 +543,6 @@ private fun MenuSelectedContent(
     cheats: VitaCheatSnapshot,
     cheatsAvailable: Boolean,
     saveStates: SaveStateMenuState,
-    sessionElapsedMs: Long,
     physicalGamepadConnected: Boolean,
     controlsVisible: Boolean,
     callbacks: EmulationMenuCallbacks
@@ -550,7 +554,6 @@ private fun MenuSelectedContent(
         when (selectedTab) {
             EmulationMenuTab.Game -> GameTab(
                 config = config,
-                sessionElapsedMs = sessionElapsedMs,
                 callbacks = callbacks
             )
             EmulationMenuTab.SaveStates -> SaveStatesTab(
@@ -586,7 +589,6 @@ private enum class EmulationMenuTab {
 @Composable
 private fun GameTab(
     config: VitaCoreConfig,
-    sessionElapsedMs: Long,
     callbacks: EmulationMenuCallbacks
 ) {
     MenuSection(
@@ -594,10 +596,6 @@ private fun GameTab(
         subtitle = stringResource(R.string.emulation_menu_section_now_desc),
         badge = null
     ) {
-        MenuInfoRow(
-            label = stringResource(R.string.play_time_current_session),
-            value = formatPlayDuration(sessionElapsedMs)
-        )
         MenuToggleRow(
             label = stringResource(R.string.settings_core_performance_overlay),
             checked = config.performanceOverlay,
@@ -655,46 +653,6 @@ private fun GameTab(
             checked = config.showTouchpadCursor,
             onCheckedChange = callbacks.onTouchpadCursor
         )
-    }
-}
-
-@Composable
-private fun MenuInfoRow(
-    label: String,
-    value: String
-) {
-    val palette = emulationMenuPalette()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(neonShape(12.dp))
-            .background(palette.row)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = palette.textPrimary,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
-}
-
-private fun formatPlayDuration(durationMs: Long): String {
-    val totalSeconds = (durationMs / 1_000L).coerceAtLeast(0L)
-    val hours = totalSeconds / 3_600L
-    val minutes = (totalSeconds % 3_600L) / 60L
-    val seconds = totalSeconds % 60L
-    return when {
-        hours > 0L -> "${hours}h ${minutes.toString().padStart(2, '0')}m"
-        minutes > 0L -> "${minutes}m ${seconds.toString().padStart(2, '0')}s"
-        else -> "${seconds}s"
     }
 }
 
@@ -1845,7 +1803,12 @@ private fun SheetHandle() {
 }
 
 @Composable
-private fun MenuHeader(gameTitle: String, gameId: String, gameIconPath: String?, paused: Boolean) {
+private fun MenuHeader(
+    gameTitle: String,
+    gameId: String,
+    gameIconPath: String?,
+    sessionElapsedMs: Long
+) {
     val palette = emulationMenuPalette()
     val displayTitle = gameTitle.ifBlank {
         gameId.ifBlank { stringResource(R.string.emulation_menu_unknown_game) }
@@ -1887,20 +1850,11 @@ private fun MenuHeader(gameTitle: String, gameId: String, gameIconPath: String?,
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.emulation_menu_title),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = palette.textPrimary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (paused) {
-                        Badge(text = stringResource(R.string.emulation_menu_paused_badge), color = LiveBadgeColor)
-                    }
-                }
+                Text(
+                    text = stringResource(R.string.emulation_menu_title),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = palette.textPrimary
+                )
                 Text(
                     text = displayTitle,
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
@@ -1908,12 +1862,36 @@ private fun MenuHeader(gameTitle: String, gameId: String, gameIconPath: String?,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (gameId.isNotBlank() && !gameTitle.equals(gameId, ignoreCase = true)) {
-                    Text(
-                        text = gameId,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = palette.textSecondary.copy(alpha = 0.72f)
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (gameId.isNotBlank() && !gameTitle.equals(gameId, ignoreCase = true)) {
+                        Text(
+                            text = gameId,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = palette.textSecondary.copy(alpha = 0.72f),
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                    Surface(
+                        shape = neonPillShape(),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.26f))
+                    ) {
+                        Text(
+                            text = stringResource(
+                                R.string.play_time_current_session,
+                                formatPlayDuration(sessionElapsedMs)
+                            ),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
                 }
             }
         }

@@ -674,7 +674,10 @@
     <string name="nav_play_time">Tiempo de juego</string>
     <string name="play_time_title">Tiempo de juego</string>
     <string name="play_time_open_for_game">Tiempo de juego</string>
-    <string name="play_time_current_session">Sesión actual</string>
+    <string name="play_time_current_session">Tiempo de juego %1$s</string>
+    <string name="play_time_duration_hours_minutes">%1$dh %2$dmin</string>
+    <string name="play_time_duration_minutes_seconds">%1$dmin %2$ds</string>
+    <string name="play_time_duration_seconds">%1$ds</string>
     <string name="play_time_filter_game">Elegir juego</string>
     <string name="play_time_all_games">Todos los juegos</string>
     <string name="play_time_total_time">Tiempo total</string>

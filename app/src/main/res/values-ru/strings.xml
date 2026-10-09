@@ -674,7 +674,10 @@
     <string name="nav_play_time">Время в игре</string>
     <string name="play_time_title">Время в игре</string>
     <string name="play_time_open_for_game">Время в игре</string>
-    <string name="play_time_current_session">Текущая сессия</string>
+    <string name="play_time_current_session">Время игры %1$s</string>
+    <string name="play_time_duration_hours_minutes">%1$dч %2$dм</string>
+    <string name="play_time_duration_minutes_seconds">%1$dм %2$dс</string>
+    <string name="play_time_duration_seconds">%1$dс</string>
     <string name="play_time_filter_game">Выбрать игру</string>
     <string name="play_time_all_games">Все игры</string>
     <string name="play_time_total_time">Общее время</string>
