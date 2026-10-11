@@ -58,9 +58,11 @@ inline bool enqueue_gpu_request_callback(Queue<WaitThreadRequest> &queue,
 
 // Only after all old queue readers have joined. Pending callbacks belong to the
 // discarded session and must release their host payload without running again.
-inline void reset_gpu_requests_after_join(Queue<WaitThreadRequest> &queue) {
-    for (auto &request : queue.snapshot_items())
-        if (auto *callback = std::get_if<CallbackRequest>(&request)) delete callback->callback;
+inline void reset_gpu_requests_after_join(Queue<WaitThreadRequest> &queue, bool keep_stopped = false) {
+    const auto requests = queue.snapshot_items();
     queue.reset();
+    if (keep_stopped) queue.abort();
+    for (auto &request : requests)
+        if (auto *callback = std::get_if<CallbackRequest>(&request)) delete callback->callback;
 }
 }

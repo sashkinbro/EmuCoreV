@@ -26,6 +26,7 @@
 #include <renderer/vulkan/surface_cache.h>
 #include <renderer/vulkan/types.h>
 
+#include <atomic>
 #include <mutex>
 #include <unordered_map>
 
@@ -121,6 +122,7 @@ struct VKState : public renderer::State {
 
     // queue where we put requests that need to wait for the GPU
     Queue<WaitThreadRequest> request_queue;
+    std::atomic<size_t> gpu_request_reader_count{ 0 };
 
     vkutil::Image default_image;
     vkutil::Image default_raw_image;

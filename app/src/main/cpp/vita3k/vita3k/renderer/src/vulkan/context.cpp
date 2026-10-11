@@ -29,6 +29,7 @@
 
 #include <util/log.h>
 #include <util/overloaded.h>
+#include <renderer/vulkan/gpu_resource_cleanup.h>
 
 #include <algorithm>
 #include <limits>
@@ -36,6 +37,7 @@
 namespace renderer::vulkan {
 
 void VKContext::wait_thread_function(const MemState &mem) {
+    const ActiveGpuRequestReader active_reader(state.gpu_request_reader_count);
     // try to wait for multiple fences at the same time if possible
     std::vector<vk::Fence> fences;
 

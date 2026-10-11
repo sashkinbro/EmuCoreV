@@ -19,6 +19,7 @@
 
 #include <gxm/functions.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
+#include <renderer/vulkan/gpu_resource_cleanup.h>
 #include <renderer/vulkan/surface_sync.h>
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/types.h>
@@ -1575,7 +1576,9 @@ bool VKSurfaceCache::try_transfer_depth_gpu(Address src_address, Address dst_add
         std::lock_guard<std::mutex> lock(state.multithread_pool_mutex);
         state.device.freeCommandBuffers(state.multithread_command_pool, transfer_cmd);
     };
-    state.request_queue.push(CallbackRequest{ new CallbackRequestFunction(std::move(vk_callback)) });
+    dispatch_gpu_resource_cleanup(state.gpu_request_reader_count.load(std::memory_order_acquire) != 0,
+        [&](CallbackRequestFunction *callback) { return state.request_queue.try_push(CallbackRequest{ callback }); },
+        std::move(vk_callback), []() { LOG_ERROR("Could not release discarded GPU depth transfer resources."); });
 
     LOG_INFO_ONCE("Depth transfer done on the GPU: 0x{:08X} -> 0x{:08X} {}x{} (scaled {}x{})", src_address, dst_address, width, height, copy_width, copy_height);
 

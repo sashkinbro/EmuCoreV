@@ -1214,6 +1214,10 @@ void VKState::cleanup() {
 
     request_queue.abort();
 
+    // Runtime contexts/readers have already been joined. Dispose submitted
+    // resource owners while their fences and command pool are still valid.
+    reset_gpu_requests_after_join(request_queue, true);
+
     context = nullptr;
 
     for (int i = 0; i < MAX_FRAMES_RENDERING; i++) {
