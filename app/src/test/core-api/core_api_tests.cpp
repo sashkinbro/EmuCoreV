@@ -291,6 +291,7 @@ using KernelHostLifetimeEnv = EmuEnvState;
 #include "ngs_resampler_tests.inc"
 #include "ngs_atrac9_decoder_tests.inc"
 #include "ngs_preflight_tests.inc"
+#include "ngs_update_admission_tests.inc"
 #include "audio_continuation_tests.inc"
 #include "kernel_timer_clock_tests.inc"
 #include "display_continuation_tests.inc"

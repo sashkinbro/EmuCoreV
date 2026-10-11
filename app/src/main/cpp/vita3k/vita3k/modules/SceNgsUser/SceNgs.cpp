@@ -23,6 +23,7 @@
 #include <kernel/thread/thread_state.h>
 #include <ngs/state.h>
 #include <ngs/system.h>
+#include <ngs/update_admission.h>
 #include <unordered_map>
 #include <util/log.h>
 #include <util/tracy.h>
@@ -475,6 +476,10 @@ EXPORT(SceUInt32, sceNgsSystemUpdate, ngs::System *system) {
     if (!emuenv.cfg.current_config.ngs_enable) {
         return 0;
     }
+
+    auto update_lease = ngs::system_update_admission().try_enter_update();
+    if (!update_lease)
+        return SCE_NGS_OK;
 
     system->voice_scheduler.update(emuenv.kernel, emuenv.mem, thread_id);
 

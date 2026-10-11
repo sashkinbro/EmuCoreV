@@ -45,6 +45,22 @@ bool lifecycle_queued(const std::shared_ptr<Primitive> &object) {
     }
     return false;
 }
+// Queue enrollment precedes publishing the thread's parked target. These HLE
+// fixtures have no run_loop, so a dormant status is not a capture boundary.
+bool lifecycle_waiting(const ThreadStatePtr &thread, WaitTarget target,
+    std::chrono::milliseconds budget = 1000ms) {
+    const auto deadline = std::chrono::steady_clock::now() + budget;
+    while (std::chrono::steady_clock::now() < deadline) {
+        {
+            const std::lock_guard lock(thread->mutex);
+            if (thread->status == ThreadStatus::waiting
+                && thread->wait_target.type == target.type && thread->wait_target.id == target.id)
+                return true;
+        }
+        std::this_thread::yield();
+    }
+    return false;
+}
 } // namespace
 TEST(KernelLifecycle, deleting_a_blocked_semaphore_wakes_and_unregisters_it) {
     KernelLifecycleEnv env;

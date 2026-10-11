@@ -63,6 +63,7 @@ public:
     bool load_and_run();
     bool set_pause_reason(AppSessionPauseReason reason, bool enabled);
     bool set_input_intercepted(bool enabled);
+    bool set_save_state_draining(bool enabled);
     void stop(AppSessionStopReason reason = AppSessionStopReason::UserRequest);
 
 private:
@@ -79,6 +80,7 @@ private:
     bool renderer_initialized = false;
     bool runtime_initialized = false;
     bool input_intercepted = false;
+    bool save_state_draining = false;
 };
 
 const char *to_string(AppSessionPhase phase);

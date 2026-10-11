@@ -165,6 +165,19 @@ bool AppSessionController::set_input_intercepted(const bool enabled) {
     return true;
 }
 
+bool AppSessionController::set_save_state_draining(const bool enabled) {
+    const std::lock_guard lock(mutex);
+    if (current_phase.load(std::memory_order_relaxed) != AppSessionPhase::Running)
+        return false;
+    const uint32_t blockers = to_pause_mask(AppSessionPauseReason::Background)
+        | to_pause_mask(AppSessionPauseReason::SaveState);
+    if (enabled && (save_state_draining || (active_pause_reasons.load(std::memory_order_relaxed) & blockers)))
+        return false;
+    save_state_draining = enabled;
+    apply_runtime_state_locked();
+    return true;
+}
+
 void AppSessionController::stop(const AppSessionStopReason reason) {
     std::optional<std::reference_wrapper<renderer::FrameHost>> active_frame_host;
     bool renderer_was_initialized = false;
@@ -215,10 +228,16 @@ void AppSessionController::stop(const AppSessionStopReason reason) {
 }
 
 void AppSessionController::apply_runtime_state_locked() {
-    const bool paused = active_pause_reasons.load(std::memory_order_relaxed) != 0;
+    const uint32_t reasons = active_pause_reasons.load(std::memory_order_relaxed);
+    const bool paused = reasons != 0 || save_state_draining;
+    const uint32_t drain_blockers = to_pause_mask(AppSessionPauseReason::Background)
+        | to_pause_mask(AppSessionPauseReason::SaveState);
+    // Guest callbacks must be able to return before their host audio-update
+    // stack can be captured. Keep presentation/input/audio paused throughout.
+    const bool guest_paused = reasons != 0 && (!save_state_draining || (reasons & drain_blockers));
     const bool currently_paused = emuenv.kernel.is_threads_paused();
-    if (currently_paused != paused) {
-        if (paused)
+    if (currently_paused != guest_paused) {
+        if (guest_paused)
             emuenv.kernel.pause_threads();
         else
             emuenv.kernel.resume_threads();
@@ -251,6 +270,7 @@ void AppSessionController::reset_session_tracking() {
     renderer_initialized = false;
     runtime_initialized = false;
     input_intercepted = false;
+    save_state_draining = false;
     set_phase(AppSessionPhase::Idle);
 }
 

@@ -8,7 +8,7 @@ start='bool preflight_input(const std::vector<uint8_t> &data, std::string &error
 production=source[source.index(start):source.index(end)]
 if '--dto' in sys.argv:
  production='''bool write_input(EmuEnvState &env, Writer &writer, std::string &error){auto s=env.motion.capture_snapshot();if(!MotionState::validate_snapshot(s,error))return false;BufferWriter b;write_motion_snapshot(b,s);return writer.write_section(SectionId::Input,b.data().data(),b.size(),true,error);}
-bool read_input(EmuEnvState &env,const std::vector<uint8_t>&data,std::string&error){BufferReader r(data.data(),data.size());MotionState::Snapshot s;if(!read_motion_snapshot(r,s,error)||r.remaining())return false;return env.motion.apply_snapshot(s,error);}''' 
+bool read_input(EmuEnvState &env,const std::vector<uint8_t>&data,std::string&error){BufferReader r(data.data(),data.size());MotionState::Snapshot s;if(!read_motion_snapshot(r,s,error)||r.remaining())return false;return env.motion.apply_snapshot(s,error);}'''
 motion_source=(motion/'src/motion.cpp').read_text(encoding='utf-8');methods=motion_source[motion_source.index('static void detect_device_motion_support'):motion_source.index('SceFVector3 get_acceleration')]
 events=motion_source[motion_source.index('constexpr uint64_t to_microseconds'):]
 out=root/'app/build/motion-snapshot-probe';out.mkdir(exist_ok=True)
@@ -67,4 +67,3 @@ os.environ['PATH']='C:/msys64/ucrt64/bin;'+os.environ['PATH'];compiler=shutil.wh
 includes=[native/'emucorev/include',motion/'include',native/'vita3k/vita3k/touch/include',native/'vita3k/vita3k/util/include',native/'vita3k/external/sdl/include',native/'vita3k/external/fmt/include']
 subprocess.run([compiler,'-std=c++20','-O0',*(['-DMOTION_DTO_TESTS'] if '--dto' in sys.argv else []),*['-I'+str(p)for p in includes],str(out/'probe.cpp'),str(motion/'src/motion_input.cpp'),'-o',str(out/'probe.exe')],check=True)
 p=subprocess.run([str(out/'probe.exe')],capture_output=True,text=True);print(p.stdout,end='');(out/'result.log').write_text(p.stdout+p.stderr);raise SystemExit(p.returncode)
-

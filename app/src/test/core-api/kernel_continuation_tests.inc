@@ -14,6 +14,39 @@ SceInt32 continuation_resume(const ThreadStatePtr &thread) {
     return thread->resume_wait_continuation(thread->current_wait_continuation());
 }
 } // namespace
+TEST(KernelContinuation, queue_enrollment_alone_is_not_a_parked_capture_boundary) {
+    KernelLifecycleEnv env;
+    auto thread = continuation_thread(env, 1);
+    const WaitTarget target{ SCE_KERNEL_WAITTYPE_SEMAPHORE, 500 };
+    auto record = thread->begin_wait_continuation(WaitOperation::semaphore, { 500, 1 }, nullptr, false, Deadline::max());
+    WaitQueue<Semaphore::WaitEntry> queue;
+    WaitQueue<Semaphore::WaitEntry>::Waiter node{ .thread = thread, .entry = { 1 }, .continuation = record };
+    std::mutex object_mutex;
+    {
+        const std::lock_guard lock(object_mutex);
+        queue.push(node);
+    }
+    // Precisely hold the production queue-enrollment -> ThreadState::wait gap.
+    // The old queue-only prerequisite accepts this dormant, unpublished wait.
+    EXPECT_FALSE(queue.empty());
+    EXPECT_FALSE(lifecycle_waiting(thread, target, 10ms));
+    const auto unpublished = thread->capture_snapshot();
+    ASSERT_EQ(unpublished.waits.size(), 1u);
+    EXPECT_TRUE(unpublished.waits[0].queued);
+    EXPECT_EQ(unpublished.waits[0].target.type, 0u);
+    auto pending = lifecycle_async(thread, [&] { return guest_result(thread->wait(target, Deadline::max(), false)); });
+    ASSERT_TRUE(lifecycle_waiting(thread, target));
+    const auto published = thread->capture_snapshot();
+    ASSERT_EQ(published.waits.size(), 1u);
+    EXPECT_EQ(published.waits[0].target.type, target.type);
+    EXPECT_EQ(published.waits[0].target.id, target.id);
+    {
+        const std::lock_guard lock(object_mutex);
+        queue.wake(node);
+    }
+    EXPECT_EQ(lifecycle_result(pending, thread), SCE_KERNEL_OK);
+    thread->end_wait_continuation(record);
+}
 TEST(KernelContinuation, completed_semaphore_grant_is_not_consumed_twice) {
     KernelLifecycleEnv original;
     auto guest = continuation_thread(original, 1);
@@ -21,6 +54,7 @@ TEST(KernelContinuation, completed_semaphore_grant_is_not_consumed_twice) {
     auto object = original.kernel.semaphores.at(uid);
     auto pending = lifecycle_async(guest, [&] { return semaphore_wait(original.kernel, "test", 1, uid, 1, nullptr, false); });
     ASSERT_TRUE(lifecycle_queued(object));
+    ASSERT_TRUE(lifecycle_waiting(guest, { SCE_KERNEL_WAITTYPE_SEMAPHORE, uid }));
     guest->request_world_stop();
     ASSERT_EQ(semaphore_signal(original.kernel, "test", 1, uid, 1), 0);
     const auto snapshot = guest->capture_snapshot();
@@ -90,6 +124,7 @@ TEST(KernelContinuation, deleted_event_keeps_completion_bits_without_reappearing
     auto object = original.kernel.eventflags.at(uid);
     auto pending = lifecycle_async(guest, [&] { return eventflag_wait(original.kernel, "test", 1, uid, 8, 0, bits, nullptr, false); });
     ASSERT_TRUE(lifecycle_queued(object));
+    ASSERT_TRUE(lifecycle_waiting(guest, { SCE_KERNEL_WAITTYPE_EVENTFLAG, uid }));
     guest->request_world_stop();
     ASSERT_EQ(eventflag_delete(original.kernel, "test", 1, uid), 0);
     const auto snapshot = guest->capture_snapshot();
@@ -177,6 +212,7 @@ TEST(KernelContinuation, resumed_msgpipe_bridge_writes_result_and_returns_ok) {
         pending.get();
         FAIL() << "pipe receiver did not queue";
     }
+    ASSERT_TRUE(lifecycle_waiting(guest, { SCE_KERNEL_WAITTYPE_MSG_PIPE, uid }));
     guest->request_world_stop();
     const char data[] = "abc";
     ASSERT_EQ(msgpipe_send(original.kernel, "test", 1, uid, SCE_KERNEL_MSG_PIPE_MODE_FULL, data, 3, nullptr, false), 3u);
@@ -334,6 +370,7 @@ TEST(KernelContinuation, frozen_deadline_snapshot_does_not_age_during_serializat
     auto object = env.kernel.semaphores.at(uid);
     auto pending = lifecycle_async(guest, [&] { SceUInt32 timeout = 200000; return semaphore_wait(env.kernel, "test", 1, uid, 1, &timeout, false); });
     ASSERT_TRUE(lifecycle_queued(object));
+    ASSERT_TRUE(lifecycle_waiting(guest, { SCE_KERNEL_WAITTYPE_SEMAPHORE, uid }));
     ASSERT_EQ(env.kernel.stop_world(0, 1s), 0);
     const auto first = guest->capture_snapshot();
     std::this_thread::sleep_for(25ms);

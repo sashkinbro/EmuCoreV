@@ -16,6 +16,7 @@
 #include <gxm/functions.h>
 #include <gxm/state.h>
 #include <io/state.h>
+#include <ngs/update_admission.h>
 #include <renderer/functions.h>
 #include <renderer/state.h>
 #include <util/fs.h>
@@ -114,7 +115,24 @@ Java_com_sbro_emucorev_core_SaveStateBridge_nativeSaveState(JNIEnv *env, jobject
         return result_to_json(env, result);
     }
 
+    emucorev::savestate::ScopedSaveStateDrain drain(get_app_session_controller());
+    if (!drain) {
+        emucorev::savestate::Result result;
+        result.status = emucorev::savestate::Status::NotRunning;
+        result.error = "session cannot drain audio callbacks";
+        return result_to_json(env, result);
+    }
+    ngs::UpdateAdmission::SnapshotLease audio_gate;
+    if (ngs::system_update_admission().close_and_drain(std::chrono::seconds(2), audio_gate)
+        != ngs::UpdateAdmission::DrainStatus::drained) {
+        emucorev::savestate::Result result;
+        result.status = emucorev::savestate::Status::InternalError;
+        result.error = "audio callback did not complete before capture";
+        LOG_ERROR("Save state failed: {}", result.error);
+        return result_to_json(env, result);
+    }
     ScopedSaveStatePause pause(get_app_session_controller());
+    drain.finish();
     if (!pause) {
         emucorev::savestate::Result result;
         result.status = emucorev::savestate::Status::NotRunning;

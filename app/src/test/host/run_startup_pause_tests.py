@@ -48,7 +48,7 @@ enum class AppSessionPhase {Idle,Launching,Running,Stopping};
 enum class AppSessionPauseReason:uint32_t {None=0,Menu=2,Background=4,SaveState=8};
 enum class AppSessionStopReason {LaunchFailure};
 uint32_t to_pause_mask(AppSessionPauseReason p){return uint32_t(p);}
-struct AppSessionController {Env &emuenv;std::mutex mutex;std::atomic<AppSessionPhase> current_phase=AppSessionPhase::Running;std::atomic<uint32_t> active_pause_reasons=0;bool input_intercepted=false;bool set_pause_reason(AppSessionPauseReason,bool);void apply_runtime_state_locked();};
+struct AppSessionController {Env &emuenv;std::mutex mutex;std::atomic<AppSessionPhase> current_phase=AppSessionPhase::Running;std::atomic<uint32_t> active_pause_reasons=0;bool input_intercepted=false,save_state_draining=false;bool set_pause_reason(AppSessionPauseReason,bool);void apply_runtime_state_locked();};
 '''
 cpp+=block(controller,'bool AppSessionController::set_pause_reason')+'\n'+block(controller,'void AppSessionController::apply_runtime_state_locked')+'\n}\n'
 cpp+='app::AppSessionController *global_controller=nullptr;auto *get_app_session_controller(){return global_controller;}\nnamespace emucorev::savestate { '+guard+' }\nusing emucorev::savestate::ScopedSaveStatePause;\n'
