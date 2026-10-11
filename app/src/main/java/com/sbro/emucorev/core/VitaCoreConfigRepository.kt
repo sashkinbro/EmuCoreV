@@ -564,7 +564,7 @@ class VitaCoreConfigRepository(private val context: Context) {
             else -> maxOf(normalizeLogLevel(config.logLevel), DEFAULT_DEBUG_LOG_LEVEL)
         }
         return config.copy(
-            validationLayer = false,
+            validationLayer = BuildConfig.DEBUG && config.validationLayer,
             discordRichPresence = false,
             gamepadDeadzone = config.gamepadDeadzone.coerceIn(0f, 0.45f),
             gamepadTriggerThreshold = config.gamepadTriggerThreshold.coerceIn(0f, 0.9f),
@@ -601,7 +601,7 @@ class VitaCoreConfigRepository(private val context: Context) {
             values["discord-rich-presence"]?.toBooleanStrictOrNull() == true ||
             values["log-level"]?.toIntOrNull()?.let { it < defaultRuntimeLogLevel() } == true ||
             values["psn-signed-in"]?.let { it != "0" && it != "1" && it.toBooleanStrictOrNull() != null } == true ||
-            values["validation-layer"]?.toBooleanStrictOrNull() == true ||
+            (!BuildConfig.DEBUG && values["validation-layer"]?.toBooleanStrictOrNull() == true) ||
             upstreamSequenceKeys.any { values[it].isNullOrEmpty() }
     }
 
