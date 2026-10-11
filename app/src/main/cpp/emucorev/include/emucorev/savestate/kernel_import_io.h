@@ -6,6 +6,9 @@
 #include <emucorev/savestate/memory_image.h>
 #include <functional>
 #include <kernel/thread/thread_state.h>
+#include <kernel/input_read_continuation.h>
+#include <ctrl/ctrl.h>
+#include <touch/touch.h>
 #include <limits>
 #include <set>
 
@@ -15,6 +18,24 @@ using SavedImportRange = std::function<bool(uint64_t, size_t)>;
 
 inline bool validate_kernel_import_abi(const WaitContinuationSnapshot &wait,
     const SavedImportRange &contains, const SavedImportRead &read, std::string &error) {
+    if (wait.operation == WaitOperation::display_vblank) {
+        const auto nid = input_read_import_at_wait(wait.context, [&](uint64_t address, void *out, size_t size) {
+            return contains(address, size) && read(address, out, size);
+        });
+        if (!nid)
+            return true; // Ordinary display waits do not replay an import.
+        const auto &regs = wait.context.cpu_registers;
+        const bool touch = is_touch_read_import(nid);
+        const uint32_t count = regs[2];
+        const uint64_t bytes = uint64_t{ count } * (touch ? sizeof(SceTouchData) : sizeof(SceCtrlData2));
+        if (regs[0] >= (touch ? SCE_TOUCH_PORT_MAX_NUM : 5)
+            || !count || count > (touch ? MAX_TOUCH_BUFFER_SAVED : uint32_t(INT32_MAX))
+            || !regs[1] || bytes > UINT32_MAX || !contains(regs[1], static_cast<size_t>(bytes))) {
+            error = "invalid saved arguments for replayed input read";
+            return false;
+        }
+        return true;
+    }
     if (wait.operation != WaitOperation::creation_import && wait.operation != WaitOperation::callback_dispatch)
         return true;
     const auto fail = [&] { error = "invalid saved arguments for replayed kernel import"; return false; };

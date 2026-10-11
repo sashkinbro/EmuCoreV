@@ -41,6 +41,7 @@
 #include <emuenv/state.h>
 #include <gxm/state.h>
 #include <kernel/state.h>
+#include <kernel/input_read_continuation.h>
 #include <kernel/sync_primitives.h>
 #include <kernel/thread/thread_state.h>
 #include <mem/functions.h>
@@ -362,10 +363,26 @@ void register_display_wait_continuations(DisplayState &display, KernelState &ker
             };
             return true;
         },
-        [&display, &kernel](ThreadState &thread, const std::shared_ptr<WaitContinuation> &record) {
+        [&display, &kernel](ThreadState &thread, const std::shared_ptr<WaitContinuation> &record) -> SceInt32 {
             const auto &state = record->state;
             const uint64_t target = uint64_t(state.args[0]) | (uint64_t(state.args[1]) << 32);
+            const uint32_t input_nid = input_read_import_at_wait(state.context, [&](uint64_t address, void *out, size_t size) {
+                // The stub is twelve bytes, so at most two allocation pages.
+                if (address + size > UINT32_MAX
+                    || !is_valid_addr(thread.get_mem(), address)
+                    || !is_valid_addr(thread.get_mem(), address + size - 1))
+                    return false;
+                std::memcpy(out, Ptr<void>(address).get(thread.get_mem()), size);
+                return true;
+            });
             wait_vblank(display, kernel.get_thread(thread.id), target, state.callbacks);
+            if (!display.abort.load() && input_nid) {
+                if (!thread.cpu || !kernel.call_import)
+                    return static_cast<SceInt32>(SCE_KERNEL_ERROR_INVALID_ARGUMENT);
+                const InputReadResumeScope completion;
+                kernel.call_import(*thread.cpu, input_nid, thread.id);
+                return static_cast<SceInt32>(read_reg(*thread.cpu, 0));
+            }
             // Matches display_wait's completion in modules/SceDisplay/SceDisplay.h.
             return display.abort.load() ? static_cast<SceInt32>(0x80290008U) : SCE_KERNEL_OK;
         }

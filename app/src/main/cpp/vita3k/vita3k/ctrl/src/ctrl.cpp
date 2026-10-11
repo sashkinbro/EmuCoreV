@@ -24,6 +24,7 @@
 #include <display/functions.h>
 #include <display/state.h>
 #include <kernel/state.h>
+#include <kernel/input_read_continuation.h>
 #include <util/log.h>
 
 static int reserve_port(CtrlState &state) {
@@ -302,7 +303,7 @@ int ctrl_get(const SceUID thread_id, EmuEnvState &emuenv, int port, SceCtrlData2
         nb_returned_data = count;
     } else {
         const uint64_t current_vcount = emuenv.display.vblank_count.load();
-        if (current_vcount <= state.last_vcount[port]) {
+        if (current_vcount <= state.last_vcount[port] && !input_read_resuming_after_vblank()) {
             // sceCtrlRead is blocking, wait for the next vsync for the buffer to be updated
             auto thread = emuenv.kernel.get_thread(thread_id);
 

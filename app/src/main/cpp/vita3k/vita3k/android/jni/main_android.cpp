@@ -601,6 +601,9 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
                 case SDL_EVENT_FINGER_MOTION:
                 case SDL_EVENT_FINGER_UP:
                 case SDL_EVENT_FINGER_CANCELED: {
+                    // Restore clears physical contacts while owning this same
+                    // mutex. Event polling must stay outside the lock.
+                    const std::lock_guard input_operation(emucorev::savestate::save_state_operation_mutex());
                     handle_touch_event(emuenv->touch, event.tfinger);
                     auto &mouse = emuenv->ctrl.overlay_mouse;
                     mouse.x.store(event.tfinger.x * 960.f, std::memory_order_relaxed);
@@ -621,9 +624,11 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
 
                 case SDL_EVENT_GAMEPAD_TOUCHPAD_DOWN:
                 case SDL_EVENT_GAMEPAD_TOUCHPAD_MOTION:
-                case SDL_EVENT_GAMEPAD_TOUCHPAD_UP:
+                case SDL_EVENT_GAMEPAD_TOUCHPAD_UP: {
+                    const std::lock_guard input_operation(emucorev::savestate::save_state_operation_mutex());
                     handle_touchpad_event(emuenv->touch, event.gtouchpad);
                     break;
+                }
 
                 case SDL_EVENT_GAMEPAD_SENSOR_UPDATE:
                     handle_motion_event(*emuenv, event.gsensor.sensor, event.gsensor);

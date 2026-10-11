@@ -21,6 +21,7 @@
 #include <display/state.h>
 #include <emuenv/state.h>
 #include <kernel/state.h>
+#include <kernel/input_read_continuation.h>
 #include <touch/functions.h>
 #include <touch/state.h>
 #include <touch/touch.h>
@@ -362,7 +363,7 @@ int touch_get(const SceUID thread_id, EmuEnvState &emuenv, const SceUInt32 &port
             nb_returned_data = 1;
     } else {
         const uint64_t current_vcount = emuenv.display.vblank_count.load();
-        if (current_vcount <= emuenv.touch.last_vcount[port_idx]) {
+        if (current_vcount <= emuenv.touch.last_vcount[port_idx] && !input_read_resuming_after_vblank()) {
             // sceTouchRead is blocking, wait for the next vsync for the buffer to be updated
             auto thread = emuenv.kernel.get_thread(thread_id);
 
