@@ -170,6 +170,7 @@ fun EmulationOverlayHost(
     var menuOpen by remember { mutableStateOf(false) }
     var menuButtonVisible by remember { mutableStateOf(true) }
     var userPaused by remember { mutableStateOf(false) }
+    var saveStateBusyLoading by remember { mutableStateOf(false) }
     var touchMode by remember { mutableIntStateOf(0) }
     var exitDialogVisible by remember { mutableStateOf(false) }
     var cheatSnapshot by remember(activity) { mutableStateOf(VitaCheatSnapshot.EMPTY) }
@@ -190,7 +191,7 @@ fun EmulationOverlayHost(
     val controlsSuppressedByGamepad = hasPhysicalGamepad && !showControlsWithGamepad
     val controlsVisible = config.enableGamepadOverlay && !controlsSuppressedByGamepad
     val touchControlsActive = !nativeImeActive && (controlsEditMode || (config.enableGamepadOverlay && !controlsSuppressedByGamepad))
-    val showTouchControls = !nativeImeActive && !menuOpen &&
+    val showTouchControls = !nativeImeActive && !menuOpen && !saveStateBusyLoading &&
         (
             controlsEditMode ||
                 (
@@ -198,7 +199,7 @@ fun EmulationOverlayHost(
                         overlayBridge.effectiveOverlayMask != 0
                 )
             )
-    val effectivePaused = userPaused || menuOpen || controlsEditMode
+    val effectivePaused = userPaused || menuOpen || controlsEditMode || saveStateBusyLoading
     val lifecycleOwner = LocalLifecycleOwner.current
     var inputResumed by remember(lifecycleOwner) {
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
@@ -248,8 +249,14 @@ fun EmulationOverlayHost(
     fun performSaveStateAction(action: SaveStateAction) {
         if (saveStateBusy || gameId.isBlank()) return
         overlayScope.launch {
+            val restoreMenuOnFailure = menuOpen
             saveStateBusy = true
             saveStateBusySaving = action is SaveStateAction.Save
+            saveStateBusyLoading = action is SaveStateAction.Load
+            if (saveStateBusyLoading) {
+                activity.setMenuPaused(true)
+                menuOpen = false
+            }
             val result = try {
                 withContext(Dispatchers.IO) {
                     when (action) {
@@ -259,6 +266,10 @@ fun EmulationOverlayHost(
                     }
                 }
             } catch (cancelled: CancellationException) {
+                if (action is SaveStateAction.Load) menuOpen = restoreMenuOnFailure
+                saveStateBusy = false
+                saveStateBusySaving = false
+                saveStateBusyLoading = false
                 throw cancelled
             } catch (error: Exception) {
                 Log.e("SaveStateOverlay", "Save-state action failed before returning a result", error)
@@ -272,9 +283,6 @@ fun EmulationOverlayHost(
                     sessionMatch = true,
                     timestamp = 0L
                 )
-            } finally {
-                saveStateBusy = false
-                saveStateBusySaving = false
             }
             saveStatesRefreshKey++
             if (!result.isOk) {
@@ -290,11 +298,25 @@ fun EmulationOverlayHost(
                 result.isTitleMismatch -> R.string.emulation_savestate_title_mismatch_toast
                 else -> R.string.emulation_savestate_failed_toast
             }
-            Toast.makeText(activity, messageRes, Toast.LENGTH_SHORT).show()
+            if (!result.sessionUsable && action is SaveStateAction.Load) {
+                menuOpen = false
+                saveStateBusy = false
+                saveStateBusySaving = false
+                saveStateBusyLoading = false
+                Toast.makeText(activity, messageRes, Toast.LENGTH_SHORT).show()
+                activity.exitEmulation()
+                return@launch
+            }
             if (result.isOk && action is SaveStateAction.Load) {
                 menuOpen = false
                 userPaused = false
+            } else if (action is SaveStateAction.Load) {
+                menuOpen = restoreMenuOnFailure
             }
+            saveStateBusy = false
+            saveStateBusySaving = false
+            saveStateBusyLoading = false
+            Toast.makeText(activity, messageRes, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -472,7 +494,9 @@ fun EmulationOverlayHost(
 
     DisposableEffect(activity) {
         activity.setOverlayBackHandler {
-            if (exitDialogVisible) {
+            if (saveStateBusyLoading) {
+                true
+            } else if (exitDialogVisible) {
                 exitDialogVisible = false
                 true
             } else if (controlsEditMode) {
@@ -489,7 +513,7 @@ fun EmulationOverlayHost(
             menuButtonVisible = true
         }
         activity.setOverlayPauseMenuOpenHandler {
-            if (!activity.launchStateLoading.active) {
+            if (!activity.launchStateLoading.active && !saveStateBusyLoading) {
                 menuOpen = true
                 menuButtonVisible = true
             }
@@ -831,7 +855,14 @@ fun EmulationOverlayHost(
             )
         }
 
-        LaunchStateLoadingOverlay(launchStateLoading)
+        LaunchStateLoadingOverlay(
+            state = if (saveStateBusyLoading) {
+                com.sbro.emucorev.core.vita.LaunchStateLoadingState(active = true)
+            } else {
+                launchStateLoading
+            },
+            indeterminate = saveStateBusyLoading
+        )
     }
 
     LaunchedEffect(hasPhysicalGamepad) {

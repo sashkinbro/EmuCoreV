@@ -12,7 +12,8 @@ data class SaveStateResult(
     val appVersion: String,
     val engineVersion: Int,
     val sessionMatch: Boolean,
-    val timestamp: Long
+    val timestamp: Long,
+    val sessionUsable: Boolean = true
 ) {
     val isOk: Boolean get() = status == STATUS_OK
     val isSessionMismatch: Boolean get() = status == STATUS_SESSION_MISMATCH
@@ -102,7 +103,8 @@ object SaveStateBridge {
                 appVersion = json.optString("appVersion", ""),
                 engineVersion = json.optInt("engineVersion", 0),
                 sessionMatch = json.optBoolean("sessionMatch", true),
-                timestamp = json.optLong("timestamp", 0L)
+                timestamp = json.optLong("timestamp", 0L),
+                sessionUsable = json.optBoolean("sessionUsable", true)
             )
         }.getOrElse { error ->
             SaveStateResult(

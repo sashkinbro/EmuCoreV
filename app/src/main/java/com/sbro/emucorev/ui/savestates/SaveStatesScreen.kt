@@ -178,7 +178,9 @@ fun SaveStatesScreen(
                             }
                         } else {
                             viewModel.launchWithState(game.titleId, slot.slot) { result ->
-                                Toast.makeText(context, launchResultMessage(result), Toast.LENGTH_LONG).show()
+                                if (result != VitaLaunchBridge.LaunchResult.Success) {
+                                    Toast.makeText(context, launchResultMessage(result), Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
                     },

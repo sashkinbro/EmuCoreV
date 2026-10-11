@@ -363,8 +363,8 @@ bool validate_gxm_state(const GxmSnapshot &state, const MemoryImage &memory, std
     const auto fail = [&](const char *message) { error = message; return false; };
     const auto sizes = gxm::snapshot_object_sizes();
     std::map<uint64_t, uint64_t> objects;
-    const auto object = [&](Address address, size_t size) {
-        if (!address || (address & 7) || !memory.contains(address, size)) return false;
+    const auto object = [&](Address address, size_t size, size_t alignment = 8) {
+        if (!address || (address & (alignment - 1)) || !memory.contains(address, size)) return false;
         const uint64_t end = uint64_t(address) + size;
         const auto next = objects.lower_bound(address);
         if ((next != objects.end() && next->first < end) || (next != objects.begin() && std::prev(next)->second > address)) return false;
@@ -393,11 +393,13 @@ bool validate_gxm_state(const GxmSnapshot &state, const MemoryImage &memory, std
         }
     }
     for (const auto &program : state.fragment_programs) {
-        if (!object(program.address, sizeof(SceGxmFragmentProgram)) || !fragment.insert(program.address).second
+        // The guest host-allocation callback can return word-aligned storage,
+        // even when the host wrapper contains pointers with wider alignment.
+        if (!object(program.address, sizeof(SceGxmFragmentProgram), 4) || !fragment.insert(program.address).second
             || !program.reference_count || !validate_program(program.program.address(), true, memory, error)) return fail("invalid saved fragment program");
     }
     for (const auto &program : state.vertex_programs) {
-        if (!object(program.address, sizeof(SceGxmVertexProgram)) || !vertex.insert(program.address).second
+        if (!object(program.address, sizeof(SceGxmVertexProgram), 4) || !vertex.insert(program.address).second
             || !program.reference_count || !validate_program(program.program.address(), false, memory, error)) return fail("invalid saved vertex program");
         for (const auto &attribute : program.attributes)
             if (attribute.streamIndex >= program.streams.size() || attribute.componentCount == 0 || attribute.componentCount > 4
@@ -407,7 +409,7 @@ bool validate_gxm_state(const GxmSnapshot &state, const MemoryImage &memory, std
     const auto callback = [&](Address address) { return !address || memory.contains(address & ~Address(1), 2); };
     for (const auto &patcher : state.shader_patchers) {
         const auto &p = patcher.params;
-        if (!object(patcher.address, sizes.shader_patcher) || !optional(p.bufferMem.address(), p.bufferMemSize)
+        if (!object(patcher.address, sizes.shader_patcher, 4) || !optional(p.bufferMem.address(), p.bufferMemSize)
             || !optional(p.vertexUsseMem.address(), p.vertexUsseMemSize) || !optional(p.fragmentUsseMem.address(), p.fragmentUsseMemSize)
             || !callback(p.hostAllocCallback.address()) || !callback(p.hostFreeCallback.address())
             || !callback(p.bufferAllocCallback.address()) || !callback(p.bufferFreeCallback.address())

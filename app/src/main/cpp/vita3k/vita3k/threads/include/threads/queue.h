@@ -144,7 +144,12 @@ public:
     }
 
     void abort() {
-        aborted = true;
+        {
+            // Serialize the predicate update with wait enrollment. An atomic
+            // flag alone allows notification to precede condvar enrollment.
+            const std::lock_guard lock(mutex_);
+            aborted = true;
+        }
         condempty_.notify_all();
         cond_.notify_all();
         notify_changes();

@@ -1,7 +1,60 @@
 #include <gxm/savestate.h>
 #include <renderer/command_snapshot.h>
+#include <atomic>
+#include <thread>
 
 DECL_EXPORT(int, sceGxmExecuteCommandList, SceGxmContext *context, SceGxmCommandList *list);
+
+namespace {
+// restore_contexts creates immediate renderer contexts through a synchronous
+// CreateContext command. The lightweight fake renderer has no render loop, so
+// service that one command exactly as a render thread would, without opening a
+// graphics backend or leaving the test blocked in wait_for_status().
+class GxmSnapshotContextCommandService {
+public:
+    explicit GxmSnapshotContextCommandService(renderer::State &state)
+        : state_(state)
+        , thread_([this] { run(); }) {}
+
+    ~GxmSnapshotContextCommandService() {
+        stopping_.store(true, std::memory_order_release);
+        state_.command_buffer_queue.wake();
+        thread_.join();
+    }
+
+private:
+    void run() {
+        while (!stopping_.load(std::memory_order_acquire)) {
+            auto list = state_.command_buffer_queue.pop(1000);
+            if (!list || !list->first)
+                continue;
+
+            auto *command = list->first;
+            renderer::CommandHelper helper(command);
+            int result = renderer::CommandErrorArgumentsTooLarge;
+            if (command->opcode == renderer::CommandOpcode::CreateContext) {
+                auto *output = helper.pop<std::unique_ptr<renderer::Context> *>();
+                *output = std::make_unique<renderer::Context>();
+                state_.context = output->get();
+                // CreateContext handlers complete with a positive bool result;
+                // renderer::create_context treats status > CommandErrorCodeNone
+                // as success.
+                result = 1;
+            }
+            {
+                const std::lock_guard lock(state_.command_finish_one_mutex);
+                helper.complete(result);
+            }
+            state_.command_finish_one.notify_all();
+            renderer::generic_command_free(command);
+        }
+    }
+
+    renderer::State &state_;
+    std::atomic<bool> stopping_{false};
+    std::thread thread_;
+};
+} // namespace
 
 TEST(GxmDeferredOwnership, ExecuteCopiesCommandsWithoutModifyingReusableListAndSnapshotsRoundTrip) {
     EmuEnvState env;
@@ -11,10 +64,12 @@ TEST(GxmDeferredOwnership, ExecuteCopiesCommandsWithoutModifyingReusableListAndS
         EmuEnvState &env;
         ~Cleanup() { gxm::destroy_all_contexts(env, true); }
     } cleanup{env};
+    GxmSnapshotContextCommandService context_command_service(*env.renderer);
 
     gxm::ContextSnapshot immediate;
     immediate.address = 0x1000;
     immediate.state.type = SCE_GXM_CONTEXT_TYPE_IMMEDIATE;
+    immediate.state.active = true;
     gxm::ContextSnapshot deferred;
     deferred.address = 0x5000;
     deferred.deferred = true;
@@ -31,8 +86,12 @@ TEST(GxmDeferredOwnership, ExecuteCopiesCommandsWithoutModifyingReusableListAndS
     ASSERT_NE(source, nullptr);
     auto *first_source = source->first;
     auto *last_source = source->last;
+    // ExecuteCommandList reads the opaque identity token from the guest wrapper.
+    // restore_contexts rebuilds the host list but deliberately leaves guest RAM
+    // untouched, so seed the same token EndCommandList would have published.
+    auto *guest_token = reinterpret_cast<renderer::CommandList *>(uintptr_t(9));
+    std::memcpy(env.mem.memory.get() + 0x3000, &guest_token, sizeof(guest_token));
     auto *guest_context = Ptr<SceGxmContext>(immediate.address).get(env.mem);
-    reinterpret_cast<GxmContextState *>(guest_context)->active = true;
     renderer::Context *destination = nullptr;
     for (const auto &[address, context] : gxm::runtime_contexts(env))
         if (address == immediate.address) destination = context;
@@ -63,7 +122,6 @@ TEST(GxmDeferredOwnership, ExecuteCopiesCommandsWithoutModifyingReusableListAndS
     EXPECT_NE(first_execution_tail->next, first_source);
     EXPECT_EQ(last_source->next, nullptr);
 
-    reinterpret_cast<GxmContextState *>(guest_context)->active = false;
     std::vector<gxm::ContextSnapshot> captured_contexts;
     std::vector<renderer::CommandSnapshot> captured_commands;
     ASSERT_TRUE(gxm::capture_contexts(env, captured_contexts, captured_commands, error)) << error;

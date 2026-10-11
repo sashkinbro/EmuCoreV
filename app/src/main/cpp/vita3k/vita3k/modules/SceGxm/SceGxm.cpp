@@ -19,8 +19,10 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <cpu/functions.h>
 #include <modules/module_parent.h>
+#include <new>
 
 #include <span>
 #include <stack>
@@ -3593,6 +3595,90 @@ EXPORT(int, sceGxmEndScene, SceGxmContext *context, SceGxmNotification *vertexNo
     return 0;
 }
 
+static void destroy_copied_command_chain(renderer::Context &context, renderer::Command *first) {
+    while (first) {
+        auto *next = first->next;
+        renderer::destroy_command_payload(*first);
+        context.free_func(first);
+        first = next;
+    }
+}
+
+static bool append_deferred_command_list(renderer::Context &destination, const renderer::CommandList &source) {
+    if ((!source.first) != (!source.last) || (!destination.command_list.first) != (!destination.command_list.last))
+        return false;
+    if (!source.first)
+        return true;
+
+    renderer::Command *first_copy = nullptr;
+    renderer::Command *last_copy = nullptr;
+    size_t copied = 0;
+    const renderer::Command *command = source.first;
+    for (;;) {
+        if (!command || copied++ >= 262144) {
+            destroy_copied_command_chain(destination, first_copy);
+            return false;
+        }
+
+        renderer::Command *copy = destination.alloc_func ? destination.alloc_func() : nullptr;
+        if (!copy) {
+            destroy_copied_command_chain(destination, first_copy);
+            return false;
+        }
+
+        // Preserve the destination allocator's ownership flags. Deferred-list
+        // nodes are owned by their reusable list and must never be freed by the
+        // immediate context's command allocator.
+        const auto allocation_flags = copy->flags;
+        copy->opcode = command->opcode;
+        copy->flags = allocation_flags;
+        std::memcpy(copy->data, command->data, sizeof(copy->data));
+        copy->status = command->status;
+        copy->completion_id = command->completion_id;
+        copy->next = nullptr;
+
+        // SetContext carries heap-owned surface copies in its payload. Clone
+        // them as well, so the renderer may consume/destroy the immediate
+        // copy without mutating or freeing the deferred source list.
+        if (command->opcode == renderer::CommandOpcode::SetContext) {
+            constexpr size_t color_offset = sizeof(renderer::RenderTarget *);
+            constexpr size_t depth_offset = color_offset + sizeof(SceGxmColorSurface *);
+            SceGxmColorSurface *source_color = nullptr;
+            SceGxmDepthStencilSurface *source_depth = nullptr;
+            std::memcpy(&source_color, command->data + color_offset, sizeof(source_color));
+            std::memcpy(&source_depth, command->data + depth_offset, sizeof(source_depth));
+            auto *color_copy = source_color ? new (std::nothrow) SceGxmColorSurface(*source_color) : nullptr;
+            auto *depth_copy = source_depth ? new (std::nothrow) SceGxmDepthStencilSurface(*source_depth) : nullptr;
+            if ((source_color && !color_copy) || (source_depth && !depth_copy)) {
+                delete color_copy;
+                delete depth_copy;
+                destination.free_func(copy);
+                destroy_copied_command_chain(destination, first_copy);
+                return false;
+            }
+            std::memcpy(copy->data + color_offset, &color_copy, sizeof(color_copy));
+            std::memcpy(copy->data + depth_offset, &depth_copy, sizeof(depth_copy));
+        }
+
+        if (last_copy)
+            last_copy->next = copy;
+        else
+            first_copy = copy;
+        last_copy = copy;
+
+        if (command == source.last)
+            break;
+        command = command->next;
+    }
+
+    if (destination.command_list.last)
+        destination.command_list.last->next = first_copy;
+    else
+        destination.command_list.first = first_copy;
+    destination.command_list.last = last_copy;
+    return true;
+}
+
 EXPORT(int, sceGxmExecuteCommandList, SceGxmContext *context, SceGxmCommandList *commandList) {
     TRACY_FUNC(sceGxmExecuteCommandList, context, commandList);
     if (!context) {
@@ -3612,17 +3698,10 @@ EXPORT(int, sceGxmExecuteCommandList, SceGxmContext *context, SceGxmCommandList 
     if (!saved_list)
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
 
-    // Emit a jump to the first command of given command list
-    // Since only one immediate context exists per process, direct linking like this should be fine! (I hope)
-    renderer::CommandList &imm_cmds = context->renderer->command_list;
-
-    if (imm_cmds.last) {
-        imm_cmds.last->next = saved_list->first;
-        imm_cmds.last = saved_list->last;
-    } else {
-        imm_cmds.first = saved_list->first;
-        imm_cmds.last = saved_list->last;
-    }
+    // Deferred VDM storage can be reused before the renderer consumes the
+    // immediate list, so execution must own copies of the deferred commands.
+    if (!context->renderer || !append_deferred_command_list(*context->renderer, *saved_list))
+        return RET_ERROR(SCE_GXM_ERROR_RESERVE_FAILED);
 
     // Restore back our GXM state
     gxmContextStateRestore(*emuenv.renderer, context, true);

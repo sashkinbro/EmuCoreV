@@ -82,6 +82,32 @@ TEST_F(GxmSysmemPreflight, RejectsStagedGxpOffsetOverflowBeforeCompilation) {
     EXPECT_FALSE(emucorev::savestate::validate_gxm_state(gxm, *memory, error));
 }
 
+TEST_F(GxmSysmemPreflight, AcceptsFourByteAlignedCallbackProgramWrappers) {
+    gxm.vertex_programs[0].address = 0x4004;
+    gxm.contexts[0].state.vertex_program = Ptr<const SceGxmVertexProgram>(0x4004);
+    gxm::FragmentProgramSnapshot fragment;
+    fragment.address = 0x6004;
+    fragment.program = Ptr<const SceGxmProgram>(0x9000);
+    gxm.fragment_programs.push_back(fragment);
+    gxm::ShaderPatcherSnapshot patcher;
+    patcher.address = 0x7004;
+    gxm.shader_patchers.push_back(patcher);
+    gxm.contexts[0].state.fragment_program = Ptr<const SceGxmFragmentProgram>(fragment.address);
+    SceGxmProgram program{};
+    program.magic = 0x00505847;
+    program.program_flags = SCE_GXM_PROGRAM_FLAG_FRAGMENT;
+    program.size = sizeof(program) + sizeof(SceGxmProgramVertexVaryings);
+    program.varyings_offset = sizeof(program) - offsetof(SceGxmProgram, varyings_offset);
+    put(0x9000, program);
+    auto memory = image(); ASSERT_TRUE(memory) << error;
+    EXPECT_TRUE(emucorev::savestate::validate_gxm_state(gxm, *memory, error)) << error;
+    gxm.shader_patchers[0].address += 2;
+    EXPECT_FALSE(emucorev::savestate::validate_gxm_state(gxm, *memory, error));
+    gxm.shader_patchers[0].address -= 2;
+    gxm.fragment_programs[0].address += 2;
+    EXPECT_FALSE(emucorev::savestate::validate_gxm_state(gxm, *memory, error));
+}
+
 TEST_F(GxmSysmemPreflight, VmTableMayAliasSameOwnerButCannotClaimDifferentAllocation) {
     using namespace emucorev::savestate;
     auto memory = image(); ASSERT_TRUE(memory);

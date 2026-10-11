@@ -99,6 +99,12 @@ void VKTextureCache::cleanup() {
 
     for (auto &staging : staging_buffers) {
         staging.buffer.destroy();
+        // Buffer::destroy clears its handle, but retains the old capacity and
+        // mapped pointer. They must not advertise a reusable freed allocation.
+        staging.buffer.allocation = nullptr;
+        staging.buffer.mapped_data = nullptr;
+        staging.buffer.size = 0;
+        staging.used_so_far = 0;
         staging.waiting_fence = nullptr;
         staging.scene_timestamp = ~0;
         staging.frame_timestamp = ~0;
@@ -120,6 +126,9 @@ void VKTextureCache::reset() {
     for (size_t i = 0; i < TextureCacheSize; i++)
         texture_queue.items[i].content.index = static_cast<int>(i);
     sampler_lookup.clear();
+    // cleanup releases the old handles and clears storage. Queue slots remain
+    // usable after reset, so recreate matching empty handle slots too.
+    samplers.resize(sampler_cache_size);
     if (sampler_cache_size > 0) {
         sampler_queue.init(sampler_cache_size);
         for (size_t i = 0; i < sampler_cache_size; i++)
@@ -249,7 +258,10 @@ void VKTextureCache::prepare_staging_buffer(bool is_configure) {
     // some textures must be 16-bytes aligned, and staging_buffer->buffer.size is 16-bytes aligned
     staging_buffer->used_so_far = align(staging_buffer->used_so_far, 16);
     // we can keep using the same buffer as before if we are in the same scene and there is enough memory left
-    bool use_previous_buffer = (current_scene_timestamp == staging_buffer->scene_timestamp) && (staging_buffer->buffer.size - staging_buffer->used_so_far) >= current_texture->memory_needed;
+    bool use_previous_buffer = staging_buffer->buffer.buffer && staging_buffer->buffer.mapped_data
+        && (current_scene_timestamp == staging_buffer->scene_timestamp)
+        && staging_buffer->used_so_far <= staging_buffer->buffer.size
+        && (staging_buffer->buffer.size - staging_buffer->used_so_far) >= current_texture->memory_needed;
 
     if (!use_previous_buffer) {
         staging_idx = (staging_idx + 1) % NB_TEXTURE_STAGING_BUFFERS;
@@ -315,7 +327,8 @@ void VKTextureCache::prepare_staging_buffer(bool is_configure) {
         staging_buffer->waiting_fence = current_fence;
         staging_buffer->used_so_far = 0;
 
-        if (staging_buffer->buffer.size < current_texture->memory_needed) {
+        if (!staging_buffer->buffer.buffer || !staging_buffer->buffer.mapped_data
+            || staging_buffer->buffer.size < current_texture->memory_needed) {
             // we need to create a bigger buffer
             // destroy the previous one if there is, no need to defer destroy it as we know it is no longer being used
             staging_buffer->buffer.destroy();

@@ -1420,6 +1420,17 @@ bool read_audio(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::stri
         }
     }
 
+    // The old guest workers have already exited at this restore stage. Remove
+    // their bindings before rebuilding the saved topology: SDL selects S16
+    // for one bound stream and a float mixer for multiple bound streams.
+    // Pure snapshot/backend validation above must leave live ports untouched.
+    emuenv.audio.stop_all_ports();
+    {
+        const std::lock_guard<std::mutex> lock(emuenv.audio.mutex);
+        emuenv.audio.out_ports.clear();
+        emuenv.audio.next_port_id = 1;
+    }
+
     std::map<int, AudioOutPortPtr> reopened;
     const uint64_t now_us = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count());
@@ -1440,11 +1451,22 @@ bool read_audio(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::stri
         emuenv.audio.set_volume(*port, info.volume);
         port->len_microseconds = info.len_microseconds;
         port->last_output = now_us - std::min(now_us, info.elapsed_microseconds);
-        if (!emuenv.audio.adapter->restore_port_state(*port, info.pending_state)) {
+        reopened.emplace(info.id, std::move(port));
+    }
+
+    // Bind every saved stream before loading queues. Binding another SDL
+    // stream updates the destination format of all streams on the device.
+    // Keep ownership local until all queues succeed so failure unbinds every
+    // replacement and cannot leave partially restored audio running.
+    for (const AudioPortSnapshot &info : snapshot.ports) {
+        if (info.codec == 1)
+            SDL_ClearError();
+        if (!emuenv.audio.adapter->restore_port_state(*reopened.at(info.id), info.pending_state)) {
             error = "failed to restore audio playback queue";
+            if (info.codec == 1 && *SDL_GetError())
+                error += std::string(": ") + SDL_GetError();
             return false;
         }
-        reopened.emplace(info.id, port);
     }
 
     {

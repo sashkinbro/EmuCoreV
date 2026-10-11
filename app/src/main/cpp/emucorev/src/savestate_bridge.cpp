@@ -61,6 +61,7 @@ jstring result_to_json(JNIEnv *env, const emucorev::savestate::Result &result) {
     json += "\"appVersion\":\"" + json_escape(result.meta.app_version) + "\",";
     json += "\"engineVersion\":" + std::to_string(result.meta.engine_version) + ",";
     json += "\"sessionMatch\":" + std::string(result.session_match ? "true" : "false") + ",";
+    json += "\"sessionUsable\":" + std::string(result.session_usable ? "true" : "false") + ",";
     json += "\"timestamp\":" + std::to_string(result.meta.timestamp_ms);
     json += "}";
     return env->NewStringUTF(json.c_str());

@@ -31,7 +31,8 @@ import com.sbro.emucorev.ui.theme.neon.neonShape
 @Composable
 internal fun LaunchStateLoadingOverlay(
     state: LaunchStateLoadingState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    indeterminate: Boolean = false
 ) {
     if (!state.active) return
 
@@ -51,7 +52,9 @@ internal fun LaunchStateLoadingOverlay(
                 .widthIn(max = 420.dp)
                 .fillMaxWidth()
                 .padding(horizontal = 28.dp)
-                .semantics { stateDescription = "${(state.progress * 100).toInt()}%" },
+                .semantics {
+                    if (!indeterminate) stateDescription = "${(state.progress * 100).toInt()}%"
+                },
             shape = neonShape(22.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp
@@ -65,7 +68,11 @@ internal fun LaunchStateLoadingOverlay(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                LinearProgressIndicator(
+                if (indeterminate) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth().testTag("launch_state_loading_progress")
+                    )
+                } else LinearProgressIndicator(
                     progress = { state.progress },
                     modifier = Modifier
                         .fillMaxWidth()
