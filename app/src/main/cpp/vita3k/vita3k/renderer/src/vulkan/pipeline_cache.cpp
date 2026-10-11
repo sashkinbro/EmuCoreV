@@ -38,6 +38,7 @@
 #include <bit>
 #include <mutex>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 
 #include <SDL3/SDL_cpuinfo.h>
@@ -49,8 +50,9 @@
 
 namespace renderer::vulkan {
 
-// Size of the record containing what is needed for the pipeline construction (what is after is dynamic state)
+// Fixed-state prefix used for the pipeline cache key, not the async snapshot extent.
 constexpr size_t record_pipeline_len = offsetof(GxmRecordState, vertex_streams);
+static_assert(std::is_trivially_copyable_v<GxmRecordState>);
 
 // structure containing everything needed to compile a pipeline
 struct CompileRequest {
@@ -64,12 +66,12 @@ struct CompileRequest {
     SceGxmFragmentProgram *fragment_program_gxm;
     shader::Hints hints;
 
-    // the content of the record useful for the pipeline creation
-    alignas(8) uint8_t record_data[record_pipeline_len];
+    // Compilation also reads color_surface beyond the hashed fixed-state prefix.
+    // Own the full value while the rendering thread advances its live record.
+    GxmRecordState record;
 
     const GxmRecordState *get_record() {
-        // note: this object is only half defined, but we are only looking at the part that's defined
-        return reinterpret_cast<const GxmRecordState *>(record_data);
+        return &record;
     }
 };
 
@@ -1479,9 +1481,9 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
             .render_pass = render_pass,
             .vertex_program_gxm = &vertex_program_gxm,
             .fragment_program_gxm = &fragment_program_gxm,
-            .hints = context.shader_hints
+            .hints = context.shader_hints,
+            .record = record
         };
-        memcpy(request->record_data, &record, record_pipeline_len);
         it->second = pipeline_compiling;
 
         // we must not delete these programs until the worker is done
