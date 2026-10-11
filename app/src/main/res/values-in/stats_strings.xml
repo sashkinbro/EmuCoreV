@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">Statistik</string>
+    <string name="stats_help">CPU mengukur aplikasi ini di semua inti. GPU untuk seluruh perangkat jika tersedia. Suhu berasal dari baterai; data tak tersedia ditandai —.</string>
+    <string name="stats_position">Posisi</string>
+    <string name="stats_top_left">Kiri atas</string>
+    <string name="stats_top_right">Kanan atas</string>
+    <string name="stats_bottom_left">Kiri bawah</string>
+    <string name="stats_bottom_right">Kanan bawah</string>
+    <string name="stats_size">Ukuran</string>
+    <string name="stats_metrics">Metrik terlihat</string>
+    <string name="stats_reset">Reset statistik</string>
+    <string name="stats_version">Versi aplikasi dan inti</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Suhu baterai</string>
+    <string name="stats_thermal">Status termal</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">Dijeda</string>
+    <string name="stats_thermal_none">Normal</string>
+    <string name="stats_thermal_light">Ringan</string>
+    <string name="stats_thermal_moderate">Sedang</string>
+    <string name="stats_thermal_severe">Berat</string>
+    <string name="stats_thermal_critical">Kritis</string>
+    <string name="stats_thermal_emergency">Darurat</string>
+    <string name="stats_thermal_shutdown">Matikan</string>
+    <string name="stats_mode">Mode tampilan</string>
+    <string name="stats_mode_off">Nonaktif</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Terperinci</string>
+    <string name="stats_enabled">Tampilkan FPS</string>
+</resources>

@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">Dokunmatik düzen</string>
+    <string name="touch_layout_settings_description">Ekrandaki kontrollerin varsayılan konumunu ve boyutunu ayarlayın. Kendi düzeni olan oyunlar bu düzeni korur.</string>
+                <string name="touch_layout_game_inherited">Genel düzen kullanılıyor</string>
+    <string name="touch_layout_game_custom">Bu oyuna özel düzen</string>
+    <string name="touch_layout_edit">Dokunmatik kontrolleri düzenle</string>
+    <string name="touch_layout_use_global">Genel düzeni kullan</string>
+        </resources>

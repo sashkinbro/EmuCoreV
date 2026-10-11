@@ -142,7 +142,6 @@ void draw_shaders_count_compiled(GuiState &gui, EmuEnvState &emuenv);
 void draw_shader_caching_warn(GuiState &gui, EmuEnvState &emuenv);
 void draw_trophies_unlocked(GuiState &gui, EmuEnvState &emuenv);
 void draw_touchpad_cursor(EmuEnvState &emuenv);
-void draw_perf_overlay(GuiState &gui, EmuEnvState &emuenv);
 
 ImTextureID load_image(GuiState &gui, const uint8_t *data, const int size);
 

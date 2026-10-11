@@ -501,6 +501,7 @@ int KernelState::stop_world(SceUID except_id, std::chrono::milliseconds budget) 
 }
 
 void KernelState::log_thread_hang_dump() {
+#ifndef NDEBUG
     std::vector<ThreadStatePtr> snapshot;
     {
         const std::lock_guard<std::mutex> lock(mutex);
@@ -541,6 +542,7 @@ void KernelState::log_thread_hang_dump() {
     if (hang_file)
         hang_file << "==== " << std::put_time(std::localtime(&now), "%Y-%m-%d %H:%M:%S") << " ====\n"
                   << dump << std::endl;
+#endif
 }
 
 void KernelState::resume_world() {

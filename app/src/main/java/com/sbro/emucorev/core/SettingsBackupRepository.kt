@@ -5,6 +5,10 @@ import android.net.Uri
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.AppFont
 import com.sbro.emucorev.data.CustomizationPreferences
+import com.sbro.emucorev.data.StatsMode
+import com.sbro.emucorev.data.legacyStatsMode
+import com.sbro.emucorev.data.legacyStatsPosition
+import com.sbro.emucorev.data.PerformanceStatsPreferences
 import com.sbro.emucorev.data.TrophySoundRepository
 import org.json.JSONObject
 import java.io.File
@@ -49,6 +53,19 @@ class SettingsBackupRepository(
                     .putNullable("customFontPath", customizationPreferences.current.customFontPath)
                     .putNullable("backgroundPath", customizationPreferences.current.backgroundPath)
                     .putNullable("backgroundMimeType", customizationPreferences.current.backgroundMimeType)
+            )
+            .put(
+                "performanceStats",
+                PerformanceStatsPreferences(context).use { stats ->
+                    stats.settings.value.let { settings ->
+                        JSONObject()
+                            .put("mode", settings.mode.name)
+                            .put("position", settings.position.name)
+                            .put("scalePercent", settings.scalePercent)
+                            .put("rememberedMode", settings.rememberedMode.name)
+                            .put("metricMask", settings.metricMask)
+                    }
+                }
             )
             .put(
                 "trophySound",
@@ -148,6 +165,32 @@ class SettingsBackupRepository(
             )
         }
 
+        // Optional visual domain: older format-1 backups leave the current HUD untouched.
+        if (applyCustomization) root.optJSONObject("performanceStats")?.let { saved ->
+            PerformanceStatsPreferences(context).use { stats ->
+                stats.update { current ->
+                    current.copy(
+                        mode = if (saved.has("mode")) saved.optEnum("mode", current.mode)
+                            else (saved.opt("enabled") as? Boolean)?.let { if (it) StatsMode.DETAILED else StatsMode.OFF } ?: current.mode,
+                        position = saved.optEnum("position", current.position),
+                        scalePercent = saved.optStatsInt("scalePercent", current.scalePercent),
+                        rememberedMode = saved.optEnum("rememberedMode", current.rememberedMode),
+                        metricMask = saved.optStatsInt("metricMask", current.metricMask)
+                    )
+                }
+            }
+        }
+
+        // Explicit older backups migrate the retired native HUD into the replacement domain.
+        if (applyCustomization && !root.has("performanceStats")) root.optJSONObject("core")?.let { old ->
+            (old.opt("performanceOverlay") as? Boolean)?.let { enabled ->
+                PerformanceStatsPreferences(context).use { stats ->
+                    stats.update { it.copy(mode = legacyStatsMode(enabled, old.optInt("performanceOverlayDetail", 0)),
+                        position = legacyStatsPosition(old.optInt("performanceOverlayPosition", 2))) }
+                }
+            }
+        }
+
         if (applyCore) {
             val restoredConfig = root.optJSONObject("core")
                 ?.toVitaCoreConfig(coreConfigRepository.ensureDefaultsPersisted())
@@ -198,9 +241,6 @@ class SettingsBackupRepository(
         .put("exportAsPng", exportAsPng)
         .put("memoryMapping", memoryMapping)
         .put("fullscreenHdResPixelPerfect", fullscreenHdResPixelPerfect)
-        .put("performanceOverlay", performanceOverlay)
-        .put("performanceOverlayDetail", performanceOverlayDetail)
-        .put("performanceOverlayPosition", performanceOverlayPosition)
         .put("enableGamepadOverlay", enableGamepadOverlay)
         .put("overlayShowTouchSwitch", overlayShowTouchSwitch)
         .put("overlayScale", overlayScale.toDouble())
@@ -292,9 +332,6 @@ class SettingsBackupRepository(
         exportAsPng = optBoolean("exportAsPng", defaults.exportAsPng),
         memoryMapping = optString("memoryMapping", defaults.memoryMapping),
         fullscreenHdResPixelPerfect = optBoolean("fullscreenHdResPixelPerfect", defaults.fullscreenHdResPixelPerfect),
-        performanceOverlay = optBoolean("performanceOverlay", defaults.performanceOverlay),
-        performanceOverlayDetail = optInt("performanceOverlayDetail", defaults.performanceOverlayDetail),
-        performanceOverlayPosition = optInt("performanceOverlayPosition", defaults.performanceOverlayPosition),
         enableGamepadOverlay = optBoolean("enableGamepadOverlay", defaults.enableGamepadOverlay),
         overlayShowTouchSwitch = optBoolean("overlayShowTouchSwitch", defaults.overlayShowTouchSwitch),
         overlayScale = optFloat("overlayScale", defaults.overlayScale),
@@ -366,6 +403,13 @@ class SettingsBackupRepository(
 
     private fun JSONObject.optFloat(name: String, fallback: Float): Float {
         return if (has(name)) optDouble(name, fallback.toDouble()).toFloat() else fallback
+    }
+
+    private fun JSONObject.optStatsInt(name: String, fallback: Int): Int {
+        val value = opt(name)
+        if (value is Int) return value
+        if (value is Long && value in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) return value.toInt()
+        return fallback
     }
 
     private fun JSONObject.optLongValue(name: String, fallback: Long): Long {

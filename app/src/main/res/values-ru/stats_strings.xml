@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">Статистика</string>
+    <string name="stats_help">CPU — нагрузка приложения на всех ядрах. GPU — всего устройства, если доступна. Температура — датчик батареи; недоступные данные отмечены —.</string>
+    <string name="stats_position">Позиция</string>
+    <string name="stats_top_left">Сверху слева</string>
+    <string name="stats_top_right">Сверху справа</string>
+    <string name="stats_bottom_left">Снизу слева</string>
+    <string name="stats_bottom_right">Снизу справа</string>
+    <string name="stats_size">Размер</string>
+    <string name="stats_metrics">Видимые показатели</string>
+    <string name="stats_reset">Сбросить статистику</string>
+    <string name="stats_version">Версия приложения и ядра</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Температура батареи</string>
+    <string name="stats_thermal">Тепловое состояние</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">Приостановлено</string>
+    <string name="stats_thermal_none">Нормальное</string>
+    <string name="stats_thermal_light">Лёгкое</string>
+    <string name="stats_thermal_moderate">Умеренное</string>
+    <string name="stats_thermal_severe">Сильное</string>
+    <string name="stats_thermal_critical">Критическое</string>
+    <string name="stats_thermal_emergency">Аварийное</string>
+    <string name="stats_thermal_shutdown">Выключение</string>
+    <string name="stats_mode">Режим отображения</string>
+    <string name="stats_mode_off">Выключено</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Подробно</string>
+    <string name="stats_enabled">Показывать FPS</string>
+</resources>

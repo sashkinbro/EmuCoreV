@@ -63,24 +63,7 @@ void reset_perf_metrics(EmuEnvState &emuenv) {
         return;
 
     auto &renderer = *emuenv.renderer;
-    renderer.perf_overlay.fps = 0;
-    renderer.perf_overlay.avg_fps = 0;
-    renderer.perf_overlay.min_fps = 0;
-    renderer.perf_overlay.max_fps = 0;
-    renderer.perf_overlay.ms_per_frame = 0;
-    renderer.perf_overlay.fps_values.fill(0.0f);
-    renderer.perf_overlay.fps_values_count = 0;
-    renderer.perf_overlay.current_fps_offset = 0;
-}
-
-void sync_perf_overlay_config(EmuEnvState &emuenv) {
-    if (!emuenv.renderer)
-        return;
-
-    auto &renderer = *emuenv.renderer;
-    renderer.perf_overlay.enabled = emuenv.cfg.performance_overlay;
-    renderer.perf_overlay.position = emuenv.cfg.performance_overlay_position;
-    renderer.perf_overlay.detail = emuenv.cfg.performance_overlay_detail;
+    renderer.performance_stats.reset();
 }
 
 void reset_controller_binding(EmuEnvState &emuenv) {
@@ -292,8 +275,6 @@ void prepare_game_launch_overlay(EmuEnvState &emuenv) {
 }
 
 bool update_runtime_metrics(EmuEnvState &emuenv, LaunchRuntimeMetrics &metrics) {
-    sync_perf_overlay_config(emuenv);
-
     if (emuenv.frame_count == 0)
         return false;
 
@@ -335,14 +316,7 @@ bool update_runtime_metrics(EmuEnvState &emuenv, LaunchRuntimeMetrics &metrics) 
         return true;
 
     auto &renderer = *emuenv.renderer;
-    renderer.perf_overlay.fps = emuenv.fps;
-    renderer.perf_overlay.avg_fps = emuenv.avg_fps;
-    renderer.perf_overlay.min_fps = emuenv.min_fps;
-    renderer.perf_overlay.max_fps = emuenv.max_fps;
-    renderer.perf_overlay.ms_per_frame = emuenv.ms_per_frame;
-    std::copy(std::begin(emuenv.fps_values), std::end(emuenv.fps_values), renderer.perf_overlay.fps_values.begin());
-    renderer.perf_overlay.fps_values_count = perf_frames_size;
-    renderer.perf_overlay.current_fps_offset = emuenv.current_fps_offset;
+    renderer.performance_stats.publish(emuenv.fps, emuenv.ms_per_frame);
 
     return true;
 }

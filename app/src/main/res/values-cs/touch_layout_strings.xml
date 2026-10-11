@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">Rozložení dotykového ovládání</string>
+    <string name="touch_layout_settings_description">Nastavte výchozí polohu a velikost ovládacích prvků na obrazovce. Hry s vlastním rozložením si ho zachovají.</string>
+                <string name="touch_layout_game_inherited">Používá globální rozložení</string>
+    <string name="touch_layout_game_custom">Vlastní rozložení pro tuto hru</string>
+    <string name="touch_layout_edit">Upravit dotykové ovládání</string>
+    <string name="touch_layout_use_global">Použít globální rozložení</string>
+        </resources>

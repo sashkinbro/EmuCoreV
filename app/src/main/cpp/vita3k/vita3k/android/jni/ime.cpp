@@ -42,7 +42,9 @@ jmethodID get_optional_method(JNIEnv *env, jclass clazz, const char *name, const
 
 void clear_callback_exception(JNIEnv *env) {
     if (env->ExceptionCheck()) {
+#ifndef NDEBUG
         env->ExceptionDescribe();
+#endif
         env->ExceptionClear();
     }
 }

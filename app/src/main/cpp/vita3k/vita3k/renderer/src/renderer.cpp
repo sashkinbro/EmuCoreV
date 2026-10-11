@@ -28,7 +28,6 @@
 #include <overlay/display_manager.h>
 #include <overlay/font.h>
 #include <overlay/pause_overlay.h>
-#include <overlay/perf_overlay.h>
 #include <overlay/shader_compile_notice.h>
 #include <renderer/gl/state.h>
 #include <renderer/gl/types.h>
@@ -75,23 +74,6 @@ void State::update_overlays() {
             if (overlay_manager->get<overlay::pause_overlay>())
                 overlay_manager->remove<overlay::pause_overlay>();
         }
-    }
-
-    if (perf_overlay.enabled && perf_overlay.fps > 0) {
-        auto perf = overlay_manager->get<overlay::perf_overlay>();
-        if (!perf)
-            perf = overlay_manager->create<overlay::perf_overlay>();
-
-        perf->set_position(static_cast<overlay::screen_quadrant>(perf_overlay.position));
-        perf->set_detail_level(static_cast<overlay::perf_detail_level>(perf_overlay.detail));
-        perf->set_fps_data(perf_overlay.fps, perf_overlay.avg_fps, perf_overlay.min_fps,
-            perf_overlay.max_fps, perf_overlay.ms_per_frame,
-            perf_overlay.fps_values.data(), perf_overlay.fps_values_count,
-            perf_overlay.current_fps_offset);
-    } else {
-        auto perf = overlay_manager->get<overlay::perf_overlay>();
-        if (perf)
-            overlay_manager->remove<overlay::perf_overlay>();
     }
 
     if (common_dialog) {

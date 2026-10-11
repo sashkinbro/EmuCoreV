@@ -110,9 +110,6 @@ struct EmulatorConfigFields {
     jfieldID archiveLog = nullptr;
     jfieldID logCompatWarn = nullptr;
     jfieldID logLevel = nullptr;
-    jfieldID performanceOverlay = nullptr;
-    jfieldID performanceOverlayDetail = nullptr;
-    jfieldID performanceOverlayPosition = nullptr;
     jfieldID screenshotFormat = nullptr;
 };
 
@@ -196,9 +193,6 @@ EmulatorConfigFields resolve_config_fields(JNIEnv *env) {
     fields.archiveLog = env->GetFieldID(fields.cls, "archiveLog", "Z");
     fields.logCompatWarn = env->GetFieldID(fields.cls, "logCompatWarn", "Z");
     fields.logLevel = env->GetFieldID(fields.cls, "logLevel", "I");
-    fields.performanceOverlay = env->GetFieldID(fields.cls, "performanceOverlay", "Z");
-    fields.performanceOverlayDetail = env->GetFieldID(fields.cls, "performanceOverlayDetail", "I");
-    fields.performanceOverlayPosition = env->GetFieldID(fields.cls, "performanceOverlayPosition", "I");
     fields.screenshotFormat = env->GetFieldID(fields.cls, "screenshotFormat", "I");
     return fields;
 }
@@ -410,9 +404,6 @@ void fill_config_object(JNIEnv *env, jobject obj, const EmulatorConfigFields &fi
     env->SetBooleanField(obj, fields.archiveLog, config.archive_log);
     env->SetBooleanField(obj, fields.logCompatWarn, config.log_compat_warn);
     env->SetIntField(obj, fields.logLevel, static_cast<jint>(config.log_level));
-    env->SetBooleanField(obj, fields.performanceOverlay, config.performance_overlay);
-    env->SetIntField(obj, fields.performanceOverlayDetail, static_cast<jint>(config.performance_overlay_detail));
-    env->SetIntField(obj, fields.performanceOverlayPosition, static_cast<jint>(config.performance_overlay_position));
     env->SetIntField(obj, fields.screenshotFormat, static_cast<jint>(config.screenshot_format));
 }
 
@@ -561,9 +552,6 @@ void read_config_object(JNIEnv *env, jobject obj, const EmulatorConfigFields &fi
     config.archive_log = env->GetBooleanField(obj, fields.archiveLog) != JNI_FALSE;
     config.log_compat_warn = env->GetBooleanField(obj, fields.logCompatWarn) != JNI_FALSE;
     config.log_level = static_cast<int>(env->GetIntField(obj, fields.logLevel));
-    config.performance_overlay = env->GetBooleanField(obj, fields.performanceOverlay) != JNI_FALSE;
-    config.performance_overlay_detail = static_cast<int>(env->GetIntField(obj, fields.performanceOverlayDetail));
-    config.performance_overlay_position = static_cast<int>(env->GetIntField(obj, fields.performanceOverlayPosition));
     if (apply_runtime_settings && emuenv) {
         emuenv->kernel.debugger.log_imports = env->GetBooleanField(obj, fields.logImports) != JNI_FALSE;
         emuenv->kernel.debugger.log_exports = env->GetBooleanField(obj, fields.logExports) != JNI_FALSE;

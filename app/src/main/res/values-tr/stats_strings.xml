@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">İstatistikler</string>
+    <string name="stats_help">CPU tüm çekirdeklerde bu uygulamayı ölçer. GPU, erişilebilirse tüm cihaz içindir. Sıcaklık pil sensörüdür; eksik veriler — olarak görünür.</string>
+    <string name="stats_position">Konum</string>
+    <string name="stats_top_left">Sol üst</string>
+    <string name="stats_top_right">Sağ üst</string>
+    <string name="stats_bottom_left">Sol alt</string>
+    <string name="stats_bottom_right">Sağ alt</string>
+    <string name="stats_size">Boyut</string>
+    <string name="stats_metrics">Görünür ölçümler</string>
+    <string name="stats_reset">İstatistikleri sıfırla</string>
+    <string name="stats_version">Uygulama ve çekirdek sürümü</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Pil sıcaklığı</string>
+    <string name="stats_thermal">Termal durum</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">Duraklatıldı</string>
+    <string name="stats_thermal_none">Normal</string>
+    <string name="stats_thermal_light">Hafif</string>
+    <string name="stats_thermal_moderate">Orta</string>
+    <string name="stats_thermal_severe">Ciddi</string>
+    <string name="stats_thermal_critical">Kritik</string>
+    <string name="stats_thermal_emergency">Acil</string>
+    <string name="stats_thermal_shutdown">Kapanma</string>
+    <string name="stats_mode">Görüntüleme modu</string>
+    <string name="stats_mode_off">Kapalı</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Ayrıntılı</string>
+    <string name="stats_enabled">FPS göster</string>
+</resources>

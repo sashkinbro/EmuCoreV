@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">タッチレイアウト</string>
+    <string name="touch_layout_settings_description">画面上の操作ボタンの標準位置とサイズを設定します。個別レイアウトがあるゲームには影響しません。</string>
+                <string name="touch_layout_game_inherited">共通レイアウトを使用中</string>
+    <string name="touch_layout_game_custom">このゲーム専用のレイアウト</string>
+    <string name="touch_layout_edit">タッチ操作を編集</string>
+    <string name="touch_layout_use_global">共通レイアウトを使用</string>
+        </resources>

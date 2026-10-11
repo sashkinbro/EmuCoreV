@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">Statistics</string>
+    <string name="stats_help">CPU usage covers this app across all cores. GPU usage is device-wide when accessible. Temperature is the battery sensor; unavailable readings show —.</string>
+    <string name="stats_position">Position</string>
+    <string name="stats_top_left">Top left</string>
+    <string name="stats_top_right">Top right</string>
+    <string name="stats_bottom_left">Bottom left</string>
+    <string name="stats_bottom_right">Bottom right</string>
+    <string name="stats_size">Size</string>
+    <string name="stats_metrics">Visible metrics</string>
+    <string name="stats_reset">Reset statistics</string>
+    <string name="stats_version">App and core version</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Battery temperature</string>
+    <string name="stats_thermal">Thermal status</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">Paused</string>
+    <string name="stats_thermal_none">Normal</string>
+    <string name="stats_thermal_light">Light</string>
+    <string name="stats_thermal_moderate">Moderate</string>
+    <string name="stats_thermal_severe">Severe</string>
+    <string name="stats_thermal_critical">Critical</string>
+    <string name="stats_thermal_emergency">Emergency</string>
+    <string name="stats_thermal_shutdown">Shutdown</string>
+    <string name="stats_mode">Display mode</string>
+    <string name="stats_mode_off">Off</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Detailed</string>
+    <string name="stats_enabled">Show FPS</string>
+</resources>

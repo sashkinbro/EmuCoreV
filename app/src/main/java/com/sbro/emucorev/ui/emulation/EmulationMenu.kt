@@ -64,6 +64,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -84,6 +86,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.CHEATS_ENABLED
 import com.sbro.emucorev.core.SaveStateRepository
@@ -112,6 +115,7 @@ import kotlin.math.roundToInt
 private val LiveBadgeColor = Color(0xFF34D27A)
 private val RestartBadgeColor = Color(0xFFE0A82E)
 private val BrokenBadgeColor = Color(0xFFE0575B)
+private val LocalMenuScrollInset = compositionLocalOf { 7.dp }
 
 private data class EmulationMenuPalette(
     val panel: Color,
@@ -324,7 +328,7 @@ fun EmulationGameMenu(
                         callbacks = callbacks,
                         selectedTab = selectedTab,
                         showHorizontalTabs = false,
-                        horizontalPadding = 18.dp
+                        horizontalPadding = 9.dp
                     )
                     if (LocalNeonTheme.current) {
                         NeonCrtOverlay()
@@ -432,7 +436,7 @@ fun EmulationGameMenu(
                         callbacks = callbacks,
                         selectedTab = selectedTab,
                         showHorizontalTabs = false,
-                        horizontalPadding = 18.dp,
+                        horizontalPadding = 9.dp,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -453,7 +457,7 @@ fun EmulationGameMenu(
                     callbacks = callbacks,
                     selectedTab = selectedTab,
                     showHorizontalTabs = true,
-                    horizontalPadding = if (effectiveStyle == GameMenuLayoutStyle.COMPACT) 12.dp else 18.dp,
+                    horizontalPadding = if (effectiveStyle == GameMenuLayoutStyle.COMPACT) 6.dp else 9.dp,
                     compact = effectiveStyle == GameMenuLayoutStyle.COMPACT,
                     showSheetHandle = !expandHorizontally,
                     onSelected = { selectedTab = it }
@@ -521,6 +525,7 @@ private fun MenuScrollableContent(
                 )
             }
         }
+        CompositionLocalProvider(LocalMenuScrollInset provides horizontalPadding + 7.dp) {
         MenuSelectedContent(
             selectedTab = selectedTab,
             gameId = gameId,
@@ -532,6 +537,7 @@ private fun MenuScrollableContent(
             controlsVisible = controlsVisible,
             callbacks = callbacks
         )
+        }
     }
 }
 
@@ -553,6 +559,7 @@ private fun MenuSelectedContent(
     ) {
         when (selectedTab) {
             EmulationMenuTab.Game -> GameTab(
+                gameId = gameId,
                 config = config,
                 callbacks = callbacks
             )
@@ -588,45 +595,21 @@ private enum class EmulationMenuTab {
 
 @Composable
 private fun GameTab(
+    gameId: String,
     config: VitaCoreConfig,
     callbacks: EmulationMenuCallbacks
 ) {
+    MenuSection(title = stringResource(R.string.stats_title), subtitle = "", badge = null) {
+        com.sbro.emucorev.ui.settings.PerformanceStatsSettingsSection(compact = true, showTitle = false, titleId = gameId,
+            scrollBleed = LocalMenuScrollInset.current,
+            textPrimary = emulationMenuPalette().textPrimary, textSecondary = emulationMenuPalette().textSecondary,
+            rowBackground = emulationMenuPalette().row)
+    }
     MenuSection(
         title = stringResource(R.string.emulation_menu_section_now),
         subtitle = stringResource(R.string.emulation_menu_section_now_desc),
         badge = null
     ) {
-        MenuToggleRow(
-            label = stringResource(R.string.settings_core_performance_overlay),
-            checked = config.performanceOverlay,
-            onCheckedChange = callbacks.onPerformanceOverlay
-        )
-        if (config.performanceOverlay) {
-            MenuChipRow(
-                label = stringResource(R.string.settings_core_overlay_detail_title),
-                selected = config.performanceOverlayDetail,
-                options = listOf(
-                    0 to stringResource(R.string.settings_core_overlay_detail_minimum),
-                    1 to stringResource(R.string.settings_core_overlay_detail_low),
-                    2 to stringResource(R.string.settings_core_overlay_detail_medium),
-                    3 to stringResource(R.string.settings_core_overlay_detail_maximum)
-                ),
-                onSelected = callbacks.onPerformanceDetail
-            )
-            MenuChipRow(
-                label = stringResource(R.string.settings_core_overlay_position_title),
-                selected = config.performanceOverlayPosition,
-                options = listOf(
-                    0 to stringResource(R.string.settings_core_overlay_position_top_left),
-                    1 to stringResource(R.string.settings_core_overlay_position_top_center),
-                    2 to stringResource(R.string.settings_core_overlay_position_top_right),
-                    3 to stringResource(R.string.settings_core_overlay_position_bottom_left),
-                    4 to stringResource(R.string.settings_core_overlay_position_bottom_center),
-                    5 to stringResource(R.string.settings_core_overlay_position_bottom_right)
-                ),
-                onSelected = callbacks.onPerformancePosition
-            )
-        }
         MenuSliderRow(
             label = stringResource(R.string.settings_core_audio_volume_label),
             value = config.audioVolume.toFloat(),
@@ -1720,7 +1703,7 @@ private fun emulationMenuTabs(): List<EmulationMenuTabItem> = listOf(
         stringResource(R.string.emulation_tab_gamepad),
         Icons.Rounded.SportsEsports
     )
-).filter { it.tab != EmulationMenuTab.Cheats || CHEATS_ENABLED || LocalCustomizationSettings.current.experimentalCheats }
+).filter { it.tab != EmulationMenuTab.Cheats || CHEATS_ENABLED }
 
 /** Callbacks bag — keeps `EmulationGameMenu` signature compact and testable. */
 data class EmulationMenuCallbacks(
@@ -1732,9 +1715,6 @@ data class EmulationMenuCallbacks(
     val onTouchSwitch: (Boolean) -> Unit,
     val onOverlayScale: (Float) -> Unit,
     val onOverlayOpacity: (Int) -> Unit,
-    val onPerformanceOverlay: (Boolean) -> Unit,
-    val onPerformanceDetail: (Int) -> Unit,
-    val onPerformancePosition: (Int) -> Unit,
     val onAudioVolume: (Int) -> Unit,
     val onBgmVolume: (Int) -> Unit,
     val onInfoBar: (Boolean) -> Unit,
@@ -1906,53 +1886,47 @@ private fun MenuSection(
     content: @Composable () -> Unit
 ) {
     val palette = emulationMenuPalette()
-    Surface(
-        shape = neonShape(16.dp),
-        color = palette.panelSoft,
-        border = BorderStroke(1.dp, palette.border)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 7.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = palette.textPrimary,
-                    modifier = Modifier.weight(1f)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp),
+                color = palette.textPrimary,
+                modifier = Modifier.weight(1f)
+            )
+            when (badge) {
+                MenuBadge.Live -> Badge(
+                    text = stringResource(R.string.emulation_menu_badge_live),
+                    color = LiveBadgeColor
                 )
-                when (badge) {
-                    MenuBadge.Live -> Badge(
-                        text = stringResource(R.string.emulation_menu_badge_live),
-                        color = LiveBadgeColor
-                    )
-                    MenuBadge.Restart -> Badge(
-                        text = stringResource(R.string.emulation_menu_badge_restart),
-                        color = RestartBadgeColor
-                    )
-                    MenuBadge.Broken -> Badge(
-                        text = stringResource(R.string.emulation_cheats_broken),
-                        color = BrokenBadgeColor
-                    )
-                    null -> Unit
-                }
-            }
-            if (subtitle.isNotBlank()) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = palette.textSecondary
+                MenuBadge.Restart -> Badge(
+                    text = stringResource(R.string.emulation_menu_badge_restart),
+                    color = RestartBadgeColor
                 )
-                Spacer(modifier = Modifier.height(1.dp))
+                MenuBadge.Broken -> Badge(
+                    text = stringResource(R.string.emulation_cheats_broken),
+                    color = BrokenBadgeColor
+                )
+                null -> Unit
             }
-            content()
         }
+        if (subtitle.isNotBlank()) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = palette.textSecondary
+            )
+            Spacer(modifier = Modifier.height(1.dp))
+        }
+        content()
     }
 }
 
@@ -2104,9 +2078,9 @@ private fun MenuChipRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalBleed(14.dp)
+                .horizontalBleed(LocalMenuScrollInset.current)
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp),
+                .padding(horizontal = LocalMenuScrollInset.current),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             options.forEach { (value, text) ->

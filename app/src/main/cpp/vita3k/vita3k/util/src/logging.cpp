@@ -20,6 +20,21 @@
 #include <typeinfo>
 #include <util/log.h>
 
+#ifdef NDEBUG
+namespace logging {
+// Release has no diagnostic sinks, files, callbacks or logging worker.
+ExitCode init(const Root &, bool) {
+    spdlog::set_level(spdlog::level::off);
+    return Success;
+}
+void set_level(spdlog::level::level_enum) {
+    spdlog::set_level(spdlog::level::off);
+}
+ExitCode add_sink(const fs::path &) { return Success; }
+void flush() {}
+void set_log_callback(std::function<void(std::string, int)>) {}
+} // namespace logging
+#else
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -247,3 +262,4 @@ void register_log_exception_handler() {
 void register_log_exception_handler() {}
 #endif
 } // namespace logging
+#endif

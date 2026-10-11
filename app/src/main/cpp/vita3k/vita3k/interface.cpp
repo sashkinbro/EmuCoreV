@@ -787,6 +787,7 @@ static ExitCode load_app_impl(SceUID &main_module_id, EmuEnvState &emuenv, const
         return KernelInitFailed;
     }
 
+#ifndef NDEBUG
     if (emuenv.cfg.archive_log) {
         const fs::path log_directory{ emuenv.log_path / "logs" };
         fs::create_directory(log_directory);
@@ -795,6 +796,7 @@ static ExitCode load_app_impl(SceUID &main_module_id, EmuEnvState &emuenv, const
             return InitConfigFailed;
         logging::set_level(static_cast<spdlog::level::level_enum>(emuenv.cfg.log_level));
     }
+#endif
 
     LOG_INFO("CPU Optimisation state: {}", emuenv.cfg.current_config.cpu_opt);
     LOG_INFO("ngs state: {}", emuenv.cfg.current_config.ngs_enable);

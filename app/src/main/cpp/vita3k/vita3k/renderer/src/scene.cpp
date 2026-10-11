@@ -32,12 +32,16 @@
 #include <util/log.h>
 #include <util/tracy.h>
 
+#ifdef NDEBUG
+#define DEBUG_FRAMEBUFFER 0
+#else
 #define DEBUG_FRAMEBUFFER 1
+#endif
 
-#if DEBUG_FRAMEBUFFER
+// Screenshots and save-state thumbnails need the writer in release as well.
+// The framebuffer diagnostic itself remains guarded by DEBUG_FRAMEBUFFER.
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
-#endif
 
 namespace renderer {
 COMMAND(handle_set_context) {

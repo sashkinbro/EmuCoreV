@@ -80,7 +80,7 @@ struct Config {
         bool v_sync = true;
         int anisotropic_filtering = 1;
         bool async_pipeline_compilation = true;
-        bool show_compile_shaders = true;
+        bool show_compile_shaders = false;
         bool show_shader_cache_warn = true;
         bool accurate_thread_scheduling = false;
         int guest_cores = 1;

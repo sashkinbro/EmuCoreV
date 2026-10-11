@@ -5,11 +5,11 @@ import android.app.ApplicationExitInfo
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import com.sbro.emucorev.BuildConfig
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@androidx.annotation.Keep
 object AndroidDiagnostics {
     private var applicationContext: Context? = null
 
@@ -22,6 +22,10 @@ object AndroidDiagnostics {
 
     @JvmStatic
     fun logStartupDiagnostics() {
+        // Native startup calls this method in every build. Keep crash/tombstone
+        // inspection available for development without dumping process history
+        // into release logs.
+        if (!BuildConfig.DEBUG) return
         try {
             val app = applicationContext ?: return
             val text = buildString {

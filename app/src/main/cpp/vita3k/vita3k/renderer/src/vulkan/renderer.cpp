@@ -2012,13 +2012,18 @@ void VKState::flush_surfaces(MemState &mem) {
 
 void VKState::wait_gpu_idle() {
     device.waitIdle();
-    if (!features.enable_memory_mapping || !context)
+    // Cold launches have no GXM context/request reader yet. GPU completion
+    // remains necessary, but no host writeback marker can run in that state.
+    if (!features.enable_memory_mapping || !context
+        || gpu_request_reader_count.load(std::memory_order_acquire) == 0
+        || request_queue.is_aborted())
         return;
 
     auto promise = std::make_shared<std::promise<void>>();
     std::future<void> future = promise->get_future();
-    request_queue.push(CallbackRequest{
-        new CallbackRequestFunction([promise]() { promise->set_value(); }), /* wait_for_gpu = */ false });
+    if (!enqueue_gpu_request_callback(request_queue,
+            std::make_unique<CallbackRequestFunction>([promise]() { promise->set_value(); }), false))
+        return;
 
     while (future.wait_for(std::chrono::milliseconds(5)) != std::future_status::ready) {
         if (request_queue.is_aborted())

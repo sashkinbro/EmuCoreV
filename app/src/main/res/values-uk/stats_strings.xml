@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">Статистика</string>
+    <string name="stats_help">CPU — навантаження застосунку на всіх ядрах. GPU — усього пристрою, якщо доступне. Температура — датчик батареї; недоступні дані позначено —.</string>
+    <string name="stats_position">Позиція</string>
+    <string name="stats_top_left">Вгорі ліворуч</string>
+    <string name="stats_top_right">Вгорі праворуч</string>
+    <string name="stats_bottom_left">Внизу ліворуч</string>
+    <string name="stats_bottom_right">Внизу праворуч</string>
+    <string name="stats_size">Розмір</string>
+    <string name="stats_metrics">Видимі показники</string>
+    <string name="stats_reset">Скинути статистику</string>
+    <string name="stats_version">Версія застосунку та ядра</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Температура батареї</string>
+    <string name="stats_thermal">Тепловий стан</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">Призупинено</string>
+    <string name="stats_thermal_none">Нормальний</string>
+    <string name="stats_thermal_light">Легкий</string>
+    <string name="stats_thermal_moderate">Помірний</string>
+    <string name="stats_thermal_severe">Сильний</string>
+    <string name="stats_thermal_critical">Критичний</string>
+    <string name="stats_thermal_emergency">Аварійний</string>
+    <string name="stats_thermal_shutdown">Вимкнення</string>
+    <string name="stats_mode">Режим відображення</string>
+    <string name="stats_mode_off">Вимкнено</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Докладно</string>
+    <string name="stats_enabled">Показувати FPS</string>
+</resources>

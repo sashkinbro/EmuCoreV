@@ -58,7 +58,9 @@ jmethodID get_optional_activity_method(JNIEnv *env, jclass clazz, const char *na
 
 void clear_activity_callback_exception(JNIEnv *env) {
     if (env->ExceptionCheck()) {
+#ifndef NDEBUG
         env->ExceptionDescribe();
+#endif
         env->ExceptionClear();
     }
 }
@@ -444,6 +446,19 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
         }
         sync_current_game_id(launch_request.app_path);
 
+        const bool has_launch_state = !load_state_path.empty();
+        if (has_launch_state) {
+            startup_state_operation.lock();
+            const auto config_result = emucorev::savestate::prepare_launch_gpu_config(*emuenv, load_state_path);
+            if (!config_result.ok()) {
+                LOG_ERROR("Failed to prepare launch save state: {}", config_result.error);
+                report_save_state_load_error(config_result.error);
+                exit_code = -1;
+                cleanup_launch(app::AppSessionStopReason::LaunchFailure);
+                break;
+            }
+        }
+
         SDL_WindowFlags window_flags = 0;
         if (emuenv->backend_renderer == renderer::Backend::OpenGL) {
             window_flags |= SDL_WINDOW_OPENGL;
@@ -523,9 +538,6 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
             cleanup_launch(app::AppSessionStopReason::LaunchFailure);
             break;
         }
-
-        if (!load_state_path.empty())
-            startup_state_operation.lock();
 
         if (!session_controller->load_and_run()) {
             LOG_ERROR("Failed to load or start the app session.");

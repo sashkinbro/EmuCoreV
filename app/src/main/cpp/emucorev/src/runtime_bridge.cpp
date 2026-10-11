@@ -20,21 +20,6 @@
 #include <SDL3/SDL_keycode.h>
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_core_vita_Emulator_setPerformanceOverlayState(
-    JNIEnv * /*env*/,
-    jobject /*thiz*/,
-    jboolean enabled,
-    jint detail,
-    jint position) {
-    if (auto *emuenv = get_emuenv()) {
-        emuenv->cfg.performance_overlay = static_cast<bool>(enabled);
-        emuenv->cfg.performance_overlay_detail = detail;
-        emuenv->cfg.performance_overlay_position = position;
-        app::sync_perf_overlay_config(*emuenv);
-    }
-}
-
-extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_vita_Emulator_setAudioVolume(
     JNIEnv * /*env*/,
     jobject /*thiz*/,

@@ -99,7 +99,6 @@ std::vector<AdhocAddressOption> get_available_adhoc_address_options();
 bool set_app_info(EmuEnvState &emuenv, const std::string &app_path);
 void reset_controller_binding(EmuEnvState &emuenv);
 void reset_perf_metrics(EmuEnvState &emuenv);
-void sync_perf_overlay_config(EmuEnvState &emuenv);
 FirmwareState get_firmware_state(const EmuEnvState &emuenv);
 bool has_firmware_installed(const EmuEnvState &emuenv);
 bool ensure_current_user(EmuEnvState &emuenv);

@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">Layout touch</string>
+    <string name="touch_layout_settings_description">Imposta posizione e dimensione predefinite dei comandi sullo schermo. I giochi con un layout personalizzato lo mantengono.</string>
+                <string name="touch_layout_game_inherited">Usa il layout globale</string>
+    <string name="touch_layout_game_custom">Layout personalizzato per questo gioco</string>
+    <string name="touch_layout_edit">Modifica i comandi touch</string>
+    <string name="touch_layout_use_global">Usa layout globale</string>
+        </resources>

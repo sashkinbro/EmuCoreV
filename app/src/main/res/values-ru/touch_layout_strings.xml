@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">Расположение сенсорных кнопок</string>
+    <string name="touch_layout_settings_description">Настройте расположение и размер экранных кнопок по умолчанию. Игры с собственным профилем сохранят его.</string>
+                <string name="touch_layout_game_inherited">Используется общий профиль</string>
+    <string name="touch_layout_game_custom">Профиль этой игры</string>
+    <string name="touch_layout_edit">Изменить сенсорные кнопки</string>
+    <string name="touch_layout_use_global">Использовать общий профиль</string>
+        </resources>

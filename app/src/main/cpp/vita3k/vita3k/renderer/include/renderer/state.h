@@ -21,6 +21,7 @@
 #include <renderer/commands.h>
 #include <renderer/frame_host.h>
 #include <renderer/pause_overlay_policy.h>
+#include <renderer/performance_stats.h>
 #include <renderer/snapshot_gate.h>
 #include <renderer/finish.h>
 #include <renderer/first_present.h>
@@ -60,21 +61,6 @@ enum struct MappingMethod : int {
 
 namespace renderer {
 
-struct PerformanceOverlayState {
-    bool enabled = false;
-    int position = 0;
-    int detail = 0;
-
-    uint32_t fps = 0;
-    uint32_t avg_fps = 0;
-    uint32_t min_fps = 0;
-    uint32_t max_fps = 0;
-    uint32_t ms_per_frame = 0;
-    std::array<float, 20> fps_values = {};
-    uint32_t fps_values_count = 0;
-    uint32_t current_fps_offset = 0;
-};
-
 class TextureCache;
 
 enum struct Filter : int {
@@ -105,7 +91,7 @@ struct State {
     bool fullscreen_hd_res_pixel_perfect;
     bool fullscreen = false;
 
-    Context *context;
+    Context *context = nullptr;
 
     GXPPtrMap gxp_ptr_map;
     Queue<CommandList> command_buffer_queue;
@@ -166,7 +152,7 @@ struct State {
 
     // Non-owning pointer to the overlay display manager
     overlay::display_manager *overlay_manager = nullptr;
-    bool show_compile_shaders = true;
+    bool show_compile_shaders = false;
 
     uint32_t m_shaders_compiled_count = 0;
     std::chrono::steady_clock::time_point m_shaders_compiled_time{};
@@ -183,7 +169,7 @@ struct State {
     int sys_lang = 0;
     int sys_button = 0;
 
-    PerformanceOverlayState perf_overlay;
+    PerformanceStatsTelemetry performance_stats;
 
     void update_overlays();
     void init_overlay_font_dirs();

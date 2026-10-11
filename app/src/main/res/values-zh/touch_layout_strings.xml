@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">触控布局</string>
+    <string name="touch_layout_settings_description">设置屏幕控制的默认位置和大小。拥有独立布局的游戏会保留自己的设置。</string>
+                <string name="touch_layout_game_inherited">正在使用全局布局</string>
+    <string name="touch_layout_game_custom">此游戏的自定义布局</string>
+    <string name="touch_layout_edit">编辑触控操作</string>
+    <string name="touch_layout_use_global">使用全局布局</string>
+        </resources>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">Statistik</string>
+    <string name="stats_help">CPU misst diese App über alle Kerne. GPU gilt für das gesamte Gerät, falls verfügbar. Temperatur stammt vom Akku; fehlende Werte erscheinen als —.</string>
+    <string name="stats_position">Position</string>
+    <string name="stats_top_left">Oben links</string>
+    <string name="stats_top_right">Oben rechts</string>
+    <string name="stats_bottom_left">Unten links</string>
+    <string name="stats_bottom_right">Unten rechts</string>
+    <string name="stats_size">Größe</string>
+    <string name="stats_metrics">Sichtbare Messwerte</string>
+    <string name="stats_reset">Statistik zurücksetzen</string>
+    <string name="stats_version">App- und Core-Version</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Akkutemperatur</string>
+    <string name="stats_thermal">Thermischer Zustand</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">Pausiert</string>
+    <string name="stats_thermal_none">Normal</string>
+    <string name="stats_thermal_light">Leicht</string>
+    <string name="stats_thermal_moderate">Mäßig</string>
+    <string name="stats_thermal_severe">Stark</string>
+    <string name="stats_thermal_critical">Kritisch</string>
+    <string name="stats_thermal_emergency">Notfall</string>
+    <string name="stats_thermal_shutdown">Abschaltung</string>
+    <string name="stats_mode">Anzeigemodus</string>
+    <string name="stats_mode_off">Aus</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Detailliert</string>
+    <string name="stats_enabled">FPS anzeigen</string>
+</resources>

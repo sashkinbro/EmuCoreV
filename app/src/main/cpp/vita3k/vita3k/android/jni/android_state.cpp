@@ -168,7 +168,9 @@ void ScopedJniCallback::call_progress(int percent, const char *status) const {
     env_->DeleteLocalRef(jstatus);
 
     if (env_->ExceptionCheck()) {
+#ifndef NDEBUG
         env_->ExceptionDescribe();
+#endif
         env_->ExceptionClear();
     }
 }

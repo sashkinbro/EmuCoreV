@@ -2,6 +2,7 @@ package com.sbro.emucorev.core
 
 import android.content.Context
 import com.sbro.emucorev.BuildConfig
+import com.sbro.emucorev.data.PerformanceStatsPreferences
 import java.io.File
 
 // Defaults follow upstream Vita3K unless EmuCoreV needs a mobile-safe runtime
@@ -27,16 +28,13 @@ data class VitaCoreConfig(
     val asyncPipelineCompilation: Boolean = true,
     val accurateThreadScheduling: Boolean = false,
     val guestCores: Int = 1,
-    val showCompileShaders: Boolean = true,
+    val showCompileShaders: Boolean = false,
     val hashlessTextureCache: Boolean = false,
     val importTextures: Boolean = false,
     val exportTextures: Boolean = false,
     val exportAsPng: Boolean = true,
     val memoryMapping: String = "double-buffer",
     val fullscreenHdResPixelPerfect: Boolean = false,
-    val performanceOverlay: Boolean = false,
-    val performanceOverlayDetail: Int = 0,
-    val performanceOverlayPosition: Int = 0,
     val enableGamepadOverlay: Boolean = true,
     val overlayShowTouchSwitch: Boolean = false,
     val overlayScale: Float = 0.9f,
@@ -192,9 +190,6 @@ class VitaCoreConfigRepository(private val context: Context) {
         "overlay-opacity",
         "overlay-scale",
         "overlay-show-touch-switch",
-        "performance-overlay",
-        "performance-overlay-detail",
-        "performance-overlay-position",
         "psn-signed-in",
         "pstv-mode",
         "screen-filter",
@@ -242,6 +237,7 @@ class VitaCoreConfigRepository(private val context: Context) {
             if (v is String) values[k] = v
         }
         values.putAll(fileValues)
+        PerformanceStatsPreferences(context).use { it.migrateLegacyCore(values) }
 
         return normalizeForBuild(
             VitaCoreConfig(
@@ -272,9 +268,6 @@ class VitaCoreConfigRepository(private val context: Context) {
                 exportAsPng = values["export-as-png"]?.toBooleanStrictOrNull() ?: defaults.exportAsPng,
                 memoryMapping = values["memory-mapping"] ?: defaults.memoryMapping,
                 fullscreenHdResPixelPerfect = values["fullscreen_hd_res_pixel_perfect"]?.toBooleanStrictOrNull() ?: defaults.fullscreenHdResPixelPerfect,
-                performanceOverlay = values["performance-overlay"]?.toBooleanStrictOrNull() ?: defaults.performanceOverlay,
-                performanceOverlayDetail = values["performance-overlay-detail"]?.toIntOrNull() ?: defaults.performanceOverlayDetail,
-                performanceOverlayPosition = values["performance-overlay-position"]?.toIntOrNull() ?: defaults.performanceOverlayPosition,
                 enableGamepadOverlay = values["enable-gamepad-overlay"]?.toBooleanStrictOrNull() ?: defaults.enableGamepadOverlay,
                 overlayShowTouchSwitch = values["overlay-show-touch-switch"]?.toBooleanStrictOrNull() ?: defaults.overlayShowTouchSwitch,
                 overlayScale = values["overlay-scale"]?.toFloatOrNull() ?: defaults.overlayScale,
@@ -358,7 +351,8 @@ class VitaCoreConfigRepository(private val context: Context) {
             persistedKeys.any { it !in existingValues } ||
             schemaOutdated ||
             storedSchemaVersion != CONFIG_SCHEMA_VERSION ||
-            releaseValuesNeedNormalization(existingValues)
+            releaseValuesNeedNormalization(existingValues) ||
+            LEGACY_STATISTICS_KEYS.any { it in existingValues }
         if (shouldPersist) {
             save(config)
         }
@@ -386,6 +380,8 @@ class VitaCoreConfigRepository(private val context: Context) {
     fun save(inputConfig: VitaCoreConfig) = synchronized(CONFIG_IO_LOCK) {
         val config = normalizeForBuild(inputConfig)
         val values = readKeyValues().toMutableMap()
+        PerformanceStatsPreferences(context).use { it.migrateLegacyCore(values) }
+        LEGACY_STATISTICS_KEYS.forEach(values::remove)
         values["validation-layer"] = config.validationLayer.toString()
         values["log-active-shaders"] = config.logActiveShaders.toString()
         values["log-uniforms"] = config.logUniforms.toString()
@@ -413,9 +409,6 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["export-as-png"] = config.exportAsPng.toString()
         values["memory-mapping"] = config.memoryMapping
         values["fullscreen_hd_res_pixel_perfect"] = config.fullscreenHdResPixelPerfect.toString()
-        values["performance-overlay"] = config.performanceOverlay.toString()
-        values["performance-overlay-detail"] = config.performanceOverlayDetail.toString()
-        values["performance-overlay-position"] = config.performanceOverlayPosition.toString()
         values["enable-gamepad-overlay"] = config.enableGamepadOverlay.toString()
         values["overlay-show-touch-switch"] = config.overlayShowTouchSwitch.toString()
         values["overlay-scale"] = formatFloat(config.overlayScale)
@@ -493,6 +486,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         
         // Backup to SharedPreferences so these settings survive native core rewrites
         prefs.edit().apply {
+            LEGACY_STATISTICS_KEYS.forEach(::remove)
             values.forEach { (k, v) -> putString(k, v) }
         }.apply()
     }
@@ -565,6 +559,11 @@ class VitaCoreConfigRepository(private val context: Context) {
         }
         return config.copy(
             validationLayer = BuildConfig.DEBUG && config.validationLayer,
+            logActiveShaders = BuildConfig.DEBUG && config.logActiveShaders,
+            logUniforms = BuildConfig.DEBUG && config.logUniforms,
+            logCompatWarn = BuildConfig.DEBUG && config.logCompatWarn,
+            archiveLog = BuildConfig.DEBUG && config.archiveLog,
+            colorSurfaceDebug = BuildConfig.DEBUG && config.colorSurfaceDebug,
             discordRichPresence = false,
             gamepadDeadzone = config.gamepadDeadzone.coerceIn(0f, 0.45f),
             gamepadTriggerThreshold = config.gamepadTriggerThreshold.coerceIn(0f, 0.9f),
@@ -636,6 +635,7 @@ class VitaCoreConfigRepository(private val context: Context) {
     }
 
     private companion object {
+        private val LEGACY_STATISTICS_KEYS = setOf("performance-overlay", "performance-overlay-detail", "performance-overlay-position")
         private val CONFIG_IO_LOCK = Any()
         // 0 = TRACE (upstream Vita3K default). EmuCoreV keeps debug gameplay at
         // CRITICAL so logcat/file flushing does not make debug builds untestable;

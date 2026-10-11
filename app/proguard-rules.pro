@@ -1,10 +1,12 @@
-# Keep JNI bridge entry points and classes touched from native code.
--keepclasseswithmembernames class * {
+# Preserve JNI/reflection names and all retained members while allowing body
+# optimization, including removal of release Log calls. No allowshrinking or
+# allowobfuscation is used for these externally addressed entry points.
+-keepclasseswithmembernames,allowoptimization,includedescriptorclasses class * {
     native <methods>;
 }
 
--keep @androidx.annotation.Keep class * { *; }
--keepclasseswithmembers class * {
+-keep,allowoptimization @androidx.annotation.Keep class * { *; }
+-keepclasseswithmembers,allowoptimization class * {
     @androidx.annotation.Keep <methods>;
 }
 
@@ -12,39 +14,44 @@
 # manifest reflection, native callbacks, or SDL's own runtime lookup.
 # VitaInstallBridge.onNativeProgress is invoked from JNI via GetStaticMethodID,
 # so the whole class must survive shrinking.
--keep class com.sbro.emucorev.core.VitaInstallBridge { *; }
--keep class com.sbro.emucorev.core.vita.Emulator { *; }
--keep class com.sbro.emucorev.core.vita.EmuSurface { *; }
--keep class com.sbro.emucorev.core.vita.provider.VitaDocumentsProvider { *; }
--keep class com.sbro.emucorev.core.vita.overlay.** { *; }
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.core.NativeLib { *; }
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.core.VitaInstallBridge { *; }
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.core.vita.Emulator { *; }
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.core.vita.EmuSurface { *; }
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.core.vita.provider.VitaDocumentsProvider { *; }
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.core.vita.overlay.** { *; }
 # The cheat bridge resolves its native entry points by JNI symbol name, and the
 # cheat manager ViewModel is created reflectively by the ViewModel factory.
--keep class com.sbro.emucorev.core.CheatBridge { *; }
--keep class com.sbro.emucorev.ui.cheats.CheatManagerViewModel { *; }
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.core.CheatBridge { *; }
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.ui.cheats.CheatManagerViewModel { *; }
 # Save-state JNI bridge resolves its entry points by symbol name.
--keep class com.sbro.emucorev.core.SaveStateBridge { *; }
--keep class com.sbro.emucorev.ui.savestates.SaveStatesViewModel { *; }
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.core.SaveStateBridge { *; }
+# These explicitly retained JNI classes intentionally use no @Keep annotation:
+# AndroidX/Play Services consumer @Keep rules prohibit method-body optimization.
+# AndroidDiagnostics.logStartupDiagnostics is resolved by FindClass + JNI name.
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.core.AndroidDiagnostics { *; }
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.ui.savestates.SaveStatesViewModel { *; }
 # Bundled SDL/HID classes live in org.libsdl.app to match SDL's own JNI
 # expectations. SDL_android.c looks them up by FQN via FindClass at JNI_OnLoad
 # and SDL3 callbacks resolve their static methods by name through reflection.
--keep class org.libsdl.app.** { *; }
+-keep,allowoptimization,includedescriptorclasses class org.libsdl.app.** { *; }
 
 # Preserve app components referenced by manifest/shortcuts/providers.
--keep class com.sbro.emucorev.MainActivity { *; }
--keep class com.sbro.emucorev.EmuCoreVApp { *; }
--keep class androidx.core.content.FileProvider { *; }
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.MainActivity { *; }
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.EmuCoreVApp { *; }
+-keep,allowoptimization,includedescriptorclasses class androidx.core.content.FileProvider { *; }
 
 # SDL.java loads ReLinker through reflection, so those names must stay stable
 # once release shrinking/obfuscation is enabled.
--keep class com.getkeepsafe.relinker.** { *; }
+-keep,allowoptimization,includedescriptorclasses class com.getkeepsafe.relinker.** { *; }
 
 # Emulator restarts itself through ProcessPhoenix.
--keep class com.jakewharton.processphoenix.** { *; }
+-keep,allowoptimization,includedescriptorclasses class com.jakewharton.processphoenix.** { *; }
 
 # The Discord bridge resolves JNI symbols by class name, and the SDK is used
 # reflectively from the isolated :discord process.
--keep,includedescriptorclasses class com.sbro.emucorev.discord.DiscordNative { *; }
--keep class com.discord.socialsdk.** { *; }
+-keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.discord.DiscordNative { *; }
+-keep,allowoptimization,includedescriptorclasses class com.discord.socialsdk.** { *; }
 
 # Keep Kotlin metadata and annotations that Compose / reflection-adjacent code
 # may rely on when stack traces or external libraries inspect them.
@@ -56,3 +63,15 @@
 -dontwarn org.tukaani.xz.MemoryLimitException
 -dontwarn org.tukaani.xz.SingleXZInputStream
 -dontwarn org.tukaani.xz.XZInputStream
+
+# Release has no Android logcat output. Preserve helpers that return strings or
+# control results; only the logging sink calls themselves have no side effects.
+-assumenosideeffects class android.util.Log {
+    public static *** v(...);
+    public static *** d(...);
+    public static *** i(...);
+    public static *** w(...);
+    public static *** e(...);
+    public static *** wtf(...);
+    public static *** println(...);
+}

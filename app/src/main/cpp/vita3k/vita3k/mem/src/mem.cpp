@@ -930,6 +930,7 @@ static void signal_handler(int sig, siginfo_t *info, void *uct) noexcept {
         }
     }
 
+#ifndef NDEBUG
     // Genuine crash so record it in our log and flush as users can rarely logcat.
     uintptr_t crash_pc = 0;
 #if defined(__aarch64__)
@@ -986,6 +987,7 @@ static void signal_handler(int sig, siginfo_t *info, void *uct) noexcept {
     }
 #endif
     logging::flush();
+#endif
     signal(sig, SIG_DFL);
     raise(sig);
     return;

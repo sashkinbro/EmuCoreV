@@ -100,7 +100,7 @@ import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 
-private val SettingsRowHorizontalPadding = ScreenHorizontalPadding
+internal val SettingsRowHorizontalPadding = ScreenHorizontalPadding
 private val SettingsRowInnerHorizontalPadding = 14.dp
 private val SettingsRowInnerVerticalPadding = 14.dp
 
@@ -129,6 +129,7 @@ fun SettingsScreen(
     onOpenVitaLanguageSettings: () -> Unit = {},
     onOpenGpuDriverSettings: () -> Unit = {},
     onOpenDiscord: () -> Unit = {},
+    onOpenTouchLayoutEditor: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -244,7 +245,8 @@ fun SettingsScreen(
                             refreshCoreSettingsClick = refreshCoreSettingsClick,
                             createBackupClick = createBackupClick,
                             restoreBackupClick = { showRestoreBackupDialog = true },
-                            onOpenTrophySoundPicker = { trophySoundPicker.launch(arrayOf("audio/*")) }
+                            onOpenTrophySoundPicker = { trophySoundPicker.launch(arrayOf("audio/*")) },
+                            onOpenTouchLayoutEditor = onOpenTouchLayoutEditor
                         )
                     }
                 }

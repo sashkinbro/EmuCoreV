@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">टच लेआउट</string>
+    <string name="touch_layout_settings_description">स्क्रीन पर दिखने वाले कंट्रोल की डिफ़ॉल्ट जगह और आकार तय करें। जिन गेम में अलग लेआउट है, वह वैसा ही रहेगा।</string>
+                <string name="touch_layout_game_inherited">वैश्विक लेआउट इस्तेमाल हो रहा है</string>
+    <string name="touch_layout_game_custom">इस गेम का कस्टम लेआउट</string>
+    <string name="touch_layout_edit">टच कंट्रोल संपादित करें</string>
+    <string name="touch_layout_use_global">वैश्विक लेआउट इस्तेमाल करें</string>
+        </resources>

@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">چیدمان لمسی</string>
+    <string name="touch_layout_settings_description">مکان و اندازه پیش‌فرض کنترل‌های روی صفحه را تنظیم کنید. بازی‌هایی که چیدمان جداگانه دارند همان را نگه می‌دارند.</string>
+                <string name="touch_layout_game_inherited">استفاده از چیدمان سراسری</string>
+    <string name="touch_layout_game_custom">چیدمان سفارشی این بازی</string>
+    <string name="touch_layout_edit">ویرایش کنترل‌های لمسی</string>
+    <string name="touch_layout_use_global">استفاده از چیدمان سراسری</string>
+        </resources>

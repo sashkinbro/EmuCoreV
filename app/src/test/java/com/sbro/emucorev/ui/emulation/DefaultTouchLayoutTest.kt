@@ -35,6 +35,14 @@ class DefaultTouchLayoutTest {
         }
     }
 
+    @Test fun configuredOverlayScaleChangesGeneratedDefaultControlSizes() {
+        val compact = buildDefaultTouchLayout(1600f, 900f, true, 0.55f, 1f, 16f, 22f, 22f)
+            .associateBy { it.id }
+        val enlarged = buildDefaultTouchLayout(1600f, 900f, true, 1.5f, 1f, 16f, 22f, 22f)
+            .associateBy { it.id }
+        assertTrue(enlarged.getValue(TouchControlIds.CROSS).width > compact.getValue(TouchControlIds.CROSS).width)
+    }
+
     @Test fun dpadTouchRectanglesHaveGapsInBothOrientations() {
         for ((width, height) in listOf(800f to 400f, 360f to 640f)) {
             val dpad = layout(width, height).values.filter { it.id.startsWith("dpad_") }

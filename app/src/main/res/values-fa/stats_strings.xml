@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">آمار</string>
+    <string name="stats_help">CPU مصرف این برنامه در همهٔ هسته‌هاست. GPU مصرف کل دستگاه در صورت دسترسی است. دما از حسگر باتری است؛ مقدار ناموجود با — نشان داده می‌شود.</string>
+    <string name="stats_position">موقعیت</string>
+    <string name="stats_top_left">بالا چپ</string>
+    <string name="stats_top_right">بالا راست</string>
+    <string name="stats_bottom_left">پایین چپ</string>
+    <string name="stats_bottom_right">پایین راست</string>
+    <string name="stats_size">اندازه</string>
+    <string name="stats_metrics">شاخص‌های نمایان</string>
+    <string name="stats_reset">بازنشانی آمار</string>
+    <string name="stats_version">نسخهٔ برنامه و هسته</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">دمای باتری</string>
+    <string name="stats_thermal">وضعیت حرارتی</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">متوقف</string>
+    <string name="stats_thermal_none">عادی</string>
+    <string name="stats_thermal_light">کم</string>
+    <string name="stats_thermal_moderate">متوسط</string>
+    <string name="stats_thermal_severe">شدید</string>
+    <string name="stats_thermal_critical">بحرانی</string>
+    <string name="stats_thermal_emergency">اضطراری</string>
+    <string name="stats_thermal_shutdown">خاموشی</string>
+    <string name="stats_mode">حالت نمایش</string>
+    <string name="stats_mode_off">خاموش</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">جزئیات</string>
+    <string name="stats_enabled">نمایش FPS</string>
+</resources>

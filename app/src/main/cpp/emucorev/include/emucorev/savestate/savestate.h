@@ -37,6 +37,7 @@ enum class Status {
     NoSpace,
     IoError,
     InternalError,
+    ConfigurationMismatch,
 };
 
 struct Result {
@@ -57,6 +58,9 @@ using ProgressCallback = std::function<void(float progress, const char *stage)>;
 Result save_state(EmuEnvState &emuenv, const fs::path &path, const std::string &app_version, const ProgressCallback &progress = {});
 Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_session, const ProgressCallback &progress = {});
 Result inspect_state(const fs::path &path);
+// After the title profile is resolved, before renderer/window creation. Changes
+// only this launch's effective config; persisted global/title settings stay intact.
+Result prepare_launch_gpu_config(EmuEnvState &emuenv, const fs::path &path);
 Result delete_state(const fs::path &path);
 bool is_current_session(EmuEnvState &emuenv, const Meta &meta);
 

@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">Układ sterowania dotykowego</string>
+    <string name="touch_layout_settings_description">Ustaw domyślne położenie i rozmiar elementów sterujących na ekranie. Gry z własnym układem zachowują go.</string>
+                <string name="touch_layout_game_inherited">Używany jest układ globalny</string>
+    <string name="touch_layout_game_custom">Własny układ tej gry</string>
+    <string name="touch_layout_edit">Edytuj sterowanie dotykowe</string>
+    <string name="touch_layout_use_global">Użyj układu globalnego</string>
+        </resources>

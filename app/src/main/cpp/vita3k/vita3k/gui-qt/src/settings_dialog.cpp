@@ -184,7 +184,6 @@ SettingsDialog::SettingsDialog(EmuEnvState &emuenv,
         m_ui->archive_log->setVisible(false);
         m_ui->discord_rich_presence->setVisible(false);
         m_ui->gb_emu_logging->setVisible(false);
-        m_ui->gb_performance_overlay->setVisible(false);
         m_ui->gb_storage->setVisible(false);
         m_ui->gb_custom_config->setVisible(false);
         m_ui->gb_screenshot->setVisible(false);
@@ -439,20 +438,6 @@ void SettingsDialog::load_config() {
         tr("Warning"), tr("Error"), tr("Critical"), tr("Off") });
     m_ui->log_level_box->setCurrentIndex(emuenv.cfg.log_level);
 
-    m_ui->perf_overlay_enabled->setChecked(emuenv.cfg.performance_overlay);
-    m_ui->perf_overlay_detail_box->clear();
-    m_ui->perf_overlay_detail_box->addItems({ tr("Minimum"), tr("Low"), tr("Medium"), tr("Maximum") });
-    m_ui->perf_overlay_detail_box->setCurrentIndex(emuenv.cfg.performance_overlay_detail);
-    m_ui->perf_overlay_position_box->clear();
-    m_ui->perf_overlay_position_box->addItems({ tr("Top Left"), tr("Top Center"), tr("Top Right"),
-        tr("Bottom Left"), tr("Bottom Center"), tr("Bottom Right") });
-    m_ui->perf_overlay_position_box->setCurrentIndex(emuenv.cfg.performance_overlay_position);
-
-    m_ui->label_perf_detail->setEnabled(emuenv.cfg.performance_overlay);
-    m_ui->perf_overlay_detail_box->setEnabled(emuenv.cfg.performance_overlay);
-    m_ui->label_perf_position->setEnabled(emuenv.cfg.performance_overlay);
-    m_ui->perf_overlay_position_box->setEnabled(emuenv.cfg.performance_overlay);
-
     m_pending_vita_fs_path = emuenv.vita_fs_path;
     update_current_emu_path_label();
 
@@ -665,9 +650,6 @@ void SettingsDialog::build_desired_config(Config &desired) const {
 #endif
 
     desired.log_level = m_ui->log_level_box->currentIndex();
-    desired.performance_overlay = m_ui->perf_overlay_enabled->isChecked();
-    desired.performance_overlay_detail = m_ui->perf_overlay_detail_box->currentIndex();
-    desired.performance_overlay_position = m_ui->perf_overlay_position_box->currentIndex();
     desired.screenshot_format = m_ui->screenshot_format->currentIndex();
     current.stretch_the_display_area = m_ui->stretch_the_display_area->isChecked();
     current.fullscreen_hd_res_pixel_perfect = m_ui->fullscreen_hd_res_pixel_perfect->isChecked();
@@ -1033,13 +1015,6 @@ void SettingsDialog::setup_connections() {
         m_ui->theme_music_volume_label->setText(tr("Theme music volume: %1%").arg(val));
     });
 
-    connect(m_ui->perf_overlay_enabled, &QCheckBox::toggled, this, [this](bool on) {
-        m_ui->label_perf_detail->setEnabled(on);
-        m_ui->perf_overlay_detail_box->setEnabled(on);
-        m_ui->label_perf_position->setEnabled(on);
-        m_ui->perf_overlay_position_box->setEnabled(on);
-    });
-
     connect(m_ui->file_loading_delay, &QSlider::valueChanged,
         this, &SettingsDialog::update_file_loading_delay_label);
     connect(m_ui->http_timeout_attempts, &QSlider::valueChanged,
@@ -1242,11 +1217,6 @@ void SettingsDialog::setup_connections() {
         { m_ui->label_log_level, tr("Log Level"), m_tooltips->log_level },
         { m_ui->log_level_box, tr("Log Level"), m_tooltips->log_level },
         { m_ui->discord_rich_presence, tr("Enable Discord Rich Presence"), m_tooltips->discord_rpc },
-        { m_ui->perf_overlay_enabled, tr("Performance Overlay"), m_tooltips->perf_overlay },
-        { m_ui->label_perf_detail, tr("Overlay Detail"), m_tooltips->perf_overlay_detail },
-        { m_ui->perf_overlay_detail_box, tr("Overlay Detail"), m_tooltips->perf_overlay_detail },
-        { m_ui->label_perf_position, tr("Overlay Position"), m_tooltips->perf_overlay_position },
-        { m_ui->perf_overlay_position_box, tr("Overlay Position"), m_tooltips->perf_overlay_position },
         { m_ui->stretch_the_display_area, tr("Stretch the Display Area"), m_tooltips->stretch_display },
         { m_ui->fullscreen_hd_res_pixel_perfect, tr("Fullscreen HD Pixel Perfect"), m_tooltips->pixel_perfect },
         { m_ui->file_loading_delay, tr("File Loading Delay"), m_tooltips->file_loading_delay },

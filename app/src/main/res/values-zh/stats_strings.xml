@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">统计</string>
+    <string name="stats_help">CPU 为应用在所有核心上的占用。GPU 为可读取的设备整体占用。温度来自电池传感器，无法获取时显示 —。</string>
+    <string name="stats_position">位置</string>
+    <string name="stats_top_left">左上</string>
+    <string name="stats_top_right">右上</string>
+    <string name="stats_bottom_left">左下</string>
+    <string name="stats_bottom_right">右下</string>
+    <string name="stats_size">大小</string>
+    <string name="stats_metrics">可见指标</string>
+    <string name="stats_reset">重置统计</string>
+    <string name="stats_version">应用与核心版本</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">电池温度</string>
+    <string name="stats_thermal">温控状态</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">已暂停</string>
+    <string name="stats_thermal_none">正常</string>
+    <string name="stats_thermal_light">轻度</string>
+    <string name="stats_thermal_moderate">中度</string>
+    <string name="stats_thermal_severe">严重</string>
+    <string name="stats_thermal_critical">危急</string>
+    <string name="stats_thermal_emergency">紧急</string>
+    <string name="stats_thermal_shutdown">关机</string>
+    <string name="stats_mode">显示模式</string>
+    <string name="stats_mode_off">关闭</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">详细</string>
+    <string name="stats_enabled">显示 FPS</string>
+</resources>

@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">Disposition tactile</string>
+    <string name="touch_layout_settings_description">Définissez la position et la taille par défaut des commandes à l’écran. Les jeux ayant leur propre disposition la conservent.</string>
+                <string name="touch_layout_game_inherited">Utilise la disposition globale</string>
+    <string name="touch_layout_game_custom">Disposition personnalisée pour ce jeu</string>
+    <string name="touch_layout_edit">Modifier les commandes tactiles</string>
+    <string name="touch_layout_use_global">Utiliser la disposition globale</string>
+        </resources>

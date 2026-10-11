@@ -2,6 +2,25 @@ package com.sbro.emucorev.ui.emulation
 
 import kotlin.math.min
 
+internal data class TouchLayoutSafeAreaPadding(
+    val sidePx: Float,
+    val bottomPx: Float,
+    val shoulderTopPx: Float
+)
+
+internal fun touchLayoutSafeAreaPadding(
+    isLandscape: Boolean,
+    density: Float,
+    leftInsetPx: Float,
+    rightInsetPx: Float,
+    topInsetPx: Float,
+    bottomInsetPx: Float
+): TouchLayoutSafeAreaPadding = TouchLayoutSafeAreaPadding(
+    sidePx = maxOf(leftInsetPx, rightInsetPx) + (if (isLandscape) 16f else 10f) * density,
+    bottomPx = bottomInsetPx + (if (isLandscape) 22f else 16f) * density,
+    shoulderTopPx = topInsetPx + (if (isLandscape) 22f else 16f) * density
+)
+
 /** EmuCoreX's primary row, shoulder stacks and bottom centre row, adapted for Vita. */
 internal fun buildDefaultTouchLayout(
     canvasWidth: Float, canvasHeight: Float, isLandscape: Boolean, overlayScale: Float,

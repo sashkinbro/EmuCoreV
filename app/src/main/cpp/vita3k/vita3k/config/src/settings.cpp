@@ -204,7 +204,7 @@ bool load_custom_config(Config::CurrentConfig &out, const fs::path &config_path,
         out.v_sync = gpu.attribute("v-sync").as_bool();
         out.anisotropic_filtering = gpu.attribute("anisotropic-filtering").as_int();
         out.async_pipeline_compilation = gpu.attribute("async-pipeline-compilation").as_bool();
-        out.show_compile_shaders = gpu.attribute("show-compile-shaders").as_bool(true);
+        out.show_compile_shaders = gpu.attribute("show-compile-shaders").as_bool(false);
         out.show_shader_cache_warn = gpu.attribute("show-shader-cache-warn").as_bool(true);
         out.accurate_thread_scheduling = gpu.attribute("accurate-thread-scheduling").as_bool();
         out.guest_cores = gpu.attribute("guest-cores").as_int(1);

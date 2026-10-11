@@ -176,9 +176,6 @@ class VitaGameSettingsRepository(private val context: Context) {
         root.childElement("emucorev")?.let { own ->
             driverMode = own.stringAttrOrNull("gpu-driver-mode")
             config = config.copy(
-                performanceOverlay = own.boolAttr("performance-overlay", config.performanceOverlay),
-                performanceOverlayDetail = own.intAttr("performance-overlay-detail", config.performanceOverlayDetail),
-                performanceOverlayPosition = own.intAttr("performance-overlay-position", config.performanceOverlayPosition),
                 enableGamepadOverlay = own.boolAttr("enable-gamepad-overlay", config.enableGamepadOverlay),
                 overlayShowTouchSwitch = own.boolAttr("overlay-show-touch-switch", config.overlayShowTouchSwitch),
                 overlayScale = own.floatAttr("overlay-scale", config.overlayScale),
@@ -291,9 +288,6 @@ class VitaGameSettingsRepository(private val context: Context) {
         })
         root.appendChild(doc.createElement("emucorev").apply {
             setAttribute("gpu-driver-mode", driverMode)
-            setAttribute("performance-overlay", config.performanceOverlay.toString())
-            setAttribute("performance-overlay-detail", config.performanceOverlayDetail.toString())
-            setAttribute("performance-overlay-position", config.performanceOverlayPosition.toString())
             setAttribute("enable-gamepad-overlay", config.enableGamepadOverlay.toString())
             setAttribute("overlay-show-touch-switch", config.overlayShowTouchSwitch.toString())
             setAttribute("overlay-scale", config.overlayScale.toString())

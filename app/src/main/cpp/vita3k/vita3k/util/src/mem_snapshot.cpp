@@ -21,7 +21,7 @@
 
 std::atomic<int> mem_diag::pending_trim_level{ -1 };
 
-#if defined(__linux__)
+#if defined(__linux__) && !defined(NDEBUG)
 
 #include <cctype>
 #include <climits>
@@ -133,7 +133,7 @@ void log_memory_snapshot(const char *tag) {
 
 } // namespace mem_diag
 
-#else // !__linux__
+#else // Release or non-Linux
 
 namespace mem_diag {
 

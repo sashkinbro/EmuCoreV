@@ -687,7 +687,6 @@ void apply_renderer_config(EmuEnvState &emuenv) {
     r.sys_button = cc.sys_button;
 
     r.show_compile_shaders = cc.show_compile_shaders;
-    app::sync_perf_overlay_config(emuenv);
 
     // overlay input callbacks
     emuenv.overlay_manager->set_input_callbacks(
@@ -773,7 +772,6 @@ void apply_runtime_settings(EmuEnvState &emuenv) {
     r.sys_lang = cc.sys_lang;
     r.sys_button = cc.sys_button;
     r.show_compile_shaders = cc.show_compile_shaders;
-    app::sync_perf_overlay_config(emuenv);
 }
 
 SettingsCommitResult commit_settings(EmuEnvState &emuenv, const Config &desired_cfg, const std::string &scope_app_path) {

@@ -441,7 +441,9 @@ if(NOT (CMAKE_BUILD_TYPE STREQUAL "Release"))
 	# in order for the condition to work properly on both single-config and multi-config
 	# CMake project generators. More info here:
 	# https://cmake.org/cmake/help/latest/manual/cmake-buildsystem.7.html#build-configurations
-	target_compile_definitions(tracy PUBLIC $<$<CONFIG:Debug,RelWithDebInfo>:TRACY_ENABLE>)
+	if(TRACY_ENABLE_ON_CORE_COMPONENTS)
+		target_compile_definitions(tracy PUBLIC $<$<CONFIG:Debug,RelWithDebInfo>:TRACY_ENABLE>)
+	endif()
 endif()
 
 #

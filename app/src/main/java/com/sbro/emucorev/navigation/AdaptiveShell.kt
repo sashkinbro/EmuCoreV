@@ -598,7 +598,7 @@ private fun SideNavigation(
                     selected = selected == PrimaryDestination.SaveStates,
                     onClick = navigateSaveStates
                 )
-                if (CHEATS_ENABLED || LocalCustomizationSettings.current.experimentalCheats) {
+                if (CHEATS_ENABLED) {
                     ShellItem(
                         icon = Icons.Rounded.AutoFixHigh,
                         label = stringResource(R.string.nav_cheat_manager),

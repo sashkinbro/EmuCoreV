@@ -105,6 +105,7 @@ import com.sbro.emucorev.core.AndroidTouchHaptics.ButtonPhase
 import com.sbro.emucorev.core.CHEATS_ENABLED
 import com.sbro.emucorev.core.CheatBridge
 import com.sbro.emucorev.core.SaveStateResult
+import com.sbro.emucorev.core.VitaLaunchBridge
 import com.sbro.emucorev.core.SaveStateRepository
 import com.sbro.emucorev.core.SaveStateSlot
 import com.sbro.emucorev.data.AppPreferences
@@ -173,6 +174,7 @@ fun EmulationOverlayHost(
     var config by remember(activity, gameId) { mutableStateOf(repository.loadEffective(gameId)) }
     var controlLayout by remember(activity) { mutableStateOf(controlLayoutRepository.load()) }
     var controlsEditMode by remember { mutableStateOf(false) }
+    var editorProfileRevision by remember { mutableIntStateOf(0) }
     var menuOpen by remember { mutableStateOf(false) }
     var menuButtonVisible by remember { mutableStateOf(true) }
     var userPaused by remember { mutableStateOf(false) }
@@ -304,6 +306,18 @@ fun EmulationOverlayHost(
                 if (!result.isOk) {
                     Log.e("SaveStateOverlay", "${action.javaClass.simpleName} failed (${result.status}): ${result.error}")
                 }
+                if (action is SaveStateAction.Load && result.requiresRendererRestart) {
+                    // Preflight has not touched the guest. Recreate the renderer
+                    // with the archived session settings, then perform a cold restore.
+                    val launch = VitaLaunchBridge.launchInstalledTitleWithSaveState(
+                        activity, gameId, saveStateRepository.stateFile(gameId, action.slot).absolutePath
+                    )
+                    if (launch == VitaLaunchBridge.LaunchResult.Success) {
+                        menuOpen = false
+                        userPaused = false
+                        return@withSaveStateMenuPause
+                    }
+                }
                 val messageRes = when {
                     result.isOk -> when (action) {
                         is SaveStateAction.Save -> R.string.emulation_savestate_saved_toast
@@ -393,14 +407,6 @@ fun EmulationOverlayHost(
         activity.updateGamepadRuntimeInputSettings(config)
     }
 
-    fun syncPerformanceOverlayState() {
-        activity.setPerformanceOverlayState(
-            config.performanceOverlay,
-            config.performanceOverlayDetail,
-            config.performanceOverlayPosition
-        )
-    }
-
     fun applyRuntimeCoreSettings() {
         activity.applyRuntimeCoreSettings(
             config.vSync,
@@ -416,7 +422,6 @@ fun EmulationOverlayHost(
 
     DisposableEffect(config) {
         overlayBridge.synchronizeConfig(config)
-        syncPerformanceOverlayState()
         applyRuntimeCoreSettings()
         onDispose {}
     }
@@ -544,6 +549,9 @@ fun EmulationOverlayHost(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
+        PerformanceStatsOverlay(visible = inputResumed && !menuOpen && !controlsEditMode && !nativeImeActive &&
+            !saveStateBusy && !waitingForStateFrame && !launchStateLoading.active && pendingSaveStateAction == null,
+            titleId = gameId)
         if (showTouchControls && inputResumed) {
             OnScreenControls(
                 modifier = Modifier.fillMaxSize(),
@@ -558,6 +566,7 @@ fun EmulationOverlayHost(
                 touchHapticsStrength = config.touchHapticsStrength,
                 editMode = controlsEditMode,
                 savedLayout = controlLayout,
+                editorProfileRevision = editorProfileRevision,
                 onLayoutChange = { updated ->
                     controlLayout = updated
                     controlLayoutRepository.save(updated)
@@ -567,8 +576,9 @@ fun EmulationOverlayHost(
                     overlayBridge.setIsInEditMode(false)
                 },
                 onEditReset = {
+                    editorProfileRevision++
                     controlLayoutRepository.reset()
-                    controlLayout = null
+                    controlLayout = controlLayoutRepository.load()
                     persistConfig { it.copy(overlayScale = 0.9f, overlayOpacity = 100) }
                 },
                 onBackTouchToggle = {
@@ -622,8 +632,9 @@ fun EmulationOverlayHost(
                 }
             },
             onResetOverlay = {
+                editorProfileRevision++
                 controlLayoutRepository.reset()
-                controlLayout = null
+                controlLayout = controlLayoutRepository.load()
                 persistConfig {
                     it.copy(
                         enableGamepadOverlay = true,
@@ -644,18 +655,6 @@ fun EmulationOverlayHost(
             },
             onOverlayScale = { value -> persistConfig { it.copy(overlayScale = value) } },
             onOverlayOpacity = { value -> persistConfig { it.copy(overlayOpacity = value) } },
-            onPerformanceOverlay = { enabled ->
-                persistConfig { it.copy(performanceOverlay = enabled) }
-                syncPerformanceOverlayState()
-            },
-            onPerformanceDetail = { value ->
-                persistConfig { it.copy(performanceOverlayDetail = value) }
-                syncPerformanceOverlayState()
-            },
-            onPerformancePosition = { value ->
-                persistConfig { it.copy(performanceOverlayPosition = value) }
-                syncPerformanceOverlayState()
-            },
             onAudioVolume = { volume ->
                 persistConfig { it.copy(audioVolume = volume) }
                 activity.setAudioVolume(volume)
@@ -804,7 +803,7 @@ fun EmulationOverlayHost(
                 gameIconPath = gameIconPath,
                 config = config,
                 cheats = cheatSnapshot,
-                cheatsAvailable = CHEATS_ENABLED || customization.experimentalCheats,
+                cheatsAvailable = CHEATS_ENABLED,
                 saveStates = SaveStateMenuState(
                     slots = saveStateSlots,
                     selectedSlot = selectedSaveStateSlot,
@@ -933,7 +932,8 @@ internal fun OnScreenControls(
     onBackTouchToggle: () -> Unit,
     onButtonChange: (Int, Boolean) -> Unit,
     onAxisChange: (Int, Short) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    editorProfileRevision: Int = 0
 ) {
     val context = LocalContext.current
     val hapticView = LocalView.current
@@ -946,15 +946,7 @@ internal fun OnScreenControls(
         WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding(),
     )
     val bottomInset = navInsets.calculateBottomPadding()
-    val sideInset = maxOf(
-        cutoutInsets.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
-        cutoutInsets.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
-    )
-
     val alpha = overlayOpacity / 100f
-    val sidePadding = sideInset + if (isLandscape) 16.dp else 10.dp
-    val bottomPadding = bottomInset + if (isLandscape) 22.dp else 16.dp
-    val shoulderTopPadding = topInset + if (isLandscape) 22.dp else 16.dp
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         if (editMode) {
@@ -963,14 +955,22 @@ internal fun OnScreenControls(
         val density = LocalDensity.current
         val canvasWidth = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
         val canvasHeight = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
+        val safeAreaPadding = with(density) {
+            touchLayoutSafeAreaPadding(
+                isLandscape = isLandscape,
+                density = density.density,
+                leftInsetPx = cutoutInsets.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr).toPx(),
+                rightInsetPx = cutoutInsets.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr).toPx(),
+                topInsetPx = topInset.toPx(),
+                bottomInsetPx = bottomInset.toPx()
+            )
+        }
         val defaultLayout = remember(
             canvasWidth,
             canvasHeight,
             isLandscape,
             overlayScale,
-            sidePadding,
-            bottomPadding,
-            shoulderTopPadding
+            safeAreaPadding
         ) {
             buildDefaultTouchLayout(
                 canvasWidth = canvasWidth,
@@ -978,27 +978,27 @@ internal fun OnScreenControls(
                 isLandscape = isLandscape,
                 overlayScale = overlayScale,
                 density = density.density,
-                sidePaddingPx = with(density) { sidePadding.toPx() },
-                bottomPaddingPx = with(density) { bottomPadding.toPx() },
-                shoulderTopPaddingPx = with(density) { shoulderTopPadding.toPx() }
+                sidePaddingPx = safeAreaPadding.sidePx,
+                bottomPaddingPx = safeAreaPadding.bottomPx,
+                shoulderTopPaddingPx = safeAreaPadding.shoulderTopPx
             )
         }
         val mergedLayout = remember(defaultLayout, savedLayout) { mergeTouchLayout(defaultLayout, savedLayout) }
-        var controls by remember(defaultLayout) { mutableStateOf(mergedLayout) }
-        var selectedId by remember(editMode) { mutableStateOf<String?>(null) }
-        var selectedGroupIds by remember(editMode) { mutableStateOf<Set<String>?>(null) }
-        var groupScalePercent by remember(editMode) { mutableIntStateOf(100) }
+        var controls by remember(defaultLayout, editorProfileRevision) { mutableStateOf(mergedLayout) }
+        var selectedId by remember(editMode, editorProfileRevision) { mutableStateOf<String?>(null) }
+        var selectedGroupIds by remember(editMode, editorProfileRevision) { mutableStateOf<Set<String>?>(null) }
+        var groupScalePercent by remember(editMode, editorProfileRevision) { mutableIntStateOf(100) }
         var pressedGroupControlIds by remember { mutableStateOf(emptySet<Int>()) }
         var hapticPressedControlIds by remember { mutableStateOf(emptySet<Int>()) }
-        LaunchedEffect(mergedLayout) {
+        LaunchedEffect(mergedLayout, editorProfileRevision) {
             controls = mergedLayout
         }
         val selected = controls.firstOrNull { it.id == selectedId } ?: controls.firstOrNull()
-        var showGrid by rememberSaveable { mutableStateOf(false) }
-        var snapToGrid by rememberSaveable { mutableStateOf(false) }
-        var comboEditorOpen by remember { mutableStateOf(false) }
-        var createCombo by remember { mutableStateOf(false) }
-        val dragResiduals = remember { mutableMapOf<String, Pair<Float, Float>>() }
+        var showGrid by rememberSaveable(editMode, editorProfileRevision) { mutableStateOf(false) }
+        var snapToGrid by rememberSaveable(editMode, editorProfileRevision) { mutableStateOf(false) }
+        var comboEditorOpen by remember(editMode, editorProfileRevision) { mutableStateOf(false) }
+        var createCombo by remember(editMode, editorProfileRevision) { mutableStateOf(false) }
+        val dragResiduals = remember(editorProfileRevision) { mutableMapOf<String, Pair<Float, Float>>() }
         val gridStep = with(density) { 24.dp.toPx() }
         val selectedDescriptor = selected?.actionId?.let(::touchControlDescriptor)
         val defaultSelected = selected?.let { element -> defaultLayout.firstOrNull { it.id == element.actionId } }
@@ -1320,7 +1320,8 @@ internal fun OnScreenControls(
 
         if (editMode && selected != null && selectedDescriptor != null) {
             val groupActive = selectedGroupIds != null
-            TouchControlEditorChrome(
+            key(editorProfileRevision) {
+                TouchControlEditorChrome(
                 selectedLabel = if (groupActive) {
                     if (TouchControlIds.DPAD_UP in selectedGroupIds.orEmpty()) {
                         stringResource(R.string.controls_editor_group_dpad)
@@ -1381,7 +1382,8 @@ internal fun OnScreenControls(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .heightIn(max = maxHeight * 0.62f)
-            )
+                )
+            }
         }
 
         if (editMode && comboEditorOpen) {

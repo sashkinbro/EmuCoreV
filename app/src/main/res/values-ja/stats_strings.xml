@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">統計</string>
+    <string name="stats_help">CPU は全コアでのアプリ使用率です。GPU は取得可能な端末全体の使用率です。温度はバッテリーセンサー値です。未取得は — と表示します。</string>
+    <string name="stats_position">位置</string>
+    <string name="stats_top_left">左上</string>
+    <string name="stats_top_right">右上</string>
+    <string name="stats_bottom_left">左下</string>
+    <string name="stats_bottom_right">右下</string>
+    <string name="stats_size">サイズ</string>
+    <string name="stats_metrics">表示する項目</string>
+    <string name="stats_reset">統計をリセット</string>
+    <string name="stats_version">アプリとコアのバージョン</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">バッテリー温度</string>
+    <string name="stats_thermal">温度状態</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">一時停止</string>
+    <string name="stats_thermal_none">正常</string>
+    <string name="stats_thermal_light">軽度</string>
+    <string name="stats_thermal_moderate">中程度</string>
+    <string name="stats_thermal_severe">重度</string>
+    <string name="stats_thermal_critical">重大</string>
+    <string name="stats_thermal_emergency">緊急</string>
+    <string name="stats_thermal_shutdown">シャットダウン</string>
+    <string name="stats_mode">表示モード</string>
+    <string name="stats_mode_off">オフ</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">詳細</string>
+    <string name="stats_enabled">FPS を表示</string>
+</resources>

@@ -4,6 +4,7 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 import androidx.core.content.edit
+import com.sbro.emucorev.core.vita.Emulator
 
 data class TouchControlElement(
     val id: String,
@@ -45,40 +46,29 @@ enum class TouchAnalogMode(val storageValue: String) {
     }
 }
 
-class TouchControlLayoutRepository(context: Context) {
+class TouchControlLayoutRepository(
+    context: Context,
+    private val activeTitleIdProvider: () -> String? = {
+        (context as? Emulator)?.currentGameIdOrIntent()
+    }
+) {
     private val preferences = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun load(): List<TouchControlElement>? {
+        val rawTitleId = activeTitleIdProvider()
+        val titleId = rawTitleId?.let(::normalizeTitleId)
+        if (rawTitleId != null && titleId == null) return loadGlobal()
+        return titleId?.let(::loadForGame) ?: loadGlobal()
+    }
+
+    /** The original layout_v1 value remains the global profile for existing installs. */
+    fun loadGlobal(): List<TouchControlElement>? {
         val raw = preferences.getString(KEY_LAYOUT, null)
         if (raw == null) {
             preferences.edit { putBoolean(KEY_SHOULDER_VISIBILITY_MIGRATED, true) }
             return null
         }
-        val elements = runCatching {
-            val array = JSONArray(raw)
-            buildList {
-                for (index in 0 until array.length()) {
-                    val element = runCatching {
-                        val item = array.getJSONObject(index)
-                        TouchControlElement(
-                            id = item.getString("id"),
-                            x = item.getDouble("x").toFloat(),
-                            y = item.getDouble("y").toFloat(),
-                            width = item.getDouble("width").toFloat(),
-                            height = item.getDouble("height").toFloat(),
-                            visible = item.optBoolean("visible", true),
-                            actionId = item.optString("actionId", item.getString("id")),
-                            secondaryActionId = item.optString("secondaryActionId").takeIf { it.isNotBlank() },
-                            analogMode = TouchAnalogMode.fromStorage(
-                                if (item.has("analogMode")) item.optString("analogMode") else null
-                            ),
-                            opacity = item.optInt("opacity", CONTROL_OPACITY_MAX)
-                        ).coerceToCanvas()
-                    }.getOrNull()
-                    if (element != null) add(element)
-                }
-            }
-        }.getOrNull() ?: return null
+        val elements = decode(raw) ?: return null
         if (!preferences.getBoolean(KEY_SHOULDER_VISIBILITY_MIGRATED, false)) {
             val migrated = elements.map { element ->
                 if (element.id == TouchControlIds.L2 || element.id == TouchControlIds.R2) {
@@ -87,14 +77,65 @@ class TouchControlLayoutRepository(context: Context) {
                     element
                 }
             }
-            save(migrated)
+            saveGlobal(migrated)
             preferences.edit { putBoolean(KEY_SHOULDER_VISIBILITY_MIGRATED, true) }
             return migrated
         }
         return elements
     }
 
+    fun loadForGame(titleId: String): List<TouchControlElement>? {
+        val key = gameLayoutKey(titleId) ?: return null
+        return preferences.getString(key, null)?.let(::decode)
+    }
+
+    fun loadEffective(titleId: String): List<TouchControlElement>? =
+        loadForGame(titleId) ?: loadGlobal()
+
+    fun hasGameOverride(titleId: String): Boolean = loadForGame(titleId) != null
+
     fun save(elements: List<TouchControlElement>) {
+        val rawTitleId = activeTitleIdProvider()
+        val titleId = rawTitleId?.let(::normalizeTitleId)
+        if (rawTitleId != null) {
+            if (titleId != null) saveForGame(titleId, elements)
+        } else {
+            saveGlobal(elements)
+        }
+    }
+
+    fun saveGlobal(elements: List<TouchControlElement>) {
+        preferences.edit {
+            putString(KEY_LAYOUT, encode(elements))
+            putBoolean(KEY_SHOULDER_VISIBILITY_MIGRATED, true)
+        }
+    }
+
+    fun saveForGame(titleId: String, elements: List<TouchControlElement>) {
+        val key = gameLayoutKey(titleId) ?: return
+        preferences.edit { putString(key, encode(elements)) }
+    }
+
+    fun clearForGame(titleId: String) {
+        val key = gameLayoutKey(titleId) ?: return
+        preferences.edit { remove(key) }
+    }
+
+    fun reset() {
+        val rawTitleId = activeTitleIdProvider()
+        val titleId = rawTitleId?.let(::normalizeTitleId)
+        if (rawTitleId != null) {
+            if (titleId != null) clearForGame(titleId)
+        } else {
+            resetGlobal()
+        }
+    }
+
+    fun resetGlobal() {
+        preferences.edit { remove(KEY_LAYOUT) }
+    }
+
+    private fun encode(elements: List<TouchControlElement>): String {
         val array = JSONArray()
         elements.distinctBy { it.id }.map { it.normalized() }.forEach { element ->
             array.put(
@@ -111,20 +152,47 @@ class TouchControlLayoutRepository(context: Context) {
                     .put("opacity", element.opacity)
             )
         }
-        preferences.edit { putString(KEY_LAYOUT, array.toString()) }
+        return array.toString()
     }
 
-    fun reset() {
-        preferences.edit {remove(KEY_LAYOUT)}
-    }
+    private fun decode(raw: String): List<TouchControlElement>? = runCatching {
+        val array = JSONArray(raw)
+        buildList {
+            for (index in 0 until array.length()) {
+                val element = runCatching {
+                    val item = array.getJSONObject(index)
+                    TouchControlElement(
+                        id = item.getString("id"),
+                        x = item.getDouble("x").toFloat(),
+                        y = item.getDouble("y").toFloat(),
+                        width = item.getDouble("width").toFloat(),
+                        height = item.getDouble("height").toFloat(),
+                        visible = item.optBoolean("visible", true),
+                        actionId = item.optString("actionId", item.getString("id")),
+                        secondaryActionId = item.optString("secondaryActionId").takeIf { it.isNotBlank() },
+                        analogMode = TouchAnalogMode.fromStorage(
+                            if (item.has("analogMode")) item.optString("analogMode") else null
+                        ),
+                        opacity = item.optInt("opacity", CONTROL_OPACITY_MAX)
+                    ).coerceToCanvas()
+                }.getOrNull()
+                if (element != null) add(element)
+            }
+        }
+    }.getOrNull()
 
-    private fun TouchControlElement.coerceToCanvas(): TouchControlElement {
-        return normalized()
-    }
+    private fun gameLayoutKey(titleId: String): String? =
+        normalizeTitleId(titleId)?.let { "$KEY_GAME_LAYOUT_PREFIX$it" }
+
+    private fun normalizeTitleId(titleId: String): String? = titleId.trim().uppercase()
+        .takeIf { it.length in 1..32 && it.all { char -> char in 'A'..'Z' || char in '0'..'9' } }
+
+    private fun TouchControlElement.coerceToCanvas(): TouchControlElement = normalized()
 
     private companion object {
         const val PREFS_NAME = "touch_control_layout"
         const val KEY_LAYOUT = "layout_v1"
+        const val KEY_GAME_LAYOUT_PREFIX = "layout_v1_game_"
         const val KEY_SHOULDER_VISIBILITY_MIGRATED = "shoulder_visibility_migrated_v1"
     }
 }

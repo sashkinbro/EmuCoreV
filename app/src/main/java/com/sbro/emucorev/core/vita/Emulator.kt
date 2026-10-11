@@ -19,7 +19,6 @@ import android.view.ViewGroup
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
-import androidx.annotation.Keep
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -74,7 +73,7 @@ import java.io.File
 class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     // Private backing state so that Compose observes changes when the native
     // core calls setCurrentGameId(). Using a separate computed property avoids
-    // a JVM signature clash between the property setter and the @Keep JNI method.
+    // a JVM signature clash between the property setter and the JNI callback method.
     private var _currentGameId by mutableStateOf("")
     val currentGameId: String get() = _currentGameId
     private lateinit var surfaceView: EmuSurface
@@ -116,7 +115,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     fun getmOverlay(): InputOverlay = inputOverlay
 
-    @Keep
     fun showSaveStateLoadError(reason: String) {
         Log.e("SaveStateBridge", "Launch save state load failed: $reason")
         runOnUiThread {
@@ -125,7 +123,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
-    @Keep
     fun onLaunchStateProgress(progress: Float, active: Boolean) {
         runOnUiThread {
             if (!active && stateFrameWaiting) return@runOnUiThread
@@ -133,7 +130,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
-    @Keep
     fun onStateFramePending(generation: Long) {
         runOnUiThread {
             if (generation > stateFrameReadyGeneration)
@@ -141,7 +137,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
-    @Keep
     fun onStateFrameReady(generation: Long) {
         runOnUiThread {
             if (generation < stateFramePendingGeneration) return@runOnUiThread
@@ -150,14 +145,12 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
-    @Keep
     fun setCurrentGameId(gameId: String) {
         _currentGameId = gameId
         refreshGamepadRuntimeInputSettings()
         startPlayTimeSessionIfNeeded()
     }
 
-    @Keep
     fun playTrophyUnlockSound() {
         runOnUiThread {
             if (rebirthRequested || isFinishing) return@runOnUiThread
@@ -173,7 +166,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
-    @Keep
     fun getBaseStoragePath(): String {
         return EmulatorStorage.runtimeRoot(this).absolutePath
     }
@@ -201,7 +193,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
-    @Keep
     fun openPauseMenuFromController() {
         runOnUiThread {
             overlayPauseMenuOpenHandler?.invoke()
@@ -332,7 +323,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
-    @Keep
     fun restartApp(appPath: String, execPath: String, execArgs: String) {
         val args = arrayListOf("-a", "true")
         if (appPath.isNotEmpty()) {
@@ -354,13 +344,11 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         triggerRebirthAfterNativeShutdown(restartIntent)
     }
 
-    @Keep
     fun setStoragePermission() {
         // Kept for the native JNI contract. Storage access is handled exclusively
         // by Android's system document pickers and app-specific directories.
     }
 
-    @Keep
     fun showFileDialog() {
         val pickerIntent = Intent()
             .setType("*/*")
@@ -371,10 +359,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         startActivityForResult(Intent.createChooser(pickerIntent, getString(R.string.emulator_choose_file)), FILE_DIALOG_CODE)
     }
 
-    @Keep
     fun isStorageManagerEnabled(): Boolean = true
 
-    @Keep
     fun showFolderDialog() {
         val pickerIntent = Intent()
             .setAction(Intent.ACTION_OPEN_DOCUMENT_TREE)
@@ -444,7 +430,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
-    @Keep
     fun setControllerOverlayState(overlayMask: Int, edit: Boolean, reset: Boolean) {
         runOnUiThread {
             getmOverlay().setState(overlayMask)
@@ -456,7 +441,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     /** SDL starts text input; Android owns retries, visibility and the fallback UI. */
-    @Keep
     fun setKeyboardActive(active: Boolean) {
         runOnUiThread {
             if (rebirthRequested) return@runOnUiThread
@@ -468,7 +452,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     /** Both sceIme and sceImeDialog need a visible editor, even without a game UI. */
-    @Keep
     fun updateNativeImeState(
         sceImeActive: Boolean,
         dialogActive: Boolean,
@@ -487,7 +470,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     /** Invalidates pending retries so a closed dialog cannot reopen the keyboard. */
-    @Keep
     fun clearNativeImeState() {
         runOnUiThread {
             nativeImeState = null
@@ -564,21 +546,18 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     external fun editNativeIme(text: String, action: Int): Boolean
     external fun submitNativeIme(): Boolean
 
-    @Keep
     fun setControllerOverlayScale(scale: Float) {
         runOnUiThread {
             getmOverlay().setScale(scale)
         }
     }
 
-    @Keep
     fun setControllerOverlayOpacity(opacity: Int) {
         runOnUiThread {
             getmOverlay().setOpacity(opacity)
         }
     }
 
-    external fun setPerformanceOverlayState(enabled: Boolean, detail: Int, position: Int)
 
     /** Push UI-driven audio volume (0..100) into the running emulator state. */
     external fun setAudioVolume(volume: Int)
@@ -750,7 +729,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         refreshPhysicalGamepadState()
     }
 
-    @Keep
     fun createShortcut(gameId: String, gameName: String): Boolean {
         if (!ShortcutManagerCompat.isRequestPinShortcutSupported(this)) {
             return false
@@ -778,7 +756,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         return true
     }
 
-    @Keep
     fun requestInstallUpdate() {
         runOnUiThread {
             runCatching {
@@ -794,7 +771,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
-    @Keep
     fun getNativeDisplayRotation(): Int {
         @Suppress("DEPRECATION")
         return windowManager.defaultDisplay.rotation

@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">터치 레이아웃</string>
+    <string name="touch_layout_settings_description">화면 조작 버튼의 기본 위치와 크기를 설정합니다. 자체 레이아웃이 있는 게임에는 영향을 주지 않습니다.</string>
+                <string name="touch_layout_game_inherited">전역 레이아웃 사용 중</string>
+    <string name="touch_layout_game_custom">이 게임의 사용자 지정 레이아웃</string>
+    <string name="touch_layout_edit">터치 조작 편집</string>
+    <string name="touch_layout_use_global">전역 레이아웃 사용</string>
+        </resources>

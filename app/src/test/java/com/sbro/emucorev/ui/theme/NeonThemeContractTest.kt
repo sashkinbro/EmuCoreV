@@ -113,6 +113,8 @@ class NeonThemeContractTest {
         val uiRoots = listOf(root.resolve("ui"), root.resolve("navigation"))
         val allowedGameOverlayFiles = setOf(
             root.resolve("ui/emulation/EmulationOverlay.kt"),
+            // In-game statistics retain the user-requested X capsule/transparent HUD geometry.
+            root.resolve("ui/emulation/PerformanceStatsOverlay.kt"),
             root.resolve("ui/common/VectorTouchControls.kt")
         )
         val neonImplementation = root.resolve("ui/theme/neon")

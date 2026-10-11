@@ -111,7 +111,7 @@ class SettingsPersistenceContractTest {
         val gui = cppSource("vita3k/vita3k/gui/src/gui.cpp")
 
         assertTrue("show-shader-cache-warn must be a serialized global option", "\"show-shader-cache-warn\"" in configHeader)
-        assertTrue("Per-game config must carry the compile notice", "bool show_compile_shaders = true;" in stateHeader)
+        assertTrue("Per-game compile notice must default off", "bool show_compile_shaders = false;" in stateHeader)
         assertTrue("Per-game config must carry the cache warning", "bool show_shader_cache_warn = true;" in stateHeader)
         listOf("show-compile-shaders", "show-shader-cache-warn").forEach { key ->
             assertTrue("Native custom config must read and write $key", settings.split(key).size >= 3)

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">आँकड़े</string>
+    <string name="stats_help">CPU सभी कोर पर इस ऐप का उपयोग मापता है। GPU उपलब्ध होने पर पूरे डिवाइस का उपयोग है। तापमान बैटरी सेंसर का है; अनुपलब्ध मान — हैं।</string>
+    <string name="stats_position">स्थान</string>
+    <string name="stats_top_left">ऊपर बाएँ</string>
+    <string name="stats_top_right">ऊपर दाएँ</string>
+    <string name="stats_bottom_left">नीचे बाएँ</string>
+    <string name="stats_bottom_right">नीचे दाएँ</string>
+    <string name="stats_size">आकार</string>
+    <string name="stats_metrics">दिखने वाले माप</string>
+    <string name="stats_reset">आँकड़े रीसेट करें</string>
+    <string name="stats_version">ऐप और कोर संस्करण</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">बैटरी तापमान</string>
+    <string name="stats_thermal">तापीय स्थिति</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">रुका हुआ</string>
+    <string name="stats_thermal_none">सामान्य</string>
+    <string name="stats_thermal_light">हल्का</string>
+    <string name="stats_thermal_moderate">मध्यम</string>
+    <string name="stats_thermal_severe">गंभीर</string>
+    <string name="stats_thermal_critical">संकटपूर्ण</string>
+    <string name="stats_thermal_emergency">आपातकाल</string>
+    <string name="stats_thermal_shutdown">बंद करना</string>
+    <string name="stats_mode">प्रदर्शन मोड</string>
+    <string name="stats_mode_off">बंद</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">विस्तृत</string>
+    <string name="stats_enabled">FPS दिखाएँ</string>
+</resources>

@@ -540,6 +540,7 @@ void ThreadState::run_loop() {
             bool probe_thumb = false;
             if (!do_step && hit_breakpoint(*cpu) && kernel.debugger.is_probe(read_pc(*cpu) & ~1u, probe_thumb)) {
                 const uint32_t probe_pc = read_pc(*cpu) & ~1u;
+#ifndef NDEBUG
                 std::string ctx = fmt::format("[CUEPROBE] pc=0x{:08X} thread='{}' ({})", probe_pc, name, id);
                 for (int ri = 0; ri <= 12; ri++)
                     ctx += fmt::format(" r{}=0x{:08X}", ri, read_reg(*cpu, ri));
@@ -558,6 +559,7 @@ void ThreadState::run_loop() {
                         ctx += fmt::format(" {:08X}", w);
                 }
                 LOG_ERROR("{}\n{}", ctx, log_stack_traceback());
+#endif
                 {
                     const std::lock_guard<std::mutex> probe_guard(kernel.debugger.probe_step_mutex);
                     kernel.debugger.remove_breakpoint(mem, probe_pc);

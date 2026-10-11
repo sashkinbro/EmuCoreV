@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">Distribución táctil</string>
+    <string name="touch_layout_settings_description">Define las posiciones y tamaños predeterminados de los controles en pantalla. Los juegos con su propia distribución la conservan.</string>
+                <string name="touch_layout_game_inherited">Usando la distribución global</string>
+    <string name="touch_layout_game_custom">Distribución personalizada para este juego</string>
+    <string name="touch_layout_edit">Editar controles táctiles</string>
+    <string name="touch_layout_use_global">Usar distribución global</string>
+        </resources>

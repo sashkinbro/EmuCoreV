@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">Touch layout</string>
+    <string name="touch_layout_settings_description">Set the default positions and sizes of on-screen controls. Games with their own layout keep it.</string>
+                <string name="touch_layout_game_inherited">Using the global layout</string>
+    <string name="touch_layout_game_custom">Custom layout for this game</string>
+    <string name="touch_layout_edit">Edit touch controls</string>
+    <string name="touch_layout_use_global">Use global layout</string>
+        </resources>

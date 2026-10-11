@@ -26,22 +26,6 @@ enum ModulesMode {
     MANUAL
 };
 
-enum PerformanceOverlayDetail {
-    MINIMUM,
-    LOW,
-    MEDIUM,
-    MAXIMUM,
-};
-
-enum PerformanceOverlayPosition {
-    TOP_LEFT,
-    TOP_CENTER,
-    TOP_RIGHT,
-    BOTTOM_LEFT,
-    BOTTOM_CENTER,
-    BOTTOM_RIGHT,
-};
-
 enum ScreenshotFormat {
     None,
     JPEG,
@@ -161,7 +145,7 @@ using PhysicalKeyCode = input::PhysicalKeyCode;
     code(bool, "async-pipeline-compilation", true, async_pipeline_compilation)                           \
     code(bool, "accurate-thread-scheduling", false, accurate_thread_scheduling)                         \
     code(int, "guest-cores", 1, guest_cores)                                                            \
-    code(bool, "show-compile-shaders", true, show_compile_shaders)                                      \
+    code(bool, "show-compile-shaders", false, show_compile_shaders)                                     \
     code(bool, "show-shader-cache-warn", true, show_shader_cache_warn)                                  \
     code(bool, "hashless-texture-cache", false, hashless_texture_cache)                                 \
     code(bool, "import-textures", false, import_textures)                                               \
@@ -189,9 +173,6 @@ using PhysicalKeyCode = input::PhysicalKeyCode;
     code(bool, "discord-rich-presence", true, discord_rich_presence)                                    \
     code(bool, "wait-for-debugger", false, wait_for_debugger)                                           \
     code(bool, "color-surface-debug", false, color_surface_debug)                                       \
-    code(bool, "performance-overlay", false, performance_overlay)                                       \
-    code(int, "performance-overlay-detail", static_cast<int>(MINIMUM), performance_overlay_detail)      \
-    code(int, "performance-overlay-position", static_cast<int>(TOP_LEFT), performance_overlay_position) \
     code(int, "screenshot-format", static_cast<int>(JPEG), screenshot_format)                           \
     code(bool, "disable-motion", false, disable_motion)                                                 \
     code(float, "controller-analog-multiplier", 1.0f, controller_analog_multiplier)                     \

@@ -313,3 +313,4 @@ using KernelHostLifetimeEnv = EmuEnvState;
 #include "motion_snapshot_tests.inc"
 #include "gxm_raw_f16_tests.inc"
 #include "cheat_lifecycle_tests.inc"
+#include "startup_gpu_config_tests.inc"

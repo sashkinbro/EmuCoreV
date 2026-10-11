@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">통계</string>
+    <string name="stats_help">CPU는 모든 코어의 앱 사용량입니다. GPU는 접근 가능한 기기 전체 사용량입니다. 온도는 배터리 센서 값이며 없는 값은 —로 표시합니다.</string>
+    <string name="stats_position">위치</string>
+    <string name="stats_top_left">왼쪽 위</string>
+    <string name="stats_top_right">오른쪽 위</string>
+    <string name="stats_bottom_left">왼쪽 아래</string>
+    <string name="stats_bottom_right">오른쪽 아래</string>
+    <string name="stats_size">크기</string>
+    <string name="stats_metrics">표시 지표</string>
+    <string name="stats_reset">통계 초기화</string>
+    <string name="stats_version">앱 및 코어 버전</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">배터리 온도</string>
+    <string name="stats_thermal">열 상태</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">일시 정지</string>
+    <string name="stats_thermal_none">정상</string>
+    <string name="stats_thermal_light">경미</string>
+    <string name="stats_thermal_moderate">보통</string>
+    <string name="stats_thermal_severe">심각</string>
+    <string name="stats_thermal_critical">위험</string>
+    <string name="stats_thermal_emergency">긴급</string>
+    <string name="stats_thermal_shutdown">종료</string>
+    <string name="stats_mode">표시 모드</string>
+    <string name="stats_mode_off">끄기</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">상세</string>
+    <string name="stats_enabled">FPS 표시</string>
+</resources>

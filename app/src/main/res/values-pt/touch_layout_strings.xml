@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">Layout de toque</string>
+    <string name="touch_layout_settings_description">Defina as posições e os tamanhos padrão dos controles na tela. Jogos com layout próprio o mantêm.</string>
+                <string name="touch_layout_game_inherited">Usando o layout global</string>
+    <string name="touch_layout_game_custom">Layout personalizado deste jogo</string>
+    <string name="touch_layout_edit">Editar controles de toque</string>
+    <string name="touch_layout_use_global">Usar layout global</string>
+        </resources>

@@ -78,9 +78,6 @@ public:
     QString archive_log;
     QString log_level;
     QString discord_rpc;
-    QString perf_overlay;
-    QString perf_overlay_detail;
-    QString perf_overlay_position;
     QString file_loading_delay;
     QString stretch_display;
     QString pixel_perfect;

@@ -13,7 +13,6 @@ add_library(
 	include/overlay/input.h
 	include/overlay/display_manager.h
 	include/overlay/shader_compile_notice.h
-	include/overlay/perf_overlay.h
 	include/overlay/trophy_notification.h
 	include/overlay/common_dialog.h
 	include/overlay/shader_precompile_progress.h
@@ -28,7 +27,6 @@ add_library(
 	src/input.cpp
 	src/display_manager.cpp
 	src/shader_compile_notice.cpp
-	src/perf_overlay.cpp
 	src/trophy_notification.cpp
 	src/common_dialog.cpp
 	src/shader_precompile_progress.cpp

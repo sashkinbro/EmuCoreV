@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">Statistiky</string>
+    <string name="stats_help">CPU měří tuto aplikaci na všech jádrech. GPU platí pro celé zařízení, pokud je dostupné. Teplota pochází z baterie; chybějící údaje značí —.</string>
+    <string name="stats_position">Pozice</string>
+    <string name="stats_top_left">Vlevo nahoře</string>
+    <string name="stats_top_right">Vpravo nahoře</string>
+    <string name="stats_bottom_left">Vlevo dole</string>
+    <string name="stats_bottom_right">Vpravo dole</string>
+    <string name="stats_size">Velikost</string>
+    <string name="stats_metrics">Viditelné metriky</string>
+    <string name="stats_reset">Obnovit statistiky</string>
+    <string name="stats_version">Verze aplikace a jádra</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Teplota baterie</string>
+    <string name="stats_thermal">Tepelný stav</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">Pozastaveno</string>
+    <string name="stats_thermal_none">Normální</string>
+    <string name="stats_thermal_light">Mírný</string>
+    <string name="stats_thermal_moderate">Střední</string>
+    <string name="stats_thermal_severe">Závažný</string>
+    <string name="stats_thermal_critical">Kritický</string>
+    <string name="stats_thermal_emergency">Nouzový</string>
+    <string name="stats_thermal_shutdown">Vypnutí</string>
+    <string name="stats_mode">Režim zobrazení</string>
+    <string name="stats_mode_off">Vypnuto</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Podrobné</string>
+    <string name="stats_enabled">Zobrazit FPS</string>
+</resources>

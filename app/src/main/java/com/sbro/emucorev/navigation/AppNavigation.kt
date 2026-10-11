@@ -54,6 +54,7 @@ import com.sbro.emucorev.ui.catalog.CatalogScreen
 import com.sbro.emucorev.ui.common.CoreUpdateResetDialog
 import com.sbro.emucorev.ui.cheats.CheatManagerScreen
 import com.sbro.emucorev.ui.detail.GameDetailScreen
+import com.sbro.emucorev.ui.emulation.TouchLayoutEditorScreen
 import com.sbro.emucorev.ui.feedback.FeedbackScreen
 import com.sbro.emucorev.ui.gamemanager.GameManagerScreen
 import com.sbro.emucorev.ui.home.HomeScreen
@@ -90,6 +91,8 @@ private const val ROUTE_MY_LISTS = "my-lists"
 private const val ROUTE_DISCORD = "discord"
 private const val ROUTE_GAME_MANAGER = "game-manager"
 private const val ROUTE_GAME_MANAGER_WITH_TITLE = "game-manager/{titleId}"
+private const val ROUTE_TOUCH_LAYOUT_EDITOR_GLOBAL = "touch-layout-editor/global"
+private const val ROUTE_TOUCH_LAYOUT_EDITOR_GAME = "touch-layout-editor/game/{titleId}"
 private const val ROUTE_PLAY_TIME = "play-time"
 private const val ROUTE_PLAY_TIME_WITH_TITLE = "play-time/{titleId}"
 private const val ROUTE_ACHIEVEMENTS = "achievements"
@@ -118,6 +121,9 @@ private fun saveStatesRoute(titleId: String? = null): String =
     titleId?.takeIf(String::isNotBlank)?.let { "$ROUTE_SAVE_STATES/$it" } ?: ROUTE_SAVE_STATES
 private fun gameManagerRoute(titleId: String? = null): String =
     titleId?.takeIf(String::isNotBlank)?.let { "$ROUTE_GAME_MANAGER/$it" } ?: ROUTE_GAME_MANAGER
+private fun touchLayoutEditorGameRoute(titleId: String?): String =
+    titleId?.takeIf(String::isNotBlank)?.let { "touch-layout-editor/game/${Uri.encode(it)}" }
+        ?: ROUTE_TOUCH_LAYOUT_EDITOR_GLOBAL
 private fun playTimeRoute(titleId: String? = null): String =
     titleId?.takeIf(String::isNotBlank)?.let { "$ROUTE_PLAY_TIME/$it" } ?: ROUTE_PLAY_TIME
 private fun achievementsRoute(titleId: String? = null): String =
@@ -322,6 +328,15 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             popExitTransition = { appScreenPopExitTransition() },
             sizeTransform = { SizeTransform(clip = false) }
         ) {
+            composable(ROUTE_TOUCH_LAYOUT_EDITOR_GLOBAL) {
+                TouchLayoutEditorScreen(onBackClick = { navController.popBackStack() })
+            }
+            composable(ROUTE_TOUCH_LAYOUT_EDITOR_GAME) { entry ->
+                TouchLayoutEditorScreen(
+                    titleId = entry.arguments?.getString("titleId"),
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
             composable(
                 ROUTE_ONBOARDING
             ) {
@@ -572,6 +587,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(ROUTE_GPU_DRIVER) { launchSingleTop = true }
                     },
                     onOpenDiscord = navigateDiscord,
+                    onOpenTouchLayoutEditor = {
+                        navController.navigate(ROUTE_TOUCH_LAYOUT_EDITOR_GLOBAL) { launchSingleTop = true }
+                    },
                         viewModel = settingsViewModel
                     )
                 }
@@ -624,6 +642,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         navController.navigate(ROUTE_GPU_DRIVER) { launchSingleTop = true }
                     },
                     onOpenDiscord = navigateDiscord,
+                    onOpenTouchLayoutEditor = {
+                        navController.navigate(ROUTE_TOUCH_LAYOUT_EDITOR_GLOBAL) { launchSingleTop = true }
+                    },
                         viewModel = settingsViewModel
                     )
                 }
@@ -1079,6 +1100,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     GameManagerScreen(
                         onMenuClick = openDrawer,
                         onBackClick = navigateHome,
+                        onOpenTouchLayoutEditor = { titleId ->
+                            navController.navigate(touchLayoutEditorGameRoute(titleId)) { launchSingleTop = true }
+                        },
                         onOpenGpuDriverManager = {
                             navController.navigate(gpuDriverRoute(it)) { launchSingleTop = true }
                         }
@@ -1090,6 +1114,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     initialTitleId = entry.arguments?.getString("titleId"),
                     onMenuClick = null,
                     onBackClick = { navController.popBackStack() },
+                    onOpenTouchLayoutEditor = { titleId ->
+                        navController.navigate(touchLayoutEditorGameRoute(titleId)) { launchSingleTop = true }
+                    },
                     onOpenGpuDriverManager = {
                         navController.navigate(gpuDriverRoute(it)) { launchSingleTop = true }
                     }

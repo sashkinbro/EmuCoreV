@@ -33,4 +33,12 @@ class SaveStateBridgeTest {
     fun olderNativeResponseDefaultsToUsableSession() {
         assertEquals(true, parse("""{"status":"ok"}""").sessionUsable)
     }
+
+    @Test
+    fun incompatibleRendererRequestsSafeRestartOnlyAfterUsablePreflight() {
+        assertEquals(true, parse("""{"status":"configuration-mismatch","sessionUsable":true}""").requiresRendererRestart)
+        assertEquals(false, parse("""{"status":"configuration-mismatch","sessionUsable":false}""").requiresRendererRestart)
+        assertEquals(false, parse("""{"status":"unsupported-version","sessionUsable":true}""").requiresRendererRestart)
+        assertEquals(false, parse("""{"status":"invalid-file","sessionUsable":true}""").requiresRendererRestart)
+    }
 }

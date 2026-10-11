@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">إحصاءات</string>
+    <string name="stats_help">يغطي استخدام المعالج هذا التطبيق عبر جميع الأنوية. استخدام معالج الرسوميات يشمل الجهاز عند توفر القراءة. درجة الحرارة من مستشعر البطارية؛ تظهر القراءات غير المتاحة بالشكل —.</string>
+    <string name="stats_position">الموضع</string>
+    <string name="stats_top_left">أعلى اليسار</string>
+    <string name="stats_top_right">أعلى اليمين</string>
+    <string name="stats_bottom_left">أسفل اليسار</string>
+    <string name="stats_bottom_right">أسفل اليمين</string>
+    <string name="stats_size">الحجم</string>
+    <string name="stats_metrics">المقاييس الظاهرة</string>
+    <string name="stats_reset">إعادة ضبط الإحصاءات</string>
+    <string name="stats_version">إصدار التطبيق والنواة</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">درجة حرارة البطارية</string>
+    <string name="stats_thermal">الحالة الحرارية</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">متوقف مؤقتًا</string>
+    <string name="stats_thermal_none">طبيعية</string>
+    <string name="stats_thermal_light">خفيفة</string>
+    <string name="stats_thermal_moderate">متوسطة</string>
+    <string name="stats_thermal_severe">شديدة</string>
+    <string name="stats_thermal_critical">حرجة</string>
+    <string name="stats_thermal_emergency">طارئة</string>
+    <string name="stats_thermal_shutdown">إيقاف التشغيل</string>
+    <string name="stats_mode">وضع العرض</string>
+    <string name="stats_mode_off">إيقاف</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">تفصيلي</string>
+    <string name="stats_enabled">عرض FPS</string>
+</resources>

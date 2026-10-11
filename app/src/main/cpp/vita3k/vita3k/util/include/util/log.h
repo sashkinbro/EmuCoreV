@@ -17,7 +17,11 @@
 
 #pragma once
 
+#ifdef NDEBUG
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_OFF
+#else
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
+#endif
 
 #include <boost/core/demangle.hpp>
 #include <boost/describe/enum.hpp>
@@ -37,7 +41,11 @@
 #define LOG_ERROR SPDLOG_ERROR
 #define LOG_CRITICAL SPDLOG_CRITICAL
 
+#ifdef NDEBUG
+#define LOG_IF(log_function, flag, ...) static_cast<void>(0)
+#else
 #define LOG_IF(log_function, flag, ...) ((flag) ? log_function(__VA_ARGS__) : static_cast<void>(0))
+#endif
 
 #define LOG_TRACE_IF(flag, ...) LOG_IF(LOG_TRACE, flag, __VA_ARGS__)
 #define LOG_DEBUG_IF(flag, ...) LOG_IF(LOG_DEBUG, flag, __VA_ARGS__)
@@ -46,12 +54,16 @@
 #define LOG_ERROR_IF(flag, ...) LOG_IF(LOG_ERROR, flag, __VA_ARGS__)
 #define LOG_CRITICAL_IF(flag, ...) LOG_IF(LOG_CRITICAL, flag, __VA_ARGS__)
 
+#ifdef NDEBUG
+#define LOG_ONCE(log_function, ...) static_cast<void>(0)
+#else
 #define LOG_ONCE(log_function, ...)         \
     do {                                    \
         static std::atomic_flag has_logged; \
         if (!has_logged.test_and_set())     \
             log_function(__VA_ARGS__);      \
     } while (0)
+#endif
 
 #define LOG_TRACE_ONCE(...) LOG_ONCE(LOG_TRACE, __VA_ARGS__)
 #define LOG_DEBUG_ONCE(...) LOG_ONCE(LOG_DEBUG, __VA_ARGS__)

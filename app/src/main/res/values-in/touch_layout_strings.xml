@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">Tata letak sentuh</string>
+    <string name="touch_layout_settings_description">Atur posisi dan ukuran awal kontrol di layar. Game dengan tata letak sendiri akan tetap menggunakannya.</string>
+                <string name="touch_layout_game_inherited">Menggunakan tata letak global</string>
+    <string name="touch_layout_game_custom">Tata letak khusus untuk game ini</string>
+    <string name="touch_layout_edit">Edit kontrol sentuh</string>
+    <string name="touch_layout_use_global">Gunakan tata letak global</string>
+        </resources>

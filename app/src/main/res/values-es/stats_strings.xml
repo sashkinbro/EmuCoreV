@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">Estadísticas</string>
+    <string name="stats_help">CPU mide esta app en todos los núcleos. GPU mide todo el dispositivo si está disponible. La temperatura es de la batería; los datos ausentes muestran —.</string>
+    <string name="stats_position">Posición</string>
+    <string name="stats_top_left">Arriba izquierda</string>
+    <string name="stats_top_right">Arriba derecha</string>
+    <string name="stats_bottom_left">Abajo izquierda</string>
+    <string name="stats_bottom_right">Abajo derecha</string>
+    <string name="stats_size">Tamaño</string>
+    <string name="stats_metrics">Métricas visibles</string>
+    <string name="stats_reset">Restablecer estadísticas</string>
+    <string name="stats_version">Versión de app y núcleo</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Temperatura de batería</string>
+    <string name="stats_thermal">Estado térmico</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">En pausa</string>
+    <string name="stats_thermal_none">Normal</string>
+    <string name="stats_thermal_light">Leve</string>
+    <string name="stats_thermal_moderate">Moderado</string>
+    <string name="stats_thermal_severe">Grave</string>
+    <string name="stats_thermal_critical">Crítico</string>
+    <string name="stats_thermal_emergency">Emergencia</string>
+    <string name="stats_thermal_shutdown">Apagado</string>
+    <string name="stats_mode">Modo de visualización</string>
+    <string name="stats_mode_off">Desactivado</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Detallado</string>
+    <string name="stats_enabled">Mostrar FPS</string>
+</resources>

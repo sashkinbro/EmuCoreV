@@ -56,6 +56,7 @@ inline static CondvarPtrs &get_condvars(KernelState &kernel, SyncWeight weight) 
 
 namespace {
 
+#ifndef NDEBUG
 struct EvfOp {
     uint64_t ms;
     SceUID evf;
@@ -68,6 +69,7 @@ struct EvfOp {
 constexpr size_t EVF_RING_SIZE = 512;
 std::array<EvfOp, EVF_RING_SIZE> evf_ring{};
 std::atomic<uint64_t> evf_ring_next{ 0 };
+#endif
 
 // every thread that EVER set each flag: the provable-cycle breaker needs "who could wake this"
 std::mutex evf_setters_mutex;
@@ -78,9 +80,11 @@ void evf_record(SceUID evf, SceUID thread, uint8_t op, uint32_t bits, uint32_t f
         const std::lock_guard<std::mutex> lock(evf_setters_mutex);
         evf_setters[evf].insert(thread);
     }
+#ifndef NDEBUG
     const uint64_t idx = evf_ring_next.fetch_add(1, std::memory_order_relaxed);
     const uint64_t ms = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
     evf_ring[idx % EVF_RING_SIZE] = EvfOp{ ms, evf, thread, op, bits, flags_after, woken };
+#endif
 }
 
 struct MutexCacheEntry {
@@ -1496,6 +1500,7 @@ int KernelState::try_break_provable_evf_cycle(bool dry_run) {
 }
 
 void KernelState::log_eventflag_history() {
+#ifndef NDEBUG
     {
         const std::lock_guard<std::mutex> lock(mutex);
         for (const auto &[uid, event] : eventflags) {
@@ -1519,6 +1524,7 @@ void KernelState::log_eventflag_history() {
             op_names[e.op <= 4 ? e.op : 4], e.ms, e.evf, e.thread, e.bits, e.flags_after, e.woken);
     }
     LOG_ERROR("HANG EVF HISTORY ({} op(s), oldest first):\n{}", count, hist);
+#endif
 }
 
 int KernelState::try_break_frame_sync_deadlock(std::vector<SceUID> &already_nudged) {

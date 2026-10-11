@@ -1,0 +1,8 @@
+<resources>
+    <string name="touch_layout_settings_title">تخطيط اللمس</string>
+    <string name="touch_layout_settings_description">اضبط مواضع عناصر التحكم على الشاشة وأحجامها الافتراضية. تحتفظ الألعاب ذات التخطيط الخاص بها به.</string>
+                <string name="touch_layout_game_inherited">يستخدم التخطيط العام</string>
+    <string name="touch_layout_game_custom">تخطيط مخصص لهذه اللعبة</string>
+    <string name="touch_layout_edit">تعديل عناصر التحكم باللمس</string>
+    <string name="touch_layout_use_global">استخدام التخطيط العام</string>
+        </resources>

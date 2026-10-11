@@ -66,6 +66,7 @@ import androidx.compose.ui.window.DialogProperties
 import android.view.InputDevice
 import android.widget.Toast
 import com.sbro.emucorev.R
+import com.sbro.emucorev.BuildConfig
 import com.sbro.emucorev.core.AndroidGyroscopeInput
 import com.sbro.emucorev.core.CHEATS_ENABLED
 import com.sbro.emucorev.core.GpuDriverCompatibility
@@ -136,7 +137,8 @@ fun SettingsTabContent(
     refreshCoreSettingsClick: () -> Unit,
     createBackupClick: () -> Unit,
     restoreBackupClick: () -> Unit,
-    onOpenTrophySoundPicker: () -> Unit = {}
+    onOpenTrophySoundPicker: () -> Unit = {},
+    onOpenTouchLayoutEditor: () -> Unit = {}
 ) {
     when (selectedTab) {
         SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings, onOpenVitaLanguageSettings)
@@ -151,7 +153,7 @@ fun SettingsTabContent(
         SettingsTab.Graphics -> GraphicsTab(uiState, defaults, viewModel, onOpenGpuDriverSettings)
         SettingsTab.Audio -> AudioTab(uiState, defaults, viewModel, refreshCoreSettingsClick, onOpenTrophySoundPicker)
         SettingsTab.Overlay -> OverlayTab(uiState, defaults, viewModel)
-        SettingsTab.Controls -> ControlsTab(uiState, defaults, viewModel)
+        SettingsTab.Controls -> ControlsTab(uiState, defaults, viewModel, onOpenTouchLayoutEditor)
         SettingsTab.Camera -> CameraTab(uiState, defaults, viewModel)
         SettingsTab.System -> SystemTab(uiState, defaults, viewModel)
         SettingsTab.Advanced -> AdvancedTab(uiState, defaults, viewModel)
@@ -221,13 +223,6 @@ private fun GeneralTab(
         SliderRow(title = stringResource(R.string.settings_cpu_pool_size), description = stringResource(R.string.settings_help_cpu_pool_size), valueText = stringResource(R.string.settings_cpu_pool_size_value, uiState.coreConfig.cpuPoolSize), onResetDefault = { viewModel.updateCoreSettings { it.copy(cpuPoolSize = defaults.cpuPoolSize) } }) {
             Slider(value = uiState.coreConfig.cpuPoolSize.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(cpuPoolSize = value.roundToInt().coerceIn(1, 32)) } }, valueRange = 1f..32f, steps = 30)
         }
-        Toggle(
-            title = stringResource(R.string.settings_experimental_cheats),
-            description = stringResource(R.string.settings_help_experimental_cheats),
-            checked = uiState.customization.experimentalCheats,
-            onCheckedChange = { enabled -> viewModel.updateExperimentalCheats(enabled) },
-            onResetDefault = { viewModel.updateExperimentalCheats(false) }
-        )
     }
 
 }
@@ -425,72 +420,8 @@ private fun AudioTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMod
 
 @Composable
 private fun OverlayTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel) {
+    PerformanceStatsSettingsSection()
     SectionCard(title = stringResource(R.string.settings_tab_overlay), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
-        Toggle(stringResource(R.string.settings_core_performance_overlay), stringResource(R.string.settings_help_performance_overlay), uiState.coreConfig.performanceOverlay, { enabled -> viewModel.updateCoreSettings { it.copy(performanceOverlay = enabled) } }, { viewModel.updateCoreSettings { it.copy(performanceOverlay = defaults.performanceOverlay) } })
-        Chips(stringResource(R.string.settings_core_overlay_detail_title), stringResource(R.string.settings_help_performance_overlay_detail), { viewModel.updateCoreSettings { it.copy(performanceOverlayDetail = defaults.performanceOverlayDetail) } }) {
-            IntChip(
-                0,
-                stringResource(R.string.settings_core_overlay_detail_minimum),
-                uiState.coreConfig.performanceOverlayDetail,
-                viewModel
-            ) { config, value -> config.copy(performanceOverlayDetail = value) }
-            IntChip(
-                1,
-                stringResource(R.string.settings_core_overlay_detail_low),
-                uiState.coreConfig.performanceOverlayDetail,
-                viewModel
-            ) { config, value -> config.copy(performanceOverlayDetail = value) }
-            IntChip(
-                2,
-                stringResource(R.string.settings_core_overlay_detail_medium),
-                uiState.coreConfig.performanceOverlayDetail,
-                viewModel
-            ) { config, value -> config.copy(performanceOverlayDetail = value) }
-            IntChip(
-                3,
-                stringResource(R.string.settings_core_overlay_detail_maximum),
-                uiState.coreConfig.performanceOverlayDetail,
-                viewModel
-            ) { config, value -> config.copy(performanceOverlayDetail = value) }
-        }
-        Chips(stringResource(R.string.settings_core_overlay_position_title), stringResource(R.string.settings_help_performance_overlay_position), { viewModel.updateCoreSettings { it.copy(performanceOverlayPosition = defaults.performanceOverlayPosition) } }) {
-            IntChip(
-                0,
-                stringResource(R.string.settings_core_overlay_position_top_left),
-                uiState.coreConfig.performanceOverlayPosition,
-                viewModel
-            ) { config, value -> config.copy(performanceOverlayPosition = value) }
-            IntChip(
-                1,
-                stringResource(R.string.settings_core_overlay_position_top_center),
-                uiState.coreConfig.performanceOverlayPosition,
-                viewModel
-            ) { config, value -> config.copy(performanceOverlayPosition = value) }
-            IntChip(
-                2,
-                stringResource(R.string.settings_core_overlay_position_top_right),
-                uiState.coreConfig.performanceOverlayPosition,
-                viewModel
-            ) { config, value -> config.copy(performanceOverlayPosition = value) }
-            IntChip(
-                3,
-                stringResource(R.string.settings_core_overlay_position_bottom_left),
-                uiState.coreConfig.performanceOverlayPosition,
-                viewModel
-            ) { config, value -> config.copy(performanceOverlayPosition = value) }
-            IntChip(
-                4,
-                stringResource(R.string.settings_core_overlay_position_bottom_center),
-                uiState.coreConfig.performanceOverlayPosition,
-                viewModel
-            ) { config, value -> config.copy(performanceOverlayPosition = value) }
-            IntChip(
-                5,
-                stringResource(R.string.settings_core_overlay_position_bottom_right),
-                uiState.coreConfig.performanceOverlayPosition,
-                viewModel
-            ) { config, value -> config.copy(performanceOverlayPosition = value) }
-        }
         Toggle(stringResource(R.string.settings_core_gamepad_overlay), stringResource(R.string.settings_help_gamepad_overlay), uiState.coreConfig.enableGamepadOverlay, { enabled -> viewModel.updateCoreSettings { it.copy(enableGamepadOverlay = enabled) } }, { viewModel.updateCoreSettings { it.copy(enableGamepadOverlay = defaults.enableGamepadOverlay) } })
         Toggle(stringResource(R.string.settings_show_touch_switch), stringResource(R.string.settings_help_show_touch_switch), uiState.coreConfig.overlayShowTouchSwitch, { enabled -> viewModel.updateCoreSettings { it.copy(overlayShowTouchSwitch = enabled) } }, { viewModel.updateCoreSettings { it.copy(overlayShowTouchSwitch = defaults.overlayShowTouchSwitch) } })
         SliderRow(stringResource(R.string.settings_core_overlay_scale_label), stringResource(R.string.settings_help_overlay_scale), stringResource(R.string.settings_core_overlay_scale_value, uiState.coreConfig.overlayScale), { viewModel.updateCoreSettings { it.copy(overlayScale = defaults.overlayScale) } }) {
@@ -503,7 +434,12 @@ private fun OverlayTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewM
 }
 
 @Composable
-private fun ControlsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel) {
+private fun ControlsTab(
+    uiState: SettingsUiState,
+    defaults: VitaCoreConfig,
+    viewModel: SettingsViewModel,
+    onOpenTouchLayoutEditor: () -> Unit
+) {
     val context = LocalContext.current
     val gamepadConnected = remember {
         InputDevice.getDeviceIds().any { id ->
@@ -515,6 +451,19 @@ private fun ControlsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
         Toggle(stringResource(R.string.settings_core_disable_motion), stringResource(R.string.settings_help_disable_motion), uiState.coreConfig.disableMotion, { enabled -> viewModel.updateCoreSettings { it.copy(disableMotion = enabled) } }, { viewModel.updateCoreSettings { it.copy(disableMotion = defaults.disableMotion) } })
         SliderRow(stringResource(R.string.settings_core_analog_multiplier_label), stringResource(R.string.settings_help_analog_multiplier), stringResource(R.string.settings_core_analog_multiplier_value, uiState.coreConfig.analogMultiplier), { viewModel.updateCoreSettings { it.copy(analogMultiplier = defaults.analogMultiplier) } }) {
             Slider(value = uiState.coreConfig.analogMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(analogMultiplier = (value * 10).roundToInt() / 10f) } }, valueRange = 0.5f..2f, steps = 14)
+        }
+    }
+    SectionCard(
+        title = stringResource(R.string.touch_layout_settings_title),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)
+    ) {
+        Text(
+            text = stringResource(R.string.touch_layout_settings_description),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
+        )
+        Button(shape = neonButtonShape(), onClick = onOpenTouchLayoutEditor, modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)) {
+            Text(stringResource(R.string.touch_layout_edit))
         }
     }
     SectionCard(title = stringResource(R.string.settings_touch_controls_section), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
@@ -734,12 +683,14 @@ private fun SystemTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMo
 @Composable
 private fun AdvancedTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel) {
     SectionCard(title = stringResource(R.string.settings_tab_advanced), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
-        Toggle(stringResource(R.string.settings_validation_layer), stringResource(R.string.settings_help_validation_layer), uiState.coreConfig.validationLayer, { enabled -> viewModel.updateCoreSettings { it.copy(validationLayer = enabled) } }, { viewModel.updateCoreSettings { it.copy(validationLayer = defaults.validationLayer) } })
-        Toggle(stringResource(R.string.settings_log_active_shaders), stringResource(R.string.settings_help_log_active_shaders), uiState.coreConfig.logActiveShaders, { enabled -> viewModel.updateCoreSettings { it.copy(logActiveShaders = enabled) } }, { viewModel.updateCoreSettings { it.copy(logActiveShaders = defaults.logActiveShaders) } })
-        Toggle(stringResource(R.string.settings_log_uniforms), stringResource(R.string.settings_help_log_uniforms), uiState.coreConfig.logUniforms, { enabled -> viewModel.updateCoreSettings { it.copy(logUniforms = enabled) } }, { viewModel.updateCoreSettings { it.copy(logUniforms = defaults.logUniforms) } })
-        Toggle(stringResource(R.string.settings_compatibility_warnings), stringResource(R.string.settings_help_compatibility_warnings), uiState.coreConfig.logCompatWarn, { enabled -> viewModel.updateCoreSettings { it.copy(logCompatWarn = enabled) } }, { viewModel.updateCoreSettings { it.copy(logCompatWarn = defaults.logCompatWarn) } })
-        Toggle(stringResource(R.string.settings_archive_install_log), stringResource(R.string.settings_help_archive_install_log), uiState.coreConfig.archiveLog, { enabled -> viewModel.updateCoreSettings { it.copy(archiveLog = enabled) } }, { viewModel.updateCoreSettings { it.copy(archiveLog = defaults.archiveLog) } })
-        Toggle(stringResource(R.string.settings_color_surface_debug), stringResource(R.string.settings_help_color_surface_debug), uiState.coreConfig.colorSurfaceDebug, { enabled -> viewModel.updateCoreSettings { it.copy(colorSurfaceDebug = enabled) } }, { viewModel.updateCoreSettings { it.copy(colorSurfaceDebug = defaults.colorSurfaceDebug) } })
+        if (BuildConfig.DEBUG) {
+            Toggle(stringResource(R.string.settings_validation_layer), stringResource(R.string.settings_help_validation_layer), uiState.coreConfig.validationLayer, { enabled -> viewModel.updateCoreSettings { it.copy(validationLayer = enabled) } }, { viewModel.updateCoreSettings { it.copy(validationLayer = defaults.validationLayer) } })
+            Toggle(stringResource(R.string.settings_log_active_shaders), stringResource(R.string.settings_help_log_active_shaders), uiState.coreConfig.logActiveShaders, { enabled -> viewModel.updateCoreSettings { it.copy(logActiveShaders = enabled) } }, { viewModel.updateCoreSettings { it.copy(logActiveShaders = defaults.logActiveShaders) } })
+            Toggle(stringResource(R.string.settings_log_uniforms), stringResource(R.string.settings_help_log_uniforms), uiState.coreConfig.logUniforms, { enabled -> viewModel.updateCoreSettings { it.copy(logUniforms = enabled) } }, { viewModel.updateCoreSettings { it.copy(logUniforms = defaults.logUniforms) } })
+            Toggle(stringResource(R.string.settings_compatibility_warnings), stringResource(R.string.settings_help_compatibility_warnings), uiState.coreConfig.logCompatWarn, { enabled -> viewModel.updateCoreSettings { it.copy(logCompatWarn = enabled) } }, { viewModel.updateCoreSettings { it.copy(logCompatWarn = defaults.logCompatWarn) } })
+            Toggle(stringResource(R.string.settings_archive_install_log), stringResource(R.string.settings_help_archive_install_log), uiState.coreConfig.archiveLog, { enabled -> viewModel.updateCoreSettings { it.copy(archiveLog = enabled) } }, { viewModel.updateCoreSettings { it.copy(archiveLog = defaults.archiveLog) } })
+            Toggle(stringResource(R.string.settings_color_surface_debug), stringResource(R.string.settings_help_color_surface_debug), uiState.coreConfig.colorSurfaceDebug, { enabled -> viewModel.updateCoreSettings { it.copy(colorSurfaceDebug = enabled) } }, { viewModel.updateCoreSettings { it.copy(colorSurfaceDebug = defaults.colorSurfaceDebug) } })
+        }
         Toggle(stringResource(R.string.settings_spirv_shader_mode), stringResource(R.string.settings_help_spirv_shader_mode), uiState.coreConfig.spirvShader, { enabled -> viewModel.updateCoreSettings { it.copy(spirvShader = enabled) } }, { viewModel.updateCoreSettings { it.copy(spirvShader = defaults.spirvShader) } })
         Chips(
             title = stringResource(R.string.settings_screenshot_format),

@@ -1,7 +1,6 @@
 package com.sbro.emucorev.core
 
 import android.util.Log
-import androidx.annotation.Keep
 import org.json.JSONObject
 
 data class SaveStateResult(
@@ -18,6 +17,7 @@ data class SaveStateResult(
     val isOk: Boolean get() = status == STATUS_OK
     val isSessionMismatch: Boolean get() = status == STATUS_SESSION_MISMATCH
     val isTitleMismatch: Boolean get() = status == STATUS_TITLE_MISMATCH
+    val requiresRendererRestart: Boolean get() = status == STATUS_CONFIGURATION_MISMATCH && sessionUsable
 
     companion object {
         const val STATUS_OK = "ok"
@@ -25,6 +25,7 @@ data class SaveStateResult(
         const val STATUS_INVALID_FILE = "invalid-file"
         const val STATUS_UNSUPPORTED_VERSION = "unsupported-version"
         const val STATUS_TITLE_MISMATCH = "title-mismatch"
+        const val STATUS_CONFIGURATION_MISMATCH = "configuration-mismatch"
         const val STATUS_SESSION_MISMATCH = "session-mismatch"
         const val STATUS_NO_SPACE = "no-space"
         const val STATUS_IO_ERROR = "io-error"
@@ -32,24 +33,17 @@ data class SaveStateResult(
     }
 }
 
-@Keep
 object SaveStateBridge {
-    @Keep
     external fun nativeSaveState(path: String, appVersion: String): String
 
-    @Keep
     external fun nativeLoadState(path: String, allowCrossSession: Boolean): String
 
-    @Keep
     external fun nativeInspectSaveState(path: String): String
 
-    @Keep
     external fun nativeDeleteSaveState(path: String): String
 
-    @Keep
     external fun nativeCaptureThumbnail(path: String, maxWidth: Int): Boolean
 
-    @Keep
     external fun nativeGetRunningTitleId(): String
 
     fun runningTitleId(): String =

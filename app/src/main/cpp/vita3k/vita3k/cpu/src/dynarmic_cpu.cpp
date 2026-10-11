@@ -42,11 +42,15 @@
 
 // Log the first few invalid guest accesses in full, then suppress (a guest null-deref loop can log GBs).
 static bool should_log_invalid_access() {
+#ifdef NDEBUG
+    return false;
+#else
     static std::atomic<uint64_t> count{ 0 };
     const uint64_t n = count.fetch_add(1, std::memory_order_relaxed);
     if (n == 8)
         LOG_ERROR("Further invalid guest memory accesses will be suppressed (guest likely spinning on a bad pointer)");
     return n < 8;
+#endif
 }
 
 static std::uint64_t coproc_noop(void *, std::uint32_t, std::uint32_t) {
@@ -214,6 +218,7 @@ public:
         if (!ptr || !ptr.valid(*parent->mem) || ptr.address() < parent->mem->host_page_size) {
             if (!confirm_invalid_access(addr, "instruction fetch"))
                 return MemoryRead32(addr);
+#ifndef NDEBUG
             uint32_t bc_nid = 0, bc_lr = 0;
             get_last_import_call(bc_nid, bc_lr);
             LOG_CRITICAL("Invalid instruction fetch at address 0x{:X} (last HLE import on this thread: nid=0x{:X} called from LR=0x{:X})\n{}", addr, bc_nid, bc_lr, cpu->save_context().description());
@@ -252,12 +257,14 @@ public:
                 }
                 LOG_CRITICAL("Memory at register targets (words -2..+5):\n{}", reg_mem);
             }
+#endif
             return std::nullopt;
         }
         return MemoryRead32(addr);
     }
 
     static void TraceInstruction(uint64_t self_, uint64_t address, uint64_t is_thumb) {
+#ifndef NDEBUG
         ArmDynarmicCallback &self = *reinterpret_cast<ArmDynarmicCallback *>(self_);
 
         std::string disassembly = [&]() -> std::string {
@@ -267,6 +274,7 @@ public:
             return disassemble(*self.parent, address);
         }();
         LOG_TRACE("{} ({}): {} {}", log_hex(self_), self.parent->thread_id, log_hex(address), disassembly);
+#endif
     }
 
     inline static std::recursive_timed_mutex loader_lock_mutex;
@@ -396,14 +404,17 @@ public:
                     ir.Imm64((uint64_t)this), ir.Imm64(0), ir.Imm64(0));
             }
         }
+#ifndef NDEBUG
         if (cpu->log_code && !may_be_conditional(is_thumb, pc, ir)) {
             ir.CallHostFunction(&TraceInstruction, ir.Imm64((uint64_t)this), ir.Imm64(pc), ir.Imm64(is_thumb));
         }
+#endif
     }
 
     // rechecks a failed lock-free validity test under the allocator lock
     bool confirm_invalid_access(Dynarmic::A32::VAddr addr, const char *what) {
         if (addr >= parent->mem->host_page_size && is_valid_addr_synced(*parent->mem, static_cast<Address>(addr))) {
+#ifndef NDEBUG
             static std::atomic<uint32_t> transient_count{ 0 };
             const uint32_t n = transient_count.fetch_add(1, std::memory_order_relaxed);
             if (n < 16)
@@ -411,6 +422,7 @@ public:
                     what, addr, this->cpu->get_pc(), parent->thread_id);
             else if (n == 16)
                 LOG_CRITICAL("Further transient-invalid recoveries will be suppressed");
+#endif
             return false;
         }
         return true;
@@ -421,6 +433,7 @@ public:
         Ptr<T> ptr{ addr };
         if (!ptr || !ptr.valid(*parent->mem) || ptr.address() < parent->mem->host_page_size) {
             const bool confirm = confirm_invalid_access(addr, "read");
+#ifndef NDEBUG
             {
                 static std::atomic<uint64_t> diag_invalid_reads{ 0 };
                 const uint64_t n = diag_invalid_reads.fetch_add(1, std::memory_order_relaxed) + 1;
@@ -464,6 +477,7 @@ public:
                         is_valid_addr(*parent->mem, addr), mem_name(addr, *parent->mem));
                 }
             }
+#endif
             if (!confirm)
                 return *ptr.get(*parent->mem);
             if (should_log_invalid_access()) {

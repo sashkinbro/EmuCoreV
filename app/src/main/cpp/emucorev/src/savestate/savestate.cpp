@@ -22,6 +22,7 @@
 #include <emucorev/savestate/motion_state_io.h>
 
 #include <cpu/functions.h>
+#include <config/state.h>
 #include <audio/state.h>
 #include <audio/continuation.h>
 #include <ctrl/state.h>
@@ -1892,6 +1893,7 @@ const char *status_name(Status status) {
     case Status::NoSpace: return "no-space";
     case Status::IoError: return "io-error";
     case Status::InternalError: return "internal-error";
+    case Status::ConfigurationMismatch: return "configuration-mismatch";
     }
     return "internal-error";
 }
@@ -2190,7 +2192,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     if (emuenv.renderer->current_backend != renderer::Backend::Vulkan
         || static_cast<uint32_t>(emuenv.renderer->mapping_method) != gpu_snapshot.mapping_method
         || emuenv.renderer->res_multiplier != gpu_snapshot.resolution) {
-        result.status = Status::UnsupportedVersion;
+        result.status = Status::ConfigurationMismatch;
         result.error = "GPU configuration differs from save state";
         return result;
     }
@@ -2486,6 +2488,53 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     report(progress, 1.0f, "done");
     world.release();
     emuenv.gxm.display_snapshot_gate.release();
+    return result;
+}
+
+Result prepare_launch_gpu_config(EmuEnvState &emuenv, const fs::path &path) {
+    Result result;
+    const auto fail = [&](Status status, const std::string &error) {
+        result.status = status;
+        result.error = error;
+        return result;
+    };
+    if (emuenv.renderer)
+        return fail(Status::NotRunning, "saved GPU configuration requires a cold launch");
+
+    Reader reader;
+    std::string error;
+    std::vector<uint8_t> data;
+    if (!reader.open(path, error)
+        || !reader.read_section(SectionId::Meta, data, error)
+        || !read_meta(data, result.meta))
+        return fail(Status::InvalidFile, error.empty() ? "invalid meta section" : error);
+    if (!supports_engine_version(result.meta.engine_version))
+        return fail(Status::UnsupportedVersion, "save state was created by an incompatible build");
+    if (emuenv.io.title_id.empty() || result.meta.title_id != emuenv.io.title_id)
+        return fail(Status::TitleMismatch, "save state belongs to another title");
+    if (result.meta.core_flags != static_cast<uint32_t>(renderer::Backend::Vulkan))
+        return fail(Status::UnsupportedVersion, "save states require Vulkan");
+
+    // No configuration is changed until the container checksums and complete
+    // GPU codec have been checked. Full guest-reference preflight remains in Load.
+    GpuSnapshot snapshot;
+    if (!reader.validate_sections(error)
+        || !reader.read_section(SectionId::Gpu, data, error)
+        || !parse_gpu_state(data, snapshot, error))
+        return fail(Status::InvalidFile, error.empty() ? "invalid GPU snapshot" : error);
+    if (snapshot.mapping_method > static_cast<uint32_t>(MappingMethod::NativeBuffer)
+        || !std::isfinite(snapshot.resolution) || snapshot.resolution <= 0 || snapshot.resolution > 16)
+        return fail(Status::InvalidFile, "invalid saved GPU configuration");
+
+    static constexpr const char *mapping_names[] = {
+        "disabled", "double-buffer", "external-host", "page-table", "native-buffer"
+    };
+    auto current = emuenv.cfg.current_config;
+    current.backend_renderer = "Vulkan";
+    current.memory_mapping = mapping_names[snapshot.mapping_method];
+    current.resolution_multiplier = snapshot.resolution;
+    emuenv.cfg.current_config = std::move(current);
+    emuenv.backend_renderer = renderer::Backend::Vulkan;
     return result;
 }
 

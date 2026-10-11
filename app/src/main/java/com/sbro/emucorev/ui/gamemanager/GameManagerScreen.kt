@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -73,6 +75,7 @@ import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.common.SettingHelpButton
+import com.sbro.emucorev.ui.emulation.TouchControlLayoutRepository
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
@@ -85,9 +88,13 @@ fun GameManagerScreen(
     onMenuClick: (() -> Unit)? = null,
     onBackClick: (() -> Unit)? = null,
     onOpenGpuDriverManager: (String?) -> Unit = {},
+    onOpenTouchLayoutEditor: (String?) -> Unit = {},
     viewModel: GameManagerViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val touchLayoutRepository = remember(context) { TouchControlLayoutRepository(context) }
+    var hasTouchLayoutOverride by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
     val resumeTitleId by rememberUpdatedState(initialTitleId ?: uiState.selectedTitleId)
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
@@ -97,10 +104,15 @@ fun GameManagerScreen(
         initialTitleId?.takeIf(String::isNotBlank)?.let(viewModel::selectGame)
     }
 
+    androidx.compose.runtime.LaunchedEffect(uiState.selectedTitleId) {
+        hasTouchLayoutOverride = uiState.selectedTitleId?.let(touchLayoutRepository::hasGameOverride) == true
+    }
+
     DisposableEffect(lifecycleOwner, initialTitleId) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.refresh(resumeTitleId)
+                hasTouchLayoutOverride = resumeTitleId?.let(touchLayoutRepository::hasGameOverride) == true
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -170,8 +182,16 @@ fun GameManagerScreen(
                     )
                     GameManagerTab.Performance -> PerformanceProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
                     GameManagerTab.Audio -> AudioProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
-                    GameManagerTab.Overlay -> OverlayProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
+                    GameManagerTab.Overlay -> OverlayProfileSection(uiState.selectedTitleId, uiState.config, uiState.defaults, viewModel::updateSelected)
                     GameManagerTab.Gamepad -> GamepadProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
+                    GameManagerTab.Controls -> GameManagerTouchLayoutSection(
+                        hasOverride = hasTouchLayoutOverride,
+                        onEdit = { onOpenTouchLayoutEditor(uiState.selectedTitleId) },
+                        onUseGlobal = {
+                            uiState.selectedTitleId?.let(touchLayoutRepository::clearForGame)
+                            hasTouchLayoutOverride = false
+                        }
+                    )
                 }
             }
         }
@@ -183,7 +203,8 @@ private enum class GameManagerTab {
     Performance,
     Audio,
     Overlay,
-    Gamepad
+    Gamepad,
+    Controls
 }
 
 @Composable
@@ -212,10 +233,41 @@ private fun GameManagerTabs(
                             GameManagerTab.Audio -> stringResource(R.string.settings_core_audio_title)
                             GameManagerTab.Overlay -> stringResource(R.string.settings_tab_overlay)
                             GameManagerTab.Gamepad -> stringResource(R.string.settings_gamepad_section)
+                            GameManagerTab.Controls -> stringResource(R.string.touch_layout_settings_title)
                         }
                     )
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun GameManagerTouchLayoutSection(
+    hasOverride: Boolean,
+    onEdit: () -> Unit,
+    onUseGlobal: () -> Unit
+) {
+    SectionCard(
+        title = stringResource(R.string.touch_layout_settings_title),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(CardContentPadding)
+    ) {
+        Text(
+            text = stringResource(
+                if (hasOverride) R.string.touch_layout_game_custom else R.string.touch_layout_game_inherited
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onEdit, shape = neonButtonShape()) {
+                Text(stringResource(R.string.touch_layout_edit))
+            }
+            if (hasOverride) {
+                OutlinedButton(onClick = onUseGlobal, shape = neonButtonShape()) {
+                    Text(stringResource(R.string.touch_layout_use_global))
+                }
+            }
         }
     }
 }
@@ -580,18 +632,13 @@ private fun AudioProfileSection(
 
 @Composable
 private fun OverlayProfileSection(
+    titleId: String?,
     config: VitaCoreConfig,
     defaults: VitaCoreConfig,
     onUpdate: ((VitaCoreConfig) -> VitaCoreConfig) -> Unit
 ) {
+    com.sbro.emucorev.ui.settings.PerformanceStatsSettingsSection(extraRowPadding = 0.dp, gameManagerStyle = true, titleId = titleId)
     SectionCard(title = stringResource(R.string.settings_tab_overlay)) {
-        ToggleRow(stringResource(R.string.settings_core_performance_overlay), config.performanceOverlay, stringResource(R.string.settings_help_performance_overlay), { onUpdate { it.copy(performanceOverlay = defaults.performanceOverlay) } }) { onUpdate { cfg -> cfg.copy(performanceOverlay = it) } }
-        ChoiceRow(stringResource(R.string.settings_core_overlay_detail_title), stringResource(R.string.settings_help_performance_overlay_detail), config.performanceOverlayDetail.toString(), listOf("0", "1", "2", "3"), { onUpdate { it.copy(performanceOverlayDetail = defaults.performanceOverlayDetail) } }) {
-            onUpdate { cfg -> cfg.copy(performanceOverlayDetail = it.toIntOrNull() ?: defaults.performanceOverlayDetail) }
-        }
-        ChoiceRow(stringResource(R.string.settings_core_overlay_position_title), stringResource(R.string.settings_help_performance_overlay_position), config.performanceOverlayPosition.toString(), listOf("0", "1", "2", "3", "4", "5"), { onUpdate { it.copy(performanceOverlayPosition = defaults.performanceOverlayPosition) } }) {
-            onUpdate { cfg -> cfg.copy(performanceOverlayPosition = it.toIntOrNull() ?: defaults.performanceOverlayPosition) }
-        }
         ToggleRow(stringResource(R.string.settings_core_gamepad_overlay), config.enableGamepadOverlay, stringResource(R.string.settings_help_gamepad_overlay), { onUpdate { it.copy(enableGamepadOverlay = defaults.enableGamepadOverlay) } }) { onUpdate { cfg -> cfg.copy(enableGamepadOverlay = it) } }
         ToggleRow(stringResource(R.string.settings_core_touchpad_cursor), config.showTouchpadCursor, stringResource(R.string.settings_help_touchpad_cursor), { onUpdate { it.copy(showTouchpadCursor = defaults.showTouchpadCursor) } }) { onUpdate { cfg -> cfg.copy(showTouchpadCursor = it) } }
         SliderRow(
@@ -767,6 +814,29 @@ private fun ChoiceRow(
     onReset: (() -> Unit)? = null,
     onSelected: (String) -> Unit
 ) {
+    ChoiceContainer(title = title, description = description, onReset = onReset) {
+        options.forEach { option ->
+            FilterChip(
+                shape = neonChipShape(),
+                selected = selected == option,
+                onClick = { onSelected(option) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ),
+                label = { Text(option) }
+            )
+        }
+    }
+}
+
+@Composable
+internal fun ChoiceContainer(
+    title: String,
+    description: String,
+    onReset: (() -> Unit)? = null,
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit
+) {
     SettingContainer(title = title, description = description, onReset = onReset) {
         Row(
             modifier = Modifier
@@ -774,21 +844,9 @@ private fun ChoiceRow(
                 .horizontalBleed(CardContentPadding)
                 .horizontalScroll(rememberScrollState())
                 .padding(horizontal = CardContentPadding),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            options.forEach { option ->
-                FilterChip(
-                    shape = neonChipShape(),
-                    selected = selected == option,
-                    onClick = { onSelected(option) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    label = { Text(option) }
-                )
-            }
-        }
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            content = content
+        )
     }
 }
 
@@ -834,7 +892,7 @@ private fun IntChoiceRow(
 }
 
 @Composable
-private fun ToggleRow(
+internal fun ToggleRow(
     title: String,
     checked: Boolean,
     description: String = title,
@@ -854,7 +912,7 @@ private fun ToggleRow(
 }
 
 @Composable
-private fun SliderRow(
+internal fun SliderRow(
     title: String,
     description: String = title,
     valueText: String,
@@ -889,14 +947,16 @@ private fun SettingContainer(
     enabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val cardShape = neonShape(18.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(cardShape)
             .combinedClickable(
                 onClick = {},
                 onLongClick = { onReset?.invoke() }
             ),
-        shape = neonShape(18.dp),
+        shape = cardShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 1.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
