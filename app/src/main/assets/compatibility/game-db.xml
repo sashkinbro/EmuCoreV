@@ -44,4 +44,10 @@
         <title-id>PCSE00383</title-id>
         <gpu high-accuracy="true" />
     </profile>
+    <profile id="ridge-racer-high-accuracy">
+        <!-- PCSE00001: verified on Lenovo on 2026-10-11. High GPU accuracy
+             avoids the crash entering car selection. Keep other user settings. -->
+        <title-id>PCSE00001</title-id>
+        <gpu high-accuracy="true" />
+    </profile>
 </game-db>

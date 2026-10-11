@@ -57,6 +57,16 @@ class GameCompatibilityDatabaseTest {
         assertSame(global, db.applyDefaults(global, "", "Borderlands 2"))
     }
 
+    @Test fun verifiedRidgeRacerStartsWithAccurateGpuWithoutChangingOtherGamesOrSettings() {
+        val db = database()
+        val global = VitaCoreConfig(highAccuracy = false, memoryMapping = "double-buffer",
+            customDriverName = "working-driver", resolutionMultiplier = 2f, audioVolume = 37)
+        assertEquals(global.copy(highAccuracy = true), db.applyDefaults(global, " pcse00001 ", "Renamed game"))
+        assertFalse(global.highAccuracy)
+        assertSame(global, db.applyDefaults(global, "UNVERIFIED", "RIDGE RACER"))
+        assertSame(global, db.applyDefaults(global, "", "RIDGE RACER"))
+    }
+
     @Test fun familyNamesAreDataDrivenAndDoNotMatchUnrelatedWords() {
         val db = database()
         listOf("FIFA Football", "EA SPORTS™ FIFA Soccer Demo", "fifa13", "FIFA 14", "FIFA 15 Legacy Edition", "FIFA 26 mod").forEach {
