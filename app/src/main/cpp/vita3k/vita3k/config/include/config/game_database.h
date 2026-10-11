@@ -30,9 +30,13 @@ inline bool valid_gpu(pugi::xml_node gpu) {
     const std::string_view renderer = gpu.attribute("backend-renderer").value();
     const std::string_view mapping = gpu.attribute("memory-mapping").value();
     const std::string_view angle = gpu.attribute("use-angle").value();
-    return (renderer == "Vulkan" || renderer == "OpenGL") && (angle == "true" || angle == "false")
+    const bool has_legacy_settings = gpu.attribute("backend-renderer") || gpu.attribute("memory-mapping") || gpu.attribute("use-angle");
+    if (has_legacy_settings && !((renderer == "Vulkan" || renderer == "OpenGL") && (angle == "true" || angle == "false")
         && (mapping == "disabled" || mapping == "double-buffer" || mapping == "external-host"
-            || mapping == "page-table" || mapping == "native-buffer");
+            || mapping == "page-table" || mapping == "native-buffer"))) return false;
+    const auto accuracy = gpu.attribute("high-accuracy");
+    if (accuracy && std::string_view(accuracy.value()) != "true" && std::string_view(accuracy.value()) != "false") return false;
+    return has_legacy_settings || accuracy;
 }
 
 inline pugi::xml_node recommendation(const pugi::xml_document &db, std::string_view title_id, std::string_view title = {}) {
@@ -57,6 +61,7 @@ template <typename Config>
 inline void apply_gpu_settings(Config &out, pugi::xml_node gpu) {
     if (auto renderer = gpu.attribute("backend-renderer")) out.backend_renderer = renderer.value();
     if (auto mapping = gpu.attribute("memory-mapping")) out.memory_mapping = mapping.value();
+    if (auto accuracy = gpu.attribute("high-accuracy")) out.high_accuracy = accuracy.as_bool();
 }
 
 } // namespace config::game_database

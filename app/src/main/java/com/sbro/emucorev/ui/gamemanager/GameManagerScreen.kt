@@ -364,8 +364,12 @@ private fun GraphicsProfileSection(
     SectionCard(title = stringResource(R.string.settings_tab_graphics)) {
         if (gameDbRecommendation != null) {
             Text(
-                text = stringResource(R.string.game_manager_db_recommendation,
-                    gameDbRecommendation.backendRenderer, gameDbRecommendation.memoryMapping),
+                text = if (gameDbRecommendation.backendRenderer != null && gameDbRecommendation.memoryMapping != null) {
+                    stringResource(R.string.game_manager_db_recommendation,
+                        gameDbRecommendation.backendRenderer, gameDbRecommendation.memoryMapping)
+                } else {
+                    stringResource(R.string.settings_core_high_accuracy)
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary
             )

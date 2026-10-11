@@ -13,16 +13,48 @@ class GameCompatibilityDatabaseTest {
     private fun database(text: String = xml) = text.byteInputStream().use(GameCompatibilityDatabase::parse)
 
     @Test fun allRegionalIdsAndRenamedModsReceiveRecommendations() {
-        val ids = Regex("<title-id>([^<]+)</title-id>").findAll(xml).map { it.groupValues[1] }.toSet()
+        val fifaProfile = xml.substringAfter("<profile id=\"fifa-native-buffer\"").substringBefore("</profile>")
+        val ids = Regex("<title-id>([^<]+)</title-id>").findAll(fifaProfile).map { it.groupValues[1] }.toSet()
         assertEquals(31, ids.size)
         val db = database()
         ids.forEach { id ->
             val recommended = db.recommendationFor(id, "EA SPORTS FC mod")!!
             assertEquals("native-buffer", recommended.memoryMapping)
             assertEquals("Vulkan", recommended.backendRenderer)
-            assertFalse(recommended.useAngle)
+            assertEquals(false, recommended.useAngle)
         }
         assertNotNull(db.recommendationFor(" pcse00483 "))
+    }
+
+    @Test fun highAccuracyOnlyRecommendationInheritsOtherGlobalSettings() {
+        val db = database("<game-db version=\"1\"><profile><title-id>EXACT</title-id><gpu high-accuracy=\"true\"/></profile></game-db>")
+        val global = VitaCoreConfig(backendRenderer = "OpenGL", memoryMapping = "page-table",
+            useAngle = true, customDriverName = "working-driver", audioVolume = 37, highAccuracy = false)
+        assertEquals(global.copy(highAccuracy = true), db.applyDefaults(global, "EXACT"))
+        assertFalse(global.highAccuracy)
+    }
+
+    @Test fun accuracyRecommendationsAcceptExplicitFalseAndRejectMalformedOrEmptyGpu() {
+        val global = VitaCoreConfig(highAccuracy = true)
+        val template = "<game-db version=\"1\"><profile><title-id>EXACT</title-id><gpu %s/></profile></game-db>"
+        assertFalse(database(template.format("high-accuracy=\"false\"")).applyDefaults(global, "EXACT").highAccuracy)
+        val fullValid = "backend-renderer=\"Vulkan\" memory-mapping=\"native-buffer\" use-angle=\"false\" high-accuracy=\"true\""
+        assertEquals(global.copy(backendRenderer = "Vulkan", memoryMapping = "native-buffer", useAngle = false),
+            database(template.format(fullValid)).applyDefaults(global, "EXACT"))
+        listOf("", "unknown=\"true\"", "high-accuracy=\"TRUE\"", "high-accuracy=\"\"",
+            "high-accuracy=\"enabled\"", "backend-renderer=\"Vulkan\" high-accuracy=\"true\"").forEach {
+            assertNull(it, database(template.format(it)).recommendationFor("EXACT"))
+        }
+        val full = "backend-renderer=\"Vulkan\" memory-mapping=\"native-buffer\" use-angle=\"false\" high-accuracy=\"invalid\""
+        assertNull(database(template.format(full)).recommendationFor("EXACT"))
+    }
+
+    @Test fun verifiedBorderlandsProfileChangesOnlyAccuracyAndDoesNotGuessOtherRegions() {
+        val db = database()
+        val global = VitaCoreConfig(backendRenderer = "OpenGL", memoryMapping = "disabled", useAngle = true)
+        assertEquals(global.copy(highAccuracy = true), db.applyDefaults(global, " pcse00383 ", "Renamed game"))
+        assertSame(global, db.applyDefaults(global, "UNVERIFIED", "Borderlands 2"))
+        assertSame(global, db.applyDefaults(global, "", "Borderlands 2"))
     }
 
     @Test fun familyNamesAreDataDrivenAndDoNotMatchUnrelatedWords() {

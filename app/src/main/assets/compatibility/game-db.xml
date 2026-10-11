@@ -38,4 +38,10 @@
         <title-id>PCSG00404</title-id>
         <gpu backend-renderer="Vulkan" memory-mapping="native-buffer" use-angle="false" />
     </profile>
+    <profile id="borderlands-2-high-accuracy">
+        <!-- PCSE00383: verified on Android on 2026-10-11. High accuracy removes
+             severe white/red posterization. Keep all other user settings. -->
+        <title-id>PCSE00383</title-id>
+        <gpu high-accuracy="true" />
+    </profile>
 </game-db>

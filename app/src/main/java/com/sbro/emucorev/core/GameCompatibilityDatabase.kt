@@ -6,12 +6,16 @@ import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
 
 data class GameGpuRecommendation(
-    val backendRenderer: String,
-    val memoryMapping: String,
-    val useAngle: Boolean
+    val backendRenderer: String? = null,
+    val memoryMapping: String? = null,
+    val useAngle: Boolean? = null,
+    val highAccuracy: Boolean? = null
 ) {
     fun applyTo(base: VitaCoreConfig): VitaCoreConfig = base.copy(
-        backendRenderer = backendRenderer, memoryMapping = memoryMapping, useAngle = useAngle
+        backendRenderer = backendRenderer ?: base.backendRenderer,
+        memoryMapping = memoryMapping ?: base.memoryMapping,
+        useAngle = useAngle ?: base.useAngle,
+        highAccuracy = highAccuracy ?: base.highAccuracy
     )
 }
 
@@ -59,19 +63,25 @@ class GameCompatibilityDatabase private constructor(private val profiles: List<P
                 if (entry.parentNode != root) continue
                 val gpu = entry.getElementsByTagName("gpu").item(0) as? Element ?: continue
                 if (gpu.parentNode != entry) continue
-                val renderer = gpu.getAttribute("backend-renderer")
-                val mapping = gpu.getAttribute("memory-mapping")
-                val angle = gpu.getAttribute("use-angle").toBooleanStrictOrNull() ?: continue
-                if (renderer !in listOf("Vulkan", "OpenGL") || mapping !in listOf(
+                val hasLegacySettings = listOf("backend-renderer", "memory-mapping", "use-angle")
+                    .any(gpu::hasAttribute)
+                val renderer = gpu.getAttribute("backend-renderer").takeIf { gpu.hasAttribute("backend-renderer") }
+                val mapping = gpu.getAttribute("memory-mapping").takeIf { gpu.hasAttribute("memory-mapping") }
+                val angle = gpu.getAttribute("use-angle").toBooleanStrictOrNull()
+                // Existing renderer profiles still require the complete validated tuple.
+                if (hasLegacySettings && (renderer !in listOf("Vulkan", "OpenGL") || mapping !in listOf(
                     "disabled", "double-buffer", "external-host", "page-table", "native-buffer"
-                )) continue
+                ) || angle == null)) continue
+                val accuracy = gpu.getAttribute("high-accuracy").toBooleanStrictOrNull()
+                if (gpu.hasAttribute("high-accuracy") && accuracy == null) continue
+                if (!hasLegacySettings && accuracy == null) continue
                 val ids = entry.getElementsByTagName("title-id")
                 val titleIds = (0 until ids.length).mapNotNull {
                     ids.item(it).takeIf { node -> node.parentNode == entry }
                         ?.textContent?.trim()?.uppercase(Locale.ROOT)
                 }.filter(String::isNotEmpty).toSet()
                 profiles += Profile(titleIds, entry.getAttribute("title-word").trim().uppercase(Locale.ROOT),
-                    GameGpuRecommendation(renderer, mapping, angle))
+                    GameGpuRecommendation(renderer, mapping, angle, accuracy))
             }
             return GameCompatibilityDatabase(profiles)
         }
