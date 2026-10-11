@@ -736,7 +736,7 @@
     <string name="install_dialog_unexpected_error">설치 중 문제가 발생했습니다.</string>
     <string name="install_dialog_firmware_failed">펌웨어 설치에 실패했습니다.</string>
     <string name="install_dialog_content_failed">게임 설치에 실패했습니다.</string>
-    <string name="install_dialog_vitamin_unsupported">일부 VPK 파일은 제대로 설치되지 않을 수 있습니다. 먼저 일반 설치를 시도하고, 실패하면 복구 후 설치를 사용하거나 일치하는 PKG와 라이선스를 설치하세요.</string>
+    <string name="install_dialog_vitamin_unsupported">Vitamin 덤프는 지원되지 않습니다. 아카이브 복구로 해결할 수 없습니다. 소유한 게임의 NoNpDrm 또는 FAGDec 덤프나 해당 PKG와 일치하는 라이선스를 사용하세요.</string>
     <string name="install_dialog_content_try_repair">유효한 VPK 또는 ZIP 이미지라면 게임 설치 대화 상자에서 복구 후 설치를 시도하세요.</string>
     <string name="install_dialog_archive_unreadable">아카이브를 읽을 수 없습니다. 손상되었거나 불완전할 수 있습니다.</string>
     <string name="install_dialog_archive_missing_metadata">아카이브에 sce_sys/param.sfo 또는 theme.xml과 같은 Vita 설치 메타데이터가 없습니다.</string>
@@ -744,7 +744,7 @@
     <string name="install_dialog_repack_entry">다시 패키징 중: %1$s</string>
     <string name="install_dialog_repack_installing">재구성된 ZIP 설치 중…</string>
     <string name="install_dialog_repack_failed">아카이브 복구로 설치 가능한 ZIP이 만들어지지 않았습니다. 다른 덤프를 시도하거나 일치하는 PKG와 라이선스를 설치하세요.</string>
-    <string name="install_dialog_vitamin_repair_failed">재구성된 VPK도 설치할 수 없습니다. 다른 덤프를 시도하거나 일치하는 PKG와 라이선스를 설치하세요.</string>
+    <string name="install_dialog_vitamin_repair_failed">Vitamin 덤프는 복구할 수 없습니다. 소유한 게임의 지원되는 덤프나 해당 PKG와 일치하는 라이선스를 사용하세요.</string>
     <string name="install_dialog_license_failed">라이선스 설치에 실패했습니다.</string>
     <string name="install_dialog_pkg_failed">PKG 설치에 실패했습니다.</string>
     <string name="install_dialog_firmware_done">펌웨어 패키지가 설치되었습니다.</string>
@@ -774,7 +774,7 @@
     <string name="setup_content_body">필요한 설치 데이터가 모두 포함된 게임 아카이브에 사용하세요. 아카이브 패킹 문제로 유효한 VPK 또는 ZIP이 실패하면 복구 옵션을 시도하세요.</string>
     <string name="setup_content_button">VPK 또는 ZIP 선택</string>
     <string name="setup_content_repair_button">복구 후 설치</string>
-    <string name="setup_content_repair_note">복구는 선택한 VPK 또는 ZIP을 설치 캐시의 새 ZIP으로 변환하고, 아카이브 패킹을 정규화하며, Vitamin 마커가 있으면 제거합니다. 유효한 아카이브의 일반 설치가 실패할 때만 사용하세요.</string>
+    <string name="setup_content_repair_note">복구는 선택한 VPK 또는 ZIP을 설치 캐시의 새 ZIP으로 다시 만들고 아카이브 구조와 압축을 정규화합니다. 지원되지 않는 Vitamin 덤프를 복구하거나 변환할 수는 없습니다.</string>
     <string name="setup_pkg_title">PKG 게임 설치</string>
     <string name="setup_pkg_body">PKG 설치는 게임 파일보다 일치하는 라이선스가 먼저 필요합니다. 1단계를 먼저 완료한 다음 2단계에서 PKG를 선택하세요.</string>
     <string name="setup_pkg_license_step_title">라이선스 추가</string>

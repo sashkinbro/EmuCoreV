@@ -740,7 +740,7 @@
     <string name="save_manager_restore_all_confirm_title">Відновити всі збереження?</string>
     <string name="save_manager_restore_all_confirm_body">Папки збережень з вибраної резервної копії замінять відповідні папки збережень на цьому пристрої. Існуючі збереження зберігаються лише тоді, коли резервна копія не містить такого ID збереження.</string>
     <string name="save_manager_restore_all_confirm">Відновити збереження</string>
-    <string name="install_dialog_vitamin_unsupported">Деякі VPK можуть встановлюватися некоректно. Спочатку спробуйте звичайне встановлення; якщо воно не вдасться, використайте "Відновити та встановити" або встановіть відповідний PKG і ліцензію.</string>
+    <string name="install_dialog_vitamin_unsupported">Дампи Vitamin не підтримуються. Відновлення архіву не виправить їх. Використайте дамп власної гри у форматі NoNpDrm або FAGDec чи її PKG і відповідну ліцензію.</string>
     <string name="settings_change_storage">Змінити сховище</string>
     <string name="settings_storage_location_internal">Пам\'ять пристрою</string>
     <string name="settings_storage_location_sd">SD-картка</string>
@@ -787,9 +787,9 @@
     <string name="install_dialog_repack_entry">Перепакування: %1$s</string>
     <string name="install_dialog_repack_installing">Встановлення перезібраного ZIP-архіву…</string>
     <string name="install_dialog_repack_failed">Відновлення архіву не створило ZIP, придатний для встановлення. Спробуйте інший дамп або встановіть відповідний PKG та ліцензію.</string>
-    <string name="install_dialog_vitamin_repair_failed">Перезібраний VPK усе ще не вдалося встановити. Спробуйте інший дамп або встановіть відповідний PKG та ліцензію.</string>
+    <string name="install_dialog_vitamin_repair_failed">Дампи Vitamin неможливо відновити. Використайте підтримуваний дамп власної гри або її PKG і відповідну ліцензію.</string>
     <string name="setup_content_repair_button">Відновити та встановити</string>
-    <string name="setup_content_repair_note">Відновлення перетворює вибраний VPK або ZIP на новий ZIP у кеші встановлення, нормалізує пакування архіву та видаляє маркер Vitamin, якщо він присутній. Використовуйте цю функцію лише тоді, коли звичайне встановлення для дійсного архіву завершується помилкою.</string>
+    <string name="setup_content_repair_note">Відновлення перезбирає вибраний VPK або ZIP у новий ZIP у кеші встановлення та нормалізує структуру й стиснення архіву. Воно не відновлює та не перетворює непідтримувані дампи Vitamin.</string>
     <string name="install_choice_archive_repair_button">Відновити та встановити</string>
     <string name="settings_vibration_section">Вібрація</string>
     <string name="settings_vibration_enable">Вібрація</string>

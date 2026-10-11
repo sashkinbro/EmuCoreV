@@ -56,9 +56,7 @@ object VitaArchiveRepacker {
                         val normalizedName = normalizeArchiveEntryName(entry.name)
                             ?: throw IOException("Unsafe archive entry: ${entry.name}")
                         if (isUnsupportedVitaminMarker(normalizedName)) {
-                            logInfo("Skipping unsupported Vitamin marker entry: $normalizedName")
-                            reportProgress(index + 1, entries.size, normalizedName, onProgress)
-                            return@forEachIndexed
+                            throw IOException("Vitamin dumps are unsupported; their required runtime cannot be removed")
                         }
                         if (!writtenNames.add(normalizedName.trimEnd('/').lowercase(Locale.US)))
                             throw IOException("Ambiguous duplicate archive entry: $normalizedName")

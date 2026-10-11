@@ -47,7 +47,8 @@ object VitaArchiveInspector {
                 var unsupportedCompressionEntries = 0
 
                 zip.entries.asSequence().forEach { entry ->
-                    val name = entry.name.replace('\\', '/').lowercase(Locale.US)
+                    val name = VitaArchiveRepacker.normalizeArchiveEntryName(entry.name)
+                        ?.lowercase(Locale.US) ?: entry.name.replace('\\', '/').lowercase(Locale.US)
                     if (name == VITAMIN_MARKER || name.endsWith("/$VITAMIN_MARKER")) {
                         vitaminDump = true
                     }

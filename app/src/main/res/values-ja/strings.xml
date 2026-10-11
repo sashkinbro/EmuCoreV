@@ -736,7 +736,7 @@
     <string name="install_dialog_unexpected_error">インストール中に問題が発生しました。</string>
     <string name="install_dialog_firmware_failed">ファームウェアのインストールに失敗しました。</string>
     <string name="install_dialog_content_failed">ゲームのインストールに失敗しました。</string>
-    <string name="install_dialog_vitamin_unsupported">一部のVPKファイルは正しくインストールできない場合があります。まず通常のインストールを試し、失敗した場合は「修復してインストール」を使用するか、対応するPKGとライセンスをインストールしてください。</string>
+    <string name="install_dialog_vitamin_unsupported">Vitaminダンプはサポートされていません。アーカイブの修復では直せません。所有するゲームのNoNpDrmまたはFAGDecダンプ、もしくはPKGと対応するライセンスを使用してください。</string>
     <string name="install_dialog_content_try_repair">これが有効なVPKまたはZIPイメージの場合は、ゲームインストールダイアログから「修復してインストール」を試してください。</string>
     <string name="install_dialog_archive_unreadable">アーカイブを読み取れませんでした。破損しているか、不完全である可能性があります。</string>
     <string name="install_dialog_archive_missing_metadata">アーカイブにsce_sys/param.sfoやtheme.xmlなどのVitaインストールメタデータが含まれていません。</string>
@@ -744,7 +744,7 @@
     <string name="install_dialog_repack_entry">再パック中: %1$s</string>
     <string name="install_dialog_repack_installing">再構築したZIPをインストール中…</string>
     <string name="install_dialog_repack_failed">アーカイブの修復でインストール可能なZIPを作成できませんでした。別のダンプを試すか、対応するPKGとライセンスをインストールしてください。</string>
-    <string name="install_dialog_vitamin_repair_failed">再構築したVPKもインストールできませんでした。別のダンプを試すか、対応するPKGとライセンスをインストールしてください。</string>
+    <string name="install_dialog_vitamin_repair_failed">Vitaminダンプは修復できません。所有するゲームの対応ダンプ、もしくはPKGと対応するライセンスを使用してください。</string>
     <string name="install_dialog_license_failed">ライセンスのインストールに失敗しました。</string>
     <string name="install_dialog_pkg_failed">PKGのインストールに失敗しました。</string>
     <string name="install_dialog_firmware_done">ファームウェアパッケージが正常にインストールされました。</string>
@@ -774,7 +774,7 @@
     <string name="setup_content_body">必要なインストールデータがすべて含まれているゲームアーカイブに使用します。アーカイブのパッキングが原因で有効なVPKまたはZIPが失敗する場合は、修復オプションを試してください。</string>
     <string name="setup_content_button">VPKまたはZIPを選択</string>
     <string name="setup_content_repair_button">修復してインストール</string>
-    <string name="setup_content_repair_note">修復は、選択したVPKまたはZIPをインストールキャッシュ内の新しいZIPに変換し、アーカイブのパッキングを正規化し、存在する場合はVitaminマーカーを削除します。有効なアーカイブで通常のインストールが失敗した場合にのみ使用してください。</string>
+    <string name="setup_content_repair_note">修復は、選択したVPKまたはZIPをインストールキャッシュ内の新しいZIPとして再構築し、アーカイブの構造と圧縮を正規化します。非対応のVitaminダンプを修復または変換することはできません。</string>
     <string name="setup_pkg_title">PKGゲームをインストール</string>
     <string name="setup_pkg_body">PKGのインストールには、ゲームファイルの前に対応するライセンスが必要です。先にステップ1を完了し、次にステップ2でPKGを選択してください。</string>
     <string name="setup_pkg_license_step_title">ライセンスを追加</string>

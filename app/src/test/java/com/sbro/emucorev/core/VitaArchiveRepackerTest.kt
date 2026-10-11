@@ -61,27 +61,34 @@ class VitaArchiveRepackerTest {
     }
 
     @Test
-    fun repackToInstallZipRemovesVitaminMarker() {
+    fun vitaminArchiveIsRejectedWithoutRemovingItsRequiredRuntime() {
         val source = temp.newFile("vitamin.vpk")
-        writeZip(
-            source,
-            "sce_sys/param.sfo" to byteArrayOf(1, 2, 3),
-            "eboot.bin" to byteArrayOf(4, 5),
-            "sce_module/steroid.suprx" to byteArrayOf(6)
-        )
+        writeZip(source, "sce_sys/param.sfo" to byteArrayOf(1, 2, 3),
+            "eboot.bin" to byteArrayOf(4, 5), "sce_module/steroid.suprx" to byteArrayOf(6))
+        val original = source.readBytes()
 
-        val output = VitaArchiveRepacker.repackToInstallZip(source.absolutePath, temp.root)
+        assertNull(VitaArchiveRepacker.repackToInstallZip(source.absolutePath, temp.root))
 
-        assertNotNull(output)
-        val inspection = VitaArchiveInspector.inspect(output!!.absolutePath)
-        assertTrue(inspection.readable)
-        assertTrue(inspection.hasInstallMetadata)
-        assertFalse(inspection.vitaminDump)
-        ZipFile(output).use { zip ->
-            assertNotNull(zip.getEntry("sce_sys/param.sfo"))
-            assertNotNull(zip.getEntry("eboot.bin"))
-            assertNull(zip.getEntry("sce_module/steroid.suprx"))
-        }
+        org.junit.Assert.assertArrayEquals(original, source.readBytes())
+        assertTrue(VitaArchiveInspector.inspect(source.absolutePath).vitaminDump)
+        assertTrue(File(temp.root, "install_repack_cache").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun nestedCaseVariantVitaminRuntimeCannotBeHiddenByRepair() {
+        val source = temp.newFile("nested.vpk")
+        writeZip(source, "PCSB00183/sce_sys/param.sfo" to byteArrayOf(1),
+            "PCSB00183/./SCE_MODULE\\.\\STEROID.SUPRX" to byteArrayOf(2))
+        assertNull(VitaArchiveRepacker.repackToInstallZip(source.absolutePath, temp.root))
+        assertTrue(File(temp.root, "install_repack_cache").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun inspectionRecognizesNormalizedVitaminRuntimeBeforeInstall() {
+        val source = temp.newFile("normalized.vpk")
+        writeZip(source, "./PCSB00183/sce_sys/param.sfo" to byteArrayOf(1),
+            "PCSB00183/./SCE_MODULE\\.\\STEROID.SUPRX" to byteArrayOf(2))
+        assertTrue(VitaArchiveInspector.inspect(source.absolutePath).vitaminDump)
     }
 
     @Test fun metadataAndVitaminBackupNamesAreOrdinaryAssets() {

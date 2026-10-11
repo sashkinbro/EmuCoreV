@@ -736,7 +736,7 @@
     <string name="install_dialog_unexpected_error">در حین نصب مشکلی پیش آمد.</string>
     <string name="install_dialog_firmware_failed">نصب فریمور ناموفق بود.</string>
     <string name="install_dialog_content_failed">نصب بازی ناموفق بود.</string>
-    <string name="install_dialog_vitamin_unsupported">ممکن است برخی فایل‌های VPK به‌درستی نصب نشوند. ابتدا نصب عادی را امتحان کنید؛ اگر ناموفق بود، از «تعمیر و نصب» استفاده کنید یا PKG و مجوز متناظر را نصب کنید.</string>
+    <string name="install_dialog_vitamin_unsupported">دامپ‌های Vitamin پشتیبانی نمی‌شوند. تعمیر آرشیو آن‌ها را اصلاح نمی‌کند. از دامپ NoNpDrm یا FAGDec بازی خود، یا فایل PKG آن و مجوز مطابق استفاده کنید.</string>
     <string name="install_dialog_content_try_repair">اگر این یک VPK یا ZIP معتبر است، از گزینه «تعمیر و نصب» در پنجره نصب بازی استفاده کنید.</string>
     <string name="install_dialog_archive_unreadable">آرشیو خوانده نشد. ممکن است آسیب دیده یا ناقص باشد.</string>
     <string name="install_dialog_archive_missing_metadata">آرشیو فراداده نصب Vita مانند sce_sys/param.sfo یا theme.xml را ندارد.</string>
@@ -744,7 +744,7 @@
     <string name="install_dialog_repack_entry">در حال بسته‌بندی مجدد: %1$s</string>
     <string name="install_dialog_repack_installing">در حال نصب ZIP بازسازی‌شده…</string>
     <string name="install_dialog_repack_failed">تعمیر آرشیو به یک ZIP قابل نصب منتهی نشد. یک دامپ دیگر را امتحان کنید یا PKG و مجوز متناظر را نصب کنید.</string>
-    <string name="install_dialog_vitamin_repair_failed">VPK بازسازی‌شده همچنان نصب نشد. یک دامپ دیگر را امتحان کنید یا PKG و مجوز متناظر را نصب کنید.</string>
+    <string name="install_dialog_vitamin_repair_failed">دامپ‌های Vitamin قابل تعمیر نیستند. از دامپ پشتیبانی‌شده بازی خود، یا فایل PKG آن و مجوز مطابق استفاده کنید.</string>
     <string name="install_dialog_license_failed">نصب مجوز ناموفق بود.</string>
     <string name="install_dialog_pkg_failed">نصب PKG ناموفق بود.</string>
     <string name="install_dialog_firmware_done">بسته فریمور با موفقیت نصب شد.</string>
@@ -774,7 +774,7 @@
     <string name="setup_content_body">از این گزینه برای آرشیوهای بازی‌ای استفاده کنید که همه داده‌های نصب موردنیاز را دارند. اگر یک VPK یا ZIP معتبر به‌دلیل بسته‌بندی آرشیو ناموفق بود، گزینه تعمیر را امتحان کنید.</string>
     <string name="setup_content_button">انتخاب VPK یا ZIP</string>
     <string name="setup_content_repair_button">تعمیر و نصب</string>
-    <string name="setup_content_repair_note">تعمیر، VPK یا ZIP انتخاب‌شده را به یک ZIP تازه در حافظه نهان نصب تبدیل می‌کند، بسته‌بندی آرشیو را یکسان‌سازی می‌کند و در صورت وجود نشانگر Vitamin را حذف می‌کند. تنها زمانی از آن استفاده کنید که نصب عادی یک آرشیو معتبر ناموفق باشد.</string>
+    <string name="setup_content_repair_note">تعمیر، فایل VPK یا ZIP انتخاب‌شده را به یک ZIP جدید در حافظه نهان نصب بازسازی می‌کند و ساختار و فشرده‌سازی آرشیو را یکسان می‌کند. این کار نمی‌تواند دامپ‌های پشتیبانی‌نشده Vitamin را تعمیر یا تبدیل کند.</string>
     <string name="setup_pkg_title">نصب بازی PKG</string>
     <string name="setup_pkg_body">نصب PKG پیش از فایل بازی به مجوز متناظر نیاز دارد. ابتدا مرحله ۱ را کامل کنید، سپس در مرحله ۲ فایل PKG را انتخاب کنید.</string>
     <string name="setup_pkg_license_step_title">افزودن مجوز</string>

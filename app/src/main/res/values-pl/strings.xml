@@ -736,7 +736,7 @@
     <string name="install_dialog_unexpected_error">Coś poszło nie tak podczas instalacji.</string>
     <string name="install_dialog_firmware_failed">Instalacja firmware nie powiodła się.</string>
     <string name="install_dialog_content_failed">Instalacja gry nie powiodła się.</string>
-    <string name="install_dialog_vitamin_unsupported">Niektóre pliki VPK mogą nie instalować się poprawnie. Najpierw spróbuj normalnej instalacji; jeśli się nie powiedzie, użyj opcji Napraw i zainstaluj albo zainstaluj pasujący PKG i licencję.</string>
+    <string name="install_dialog_vitamin_unsupported">Zrzuty Vitamin nie są obsługiwane. Naprawa archiwum ich nie naprawi. Użyj zrzutu własnej gry w formacie NoNpDrm lub FAGDec albo jej PKG i pasującej licencji.</string>
     <string name="install_dialog_content_try_repair">Jeśli to prawidłowy obraz VPK lub ZIP, spróbuj opcji Napraw i zainstaluj w oknie instalacji gry.</string>
     <string name="install_dialog_archive_unreadable">Nie udało się odczytać archiwum. Może być uszkodzone lub niekompletne.</string>
     <string name="install_dialog_archive_missing_metadata">Archiwum nie zawiera metadanych instalacyjnych Vita, takich jak sce_sys/param.sfo lub theme.xml.</string>
@@ -744,7 +744,7 @@
     <string name="install_dialog_repack_entry">Przepakowywanie: %1$s</string>
     <string name="install_dialog_repack_installing">Instalowanie przebudowanego ZIP…</string>
     <string name="install_dialog_repack_failed">Naprawa archiwum nie utworzyła instalowalnego ZIP. Spróbuj innego zrzutu lub zainstaluj pasujący PKG i licencję.</string>
-    <string name="install_dialog_vitamin_repair_failed">Przebudowany VPK nadal nie dał się zainstalować. Spróbuj innego zrzutu lub zainstaluj pasujący PKG i licencję.</string>
+    <string name="install_dialog_vitamin_repair_failed">Zrzutów Vitamin nie można naprawić. Użyj obsługiwanego zrzutu własnej gry albo jej PKG i pasującej licencji.</string>
     <string name="install_dialog_license_failed">Instalacja licencji nie powiodła się.</string>
     <string name="install_dialog_pkg_failed">Instalacja PKG nie powiodła się.</string>
     <string name="install_dialog_firmware_done">Pakiet firmware został pomyślnie zainstalowany.</string>
@@ -774,7 +774,7 @@
     <string name="setup_content_body">Użyj tej opcji w przypadku archiwów gier, które zawierają już wszystkie wymagane dane instalacyjne. Jeśli prawidłowy VPK lub ZIP nie działa z powodu sposobu pakowania archiwum, wypróbuj opcję naprawy.</string>
     <string name="setup_content_button">Wybierz VPK lub ZIP</string>
     <string name="setup_content_repair_button">Napraw i zainstaluj</string>
-    <string name="setup_content_repair_note">Naprawa konwertuje wybrany VPK lub ZIP na nowy ZIP w pamięci podręcznej instalacji, normalizuje pakowanie archiwum i usuwa znacznik Vitamin, jeśli występuje. Użyj jej tylko wtedy, gdy normalna instalacja prawidłowego archiwum się nie powiedzie.</string>
+    <string name="setup_content_repair_note">Naprawa przebudowuje wybrany VPK lub ZIP na nowy ZIP w pamięci podręcznej instalacji i normalizuje strukturę oraz kompresję archiwum. Nie może naprawić ani przekonwertować nieobsługiwanych zrzutów Vitamin.</string>
     <string name="setup_pkg_title">Zainstaluj grę PKG</string>
     <string name="setup_pkg_body">Instalacje PKG wymagają pasującej licencji przed plikiem gry. Najpierw wykonaj krok 1, a następnie wybierz PKG w kroku 2.</string>
     <string name="setup_pkg_license_step_title">Dodaj licencję</string>

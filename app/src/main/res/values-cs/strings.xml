@@ -736,7 +736,7 @@
     <string name="install_dialog_unexpected_error">Během instalace se něco pokazilo.</string>
     <string name="install_dialog_firmware_failed">Instalace firmwaru se nezdařila.</string>
     <string name="install_dialog_content_failed">Instalace hry se nezdařila.</string>
-    <string name="install_dialog_vitamin_unsupported">Některé soubory VPK se nemusí nainstalovat správně. Zkuste nejprve běžnou instalaci; pokud selže, použijte Opravit a nainstalovat nebo nainstalujte odpovídající PKG a licenci.</string>
+    <string name="install_dialog_vitamin_unsupported">Dumpy Vitamin nejsou podporovány. Oprava archivu je neopraví. Použijte dump vlastní hry ve formátu NoNpDrm nebo FAGDec, případně její PKG a odpovídající licenci.</string>
     <string name="install_dialog_content_try_repair">Pokud jde o platný obraz VPK nebo ZIP, zkuste v dialogu instalace hry možnost Opravit a nainstalovat.</string>
     <string name="install_dialog_archive_unreadable">Archiv se nepodařilo přečíst. Může být poškozený nebo neúplný.</string>
     <string name="install_dialog_archive_missing_metadata">Archiv neobsahuje metadata instalace pro Vitu, jako jsou sce_sys/param.sfo nebo theme.xml.</string>
@@ -744,7 +744,7 @@
     <string name="install_dialog_repack_entry">Přebalování: %1$s</string>
     <string name="install_dialog_repack_installing">Instalace přestavěného ZIP…</string>
     <string name="install_dialog_repack_failed">Oprava archivu nevytvořila instalovatelný ZIP. Zkuste jiný dump nebo nainstalujte odpovídající PKG a licenci.</string>
-    <string name="install_dialog_vitamin_repair_failed">Přestavěný VPK se stále nepodařilo nainstalovat. Zkuste jiný dump nebo nainstalujte odpovídající PKG a licenci.</string>
+    <string name="install_dialog_vitamin_repair_failed">Dumpy Vitamin nelze opravit. Použijte podporovaný dump vlastní hry, případně její PKG a odpovídající licenci.</string>
     <string name="install_dialog_license_failed">Instalace licence se nezdařila.</string>
     <string name="install_dialog_pkg_failed">Instalace PKG se nezdařila.</string>
     <string name="install_dialog_firmware_done">Balíček firmwaru byl úspěšně nainstalován.</string>
@@ -774,7 +774,7 @@
     <string name="setup_content_body">Použijte pro archivy her, které už obsahují všechna potřebná data pro instalaci. Pokud platný VPK nebo ZIP selže kvůli zabalení archivu, zkuste možnost opravy.</string>
     <string name="setup_content_button">Vybrat VPK nebo ZIP</string>
     <string name="setup_content_repair_button">Opravit a nainstalovat</string>
-    <string name="setup_content_repair_note">Oprava převede vybraný VPK nebo ZIP na nový ZIP v cache instalace, normalizuje zabalení archivu a odstraní značku Vitamin, pokud je přítomna. Použijte ji jen tehdy, když běžná instalace platného archivu selže.</string>
+    <string name="setup_content_repair_note">Oprava znovu sestaví vybraný VPK nebo ZIP jako nový ZIP v instalační mezipaměti a sjednotí strukturu a kompresi archivu. Nepodporované dumpy Vitamin nedokáže opravit ani převést.</string>
     <string name="setup_pkg_title">Instalovat hru PKG</string>
     <string name="setup_pkg_body">Instalace PKG vyžadují odpovídající licenci před souborem hry. Nejprve dokončete krok 1 a poté v kroku 2 zvolte PKG.</string>
     <string name="setup_pkg_license_step_title">Přidat licenci</string>

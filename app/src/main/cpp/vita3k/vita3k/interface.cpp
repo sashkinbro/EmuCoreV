@@ -180,7 +180,7 @@ static std::string archive_path_identity(std::string path) {
 }
 
 static bool is_vitamin_marker_path(const std::string &path) {
-    const std::string normalized = normalize_archive_path(path);
+    const std::string normalized = archive_path_identity(normalize_archive_path(path));
     const std::string marker = "sce_module/steroid.suprx";
     if (normalized == marker)
         return true;
@@ -468,8 +468,8 @@ static bool install_archive_content(
                 replace_filename = "theme.xml";
 
             if (is_vitamin_marker_path(replace_filename)) {
-                LOG_WARN("Skipping Vitamin marker during archive extraction: {}", m_filename);
-                continue;
+                LOG_CRITICAL("Vitamin dumps are unsupported; refusing archive entry: {}", m_filename);
+                return false;
             }
             const fs::path file_output = (staging_path / fs_utils::utf8_to_path(replace_filename)).generic_path();
             if (mz_zip_reader_is_file_a_directory(zip.get(), i)) {
@@ -554,7 +554,9 @@ static std::vector<ArchiveContentPath> get_archive_contents_path(const ZipPtr &z
             return {};
         }
         if (is_vitamin_marker_path(m_filename)) {
-            LOG_WARN("A Vitamin marker was detected; continuing archive installation.");
+            LOG_CRITICAL("Vitamin dumps are unsupported; refusing archive entry: {}", m_filename);
+            valid = false;
+            return {};
         }
 
         if (is_directory)

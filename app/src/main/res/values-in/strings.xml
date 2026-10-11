@@ -736,7 +736,7 @@
     <string name="install_dialog_unexpected_error">Terjadi kesalahan saat pemasangan.</string>
     <string name="install_dialog_firmware_failed">Pemasangan firmware gagal.</string>
     <string name="install_dialog_content_failed">Pemasangan game gagal.</string>
-    <string name="install_dialog_vitamin_unsupported">Beberapa file VPK mungkin tidak terpasang dengan benar. Coba pemasangan normal terlebih dahulu; jika gagal, gunakan Perbaiki dan pasang, atau pasang PKG dan lisensi yang sesuai.</string>
+    <string name="install_dialog_vitamin_unsupported">Dump Vitamin tidak didukung. Perbaikan arsip tidak dapat memperbaikinya. Gunakan dump NoNpDrm atau FAGDec dari game milik Anda, atau PKG dan lisensi yang sesuai.</string>
     <string name="install_dialog_content_try_repair">Jika ini adalah image VPK atau ZIP yang valid, coba Perbaiki dan pasang dari dialog pemasangan game.</string>
     <string name="install_dialog_archive_unreadable">Arsip tidak dapat dibaca. Mungkin rusak atau tidak lengkap.</string>
     <string name="install_dialog_archive_missing_metadata">Arsip tidak berisi metadata pemasangan Vita seperti sce_sys/param.sfo atau theme.xml.</string>
@@ -744,7 +744,7 @@
     <string name="install_dialog_repack_entry">Mengemas ulang: %1$s</string>
     <string name="install_dialog_repack_installing">Memasang ZIP yang telah dibangun ulang…</string>
     <string name="install_dialog_repack_failed">Perbaikan arsip tidak menghasilkan ZIP yang dapat dipasang. Coba dump lain, atau pasang PKG dan lisensi yang sesuai.</string>
-    <string name="install_dialog_vitamin_repair_failed">VPK yang telah dibangun ulang tetap tidak dapat dipasang. Coba dump lain, atau pasang PKG dan lisensi yang sesuai.</string>
+    <string name="install_dialog_vitamin_repair_failed">Dump Vitamin tidak dapat diperbaiki. Gunakan dump yang didukung dari game milik Anda, atau PKG dan lisensi yang sesuai.</string>
     <string name="install_dialog_license_failed">Pemasangan lisensi gagal.</string>
     <string name="install_dialog_pkg_failed">Pemasangan PKG gagal.</string>
     <string name="install_dialog_firmware_done">Paket firmware berhasil dipasang.</string>
@@ -774,7 +774,7 @@
     <string name="setup_content_body">Gunakan ini untuk arsip game yang sudah berisi semua data pemasangan yang diperlukan. Jika VPK atau ZIP yang valid gagal karena pengemasan arsip, coba opsi perbaikan.</string>
     <string name="setup_content_button">Pilih VPK atau ZIP</string>
     <string name="setup_content_repair_button">Perbaiki dan pasang</string>
-    <string name="setup_content_repair_note">Perbaiki mengonversi VPK atau ZIP yang dipilih menjadi ZIP baru di cache pemasangan, menormalkan pengemasan arsip, dan menghapus penanda Vitamin jika ada. Gunakan hanya saat pemasangan normal gagal untuk arsip yang valid.</string>
+    <string name="setup_content_repair_note">Perbaikan membangun ulang VPK atau ZIP yang dipilih menjadi ZIP baru di cache pemasangan serta menormalkan struktur dan kompresi arsip. Fitur ini tidak dapat memperbaiki atau mengonversi dump Vitamin yang tidak didukung.</string>
     <string name="setup_pkg_title">Pasang game PKG</string>
     <string name="setup_pkg_body">Pemasangan PKG memerlukan lisensi yang sesuai sebelum file game. Selesaikan langkah 1 terlebih dahulu, lalu pilih PKG pada langkah 2.</string>
     <string name="setup_pkg_license_step_title">Tambahkan lisensi</string>
