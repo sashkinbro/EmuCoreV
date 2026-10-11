@@ -22,6 +22,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.horizontalScroll
@@ -66,6 +70,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.withFrameNanos
+import com.sbro.emucorev.ui.settings.centeredTabScrollDelta
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -1586,7 +1592,24 @@ private fun MenuTabs(
 ) {
     val palette = emulationMenuPalette()
     val tabs = emulationMenuTabs()
+    val listState = rememberLazyListState()
+    LaunchedEffect(selectedTab) {
+        val selectedIndex = tabs.indexOfFirst { it.tab == selectedTab }.coerceAtLeast(0)
+        var selectedItem = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
+        if (selectedItem == null) {
+            listState.scrollToItem(selectedIndex)
+            withFrameNanos { }
+            selectedItem = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
+        }
+        selectedItem?.let { item ->
+            val layout = listState.layoutInfo
+            val delta = centeredTabScrollDelta(item.offset, item.size,
+                layout.viewportStartOffset, layout.viewportEndOffset)
+            if (kotlin.math.abs(delta) > 1f) listState.animateScrollBy(delta)
+        }
+    }
     LazyRow(
+        state = listState,
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = horizontalContentPadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1627,6 +1650,11 @@ private fun MenuVerticalTabs(
     contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
     val palette = emulationMenuPalette()
+    val selectedTabRequester = remember { BringIntoViewRequester() }
+    LaunchedEffect(selectedTab) {
+        withFrameNanos { }
+        selectedTabRequester.bringIntoView()
+    }
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
@@ -1637,7 +1665,9 @@ private fun MenuVerticalTabs(
             val selected = selectedTab == item.tab
             Surface(
                 onClick = { onSelected(item.tab) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().then(
+                    if (selected) Modifier.bringIntoViewRequester(selectedTabRequester) else Modifier
+                ),
                 shape = neonShape(12.dp),
                 color = if (selected) {
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)

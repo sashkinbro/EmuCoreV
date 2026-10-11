@@ -42,6 +42,8 @@ enum class AppLanguage(val storageValue: Int, val languageTag: String) {
     }
 }
 
+enum class LibraryLayoutMode { LIST, GRID }
+
 class AppPreferences(context: Context) {
     private val appContext = context.applicationContext
     private val prefs = context.getSharedPreferences("emucorev_prefs", Context.MODE_PRIVATE)
@@ -132,6 +134,21 @@ class AppPreferences(context: Context) {
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }.distinctUntilChanged()
 
+    var libraryLayoutMode: LibraryLayoutMode
+        get() = LibraryLayoutMode.entries.firstOrNull { it.name == prefs.all[KEY_LIBRARY_LAYOUT_MODE] }
+            ?: LibraryLayoutMode.LIST
+        set(value) = prefs.edit { putString(KEY_LIBRARY_LAYOUT_MODE, value.name) }
+
+    val libraryLayoutModeFlow: Flow<LibraryLayoutMode>
+        get() = callbackFlow {
+            val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key == KEY_LIBRARY_LAYOUT_MODE) trySend(libraryLayoutMode)
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(libraryLayoutMode)
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }.distinctUntilChanged()
+
     var lastCoreBinaryFingerprint: String?
         get() = prefs.getString(KEY_LAST_CORE_BINARY_FINGERPRINT, null)
         set(value) = prefs.edit { putString(KEY_LAST_CORE_BINARY_FINGERPRINT, value) }
@@ -211,6 +228,7 @@ class AppPreferences(context: Context) {
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_PRO_UNLOCKED = "pro_unlocked"
         private const val KEY_WELCOME_DIALOG_SHOWN = "welcome_dialog_shown"
+        private const val KEY_LIBRARY_LAYOUT_MODE = "library_layout_mode"
         private const val KEY_CONFIRM_SAVE_STATE_ACTIONS = "confirm_save_state_actions"
         private const val KEY_LAST_CORE_BINARY_FINGERPRINT = "last_core_binary_fingerprint"
         private const val KEY_APP_LANGUAGE = "app_language"

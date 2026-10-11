@@ -82,6 +82,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
+import com.sbro.emucorev.data.AppPreferences
+import com.sbro.emucorev.data.LibraryLayoutMode
 import com.sbro.emucorev.ui.common.LocalImage
 import com.sbro.emucorev.ui.common.CustomizationBackground
 import com.sbro.emucorev.ui.common.NavigationMenuButton
@@ -93,11 +95,6 @@ import com.sbro.emucorev.ui.theme.LocalCustomizationSettings
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
-
-private enum class LibraryLayoutMode {
-    LIST,
-    GRID
-}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -118,7 +115,9 @@ fun LibraryScreen(
     val customization = LocalCustomizationSettings.current
     val neon = LocalNeonTheme.current
     val refreshClick = rememberDebouncedClick(onClick = viewModel::refresh)
-    var layoutMode by rememberSaveable { mutableStateOf(LibraryLayoutMode.LIST) }
+    val preferences = remember(context) { AppPreferences(context) }
+    val layoutMode by remember(preferences) { preferences.libraryLayoutModeFlow }
+        .collectAsState(initial = preferences.libraryLayoutMode)
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     var deleteGameId by remember { mutableStateOf<String?>(null) }
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
@@ -128,7 +127,6 @@ fun LibraryScreen(
         uiState.items.size
     )
     val deleteGameLabel = stringResource(R.string.detail_delete_game)
-    val manageSaveDataLabel = stringResource(R.string.save_manager_open_for_game)
     val manageSaveStatesLabel = stringResource(R.string.savestate_manager_open_for_game)
     val manageGameSettingsLabel = stringResource(R.string.game_manager_open_for_game)
     val playTimeLabel = stringResource(R.string.play_time_open_for_game)
@@ -230,7 +228,7 @@ fun LibraryScreen(
                             if (neon) LibraryHeaderActionDivider()
                             IconButton(
                                 modifier = Modifier.size(42.dp),
-                                onClick = { layoutMode = if (layoutMode == LibraryLayoutMode.LIST) LibraryLayoutMode.GRID else LibraryLayoutMode.LIST }
+                                onClick = { preferences.libraryLayoutMode = if (preferences.libraryLayoutMode == LibraryLayoutMode.LIST) LibraryLayoutMode.GRID else LibraryLayoutMode.LIST }
                             ) {
                                 Icon(
                                     imageVector = if (layoutMode == LibraryLayoutMode.LIST) Icons.Rounded.ViewModule else Icons.AutoMirrored.Rounded.ViewList,
@@ -421,11 +419,6 @@ fun LibraryScreen(
                             onOpenSaveStates(game.titleId)
                             menuExpanded = false
                         },
-                        manageSaveDataLabel = manageSaveDataLabel,
-                        onManageSaveData = {
-                            onOpenSaveManager(game.titleId)
-                            menuExpanded = false
-                        },
                         deleteGameLabel = deleteGameLabel,
                         onDeleteGame = {
                             deleteGameId = game.titleId
@@ -462,32 +455,12 @@ fun LibraryScreen(
                                 shadowElevation = 8.dp,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    LibraryGameArtwork(
-                                        path = game.iconPath,
-                                        title = game.title,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        artworkAspectRatio = 1f
-                                    )
-                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(42.dp),
-                                            contentAlignment = Alignment.BottomStart
-                                        ) {
-                                        Text(
-                                            text = game.title,
-                                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        }
-                                    }
-                                }
+                                LocalImage(
+                                    path = game.iconPath,
+                                    contentDescription = game.title,
+                                    fallbackLabel = game.title,
+                                    modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+                                )
                             }
                             LibraryGameContextMenu(
                                 expanded = menuExpanded,
@@ -520,11 +493,6 @@ fun LibraryScreen(
                                 manageSaveStatesLabel = manageSaveStatesLabel,
                                 onOpenSaveStates = {
                                     onOpenSaveStates(game.titleId)
-                                    menuExpanded = false
-                                },
-                                manageSaveDataLabel = manageSaveDataLabel,
-                                onManageSaveData = {
-                                    onOpenSaveManager(game.titleId)
                                     menuExpanded = false
                                 },
                                 deleteGameLabel = deleteGameLabel,
@@ -599,8 +567,6 @@ private fun LibraryGameContextMenu(
     onOpenAchievements: () -> Unit,
     manageSaveStatesLabel: String,
     onOpenSaveStates: () -> Unit,
-    manageSaveDataLabel: String,
-    onManageSaveData: () -> Unit,
     deleteGameLabel: String,
     onDeleteGame: () -> Unit
 ) {
@@ -639,11 +605,6 @@ private fun LibraryGameContextMenu(
             text = manageSaveStatesLabel,
             icon = Icons.Rounded.Save,
             onClick = onOpenSaveStates
-        )
-        LibraryGameContextMenuItem(
-            text = manageSaveDataLabel,
-            icon = Icons.Rounded.Save,
-            onClick = onManageSaveData
         )
         LibraryGameContextMenuDivider()
         LibraryGameContextMenuItem(

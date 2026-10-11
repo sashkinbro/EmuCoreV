@@ -1,6 +1,7 @@
 package com.sbro.emucorev.ui.playtime
 
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import com.sbro.emucorev.ui.theme.neon.neonPillShape
@@ -40,6 +42,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.withFrameNanos
+import com.sbro.emucorev.ui.settings.centeredTabScrollDelta
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -208,6 +212,25 @@ private fun GameSelector(
     showAllGames: Boolean,
     onSelect: (String?) -> Unit
 ) {
+    val listState = rememberLazyListState()
+    val gameIds = games.map { it.titleId }
+    LaunchedEffect(selectedTitleId, gameIds, showAllGames) {
+        if (gameIds.isEmpty() && !showAllGames) return@LaunchedEffect
+        val gameIndex = gameIds.indexOfFirst { it.equals(selectedTitleId, ignoreCase = true) }
+        val selectedIndex = if (gameIndex >= 0) gameIndex + (if (showAllGames) 1 else 0) else 0
+        var selectedItem = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
+        if (selectedItem == null) {
+            listState.scrollToItem(selectedIndex)
+            withFrameNanos { }
+            selectedItem = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
+        }
+        selectedItem?.let { item ->
+            val layout = listState.layoutInfo
+            val delta = centeredTabScrollDelta(item.offset, item.size,
+                layout.viewportStartOffset, layout.viewportEndOffset)
+            if (kotlin.math.abs(delta) > 1f) listState.animateScrollBy(delta)
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             text = stringResource(R.string.play_time_filter_game),
@@ -216,6 +239,7 @@ private fun GameSelector(
             modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
         )
         LazyRow(
+            state = listState,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             contentPadding = PaddingValues(horizontal = ScreenHorizontalPadding)
         ) {

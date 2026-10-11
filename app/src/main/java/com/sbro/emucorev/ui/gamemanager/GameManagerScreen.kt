@@ -5,6 +5,7 @@ import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -42,6 +44,9 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
+import com.sbro.emucorev.ui.settings.centeredTabScrollDelta
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -212,11 +217,29 @@ private fun GameManagerTabs(
     selectedTab: GameManagerTab,
     onSelected: (GameManagerTab) -> Unit
 ) {
+    val tabs = remember { GameManagerTab.entries.toList() }
+    val listState = rememberLazyListState()
+    LaunchedEffect(selectedTab) {
+        val selectedIndex = tabs.indexOf(selectedTab).coerceAtLeast(0)
+        var selectedItem = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
+        if (selectedItem == null) {
+            listState.scrollToItem(selectedIndex)
+            withFrameNanos { }
+            selectedItem = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
+        }
+        selectedItem?.let { item ->
+            val layout = listState.layoutInfo
+            val delta = centeredTabScrollDelta(item.offset, item.size,
+                layout.viewportStartOffset, layout.viewportEndOffset)
+            if (kotlin.math.abs(delta) > 1f) listState.animateScrollBy(delta)
+        }
+    }
     LazyRow(
+        state = listState,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = ScreenHorizontalPadding)
     ) {
-        items(GameManagerTab.entries, key = { it.name }) { tab ->
+        items(tabs, key = { it.name }) { tab ->
             FilterChip(
                 shape = neonChipShape(),
                 selected = selectedTab == tab,
@@ -315,6 +338,24 @@ private fun GamePicker(
     onReset: () -> Unit,
     onSelect: (String) -> Unit
 ) {
+    val listState = rememberLazyListState()
+    val gameIds = games.map { it.titleId }
+    LaunchedEffect(selectedTitleId, gameIds) {
+        if (gameIds.isEmpty()) return@LaunchedEffect
+        val selectedIndex = gameIds.indexOf(selectedTitleId).coerceAtLeast(0)
+        var selectedItem = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
+        if (selectedItem == null) {
+            listState.scrollToItem(selectedIndex)
+            withFrameNanos { }
+            selectedItem = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
+        }
+        selectedItem?.let { item ->
+            val layout = listState.layoutInfo
+            val delta = centeredTabScrollDelta(item.offset, item.size,
+                layout.viewportStartOffset, layout.viewportEndOffset)
+            if (kotlin.math.abs(delta) > 1f) listState.animateScrollBy(delta)
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier
@@ -348,6 +389,7 @@ private fun GamePicker(
             }
         }
         LazyRow(
+            state = listState,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = ScreenHorizontalPadding)
         ) {
