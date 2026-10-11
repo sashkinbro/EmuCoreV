@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="library_game_count">
+        <item quantity="other">ゲーム数: %1$d</item>
+    </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="other">ゲームを%1$d件インストールしました。</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="other">全%2$d件中%1$d件を完了</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="other">アーカイブには、このインストーラーで読み込めないZIP圧縮方式のファイルが%1$d件含まれています。</item>
+    </plurals>
+</resources>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="library_game_count">
+        <item quantity="one">Celkem %1$d hra</item>
+        <item quantity="few">Celkem %1$d hry</item>
+        <item quantity="many">Celkem %1$d her</item>
+        <item quantity="other">Celkem %1$d her</item>
+    </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="one">%1$d hra byla úspěšně nainstalována.</item>
+        <item quantity="few">%1$d hry byly úspěšně nainstalovány.</item>
+        <item quantity="many">%1$d her bylo úspěšně nainstalováno.</item>
+        <item quantity="other">%1$d her bylo úspěšně nainstalováno.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="one">Dokončena %1$d z %2$d položky</item>
+        <item quantity="few">Dokončeny %1$d z %2$d položek</item>
+        <item quantity="many">Dokončeno %1$d z %2$d položek</item>
+        <item quantity="other">Dokončeno %1$d z %2$d položek</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="one">Archiv obsahuje %1$d soubor s metodou komprese ZIP, kterou tento instalátor neumí přečíst.</item>
+        <item quantity="few">Archiv obsahuje %1$d soubory s metodou komprese ZIP, kterou tento instalátor neumí přečíst.</item>
+        <item quantity="many">Archiv obsahuje %1$d souborů s metodou komprese ZIP, kterou tento instalátor neumí přečíst.</item>
+        <item quantity="other">Archiv obsahuje %1$d souborů s metodou komprese ZIP, kterou tento instalátor neumí přečíst.</item>
+    </plurals>
+</resources>

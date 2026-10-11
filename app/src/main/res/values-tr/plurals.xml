@@ -12,4 +12,8 @@
         <item quantity="one">%2$d öğeden %1$d tanesi tamamlandı</item>
         <item quantity="other">%2$d öğeden %1$d tanesi tamamlandı</item>
     </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression" tools:ignore="MissingTranslation">
+        <item quantity="one">Arşivde, bu yükleyicinin okuyamadığı bir ZIP sıkıştırma yöntemi kullanan %1$d dosya var.</item>
+        <item quantity="other">Arşivde, bu yükleyicinin okuyamadığı bir ZIP sıkıştırma yöntemi kullanan %1$d dosya var.</item>
+    </plurals>
 </resources>

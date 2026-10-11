@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="library_game_count">
+        <item quantity="other">Jumlah game: %1$d</item>
+    </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="other">%1$d game berhasil dipasang.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="other">Selesai %1$d dari %2$d item</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="other">Arsip berisi %1$d file dengan metode kompresi ZIP yang tidak dapat dibaca oleh pemasang ini.</item>
+    </plurals>
+</resources>

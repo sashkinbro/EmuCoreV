@@ -18,4 +18,10 @@
         <item quantity="many">%1$d éléments sur %2$d terminés</item>
         <item quantity="other">%1$d éléments sur %2$d terminés</item>
     </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression" tools:ignore="UnusedQuantity">
+        <item quantity="one">L’archive contient %1$d fichier utilisant une méthode de compression ZIP que cet installateur ne peut pas lire.</item>
+        <item quantity="few">L’archive contient %1$d fichiers utilisant une méthode de compression ZIP que cet installateur ne peut pas lire.</item>
+        <item quantity="many">L’archive contient %1$d fichiers utilisant une méthode de compression ZIP que cet installateur ne peut pas lire.</item>
+        <item quantity="other">L’archive contient %1$d fichiers utilisant une méthode de compression ZIP que cet installateur ne peut pas lire.</item>
+    </plurals>
 </resources>

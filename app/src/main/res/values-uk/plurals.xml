@@ -18,4 +18,10 @@
         <item quantity="many">Завершено %1$d з %2$d елементів</item>
         <item quantity="other">Завершено %1$d з %2$d елементів</item>
     </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="one">Архів містить %1$d файл із методом стиснення ZIP, який цей інсталятор не може прочитати.</item>
+        <item quantity="few">Архів містить %1$d файли з методом стиснення ZIP, який цей інсталятор не може прочитати.</item>
+        <item quantity="many">Архів містить %1$d файлів із методом стиснення ZIP, який цей інсталятор не може прочитати.</item>
+        <item quantity="other">Архів містить %1$d файлу з методом стиснення ZIP, який цей інсталятор не може прочитати.</item>
+    </plurals>
 </resources>

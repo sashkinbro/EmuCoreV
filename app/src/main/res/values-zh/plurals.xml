@@ -12,4 +12,7 @@
         <item quantity="one">已完成 %1$d / %2$d 個項目</item>
         <item quantity="other">已完成 %1$d / %2$d 個項目</item>
     </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression" tools:ignore="MissingTranslation">
+        <item quantity="other">壓縮檔中有 %1$d 個檔案使用此安裝程式無法讀取的 ZIP 壓縮方式。</item>
+    </plurals>
 </resources>

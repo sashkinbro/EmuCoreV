@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="library_game_count">
+        <item quantity="one">Łącznie: %1$d gra</item>
+        <item quantity="few">Łącznie: %1$d gry</item>
+        <item quantity="many">Łącznie: %1$d gier</item>
+        <item quantity="other">Łącznie: %1$d gry</item>
+    </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="one">Pomyślnie zainstalowano %1$d grę.</item>
+        <item quantity="few">Pomyślnie zainstalowano %1$d gry.</item>
+        <item quantity="many">Pomyślnie zainstalowano %1$d gier.</item>
+        <item quantity="other">Pomyślnie zainstalowano %1$d gry.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="one">Ukończono %1$d z %2$d elementów</item>
+        <item quantity="few">Ukończono %1$d z %2$d elementów</item>
+        <item quantity="many">Ukończono %1$d z %2$d elementów</item>
+        <item quantity="other">Ukończono %1$d z %2$d elementów</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="one">Archiwum zawiera %1$d plik z metodą kompresji ZIP, której ten instalator nie może odczytać.</item>
+        <item quantity="few">Archiwum zawiera %1$d pliki z metodą kompresji ZIP, której ten instalator nie może odczytać.</item>
+        <item quantity="many">Archiwum zawiera %1$d plików z metodą kompresji ZIP, której ten instalator nie może odczytać.</item>
+        <item quantity="other">Archiwum zawiera %1$d pliku z metodą kompresji ZIP, której ten instalator nie może odczytać.</item>
+    </plurals>
+</resources>

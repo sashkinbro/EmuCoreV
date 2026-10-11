@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="library_game_count">
+        <item quantity="one">تعداد بازی‌ها: %1$d</item>
+        <item quantity="other">تعداد بازی‌ها: %1$d</item>
+    </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="one">%1$d بازی با موفقیت نصب شد.</item>
+        <item quantity="other">%1$d بازی با موفقیت نصب شد.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="one">تکمیل %1$d مورد از %2$d مورد</item>
+        <item quantity="other">تکمیل %1$d مورد از %2$d مورد</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="one">این بایگانی شامل %1$d فایل با روش فشرده‌سازی ZIP است که این نصب‌کننده نمی‌تواند آن را بخواند.</item>
+        <item quantity="other">این بایگانی شامل %1$d فایل با روش فشرده‌سازی ZIP است که این نصب‌کننده نمی‌تواند آن‌ها را بخواند.</item>
+    </plurals>
+</resources>

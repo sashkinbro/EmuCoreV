@@ -12,4 +12,8 @@
         <item quantity="one">%2$d में से %1$d आइटम पूरा हुआ</item>
         <item quantity="other">%2$d में से %1$d आइटम पूरे हुए</item>
     </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression" tools:ignore="MissingTranslation">
+        <item quantity="one">आर्काइव में %1$d फ़ाइल है, जिसका ZIP कम्प्रेशन तरीका इस इंस्टॉलर द्वारा पढ़ा नहीं जा सकता।</item>
+        <item quantity="other">आर्काइव में %1$d फ़ाइलें हैं, जिनका ZIP कम्प्रेशन तरीका इस इंस्टॉलर द्वारा पढ़ा नहीं जा सकता।</item>
+    </plurals>
 </resources>

@@ -18,4 +18,10 @@
         <item quantity="many">Завершено %1$d из %2$d элементов</item>
         <item quantity="other">Завершено %1$d из %2$d элементов</item>
     </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="one">В архиве содержится %1$d файл с методом сжатия ZIP, который эта программа установки не может прочитать.</item>
+        <item quantity="few">В архиве содержится %1$d файла с методом сжатия ZIP, который эта программа установки не может прочитать.</item>
+        <item quantity="many">В архиве содержится %1$d файлов с методом сжатия ZIP, который эта программа установки не может прочитать.</item>
+        <item quantity="other">В архиве содержится %1$d файла с методом сжатия ZIP, который эта программа установки не может прочитать.</item>
+    </plurals>
 </resources>

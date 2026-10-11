@@ -12,4 +12,8 @@
         <item quantity="one">%1$d von %2$d Element abgeschlossen</item>
         <item quantity="other">%1$d von %2$d Elementen abgeschlossen</item>
     </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression" tools:ignore="MissingTranslation">
+        <item quantity="one">Das Archiv enthält %1$d Datei mit einer ZIP-Komprimierungsmethode, die dieses Installationsprogramm nicht lesen kann.</item>
+        <item quantity="other">Das Archiv enthält %1$d Dateien mit einer ZIP-Komprimierungsmethode, die dieses Installationsprogramm nicht lesen kann.</item>
+    </plurals>
 </resources>
