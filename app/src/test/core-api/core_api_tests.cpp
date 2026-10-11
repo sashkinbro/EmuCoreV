@@ -311,3 +311,4 @@ using KernelHostLifetimeEnv = EmuEnvState;
 #include "input_read_continuation_tests.inc"
 #include "usse_control_flow_tests.inc"
 #include "motion_snapshot_tests.inc"
+#include "cheat_lifecycle_tests.inc"

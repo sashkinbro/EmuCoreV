@@ -12,6 +12,7 @@
 #include <cheat/cheat.h>
 #include <cheat/functions.h>
 #include <emuenv/state.h>
+#include <emucorev/savestate/operation_mutex.h>
 #include <io/state.h>
 #include <kernel/state.h>
 #include <util/fs.h>
@@ -21,6 +22,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <mutex>
 #include <string>
 
 namespace {
@@ -136,6 +138,7 @@ std::string lowercase_extension(const std::string &filename) {
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_sbro_emucorev_core_CheatBridge_getCheats(JNIEnv *env, jobject /*thiz*/, jstring title_id) {
+    const std::lock_guard operation_lock(emucorev::savestate::save_state_operation_mutex());
     auto *emuenv = get_emuenv();
     if (!emuenv || !title_id)
         return to_jstring(env, "{}");
@@ -154,6 +157,7 @@ Java_com_sbro_emucorev_core_CheatBridge_setCheatEnabled(
     jstring title_id,
     jint index,
     jboolean enabled) {
+    const std::lock_guard operation_lock(emucorev::savestate::save_state_operation_mutex());
     auto *emuenv = get_emuenv();
     if (!emuenv || !title_id || index < 0)
         return JNI_FALSE;
@@ -178,6 +182,7 @@ Java_com_sbro_emucorev_core_CheatBridge_setAllCheatsEnabled(
     jobject /*thiz*/,
     jstring title_id,
     jboolean enabled) {
+    const std::lock_guard operation_lock(emucorev::savestate::save_state_operation_mutex());
     auto *emuenv = get_emuenv();
     if (!emuenv || !title_id)
         return JNI_FALSE;
@@ -200,6 +205,7 @@ Java_com_sbro_emucorev_core_CheatBridge_setAllCheatsEnabled(
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorev_core_CheatBridge_setCheatsEnabled(JNIEnv * /*env*/, jobject /*thiz*/, jboolean enabled) {
+    const std::lock_guard operation_lock(emucorev::savestate::save_state_operation_mutex());
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return JNI_FALSE;
@@ -211,6 +217,7 @@ Java_com_sbro_emucorev_core_CheatBridge_setCheatsEnabled(JNIEnv * /*env*/, jobje
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorev_core_CheatBridge_saveCheats(JNIEnv *env, jobject /*thiz*/, jstring title_id) {
+    const std::lock_guard operation_lock(emucorev::savestate::save_state_operation_mutex());
     auto *emuenv = get_emuenv();
     if (!emuenv || !title_id)
         return JNI_FALSE;
@@ -225,6 +232,7 @@ Java_com_sbro_emucorev_core_CheatBridge_saveCheats(JNIEnv *env, jobject /*thiz*/
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_sbro_emucorev_core_CheatBridge_reloadCheats(JNIEnv *env, jobject /*thiz*/, jstring title_id) {
+    const std::lock_guard operation_lock(emucorev::savestate::save_state_operation_mutex());
     auto *emuenv = get_emuenv();
     if (!emuenv || !title_id)
         return to_jstring(env, "{}");
@@ -238,6 +246,7 @@ Java_com_sbro_emucorev_core_CheatBridge_reloadCheats(JNIEnv *env, jobject /*thiz
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_sbro_emucorev_core_CheatBridge_getCheatFilePath(JNIEnv *env, jobject /*thiz*/, jstring title_id) {
+    const std::lock_guard operation_lock(emucorev::savestate::save_state_operation_mutex());
     auto *emuenv = get_emuenv();
     if (!emuenv || !title_id)
         return to_jstring(env, "");
@@ -259,6 +268,7 @@ Java_com_sbro_emucorev_core_CheatBridge_importCheatFile(
     jstring title_id,
     jstring source_path,
     jstring display_name) {
+    const std::lock_guard operation_lock(emucorev::savestate::save_state_operation_mutex());
     auto *emuenv = get_emuenv();
     if (!emuenv || !title_id || !source_path)
         return to_jstring(env, "{}");
@@ -300,6 +310,7 @@ Java_com_sbro_emucorev_core_CheatBridge_importCheatFile(
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorev_core_CheatBridge_deleteCheats(JNIEnv *env, jobject /*thiz*/, jstring title_id) {
+    const std::lock_guard operation_lock(emucorev::savestate::save_state_operation_mutex());
     auto *emuenv = get_emuenv();
     if (!emuenv || !title_id)
         return JNI_FALSE;
@@ -326,7 +337,7 @@ Java_com_sbro_emucorev_core_CheatBridge_deleteCheats(JNIEnv *env, jobject /*thiz
 
     LOG_INFO("Deleted cheat file {}", path);
     if (is_live_title(emuenv, title))
-        cheat::unload(emuenv->cheat);
+        cheat::clear_file(emuenv->cheat, emuenv->mem, make_invalidate(*emuenv));
 
     return JNI_TRUE;
 }

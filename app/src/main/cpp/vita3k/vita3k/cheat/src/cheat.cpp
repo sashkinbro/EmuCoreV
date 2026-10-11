@@ -495,6 +495,13 @@ void unload(CheatState &state) {
     state.buttons.store(0, std::memory_order_relaxed);
 }
 
+void clear_file(CheatState &state, MemState &mem, const JitInvalidate &invalidate_jit) {
+    const std::lock_guard<std::mutex> lock(state.mutex);
+    for (auto &cheat : state.file.cheats)
+        restore_cheat(cheat, mem, invalidate_jit);
+    state.file = {};
+}
+
 bool load(CheatState &state, const fs::path &cheats_dir, const std::string &title_id) {
     const auto path = find_cheat_file(cheats_dir, title_id);
     if (path.empty()) {

@@ -593,6 +593,46 @@ TEST_F(CheatTest, master_switch_stops_and_restores_every_cheat) {
     EXPECT_EQ(read32(0), 0u);
 }
 
+TEST_F(CheatTest, deleting_pack_preserves_module_bases_for_reimport) {
+    CheatModule module;
+    module.name = "main";
+    module.segments[1] = { scratch, scratch_size };
+    cheat::add_module(state, module);
+    run("_V1 inf.HP\n$B200 00000001 00000000\n$0200 00000010 00020000\n");
+    ASSERT_EQ(read32(0x10), 0x20000u);
+
+    cheat::clear_file(state, mem, {});
+    EXPECT_TRUE(cheat::snapshot(state).cheats.empty());
+    // Ordinary data writes have no saved original and are not undone.
+    EXPECT_EQ(read32(0x10), 0x20000u);
+    ASSERT_EQ(state.modules.size(), 1u);
+    EXPECT_EQ(state.modules[0].segments[1].address, scratch);
+
+    write32(0x10, 0);
+    ASSERT_TRUE(cheat::reload(state, directory, title_id, mem, {}));
+    cheat::apply(state, mem, {});
+    EXPECT_EQ(read32(0x10), 0x20000u);
+    EXPECT_FALSE(cheat::snapshot(state).cheats[0].broken);
+
+    cheat::unload(state);
+    EXPECT_TRUE(state.modules.empty());
+}
+
+TEST_F(CheatTest, deleting_pack_restores_saved_arm_patch) {
+    write32(0, 0xE1A00000u);
+    run(fmt::format("_V1 ARM patch\n$A200 {:08X} EA01D709\n", at(0)));
+    ASSERT_EQ(read32(0), 0xEA01D709u);
+    unsigned invalidated = 0;
+    cheat::clear_file(state, mem, [&](uint32_t address, size_t size) {
+        EXPECT_EQ(address, at(0));
+        EXPECT_EQ(size, 4u);
+        ++invalidated;
+    });
+    EXPECT_EQ(read32(0), 0xE1A00000u);
+    EXPECT_EQ(invalidated, 1u);
+    EXPECT_TRUE(cheat::snapshot(state).cheats.empty());
+}
+
 TEST_F(CheatTest, saving_rewrites_the_boot_markers_only) {
     const auto path = write_file(title_id,
         "# PCSA00001 Test Game\r\n"

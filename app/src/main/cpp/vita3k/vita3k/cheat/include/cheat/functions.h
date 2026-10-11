@@ -33,6 +33,10 @@ using JitInvalidate = std::function<void(uint32_t address, size_t size)>;
 
 void unload(CheatState &state);
 
+// Delete the current pack without discarding the running executable's bases.
+// Only ARM writes have saved originals; ordinary data writes remain unchanged.
+void clear_file(CheatState &state, MemState &mem, const JitInvalidate &invalidate_jit);
+
 bool load(CheatState &state, const fs::path &cheats_dir, const std::string &title_id);
 
 bool reload(CheatState &state, const fs::path &cheats_dir, const std::string &title_id, MemState &mem, const JitInvalidate &invalidate_jit);
