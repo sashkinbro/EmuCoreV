@@ -20,6 +20,8 @@
 #include <emuenv/state.h>
 #include <motion/state.h>
 
+// Numerical accessors require the caller to own MotionState::mutex. Guest
+// exports take one lock across their flag checks and complete output writes.
 SceFVector3 get_acceleration(const MotionState &state);
 SceFVector3 get_gyroscope(const MotionState &state);
 Util::Quaternion<SceFloat> get_orientation(const MotionState &state);

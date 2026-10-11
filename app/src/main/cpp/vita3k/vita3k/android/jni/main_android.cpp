@@ -630,12 +630,16 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
                     break;
                 }
 
-                case SDL_EVENT_GAMEPAD_SENSOR_UPDATE:
+                case SDL_EVENT_GAMEPAD_SENSOR_UPDATE: {
+                    const std::lock_guard input_operation(emucorev::savestate::save_state_operation_mutex());
                     handle_motion_event(*emuenv, event.gsensor.sensor, event.gsensor);
                     break;
-                case SDL_EVENT_SENSOR_UPDATE:
+                }
+                case SDL_EVENT_SENSOR_UPDATE: {
+                    const std::lock_guard input_operation(emucorev::savestate::save_state_operation_mutex());
                     handle_motion_event(*emuenv, SDL_GetSensorTypeForID(event.sensor.which), event.sensor);
                     break;
+                }
 
                 default:
                     break;

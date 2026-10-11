@@ -7,9 +7,27 @@
 #include "util/quaternion.h"
 #include "util/types.h"
 #include "util/vector_math.h"
+#include <string>
 
 class MotionInput {
 public:
+    struct Snapshot {
+        SceFloat kp = 0.3f, ki = 0.005f, kd = 0.0f;
+        Util::Vec3f real_error{}, integral_error{}, derivative_error{};
+        Util::Quaternion<SceFloat> quat{ { 0.0f, 0.0f, -1.0f }, 0.0f };
+        Util::Vec3f rotations{}, accel{}, gyro{}, gyro_bias{};
+        SceFloat gyro_deadband = 0.007f, gyro_deadband2 = 0.007f * 0.007f;
+        SceFloat angle_threshold = 20.0f;
+        SceFVector3 basic_orientation{}, basic_orientation_base{};
+        SceFloat reset_counter = 0.0f;
+        bool reset_enabled = true, bias_enabled = true, deadband_enabled = true;
+        bool tilt_correction_enabled = true, only_accelerometer = true;
+    };
+
+    Snapshot capture_snapshot() const;
+    static bool validate_snapshot(const Snapshot &snapshot, std::string &error);
+    void apply_snapshot(const Snapshot &snapshot);
+
     static constexpr float GyroMaxValue = 5.0f;
     static constexpr float AccelMaxValue = 7.0f;
 

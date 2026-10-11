@@ -308,3 +308,5 @@ using KernelHostLifetimeEnv = EmuEnvState;
 #include "audio_restore_topology_tests.inc"
 #include "queue_abort_tests.inc"
 #include "input_read_continuation_tests.inc"
+#include "usse_control_flow_tests.inc"
+#include "motion_snapshot_tests.inc"

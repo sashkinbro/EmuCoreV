@@ -440,8 +440,11 @@ void analyze(USSEBlockNode &root, USSEOffset end_offset, const AnalyzeReadFuncti
                 if (!is_loop_stmt) {
                     // Some ifs may be trying to jump to parent's merge point. It's also means there's no more content
                     // further in this block.
-                    if (branch_from_result->second.pred == 0) {
-                        // Execution changed direction, follow it. Emit the code before the branch.
+                    if (branch_from_result->second.pred == 0 || branch_from_result->second.dest == baddr + 1) {
+                        // A branch to the next instruction has the same taken and fall-through
+                        // successor for every predicate. Consume it without constructing an
+                        // if/else (which would mistake this branch for its own else terminator).
+                        // Ordinary unconditional branches follow their destination as before.
                         current_code->size = baddr - current_code->offset;
                         request.block_node->add_children(current_code_inst);
 

@@ -3,8 +3,47 @@
 // Refer to the license.txt file included
 
 #include <algorithm>
+#include <cmath>
 
 #include "motion/motion_input.h"
+
+MotionInput::Snapshot MotionInput::capture_snapshot() const {
+    return { kp, ki, kd, real_error, integral_error, derivative_error, quat,
+        rotations, accel, gyro, gyro_bias, gyro_deadband, gyro_deadband2,
+        angle_threshold, basic_orientation, basic_orientation_base, reset_counter,
+        reset_enabled, bias_enabled, deadband_enabled, tilt_correction_enabled, only_accelerometer };
+}
+
+bool MotionInput::validate_snapshot(const Snapshot &s, std::string &error) {
+    const auto vec = [](const auto &v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); };
+    const SceFloat norm = s.quat.xyz.Length2() + s.quat.w * s.quat.w;
+    if (!std::isfinite(s.kp) || !std::isfinite(s.ki) || !std::isfinite(s.kd)
+        || !vec(s.real_error) || !vec(s.integral_error) || !vec(s.derivative_error)
+        || !vec(s.quat.xyz) || !std::isfinite(s.quat.w) || !std::isfinite(norm) || std::abs(norm - 1.0f) > 0.02f
+        || !vec(s.rotations) || !vec(s.accel) || !vec(s.gyro) || !vec(s.gyro_bias)
+        || !std::isfinite(s.gyro_deadband) || s.gyro_deadband < 0
+        || !std::isfinite(s.gyro_deadband2) || s.gyro_deadband2 < 0
+        || !std::isfinite(s.angle_threshold) || s.angle_threshold < 0 || s.angle_threshold > 45
+        || !vec(s.basic_orientation) || !vec(s.basic_orientation_base)
+        || !std::isfinite(s.reset_counter) || s.reset_counter < 0) {
+        error = "invalid motion numerical state";
+        return false;
+    }
+    return true;
+}
+
+void MotionInput::apply_snapshot(const Snapshot &s) {
+    // Restore the filtered values directly; measurement setters would apply
+    // calibration and deadband for a second time.
+    kp = s.kp; ki = s.ki; kd = s.kd;
+    real_error = s.real_error; integral_error = s.integral_error; derivative_error = s.derivative_error;
+    quat = s.quat; rotations = s.rotations; accel = s.accel; gyro = s.gyro; gyro_bias = s.gyro_bias;
+    gyro_deadband = s.gyro_deadband; gyro_deadband2 = s.gyro_deadband2; angle_threshold = s.angle_threshold;
+    basic_orientation = s.basic_orientation; basic_orientation_base = s.basic_orientation_base;
+    reset_counter = s.reset_counter; reset_enabled = s.reset_enabled; bias_enabled = s.bias_enabled;
+    deadband_enabled = s.deadband_enabled; tilt_correction_enabled = s.tilt_correction_enabled;
+    only_accelerometer = s.only_accelerometer;
+}
 
 MotionInput::MotionInput() {
     // Initialize PID constants with default values

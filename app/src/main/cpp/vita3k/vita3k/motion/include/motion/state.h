@@ -39,7 +39,18 @@ struct SDL_SensorDeleter {
 using SDL_SensorPtr = std::unique_ptr<SDL_Sensor, SDL_SensorDeleter>;
 
 struct MotionState {
-    std::mutex mutex;
+    mutable std::mutex mutex;
+    struct Snapshot {
+        bool is_sampling = false;
+        uint32_t last_counter = 0;
+        uint64_t last_gyro_timestamp = 0, last_accel_timestamp = 0;
+        uint64_t last_updated_gyro_timestamp = 0, last_updated_accel_timestamp = 0;
+        MotionInput::Snapshot data;
+    };
+    Snapshot capture_snapshot() const;
+    static bool validate_snapshot(const Snapshot &snapshot, std::string &error);
+    bool apply_snapshot(const Snapshot &snapshot, std::string &error);
+    static Snapshot legacy_snapshot();
     MotionInput motion_data;
     uint32_t last_counter = 0;
     uint64_t last_gyro_timestamp = 0;
@@ -55,10 +66,22 @@ struct MotionState {
     bool has_device_motion_support = false;
     bool is_sampling = false;
 
+    // Transient host clocks and event admission never belong in the archive.
+    struct SensorClock {
+        bool anchored = true;
+        uint64_t raw_base = 0, logical_base = 0;
+        uint64_t map(uint64_t raw_timestamp, uint64_t last_logical_timestamp);
+    } gyro_clock, accel_clock;
+    uint64_t minimum_event_timestamp = 0;
+
     void init();
     void clear_device_motion_support();
     void refresh_device_motion_support();
     void stop_sensor_sampling();
     void start_sensor_sampling();
     void reset_runtime();
+    // Caller owns mutex; public lifecycle methods acquire it themselves.
+    void stop_sensor_sampling_locked();
+    void start_sensor_sampling_locked();
+    void reset_runtime_locked();
 };

@@ -25,8 +25,11 @@
 
 #include <SDL3/SDL_gamepad.h>
 #include <numbers>
+#include <limits>
+#include <SDL3/SDL_timer.h>
 
 void set_display_rotation(MotionState &state, int rotation) {
+    const std::lock_guard lock(state.mutex);
     state.device_native_rotation = static_cast<DeviceRotation>(rotation);
 }
 
@@ -78,21 +81,26 @@ static std::string device_rotation_to_string(DeviceRotation rotation) {
 }
 
 void MotionState::init() {
-    reset_runtime();
+    const std::lock_guard lock(mutex);
+    reset_runtime_locked();
     has_device_motion_support = false;
     device_accel_id = 0;
     device_gyro_id = 0;
 }
 
 void MotionState::clear_device_motion_support() {
-    stop_sensor_sampling();
+    const std::lock_guard lock(mutex);
+    stop_sensor_sampling_locked();
     has_device_motion_support = false;
     device_accel_id = 0;
     device_gyro_id = 0;
 }
 
 void MotionState::refresh_device_motion_support() {
-    clear_device_motion_support();
+    const std::lock_guard lock(mutex);
+    stop_sensor_sampling_locked();
+    has_device_motion_support = false;
+    device_accel_id = device_gyro_id = 0;
     detect_device_motion_support(*this);
 
     if (has_device_motion_support)
@@ -100,12 +108,22 @@ void MotionState::refresh_device_motion_support() {
 }
 
 void MotionState::stop_sensor_sampling() {
+    const std::lock_guard lock(mutex);
+    stop_sensor_sampling_locked();
+}
+
+void MotionState::stop_sensor_sampling_locked() {
     is_sampling = false;
     device_accel.reset();
     device_gyro.reset();
 }
 
 void MotionState::start_sensor_sampling() {
+    const std::lock_guard lock(mutex);
+    start_sensor_sampling_locked();
+}
+
+void MotionState::start_sensor_sampling_locked() {
     is_sampling = true;
     if (!has_device_motion_support)
         return;
@@ -126,12 +144,21 @@ void MotionState::start_sensor_sampling() {
         return true;
     };
 
-    if (!open_sensor(device_accel, device_accel_id, "accelerometer") || !open_sensor(device_gyro, device_gyro_id, "gyroscope"))
-        clear_device_motion_support();
+    if (!open_sensor(device_accel, device_accel_id, "accelerometer") || !open_sensor(device_gyro, device_gyro_id, "gyroscope")) {
+        device_accel.reset();
+        device_gyro.reset();
+        has_device_motion_support = false;
+        // Guest sampling stays enabled with neutral readings if hardware is unavailable.
+    }
 }
 
 void MotionState::reset_runtime() {
-    stop_sensor_sampling();
+    const std::lock_guard lock(mutex);
+    reset_runtime_locked();
+}
+
+void MotionState::reset_runtime_locked() {
+    stop_sensor_sampling_locked();
     motion_data.ResetQuaternion();
     motion_data.ResetRotations();
     last_counter = 0;
@@ -139,6 +166,66 @@ void MotionState::reset_runtime() {
     last_accel_timestamp = 0;
     last_updated_gyro_timestamp = 0;
     last_updated_accel_timestamp = 0;
+    gyro_clock = {};
+    accel_clock = {};
+    minimum_event_timestamp = 0;
+}
+
+uint64_t MotionState::SensorClock::map(uint64_t raw, uint64_t latest) {
+    if (!anchored || raw < raw_base) {
+        anchored = true;
+        raw_base = raw;
+        logical_base = latest;
+    }
+    const auto delta = raw - raw_base;
+    const uint64_t mapped = delta > std::numeric_limits<uint64_t>::max() - logical_base
+        ? std::numeric_limits<uint64_t>::max() : logical_base + delta;
+    return std::max(latest, mapped);
+}
+
+MotionState::Snapshot MotionState::capture_snapshot() const {
+    const std::lock_guard lock(mutex);
+    return { is_sampling, last_counter, last_gyro_timestamp, last_accel_timestamp,
+        last_updated_gyro_timestamp, last_updated_accel_timestamp, motion_data.capture_snapshot() };
+}
+
+bool MotionState::validate_snapshot(const Snapshot &s, std::string &error) {
+    if (s.last_updated_gyro_timestamp < s.last_gyro_timestamp || s.last_updated_accel_timestamp < s.last_accel_timestamp
+        || s.last_gyro_timestamp == UINT64_MAX || s.last_accel_timestamp == UINT64_MAX
+        || s.last_updated_gyro_timestamp == UINT64_MAX || s.last_updated_accel_timestamp == UINT64_MAX) {
+        error = "invalid motion sample clock";
+        return false;
+    }
+    return MotionInput::validate_snapshot(s.data, error);
+}
+
+bool MotionState::apply_snapshot(const Snapshot &s, std::string &error) {
+    if (!validate_snapshot(s, error))
+        return false;
+    const std::lock_guard lock(mutex);
+    if (!s.is_sampling)
+        stop_sensor_sampling_locked();
+    else if (!is_sampling || (has_device_motion_support && (!device_accel || !device_gyro)))
+        start_sensor_sampling_locked();
+    is_sampling = s.is_sampling;
+    motion_data.apply_snapshot(s.data);
+    last_counter = s.last_counter;
+    last_gyro_timestamp = s.last_gyro_timestamp;
+    last_accel_timestamp = s.last_accel_timestamp;
+    last_updated_gyro_timestamp = s.last_updated_gyro_timestamp;
+    last_updated_accel_timestamp = s.last_updated_accel_timestamp;
+    gyro_clock = { false, 0, 0 };
+    accel_clock = { false, 0, 0 };
+    minimum_event_timestamp = SDL_GetTicksNS();
+    return true;
+}
+
+MotionState::Snapshot MotionState::legacy_snapshot() {
+    // Old archives did not store sampling/settings. Neutral active sampling is
+    // a best-effort gameplay policy, not reconstruction of missing guest state.
+    Snapshot snapshot;
+    snapshot.is_sampling = true;
+    return snapshot;
 }
 
 SceFVector3 get_acceleration(const MotionState &state) {
@@ -209,6 +296,9 @@ constexpr uint64_t to_microseconds(uint64_t ns) {
 
 template <typename SensorEvent>
 static void handle_motion_event(EmuEnvState &emuenv, int32_t sensor_type, const SensorEvent &sensor) {
+    const std::lock_guard lock(emuenv.motion.mutex);
+    if (sensor.timestamp < emuenv.motion.minimum_event_timestamp)
+        return;
     if (!emuenv.motion.is_sampling)
         return;
 
@@ -248,11 +338,11 @@ static void handle_motion_event(EmuEnvState &emuenv, int32_t sensor_type, const 
     if (sensor_type == SDL_SENSOR_ACCEL) {
         sensor_data /= -SDL_STANDARD_GRAVITY;
         emuenv.motion.motion_data.SetAcceleration(sensor_data);
-        emuenv.motion.last_updated_accel_timestamp = sensor_timestamp;
+        emuenv.motion.last_updated_accel_timestamp = emuenv.motion.accel_clock.map(sensor_timestamp, emuenv.motion.last_updated_accel_timestamp);
     } else if (sensor_type == SDL_SENSOR_GYRO) {
         sensor_data /= 2.f * std::numbers::pi_v<float>;
         emuenv.motion.motion_data.SetGyroscope(sensor_data);
-        emuenv.motion.last_updated_gyro_timestamp = sensor_timestamp;
+        emuenv.motion.last_updated_gyro_timestamp = emuenv.motion.gyro_clock.map(sensor_timestamp, emuenv.motion.last_updated_gyro_timestamp);
     }
 }
 
@@ -265,6 +355,7 @@ void handle_motion_event(EmuEnvState &emuenv, int32_t sensor_type, const SDL_Gam
 }
 
 void refresh_motion(MotionState &state, CtrlState &ctrl_state) {
+    const std::lock_guard lock(state.mutex);
     if (!state.is_sampling)
         return;
 

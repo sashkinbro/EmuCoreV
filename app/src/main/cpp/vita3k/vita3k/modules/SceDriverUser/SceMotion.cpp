@@ -26,20 +26,19 @@ TRACY_MODULE_NAME(SceMotion);
 
 EXPORT(SceFloat, sceMotionGetAngleThreshold) {
     TRACY_FUNC(sceMotionGetAngleThreshold);
+    const std::lock_guard guard(emuenv.motion.mutex);
     return get_angle_threshold(emuenv.motion);
 }
 
 EXPORT(int, sceMotionGetBasicOrientation, SceFVector3 *basicOrientation) {
     TRACY_FUNC(sceMotionGetBasicOrientation, basicOrientation);
+    const std::lock_guard guard(emuenv.motion.mutex);
     if (!emuenv.motion.is_sampling) {
         return SCE_MOTION_ERROR_NOT_SAMPLING;
     }
     if (basicOrientation == nullptr) {
         return RET_ERROR(SCE_MOTION_ERROR_NULL_PARAMETER);
     }
-
-    std::lock_guard<std::mutex> guard(emuenv.motion.mutex);
-
     *basicOrientation = get_basic_orientation(emuenv.motion);
 
     return SCE_MOTION_OK;
@@ -47,6 +46,7 @@ EXPORT(int, sceMotionGetBasicOrientation, SceFVector3 *basicOrientation) {
 
 EXPORT(SceBool, sceMotionGetDeadband) {
     TRACY_FUNC(sceMotionGetDeadband);
+    const std::lock_guard guard(emuenv.motion.mutex);
     return get_deadband(emuenv.motion);
 }
 
@@ -62,6 +62,7 @@ EXPORT(int, sceMotionGetDeviceLocation, SceMotionDeviceLocation *devLocation) {
 
 EXPORT(SceBool, sceMotionGetGyroBiasCorrection) {
     TRACY_FUNC(sceMotionGetGyroBiasCorrection);
+    const std::lock_guard guard(emuenv.motion.mutex);
     return get_gyro_bias_correction(emuenv.motion);
 }
 
@@ -72,6 +73,7 @@ EXPORT(SceBool, sceMotionGetMagnetometerState) {
 
 EXPORT(int, sceMotionGetSensorState, SceMotionSensorState *sensorState, int numRecords) {
     TRACY_FUNC(sceMotionGetSensorState, sensorState, numRecords);
+    const std::lock_guard guard(emuenv.motion.mutex);
     if (!emuenv.motion.is_sampling) {
         return SCE_MOTION_ERROR_NOT_SAMPLING;
     }
@@ -83,7 +85,6 @@ EXPORT(int, sceMotionGetSensorState, SceMotionSensorState *sensorState, int numR
     }
 
     if ((emuenv.ctrl.has_motion_support || emuenv.motion.has_device_motion_support) && !emuenv.cfg.disable_motion) {
-        std::lock_guard<std::mutex> guard(emuenv.motion.mutex);
         sensorState->accelerometer = get_acceleration(emuenv.motion);
         sensorState->gyro = get_gyroscope(emuenv.motion);
 
@@ -112,6 +113,7 @@ EXPORT(int, sceMotionGetSensorState, SceMotionSensorState *sensorState, int numR
 
 EXPORT(int, sceMotionGetState, SceMotionState *motionState) {
     TRACY_FUNC(sceMotionGetState, motionState);
+    const std::lock_guard guard(emuenv.motion.mutex);
     if (!emuenv.motion.is_sampling) {
         return SCE_MOTION_ERROR_NOT_SAMPLING;
     }
@@ -120,7 +122,6 @@ EXPORT(int, sceMotionGetState, SceMotionState *motionState) {
     }
 
     if ((emuenv.ctrl.has_motion_support || emuenv.motion.has_device_motion_support) && !emuenv.cfg.disable_motion) {
-        std::lock_guard<std::mutex> guard(emuenv.motion.mutex);
         motionState->timestamp = emuenv.motion.last_accel_timestamp;
 
         motionState->acceleration = get_acceleration(emuenv.motion);
@@ -158,7 +159,7 @@ EXPORT(int, sceMotionGetState, SceMotionState *motionState) {
         }
     }
 
-    CALL_EXPORT(sceMotionGetBasicOrientation, &motionState->basicOrientation);
+    motionState->basicOrientation = get_basic_orientation(emuenv.motion);
     return SCE_MOTION_OK;
 }
 
@@ -174,6 +175,7 @@ EXPORT(int, sceMotionGetStateInternal) {
 
 EXPORT(SceBool, sceMotionGetTiltCorrection) {
     TRACY_FUNC(sceMotionGetTiltCorrection);
+    const std::lock_guard guard(emuenv.motion.mutex);
     return get_tilt_correction(emuenv.motion);
 }
 
@@ -199,7 +201,7 @@ EXPORT(int, sceMotionMagnetometerOn) {
 
 EXPORT(int, sceMotionReset) {
     TRACY_FUNC(sceMotionReset);
-    std::lock_guard<std::mutex> guard(emuenv.motion.mutex);
+    const std::lock_guard guard(emuenv.motion.mutex);
     emuenv.motion.motion_data.ResetQuaternion();
     emuenv.motion.motion_data.ResetRotations();
     return SCE_MOTION_OK;
@@ -212,12 +214,14 @@ EXPORT(int, sceMotionResetExt) {
 
 EXPORT(int, sceMotionRotateYaw, const float radians) {
     TRACY_FUNC(sceMotionRotateYaw, radians);
+    const std::lock_guard guard(emuenv.motion.mutex);
     emuenv.motion.motion_data.RotateYaw(radians);
     return SCE_MOTION_OK;
 }
 
 EXPORT(int, sceMotionSetAngleThreshold, SceFloat angle) {
     TRACY_FUNC(sceMotionSetAngleThreshold, angle);
+    const std::lock_guard guard(emuenv.motion.mutex);
     if (std::isnan(angle) || angle > 45.0f) {
         return SCE_MOTION_ERROR_ANGLE_OUT_OF_RANGE;
     }
@@ -228,6 +232,7 @@ EXPORT(int, sceMotionSetAngleThreshold, SceFloat angle) {
 
 EXPORT(int, sceMotionSetDeadband, SceBool setValue) {
     TRACY_FUNC(sceMotionSetDeadband, setValue);
+    const std::lock_guard guard(emuenv.motion.mutex);
     set_deadband(emuenv.motion, setValue);
 
     return SCE_MOTION_OK;
@@ -240,6 +245,7 @@ EXPORT(int, sceMotionSetDeadbandExt) {
 
 EXPORT(int, sceMotionSetGyroBiasCorrection, SceBool setValue) {
     TRACY_FUNC(sceMotionSetGyroBiasCorrection, setValue);
+    const std::lock_guard guard(emuenv.motion.mutex);
     set_gyro_bias_correction(emuenv.motion, setValue);
 
     return SCE_MOTION_OK;
@@ -247,6 +253,7 @@ EXPORT(int, sceMotionSetGyroBiasCorrection, SceBool setValue) {
 
 EXPORT(int, sceMotionSetTiltCorrection, SceBool setValue) {
     TRACY_FUNC(sceMotionSetTiltCorrection, setValue);
+    const std::lock_guard guard(emuenv.motion.mutex);
     set_tilt_correction(emuenv.motion, setValue);
 
     return SCE_MOTION_OK;
@@ -259,11 +266,12 @@ EXPORT(int, sceMotionSetTiltCorrectionExt) {
 
 EXPORT(int, sceMotionStartSampling) {
     TRACY_FUNC(sceMotionStartSampling);
+    const std::lock_guard guard(emuenv.motion.mutex);
     if (emuenv.motion.is_sampling) {
         return SCE_MOTION_ERROR_ALREADY_SAMPLING;
     }
 
-    emuenv.motion.start_sensor_sampling();
+    emuenv.motion.start_sensor_sampling_locked();
     return SCE_MOTION_OK;
 }
 
@@ -274,11 +282,12 @@ EXPORT(int, sceMotionStartSamplingExt) {
 
 EXPORT(int, sceMotionStopSampling) {
     TRACY_FUNC(sceMotionStopSampling);
+    const std::lock_guard guard(emuenv.motion.mutex);
     if (!emuenv.motion.is_sampling) {
         return SCE_MOTION_ERROR_NOT_SAMPLING;
     }
 
-    emuenv.motion.stop_sensor_sampling();
+    emuenv.motion.stop_sensor_sampling_locked();
     return SCE_MOTION_OK;
 }
 

@@ -19,6 +19,7 @@
 #include <emucorev/savestate/sysmem_state_io.h>
 #include <emucorev/savestate/gpu_state_io.h>
 #include <emucorev/savestate/kernel_import_io.h>
+#include <emucorev/savestate/motion_state_io.h>
 
 #include <cpu/functions.h>
 #include <audio/state.h>
@@ -1481,7 +1482,7 @@ bool read_audio(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::stri
 
 bool preflight_input(const std::vector<uint8_t> &data, std::string &error);
 
-constexpr uint32_t kTouchInputFormatVersion = 1;
+constexpr uint32_t kTouchInputFormatVersion = 2;
 
 bool write_input(EmuEnvState &emuenv, Writer &writer, std::string &error) {
     BufferWriter buffer;
@@ -1500,6 +1501,7 @@ bool write_input(EmuEnvState &emuenv, Writer &writer, std::string &error) {
     for (const auto &ports : emuenv.touch.touch_buffers)
         for (const auto &sample : ports)
             buffer.value(sample);
+    write_motion_snapshot(buffer, emuenv.motion.capture_snapshot());
     if (!preflight_input(buffer.data(), error))
         return false;
     return writer.write_section(SectionId::Input, buffer.data().data(), buffer.size(), true, error);
@@ -1516,6 +1518,7 @@ struct InputSnapshot {
     std::array<int32_t, 2> curr_touch_id{};
     int32_t touch_buffer_idx = 0;
     std::array<std::array<SceTouchData, 2>, MAX_TOUCH_BUFFER_SAVED> touch_buffers{};
+    MotionState::Snapshot motion = MotionState::legacy_snapshot();
 };
 
 bool parse_input_state(const std::vector<uint8_t> &data, InputSnapshot &snapshot, std::string &error) {
@@ -1528,7 +1531,8 @@ bool parse_input_state(const std::vector<uint8_t> &data, InputSnapshot &snapshot
     // The original 48-byte section had controller state only. Its touch
     // cursors must never survive a display-clock rewind on a running load.
     if (reader.ok() && reader.remaining() != 0) {
-        if (reader.u32() != kTouchInputFormatVersion) {
+        const uint32_t version = reader.u32();
+        if (version != 1 && version != kTouchInputFormatVersion) {
             error = "unsupported touch input state";
             return false;
         }
@@ -1560,6 +1564,8 @@ bool parse_input_state(const std::vector<uint8_t> &data, InputSnapshot &snapshot
                 }
             }
         }
+        if (version >= 2 && !read_motion_snapshot(reader, parsed.motion, error))
+            return false;
     }
     if (!reader.ok() || reader.remaining() != 0 ||
         parsed.input_mode < SCE_CTRL_MODE_DIGITAL || parsed.input_mode > SCE_CTRL_MODE_ANALOG_WIDE ||
@@ -1622,6 +1628,8 @@ bool read_input(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::stri
     touch.touch_buffer_idx = snapshot.touch_buffer_idx;
     for (int i = 0; i < MAX_TOUCH_BUFFER_SAVED; ++i)
         std::copy(snapshot.touch_buffers[i].begin(), snapshot.touch_buffers[i].end(), touch.touch_buffers[i]);
+    if (!emuenv.motion.apply_snapshot(snapshot.motion, error))
+        return false;
     LOG_CRITICAL("[savestate-input] restored input_mode={} input_mode_ext={}", snapshot.input_mode, snapshot.input_mode_ext);
     return true;
 }
