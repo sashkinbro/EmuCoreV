@@ -116,6 +116,22 @@ class AppPreferences(context: Context) {
         get() = prefs.getBoolean(KEY_WELCOME_DIALOG_SHOWN, false)
         set(value) = prefs.edit { putBoolean(KEY_WELCOME_DIALOG_SHOWN, value) }
 
+    var confirmSaveStateActions: Boolean
+        get() = prefs.getBoolean(KEY_CONFIRM_SAVE_STATE_ACTIONS, true)
+        set(value) = prefs.edit { putBoolean(KEY_CONFIRM_SAVE_STATE_ACTIONS, value) }
+
+    val confirmSaveStateActionsFlow: Flow<Boolean>
+        get() = callbackFlow {
+            val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key == KEY_CONFIRM_SAVE_STATE_ACTIONS) {
+                    trySend(confirmSaveStateActions)
+                }
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(confirmSaveStateActions)
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }.distinctUntilChanged()
+
     var lastCoreBinaryFingerprint: String?
         get() = prefs.getString(KEY_LAST_CORE_BINARY_FINGERPRINT, null)
         set(value) = prefs.edit { putString(KEY_LAST_CORE_BINARY_FINGERPRINT, value) }
@@ -195,6 +211,7 @@ class AppPreferences(context: Context) {
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_PRO_UNLOCKED = "pro_unlocked"
         private const val KEY_WELCOME_DIALOG_SHOWN = "welcome_dialog_shown"
+        private const val KEY_CONFIRM_SAVE_STATE_ACTIONS = "confirm_save_state_actions"
         private const val KEY_LAST_CORE_BINARY_FINGERPRINT = "last_core_binary_fingerprint"
         private const val KEY_APP_LANGUAGE = "app_language"
         private const val KEY_SKIPPED_UPDATE_TAG = "skipped_update_tag"

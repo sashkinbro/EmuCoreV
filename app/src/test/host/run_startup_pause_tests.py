@@ -59,6 +59,9 @@ void report_launch_state_progress(float progress,bool active){progress_active=ac
 struct Result {std::string error="deliberate restore failure";bool ok()const{return restore_ok;}};
 namespace emucorev::savestate { Result load_state(Env &env,const std::string &,bool,const std::function<void(float,const char*)> &progress={}){++restore_calls;restore_paused=env.kernel.paused&&env.audio.paused;env.audio.new_port_started=false;if(progress){progress(.02f,"prepare");progress(.8f,"memory");progress(1.f,"done");}return {};} }
 void report_save_state_load_error(const std::string &){progress_active=false;}
+// JNI frame delivery belongs to the first-present test; this probe verifies
+// startup keeps its loading state pending when the IO phase alone completes.
+void register_state_frame_readiness(Env::R &) {}
 void startup(Env *emuenv,app::AppSessionController *session_controller) {
 std::string load_state_path="fixture";int exit_code=0;
 std::mutex operation_mutex;std::unique_lock startup_state_operation(operation_mutex);progress_active=true;
@@ -70,7 +73,7 @@ do {
 int main(){int failed=0;auto check=[&](bool ok,const char *name){std::printf("%s %s\n",ok?"PASS":"FAIL",name);failed+=!ok;};
 Env env;app::AppSessionController c{env};global_controller=&c;
 startup(&env,&c);check(restore_paused,"startup restore is inside kernel/audio pause");check(env.audio.new_port_started,"startup restored stopped audio port resumes");
-check(progress_values.size()==3&&progress_values.front()==.02f&&progress_values.back()==1.f,"startup forwards actual core progress");check(finish_seen&&!progress_active,"startup clears loading overlay on success");check(completed_after_resume,"loading overlay finishes after restored audio resumes");
+check(progress_values.size()==3&&progress_values.front()==.02f&&progress_values.back()==1.f,"startup forwards actual core progress");check(!finish_seen&&progress_active,"startup leaves overlay pending until actual restored presentation");
 restore_paused=false;{ScopedSaveStatePause pause(get_app_session_controller());check(bool(pause),"JNI pause acquired");emucorev::savestate::load_state(env,"fixture",true);}check(restore_paused&&env.audio.new_port_started,"JNI restore paused and resumed");
 c.set_pause_reason(app::AppSessionPauseReason::Menu,true);c.set_pause_reason(app::AppSessionPauseReason::Background,true);startup(&env,&c);check(env.kernel.paused&&env.audio.paused&&!env.audio.new_port_started&&c.active_pause_reasons==6,"startup preserves Menu and Background reasons");
 c.set_pause_reason(app::AppSessionPauseReason::Menu,false);c.set_pause_reason(app::AppSessionPauseReason::Background,false);restore_ok=false;startup(&env,&c);const int calls=cleanup_audio_calls;check(cleanup_count==1&&c.current_phase==app::AppSessionPhase::Idle,"failed restore cleans stopped session");check(env.audio.calls==calls,"no resume after cleanup");

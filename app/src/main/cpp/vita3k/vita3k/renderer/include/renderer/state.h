@@ -23,6 +23,7 @@
 #include <renderer/pause_overlay_policy.h>
 #include <renderer/snapshot_gate.h>
 #include <renderer/finish.h>
+#include <renderer/first_present.h>
 #include <renderer/types.h>
 #include <threads/queue.h>
 
@@ -145,6 +146,8 @@ struct State {
     std::unique_ptr<std::thread> render_thread;
     std::atomic<bool> render_abort{ false };
     SnapshotGate snapshot_gate;
+    FirstPresentReadiness restore_presentation;
+    FirstPresentReadiness::Callback restore_presentation_callback;
 
     std::vector<ShadersHash> precompile_queue;
     bool precompile_requested = false;

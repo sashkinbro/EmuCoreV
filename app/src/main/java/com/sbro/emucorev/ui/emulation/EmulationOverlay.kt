@@ -107,6 +107,7 @@ import com.sbro.emucorev.core.CheatBridge
 import com.sbro.emucorev.core.SaveStateResult
 import com.sbro.emucorev.core.SaveStateRepository
 import com.sbro.emucorev.core.SaveStateSlot
+import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.core.VitaCheatSnapshot
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
@@ -147,8 +148,13 @@ fun EmulationOverlayHost(
     val nativeGameId = activity.currentGameId
     val gameId = nativeGameId.ifBlank { activity.currentGameIdOrIntent() }
     val launchStateLoading = activity.launchStateLoading
+    val waitingForStateFrame = activity.stateFrameWaiting
     val repository = remember(activity) { VitaGameSettingsRepository(activity) }
     val coreConfigRepository = remember(activity) { VitaCoreConfigRepository(activity) }
+    val appPreferences = remember(activity) { AppPreferences(activity) }
+    val confirmSaveStateActions by appPreferences.confirmSaveStateActionsFlow.collectAsState(
+        initial = appPreferences.confirmSaveStateActions
+    )
     val controlLayoutRepository = remember(activity) { TouchControlLayoutRepository(activity) }
     val customizationPreferences = remember(activity) { CustomizationPreferences(activity) }
     val customization by customizationPreferences.settings.collectAsState()
@@ -171,6 +177,8 @@ fun EmulationOverlayHost(
     var menuButtonVisible by remember { mutableStateOf(true) }
     var userPaused by remember { mutableStateOf(false) }
     var saveStateBusyLoading by remember { mutableStateOf(false) }
+    var saveStateBusySaving by remember { mutableStateOf(false) }
+    var pendingSaveStateAction by remember { mutableStateOf<SaveStateAction?>(null) }
     var touchMode by remember { mutableIntStateOf(0) }
     var exitDialogVisible by remember { mutableStateOf(false) }
     var cheatSnapshot by remember(activity) { mutableStateOf(VitaCheatSnapshot.EMPTY) }
@@ -191,7 +199,8 @@ fun EmulationOverlayHost(
     val controlsSuppressedByGamepad = hasPhysicalGamepad && !showControlsWithGamepad
     val controlsVisible = config.enableGamepadOverlay && !controlsSuppressedByGamepad
     val touchControlsActive = !nativeImeActive && (controlsEditMode || (config.enableGamepadOverlay && !controlsSuppressedByGamepad))
-    val showTouchControls = !nativeImeActive && !menuOpen && !saveStateBusyLoading &&
+    val showTouchControls = !nativeImeActive && !menuOpen && !saveStateBusyLoading && !waitingForStateFrame &&
+        !saveStateBusySaving && pendingSaveStateAction == null &&
         (
             controlsEditMode ||
                 (
@@ -199,7 +208,8 @@ fun EmulationOverlayHost(
                         overlayBridge.effectiveOverlayMask != 0
                 )
             )
-    val effectivePaused = userPaused || menuOpen || controlsEditMode || saveStateBusyLoading
+    val effectivePaused = userPaused || menuOpen || controlsEditMode || saveStateBusyLoading ||
+        saveStateBusySaving || pendingSaveStateAction != null
     val lifecycleOwner = LocalLifecycleOwner.current
     var inputResumed by remember(lifecycleOwner) {
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
@@ -225,8 +235,6 @@ fun EmulationOverlayHost(
     var saveStateSlots by remember(activity, gameId) { mutableStateOf(emptyList<SaveStateSlot>()) }
     var selectedSaveStateSlot by remember(activity) { mutableIntStateOf(SaveStateRepository.QUICK_SLOT) }
     var saveStateBusy by remember { mutableStateOf(false) }
-    var saveStateBusySaving by remember { mutableStateOf(false) }
-    var pendingSaveStateAction by remember { mutableStateOf<SaveStateAction?>(null) }
     var saveStatesRefreshKey by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(gameId, saveStatesRefreshKey) {
@@ -247,76 +255,85 @@ fun EmulationOverlayHost(
     val overlayScope = rememberCoroutineScope()
 
     fun performSaveStateAction(action: SaveStateAction) {
-        if (saveStateBusy || gameId.isBlank()) return
+        if (saveStateBusy || waitingForStateFrame || gameId.isBlank()) return
         overlayScope.launch {
             val restoreMenuOnFailure = menuOpen
             saveStateBusy = true
             saveStateBusySaving = action is SaveStateAction.Save
             saveStateBusyLoading = action is SaveStateAction.Load
-            if (saveStateBusyLoading) {
-                activity.setMenuPaused(true)
-                menuOpen = false
-            }
-            val result = try {
-                withContext(Dispatchers.IO) {
-                    when (action) {
-                        is SaveStateAction.Save -> saveStateRepository.save(gameId, action.slot, BuildConfig.VERSION_NAME)
-                        is SaveStateAction.Load -> saveStateRepository.load(gameId, action.slot)
-                        is SaveStateAction.Delete -> saveStateRepository.delete(gameId, action.slot)
+            withSaveStateMenuPause(
+                setPaused = activity::setMenuPaused,
+                pausedAfter = {
+                    saveStateBusy = false
+                    saveStateBusySaving = false
+                    saveStateBusyLoading = false
+                    userPaused || menuOpen || controlsEditMode || pendingSaveStateAction != null
+                }
+            ) {
+                if (saveStateBusyLoading) {
+                    menuOpen = false
+                }
+                val result = try {
+                    withContext(Dispatchers.IO) {
+                        when (action) {
+                            is SaveStateAction.Save -> saveStateRepository.save(gameId, action.slot, BuildConfig.VERSION_NAME)
+                            is SaveStateAction.Load -> saveStateRepository.load(gameId, action.slot)
+                            is SaveStateAction.Delete -> saveStateRepository.delete(gameId, action.slot)
+                        }
                     }
+                } catch (cancelled: CancellationException) {
+                    if (action is SaveStateAction.Load) menuOpen = restoreMenuOnFailure
+                    saveStateBusy = false
+                    saveStateBusySaving = false
+                    saveStateBusyLoading = false
+                    throw cancelled
+                } catch (error: Exception) {
+                    Log.e("SaveStateOverlay", "Save-state action failed before returning a result", error)
+                    SaveStateResult(
+                        status = SaveStateResult.STATUS_IO_ERROR,
+                        error = error.message ?: "save state operation failed",
+                        bytes = 0L,
+                        titleId = gameId,
+                        appVersion = "",
+                        engineVersion = 0,
+                        sessionMatch = true,
+                        timestamp = 0L
+                    )
                 }
-            } catch (cancelled: CancellationException) {
-                if (action is SaveStateAction.Load) menuOpen = restoreMenuOnFailure
-                saveStateBusy = false
-                saveStateBusySaving = false
-                saveStateBusyLoading = false
-                throw cancelled
-            } catch (error: Exception) {
-                Log.e("SaveStateOverlay", "Save-state action failed before returning a result", error)
-                SaveStateResult(
-                    status = SaveStateResult.STATUS_IO_ERROR,
-                    error = error.message ?: "save state operation failed",
-                    bytes = 0L,
-                    titleId = gameId,
-                    appVersion = "",
-                    engineVersion = 0,
-                    sessionMatch = true,
-                    timestamp = 0L
-                )
-            }
-            saveStatesRefreshKey++
-            if (!result.isOk) {
-                Log.e("SaveStateOverlay", "${action.javaClass.simpleName} failed (${result.status}): ${result.error}")
-            }
-            val messageRes = when {
-                result.isOk -> when (action) {
-                    is SaveStateAction.Save -> R.string.emulation_savestate_saved_toast
-                    is SaveStateAction.Load -> R.string.emulation_savestate_loaded_toast
-                    is SaveStateAction.Delete -> R.string.emulation_savestate_deleted_toast
+                saveStatesRefreshKey++
+                if (!result.isOk) {
+                    Log.e("SaveStateOverlay", "${action.javaClass.simpleName} failed (${result.status}): ${result.error}")
                 }
-                result.isSessionMismatch -> R.string.emulation_savestate_session_mismatch_toast
-                result.isTitleMismatch -> R.string.emulation_savestate_title_mismatch_toast
-                else -> R.string.emulation_savestate_failed_toast
-            }
-            if (!result.sessionUsable && action is SaveStateAction.Load) {
-                menuOpen = false
+                val messageRes = when {
+                    result.isOk -> when (action) {
+                        is SaveStateAction.Save -> R.string.emulation_savestate_saved_toast
+                        is SaveStateAction.Load -> R.string.emulation_savestate_loaded_toast
+                        is SaveStateAction.Delete -> R.string.emulation_savestate_deleted_toast
+                    }
+                    result.isSessionMismatch -> R.string.emulation_savestate_session_mismatch_toast
+                    result.isTitleMismatch -> R.string.emulation_savestate_title_mismatch_toast
+                    else -> R.string.emulation_savestate_failed_toast
+                }
+                if (!result.sessionUsable && action is SaveStateAction.Load) {
+                    menuOpen = false
+                    saveStateBusy = false
+                    saveStateBusySaving = false
+                    saveStateBusyLoading = false
+                    Toast.makeText(activity, messageRes, Toast.LENGTH_SHORT).show()
+                    activity.exitEmulation()
+                    return@withSaveStateMenuPause
+                }
+                if (result.isOk && action is SaveStateAction.Load) {
+                    menuOpen = false
+                    userPaused = false
+                } else if (action is SaveStateAction.Load) {
+                    menuOpen = restoreMenuOnFailure
+                }
                 saveStateBusy = false
                 saveStateBusySaving = false
                 saveStateBusyLoading = false
                 Toast.makeText(activity, messageRes, Toast.LENGTH_SHORT).show()
-                activity.exitEmulation()
-                return@launch
             }
-            if (result.isOk && action is SaveStateAction.Load) {
-                menuOpen = false
-                userPaused = false
-            } else if (action is SaveStateAction.Load) {
-                menuOpen = restoreMenuOnFailure
-            }
-            saveStateBusy = false
-            saveStateBusySaving = false
-            saveStateBusyLoading = false
-            Toast.makeText(activity, messageRes, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -494,7 +511,7 @@ fun EmulationOverlayHost(
 
     DisposableEffect(activity) {
         activity.setOverlayBackHandler {
-            if (saveStateBusyLoading) {
+            if (saveStateBusyLoading || saveStateBusySaving || activity.stateFrameWaiting || activity.launchStateLoading.active) {
                 true
             } else if (exitDialogVisible) {
                 exitDialogVisible = false
@@ -513,7 +530,7 @@ fun EmulationOverlayHost(
             menuButtonVisible = true
         }
         activity.setOverlayPauseMenuOpenHandler {
-            if (!activity.launchStateLoading.active && !saveStateBusyLoading) {
+            if (!activity.launchStateLoading.active && !activity.stateFrameWaiting && !saveStateBusy) {
                 menuOpen = true
                 menuButtonVisible = true
             }
@@ -687,34 +704,43 @@ fun EmulationOverlayHost(
             onSaveStateSlotSelected = { slot -> selectedSaveStateSlot = slot },
             onSaveStateSave = { slot ->
                 val exists = saveStateSlots.firstOrNull { it.slot == slot }?.exists == true
-                if (exists) {
+                if (exists && confirmSaveStateActions) {
                     pendingSaveStateAction = SaveStateAction.Save(slot, overwrite = true)
                 } else {
-                    performSaveStateAction(SaveStateAction.Save(slot, overwrite = false))
+                    performSaveStateAction(SaveStateAction.Save(slot, overwrite = exists))
                 }
             },
             onSaveStateLoad = { slot ->
                 val target = saveStateSlots.firstOrNull { it.slot == slot }
                 if (target != null && target.exists) {
-                    pendingSaveStateAction = SaveStateAction.Load(slot)
+                    if (confirmSaveStateActions) pendingSaveStateAction = SaveStateAction.Load(slot)
+                    else performSaveStateAction(SaveStateAction.Load(slot))
                 }
             },
             onSaveStateDelete = { slot -> pendingSaveStateAction = SaveStateAction.Delete(slot) },
             onQuickSaveState = {
-                performSaveStateAction(SaveStateAction.Save(SaveStateRepository.QUICK_SLOT, overwrite = false))
+                val exists = saveStateSlots.firstOrNull { it.slot == SaveStateRepository.QUICK_SLOT }?.exists == true
+                if (exists && confirmSaveStateActions) {
+                    pendingSaveStateAction = SaveStateAction.Save(SaveStateRepository.QUICK_SLOT, overwrite = true)
+                } else {
+                    performSaveStateAction(SaveStateAction.Save(SaveStateRepository.QUICK_SLOT, overwrite = exists))
+                }
             },
             onQuickLoadState = {
                 val quick = saveStateSlots.firstOrNull { it.slot == SaveStateRepository.QUICK_SLOT }
                 if (quick == null || !quick.exists) {
                     Toast.makeText(activity, R.string.emulation_savestate_empty, Toast.LENGTH_SHORT).show()
                 } else {
-                    performSaveStateAction(SaveStateAction.Load(SaveStateRepository.QUICK_SLOT))
+                    if (confirmSaveStateActions) {
+                        pendingSaveStateAction = SaveStateAction.Load(SaveStateRepository.QUICK_SLOT)
+                    } else performSaveStateAction(SaveStateAction.Load(SaveStateRepository.QUICK_SLOT))
                 }
             }
         )
 
         AnimatedVisibility(
-            visible = !nativeImeActive && !controlsEditMode && menuButtonVisible,
+            visible = !nativeImeActive && !controlsEditMode && menuButtonVisible &&
+                !saveStateBusy && !waitingForStateFrame && pendingSaveStateAction == null,
             enter = fadeIn(tween(180)),
             exit = fadeOut(tween(140)),
             modifier = Modifier.align(Alignment.TopCenter)
@@ -856,12 +882,14 @@ fun EmulationOverlayHost(
         }
 
         LaunchStateLoadingOverlay(
-            state = if (saveStateBusyLoading) {
+            state = if (saveStateBusyLoading || saveStateBusySaving || waitingForStateFrame) {
                 com.sbro.emucorev.core.vita.LaunchStateLoadingState(active = true)
             } else {
                 launchStateLoading
             },
-            indeterminate = saveStateBusyLoading
+            indeterminate = saveStateBusyLoading || saveStateBusySaving || waitingForStateFrame,
+            messageRes = if (saveStateBusySaving) R.string.emulation_savestate_saving
+                else R.string.emulation_savestate_startup_loading
         )
     }
 

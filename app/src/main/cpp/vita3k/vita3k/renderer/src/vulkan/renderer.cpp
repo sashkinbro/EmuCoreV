@@ -1309,13 +1309,16 @@ void VKState::cleanup() {
 }
 
 void VKState::render_frame(DisplayState &display, const GxmState &gxm, MemState &mem) {
+    restore_presentation_ticket = {};
     // we are displaying this frame, wait for a new one
     should_display = false;
 
     DisplayFrameInfo frame;
+    FirstPresentReadiness::Ticket frame_ticket;
     {
         std::lock_guard<std::mutex> guard(display.display_info_mutex);
         frame = display.next_rendered_frame;
+        frame_ticket = restore_presentation.begin_frame(static_cast<bool>(frame.base));
     }
 
     update_overlays();
@@ -1455,10 +1458,14 @@ void VKState::render_frame(DisplayState &display, const GxmState &gxm, MemState 
             display.viewport_x, display.viewport_y,
             display.viewport_w, display.viewport_h);
     }
+    if (frame.base && screen_renderer.current_cmd_buffer)
+        restore_presentation_ticket = frame_ticket;
 }
 
 void VKState::swap_window() {
-    screen_renderer.swap_window();
+    const bool presented = screen_renderer.swap_window();
+    restore_presentation.presented(restore_presentation_ticket, presented);
+    restore_presentation_ticket = {};
 
     // Android asked us to give memory back!
     const int trim_level = mem_diag::pending_trim_level.exchange(-1, std::memory_order_relaxed);

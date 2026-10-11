@@ -1472,6 +1472,9 @@
     <string name="settings_trophy_sound_unavailable">Nie można uzyskać dostępu do zapisanego dźwięku. Wybierz go ponownie.</string>
     <string name="settings_trophy_sound_pick_error">Nie udało się użyć tego pliku audio.</string>
     <string name="emulation_savestate_startup_loading">Wczytywanie stanu zapisu…</string>
+    <string name="emulation_savestate_saving">Zapisywanie stanu gry…</string>
+    <string name="settings_savestate_confirmations">Potwierdzaj operacje na stanach gry</string>
+    <string name="settings_help_savestate_confirmations">Pytaj przed wczytaniem lub nadpisaniem stanu gry. Usunięcie stanu gry zawsze wymaga potwierdzenia.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

@@ -60,6 +60,7 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.core.SaveStateResult
 import com.sbro.emucorev.core.SaveStateSlot
 import com.sbro.emucorev.core.VitaLaunchBridge
+import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.core.formatSaveStateSize
 import com.sbro.emucorev.core.formatSaveStateTimestamp
 import com.sbro.emucorev.ui.common.LocalImage
@@ -79,10 +80,15 @@ fun SaveStatesScreen(
     viewModel: SaveStatesViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val preferences = remember(context) { AppPreferences(context) }
+    val confirmSaveStateActions by preferences.confirmSaveStateActionsFlow.collectAsState(
+        initial = preferences.confirmSaveStateActions
+    )
     val uiState by viewModel.uiState.collectAsState()
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val backClick = rememberDebouncedClick(onClick = onBackClick)
     var pendingDelete by remember { mutableStateOf<Pair<SaveStatesGame, SaveStateSlot>?>(null) }
+    var pendingLoad by remember { mutableStateOf<Pair<SaveStatesGame, SaveStateSlot>?>(null) }
 
     val deletedMessage = stringResource(R.string.emulation_savestate_deleted_toast)
     val loadedMessage = stringResource(R.string.emulation_savestate_loaded_toast)
@@ -107,6 +113,20 @@ fun SaveStatesScreen(
         VitaLaunchBridge.LaunchResult.MissingFirmware -> launchFirmwareMessage
         VitaLaunchBridge.LaunchResult.MissingFirmwareUpdate -> launchFirmwareUpdateMessage
         VitaLaunchBridge.LaunchResult.Failure -> launchFailedMessage
+    }
+
+    fun loadState(game: SaveStatesGame, slot: SaveStateSlot) {
+        if (viewModel.isRunning(game.titleId)) {
+            viewModel.load(game.titleId, slot.slot) { result ->
+                Toast.makeText(context, describe(result, loadedMessage), Toast.LENGTH_LONG).show()
+            }
+        } else {
+            viewModel.launchWithState(game.titleId, slot.slot) { result ->
+                if (result != VitaLaunchBridge.LaunchResult.Success) {
+                    Toast.makeText(context, launchResultMessage(result), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     LazyColumn(
@@ -172,22 +192,30 @@ fun SaveStatesScreen(
                     busyKey = uiState.busyKey,
                     loadUnavailableMessage = launchUnavailableMessage,
                     onLoad = { slot ->
-                        if (viewModel.isRunning(game.titleId)) {
-                            viewModel.load(game.titleId, slot.slot) { result ->
-                                Toast.makeText(context, describe(result, loadedMessage), Toast.LENGTH_LONG).show()
-                            }
-                        } else {
-                            viewModel.launchWithState(game.titleId, slot.slot) { result ->
-                                if (result != VitaLaunchBridge.LaunchResult.Success) {
-                                    Toast.makeText(context, launchResultMessage(result), Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
+                        if (confirmSaveStateActions) pendingLoad = game to slot
+                        else loadState(game, slot)
                     },
                     onDelete = { slot -> pendingDelete = game to slot }
                 )
             }
         }
+    }
+
+    pendingLoad?.let { (game, slot) ->
+        AlertDialog(
+            onDismissRequest = { pendingLoad = null },
+            title = { Text(stringResource(R.string.emulation_savestate_confirm_load_title)) },
+            text = { Text(stringResource(R.string.emulation_savestate_confirm_load_body, saveStateSlotName(slot))) },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingLoad = null
+                    loadState(game, slot)
+                }) { Text(stringResource(R.string.emulation_savestate_load_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingLoad = null }) { Text(stringResource(R.string.common_cancel)) }
+            }
+        )
     }
 
     pendingDelete?.let { (game, slot) ->

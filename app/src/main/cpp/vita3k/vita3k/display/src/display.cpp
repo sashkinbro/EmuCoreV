@@ -491,6 +491,8 @@ void update_prediction(EmuEnvState &emuenv, DisplayFrameInfo &frame) {
 
     if (!display.predicting) {
         display.next_rendered_frame = frame;
+        if (frame.base)
+            emuenv.renderer->restore_presentation.fresh_frame();
         emuenv.renderer->should_display = true;
     }
 
@@ -509,6 +511,8 @@ void update_prediction(EmuEnvState &emuenv, DisplayFrameInfo &frame) {
     if (display.predicting) {
         LOG_TRACE("Mispredicted the next swapchain image");
         display.next_rendered_frame = frame;
+        if (frame.base)
+            emuenv.renderer->restore_presentation.fresh_frame();
         emuenv.renderer->should_display = true;
     }
 

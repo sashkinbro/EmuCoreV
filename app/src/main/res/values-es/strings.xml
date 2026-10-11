@@ -1468,6 +1468,9 @@
     <string name="settings_trophy_sound_unavailable">No se puede acceder al sonido guardado. Vuelve a elegirlo.</string>
     <string name="settings_trophy_sound_pick_error">No se pudo usar ese archivo de audio.</string>
     <string name="emulation_savestate_startup_loading">Cargando estado guardado…</string>
+    <string name="emulation_savestate_saving">Guardando el estado guardado…</string>
+    <string name="settings_savestate_confirmations">Confirmar acciones de estados guardados</string>
+    <string name="settings_help_savestate_confirmations">Pedir confirmación antes de cargar o sobrescribir un estado guardado. Eliminar un estado guardado siempre requiere confirmación.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

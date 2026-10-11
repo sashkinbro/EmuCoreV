@@ -283,6 +283,21 @@ private:
 
 } // namespace
 
+void register_state_frame_readiness(renderer::State &state) {
+    state.restore_presentation_callback = [](uint64_t generation, bool ready) {
+        auto *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+        auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
+        if (!env || !activity) return;
+        const auto clazz = env->GetObjectClass(activity);
+        const auto method = clazz ? get_optional_activity_method(env, clazz,
+            ready ? "onStateFrameReady" : "onStateFramePending", "(J)V") : nullptr;
+        if (method) env->CallVoidMethod(activity, method, static_cast<jlong>(generation));
+        clear_activity_callback_exception(env);
+        if (clazz) env->DeleteLocalRef(clazz);
+        env->DeleteLocalRef(activity);
+    };
+}
+
 extern "C" {
 
 // SDL3 entry point — called by SDLActivity's native thread when the Emulator activity starts.
@@ -370,8 +385,14 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
         SDL_GLContext gl_context = nullptr;
         AndroidFrameHost frame_host(nullptr, &gl_context);
         std::optional<AppLaunchRequest> pending_launch_request;
+        std::unique_lock startup_state_operation(emucorev::savestate::save_state_operation_mutex(), std::defer_lock);
 
         const auto cleanup_launch = [&](const app::AppSessionStopReason reason) {
+            // A background JNI Save/Load owns live runtime pointers through
+            // completion. Startup Load failure already holds this mutex here.
+            std::unique_lock cleanup_operation(emucorev::savestate::save_state_operation_mutex(), std::defer_lock);
+            if (!startup_state_operation.owns_lock())
+                cleanup_operation.lock();
             detach_overlay_virtual_controller();
             session_controller->stop(reason);
             reset_android_session_audio(*emuenv);
@@ -503,7 +524,6 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
             break;
         }
 
-        std::unique_lock startup_state_operation(emucorev::savestate::save_state_operation_mutex(), std::defer_lock);
         if (!load_state_path.empty())
             startup_state_operation.lock();
 
@@ -526,6 +546,7 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
                 break;
             }
             LOG_INFO("Applying launch save state {}", requested_state_path);
+            register_state_frame_readiness(*emuenv->renderer);
             const auto state_result = emucorev::savestate::load_state(*emuenv, requested_state_path, true,
                 [](float progress, const char *) { report_launch_state_progress(progress, true); });
             if (state_result.ok()) {
@@ -542,7 +563,8 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
         if (startup_state_operation.owns_lock()) {
             // The pause scope has released restored threads/audio before input
             // and the game surface are exposed to the frontend again.
-            report_launch_state_progress(1.0f, false);
+            // The successful first restored presentation completes the visual
+            // loading state after guest/runtime pause reasons have been released.
             startup_state_operation.unlock();
         }
 

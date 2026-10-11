@@ -554,10 +554,10 @@ void ScreenRenderer::render(vk::ImageView image_view, vk::ImageLayout layout, co
 #endif
 }
 
-void ScreenRenderer::swap_window() {
+bool ScreenRenderer::swap_window() {
     if (!current_cmd_buffer) {
         swapchain_image_idx = ~0;
-        return;
+        return false;
     }
 
     // first submit the command buffer
@@ -596,11 +596,12 @@ void ScreenRenderer::swap_window() {
         LOG_ERROR("Could not present KHR.");
         swapchain_image_idx = ~0;
         current_cmd_buffer = nullptr;
-        return;
+        return false;
     }
 
     swapchain_image_idx = ~0;
     current_cmd_buffer = nullptr;
+    return result == vk::Result::eSuccess || result == vk::Result::eSuboptimalKHR;
 }
 
 void ScreenRenderer::set_filter(const std::string_view &filter) {

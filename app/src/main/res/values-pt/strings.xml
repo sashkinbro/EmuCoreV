@@ -1468,6 +1468,9 @@
     <string name="settings_trophy_sound_unavailable">Não é possível acessar o som salvo. Escolha-o novamente.</string>
     <string name="settings_trophy_sound_pick_error">Não foi possível usar esse arquivo de áudio.</string>
     <string name="emulation_savestate_startup_loading">Carregando estado salvo…</string>
+    <string name="emulation_savestate_saving">Salvando o estado salvo…</string>
+    <string name="settings_savestate_confirmations">Confirmar ações de estado salvo</string>
+    <string name="settings_help_savestate_confirmations">Pedir confirmação antes de carregar ou substituir um estado salvo. Excluir um estado salvo sempre exige confirmação.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

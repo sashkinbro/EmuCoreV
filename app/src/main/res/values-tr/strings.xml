@@ -1468,6 +1468,9 @@
     <string name="settings_trophy_sound_unavailable">Kaydedilen sese erişilemiyor. Yeniden seçin.</string>
     <string name="settings_trophy_sound_pick_error">Bu ses dosyası kullanılamadı.</string>
     <string name="emulation_savestate_startup_loading">Kayıt durumu yükleniyor…</string>
+    <string name="emulation_savestate_saving">Oyun durumu kaydediliyor…</string>
+    <string name="settings_savestate_confirmations">Kayıt durumu işlemlerini onayla</string>
+    <string name="settings_help_savestate_confirmations">Kayıt durumunu yüklemeden veya üzerine yazmadan önce onay iste. Kayıt durumunu silmek her zaman onay gerektirir.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

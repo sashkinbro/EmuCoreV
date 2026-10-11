@@ -1471,6 +1471,9 @@
     <string name="settings_trophy_sound_unavailable">Не удаётся открыть сохранённый звук. Выберите его снова.</string>
     <string name="settings_trophy_sound_pick_error">Не удалось использовать этот аудиофайл.</string>
     <string name="emulation_savestate_startup_loading">Загрузка сохранения состояния…</string>
+    <string name="emulation_savestate_saving">Сохранение состояния игры…</string>
+    <string name="settings_savestate_confirmations">Подтверждение действий с состояниями</string>
+    <string name="settings_help_savestate_confirmations">Спрашивать перед загрузкой или перезаписью сохранённого состояния. Удаление состояния всегда требует подтверждения.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

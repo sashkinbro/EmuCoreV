@@ -40,6 +40,7 @@ AndroidSessionState &android_session_state();
 EmuEnvState *get_emuenv();
 app::AppSessionController *get_app_session_controller();
 Root &get_root_paths();
+void register_state_frame_readiness(renderer::State &state);
 
 std::string jstring_to_string(JNIEnv *env, jstring str);
 bool is_ime_dialog_active(const EmuEnvState &emuenv);

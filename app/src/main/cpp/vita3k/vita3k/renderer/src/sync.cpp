@@ -113,6 +113,8 @@ COMMAND(new_frame) {
         // set the predicted frame as the next one to render
         std::lock_guard<std::mutex> guard(display->display_info_mutex);
         display->next_rendered_frame = *next_frame;
+        if (next_frame->base)
+            renderer.restore_presentation.fresh_frame();
         delete next_frame;
 
         renderer.should_display = true;

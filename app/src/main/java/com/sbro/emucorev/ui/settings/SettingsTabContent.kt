@@ -190,6 +190,13 @@ private fun GeneralTab(
             selectedLanguage = uiState.coreConfig.sysLang,
             onClick = onOpenVitaLanguageSettings
         )
+        Toggle(
+            title = stringResource(R.string.settings_savestate_confirmations),
+            description = stringResource(R.string.settings_help_savestate_confirmations),
+            checked = uiState.confirmSaveStateActions,
+            onCheckedChange = viewModel::updateConfirmSaveStateActions,
+            onResetDefault = { viewModel.updateConfirmSaveStateActions(true) }
+        )
         Toggle(title = stringResource(R.string.settings_core_pstv_mode), description = stringResource(R.string.settings_help_pstv_mode), checked = uiState.coreConfig.pstvMode, onCheckedChange = { enabled -> viewModel.updateCoreSettings { it.copy(pstvMode = enabled) } }, onResetDefault = { viewModel.updateCoreSettings { it.copy(pstvMode = defaults.pstvMode) } })
         Toggle(title = stringResource(R.string.settings_show_info_bar), description = stringResource(R.string.settings_help_show_info_bar), checked = uiState.coreConfig.showInfoBar, onCheckedChange = { enabled -> viewModel.updateCoreSettings { it.copy(showInfoBar = enabled) } }, onResetDefault = { viewModel.updateCoreSettings { it.copy(showInfoBar = defaults.showInfoBar) } })
         Chips(title = stringResource(R.string.settings_confirm_button), description = stringResource(R.string.settings_help_confirm_button), onResetDefault = { viewModel.updateCoreSettings { it.copy(sysButton = defaults.sysButton) } }) {

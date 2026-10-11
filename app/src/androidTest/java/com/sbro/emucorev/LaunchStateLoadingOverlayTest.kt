@@ -46,6 +46,28 @@ class LaunchStateLoadingOverlayTest {
     }
 
     @Test
+    fun savingShowsLocalizedIndeterminateProgressAndBlocksUnderlyingControls() {
+        var backgroundClicks = 0
+        compose.setContent {
+            EmuCoreVTheme {
+                Box(Modifier.fillMaxSize()) {
+                    Button(modifier = Modifier.align(Alignment.Center), onClick = { backgroundClicks++ }) { Text("Underlay") }
+                    LaunchStateLoadingOverlay(
+                        state = LaunchStateLoadingState(active = true),
+                        indeterminate = true,
+                        messageRes = R.string.emulation_savestate_saving
+                    )
+                }
+            }
+        }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        compose.onNodeWithText(context.getString(R.string.emulation_savestate_saving)).assertIsDisplayed()
+        compose.onNodeWithTag("launch_state_loading_progress").assertIsDisplayed()
+        compose.onNodeWithTag("launch_state_loading_overlay").performTouchInput { click(center) }
+        assertEquals(0, backgroundClicks)
+    }
+
+    @Test
     fun inactiveStateDoesNotLeaveLoadingLayerComposed() {
         compose.setContent {
             EmuCoreVTheme {

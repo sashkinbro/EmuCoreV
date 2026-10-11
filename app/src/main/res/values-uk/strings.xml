@@ -1471,6 +1471,9 @@
     <string name="settings_trophy_sound_unavailable">Не вдається відкрити збережений звук. Виберіть його ще раз.</string>
     <string name="settings_trophy_sound_pick_error">Не вдалося використати цей аудіофайл.</string>
     <string name="emulation_savestate_startup_loading">Завантаження стану збереження…</string>
+    <string name="emulation_savestate_saving">Збереження стану гри…</string>
+    <string name="settings_savestate_confirmations">Підтверджувати дії зі станами гри</string>
+    <string name="settings_help_savestate_confirmations">Запитувати підтвердження перед завантаженням або перезаписом стану гри. Видалення стану гри завжди потребує підтвердження.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

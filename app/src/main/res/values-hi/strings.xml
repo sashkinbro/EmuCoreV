@@ -1468,6 +1468,9 @@
     <string name="settings_trophy_sound_unavailable">सहेजी गई ध्वनि उपलब्ध नहीं है। इसे फिर से चुनें।</string>
     <string name="settings_trophy_sound_pick_error">इस ऑडियो फ़ाइल का उपयोग नहीं हो सका।</string>
     <string name="emulation_savestate_startup_loading">सेव स्टेट लोड हो रहा है…</string>
+    <string name="emulation_savestate_saving">सेव स्टेट सहेजा जा रहा है…</string>
+    <string name="settings_savestate_confirmations">सेव स्टेट की कार्रवाइयों की पुष्टि</string>
+    <string name="settings_help_savestate_confirmations">सेव स्टेट लोड या ओवरराइट करने से पहले पुष्टि पूछें। सेव स्टेट हटाने के लिए हमेशा पुष्टि जरूरी होगी।</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

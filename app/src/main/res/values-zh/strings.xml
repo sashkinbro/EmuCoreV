@@ -1467,6 +1467,9 @@
     <string name="settings_trophy_sound_unavailable">無法存取已儲存的音效，請重新選取。</string>
     <string name="settings_trophy_sound_pick_error">無法使用此音訊檔案。</string>
     <string name="emulation_savestate_startup_loading">正在加载即时存档…</string>
+    <string name="emulation_savestate_saving">正在保存即时存档…</string>
+    <string name="settings_savestate_confirmations">确认即时存档操作</string>
+    <string name="settings_help_savestate_confirmations">载入或覆盖即时存档前先询问确认。删除即时存档仍始终需要确认。</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

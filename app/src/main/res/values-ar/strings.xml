@@ -1472,6 +1472,9 @@
     <string name="settings_trophy_sound_unavailable">يتعذر الوصول إلى الصوت المحفوظ. اختره مرة أخرى.</string>
     <string name="settings_trophy_sound_pick_error">تعذر استخدام ملف الصوت هذا.</string>
     <string name="emulation_savestate_startup_loading">جارٍ تحميل حالة الحفظ…</string>
+    <string name="emulation_savestate_saving">جارٍ حفظ الحالة…</string>
+    <string name="settings_savestate_confirmations">تأكيد عمليات حالات الحفظ</string>
+    <string name="settings_help_savestate_confirmations">اطلب التأكيد قبل تحميل حالة حفظ أو استبدالها. يظل حذف حالة الحفظ بحاجة إلى تأكيد دائمًا.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

@@ -1472,6 +1472,9 @@
     <string name="settings_trophy_sound_unavailable">صدای ذخیره‌شده در دسترس نیست. آن را دوباره انتخاب کنید.</string>
     <string name="settings_trophy_sound_pick_error">استفاده از آن فایل صوتی ممکن نشد.</string>
     <string name="emulation_savestate_startup_loading">در حال بارگذاری سیو استیت…</string>
+    <string name="emulation_savestate_saving">در حال ذخیرهٔ سیو استیت…</string>
+    <string name="settings_savestate_confirmations">تأیید عملیات سیو استیت</string>
+    <string name="settings_help_savestate_confirmations">پیش از بارگذاری یا بازنویسی سیو استیت تأیید بپرس. حذف سیو استیت همیشه به تأیید نیاز دارد.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

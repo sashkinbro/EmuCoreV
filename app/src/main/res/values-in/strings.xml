@@ -1472,6 +1472,9 @@
     <string name="settings_trophy_sound_unavailable">Suara yang disimpan tidak dapat diakses. Pilih lagi.</string>
     <string name="settings_trophy_sound_pick_error">Tidak dapat menggunakan file audio tersebut.</string>
     <string name="emulation_savestate_startup_loading">Memuat save state…</string>
+    <string name="emulation_savestate_saving">Menyimpan save state…</string>
+    <string name="settings_savestate_confirmations">Konfirmasi tindakan save state</string>
+    <string name="settings_help_savestate_confirmations">Minta konfirmasi sebelum memuat atau menimpa save state. Penghapusan save state tetap selalu memerlukan konfirmasi.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

@@ -1472,6 +1472,9 @@
     <string name="settings_trophy_sound_unavailable">保存されたサウンドにアクセスできません。もう一度選択してください。</string>
     <string name="settings_trophy_sound_pick_error">そのオーディオファイルを使用できませんでした。</string>
     <string name="emulation_savestate_startup_loading">セーブステートを読み込み中…</string>
+    <string name="emulation_savestate_saving">セーブステートを保存中…</string>
+    <string name="settings_savestate_confirmations">セーブステートの操作を確認</string>
+    <string name="settings_help_savestate_confirmations">セーブステートの読み込みや上書きの前に確認します。セーブステートの削除は常に確認が必要です。</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

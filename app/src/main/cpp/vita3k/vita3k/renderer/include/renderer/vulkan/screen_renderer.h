@@ -97,7 +97,7 @@ public:
     bool acquire_swapchain_image();
     void begin_default_render_pass();
     void render(vk::ImageView image_view, vk::ImageLayout layout, const Viewport &viewport);
-    void swap_window();
+    bool swap_window();
     void set_filter(const std::string_view &filter);
 
 private:

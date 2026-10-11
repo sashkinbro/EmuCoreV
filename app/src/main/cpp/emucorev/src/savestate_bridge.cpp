@@ -155,6 +155,7 @@ Java_com_sbro_emucorev_core_SaveStateBridge_nativeLoadState(JNIEnv *env, jobject
         result.error = "no active session";
         return result_to_json(env, result);
     }
+    register_state_frame_readiness(*emuenv->renderer);
     const auto result = emucorev::savestate::load_state(*emuenv, fs::path(path_str), allow_cross_session == JNI_TRUE);
     if (result.status == emucorev::savestate::Status::Ok)
         LOG_INFO("Load state completed for {}", result.meta.title_id);

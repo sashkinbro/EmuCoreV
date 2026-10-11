@@ -375,6 +375,7 @@ void discard_pending_batches(State &state) {
 }
 
 void stop_render_thread(State &state) {
+    state.restore_presentation.cancel();
     abort_finish_operations(state);
     state.render_abort = true;
     state.snapshot_gate.stop();

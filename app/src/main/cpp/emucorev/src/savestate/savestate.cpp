@@ -2367,6 +2367,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         return result;
     }
     result.session_usable = true;
+    emuenv.renderer->restore_presentation.arm(emuenv.renderer->restore_presentation_callback);
     restored_rendering.release();
 
     for (const auto &[id, thread] : emuenv.kernel.threads) {

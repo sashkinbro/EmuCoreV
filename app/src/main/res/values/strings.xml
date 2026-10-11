@@ -1472,6 +1472,9 @@
     <string name="settings_trophy_sound_unavailable">The saved sound cannot be accessed. Choose it again.</string>
     <string name="settings_trophy_sound_pick_error">Could not use that audio file.</string>
     <string name="emulation_savestate_startup_loading">Loading save state…</string>
+    <string name="emulation_savestate_saving">Saving save state…</string>
+    <string name="settings_savestate_confirmations">Confirm save-state actions</string>
+    <string name="settings_help_savestate_confirmations">Ask before loading or overwriting a save state. Deleting a save state always requires confirmation.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

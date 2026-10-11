@@ -152,6 +152,7 @@ struct VKState : public renderer::State {
 
     void render_frame(DisplayState &display, const GxmState &gxm, MemState &mem) override;
     void swap_window() override;
+    FirstPresentReadiness::Ticket restore_presentation_ticket;
     std::vector<uint32_t> dump_frame(DisplayState &display, uint32_t &width, uint32_t &height) override;
 
     uint32_t get_features_mask() override;

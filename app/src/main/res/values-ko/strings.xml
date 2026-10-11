@@ -1472,6 +1472,9 @@
     <string name="settings_trophy_sound_unavailable">저장된 소리에 접근할 수 없습니다. 다시 선택하세요.</string>
     <string name="settings_trophy_sound_pick_error">해당 오디오 파일을 사용할 수 없습니다.</string>
     <string name="emulation_savestate_startup_loading">세이브 스테이트 불러오는 중…</string>
+    <string name="emulation_savestate_saving">세이브 스테이트 저장 중…</string>
+    <string name="settings_savestate_confirmations">세이브 스테이트 작업 확인</string>
+    <string name="settings_help_savestate_confirmations">세이브 스테이트를 불러오거나 덮어쓰기 전에 확인합니다. 세이브 스테이트 삭제는 항상 확인이 필요합니다.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

@@ -1472,6 +1472,9 @@
     <string name="settings_trophy_sound_unavailable">K uloženému zvuku nelze přistupovat. Zvolte jej znovu.</string>
     <string name="settings_trophy_sound_pick_error">Tento zvukový soubor se nepodařilo použít.</string>
     <string name="emulation_savestate_startup_loading">Načítání uloženého stavu…</string>
+    <string name="emulation_savestate_saving">Ukládání uloženého stavu…</string>
+    <string name="settings_savestate_confirmations">Potvrzovat akce s uloženými stavy</string>
+    <string name="settings_help_savestate_confirmations">Před načtením nebo přepsáním uloženého stavu vyžadovat potvrzení. Smazání uloženého stavu vždy vyžaduje potvrzení.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

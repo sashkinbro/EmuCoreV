@@ -24,6 +24,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import androidx.annotation.StringRes
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.vita.LaunchStateLoadingState
 import com.sbro.emucorev.ui.theme.neon.neonShape
@@ -32,7 +33,8 @@ import com.sbro.emucorev.ui.theme.neon.neonShape
 internal fun LaunchStateLoadingOverlay(
     state: LaunchStateLoadingState,
     modifier: Modifier = Modifier,
-    indeterminate: Boolean = false
+    indeterminate: Boolean = false,
+    @StringRes messageRes: Int = R.string.emulation_savestate_startup_loading
 ) {
     if (!state.active) return
 
@@ -64,7 +66,7 @@ internal fun LaunchStateLoadingOverlay(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = stringResource(R.string.emulation_savestate_startup_loading),
+                    text = stringResource(messageRes),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )

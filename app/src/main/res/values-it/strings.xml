@@ -1468,6 +1468,9 @@
     <string name="settings_trophy_sound_unavailable">Impossibile accedere al suono salvato. Selezionalo di nuovo.</string>
     <string name="settings_trophy_sound_pick_error">Impossibile usare questo file audio.</string>
     <string name="emulation_savestate_startup_loading">Caricamento dello stato salvato…</string>
+    <string name="emulation_savestate_saving">Salvataggio dello stato di gioco…</string>
+    <string name="settings_savestate_confirmations">Conferma le operazioni sugli stati salvati</string>
+    <string name="settings_help_savestate_confirmations">Chiedi conferma prima di caricare o sovrascrivere uno stato salvato. L’eliminazione di uno stato salvato richiede sempre una conferma.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>

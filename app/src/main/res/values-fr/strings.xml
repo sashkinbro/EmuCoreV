@@ -1468,6 +1468,9 @@
     <string name="settings_trophy_sound_unavailable">Le son enregistré est inaccessible. Sélectionnez-le à nouveau.</string>
     <string name="settings_trophy_sound_pick_error">Impossible d’utiliser ce fichier audio.</string>
     <string name="emulation_savestate_startup_loading">Chargement de l’état sauvegardé…</string>
+    <string name="emulation_savestate_saving">Enregistrement de l’état sauvegardé…</string>
+    <string name="settings_savestate_confirmations">Confirmer les actions sur les états sauvegardés</string>
+    <string name="settings_help_savestate_confirmations">Demander confirmation avant de charger ou d’écraser un état sauvegardé. La suppression d’un état sauvegardé demande toujours une confirmation.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>
