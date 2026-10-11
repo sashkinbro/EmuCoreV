@@ -759,7 +759,13 @@ fun EmulationOverlayHost(
             )
         }
 
-        AnimatedVisibility(visible = menuOpen, enter = fadeIn(tween(220)), exit = fadeOut(tween(180))) {
+        // Retain the selected menu tab and pause state while exposing only the game frame during Save.
+        AnimatedVisibility(
+            visible = menuOpen,
+            enter = fadeIn(tween(220)),
+            exit = fadeOut(tween(180)),
+            modifier = Modifier.graphicsLayer(alpha = if (saveStateBusySaving) 0f else 1f)
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -783,6 +789,7 @@ fun EmulationOverlayHost(
                 androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) + fadeOut(tween(180))
             },
             modifier = Modifier
+                .graphicsLayer(alpha = if (saveStateBusySaving) 0f else 1f)
                 .align(if (useSidePanel) Alignment.CenterEnd else Alignment.BottomCenter)
                 .padding(
                     start = if (useSidePanel) 0.dp else 16.dp,
@@ -888,6 +895,7 @@ fun EmulationOverlayHost(
                 launchStateLoading
             },
             indeterminate = saveStateBusyLoading || saveStateBusySaving || waitingForStateFrame,
+            scrimAlpha = if (saveStateBusySaving) 0.35f else 1f,
             messageRes = if (saveStateBusySaving) R.string.emulation_savestate_saving
                 else R.string.emulation_savestate_startup_loading
         )

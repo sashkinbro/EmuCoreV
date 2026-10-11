@@ -34,6 +34,7 @@ internal fun LaunchStateLoadingOverlay(
     state: LaunchStateLoadingState,
     modifier: Modifier = Modifier,
     indeterminate: Boolean = false,
+    scrimAlpha: Float = 1f,
     @StringRes messageRes: Int = R.string.emulation_savestate_startup_loading
 ) {
     if (!state.active) return
@@ -41,7 +42,7 @@ internal fun LaunchStateLoadingOverlay(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Color.Black.copy(alpha = scrimAlpha.coerceIn(0f, 1f)))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
