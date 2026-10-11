@@ -679,7 +679,8 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
                 sizeof(uint32_t), vk::QueryResultFlagBits::eWait);
         }
         visibility_max_used_idx = -1;
-        current_visibility_buffer->queries_used.assign(current_visibility_buffer->size, false);
+        // The range builder reads one false sentinel after the final query.
+        current_visibility_buffer->queries_used.assign(current_visibility_buffer->size + 1, false);
     }
 
     // remember which part of the colour surface this scene's draws could have touched (for write-back bounds)
