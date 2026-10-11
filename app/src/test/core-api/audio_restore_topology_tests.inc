@@ -135,6 +135,55 @@ TEST_F(AudioRestoreTopology, ColdTwoPortLoadBindsCompleteFloatMixingTopologyBefo
         expect_queue_and_pause(id, queues.at(id));
 }
 
+TEST_F(AudioRestoreTopology, RestoredDownsamplerCanBeSavedAgainWithMoreThanOneFrameOfPhase) {
+    add_port(1);
+    enqueue_and_prime(1); // 40 output frames at 48k -> 44.1k.
+    std::map<int, std::vector<uint8_t>> queues;
+    const auto section = capture_section(queues);
+    std::string error;
+    ASSERT_TRUE(emucorev::savestate::read_audio(*env, section, error)) << error;
+
+    // Six more output frames leave a legitimate phase of 1.068 source
+    // frames. SDL carries a whole frame across downsampling calls.
+    std::array<int16_t, 12> continued;
+    ASSERT_EQ(SDL_GetAudioStreamData(stream(1), continued.data(), sizeof(continued)), sizeof(continued));
+    std::vector<uint8_t> after;
+    ASSERT_TRUE(env->audio.adapter->save_port_state(*env->audio.out_ports.at(1), after));
+    ASSERT_GT(after.size(), 68u);
+    // Default channel maps have three zero counts at offsets 40,44,48.
+    uint32_t maps[3]; std::memcpy(maps, after.data() + 40, sizeof(maps));
+    ASSERT_EQ(maps[0] | maps[1] | maps[2], 0u);
+    int64_t phase; std::memcpy(&phase, after.data() + 60, sizeof(phase));
+    ASSERT_GE(phase, INT64_C(0x100000000));
+    EXPECT_TRUE(validate_audio_port_snapshot(1, 4096, after));
+
+    SDL_AudioSpec src{}, dst{};
+    ASSERT_TRUE(SDL_GetAudioStreamFormat(stream(1), &src, &dst));
+    const int64_t step = (((int64_t(src.freq) << 32) - 1) / dst.freq) + 1;
+    ASSERT_LT(phase, step);
+    auto malformed = after;
+    std::memcpy(malformed.data() + 60, &step, sizeof(step));
+    EXPECT_FALSE(validate_audio_port_snapshot(1, 4096, malformed));
+    const int64_t negative_overflow = -INT64_C(0x100000000) - 1;
+    std::memcpy(malformed.data() + 60, &negative_overflow, sizeof(negative_overflow));
+    EXPECT_FALSE(validate_audio_port_snapshot(1, 4096, malformed));
+    // Reject a finite ratio whose scaled input frequency cannot be cast to int.
+    const int64_t zero_phase = 0;
+    const float invalid_ratio = 100000.0f;
+    std::memcpy(malformed.data() + 60, &zero_phase, sizeof(zero_phase));
+    std::memcpy(malformed.data() + 52, &invalid_ratio, sizeof(invalid_ratio));
+    EXPECT_FALSE(validate_audio_port_snapshot(1, 4096, malformed));
+
+    std::map<int, std::vector<uint8_t>> resaved;
+    const auto new_section = capture_section(resaved);
+    ASSERT_TRUE(emucorev::savestate::preflight_audio(new_section, error)) << error;
+    std::array<int16_t, 256> expected, actual;
+    ASSERT_EQ(SDL_GetAudioStreamData(stream(1), expected.data(), sizeof(expected)), sizeof(expected));
+    ASSERT_TRUE(emucorev::savestate::read_audio(*env, new_section, error)) << error;
+    ASSERT_EQ(SDL_GetAudioStreamData(stream(1), actual.data(), sizeof(actual)), sizeof(actual));
+    EXPECT_EQ(actual, expected); // Preserve phase/history, not merely allow Save.
+}
+
 TEST_F(AudioRestoreTopology, InvalidQueueIsRejectedBeforeChangingExistingPorts) {
     add_port(1);
     ASSERT_EQ(env->audio.out_ports.size(), 1u);

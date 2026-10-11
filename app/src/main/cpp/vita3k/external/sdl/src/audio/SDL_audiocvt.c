@@ -1480,8 +1480,17 @@ static bool ParseAudioStreamSnapshot(const void *blob, size_t size, SDL_AudioStr
     snapshot->resample_offset = (Sint64)(((Uint64)resample_high << 32) | resample_low);
     if (SDL_isinff(snapshot->ratio) || SDL_isnanf(snapshot->ratio) || snapshot->ratio <= 0.0f ||
         SDL_isinff(snapshot->gain) || SDL_isnanf(snapshot->gain) || snapshot->gain < 0.0f ||
-        snapshot->resample_offset < -0x100000000LL || snapshot->resample_offset >= 0x100000000LL ||
         (snapshot->input.channels == 0 && (snapshot->input.format != SDL_AUDIO_UNKNOWN || snapshot->input.freq != 0 || snapshot->input_count != 0))) return false;
+    // SDL_ResampleAudio carries less than one resample step, which can exceed
+    // one source frame when downsampling. Use the active input specification,
+    // as GetAudioStreamDataInternal does, and preserve this playback phase.
+    const int input_freq = snapshot->input.channels ? snapshot->input.freq : snapshot->src.freq;
+    const float scaled_freq = (float)input_freq * snapshot->ratio;
+    if (SDL_isinff(scaled_freq) || SDL_isnanf(scaled_freq) || scaled_freq < 1.0f ||
+        (double)scaled_freq > SDL_MAX_SINT32) return false;
+    const Sint64 resample_rate = SDL_GetResampleRate((int)scaled_freq, snapshot->dst.freq);
+    const Sint64 phase_limit = SDL_max(0x100000000LL, resample_rate);
+    if (snapshot->resample_offset < -0x100000000LL || snapshot->resample_offset >= phase_limit) return false;
     snapshot->queue = src + offset;
     snapshot->queue_size = queue_size;
     return SDL_ValidateAudioQueueSnapshot(snapshot->queue, snapshot->queue_size);
