@@ -986,7 +986,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
 
         // dummy raw u16 storage image, bound at the raw-color slot when the current surface has no raw alias
         default_raw_image = vkutil::Image(1, 1, vk::Format::eR16G16B16A16Uint);
-        default_raw_image.init_image(vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferDst);
+        default_raw_image.init_image(vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eTransferDst);
         default_raw_image.transition_to(cmd_buffer, vkutil::ImageLayout::StorageImage);
         vkutil::end_single_time_command(device, general_queue, general_command_pool, cmd_buffer);
 

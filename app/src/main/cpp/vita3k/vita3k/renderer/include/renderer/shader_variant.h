@@ -8,7 +8,14 @@
 namespace renderer {
 // Other formats retain their existing cache identity. Alpha-only surfaces
 // compile different fragment code despite sharing the same GXP and R8 storage.
-inline Sha256Hash fragment_shader_variant_hash(const Sha256Hash &hash, SceGxmColorFormat format) {
+inline Sha256Hash fragment_shader_variant_hash(const Sha256Hash &hash, SceGxmColorFormat format, bool raw_input = false) {
+    if (raw_input) {
+        std::array<uint8_t, 36> tagged{};
+        const auto surface_hash = fragment_shader_variant_hash(hash, format, false);
+        std::copy(surface_hash.begin(), surface_hash.end(), tagged.begin());
+        tagged[32] = 'R'; tagged[33] = 'A'; tagged[34] = 'W'; tagged[35] = 'I';
+        return sha256(tagged.data(), tagged.size());
+    }
     if (format != SCE_GXM_COLOR_FORMAT_U8_A)
         return hash;
     std::array<uint8_t, 36> tagged{};

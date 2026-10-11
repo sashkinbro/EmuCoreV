@@ -162,7 +162,7 @@ static shader::GeneratedShader load_shader_generic(shader::Target target, const 
     // TODO: no need to recompute the hash here
     const auto hash = get_shader_hash(program);
     const std::string hash_text = hex_string(program.is_fragment()
-            ? fragment_shader_variant_hash(hash, hints.color_format) : hash);
+            ? fragment_shader_variant_hash(hash, hints.color_format, hints.raw_color_attachment_input) : hash);
     // Set Shader Hash with Version
     const std::string hash_hex_ver = fmt::format("{}-{}", shader_version, hash_text);
     const auto get_shader_path = [&](const char *ext) {

@@ -31,7 +31,7 @@ namespace shader {
 static constexpr int COLOR_ATTACHMENT_TEXTURE_SLOT_IMAGE = 0;
 static constexpr int MASK_TEXTURE_SLOT_IMAGE = 1;
 static constexpr int COLOR_ATTACHMENT_RAW_TEXTURE_SLOT_IMAGE = 3;
-static constexpr uint32_t CURRENT_VERSION = 19;
+static constexpr uint32_t CURRENT_VERSION = 20;
 // fragment shader using the rendering surface as a storage image (because of shader interlock) have a line
 // layout (constant_id = GAMMA_CORRECTION_SPECIALIZATIO_ID) const bool is_srgb = false;
 // Setting this constant to true performs gamma correction in the shader
@@ -59,6 +59,9 @@ struct Hints {
     // - when sampling, we need to know the component count of a texture
     SceGxmTextureFormat vertex_textures[SCE_GXM_MAX_TEXTURE_UNITS];
     SceGxmTextureFormat fragment_textures[SCE_GXM_MAX_TEXTURE_UNITS];
+
+    // The F16 raw alias is input attachment1 on Vulkan subpass fetch.
+    bool raw_color_attachment_input = false;
 };
 
 struct GeneratedShader {

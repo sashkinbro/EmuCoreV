@@ -345,6 +345,7 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
     context.current_fb_width = framebuffer.width;
     context.current_fb_height = framebuffer.height;
     context.current_color_raw_view = framebuffer.raw_image ? framebuffer.raw_image->view : state.default_raw_image.view;
+    context.current_color_raw_image = framebuffer.raw_image;
 
     // make sure we are not keeping any texture from the previous pass
     // (textures can be still bound even though they are not used)
@@ -471,15 +472,15 @@ static vk::DescriptorSet retrieve_color_descriptor(VKState &state, FrameDescript
 
     // we have no more frame descriptor available, create a bunch of new one for this specific layout
     // the type depends on the way we read it; each set holds the color attachment (binding 0)
-    uint32_t storage_images_per_set = state.features.support_shader_interlock ? 1 : 0;
+    const uint32_t attachment_images_per_set = state.features.preserve_f16_nan_as_u16 ? 2 : 1;
+    uint32_t storage_images_per_set = state.features.support_shader_interlock ? attachment_images_per_set : 0;
     if (state.features.use_mask_bit)
         storage_images_per_set++;
-    if (state.features.preserve_f16_nan_as_u16)
-        storage_images_per_set++;
+
 
     std::vector<vk::DescriptorPoolSize> pool_sizes;
     if (!state.features.support_shader_interlock)
-        pool_sizes.push_back({ vk::DescriptorType::eInputAttachment, DESCRIPTOR_PACK_SIZE * MAX_FRAMES_RENDERING });
+        pool_sizes.push_back({ vk::DescriptorType::eInputAttachment, attachment_images_per_set * DESCRIPTOR_PACK_SIZE * MAX_FRAMES_RENDERING });
     if (storage_images_per_set > 0)
         pool_sizes.push_back({ vk::DescriptorType::eStorageImage, storage_images_per_set * DESCRIPTOR_PACK_SIZE * MAX_FRAMES_RENDERING });
 
@@ -607,7 +608,7 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
             .dstSet = rendertarget_set,
             .dstBinding = 2,
             .dstArrayElement = 0,
-            .descriptorType = vk::DescriptorType::eStorageImage,
+            .descriptorType = input_type,
         };
         write_raw_descr.setImageInfo(descr_raw_info);
         std::array<vk::WriteDescriptorSet, 2> writes = { write_descr, write_raw_descr };

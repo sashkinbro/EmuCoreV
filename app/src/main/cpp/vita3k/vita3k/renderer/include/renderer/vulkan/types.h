@@ -264,6 +264,7 @@ struct VKContext : public renderer::Context {
     uint32_t current_fb_height = 0;
 
     vk::ImageView current_color_raw_view = nullptr;
+    vkutil::Image *current_color_raw_image = nullptr;
 
     vkutil::HostRingBuffer vertex_stream_ring_buffer;
     vkutil::HostRingBuffer index_stream_ring_buffer;

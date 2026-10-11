@@ -846,7 +846,7 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
         vkutil::Image &raw = *info_added.raw_image;
         raw.layout = vkutil::ImageLayout::Undefined;
         raw.init_image(vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eColorAttachment
-                | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc,
+                | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc,
             vkutil::default_comp_mapping, vk::ImageCreateFlagBits::eMutableFormat);
         raw.transition_to(cmd_buffer, vkutil::ImageLayout::TransferDst);
         vk::ClearColorValue clear_zero{};

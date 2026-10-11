@@ -889,8 +889,33 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
             spv::Id coord_0 = b.makeIntConstant(0);
             const spv::Id ivec2 = b.makeVectorType(b.makeIntType(32), 2);
             coord_0 = b.makeCompositeConstant(ivec2, { coord_0, coord_0 });
-            source = b.createOp(spv::OpImageRead, v4, { b.createLoad(last_frag_data, spv::NoPrecision), coord_0 });
-            b.setPrecision(source, precision);
+            if (translation_state.is_vulkan && translation_state.hints->raw_color_attachment_input) {
+                const spv::Id raw_component_type = b.makeUintType(32);
+                const spv::Id raw_image_type = b.makeImageType(raw_component_type, spv::DimSubpassData, false, false, false, 2, spv::ImageFormatUnknown);
+                const spv::Id last_frag_data_raw = b.createVariable(spv::NoPrecision, spv::StorageClassUniformConstant, raw_image_type, "last_frag_data_rawUI");
+                b.addDecoration(last_frag_data_raw, spv::DecorationInputAttachmentIndex, 1);
+                b.addDecoration(last_frag_data_raw, spv::DecorationBinding, 2);
+                b.addDecoration(last_frag_data_raw, spv::DecorationDescriptorSet, 1);
+
+                const spv::Id use_raw_ptr = utils::create_access_chain(b, spv::StorageClassUniform, translation_state.render_info_id, { b.makeIntConstant(FRAG_UNIFORM_use_raw_image) });
+                const spv::Id read_float_input = b.createBinOp(spv::OpFOrdLessThan, b.makeBoolType(), b.createLoad(use_raw_ptr, spv::NoPrecision), b.makeFloatConstant(0.5f));
+                spv::Builder::If raw_cond_builder(read_float_input, spv::SelectionControlMaskNone, b);
+
+                source = b.createOp(spv::OpImageRead, v4, { b.createLoad(last_frag_data, spv::NoPrecision), coord_0 });
+                b.setPrecision(source, precision);
+                store_source_result();
+
+                raw_cond_builder.makeBeginElse();
+                source = b.createOp(spv::OpImageRead, b.makeVectorType(raw_component_type, 4), { b.createLoad(last_frag_data_raw, spv::NoPrecision), coord_0 });
+                target_to_store.type = DataType::UINT16;
+                store_source_result(true);
+                raw_cond_builder.makeEndIf();
+
+                source = spv::NoResult;
+            } else {
+                source = b.createOp(spv::OpImageRead, v4, { b.createLoad(last_frag_data, spv::NoPrecision), coord_0 });
+                b.setPrecision(source, precision);
+            }
 
             translation_state.last_frag_data_id = last_frag_data;
         } else if (features.support_shader_interlock || features.support_texture_barrier) {

@@ -494,8 +494,12 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
             .image = context.current_color_base_image->image,
             .subresourceRange = vkutil::color_subresource_range
         };
+        std::array<vk::ImageMemoryBarrier, 2> barriers = { barrier, barrier };
+        const uint32_t barrier_count = context.current_color_raw_image ? 2 : 1;
+        if (context.current_color_raw_image)
+            barriers[1].image = context.current_color_raw_image->image;
         context.render_cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eFragmentShader,
-            vk::DependencyFlagBits::eByRegion, {}, {}, barrier);
+            vk::DependencyFlagBits::eByRegion, {}, {}, vk::ArrayProxy<const vk::ImageMemoryBarrier>(barrier_count, barriers.data()));
     } else if (context.state.features.support_shader_interlock
         && fragment_program_gxp.is_frag_color_used() != context.last_draw_was_framebuffer_fetch) {
         // restart the render pass to act as a barrier
