@@ -357,6 +357,33 @@ bool validate_program(Address address, bool fragment, const MemoryImage &memory,
     }
     return true;
 }
+
+bool matrix_attribute_valid(const SceGxmVertexAttribute &attribute, Address address,
+    const MemoryImage &memory, std::string &error) {
+    if (attribute.format != SCE_GXM_ATTRIBUTE_FORMAT_UNTYPED || attribute.regIndex >= 64)
+        return false;
+    // validate_program has already checked these tables against the complete
+    // saved GXP. Regformatted arrays carry their total component count in the
+    // vertex descriptor (for example, a float4[3] matrix carries twelve).
+    SceGxmProgram program{};
+    SceGxmProgramVertexVaryings varyings{};
+    if (!memory.read_bytes(address, &program, sizeof(program), error)
+        || !memory.read_bytes(uint64_t(address) + offsetof(SceGxmProgram, varyings_offset)
+                + program.varyings_offset, &varyings, sizeof(varyings), error)
+        || !(varyings.untyped_pa_regs & (uint64_t{1} << attribute.regIndex)))
+        return false;
+    for (uint32_t i = 0; i < program.parameter_count; ++i) {
+        SceGxmProgramParameter parameter{};
+        const uint64_t begin = offsetof(SceGxmProgram, parameters_offset)
+            + uint64_t(program.parameters_offset) + uint64_t(i) * sizeof(parameter);
+        if (!memory.read_bytes(uint64_t(address) + begin, &parameter, sizeof(parameter), error))
+            return false;
+        if (parameter.category == SCE_GXM_PARAMETER_CATEGORY_ATTRIBUTE
+            && parameter.resource_index == attribute.regIndex)
+            return uint64_t(parameter.component_count) * parameter.array_size == attribute.componentCount;
+    }
+    return false;
+}
 }
 
 bool validate_gxm_state(const GxmSnapshot &state, const MemoryImage &memory, std::string &error) {
@@ -402,8 +429,10 @@ bool validate_gxm_state(const GxmSnapshot &state, const MemoryImage &memory, std
         if (!object(program.address, sizeof(SceGxmVertexProgram), 4) || !vertex.insert(program.address).second
             || !program.reference_count || !validate_program(program.program.address(), false, memory, error)) return fail("invalid saved vertex program");
         for (const auto &attribute : program.attributes)
-            if (attribute.streamIndex >= program.streams.size() || attribute.componentCount == 0 || attribute.componentCount > 4
-                || attribute.format > SCE_GXM_ATTRIBUTE_FORMAT_UNTYPED || attribute.regIndex >= 256) return fail("invalid saved vertex attribute");
+            if (attribute.streamIndex >= program.streams.size() || attribute.componentCount == 0
+                || attribute.format > SCE_GXM_ATTRIBUTE_FORMAT_UNTYPED || attribute.regIndex >= 256
+                || (attribute.componentCount > 4 && !matrix_attribute_valid(attribute, program.program.address(), memory, error)))
+                return fail("invalid saved vertex attribute");
     }
     const auto optional = [&](Address address, uint64_t length) { return !address || memory.contains(address, length ? length : 1); };
     const auto callback = [&](Address address) { return !address || memory.contains(address & ~Address(1), 2); };
@@ -436,12 +465,13 @@ bool validate_gxm_state(const GxmSnapshot &state, const MemoryImage &memory, std
             && format != SCE_GXM_DEPTH_STENCIL_FORMAT_DF32_S8 && format != SCE_GXM_DEPTH_STENCIL_FORMAT_DF32M
             && format != SCE_GXM_DEPTH_STENCIL_FORMAT_DF32M_S8 && format != SCE_GXM_DEPTH_STENCIL_FORMAT_S8D24
             && format != SCE_GXM_DEPTH_STENCIL_FORMAT_D16) return false;
-        uint64_t width = target->width, height = target->height;
+        uint64_t height = target->height;
         if (target->params.multisampleMode != SCE_GXM_MULTISAMPLE_NONE) height *= 2;
-        if (target->params.multisampleMode == SCE_GXM_MULTISAMPLE_4X) width *= 2;
-        if (surface.get_stride() < width) return false;
+        // A scene may use a narrower guest surface inside a retained larger
+        // render target. Its physical row stride is independent of that allocation.
         const uint64_t samples = uint64_t(surface.get_stride()) * height;
-        const uint32_t depth_bytes = format == SCE_GXM_DEPTH_STENCIL_FORMAT_D16 ? 2 : 4;
+        const uint32_t depth_bytes = format == SCE_GXM_DEPTH_STENCIL_FORMAT_D16 ? 2
+            : format == SCE_GXM_DEPTH_STENCIL_FORMAT_S8 ? 1 : 4;
         return (!surface.depth_data || memory.contains(surface.depth_data.address(), samples * depth_bytes))
             && (!surface.stencil_data || memory.contains(surface.stencil_data.address(), samples));
     };

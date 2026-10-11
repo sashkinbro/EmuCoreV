@@ -1,4 +1,5 @@
 #include <emucorev/savestate/gxm_state_io.h>
+#include <emucorev/savestate/gpu_state_io.h>
 #include <emucorev/savestate/sysmem_state_io.h>
 #include <emucorev/savestate/memory_image.h>
 #include <emucorev/savestate/state_io.h>
@@ -106,6 +107,111 @@ TEST_F(GxmSysmemPreflight, AcceptsFourByteAlignedCallbackProgramWrappers) {
     gxm.shader_patchers[0].address -= 2;
     gxm.fragment_programs[0].address += 2;
     EXPECT_FALSE(emucorev::savestate::validate_gxm_state(gxm, *memory, error));
+}
+
+TEST_F(GxmSysmemPreflight, AcceptsUntypedMatrixAttributeMatchingSavedShaderArray) {
+    SceGxmProgram program{};
+    program.magic = 0x00505847;
+    program.size = sizeof(program) + sizeof(SceGxmProgramVertexVaryings) + sizeof(SceGxmProgramParameter) + 7;
+    program.varyings_offset = sizeof(program) - offsetof(SceGxmProgram, varyings_offset);
+    program.parameter_count = 1;
+    program.parameters_offset = sizeof(program) + sizeof(SceGxmProgramVertexVaryings) - offsetof(SceGxmProgram, parameters_offset);
+    put(0x8000, program);
+    SceGxmProgramVertexVaryings varyings{};
+    varyings.untyped_pa_regs = uint64_t{1} << 4;
+    put(0x8000 + sizeof(program), varyings);
+    SceGxmProgramParameter parameter{};
+    parameter.name_offset = sizeof(parameter);
+    parameter.category = SCE_GXM_PARAMETER_CATEGORY_ATTRIBUTE;
+    parameter.type = SCE_GXM_PARAMETER_TYPE_F32;
+    parameter.component_count = 4;
+    parameter.array_size = 3;
+    parameter.resource_index = 4;
+    const Address parameter_address = 0x8000 + sizeof(program) + sizeof(varyings);
+    put(parameter_address, parameter);
+    std::memcpy(ram.data() + parameter_address + sizeof(parameter) - 0x1000, "matrix", 7);
+    auto &vertex = gxm.vertex_programs[0];
+    vertex.attributes.push_back(SceGxmVertexAttribute{0, 0, SCE_GXM_ATTRIBUTE_FORMAT_UNTYPED, 12, 4});
+    vertex.streams.push_back(SceGxmVertexStream{48, 0});
+    auto memory = image(); ASSERT_TRUE(memory) << error;
+    EXPECT_TRUE(emucorev::savestate::validate_gxm_state(gxm, *memory, error)) << error;
+
+    // Ordinary converted attributes cannot use the regformatted matrix rule.
+    vertex.attributes[0].format = SCE_GXM_ATTRIBUTE_FORMAT_F32;
+    EXPECT_FALSE(emucorev::savestate::validate_gxm_state(gxm, *memory, error));
+    vertex.attributes[0].format = SCE_GXM_ATTRIBUTE_FORMAT_UNTYPED;
+    vertex.attributes[0].componentCount = 11;
+    EXPECT_FALSE(emucorev::savestate::validate_gxm_state(gxm, *memory, error));
+    vertex.attributes[0].componentCount = 12;
+    vertex.attributes[0].regIndex = 5;
+    EXPECT_FALSE(emucorev::savestate::validate_gxm_state(gxm, *memory, error));
+    vertex.attributes[0].regIndex = 4;
+    varyings.untyped_pa_regs = 0;
+    put(0x8000 + sizeof(program), varyings);
+    memory = image(); ASSERT_TRUE(memory) << error;
+    EXPECT_FALSE(emucorev::savestate::validate_gxm_state(gxm, *memory, error));
+}
+
+TEST_F(GxmSysmemPreflight, DepthStrideUsesGuestRowsInsteadOfLargerRenderTargetAllocation) {
+    ram.resize(4u << 20);
+    auto &target = gxm.render_targets[0];
+    target.width = target.params.width = 960; target.height = target.params.height = 800;
+    auto &record = gxm.contexts[0].renderer_record;
+    record.color_surface.width = 704; record.color_surface.height = 576;
+    record.color_surface.strideInPixels = 704;
+    record.color_surface.data = Ptr<void>(0x20000);
+    record.color_surface.colorFormat = SCE_GXM_COLOR_FORMAT_A8B8G8R8;
+    record.color_surface.surfaceType = SCE_GXM_COLOR_SURFACE_LINEAR;
+    auto &depth = record.depth_stencil_surface;
+    depth.depth_data = Ptr<void>(0x1c0000);
+    depth.set_format(SCE_GXM_DEPTH_STENCIL_FORMAT_DF32);
+    depth.set_type(SCE_GXM_DEPTH_STENCIL_SURFACE_LINEAR);
+    depth.set_stride(704);
+    auto memory = image(); ASSERT_TRUE(memory) << error;
+    EXPECT_TRUE(emucorev::savestate::validate_gxm_state(gxm, *memory, error)) << error;
+    depth.depth_data = Ptr<void>(0x300000);
+    EXPECT_FALSE(emucorev::savestate::validate_gxm_state(gxm, *memory, error));
+    depth.depth_data = Ptr<void>(0x1c0000);
+    const auto invalid_format = static_cast<SceGxmDepthStencilFormat>(0x00088000);
+    depth.set_format(invalid_format);
+    ASSERT_FALSE(depth.disabled());
+    ASSERT_EQ(depth.get_format(), invalid_format);
+    EXPECT_FALSE(emucorev::savestate::validate_gxm_state(gxm, *memory, error));
+}
+
+TEST_F(GxmSysmemPreflight, DepthCacheUsesPhysicalStrideAndFormatByteFootprint) {
+    using namespace emucorev::savestate;
+    ram.resize(4u << 20);
+    auto memory = image(); ASSERT_TRUE(memory) << error;
+    GpuSnapshot gpu;
+    gpu.resolution = 1;
+    gpu.surfaces.colors.resize(20); gpu.surfaces.depth_stencil.resize(20);
+    for (uint8_t i = 0; i < 20; ++i) { gpu.surfaces.color_mru_order.push_back(i); gpu.surfaces.depth_stencil_mru_order.push_back(i); }
+    auto &depth = gpu.surfaces.depth_stencil[0];
+    depth.active = true; depth.memory_width = 960; depth.memory_height = 800; depth.stride_samples = 704;
+    depth.surface.set_stride(704); depth.surface.set_type(SCE_GXM_DEPTH_STENCIL_SURFACE_LINEAR);
+    depth.texture.present = true;
+    depth.texture.usage = vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eDepthStencilAttachment;
+    depth.texture.image.width = 960; depth.texture.image.height = 800;
+    depth.texture.image.format = vk::Format::eD32Sfloat;
+    depth.texture.image.layout = vkutil::ImageLayout::DepthStencilAttachment;
+    depth.texture.image.bytes.resize(960 * 800 * 4);
+    for (const auto [format, bytes] : { std::pair{SCE_GXM_DEPTH_STENCIL_FORMAT_DF32, 4u},
+            std::pair{SCE_GXM_DEPTH_STENCIL_FORMAT_D16, 2u}, std::pair{SCE_GXM_DEPTH_STENCIL_FORMAT_S8, 1u} }) {
+        depth.surface.set_format(format);
+        depth.total_bytes = 704 * 800 * bytes;
+        // Exact valid ending tests D16/S8 independently of the former four-byte assumption.
+        depth.surface.depth_data = Ptr<void>(0x401000 - depth.total_bytes);
+        EXPECT_TRUE(validate_gpu_state(gpu, *memory, error)) << error;
+        depth.stride_samples += 32;
+        EXPECT_FALSE(validate_gpu_state(gpu, *memory, error));
+        depth.stride_samples -= 32;
+        --depth.total_bytes;
+        EXPECT_FALSE(validate_gpu_state(gpu, *memory, error));
+        ++depth.total_bytes;
+        depth.surface.depth_data = Ptr<void>(depth.surface.depth_data.address() + 32);
+        EXPECT_FALSE(validate_gpu_state(gpu, *memory, error));
+    }
 }
 
 TEST_F(GxmSysmemPreflight, VmTableMayAliasSameOwnerButCannotClaimDifferentAllocation) {

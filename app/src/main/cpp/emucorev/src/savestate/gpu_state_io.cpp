@@ -410,9 +410,25 @@ bool validate_gpu_state(const GpuSnapshot &snapshot, const MemoryImage &memory, 
         if (color.active && !memory.contains(color.guest_address, color.total_bytes)) return fail();
     for (const auto &ds : snapshot.surfaces.depth_stencil) {
         if (!ds.active) continue;
-        if (ds.memory_width < 0 || ds.memory_height < 0 || ds.stride_samples < static_cast<uint32_t>(ds.memory_width)) return fail();
+        if (ds.memory_width < 0 || ds.memory_height < 0 || !ds.stride_samples
+            || ds.stride_samples != ds.surface.get_stride()) return fail();
+        const auto format = ds.surface.get_format();
+        uint32_t depth_bytes;
+        switch (format) {
+        case SCE_GXM_DEPTH_STENCIL_FORMAT_S8: depth_bytes = 1; break;
+        case SCE_GXM_DEPTH_STENCIL_FORMAT_D16: depth_bytes = 2; break;
+        case SCE_GXM_DEPTH_STENCIL_FORMAT_DF32:
+        case SCE_GXM_DEPTH_STENCIL_FORMAT_DF32_S8:
+        case SCE_GXM_DEPTH_STENCIL_FORMAT_DF32M:
+        case SCE_GXM_DEPTH_STENCIL_FORMAT_DF32M_S8:
+        case SCE_GXM_DEPTH_STENCIL_FORMAT_S8D24: depth_bytes = 4; break;
+        default: return fail();
+        }
+        // memory_width describes the GPU target allocation, not the guest row
+        // pitch. The cache producer sizes physical storage from pitch and height.
         const uint64_t samples = uint64_t(ds.stride_samples) * ds.memory_height;
-        if ((ds.surface.depth_data && !memory.contains(ds.surface.depth_data.address(), samples * 4))
+        if (uint64_t(ds.total_bytes) != samples * depth_bytes
+            || (ds.surface.depth_data && !memory.contains(ds.surface.depth_data.address(), samples * depth_bytes))
             || (ds.surface.stencil_data && !memory.contains(ds.surface.stencil_data.address(), samples))) return fail();
     }
     return renderer::vulkan::validate_surface_cache_snapshot(snapshot.surfaces, error);
