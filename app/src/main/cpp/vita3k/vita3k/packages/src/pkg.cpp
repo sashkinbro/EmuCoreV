@@ -198,7 +198,8 @@ static bool decrypt_theme_pfs(
     const fs::path &source_path,
     const fs::path &destination_path,
     F00DEncryptorTypes type,
-    std::string &f00d_arg) {
+    std::string &f00d_arg,
+    PfsProgressCallback progress = nullptr) {
     PsvPfsParserConfig cfg;
     cfg.zRIF = zrif;
     cfg.title_id_src = source_path.string();
@@ -222,7 +223,7 @@ static bool decrypt_theme_pfs(
     PfsFilesystem pfs(cryptops, f00d, std::cout, klicensee, source);
     if (pfs.mount() < 0)
         return false;
-    return pfs.decrypt_files(destination) >= 0;
+    return pfs.decrypt_files(destination, progress) >= 0;
 }
 
 } // namespace
@@ -242,7 +243,14 @@ bool decrypt_install_nonpdrm(EmuEnvState &emuenv, const fs::path &drmlicpath, co
         };
     }
 
-    if ((execute(zRIF, title_id_src, title_id_dst, f00d_enc_type, f00d_arg, pfs_progress) < 0) && (title_path.string().find("theme") == std::string::npos))
+    // VPKs decrypt in a same-parent staging directory. Theme content alone may
+    // omit a keystone; mount/decrypt failures must never publish partial output.
+    const bool is_theme = title_path.parent_path().lexically_normal() ==
+        (emuenv.vita_fs_path / "ux0/theme").lexically_normal();
+    const bool decrypted = is_theme
+        ? decrypt_theme_pfs(zRIF, title_id_src, title_id_dst, f00d_enc_type, f00d_arg, pfs_progress)
+        : execute(zRIF, title_id_src, title_id_dst, f00d_enc_type, f00d_arg, pfs_progress) >= 0;
+    if (!decrypted || !fs::is_directory(title_id_dst))
         return false;
 
     if (!emuenv.app_info.app_category.contains("gp"))
