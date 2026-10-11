@@ -236,7 +236,6 @@ int main() {
 
     // The actual transition to waiting must release a token belonging to this CPU.
     auto gated=std::make_shared<ThreadState>(5,kernel,mem);gated->priority=100;
-    gated->cpu=CPUStatePtr(reinterpret_cast<CPUState*>(1),[](CPUState*){});
     token_cpu=gated->cpu.get(); const auto before=releases.load();
     assert(*gated->delay_until(std::chrono::steady_clock::now()+2ms,false)==SCE_KERNEL_OK);
     assert(token_cpu==nullptr && releases>before);

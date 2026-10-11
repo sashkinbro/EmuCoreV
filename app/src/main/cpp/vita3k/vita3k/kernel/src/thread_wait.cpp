@@ -306,7 +306,7 @@ void ThreadState::suspend_and_wait() {
 void ThreadState::resume_if_suspended() {
     const std::lock_guard<std::mutex> lock(mutex);
     vm_suspended = false;
-    if (status == ThreadStatus::suspended && !world_stop_requested && !debugger_suspended && !session_suspended)
+    if (status == ThreadStatus::suspended && !freeze_waiting && !world_stop_requested && !debugger_suspended && !session_suspended)
         update_status(ThreadStatus::running);
     status_cond.notify_all();
 }
@@ -334,7 +334,7 @@ bool ThreadState::resume_from_world() {
     const bool parked_for_freeze = world_stopped || freeze_waiting;
     world_stopped = false;
     // A VM freeze remains in force, including when it arrived after our gate parked.
-    if (parked_for_freeze && status == ThreadStatus::suspended && !vm_suspended && !debugger_suspended && !session_suspended) {
+    if (parked_for_freeze && !freeze_waiting && status == ThreadStatus::suspended && !vm_suspended && !debugger_suspended && !session_suspended) {
         update_status(ThreadStatus::running);
         return true;
     }
@@ -362,7 +362,7 @@ void ThreadState::resume(bool step) {
         single_stepping = step;
         suspend_requested = false;
         debugger_suspended = false;
-        if (!world_stop_requested && !vm_suspended && !session_suspended)
+        if (!freeze_waiting && !world_stop_requested && !vm_suspended && !session_suspended)
             update_status(ThreadStatus::running);
         status_cond.notify_all();
     }
@@ -382,7 +382,10 @@ ThreadStatus ThreadState::pause_for_session() {
 void ThreadState::resume_after_session_pause() {
     const std::lock_guard lock(mutex);
     session_suspended = false;
-    if (status == ThreadStatus::suspended && !world_stop_requested && !vm_suspended && !debugger_suspended)
+    // A host wait gate owns its transition back to RUNNING. Publishing it here
+    // can race with a new pause before the waiter observes this notification,
+    // leaving a parked host stack falsely reported as executing guest code.
+    if (status == ThreadStatus::suspended && !freeze_waiting && !world_stop_requested && !vm_suspended && !debugger_suspended)
         update_status(ThreadStatus::running);
     status_cond.notify_all();
     wait_cv.notify_all();
@@ -408,7 +411,10 @@ void ThreadState::park_creation_for_capture() {
 void ThreadState::resume_creation_after_capture() {
     std::unique_lock lock(mutex);
     freeze_waiting = false;
-    wait_for_guest_resume(lock);
+    // Creation admission owns this park, rather than the status_cond waiter.
+    // Complete its handoff even when the capture reason was already released.
+    if (wait_for_guest_resume(lock) && status == ThreadStatus::suspended)
+        update_status(ThreadStatus::running);
     std::erase(wait_continuations, creation_wait);
     creation_wait.reset();
 }

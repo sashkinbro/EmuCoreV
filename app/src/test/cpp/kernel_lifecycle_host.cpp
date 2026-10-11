@@ -6,7 +6,14 @@ ThreadState::ThreadState(SceUID id, KernelState &kernel, MemState &mem)
     , kernel(kernel)
     , mem(mem) {}
 ThreadState::~ThreadState() = default;
-uint32_t ThreadState::run_callback_locked(std::unique_lock<std::mutex> &, Address, const std::vector<uint32_t> &) { return 0; }
+uint32_t ThreadState::run_callback_locked(std::unique_lock<std::mutex> &, Address, const std::vector<uint32_t> &, CallbackPurpose, SceUID, std::array<uint32_t, 4>, uint32_t) { return 0; }
+// These lifecycle fixtures have no guest CPU. Keep unexpected CPU capture
+// observable rather than inventing register state at this host boundary.
+CPUContext save_context(CPUState &) {
+    ADD_FAILURE() << "CPU capture is outside the lifecycle host fixture";
+    return {};
+}
+thread_local ThreadState *g_tls_guest_thread = nullptr;
 void stop(CPUState &) {}
 void guest_sched_release_for_block() {}
 CPUState *guest_sched_token_cpu() { return nullptr; }

@@ -1,4 +1,5 @@
 #include <emucorev/savestate/kernel_state_io.h>
+#include <cpu/functions.h>
 // Actual production wait scopes, queues, snapshot application and typed resume.
 // No guest CPU/JIT is needed; the same cases are intended for host and Android.
 namespace {
@@ -14,6 +15,92 @@ SceInt32 continuation_resume(const ThreadStatePtr &thread) {
     return thread->resume_wait_continuation(thread->current_wait_continuation());
 }
 } // namespace
+namespace {
+void continuation_repause_capture(bool expired_delay) {
+    // Exercise the actual CV gate without a guest run_loop. If a resume lets
+    // this short HLE tail complete first, retry rather than capture a finished
+    // host fixture whose RUNNING status no longer has an executing CPU owner.
+    bool captured_parked_wait = false;
+    for (unsigned attempt = 0; attempt < 32 && !captured_parked_wait; ++attempt) {
+        KernelLifecycleEnv env;
+        auto thread = continuation_thread(env, 1);
+        thread->cpu = init_cpu(false, 1, 0, env.mem);
+        ASSERT_NE(thread->cpu, nullptr);
+        thread->pause_for_session();
+        auto pending = std::async(std::launch::async, [&] {
+            return guest_result(expired_delay
+                ? thread->delay_until(std::chrono::steady_clock::now() + 1ms, false)
+                : thread->wait({ SCE_KERNEL_WAITTYPE_SIGNAL }, Deadline::max(), false));
+        });
+        struct Cleanup {
+            ThreadStatePtr thread;
+            std::future<SceInt32> &pending;
+            ~Cleanup() {
+                if (pending.valid()) {
+                    thread->exit_delete(false);
+                    // Baseline may incorrectly publish RUNNING while its host
+                    // waits on status_cond; CPU stop cannot wake that CV.
+                    thread->status_cond.notify_all();
+                    pending.wait();
+                }
+            }
+        } cleanup{ thread, pending };
+        if (!expired_delay) {
+            ASSERT_TRUE(lifecycle_waiting(thread, { SCE_KERNEL_WAITTYPE_SIGNAL }));
+            thread->wake();
+        }
+        ASSERT_TRUE(await_waiter([&] {
+            const std::lock_guard lock(thread->mutex);
+            return thread->status == ThreadStatus::suspended;
+        }));
+        thread->resume_after_session_pause();
+        thread->pause_for_session();
+        {
+            const std::lock_guard lock(thread->mutex);
+            captured_parked_wait = thread->wait_target.type != 0;
+        }
+        if (!captured_parked_wait)
+            continue;
+        thread->request_world_stop();
+        EXPECT_TRUE(thread->wait_world_stopped(std::chrono::steady_clock::now() + 25ms))
+            << "a re-paused host freeze waiter must remain quiescent for capture";
+        // The expired deadline or sticky signal must remain in flight until
+        // both pause reasons are released, without losing its completion.
+        EXPECT_EQ(pending.wait_for(0ms), std::future_status::timeout);
+        thread->resume_from_world();
+        thread->resume_after_session_pause();
+        const auto ready = pending.wait_for(1s);
+        EXPECT_EQ(ready, std::future_status::ready);
+        if (ready == std::future_status::ready)
+            EXPECT_EQ(pending.get(), SCE_KERNEL_OK);
+    }
+    EXPECT_TRUE(captured_parked_wait) << "test must exercise an actual pending freeze gate";
+}
+} // namespace
+TEST(KernelContinuation, session_resume_repause_keeps_expired_delay_quiescent_for_capture) {
+    continuation_repause_capture(true);
+}
+TEST(KernelContinuation, session_resume_repause_keeps_completed_signal_wait_quiescent_for_capture) {
+    continuation_repause_capture(false);
+}
+TEST(KernelContinuation, creation_admission_owner_resumes_after_world_freeze_is_released) {
+    KernelLifecycleEnv env;
+    auto thread = continuation_thread(env, 1);
+    thread->park_creation_for_capture();
+    {
+        const std::lock_guard lock(thread->mutex);
+        ASSERT_EQ(thread->status, ThreadStatus::suspended);
+    }
+    // This host gate has its own durable import completion, rather than being
+    // a status_cond waiter inside wait_for_guest_resume.
+    thread->resume_from_world();
+    thread->resume_creation_after_capture();
+    {
+        const std::lock_guard lock(thread->mutex);
+        EXPECT_EQ(thread->status, ThreadStatus::running);
+    }
+    EXPECT_TRUE(thread->saved_wait_continuations().empty());
+}
 TEST(KernelContinuation, queue_enrollment_alone_is_not_a_parked_capture_boundary) {
     KernelLifecycleEnv env;
     auto thread = continuation_thread(env, 1);
