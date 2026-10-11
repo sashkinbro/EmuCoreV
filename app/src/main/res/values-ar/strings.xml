@@ -1397,7 +1397,7 @@
     <string name="settings_discord_token_error">تعذر حماية رمز تسجيل الدخول إلى Discord.</string>
     <string name="core_update_reset_title">تحديث النواة</string>
     <string name="core_update_reset_body">يتضمن هذا التحديث تغييرات في نواة المحاكي. أعد تعيين ذاكرة التخزين المؤقت والإعدادات لتجنب المشكلات.</string>
-    <string name="core_update_reset_kept">سيتم الاحتفاظ بـ BIOS ومجلدات الألعاب والتحكم والحفظ وبطاقات الذاكرة والأغلفة.</string>
+    <string name="core_update_reset_kept">سيتم الاحتفاظ ببرامج Vita الثابتة والألعاب المثبتة وحفظ الألعاب والحفظ السريع وتخطيطات اللمس والأغلفة.</string>
     <string name="core_update_reset_action">إعادة تعيين الإعدادات</string>
     <string name="core_update_reset_keep">الاحتفاظ بالإعدادات</string>
     <string name="core_update_reset_done">تمت إعادة تعيين الإعدادات</string>

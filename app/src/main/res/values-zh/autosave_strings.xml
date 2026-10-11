@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">退出时自动保存</string>
+    <string name="emulation_auto_save_on_exit_desc">在关闭模拟器之前，将此游戏保存到自动保存槽位。</string>
+    <string name="emulation_auto_load_on_start">启动时自动加载</string>
+    <string name="emulation_auto_load_on_start_desc">在游戏启动时自动加载其最新的自动保存。</string>
+</resources>

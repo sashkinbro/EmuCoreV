@@ -51,6 +51,21 @@ import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.core.TrophySoundPlayer
+import com.sbro.emucorev.core.AUTOMATIC_STATE_LOAD_EXTRA
+import com.sbro.emucorev.core.SKIP_AUTOMATIC_STATE_LOAD_EXTRA
+import com.sbro.emucorev.core.autoLoadFallbackArguments
+import com.sbro.emucorev.core.SaveStateBridge
+import com.sbro.emucorev.core.SaveStateRepository
+import com.sbro.emucorev.core.SaveStateExitCoordinator
+import com.sbro.emucorev.core.resolveAutoLoadArguments
+import com.sbro.emucorev.core.shouldSkipExitAutoSave
+import com.sbro.emucorev.data.SaveStateAutomationPreferences
+import com.sbro.emucorev.BuildConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.sbro.emucorev.core.input.InputDeviceClassifier
 import org.libsdl.app.SDLActivity
 import org.libsdl.app.SDLControllerManager
@@ -81,7 +96,13 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var composeOverlayAttached = false
     private var activeTouchSnapshot: MotionEvent? = null
     private var exitRequested = false
-    private var rebirthRequested = false
+    private var rebirthRequested by mutableStateOf(false)
+    val exitInProgress: Boolean get() = rebirthRequested
+    private var sessionUsable = true
+    private val exitScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val exitCoordinator = SaveStateExitCoordinator()
+    var autoSaveInProgress by mutableStateOf(false)
+        private set
     private lateinit var composeOwners: ComposeOwners
     private var inputManager: InputManager? = null
     private var overlayBackHandler: (() -> Boolean)? = null
@@ -118,8 +139,20 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     fun showSaveStateLoadError(reason: String) {
         Log.e("SaveStateBridge", "Launch save state load failed: $reason")
         runOnUiThread {
+            sessionUsable = false
             launchStateLoading = launchStateLoading.onFailure()
             Toast.makeText(this, R.string.emulation_savestate_failed_toast, Toast.LENGTH_LONG).show()
+            if (intent.getBooleanExtra(AUTOMATIC_STATE_LOAD_EXTRA, false)) {
+                // Header inspection cannot detect every corrupt payload. A failed
+                // automatic Load gets one normal boot, retaining the original quick file.
+                val fallback = Intent(this, Emulator::class.java).apply {
+                    action = "LAUNCH_${currentGameIdOrIntent()}_${System.currentTimeMillis()}"
+                    putExtra(APP_RESTART_PARAMETERS, autoLoadFallbackArguments(
+                        intent.getStringArrayExtra(APP_RESTART_PARAMETERS).orEmpty()))
+                    putExtra(SKIP_AUTOMATIC_STATE_LOAD_EXTRA, true)
+                }
+                triggerRebirthAfterNativeShutdown(fallback, allowAutoSave = false)
+            }
         }
     }
 
@@ -212,28 +245,34 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun getArguments(): Array<String> {
-        val args = intent.getStringArrayExtra(APP_RESTART_PARAMETERS)
-        if (args != null) {
-            val gameId = gameIdFromArgs(args)
-            Log.i(TAG, "Starting emulator with args=${args.joinToString(" ")} gameId=$gameId")
-            syncEffectiveDriverForLaunch(gameId)
-            return args
+        val baseArgs = intent.getStringArrayExtra(APP_RESTART_PARAMETERS) ?: gameIdFromIntent(intent).let {
+            if (it.isBlank()) emptyArray() else arrayOf("-r", it)
         }
-        val gameId = gameIdFromIntent(intent)
-        Log.i(TAG, "Starting emulator from intent action=${intent?.action.orEmpty()} gameId=$gameId")
+        val gameId = gameIdFromArgs(baseArgs)
         syncEffectiveDriverForLaunch(gameId)
-        return if (gameId.isBlank()) emptyArray() else arrayOf("-r", gameId)
+        // SDL requests these arguments on SDLThread after loading the core.
+        // External shortcuts therefore inspect their auto slot off the UI thread too.
+        val enabled = SaveStateAutomationPreferences(this, gameId).use { it.current.autoLoadOnStart }
+        val args = resolveAutoLoadArguments(baseArgs, enabled,
+            skipAutomatic = intent.getBooleanExtra(SKIP_AUTOMATIC_STATE_LOAD_EXTRA, false)) {
+            SaveStateRepository(this).validQuickStatePath(gameId)
+        }
+        if (args !== baseArgs) {
+            intent.putExtra(APP_RESTART_PARAMETERS, args).putExtra(AUTOMATIC_STATE_LOAD_EXTRA, true)
+            runOnUiThread { launchStateLoading = LaunchStateLoadingState.fromArguments(args) }
+        }
+        Log.i(TAG, "Starting emulator with args=${args.joinToString(" ")} gameId=$gameId")
+        return args
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        val outgoingTitle = currentGameIdOrIntent()
         setIntent(intent)
         if (isLaunchIntent(intent)) {
-            val gameId = gameIdFromIntent(intent)
-            if (gameId.isNotBlank()) {
-                _currentGameId = gameId
-            }
-            triggerRebirthAfterNativeShutdown(markRebirthHandled(intent))
+            triggerRebirthAfterNativeShutdown(markRebirthHandled(intent), outgoingTitle,
+                allowAutoSave = !shouldSkipExitAutoSave(intent.getStringArrayExtra(APP_RESTART_PARAMETERS),
+                    intent.getBooleanExtra(AUTOMATIC_STATE_LOAD_EXTRA, false)))
         }
     }
 
@@ -621,7 +660,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
-    fun exitEmulation() {
+    fun exitEmulation(autoSave: Boolean = true) {
         if (exitRequested) return
         exitRequested = true
         finishPlayTimeSessionIfNeeded()
@@ -634,7 +673,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 addCategory(Intent.CATEGORY_LAUNCHER)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             }
-            triggerRebirthAfterNativeShutdown(homeIntent)
+            triggerRebirthAfterNativeShutdown(homeIntent, allowAutoSave = autoSave)
         }
     }
 
@@ -924,18 +963,44 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         return Intent(sourceIntent).putExtra(EXTRA_REBIRTH_HANDLED, true)
     }
 
-    private fun triggerRebirthAfterNativeShutdown(targetIntent: Intent) {
+    private fun triggerRebirthAfterNativeShutdown(targetIntent: Intent,
+                                                outgoingTitle: String = currentGameIdOrIntent(),
+                                                allowAutoSave: Boolean = true) {
         runOnUiThread {
             if (rebirthRequested) return@runOnUiThread
             rebirthRequested = true
             cancelActiveTouches()
             keyboardRequestGeneration++
             if (::inputOverlay.isInitialized) inputOverlay.setTouchControlsActive(false)
-            performNativeShutdown {
-                if (SDLActivity.mSDLThread?.isAlive == true) {
-                    Log.w(TAG, "Proceeding with process rebirth while SDLThread is still alive; shader cache may not be fully flushed")
-                }
-                ProcessPhoenix.triggerRebirth(applicationContext, targetIntent)
+            val saveEnabled = allowAutoSave && sessionUsable &&
+                SaveStateAutomationPreferences(this, outgoingTitle).use { it.current.autoSaveOnExit }
+            exitScope.launch {
+                exitCoordinator.run(outgoingTitle, saveEnabled, save = { title ->
+                    autoSaveInProgress = true
+                    try {
+                        setMenuPaused(true)
+                        val result = withContext(Dispatchers.IO) {
+                            // A failed/destructive Load or already stopped core must never overwrite quick0.
+                            if (SaveStateBridge.runningTitleId() != title) null else
+                                SaveStateRepository(this@Emulator).save(title, SaveStateRepository.QUICK_SLOT, BuildConfig.VERSION_NAME)
+                        }
+                        if (result != null && !result.isOk) {
+                            Toast.makeText(this@Emulator, R.string.emulation_savestate_failed_toast, Toast.LENGTH_LONG).show()
+                        }
+                    } catch (error: Exception) {
+                        Log.e(TAG, "Automatic exit save failed", error)
+                        Toast.makeText(this@Emulator, R.string.emulation_savestate_failed_toast, Toast.LENGTH_LONG).show()
+                    } finally {
+                        autoSaveInProgress = false
+                    }
+                }, shutdown = {
+                    performNativeShutdown {
+                        if (SDLActivity.mSDLThread?.isAlive == true) {
+                            Log.w(TAG, "Proceeding with process rebirth while SDLThread is still alive; shader cache may not be fully flushed")
+                        }
+                        ProcessPhoenix.triggerRebirth(applicationContext, targetIntent)
+                    }
+                })
             }
         }
     }

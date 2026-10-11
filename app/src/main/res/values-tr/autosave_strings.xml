@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">Çıkışta otomatik kaydet</string>
+    <string name="emulation_auto_save_on_exit_desc">Emülatörü kapatmadan önce bu oyunu otomatik kayıt yuvasına kaydedin.</string>
+    <string name="emulation_auto_load_on_start">Başlangıçta otomatik yükle</string>
+    <string name="emulation_auto_load_on_start_desc">Başladığında bu oyunun en son otomatik kaydını otomatik olarak yükleyin.</string>
+</resources>

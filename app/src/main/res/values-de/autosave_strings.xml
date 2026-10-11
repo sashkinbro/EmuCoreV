@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">Automatisches Speichern beim Beenden</string>
+    <string name="emulation_auto_save_on_exit_desc">Speichere dieses Spiel im Auto-Save-Slot, bevor du den Emulator schließt.</string>
+    <string name="emulation_auto_load_on_start">Automatisches Laden beim Start</string>
+    <string name="emulation_auto_load_on_start_desc">Lade automatisch den neuesten Auto-Save dieses Spiels, wenn es gestartet wird.</string>
+</resources>

@@ -8,6 +8,7 @@ import android.os.SystemClock
 import com.jakewharton.processphoenix.ProcessPhoenix
 import com.sbro.emucorev.core.vita.Emulator
 import com.sbro.emucorev.data.SaveDataRepository
+import com.sbro.emucorev.data.SaveStateAutomationPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,12 +56,20 @@ object VitaLaunchBridge {
                     .onFailure { error -> Log.w(TAG, "Save data migration failed", error) }
                 val config = VitaGameSettingsRepository(context).syncEffectiveDriverForLaunch(titleId)
                 val shouldAngle = config.useAngle && config.backendRenderer == "OpenGL"
-                val args = if (statePath.isNullOrBlank()) {
+                val baseArgs = if (statePath.isNullOrBlank()) {
                     arrayOf("-r", titleId)
                 } else {
                     arrayOf("-r", titleId, "-loadstate", statePath)
                 }
-                launchWithArgs(context, "LAUNCH_$titleId", args, shouldAngle)
+                val autoLoad = SaveStateAutomationPreferences(context, titleId).use { it.current.autoLoadOnStart }
+                val args = resolveAutoLoadArguments(baseArgs, autoLoad) {
+                    val repository = SaveStateRepository(context)
+                    if (!repository.stateFile(titleId, SaveStateRepository.QUICK_SLOT).isFile) null else {
+                        NativeLibraryLoader.ensureLoaded(context)
+                        repository.validQuickStatePath(titleId)
+                    }
+                }
+                launchWithArgs(context, "LAUNCH_$titleId", args, shouldAngle, automaticLoad = args !== baseArgs)
                 LaunchResult.Success
             }
         } catch (cancelled: CancellationException) {
@@ -87,7 +96,8 @@ object VitaLaunchBridge {
         return runWithArgs(context, ACTION_INSTALL_PKG, arrayOf("--pkg", pkgPath, "--zrif", zrif))
     }
 
-    private suspend fun launchWithArgs(context: Context, action: String, args: Array<String>, useAngle: Boolean = false) {
+    private suspend fun launchWithArgs(context: Context, action: String, args: Array<String>, useAngle: Boolean = false,
+                                      automaticLoad: Boolean = false) {
         Log.i(TAG, "Launching emulator action=$action args=${args.joinToString(" ")}")
         applyAngleEnvironment(context, useAngle)
         NativeLibraryLoader.ensureLoaded(context)
@@ -96,6 +106,7 @@ object VitaLaunchBridge {
         val intent = Intent(context, Emulator::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra(APP_RESTART_PARAMETERS, args)
+            putExtra(AUTOMATIC_STATE_LOAD_EXTRA, automaticLoad)
             this.action = "${action}_${System.currentTimeMillis()}"
         }
         withContext(Dispatchers.Main.immediate) { context.startActivity(intent) }

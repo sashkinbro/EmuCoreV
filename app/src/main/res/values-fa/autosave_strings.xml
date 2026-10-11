@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">ذخیره خودکار هنگام خروج</string>
+    <string name="emulation_auto_save_on_exit_desc">قبل از بستن شبیه‌ساز، این بازی را در شکاف ذخیره خودکار ذخیره کنید.</string>
+    <string name="emulation_auto_load_on_start">بارگذاری خودکار در شروع</string>
+    <string name="emulation_auto_load_on_start_desc">هنگام شروع، آخرین ذخیره خودکار این بازی را به طور خودکار بارگذاری کنید.</string>
+</resources>

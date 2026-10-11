@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">Simpan otomatis saat keluar</string>
+    <string name="emulation_auto_save_on_exit_desc">Simpan game ini ke slot simpan otomatis sebelum menutup emulator.</string>
+    <string name="emulation_auto_load_on_start">Muat otomatis saat mulai</string>
+    <string name="emulation_auto_load_on_start_desc">Muat otomatis simpanan terbaru game ini saat dimulai.</string>
+</resources>

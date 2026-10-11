@@ -73,6 +73,15 @@ class SaveStateRepository internal constructor(
     fun stateFile(titleId: String, slot: Int): File =
         File(slotsDirectory(titleId), baseName(slot) + STATE_EXTENSION)
 
+    /** Automatic launches ignore absent or rejected files; explicit loads retain their normal errors. */
+    fun validQuickStatePath(titleId: String): String? = operationLock.withLock {
+        if (titleId.isBlank()) return@withLock null
+        val file = stateFile(titleId, QUICK_SLOT)
+        if (!file.isFile || file.length() == 0L) return@withLock null
+        val inspection = backend.inspect(file.absolutePath)
+        file.absolutePath.takeIf { inspection.isOk && inspection.titleId == titleId && inspection.engineVersion > 0 }
+    }
+
     fun thumbnailFile(titleId: String, slot: Int): File =
         File(slotsDirectory(titleId), baseName(slot) + THUMBNAIL_EXTENSION)
 

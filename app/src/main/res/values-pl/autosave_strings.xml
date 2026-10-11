@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">Autozapis przy wyjściu</string>
+    <string name="emulation_auto_save_on_exit_desc">Zapisz tę grę w gnieździe autozapisu przed zamknięciem emulatora.</string>
+    <string name="emulation_auto_load_on_start">Autowczytywanie przy starcie</string>
+    <string name="emulation_auto_load_on_start_desc">Automatycznie wczytaj najnowszy autozapis tej gry po jej uruchomieniu.</string>
+</resources>

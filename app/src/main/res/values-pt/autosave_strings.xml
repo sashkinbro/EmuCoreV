@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">Salvar automaticamente ao sair</string>
+    <string name="emulation_auto_save_on_exit_desc">Salve este jogo no slot de salvamento automático antes de fechar o emulador.</string>
+    <string name="emulation_auto_load_on_start">Carregamento automático ao iniciar</string>
+    <string name="emulation_auto_load_on_start_desc">Carrega automaticamente o último salvamento automático deste jogo quando for iniciado.</string>
+</resources>

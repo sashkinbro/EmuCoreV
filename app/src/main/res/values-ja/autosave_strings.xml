@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">終了時にオートセーブ</string>
+    <string name="emulation_auto_save_on_exit_desc">エミュレータを閉じる前に、このゲームをオートセーブスロットに保存します。</string>
+    <string name="emulation_auto_load_on_start">起動時にオートロード</string>
+    <string name="emulation_auto_load_on_start_desc">起動時に、このゲームの最新のオートセーブを自動的にロードします。</string>
+</resources>

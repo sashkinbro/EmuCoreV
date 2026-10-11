@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">Automaticky uložit při ukončení</string>
+    <string name="emulation_auto_save_on_exit_desc">Před zavřením emulátoru uložit tuto hru do pozice pro automatické ukládání.</string>
+    <string name="emulation_auto_load_on_start">Automaticky načíst při spuštění</string>
+    <string name="emulation_auto_load_on_start_desc">Při startu automaticky načíst poslední automatické uložení této hry.</string>
+</resources>

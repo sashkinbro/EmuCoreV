@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">Автосохранение при выходе</string>
+    <string name="emulation_auto_save_on_exit_desc">Сохранить эту игру в слот автосохранения перед закрытием эмулятора.</string>
+    <string name="emulation_auto_load_on_start">Автозагрузка при старте</string>
+    <string name="emulation_auto_load_on_start_desc">Автоматически загружать последнее автосохранение этой игры при ее запуске.</string>
+</resources>

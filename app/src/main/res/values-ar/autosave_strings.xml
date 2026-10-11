@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">حفظ تلقائي عند الخروج</string>
+    <string name="emulation_auto_save_on_exit_desc">احفظ هذه اللعبة في فتحة الحفظ التلقائي قبل إغلاق المحاكي.</string>
+    <string name="emulation_auto_load_on_start">تحميل تلقائي عند البدء</string>
+    <string name="emulation_auto_load_on_start_desc">قم بتحميل أحدث حفظ تلقائي لهذه اللعبة تلقائيًا عند بدئها.</string>
+</resources>

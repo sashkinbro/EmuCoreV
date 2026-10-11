@@ -23,13 +23,15 @@ class SaveStateRepositoryTest {
         var failSave = true
         var failThumbnail = false
         var throwSave = false
+        var inspectStatus = SaveStateResult.STATUS_OK
+        var inspectTitle = "PCSE00120"
         override fun save(path: String, appVersion: String): SaveStateResult {
             if (throwSave) throw IllegalStateException("synthetic save failure")
             if (!failSave) File(path).writeText("new state")
             return result(if (failSave) SaveStateResult.STATUS_IO_ERROR else SaveStateResult.STATUS_OK)
         }
         override fun load(path: String, allowCrossSession: Boolean) = result(SaveStateResult.STATUS_OK)
-        override fun inspect(path: String) = result(SaveStateResult.STATUS_OK)
+        override fun inspect(path: String) = result(inspectStatus).copy(titleId = inspectTitle)
         override fun delete(path: String) = result(SaveStateResult.STATUS_IO_ERROR)
         override fun captureThumbnail(path: String): Boolean {
             File(path).writeText("new thumbnail")
@@ -50,6 +52,24 @@ class SaveStateRepositoryTest {
         assertEquals("previous state", state.readText())
         assertEquals("previous thumbnail", thumbnail.readText())
         assertEquals(setOf(state.name, thumbnail.name), state.parentFile!!.list()!!.toSet())
+    }
+
+    @Test fun automaticSlotAcceptsMatchingMetadataAndIgnoresRejectedOrForeignFiles() {
+        assertEquals(state.absolutePath, repository.validQuickStatePath("PCSE00120"))
+        backend.inspectStatus = SaveStateResult.STATUS_INVALID_FILE
+        assertNull(repository.validQuickStatePath("PCSE00120"))
+        backend.inspectStatus = SaveStateResult.STATUS_OK
+        backend.inspectTitle = "OTHER_GAME"
+        assertNull(repository.validQuickStatePath("PCSE00120"))
+        assertEquals("previous state", state.readText())
+    }
+
+    @Test fun missingAutomaticSlotNormalBootsWithoutDiscardingOtherSlots() {
+        state.delete()
+        val manual = repository.stateFile("PCSE00120", 1).apply { writeText("manual") }
+        assertNull(repository.validQuickStatePath("PCSE00120"))
+        assertEquals("manual", manual.readText())
+        manual.delete()
     }
 
     @Test fun successfulOverwritePublishesMatchingNewThumbnail() {

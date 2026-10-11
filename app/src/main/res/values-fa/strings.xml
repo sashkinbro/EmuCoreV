@@ -1382,7 +1382,7 @@
     <string name="settings_discord_token_error">محافظت از توکن ورود Discord ممکن نشد.</string>
     <string name="core_update_reset_title">به‌روزرسانی هسته</string>
     <string name="core_update_reset_body">این به‌روزرسانی شامل تغییراتی در هسته شبیه‌ساز است. حافظه نهان و پیکربندی شبیه‌ساز را بازنشانی کنید تا هسته جدید بدون مشکل اجرا شود.</string>
-    <string name="core_update_reset_kept">BIOS، پوشه‌های بازی، کنترل‌ها، ذخیره‌ها، کارت‌های حافظه و کاورها حفظ می‌شوند.</string>
+    <string name="core_update_reset_kept">میان‌افزار Vita، بازی‌های نصب‌شده، ذخیره‌های بازی، ذخیره‌های سریع، چیدمان‌های لمسی و جلدها حفظ می‌شوند.</string>
     <string name="core_update_reset_action">بازنشانی تنظیمات</string>
     <string name="core_update_reset_keep">نگهداری تنظیمات فعلی</string>
     <string name="core_update_reset_done">تنظیمات بازنشانی شدند</string>

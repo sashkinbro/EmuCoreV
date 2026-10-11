@@ -62,6 +62,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -73,6 +74,8 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import com.sbro.emucorev.ui.settings.centeredTabScrollDelta
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -100,6 +103,7 @@ import com.sbro.emucorev.core.SaveStateSlot
 import com.sbro.emucorev.core.VitaCheatSnapshot
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.data.TrophyRepository
+import com.sbro.emucorev.data.SaveStateAutomationPreferences
 import com.sbro.emucorev.data.GameMenuLayoutStyle
 import com.sbro.emucorev.data.VitaTrophy
 import com.sbro.emucorev.data.VitaTrophyGrade
@@ -570,6 +574,7 @@ private fun MenuSelectedContent(
                 callbacks = callbacks
             )
             EmulationMenuTab.SaveStates -> SaveStatesTab(
+                gameId = gameId,
                 saveStates = saveStates,
                 callbacks = callbacks
             )
@@ -866,74 +871,50 @@ private fun SystemTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks)
 }
 
 @Composable
-private fun SaveStatesTab(saveStates: SaveStateMenuState, callbacks: EmulationMenuCallbacks) {
+private fun SaveStatesTab(gameId: String, saveStates: SaveStateMenuState, callbacks: EmulationMenuCallbacks) {
     val palette = emulationMenuPalette()
     val slotOrder = SaveStateRepository.SLOT_ORDER
     val selectedIndex = slotOrder.indexOf(saveStates.selectedSlot).coerceAtLeast(0)
     val selected = slotOrder[selectedIndex]
     val slot = saveStates.slots.firstOrNull { it.slot == selected }
     val hasState = slot?.exists == true
-    val busy = saveStates.busy
+    val busy = saveStates.busy || !saveStates.canInteract
     val statusText = if (slot?.exists == true) {
-        stringResource(R.string.emulation_savestate_saved_at, formatSaveStateDate(slot.timestamp)) +
-            " · " + stringResource(R.string.emulation_savestate_size, formatSaveStateSize(slot.sizeBytes))
+        stringResource(R.string.emulation_savestate_saved_at, formatSaveStateDate(slot.timestamp))
     } else {
         stringResource(R.string.emulation_savestate_empty)
     }
 
-    Surface(
-        shape = neonShape(16.dp),
-        color = palette.panelSoft,
-        border = BorderStroke(1.dp, palette.border)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp)
-        ) {
+    Column(modifier = Modifier.padding(horizontal = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(modifier = Modifier.fillMaxWidth(), shape = neonShape(16.dp), color = palette.panelSoft) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = stringResource(R.string.emulation_menu_section_savestates),
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = palette.textPrimary,
-                    modifier = Modifier.weight(1f)
-                )
+                Text(text = stringResource(R.string.emulation_menu_section_savestates),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    color = palette.textPrimary, modifier = Modifier.weight(1f))
                 SaveStateSlotSwitcher(
-                    label = saveStateSlotLabel(selected),
+                    label = if (selected == SaveStateRepository.QUICK_SLOT) saveStateSlotLabel(selected) else selected.toString(),
                     canGoPrevious = selectedIndex > 0 && !busy,
                     canGoNext = selectedIndex < slotOrder.lastIndex && !busy,
                     onPrevious = { callbacks.onSaveStateSlotSelected(slotOrder[selectedIndex - 1]) },
                     onNext = { callbacks.onSaveStateSlotSelected(slotOrder[selectedIndex + 1]) }
                 )
             }
-
-            Text(
-                text = statusText,
-                style = MaterialTheme.typography.bodySmall,
-                color = palette.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            HorizontalDivider(color = palette.border)
-
-            if (busy) {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary
-                )
+            Text(text = statusText, style = MaterialTheme.typography.bodySmall,
+                color = palette.textSecondary, modifier = Modifier.fillMaxWidth())
             }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SaveStateActionButton(
                     icon = Icons.Rounded.Save,
                     contentDescription = stringResource(R.string.emulation_savestate_save_action),
                     enabled = !busy,
+                    showProgress = busy && saveStates.busySaving,
                     onClick = { callbacks.onSaveStateSave(selected) },
                     modifier = Modifier.weight(1f)
                 )
@@ -941,6 +922,7 @@ private fun SaveStatesTab(saveStates: SaveStateMenuState, callbacks: EmulationMe
                     icon = Icons.Rounded.Restore,
                     contentDescription = stringResource(R.string.emulation_savestate_load_action),
                     enabled = hasState && !busy,
+                    showProgress = busy && !saveStates.busySaving,
                     onClick = { callbacks.onSaveStateLoad(selected) },
                     modifier = Modifier.weight(1f)
                 )
@@ -951,7 +933,25 @@ private fun SaveStatesTab(saveStates: SaveStateMenuState, callbacks: EmulationMe
                     )
                 }
             }
-        }
+        SaveStateAutomationSection(gameId, enabled = !busy)
+    }
+}
+
+@Composable
+internal fun SaveStateAutomationSection(gameId: String, enabled: Boolean = true) {
+    val context = LocalContext.current
+    val preferences = remember(context, gameId) { SaveStateAutomationPreferences(context, gameId) }
+    val settings by preferences.settings.collectAsState()
+    DisposableEffect(preferences) { onDispose { preferences.close() } }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        MenuToggleRow(label = stringResource(R.string.emulation_auto_save_on_exit),
+            subtitle = stringResource(R.string.emulation_auto_save_on_exit_desc),
+            checked = settings.autoSaveOnExit, enabled = enabled && gameId.isNotBlank(),
+            onCheckedChange = preferences::setAutoSaveOnExit)
+        MenuToggleRow(label = stringResource(R.string.emulation_auto_load_on_start),
+            subtitle = stringResource(R.string.emulation_auto_load_on_start_desc),
+            checked = settings.autoLoadOnStart, enabled = enabled && gameId.isNotBlank(),
+            onCheckedChange = preferences::setAutoLoadOnStart)
     }
 }
 
@@ -981,7 +981,7 @@ private fun SaveStateSlotSwitcher(
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(min = 44.dp)
+            modifier = Modifier.padding(horizontal = 4.dp)
         )
         IconButton(
             onClick = onNext,
@@ -1001,33 +1001,29 @@ private fun SaveStateActionButton(
     icon: ImageVector,
     contentDescription: String,
     enabled: Boolean,
+    showProgress: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val palette = emulationMenuPalette()
-    val shape = neonShape(16.dp)
+    val shape = neonShape(18.dp)
     Surface(
         modifier = modifier
-            .height(54.dp)
+            .fillMaxWidth()
             .clip(shape)
             .clickable(enabled = enabled, onClick = onClick),
         shape = shape,
         color = if (enabled) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
         } else {
             palette.row
         },
-        border = BorderStroke(
-            1.dp,
-            if (enabled) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.26f)
-            } else {
-                palette.border
-            }
-        )
+        border = BorderStroke(1.dp, palette.textPrimary.copy(alpha = 0.05f))
     ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(
+        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+            if (showProgress) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary)
+            else Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
                 tint = if (enabled) MaterialTheme.colorScheme.primary else palette.textSecondary.copy(alpha = 0.42f),
@@ -1043,7 +1039,7 @@ private fun SaveStateDeleteButton(enabled: Boolean, onClick: () -> Unit) {
     val shape = neonShape(16.dp)
     Surface(
         modifier = Modifier
-            .size(54.dp)
+            .size(52.dp)
             .clip(shape)
             .clickable(enabled = enabled, onClick = onClick),
         shape = shape,
@@ -1982,6 +1978,7 @@ private fun MenuToggleRow(
     checked: Boolean,
     enabled: Boolean = true,
     badge: MenuBadge? = null,
+    subtitle: String? = null,
     onCheckedChange: (Boolean) -> Unit
 ) {
     val palette = emulationMenuPalette()
@@ -2003,6 +2000,8 @@ private fun MenuToggleRow(
                 style = MaterialTheme.typography.bodyMedium,
                 color = palette.textPrimary.copy(alpha = if (enabled) 1f else 0.48f)
             )
+            if (subtitle != null) Text(text = subtitle, style = MaterialTheme.typography.bodySmall,
+                color = palette.textSecondary.copy(alpha = if (enabled) 1f else 0.48f))
             RowBadge(badge)
         }
         Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)

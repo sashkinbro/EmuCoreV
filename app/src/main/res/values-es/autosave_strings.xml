@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">Guardado automático al salir</string>
+    <string name="emulation_auto_save_on_exit_desc">Guarda este juego en el espacio de guardado automático antes de cerrar el emulador.</string>
+    <string name="emulation_auto_load_on_start">Carga automática al iniciar</string>
+    <string name="emulation_auto_load_on_start_desc">Carga automáticamente el último guardado automático de este juego cuando se inicie.</string>
+</resources>

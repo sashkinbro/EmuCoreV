@@ -1382,7 +1382,7 @@
     <string name="settings_discord_token_error">Nie udało się zabezpieczyć tokenu logowania Discord.</string>
     <string name="core_update_reset_title">Aktualizacja rdzenia</string>
     <string name="core_update_reset_body">Ta aktualizacja obejmuje zmiany w rdzeniu emulatora. Przywróć domyślne ustawienia pamięci podręcznej i konfiguracji emulatora, aby nowy rdzeń działał bez zakłóceń.</string>
-    <string name="core_update_reset_kept">BIOS, foldery gier, sterowanie, zapisy, karty pamięci i okładki zostaną zachowane.</string>
+    <string name="core_update_reset_kept">Firmware Vita, zainstalowane gry, zapisy gier, szybkie zapisy, układy sterowania dotykowego i okładki zostaną zachowane.</string>
     <string name="core_update_reset_action">Przywróć domyślne ustawienia</string>
     <string name="core_update_reset_keep">Zachowaj obecne ustawienia</string>
     <string name="core_update_reset_done">Ustawienia zostały przywrócone do domyślnych</string>

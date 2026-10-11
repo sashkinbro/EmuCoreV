@@ -1393,7 +1393,7 @@
     <string name="settings_discord_token_error">Discord giriş belirteci korunamadı.</string>
     <string name="core_update_reset_title">Çekirdek güncellemesi</string>
     <string name="core_update_reset_body">Bu güncelleme emülatör çekirdeğinde değişiklikler içeriyor. Sorun yaşamamak için önbelleği ve yapılandırmayı sıfırlayın.</string>
-    <string name="core_update_reset_kept">BIOS, oyun klasörleri, kontroller, kayıtlar, hafıza kartları ve kapaklar korunur.</string>
+    <string name="core_update_reset_kept">Vita aygıt yazılımı, yüklü oyunlar, oyun kayıtları, hızlı kayıtlar, dokunmatik düzenler ve kapaklar korunur.</string>
     <string name="core_update_reset_action">Ayarları sıfırla</string>
     <string name="core_update_reset_keep">Ayarları koru</string>
     <string name="core_update_reset_done">Ayarlar sıfırlandı</string>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">बाहर निकलने पर ऑटो सेव</string>
+    <string name="emulation_auto_save_on_exit_desc">एमुलेटर बंद करने से पहले इस गेम को ऑटो-सेव स्लॉट में सेव करें।</string>
+    <string name="emulation_auto_load_on_start">शुरू होने पर ऑटो लोड</string>
+    <string name="emulation_auto_load_on_start_desc">जब यह शुरू होता है तो स्वचालित रूप से इस गेम का नवीनतम ऑटो-सेव लोड करें।</string>
+</resources>

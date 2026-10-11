@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">Auto save on exit</string>
+    <string name="emulation_auto_save_on_exit_desc">Save this game to the auto-save slot before closing the emulator.</string>
+    <string name="emulation_auto_load_on_start">Auto load on start</string>
+    <string name="emulation_auto_load_on_start_desc">Load this game\'s latest auto-save automatically when it starts.</string>
+</resources>

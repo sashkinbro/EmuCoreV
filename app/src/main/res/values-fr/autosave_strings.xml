@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">Sauvegarde automatique en quittant</string>
+    <string name="emulation_auto_save_on_exit_desc">Sauvegardez ce jeu dans l\'emplacement de sauvegarde automatique avant de fermer l\'émulateur.</string>
+    <string name="emulation_auto_load_on_start">Chargement automatique au démarrage</string>
+    <string name="emulation_auto_load_on_start_desc">Charger automatiquement la dernière sauvegarde automatique de ce jeu lors de son lancement.</string>
+</resources>

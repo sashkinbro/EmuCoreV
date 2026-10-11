@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emulation_auto_save_on_exit">종료 시 자동 저장</string>
+    <string name="emulation_auto_save_on_exit_desc">에뮬레이터를 닫기 전에 이 게임을 자동 저장 슬롯에 저장합니다.</string>
+    <string name="emulation_auto_load_on_start">시작 시 자동 로드</string>
+    <string name="emulation_auto_load_on_start_desc">게임이 시작될 때 이 게임의 최신 자동 저장을 자동으로 로드합니다.</string>
+</resources>
