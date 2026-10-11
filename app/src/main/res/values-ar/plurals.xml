@@ -17,12 +17,12 @@
         <item quantity="other">عدد الألعاب التي تم تثبيتها بنجاح: %1$d</item>
     </plurals>
     <plurals name="install_dialog_items_progress">
-        <item quantity="zero">اكتمل %1$d من أصل %2$d عنصر</item>
-        <item quantity="one">اكتمل %1$d من أصل %2$d عنصر</item>
-        <item quantity="two">اكتمل %1$d من أصل %2$d عنصر</item>
-        <item quantity="few">اكتمل %1$d من أصل %2$d عنصر</item>
-        <item quantity="many">اكتمل %1$d من أصل %2$d عنصر</item>
-        <item quantity="other">اكتمل %1$d من أصل %2$d عنصر</item>
+        <item quantity="zero">العناصر المكتملة: %1$d من %2$d</item>
+        <item quantity="one">العناصر المكتملة: %1$d من %2$d</item>
+        <item quantity="two">العناصر المكتملة: %1$d من %2$d</item>
+        <item quantity="few">العناصر المكتملة: %1$d من %2$d</item>
+        <item quantity="many">العناصر المكتملة: %1$d من %2$d</item>
+        <item quantity="other">العناصر المكتملة: %1$d من %2$d</item>
     </plurals>
     <plurals name="install_dialog_archive_unsupported_compression">
         <item quantity="zero">يحتوي الأرشيف على %1$d ملف بطريقة ضغط ZIP لا يستطيع هذا المثبّت قراءتها.</item>

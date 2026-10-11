@@ -13,10 +13,10 @@
         <item quantity="other">%1$d her bylo úspěšně nainstalováno.</item>
     </plurals>
     <plurals name="install_dialog_items_progress">
-        <item quantity="one">Dokončena %1$d z %2$d položky</item>
-        <item quantity="few">Dokončeny %1$d z %2$d položek</item>
-        <item quantity="many">Dokončeno %1$d z %2$d položek</item>
-        <item quantity="other">Dokončeno %1$d z %2$d položek</item>
+        <item quantity="one">Dokončeno položek: %1$d z %2$d</item>
+        <item quantity="few">Dokončeno položek: %1$d z %2$d</item>
+        <item quantity="many">Dokončeno položek: %1$d z %2$d</item>
+        <item quantity="other">Dokončeno položek: %1$d z %2$d</item>
     </plurals>
     <plurals name="install_dialog_archive_unsupported_compression">
         <item quantity="one">Archiv obsahuje %1$d soubor s metodou komprese ZIP, kterou tento instalátor neumí přečíst.</item>
