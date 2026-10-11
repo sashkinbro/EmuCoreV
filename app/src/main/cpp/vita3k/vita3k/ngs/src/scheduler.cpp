@@ -16,6 +16,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include <ngs/modules/atrac9.h>
+#include <ngs/modules/envelope.h>
 #include <ngs/scheduler.h>
 #include <ngs/system.h>
 
@@ -340,12 +341,45 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
     for (ngs::Voice *voice : queue_copy) {
         // Modify the state, in peace....
         std::unique_lock<std::mutex> voice_lock(*voice->voice_mutex);
+        // A prior voice's guest callback may have paused or stopped this voice
+        // after queue_copy was taken. Respect the current state before processing.
+        if (voice->is_paused || (voice->state != VOICE_STATE_ACTIVE && voice->state != VOICE_STATE_FINALIZING))
+            continue;
         memset(voice->products, 0, sizeof(voice->products));
 
         bool finished = false;
+        bool finish_without_release = false;
         uint32_t finished_module = 0;
 
-        for (size_t i = 0; i < voice->rack->modules.size(); i++) {
+        if (voice->state == VOICE_STATE_FINALIZING) {
+            bool has_release_envelope = false;
+            for (size_t i = 0; i < voice->rack->modules.size(); ++i) {
+                const auto &module = voice->rack->modules[i];
+                if (!module || module->module_id() != 0x5CE3)
+                    continue;
+                auto &data = voice->datas[i];
+                if (data.is_bypassed || data.needs_reinit)
+                    continue;
+                const auto *params = data.get_parameters<SceNgsEnvelopeParams>(mem);
+                has_release_envelope |= params && params->desc.id == SCE_NGS_ENVELOPE_PARAMS_STRUCT_ID
+                    && params->uNumPoints != 0;
+            }
+            // A looping source cannot finish itself after key-off. Without an
+            // effective envelope, complete on the updater before decoding any
+            // more audio, retaining the deferred guest callback boundary.
+            if (!has_release_envelope) {
+                finished = true;
+                finish_without_release = true;
+                for (const auto &module : voice->rack->modules) {
+                    if (module) {
+                        finished_module = module->module_id();
+                        break;
+                    }
+                }
+            }
+        }
+
+        for (size_t i = 0; !finish_without_release && i < voice->rack->modules.size(); i++) {
             if (voice->rack->modules[i]) {
                 // Voices rebuilt by a save-state load stay silent until the game
                 // re-creates their module state; running them would decode from

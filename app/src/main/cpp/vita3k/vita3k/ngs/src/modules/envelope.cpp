@@ -102,7 +102,7 @@ bool EnvelopeModule::process(KernelState &kern, const MemState &mem, const SceUI
     };
 
     const bool keyed_off = voice->is_keyed_off || voice->state == VOICE_STATE_FINALIZING;
-    const float start_gain = logical->releasing || keyed_off
+    const float start_gain = logical->releasing
         ? logical->release_height
         : height_at_current();
 
