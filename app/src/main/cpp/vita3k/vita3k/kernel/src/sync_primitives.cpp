@@ -56,35 +56,15 @@ inline static CondvarPtrs &get_condvars(KernelState &kernel, SyncWeight weight) 
 
 namespace {
 
-#ifndef NDEBUG
-struct EvfOp {
-    uint64_t ms;
-    SceUID evf;
-    SceUID thread;
-    uint8_t op; // 0=SET 1=CLEAR 2=WAIT_OK 3=WAIT_BLOCK 4=CANCEL
-    uint32_t bits;
-    uint32_t flags_after;
-    uint32_t woken;
-};
-constexpr size_t EVF_RING_SIZE = 512;
-std::array<EvfOp, EVF_RING_SIZE> evf_ring{};
-std::atomic<uint64_t> evf_ring_next{ 0 };
-#endif
-
 // every thread that EVER set each flag: the provable-cycle breaker needs "who could wake this"
 std::mutex evf_setters_mutex;
 std::unordered_map<SceUID, std::set<SceUID>> evf_setters;
 
-void evf_record(SceUID evf, SceUID thread, uint8_t op, uint32_t bits, uint32_t flags_after, uint32_t woken) {
-    if (op == 0 && thread > 0) {
+void record_eventflag_setter(SceUID evf, SceUID thread) {
+    if (thread > 0) {
         const std::lock_guard<std::mutex> lock(evf_setters_mutex);
         evf_setters[evf].insert(thread);
     }
-#ifndef NDEBUG
-    const uint64_t idx = evf_ring_next.fetch_add(1, std::memory_order_relaxed);
-    const uint64_t ms = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
-    evf_ring[idx % EVF_RING_SIZE] = EvfOp{ ms, evf, thread, op, bits, flags_after, woken };
-#endif
 }
 
 struct MutexCacheEntry {
@@ -263,7 +243,6 @@ SceInt32 simple_event_waitorpoll(KernelState &kernel, const char *export_name, S
 
         return SCE_KERNEL_OK;
     } else if (is_wait) {
-        thread->set_wait_reason("event", event_id, wait_pattern);
         const Deadline deadline = continuation.deadline();
         const WaitResult r = event->waiters.wait(event_lock, thread, { SCE_KERNEL_WAITTYPE_EVENT, event_id }, { wait_pattern, result_pattern, user_data }, deadline, callbacks);
         writeback_timeout(timeout, deadline);
@@ -705,7 +684,6 @@ inline static int mutex_lock_impl(KernelState &kernel, MemState &mem, const char
     auto mutex_lock = resumed_queue ? std::unique_lock(mutex->mutex) : mutex->lock();
     if (!mutex_lock)
         return unknown_mutex_id(export_name, weight);
-    thread->set_wait_reason("mutex", mutex->uid, mutex->owner ? mutex->owner->id : 0);
 
     bool is_recursive = (mutex->attr & SCE_KERNEL_MUTEX_ATTR_RECURSIVE);
 
@@ -1070,7 +1048,6 @@ SceInt32 semaphore_wait(KernelState &kernel, const char *export_name, SceUID thr
 
     WaitContinuationScope continuation(*thread, WaitOperation::semaphore,
         { static_cast<uint32_t>(semaId), static_cast<uint32_t>(needCount) }, pTimeout, callbacks, deadline_from(pTimeout));
-    thread->set_wait_reason("sema", semaId, needCount);
     continuation.record->object = semaphore;
     auto semaphore_lock = continuation.resuming ? std::unique_lock(semaphore->mutex) : semaphore->lock();
     if (!semaphore_lock)
@@ -1214,7 +1191,6 @@ int condvar_wait(KernelState &kernel, MemState &mem, const char *export_name, Sc
     auto condition_variable_lock = continuation.resuming ? std::unique_lock(condvar->mutex) : condvar->lock();
     if (!condition_variable_lock)
         return unknown_cond_id(export_name, weight);
-    thread->set_wait_reason("cond", condid, condvar->associated_mutex->uid);
     WaitResult result = SCE_KERNEL_OK;
     const bool reacquiring = continuation.resuming && continuation.record->state.phase == WaitPhase::reacquire_mutex;
     if (!reacquiring) {
@@ -1311,7 +1287,6 @@ SceUID eventflag_clear(KernelState &kernel, const char *export_name, SceUID evfI
         return SCE_KERNEL_ERROR_UNKNOWN_EVF_ID;
 
     event->flags &= bitPattern;
-    evf_record(evfId, 0, 1, bitPattern, event->flags, 0);
 
     return SCE_KERNEL_OK;
 }
@@ -1410,12 +1385,9 @@ static int eventflag_waitorpoll(KernelState &kernel, const char *export_name, Sc
         if (wait & SCE_EVENT_WAITCLEAR_PAT) {
             event->flags &= ~flags;
         }
-        evf_record(event_id, thread_id, 2, flags, event->flags, 0);
 
         return SCE_KERNEL_OK;
     } else if (dowait) {
-        evf_record(event_id, thread_id, 3, flags, event->flags, static_cast<uint32_t>(wait));
-        thread->set_wait_reason("evf", event->uid, flags);
         const Deadline deadline = continuation.deadline();
         const WaitResult r = event->waiters.wait(event_lock, thread, { SCE_KERNEL_WAITTYPE_EVENTFLAG, event_id }, { wait, flags, outBits }, deadline, callbacks);
         writeback_timeout(timeout, deadline);
@@ -1440,10 +1412,9 @@ int eventflag_poll(KernelState &kernel, const char *export_name, SceUID thread_i
     return eventflag_waitorpoll(kernel, export_name, thread_id, event_id, flags, wait, outBits, 0, false, false);
 }
 
-int KernelState::try_break_provable_evf_cycle(bool dry_run) {
+int KernelState::try_break_provable_evf_cycle() {
     struct FlagInfo {
         EventFlagPtr event;
-        std::set<SceUID> waiter_tids;
         uint32_t wanted_union = 0;
     };
     std::unordered_map<SceUID, FlagInfo> flags;
@@ -1459,7 +1430,6 @@ int KernelState::try_break_provable_evf_cycle(bool dry_run) {
             event->waiters.for_each([&](const auto &w) {
                 if (!w.thread)
                     return;
-                fi.waiter_tids.insert(w.thread->id);
                 fi.wanted_union |= w.entry.pattern;
                 thread_waits_on[w.thread->id] = uid;
             });
@@ -1490,41 +1460,12 @@ int KernelState::try_break_provable_evf_cycle(bool dry_run) {
         }
         if (!all_setters_blocked_here)
             continue;
-        LOG_ERROR("[EVFCYCLE]{} flag {} '{}' looks PROVABLY dead: every historical setter is itself blocked on a flag with waiters - {} bits 0x{:X}",
-            dry_run ? " (DRY-RUN)" : "", uid, fi.event->name, dry_run ? "would set" : "setting", fi.wanted_union);
-        if (!dry_run)
-            eventflag_set(*this, "provable_cycle_breaker", 0, uid, fi.wanted_union);
+        LOG_ERROR("[EVFCYCLE] flag {} '{}' looks PROVABLY dead: every historical setter is itself blocked on a flag with waiters - setting bits 0x{:X}",
+            uid, fi.event->name, fi.wanted_union);
+        eventflag_set(*this, "provable_cycle_breaker", 0, uid, fi.wanted_union);
         broken++;
     }
     return broken;
-}
-
-void KernelState::log_eventflag_history() {
-#ifndef NDEBUG
-    {
-        const std::lock_guard<std::mutex> lock(mutex);
-        for (const auto &[uid, event] : eventflags) {
-            auto evlock = event->lock();
-            if (!evlock || event->waiters.empty())
-                continue;
-            std::string waiters;
-            event->waiters.for_each([&](const auto &w) {
-                waiters += fmt::format(" [tid={} wants=0x{:X} mode=0x{:X}]", w.thread ? w.thread->id : -1, w.entry.pattern, w.entry.wait_mode);
-            });
-            LOG_ERROR("HANG EVF: flag {} '{}' current=0x{:X} waiters:{}", uid, event->name, event->flags, waiters);
-        }
-    }
-    const uint64_t next = evf_ring_next.load(std::memory_order_relaxed);
-    const uint64_t count = std::min<uint64_t>(next, EVF_RING_SIZE);
-    static const char *op_names[] = { "SET", "CLEAR", "WAIT_OK", "WAIT_BLOCK", "CANCEL" };
-    std::string hist;
-    for (uint64_t k = next - count; k < next; k++) {
-        const EvfOp &e = evf_ring[k % EVF_RING_SIZE];
-        hist += fmt::format("{} ms={} evf={} tid={} bits=0x{:X} after=0x{:X} woken_or_mode={}\n",
-            op_names[e.op <= 4 ? e.op : 4], e.ms, e.evf, e.thread, e.bits, e.flags_after, e.woken);
-    }
-    LOG_ERROR("HANG EVF HISTORY ({} op(s), oldest first):\n{}", count, hist);
-#endif
 }
 
 int KernelState::try_break_frame_sync_deadlock(std::vector<SceUID> &already_nudged) {
@@ -1583,7 +1524,7 @@ SceInt32 eventflag_set(KernelState &kernel, const char *export_name, SceUID thre
     if (!event_lock)
         return SCE_KERNEL_ERROR_UNKNOWN_EVF_ID;
     event->flags |= bitPattern;
-    const auto woken_count = event->waiters.wake_if([&](auto &waiter) {
+    event->waiters.wake_if([&](auto &waiter) {
         const EventFlag::WaitEntry &wait = waiter.entry;
         const SceUInt32 waiting_flags = wait.pattern;
 
@@ -1611,7 +1552,7 @@ SceInt32 eventflag_set(KernelState &kernel, const char *export_name, SceUID thre
 
         return true;
     });
-    evf_record(evfId, thread_id, 0, bitPattern, event->flags, static_cast<uint32_t>(woken_count));
+    record_eventflag_setter(evfId, thread_id);
 
     return 0;
 }

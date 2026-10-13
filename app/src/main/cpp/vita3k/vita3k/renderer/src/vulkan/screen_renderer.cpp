@@ -540,13 +540,7 @@ void ScreenRenderer::render(vk::ImageView image_view, vk::ImageLayout layout, co
     // so as a partial fix, render the gui and screen in different render passes
     const bool keep_single_pass = state.mapping_method == MappingMethod::PageTable
         || state.mapping_method == MappingMethod::NativeBuffer;
-    if (state.is_adreno_stock && keep_single_pass) {
-        static bool logged_single_pass = false;
-        if (!logged_single_pass) {
-            logged_single_pass = true;
-            LOG_INFO("present: SINGLE-PASS mode active (game + GUI in one render pass, PT/NB on stock Adreno)");
-        }
-    } else if (state.is_adreno_stock) {
+    if (state.is_adreno_stock && !keep_single_pass) {
         current_cmd_buffer.endRenderPass();
         pass_info.renderPass = stock_adreno_pass;
         current_cmd_buffer.beginRenderPass(pass_info, vk::SubpassContents::eInline);

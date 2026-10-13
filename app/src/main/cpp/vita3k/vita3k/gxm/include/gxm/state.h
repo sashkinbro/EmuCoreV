@@ -88,8 +88,6 @@ struct GxmState {
 
     renderer::SnapshotGate display_snapshot_gate;
     Queue<DisplayCallback> display_queue;
-    std::atomic<int> display_worker_state{ 0 };
-    std::atomic<uint32_t> display_entries_done{ 0 };
     SceUID display_queue_thread;
     std::thread display_host_thread;
     DisplayWorkerPhase display_phase = DisplayWorkerPhase::Idle;

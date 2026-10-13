@@ -122,7 +122,6 @@ EXPORT(int, _sceDisplayGetResolutionInfoInternal) {
 
 EXPORT(SceInt32, _sceDisplaySetFrameBuf, const SceDisplayFrameBuf *pFrameBuf, SceDisplaySetBufSync sync, uint32_t *pFrameBuf_size) {
     TRACY_FUNC(_sceDisplaySetFrameBuf, pFrameBuf, sync, pFrameBuf_size);
-    emuenv.display.setframe_call_count.fetch_add(1, std::memory_order_relaxed);
     if (!pFrameBuf)
         return SCE_DISPLAY_ERROR_OK;
     if (pFrameBuf->size != sizeof(SceDisplayFrameBuf) && pFrameBuf->size != sizeof(SceDisplayFrameBuf2)) {
@@ -161,7 +160,6 @@ EXPORT(SceInt32, _sceDisplaySetFrameBuf, const SceDisplayFrameBuf *pFrameBuf, Sc
     emuenv.display.last_setframe_vblank_count = emuenv.display.vblank_count.load();
     emuenv.frame_count++;
 
-    emuenv.display.setframe_accept_count.fetch_add(1, std::memory_order_relaxed);
 
 #ifdef TRACY_ENABLE
     FrameMarkNamed("SCE frame buffer"); // Tracy - Secondary frame end mark for the emulated frame buffer

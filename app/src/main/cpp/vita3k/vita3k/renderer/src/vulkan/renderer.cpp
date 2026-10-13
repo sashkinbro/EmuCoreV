@@ -116,23 +116,11 @@ static void debug_log_message(std::string_view msg) {
 }
 
 static vk::DebugUtilsMessengerEXT debug_messenger;
-static bool debug_messenger_is_driver_only = false;
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_util_callback(
     vk::DebugUtilsMessageSeverityFlagBitsEXT message_severity,
     vk::DebugUtilsMessageTypeFlagsEXT message_type,
     const vk::DebugUtilsMessengerCallbackDataEXT *callback_data,
     void *pUserData) {
-    if (debug_messenger_is_driver_only) {
-        const std::string_view msg = callback_data->pMessage ? callback_data->pMessage : "(no message)";
-        if (message_severity >= vk::DebugUtilsMessageSeverityFlagBitsEXT::eError)
-            LOG_ERROR("Vulkan driver [{}]: {}", vk::to_string(message_type), msg);
-        else if (message_severity >= vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning)
-            LOG_WARN("Vulkan driver [{}]: {}", vk::to_string(message_type), msg);
-        else
-            LOG_INFO("Vulkan driver [{}]: {}", vk::to_string(message_type), msg);
-        return VK_FALSE;
-    }
-
     if (message_severity >= vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
         // for now we are not interested by performance warnings
         && (message_type & ~vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance)) {
@@ -480,10 +468,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         }
         if (use_validation_layer)
             instance_layers.push_back(validation_layer.c_str());
-        // Always take the debug extension when the loader offers it, even without the validation layer
-        if (!found_debug_extension.empty()) {
+        if (use_validation_layer) {
             instance_extensions.push_back(found_debug_extension.data());
-            debug_messenger_is_driver_only = !use_validation_layer;
         }
         // required for the VkValidationFeaturesEXT chain (synchronization validation) below
         bool has_validation_features_ext = false;
@@ -552,19 +538,16 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         instance = vk::createInstance(instance_info);
         VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
 
-        if (!found_debug_extension.empty()) {
+        if (use_validation_layer) {
             // we support two debugging extensions
             if (found_debug_extension == VK_EXT_DEBUG_UTILS_EXTENSION_NAME) {
                 vk::DebugUtilsMessengerCreateInfoEXT debug_info{
-                    .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
-                        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
-                        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
+                    .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
                     .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral
                         | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
                     .pfnUserCallback = debug_util_callback
                 };
                 debug_messenger = instance.createDebugUtilsMessengerEXT(debug_info);
-                LOG_INFO("Vulkan debug messenger installed ({})", debug_messenger_is_driver_only ? "driver diagnostics only, no validation layer" : "with validation layer");
 
             } else if (found_debug_extension == VK_EXT_DEBUG_REPORT_EXTENSION_NAME) {
                 vk::DebugReportCallbackCreateInfoEXT report_info{
@@ -572,10 +555,9 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                     .pfnCallback = debug_report_callback
                 };
                 debug_report = instance.createDebugReportCallbackEXT(report_info);
-                LOG_INFO("Vulkan debug report callback installed");
             }
-        } else {
-            LOG_WARN("Neither VK_EXT_debug_utils nor VK_EXT_debug_report is available: driver errors will have no message");
+        } else if (config.validation_layer && found_debug_extension.empty()) {
+            LOG_WARN("Neither VK_EXT_debug_utils nor VK_EXT_debug_report is available: validation messages are unavailable");
         }
     }
 
@@ -1524,7 +1506,6 @@ void VKState::swap_window() {
         device.waitIdle();
         const uint64_t freed = texture_cache.release_all_cached_textures();
         LOG_WARN("[ANDROID MEMORY] trim level {}: released {} MiB of cached textures", trim_level, freed / (1024 * 1024));
-        mem_diag::log_memory_snapshot("post-trim");
         logging::flush();
     }
 
@@ -1678,12 +1659,8 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
         return native_buffer_memory_type(physical_device_memory, hardware_types);
     };
 
-    // counted, not one-shot: this fires per mapping and the count is what tells us it is systemic
     auto report_no_coherent = [](const char *kind) {
-        static std::atomic<uint32_t> no_coherent_count{ 0 };
-        const uint32_t n = no_coherent_count.fetch_add(1, std::memory_order_relaxed) + 1;
-        if (n <= 3 || (n % 100) == 0)
-            LOG_WARN("No host-coherent memory type for {} import ({} so far): using page-table mapping for this range instead", kind, n);
+        LOG_WARN_ONCE("No host-coherent memory type for {} import: using page-table mapping for this range instead", kind);
     };
 
     switch (mapping_method) {
@@ -1737,9 +1714,7 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
         }
 
         if (!device_atomics_broken && !test_arm64_atomics_on(mapped_location)) {
-            static std::atomic<uint32_t> atomic_probe_failures{ 0 };
-            const uint32_t n = atomic_probe_failures.fetch_add(1, std::memory_order_relaxed) + 1;
-            LOG_ERROR("ARM64 atomics fault on the AHardwareBuffer mapping for 0x{:X} ({} so far) — falling back to page-table mapping for this range", address.address(), n);
+            LOG_ERROR("ARM64 atomics fault on the AHardwareBuffer mapping for 0x{:X} — falling back to page-table mapping for this range", address.address());
             ahb_atomics_broken.store(true, std::memory_order_relaxed);
             _AHardwareBuffer_unlock(buffer, nullptr);
             _AHardwareBuffer_release(buffer);
@@ -1955,7 +1930,6 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
     }
 
     // memory state right after every mapping - if an LMK kill follows one, the last snapshot is the evidence
-    mem_diag::log_memory_snapshot("map_memory");
     return true;
 }
 
@@ -2145,7 +2119,6 @@ void VKState::unmap_memory(MemState &mem, Ptr<void> address) {
         break;
     }
     mapped_memories.erase(ite);
-    mem_diag::log_memory_snapshot("unmap_memory");
 }
 
 std::tuple<vk::Buffer, uint32_t> VKState::get_matching_mapping(const Ptr<void> address) {

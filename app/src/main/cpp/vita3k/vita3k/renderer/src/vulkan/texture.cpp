@@ -161,18 +161,6 @@ void sync_texture(VKContext &context, MemState &mem, std::size_t index, SceGxmTe
         return;
     }
 
-    // [savestate-diag] textures pointing at unmapped memory would sample black
-    {
-        const Address texture_address = texture.data_addr << 2;
-        if (texture_address != 0 && !is_valid_addr(mem, texture_address)) {
-            static std::atomic<uint64_t> bad_textures{ 0 };
-            const uint64_t n = bad_textures.fetch_add(1, std::memory_order_relaxed) + 1;
-            if (n <= 20 || (n % 256) == 0)
-                LOG_CRITICAL("[savestate-diag] texture with unmapped address {:#010x} (index {}, format {:#010x}, total {})",
-                    texture_address, index, static_cast<uint32_t>(format), n);
-        }
-    }
-
     if (index >= SCE_GXM_MAX_TEXTURE_UNITS) {
         // Vertex textures
         context.shader_hints.vertex_textures[index - SCE_GXM_MAX_TEXTURE_UNITS] = format;
@@ -482,8 +470,7 @@ void VKTextureCache::configure_texture(const SceGxmTexture &gxm_texture) {
             LOG_WARN_ONCE("Texture format {} is not sampleable on this GPU - using {} instead (sRGB decode dropped)", vk::to_string(vk_format), vk::to_string(fallback));
             vk_format = fallback;
         } else {
-            const auto raw = std::bit_cast<std::array<uint32_t, 4>>(gxm_texture);
-            LOG_ERROR("Texture format {} (base 0x{:X}) is not sampleable on this GPU and has no direct fallback - substituting RGBA8; raw words {:08X} {:08X} {:08X} {:08X}", vk::to_string(vk_format), fmt::underlying(base_format), raw[0], raw[1], raw[2], raw[3]);
+            LOG_ERROR("Texture format {} (base 0x{:X}) is not sampleable on this GPU and has no direct fallback - substituting RGBA8", vk::to_string(vk_format), fmt::underlying(base_format));
             vk_format = gxm_texture.gamma_mode ? vk::Format::eR8G8B8A8Srgb : vk::Format::eR8G8B8A8Unorm;
         }
     }
@@ -496,10 +483,9 @@ void VKTextureCache::configure_texture(const SceGxmTexture &gxm_texture) {
         const uint32_t max_mips_allowed = static_cast<uint32_t>(std::bit_width(std::max(std::max(width, 1u), std::max(height, 1u))));
         const bool mips_invalid = (mip_count == 0) || (mip_count > max_mips_allowed);
         if (format_invalid || dims_invalid || mips_invalid) {
-            const auto raw = std::bit_cast<std::array<uint32_t, 4>>(gxm_texture);
-            LOG_ERROR("Refusing degenerate texture image: {}x{} mips {} format {} (base 0x{:X} type 0x{:X} cube {}) raw words {:08X} {:08X} {:08X} {:08X} - substituting a safe placeholder",
+            LOG_ERROR("Refusing degenerate texture image: {}x{} mips {} format {} (base 0x{:X} type 0x{:X} cube {}) - substituting a safe placeholder",
                 width, height, mip_count, vk::to_string(vk_format), fmt::underlying(base_format),
-                fmt::underlying(gxm_texture.texture_type()), is_cube, raw[0], raw[1], raw[2], raw[3]);
+                fmt::underlying(gxm_texture.texture_type()), is_cube);
             if (format_invalid)
                 vk_format = vk::Format::eR8G8B8A8Unorm;
             width = std::clamp(width, 1u, max_dim);

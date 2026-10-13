@@ -223,10 +223,7 @@ COMMAND(handle_draw) {
     // After a save-state load the context can resume mid-scene before the guest
     // begins the next one; skip draws that have no render target.
     if (!render_context->current_render_target) {
-        static std::atomic<uint64_t> dropped_draws{ 0 };
-        const uint64_t n = dropped_draws.fetch_add(1, std::memory_order_relaxed) + 1;
-        if (n <= 8 || (n % 512) == 0)
-            LOG_CRITICAL("[savestate-diag] dropped draw without render target (total {})", n);
+        LOG_CRITICAL_ONCE("Dropped draw without render target");
         return;
     }
     SceGxmPrimitiveType type = helper.pop<SceGxmPrimitiveType>();

@@ -29,8 +29,6 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
-// after windows.h
-#include <psapi.h>
 #endif
 #include <display/functions.h>
 
@@ -60,73 +58,8 @@ static constexpr int64_t TARGET_MICRO_PER_FRAME = 1000000LL / TARGET_FPS;
 static constexpr int predict_threshold = 3;
 static constexpr int max_expected_swapchain_size = 6;
 
-struct ProcSample {
-    uint64_t page_faults = 0;
-    uint64_t working_set_mb = 0;
-    uint64_t private_mb = 0;
-    uint64_t user_us = 0;
-    uint64_t kernel_us = 0;
-    uint64_t sys_idle_us = 0;
-    uint64_t sys_busy_us = 0;
-};
-
-static ProcSample sample_process() {
-    ProcSample out;
-#ifdef _WIN32
-    PROCESS_MEMORY_COUNTERS pmc{};
-    pmc.cb = sizeof(pmc);
-    if (K32GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
-        out.page_faults = pmc.PageFaultCount;
-        out.working_set_mb = pmc.WorkingSetSize / (1024 * 1024);
-        out.private_mb = pmc.PagefileUsage / (1024 * 1024);
-    }
-    auto to_us = [](const FILETIME &ft) {
-        return ((static_cast<uint64_t>(ft.dwHighDateTime) << 32) | ft.dwLowDateTime) / 10;
-    };
-    FILETIME created{}, exited{}, kernel{}, user{};
-    if (GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user)) {
-        out.kernel_us = to_us(kernel);
-        out.user_us = to_us(user);
-    }
-    FILETIME sys_idle{}, sys_kernel{}, sys_user{};
-    if (GetSystemTimes(&sys_idle, &sys_kernel, &sys_user)) {
-        out.sys_idle_us = to_us(sys_idle);
-        out.sys_busy_us = to_us(sys_kernel) + to_us(sys_user) - to_us(sys_idle);
-    }
-#endif
-    return out;
-}
-
-static void freeze_watchdog_thread(EmuEnvState &emuenv) {
-    DisplayState &display = emuenv.display;
-    ProcSample prev = sample_process();
-    while (!display.abort.load()) {
-        const auto before = std::chrono::steady_clock::now();
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        const auto slept_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - before).count();
-        const int64_t overshoot = std::max<int64_t>(0, slept_us - 10000);
-
-        const ProcSample now = sample_process();
-        if (overshoot > 100000) {
-            const double sys_idle_ms = (now.sys_idle_us - prev.sys_idle_us) / 1000.0;
-            const double sys_busy_ms = (now.sys_busy_us - prev.sys_busy_us) / 1000.0;
-            LOG_WARN("[FREEZE] {:.0f}ms process-wide stall | page_faults +{} (total {}) | working_set {}MB (delta {}MB) | private {}MB | OUR cpu: user {:.0f}ms kernel {:.0f}ms (= {:.0f}% of one core) | SYSTEM cpu: busy {:.0f}ms idle {:.0f}ms across {} cores (= {:.0f}% busy)",
-                overshoot / 1000.0,
-                now.page_faults - prev.page_faults, now.page_faults,
-                now.working_set_mb, static_cast<int64_t>(now.working_set_mb) - static_cast<int64_t>(prev.working_set_mb),
-                now.private_mb,
-                (now.user_us - prev.user_us) / 1000.0, (now.kernel_us - prev.kernel_us) / 1000.0,
-                100.0 * (now.user_us - prev.user_us + now.kernel_us - prev.kernel_us) / static_cast<double>(slept_us),
-                sys_busy_ms, sys_idle_ms, std::thread::hardware_concurrency(),
-                (sys_busy_ms + sys_idle_ms) > 0.0 ? (100.0 * sys_busy_ms / (sys_busy_ms + sys_idle_ms)) : 0.0);
-        }
-        prev = now;
-    }
-}
-
 static void vblank_sync_thread(EmuEnvState &emuenv) {
     DisplayState &display = emuenv.display;
-    std::thread watchdog(freeze_watchdog_thread, std::ref(emuenv));
 
     const cheat::JitInvalidate invalidate_jit = [&emuenv](uint32_t address, size_t size) {
         emuenv.kernel.invalidate_jit_cache(address, size);
@@ -194,7 +127,6 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
             static uint64_t last_dumped_setframe = ~0ull;
             static uint64_t last_break_vblanks = 0;
             static uint64_t last_provable_break_setframe = ~0ull;
-            static uint64_t last_provable_dryrun_setframe = ~0ull;
             static uint64_t last_progress_value = 0;
             static uint64_t last_progress_change_vblank = 0;
             static std::vector<SceUID> nudged_this_stall;
@@ -209,7 +141,6 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
                 last_dumped_setframe = ~0ull;
                 last_break_vblanks = 0;
                 last_provable_break_setframe = ~0ull;
-                last_provable_dryrun_setframe = ~0ull;
                 last_progress_value = 0;
                 last_progress_change_vblank = 0;
                 last_wake_value = 0;
@@ -237,35 +168,23 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
             // Full 10s dump for diagnostics (once per distinct stall).
             if (stall_vblanks > 600 && unpaused && last_dumped_setframe != setframe) {
                 last_dumped_setframe = setframe; // one dump per distinct stall
-                LOG_ERROR("HANG WATCHDOG: no framebuffer flip for {} vblanks{} (renderer idle {}, guest wake-idle {}, SetFrameBuf calls={} accepted={}) — dumping guest threads",
-                    stall_vblanks, never_flipped ? " (game NEVER flipped since boot)" : "", renderer_idle_vblanks, guest_idle_vblanks,
-                    emuenv.display.setframe_call_count.load(), emuenv.display.setframe_accept_count.load());
+                LOG_ERROR("HANG WATCHDOG: no framebuffer flip for {} vblanks{} (renderer idle {}, guest wake-idle {}) — dumping guest threads",
+                    stall_vblanks, never_flipped ? " (game NEVER flipped since boot)" : "", renderer_idle_vblanks, guest_idle_vblanks);
                 emuenv.kernel.log_thread_hang_dump();
-                LOG_ERROR("HANG DISPLAY QUEUE: depth={} worker_state={} (0=idle-waiting-entry 1=wait-old-sync 2=wait-new-sync 3=running-callback) entries_done={}",
-                    emuenv.gxm.display_queue.size(), emuenv.gxm.display_worker_state.load(), emuenv.gxm.display_entries_done.load());
-                emuenv.kernel.log_eventflag_history();
             }
             if (never_flipped && stall_vblanks > 3600 && unpaused && !never_flip_redumped) {
                 never_flip_redumped = true;
-                LOG_ERROR("HANG WATCHDOG: STILL no first flip after {} vblanks (SetFrameBuf calls={}) — re-dumping for movement comparison",
-                    stall_vblanks, emuenv.display.setframe_call_count.load());
+                LOG_ERROR("HANG WATCHDOG: STILL no first flip after {} vblanks — re-dumping for movement comparison",
+                    stall_vblanks);
                 emuenv.kernel.log_thread_hang_dump();
-                LOG_ERROR("HANG DISPLAY QUEUE: depth={} worker_state={} (0=idle-waiting-entry 1=wait-old-sync 2=wait-new-sync 3=running-callback) entries_done={}",
-                    emuenv.gxm.display_queue.size(), emuenv.gxm.display_worker_state.load(), emuenv.gxm.display_entries_done.load());
-                emuenv.kernel.log_eventflag_history();
             }
             // Cycle breaker
-            constexpr uint64_t PROVABLE_DRYRUN_VBLANKS = 120;
             constexpr uint64_t PROVABLE_BREAK_VBLANKS = 3600;
             const int64_t now_epoch_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
             const bool world_stop_quiet = (now_epoch_ms - emuenv.kernel.last_world_stop_epoch_ms.load(std::memory_order_relaxed)) >= 5000;
             // deferred-unmap collapses remaps WITHOUT world-stops, blinding the veto above; transitions are stamped regardless
             const bool mem_transition_quiet = !emuenv.renderer
                 || (now_epoch_ms - emuenv.renderer->last_mem_transition_epoch_ms.load(std::memory_order_relaxed)) >= 5000;
-            if (!never_flipped && stall_vblanks > PROVABLE_DRYRUN_VBLANKS && unpaused && renderer_idle_vblanks > PROVABLE_DRYRUN_VBLANKS && last_provable_dryrun_setframe != setframe) {
-                last_provable_dryrun_setframe = setframe;
-                emuenv.kernel.try_break_provable_evf_cycle(true);
-            }
             if (!never_flipped && stall_vblanks > PROVABLE_BREAK_VBLANKS && unpaused && renderer_idle_vblanks > PROVABLE_BREAK_VBLANKS && world_stop_quiet && mem_transition_quiet && last_provable_break_setframe != setframe) {
 #ifdef _WIN32
                 if (!IsDebuggerPresent())
@@ -317,8 +236,6 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
         const auto time_left = TARGET_MICRO_PER_FRAME - (time_ms % TARGET_MICRO_PER_FRAME);
         std::this_thread::sleep_for(std::chrono::microseconds(time_left));
     }
-
-    watchdog.join();
 }
 
 void start_sync_thread(EmuEnvState &emuenv) {
@@ -559,8 +476,6 @@ void DisplayState::deinit() {
 
     vblank_count = 0;
     last_setframe_vblank_count = 0;
-    setframe_call_count = 0;
-    setframe_accept_count = 0;
 
     fps_hack = false;
     // pretty sure we set this on game boot

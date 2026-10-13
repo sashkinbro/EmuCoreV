@@ -22,11 +22,10 @@
 #include <vkutil/vkutil.h>
 
 #include <array>
-#include <atomic>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <set>
-#include <string>
 #include <thread>
 #include <vector>
 
@@ -95,27 +94,6 @@ private:
     // because of multithreading, we want the pointers to remain stable
     unordered_map_stable<Sha256Hash, vk::ShaderModule> shaders;
     unordered_map_stable<uint64_t, vk::Pipeline> pipelines;
-
-    // --- diagnostics -------------------------------------------------------------------------
-    // Everything below only exists so that a single run produces enough information to explain a
-    // pipeline creation failure without having to rebuild and ask for another log.
-
-    // human readable description of every render pass we have created, keyed by the handle, so a
-    // failing pipeline can report the exact subpass it was being created against
-    std::map<uint64_t, std::string> render_pass_descriptions;
-    std::mutex diagnostics_mutex;
-    std::atomic<uint32_t> pipelines_created{ 0 };
-    std::atomic<uint32_t> pipelines_failed{ 0 };
-    // the full state dump and the knockout bisect are expensive, only do them for the first few
-    std::atomic<uint32_t> failures_dumped{ 0 };
-    static constexpr uint32_t max_failures_dumped = 3;
-
-    // reads the module back off disk and summarises it; only called when a pipeline is refused, so
-    // that shader creation itself carries no diagnostic cost
-    std::string describe_shader(const Sha256Hash &hash);
-    // retries the failing pipeline with one piece of state neutralised at a time and logs which
-    // variant the driver accepts. This is what turns "ErrorOutOfHostMemory" into an actual answer.
-    void bisect_pipeline_failure(const vk::GraphicsPipelineCreateInfo &failing_info);
 
     vk::PipelineShaderStageCreateInfo retrieve_shader(const SceGxmProgram *program, const Sha256Hash &hash, bool is_vertex, bool maskupdate, MemState &mem, const shader::Hints &hints, bool is_srgb = false);
     vk::PipelineVertexInputStateCreateInfo get_vertex_input_state(const SceGxmVertexProgram &vertex_program, MemState &mem);

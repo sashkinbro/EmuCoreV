@@ -34,43 +34,56 @@
 #include <functional>
 #include <type_traits>
 
-#define LOG_TRACE SPDLOG_TRACE
-#define LOG_DEBUG SPDLOG_DEBUG
-#define LOG_INFO SPDLOG_INFO
-#define LOG_WARN SPDLOG_WARN
-#define LOG_ERROR SPDLOG_ERROR
-#define LOG_CRITICAL SPDLOG_CRITICAL
-
 #ifdef NDEBUG
-#define LOG_IF(log_function, flag, ...) static_cast<void>(0)
+#define LOG_AT_LEVEL(level, ...) static_cast<void>(0)
 #else
-#define LOG_IF(log_function, flag, ...) ((flag) ? log_function(__VA_ARGS__) : static_cast<void>(0))
+// Check severity before evaluating arguments: muted diagnostics must not
+// format strings, inspect guest memory or construct hex dumps.
+#define LOG_AT_LEVEL(level, ...)                                                     \
+    (spdlog::default_logger_raw()->should_log(level)                                 \
+            ? spdlog::default_logger_raw()->log(                                    \
+                  spdlog::source_loc{ __FILE__, __LINE__, SPDLOG_FUNCTION }, level, __VA_ARGS__) \
+            : static_cast<void>(0))
 #endif
 
-#define LOG_TRACE_IF(flag, ...) LOG_IF(LOG_TRACE, flag, __VA_ARGS__)
-#define LOG_DEBUG_IF(flag, ...) LOG_IF(LOG_DEBUG, flag, __VA_ARGS__)
-#define LOG_INFO_IF(flag, ...) LOG_IF(LOG_INFO, flag, __VA_ARGS__)
-#define LOG_WARN_IF(flag, ...) LOG_IF(LOG_WARN, flag, __VA_ARGS__)
-#define LOG_ERROR_IF(flag, ...) LOG_IF(LOG_ERROR, flag, __VA_ARGS__)
-#define LOG_CRITICAL_IF(flag, ...) LOG_IF(LOG_CRITICAL, flag, __VA_ARGS__)
+#define LOG_TRACE(...) LOG_AT_LEVEL(spdlog::level::trace, __VA_ARGS__)
+#define LOG_DEBUG(...) LOG_AT_LEVEL(spdlog::level::debug, __VA_ARGS__)
+#define LOG_INFO(...) LOG_AT_LEVEL(spdlog::level::info, __VA_ARGS__)
+#define LOG_WARN(...) LOG_AT_LEVEL(spdlog::level::warn, __VA_ARGS__)
+#define LOG_ERROR(...) LOG_AT_LEVEL(spdlog::level::err, __VA_ARGS__)
+#define LOG_CRITICAL(...) LOG_AT_LEVEL(spdlog::level::critical, __VA_ARGS__)
 
 #ifdef NDEBUG
-#define LOG_ONCE(log_function, ...) static_cast<void>(0)
+#define LOG_IF(level, log_function, flag, ...) static_cast<void>(0)
 #else
-#define LOG_ONCE(log_function, ...)         \
+#define LOG_IF(level, log_function, flag, ...) \
+    ((spdlog::default_logger_raw()->should_log(level) && (flag)) ? log_function(__VA_ARGS__) : static_cast<void>(0))
+#endif
+
+#define LOG_TRACE_IF(flag, ...) LOG_IF(spdlog::level::trace, LOG_TRACE, flag, __VA_ARGS__)
+#define LOG_DEBUG_IF(flag, ...) LOG_IF(spdlog::level::debug, LOG_DEBUG, flag, __VA_ARGS__)
+#define LOG_INFO_IF(flag, ...) LOG_IF(spdlog::level::info, LOG_INFO, flag, __VA_ARGS__)
+#define LOG_WARN_IF(flag, ...) LOG_IF(spdlog::level::warn, LOG_WARN, flag, __VA_ARGS__)
+#define LOG_ERROR_IF(flag, ...) LOG_IF(spdlog::level::err, LOG_ERROR, flag, __VA_ARGS__)
+#define LOG_CRITICAL_IF(flag, ...) LOG_IF(spdlog::level::critical, LOG_CRITICAL, flag, __VA_ARGS__)
+
+#ifdef NDEBUG
+#define LOG_ONCE(level, log_function, ...) static_cast<void>(0)
+#else
+#define LOG_ONCE(level, log_function, ...)   \
     do {                                    \
         static std::atomic_flag has_logged; \
-        if (!has_logged.test_and_set())     \
+        if (spdlog::default_logger_raw()->should_log(level) && !has_logged.test_and_set()) \
             log_function(__VA_ARGS__);      \
     } while (0)
 #endif
 
-#define LOG_TRACE_ONCE(...) LOG_ONCE(LOG_TRACE, __VA_ARGS__)
-#define LOG_DEBUG_ONCE(...) LOG_ONCE(LOG_DEBUG, __VA_ARGS__)
-#define LOG_INFO_ONCE(...) LOG_ONCE(LOG_INFO, __VA_ARGS__)
-#define LOG_WARN_ONCE(...) LOG_ONCE(LOG_WARN, __VA_ARGS__)
-#define LOG_ERROR_ONCE(...) LOG_ONCE(LOG_ERROR, __VA_ARGS__)
-#define LOG_CRITICAL_ONCE(...) LOG_ONCE(LOG_CRITICAL, __VA_ARGS__)
+#define LOG_TRACE_ONCE(...) LOG_ONCE(spdlog::level::trace, LOG_TRACE, __VA_ARGS__)
+#define LOG_DEBUG_ONCE(...) LOG_ONCE(spdlog::level::debug, LOG_DEBUG, __VA_ARGS__)
+#define LOG_INFO_ONCE(...) LOG_ONCE(spdlog::level::info, LOG_INFO, __VA_ARGS__)
+#define LOG_WARN_ONCE(...) LOG_ONCE(spdlog::level::warn, LOG_WARN, __VA_ARGS__)
+#define LOG_ERROR_ONCE(...) LOG_ONCE(spdlog::level::err, LOG_ERROR, __VA_ARGS__)
+#define LOG_CRITICAL_ONCE(...) LOG_ONCE(spdlog::level::critical, LOG_CRITICAL, __VA_ARGS__)
 
 namespace logging {
 

@@ -503,6 +503,9 @@ int KernelState::stop_world(SceUID except_id, std::chrono::milliseconds budget) 
 
 void KernelState::log_thread_hang_dump() {
 #ifndef NDEBUG
+    if (!spdlog::default_logger_raw()->should_log(spdlog::level::err))
+        return;
+
     std::vector<ThreadStatePtr> snapshot;
     {
         const std::lock_guard<std::mutex> lock(mutex);
@@ -519,7 +522,7 @@ void KernelState::log_thread_hang_dump() {
         std::string line;
         if (status == ThreadStatus::running) {
             const uint32_t run_pc = read_pc(*t->cpu) & ~1u;
-            line = fmt::format("thread {} ({}) status=run pc~0x{:X} lr~0x{:X} last_import_nid=0x{:08X} import_lr=0x{:X}", t->name, t->id, run_pc, read_lr(*t->cpu), t->last_import_nid, t->last_import_lr);
+            line = fmt::format("thread {} ({}) status=run pc~0x{:X} lr~0x{:X} last_import_nid=0x{:08X} import_lr=0x{:X}", t->name, t->id, run_pc, read_lr(*t->cpu), t->last_import_nid, t->last_import_context.cpu_registers[14]);
             for (int ri = 0; ri <= 7; ri++)
                 line += fmt::format(" r{}=0x{:X}", ri, read_reg(*t->cpu, ri));
             uint32_t code[16];
@@ -530,8 +533,8 @@ void KernelState::log_thread_hang_dump() {
             }
             line += "\n" + t->log_stack_traceback();
         } else {
-            line = fmt::format("thread {} ({}) status={} PC=0x{:X} LR=0x{:X} last_import_nid=0x{:08X} import_lr=0x{:X} stack:\n{}", t->name, t->id, status_str, read_pc(*t->cpu), read_lr(*t->cpu), t->last_import_nid, t->last_import_lr, t->log_stack_traceback())
-                + fmt::format(" waiting_on={}#{} extra=0x{:X}", t->wait_prim_kind ? t->wait_prim_kind : "?", t->wait_prim_uid, t->wait_extra);
+            line = fmt::format("thread {} ({}) status={} PC=0x{:X} LR=0x{:X} last_import_nid=0x{:08X} import_lr=0x{:X} stack:\n{}", t->name, t->id, status_str, read_pc(*t->cpu), read_lr(*t->cpu), t->last_import_nid, t->last_import_context.cpu_registers[14], t->log_stack_traceback())
+                + fmt::format(" waiting_type={}#{}", t->wait_target.type, t->wait_target.id);
         }
         LOG_ERROR("HANG DUMP: {}", line);
         dump += line + "\n";

@@ -400,11 +400,7 @@ int read_file_at(void *data, IOState &io, const SceUID fd, const SceSize size, c
     if (fd < 0)
         return IO_ERROR(SCE_ERROR_ERRNO_EBADFD);
 
-    if (!io.file_mutex.try_lock()) {
-        io.concurrent_positional_io.fetch_add(1, std::memory_order_relaxed);
-        io.file_mutex.lock();
-    }
-    const std::lock_guard<std::mutex> lock(io.file_mutex, std::adopt_lock);
+    const std::lock_guard<std::mutex> lock(io.file_mutex);
 
     const auto file = io.std_files.find(fd);
     if (file == io.std_files.end())

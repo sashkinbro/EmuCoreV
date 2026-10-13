@@ -214,6 +214,7 @@ CPUState *get_current_cpu_state() {
     return current_cpu_state;
 }
 
+#ifndef NDEBUG
 static thread_local uint32_t last_import_nid = 0;
 static thread_local uint32_t last_import_lr = 0;
 
@@ -221,8 +222,14 @@ void set_last_import_call(uint32_t nid, uint32_t lr) {
     last_import_nid = nid;
     last_import_lr = lr;
 }
+#endif
 
 void get_last_import_call(uint32_t &nid, uint32_t &lr) {
+#ifndef NDEBUG
     nid = last_import_nid;
     lr = last_import_lr;
+#else
+    nid = 0;
+    lr = 0;
+#endif
 }

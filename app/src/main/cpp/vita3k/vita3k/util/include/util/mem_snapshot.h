@@ -25,6 +25,5 @@ namespace mem_diag {
 // which the emulation thread may be destroying between game sessions.
 extern std::atomic<int> pending_trim_level;
 
-void log_memory_snapshot(const char *tag);
 
 } // namespace mem_diag

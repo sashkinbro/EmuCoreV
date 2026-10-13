@@ -275,8 +275,7 @@ struct KernelState {
     void resume_world();
 
     void log_thread_hang_dump();
-    void log_eventflag_history();
-    int try_break_provable_evf_cycle(bool dry_run = false);
+    int try_break_provable_evf_cycle();
     std::atomic<int64_t> last_world_stop_epoch_ms{ 0 };
     // Last resort recovery for a full deadlock (called by the hang watchdog)
     int try_break_frame_sync_deadlock(std::vector<SceUID> &already_nudged);

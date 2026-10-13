@@ -1,7 +1,6 @@
 package com.sbro.emucorev
 
 import android.app.Application
-import com.sbro.emucorev.core.AndroidDiagnostics
 import com.sbro.emucorev.core.BackupSessionGate
 import com.sbro.emucorev.core.NativeLib
 import com.sbro.emucorev.core.AppIconManager
@@ -25,7 +24,6 @@ class EmuCoreVApp : Application() {
         // helper may build the emulator-side graph.
         val processName = Application.getProcessName()
         if (processName.endsWith(PHOENIX_PROCESS_SUFFIX) || processName.endsWith(DISCORD_PROCESS_SUFFIX)) return
-        AndroidDiagnostics.initialize(this)
         AppIconManager.applyProIcon(this, AppPreferences(this).proUnlocked)
         PlayTimeRepository(this).finishOpenSessions().forEach { session ->
             ProfilePlayTimeSyncer.recordAndSync(this, session.titleId, session.title, session.durationMs)

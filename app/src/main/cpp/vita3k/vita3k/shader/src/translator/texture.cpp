@@ -409,22 +409,8 @@ bool USSETranslatorVisitor::smp(
         coord_mask = 0b0001;
     }
 
-    std::string additional_info;
-    switch (sb_mode) {
-    case 1:
-        additional_info = ".gather4";
-        break;
-    case 2:
-        additional_info = ".info";
-        break;
-    case 3:
-        additional_info = ".gather4.uv";
-        break;
-    default:
-        additional_info.clear();
-    }
-
-    LOG_DISASM("{:016x}: {}SMP{}d.{}.{}{} {} {} {} {}", m_instr, disasm::e_predicate_str(pred), dim, disasm::data_type_str(inst.opr.dest.type), disasm::data_type_str(inst.opr.src0.type), additional_info,
+    LOG_DISASM("{:016x}: {}SMP{}d.{}.{}{} {} {} {} {}", m_instr, disasm::e_predicate_str(pred), dim, disasm::data_type_str(inst.opr.dest.type), disasm::data_type_str(inst.opr.src0.type),
+        sb_mode == 1 ? ".gather4" : sb_mode == 2 ? ".info" : sb_mode == 3 ? ".gather4.uv" : "",
         disasm::operand_to_str(inst.opr.dest, 0b0001), disasm::operand_to_str(inst.opr.src0, coord_mask), disasm::operand_to_str(inst.opr.src1, 0b0000), (lod_mode == 0) ? "" : disasm::operand_to_str(inst.opr.src2, 0b0001));
 
     m_b.setDebugSourceLocation(m_recompiler.cur_pc, nullptr);

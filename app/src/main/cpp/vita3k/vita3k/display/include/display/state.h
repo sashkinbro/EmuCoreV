@@ -79,8 +79,6 @@ struct DisplayState {
     std::atomic<bool> imgui_render{ true };
     std::atomic<bool> fullscreen{ false };
     std::atomic<std::uint64_t> vblank_count{ 0 };
-    std::atomic<uint64_t> setframe_call_count{ 0 };
-    std::atomic<uint64_t> setframe_accept_count{ 0 };
     WaitQueue<VBlankWaitEntry> vblank_waiters;
     std::atomic<uint64_t> last_setframe_vblank_count = 0;
     std::map<SceUID, CallbackPtr> vblank_callbacks{};

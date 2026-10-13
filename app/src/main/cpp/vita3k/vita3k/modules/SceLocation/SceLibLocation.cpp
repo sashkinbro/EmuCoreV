@@ -111,20 +111,6 @@ static LocationHandleState *find_handle(LocationState *state, SceLocationHandle 
     return (it == state->handles.end()) ? nullptr : &it->second;
 }
 
-static void log_location(const char *what, SceLocationHandle handle, int result) {
-    static std::mutex log_mutex;
-    static std::map<std::string, uint64_t> totals;
-
-    uint64_t n;
-    {
-        std::lock_guard<std::mutex> lock(log_mutex);
-        n = ++totals[what];
-    }
-    if ((n > 32) && ((n % 500) != 0))
-        return;
-    LOG_INFO("[LOCATION] {} handle {} -> 0x{:X} (call {})", what, handle, static_cast<uint32_t>(result), n);
-}
-
 template <typename T>
 static bool writable(const MemState &mem, const Ptr<T> &p) {
     return p && p.valid(mem);
@@ -138,13 +124,11 @@ EXPORT(int, sceLocationInit, SceUInt32 unk0, SceUInt32 unk1) {
         state->handles.clear();
         state->next_handle = 1;
     }
-    log_location("sceLocationInit", 0, 0);
     return 0;
 }
 
 EXPORT(int, sceLocationTerm) {
     TRACY_FUNC(sceLocationTerm);
-    log_location("sceLocationTerm", 0, 0);
     LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
     std::lock_guard<std::mutex> lock(state->mutex);
     state->handles.clear();
@@ -164,7 +148,6 @@ EXPORT(int, sceLocationOpen, Ptr<SceLocationHandle> handle, SceUInt32 locateMeth
     opened.locate_method = locateMethod;
     opened.heading_method = headingMethod;
     *handle.get(emuenv.mem) = id;
-    log_location("sceLocationOpen", id, 0);
     return 0;
 }
 
@@ -172,7 +155,6 @@ EXPORT(int, sceLocationClose, SceLocationHandle handle) {
     TRACY_FUNC(sceLocationClose, handle);
     LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
     std::lock_guard<std::mutex> lock(state->mutex);
-    log_location("sceLocationClose", handle, 0);
     if (state->handles.erase(handle) == 0)
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     return 0;
@@ -220,7 +202,6 @@ EXPORT(int, sceLocationGetLocation, SceLocationHandle handle, Ptr<SceLocationLoc
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
 
     *locationInfo.get(emuenv.mem) = {};
-    log_location("sceLocationGetLocation", handle, SCE_LOCATION_INFO_LOCATION_NOT_AVAILABLE);
     return RET_ERROR(SCE_LOCATION_INFO_LOCATION_NOT_AVAILABLE);
 }
 
@@ -245,7 +226,6 @@ EXPORT(int, sceLocationStartLocationCallback, SceLocationHandle handle, SceUInt3
     if (!find_handle(state, handle))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
 
-    log_location("sceLocationStartLocationCallback", handle, SCE_LOCATION_INFO_LOCATION_NOT_AVAILABLE);
     return RET_ERROR(SCE_LOCATION_INFO_LOCATION_NOT_AVAILABLE);
 }
 
@@ -268,7 +248,6 @@ EXPORT(int, sceLocationGetHeading, SceLocationHandle handle, Ptr<SceLocationHead
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
 
     *headingInfo.get(emuenv.mem) = {};
-    log_location("sceLocationGetHeading", handle, SCE_LOCATION_INFO_HEADING_NOT_AVAILABLE);
     return RET_ERROR(SCE_LOCATION_INFO_HEADING_NOT_AVAILABLE);
 }
 
@@ -302,7 +281,6 @@ EXPORT(int, sceLocationConfirm, SceLocationHandle handle) {
     // No dialog to run so its over and send FINISHED on the first poll or the caller loops forever
     opened->dialog_status = SCE_LOCATION_DIALOG_STATUS_FINISHED;
     opened->dialog_result = SCE_LOCATION_DIALOG_RESULT_ENABLE;
-    log_location("sceLocationConfirm", handle, 0);
     return 0;
 }
 
@@ -316,7 +294,6 @@ EXPORT(int, sceLocationConfirmGetStatus, SceLocationHandle handle, Ptr<SceUInt32
     if (!writable(emuenv.mem, status))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_ADDRESS);
     *status.get(emuenv.mem) = opened->dialog_status;
-    log_location("sceLocationConfirmGetStatus", handle, opened->dialog_status);
     return 0;
 }
 
@@ -330,7 +307,6 @@ EXPORT(int, sceLocationConfirmGetResult, SceLocationHandle handle, Ptr<SceUInt32
     if (!writable(emuenv.mem, result))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_ADDRESS);
     *result.get(emuenv.mem) = opened->dialog_result;
-    log_location("sceLocationConfirmGetResult", handle, opened->dialog_result);
     return 0;
 }
 
@@ -364,7 +340,6 @@ EXPORT(int, sceLocationGetPermission, SceLocationHandle handle, Ptr<SceLocationP
     out->applicationstatus = SCE_LOCATION_PERMISSION_APPLICATION_ALLOW;
     out->confirm_required = 0;
     out->reserved = 0;
-    log_location("sceLocationGetPermission", handle, 0);
     return 0;
 }
 

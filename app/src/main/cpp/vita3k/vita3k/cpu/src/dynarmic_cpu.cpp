@@ -45,6 +45,8 @@ static bool should_log_invalid_access() {
 #ifdef NDEBUG
     return false;
 #else
+    if (!spdlog::default_logger_raw()->should_log(spdlog::level::err))
+        return false;
     static std::atomic<uint64_t> count{ 0 };
     const uint64_t n = count.fetch_add(1, std::memory_order_relaxed);
     if (n == 8)
@@ -216,46 +218,48 @@ public:
             LOG_TRACE("Instruction fetch at address 0x{:X}", addr);
         const Ptr<uint32_t> ptr{ static_cast<Address>(addr) };
         if (!ptr || !ptr.valid(*parent->mem) || ptr.address() < parent->mem->host_page_size) {
-            if (!confirm_invalid_access(addr, "instruction fetch"))
+            if (!confirm_invalid_access(addr))
                 return MemoryRead32(addr);
 #ifndef NDEBUG
-            uint32_t bc_nid = 0, bc_lr = 0;
-            get_last_import_call(bc_nid, bc_lr);
-            LOG_CRITICAL("Invalid instruction fetch at address 0x{:X} (last HLE import on this thread: nid=0x{:X} called from LR=0x{:X})\n{}", addr, bc_nid, bc_lr, cpu->save_context().description());
-            // Disassemble the code before LR: it shows where the (bad) branch target was loaded from.
-            const uint32_t lr_raw = read_lr(*parent);
-            const bool thumb_caller = (lr_raw & 1) != 0;
-            const uint32_t lr = lr_raw & ~1u;
-            if (lr >= parent->mem->host_page_size) {
-                std::string window;
-                uint32_t a = lr - 64;
-                while (a <= lr + 2 && Ptr<uint32_t>{ a }.valid(*parent->mem)) {
-                    uint16_t insn_size = 2;
-                    window += fmt::format("  0x{:X}: {}\n", a, disassemble(*parent, a, thumb_caller, &insn_size));
-                    a += insn_size ? insn_size : 2;
-                }
-                LOG_CRITICAL("Code before the call site (LR-64..LR, thumb={}):\n{}", thumb_caller, window);
-            }
-            // memory each register points at, captured at crash time
-            {
-                const CPUContext crash_ctx = cpu->save_context();
-                std::string reg_mem;
-                for (int r = 0; r < 14; r++) {
-                    const uint32_t rv = crash_ctx.cpu_registers[r];
-                    const uint32_t base = rv & ~3u;
-                    if (base < parent->mem->host_page_size)
-                        continue;
-                    reg_mem += fmt::format("  [r{}=0x{:08X}]:", r, rv);
-                    for (int w = -2; w < 6; w++) {
-                        const Ptr<uint32_t> wp{ static_cast<Address>(base + w * 4) };
-                        if (wp.valid(*parent->mem))
-                            reg_mem += fmt::format(" {:08X}", *wp.get(*parent->mem));
-                        else
-                            reg_mem += " ????????";
+            if (spdlog::default_logger_raw()->should_log(spdlog::level::err)) {
+                uint32_t bc_nid = 0, bc_lr = 0;
+                get_last_import_call(bc_nid, bc_lr);
+                LOG_CRITICAL("Invalid instruction fetch at address 0x{:X} (last HLE import on this thread: nid=0x{:X} called from LR=0x{:X})\n{}", addr, bc_nid, bc_lr, cpu->save_context().description());
+                // Disassemble the code before LR: it shows where the (bad) branch target was loaded from.
+                const uint32_t lr_raw = read_lr(*parent);
+                const bool thumb_caller = (lr_raw & 1) != 0;
+                const uint32_t lr = lr_raw & ~1u;
+                if (lr >= parent->mem->host_page_size) {
+                    std::string window;
+                    uint32_t a = lr - 64;
+                    while (a <= lr + 2 && Ptr<uint32_t>{ a }.valid(*parent->mem)) {
+                        uint16_t insn_size = 2;
+                        window += fmt::format("  0x{:X}: {}\n", a, disassemble(*parent, a, thumb_caller, &insn_size));
+                        a += insn_size ? insn_size : 2;
                     }
-                    reg_mem += "\n";
+                    LOG_CRITICAL("Code before the call site (LR-64..LR, thumb={}):\n{}", thumb_caller, window);
                 }
-                LOG_CRITICAL("Memory at register targets (words -2..+5):\n{}", reg_mem);
+                // memory each register points at, captured at crash time
+                {
+                    const CPUContext crash_ctx = cpu->save_context();
+                    std::string reg_mem;
+                    for (int r = 0; r < 14; r++) {
+                        const uint32_t rv = crash_ctx.cpu_registers[r];
+                        const uint32_t base = rv & ~3u;
+                        if (base < parent->mem->host_page_size)
+                            continue;
+                        reg_mem += fmt::format("  [r{}=0x{:08X}]:", r, rv);
+                        for (int w = -2; w < 6; w++) {
+                            const Ptr<uint32_t> wp{ static_cast<Address>(base + w * 4) };
+                            if (wp.valid(*parent->mem))
+                                reg_mem += fmt::format(" {:08X}", *wp.get(*parent->mem));
+                            else
+                                reg_mem += " ????????";
+                        }
+                        reg_mem += "\n";
+                    }
+                    LOG_CRITICAL("Memory at register targets (words -2..+5):\n{}", reg_mem);
+                }
             }
 #endif
             return std::nullopt;
@@ -265,6 +269,8 @@ public:
 
     static void TraceInstruction(uint64_t self_, uint64_t address, uint64_t is_thumb) {
 #ifndef NDEBUG
+        if (!spdlog::default_logger_raw()->should_log(spdlog::level::trace))
+            return;
         ArmDynarmicCallback &self = *reinterpret_cast<ArmDynarmicCallback *>(self_);
 
         std::string disassembly = [&]() -> std::string {
@@ -278,7 +284,9 @@ public:
     }
 
     inline static std::recursive_timed_mutex loader_lock_mutex;
+#ifndef NDEBUG
     inline static std::atomic<int> loader_lock_timeouts{ 0 };
+#endif
     int loader_lock_held = 0;
 
     static void MonoLoaderLockAcquire(uint64_t self_, uint64_t, uint64_t) {
@@ -288,8 +296,10 @@ public:
             return;
         }
         if (!loader_lock_mutex.try_lock_for(std::chrono::seconds(5))) {
-            if (loader_lock_timeouts.fetch_add(1) < 20)
+#ifndef NDEBUG
+            if (spdlog::default_logger_raw()->should_log(spdlog::level::warn) && loader_lock_timeouts.fetch_add(1) < 20)
                 LOG_WARN("Timed out waiting for the emulated mono loader lock on thread {}, proceeding unserialised", self.parent->thread_id);
+#endif
             return;
         }
         self.loader_lock_held = 1;
@@ -412,17 +422,8 @@ public:
     }
 
     // rechecks a failed lock-free validity test under the allocator lock
-    bool confirm_invalid_access(Dynarmic::A32::VAddr addr, const char *what) {
+    bool confirm_invalid_access(Dynarmic::A32::VAddr addr) {
         if (addr >= parent->mem->host_page_size && is_valid_addr_synced(*parent->mem, static_cast<Address>(addr))) {
-#ifndef NDEBUG
-            static std::atomic<uint32_t> transient_count{ 0 };
-            const uint32_t n = transient_count.fetch_add(1, std::memory_order_relaxed);
-            if (n < 16)
-                LOG_CRITICAL("TRANSIENT invalid {} at 0x{:X} recovered (PC 0x{:X}, thread {}) — lock-free validity race caught in the act",
-                    what, addr, this->cpu->get_pc(), parent->thread_id);
-            else if (n == 16)
-                LOG_CRITICAL("Further transient-invalid recoveries will be suppressed");
-#endif
             return false;
         }
         return true;
@@ -432,52 +433,7 @@ public:
     T MemoryRead(Dynarmic::A32::VAddr addr) {
         Ptr<T> ptr{ addr };
         if (!ptr || !ptr.valid(*parent->mem) || ptr.address() < parent->mem->host_page_size) {
-            const bool confirm = confirm_invalid_access(addr, "read");
-#ifndef NDEBUG
-            {
-                static std::atomic<uint64_t> diag_invalid_reads{ 0 };
-                const uint64_t n = diag_invalid_reads.fetch_add(1, std::memory_order_relaxed) + 1;
-                if (n <= 16 || (n % 64) == 0) {
-                    const uint32_t pc = cpu->get_pc();
-                    const uint32_t lr = read_lr(*parent);
-                    LOG_CRITICAL("[savestate-diag] invalid read{} at 0x{:x} pc=0x{:x} lr=0x{:x} confirm={} (total {})",
-                        sizeof(T) * 8, addr, pc, lr, confirm, n);
-                    if (Ptr<uint32_t>{ pc }.valid(*parent->mem))
-                        LOG_CRITICAL("[savestate-diag]   pc code: {}", disassemble(*parent, pc, (pc & 1) != 0));
-                }
-                static std::atomic<bool> diag_dumped{ false };
-                if (n >= 1000 && !diag_dumped.exchange(true)) {
-                    const CPUContext ctx = cpu->save_context();
-                    std::string regs;
-                    for (int r = 0; r < 15; r++)
-                        regs += fmt::format(" r{}={:08X}", r, ctx.cpu_registers[r]);
-                    const uint32_t pc = cpu->get_pc();
-                    const uint32_t sp = read_sp(*parent);
-                    std::string stack;
-                    for (int w = 0; w < 32; w++) {
-                        const Ptr<uint32_t> wp{ sp + static_cast<uint32_t>(w * 4) };
-                        if (wp.valid(*parent->mem))
-                            stack += fmt::format(" {:08X}", *wp.get(*parent->mem));
-                    }
-                    std::string code;
-                    const bool thumb = ctx.thumb();
-                    uint32_t a = pc & ~1u;
-                    if (a > 64)
-                        a -= 64;
-                    for (int k = 0; k < 24; k++) {
-                        uint16_t insn_size = 2;
-                        code += fmt::format("\n  0x{:X}: {}", a, disassemble(*parent, a, thumb, &insn_size));
-                        a += insn_size ? insn_size : 2;
-                    }
-                    LOG_CRITICAL("[savestate-diag] SPIN dump addr=0x{:x} pc=0x{:X} thumb={}{}\nstack@0x{:X}:{}\ncode:{}", addr, pc, thumb ? 1 : 0, regs, sp, stack, code);
-                    const uint32_t fault_page = addr / KiB(4);
-                    const AllocMemPage &fault_entry = parent->mem->alloc_table[fault_page];
-                    LOG_CRITICAL("[savestate-diag] SPIN page 0x{:X}: allocated={} size={} valid={} name={}",
-                        fault_page * KiB(4), static_cast<uint32_t>(fault_entry.allocated), static_cast<uint32_t>(fault_entry.size),
-                        is_valid_addr(*parent->mem, addr), mem_name(addr, *parent->mem));
-                }
-            }
-#endif
+            const bool confirm = confirm_invalid_access(addr);
             if (!confirm)
                 return *ptr.get(*parent->mem);
             if (should_log_invalid_access()) {
@@ -519,7 +475,7 @@ public:
     void MemoryWrite(Dynarmic::A32::VAddr addr, T value) {
         Ptr<T> ptr{ addr };
         if (!ptr || !ptr.valid(*parent->mem) || ptr.address() < parent->mem->host_page_size) {
-            if (!confirm_invalid_access(addr, "write")) {
+            if (!confirm_invalid_access(addr)) {
                 *ptr.get(*parent->mem) = value;
                 return;
             }

@@ -73,8 +73,10 @@ struct GeneratedShader {
 void spirv_disasm_print(const usse::SpirvCode &spirv_binary, std::string *spirv_dump = nullptr);
 
 // the returned object will only have its glsl or spirv field non-empty depending on the target
+// Cache-only callbacks can disable disassembly without suppressing GLSL output.
 GeneratedShader convert_gxp(const SceGxmProgram &program, const std::string &shader_hash, const FeatureState &features, const Target target, const Hints &hints, bool maskupdate = false,
-    bool force_shader_debug = false, const std::function<bool(const std::string &ext, const std::string &dump)> &dumper = nullptr);
+    bool force_shader_debug = false, const std::function<bool(const std::string &ext, const std::string &dump)> &dumper = nullptr,
+    bool dump_disassembly = true);
 
 void convert_gxp_to_glsl_from_filepath(const std::string &shader_filepath_utf8);
 

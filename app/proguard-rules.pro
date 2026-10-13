@@ -28,8 +28,6 @@
 -keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.core.SaveStateBridge { *; }
 # These explicitly retained JNI classes intentionally use no @Keep annotation:
 # AndroidX/Play Services consumer @Keep rules prohibit method-body optimization.
-# AndroidDiagnostics.logStartupDiagnostics is resolved by FindClass + JNI name.
--keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.core.AndroidDiagnostics { *; }
 -keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.ui.savestates.SaveStatesViewModel { *; }
 # Bundled SDL/HID classes live in org.libsdl.app to match SDL's own JNI
 # expectations. SDL_android.c looks them up by FQN via FindClass at JNI_OnLoad

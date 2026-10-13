@@ -231,7 +231,6 @@ TEST(GxmDisplayWorker, waiting_callback_can_park_host_without_releasing_queue_or
     EXPECT_EQ(env.gxm.display_queue.size(), 0u);
     EXPECT_FALSE(is_valid_addr(env.mem, data));
     EXPECT_EQ(sync->timestamp_current.load(), 11u);
-    EXPECT_EQ(env.gxm.display_entries_done.load(), 1u);
     EXPECT_EQ(display->capture_snapshot().entry_point, 0x4568u);
     EXPECT_EQ(read_reg(*display->cpu, 0), 0x99u);
     EXPECT_EQ(env.kernel.get_thread(79), display);
@@ -303,7 +302,6 @@ TEST(GxmDisplayWorker, failed_restore_stops_and_joins_bootstrap_held_host_withou
     EXPECT_EQ(fixture.env.gxm.display_phase, DisplayWorkerPhase::WaitCallback);
     EXPECT_EQ(fixture.thread->status, ThreadStatus::waiting);
     EXPECT_EQ(read_reg(*fixture.thread->cpu, 0), 0x56789abcu);
-    EXPECT_EQ(fixture.env.gxm.display_entries_done.load(), 0u);
     EXPECT_EQ(fixture.env.gxm.display_queue.size(), 1u);
     EXPECT_EQ(*Ptr<uint8_t>(0x1000).get(fixture.env.mem), 0x77u);
 }

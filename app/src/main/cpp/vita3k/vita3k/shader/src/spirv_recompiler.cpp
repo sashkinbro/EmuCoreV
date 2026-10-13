@@ -41,6 +41,7 @@
 #include <functional>
 #include <list>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -1443,32 +1444,36 @@ static SpirvShaderParameters create_parameters(spv::Builder &b, const SceGxmProg
         }
     }
 
-    // Log parameters
-    for (size_t i = 0; i < program.parameter_count; ++i) {
-        const SceGxmProgramParameter &parameter = gxp_parameters[i];
-        if (parameter.category == SCE_GXM_PARAMETER_CATEGORY_UNIFORM || parameter.category == SCE_GXM_PARAMETER_CATEGORY_ATTRIBUTE) {
-            bool is_uniform = parameter.category == SCE_GXM_PARAMETER_CATEGORY_UNIFORM;
-            std::string var_name = gxp::parameter_name(parameter);
+    // Parameter descriptions are only needed for explicitly enabled diagnostics.
+#ifndef NDEBUG
+    if (spdlog::default_logger_raw()->should_log(spdlog::level::debug)) {
+        for (size_t i = 0; i < program.parameter_count; ++i) {
+            const SceGxmProgramParameter &parameter = gxp_parameters[i];
+            if (parameter.category == SCE_GXM_PARAMETER_CATEGORY_UNIFORM || parameter.category == SCE_GXM_PARAMETER_CATEGORY_ATTRIBUTE) {
+                bool is_uniform = parameter.category == SCE_GXM_PARAMETER_CATEGORY_UNIFORM;
+                std::string var_name = gxp::parameter_name(parameter);
 
-            auto container = gxp::get_container_by_index(program, parameter.container_index);
-            std::uint32_t offset = parameter.resource_index;
+                auto container = gxp::get_container_by_index(program, parameter.container_index);
+                std::uint32_t offset = parameter.resource_index;
 
-            if (container && is_uniform) {
-                offset = container->base_sa_offset + parameter.resource_index;
+                if (container && is_uniform) {
+                    offset = container->base_sa_offset + parameter.resource_index;
+                }
+
+                const auto [store_type, param_type_name] = shader::get_parameter_type_store_and_name(parameter.type);
+                std::string param_log = fmt::format("[{} + {}] {}a{} = ({}{}) {}",
+                    gxp::get_container_name(parameter.container_index), parameter.resource_index,
+                    is_uniform ? "s" : "p", offset, param_type_name, parameter.component_count, var_name);
+
+                if (parameter.array_size > 1) {
+                    param_log += fmt::format("[{}]", parameter.array_size);
+                }
+
+                LOG_DEBUG(param_log);
             }
-
-            const auto [store_type, param_type_name] = shader::get_parameter_type_store_and_name(parameter.type);
-            std::string param_log = fmt::format("[{} + {}] {}a{} = ({}{}) {}",
-                gxp::get_container_name(parameter.container_index), parameter.resource_index,
-                is_uniform ? "s" : "p", offset, param_type_name, parameter.component_count, var_name);
-
-            if (parameter.array_size > 1) {
-                param_log += fmt::format("[{}]", parameter.array_size);
-            }
-
-            LOG_DEBUG(param_log);
         }
     }
+#endif
 
     // create thread buffer if it is being used
     if (program.thread_buffer_count > 0) {
@@ -2090,7 +2095,7 @@ static void generate_update_mask_body(spv::Builder &b, TranslationState &transla
     b.createStore(mask_v, out);
 }
 
-static SpirvCode convert_gxp_to_spirv_impl(const SceGxmProgram &program, const std::string &shader_hash, const FeatureState &features, TranslationState &translation_state, bool force_shader_debug, const std::function<bool(const std::string &ext, const std::string &dump)> &dumper) {
+static SpirvCode convert_gxp_to_spirv_impl(const SceGxmProgram &program, const std::string &shader_hash, const FeatureState &features, TranslationState &translation_state, bool force_shader_debug, const std::function<bool(const std::string &ext, const std::string &dump)> &dumper, bool dump_disassembly) {
     SpirvCode spirv;
 
     SceGxmProgramType program_type = program.get_type();
@@ -2143,10 +2148,18 @@ static SpirvCode convert_gxp_to_spirv_impl(const SceGxmProgram &program, const s
         break;
     }
 
-    std::stringstream disasm_dump;
-
-    // Put disasm storage
-    disasm::disasm_storage = &disasm_dump;
+    // Cache output callbacks do not necessarily request diagnostic text. Restore
+    // the thread-local sink on every exit so it never points at a dead stream.
+    struct DisassemblyScope {
+        std::optional<std::stringstream> dump;
+        std::stringstream *previous = disasm::disasm_storage;
+        explicit DisassemblyScope(bool capture) {
+            if (capture)
+                dump.emplace();
+            disasm::disasm_storage = dump ? &*dump : nullptr;
+        }
+        ~DisassemblyScope() { disasm::disasm_storage = previous; }
+    } disassembly_scope(dumper && dump_disassembly);
 
     // Entry point
     spv::Function *spv_func_main = b.makeEntryPoint(entry_point_name.c_str());
@@ -2245,8 +2258,8 @@ static SpirvCode convert_gxp_to_spirv_impl(const SceGxmProgram &program, const s
     if (!spirv_log.empty())
         LOG_ERROR("SPIR-V Error:\n{}", spirv_log);
 
-    if (dumper) {
-        dumper("dsm", disasm_dump.str());
+    if (disassembly_scope.dump) {
+        dumper("dsm", disassembly_scope.dump->str());
     }
 
     b.dump(spirv);
@@ -2352,7 +2365,7 @@ static spv::ImageFormat translate_color_format(const SceGxmColorBaseFormat forma
 // ***************************
 
 GeneratedShader convert_gxp(const SceGxmProgram &program, const std::string &shader_hash, const FeatureState &features, const Target target, const Hints &hints, bool maskupdate,
-    bool force_shader_debug, const std::function<bool(const std::string &ext, const std::string &dump)> &dumper) {
+    bool force_shader_debug, const std::function<bool(const std::string &ext, const std::string &dump)> &dumper, bool dump_disassembly) {
     TranslationState translation_state;
     translation_state.is_fragment = program.is_fragment();
     translation_state.is_maskupdate = maskupdate;
@@ -2366,7 +2379,7 @@ GeneratedShader convert_gxp(const SceGxmProgram &program, const std::string &sha
     }
 
     GeneratedShader shader{};
-    shader.spirv = convert_gxp_to_spirv_impl(program, shader_hash, features, translation_state, force_shader_debug, dumper);
+    shader.spirv = convert_gxp_to_spirv_impl(program, shader_hash, features, translation_state, force_shader_debug, dumper, dump_disassembly);
 
     constexpr bool strip_relaxed_precision = false;
     if (strip_relaxed_precision && !shader.spirv.empty() && shader.spirv.size() > 5) {

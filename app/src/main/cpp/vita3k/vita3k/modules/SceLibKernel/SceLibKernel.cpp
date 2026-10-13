@@ -91,9 +91,7 @@ EXPORT(int, __stack_chk_fail) {
     TRACY_FUNC(__stack_chk_fail);
     LOG_CRITICAL("Stack corruption on TID: {}", thread_id);
 
-    const ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
-    auto ctx = save_context(*thread->cpu);
-    LOG_ERROR("{}", ctx.description());
+    LOG_ERROR("{}", save_context(*emuenv.kernel.get_thread(thread_id)->cpu).description());
 
     assert(false); // if this triggers then something is seriously wrong somewhere else
 

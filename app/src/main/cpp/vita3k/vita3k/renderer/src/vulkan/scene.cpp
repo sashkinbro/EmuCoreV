@@ -383,10 +383,7 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     const SceGxmFragmentProgram *frag_program = context.record.fragment_program.get(mem);
     const SceGxmVertexProgram *vert_program = context.record.vertex_program.get(mem);
     if (!frag_program || !frag_program->renderer_data || !vert_program || !vert_program->renderer_data) {
-        static std::atomic<uint64_t> diag_dropped{ 0 };
-        const uint64_t n = diag_dropped.fetch_add(1, std::memory_order_relaxed) + 1;
-        if (n <= 8 || (n % 256) == 0)
-            LOG_CRITICAL("[savestate-diag] draw dropped: frag={} vert={} (total {})", fmt::ptr(frag_program), fmt::ptr(vert_program), n);
+        LOG_CRITICAL_ONCE("Dropped draw with invalid shader programs");
         return;
     }
 
@@ -422,7 +419,6 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
                             written_mask |= 1u << e.location;
                 }
                 vp_data->varying_location_mask = written_mask;
-                LOG_INFO("[ITERMASK] vertex program varying mask = 0x{:04X}", written_mask);
             }
             context.curr_frag_ublock.set_iterator_written_mask(vp_data->varying_location_mask);
         }
@@ -554,10 +550,9 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         return;
 
     if (config.log_active_shaders) {
-        const std::string hash_text_f = hex_string(context.record.fragment_program.get(mem)->renderer_data->hash);
-        const std::string hash_text_v = hex_string(context.record.vertex_program.get(mem)->renderer_data->hash);
-
-        LOG_DEBUG("\nVertex  : {}\nFragment: {}", hash_text_v, hash_text_f);
+        LOG_DEBUG("\nVertex  : {}\nFragment: {}",
+            hex_string(context.record.vertex_program.get(mem)->renderer_data->hash),
+            hex_string(context.record.fragment_program.get(mem)->renderer_data->hash));
         LOG_DEBUG("Vertex default uniform buffer: {}\n", spdlog::to_hex(context.ubo_data[0], 16));
         LOG_DEBUG("Fragment default uniform buffer: {}\n", spdlog::to_hex(context.ubo_data[SCE_GXM_REAL_MAX_UNIFORM_BUFFER + 1], 16));
     }
@@ -615,16 +610,6 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     frag_ublock.raw_cast_mask = static_cast<float>(context.curr_frag_ublock.raw_cast_bits);
     frag_ublock.inv_frag_width = 1.0f / static_cast<float>(context.render_target->width);
     frag_ublock.inv_frag_height = 1.0f / static_cast<float>(context.render_target->height);
-    if (context.curr_frag_ublock.cast_sampler_bits != 0) {
-        static uint64_t reanchor_log_n = 0;
-        if (reanchor_log_n < 16 || (reanchor_log_n % 512) == 0)
-            LOG_INFO("UV re-anchor: mask=0x{:X} phase=0x{:X} rt={}x{} res_mult={} surface_orig={}x{}",
-                context.curr_frag_ublock.cast_sampler_bits, context.curr_frag_ublock.cast_phase_bits,
-                context.render_target->width, context.render_target->height,
-                frag_ublock.res_multiplier, context.record.color_surface.width, context.record.color_surface.height);
-        reanchor_log_n++;
-    }
-
     if (context.curr_frag_ublock.changed || memcmp(&context.prev_frag_ublock, &frag_ublock, sizeof(frag_ublock)) != 0) {
         // TODO: this intermediate step can be avoided
         context.curr_frag_ublock.copy_to(context.shader_info_temp);

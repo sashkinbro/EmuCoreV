@@ -39,7 +39,9 @@
 
 #include <unordered_set>
 
+#ifndef NDEBUG
 static constexpr bool LOG_UNK_NIDS_ALWAYS = false;
+#endif
 
 #define LIBRARY(name) extern const LibraryInitFn import_library_init_##name;
 #include <modules/library_init_list.inc>
@@ -142,16 +144,19 @@ Ptr<void> get_client_vtable(KernelState &kernel, MemState &mem) {
     return kernel.client_vtable;
 }
 
+#ifndef NDEBUG
 static void log_import_call(char emulation_level, uint32_t nid, SceUID thread_id, const std::unordered_set<uint32_t> &nid_blacklist, Address lr) {
     if (!nid_blacklist.contains(nid)) {
         const char *const name = import_name(nid);
         LOG_TRACE("[{}LE] TID: {:<3} FUNC: {} {} at {}", emulation_level, thread_id, log_hex(nid), name, log_hex(lr));
     }
 }
+#endif
 
 void call_import(EmuEnvState &emuenv, CPUState &cpu, uint32_t nid, SceUID thread_id) {
     // HLE - call our C++ function
-    if (emuenv.kernel.debugger.watch_import_calls) {
+#ifndef NDEBUG
+    if (emuenv.kernel.debugger.watch_import_calls && spdlog::default_logger_raw()->should_log(spdlog::level::trace)) {
         const std::unordered_set<uint32_t> hle_nid_blacklist = {
             0xB295EB61, // sceKernelGetTLSAddr
             0x46E7BE7B, // sceKernelLockLwMutex
@@ -160,7 +165,9 @@ void call_import(EmuEnvState &emuenv, CPUState &cpu, uint32_t nid, SceUID thread
         auto lr = read_lr(cpu);
         log_import_call('H', nid, thread_id, hle_nid_blacklist, lr);
     }
-    set_last_import_call(nid, read_lr(cpu));
+    if (spdlog::default_logger_raw()->should_log(spdlog::level::err))
+        set_last_import_call(nid, read_lr(cpu));
+#endif
 
     const ImportFn *fn = resolve_import(nid);
     if (fn) {
@@ -170,7 +177,9 @@ void call_import(EmuEnvState &emuenv, CPUState &cpu, uint32_t nid, SceUID thread
         // make the function return 0
         write_reg(*thread->cpu, 0, 0);
 
-        if (!emuenv.missing_nids.contains(nid) || LOG_UNK_NIDS_ALWAYS) {
+#ifndef NDEBUG
+        if (spdlog::default_logger_raw()->should_log(spdlog::level::err)
+            && (!emuenv.missing_nids.contains(nid) || LOG_UNK_NIDS_ALWAYS)) {
             std::string lib_name = "unknown library";
             {
                 const std::lock_guard<std::mutex> guard(emuenv.kernel.export_nids_mutex);
@@ -182,6 +191,7 @@ void call_import(EmuEnvState &emuenv, CPUState &cpu, uint32_t nid, SceUID thread
             if (!LOG_UNK_NIDS_ALWAYS)
                 emuenv.missing_nids.insert(nid);
         }
+#endif
     }
 }
 

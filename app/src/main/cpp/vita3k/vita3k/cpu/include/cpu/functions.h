@@ -70,7 +70,9 @@ void set_log_code(CPUState &state, bool log);
 // Thread-local CPU state for signal handler access (exception handlers)
 void set_current_cpu_state(CPUState *state);
 CPUState *get_current_cpu_state();
+#ifndef NDEBUG
 void set_last_import_call(uint32_t nid, uint32_t lr);
+#endif
 void get_last_import_call(uint32_t &nid, uint32_t &lr);
 void set_log_mem(CPUState &state, bool log);
 bool get_log_code(CPUState &state);

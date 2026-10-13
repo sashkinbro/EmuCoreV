@@ -311,12 +311,6 @@ static void release_external_shadow_pages(uint8_t *target, size_t size, size_t h
         return;
     }
 
-    static std::atomic<uint64_t> released_total{ 0 };
-    const uint64_t before = released_total.fetch_add(inner_size, std::memory_order_relaxed);
-    const uint64_t after = before + inner_size;
-    constexpr uint64_t step = MiB(64);
-    if ((before / step) != (after / step))
-        LOG_INFO("Released {} MiB of arena pages shadowed by external mappings", after / MiB(1));
 #else
     (void)target;
     (void)size;
@@ -433,14 +427,9 @@ bool handle_access_violation(MemState &state, uint8_t *addr, bool write) noexcep
     const auto unhandled_but_valid = [&]() {
         apply_host_protect(reinterpret_cast<uint8_t *>(align_down(fault_addr, state.host_page_size)),
             state.host_page_size, MemPerm::ReadWrite, state.host_page_size);
-        static std::atomic<uint32_t> count{ 0 };
-        const uint32_t n = count.fetch_add(1, std::memory_order_relaxed);
-        if (n < 8) {
-            LOG_CRITICAL("Unhandled {} to protected-but-valid region. vaddr=0x{:X} host=0x{:X}{}",
-                write ? "write" : "read", vaddr, fault_addr,
-                g_fault_context_provider ? g_fault_context_provider() : std::string());
-        } else if (n == 8)
-            LOG_CRITICAL("Further unhandled protected-region accesses will be suppressed");
+        LOG_CRITICAL_ONCE("Unhandled {} to protected-but-valid region. vaddr=0x{:X} host=0x{:X}{}",
+            write ? "write" : "read", vaddr, fault_addr,
+            g_fault_context_provider ? g_fault_context_provider() : std::string());
     };
 
     auto it = state.protect_tree.lower_bound(vaddr);

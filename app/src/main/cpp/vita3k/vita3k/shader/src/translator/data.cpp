@@ -163,31 +163,33 @@ bool USSETranslatorVisitor::vmov(
     BEGIN_REPEAT(repeat_count)
     GET_REPEAT(inst, RepeatMode::SLMSI);
 
-    std::string conditional_str;
-    if (is_conditional) {
-        std::string expr;
-        switch (compare_method) {
-        case CompareMethod::LT_ZERO:
-            expr = "<";
-            break;
-        case CompareMethod::LTE_ZERO:
-            expr = "<=";
-            break;
-        case CompareMethod::EQ_ZERO:
-            expr = "==";
-            break;
-        case CompareMethod::NE_ZERO:
-            expr = "!=";
-            break;
+    if (disasm::enabled()) {
+        std::string conditional_str;
+        if (is_conditional) {
+            std::string expr;
+            switch (compare_method) {
+            case CompareMethod::LT_ZERO:
+                expr = "<";
+                break;
+            case CompareMethod::LTE_ZERO:
+                expr = "<=";
+                break;
+            case CompareMethod::EQ_ZERO:
+                expr = "==";
+                break;
+            case CompareMethod::NE_ZERO:
+                expr = "!=";
+                break;
+            }
+            conditional_str = fmt::format(" ({} {} vec(0)) ?", disasm::operand_to_str(inst.opr.src0, dest_mask), expr);
         }
-        conditional_str = fmt::format(" ({} {} vec(0)) ?", disasm::operand_to_str(inst.opr.src0, dest_mask), expr);
+
+        const std::string disasm_str = fmt::format("{:016x}: {}{}.{} {}{} {} {}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(inst.opcode), disasm::data_type_str(move_data_type),
+            disasm::operand_to_str(inst.opr.dest, dest_mask, dest_repeat_offset), conditional_str, disasm::operand_to_str(inst.opr.src1, dest_mask, src1_repeat_offset),
+            is_conditional ? fmt::format(": {}", disasm::operand_to_str(inst.opr.src2, dest_mask, src2_repeat_offset)) : "");
+
+        LOG_DISASM("{}", disasm_str);
     }
-
-    const std::string disasm_str = fmt::format("{:016x}: {}{}.{} {}{} {} {}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(inst.opcode), disasm::data_type_str(move_data_type),
-        disasm::operand_to_str(inst.opr.dest, dest_mask, dest_repeat_offset), conditional_str, disasm::operand_to_str(inst.opr.src1, dest_mask, src1_repeat_offset),
-        is_conditional ? fmt::format(": {}", disasm::operand_to_str(inst.opr.src2, dest_mask, src2_repeat_offset)) : "");
-
-    LOG_DISASM("{}", disasm_str);
 
     spv::Id source_to_compare_with_0 = spv::NoResult;
     spv::Id source_1 = load(inst.opr.src1, dest_mask, src1_repeat_offset);
@@ -407,7 +409,7 @@ bool USSETranslatorVisitor::vpck(
 
     inst.opcode = op_table[dest_fmt][src_fmt];
 
-    std::string disasm_str = fmt::format("{:016x}: {}{}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(inst.opcode));
+    const std::string disasm_str = disasm::enabled() ? fmt::format("{:016x}: {}{}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(inst.opcode)) : std::string{};
 
     inst.opr.dest.type = dest_data_type_table[dest_fmt];
     inst.opr.src1.type = src_data_type_table[src_fmt];
@@ -722,7 +724,7 @@ bool USSETranslatorVisitor::vldst(
     const int src1_offset = is_store ? dest_repeat_offset : 0;
     const int src2_offset = 0; // not used when storing
 
-    std::string disasm_str = fmt::format("{:016x}: {}{}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(inst.opcode));
+    const std::string disasm_str = disasm::enabled() ? fmt::format("{:016x}: {}{}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(inst.opcode)) : std::string{};
     LOG_DISASM("{} {} ({} + {} + {}) [{} bytes]", disasm_str, disasm::operand_to_str(to_store, 0b1, to_store_offset),
         disasm::operand_to_str(inst.opr.src0, 0b1, src0_offset),
         disasm::operand_to_str(inst.opr.src1, 0b1, src1_offset), is_store ? "0" : disasm::operand_to_str(inst.opr.src2, 0b1, src2_offset), current_bytes_to_fetch);
@@ -904,7 +906,7 @@ bool USSETranslatorVisitor::limm(
     inst.opr.dest = decode_dest(inst.opr.dest, dest_num, dest_bank, dest_bank_ext, false, 7, m_second_program);
     inst.opr.dest.type = DataType::UINT32;
 
-    const std::string disasm_str = fmt::format("{:016x}: {}{}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(inst.opcode));
+    const std::string disasm_str = disasm::enabled() ? fmt::format("{:016x}: {}{}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(inst.opcode)) : std::string{};
     LOG_DISASM("{} {} #0x{:X}", disasm_str, disasm::operand_to_str(inst.opr.dest, 0b1, 0), imm_value);
 
     store(inst.opr.dest, const_imm_id, 0b1);

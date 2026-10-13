@@ -113,26 +113,31 @@ bool USSETranslatorVisitor::smlsi(
     Imm8 src0_inc,
     Imm8 src1_inc,
     Imm8 src2_inc) {
-    std::string disasm_str = fmt::format("{:016x}: SMLSI ", m_instr);
+    const bool log_disassembly = disasm::enabled();
+    std::string disasm_str = log_disassembly ? fmt::format("{:016x}: SMLSI ", m_instr) : std::string{};
 
     auto parse_increment = [&](const int idx, const Imm1 inc_mode, const Imm8 inc_value) {
         if (inc_mode) {
-            disasm_str += "swizz.(";
+            if (log_disassembly)
+                disasm_str += "swizz.(";
 
             // Parse value as swizzle
             for (int i = 0; i < 4; i++) {
                 repeat_increase[idx][i] = ((inc_value >> (2 * i)) & 0b11);
-                disasm_str += fmt::format("{}", repeat_increase[idx][i]);
+                if (log_disassembly)
+                    disasm_str += fmt::format("{}", repeat_increase[idx][i]);
             }
 
-            disasm_str += ") ";
+            if (log_disassembly)
+                disasm_str += ") ";
         } else {
             // Parse value as immediate
             for (int i = 0; i < 17; i++) {
                 repeat_increase[idx][i] = i * static_cast<std::int8_t>(inc_value);
             }
 
-            disasm_str += fmt::format(" inc.{} ", static_cast<std::int8_t>(inc_value));
+            if (log_disassembly)
+                disasm_str += fmt::format(" inc.{} ", static_cast<std::int8_t>(inc_value));
         }
     };
 

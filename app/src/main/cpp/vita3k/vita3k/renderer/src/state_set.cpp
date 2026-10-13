@@ -109,12 +109,7 @@ COMMAND_SET_STATE(program) {
     if (is_fragment) {
         const SceGxmFragmentProgram *gxm_program = program.cast<SceGxmFragmentProgram>().get(mem);
         if (!is_sane_fragment_program(mem, gxm_program)) {
-            static std::atomic<uint64_t> diag_missing{ 0 };
-            const uint64_t n = diag_missing.fetch_add(1, std::memory_order_relaxed) + 1;
-            if (n <= 8 || (n % 256) == 0)
-                LOG_CRITICAL("[savestate-diag] set_state_program: fragment program {:#x} rejected (struct={}, program_field={:#x}, refs={}, total {})",
-                    program.address(), fmt::ptr(gxm_program), gxm_program ? gxm_program->program.address() : 0,
-                    gxm_program ? gxm_program->reference_count.load() : 0, n);
+            LOG_CRITICAL_ONCE("Rejected invalid fragment program {:#x}", program.address());
             return;
         }
         render_context->record.fragment_program = program.cast<SceGxmFragmentProgram>();
@@ -138,11 +133,7 @@ COMMAND_SET_STATE(program) {
         if (is_sane_vertex_program(mem, gxm_program))
             render_context->record.vertex_program_hash = gxm_program->renderer_data->hash;
         else {
-            static std::atomic<uint64_t> diag_missing_vert{ 0 };
-            const uint64_t n = diag_missing_vert.fetch_add(1, std::memory_order_relaxed) + 1;
-            if (n <= 8 || (n % 256) == 0)
-                LOG_CRITICAL("[savestate-diag] set_state_program: vertex program {:#x} rejected (struct={}, total {})",
-                    program.address(), fmt::ptr(gxm_program), n);
+            LOG_CRITICAL_ONCE("Rejected invalid vertex program {:#x}", program.address());
             return;
         }
         render_context->record.vertex_program = program.cast<SceGxmVertexProgram>();
@@ -188,7 +179,7 @@ COMMAND_SET_STATE(uniform_buffer) {
     }
 
     const auto offset = program->uniform_buffer_data_offsets.at(block_num);
-    if (offset != static_cast<uint32_t>(-1) && config.log_active_shaders) {
+    if (offset != static_cast<uint32_t>(-1) && config.log_active_shaders && spdlog::should_log(spdlog::level::debug)) {
         const int base_binding_ubo_relative = is_vertex ? 0 : (SCE_GXM_REAL_MAX_UNIFORM_BUFFER + 1);
 
         std::vector<uint8_t> my_data(data.get(mem), data.get(mem) + size);

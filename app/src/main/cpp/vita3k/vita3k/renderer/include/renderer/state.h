@@ -161,7 +161,6 @@ struct State {
     // The controls editor overlays the Android UI while the game stays paused.
     std::atomic<bool> show_pause_overlay{ true };
     // Diagnostic: last phase reached by the render loop (0 idle, 1 batches, 2 frame, 3 swap).
-    std::atomic<int> render_phase{ 0 };
 
     // Non-owning pointer to dialog state for native common dialog overlays.
     DialogState *common_dialog = nullptr;

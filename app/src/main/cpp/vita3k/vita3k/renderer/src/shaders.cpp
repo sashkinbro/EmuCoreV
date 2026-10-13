@@ -218,7 +218,7 @@ static shader::GeneratedShader load_shader_generic(shader::Target target, const 
         return true;
     };
 
-    shader::GeneratedShader source = shader::convert_gxp(program, hash_text, features, target, hints, maskupdate, false, write_data_with_ext);
+    shader::GeneratedShader source = shader::convert_gxp(program, hash_text, features, target, hints, maskupdate, false, write_data_with_ext, write_shader_dumps);
 
     // Copy shader generate to shaders cache
     const auto shaders_cache_path = fs::path(shader_cache_path);

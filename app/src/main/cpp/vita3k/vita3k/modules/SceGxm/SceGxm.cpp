@@ -912,7 +912,6 @@ bool process_display_queue_step(EmuEnvState &emuenv) {
     auto &queue = gxm.display_queue;
     if (queue.is_aborted() || emuenv.display.abort.load())
         return false;
-    gxm.display_worker_state.store(static_cast<int>(gxm.display_phase), std::memory_order_relaxed);
     const auto entry = queue.top(1000);
     if (!entry)
         return !queue.is_aborted();
@@ -972,7 +971,6 @@ bool process_display_queue_step(EmuEnvState &emuenv) {
     if (entry->data)
         free(emuenv.mem, entry->data);
     queue.pop();
-    gxm.display_entries_done.fetch_add(1, std::memory_order_relaxed);
     gxm.display_previous_entry_point = 0;
     gxm.display_phase = DisplayWorkerPhase::Idle;
     return true;
@@ -1780,8 +1778,6 @@ void stop_display_queue_host(EmuEnvState &emuenv) {
 bool restart_display_queue(EmuEnvState &emuenv, bool hold) {
     stop_display_queue_host(emuenv);
     emuenv.gxm.display_queue.reset();
-    emuenv.gxm.display_worker_state.store(0, std::memory_order_relaxed);
-    emuenv.gxm.display_entries_done.store(0, std::memory_order_relaxed);
 
     if (!emuenv.gxm.display_queue_thread) {
         emuenv.gxm.display_snapshot_gate.reset();
@@ -2100,13 +2096,6 @@ void restore_fragment_programs(EmuEnvState &emuenv, const std::vector<FragmentPr
         info.blend = snapshot.blend;
         info.is_mask_update = snapshot.is_mask_update;
         emuenv.gxm.fragment_programs.emplace(snapshot.address, info);
-    }
-
-    {
-        std::string addresses;
-        for (const FragmentProgramSnapshot &snapshot : snapshots)
-            addresses += fmt::format(" {:#x}", snapshot.address);
-        LOG_CRITICAL("[savestate-diag] restored {} fragment programs:{}", snapshots.size(), addresses);
     }
 }
 
@@ -4982,11 +4971,6 @@ EXPORT(void, sceGxmSetFragmentProgram, SceGxmContext *context, Ptr<const SceGxmF
         const bool valid_address = is_valid_addr(emuenv.mem, fragmentProgram.address());
         const bool registered = emuenv.gxm.fragment_programs.find(fragmentProgram.address()) != emuenv.gxm.fragment_programs.end();
         if (!valid_address || !registered) {
-            static std::atomic<uint64_t> diag_bad{ 0 };
-            const uint64_t bad = diag_bad.fetch_add(1, std::memory_order_relaxed) + 1;
-            if (bad <= 16 || (bad % 256) == 0)
-                LOG_CRITICAL("[savestate-diag] setFragmentProgram rejected addr={:#x} valid_addr={} registered={} (total {})",
-                    fragmentProgram.address(), valid_address, registered, bad);
             return;
         }
     }
@@ -5377,12 +5361,6 @@ EXPORT(void, sceGxmSetVertexProgram, SceGxmContext *context, Ptr<const SceGxmVer
 
     if (!is_valid_addr(emuenv.mem, vertexProgram.address())
         || emuenv.gxm.vertex_programs.find(vertexProgram.address()) == emuenv.gxm.vertex_programs.end()) {
-        static std::atomic<uint64_t> diag_bad{ 0 };
-        const uint64_t bad = diag_bad.fetch_add(1, std::memory_order_relaxed) + 1;
-        if (bad <= 16 || (bad % 256) == 0)
-            LOG_CRITICAL("[savestate-diag] setVertexProgram rejected addr={:#x} valid_addr={} registered={} (total {})",
-                vertexProgram.address(), is_valid_addr(emuenv.mem, vertexProgram.address()),
-                emuenv.gxm.vertex_programs.find(vertexProgram.address()) != emuenv.gxm.vertex_programs.end(), bad);
         return;
     }
 

@@ -27,6 +27,14 @@ namespace shader::usse::disasm {
 
 extern thread_local std::stringstream *disasm_storage;
 
+inline bool enabled() {
+#ifdef NDEBUG
+    return disasm_storage != nullptr;
+#else
+    return disasm_storage != nullptr || spdlog::should_log(spdlog::level::trace);
+#endif
+}
+
 //
 // Disasm helpers
 //
@@ -43,10 +51,12 @@ std::string swizzle_to_str(Swizzle<s> swizz, const Imm4 write_mask);
 } // namespace shader::usse::disasm
 
 // TODO: make LOG_RAW
-#define LOG_DISASM(fmt_str, ...)                                         \
-    {                                                                    \
-        auto fmt_disasm = fmt::format(fmt_str, ##__VA_ARGS__);           \
-        LOG_TRACE("\t{}", fmt_disasm);                                   \
-        if (shader::usse::disasm::disasm_storage)                        \
-            *shader::usse::disasm::disasm_storage << fmt_disasm << '\n'; \
-    }
+#define LOG_DISASM(fmt_str, ...)                                             \
+    do {                                                                     \
+        if (shader::usse::disasm::enabled()) {                               \
+            auto fmt_disasm = fmt::format(fmt_str, ##__VA_ARGS__);            \
+            LOG_TRACE("\t{}", fmt_disasm);                                  \
+            if (shader::usse::disasm::disasm_storage)                         \
+                *shader::usse::disasm::disasm_storage << fmt_disasm << '\n'; \
+        }                                                                    \
+    } while (0)

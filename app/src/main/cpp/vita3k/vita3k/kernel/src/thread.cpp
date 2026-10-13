@@ -246,19 +246,21 @@ void sched_acquire(int priority, SceInt32 affinity_mask, bool enabled, CPUState 
         if (g_sched_cv.wait_until(lock, deadline) == std::cv_status::timeout) {
 
 #ifndef NDEBUG
-            static std::atomic<int64_t> last_logged_us{ 0 };
-            const int64_t now_forced_us = std::chrono::duration_cast<std::chrono::microseconds>(
-                std::chrono::steady_clock::now().time_since_epoch())
-                                              .count();
-            int64_t prev_logged = last_logged_us.load(std::memory_order_relaxed);
-            if (now_forced_us - prev_logged >= 10'000'000
-                && last_logged_us.compare_exchange_strong(prev_logged, now_forced_us)) {
-                int holder_prio = -1;
-                for (const auto &h : g_sched_holders) {
-                    if (h.cpu)
-                        holder_prio = h.priority;
+            if (spdlog::default_logger_raw()->should_log(spdlog::level::warn)) {
+                static std::atomic<int64_t> last_logged_us{ 0 };
+                const int64_t now_forced_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch())
+                                                  .count();
+                int64_t prev_logged = last_logged_us.load(std::memory_order_relaxed);
+                if (now_forced_us - prev_logged >= 10'000'000
+                    && last_logged_us.compare_exchange_strong(prev_logged, now_forced_us)) {
+                    int holder_prio = -1;
+                    for (const auto &h : g_sched_holders) {
+                        if (h.cpu)
+                            holder_prio = h.priority;
+                    }
+                    LOG_WARN("[GUEST-SCHED] \"{}\" (#{} prio {}) forced through after {}ms; holder prio {}", name, id, priority, std::chrono::duration_cast<std::chrono::milliseconds>(SCHED_DEADLINE_WINDOW).count(), holder_prio);
                 }
-                LOG_WARN("[GUEST-SCHED] \"{}\" (#{} prio {}) forced through after {}ms; holder prio {}", name, id, priority, std::chrono::duration_cast<std::chrono::milliseconds>(SCHED_DEADLINE_WINDOW).count(), holder_prio);
             }
 #endif
             break;
@@ -469,9 +471,8 @@ void ThreadState::run_loop() {
             // handle svc call if this was what stopped the cpu
             if (cpu->svc_called) {
                 const uint32_t nid = *Ptr<uint32_t>(read_pc(*cpu) + 4).get(mem);
-                // breadcrumbs for the hang dump: free here, a global lock inside call_import
+                // Preserve the import entry context for wait continuation restore.
                 last_import_nid = nid;
-                last_import_lr = read_lr(*cpu);
                 last_import_context = save_context(*cpu);
                 kernel.call_import(*cpu, nid, id);
                 clear_exclusive(*cpu);
@@ -490,24 +491,26 @@ void ThreadState::run_loop() {
             if (!do_step && hit_breakpoint(*cpu) && kernel.debugger.is_probe(read_pc(*cpu) & ~1u, probe_thumb)) {
                 const uint32_t probe_pc = read_pc(*cpu) & ~1u;
 #ifndef NDEBUG
-                std::string ctx = fmt::format("[CUEPROBE] pc=0x{:08X} thread='{}' ({})", probe_pc, name, id);
-                for (int ri = 0; ri <= 12; ri++)
-                    ctx += fmt::format(" r{}=0x{:08X}", ri, read_reg(*cpu, ri));
-                ctx += fmt::format(" sp=0x{:08X} lr=0x{:08X}", read_sp(*cpu), read_lr(*cpu));
-                std::set<uint32_t> dump_bases;
-                for (const int ri : { 0, 1, 4, 5, 6, 7 })
-                    dump_bases.insert(read_reg(*cpu, ri) & ~3u);
-                dump_bases.insert(read_sp(*cpu) & ~3u);
-                for (const uint32_t base : dump_bases) {
-                    // Bitmap validity != host accessibility
-                    uint32_t words[48];
-                    if (!debug_safe_copy_guest(mem, base, words, sizeof(words)))
-                        continue;
-                    ctx += fmt::format("\n[CUEPROBE] mem 0x{:08X}:", base);
-                    for (const uint32_t w : words)
-                        ctx += fmt::format(" {:08X}", w);
+                if (spdlog::default_logger_raw()->should_log(spdlog::level::err)) {
+                    std::string ctx = fmt::format("[CUEPROBE] pc=0x{:08X} thread='{}' ({})", probe_pc, name, id);
+                    for (int ri = 0; ri <= 12; ri++)
+                        ctx += fmt::format(" r{}=0x{:08X}", ri, read_reg(*cpu, ri));
+                    ctx += fmt::format(" sp=0x{:08X} lr=0x{:08X}", read_sp(*cpu), read_lr(*cpu));
+                    std::set<uint32_t> dump_bases;
+                    for (const int ri : { 0, 1, 4, 5, 6, 7 })
+                        dump_bases.insert(read_reg(*cpu, ri) & ~3u);
+                    dump_bases.insert(read_sp(*cpu) & ~3u);
+                    for (const uint32_t base : dump_bases) {
+                        // Bitmap validity != host accessibility
+                        uint32_t words[48];
+                        if (!debug_safe_copy_guest(mem, base, words, sizeof(words)))
+                            continue;
+                        ctx += fmt::format("\n[CUEPROBE] mem 0x{:08X}:", base);
+                        for (const uint32_t w : words)
+                            ctx += fmt::format(" {:08X}", w);
+                    }
+                    LOG_ERROR("{}\n{}", ctx, log_stack_traceback());
                 }
-                LOG_ERROR("{}\n{}", ctx, log_stack_traceback());
 #endif
                 {
                     const std::lock_guard<std::mutex> probe_guard(kernel.debugger.probe_step_mutex);
@@ -518,7 +521,6 @@ void ThreadState::run_loop() {
                 if (cpu->svc_called) {
                     const uint32_t nid = *Ptr<uint32_t>(read_pc(*cpu) + 4).get(mem);
                     last_import_nid = nid;
-                    last_import_lr = read_lr(*cpu);
                     last_import_context = save_context(*cpu);
                     kernel.call_import(*cpu, nid, id);
                     clear_exclusive(*cpu);

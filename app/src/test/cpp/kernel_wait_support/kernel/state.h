@@ -27,7 +27,7 @@ struct KernelState {
         const auto it = threads.find(id);
         return it == threads.end() ? nullptr : it->second;
     }
-    int try_break_provable_evf_cycle(bool dry_run = false);
+    int try_break_provable_evf_cycle();
     void log_eventflag_history();
     int try_break_frame_sync_deadlock(std::vector<SceUID> &);
     Address halt_instruction_pc = 0x100;

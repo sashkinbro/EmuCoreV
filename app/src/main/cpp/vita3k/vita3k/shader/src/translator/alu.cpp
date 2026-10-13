@@ -71,7 +71,7 @@ bool USSETranslatorVisitor::vmad(
     Imm1 src1_swiz_ext,
     Imm4 src1_swiz,
     Imm6 src1_n) {
-    std::string disasm_str = fmt::format("{:016x}: {}{}", m_instr, disasm::e_predicate_str(ext_vec_predicate_to_ext(pred)), "VMAD");
+    const std::string disasm_str = disasm::enabled() ? fmt::format("{:016x}: {}{}", m_instr, disasm::e_predicate_str(ext_vec_predicate_to_ext(pred)), "VMAD") : std::string{};
 
     Instruction inst;
 
@@ -1804,7 +1804,8 @@ bool USSETranslatorVisitor::vdual(
     std::vector<Operand> op1_srcs = create_srcs_from_layout(*op1_layout, op1_info);
     std::vector<Operand> op2_srcs = create_srcs_from_layout(*op2_layout, op2_info);
 
-    std::string disasm_str = fmt::format("{:016x}: ", m_instr);
+    const bool log_disassembly = disasm::enabled();
+    std::string disasm_str = log_disassembly ? fmt::format("{:016x}: ", m_instr) : std::string{};
 
     auto do_dual_op = [&](Opcode code, std::vector<Operand> &ops, Operand &dest,
                           Imm4 write_mask_dest, const DualOpInfo &code_info) {
@@ -1924,10 +1925,11 @@ bool USSETranslatorVisitor::vdual(
             result = postprocess_dot_result_for_store(m_b, result, write_mask_dest);
         }
 
-        disasm_str += fmt::format("{} {}", disasm::opcode_str(code), disasm::operand_to_str(dest, write_mask_dest));
-
-        for (Operand &op : ops)
-            disasm_str += " " + disasm::operand_to_str(op, write_mask_source);
+        if (log_disassembly) {
+            disasm_str += fmt::format("{} {}", disasm::opcode_str(code), disasm::operand_to_str(dest, write_mask_dest));
+            for (Operand &op : ops)
+                disasm_str += " " + disasm::operand_to_str(op, write_mask_source);
+        }
 
         return result;
     };
@@ -1935,7 +1937,8 @@ bool USSETranslatorVisitor::vdual(
     spv::Id op1_result = do_dual_op(op1.opcode, op1_srcs, op1.opr.dest, op1_write_mask, op1_info);
     if (op1_result == spv::NoResult)
         return false;
-    disasm_str += " + ";
+    if (log_disassembly)
+        disasm_str += " + ";
     spv::Id op2_result = do_dual_op(op2.opcode, op2_srcs, op2.opr.dest, op2_write_mask, op2_info);
     if (op2_result == spv::NoResult)
         return false;

@@ -92,10 +92,9 @@ void draw(GLState &renderer, GLContext &context, const FeatureState &features, S
     }
 
     if (config.log_active_shaders) {
-        const std::string hash_text_f = hex_string(context.record.fragment_program.get(mem)->renderer_data->hash);
-        const std::string hash_text_v = hex_string(context.record.vertex_program.get(mem)->renderer_data->hash);
-
-        LOG_DEBUG("\nVertex  : {}\nFragment: {}", hash_text_v, hash_text_f);
+        LOG_DEBUG("\nVertex  : {}\nFragment: {}",
+            hex_string(context.record.vertex_program.get(mem)->renderer_data->hash),
+            hex_string(context.record.fragment_program.get(mem)->renderer_data->hash));
         LOG_DEBUG(fmt::runtime("Vertex default uniform buffer: {}\n"), spdlog::to_hex(context.ubo_data[0], 16));
         LOG_DEBUG(fmt::runtime("Fragment default uniform buffer: {}\n"), spdlog::to_hex(context.ubo_data[SCE_GXM_REAL_MAX_UNIFORM_BUFFER], 16));
     }

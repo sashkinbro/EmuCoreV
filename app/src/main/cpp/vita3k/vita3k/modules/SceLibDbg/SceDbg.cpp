@@ -57,6 +57,12 @@ EXPORT(int, sceDbgLoggingHandler, const char *pFile, int line, int severity, con
         return SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID;
     }
 
+#ifdef NDEBUG
+    return 0;
+#else
+    if (!spdlog::default_logger_raw()->should_log(spdlog::level::info))
+        return 0;
+
     std::string output = fmt::format("SCE libdbg LOG, LEVEL: {}", severity);
 
     if (pComponent && (pComponent[0] != '\0')) {
@@ -79,6 +85,7 @@ EXPORT(int, sceDbgLoggingHandler, const char *pFile, int line, int severity, con
     LOG_INFO(output);
 
     return 0;
+#endif
 }
 
 EXPORT(int, sceDbgSetBreakOnErrorState) {
