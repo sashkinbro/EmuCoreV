@@ -85,7 +85,7 @@ static bool is_sane_fragment_program(const MemState &mem, const SceGxmFragmentPr
     if (!program || !program->renderer_data)
         return false;
     const uint32_t refs = program->reference_count.load();
-    if (refs == 0 || refs > 100000)
+    if (refs == 0)
         return false;
     const SceGxmProgram *gxp = program->program.get(mem);
     return gxp && gxp->magic == 0x00505847; // "GXP\0"
@@ -95,7 +95,7 @@ static bool is_sane_vertex_program(const MemState &mem, const SceGxmVertexProgra
     if (!program || !program->renderer_data)
         return false;
     const uint32_t refs = program->reference_count.load();
-    if (refs == 0 || refs > 100000)
+    if (refs == 0)
         return false;
     const SceGxmProgram *gxp = program->program.get(mem);
     return gxp && gxp->magic == 0x00505847 && gxp->is_vertex();
