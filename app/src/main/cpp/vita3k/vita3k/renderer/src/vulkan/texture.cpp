@@ -711,7 +711,8 @@ void VKTextureCache::configure_sampler(size_t index, const SceGxmTexture &textur
         state.device.destroy(sampler);
     }
 
-    // linear strided textures use the mag filter as the min filter too
+    // Strided textures reuse the mip/LOD fields for their byte stride.
+    // Their sampler key excludes those fields, so do not interpret them as LOD state.
     const bool is_linear_strided = texture.texture_type() == SCE_GXM_TEXTURE_LINEAR_STRIDED;
 
     const SceGxmTextureAddrMode uaddr = static_cast<SceGxmTextureAddrMode>(texture.uaddr_mode);
@@ -729,14 +730,14 @@ void VKTextureCache::configure_sampler(size_t index, const SceGxmTexture &textur
     vk::SamplerCreateInfo sampler_info{
         .magFilter = texture::translate_filter(mag_filter),
         .minFilter = texture::translate_filter(min_filter),
-        .mipmapMode = texture.mip_filter ? vk::SamplerMipmapMode::eLinear : vk::SamplerMipmapMode::eNearest,
+        .mipmapMode = !is_linear_strided && texture.mip_filter && !no_linear ? vk::SamplerMipmapMode::eLinear : vk::SamplerMipmapMode::eNearest,
         .addressModeU = texture::translate_address_mode(uaddr),
         .addressModeV = texture::translate_address_mode(vaddr),
         .addressModeW = vk::SamplerAddressMode::eRepeat,
-        .mipLodBias = (static_cast<float>(texture.lod_bias) - 31.f) / 8.f,
+        .mipLodBias = is_linear_strided ? 0.f : (static_cast<float>(texture.lod_bias) - 31.f) / 8.f,
         .maxAnisotropy = static_cast<float>(anisotropic_filtering),
         .compareEnable = VK_FALSE,
-        .minLod = static_cast<float>(texture.true_lod_min()),
+        .minLod = is_linear_strided ? 0.f : static_cast<float>(texture.true_lod_min()),
         .maxLod = VK_LOD_CLAMP_NONE,
         .unnormalizedCoordinates = VK_FALSE,
     };
