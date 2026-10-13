@@ -64,6 +64,7 @@ struct VKState : public renderer::State {
 
     vk::Instance instance;
     vk::Device device;
+    bool support_device_fault = false;
 
     ScreenRenderer screen_renderer;
     OverlayRenderer overlay_renderer;
@@ -190,6 +191,7 @@ struct VKState : public renderer::State {
 
     // dumps the resolved device/driver/feature configuration to the log, once, from late_init
     void log_gpu_configuration(const Config &cfg);
+    void log_device_fault();
 
     inline FrameObject &frame() {
         return frames[current_frame_idx];

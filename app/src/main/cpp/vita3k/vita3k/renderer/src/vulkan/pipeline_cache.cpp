@@ -1198,7 +1198,38 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
     // also report an internal shader-compiler rejection as ErrorOutOfHostMemory rather than a
     // specific error.
     try {
+#ifndef NDEBUG
+        // A native driver crash cannot reach the SystemError handler. Record
+        // each attempt before calling it so the last incomplete attempt can
+        // be reproduced independently of the game's cutscenes and timing.
+        static std::atomic<uint64_t> next_attempt{0};
+        const uint64_t attempt = next_attempt.fetch_add(1, std::memory_order_relaxed);
+        const auto fragment_variant = fragment_shader_variant_hash(fragment_program.hash,
+            fragment_hints.color_format, fragment_hints.raw_color_attachment_input);
+        std::string pass_description;
+        {
+            std::lock_guard<std::mutex> guard(diagnostics_mutex);
+            const auto found = render_pass_descriptions.find(std::bit_cast<uint64_t>(static_cast<VkRenderPass>(render_pass)));
+            if (found != render_pass_descriptions.end()) pass_description = found->second;
+        }
+        LOG_INFO("[PIPELINE {}] compiling vert={} frag={} variant={} stages={} format={:#x} raw={} topology={} pass={}",
+            attempt, hex_string(vertex_program.hash), hex_string(fragment_program.hash), hex_string(fragment_variant),
+            shader_stage_count, static_cast<uint32_t>(record.color_base_format), with_raw_attachment,
+            vk::to_string(input_assembly.topology), pass_description);
+        for (uint32_t i = 0; i < vertex_input.vertexBindingDescriptionCount; ++i) {
+            const auto &binding = vertex_input.pVertexBindingDescriptions[i];
+            LOG_INFO("[PIPELINE {}] binding={} stride={} rate={}", attempt, binding.binding, binding.stride, vk::to_string(binding.inputRate));
+        }
+        for (uint32_t i = 0; i < vertex_input.vertexAttributeDescriptionCount; ++i) {
+            const auto &attribute = vertex_input.pVertexAttributeDescriptions[i];
+            LOG_INFO("[PIPELINE {}] location={} binding={} format={} offset={}",
+                attempt, attribute.location, attribute.binding, vk::to_string(attribute.format), attribute.offset);
+        }
+#endif
         const auto result = state.device.createGraphicsPipeline(pipeline_cache, pipeline_info);
+#ifndef NDEBUG
+        LOG_INFO("[PIPELINE {}] compiled result={}", attempt, vk::to_string(result.result));
+#endif
         if (result.result != vk::Result::eSuccess) {
             LOG_CRITICAL("Failed to create pipeline: {}", vk::to_string(result.result));
             return nullptr;

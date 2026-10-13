@@ -35,8 +35,12 @@ def body(text, marker):
     raise AssertionError('Unterminated production body: ' + marker)
 reset = body(reset_source, 'inline void reset_gpu_requests_after_join(')
 cleanup_source = (renderer / 'src/vulkan/renderer.cpp').read_text()
-cleanup_start = cleanup_source.index('void VKState::cleanup()')
-cleanup_start = cleanup_source.index('    device.waitIdle();', cleanup_start)
+cleanup_function = cleanup_source.index('void VKState::cleanup()')
+cleanup_start = cleanup_source.index('    device.waitIdle();', cleanup_function)
+# Keep a production exception wrapper around waitIdle intact, when present.
+cleanup_try = cleanup_source.rfind('    try {', cleanup_function, cleanup_start)
+if cleanup_try != -1:
+    cleanup_start = cleanup_try
 cleanup_end = cleanup_source.index('    context = nullptr;', cleanup_start)
 cleanup_prefix = cleanup_source[cleanup_start:cleanup_end]
 
@@ -54,7 +58,7 @@ cpp = r'''
 #include <threads/queue.h>
 ''' + owner_include + r'''
 #define LOG_ERROR(...) ((void)0)
-namespace vk { enum class Result {eSuccess}; constexpr bool True=true; }
+namespace vk { enum class Result {eSuccess}; constexpr bool True=true; struct DeviceLostError : std::runtime_error { using std::runtime_error::runtime_error; }; }
 using CallbackRequestFunction=std::function<void()>;
 struct CallbackRequest {CallbackRequestFunction* callback; bool wait_for_gpu=false;};
 using WaitThreadRequest=std::variant<CallbackRequest>;
@@ -81,6 +85,7 @@ struct State {
   void freeCommandBuffers(int,int){check(s.device_alive,"command free precedes pool destruction");check(s.multithread_pool_mutex.held,"command free holds pool mutex");++s.frees;}
  } device{*this};
  void normal_cleanup();
+ void log_device_fault() {}
 };
 struct Info {bool depth_content_stored=false;};
 struct VKSurfaceCache {

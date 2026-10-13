@@ -705,6 +705,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             { vk::KHRShaderFloat16Int8ExtensionName, &support_fsr },
             // used for accurate programmable blending on desktop GPUs
             { vk::EXTFragmentShaderInterlockExtensionName, &support_shader_interlock },
+            { vk::EXTDeviceFaultExtensionName, &support_device_fault },
 #ifdef __APPLE__
             // Needed to create the MoltenVK device
             { vk::KHRPortabilitySubsetExtensionName, &temp_bool },
@@ -867,7 +868,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             vk::PhysicalDeviceUniformBufferStandardLayoutFeatures,
             vk::PhysicalDeviceShaderFloat16Int8Features,
             vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT,
-            vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT>
+            vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT,
+            vk::PhysicalDeviceFaultFeaturesEXT>
             device_info{
                 vk::DeviceCreateInfo{
                     .pEnabledFeatures = &enabled_features },
@@ -881,7 +883,9 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                 vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT{
                     .fragmentShaderSampleInterlock = VK_TRUE },
                 vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT{
-                    .rasterizationOrderColorAttachmentAccess = VK_TRUE }
+                    .rasterizationOrderColorAttachmentAccess = VK_TRUE },
+                vk::PhysicalDeviceFaultFeaturesEXT{
+                    .deviceFault = VK_TRUE }
             };
         device_info.get().setQueueCreateInfos(queue_infos);
         device_info.get().setPEnabledExtensionNames(device_extensions);
@@ -900,6 +904,13 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
 
         if (!support_shader_interlock)
             device_info.unlink<vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT>();
+
+        if (support_device_fault) {
+            const auto supported_fault = physical_device.getFeatures2KHR<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceFaultFeaturesEXT>();
+            support_device_fault = supported_fault.get<vk::PhysicalDeviceFaultFeaturesEXT>().deviceFault;
+        }
+        if (!support_device_fault)
+            device_info.unlink<vk::PhysicalDeviceFaultFeaturesEXT>();
 
         try {
             device = physical_device.createDevice(device_info.get());
@@ -1204,13 +1215,49 @@ void VKState::log_gpu_configuration(const Config &cfg) {
     LOG_INFO("=== END GPU CONFIGURATION ===");
 }
 
+void VKState::log_device_fault() {
+    if (!support_device_fault) {
+        LOG_CRITICAL("[GPU FAULT] VK_EXT_device_fault is unavailable");
+        return;
+    }
+    const auto query = reinterpret_cast<PFN_vkGetDeviceFaultInfoEXT>(device.getProcAddr("vkGetDeviceFaultInfoEXT"));
+    if (!query) return;
+    VkDeviceFaultCountsEXT counts{VK_STRUCTURE_TYPE_DEVICE_FAULT_COUNTS_EXT};
+    const VkResult count_result = query(static_cast<VkDevice>(device), &counts, nullptr);
+    if (count_result != VK_SUCCESS || counts.addressInfoCount > 1024 || counts.vendorInfoCount > 1024) {
+        LOG_CRITICAL("[GPU FAULT] count query result={} addresses={} vendor={}",
+            static_cast<int>(count_result), counts.addressInfoCount, counts.vendorInfoCount);
+        return;
+    }
+    std::vector<VkDeviceFaultAddressInfoEXT> addresses(counts.addressInfoCount);
+    std::vector<VkDeviceFaultVendorInfoEXT> vendors(counts.vendorInfoCount);
+    VkDeviceFaultInfoEXT info{VK_STRUCTURE_TYPE_DEVICE_FAULT_INFO_EXT};
+    info.pAddressInfos = addresses.data();
+    info.pVendorInfos = vendors.data();
+    counts.vendorBinarySize = 0;
+    const VkResult result = query(static_cast<VkDevice>(device), &counts, &info);
+    LOG_CRITICAL("[GPU FAULT] result={} description={} addresses={} vendor={}",
+        static_cast<int>(result), info.description, counts.addressInfoCount, counts.vendorInfoCount);
+    for (const auto &address : addresses)
+        LOG_CRITICAL("[GPU FAULT] type={} address={:#x} precision={}",
+            static_cast<int>(address.addressType), address.reportedAddress, address.addressPrecision);
+    for (const auto &vendor : vendors)
+        LOG_CRITICAL("[GPU FAULT] vendor={} code={:#x} data={:#x}",
+            vendor.description, vendor.vendorFaultCode, vendor.vendorFaultData);
+}
+
 void VKState::cleanup() {
     const auto release_descriptor_sets = [](FrameDescriptor &descriptor) {
         std::vector<vk::DescriptorSet>().swap(descriptor.sets);
         descriptor.descriptors_idx = 0;
     };
 
-    device.waitIdle();
+    try {
+        device.waitIdle();
+    } catch (const vk::DeviceLostError &) {
+        log_device_fault();
+        throw;
+    }
 
     request_queue.abort();
 
@@ -2041,7 +2088,12 @@ void VKState::unmap_memory(MemState &mem, Ptr<void> address) {
     }
 
     // we need to wait in case the buffer is being used
-    device.waitIdle();
+    try {
+        device.waitIdle();
+    } catch (const vk::DeviceLostError &) {
+        log_device_fault();
+        throw;
+    }
 
     // Save-state teardown already joined every request reader before unmap.
     // Do not allocate a callback for that aborted queue; ordinary unmaps still
