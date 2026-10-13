@@ -79,6 +79,16 @@ fun buildConfigString(value: String): String = "\"" + value
 val feedbackEndpoint = localBuildProperties.getProperty("emucorev.feedback.endpoint").orEmpty()
 val feedbackApiKey = localBuildProperties.getProperty("emucorev.feedback.apiKey").orEmpty()
 
+// AGP gives source-set JNI libraries precedence over CMake outputs. A locally
+// copied core would silently replace the core compiled for this variant,
+// including debug diagnostics and fixes. Only CMake supplies libVita3K.so.
+val bundledJniLibraries = tasks.register<Sync>("prepareBundledJniLibraries") {
+    from("src/main/jniLibs") {
+        exclude("**/libVita3K.so")
+    }
+    into(layout.buildDirectory.dir("generated/bundled-jni-libs"))
+}
+
 android {
     namespace = "com.sbro.emucorev"
     ndkVersion = "29.0.14206865"
@@ -182,7 +192,7 @@ android {
                     vita3kAssetsDir
                 )
             )
-            jniLibs.setSrcDirs(listOf("src/main/jniLibs"))
+            jniLibs.setSrcDirs(listOf(bundledJniLibraries))
             discordSdkDirectory?.let(jniLibs::srcDir)
         }
         // The vendored Khronos validation layer (downloaded into
