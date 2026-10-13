@@ -152,6 +152,22 @@ TEST_F(ModuleValidationTests, AcceptsOnlyExactSyntheticHleModuleShape) {
     rejects(changed);
 }
 
+TEST_F(ModuleValidationTests, CodecAllocationCounterDoesNotReferToGuestMemory) {
+    auto image = make_image(std::vector<uint8_t>(kPage, 0));
+    ASSERT_NE(image, nullptr) << error;
+    KernelBaseSnapshot snapshot;
+    snapshot.next_uid = 8424;
+    // NFS has made two stub codec allocations before its intro quick save.
+    // The field is an allocation counter used to issue synthetic handles.
+    snapshot.codec_blocks.emplace(4317, CodecEngineBlock{2097152, 2});
+    ASSERT_TRUE(validate_kernel_base(snapshot, *image, error)) << error;
+    EXPECT_EQ(snapshot.codec_blocks.at(4317).vaddr, 2);
+    snapshot.codec_blocks.at(4317).size = 0;
+    EXPECT_FALSE(validate_kernel_base(snapshot, *image, error));
+    snapshot.codec_blocks.at(4317) = {2097152, -1};
+    EXPECT_FALSE(validate_kernel_base(snapshot, *image, error));
+}
+
 TEST_F(ModuleValidationTests, AcceptsValidExportArraysAndShortAndLongImports) {
     for (const uint16_t import_size : {uint16_t{0x24}, uint16_t{0x34}}) {
         std::vector<uint8_t> guest(kPage, 0);

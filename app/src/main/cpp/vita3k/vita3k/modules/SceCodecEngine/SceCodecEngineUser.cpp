@@ -61,7 +61,7 @@ EXPORT(SceUID, sceCodecEngineOpenUnmapMemBlock, Address memBlock, uint32_t size)
     TRACY_FUNC(sceCodecEngineOpenUnmapMemBlock, memBlock, size);
     auto uid = emuenv.kernel.get_next_uid();
     auto guard = std::lock_guard<std::mutex>(emuenv.kernel.mutex);
-    CodecEngineBlock block;
+    CodecEngineBlock block{};
     block.size = size;
     emuenv.kernel.codec_blocks.emplace(uid, block);
     return uid;

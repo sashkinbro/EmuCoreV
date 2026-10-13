@@ -141,7 +141,9 @@ bool validate_kernel_base(const KernelBaseSnapshot &s, const MemoryImage &memory
     std::set<SceUID> identities;
     const auto identity = [&](SceUID uid) { return uid > 0 && uid < s.next_uid && identities.insert(uid).second; };
     for (const auto &[uid, block] : s.codec_blocks)
-        if (!identity(uid) || !block.size || !memory.contains(static_cast<Address>(block.vaddr), block.size)) return fail();
+        // SceCodecEngine's stub uses vaddr as a monotonically increasing
+        // allocation counter, not a pointer into the captured RAM image.
+        if (!identity(uid) || !block.size || block.vaddr < 0) return fail();
     for (const auto &[uid, module] : s.loaded_modules) {
         if (!identity(uid)) return fail();
         if (!module) continue;
