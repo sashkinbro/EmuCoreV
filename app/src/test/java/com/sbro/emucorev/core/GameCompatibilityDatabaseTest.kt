@@ -12,18 +12,20 @@ class GameCompatibilityDatabaseTest {
     private val xml = app.resolve("src/main/assets/${GameCompatibilityDatabase.ASSET_PATH}").readText()
     private fun database(text: String = xml) = text.byteInputStream().use(GameCompatibilityDatabase::parse)
 
-    @Test fun allRegionalIdsAndRenamedModsReceiveRecommendations() {
-        val fifaProfile = xml.substringAfter("<profile id=\"fifa-native-buffer\"").substringBefore("</profile>")
-        val ids = Regex("<title-id>([^<]+)</title-id>").findAll(fifaProfile).map { it.groupValues[1] }.toSet()
+    @Test fun allFifaRegionsAndModsInheritGlobalSettings() {
+        val ids = "PCSB00051 PCSB00052 PCSG00039 PCSB00082 PCSB00083 PCSB00084 PCSB00085 PCSB00086 PCSE00055 PCSE00059 PCSE00060 PCSG90012 PCSB00170 PCSB00171 PCSB00174 PCSE00093 PCSE00096 PCSG00107 PCSB00339 PCSB00340 PCSE00263 PCSG00201 PCSB00603 PCSB00604 PCSB00605 PCSB00606 PCSB00607 PCSE00481 PCSE00482 PCSE00483 PCSG00404".split(" ")
         assertEquals(31, ids.size)
         val db = database()
-        ids.forEach { id ->
-            val recommended = db.recommendationFor(id, "EA SPORTS FC mod")!!
-            assertEquals("native-buffer", recommended.memoryMapping)
-            assertEquals("Vulkan", recommended.backendRenderer)
-            assertEquals(false, recommended.useAngle)
+        listOf("disabled", "double-buffer", "external-host", "page-table", "native-buffer").forEach { mapping ->
+            val global = VitaCoreConfig(backendRenderer = "OpenGL", memoryMapping = mapping,
+                useAngle = true, customDriverName = "working-driver", highAccuracy = false)
+            (ids + "UNKNOWN").forEach { id ->
+                listOf("EA SPORTS FC mod", "FIFA Football", "FIFA 13", "FIFA 14", "FIFA 15", "FIFA 26 mod").forEach { title ->
+                    assertSame("$id / $title / $mapping", global, db.applyDefaults(global, id, title))
+                }
+            }
         }
-        assertNotNull(db.recommendationFor(" pcse00483 "))
+        assertNull(db.recommendationFor(" pcse00483 "))
     }
 
     @Test fun highAccuracyOnlyRecommendationInheritsOtherGlobalSettings() {
@@ -68,7 +70,8 @@ class GameCompatibilityDatabaseTest {
     }
 
     @Test fun familyNamesAreDataDrivenAndDoNotMatchUnrelatedWords() {
-        val db = database()
+        val familyXml = "<game-db version=\"1\"><profile title-word=\"FIFA\"><gpu backend-renderer=\"Vulkan\" memory-mapping=\"double-buffer\" use-angle=\"false\"/></profile></game-db>"
+        val db = database(familyXml)
         listOf("FIFA Football", "EA SPORTS™ FIFA Soccer Demo", "fifa13", "FIFA 14", "FIFA 15 Legacy Edition", "FIFA 26 mod").forEach {
             assertNotNull(it, db.recommendationFor("UNKNOWN", it))
         }
@@ -76,7 +79,7 @@ class GameCompatibilityDatabaseTest {
             assertNull(it, db.recommendationFor("UNKNOWN", it))
         }
         assertNull(db.recommendationFor("", "FIFA 15"))
-        val changed = database(xml.replace("title-word=\"FIFA\"", "title-word=\"SAMPLE\""))
+        val changed = database(familyXml.replace("title-word=\"FIFA\"", "title-word=\"SAMPLE\""))
         assertNull(changed.recommendationFor("UNKNOWN", "FIFA 15"))
         assertNotNull(changed.recommendationFor("UNKNOWN", "SAMPLE 15"))
     }
@@ -95,7 +98,8 @@ class GameCompatibilityDatabaseTest {
     @Test fun missingUnknownOrInvalidDatabaseCannotForceSettings() {
         assertNull(database("<game-db version=\"1\"/>").recommendationFor("PCSE00481"))
         assertNull(database(xml.replace("version=\"1\"", "version=\"99\"")).recommendationFor("PCSE00481"))
-        assertNull(database(xml.replace("memory-mapping=\"native-buffer\"", "memory-mapping=\"invalid\"")).recommendationFor("PCSE00481"))
+        val malformed = "<game-db version=\"1\"><profile><title-id>PCSE00481</title-id><gpu backend-renderer=\"Vulkan\" memory-mapping=\"invalid\" use-angle=\"false\"/></profile></game-db>"
+        assertNull(database(malformed).recommendationFor("PCSE00481"))
         assertNull(GameCompatibilityDatabase.EMPTY.recommendationFor("PCSE00481"))
     }
 

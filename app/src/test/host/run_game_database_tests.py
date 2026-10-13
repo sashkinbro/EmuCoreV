@@ -45,12 +45,14 @@ int main(int argc,char **argv){
   &&recommended.memory_mapping==global.memory_mapping,"verified Borderlands ID recommends only accuracy");
  check(!config::game_database::recommendation(bundled,"UNVERIFIED","Borderlands 2")
   &&!config::game_database::recommendation(bundled,"","Borderlands 2"),"no regional or global guesses");
- auto fifa=bundled.child("game-db").find_child_by_attribute("profile","id","fifa-native-buffer");
- check(std::distance(fifa.children("title-id").begin(),fifa.children("title-id").end())==31,"FIFA retains all 31 regional IDs");
- for(auto id:fifa.children("title-id")){
-  Settings cfg=global;config::game_database::apply_gpu_settings(cfg,config::game_database::recommendation(bundled,id.text().as_string()));
-  check(cfg.backend_renderer=="Vulkan"&&cfg.memory_mapping=="native-buffer"&&!cfg.high_accuracy,
-   "FIFA keeps existing recommendations and inherits accuracy");
+ const char *ids[]={"PCSB00051","PCSB00052","PCSG00039","PCSB00082","PCSB00083","PCSB00084","PCSB00085","PCSB00086","PCSE00055","PCSE00059","PCSE00060","PCSG90012","PCSB00170","PCSB00171","PCSB00174","PCSE00093","PCSE00096","PCSG00107","PCSB00339","PCSB00340","PCSE00263","PCSG00201","PCSB00603","PCSB00604","PCSB00605","PCSB00606","PCSB00607","PCSE00481","PCSE00482","PCSE00483","PCSG00404","UNKNOWN"};
+ for(auto mapping:{"disabled","double-buffer","external-host","page-table","native-buffer"}){
+  for(auto id:ids) for(auto title:{"EA SPORTS FC mod","FIFA Football","FIFA 13","FIFA 14","FIFA 15","FIFA 26 mod"}){
+   Settings cfg=global;cfg.memory_mapping=mapping;
+   config::game_database::apply_gpu_settings(cfg,config::game_database::recommendation(bundled,id,title));
+   check(cfg.backend_renderer==global.backend_renderer&&cfg.memory_mapping==mapping&&!cfg.high_accuracy
+    &&cfg.driver==global.driver&&cfg.audio_volume==global.audio_volume,"FIFA regions and mods inherit all global settings");
+  }
  }
  return failed?1:0;
 }
