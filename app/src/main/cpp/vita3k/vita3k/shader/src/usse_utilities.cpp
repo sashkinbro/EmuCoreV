@@ -1440,9 +1440,29 @@ void store(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFuncti
         std::vector<spv::Id> composites;
         spv::Id vec_comp_type = utils::unwrap_type(b, b.getTypeId(source));
         int source_value_taken_count = 0;
+        const int bits_per_component = dest.type == DataType::C10 ? 10 : static_cast<int>(size_comp * 8);
+
+        const auto load_original_word = [&](int component) {
+            const int word_offset = insert_offset + component / num_comp_in_float;
+            const spv::Id word_vec = b.createOp(spv::OpAccessChain, comp_type, { bank_base, b.makeIntConstant(word_offset >> 2) });
+            return b.createOp(spv::OpVectorExtractDynamic, type_f32, { b.createLoad(word_vec, spv::NoPrecision), b.makeIntConstant(word_offset % 4) });
+        };
 
         // We need to pack source
         for (auto i = 0; i < 4 - nearest_swizz_on; i += num_comp_in_float) {
+            uint32_t written_bits = 0;
+            for (int j = 0; j < num_comp_in_float; j++) {
+                if (dest_mask & (1 << (nearest_swizz_on + i + j)))
+                    written_bits |= ((1u << bits_per_component) - 1u) << (j * bits_per_component);
+            }
+            if (written_bits == 0) {
+                composites.push_back(load_original_word(nearest_swizz_on + i));
+                continue;
+            }
+            // Keep the existing zero-padding behavior for a touched FX10 word.
+            if (dest.type == DataType::C10)
+                written_bits |= 0xC0000000u;
+
             // Shuffle to get the type out
             std::vector<spv::Id> ops;
             for (auto j = 0; j < num_comp_in_float; j++) {
@@ -1453,17 +1473,10 @@ void store(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFuncti
                         ops.push_back(b.createOp(spv::OpVectorExtractDynamic, vec_comp_type, { source, b.makeIntConstant(std::min(source_value_taken_count++, (int)total_comp_source - 1)) }));
                     }
                 } else {
-                    if (elem == spv::NoResult) {
-                        // Replace it
-                        const int actual_offset_start_to_store = insert_offset + (i + nearest_swizz_on) / num_comp_in_float;
-                        elem = b.createOp(spv::OpAccessChain, comp_type, { bank_base, b.makeIntConstant(actual_offset_start_to_store >> 2) });
-                        elem = b.createOp(spv::OpVectorExtractDynamic, b.makeFloatType(32), { b.createLoad(elem, spv::NoPrecision), b.makeIntConstant(actual_offset_start_to_store % 4) });
-
-                        // Extract to f16
-                        elem = unpack_one(b, utils, features, elem, dest.type);
-                    }
-
-                    ops.push_back(b.createOp(spv::OpVectorExtractDynamic, vec_comp_type, { elem, b.makeIntConstant(j) }));
+                    // Never decode an unwritten lane as a number: its bits may
+                    // contain packed data, Inf or a NaN payload in another format.
+                    ops.push_back(b.isFloatType(vec_comp_type) ? b.makeFloatConstant(0.f)
+                        : b.isUintType(vec_comp_type) ? b.makeUintConstant(0) : b.makeIntConstant(0));
                 }
             }
 
@@ -1471,9 +1484,17 @@ void store(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFuncti
             spv::Id result = ops.size() == 1 ? ops[0] : b.createCompositeConstruct(result_type, ops);
             result = pack_one(b, utils, features, result, dest.type);
 
+            if (written_bits != 0xFFFFFFFFu) {
+                const auto u32 = b.makeUintType(32);
+                const auto original = b.createUnaryOp(spv::OpBitcast, u32, load_original_word(nearest_swizz_on + i));
+                const auto packed = b.createUnaryOp(spv::OpBitcast, u32, result);
+                const auto keep = b.createBinOp(spv::OpBitwiseAnd, u32, original, b.makeUintConstant(~written_bits));
+                const auto replace = b.createBinOp(spv::OpBitwiseAnd, u32, packed, b.makeUintConstant(written_bits));
+                result = b.createUnaryOp(spv::OpBitcast, type_f32, b.createBinOp(spv::OpBitwiseOr, u32, keep, replace));
+            }
+
             composites.push_back(result);
 
-            elem = spv::NoResult;
         }
 
         if (composites.size() == 1) {
