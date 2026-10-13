@@ -50,9 +50,6 @@ enum struct SurfaceTiling {
     Tiled
 };
 
-extern std::atomic<uint32_t> f10_sync_count;
-extern std::atomic<uint32_t> f10_skip_count;
-extern std::atomic<uint64_t> f10_repack_us;
 
 struct SurfaceCacheInfo {
     vkutil::Image texture;

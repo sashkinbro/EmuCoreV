@@ -720,53 +720,17 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
                 break;
             }
 
-            constexpr bool use_derived_query_component_count = true;
-            const char *count_source = " <- from hint";
             if (derive_query_component_count_from_program && components_per_register != 0) {
                 const uint32_t from_regs = static_cast<uint32_t>(size) * components_per_register;
                 uint8_t derived_count = 0;
                 if (program_pins_component_count && num_component > 0) {
                     derived_count = static_cast<uint8_t>(std::min(from_regs, num_component));
-                    count_source = " <- from program registers";
                 } else if (hint_count > from_regs) {
                     derived_count = static_cast<uint8_t>(from_regs);
-                    count_source = " <- hint clamped to program registers";
                 }
-                if (use_derived_query_component_count && derived_count != 0)
+                if (derived_count != 0)
                     tex_query_info.store_component_count = derived_count;
-                else if (derived_count != 0 && derived_count != hint_count)
-                    LOG_WARN("[TEXQUERY] derived count {} differs from hint count {} (NOT applied this build){}",
-                        derived_count, hint_count, count_source);
             }
-
-            auto dt_name = [](DataType t) -> const char * {
-                switch (t) {
-                case DataType::INT8: return "I8";
-                case DataType::INT16: return "I16";
-                case DataType::INT32: return "I32";
-                case DataType::C10: return "C10";
-                case DataType::F16: return "F16";
-                case DataType::F32: return "F32";
-                case DataType::UINT8: return "U8";
-                case DataType::UINT16: return "U16";
-                case DataType::UINT32: return "U32";
-                case DataType::O8: return "O8";
-                default: return "UNK";
-                }
-            };
-            constexpr bool log_texture_queries = false; // per shader compile; on for sample-layout work
-            if (log_texture_queries)
-                LOG_INFO("[TEXQUERY] {} tex={} sampler={} pa{} regs={} num_component={} pin={} "
-                         "desc(attr=0x{:08X} size=0x{:08X} comp=0x{:08X}) component_type={} store={} | "
-                         "hint fmt=0x{:08X} -> {}x{} | STORING {}x{}{}",
-                    translation_state.is_fragment ? "FRAG" : "VERT", tex_name, sampler_resource_index,
-                    pa_offset, size, num_component, program_pins_component_count,
-                    descriptor->attribute_info, descriptor->size, descriptor->component_info,
-                    component_type, dt_name(store_type),
-                    static_cast<uint32_t>(texture_format), dt_name(hint_type), hint_count,
-                    dt_name(effective_store_type),
-                    tex_query_info.store_component_count ? tex_query_info.store_component_count : hint_count,
-                    count_source);
 
             tex_query_info.dest_offset = pa_offset;
 

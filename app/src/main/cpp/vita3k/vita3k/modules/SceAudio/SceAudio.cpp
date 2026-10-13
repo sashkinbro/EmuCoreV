@@ -186,7 +186,6 @@ EXPORT(int, sceAudioOutOpenPort, SceAudioOutPortType type, int len, int freq, Sc
     const int port_id = emuenv.audio.next_port_id++;
     emuenv.audio.out_ports.emplace(port_id, port);
 
-    LOG_CRITICAL("[savestate-audio] sceAudioOutOpenPort -> id={} type={} len={} freq={} mode={} thread={}", port_id, static_cast<int>(type), len, freq, static_cast<int>(mode), thread_id);
     return port_id;
 }
 

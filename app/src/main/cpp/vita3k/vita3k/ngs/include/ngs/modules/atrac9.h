@@ -72,8 +72,9 @@ struct Atrac9LogicalState : public ModuleLogicalState {
     // preserve enough recent resampler input to rebuild the swresample state later
     StereoRateResamplerLogicalState rate_resampler;
     std::vector<uint8_t> superframe_staging;
-    // diagnostics
+    // Reserved slots retain the historical save-state layout.
     uint32_t diag_superframes = 0;
+    // Still used by silence recovery; keep its serialized name and position.
     uint32_t diag_silent_streak = 0;
     bool diag_reported_silent = false;
     bool diag_reported_onset = false;

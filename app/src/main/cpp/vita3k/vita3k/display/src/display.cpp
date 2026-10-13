@@ -234,12 +234,6 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
             const uint64_t renderer_idle_vblanks = vblanks - last_progress_change_vblank;
             const uint64_t guest_idle_vblanks = vblanks - last_wake_change_vblank;
 
-            if (unpaused && vblanks > 0 && (vblanks % 600) == 0)
-                LOG_INFO("[FLIPTRACE] vblank={} SetFrameBuf calls={} accepted={} queue: entries_done={} depth={} worker_state={} renderer_progress={}",
-                    vblanks, emuenv.display.setframe_call_count.load(), emuenv.display.setframe_accept_count.load(),
-                    emuenv.gxm.display_entries_done.load(), emuenv.gxm.display_queue.size(), emuenv.gxm.display_worker_state.load(),
-                    emuenv.renderer ? emuenv.renderer->progress_counter.load(std::memory_order_relaxed) : 0);
-
             // Full 10s dump for diagnostics (once per distinct stall).
             if (stall_vblanks > 600 && unpaused && last_dumped_setframe != setframe) {
                 last_dumped_setframe = setframe; // one dump per distinct stall

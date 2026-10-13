@@ -41,9 +41,6 @@ extern "C" {
 
 namespace renderer::vulkan {
 thread_local bool surface_sync_internal_write = false;
-std::atomic<uint32_t> f10_sync_count{ 0 };
-std::atomic<uint32_t> f10_skip_count{ 0 };
-std::atomic<uint64_t> f10_repack_us{ 0 };
 } // namespace renderer::vulkan
 
 static bool format_support_surface_sync(SceGxmColorBaseFormat format) {
@@ -2130,7 +2127,6 @@ bool VKSurfaceCache::check_for_surface(MemState &mem, Address source_address, Ca
         it = find_color_surface_containing(source_address, source_size);
         if (it == color_address_lookup.end())
             return false;
-        LOG_INFO_ONCE("[XFER] transfer source 0x{:08X} is a sub-rectangle of the surface at 0x{:08X}; syncing it before the CPU read", source_address, it->first);
     }
 
     auto &surface = *it->second;
@@ -2345,11 +2341,9 @@ ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {
     if (surface_sync_needs_f10_repack(*last_written_surface) || surface_sync_needs_se5_repack(*last_written_surface)) {
         const auto now = std::chrono::steady_clock::now();
         if (now - last_written_surface->last_repack_sync_time < std::chrono::milliseconds(25)) {
-            f10_skip_count.fetch_add(1, std::memory_order_relaxed);
             return nullptr;
         }
         last_written_surface->last_repack_sync_time = now;
-        f10_sync_count.fetch_add(1, std::memory_order_relaxed);
     }
 
     VKContext *context = reinterpret_cast<VKContext *>(state.context);
@@ -2670,9 +2664,7 @@ void VKSurfaceCache::perform_post_surface_sync(const MemState &mem, ColorSurface
     }
 
     if (surface_sync_needs_f10_repack(*surface)) {
-        const auto t0 = std::chrono::steady_clock::now();
         pack_rgba16f_to_u2f10f10f10(pixels, static_cast<const uint8_t *>(surface->copy_buffer->mapped_data), pixel_stride, surface->original_height);
-        f10_repack_us.fetch_add(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count(), std::memory_order_relaxed);
 
         return;
     }

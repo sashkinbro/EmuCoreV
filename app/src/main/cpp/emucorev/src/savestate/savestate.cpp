@@ -1478,7 +1478,6 @@ bool read_audio(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::stri
         emuenv.audio.out_ports = std::move(reopened);
         emuenv.audio.next_port_id = static_cast<int>(snapshot.next_port_id);
     }
-    LOG_CRITICAL("[savestate-audio] restored {} audio ports (next_id={})", snapshot.ports.size(), snapshot.next_port_id);
     return true;
 }
 
@@ -1632,7 +1631,6 @@ bool read_input(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::stri
         std::copy(snapshot.touch_buffers[i].begin(), snapshot.touch_buffers[i].end(), touch.touch_buffers[i]);
     if (!emuenv.motion.apply_snapshot(snapshot.motion, error))
         return false;
-    LOG_CRITICAL("[savestate-input] restored input_mode={} input_mode_ext={}", snapshot.input_mode, snapshot.input_mode_ext);
     return true;
 }
 
@@ -1827,8 +1825,6 @@ bool read_io(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::string 
     for (const IoTtyInfo &tty : snapshot.ttys)
         staged.tty_files.emplace(tty.fd, static_cast<TtyType>(tty.type));
 
-    uint32_t reopened_files = 0;
-    uint32_t reopened_dirs = 0;
     for (const IoFileInfo &file : snapshot.files) {
         const int32_t safe_mode = file.open_mode & ~(SCE_O_CREAT | SCE_O_TRUNC | SCE_O_EXCL);
         staged.next_fd = file.fd;
@@ -1842,7 +1838,6 @@ bool read_io(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::string 
             error = "failed to restore saved IO file position: " + file.path;
             return false;
         }
-        ++reopened_files;
     }
     for (const IoDirInfo &dir : snapshot.dirs) {
         staged.next_fd = dir.fd;
@@ -1851,7 +1846,6 @@ bool read_io(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::string 
             error = "failed to reopen saved IO directory: " + dir.path;
             return false;
         }
-        ++reopened_dirs;
     }
     staged.next_fd = snapshot.next_fd;
 
@@ -1863,7 +1857,6 @@ bool read_io(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::string 
         io.next_fd = staged.next_fd;
     }
 
-    LOG_CRITICAL("[savestate-io] restored files={}/{} dirs={}/{} tty={} next_fd={}", reopened_files, snapshot.files.size(), reopened_dirs, snapshot.dirs.size(), snapshot.ttys.size(), io.next_fd);
     return true;
 }
 

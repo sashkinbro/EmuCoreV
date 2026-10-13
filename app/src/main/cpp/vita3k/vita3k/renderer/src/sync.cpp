@@ -102,10 +102,6 @@ COMMAND(handle_set_screen_filter) {
 
 COMMAND(new_frame) {
     TRACY_FUNC_COMMANDS(new_frame);
-    static std::atomic<uint32_t> new_frame_count{ 0 };
-    const uint32_t frame_number = new_frame_count.fetch_add(1, std::memory_order_relaxed) + 1;
-    if (frame_number % 120 == 1)
-        LOG_CRITICAL("[fliptrace] renderer new_frame #{}", frame_number);
     DisplayFrameInfo *next_frame = helper.pop<DisplayFrameInfo *>();
     DisplayState *display = helper.pop<DisplayState *>();
 

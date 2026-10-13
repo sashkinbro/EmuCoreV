@@ -166,15 +166,11 @@ struct WorldStopScope {
         if (!enable_world_stop_for_transitions || !mem.use_page_table || !renderer.kernel)
             return;
         kernel = renderer.kernel;
-        const auto start = std::chrono::steady_clock::now();
-        const int not_parked = kernel->stop_world(except_thread, std::chrono::milliseconds(50));
-        const auto took_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
-        LOG_INFO("memory transition 0x{:X} size 0x{:X}: world stopped in {} ms, {} thread(s) not parked", addr, size, took_ms, not_parked);
+        kernel->stop_world(except_thread, std::chrono::milliseconds(50));
     }
     ~WorldStopScope() {
         if (kernel) {
             kernel->resume_world();
-            LOG_DEBUG("memory transition: world resumed");
         }
     }
 };
@@ -189,9 +185,6 @@ bool has_pending_deferred_unmap() {
 
 static void note_memory_transition(renderer::State &renderer, const char *kind, Address addr, uint32_t size) {
     renderer.last_mem_transition_epoch_ms.store(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(), std::memory_order_relaxed);
-    static uint64_t transitions = 0;
-    if (((++transitions) & 1023) == 1)
-        LOG_INFO("[MEMTRANS] transition #{}: {} 0x{:X} size 0x{:X}", transitions, kind, addr, size);
 }
 
 static void flush_deferred_unmap(renderer::State &renderer, MemState &mem, SceUID caller_thread) {

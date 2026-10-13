@@ -51,7 +51,6 @@ void AudioState::stop_all_ports() {
             port->stopping = true;
             port->notify_output_ready();
         }
-        LOG_CRITICAL("[savestate-audio] stop_all_ports: {} ports stopped", out_ports.size());
     }
     if (adapter)
         adapter->wake_all_ports();
@@ -107,7 +106,6 @@ AudioOutPortPtr AudioState::open_port(int nb_channels, int freq, int nb_sample) 
     if (!port)
         return nullptr;
 
-    LOG_CRITICAL("[savestate-audio] open_port channels={} freq={} samples={} len_us={}", nb_channels, freq, nb_sample, port->len_microseconds);
     set_volume(*port, port->volume);
     return port;
 }

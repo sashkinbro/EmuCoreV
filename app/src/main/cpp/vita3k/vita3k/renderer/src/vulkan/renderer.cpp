@@ -1531,19 +1531,6 @@ void VKState::swap_window() {
     // look once a frame if we need to save the pipeline cache
     const auto time_s = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
-    // Renderer heartbeat. If the emulator ever appears frozen, this is what says whether frames are still being presented
-    static uint64_t frames_presented = 0;
-    static int64_t next_heartbeat = 0;
-    frames_presented++;
-    if (time_s >= next_heartbeat) {
-        if (next_heartbeat != 0) {
-            LOG_DEBUG("renderer heartbeat: {} frames presented, pipelines created={} failed={}",
-                frames_presented, pipeline_cache.pipelines_created.load(), pipeline_cache.pipelines_failed.load());
-            mem_diag::log_memory_snapshot("heartbeat");
-        }
-        next_heartbeat = time_s + 5;
-    }
-
     if (time_s >= pipeline_cache.next_pipeline_cache_save) {
         pipeline_cache.save_pipeline_cache();
 
@@ -1833,21 +1820,6 @@ bool VKState::map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
                 .buffer = mapped_buffer
             };
             const uint64_t buffer_address = device.getBufferAddress(address_info);
-
-            // CPU-speed probe: one line per mapping makes slow write-combined gralloc memory visible in the log
-            if (size >= MiB(1)) {
-                static std::vector<uint8_t> probe_buf;
-                probe_buf.resize(MiB(1));
-                const auto t0 = std::chrono::steady_clock::now();
-                memcpy(probe_buf.data(), reinterpret_cast<uint8_t *>(mapped_location), MiB(1));
-                const auto t1 = std::chrono::steady_clock::now();
-                memcpy(reinterpret_cast<uint8_t *>(mapped_location), probe_buf.data(), MiB(1));
-                const auto t2 = std::chrono::steady_clock::now();
-                const auto us_read = std::max<int64_t>(1, std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count());
-                const auto us_write = std::max<int64_t>(1, std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
-                LOG_INFO("NativeBuffer 0x{:X}: CPU read {} MB/s, write {} MB/s ({})", address.address(),
-                    1'000'000 / us_read, 1'000'000 / us_write, (1'000'000 / us_read) < 200 ? "WRITE-COMBINED? SLOW!" : "cached, OK");
-            }
 
             add_external_mapping(mem, address.address(), size, reinterpret_cast<uint8_t *>(mapped_location));
             mapped_memories[address.address()] = { address.address(), ExternalBuffer{ device_memory, buffer }, mapped_buffer, size, buffer_address };

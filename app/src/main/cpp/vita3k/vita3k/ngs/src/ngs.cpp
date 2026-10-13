@@ -521,8 +521,6 @@ bool restore_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> definit
             return false;
     }
 
-    static std::atomic<uint64_t> diag_restore_logs{ 0 };
-
     for (const RackInitInfo &info : rack_infos) {
         System *system = info.system.get(mem);
         if (!system)
@@ -539,13 +537,6 @@ bool restore_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> definit
         // The mempool keeps dynamic allocations (patches) alive.
         if (!info.blocks.empty())
             rack->allocator.blocks = info.blocks;
-
-        uint32_t diag_voices = 0;
-        uint32_t diag_modules = 0;
-        uint32_t diag_logical = 0;
-        uint32_t diag_params = 0;
-        uint32_t diag_reinit = 0;
-        uint32_t diag_queued = 0;
 
         // Rebuild the host-side voices in place, then re-link their patches.
         for (size_t v = 0; v < rack->voices.size(); v++) {
@@ -603,7 +594,6 @@ bool restore_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> definit
                     voice->patches[p][k] = Ptr<Patch>(voice_info.patches[p][k]);
             }
 
-            diag_voices++;
             for (size_t m = 0; m < voice->datas.size() && m < voice_info.modules.size(); m++) {
                 ModuleData &data = voice->datas[m];
                 const ModuleDataInfo &module_info = voice_info.modules[m];
@@ -615,11 +605,6 @@ bool restore_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> definit
                     return false;
                 data.parent = voice;
                 data.index = static_cast<uint32_t>(m);
-                diag_modules++;
-                if (!module_info.logical_state.empty())
-                    diag_logical++;
-                if (!module_info.parameters.empty())
-                    diag_params++;
                 data.guest_state_data = module_info.guest_state_data;
                 data.last_info = module_info.last_info;
                 data.callback = Ptr<void>(module_info.callback);
@@ -638,12 +623,6 @@ bool restore_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> definit
             }
         }
 
-        const uint64_t diag_n = diag_restore_logs.fetch_add(1, std::memory_order_relaxed) + 1;
-        if (diag_n <= 8 || (diag_n % 64) == 0)
-            LOG_CRITICAL("[savestate-ngs] rack restored voices={} modules={} logical_blobs={} param_blobs={} needs_reinit={} saved_voices={} blocks={}",
-                diag_voices, diag_modules, diag_logical, diag_params, diag_reinit, info.voices.size(), info.blocks.size());
-
-        (void)diag_queued;
     }
 
     // Voices that were being mixed before the save must run again.
@@ -668,11 +647,6 @@ bool restore_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> definit
         // deque_insert would sort dependencies again and alter that order.
         const std::lock_guard<std::recursive_mutex> guard(system->voice_scheduler.mutex);
         system->voice_scheduler.queue = std::move(restored_queue);
-        if (!info.queued_voices.empty()) {
-            const uint64_t diag_n = diag_restore_logs.fetch_add(1, std::memory_order_relaxed) + 1;
-            if (diag_n <= 8 || (diag_n % 64) == 0)
-                LOG_CRITICAL("[savestate-ngs] system requeued {} voices (queue={})", info.queued_voices.size(), system->voice_scheduler.queue.size());
-        }
     }
     return true;
 }
@@ -748,7 +722,6 @@ bool init_rack(State &ngs, const MemState &mem, System *system, SceNgsBufferInfo
 
     // Alloc spaces for voice
     rack->voices.resize(description->voice_count);
-    LOG_WARN("[NGSLIFE] init_rack {} ({} voices)", fmt::ptr(rack), description->voice_count);
     rack->vdef = description->definition.get(mem);
 
     for (auto &voice : rack->voices) {
@@ -790,7 +763,6 @@ bool init_rack(State &ngs, const MemState &mem, System *system, SceNgsBufferInfo
 }
 
 void release_rack(State &ngs, const MemState &mem, System *system, Rack *rack) {
-    LOG_WARN("[NGSLIFE] release_rack {} ({} voices)", fmt::ptr(rack), rack ? rack->voices.size() : 0);
     // this function should only be called outside of ngs update and with the scheduler mutex acquired (except when releasing the system)
     if (!rack)
         return;

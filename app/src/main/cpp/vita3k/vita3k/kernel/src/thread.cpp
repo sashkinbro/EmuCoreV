@@ -205,41 +205,6 @@ void waiter_remove(int priority) {
     }
 }
 
-std::atomic<uint64_t> g_sched_acquires{ 0 };
-std::atomic<uint64_t> g_sched_forced{ 0 };
-std::atomic<uint64_t> g_sched_preempts{ 0 };
-std::atomic<uint64_t> g_sched_wait_us{ 0 };
-std::atomic<uint64_t> g_sched_max_wait_us{ 0 };
-std::atomic<uint64_t> g_sched_fastpath{ 0 };
-std::atomic<uint64_t> g_sched_yield_slice{ 0 };
-std::atomic<uint64_t> g_sched_yield_preempted{ 0 };
-std::atomic<uint64_t> g_sched_yield_block{ 0 };
-std::atomic<uint64_t> g_sched_hold_us{ 0 };
-std::atomic<uint64_t> g_sched_hold_max_us{ 0 };
-std::atomic<int64_t> g_sched_last_report{ 0 };
-
-void sched_report(int64_t now_us) {
-    int64_t last = g_sched_last_report.load(std::memory_order_relaxed);
-    if (last != 0 && now_us - last < 10'000'000)
-        return;
-    if (!g_sched_last_report.compare_exchange_strong(last, now_us))
-        return;
-    if (last == 0)
-        return;
-    const uint64_t acquires = g_sched_acquires.exchange(0);
-    if (acquires == 0)
-        return;
-    const uint64_t fast = g_sched_fastpath.exchange(0);
-    const uint64_t held_us = g_sched_hold_us.exchange(0);
-    LOG_INFO("[GUEST-SCHED] 10s: acquires={} ({:.1f}% uncontended) preempts={} deadline_overrides={} wait_total_ms={:.1f} wait_max_ms={:.2f} | yields slice={} preempt={} block={} | held_total_ms={:.0f} held_avg_us={:.1f} held_max_ms={:.2f}",
-        acquires, acquires ? (100.0 * fast / acquires) : 0.0,
-        g_sched_preempts.exchange(0), g_sched_forced.exchange(0),
-        g_sched_wait_us.exchange(0) / 1000.0, g_sched_max_wait_us.exchange(0) / 1000.0,
-        g_sched_yield_slice.exchange(0), g_sched_yield_preempted.exchange(0), g_sched_yield_block.exchange(0),
-        held_us / 1000.0, acquires ? static_cast<double>(held_us) / acquires : 0.0,
-        g_sched_hold_max_us.exchange(0) / 1000.0);
-}
-
 void sched_acquire(int priority, SceInt32 affinity_mask, bool enabled, CPUState *cpu,
     const std::string &name, SceUID id) {
     if (affinity_mask != 0 || !enabled)
@@ -258,8 +223,6 @@ void sched_acquire(int priority, SceInt32 affinity_mask, bool enabled, CPUState 
                 break;
             }
         }
-        g_sched_acquires.fetch_add(1, std::memory_order_relaxed);
-        g_sched_fastpath.fetch_add(1, std::memory_order_relaxed);
         tls_holds_token = true;
         tls_token_priority = priority;
         tls_token_cpu = cpu;
@@ -273,7 +236,6 @@ void sched_acquire(int priority, SceInt32 affinity_mask, bool enabled, CPUState 
         for (auto &h : g_sched_holders) {
             if (h.cpu && h.priority > priority && now - h.since >= SCHED_MIN_SLICE) {
                 stop(*h.cpu);
-                g_sched_preempts.fetch_add(1, std::memory_order_relaxed);
             }
         }
     };
@@ -282,7 +244,8 @@ void sched_acquire(int priority, SceInt32 affinity_mask, bool enabled, CPUState 
     const auto deadline = start + SCHED_DEADLINE_WINDOW;
     while (g_sched_running >= g_sched_cores || g_sched_best_waiter.load(std::memory_order_relaxed) < priority) {
         if (g_sched_cv.wait_until(lock, deadline) == std::cv_status::timeout) {
-            g_sched_forced.fetch_add(1, std::memory_order_relaxed);
+
+#ifndef NDEBUG
             static std::atomic<int64_t> last_logged_us{ 0 };
             const int64_t now_forced_us = std::chrono::duration_cast<std::chrono::microseconds>(
                 std::chrono::steady_clock::now().time_since_epoch())
@@ -297,6 +260,7 @@ void sched_acquire(int priority, SceInt32 affinity_mask, bool enabled, CPUState 
                 }
                 LOG_WARN("[GUEST-SCHED] \"{}\" (#{} prio {}) forced through after {}ms; holder prio {}", name, id, priority, std::chrono::duration_cast<std::chrono::milliseconds>(SCHED_DEADLINE_WINDOW).count(), holder_prio);
             }
+#endif
             break;
         }
         preempt_lower(std::chrono::steady_clock::now());
@@ -315,21 +279,9 @@ void sched_acquire(int priority, SceInt32 affinity_mask, bool enabled, CPUState 
     tls_token_cpu = cpu;
     tls_slice_start = std::chrono::steady_clock::now();
 
-    const auto waited_us = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count());
-    g_sched_acquires.fetch_add(1, std::memory_order_relaxed);
-    g_sched_wait_us.fetch_add(waited_us, std::memory_order_relaxed);
-    uint64_t prev_max = g_sched_max_wait_us.load(std::memory_order_relaxed);
-    while (waited_us > prev_max && !g_sched_max_wait_us.compare_exchange_weak(prev_max, waited_us)) {
-    }
 }
 
 void sched_release_internal(CPUState *cpu) {
-    const auto held_us = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - tls_slice_start).count());
-    g_sched_hold_us.fetch_add(held_us, std::memory_order_relaxed);
-    uint64_t prev_hold = g_sched_hold_max_us.load(std::memory_order_relaxed);
-    while (held_us > prev_hold && !g_sched_hold_max_us.compare_exchange_weak(prev_hold, held_us)) {
-    }
-
     bool has_waiters;
     {
         const std::lock_guard<std::mutex> lock(g_sched_mutex);
@@ -349,7 +301,6 @@ void sched_release_internal(CPUState *cpu) {
     if (has_waiters)
         g_sched_cv.notify_all();
 
-    sched_report(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
 }
 
 void sched_maybe_yield(SceInt32 affinity_mask, bool enabled, CPUState *cpu) {
@@ -359,7 +310,6 @@ void sched_maybe_yield(SceInt32 affinity_mask, bool enabled, CPUState *cpu) {
     const bool slice_over = (std::chrono::steady_clock::now() - tls_slice_start) >= SCHED_TIMESLICE;
     const bool outranked = !slice_over && g_sched_best_waiter.load(std::memory_order_relaxed) < tls_token_priority;
     if (slice_over || outranked) {
-        (slice_over ? g_sched_yield_slice : g_sched_yield_preempted).fetch_add(1, std::memory_order_relaxed);
         sched_release_internal(cpu);
     }
 }
@@ -375,7 +325,6 @@ void guest_sched_set_cores(int cores) {
 
 void guest_sched_release_for_block() {
     if (tls_holds_token) {
-        g_sched_yield_block.fetch_add(1, std::memory_order_relaxed);
         sched_release_internal(tls_token_cpu);
     }
 }

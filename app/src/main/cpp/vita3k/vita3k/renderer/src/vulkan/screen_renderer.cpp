@@ -753,12 +753,8 @@ bool ScreenRenderer::rebuild_swapchain_if_visible() {
 
     // This is the most expensive thing the emulator does outside loading
     // it idles the device, which stalls the vblank thread too
-    auto *frame_host = static_cast<renderer::State &>(state).frame;
-    const auto rebuild_start = std::chrono::steady_clock::now();
     state.device.waitIdle();
-    const auto idled = std::chrono::steady_clock::now();
     destroy_swapchain();
-    const auto destroyed = std::chrono::steady_clock::now();
 
 #ifdef __ANDROID__
     if (!create())
@@ -769,14 +765,6 @@ bool ScreenRenderer::rebuild_swapchain_if_visible() {
 #endif
 
     create_swapchain();
-    const auto created = std::chrono::steady_clock::now();
-    const auto ms = [](auto a, auto b) {
-        return std::chrono::duration_cast<std::chrono::microseconds>(b - a).count() / 1000.0;
-    };
-    LOG_WARN("[SWAPCHAIN] rebuild ({}): window={}x{} -> swapchain={}x{} | waitIdle={:.1f}ms destroy={:.1f}ms create={:.1f}ms total={:.1f}ms",
-        rebuild_reason, frame_host->drawable_width(), frame_host->drawable_height(),
-        extent.width, extent.height, ms(rebuild_start, idled), ms(idled, destroyed),
-        ms(destroyed, created), ms(rebuild_start, created));
     size_mismatch_frames = 0;
     return static_cast<bool>(swapchain);
 }

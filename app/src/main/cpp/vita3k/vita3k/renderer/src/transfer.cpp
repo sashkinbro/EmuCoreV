@@ -311,7 +311,7 @@ COMMAND(handle_transfer_downscale) {
         if (can_stage
             && (!is_valid_addr_range(mem, src_addr, static_cast<Address>(src_addr + src_bytes))
                 || !is_valid_addr_range(mem, dst_addr, static_cast<Address>(dst_addr + dst_bytes)))) {
-            LOG_WARN_ONCE("[XFER] downscale skipped: src 0x{:08X}+{} or dst 0x{:08X}+{} is not fully allocated guest memory",
+            LOG_WARN_ONCE("Downscale skipped: src 0x{:08X}+{} or dst 0x{:08X}+{} is not fully allocated guest memory",
                 src_addr, src_bytes, dst_addr, dst_bytes);
             delete src;
             delete dst;
@@ -390,21 +390,11 @@ COMMAND(handle_transfer_downscale) {
         delete dst;
     };
 
-    const auto log_src = *src;
-    const auto log_dst = *dst;
-
     bool gpu_path = false;
     if (renderer.current_backend == Backend::Vulkan && renderer.features.enable_memory_mapping && !renderer.disable_surface_sync) {
         // src->address has already been adjusted to the first read byte above
         gpu_path = dynamic_cast<vulkan::VKState &>(renderer).surface_cache.check_for_surface(mem, src->address.address(), downscale_operation, dst->address.address(), static_cast<uint32_t>(std::min<uint64_t>(transfer_region_bytes(*src, pixel_bytes), UINT32_MAX)));
     }
-
-    static std::atomic<uint32_t> downscales{ 0 };
-    const uint32_t n = downscales.fetch_add(1, std::memory_order_relaxed) + 1;
-    if (n <= 4 || (n & 1023) == 0)
-        LOG_INFO("[XFER] downscale #{}: fmt 0x{:X} src 0x{:08X} (surface base 0x{:08X}) xy=({},{}) {}x{} stride {} -> dst 0x{:08X} xy=({},{}) {}x{} stride {} | {}",
-            n, fmt::underlying(log_src.format), log_src.address.address(), src_surface_base, log_src.x, log_src.y, log_src.width, log_src.height, log_src.stride,
-            log_dst.address.address(), log_dst.x, log_dst.y, log_dst.width, log_dst.height, log_dst.stride, gpu_path ? "GPU surface path" : "CPU path (staged)");
 
     if (gpu_path)
         // let the vulkan surface cache handle it
