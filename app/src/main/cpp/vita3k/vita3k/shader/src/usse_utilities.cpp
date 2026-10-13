@@ -1651,6 +1651,13 @@ spv::Id convert_to_int(spv::Builder &b, const SpirvUtilFunctions &utils, spv::Id
         opr = b.createBuiltinCall(opr_type, utils.std_builtins, GLSLstd450FClamp, { opr, range_begin_vec, range_end_vec });
         opr = b.createBinOp(spv::OpFMul, opr_type, opr, normalizer_vec);
         opr = b.createBuiltinCall(opr_type, utils.std_builtins, GLSLstd450Round, { opr });
+    } else if (type == DataType::UINT8) {
+        // Unscaled float-to-U8 packing still saturates to the destination range.
+        // Converting to U32 first and keeping the low byte wraps bright colors
+        // (for example 300 becomes 44) and leaves negative conversions undefined.
+        const auto range_begin_vec = create_constant_vector_or_scalar(b, b.makeFloatConstant(0.f), comp_count);
+        const auto range_end_vec = create_constant_vector_or_scalar(b, b.makeFloatConstant(255.f), comp_count);
+        opr = b.createBuiltinCall(opr_type, utils.std_builtins, GLSLstd450FClamp, { opr, range_begin_vec, range_end_vec });
     }
 
     if (!is_uint) {
