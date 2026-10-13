@@ -27,6 +27,7 @@ import com.sbro.emucorev.ui.theme.ThemeMode
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 class MainActivity : ComponentActivity() {
     private lateinit var customizationPreferences: CustomizationPreferences
@@ -76,7 +77,7 @@ class MainActivity : ComponentActivity() {
         enterImmersiveMode()
         reviewPromptJob?.cancel()
         reviewPromptJob = lifecycleScope.launch {
-            delay(REVIEW_PROMPT_DELAY_MS)
+            delay(REVIEW_PROMPT_DELAY_MS.milliseconds)
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
                 inAppReviewCoordinator.attempt()
             }
