@@ -44,6 +44,8 @@ EXPORT(void, SceImeEventHandler, Ptr<void> arg, const SceImeEvent *e) {
 EXPORT(SceInt32, sceImeClose) {
     TRACY_FUNC(sceImeClose);
     emuenv.ime.state = false;
+    emuenv.ime.open_event_pending = false;
+    emuenv.ime.close_event_pending = false;
 
     if (emuenv.ime.param.inputTextBuffer.address())
         free(emuenv.mem, emuenv.ime.param.inputTextBuffer.address());
@@ -111,6 +113,8 @@ EXPORT(SceInt32, sceImeOpen, SceImeParam *param) {
 
     emuenv.ime.event_id = SCE_IME_EVENT_OPEN;
     emuenv.ime.state = true;
+    emuenv.ime.open_event_pending = true;
+    emuenv.ime.close_event_pending = false;
 
 #ifdef __ANDROID__
     ime::set_keyboard_active(true);
@@ -162,14 +166,21 @@ EXPORT(SceInt32, sceImeUpdate) {
     if (!emuenv.ime.state)
         return RET_ERROR(SCE_IME_ERROR_NOT_OPENED);
 
-    std::lock_guard lock(emuenv.ime.mutex);
+    std::unique_lock lock(emuenv.ime.mutex);
 
-    if (emuenv.ime.event_id == SCE_IME_EVENT_OPEN)
+    const bool open_event = emuenv.ime.open_event_pending;
+    const bool close_event = emuenv.ime.event_id == SCE_IME_EVENT_OPEN && emuenv.ime.close_event_pending;
+    if (!open_event && !close_event && emuenv.ime.event_id == SCE_IME_EVENT_OPEN)
         return 0;
 
     Ptr<SceImeEvent> event = Ptr<SceImeEvent>(alloc(emuenv.mem, sizeof(SceImeEvent), "ime_event"));
     SceImeEvent *e = event.get(emuenv.mem);
-    e->id = emuenv.ime.event_id;
+    if (!e)
+        return RET_ERROR(SCE_IME_ERROR_NO_MEMORY);
+    *e = {};
+    e->id = open_event ? SCE_IME_EVENT_OPEN : close_event ? SCE_IME_EVENT_PRESS_CLOSE : emuenv.ime.event_id;
+    if (open_event) emuenv.ime.open_event_pending = false;
+    if (close_event) emuenv.ime.close_event_pending = false;
 
     // Guard against a null inputTextBuffer — can happen if sceImeOpen allocated
     // the buffer but the game never initialised the edit_text.str pointer.
@@ -178,11 +189,20 @@ EXPORT(SceInt32, sceImeUpdate) {
         memcpy(text_dst, emuenv.ime.str.c_str(), (emuenv.ime.str.length() + 1) * sizeof(SceWChar16));
     }
 
-    e->param.text = emuenv.ime.edit_text;
-    e->param.caretIndex = emuenv.ime.caretIndex;
-    CALL_EXPORT(SceImeEventHandler, emuenv.ime.param.arg, e);
+    if (e->id == SCE_IME_EVENT_OPEN)
+        e->param.rect = {0, 0, 960, 544};
+    else if (e->id == SCE_IME_EVENT_UPDATE_CARET)
+        e->param.caretIndex = emuenv.ime.caretIndex;
+    else
+        e->param.text = emuenv.ime.edit_text;
+    const auto arg = emuenv.ime.param.arg;
+    // Consume this snapshot before entering guest code. The callback may close
+    // or reopen the IME (Android then snapshots it under the same mutex), or
+    // generate another event which must survive this update.
+    if (!open_event) emuenv.ime.event_id = SCE_IME_EVENT_OPEN;
+    lock.unlock();
+    CALL_EXPORT(SceImeEventHandler, arg, e);
     free(emuenv.mem, event.address());
-    emuenv.ime.event_id = SCE_IME_EVENT_OPEN;
 
     return 0;
 }

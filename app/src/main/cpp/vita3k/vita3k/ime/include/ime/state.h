@@ -51,6 +51,8 @@ struct Ime {
     uint32_t caps_level = 0;
     uint32_t caretIndex = 0;
     uint32_t event_id = SCE_IME_EVENT_OPEN;
+    bool open_event_pending = false;
+    bool close_event_pending = false;
 
     void deinit() {
         state = false;
@@ -61,5 +63,7 @@ struct Ime {
         caps_level = 0;
         caretIndex = 0;
         event_id = SCE_IME_EVENT_OPEN;
+        open_event_pending = false;
+        close_event_pending = false;
     }
 };

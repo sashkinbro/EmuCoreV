@@ -47,7 +47,8 @@ bool is_ime_dialog_active(const EmuEnvState &emuenv);
 bool is_any_ime_active(const EmuEnvState &emuenv);
 void finish_ime_dialog(EmuEnvState &emuenv);
 void cancel_ime_dialog(EmuEnvState &emuenv);
-bool submit_current_ime(EmuEnvState &emuenv);
+constexpr int kAndroidImeCompletionEvent = 0x494d4544;
+bool submit_current_ime(EmuEnvState &emuenv, bool finish_keyboard = true);
 bool dismiss_current_ime(EmuEnvState &emuenv);
 
 class ScopedJniCallback {

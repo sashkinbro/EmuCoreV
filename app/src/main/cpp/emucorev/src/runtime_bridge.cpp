@@ -124,12 +124,11 @@ Java_com_sbro_emucorev_core_vita_Emulator_submitNativeIme(JNIEnv *, jobject) {
     auto *controller = get_app_session_controller();
     if (!emuenv || !controller || !controller->is_running() || !is_any_ime_active(*emuenv))
         return JNI_FALSE;
-    // Queue Enter behind Android's pending SDL text events. Completing directly
+    // Queue completion behind Android's pending SDL text events. Completing directly
     // on the UI thread can return the old string before the final character arrives.
     SDL_Event event{};
-    event.type = SDL_EVENT_KEY_DOWN;
-    event.key.key = SDLK_RETURN;
-    event.key.down = true;
+    event.type = SDL_EVENT_USER;
+    event.user.code = kAndroidImeCompletionEvent;
     return SDL_PushEvent(&event) ? JNI_TRUE : JNI_FALSE;
 }
 

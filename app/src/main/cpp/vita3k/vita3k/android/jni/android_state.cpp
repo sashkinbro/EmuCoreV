@@ -98,7 +98,7 @@ void cancel_ime_dialog(EmuEnvState &emuenv) {
     dialog.result = SCE_COMMON_DIALOG_RESULT_USER_CANCELED;
 }
 
-bool submit_current_ime(EmuEnvState &emuenv) {
+bool submit_current_ime(EmuEnvState &emuenv, bool finish_keyboard) {
     if (!is_any_ime_active(emuenv))
         return false;
 
@@ -107,6 +107,7 @@ bool submit_current_ime(EmuEnvState &emuenv) {
     } else {
         std::lock_guard<std::mutex> lock(emuenv.ime.mutex);
         emuenv.ime.event_id = SCE_IME_EVENT_PRESS_ENTER;
+        emuenv.ime.close_event_pending = finish_keyboard;
     }
 
     return true;

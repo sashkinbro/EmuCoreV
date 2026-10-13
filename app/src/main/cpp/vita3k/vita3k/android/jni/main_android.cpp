@@ -131,8 +131,14 @@ bool handle_ime_keydown(EmuEnvState &emuenv, const SDL_KeyboardEvent &event) {
 
     case SDLK_RETURN:
     case SDLK_KP_ENTER:
-        submit_current_ime(emuenv);
-        ime::set_keyboard_active(false);
+        if (is_ime_dialog_active(emuenv)) {
+            submit_current_ime(emuenv, false);
+            ime::set_keyboard_active(false);
+        } else {
+            // Hardware Enter is an editor action. Android Done separately
+            // finishes the keyboard through kAndroidImeCompletionEvent.
+            submit_current_ime(emuenv, false);
+        }
         return true;
 
     case SDLK_ESCAPE:
@@ -599,6 +605,12 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
                 case SDL_EVENT_KEY_DOWN:
                     if (handle_ime_keydown(*emuenv, event.key))
                         break;
+                    break;
+
+                case SDL_EVENT_USER:
+                    if (event.user.code == kAndroidImeCompletionEvent && submit_current_ime(*emuenv)) {
+                        ime::set_keyboard_active(false);
+                    }
                     break;
 
                 case SDL_EVENT_TEXT_EDITING:
