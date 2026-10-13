@@ -14,3 +14,6 @@ allows the app to read it, then run the test with `am instrument -w -e class
 com.sbro.emucorev.DeviceGameSetupTest -e gameArchive <cache path> -e gameTitleId
 <title ID> com.sbro.emucorev.test/androidx.test.runner.AndroidJUnitRunner`.
 Remove only the temporary cached input after a successful installation.
+
+Pass `-e installOnly true` to validate the authorized archive installation and
+installed executable without downloading a cheat pack.

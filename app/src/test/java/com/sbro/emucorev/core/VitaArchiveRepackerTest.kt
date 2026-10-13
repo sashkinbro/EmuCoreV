@@ -61,17 +61,23 @@ class VitaArchiveRepackerTest {
     }
 
     @Test
-    fun vitaminArchiveIsRejectedWithoutRemovingItsRequiredRuntime() {
+    fun vitaminArchiveRepairPreservesItsRequiredRuntime() {
         val source = temp.newFile("vitamin.vpk")
         writeZip(source, "sce_sys/param.sfo" to byteArrayOf(1, 2, 3),
             "eboot.bin" to byteArrayOf(4, 5), "sce_module/steroid.suprx" to byteArrayOf(6))
         val original = source.readBytes()
 
-        assertNull(VitaArchiveRepacker.repackToInstallZip(source.absolutePath, temp.root))
+        val output = VitaArchiveRepacker.repackToInstallZip(source.absolutePath, temp.root)
+        assertNotNull(output)
+        ZipFile(output!!).use { zip ->
+            org.junit.Assert.assertArrayEquals(byteArrayOf(6),
+                zip.getInputStream(zip.getEntry("sce_module/steroid.suprx")).readBytes())
+            org.junit.Assert.assertArrayEquals(byteArrayOf(4, 5),
+                zip.getInputStream(zip.getEntry("eboot.bin")).readBytes())
+        }
 
         org.junit.Assert.assertArrayEquals(original, source.readBytes())
         assertTrue(VitaArchiveInspector.inspect(source.absolutePath).vitaminDump)
-        assertTrue(File(temp.root, "install_repack_cache").listFiles().orEmpty().isEmpty())
     }
 
     @Test
@@ -79,8 +85,12 @@ class VitaArchiveRepackerTest {
         val source = temp.newFile("nested.vpk")
         writeZip(source, "PCSB00183/sce_sys/param.sfo" to byteArrayOf(1),
             "PCSB00183/./SCE_MODULE\\.\\STEROID.SUPRX" to byteArrayOf(2))
-        assertNull(VitaArchiveRepacker.repackToInstallZip(source.absolutePath, temp.root))
-        assertTrue(File(temp.root, "install_repack_cache").listFiles().orEmpty().isEmpty())
+        val output = VitaArchiveRepacker.repackToInstallZip(source.absolutePath, temp.root)
+        assertNotNull(output)
+        ZipFile(output!!).use { zip ->
+            org.junit.Assert.assertArrayEquals(byteArrayOf(2),
+                zip.getInputStream(zip.getEntry("PCSB00183/SCE_MODULE/STEROID.SUPRX")).readBytes())
+        }
     }
 
     @Test

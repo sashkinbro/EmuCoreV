@@ -332,6 +332,24 @@ class ContentInstallSafetyTest {
         }
     }
 
+    @Test
+    fun vitaminArchiveInstallsItsRequiredRuntimeWithoutChangingOtherTitles() {
+        withInstallRoot { root ->
+            val sentinel = File(root, "vita/ux0/app/PCSE12345/keep.txt")
+            sentinel.parentFile!!.mkdirs()
+            sentinel.writeText("other title")
+            val runtime = byteArrayOf(0x53, 0x43, 0x45, 0, 3, 0, 0, 0)
+            val archive = createArchive(root, "PCSE54321",
+                additionalEntries = listOf("sce_module/steroid.suprx" to runtime))
+
+            assertEquals(1, install(root, archive))
+            org.junit.Assert.assertArrayEquals(runtime,
+                File(root, "vita/ux0/app/PCSE54321/sce_module/steroid.suprx").readBytes())
+            assertEquals("new executable", File(root, "vita/ux0/app/PCSE54321/eboot.bin").readText())
+            assertEquals("other title", sentinel.readText())
+        }
+    }
+
     private fun withInstallRoot(test: (File) -> Unit) {
         val root = File(context.cacheDir, "install-regression-${UUID.randomUUID()}")
         check(root.mkdirs())

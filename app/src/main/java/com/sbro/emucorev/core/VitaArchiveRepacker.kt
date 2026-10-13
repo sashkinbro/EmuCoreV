@@ -20,7 +20,6 @@ data class ArchiveRepackProgress(
 object VitaArchiveRepacker {
     private const val TAG = "VitaArchiveRepacker"
     private const val CACHE_DIR_NAME = "install_repack_cache"
-    private const val VITAMIN_MARKER = "sce_module/steroid.suprx"
 
     fun canRepack(path: String): Boolean {
         val extension = File(path).extension.lowercase(Locale.US)
@@ -55,9 +54,6 @@ object VitaArchiveRepacker {
                     entries.forEachIndexed { index, entry ->
                         val normalizedName = normalizeArchiveEntryName(entry.name)
                             ?: throw IOException("Unsafe archive entry: ${entry.name}")
-                        if (isUnsupportedVitaminMarker(normalizedName)) {
-                            throw IOException("Vitamin dumps are unsupported; their required runtime cannot be removed")
-                        }
                         if (!writtenNames.add(normalizedName.trimEnd('/').lowercase(Locale.US)))
                             throw IOException("Ambiguous duplicate archive entry: $normalizedName")
                         if (normalizedName.isEmpty()) {
@@ -117,11 +113,6 @@ object VitaArchiveRepacker {
         val canonical = components.filter { it.isNotEmpty() && it != "." }.joinToString("/")
         if (canonical.isEmpty()) return if (normalized.endsWith('/')) "" else null
         return canonical + if (normalized.endsWith('/')) "/" else ""
-    }
-
-    internal fun isUnsupportedVitaminMarker(name: String): Boolean {
-        val normalized = name.replace('\\', '/').lowercase(Locale.US)
-        return normalized == VITAMIN_MARKER || normalized.endsWith("/$VITAMIN_MARKER")
     }
 
     private fun safeBaseName(source: File): String {

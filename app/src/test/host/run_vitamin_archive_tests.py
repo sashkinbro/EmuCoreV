@@ -70,7 +70,7 @@ for(const auto &marker: std::vector<std::string>{"sce_module/steroid.suprx",
  "PCSB00183/./SCE_MODULE\\.\\STEROID.SUPRX"}){
  ZipPtr zip(new mz_zip_archive{{{"sce_sys/param.sfo"},{marker}}});
  bool valid=true;auto contents=get_archive_contents_path(zip,valid);
- check(!valid&&contents.empty(),"Vitamin runtime rejects entire archive before installation");
+ check(valid&&contents.size()==1,"Vitamin runtime does not prevent content admission");
 }
 {
  ZipPtr zip(new mz_zip_archive{{{"sce_sys/param.sfo"},{"sce_module/steroid.suprx.bak"}}});
@@ -81,7 +81,7 @@ for(const auto &marker: std::vector<std::string>{"sce_module/steroid.suprx",
  ZipPtr zip(new mz_zip_archive{{{"supported/sce_sys/param.sfo"},
  {"vitamin/sce_sys/param.sfo"},{"vitamin/sce_module/steroid.suprx"}}});
  bool valid=true;auto contents=get_archive_contents_path(zip,valid);
- check(!valid&&contents.empty(),"mixed archive cannot partially install before rejection");
+ check(valid&&contents.size()==2,"mixed archive admits both titles without discarding a runtime");
 }
 return failed?1:0;}
 '''

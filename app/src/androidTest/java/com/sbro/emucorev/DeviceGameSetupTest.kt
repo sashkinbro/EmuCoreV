@@ -38,6 +38,7 @@ class DeviceGameSetupTest {
         assertNotNull("Installed game is absent from the library", game)
         assertTrue("Installed executable is missing", File(game!!.installPath, "eboot.bin").isFile)
         println("Installed ${game.titleId}: ${game.title}, APP_VER=${game.version}")
+        if (arguments.getString("installOnly") == "true") return@runBlocking
 
         // Avoid changing a pack the user has already selected for this game.
         assumeTrue("An existing cheat pack is left in place", CheatBridge.snapshot(titleId).cheats.isEmpty())
