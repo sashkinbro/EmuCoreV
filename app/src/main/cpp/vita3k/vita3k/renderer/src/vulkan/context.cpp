@@ -19,6 +19,7 @@
 
 #include <renderer/vulkan/functions.h>
 #include <renderer/vulkan/context_snapshot.h>
+#include <renderer/vulkan/depth_clear.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/surface_sync.h>
@@ -562,7 +563,7 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
     // only the depth-stencil attachment may be clear if not force loaded. It can sit at attachment index 1 or 2 (raw u16 attachment present) so provide the value at both
     std::array<vk::ClearValue, 3> curr_clear_values{};
     const vk::ClearDepthStencilValue ds_clear{
-        .depth = record.depth_stencil_surface.background_depth,
+        .depth = normalized_depth_clear(record.depth_stencil_surface.background_depth),
         .stencil = record.depth_stencil_surface.stencil
     };
     curr_clear_values[1].depthStencil = ds_clear;
