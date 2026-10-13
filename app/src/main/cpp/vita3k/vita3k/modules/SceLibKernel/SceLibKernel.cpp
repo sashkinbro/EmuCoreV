@@ -216,10 +216,38 @@ EXPORT(int, sceClibMemsetChk) {
     return UNIMPLEMENTED();
 }
 
+// Guest RAM snapshots also contain dlmalloc's host-addressed bookkeeping.
+// Prepare the exact handle lazily so legacy states need no memory scan or
+// format change. All callers already hold the kernel mutex.
+static bool prepare_clib_mspace(EmuEnvState &emuenv, Ptr<void> space) {
+    if (emuenv.kernel.prepared_clib_mspaces.contains(space.address())) return true;
+    const auto mapped_region = [](void *pointer, size_t size, void *context) -> int {
+        auto &mem = *static_cast<MemState *>(context);
+        if (!pointer || !size || size > UINT32_MAX) return 0;
+        const Address start = host_to_guest(mem, pointer);
+        const uint64_t end = static_cast<uint64_t>(start) + size;
+        if (!start || end >= (uint64_t{1} << 32)
+            || Ptr<void>(start).get(mem) != pointer) return 0;
+        for (uint64_t address = start; address < end; address = (address | 4095u) + 1) {
+            if (!is_valid_addr(mem, static_cast<Address>(address))
+                || Ptr<void>(static_cast<Address>(address)).get(mem)
+                    != static_cast<uint8_t *>(pointer) + (address - start)) return 0;
+        }
+        return 1;
+    };
+    if (mspace_prepare_external(space.get(emuenv.mem), mapped_region, &emuenv.mem)) {
+        emuenv.kernel.prepared_clib_mspaces.insert(space.address());
+        return true;
+    }
+    LOG_ERROR("Invalid or unsupported guest mspace at {:#x}", space.address());
+    return false;
+}
+
 EXPORT(Ptr<void>, sceClibMspaceCalloc, Ptr<void> space, uint32_t elements, uint32_t size) {
     TRACY_FUNC(sceClibMspaceCalloc, space, elements, size);
     const std::lock_guard<std::mutex> guard(emuenv.kernel.mutex);
 
+    if (!prepare_clib_mspace(emuenv, space)) return Ptr<void>();
     void *address = mspace_calloc(space.get(emuenv.mem), elements, size);
     return Ptr<void>(address, emuenv.mem);
 }
@@ -229,13 +257,17 @@ EXPORT(Ptr<void>, sceClibMspaceCreate, Ptr<void> base, uint32_t capacity) {
     const std::lock_guard<std::mutex> guard(emuenv.kernel.mutex);
 
     mspace space = create_mspace_with_base(base.get(emuenv.mem), capacity, 0);
-    return Ptr<void>(space, emuenv.mem);
+    const Ptr<void> result(space, emuenv.mem);
+    if (space) emuenv.kernel.prepared_clib_mspaces.insert(result.address());
+    return result;
 }
 
 EXPORT(uint32_t, sceClibMspaceDestroy, Ptr<void> space) {
     TRACY_FUNC(sceClibMspaceDestroy, space);
     const std::lock_guard<std::mutex> guard(emuenv.kernel.mutex);
 
+    if (!prepare_clib_mspace(emuenv, space)) return 0;
+    emuenv.kernel.prepared_clib_mspaces.erase(space.address());
     return static_cast<uint32_t>(destroy_mspace(space.get(emuenv.mem)));
 }
 
@@ -243,6 +275,7 @@ EXPORT(void, sceClibMspaceFree, Ptr<void> space, Ptr<void> address) {
     TRACY_FUNC(sceClibMspaceFree, space, address);
     const std::lock_guard<std::mutex> guard(emuenv.kernel.mutex);
 
+    if (!prepare_clib_mspace(emuenv, space)) return;
     mspace_free(space.get(emuenv.mem), address.get(emuenv.mem));
 }
 
@@ -255,6 +288,7 @@ EXPORT(Ptr<void>, sceClibMspaceMalloc, Ptr<void> space, uint32_t size) {
     TRACY_FUNC(sceClibMspaceMalloc, space, size);
     const std::lock_guard<std::mutex> guard(emuenv.kernel.mutex);
 
+    if (!prepare_clib_mspace(emuenv, space)) return Ptr<void>();
     void *address = mspace_malloc(space.get(emuenv.mem), size);
     return Ptr<void>(address, emuenv.mem);
 }
@@ -278,6 +312,7 @@ EXPORT(Ptr<void>, sceClibMspaceMemalign, Ptr<void> space, uint32_t alignment, ui
     TRACY_FUNC(sceClibMspaceMemalign, space, alignment, size);
     const std::lock_guard<std::mutex> guard(emuenv.kernel.mutex);
 
+    if (!prepare_clib_mspace(emuenv, space)) return Ptr<void>();
     void *address = mspace_memalign(space.get(emuenv.mem), alignment, size);
     return Ptr<void>(address, emuenv.mem);
 }
@@ -286,6 +321,7 @@ EXPORT(Ptr<void>, sceClibMspaceRealloc, Ptr<void> space, Ptr<void> address, uint
     TRACY_FUNC(sceClibMspaceRealloc, space, address, size);
     const std::lock_guard<std::mutex> guard(emuenv.kernel.mutex);
 
+    if (!prepare_clib_mspace(emuenv, space)) return Ptr<void>();
     void *new_address = mspace_realloc(space.get(emuenv.mem), address.get(emuenv.mem), size);
     return Ptr<void>(new_address, emuenv.mem);
 }

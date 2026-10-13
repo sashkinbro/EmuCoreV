@@ -42,6 +42,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <thread>
 #include <vector>
 
@@ -116,6 +117,8 @@ struct KernelState {
     const uint64_t sync_cache_identity;
     std::atomic<uint64_t> sync_cache_generation{ 0 };
     CodecEngineBlocks codec_blocks;
+    // Host-only cache: copied guest heaps must be validated once after RAM restore.
+    std::set<Address> prepared_clib_mspaces;
 
     bool accurate_thread_scheduling = false;
 

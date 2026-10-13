@@ -369,6 +369,7 @@ void KernelState::process_exit() {
     host_threads.join_all();
     snapshot_objects.clear();
     snapshot_thread_owners.clear();
+    prepared_clib_mspaces.clear();
     sync_cache_generation.fetch_add(1, std::memory_order_acq_rel);
     clear_sync_primitive_thread_cache();
 }

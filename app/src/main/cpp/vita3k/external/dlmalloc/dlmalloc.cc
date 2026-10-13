@@ -1,4 +1,9 @@
 #include "dlmalloc.h"
+#include <cstdint>
+#include <map>
+#include <set>
+#include <type_traits>
+#include <vector>
 
 /*------------------------------ internal #includes ---------------------- */
 
@@ -1228,6 +1233,7 @@ public:
     void      init_top(mchunkptr p, size_t psize);
     void      init_bins();
     void      init(char* tbase, size_t tsize);
+    int       prepare_external(int (*validate_region)(void*, size_t, void*), void* context);
 
     /* ------------------------ System alloc/dealloc -------------------------- */
     void*     sys_alloc(size_t nb);
@@ -4185,6 +4191,157 @@ size_t destroy_mspace(mspace msp) {
 }
 
 /* ----------------------------  mspace versions of malloc/calloc/free routines -------------------- */
+int malloc_state::prepare_external(int (*validate_region)(void*, size_t, void*), void* context) {
+#if FOOTERS || HAVE_MMAP || HAVE_MORECORE
+    // This importer deliberately supports the fixed external heaps used by Vita.
+    return 0;
+#else
+    if (!validate_region || !validate_region(this, sizeof(*this), context)) return 0;
+    mparams.ensure_initialization();
+    const uintptr_t current = reinterpret_cast<uintptr_t>(this);
+    const uintptr_t bin_offset = reinterpret_cast<uintptr_t>(smallbin_at(0)) - current;
+    const uintptr_t old_bin = reinterpret_cast<uintptr_t>(_smallbins[2]);
+    if (old_bin < bin_offset || _smallbins[2] != _smallbins[3]) return 0;
+    const uintptr_t old_state = old_bin - bin_offset;
+    const uintptr_t bin1_offset = reinterpret_cast<uintptr_t>(smallbin_at(1)) - current;
+    if (old_state > UINTPTR_MAX - bin1_offset
+        || reinterpret_cast<uintptr_t>(_smallbins[4]) != old_state + bin1_offset
+        || _smallbins[4] != _smallbins[5]) return 0;
+    const uintptr_t old_base = reinterpret_cast<uintptr_t>(_seg._base);
+    const size_t capacity = _seg._size;
+    if (_seg._sflags != EXTERN_BIT || _seg._next || old_state < old_base
+        || old_state - old_base > 2 * MALLOC_ALIGNMENT
+        || capacity < sizeof(*this) + TOP_FOOT_SIZE
+        || capacity > UINTPTR_MAX - old_base || _footprint != capacity
+        || _least_addr != _seg._base || _extp || _exts) return 0;
+    const uintptr_t offset = old_state - old_base;
+    if (current < offset) return 0;
+    const uintptr_t base = current - offset;
+    if (capacity > UINTPTR_MAX - base
+        || chunk2mem(align_as_chunk(reinterpret_cast<char*>(base))) != this
+        || !validate_region(reinterpret_cast<void*>(base), capacity, context)) return 0;
+
+    const auto translate = [&](uintptr_t pointer) -> uintptr_t {
+        return pointer ? base + (pointer - old_base) : 0;
+    };
+    const auto in_heap = [&](uintptr_t pointer, size_t size) {
+        return pointer >= old_base && pointer - old_base <= capacity
+            && size <= capacity - (pointer - old_base)
+            && (pointer % alignof(void*)) == 0;
+    };
+    const uintptr_t old_top = reinterpret_cast<uintptr_t>(_top);
+    const uintptr_t old_dv = reinterpret_cast<uintptr_t>(_dv);
+    if (!in_heap(old_top, sizeof(malloc_chunk_header))
+        || (old_dv && !in_heap(old_dv, sizeof(malloc_chunk_header)))
+        || (_dvsize && !old_dv)) return 0;
+    std::map<uintptr_t, mchunkptr> free_chunks;
+    bool found_dv = !_dvsize;
+    auto *chunk = align_as_chunk(reinterpret_cast<char*>(base));
+    if (chunk->_head != (pad_request(sizeof(*this)) | INUSE_BITS)) return 0;
+    while (reinterpret_cast<uintptr_t>(chunk) < translate(old_top)) {
+        const uintptr_t at = reinterpret_cast<uintptr_t>(chunk);
+        if (at - base > capacity - sizeof(malloc_chunk_header)) return 0;
+        const size_t size = chunk->chunksize();
+        if (size < MIN_CHUNK_SIZE || (size & CHUNK_ALIGN_MASK)
+            || size > translate(old_top) - at) return 0;
+        auto *next = reinterpret_cast<mchunkptr>(at + size);
+        if (chunk->is_inuse()) {
+            if (!next->pinuse()) return 0;
+        } else {
+            if (next->pinuse() || next->_prev_foot != size) return 0;
+            if (at == translate(old_dv)) {
+                if (size != _dvsize) return 0;
+                found_dv = true;
+            } else {
+                free_chunks.emplace(old_base + (at - base), chunk);
+            }
+        }
+        chunk = next;
+    }
+    if (!found_dv || reinterpret_cast<uintptr_t>(chunk) != translate(old_top)
+        || chunk->is_inuse() || chunk->chunksize() != _topsize
+        || _topsize > capacity - (translate(old_top) - base)
+        || TOP_FOOT_SIZE > capacity - (translate(old_top) - base) - _topsize) return 0;
+    if (reinterpret_cast<mchunkptr>(translate(old_top) + _topsize)->_head != TOP_FOOT_SIZE) return 0;
+
+    // Validate ownership and reciprocal links before constructing any mutations.
+    std::set<uintptr_t> owned;
+    for (bindex_t i = 0; i < NSMALLBINS; ++i) {
+        if (!smallmap_is_marked(i)) continue;
+        const uintptr_t sentinel = old_state + (reinterpret_cast<uintptr_t>(smallbin_at(i)) - current);
+        auto *header = smallbin_at(i);
+        uintptr_t previous = sentinel, cursor = reinterpret_cast<uintptr_t>(header->_fd);
+        if (cursor == sentinel) return 0;
+        while (cursor != sentinel) {
+            const auto found = free_chunks.find(cursor);
+            if (found == free_chunks.end() || !owned.insert(cursor).second) return 0;
+            auto *node = found->second;
+            if (node->chunksize() != small_index2size(i)
+                || reinterpret_cast<uintptr_t>(node->_bk) != previous) return 0;
+            previous = cursor; cursor = reinterpret_cast<uintptr_t>(node->_fd);
+        }
+        if (reinterpret_cast<uintptr_t>(header->_bk) != previous) return 0;
+    }
+    for (bindex_t i = 0; i < NTREEBINS; ++i) {
+        const uintptr_t root = reinterpret_cast<uintptr_t>(_treebins[i]);
+        if (bool(root) != bool(treemap_is_marked(i))) return 0;
+        if (!root) continue;
+        const uintptr_t slot = old_state + (reinterpret_cast<uintptr_t>(&_treebins[i]) - current);
+        std::vector<std::pair<uintptr_t, uintptr_t>> pending{{root, slot}};
+        while (!pending.empty()) {
+            const auto [address, parent] = pending.back(); pending.pop_back();
+            uintptr_t cursor = address, previous = 0;
+            do {
+                const auto found = free_chunks.find(cursor);
+                if (found == free_chunks.end() || !owned.insert(cursor).second) return 0;
+                auto *node = reinterpret_cast<tchunkptr>(found->second);
+                if (node->chunksize() < MIN_LARGE_SIZE || compute_tree_index(node->chunksize()) != i || node->_index != i
+                    || reinterpret_cast<uintptr_t>(node->_parent) != (cursor == address ? parent : 0)) return 0;
+                const auto next = free_chunks.find(reinterpret_cast<uintptr_t>(node->_fd));
+                if (next == free_chunks.end() || next->second->_bk != reinterpret_cast<mchunkptr>(cursor)
+                    || next->second->chunksize() != node->chunksize()) return 0;
+                if (previous && reinterpret_cast<uintptr_t>(node->_bk) != previous) return 0;
+                if (cursor == address) {
+                    for (auto *child : node->_child) if (child)
+                        pending.emplace_back(reinterpret_cast<uintptr_t>(child), address);
+                } else if (node->_child[0] || node->_child[1]) return 0;
+                previous = cursor; cursor = reinterpret_cast<uintptr_t>(node->_fd);
+            } while (cursor != address);
+        }
+    }
+    if (owned.size() != free_chunks.size()) return 0;
+    // Empty bin headers may retain stale (but in-heap) links after their last unlink.
+    for (bindex_t i = 0; i < NSMALLBINS; ++i)
+        for (auto *p : {smallbin_at(i)->_fd, smallbin_at(i)->_bk})
+            if (!in_heap(reinterpret_cast<uintptr_t>(p), 0)) return 0;
+
+    const auto relocate = [&](auto *&pointer) {
+        pointer = reinterpret_cast<std::remove_reference_t<decltype(pointer)>>(translate(reinterpret_cast<uintptr_t>(pointer)));
+    };
+    for (auto &[address, node] : free_chunks) {
+        relocate(node->_fd); relocate(node->_bk);
+        if (!is_small(node->chunksize())) {
+            auto *tree = reinterpret_cast<tchunkptr>(node);
+            relocate(tree->_child[0]); relocate(tree->_child[1]); relocate(tree->_parent);
+        }
+    }
+    for (bindex_t i = 0; i < NSMALLBINS; ++i) {
+        relocate(smallbin_at(i)->_fd); relocate(smallbin_at(i)->_bk);
+    }
+    for (auto *&root : _treebins) relocate(root);
+    relocate(_least_addr);
+    if (_dvsize) relocate(_dv); else _dv = nullptr;
+    relocate(_top); relocate(_seg._base);
+    _magic = mparams._magic;
+    (void)INITIAL_LOCK(&get_mutex());
+    return 1;
+#endif
+}
+
+int mspace_prepare_external(mspace msp, int (*validate_region)(void*, size_t, void*), void* context) {
+    return msp ? static_cast<mstate>(msp)->prepare_external(validate_region, context) : 0;
+}
+
 void* mspace_malloc(mspace msp, size_t bytes) {
     mstate ms = (mstate)msp;
     if (!ms->ok_magic()) {

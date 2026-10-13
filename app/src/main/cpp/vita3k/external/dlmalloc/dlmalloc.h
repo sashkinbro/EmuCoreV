@@ -1330,6 +1330,12 @@ DLMALLOC_EXPORT int mspace_track_large_chunks(mspace msp, int enable);
 */
 DLMALLOC_EXPORT void* mspace_malloc(mspace msp, size_t bytes);
 
+/* Restore the host bookkeeping of a copied single external guest heap.
+   The callback must validate mapped, contiguous storage before any read.
+   Returns zero without mutation when the copied heap cannot be validated. */
+DLMALLOC_EXPORT int mspace_prepare_external(mspace msp,
+    int (*validate_region)(void*, size_t, void*), void* context);
+
 /*
   mspace_free behaves as free, but operates within
   the given space.

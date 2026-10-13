@@ -397,6 +397,7 @@ bool write_memory(EmuEnvState &emuenv, Writer &writer, const ProgressCallback &p
 
 bool read_memory(EmuEnvState &emuenv, const MemoryImage &image, const ProgressCallback &progress, std::string &error) {
     MemState &mem = emuenv.mem;
+    emuenv.kernel.prepared_clib_mspaces.clear();
     reset_memory(mem);
     uint64_t total_bytes = 0;
     for (const auto &span : image.spans()) {
