@@ -21,17 +21,17 @@ EmuCoreV is a PlayStation Vita emulator for Android. It combines a custom Androi
 
 In-game captures running on a Snapdragon 8 Elite Gen 5 device with the Vulkan renderer:
 
-| God of War Collection | FIFA 15 |
+| FIFA 15 | Rayman Legends |
 | --- | --- |
-| ![God of War Collection](Screenshot/god_of_war_collection.jpg) | ![FIFA 15](Screenshot/fifa_15.jpg) |
+| ![FIFA 15](Screenshot/fifa_15.jpg) | ![Rayman Legends](Screenshot/rayman_legends.jpg) |
 
-| Assassin's Creed III Liberation | Rayman Legends |
+| Dead or Alive 5 Plus | God Eater 2 |
 | --- | --- |
-| ![Assassin's Creed III Liberation](Screenshot/assassins_creed_iii_liberation.jpg) | ![Rayman Legends](Screenshot/rayman_legends.jpg) |
+| ![Dead or Alive 5 Plus](Screenshot/dead_or_alive_5_plus.jpg) | ![God Eater 2](Screenshot/god_eater_2.jpg) |
 
-| Gravity Rush | |
+| Need for Speed: Most Wanted | |
 | --- | --- |
-| ![Gravity Rush](Screenshot/gravity_rush.jpg) | |
+| ![Need for Speed: Most Wanted](Screenshot/need_for_speed_most_wanted.jpg) | |
 
 ## What This Repository Contains
 
