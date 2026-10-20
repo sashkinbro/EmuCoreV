@@ -68,6 +68,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import com.sbro.emucorev.core.input.InputDeviceClassifier
 import org.libsdl.app.SDLActivity
@@ -81,6 +82,7 @@ import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.ProfilePlayTimeSyncer
 import com.sbro.emucorev.data.TrophyCloudRepository
 import com.sbro.emucorev.data.TrophySoundRepository
+import com.sbro.emucorev.data.TrophySyncSessionGate
 import com.sbro.emucorev.data.drive.DriveBackupWork
 import com.sbro.emucorev.discord.DiscordIntegration
 import com.sbro.emucorev.ui.common.ImmersiveMode
@@ -250,19 +252,24 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun main() {
-        // SDL invokes this on SDLThread before nativeRunMain, including old pinned shortcuts.
-        // Failed maintenance must abort the native entry point rather than boot with stale state.
+        runBlocking { TrophySyncSessionGate.shared.gameStarting() }
         try {
-            CoreMaintenanceRepository(this).ensureCoreUpdated()
-        } catch (error: Exception) {
-            Log.e(TAG, "Core maintenance failed before external launch", error)
-            runOnUiThread {
-                Toast.makeText(this, R.string.settings_clear_cache_failed, Toast.LENGTH_LONG).show()
-                finish()
+            // SDL invokes this on SDLThread before nativeRunMain, including old pinned shortcuts.
+            // Failed maintenance must abort the native entry point rather than boot with stale state.
+            try {
+                CoreMaintenanceRepository(this).ensureCoreUpdated()
+            } catch (error: Exception) {
+                Log.e(TAG, "Core maintenance failed before external launch", error)
+                runOnUiThread {
+                    Toast.makeText(this, R.string.settings_clear_cache_failed, Toast.LENGTH_LONG).show()
+                    finish()
+                }
+                return
             }
-            return
+            super.main()
+        } finally {
+            TrophySyncSessionGate.shared.gameStopped()
         }
-        super.main()
     }
 
     override fun getArguments(): Array<String> {
@@ -350,6 +357,17 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun onStop() {
         super.onStop()
         finishPlayTimeSessionIfNeeded()
+    }
+
+    override fun quitAfterShutdown() {
+        try {
+            super.quitAfterShutdown()
+        } finally {
+            TrophySyncSessionGate.shared.gameStopped()
+            runCatching {
+                runBlocking { TrophyCloudRepository(applicationContext).sync() }
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -943,7 +961,6 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         if (scheduleBackup) {
             BackupSessionGate.stopped()
             DriveBackupWork.afterGame(applicationContext)
-            TrophyCloudRepository.syncAsync(applicationContext)
         }
         DiscordIntegration.clearGame()
     }

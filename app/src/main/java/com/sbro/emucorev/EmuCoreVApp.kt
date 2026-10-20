@@ -10,6 +10,7 @@ import com.sbro.emucorev.core.PlayTimeRepository
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.ProfilePlayTimeSyncer
+import com.sbro.emucorev.data.TrophyCloudRepository
 import com.sbro.emucorev.data.drive.DriveBackupArchive
 import com.sbro.emucorev.data.drive.DriveBackupWork
 import com.sbro.emucorev.discord.DiscordIntegration
@@ -29,6 +30,7 @@ class EmuCoreVApp : Application() {
             ProfilePlayTimeSyncer.recordAndSync(this, session.titleId, session.title, session.durationMs)
         }
         ProfilePlayTimeSyncer.syncPendingAsync(this)
+        TrophyCloudRepository.resumePending(this)
         recoverPendingDriveRestore()
         DriveBackupWork.resumePending(this)
         DiscordIntegration.initialize(this)
