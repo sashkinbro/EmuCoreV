@@ -1990,6 +1990,7 @@ private fun MenuToggleRow(
             .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .background(palette.row)
             .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(
