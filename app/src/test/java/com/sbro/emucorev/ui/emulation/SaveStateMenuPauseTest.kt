@@ -1,11 +1,33 @@
 package com.sbro.emucorev.ui.emulation
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SaveStateMenuPauseTest {
+    @Test
+    fun cancellationWhileEnteringPauseStillQueuesResume() = runBlocking {
+        val pauses = mutableListOf<Boolean>()
+        val entered = CompletableDeferred<Unit>()
+        val job = launch {
+            withSaveStateMenuPause({ paused ->
+                pauses += paused
+                if (paused) {
+                    entered.complete(Unit)
+                    awaitCancellation()
+                }
+            }, { false }) { error("Must not start before pause completes") }
+        }
+        entered.await()
+        job.cancel()
+        job.join()
+        assertEquals(listOf(true, false), pauses)
+    }
+
     @Test
     fun immediateFailureReleasesPauseWithoutRecomposition() = runBlocking {
         val pauses = mutableListOf<Boolean>()

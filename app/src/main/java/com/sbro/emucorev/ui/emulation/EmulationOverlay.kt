@@ -153,6 +153,7 @@ fun EmulationOverlayHost(
     val autoSaving = activity.autoSaveInProgress
     val repository = remember(activity) { VitaGameSettingsRepository(activity) }
     val coreConfigRepository = remember(activity) { VitaCoreConfigRepository(activity) }
+    val cheatWorkDispatcher = remember(activity) { Dispatchers.IO.limitedParallelism(1) }
     val appPreferences = remember(activity) { AppPreferences(activity) }
     val confirmSaveStateActions by appPreferences.confirmSaveStateActionsFlow.collectAsState(
         initial = appPreferences.confirmSaveStateActions
@@ -177,7 +178,10 @@ fun EmulationOverlayHost(
     var controlsEditMode by remember { mutableStateOf(false) }
     var editorProfileRevision by remember { mutableIntStateOf(0) }
     var menuOpen by remember { mutableStateOf(false) }
-    var menuButtonVisible by remember { mutableStateOf(true) }
+    val showQuickBar by appPreferences.showEmulationQuickBarFlow.collectAsState(
+        initial = appPreferences.showEmulationQuickBar
+    )
+    var menuButtonVisible by remember { mutableStateOf(false) }
     var userPaused by remember { mutableStateOf(false) }
     var saveStateBusyLoading by remember { mutableStateOf(false) }
     var saveStateBusySaving by remember { mutableStateOf(false) }
@@ -231,7 +235,9 @@ fun EmulationOverlayHost(
         if (!showTouchControls || menuOpen || nativeImeActive) resetOverlayAxes()
     }
     LaunchedEffect(menuOpen, gameId) {
-        if (menuOpen && gameId.isNotBlank()) cheatSnapshot = CheatBridge.snapshot(gameId)
+        if (menuOpen && CHEATS_ENABLED && gameId.isNotBlank()) {
+            cheatSnapshot = withContext(cheatWorkDispatcher) { CheatBridge.snapshot(gameId) }
+        }
     }
 
     val saveStateRepository = remember(activity) { SaveStateRepository(activity) }
@@ -265,7 +271,7 @@ fun EmulationOverlayHost(
             saveStateBusySaving = action is SaveStateAction.Save
             saveStateBusyLoading = action is SaveStateAction.Load
             withSaveStateMenuPause(
-                setPaused = activity::setMenuPaused,
+                setPaused = activity::setMenuPausedAndAwait,
                 pausedAfter = {
                     saveStateBusy = false
                     saveStateBusySaving = false
@@ -501,8 +507,14 @@ fun EmulationOverlayHost(
 
     LaunchedEffect(activity) {
         while (true) {
-            sessionElapsedMs = activity.currentPlayTimeElapsedMs()
             activity.heartbeatPlayTimeSession()
+            kotlinx.coroutines.delay(1_000)
+        }
+    }
+
+    LaunchedEffect(activity, menuOpen) {
+        while (menuOpen) {
+            sessionElapsedMs = activity.currentPlayTimeElapsedMs()
             kotlinx.coroutines.delay(1_000)
         }
     }
@@ -687,19 +699,31 @@ fun EmulationOverlayHost(
             onGamepadInvertLeftY = { enabled -> persistConfig { it.copy(gamepadInvertLeftY = enabled) } },
             onGamepadInvertRightY = { enabled -> persistConfig { it.copy(gamepadInvertRightY = enabled) } },
             onCheatsMaster = { enabled ->
-                CheatBridge.setCheatsEnabled(enabled)
-                coreConfigRepository.save(coreConfigRepository.load().copy(enableCheats = enabled))
-                cheatSnapshot = CheatBridge.snapshot(gameId)
+                overlayScope.launch {
+                    cheatSnapshot = withContext(cheatWorkDispatcher) {
+                        CheatBridge.setCheatsEnabled(enabled)
+                        coreConfigRepository.save(coreConfigRepository.load().copy(enableCheats = enabled))
+                        CheatBridge.snapshot(gameId)
+                    }
+                }
             },
             onCheatToggle = { index, enabled ->
-                CheatBridge.setCheatEnabled(gameId, index, enabled)
-                CheatBridge.saveCheats(gameId)
-                cheatSnapshot = CheatBridge.snapshot(gameId)
+                overlayScope.launch {
+                    cheatSnapshot = withContext(cheatWorkDispatcher) {
+                        CheatBridge.setCheatEnabled(gameId, index, enabled)
+                        CheatBridge.saveCheats(gameId)
+                        CheatBridge.snapshot(gameId)
+                    }
+                }
             },
             onCheatsGroupToggle = { indices, enabled ->
-                indices.forEach { index -> CheatBridge.setCheatEnabled(gameId, index, enabled) }
-                CheatBridge.saveCheats(gameId)
-                cheatSnapshot = CheatBridge.snapshot(gameId)
+                overlayScope.launch {
+                    cheatSnapshot = withContext(cheatWorkDispatcher) {
+                        indices.forEach { index -> CheatBridge.setCheatEnabled(gameId, index, enabled) }
+                        CheatBridge.saveCheats(gameId)
+                        CheatBridge.snapshot(gameId)
+                    }
+                }
             },
             onCheatsImport = { activity.requestCheatImport() },
             onSaveStateSlotSelected = { slot -> selectedSaveStateSlot = slot },
@@ -740,7 +764,7 @@ fun EmulationOverlayHost(
         )
 
         AnimatedVisibility(
-            visible = !activity.exitInProgress && !nativeImeActive && !controlsEditMode && menuButtonVisible &&
+            visible = showQuickBar && !activity.exitInProgress && !nativeImeActive && !controlsEditMode && menuButtonVisible &&
                 !saveStateBusy && !waitingForStateFrame && pendingSaveStateAction == null,
             enter = fadeIn(tween(180)),
             exit = fadeOut(tween(140)),
@@ -760,66 +784,50 @@ fun EmulationOverlayHost(
             )
         }
 
-        // Retain the selected menu tab and pause state while exposing only the game frame during Save.
-        AnimatedVisibility(
-            visible = menuOpen,
-            enter = fadeIn(tween(220)),
-            exit = fadeOut(tween(180)),
-            modifier = Modifier.graphicsLayer(alpha = if (saveStateBusySaving || autoSaving) 0f else 1f)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f))
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                        menuOpen = false
-                    }
-            )
-        }
+        if (menuOpen) {
+            EmulationMenuWindow {
+                Box(Modifier.fillMaxSize().graphicsLayer {
+                    alpha = if (saveStateBusySaving || autoSaving) 0f else 1f
+                }) {
+                    // Retain the selected menu tab and pause state while exposing only the game frame during Save.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f))
+                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                                menuOpen = false
+                            }
+                    )
 
-        AnimatedVisibility(
-            visible = menuOpen,
-            enter = if (useSidePanel) {
-                slideInHorizontally(initialOffsetX = { it }) + fadeIn(tween(220))
-            } else {
-                androidx.compose.animation.slideInVertically(initialOffsetY = { it }) + fadeIn(tween(220))
-            },
-            exit = if (useSidePanel) {
-                slideOutHorizontally(targetOffsetX = { it }) + fadeOut(tween(180))
-            } else {
-                androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) + fadeOut(tween(180))
-            },
-            modifier = Modifier
-                .graphicsLayer(alpha = if (saveStateBusySaving || autoSaving) 0f else 1f)
-                .align(if (useSidePanel) Alignment.CenterEnd else Alignment.BottomCenter)
-                .padding(
-                    start = if (useSidePanel) 0.dp else 16.dp,
-                    top = 16.dp,
-                    end = 16.dp,
-                    bottom = 16.dp
-                )
-        ) {
-            EmulationGameMenu(
-                gameTitle = gameTitle,
-                gameId = gameId,
-                gameIconPath = gameIconPath,
-                config = config,
-                cheats = cheatSnapshot,
-                cheatsAvailable = CHEATS_ENABLED,
-                saveStates = SaveStateMenuState(
-                    slots = saveStateSlots,
-                    selectedSlot = selectedSaveStateSlot,
-                    busy = saveStateBusy || activity.exitInProgress,
-                    busySaving = saveStateBusySaving || autoSaving
-                ),
-                paused = effectivePaused,
-                sessionElapsedMs = sessionElapsedMs,
-                expandHorizontally = useSidePanel,
-                layoutStyle = customization.gameMenuLayoutStyle,
-                physicalGamepadConnected = hasPhysicalGamepad,
-                controlsVisible = controlsVisible,
-                callbacks = menuCallbacks
-            )
+                    Box(
+                        modifier = Modifier
+                            .align(if (useSidePanel) Alignment.CenterEnd else Alignment.BottomCenter)
+                            .padding(start = if (useSidePanel) 0.dp else 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp)
+                    ) {
+                        EmulationGameMenu(
+                            gameTitle = gameTitle,
+                            gameId = gameId,
+                            gameIconPath = gameIconPath,
+                            config = config,
+                            cheats = cheatSnapshot,
+                            cheatsAvailable = CHEATS_ENABLED,
+                            saveStates = SaveStateMenuState(
+                                slots = saveStateSlots,
+                                selectedSlot = selectedSaveStateSlot,
+                                busy = saveStateBusy || activity.exitInProgress,
+                                busySaving = saveStateBusySaving || autoSaving
+                            ),
+                            paused = effectivePaused,
+                            sessionElapsedMs = sessionElapsedMs,
+                            expandHorizontally = useSidePanel,
+                            layoutStyle = customization.gameMenuLayoutStyle,
+                            physicalGamepadConnected = hasPhysicalGamepad,
+                            controlsVisible = controlsVisible,
+                            callbacks = menuCallbacks
+                        )
+                    }
+                }
+            }
         }
 
         NativeImeOverlay(activity)

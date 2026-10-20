@@ -1472,4 +1472,7 @@
     <string name="controls_button_select">Selecionar</string>
     <string name="controls_button_start">Iniciar</string>
     <string name="controls_button_touch">Toque</string>
+
+    <string name="settings_show_quick_bar">Mostrar barra de ações rápidas</string>
+    <string name="settings_help_show_quick_bar">Toque duas vezes na tela do jogo para mostrar os botões de salvar, carregar, captura de tela, pausa e menu.</string>
 </resources>

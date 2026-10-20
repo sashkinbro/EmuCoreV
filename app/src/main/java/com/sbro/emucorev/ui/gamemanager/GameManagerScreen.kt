@@ -2,6 +2,10 @@ package com.sbro.emucorev.ui.gamemanager
 
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
+import com.sbro.emucorev.ui.common.StickyTabHeader
+import com.sbro.emucorev.ui.common.stickyTabTopInset
+import com.sbro.emucorev.ui.common.rememberStickyTabHeaderPinned
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -86,7 +90,7 @@ import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun GameManagerScreen(
     initialTitleId: String? = null,
@@ -103,6 +107,9 @@ fun GameManagerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val resumeTitleId by rememberUpdatedState(initialTitleId ?: uiState.selectedTitleId)
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
+    val stickyInset = stickyTabTopInset()
+    val screenListState = rememberLazyListState()
+    val tabsPinned = rememberStickyTabHeaderPinned(screenListState, "pinned-tabs")
     var selectedTab by remember { mutableStateOf(GameManagerTab.Graphics) }
 
     androidx.compose.runtime.LaunchedEffect(initialTitleId) {
@@ -125,12 +132,14 @@ fun GameManagerScreen(
     }
 
     LazyColumn(
+        state = screenListState,
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .navigationBarsPadding(),
+            .navigationBarsPadding()
+            .padding(top = stickyInset),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            top = topInset,
+            top = (topInset - stickyInset).coerceAtLeast(0.dp),
             bottom = ScreenContentBottomPadding
         ),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -170,8 +179,10 @@ fun GameManagerScreen(
                     onSelect = viewModel::selectGame
                 )
             }
-            item {
-                GameManagerTabs(selectedTab = selectedTab, onSelected = { selectedTab = it })
+            stickyHeader(key = "pinned-tabs") {
+                StickyTabHeader(showDivider = tabsPinned) {
+                    GameManagerTabs(selectedTab = selectedTab, onSelected = { selectedTab = it })
+                }
             }
             item {
                 when (selectedTab) {

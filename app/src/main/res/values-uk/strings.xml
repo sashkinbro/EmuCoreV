@@ -1475,4 +1475,7 @@
     <string name="controls_button_select">Вибір</string>
     <string name="controls_button_start">Старт</string>
     <string name="controls_button_touch">Дотик</string>
+
+    <string name="settings_show_quick_bar">Показувати панель швидких дій</string>
+    <string name="settings_help_show_quick_bar">Двічі торкніться екрана гри, щоб показати кнопки збереження, завантаження, знімка екрана, паузи й меню.</string>
 </resources>

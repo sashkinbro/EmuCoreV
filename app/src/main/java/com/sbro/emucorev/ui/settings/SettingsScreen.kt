@@ -18,6 +18,9 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import com.sbro.emucorev.ui.common.StickyTabHeader
+import com.sbro.emucorev.ui.common.stickyTabTopInset
+import com.sbro.emucorev.ui.common.rememberStickyTabHeaderPinned
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -37,6 +40,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -120,7 +124,7 @@ enum class SettingsTab(@param:StringRes val titleRes: Int, val icon: ImageVector
     About(R.string.settings_tab_about, Icons.Rounded.Info),
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun SettingsScreen(
     initialTab: SettingsTab = SettingsTab.General,
@@ -143,6 +147,9 @@ fun SettingsScreen(
         if (selectedTab != SettingsTab.Audio) viewModel.stopTrophyPreview()
     }
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
+    val stickyInset = stickyTabTopInset()
+    val screenListState = rememberLazyListState()
+    val tabsPinned = rememberStickyTabHeaderPinned(screenListState, "pinned-tabs")
     val backupCreatedMessage = stringResource(R.string.settings_backup_created)
     val backupFailedMessage = stringResource(R.string.settings_backup_failed)
     val restoreCompletedMessage = stringResource(R.string.settings_backup_restored)
@@ -183,71 +190,78 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Column(
+        LazyColumn(
+            state = screenListState,
             modifier = Modifier
                 .fillMaxSize()
                 .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
+                .padding(top = stickyInset)
         ) {
-            SettingsCompactTopBar(
-                title = stringResource(R.string.settings_title),
-                subtitle = stringResource(selectedTab.titleRes),
-                topInset = topInset,
-                onBackClick = backClick,
-                onResetSettingsClick = { showResetDialog = true }
-            )
-
-            SettingsTabRow(
-                selectedTab = selectedTab,
-                onSelected = { selectedTab = it }
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp, bottom = 110.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
-            ) {
-                AnimatedContent(
-                    targetState = selectedTab,
-                    transitionSpec = {
-                        val forward = targetState.ordinal > initialState.ordinal
-                        val direction = if (forward) 1 else -1
-                        (
-                            fadeIn(animationSpec = tween(160)) +
-                                slideInHorizontally(
-                                    animationSpec = tween(240),
-                                    initialOffsetX = { width -> (width * 0.08f * direction).toInt() }
-                                )
-                            ).togetherWith(
-                            fadeOut(animationSpec = tween(120)) +
-                                slideOutHorizontally(
-                                    animationSpec = tween(200),
-                                    targetOffsetX = { width -> -(width * 0.05f * direction).toInt() }
-                                )
-                        ).using(SizeTransform(clip = false))
-                    },
-                    label = "settings-tab-content"
-                ) { targetTab ->
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(18.dp)
-                    ) {
-                        SettingsTabContent(
-                            selectedTab = targetTab,
-                            uiState = uiState,
-                            defaults = defaults,
-                            viewModel = viewModel,
-                            onOpenLanguageSettings = onOpenLanguageSettings,
-                            onOpenVitaLanguageSettings = onOpenVitaLanguageSettings,
-                            onOpenGpuDriverSettings = onOpenGpuDriverSettings,
-                            onOpenDiscord = onOpenDiscord,
-                            refreshCoreSettingsClick = refreshCoreSettingsClick,
-                            createBackupClick = createBackupClick,
-                            restoreBackupClick = { showRestoreBackupDialog = true },
-                            onOpenTrophySoundPicker = { trophySoundPicker.launch(arrayOf("audio/*")) },
-                            onOpenTouchLayoutEditor = onOpenTouchLayoutEditor
-                        )
+            item(key = "settings-top-bar") {
+                SettingsCompactTopBar(
+                    title = stringResource(R.string.settings_title),
+                    subtitle = stringResource(selectedTab.titleRes),
+                    topInset = (topInset - stickyInset).coerceAtLeast(0.dp),
+                    onBackClick = backClick,
+                    onResetSettingsClick = { showResetDialog = true }
+                )
+            }
+            stickyHeader(key = "pinned-tabs") {
+                StickyTabHeader(showDivider = tabsPinned) {
+                    SettingsTabRow(
+                        selectedTab = selectedTab,
+                        onSelected = { selectedTab = it }
+                    )
+                }
+            }
+            item(key = "settings-content") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp, bottom = 110.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    AnimatedContent(
+                        targetState = selectedTab,
+                        transitionSpec = {
+                            val forward = targetState.ordinal > initialState.ordinal
+                            val direction = if (forward) 1 else -1
+                            (
+                                fadeIn(animationSpec = tween(160)) +
+                                    slideInHorizontally(
+                                        animationSpec = tween(240),
+                                        initialOffsetX = { width -> (width * 0.08f * direction).toInt() }
+                                    )
+                                ).togetherWith(
+                                fadeOut(animationSpec = tween(120)) +
+                                    slideOutHorizontally(
+                                        animationSpec = tween(200),
+                                        targetOffsetX = { width -> -(width * 0.05f * direction).toInt() }
+                                    )
+                            ).using(SizeTransform(clip = false))
+                        },
+                        label = "settings-tab-content"
+                    ) { targetTab ->
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(18.dp)
+                        ) {
+                            SettingsTabContent(
+                                selectedTab = targetTab,
+                                uiState = uiState,
+                                defaults = defaults,
+                                viewModel = viewModel,
+                                onOpenLanguageSettings = onOpenLanguageSettings,
+                                onOpenVitaLanguageSettings = onOpenVitaLanguageSettings,
+                                onOpenGpuDriverSettings = onOpenGpuDriverSettings,
+                                onOpenDiscord = onOpenDiscord,
+                                refreshCoreSettingsClick = refreshCoreSettingsClick,
+                                createBackupClick = createBackupClick,
+                                restoreBackupClick = { showRestoreBackupDialog = true },
+                                onOpenTrophySoundPicker = { trophySoundPicker.launch(arrayOf("audio/*")) },
+                                onOpenTouchLayoutEditor = onOpenTouchLayoutEditor
+                            )
+                        }
                     }
                 }
             }

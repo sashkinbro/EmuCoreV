@@ -1472,4 +1472,7 @@
     <string name="controls_button_select">Seç</string>
     <string name="controls_button_start">Başlat</string>
     <string name="controls_button_touch">Dokunma</string>
+
+    <string name="settings_show_quick_bar">Hızlı işlem çubuğunu göster</string>
+    <string name="settings_help_show_quick_bar">Kaydet, Yükle, Ekran Görüntüsü, Duraklat ve Menü düğmelerini göstermek için oyun ekranına iki kez dokunun.</string>
 </resources>

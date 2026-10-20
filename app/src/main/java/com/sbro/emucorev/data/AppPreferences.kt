@@ -118,6 +118,20 @@ class AppPreferences(context: Context) {
         get() = prefs.getBoolean(KEY_WELCOME_DIALOG_SHOWN, false)
         set(value) = prefs.edit { putBoolean(KEY_WELCOME_DIALOG_SHOWN, value) }
 
+    var showEmulationQuickBar: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_EMULATION_QUICK_BAR, false)
+        set(value) = prefs.edit { putBoolean(KEY_SHOW_EMULATION_QUICK_BAR, value) }
+
+    val showEmulationQuickBarFlow: Flow<Boolean>
+        get() = callbackFlow {
+            val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key == KEY_SHOW_EMULATION_QUICK_BAR) trySend(showEmulationQuickBar)
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(showEmulationQuickBar)
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }.distinctUntilChanged()
+
     var confirmSaveStateActions: Boolean
         get() = prefs.getBoolean(KEY_CONFIRM_SAVE_STATE_ACTIONS, true)
         set(value) = prefs.edit { putBoolean(KEY_CONFIRM_SAVE_STATE_ACTIONS, value) }
@@ -230,6 +244,7 @@ class AppPreferences(context: Context) {
         private const val KEY_WELCOME_DIALOG_SHOWN = "welcome_dialog_shown"
         private const val KEY_LIBRARY_LAYOUT_MODE = "library_layout_mode"
         private const val KEY_CONFIRM_SAVE_STATE_ACTIONS = "confirm_save_state_actions"
+        private const val KEY_SHOW_EMULATION_QUICK_BAR = "show_emulation_quick_bar"
         private const val KEY_LAST_CORE_BINARY_FINGERPRINT = "last_core_binary_fingerprint"
         private const val KEY_APP_LANGUAGE = "app_language"
         private const val KEY_SKIPPED_UPDATE_TAG = "skipped_update_tag"

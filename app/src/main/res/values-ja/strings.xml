@@ -1476,4 +1476,7 @@
     <string name="controls_button_select">セレクト</string>
     <string name="controls_button_start">スタート</string>
     <string name="controls_button_touch">タッチ</string>
+
+    <string name="settings_show_quick_bar">クイックアクションバーを表示</string>
+    <string name="settings_help_show_quick_bar">ゲーム画面をダブルタップすると、セーブ、ロード、スクリーンショット、一時停止、メニューのボタンを表示します。</string>
 </resources>

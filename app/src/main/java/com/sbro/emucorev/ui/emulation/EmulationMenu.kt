@@ -905,6 +905,7 @@ private fun SaveStatesTab(gameId: String, saveStates: SaveStateMenuState, callba
                     onNext = { callbacks.onSaveStateSlotSelected(slotOrder[selectedIndex + 1]) }
                 )
             }
+            SaveStatePreview(slot = slot, contentDescription = saveStateSlotLabel(selected))
             Text(text = statusText, style = MaterialTheme.typography.bodySmall,
                 color = palette.textSecondary, modifier = Modifier.fillMaxWidth())
             }

@@ -45,6 +45,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.sbro.emucorev.MainActivity
 import com.sbro.emucorev.core.BackupSessionGate
+import com.sbro.emucorev.core.MenuPauseQueue
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.PlayTimeRepository
 import com.sbro.emucorev.core.VitaCoreConfig
@@ -63,6 +64,7 @@ import com.sbro.emucorev.data.SaveStateAutomationPreferences
 import com.sbro.emucorev.BuildConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -101,6 +103,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var sessionUsable = true
     private val exitScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val exitCoordinator = SaveStateExitCoordinator()
+    private val menuPauseQueue = MenuPauseQueue(exitScope) { paused -> setAppSessionMenuPaused(paused) }
+    private var menuPauseCompletion: Deferred<Unit>? = null
     var autoSaveInProgress by mutableStateOf(false)
         private set
     private lateinit var composeOwners: ComposeOwners
@@ -332,6 +336,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onDestroy() {
+        menuPauseQueue.close()
         cancelActiveTouches()
         keyboardRequestGeneration++
         finishPlayTimeSessionIfNeeded()
@@ -640,24 +645,21 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
+    suspend fun setMenuPausedAndAwait(paused: Boolean) {
+        setMenuPaused(paused)
+        menuPauseCompletion?.await()
+    }
+
     /**
-     * Drives the native pause state for the menu.
-     *
-     * [pauseNativeThread] and [resumeNativeThread] are not reference counted, so
-     * every pause must be matched by exactly one resume. Re-applying a pause that
-     * is already active would desynchronise the SDL thread from the core session
-     * and leave input dropped after the menu closes.
+     * Pause the guest session without sending Android background/foreground events to SDL.
+     * SDL lifecycle changes belong to Activity lifecycle callbacks, not an in-game panel.
+     * Kernel and audio locks are acquired by the ordered worker, never the input thread.
      */
     private fun applyMenuPauseState(paused: Boolean) {
         if (nativeThreadPaused == paused) return
         nativeThreadPaused = paused
         DiscordIntegration.setPaused(paused)
-        setAppSessionMenuPaused(paused)
-        if (paused) {
-            pauseNativeThread()
-        } else {
-            resumeNativeThread()
-        }
+        menuPauseCompletion = menuPauseQueue.request(paused)
     }
 
     fun exitEmulation(autoSave: Boolean = true) {
@@ -978,7 +980,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 exitCoordinator.run(outgoingTitle, saveEnabled, save = { title ->
                     autoSaveInProgress = true
                     try {
-                        setMenuPaused(true)
+                        setMenuPausedAndAwait(true)
                         val result = withContext(Dispatchers.IO) {
                             // A failed/destructive Load or already stopped core must never overwrite quick0.
                             if (SaveStateBridge.runningTitleId() != title) null else

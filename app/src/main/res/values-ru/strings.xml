@@ -1475,4 +1475,7 @@
     <string name="controls_button_select">Выбор</string>
     <string name="controls_button_start">Старт</string>
     <string name="controls_button_touch">Касание</string>
+
+    <string name="settings_show_quick_bar">Показывать панель быстрых действий</string>
+    <string name="settings_help_show_quick_bar">Дважды коснитесь экрана игры, чтобы показать кнопки сохранения, загрузки, снимка экрана, паузы и меню.</string>
 </resources>

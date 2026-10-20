@@ -1472,4 +1472,7 @@
     <string name="controls_button_select">चुनें</string>
     <string name="controls_button_start">शुरू करें</string>
     <string name="controls_button_touch">स्पर्श</string>
+
+    <string name="settings_show_quick_bar">त्वरित कार्रवाई बार दिखाएँ</string>
+    <string name="settings_help_show_quick_bar">सेव, लोड, स्क्रीनशॉट, पॉज़ और मेन्यू बटन दिखाने के लिए गेम की स्क्रीन पर दो बार टैप करें।</string>
 </resources>

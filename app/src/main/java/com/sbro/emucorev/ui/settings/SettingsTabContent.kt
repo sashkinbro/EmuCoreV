@@ -193,6 +193,13 @@ private fun GeneralTab(
             onClick = onOpenVitaLanguageSettings
         )
         Toggle(
+            title = stringResource(R.string.settings_show_quick_bar),
+            description = stringResource(R.string.settings_help_show_quick_bar),
+            checked = uiState.showEmulationQuickBar,
+            onCheckedChange = viewModel::updateShowEmulationQuickBar,
+            onResetDefault = { viewModel.updateShowEmulationQuickBar(false) }
+        )
+        Toggle(
             title = stringResource(R.string.settings_savestate_confirmations),
             description = stringResource(R.string.settings_help_savestate_confirmations),
             checked = uiState.confirmSaveStateActions,

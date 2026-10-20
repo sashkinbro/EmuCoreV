@@ -1,14 +1,17 @@
 package com.sbro.emucorev.ui.emulation
 
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+
 internal suspend fun <T> withSaveStateMenuPause(
-    setPaused: (Boolean) -> Unit,
+    setPaused: suspend (Boolean) -> Unit,
     pausedAfter: () -> Boolean,
     operation: suspend () -> T
 ): T {
-    setPaused(true)
     return try {
+        setPaused(true)
         operation()
     } finally {
-        setPaused(pausedAfter())
+        withContext(NonCancellable) { setPaused(pausedAfter()) }
     }
 }

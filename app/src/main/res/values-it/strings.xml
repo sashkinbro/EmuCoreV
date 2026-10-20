@@ -1472,4 +1472,7 @@
     <string name="controls_button_select">Seleziona</string>
     <string name="controls_button_start">Avvia</string>
     <string name="controls_button_touch">Tocco</string>
+
+    <string name="settings_show_quick_bar">Mostra barra delle azioni rapide</string>
+    <string name="settings_help_show_quick_bar">Tocca due volte lo schermo di gioco per mostrare i pulsanti di salvataggio, caricamento, cattura schermo, pausa e menu.</string>
 </resources>

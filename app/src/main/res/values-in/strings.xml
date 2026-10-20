@@ -1476,4 +1476,7 @@
     <string name="controls_button_select">Pilih</string>
     <string name="controls_button_start">Mulai</string>
     <string name="controls_button_touch">Sentuh</string>
+
+    <string name="settings_show_quick_bar">Tampilkan bilah tindakan cepat</string>
+    <string name="settings_help_show_quick_bar">Ketuk layar game dua kali untuk menampilkan tombol Simpan, Muat, Tangkapan Layar, Jeda, dan Menu.</string>
 </resources>

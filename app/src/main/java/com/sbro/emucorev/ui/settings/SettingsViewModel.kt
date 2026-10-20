@@ -64,6 +64,7 @@ data class SettingsUiState(
     val storageMigration: StorageMigrationUiState = StorageMigrationUiState(),
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val confirmSaveStateActions: Boolean = true,
+    val showEmulationQuickBar: Boolean = false,
     val customization: CustomizationSettings = CustomizationSettings(),
     val trophySound: TrophySoundSettings = TrophySoundSettings(),
     val trophySoundError: Boolean = false,
@@ -128,6 +129,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             installedGpuDrivers = gpuDriverManager.listInstalledDrivers(),
             appLanguage = preferences.appLanguage,
             confirmSaveStateActions = preferences.confirmSaveStateActions,
+            showEmulationQuickBar = preferences.showEmulationQuickBar,
             customization = customizationPreferences.current,
             trophySound = trophySoundRepository.current()
         )
@@ -150,6 +152,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             preferences.confirmSaveStateActionsFlow.collect { enabled ->
                 _uiState.update { it.copy(confirmSaveStateActions = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.showEmulationQuickBarFlow.collect { enabled ->
+                _uiState.update { it.copy(showEmulationQuickBar = enabled) }
             }
         }
         coreSettingsSaveJob = viewModelScope.launch(Dispatchers.IO) {
@@ -313,6 +320,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         preferences.appLanguage = language
         _uiState.value = _uiState.value.copy(appLanguage = language)
         preferences.applyAppLanguage()
+    }
+
+    fun updateShowEmulationQuickBar(enabled: Boolean) {
+        preferences.showEmulationQuickBar = enabled
     }
 
     fun updateConfirmSaveStateActions(enabled: Boolean) {

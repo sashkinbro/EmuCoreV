@@ -1471,4 +1471,7 @@
     <string name="controls_button_select">选择</string>
     <string name="controls_button_start">开始</string>
     <string name="controls_button_touch">触摸</string>
+
+    <string name="settings_show_quick_bar">显示快捷操作栏</string>
+    <string name="settings_help_show_quick_bar">双击游戏画面可显示保存、加载、截图、暂停和菜单按钮。</string>
 </resources>

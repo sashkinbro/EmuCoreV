@@ -1476,4 +1476,7 @@
     <string name="controls_button_select">Select</string>
     <string name="controls_button_start">Start</string>
     <string name="controls_button_touch">Touch</string>
+
+    <string name="settings_show_quick_bar">Show quick action bar</string>
+    <string name="settings_help_show_quick_bar">Double-tap the game screen to show Save, Load, Screenshot, Pause and Menu buttons.</string>
 </resources>

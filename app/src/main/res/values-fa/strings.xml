@@ -1476,4 +1476,7 @@
     <string name="controls_button_select">انتخاب</string>
     <string name="controls_button_start">شروع</string>
     <string name="controls_button_touch">لمسی</string>
+
+    <string name="settings_show_quick_bar">نمایش نوار اقدامات سریع</string>
+    <string name="settings_help_show_quick_bar">برای نمایش دکمه‌های ذخیره، بارگذاری، تصویر صفحه، توقف موقت و منو، دو بار روی صفحهٔ بازی بزنید.</string>
 </resources>

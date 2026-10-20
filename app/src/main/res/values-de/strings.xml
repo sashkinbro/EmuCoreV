@@ -1472,4 +1472,7 @@
     <string name="controls_button_select">Auswahl</string>
     <string name="controls_button_start">Start</string>
     <string name="controls_button_touch">Berührung</string>
+
+    <string name="settings_show_quick_bar">Schnellaktionsleiste anzeigen</string>
+    <string name="settings_help_show_quick_bar">Tippe zweimal auf den Spielbildschirm, um die Tasten zum Speichern, Laden, Aufnehmen eines Screenshots, Pausieren und Öffnen des Menüs anzuzeigen.</string>
 </resources>

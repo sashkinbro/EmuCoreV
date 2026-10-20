@@ -1472,4 +1472,7 @@
     <string name="controls_button_select">Sélection</string>
     <string name="controls_button_start">Démarrer</string>
     <string name="controls_button_touch">Tactile</string>
+
+    <string name="settings_show_quick_bar">Afficher la barre d’actions rapides</string>
+    <string name="settings_help_show_quick_bar">Touchez deux fois l’écran du jeu pour afficher les boutons de sauvegarde, de chargement, de capture d’écran, de pause et de menu.</string>
 </resources>

@@ -1476,4 +1476,7 @@
     <string name="controls_button_select">اختيار</string>
     <string name="controls_button_start">بدء</string>
     <string name="controls_button_touch">لمس</string>
+
+    <string name="settings_show_quick_bar">إظهار شريط الإجراءات السريعة</string>
+    <string name="settings_help_show_quick_bar">انقر مرتين على شاشة اللعبة لإظهار أزرار الحفظ والتحميل ولقطة الشاشة والإيقاف المؤقت والقائمة.</string>
 </resources>
