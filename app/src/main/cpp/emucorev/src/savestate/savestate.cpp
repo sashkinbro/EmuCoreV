@@ -1714,8 +1714,9 @@ bool valid_io_open_mode(int32_t mode) {
     constexpr int32_t kKnownFlags = SCE_O_RDONLY | SCE_O_WRONLY | SCE_O_NBLOCK | SCE_O_RDLOCK | SCE_O_WRLOCK |
         SCE_O_APPEND | SCE_O_CREAT | SCE_O_TRUNC | SCE_O_EXCL | SCE_O_SCAN | SCE_O_RCOM | SCE_O_NOBUF |
         SCE_O_NOWAIT | SCE_O_FDEXCL | SCE_O_PWLOCK | SCE_O_FGAMEDATA;
-    const int32_t access = mode & (SCE_O_RDONLY | SCE_O_WRONLY);
-    return mode >= 0 && (mode & ~kKnownFlags) == 0 && access != 0;
+    // Match translate_open_mode: without WRONLY the core opens the file as
+    // "rb", even when RDONLY is absent (Rayman Origins uses CREAT alone).
+    return mode >= 0 && (mode & ~kKnownFlags) == 0;
 }
 
 bool parse_io_state(const std::vector<uint8_t> &data, IoSnapshot &snapshot, std::string &error) {
