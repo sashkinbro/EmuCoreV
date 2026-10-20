@@ -47,6 +47,7 @@ object VitaLaunchBridge {
         val startedAt = SystemClock.elapsedRealtime()
         try {
             return withContext(Dispatchers.IO) {
+                CoreMaintenanceRepository(context).ensureCoreUpdated()
                 if (!EmulatorStorage.hasInstalledFirmware(context)) return@withContext LaunchResult.MissingFirmware
                 if (!EmulatorStorage.hasInstalledFirmwareUpdate(context)) return@withContext LaunchResult.MissingFirmwareUpdate
                 // Saves imported by older builds sit in ux0:user/savedata, which
@@ -115,6 +116,7 @@ object VitaLaunchBridge {
     private fun runWithArgs(context: Context, action: String, args: Array<String>): Boolean {
         return runCatching {
             Log.i(TAG, "Restarting emulator action=$action args=${args.joinToString(" ")}")
+            CoreMaintenanceRepository(context).ensureCoreUpdated()
             applyAngleEnvironment(context, false)
             EmulatorStorage.prepareRuntime(context)
             VitaCoreConfigRepository(context).ensureDefaultsPersisted()

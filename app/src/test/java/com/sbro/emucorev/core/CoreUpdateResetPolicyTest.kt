@@ -18,9 +18,9 @@ class CoreUpdateResetPolicyTest {
     }
 
     @Test
-    fun `existing install without a stored fingerprint prompts once`() {
+    fun `existing install without a stored fingerprint resets automatically`() {
         assertEquals(
-            CoreUpdateResetAction.PROMPT,
+            CoreUpdateResetAction.RESET_AUTOMATICALLY,
             decideCoreUpdateResetAction(
                 storedFingerprint = null,
                 currentFingerprint = "zip:1a2b:12345",
@@ -42,9 +42,9 @@ class CoreUpdateResetPolicyTest {
     }
 
     @Test
-    fun `changed core prompts`() {
+    fun `changed core resets automatically`() {
         assertEquals(
-            CoreUpdateResetAction.PROMPT,
+            CoreUpdateResetAction.RESET_AUTOMATICALLY,
             decideCoreUpdateResetAction(
                 storedFingerprint = "zip:1a2b:12345",
                 currentFingerprint = "zip:9f8e:12345",

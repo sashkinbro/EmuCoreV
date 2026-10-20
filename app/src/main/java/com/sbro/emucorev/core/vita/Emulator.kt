@@ -44,6 +44,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.sbro.emucorev.MainActivity
+import com.sbro.emucorev.core.CoreMaintenanceRepository
 import com.sbro.emucorev.core.BackupSessionGate
 import com.sbro.emucorev.core.MenuPauseQueue
 import com.sbro.emucorev.core.EmulatorStorage
@@ -246,6 +247,22 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
         surfaceView = EmuSurface(context)
         return surfaceView
+    }
+
+    override fun main() {
+        // SDL invokes this on SDLThread before nativeRunMain, including old pinned shortcuts.
+        // Failed maintenance must abort the native entry point rather than boot with stale state.
+        try {
+            CoreMaintenanceRepository(this).ensureCoreUpdated()
+        } catch (error: Exception) {
+            Log.e(TAG, "Core maintenance failed before external launch", error)
+            runOnUiThread {
+                Toast.makeText(this, R.string.settings_clear_cache_failed, Toast.LENGTH_LONG).show()
+                finish()
+            }
+            return
+        }
+        super.main()
     }
 
     override fun getArguments(): Array<String> {

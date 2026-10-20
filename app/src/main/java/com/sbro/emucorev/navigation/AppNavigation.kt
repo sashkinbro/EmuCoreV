@@ -40,18 +40,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sbro.emucorev.R
-import com.sbro.emucorev.core.CoreBinaryFingerprint
 import com.sbro.emucorev.core.CoreMaintenanceRepository
-import com.sbro.emucorev.core.CoreUpdateResetAction
 import com.sbro.emucorev.core.DocumentPathResolver
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.InstallStateBus
 import com.sbro.emucorev.core.VitaLaunchBridge
-import com.sbro.emucorev.core.decideCoreUpdateResetAction
 import com.sbro.emucorev.ui.achievements.AchievementsScreen
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.ui.catalog.CatalogScreen
-import com.sbro.emucorev.ui.common.CoreUpdateResetDialog
 import com.sbro.emucorev.ui.cheats.CheatManagerScreen
 import com.sbro.emucorev.ui.detail.GameDetailScreen
 import com.sbro.emucorev.ui.emulation.TouchLayoutEditorScreen
@@ -78,6 +74,8 @@ import com.sbro.emucorev.ui.setup.InstallGameChoiceDialog
 import com.sbro.emucorev.ui.setup.SetupInstallDialog
 import com.sbro.emucorev.ui.setup.SetupInstallViewModel
 import com.sbro.emucorev.ui.setup.SetupScreen
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -163,25 +161,23 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     var showWelcomeDialog by rememberSaveable {
         mutableStateOf(preferences.onboardingCompleted && !preferences.welcomeDialogShown)
     }
-    var showCoreResetDialog by rememberSaveable { mutableStateOf(false) }
-    val pendingCoreFingerprint = remember { mutableStateOf<String?>(null) }
+    val coreMaintenanceReady = remember(context) { CompletableDeferred<Boolean>() }
 
     LaunchedEffect(preferences.onboardingCompleted) {
-        val currentFingerprint = withContext(Dispatchers.IO) {
-            CoreBinaryFingerprint.current(context)
-        }
-        pendingCoreFingerprint.value = currentFingerprint
-        when (
-            decideCoreUpdateResetAction(
-                preferences.lastCoreBinaryFingerprint,
-                currentFingerprint,
-                preferences.onboardingCompleted
-            )
-        ) {
-            CoreUpdateResetAction.STORE_SILENTLY ->
-                preferences.lastCoreBinaryFingerprint = currentFingerprint
-            CoreUpdateResetAction.PROMPT -> showCoreResetDialog = true
-            CoreUpdateResetAction.NONE -> Unit
+        try {
+            val reset = withContext(Dispatchers.IO) {
+                CoreMaintenanceRepository(context).ensureCoreUpdated()
+            }
+            if (reset) {
+                settingsViewModel.refreshCoreSettings()
+            }
+            coreMaintenanceReady.complete(true)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            android.util.Log.e("CoreMaintenance", "Automatic core reset failed", error)
+            Toast.makeText(context, R.string.settings_clear_cache_failed, Toast.LENGTH_LONG).show()
+            coreMaintenanceReady.complete(false)
         }
     }
 
@@ -280,6 +276,8 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
 
     val launchInstalledGame: (String) -> Unit = { titleId ->
         launchScope.launch {
+            // Cache/config migration must finish before the core can read or recreate them.
+            if (!coreMaintenanceReady.await()) return@launch
             when (VitaLaunchBridge.launchInstalledTitle(context, titleId)) {
                 VitaLaunchBridge.LaunchResult.Success -> Unit
                 VitaLaunchBridge.LaunchResult.MissingFirmware -> Toast.makeText(context, launchRequiresFirmwareMessage, Toast.LENGTH_SHORT).show()
@@ -1206,37 +1204,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         )
     }
 
-    if (
-        showCoreResetDialog &&
-        !showWelcomeDialog &&
-        preferences.onboardingCompleted &&
-        (currentRoute == ROUTE_LIBRARY || currentRoute == ROUTE_HOME)
-    ) {
-        CoreUpdateResetDialog(
-            onReset = {
-                showCoreResetDialog = false
-                launchScope.launch(Dispatchers.IO) {
-                    CoreMaintenanceRepository(context).resetGeneratedCoreState()
-                    preferences.lastCoreBinaryFingerprint =
-                        pendingCoreFingerprint.value ?: CoreBinaryFingerprint.current(context)
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(
-                            context,
-                            R.string.core_update_reset_done,
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-            },
-            onKeep = {
-                showCoreResetDialog = false
-                launchScope.launch(Dispatchers.IO) {
-                    preferences.lastCoreBinaryFingerprint =
-                        pendingCoreFingerprint.value ?: CoreBinaryFingerprint.current(context)
-                }
-            }
-        )
-    }
 
 }
 

@@ -45,6 +45,7 @@ object VitaInstallBridge {
         firmwarePath: String,
         systemLanguage: Int
     ): String? {
+        CoreMaintenanceRepository(context).ensureCoreUpdated()
         NativeLibraryLoader.ensureLoaded(context)
         return nativeInstallFirmware(
             EmulatorStorage.vitaRoot(context).absolutePath,
@@ -58,6 +59,7 @@ object VitaInstallBridge {
         contentPath: String,
         systemLanguage: Int
     ): Int {
+        CoreMaintenanceRepository(context).ensureCoreUpdated()
         NativeLibraryLoader.ensureLoaded(context)
         val installedCount = nativeInstallContent(
             EmulatorStorage.vitaRoot(context).absolutePath,
@@ -76,6 +78,7 @@ object VitaInstallBridge {
         licensePath: String,
         systemLanguage: Int
     ): Boolean {
+        CoreMaintenanceRepository(context).ensureCoreUpdated()
         NativeLibraryLoader.ensureLoaded(context)
         return nativeInstallLicense(
             EmulatorStorage.vitaRoot(context).absolutePath,
@@ -91,6 +94,7 @@ object VitaInstallBridge {
         zrif: String,
         systemLanguage: Int
     ): Boolean {
+        CoreMaintenanceRepository(context).ensureCoreUpdated()
         NativeLibraryLoader.ensureLoaded(context)
         val success = nativeInstallPkg(
             EmulatorStorage.vitaRoot(context).absolutePath,
@@ -110,6 +114,7 @@ object VitaInstallBridge {
      * game/update installs so the UI can show a precise result and error.
      */
     fun inspectPkg(context: Context, pkgPath: String): VitaPkgInfo {
+        CoreMaintenanceRepository(context).ensureCoreUpdated()
         NativeLibraryLoader.ensureLoaded(context)
         val raw = runCatching { nativeInspectPkg(pkgPath) }.getOrNull().orEmpty()
         val separator = raw.indexOf('|')
