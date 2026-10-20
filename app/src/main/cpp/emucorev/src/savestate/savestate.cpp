@@ -1704,7 +1704,9 @@ bool read_bounded_io_path(BufferReader &reader, std::string &path) {
     std::replace(normalized.begin(), normalized.end(), '\\', '/');
     const fs::path parsed(normalized);
     for (const fs::path &part : parsed) {
-        if (part == "." || part == "..")
+        // A live descriptor may contain harmless current-directory components
+        // (DOA5 Plus opens ./common.lnk). Keep rejecting parent traversal.
+        if (part == "..")
             return false;
     }
     return true;
