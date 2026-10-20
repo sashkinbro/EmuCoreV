@@ -1,5 +1,6 @@
 set(SOURCE_LIST
 	module_parent.cpp
+	guest_code_fixes.cpp
 	SceAppMgr/SceAppMgr.cpp
 	SceAppMgr/SceSharedFb.cpp
 	SceAppUtil/SceAppUtil.cpp

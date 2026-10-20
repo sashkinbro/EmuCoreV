@@ -20,6 +20,7 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <modules/module_parent.h>
+#include <modules/guest_code_fixes.h>
 
 #include <cpu/functions.h>
 #include <emuenv/state.h>
@@ -253,6 +254,7 @@ SceUID load_module(EmuEnvState &emuenv, const std::string &module_path) {
 
         if (module_id >= 0) {
             const auto module = lock_and_find(module_id, emuenv.kernel.loaded_modules, emuenv.kernel.mutex);
+            apply_guest_code_fixes(emuenv, module->info);
             LOG_INFO("Module {} (at \"{}\") loaded", module->info.module_name, module_path);
         } else {
             LOG_ERROR("Failed to load module {}", module_path);
