@@ -20,6 +20,7 @@
 
 #include <audio/state.h>
 #include <ctrl/state.h>
+#include <display/functions.h>
 #include <display/state.h>
 #include <gxm/functions.h>
 #include <gxm/state.h>
@@ -104,7 +105,7 @@ bool AppSessionController::initialize_runtime() {
     return true;
 }
 
-bool AppSessionController::load_and_run() {
+bool AppSessionController::load_and_run(bool restore_state) {
     std::lock_guard<std::mutex> lock(mutex);
     const AppSessionPhase phase = current_phase.load(std::memory_order_relaxed);
     if (phase != AppSessionPhase::Launching || !renderer_initialized || !runtime_initialized) {
@@ -121,8 +122,15 @@ bool AppSessionController::load_and_run() {
     emuenv.renderer->set_app(emuenv.io.title_id.c_str(), emuenv.self_name.c_str());
     prepare_game_launch_overlay(emuenv);
 
-    if (run_app(emuenv, main_module_id, active_launch_request) != Success)
+    if (restore_state) {
+        // Load reconstructs every guest thread and module from the snapshot.
+        // Starting a fresh main thread first can leave it waiting for a module
+        // start whose child is frozen by the restore pause. Only host producers
+        // are needed here; do not execute another guest timeline before Load.
+        start_sync_thread(emuenv);
+    } else if (run_app(emuenv, main_module_id, active_launch_request) != Success) {
         return false;
+    }
 
     frame_host->get().prepare_for_render_thread();
 

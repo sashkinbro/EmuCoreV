@@ -60,7 +60,7 @@ public:
     bool begin_launch(const AppLaunchRequest &launch_request, bool update_last_time_used = true);
     bool initialize_renderer(renderer::FrameHost &frame);
     bool initialize_runtime();
-    bool load_and_run();
+    bool load_and_run(bool restore_state = false);
     bool set_pause_reason(AppSessionPauseReason reason, bool enabled);
     bool set_input_intercepted(bool enabled);
     bool set_save_state_draining(bool enabled);

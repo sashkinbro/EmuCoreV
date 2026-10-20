@@ -545,7 +545,7 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
             break;
         }
 
-        if (!session_controller->load_and_run()) {
+        if (!session_controller->load_and_run(!load_state_path.empty())) {
             LOG_ERROR("Failed to load or start the app session.");
             exit_code = -1;
             cleanup_launch(app::AppSessionStopReason::LaunchFailure);
