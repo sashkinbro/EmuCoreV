@@ -856,8 +856,10 @@ SettingsCommitResult delete_custom_settings(EmuEnvState &emuenv, const std::stri
 
 // need to remove this function completely, waiting for gdb refactor
 void destroy(EmuEnvState &emuenv) {
+#ifndef NDEBUG
     if (emuenv.cfg.gdbstub)
         server_close(emuenv);
+#endif
 }
 
 } // namespace app

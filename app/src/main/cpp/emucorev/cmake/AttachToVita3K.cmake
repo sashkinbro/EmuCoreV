@@ -78,6 +78,12 @@ set(EMUCOREV_BRIDGE_SOURCES
 
 target_sources(vita3k PRIVATE ${EMUCOREV_BRIDGE_SOURCES})
 
+# These private diagnostic archives expose no JNI API. Hide their symbols so
+# section GC can discard unused logging/debug-server implementations in release.
+target_link_options(vita3k PRIVATE
+    "$<$<NOT:$<CONFIG:Debug>>:-Wl,--exclude-libs,libspdlog.a:libgdbstub.a>"
+)
+
 # Built only on explicit request; exercise real guest APIs against the same
 # shared core as the APK, without adding test entry points to the application.
 if(ANDROID)

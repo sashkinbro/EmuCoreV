@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compile the production logging macros in both build modes.
 
-The spdlog seam models its compile-level macro contract and counts evaluated
+The spdlog seam models the logger contract and counts evaluated
 arguments. Release must avoid logging arguments, conditionals and once state;
 Debug must retain them. Error-return behavior is independent of logging.
 """
@@ -23,26 +23,25 @@ prefix = '\n'.join(line for line in prefix.splitlines() if not line.startswith('
 seam = r'''
 #define SPDLOG_LEVEL_TRACE 0
 #define SPDLOG_LEVEL_OFF 6
-#if SPDLOG_ACTIVE_LEVEL < SPDLOG_LEVEL_OFF
-#define SPDLOG_TRACE(...) fake_log(__VA_ARGS__)
-#define SPDLOG_DEBUG(...) fake_log(__VA_ARGS__)
-#define SPDLOG_INFO(...) fake_log(__VA_ARGS__)
-#define SPDLOG_WARN(...) fake_log(__VA_ARGS__)
-#define SPDLOG_ERROR(...) fake_log(__VA_ARGS__)
-#define SPDLOG_CRITICAL(...) fake_log(__VA_ARGS__)
-#else
-#define SPDLOG_TRACE(...) ((void)0)
-#define SPDLOG_DEBUG(...) ((void)0)
-#define SPDLOG_INFO(...) ((void)0)
-#define SPDLOG_WARN(...) ((void)0)
-#define SPDLOG_ERROR(...) ((void)0)
-#define SPDLOG_CRITICAL(...) ((void)0)
-#endif
+#define SPDLOG_FUNCTION __func__
+namespace spdlog {
+namespace level {enum level_enum {trace,debug,info,warn,err,critical,off};}
+struct source_loc {const char* file;int line;const char* function;};
+struct Logger {
+ bool enabled=true;int calls=0;
+ bool should_log(level::level_enum) const {return enabled;}
+ template<class... T> void log(source_loc,level::level_enum,const char*,T...){++calls;}
+};
+Logger logger;
+Logger* default_logger_raw(){return &logger;}
+}
 '''
-prefix = prefix.replace('#define LOG_TRACE SPDLOG_TRACE', seam + '\n#define LOG_TRACE SPDLOG_TRACE')
 ret_error = source[source.index('#define RET_ERROR'):source.index('/*', source.index('#define RET_ERROR'))]
-cpp = '#include <atomic>\n#include <cstdio>\nint effects=0;\ntemplate<class... T> void fake_log(const char*,T...){}\nint log_hex(int value){++effects;return value;}\n' + prefix + ret_error + r'''
+cpp = '#include <atomic>\n#include <cstdio>\nint effects=0;\nint log_hex(int value){++effects;return value;}\n' + seam + prefix + ret_error + r'''
 int main(){
+ // Force the logger enabled even in release: zero effects must come from
+ // production macro compilation, not the seam suppressing runtime logging.
+ spdlog::logger.enabled=true;
  LOG_TRACE("trace",++effects); LOG_DEBUG("debug",++effects);
  LOG_INFO("info",++effects); LOG_WARN("warn",++effects);
  LOG_ERROR("error",++effects); LOG_CRITICAL("critical",++effects);
@@ -56,6 +55,13 @@ int main(){
  const char* export_name="test_export";
  const int error = RET_ERROR(-42);
  const int expected_final=expected+(expected?1:0);
+ const int expected_calls=expected?9:0;
+ if(spdlog::logger.calls!=expected_calls)return 2;
+ spdlog::logger.enabled=false;
+ LOG_ERROR("muted",++effects);
+ LOG_INFO_IF(++effects,"muted condition",++effects);
+ LOG_WARN_ONCE("muted once",++effects);
+ if(spdlog::logger.calls!=expected_calls)return 3;
  std::printf("effects=%d expected=%d error=%d\n",effects,expected_final,error);
  return effects==expected_final&&error==-42?0:1;
 }

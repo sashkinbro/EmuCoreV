@@ -89,6 +89,7 @@ decltype(AHardwareBuffer_unlock) *_AHardwareBuffer_unlock;
 decltype(AHardwareBuffer_release) *_AHardwareBuffer_release;
 #endif
 
+#ifndef NDEBUG
 static void debug_log_message(std::string_view msg) {
     static const char *ignored_errors[] = {
         "VUID-vkCmdDrawIndexed-None-02721", // using r8g8b8a8 with non-multiple of 4 stride
@@ -153,6 +154,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_report_callback(
     return VK_FALSE;
 }
 
+#endif
 const static std::vector<const char *> required_device_extensions = {
     vk::KHRSwapchainExtensionName,
     // needed in order to use storage buffers
@@ -437,6 +439,10 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             }
         }
 
+        std::vector<const char *> instance_layers;
+#ifdef NDEBUG
+        constexpr bool use_validation_layer = false;
+#else
         // look if we can use the validation layer
         bool has_validation_layer = false;
         const std::array<const std::string, 2> debug_extensions = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
@@ -458,7 +464,6 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             }
         }
 
-        std::vector<const char *> instance_layers;
         const bool use_validation_layer = has_validation_layer && !found_debug_extension.empty() && config.validation_layer;
         if (has_validation_layer && !found_debug_extension.empty()) {
             if (config.validation_layer)
@@ -485,6 +490,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                 LOG_WARN("VK_EXT_validation_features not available: synchronization validation cannot be enabled");
         }
 
+#endif
 #ifdef __APPLE__
         const VkBool32 full_image_swizzle = VK_TRUE;
         const VkBool32 resume_lost_device = VK_TRUE;
@@ -511,12 +517,14 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         const void *instance_create_pnext = has_layer_settings_extension ? &layer_settings_info : nullptr;
 #endif
 
+#ifndef NDEBUG
         static const std::array<vk::ValidationFeatureEnableEXT, 2> enabled_val_features = {
             vk::ValidationFeatureEnableEXT::eSynchronizationValidation,
             vk::ValidationFeatureEnableEXT::eBestPractices,
         };
         vk::ValidationFeaturesEXT validation_features{};
         validation_features.setEnabledValidationFeatures(enabled_val_features);
+#endif
 
         vk::InstanceCreateInfo instance_info{
 #ifdef __APPLE__
@@ -527,7 +535,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         };
         instance_info.setPEnabledLayerNames(instance_layers);
         instance_info.setPEnabledExtensionNames(instance_extensions);
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(NDEBUG)
         if (use_validation_layer && has_validation_features_ext && std::getenv("VITA3K_SYNC_VALIDATION")) {
             validation_features.pNext = instance_info.pNext;
             instance_info.pNext = &validation_features;
@@ -538,6 +546,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         instance = vk::createInstance(instance_info);
         VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
 
+#ifndef NDEBUG
         if (use_validation_layer) {
             // we support two debugging extensions
             if (found_debug_extension == VK_EXT_DEBUG_UTILS_EXTENSION_NAME) {
@@ -559,6 +568,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         } else if (config.validation_layer && found_debug_extension.empty()) {
             LOG_WARN("Neither VK_EXT_debug_utils nor VK_EXT_debug_report is available: validation messages are unavailable");
         }
+#endif
     }
 
     // Create Surface
@@ -706,11 +716,15 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
 #endif
         };
 
+#ifndef NDEBUG
         std::string available_extensions;
         uint32_t available_extension_count = 0;
+#endif
         for (const vk::ExtensionProperties &ext : physical_device.enumerateDeviceExtensionProperties()) {
+#ifndef NDEBUG
             available_extension_count++;
             available_extensions += (available_extensions.empty() ? "" : ", ") + std::string(ext.extensionName.data());
+#endif
             auto it = optional_extensions.find(ext.extensionName.data());
             if (it != optional_extensions.end()) {
                 // this extension is available on the GPU
@@ -719,6 +733,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             }
         }
 
+#ifndef NDEBUG
         {
             std::string enabled;
             for (const char *ext : device_extensions)
@@ -726,6 +741,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             LOG_INFO("Device extensions: {} available, {} enabled: {}", available_extension_count, device_extensions.size(), enabled);
             LOG_INFO("All available device extensions: {}", available_extensions);
         }
+#endif
 
         bool support_memory_mapping = true;
         const bool has_features2_khr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceFeatures2KHR != nullptr;
@@ -1110,11 +1126,14 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
 
     texture_cache.init(true, texture_folder(), game_id); // Nick - Turning off hashless texture cache can be useful for debugging
 
+#ifndef NDEBUG
     log_gpu_configuration(cfg);
+#endif
 }
 
 // Everything a rendering bug report needs about the host GPU, printed once
 void VKState::log_gpu_configuration(const Config &cfg) {
+#ifndef NDEBUG
     LOG_INFO("=== GPU CONFIGURATION ===");
     LOG_INFO("  device: {} (type {}, vendor 0x{:X}, device 0x{:X})", physical_device_properties.deviceName.data(),
         vk::to_string(physical_device_properties.deviceType), physical_device_properties.vendorID,
@@ -1195,9 +1214,11 @@ void VKState::log_gpu_configuration(const Config &cfg) {
     // pipeline failure dump instead
     LOG_INFO("  shader version: vk{}", shader::CURRENT_VERSION);
     LOG_INFO("=== END GPU CONFIGURATION ===");
+#endif
 }
 
 void VKState::log_device_fault() {
+#ifndef NDEBUG
     if (!support_device_fault) {
         LOG_CRITICAL("[GPU FAULT] VK_EXT_device_fault is unavailable");
         return;
@@ -1226,6 +1247,7 @@ void VKState::log_device_fault() {
     for (const auto &vendor : vendors)
         LOG_CRITICAL("[GPU FAULT] vendor={} code={:#x} data={:#x}",
             vendor.description, vendor.vendorFaultCode, vendor.vendorFaultData);
+#endif
 }
 
 void VKState::cleanup() {
@@ -1319,6 +1341,7 @@ void VKState::cleanup() {
 
     device.destroy();
 
+#ifndef NDEBUG
     if (debug_messenger) {
         instance.destroyDebugUtilsMessengerEXT(debug_messenger);
         debug_messenger = nullptr;
@@ -1327,6 +1350,7 @@ void VKState::cleanup() {
         instance.destroyDebugReportCallbackEXT(debug_report);
         debug_report = nullptr;
     }
+#endif
 
     instance.destroy();
 

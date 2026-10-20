@@ -113,7 +113,7 @@ std::optional<UpdateInfo> parse_ver_resp(const CompatState &state, const std::st
 
     std::smatch match;
     if (!std::regex_search(body, match, re)) {
-        spdlog::error("Compat: Could not find version string in response");
+        LOG_ERROR("Compat: Could not find version string in response");
         return std::nullopt;
     }
 

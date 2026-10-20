@@ -552,11 +552,13 @@ void read_config_object(JNIEnv *env, jobject obj, const EmulatorConfigFields &fi
     config.archive_log = env->GetBooleanField(obj, fields.archiveLog) != JNI_FALSE;
     config.log_compat_warn = env->GetBooleanField(obj, fields.logCompatWarn) != JNI_FALSE;
     config.log_level = static_cast<int>(env->GetIntField(obj, fields.logLevel));
+#ifndef NDEBUG
     if (apply_runtime_settings && emuenv) {
         emuenv->kernel.debugger.log_imports = env->GetBooleanField(obj, fields.logImports) != JNI_FALSE;
         emuenv->kernel.debugger.log_exports = env->GetBooleanField(obj, fields.logExports) != JNI_FALSE;
         emuenv->kernel.debugger.dump_elfs = env->GetBooleanField(obj, fields.dumpElfs) != JNI_FALSE;
     }
+#endif
     config.screenshot_format = static_cast<int>(env->GetIntField(obj, fields.screenshotFormat));
 }
 
@@ -685,9 +687,11 @@ Java_org_vita3k_emulator_NativeLib_saveSettings(JNIEnv *env, jclass, jstring tit
         if (emuenv->cfg.log_level != previous_log_level)
             logging::set_level(static_cast<spdlog::level::level_enum>(emuenv->cfg.log_level));
 
+#ifndef NDEBUG
         emuenv->kernel.debugger.log_imports = env->GetBooleanField(config_obj, fields.logImports) != JNI_FALSE;
         emuenv->kernel.debugger.log_exports = env->GetBooleanField(config_obj, fields.logExports) != JNI_FALSE;
         emuenv->kernel.debugger.dump_elfs = env->GetBooleanField(config_obj, fields.dumpElfs) != JNI_FALSE;
+#endif
     }
 
     return make_restart_required_array(env, result.restart_required_settings);

@@ -141,11 +141,14 @@ int ThreadState::start_locked(SceSize arglen, const Ptr<void> argp, bool run_ent
         write_reg(*cpu, 1, 0);
     }
 
+#ifndef NDEBUG
     if (kernel.debugger.wait_for_debugger) {
         kernel.debugger.wait_for_debugger = false;
         debugger_suspended = true;
         status = ThreadStatus::suspended;
-    } else {
+    } else
+#endif
+    {
         debugger_suspended = false;
         status = ThreadStatus::running;
     }
@@ -487,6 +490,7 @@ void ThreadState::run_loop() {
 
             // Cue Probe
             bool probe_handled = false;
+#ifndef NDEBUG
             bool probe_thumb = false;
             if (!do_step && hit_breakpoint(*cpu) && kernel.debugger.is_probe(read_pc(*cpu) & ~1u, probe_thumb)) {
                 const uint32_t probe_pc = read_pc(*cpu) & ~1u;
@@ -527,6 +531,7 @@ void ThreadState::run_loop() {
                 }
                 probe_handled = true;
             }
+#endif
 
             lock.lock();
 

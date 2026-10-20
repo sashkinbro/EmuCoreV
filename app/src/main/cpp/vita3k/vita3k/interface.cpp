@@ -1010,10 +1010,12 @@ ExitCode load_app(int32_t &main_module_id, EmuEnvState &emuenv, const AppLaunchR
         return ModuleLoadFailed;
     }
 
+#ifndef NDEBUG
     if (emuenv.cfg.gdbstub) {
         emuenv.kernel.debugger.wait_for_debugger = true;
         server_open(emuenv);
     }
+#endif
 
 #if USE_DISCORD
     if (emuenv.cfg.discord_rich_presence)

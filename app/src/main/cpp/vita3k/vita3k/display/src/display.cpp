@@ -110,6 +110,7 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
                 return waiter.entry.target_vcount <= display.vblank_count;
             });
         }
+#ifndef NDEBUG
         // Periodic thread dump for diagnosing partial hangs
         if (emuenv.cfg.hang_dump_seconds > 0) {
             static uint64_t next_forced_dump_vblank = 0;
@@ -122,9 +123,12 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
             }
         }
 
+#endif
         // Hang watchdog - if there's no framebuffer flip for ~10s (600 vblanks) while unpaused then dump guest threads
         {
+#ifndef NDEBUG
             static uint64_t last_dumped_setframe = ~0ull;
+#endif
             static uint64_t last_break_vblanks = 0;
             static uint64_t last_provable_break_setframe = ~0ull;
             static uint64_t last_progress_value = 0;
@@ -132,13 +136,17 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
             static std::vector<SceUID> nudged_this_stall;
             static uint64_t last_wake_value = 0;
             static uint64_t last_wake_change_vblank = 0;
+#ifndef NDEBUG
             static bool never_flip_redumped = false;
+#endif
             static uint64_t last_seen_vblanks = 0;
             const uint64_t setframe = emuenv.display.last_setframe_vblank_count.load();
             const uint64_t vblanks = emuenv.display.vblank_count.load();
             // vblank_count restarts at 0 each game session (DisplayState::deinit); these statics outlive it, so reset them with it
             if (vblanks < last_seen_vblanks) {
+#ifndef NDEBUG
                 last_dumped_setframe = ~0ull;
+#endif
                 last_break_vblanks = 0;
                 last_provable_break_setframe = ~0ull;
                 last_progress_value = 0;
@@ -146,7 +154,9 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
                 last_wake_value = 0;
                 last_wake_change_vblank = 0;
                 nudged_this_stall.clear();
+#ifndef NDEBUG
                 never_flip_redumped = false;
+#endif
             }
             last_seen_vblanks = vblanks;
             const bool unpaused = !emuenv.kernel.is_threads_paused();
@@ -165,6 +175,7 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
             const uint64_t renderer_idle_vblanks = vblanks - last_progress_change_vblank;
             const uint64_t guest_idle_vblanks = vblanks - last_wake_change_vblank;
 
+#ifndef NDEBUG
             // Full 10s dump for diagnostics (once per distinct stall).
             if (stall_vblanks > 600 && unpaused && last_dumped_setframe != setframe) {
                 last_dumped_setframe = setframe; // one dump per distinct stall
@@ -178,6 +189,7 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
                     stall_vblanks);
                 emuenv.kernel.log_thread_hang_dump();
             }
+#endif
             // Cycle breaker
             constexpr uint64_t PROVABLE_BREAK_VBLANKS = 3600;
             const int64_t now_epoch_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -209,9 +221,11 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
                 if (!full_wedge && !partial_wedge) {
                     LOG_WARN("HANG WATCHDOG: no flip for {} vblanks but still alive (renderer executed a command {} vblanks ago, a guest thread woke {} vblanks ago) — breaker suppressed", stall_vblanks, renderer_idle_vblanks, guest_idle_vblanks);
                 } else {
+#ifndef NDEBUG
                     // dump BEFORE mutating anything so the log always records what was stuck on what
                     LOG_ERROR("HANG WATCHDOG: no flip for {} vblanks, renderer idle {}, guest wake-idle {} — dumping guest threads, then breaking", stall_vblanks, renderer_idle_vblanks, guest_idle_vblanks);
                     emuenv.kernel.log_thread_hang_dump();
+#endif
 #ifdef _WIN32
                     // Debug speed makes a normal load look exactly like a wedge hang
                     if (IsDebuggerPresent()) {

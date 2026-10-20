@@ -107,10 +107,12 @@ bool initialize_session(
 #endif
         LOG_INFO("BUILD IDENTITY: {} | compiled {} {} (this TU)", build_kind, __DATE__, __TIME__);
 
+#ifndef NDEBUG
         if (!cfg.tu_debug.empty()) {
             setenv("TU_DEBUG", cfg.tu_debug.c_str(), 1);
             LOG_INFO("TU_DEBUG set to '{}' for the Turnip driver", cfg.tu_debug);
         }
+#endif
 
         if (!app::init(*emuenv, cfg, root_paths)) {
             LOG_ERROR("Failed to initialise emulated environment.");

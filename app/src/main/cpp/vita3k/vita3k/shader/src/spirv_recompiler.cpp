@@ -46,8 +46,10 @@
 #include <utility>
 #include <vector>
 
+#ifndef NDEBUG
 static constexpr bool LOG_SHADER_CODE = false;
 static constexpr bool DUMP_SPIRV_BINARIES = false;
+#endif
 
 using namespace shader::usse;
 
@@ -1884,9 +1886,6 @@ static spv::Function *make_vert_finalize_function(spv::Builder &b, const SpirvSh
         translation_state.interfaces.push_back(clip_var);
     }
     uint32_t gxm_clip_written = 0;
-    if (gxm_clip_count > 0)
-        LOG_INFO("[CLIPPLANE] vertex program {} declares {} clip plane(s), written to gl_ClipDistance[{}..{}]",
-            translation_state.hash, gxm_clip_count, eye_clip_count, eye_clip_count + gxm_clip_count - 1);
 
     for (const auto vo : vertex_outputs_list) {
         if (vertex_outputs & vo) {
@@ -2163,6 +2162,7 @@ static SpirvCode convert_gxp_to_spirv_impl(const SceGxmProgram &program, const s
         break;
     }
 
+#ifndef NDEBUG
     // Cache output callbacks do not necessarily request diagnostic text. Restore
     // the thread-local sink on every exit so it never points at a dead stream.
     struct DisassemblyScope {
@@ -2175,6 +2175,7 @@ static SpirvCode convert_gxp_to_spirv_impl(const SceGxmProgram &program, const s
         }
         ~DisassemblyScope() { disasm::disasm_storage = previous; }
     } disassembly_scope(dumper && dump_disassembly);
+#endif
 
     // Entry point
     spv::Function *spv_func_main = b.makeEntryPoint(entry_point_name.c_str());
@@ -2269,16 +2270,21 @@ static SpirvCode convert_gxp_to_spirv_impl(const SceGxmProgram &program, const s
         entrypoint->addIdOperand(i);
     }
 
+#ifndef NDEBUG
     auto spirv_log = spv_logger.getAllMessages();
     if (!spirv_log.empty())
         LOG_ERROR("SPIR-V Error:\n{}", spirv_log);
+#endif
 
+#ifndef NDEBUG
     if (disassembly_scope.dump) {
         dumper("dsm", disassembly_scope.dump->str());
     }
+#endif
 
     b.dump(spirv);
 
+#ifndef NDEBUG
     if (LOG_SHADER_CODE || force_shader_debug) {
         std::string spirv_dump;
         spirv_disasm_print(spirv, &spirv_dump);
@@ -2293,6 +2299,7 @@ static SpirvCode convert_gxp_to_spirv_impl(const SceGxmProgram &program, const s
         spirv_dump.write((char *)&spirv, spirv.size() * sizeof(uint32_t));
         spirv_dump.close();
     }
+#endif
 
     return spirv;
 }
@@ -2396,40 +2403,16 @@ GeneratedShader convert_gxp(const SceGxmProgram &program, const std::string &sha
     GeneratedShader shader{};
     shader.spirv = convert_gxp_to_spirv_impl(program, shader_hash, features, translation_state, force_shader_debug, dumper, dump_disassembly);
 
-    constexpr bool strip_relaxed_precision = false;
-    if (strip_relaxed_precision && !shader.spirv.empty() && shader.spirv.size() > 5) {
-        constexpr uint32_t OpDecorate = 71, OpMemberDecorate = 72, DecorationRelaxedPrecision = 0;
-        std::vector<uint32_t> filtered;
-        filtered.reserve(shader.spirv.size());
-        filtered.insert(filtered.end(), shader.spirv.begin(), shader.spirv.begin() + 5);
-        size_t i = 5, stripped = 0;
-        while (i < shader.spirv.size()) {
-            const uint32_t word_count = shader.spirv[i] >> 16;
-            const uint32_t opcode = shader.spirv[i] & 0xFFFF;
-            if (word_count == 0 || i + word_count > shader.spirv.size())
-                break; // malformed so keep the rest untouched
-            const bool is_relaxed = (opcode == OpDecorate && word_count >= 3 && shader.spirv[i + 2] == DecorationRelaxedPrecision)
-                || (opcode == OpMemberDecorate && word_count >= 4 && shader.spirv[i + 3] == DecorationRelaxedPrecision);
-            if (is_relaxed)
-                stripped++;
-            else
-                filtered.insert(filtered.end(), shader.spirv.begin() + i, shader.spirv.begin() + i + word_count);
-            i += word_count;
-        }
-        if (stripped > 0) {
-            LOG_INFO("[PRECISION] stripped {} RelaxedPrecision decorations from {}", stripped, shader_hash);
-            shader.spirv = std::move(filtered);
-        }
-    }
-
     if (translation_state.is_target_glsl) {
         // also generate the glsl file
         // this destroys shader.spirv
         shader.glsl = convert_spirv_to_glsl(shader_hash, shader.spirv, features, translation_state);
 
+#ifndef NDEBUG
         if (LOG_SHADER_CODE || force_shader_debug) {
             LOG_INFO("Generated GLSL:\n{}", shader.glsl);
         }
+#endif
 
         if (dumper) {
             if (program.is_fragment()) {

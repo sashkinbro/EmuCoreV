@@ -2472,6 +2472,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     emuenv.renderer->restore_presentation.arm(emuenv.renderer->restore_presentation_callback);
     restored_rendering.release();
 
+#ifndef NDEBUG
     for (const auto &[id, thread] : emuenv.kernel.threads) {
         if (!thread || !thread->cpu)
             continue;
@@ -2480,6 +2481,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         if ((sp && !is_valid_addr(emuenv.mem, sp)) || (pc && !is_valid_addr(emuenv.mem, pc)))
             LOG_CRITICAL("[savestate-error] load: thread {} has invalid sp=0x{:X} pc=0x{:X} status={}", id, sp, pc, static_cast<int>(thread->status));
     }
+#endif
 
 
     report(progress, 1.0f, "done");

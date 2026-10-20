@@ -13,8 +13,13 @@
 #include <string>
 
 #define DTAG "EmuCoreVDiscord"
+#ifdef NDEBUG
+#define DLOGI(...) ((void)0)
+#define DLOGW(...) ((void)0)
+#else
 #define DLOGI(...) __android_log_print(ANDROID_LOG_INFO, DTAG, __VA_ARGS__)
 #define DLOGW(...) __android_log_print(ANDROID_LOG_WARN, DTAG, __VA_ARGS__)
+#endif
 
 namespace
 {
@@ -206,10 +211,12 @@ Java_com_sbro_emucorev_discord_DiscordNative_start(JNIEnv* env, jclass, jstring 
 			S().client = std::make_shared<discordpp::Client>();
 			S().client->SetApplicationId(kApplicationId);
 			WireCallbacks(S().client);
+#ifndef NDEBUG
 			S().client->AddLogCallback([](std::string message, discordpp::LoggingSeverity severity) {
 				if (severity <= discordpp::LoggingSeverity::Warning)
 					DLOGW("[SDK] %s", message.c_str());
 			}, discordpp::LoggingSeverity::Warning);
+#endif
 		}
 		S().error.clear();
 	}

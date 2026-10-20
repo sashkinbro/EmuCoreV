@@ -702,6 +702,7 @@ SceUID load_self(KernelState &kernel, MemState &mem, const void *self, const std
         }
     }
 
+#ifndef NDEBUG
     if (kernel.debugger.dump_elfs) {
         const uint8_t *dump_begin = is_self ? (image_bytes + self_header.header_len) : elf_bytes;
         const uint8_t *dump_end;
@@ -738,6 +739,7 @@ SceUID load_self(KernelState &kernel, MemState &mem, const void *self, const std
         const auto filename = dump_path / fmt::format("{}-{}_{}.elf", log_hex_full(start), log_hex_full(end), elf_name);
         fs_utils::dump_data(filename, dump_elf.data(), dump_elf.size());
     }
+#endif
 
     const unsigned int module_info_segment_index = elf.e_entry >> 30;
     const Ptr<const uint8_t> module_info_segment_address = Ptr<const uint8_t>(segment_reloc_info[module_info_segment_index].addr);
