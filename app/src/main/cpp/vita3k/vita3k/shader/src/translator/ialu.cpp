@@ -429,18 +429,27 @@ bool USSETranslatorVisitor::i16mad(
         disasm::operand_to_str(inst.opr.src2, mask_src2, src2_repeat_offset) + ((src2_format != 0) ? "-8bits" : ""));
 
     inst.opr.src0.swizzle = SWIZZLE_CHANNEL_4_DEFAULT;
-    spv::Id source0 = load(inst.opr.src0, 0b1, src0_repeat_offset);
-    spv::Id source1 = load(inst.opr.src1, mask_src1, src1_repeat_offset);
-    spv::Id source2 = load(inst.opr.src2, mask_src2, src2_repeat_offset);
-
-    spv::Id source0_type = m_b.getTypeId(source0);
-
-    auto mul_result = m_b.createBinOp(spv::OpIMul, source0_type, source0, source1);
-    auto add_result = m_b.createBinOp(spv::OpIAdd, source0_type, mul_result, source2);
-
-    if (add_result != spv::NoResult) {
-        store(inst.opr.dest, add_result, 0b1, dest_repeat_offset);
+    const auto lane_source = [&](const Operand &op, const std::uint8_t low_mask, const int repeat_offset, const int lane) {
+        if (lane == 1 && op.bank == RegisterBank::IMMEDIATE)
+            return is_signed_integer_data_type(op.type) ? m_b.makeIntConstant(0) : m_b.makeUintConstant(0);
+        const int lane_shift = get_data_type_size(op.type) == 1 ? 2 : 1;
+        return load(op, static_cast<std::uint8_t>(low_mask << (lane_shift * lane)), repeat_offset);
+    };
+    const int lane_count = (inst.opr.dest.bank == RegisterBank::INDEX || inst.opr.dest.bank == RegisterBank::FPINTERNAL) ? 1 : 2;
+    std::vector<spv::Id> lanes;
+    for (int lane = 0; lane < lane_count; lane++) {
+        const spv::Id source0 = lane_source(inst.opr.src0, 0b1, src0_repeat_offset, lane);
+        const spv::Id source1 = lane_source(inst.opr.src1, mask_src1, src1_repeat_offset, lane);
+        const spv::Id source2 = lane_source(inst.opr.src2, mask_src2, src2_repeat_offset, lane);
+        const spv::Id source_type = m_b.getTypeId(source0);
+        const spv::Id product = m_b.createBinOp(spv::OpIMul, source_type, source0, source1);
+        lanes.push_back(m_b.createBinOp(src2_neg ? spv::OpISub : spv::OpIAdd, source_type, product, source2));
     }
+
+    if (lanes.size() == 1)
+        store(inst.opr.dest, lanes[0], 0b1, dest_repeat_offset);
+    else
+        store(inst.opr.dest, m_b.createCompositeConstruct(m_b.makeVectorType(m_b.getTypeId(lanes[0]), 2), lanes), 0b11, dest_repeat_offset);
 
     END_REPEAT();
 

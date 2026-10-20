@@ -1354,14 +1354,11 @@ void store(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFuncti
                 source = b.createOp(spv::OpBitcast, b.makeIntType(32), ops);
             }
 
-            // if dest is a 8 or 16 bits integer
-            // Todo: keep the content of the upper bits of idx (not done right now)
-            if (!is_float_data_type(dest.type) && get_data_type_size(dest.type) < 4) {
-                spv::Id mask = (get_data_type_size(dest.type) == 1)
-                    ? b.makeIntConstant(0xFF)
-                    : b.makeIntConstant(0xFFFF);
-                source = b.createBinOp(spv::OpBitwiseAnd, b.makeIntType(32), source, mask);
-            }
+            // Index registers are 16 bits wide, including writes from 32-bit sources.
+            // TODO: an 8-bit write should preserve the upper byte of idx.
+            const bool byte_write = !is_float_data_type(dest.type) && get_data_type_size(dest.type) == 1;
+            source = b.createBinOp(spv::OpBitwiseAnd, b.makeIntType(32), source,
+                b.makeIntConstant(byte_write ? 0xFF : 0xFFFF));
         }
 
         spv::Id var = b.createOp(spv::OpAccessChain, b.makePointer(spv::StorageClassPrivate, b.getContainedTypeId(b.getContainedTypeId(b.getTypeId(bank_base)))), { bank_base, b.makeIntConstant(dest.num) });
