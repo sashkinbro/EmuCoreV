@@ -387,9 +387,10 @@ bool USSETranslatorVisitor::vdp(
     return true;
 }
 
-spv::Id USSETranslatorVisitor::do_alu_op(Instruction &inst, const Imm4 source_mask, const Imm4 possible_dest_mask) {
-    spv::Id vsrc1 = load(inst.opr.src1, source_mask, 0);
-    spv::Id vsrc2 = load(inst.opr.src2, source_mask, 0);
+spv::Id USSETranslatorVisitor::do_alu_op(Instruction &inst, const Imm4 source_mask, const Imm4 possible_dest_mask,
+    int src1_repeat_offset, int src2_repeat_offset) {
+    spv::Id vsrc1 = load(inst.opr.src1, source_mask, src1_repeat_offset);
+    spv::Id vsrc2 = load(inst.opr.src2, source_mask, src2_repeat_offset);
     std::vector<spv::Id> ids;
     ids.push_back(vsrc1);
 
@@ -602,16 +603,27 @@ bool USSETranslatorVisitor::v32nmad(
 
     ExtPredicate pred_translated = ext_vec_predicate_to_ext(pred);
 
-    LOG_DISASM("{:016x}: {}{} {} {} {}", m_instr, disasm::e_predicate_str(pred_translated), disasm::opcode_str(opcode), disasm::operand_to_str(inst.opr.dest, dest_mask),
-        disasm::operand_to_str(inst.opr.src1, source_mask), disasm::operand_to_str(inst.opr.src2, source_mask));
-
     // Recompile
     m_b.setDebugSourceLocation(m_recompiler.cur_pc, nullptr);
-    spv::Id result = do_alu_op(inst, source_mask, dest_mask);
+
+    set_repeat_multiplier(2, 2, 2, 2);
+
+    // Even without repeats, slot zero carries SMLSI/SMBO register offsets.
+    // See Vita3K-Plus 099eb7157e (Ultimate Marvel vs. Capcom 3).
+    BEGIN_REPEAT(0)
+    GET_REPEAT(inst, RepeatMode::SLMSI);
+
+    LOG_DISASM("{:016x}: {}{} {} {} {}", m_instr, disasm::e_predicate_str(pred_translated), disasm::opcode_str(opcode), disasm::operand_to_str(inst.opr.dest, dest_mask, dest_repeat_offset),
+        disasm::operand_to_str(inst.opr.src1, source_mask, src1_repeat_offset), disasm::operand_to_str(inst.opr.src2, source_mask, src2_repeat_offset));
+
+    spv::Id result = do_alu_op(inst, source_mask, dest_mask, src1_repeat_offset, src2_repeat_offset);
 
     if (result != spv::NoResult) {
-        store(inst.opr.dest, result, dest_mask, 0);
+        store(inst.opr.dest, result, dest_mask, dest_repeat_offset);
     }
+    END_REPEAT()
+
+    reset_repeat_multiplier();
 
     return true;
 }
