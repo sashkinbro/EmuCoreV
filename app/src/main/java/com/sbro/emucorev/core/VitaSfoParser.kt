@@ -17,6 +17,10 @@ object VitaSfoParser {
     fun parse(file: File): VitaSfoData {
         if (!file.exists() || !file.isFile) return VitaSfoData()
         val bytes = runCatching { file.readBytes() }.getOrElse { return VitaSfoData() }
+        return parse(bytes)
+    }
+
+    fun parse(bytes: ByteArray): VitaSfoData {
         if (bytes.size < 20) return VitaSfoData()
 
         val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)

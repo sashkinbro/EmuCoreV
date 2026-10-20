@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import java.io.File
 
 enum class InstallOperation {
     Firmware,
@@ -318,10 +319,15 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
         inspection: VitaArchiveInspection,
         repairRequested: Boolean
     ): String {
+        val missingBase = inspection.patchTitleIds.firstOrNull { titleId ->
+            val base = File(EmulatorStorage.ux0AppRoot(appContext), titleId)
+            !base.isDirectory || base.listFiles().isNullOrEmpty()
+        }
         return when {
             !inspection.readable -> inspection.errorMessage
                 ?: appContext.getString(R.string.install_dialog_archive_unreadable)
             !inspection.hasInstallMetadata -> appContext.getString(R.string.install_dialog_archive_missing_metadata)
+            missingBase != null -> appContext.getString(R.string.install_dialog_archive_requires_base, missingBase)
             !inspection.supportedCompression -> appContext.resources.getQuantityString(
                 R.plurals.install_dialog_archive_unsupported_compression,
                 inspection.unsupportedCompressionEntries,

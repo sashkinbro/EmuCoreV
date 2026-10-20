@@ -49,6 +49,7 @@
 #include <util/vita_theme_utils.h>
 
 #include <unordered_set>
+#include <unordered_map>
 
 #include <gdbstub/functions.h>
 #include <stb_image_write.h>
@@ -517,13 +518,36 @@ static bool install_archive_content(
     return true;
 }
 
+static bool is_identical_vitamin_duplicate(const ZipPtr &zip, mz_uint first_index, mz_uint second_index) {
+    mz_zip_archive_file_stat first{}, second{};
+    if (!mz_zip_reader_file_stat(zip.get(), first_index, &first)
+        || !mz_zip_reader_file_stat(zip.get(), second_index, &second)
+        || mz_zip_reader_is_file_a_directory(zip.get(), first_index)
+        || mz_zip_reader_is_file_a_directory(zip.get(), second_index))
+        return false;
+    const std::string first_name = normalize_archive_path(first.m_filename);
+    if (first_name != normalize_archive_path(second.m_filename) || !is_vitamin_marker_path(first_name))
+        return false;
+    // Known legacy VPKs repeat their ~100 KiB Vitamin runtime verbatim. Keep
+    // all other duplicate rejection, and bound memory before comparing bytes.
+    constexpr size_t max_runtime_size = 4 * 1024 * 1024;
+    if (!first.m_uncomp_size || first.m_uncomp_size > max_runtime_size
+        || first.m_uncomp_size != second.m_uncomp_size || first.m_crc32 != second.m_crc32)
+        return false;
+    std::vector<uint8_t> original(static_cast<size_t>(first.m_uncomp_size));
+    std::vector<uint8_t> repeated(original.size());
+    return mz_zip_reader_extract_to_mem(zip.get(), first_index, original.data(), original.size(), 0)
+        && mz_zip_reader_extract_to_mem(zip.get(), second_index, repeated.data(), repeated.size(), 0)
+        && original == repeated;
+}
+
 static std::vector<ArchiveContentPath> get_archive_contents_path(const ZipPtr &zip, bool &valid) {
     mz_uint num_files = mz_zip_reader_get_num_files(zip.get());
     std::vector<ArchiveContentPath> content_paths;
     valid = true;
     const std::string sfo_path = "sce_sys/param.sfo";
     const std::string theme_path = "theme.xml";
-    std::unordered_set<std::string> archive_path_identities;
+    std::unordered_map<std::string, mz_uint> archive_path_identities;
     bool relative_root_directory_seen = false;
 
     for (mz_uint i = 0; i < num_files; i++) {
@@ -550,7 +574,10 @@ static std::vector<ArchiveContentPath> get_archive_contents_path(const ZipPtr &z
             continue;
         }
         const std::string identity = archive_path_identity(m_filename);
-        if (identity.empty() || !archive_path_identities.insert(identity).second) {
+        const auto [identity_entry, inserted] = archive_path_identities.emplace(identity, i);
+        if (!inserted && is_identical_vitamin_duplicate(zip, identity_entry->second, i))
+            continue;
+        if (identity.empty() || !inserted) {
             LOG_ERROR("Rejecting duplicate or empty archive entry '{}'", file_stat.m_filename);
             valid = false;
             return {};

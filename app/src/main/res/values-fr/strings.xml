@@ -1475,4 +1475,5 @@
 
     <string name="settings_show_quick_bar">Afficher la barre d’actions rapides</string>
     <string name="settings_help_show_quick_bar">Touchez deux fois l’écran du jeu pour afficher les boutons de sauvegarde, de chargement, de capture d’écran, de pause et de menu.</string>
+    <string name="install_dialog_archive_requires_base">Selon ses métadonnées, cette archive contient une mise à jour pour %1$s. Installez d’abord le jeu de base.</string>
 </resources>

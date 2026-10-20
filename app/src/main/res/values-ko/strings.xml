@@ -1478,4 +1478,5 @@
     <string name="controls_button_touch">터치</string>
     <string name="settings_show_quick_bar">빠른 작업 표시줄 표시</string>
     <string name="settings_help_show_quick_bar">게임 화면을 두 번 탭하면 저장, 불러오기, 스크린샷, 일시 정지, 메뉴 버튼이 표시됩니다.</string>
+    <string name="install_dialog_archive_requires_base">메타데이터에 따르면 이 압축 파일은 %1$s의 업데이트입니다. 먼저 기본 게임을 설치하세요.</string>
 </resources>

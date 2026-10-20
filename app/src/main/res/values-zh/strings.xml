@@ -1474,4 +1474,5 @@
 
     <string name="settings_show_quick_bar">显示快捷操作栏</string>
     <string name="settings_help_show_quick_bar">双击游戏画面可显示保存、加载、截图、暂停和菜单按钮。</string>
+    <string name="install_dialog_archive_requires_base">根据元数据，此压缩包包含 %1$s 的更新。请先安装游戏本体。</string>
 </resources>

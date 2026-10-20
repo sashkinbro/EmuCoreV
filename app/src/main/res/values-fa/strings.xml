@@ -1479,4 +1479,5 @@
 
     <string name="settings_show_quick_bar">نمایش نوار اقدامات سریع</string>
     <string name="settings_help_show_quick_bar">برای نمایش دکمه‌های ذخیره، بارگذاری، تصویر صفحه، توقف موقت و منو، دو بار روی صفحهٔ بازی بزنید.</string>
+    <string name="install_dialog_archive_requires_base">طبق فراداده‌ها، این آرشیو یک به‌روزرسانی برای %1$s است. ابتدا بازی اصلی را نصب کنید.</string>
 </resources>

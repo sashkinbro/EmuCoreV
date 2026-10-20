@@ -1475,4 +1475,5 @@
 
     <string name="settings_show_quick_bar">Schnellaktionsleiste anzeigen</string>
     <string name="settings_help_show_quick_bar">Tippe zweimal auf den Spielbildschirm, um die Tasten zum Speichern, Laden, Aufnehmen eines Screenshots, Pausieren und Öffnen des Menüs anzuzeigen.</string>
+    <string name="install_dialog_archive_requires_base">Laut Metadaten enthält das Archiv ein Update für %1$s. Installiere zuerst das Hauptspiel.</string>
 </resources>

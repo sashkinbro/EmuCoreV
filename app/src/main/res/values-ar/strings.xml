@@ -1479,4 +1479,5 @@
 
     <string name="settings_show_quick_bar">إظهار شريط الإجراءات السريعة</string>
     <string name="settings_help_show_quick_bar">انقر مرتين على شاشة اللعبة لإظهار أزرار الحفظ والتحميل ولقطة الشاشة والإيقاف المؤقت والقائمة.</string>
+    <string name="install_dialog_archive_requires_base">تشير بيانات الأرشيف إلى أنه تحديث للعبة %1$s. ثبّت اللعبة الأساسية أولًا.</string>
 </resources>

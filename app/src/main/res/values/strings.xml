@@ -1479,4 +1479,5 @@
 
     <string name="settings_show_quick_bar">Show quick action bar</string>
     <string name="settings_help_show_quick_bar">Double-tap the game screen to show Save, Load, Screenshot, Pause and Menu buttons.</string>
+    <string name="install_dialog_archive_requires_base">Archive metadata identifies an update for %1$s. Install the base game first.</string>
 </resources>

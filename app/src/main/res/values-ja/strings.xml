@@ -1479,4 +1479,5 @@
 
     <string name="settings_show_quick_bar">クイックアクションバーを表示</string>
     <string name="settings_help_show_quick_bar">ゲーム画面をダブルタップすると、セーブ、ロード、スクリーンショット、一時停止、メニューのボタンを表示します。</string>
+    <string name="install_dialog_archive_requires_base">アーカイブのメタデータでは、%1$s の更新データとされています。先にゲーム本体をインストールしてください。</string>
 </resources>

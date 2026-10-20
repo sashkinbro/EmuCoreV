@@ -1478,4 +1478,5 @@
     <string name="controls_button_touch">Dotyk</string>
     <string name="settings_show_quick_bar">Pokazuj pasek szybkich akcji</string>
     <string name="settings_help_show_quick_bar">Dotknij dwukrotnie ekranu gry, aby wyświetlić przyciski zapisu, wczytywania, zrzutu ekranu, pauzy i menu.</string>
+    <string name="install_dialog_archive_requires_base">Według metadanych archiwum zawiera aktualizację gry %1$s. Najpierw zainstaluj podstawową wersję gry.</string>
 </resources>

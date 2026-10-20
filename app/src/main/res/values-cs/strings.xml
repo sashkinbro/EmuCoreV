@@ -1479,4 +1479,5 @@
 
     <string name="settings_show_quick_bar">Zobrazovat panel rychlých akcí</string>
     <string name="settings_help_show_quick_bar">Dvojitým klepnutím na obrazovku hry zobrazíte tlačítka pro uložení, načtení, snímek obrazovky, pozastavení a nabídku.</string>
+    <string name="install_dialog_archive_requires_base">Podle metadat obsahuje archiv aktualizaci pro %1$s. Nejprve nainstalujte základní hru.</string>
 </resources>

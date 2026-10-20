@@ -1478,4 +1478,5 @@
 
     <string name="settings_show_quick_bar">Показывать панель быстрых действий</string>
     <string name="settings_help_show_quick_bar">Дважды коснитесь экрана игры, чтобы показать кнопки сохранения, загрузки, снимка экрана, паузы и меню.</string>
+    <string name="install_dialog_archive_requires_base">Согласно метаданным, архив содержит обновление для %1$s. Сначала установите базовую игру.</string>
 </resources>

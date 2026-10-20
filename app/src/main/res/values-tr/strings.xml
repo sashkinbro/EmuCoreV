@@ -1475,4 +1475,5 @@
 
     <string name="settings_show_quick_bar">Hızlı işlem çubuğunu göster</string>
     <string name="settings_help_show_quick_bar">Kaydet, Yükle, Ekran Görüntüsü, Duraklat ve Menü düğmelerini göstermek için oyun ekranına iki kez dokunun.</string>
+    <string name="install_dialog_archive_requires_base">Arşiv meta verilerine göre bu, %1$s için bir güncellemedir. Önce temel oyunu yükleyin.</string>
 </resources>

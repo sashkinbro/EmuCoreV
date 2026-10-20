@@ -1478,4 +1478,5 @@
 
     <string name="settings_show_quick_bar">Показувати панель швидких дій</string>
     <string name="settings_help_show_quick_bar">Двічі торкніться екрана гри, щоб показати кнопки збереження, завантаження, знімка екрана, паузи й меню.</string>
+    <string name="install_dialog_archive_requires_base">За метаданими архів містить оновлення для %1$s. Спочатку встановіть базову гру.</string>
 </resources>

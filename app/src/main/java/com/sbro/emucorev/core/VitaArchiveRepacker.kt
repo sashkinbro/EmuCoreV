@@ -2,6 +2,7 @@ package com.sbro.emucorev.core
 
 import android.util.Log
 import org.apache.commons.compress.archivers.zip.ZipFile
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import java.io.File
 import java.io.IOException
 import java.util.Locale
@@ -47,15 +48,21 @@ object VitaArchiveRepacker {
                 }
                 logInfo("Repairing ${source.name}: ${entries.size} ZIP entries")
 
-                val writtenNames = LinkedHashSet<String>()
+                val writtenNames = LinkedHashMap<String, ZipArchiveEntry>()
                 ZipOutputStream(output.outputStream().buffered()).use { zipOut ->
                     zipOut.setLevel(Deflater.DEFAULT_COMPRESSION)
 
                     entries.forEachIndexed { index, entry ->
                         val normalizedName = normalizeArchiveEntryName(entry.name)
                             ?: throw IOException("Unsafe archive entry: ${entry.name}")
-                        if (!writtenNames.add(normalizedName.trimEnd('/').lowercase(Locale.US)))
-                            throw IOException("Ambiguous duplicate archive entry: $normalizedName")
+                        val identity = normalizedName.trimEnd('/').lowercase(Locale.US)
+                        val previous = writtenNames.putIfAbsent(identity, entry)
+                        if (previous != null) {
+                            if (!identicalVitaminRuntime(inputZip, previous, entry))
+                                throw IOException("Ambiguous duplicate archive entry: $normalizedName")
+                            reportProgress(index + 1, entries.size, normalizedName, onProgress)
+                            return@forEachIndexed
+                        }
                         if (normalizedName.isEmpty()) {
                             if (!entry.isDirectory) throw IOException("Empty archive filename")
                             reportProgress(index + 1, entries.size, entry.name, onProgress)
@@ -113,6 +120,31 @@ object VitaArchiveRepacker {
         val canonical = components.filter { it.isNotEmpty() && it != "." }.joinToString("/")
         if (canonical.isEmpty()) return if (normalized.endsWith('/')) "" else null
         return canonical + if (normalized.endsWith('/')) "/" else ""
+    }
+
+    private fun identicalVitaminRuntime(zip: ZipFile, first: ZipArchiveEntry, second: ZipArchiveEntry): Boolean {
+        val name = normalizeArchiveEntryName(first.name) ?: return false
+        val folded = name.lowercase(Locale.US)
+        if (name != normalizeArchiveEntryName(second.name) || first.isDirectory || second.isDirectory ||
+            (folded != "sce_module/steroid.suprx" && !folded.endsWith("/sce_module/steroid.suprx")) ||
+            first.size !in 1L..(4L * 1024 * 1024) || first.size != second.size || first.crc != second.crc ||
+            !zip.canReadEntryData(first) || !zip.canReadEntryData(second)) return false
+
+        fun readVerified(entry: ZipArchiveEntry): ByteArray? = zip.getInputStream(entry).use { input ->
+            val bytes = ByteArray(entry.size.toInt())
+            var offset = 0
+            while (offset < bytes.size) {
+                val count = input.read(bytes, offset, bytes.size - offset)
+                if (count < 0) return null
+                if (count == 0) continue
+                offset += count
+            }
+            if (input.read() != -1 || CRC32().apply { update(bytes) }.value != entry.crc) return null
+            bytes
+        }
+        val original = readVerified(first) ?: return false
+        val repeated = readVerified(second) ?: return false
+        return original.contentEquals(repeated)
     }
 
     private fun safeBaseName(source: File): String {

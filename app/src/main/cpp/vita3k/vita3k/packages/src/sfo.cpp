@@ -155,8 +155,11 @@ bool load(SfoFile &sfile, const std::vector<uint8_t> &content) {
             item.data.second.assign(data_begin, data_end);
             break;
         case SfoDataFormat::UTF8_NULL:
-            if (entry.data_len == 0 || *(data_end - 1) != 0)
+            if (entry.data_len == 0)
                 return false;
+            // Some legacy dumps omit the terminator from data_len (including
+            // All-Stars' TITLE). The checked length still bounds the string;
+            // never scan padding or another entry looking for a trailing NUL.
             item.data.second.assign(data_begin, std::find(data_begin, data_end, uint8_t(0)));
             break;
         default:

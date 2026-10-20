@@ -33,6 +33,8 @@ def block(marker):
 cpp = r'''
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
+#include <cstring>
 #include <cstdio>
 #include <filesystem>
 #include <limits>
@@ -40,6 +42,7 @@ cpp = r'''
 #include <optional>
 #include <string>
 #include <unordered_set>
+#include <unordered_map>
 #include <vector>
 namespace fs = std::filesystem;
 namespace fs_utils {auto utf8_to_path(const std::string &s){return fs::path(s);}}
@@ -47,22 +50,26 @@ namespace fs_utils {auto utf8_to_path(const std::string &s){return fs::path(s);}
 #define LOG_WARN(...) ((void)0)
 #define LOG_CRITICAL(...) ((void)0)
 using mz_uint = unsigned;
-struct Entry {std::string name; bool directory = false;};
+struct Entry {std::string name; bool directory = false; std::string data = "runtime"; bool readable = true;};
 struct mz_zip_archive {std::vector<Entry> entries;};
-struct mz_zip_archive_file_stat {const char *m_filename;};
+struct mz_zip_archive_file_stat {const char *m_filename; uint64_t m_uncomp_size; uint32_t m_crc32;};
 using ZipPtr = std::unique_ptr<mz_zip_archive>;
 auto mz_zip_reader_get_num_files(mz_zip_archive *z){return unsigned(z->entries.size());}
 bool mz_zip_reader_file_stat(mz_zip_archive *z,unsigned i,mz_zip_archive_file_stat *s){
- if(i>=z->entries.size())return false;s->m_filename=z->entries[i].name.c_str();return true;}
+ if(i>=z->entries.size())return false;s->m_filename=z->entries[i].name.c_str();s->m_uncomp_size=z->entries[i].data.size();s->m_crc32=42;return true;}
 bool mz_zip_reader_is_file_a_directory(mz_zip_archive *z,unsigned i){return z->entries[i].directory;}
+bool mz_zip_reader_extract_to_mem(mz_zip_archive *z,unsigned i,void* out,size_t size,unsigned){
+ auto &e=z->entries[i];if(!e.readable||size!=e.data.size())return false;memcpy(out,e.data.data(),size);return true;}
 '''
 for marker in ('static std::string normalize_archive_path', 'struct ArchiveContentPath',
                'static bool is_safe_archive_relative_path',
                'static std::optional<std::string> archive_content_root',
                'static std::string archive_path_identity',
-               'static bool is_vitamin_marker_path',
-               'static std::vector<ArchiveContentPath> get_archive_contents_path'):
+               'static bool is_vitamin_marker_path'):
     cpp += block(marker) + (';' if marker.startswith('struct ') else '') + '\n'
+if 'static bool is_identical_vitamin_duplicate' in source:
+    cpp += block('static bool is_identical_vitamin_duplicate') + '\n'
+cpp += block('static std::vector<ArchiveContentPath> get_archive_contents_path') + '\n'
 cpp += r'''
 int main(){int failed=0;auto check=[&](bool ok,const char *name){
  std::printf("%s %s\n",ok?"PASS":"FAIL",name);failed+=!ok;};
@@ -82,6 +89,18 @@ for(const auto &marker: std::vector<std::string>{"sce_module/steroid.suprx",
  {"vitamin/sce_sys/param.sfo"},{"vitamin/sce_module/steroid.suprx"}}});
  bool valid=true;auto contents=get_archive_contents_path(zip,valid);
  check(valid&&contents.size()==2,"mixed archive admits both titles without discarding a runtime");
+}
+for(int variant=0;variant<6;++variant){
+ Entry first{"sce_module/steroid.suprx"}, second=first;
+ if(variant==1)second.data="changed"; // same length and test CRC: compare actual bytes too
+ if(variant==2)second.readable=false;
+ if(variant==3)second.name="SCE_MODULE/STEROID.SUPRX";
+ if(variant==4){first.name=second.name="sce_sys/param.sfo";}
+ if(variant==5){first.name=second.name="ordinary.bin";}
+ ZipPtr zip(new mz_zip_archive{{{"sce_sys/param.sfo"},first,second}});
+ bool valid=true;auto contents=get_archive_contents_path(zip,valid);
+ check(variant==0 ? (valid&&contents.size()==1) : (!valid&&contents.empty()),
+   variant==0?"identical repeated Vitamin runtime is admitted":"conflicting, unreadable, aliased or ordinary duplicates remain rejected");
 }
 return failed?1:0;}
 '''

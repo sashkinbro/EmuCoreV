@@ -1475,4 +1475,5 @@
 
     <string name="settings_show_quick_bar">त्वरित कार्रवाई बार दिखाएँ</string>
     <string name="settings_help_show_quick_bar">सेव, लोड, स्क्रीनशॉट, पॉज़ और मेन्यू बटन दिखाने के लिए गेम की स्क्रीन पर दो बार टैप करें।</string>
+    <string name="install_dialog_archive_requires_base">मेटाडेटा के अनुसार, इस आर्काइव में %1$s का अपडेट है। पहले मूल गेम इंस्टॉल करें।</string>
 </resources>

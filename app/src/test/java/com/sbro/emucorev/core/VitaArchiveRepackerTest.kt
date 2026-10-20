@@ -209,6 +209,40 @@ class VitaArchiveRepackerTest {
         file.writeBytes(buffer.array())
     }
 
+    @Test fun repairKeepsOneCopyOfIdenticalRepeatedVitaminRuntime() {
+        val source = temp.newFile("duplicate-runtime.vpk")
+        val runtime = "identical Vitamin runtime".toByteArray()
+        writeDuplicateZip(source, "sce_module/steroid.suprx", runtime, runtime)
+        val repaired = VitaArchiveRepacker.repackToInstallZip(source.absolutePath, temp.root)
+        assertNotNull(repaired)
+        ZipFile(repaired!!).use { zip ->
+            assertEquals(1, zip.entries().asSequence().count { it.name == "sce_module/steroid.suprx" })
+            org.junit.Assert.assertArrayEquals(runtime, zip.getInputStream(zip.getEntry("sce_module/steroid.suprx")).readBytes())
+        }
+    }
+
+    @Test fun repairRejectsConflictingRuntimeAndOrdinaryDuplicates() {
+        for ((name, first, second) in listOf(
+            Triple("sce_module/steroid.suprx", byteArrayOf(1), byteArrayOf(2)),
+            Triple("sce_sys/param.sfo", byteArrayOf(1), byteArrayOf(1)),
+            Triple("ordinary.bin", byteArrayOf(1), byteArrayOf(1))
+        )) {
+            val source = temp.newFile("conflict-${name.substringAfterLast('/')}.vpk")
+            writeDuplicateZip(source, name, first, second)
+            assertNull(VitaArchiveRepacker.repackToInstallZip(source.absolutePath, temp.root))
+        }
+    }
+
+    private fun writeDuplicateZip(file: File, name: String, first: ByteArray, second: ByteArray) {
+        org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream(file).use { zip ->
+            for (payload in listOf(first, second)) {
+                zip.putArchiveEntry(org.apache.commons.compress.archivers.zip.ZipArchiveEntry(name))
+                zip.write(payload)
+                zip.closeArchiveEntry()
+            }
+        }
+    }
+
     private fun writeZip(file: File, vararg entries: Pair<String, ByteArray>) {
         ZipOutputStream(file.outputStream()).use { zip ->
             entries.forEach { (name, bytes) ->

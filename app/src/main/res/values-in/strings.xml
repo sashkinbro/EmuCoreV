@@ -1479,4 +1479,5 @@
 
     <string name="settings_show_quick_bar">Tampilkan bilah tindakan cepat</string>
     <string name="settings_help_show_quick_bar">Ketuk layar game dua kali untuk menampilkan tombol Simpan, Muat, Tangkapan Layar, Jeda, dan Menu.</string>
+    <string name="install_dialog_archive_requires_base">Menurut metadata, arsip ini berisi pembaruan untuk %1$s. Instal game dasar terlebih dahulu.</string>
 </resources>
