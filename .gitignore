@@ -51,6 +51,8 @@ emulog.txt
 third_party/vcpkg/
 release/
 tools/
+# Local documentation only. NEVER force-add docs/ (including plans and test reports).
+# Keep this directory out of commits and pushes unless the user explicitly asks otherwise.
 docs/
 app/src/main/cpp/vita3k/android/app/assets/*
 !app/src/main/cpp/vita3k/android/app/assets/.gitignore
