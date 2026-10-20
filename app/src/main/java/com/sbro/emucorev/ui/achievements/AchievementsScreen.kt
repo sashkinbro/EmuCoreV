@@ -2,6 +2,7 @@ package com.sbro.emucorev.ui.achievements
 
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import com.sbro.emucorev.ui.theme.neon.neonShape
 
@@ -77,13 +79,16 @@ import com.sbro.emucorev.data.VitaTrophyGroup
 import com.sbro.emucorev.data.VitaTrophySet
 import com.sbro.emucorev.ui.common.LocalImage
 import com.sbro.emucorev.ui.common.ScreenTopBar
+import com.sbro.emucorev.ui.common.StickyTabHeader
+import com.sbro.emucorev.ui.common.rememberStickyTabHeaderPinned
+import com.sbro.emucorev.ui.common.stickyTabTopInset
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import java.text.DateFormat
 import java.util.Date
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun AchievementsScreen(
     focusTitleId: String? = null,
@@ -93,6 +98,9 @@ fun AchievementsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
+    val stickyInset = stickyTabTopInset()
+    val screenListState = rememberLazyListState()
+    val gamesPinned = rememberStickyTabHeaderPinned(screenListState, "pinned-games")
 
     LaunchedEffect(focusTitleId) {
         if (!focusTitleId.isNullOrBlank()) {
@@ -101,12 +109,14 @@ fun AchievementsScreen(
     }
 
     LazyColumn(
+        state = screenListState,
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .navigationBarsPadding(),
+            .navigationBarsPadding()
+            .padding(top = stickyInset),
         contentPadding = PaddingValues(
-            top = topInset,
+            top = (topInset - stickyInset).coerceAtLeast(0.dp),
             bottom = ScreenContentBottomPadding
         ),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -138,12 +148,14 @@ fun AchievementsScreen(
                 )
             }
         } else {
-            item {
-                TrophySetSelector(
-                    sets = uiState.sets,
-                    selectedCommunicationId = uiState.selectedSet?.communicationId,
-                    onSelect = viewModel::selectSet
-                )
+            stickyHeader(key = "pinned-games") {
+                StickyTabHeader(showDivider = gamesPinned) {
+                    TrophySetSelector(
+                        sets = uiState.sets,
+                        selectedCommunicationId = uiState.selectedSet?.communicationId,
+                        onSelect = viewModel::selectSet
+                    )
+                }
             }
 
             uiState.selectedSet?.let { set ->
