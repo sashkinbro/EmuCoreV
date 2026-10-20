@@ -2,6 +2,8 @@ package com.sbro.emucorev.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
@@ -23,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -112,7 +115,21 @@ fun PerformanceStatsSettingsSection(
                     }
                 }
             }
-            TextButton({ preferences.reset() }) { Text(stringResource(R.string.stats_reset)) }
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = neonShape(12.dp),
+                color = rowBackground,
+                border = BorderStroke(1.dp, textSecondary.copy(alpha = 0.18f))
+            ) {
+                Row(
+                    modifier = Modifier.clickable { preferences.reset() }
+                        .padding(horizontal = 12.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(stringResource(R.string.stats_reset),
+                        style = MaterialTheme.typography.bodyMedium, color = textPrimary)
+                }
+            }
         }
     }
     if (compact) {
