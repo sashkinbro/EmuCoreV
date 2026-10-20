@@ -50,6 +50,11 @@
 
 namespace renderer::vulkan {
 
+// Cache status markers are never Vulkan objects and must not reach the driver.
+const vk::Pipeline kPipelineCompiling = std::bit_cast<vk::Pipeline, uint64_t>(~0ULL);
+// Remember driver refusals so later draws do not repeatedly queue the same failure.
+const vk::Pipeline kPipelineFailed = std::bit_cast<vk::Pipeline, uint64_t>(~1ULL);
+
 // Fixed-state prefix used for the pipeline cache key, not the async snapshot extent.
 constexpr size_t record_pipeline_len = offsetof(GxmRecordState, vertex_streams);
 static_assert(std::is_trivially_copyable_v<GxmRecordState>);
@@ -401,8 +406,10 @@ void PipelineCache::cleanup() {
     if (use_async_compilation)
         set_async_compilation(false);
 
-    for (auto &[hash, pipeline] : pipelines)
-        state.device.destroy(pipeline);
+    for (auto &[hash, pipeline] : pipelines) {
+        if (pipeline && pipeline != kPipelineCompiling && pipeline != kPipelineFailed)
+            state.device.destroy(pipeline);
+    }
     pipelines.clear();
 
     {
@@ -840,7 +847,7 @@ void PipelineCache::compiler_thread(MemState &mem) {
         vk::Pipeline pipeline = compile_pipeline(request->type, request->render_pass, *request->vertex_program_gxm, *request->fragment_program_gxm, *request->get_record(), request->hints, mem);
         // mark a refused pipeline as failed rather than leaving it null, which would make every
         // later draw queue the same doomed compilation again
-        *request->pipeline = pipeline ? pipeline : std::bit_cast<vk::Pipeline, uint64_t>(~1ULL);
+        *request->pipeline = pipeline ? pipeline : kPipelineFailed;
 
         request->vertex_program_gxm->compile_threads_on.fetch_sub(1, std::memory_order_release);
         request->fragment_program_gxm->compile_threads_on.fetch_sub(1, std::memory_order_release);
@@ -1018,21 +1025,16 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
     // and also add the primitive type
     key ^= static_cast<uint64_t>(type);
 
-    // can't use constexpr because of apple clang...
-    const vk::Pipeline pipeline_compiling = std::bit_cast<vk::Pipeline, uint64_t>(~0ULL);
-    // a pipeline the driver refused: remembered so we don't recompile (and re-log) it on every
-    // single draw, which turns one rejected pipeline into a freeze and a gigabyte of log
-    const vk::Pipeline pipeline_failed = std::bit_cast<vk::Pipeline, uint64_t>(~1ULL);
     // if the pipeline is in the pipeline cache, we can expect its creation time to be almost instantaneous
     bool already_in_cache = false;
 
     auto it = pipelines.find(key);
     if (it != pipelines.end()) {
         if (it->second != nullptr) {
-            if (it->second == pipeline_compiling)
+            if (it->second == kPipelineCompiling)
                 // pipeline is still compiling
                 return nullptr;
-            else if (it->second == pipeline_failed)
+            else if (it->second == kPipelineFailed)
                 // the driver already rejected this one, don't try again
                 return nullptr;
             else
@@ -1041,7 +1043,7 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
         already_in_cache = true;
     } else {
         // the pipeline hash was not in the cache;
-        it = pipelines.insert({ key, pipeline_compiling }).first;
+        it = pipelines.insert({ key, kPipelineCompiling }).first;
     }
 
     // get the correct renderpass here
@@ -1067,7 +1069,7 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
             .hints = context.shader_hints,
             .record = record
         };
-        it->second = pipeline_compiling;
+        it->second = kPipelineCompiling;
 
         // we must not delete these programs until the worker is done
         vertex_program_gxm.compile_threads_on.fetch_add(1, std::memory_order_relaxed);
@@ -1086,7 +1088,7 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
         if (!already_in_cache)
             state.shaders_count_compiled++;
 
-        it->second = result ? result : pipeline_failed;
+        it->second = result ? result : kPipelineFailed;
 
         return result;
     }
