@@ -2,6 +2,13 @@
 <!-- Recommendations only: global defaults -> Game DB -> explicit per-game settings.
      Shared by the Android settings UI and the native core. Never select a driver here. -->
 <game-db version="1">
+    <profile id="injustice-high-accuracy">
+        <!-- PCSB00356: tested on Lenovo on 2026-10-20 after intermittent HUD
+             and texture flicker. Prefer GPU-completion synchronization for
+             this title; explicit per-game user settings still take precedence. -->
+        <title-id>PCSB00356</title-id>
+        <gpu high-accuracy="true" />
+    </profile>
     <profile id="borderlands-2-high-accuracy">
         <!-- PCSE00383: verified on Android on 2026-10-11. High accuracy removes
              severe white/red posterization. Keep all other user settings. -->

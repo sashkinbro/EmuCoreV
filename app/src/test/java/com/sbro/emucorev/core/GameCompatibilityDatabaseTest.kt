@@ -84,6 +84,16 @@ class GameCompatibilityDatabaseTest {
         assertNotNull(changed.recommendationFor("UNKNOWN", "SAMPLE 15"))
     }
 
+    @Test fun injusticeUsesAccurateGpuOnlyForTheVerifiedTitleWithoutChangingGlobalSettings() {
+        val db = database()
+        val global = VitaCoreConfig(highAccuracy = false, memoryMapping = "double-buffer",
+            customDriverName = "working-driver", resolutionMultiplier = 1.5f, audioVolume = 37)
+        assertEquals(global.copy(highAccuracy = true), db.applyDefaults(global, " pcsb00356 ", "Renamed game"))
+        assertFalse(global.highAccuracy)
+        assertSame(global, db.applyDefaults(global, "UNVERIFIED", "Injustice: Gods Among Us"))
+        assertSame(global, db.applyDefaults(global, "", "Injustice: Gods Among Us"))
+    }
+
     @Test fun recommendationsDoNotMutateGlobalSettingsOrSelectDrivers() {
         val global = VitaCoreConfig(memoryMapping = "double-buffer", audioVolume = 37, customDriverName = "working-driver")
         val db = database()
