@@ -487,7 +487,7 @@ static const vk::SpecializationInfo srgb_info_false = {
 };
 
 vk::PipelineShaderStageCreateInfo PipelineCache::retrieve_shader(const SceGxmProgram *program, const Sha256Hash &hash, bool is_vertex, bool maskupdate, MemState &mem, const shader::Hints &hints, bool is_srgb) {
-    const auto variant_hash = is_vertex ? hash : fragment_shader_variant_hash(hash, hints.color_format, hints.raw_color_attachment_input);
+    const auto variant_hash = is_vertex ? hash : fragment_shader_variant_hash(hash, hints.color_format, hints.raw_color_attachment_input, hints.vertex_output_mask);
     if (maskupdate)
         LOG_WARN_ONCE("Mask not implemented in the vulkan renderer!");
 
@@ -884,6 +884,9 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
         && record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16 && record.color_surface.data;
     shader::Hints fragment_hints = hints;
     fragment_hints.raw_color_attachment_input = with_raw_attachment && state.features.direct_fragcolor && gxm_fragment_shader->is_frag_color_used();
+    // draw() computes this from the paired GXP before queuing a pipeline.
+    // Include it in both shader cache identities so async and disk caches agree.
+    fragment_hints.vertex_output_mask = vertex_program.varying_location_mask;
 
     const vk::PipelineShaderStageCreateInfo vertex_shader = retrieve_shader(vertex_program_gxm.program.get(mem), vertex_program.hash, true, fragment_program_gxm.is_maskupdate, mem, hints);
     const vk::PipelineShaderStageCreateInfo fragment_shader = retrieve_shader(gxm_fragment_shader, fragment_program.hash, false, fragment_program_gxm.is_maskupdate, mem, fragment_hints, record.is_gamma_corrected);

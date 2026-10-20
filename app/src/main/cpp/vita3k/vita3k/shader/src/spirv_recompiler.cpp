@@ -424,6 +424,24 @@ static spv::Id srgb_decode_rgb(spv::Builder &b, utils::SpirvUtilFunctions &utils
     return b.createTriOp(spv::OpSelect, v3, cond, lo, hi);
 }
 
+static spv::Id create_fragment_iterator(spv::Builder &b, TranslationState &translation_state,
+    spv::Decoration precision, spv::Id type, const char *name, uint32_t location) {
+    const uint32_t output_mask = translation_state.hints->vertex_output_mask;
+    if (translation_state.is_vulkan && location < 32 && !(output_mask & (1u << location))) {
+        // The existing runtime iterator guard supplies (0,0,0,1) when GXM has
+        // no corresponding output. A Vulkan input declaration is still invalid
+        // in that case: strict drivers reject the entire graphics pipeline.
+        // Private initialized storage also works for non-dependent queries.
+        const spv::Id zero = b.makeFloatConstant(0.0f);
+        const spv::Id fallback = b.makeCompositeConstant(type, { zero, zero, zero, b.makeFloatConstant(1.0f) });
+        return b.createVariable(spv::NoPrecision, spv::StorageClassPrivate, type, name, fallback);
+    }
+    const spv::Id variable = b.createVariable(precision, spv::StorageClassInput, type, name);
+    b.addDecoration(variable, spv::DecorationLocation, location);
+    translation_state.interfaces.push_back(variable);
+    return variable;
+}
+
 static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &parameters, utils::SpirvUtilFunctions &utils, const FeatureState &features, TranslationState &translation_state, NonDependentTextureQueryCallInfos &tex_query_infos, SamplerMap &samplers,
     const SceGxmProgram &program) {
     static const std::unordered_map<std::uint32_t, std::pair<std::string, std::uint32_t>> name_map = {
@@ -531,10 +549,7 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
                 pa_iter_var = b.createBinOp(spv::OpFDiv, v4, pa_iter_var, res_multiplier);
             } else {
                 spv::Decoration precision = (get_data_type_size(pa_dtype) < 4 && !features.force_full_precision) ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
-                pa_iter_var = b.createVariable(precision, spv::StorageClassInput, pa_iter_type, pa_name.c_str());
-                b.addDecoration(pa_iter_var, spv::DecorationLocation, pa_loc);
-
-                translation_state.interfaces.push_back(pa_iter_var);
+                pa_iter_var = create_fragment_iterator(b, translation_state, precision, pa_iter_type, pa_name.c_str(), pa_loc);
             }
 
             translation_state.var_to_regs.push_back(
@@ -773,15 +788,15 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
                 coord_name += std::to_string(query_info.coord_index);
             }
 
-            coords[query_info.coord_index].first = b.createVariable(spv::NoPrecision, spv::StorageClassInput,
-                b.makeVectorType(b.makeFloatType(32), /*tex_coord_comp_count*/ query_info.coord_index == 10 ? 2 : 4), coord_name.c_str());
-
-            if (query_info.coord_index == 10)
+            if (query_info.coord_index == 10) {
+                coords[query_info.coord_index].first = b.createVariable(spv::NoPrecision, spv::StorageClassInput,
+                    b.makeVectorType(b.makeFloatType(32), 2), coord_name.c_str());
                 b.addDecoration(coords[query_info.coord_index].first, spv::DecorationBuiltIn, spv::BuiltInPointCoord);
-            else
-                b.addDecoration(coords[query_info.coord_index].first, spv::DecorationLocation, TEXCOORD_BASE_LOCATION + query_info.coord_index);
-
-            translation_state.interfaces.push_back(coords[query_info.coord_index].first);
+                translation_state.interfaces.push_back(coords[query_info.coord_index].first);
+            } else {
+                coords[query_info.coord_index].first = create_fragment_iterator(b, translation_state, spv::NoPrecision,
+                    b.makeVectorType(b.makeFloatType(32), 4), coord_name.c_str(), TEXCOORD_BASE_LOCATION + query_info.coord_index);
+            }
 
             coords[query_info.coord_index].second = static_cast<int>(DataType::F32);
         }

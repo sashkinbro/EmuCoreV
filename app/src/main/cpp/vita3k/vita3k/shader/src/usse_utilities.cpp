@@ -1024,7 +1024,7 @@ spv::Id load(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFunc
                     if (integral_unsigned)
                         return b.makeUintConstant(value_int);
                     else
-                        return b.makeIntConstant(static_cast<int16_t>(value));
+                        return b.makeIntConstant(static_cast<int16_t>(value_int));
                 } else {
                     return b.makeFloatConstant(value);
                 }
@@ -1040,7 +1040,7 @@ spv::Id load(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFunc
         if (consts.size() == 1) {
             return apply_modifiers(b, utils, op.flags, consts[0]);
         } else {
-            spv::Id result = b.makeCompositeConstant(b.makeVectorType(type_f32, static_cast<int>(consts.size())), consts);
+            spv::Id result = b.makeCompositeConstant(b.makeVectorType(b.getTypeId(consts[0]), static_cast<int>(consts.size())), consts);
             return apply_modifiers(b, utils, op.flags, result);
         }
     }
