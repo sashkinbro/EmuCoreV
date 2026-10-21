@@ -25,18 +25,29 @@ object GpuDriverRecommendations {
     fun currentDeviceProfile(): SnapdragonGpuProfile? =
         profileForSoc(MobileSocNameMapper.currentDeviceName())
 
-    internal fun profileForSoc(socName: String): SnapdragonGpuProfile? {
-        val normalized = socName.lowercase(Locale.US)
-        if (!normalized.contains("snapdragon")) return null
+    internal fun profileForSoc(socName: String): SnapdragonGpuProfile? =
+        profileForGpu(socName, null)
 
-        val mapping = SOC_GPU_MAPPINGS.firstOrNull { (socTokens, _) ->
-            socTokens.any(normalized::contains)
-        }?.second ?: return null
+    internal fun profileForGpu(socName: String, gpu: GpuModelInfo?): SnapdragonGpuProfile? {
+        val model = SocGpuCatalog.forSoc(socName) ?: gpu ?: return null
+        if (model.vendor != GpuVendor.ADRENO) return null
+        val family = model.adrenoFamily ?: adrenoFamilyOf(model.displayName) ?: return null
         return SnapdragonGpuProfile(
             socName = socName,
-            adrenoName = "Adreno ${mapping.first}",
-            family = mapping.second
+            adrenoName = model.displayName,
+            family = family
         )
+    }
+
+    private fun adrenoFamilyOf(modelName: String): AdrenoFamily? {
+        val value = ADRENO_MODEL.find(modelName)?.groupValues?.getOrNull(1)?.toIntOrNull()
+            ?: return null
+        return when {
+            value >= 800 -> AdrenoFamily.A8XX
+            value >= 700 -> AdrenoFamily.A7XX
+            value >= 600 -> AdrenoFamily.A6XX
+            else -> null
+        }
     }
 
     fun match(driver: RemoteGpuDriver, profile: SnapdragonGpuProfile?): GpuDriverMatch {
@@ -67,34 +78,6 @@ object GpuDriverRecommendations {
         }
     }
 
-    private val SOC_GPU_MAPPINGS = listOf(
-        listOf("8 elite gen 5") to ("840" to AdrenoFamily.A8XX),
-        listOf("8 gen 5") to ("829" to AdrenoFamily.A8XX),
-        listOf("8 elite") to ("830" to AdrenoFamily.A8XX),
-        listOf("8s gen 4") to ("825" to AdrenoFamily.A8XX),
-        listOf("8 gen 3") to ("750" to AdrenoFamily.A7XX),
-        listOf("8s gen 3") to ("735" to AdrenoFamily.A7XX),
-        listOf("8 gen 2") to ("740" to AdrenoFamily.A7XX),
-        listOf("8+ gen 1", "8 gen 1") to ("730" to AdrenoFamily.A7XX),
-        listOf("7 gen 4") to ("722" to AdrenoFamily.A7XX),
-        listOf("7+ gen 3") to ("732" to AdrenoFamily.A7XX),
-        listOf("7s gen 3") to ("710" to AdrenoFamily.A7XX),
-        listOf("7 gen 3") to ("720" to AdrenoFamily.A7XX),
-        listOf("7+ gen 2") to ("725" to AdrenoFamily.A7XX),
-        listOf("7s gen 2") to ("710" to AdrenoFamily.A7XX),
-        listOf("6 gen 4") to ("810" to AdrenoFamily.A8XX),
-        listOf("6 gen 3", "6 gen 1") to ("710" to AdrenoFamily.A7XX),
-        listOf("888") to ("660" to AdrenoFamily.A6XX),
-        listOf("865") to ("650" to AdrenoFamily.A6XX),
-        listOf("855") to ("640" to AdrenoFamily.A6XX),
-        listOf("845") to ("630" to AdrenoFamily.A6XX),
-        listOf("7 gen 1") to ("644" to AdrenoFamily.A6XX),
-        listOf("780g", "778g") to ("642" to AdrenoFamily.A6XX),
-        listOf("765") to ("620" to AdrenoFamily.A6XX),
-        listOf("750g") to ("619" to AdrenoFamily.A6XX),
-        listOf("730", "720g") to ("618" to AdrenoFamily.A6XX),
-        listOf("695", "690", "680", "665", "662") to ("6xx" to AdrenoFamily.A6XX)
-    )
-
     private val EXPLICIT_ADRENO_MODEL = Regex("8xx\\s*\\(([^)]+)\\)", RegexOption.IGNORE_CASE)
+    private val ADRENO_MODEL = Regex("""adreno\s*(\d{3})""", RegexOption.IGNORE_CASE)
 }

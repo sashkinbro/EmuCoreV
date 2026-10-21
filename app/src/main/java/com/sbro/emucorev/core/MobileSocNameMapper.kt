@@ -5,32 +5,6 @@ import java.util.Locale
 
 /** Converts Android SoC/platform identifiers into names suitable for the performance overlay. */
 object MobileSocNameMapper {
-    /**
-     * Gaming platforms often expose the phone SoC they are derived from (for example SM8550)
-     * instead of their Snapdragon G-series retail name. Keep these model overrides separate so
-     * phones using the same silicon are not mislabeled as handheld gaming platforms.
-     */
-    private val handheldModelNames: Map<String, String> = mapOf(
-        "RETROIDPOCKETG2" to "Snapdragon G2 Gen 2",
-        "RETROIDPOCKETCLASSIC" to "Snapdragon G1 Gen 2",
-        "AYANEOPOCKETS2" to "Snapdragon G3 Gen 3",
-        "KONKRPOCKETFITG3" to "Snapdragon G3 Gen 3",
-        "ONEXSUGARSUGAR1" to "Snapdragon G3 Gen 3",
-        "AYANEOPOCKETS" to "Snapdragon G3x Gen 2",
-        "AYANEOPOCKETEVO" to "Snapdragon G3x Gen 2",
-        "AYANEOPOCKETDMG" to "Snapdragon G3x Gen 2",
-        "AYANEOPOCKETACE" to "Snapdragon G3x Gen 2",
-        "AYANEOPOCKETDS" to "Snapdragon G3x Gen 2",
-        "RAZEREDGE" to "Snapdragon G3x Gen 1",
-        "RAZEREDGE5G" to "Snapdragon G3x Gen 1",
-        "RAZEREDGEWIFI" to "Snapdragon G3x Gen 1",
-        "PIMAXPORTAL" to "Snapdragon XR2",
-        "PIMAXPORTALQLED" to "Snapdragon XR2",
-        "PIMAXPORTALRETRO" to "Snapdragon XR2",
-        "AYANEOPOCKETMICRO" to "Helio G99",
-        "AYANEOPOCKETMICRO2" to "Snapdragon 865 series"
-    )
-
     private val socNames: Map<String, String> = buildMap {
         // Qualcomm gaming/XR platforms. The full marketing-name aliases cover devices which
         // expose ro.soc.model as text; SG8175P is the dedicated G3x Gen 1 part identifier.
@@ -45,7 +19,18 @@ object MobileSocNameMapper {
         put("SNAPDRAGONXR2", "Snapdragon XR2")
 
         // Qualcomm Snapdragon 8 series.
+        put("SM8975", "Snapdragon 8 Elite Extreme Gen 6")
+        put("SM8950", "Snapdragon 8 Elite Gen 6")
+        put("SM8850Q", "Snapdragon 8 Elite Gen 5")
+        put("SM8845PRO", "Snapdragon 8 Gen 6")
         put("SM8850", "Snapdragon 8 Elite Gen 5")
+        put("SM7635AC", "Snapdragon 7s Gen 4")
+        put("SM6435", "Snapdragon 6s Gen 4")
+        put("SM6375AC", "Snapdragon 6s Gen 3")
+        put("SM6370", "Snapdragon 6s Gen 3")
+        put("SM4450AF", "Snapdragon 4 Gen 4")
+        put("SM6225AF", "Snapdragon 6s 4G Gen 2")
+        put("SM6225AD", "Snapdragon 685")
         put("SM8845", "Snapdragon 8 Gen 5")
         put("SM8750", "Snapdragon 8 Elite")
         put("SM8735", "Snapdragon 8s Gen 4")
@@ -55,7 +40,9 @@ object MobileSocNameMapper {
         put("SM8475", "Snapdragon 8+ Gen 1")
         put("SM8450", "Snapdragon 8 Gen 1")
         put("SM8350", "Snapdragon 888 series")
+        put("SM8250AC", "Snapdragon 870")
         put("SM8250", "Snapdragon 865 series")
+        put("SM8150AC", "Snapdragon 855+")
         put("SM8150", "Snapdragon 855 series")
         put("SDM845", "Snapdragon 845")
         put("MSM8998", "Snapdragon 835")
@@ -148,7 +135,9 @@ object MobileSocNameMapper {
         put("QM215", "Snapdragon 215")
 
         // MediaTek Dimensity.
+        put("MT6995", "Dimensity 9600 Pro")
         put("MT6993", "Dimensity 9500")
+        put("MT6899Z", "Dimensity 8500")
         put("MT6991", "Dimensity 9400 series")
         put("MT6989", "Dimensity 9300 series")
         put("MT6985", "Dimensity 9200 series")
@@ -223,6 +212,7 @@ object MobileSocNameMapper {
         put("S5E9610", "Exynos 9610")
         put("S5E9609", "Exynos 9609")
         put("S5E8895", "Exynos 8895")
+        put("S5E8865", "Exynos 1680")
         put("S5E8855", "Exynos 1580")
         put("S5E8845", "Exynos 1480")
         put("S5E8835", "Exynos 1380")
@@ -248,6 +238,8 @@ object MobileSocNameMapper {
         put("S5E4210", "Exynos 4210")
 
         // Google Tensor platform and board identifiers.
+        put("GS601", "Google Tensor G6")
+        put("MALIBU", "Google Tensor G6")
         put("GS501", "Google Tensor G5")
         put("LAGUNA", "Google Tensor G5")
         put("GS401", "Google Tensor G4")
@@ -320,32 +312,6 @@ object MobileSocNameMapper {
         put("RK3188", "Rockchip RK3188")
         put("RK3128", "Rockchip RK3128")
         put("RK3126", "Rockchip RK3126")
-        put("ALLWINNERA733", "Allwinner A733")
-        put("ALLWINNERA523", "Allwinner A523")
-        put("ALLWINNERA133", "Allwinner A133")
-        put("ALLWINNERA100", "Allwinner A100")
-        put("ALLWINNERA64", "Allwinner A64")
-        put("ALLWINNERA33", "Allwinner A33")
-        put("ALLWINNERA31", "Allwinner A31")
-        put("ALLWINNERA23", "Allwinner A23")
-        put("ALLWINNERA20", "Allwinner A20")
-        put("ALLWINNERA13", "Allwinner A13")
-        put("ALLWINNERA10", "Allwinner A10")
-        // Allwinner BSP platform identifiers can cover multiple retail SoCs. Keep shared
-        // identifiers honest and let an explicit H313/H616/H618/etc. token found in any
-        // Android build field take precedence in resolve().
-        put("SUN55IW6", "Allwinner T536 family")
-        put("SUN55IW3", "Allwinner A523/A527/T527/H728 family")
-        put("SUN50IW12", "Allwinner H713/TV303 family")
-        put("SUN50IW11", "Allwinner R329")
-        put("SUN50IW10", "Allwinner A100/A133 family")
-        put("SUN50IW9", "Allwinner H313/H616/H618/H700 family")
-        put("SUN50IW6", "Allwinner H6")
-        put("SUN50IW3", "Allwinner A63")
-        put("SUN50IW2", "Allwinner H5")
-        put("SUN50IW1", "Allwinner A64/H64 family")
-        put("SUN20IW1", "Allwinner D1/F133 family")
-        put("SUN8IW7", "Allwinner H2+/H3 family")
         put("S928X", "Amlogic S928X")
         put("A311D", "Amlogic A311D")
         put("S922X", "Amlogic S922X")
@@ -355,34 +321,35 @@ object MobileSocNameMapper {
         put("S905W", "Amlogic S905W")
         put("S905", "Amlogic S905")
         put("S912", "Amlogic S912")
-        put("T210", "NVIDIA Tegra X1")
-        put("T124", "NVIDIA Tegra K1")
-        put("T114", "NVIDIA Tegra 4")
-        put("TEGRA3", "NVIDIA Tegra 3")
+        put("TEGRA210", "NVIDIA Tegra X1")
+        put("TEGRA124", "NVIDIA Tegra K1")
+        put("TEGRA114", "NVIDIA Tegra 4")
+        put("TEGRA30", "NVIDIA Tegra 3")
     }
 
     private val aliasesByLength = socNames.keys.sortedByDescending(String::length)
 
-    private val explicitAllwinnerSocNames: Map<String, String> = mapOf(
-        "H728" to "Allwinner H728",
-        "H713" to "Allwinner H713",
-        "H700" to "Allwinner H700",
-        "H618" to "Allwinner H618",
-        "H616" to "Allwinner H616",
-        "H313" to "Allwinner H313",
-        "A733" to "Allwinner A733",
-        "A527" to "Allwinner A527",
-        "A523" to "Allwinner A523",
-        "A133" to "Allwinner A133",
-        "A100" to "Allwinner A100",
-        "T536" to "Allwinner T536",
-        "T527" to "Allwinner T527",
-        "R329" to "Allwinner R329",
-        "A64" to "Allwinner A64",
-        "H6" to "Allwinner H6",
-        "H5" to "Allwinner H5",
-        "H3" to "Allwinner H3",
-        "D1" to "Allwinner D1"
+    internal fun knownSocNames(): List<String> = socNames.values.distinct()
+
+    private val SAMSUNG_DEVICE_MODEL = Regex("""^SM-[A-Z0-9]""", RegexOption.IGNORE_CASE)
+
+    private val GENERIC_MARKETING_NAMES = setOf(
+        "snapdragon",
+        "qualcomm snapdragon",
+        "mediatek",
+        "dimensity",
+        "helio",
+        "exynos",
+        "samsung exynos",
+        "tensor",
+        "google tensor",
+        "kirin",
+        "unisoc",
+        "spreadtrum",
+        "rockchip",
+        "amlogic",
+        "nvidia tegra",
+        "tegra"
     )
 
     fun currentDeviceName(): String {
@@ -408,27 +375,17 @@ object MobileSocNameMapper {
         device: String? = null,
         product: String? = null
     ): String {
-        listOf(model, device, product)
-            .mapNotNull { it?.trim()?.takeIf(String::isNotEmpty) }
-            .forEach { candidate ->
-                resolveHandheldModel(candidate)?.let { return it }
-            }
-
-        // TV boxes and handhelds frequently expose the exact SoC only in ro.product.device
-        // or ro.product.name while ro.hardware contains an ambiguous Allwinner BSP family.
         val candidates = listOf(socModel, hardware, board, device, product, model)
             .mapNotNull { it?.trim()?.takeIf(String::isNotEmpty) }
 
-        candidates.forEach { candidate ->
-            resolveExplicitAllwinnerSoc(candidate)?.let { return it }
-        }
+        candidates.firstOrNull(::isSpecificMarketingName)?.let { return cleanDisplayName(it) }
 
         candidates.forEach { candidate ->
+            if (SAMSUNG_DEVICE_MODEL.containsMatchIn(candidate)) return@forEach
             resolveKnownCode(candidate)?.let { return it }
         }
 
-        val readable = candidates.firstOrNull(::isReadableMarketingName)
-        if (readable != null) return cleanDisplayName(readable)
+        candidates.firstOrNull(::isReadableMarketingName)?.let { return cleanDisplayName(it) }
 
         return inferVendorFamily(candidates, manufacturer) ?: "Unknown SoC"
     }
@@ -439,37 +396,27 @@ object MobileSocNameMapper {
         return socNames.getValue(alias)
     }
 
-    internal fun resolveHandheldModel(value: String): String? {
-        val normalized = normalize(value)
-        return handheldModelNames[normalized]
-    }
-
-    internal fun resolveExplicitAllwinnerSoc(value: String): String? {
-        val uppercase = value.uppercase(Locale.US)
-        val normalized = normalize(value)
-        return explicitAllwinnerSocNames.entries.firstOrNull { (alias, _) ->
-            val separatedToken = Regex("(^|[^A-Z0-9])${Regex.escape(alias)}([^A-Z0-9]|$)")
-                .containsMatchIn(uppercase)
-            val vendorToken = normalized.contains("ALLWINNER$alias") || normalized.contains("ALLWINER$alias")
-            val sunxiToken = normalized.startsWith("SUN") && normalized.endsWith(alias)
-            separatedToken || vendorToken || sunxiToken
-        }?.value
-    }
-
     private fun normalize(value: String): String = value
         .uppercase(Locale.US)
         .filter(Char::isLetterOrDigit)
+
+    private fun isSpecificMarketingName(value: String): Boolean {
+        if (!isReadableMarketingName(value)) return false
+        return value.trim().lowercase(Locale.US) !in GENERIC_MARKETING_NAMES
+    }
 
     private fun isReadableMarketingName(value: String): Boolean {
         val normalized = value.lowercase(Locale.US)
         return listOf(
             "snapdragon", "dimensity", "helio", "exynos", "tensor", "kirin",
-            "unisoc", "spreadtrum", "rockchip", "allwinner", "allwiner", "amlogic", "tegra"
+            "unisoc", "spreadtrum", "rockchip", "amlogic", "tegra"
         ).any(normalized::contains)
     }
 
     private fun inferVendorFamily(candidates: List<String>, manufacturer: String?): String? {
-        val identifiers = candidates.map(::normalize)
+        val identifiers = candidates
+            .filterNot { SAMSUNG_DEVICE_MODEL.containsMatchIn(it) }
+            .map(::normalize)
         val vendor = normalize(manufacturer.orEmpty())
 
         return when {
@@ -481,8 +428,6 @@ object MobileSocNameMapper {
             identifiers.any { it.startsWith("HI") || it.startsWith("KIRIN") } || vendor.contains("HISILICON") -> "Kirin"
             identifiers.any { it.startsWith("UMS") } || vendor.contains("UNISOC") || vendor.contains("SPREADTRUM") -> "Unisoc"
             identifiers.any { it.startsWith("RK") } || vendor.contains("ROCKCHIP") -> "Rockchip"
-            identifiers.any { it.startsWith("SUN") || it.startsWith("ALLWINNER") || it.startsWith("ALLWINER") } ||
-                vendor.contains("ALLWINNER") || vendor.contains("ALLWINER") -> "Allwinner"
             vendor.contains("AMLOGIC") -> "Amlogic"
             identifiers.any { it.startsWith("TEGRA") } || vendor.contains("NVIDIA") -> "NVIDIA Tegra"
             else -> null
@@ -491,7 +436,6 @@ object MobileSocNameMapper {
 
     private fun cleanDisplayName(value: String): String = value
         .replace("Qualcomm Technologies, Inc", "Qualcomm", ignoreCase = true)
-        .replace("Allwiner", "Allwinner", ignoreCase = true)
         .replace("(TM)", "", ignoreCase = true)
         .replace(Regex("\\s+"), " ")
         .trim()

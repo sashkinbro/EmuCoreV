@@ -157,7 +157,7 @@ object GpuDriverCompatibility {
         val normalizedDeviceInfo = deviceInfo.lowercase(Locale.US)
         val qualcommSignals = listOf(
             "adreno", "qcom", "qualcomm", "qti", "snapdragon", "msm", "sdm",
-            "sm8", "sm7", "sm6", "kalama", "lahaina", "taro", "waipio"
+            "sm8", "sm7", "sm6", "sm4", "qcs", "qcm", "kalama", "lahaina", "taro", "waipio"
         )
         if (qualcommSignals.any { it in normalizedDeviceInfo }) return true
 
@@ -166,6 +166,7 @@ object GpuDriverCompatibility {
             "hisilicon", "tensor", "unisoc", "spreadtrum", "powervr", "imgtec"
         )
         return knownNonAdrenoSignals.none { it in normalizedDeviceInfo } &&
-            Regex("""\bsm[0-9]{3,4}\b""").containsMatchIn(normalizedDeviceInfo)
+            Regex("""\bsm[0-9]{3,4}[a-z]*\b""", RegexOption.IGNORE_CASE)
+                .containsMatchIn(normalizedDeviceInfo)
     }
 }

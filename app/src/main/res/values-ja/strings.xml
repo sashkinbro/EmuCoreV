@@ -1049,8 +1049,8 @@
     <string name="settings_gpu_driver_compatible">互換</string>
     <string name="settings_gpu_driver_other_family">異なるAdrenoファミリー</string>
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888、および多くのSnapdragon 6/7シリーズ</string>
-    <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3、8s Gen 3、最近のSnapdragon 7シリーズ、6 Gen 1/3</string>
-    <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5、8 Gen 5、8 Elite、8s Gen 4、6 Gen 4</string>
+    <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3、8s Gen 3、7 Gen 3/4、7+ Gen 2/3、6 Gen 1/3</string>
+    <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Extreme Gen 6、8 Elite Gen 6、8 Gen 6、8 Elite Gen 5、8 Gen 5、8s Gen 4、7s Gen 3/4、6 Gen 4</string>
     <string name="game_manager_db_recommendation">ゲームDBはこのゲームに%1$s / %2$sを推奨しています。どちらのオプションも変更できます。保存されたゲームごとの設定が優先されます。</string>
     <string name="emulation_ime_done">完了</string>
     <string name="emulation_ime_system">Androidキーボード</string>
