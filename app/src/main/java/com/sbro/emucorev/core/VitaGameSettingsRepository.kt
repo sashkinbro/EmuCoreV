@@ -2,6 +2,9 @@ package com.sbro.emucorev.core
 
 import android.content.Context
 import android.util.Log
+import com.sbro.emucorev.data.KeyboardMouseSettings
+import com.sbro.emucorev.data.KeyboardMouseSettingsCodec
+import org.json.JSONObject
 import org.w3c.dom.Element
 import java.io.File
 import java.io.StringWriter
@@ -13,7 +16,8 @@ import javax.xml.transform.stream.StreamResult
 
 data class VitaGameSettingsProfile(
     val config: VitaCoreConfig,
-    val customDriverOverride: String?
+    val customDriverOverride: String?,
+    val keyboardMouse: KeyboardMouseSettings? = null
 )
 
 class VitaGameSettingsRepository(private val context: Context) {
@@ -69,13 +73,52 @@ class VitaGameSettingsRepository(private val context: Context) {
     }
 
     fun saveProfile(titleId: String, config: VitaCoreConfig, customDriverOverride: String?) {
+        saveProfile(titleId, config, customDriverOverride, loadProfile(titleId).keyboardMouse)
+    }
+
+    fun saveProfile(
+        titleId: String,
+        config: VitaCoreConfig,
+        customDriverOverride: String?,
+        keyboardMouse: KeyboardMouseSettings?
+    ) {
         if (titleId.isBlank()) return
         synchronized(CONFIG_IO_LOCK) {
             val base = globalRepository.ensureDefaultsPersisted()
             val effectiveConfig = config.copy(customDriverName = customDriverOverride ?: base.customDriverName)
             configDirectory.mkdirs()
-            writeCustomConfig(customConfigFile(titleId), effectiveConfig, customDriverOverride.driverMode())
+            writeCustomConfig(
+                customConfigFile(titleId),
+                effectiveConfig,
+                customDriverOverride.driverMode(),
+                keyboardMouse
+            )
         }
+    }
+
+    /** Persists or clears a game-specific keyboard/mouse override without touching other settings. */
+    fun updateKeyboardMouse(titleId: String, keyboardMouse: KeyboardMouseSettings?) {
+        if (titleId.isBlank()) return
+        val profile = loadProfile(titleId)
+        if (keyboardMouse == null) {
+            if (profile.keyboardMouse == null || !customConfigFile(titleId).exists()) return
+        }
+        saveProfile(titleId, profile.config, profile.customDriverOverride, keyboardMouse)
+    }
+
+    /**
+     * Persists the supplied game state together with a keyboard/mouse override. Clearing the
+     * override on a game without a custom profile is a no-op instead of creating one.
+     */
+    fun updateKeyboardMouse(
+        titleId: String,
+        config: VitaCoreConfig,
+        customDriverOverride: String?,
+        keyboardMouse: KeyboardMouseSettings?
+    ) {
+        if (titleId.isBlank()) return
+        if (keyboardMouse == null && !customConfigFile(titleId).exists()) return
+        saveProfile(titleId, config, customDriverOverride, keyboardMouse)
     }
 
     fun syncEffectiveDriverForLaunch(titleId: String): VitaCoreConfig {
@@ -106,6 +149,7 @@ class VitaGameSettingsRepository(private val context: Context) {
         var config = base
         var rawDriverName: String? = null
         var driverMode: String? = null
+        var keyboardMouse: KeyboardMouseSettings? = null
 
         root.childElement("core")?.let { core ->
             config = config.copy(modulesMode = core.intAttr("modules-mode", config.modulesMode))
@@ -175,6 +219,10 @@ class VitaGameSettingsRepository(private val context: Context) {
         }
         root.childElement("emucorev")?.let { own ->
             driverMode = own.stringAttrOrNull("gpu-driver-mode")
+            keyboardMouse = own.childElement("keyboard-mouse")
+                ?.textContent
+                ?.takeIf { it.isNotBlank() }
+                ?.let { raw -> runCatching { KeyboardMouseSettingsCodec.decode(JSONObject(raw)) }.getOrNull() }
             config = config.copy(
                 enableGamepadOverlay = own.boolAttr("enable-gamepad-overlay", config.enableGamepadOverlay),
                 overlayShowTouchSwitch = own.boolAttr("overlay-show-touch-switch", config.overlayShowTouchSwitch),
@@ -216,11 +264,17 @@ class VitaGameSettingsRepository(private val context: Context) {
         val customDriverOverride = resolveDriverOverride(driverMode, rawDriverName, base)
         return VitaGameSettingsProfile(
             config = config.copy(customDriverName = customDriverOverride ?: base.customDriverName),
-            customDriverOverride = customDriverOverride
+            customDriverOverride = customDriverOverride,
+            keyboardMouse = keyboardMouse
         )
     }
 
-    private fun writeCustomConfig(file: File, config: VitaCoreConfig, driverMode: String) {
+    private fun writeCustomConfig(
+        file: File,
+        config: VitaCoreConfig,
+        driverMode: String,
+        keyboardMouse: KeyboardMouseSettings?
+    ) {
         val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
         val root = doc.createElement("config")
         doc.appendChild(root)
@@ -317,6 +371,11 @@ class VitaGameSettingsRepository(private val context: Context) {
             setAttribute("turbo-mode", config.turboMode.toString())
             setAttribute("show-info-bar", config.showInfoBar.toString())
             setAttribute("bgm-volume", config.bgmVolume.toString())
+            if (keyboardMouse != null) {
+                appendChild(doc.createElement("keyboard-mouse").apply {
+                    textContent = KeyboardMouseSettingsCodec.encode(keyboardMouse).toString()
+                })
+            }
         })
 
         val output = StringWriter()

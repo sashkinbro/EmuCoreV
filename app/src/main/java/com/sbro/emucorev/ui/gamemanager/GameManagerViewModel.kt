@@ -11,7 +11,9 @@ import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.GameGpuRecommendation
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.VitaGameSettingsRepository
+import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.InstalledGameRepository
+import com.sbro.emucorev.data.KeyboardMouseSettings
 import com.sbro.emucorev.data.InstalledVitaGame
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -32,6 +34,8 @@ data class GameManagerUiState(
     val installedGpuDrivers: List<InstalledGpuDriver> = emptyList(),
     val customDriverOverride: String? = null,
     val hasCustomProfile: Boolean = false,
+    val keyboardMouse: KeyboardMouseSettings? = null,
+    val globalKeyboardMouse: KeyboardMouseSettings = KeyboardMouseSettings(),
     val isLoading: Boolean = true
 ) {
     val selectedGame: InstalledVitaGame?
@@ -42,6 +46,7 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
     private val gameRepository = InstalledGameRepository()
     private val globalRepository = VitaCoreConfigRepository(application)
     private val perGameRepository = VitaGameSettingsRepository(application)
+    private val preferences = AppPreferences(application)
     private val gpuDriverManager = GpuDriverManager(application)
     private val profileSaveQueue = Channel<ProfileWriteRequest>(Channel.UNLIMITED)
     private val latestProfileWrites = linkedMapOf<String, ProfileWriteRequest>()
@@ -58,7 +63,14 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
                         is ProfileWriteRequest.Save -> perGameRepository.saveProfile(
                             request.titleId,
                             request.config,
-                            request.customDriverOverride
+                            request.customDriverOverride,
+                            request.keyboardMouse
+                        )
+                        is ProfileWriteRequest.KeyboardMouse -> perGameRepository.updateKeyboardMouse(
+                            request.titleId,
+                            request.config,
+                            request.customDriverOverride,
+                            request.keyboardMouse
                         )
                         is ProfileWriteRequest.Reset -> perGameRepository.reset(request.titleId)
                     }
@@ -96,6 +108,8 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
                 installedGpuDrivers = installedGpuDrivers,
                 customDriverOverride = profile?.customDriverOverride,
                 hasCustomProfile = selected?.let(perGameRepository::hasCustomConfig) == true,
+                keyboardMouse = profile?.keyboardMouse,
+                globalKeyboardMouse = preferences.keyboardMouseSettings,
                 isLoading = false
             )
         }
@@ -114,7 +128,32 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
             config = updated,
             hasCustomProfile = true
         )
-        enqueueProfileWrite(ProfileWriteRequest.Save(titleId, updated, driverOverride))
+        enqueueProfileWrite(
+            ProfileWriteRequest.Save(
+                titleId,
+                updated,
+                driverOverride,
+                _uiState.value.keyboardMouse
+            )
+        )
+    }
+
+    fun updateSelectedKeyboardMouse(keyboardMouse: KeyboardMouseSettings?) {
+        val titleId = _uiState.value.selectedTitleId ?: return
+        val hadCustomProfile = _uiState.value.hasCustomProfile
+        _uiState.value = _uiState.value.copy(
+            keyboardMouse = keyboardMouse,
+            hasCustomProfile = keyboardMouse != null || hadCustomProfile ||
+                perGameRepository.hasCustomConfig(titleId)
+        )
+        enqueueProfileWrite(
+            ProfileWriteRequest.KeyboardMouse(
+                titleId,
+                _uiState.value.config,
+                _uiState.value.customDriverOverride,
+                keyboardMouse
+            )
+        )
     }
 
     fun selectCustomDriverOverride(driverName: String?) {
@@ -126,7 +165,14 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
             customDriverOverride = driverName,
             hasCustomProfile = true
         )
-        enqueueProfileWrite(ProfileWriteRequest.Save(titleId, updated, driverName))
+        enqueueProfileWrite(
+            ProfileWriteRequest.Save(
+                titleId,
+                updated,
+                driverName,
+                _uiState.value.keyboardMouse
+            )
+        )
     }
 
     fun resetSelectedToGlobal() {
@@ -136,7 +182,8 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
         _uiState.value = _uiState.value.copy(
             config = defaults,
             customDriverOverride = null,
-            hasCustomProfile = false
+            hasCustomProfile = false,
+            keyboardMouse = null
         )
         enqueueProfileWrite(ProfileWriteRequest.Reset(titleId))
     }
@@ -150,7 +197,14 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
                     is ProfileWriteRequest.Save -> perGameRepository.saveProfile(
                         request.titleId,
                         request.config,
-                        request.customDriverOverride
+                        request.customDriverOverride,
+                        request.keyboardMouse
+                    )
+                    is ProfileWriteRequest.KeyboardMouse -> perGameRepository.updateKeyboardMouse(
+                        request.titleId,
+                        request.config,
+                        request.customDriverOverride,
+                        request.keyboardMouse
                     )
                     is ProfileWriteRequest.Reset -> perGameRepository.reset(request.titleId)
                 }
@@ -171,7 +225,15 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
         data class Save(
             override val titleId: String,
             val config: VitaCoreConfig,
-            val customDriverOverride: String?
+            val customDriverOverride: String?,
+            val keyboardMouse: KeyboardMouseSettings?
+        ) : ProfileWriteRequest
+
+        data class KeyboardMouse(
+            override val titleId: String,
+            val config: VitaCoreConfig,
+            val customDriverOverride: String?,
+            val keyboardMouse: KeyboardMouseSettings?
         ) : ProfileWriteRequest
 
         data class Reset(override val titleId: String) : ProfileWriteRequest

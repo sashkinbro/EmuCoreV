@@ -5,6 +5,7 @@ import android.net.Uri
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.AppFont
 import com.sbro.emucorev.data.CustomizationPreferences
+import com.sbro.emucorev.data.KeyboardMouseSettingsCodec
 import com.sbro.emucorev.data.StatsMode
 import com.sbro.emucorev.data.legacyStatsMode
 import com.sbro.emucorev.data.legacyStatsPosition
@@ -35,6 +36,7 @@ class SettingsBackupRepository(
                     .putNullable("skippedUpdateTag", preferences.skippedUpdateTag)
             )
             .put("core", config.toJson())
+            .put("keyboardMouse", KeyboardMouseSettingsCodec.encode(preferences.keyboardMouseSettings))
             .put(
                 "customization",
                 JSONObject()
@@ -95,6 +97,10 @@ class SettingsBackupRepository(
             preferences.themeMode = app.optEnum("themeMode", preferences.themeMode)
             preferences.appLanguage = app.optEnum("appLanguage", preferences.appLanguage)
             preferences.applyAppLanguage()
+        }
+        if (applyApp) root.optJSONObject("keyboardMouse")?.let { saved ->
+            preferences.keyboardMouseSettings = KeyboardMouseSettingsCodec.decode(saved)
+                ?: preferences.keyboardMouseSettings
         }
         if (applyApp) root.optJSONObject("trophySound")?.let { sound ->
             check(trophySoundRepository.restoreBackup(

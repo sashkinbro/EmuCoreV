@@ -1476,4 +1476,66 @@
     <string name="settings_show_quick_bar">Afficher la barre d’actions rapides</string>
     <string name="settings_help_show_quick_bar">Touchez deux fois l’écran du jeu pour afficher les boutons de sauvegarde, de chargement, de capture d’écran, de pause et de menu.</string>
     <string name="install_dialog_archive_requires_base">Selon ses métadonnées, cette archive contient une mise à jour pour %1$s. Installez d’abord le jeu de base.</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">Clavier et souris</string>
+    <string name="settings_keyboard_input">Entrée clavier</string>
+    <string name="settings_keyboard_input_desc">Associez un clavier physique à la manette émulée.</string>
+    <string name="settings_keyboard_target_player">Joueur clavier</string>
+    <string name="settings_keyboard_mapping_title">Mappage du clavier</string>
+    <string name="settings_keyboard_mapping_desc">Choisissez la touche qui active chaque action de la manette.</string>
+    <string name="settings_mouse_input">Entrée souris</string>
+    <string name="settings_mouse_input_desc">Associez les boutons de la souris et utilisez-la éventuellement pour viser en analogique.</string>
+    <string name="settings_mouse_target_player">Joueur souris</string>
+    <string name="settings_mouse_mapping_title">Mappage de la souris</string>
+    <string name="settings_mouse_mapping_desc">Choisissez le bouton de la souris qui active chaque action de la manette.</string>
+    <string name="settings_keyboard_mapping_listening_title">Appuyez sur une touche</string>
+    <string name="settings_keyboard_mapping_listening_desc">Appuyez sur la touche à attribuer. Appuyez sur Retour pour annuler.</string>
+    <string name="settings_mouse_mapping_listening_title">Cliquez sur un bouton de la souris</string>
+    <string name="settings_mouse_mapping_listening_desc">Cliquez sur le bouton de la souris à attribuer. Appuyez sur Retour pour annuler.</string>
+    <string name="settings_keyboard_connected">Clavier connecté</string>
+    <string name="settings_mouse_connected">Souris connectée</string>
+    <string name="settings_mouse_aim_mode">Visée à la souris</string>
+    <string name="settings_mouse_aim_off">Désactivé</string>
+    <string name="settings_mouse_aim_right_stick">Stick droit</string>
+    <string name="settings_mouse_aim_left_stick">Stick gauche</string>
+    <string name="settings_mouse_aim_mode_desc">Déplacez un stick analogique avec la souris.</string>
+    <string name="settings_mouse_sensitivity">Sensibilité de la souris</string>
+    <string name="settings_mouse_sensitivity_desc">Réglez la distance dont la souris déplace le stick émulé.</string>
+    <string name="settings_mouse_invert_y">Inverser l\'axe Y de la souris</string>
+    <string name="settings_mouse_invert_y_desc">Inverse la visée verticale à la souris.</string>
+    <string name="settings_mouse_capture">Capturer le curseur</string>
+    <string name="settings_mouse_capture_desc">Masque et verrouille le pointeur pendant la visée à la souris.</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">Réinitialiser le mappage clavier/souris</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">Restaure les mappages clavier et souris par défaut pour ce joueur.</string>
+    <string name="settings_keyboard_mouse_global_note">Les mappages clavier et souris sont globaux et s\'appliquent à tous les jeux.</string>
+    <string name="settings_keyboard_mouse_source_keyboard">Clavier</string>
+    <string name="settings_keyboard_mouse_source_mouse">Souris</string>
+    <string name="settings_keyboard_mouse_game_desc">Ces réglages ne s’appliquent qu’à ce jeu.</string>
+    <string name="settings_keyboard_mouse_use_global">Utiliser les réglages globaux clavier/souris</string>
+    <string name="settings_keyboard_mouse_use_global_desc">Supprimer le réglage clavier et souris propre à ce jeu.</string>
+    <string name="settings_mouse_smoothing">Lissage de la souris</string>
+    <string name="settings_mouse_smoothing_desc">Lisse les petits mouvements de souris pour une visée plus stable.</string>
+    <string name="settings_mouse_invert_x">Inverser l\'axe X de la souris</string>
+    <string name="settings_mouse_invert_x_desc">Inverse la visée horizontale à la souris.</string>
+    <string name="settings_mouse_left_handed">Souris pour gaucher</string>
+    <string name="settings_mouse_left_handed_desc">Échange les boutons gauche et droit de la souris.</string>
+    <string name="settings_mouse_wheel">Molette de la souris</string>
+    <string name="settings_mouse_wheel_off">Désactivée</string>
+    <string name="settings_mouse_wheel_dpad">Croix directionnelle haut/bas</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">Stick gauche haut/bas</string>
+    <string name="settings_mouse_wheel_right_stick">Stick droit haut/bas</string>
+    <string name="settings_mouse_deadzone">Zone morte de visée</string>
+    <string name="settings_mouse_wheel_pulse">Durée d\'appui de la molette</string>
+    <string name="settings_mouse_vertical_sensitivity">Sensibilité verticale</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">Supprime les remplacements de boutons de manette pour ce jeu.</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">Joueur 1</string>
+    <string name="settings_gamepad_player_2">Joueur 2</string>
+    <string name="settings_not_set">Non défini</string>
+    <string name="settings_gamepad_mapping_clear">Effacer</string>
+    <string name="settings_gamepad_mapping_auto_format">Auto</string>
 </resources>

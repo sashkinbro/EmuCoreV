@@ -1476,4 +1476,66 @@
     <string name="settings_show_quick_bar">त्वरित कार्रवाई बार दिखाएँ</string>
     <string name="settings_help_show_quick_bar">सेव, लोड, स्क्रीनशॉट, पॉज़ और मेन्यू बटन दिखाने के लिए गेम की स्क्रीन पर दो बार टैप करें।</string>
     <string name="install_dialog_archive_requires_base">मेटाडेटा के अनुसार, इस आर्काइव में %1$s का अपडेट है। पहले मूल गेम इंस्टॉल करें।</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">कीबोर्ड और माउस</string>
+    <string name="settings_keyboard_input">कीबोर्ड इनपुट</string>
+    <string name="settings_keyboard_input_desc">भौतिक कीबोर्ड को एम्युलेटेड कंट्रोलर से मैप करें।</string>
+    <string name="settings_keyboard_target_player">कीबोर्ड खिलाड़ी</string>
+    <string name="settings_keyboard_mapping_title">कीबोर्ड मैपिंग</string>
+    <string name="settings_keyboard_mapping_desc">चुनें कि कौन-सी कुंजी हर कंट्रोलर क्रिया सक्रिय करे।</string>
+    <string name="settings_mouse_input">माउस इनपुट</string>
+    <string name="settings_mouse_input_desc">माउस बटन मैप करें और वैकल्पिक रूप से माउस से एनालॉग एमिंग करें।</string>
+    <string name="settings_mouse_target_player">माउस खिलाड़ी</string>
+    <string name="settings_mouse_mapping_title">माउस मैपिंग</string>
+    <string name="settings_mouse_mapping_desc">चुनें कि कौन-सा माउस बटन हर कंट्रोलर क्रिया सक्रिय करे।</string>
+    <string name="settings_keyboard_mapping_listening_title">कोई कुंजी दबाएँ</string>
+    <string name="settings_keyboard_mapping_listening_desc">जिस कुंजी को असाइन करना है उसे दबाएँ। रद्द करने के लिए वापस दबाएँ।</string>
+    <string name="settings_mouse_mapping_listening_title">माउस बटन क्लिक करें</string>
+    <string name="settings_mouse_mapping_listening_desc">जिस माउस बटन को असाइन करना है उस पर क्लिक करें। रद्द करने के लिए वापस दबाएँ।</string>
+    <string name="settings_keyboard_connected">कीबोर्ड कनेक्ट है</string>
+    <string name="settings_mouse_connected">माउस कनेक्ट है</string>
+    <string name="settings_mouse_aim_mode">माउस एमिंग</string>
+    <string name="settings_mouse_aim_off">बंद</string>
+    <string name="settings_mouse_aim_right_stick">दायाँ स्टिक</string>
+    <string name="settings_mouse_aim_left_stick">बायाँ स्टिक</string>
+    <string name="settings_mouse_aim_mode_desc">माउस से एनालॉग स्टिक घुमाएँ।</string>
+    <string name="settings_mouse_sensitivity">माउस संवेदनशीलता</string>
+    <string name="settings_mouse_sensitivity_desc">समायोजित करें कि माउस एम्युलेटेड स्टिक को कितना घुमाता है।</string>
+    <string name="settings_mouse_invert_y">माउस Y उलटें</string>
+    <string name="settings_mouse_invert_y_desc">माउस की लंबवत एमिंग उलटें।</string>
+    <string name="settings_mouse_capture">माउस कर्सर कैप्चर करें</string>
+    <string name="settings_mouse_capture_desc">माउस एमिंग सक्रिय होने पर पॉइंटर छिपाएँ और लॉक करें।</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">कीबोर्ड/माउस मैपिंग रीसेट करें</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">इस खिलाड़ी के लिए डिफ़ॉल्ट कीबोर्ड और माउस मैपिंग बहाल करें।</string>
+    <string name="settings_keyboard_mouse_global_note">कीबोर्ड और माउस मैपिंग वैश्विक हैं और हर गेम पर लागू होती हैं।</string>
+    <string name="settings_keyboard_mouse_source_keyboard">कीबोर्ड</string>
+    <string name="settings_keyboard_mouse_source_mouse">माउस</string>
+    <string name="settings_keyboard_mouse_game_desc">ये सेटिंग्स केवल इस गेम पर लागू होती हैं।</string>
+    <string name="settings_keyboard_mouse_use_global">वैश्विक कीबोर्ड/माउस सेटिंग्स का उपयोग करें</string>
+    <string name="settings_keyboard_mouse_use_global_desc">इस गेम का विशिष्ट कीबोर्ड और माउस ओवरराइड हटाएँ।</string>
+    <string name="settings_mouse_smoothing">माउस स्मूदिंग</string>
+    <string name="settings_mouse_smoothing_desc">स्थिर एमिंग के लिए माउस की छोटी गतियों को स्मूद करें।</string>
+    <string name="settings_mouse_invert_x">माउस X उलटें</string>
+    <string name="settings_mouse_invert_x_desc">माउस की क्षैतिज एमिंग उलटें।</string>
+    <string name="settings_mouse_left_handed">बाएँ हाथ के लिए माउस</string>
+    <string name="settings_mouse_left_handed_desc">माउस के बाएँ और दाएँ बटन बदलें।</string>
+    <string name="settings_mouse_wheel">माउस व्हील</string>
+    <string name="settings_mouse_wheel_off">बंद</string>
+    <string name="settings_mouse_wheel_dpad">डी-पैड ऊपर/नीचे</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">बायाँ स्टिक ऊपर/नीचे</string>
+    <string name="settings_mouse_wheel_right_stick">दायाँ स्टिक ऊपर/नीचे</string>
+    <string name="settings_mouse_deadzone">लक्ष्य डेडज़ोन</string>
+    <string name="settings_mouse_wheel_pulse">व्हील दबाने की अवधि</string>
+    <string name="settings_mouse_vertical_sensitivity">वर्टिकल संवेदनशीलता</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">इस गेम के गेमपैड बटन ओवरराइड हटाएँ।</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">प्लेयर 1</string>
+    <string name="settings_gamepad_player_2">प्लेयर 2</string>
+    <string name="settings_not_set">सेट नहीं है</string>
+    <string name="settings_gamepad_mapping_clear">साफ़ करें</string>
+    <string name="settings_gamepad_mapping_auto_format">स्वतः</string>
 </resources>

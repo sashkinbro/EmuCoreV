@@ -1480,4 +1480,66 @@
     <string name="settings_show_quick_bar">Show quick action bar</string>
     <string name="settings_help_show_quick_bar">Double-tap the game screen to show Save, Load, Screenshot, Pause and Menu buttons.</string>
     <string name="install_dialog_archive_requires_base">Archive metadata identifies an update for %1$s. Install the base game first.</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">Keyboard &amp; Mouse</string>
+    <string name="settings_keyboard_input">Keyboard input</string>
+    <string name="settings_keyboard_input_desc">Map a physical keyboard to the emulated controller.</string>
+    <string name="settings_keyboard_target_player">Keyboard player</string>
+    <string name="settings_keyboard_mapping_title">Keyboard mapping</string>
+    <string name="settings_keyboard_mapping_desc">Choose which key activates each controller action.</string>
+    <string name="settings_mouse_input">Mouse input</string>
+    <string name="settings_mouse_input_desc">Map mouse buttons and optionally use the mouse for analog aiming.</string>
+    <string name="settings_mouse_target_player">Mouse player</string>
+    <string name="settings_mouse_mapping_title">Mouse mapping</string>
+    <string name="settings_mouse_mapping_desc">Choose which mouse button activates each controller action.</string>
+    <string name="settings_keyboard_mapping_listening_title">Press a key</string>
+    <string name="settings_keyboard_mapping_listening_desc">Press the keyboard key you want to assign. Press Back to cancel.</string>
+    <string name="settings_mouse_mapping_listening_title">Click a mouse button</string>
+    <string name="settings_mouse_mapping_listening_desc">Click the mouse button you want to assign. Press Back to cancel.</string>
+    <string name="settings_keyboard_connected">Keyboard connected</string>
+    <string name="settings_mouse_connected">Mouse connected</string>
+    <string name="settings_mouse_aim_mode">Mouse aiming</string>
+    <string name="settings_mouse_aim_off">Off</string>
+    <string name="settings_mouse_aim_right_stick">Right stick</string>
+    <string name="settings_mouse_aim_left_stick">Left stick</string>
+    <string name="settings_mouse_aim_mode_desc">Move an analog stick with the mouse.</string>
+    <string name="settings_mouse_sensitivity">Mouse sensitivity</string>
+    <string name="settings_mouse_sensitivity_desc">Adjust how far the mouse moves the emulated stick.</string>
+    <string name="settings_mouse_invert_y">Invert mouse Y</string>
+    <string name="settings_mouse_invert_y_desc">Reverse vertical mouse aiming.</string>
+    <string name="settings_mouse_capture">Capture mouse cursor</string>
+    <string name="settings_mouse_capture_desc">Hide and lock the pointer while mouse aiming is active.</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">Reset keyboard/mouse mapping</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">Restore the default keyboard and mouse mappings for this player.</string>
+    <string name="settings_keyboard_mouse_global_note">Keyboard and mouse mappings are global and apply to every game.</string>
+    <string name="settings_keyboard_mouse_source_keyboard">Keyboard</string>
+    <string name="settings_keyboard_mouse_source_mouse">Mouse</string>
+    <string name="settings_keyboard_mouse_game_desc">These settings apply only to this game.</string>
+    <string name="settings_keyboard_mouse_use_global">Use global keyboard/mouse settings</string>
+    <string name="settings_keyboard_mouse_use_global_desc">Remove the game-specific keyboard and mouse override.</string>
+    <string name="settings_mouse_smoothing">Mouse smoothing</string>
+    <string name="settings_mouse_smoothing_desc">Smooth out small mouse movements for steadier aiming.</string>
+    <string name="settings_mouse_invert_x">Invert mouse X</string>
+    <string name="settings_mouse_invert_x_desc">Reverse horizontal mouse aiming.</string>
+    <string name="settings_mouse_left_handed">Left-handed mouse</string>
+    <string name="settings_mouse_left_handed_desc">Swap the left and right mouse buttons.</string>
+    <string name="settings_mouse_wheel">Mouse wheel</string>
+    <string name="settings_mouse_wheel_off">Off</string>
+    <string name="settings_mouse_wheel_dpad">D-pad up/down</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">Left stick up/down</string>
+    <string name="settings_mouse_wheel_right_stick">Right stick up/down</string>
+    <string name="settings_mouse_deadzone">Aim deadzone</string>
+    <string name="settings_mouse_wheel_pulse">Wheel press duration</string>
+    <string name="settings_mouse_vertical_sensitivity">Vertical sensitivity</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">Remove this game\'s gamepad button overrides.</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">Player 1</string>
+    <string name="settings_gamepad_player_2">Player 2</string>
+    <string name="settings_not_set">Not set</string>
+    <string name="settings_gamepad_mapping_clear">Clear</string>
+    <string name="settings_gamepad_mapping_auto_format">Auto</string>
 </resources>

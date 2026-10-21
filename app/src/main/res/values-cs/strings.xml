@@ -1480,4 +1480,66 @@
     <string name="settings_show_quick_bar">Zobrazovat panel rychlých akcí</string>
     <string name="settings_help_show_quick_bar">Dvojitým klepnutím na obrazovku hry zobrazíte tlačítka pro uložení, načtení, snímek obrazovky, pozastavení a nabídku.</string>
     <string name="install_dialog_archive_requires_base">Podle metadat obsahuje archiv aktualizaci pro %1$s. Nejprve nainstalujte základní hru.</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">Klávesnice a myš</string>
+    <string name="settings_keyboard_input">Vstup z klávesnice</string>
+    <string name="settings_keyboard_input_desc">Přiřaďte fyzickou klávesnici k emulovanému ovladači.</string>
+    <string name="settings_keyboard_target_player">Hráč s klávesnicí</string>
+    <string name="settings_keyboard_mapping_title">Mapování klávesnice</string>
+    <string name="settings_keyboard_mapping_desc">Zvolte, která klávesa aktivuje jednotlivé akce ovladače.</string>
+    <string name="settings_mouse_input">Vstup z myši</string>
+    <string name="settings_mouse_input_desc">Přiřaďte tlačítka myši a volitelně použijte myš pro analogové míření.</string>
+    <string name="settings_mouse_target_player">Hráč s myší</string>
+    <string name="settings_mouse_mapping_title">Mapování myši</string>
+    <string name="settings_mouse_mapping_desc">Zvolte, které tlačítko myši aktivuje jednotlivé akce ovladače.</string>
+    <string name="settings_keyboard_mapping_listening_title">Stiskněte klávesu</string>
+    <string name="settings_keyboard_mapping_listening_desc">Stiskněte klávesu, kterou chcete přiřadit. Stisknutím Zpět zrušíte.</string>
+    <string name="settings_mouse_mapping_listening_title">Klikněte tlačítkem myši</string>
+    <string name="settings_mouse_mapping_listening_desc">Klikněte tlačítkem myši, které chcete přiřadit. Stisknutím Zpět zrušíte.</string>
+    <string name="settings_keyboard_connected">Klávesnice je připojena</string>
+    <string name="settings_mouse_connected">Myš je připojena</string>
+    <string name="settings_mouse_aim_mode">Míření myší</string>
+    <string name="settings_mouse_aim_off">Vypnuto</string>
+    <string name="settings_mouse_aim_right_stick">Pravá páčka</string>
+    <string name="settings_mouse_aim_left_stick">Levá páčka</string>
+    <string name="settings_mouse_aim_mode_desc">Pohybujte analogovou páčkou pomocí myši.</string>
+    <string name="settings_mouse_sensitivity">Citlivost myši</string>
+    <string name="settings_mouse_sensitivity_desc">Upravte, jak daleko myš pohybuje emulovanou páčkou.</string>
+    <string name="settings_mouse_invert_y">Invertovat osu Y myši</string>
+    <string name="settings_mouse_invert_y_desc">Obrátí svislé míření myší.</string>
+    <string name="settings_mouse_capture">Zachytit kurzor myši</string>
+    <string name="settings_mouse_capture_desc">Skryje a uzamkne ukazatel, když je aktivní míření myší.</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">Obnovit mapování klávesnice/myši</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">Obnoví výchozí mapování klávesnice a myši pro tohoto hráče.</string>
+    <string name="settings_keyboard_mouse_global_note">Mapování klávesnice a myši je globální a platí pro všechny hry.</string>
+    <string name="settings_keyboard_mouse_source_keyboard">Klávesnice</string>
+    <string name="settings_keyboard_mouse_source_mouse">Myš</string>
+    <string name="settings_keyboard_mouse_game_desc">Tato nastavení platí pouze pro tuto hru.</string>
+    <string name="settings_keyboard_mouse_use_global">Použít globální nastavení klávesnice/myši</string>
+    <string name="settings_keyboard_mouse_use_global_desc">Odebrat specifické nastavení klávesnice a myši pro tuto hru.</string>
+    <string name="settings_mouse_smoothing">Vyhlazení myši</string>
+    <string name="settings_mouse_smoothing_desc">Vyhladí drobné pohyby myši pro plynulejší míření.</string>
+    <string name="settings_mouse_invert_x">Invertovat osu X myši</string>
+    <string name="settings_mouse_invert_x_desc">Obrátí vodorovné míření myší.</string>
+    <string name="settings_mouse_left_handed">Myš pro leváky</string>
+    <string name="settings_mouse_left_handed_desc">Prohodí levé a pravé tlačítko myši.</string>
+    <string name="settings_mouse_wheel">Kolečko myši</string>
+    <string name="settings_mouse_wheel_off">Vypnuto</string>
+    <string name="settings_mouse_wheel_dpad">D-pad nahoru/dolů</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">Levá páčka nahoru/dolů</string>
+    <string name="settings_mouse_wheel_right_stick">Pravá páčka nahoru/dolů</string>
+    <string name="settings_mouse_deadzone">Mrtvá zóna míření</string>
+    <string name="settings_mouse_wheel_pulse">Doba stisku kolečka</string>
+    <string name="settings_mouse_vertical_sensitivity">Vertikální citlivost</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">Odstraní přepisy tlačítek ovladače pro tuto hru.</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">Hráč 1</string>
+    <string name="settings_gamepad_player_2">Hráč 2</string>
+    <string name="settings_not_set">Nenastaveno</string>
+    <string name="settings_gamepad_mapping_clear">Vymazat</string>
+    <string name="settings_gamepad_mapping_auto_format">Auto</string>
 </resources>

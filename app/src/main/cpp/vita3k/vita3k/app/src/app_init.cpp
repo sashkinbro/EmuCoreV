@@ -30,6 +30,7 @@
 #include <cpu/functions.h>
 #include <ctrl/functions.h>
 #include <ctrl/state.h>
+#include <emucorev/input_state.h>
 #include <dialog/state.h>
 #include <display/state.h>
 #include <emuenv/state.h>
@@ -126,6 +127,8 @@ static overlay::button_states poll_overlay_input(EmuEnvState &emuenv) {
     axes[1] += kb.axes[1];
     axes[2] += kb.axes[2];
     axes[3] += kb.axes[3];
+
+    emucorev::input_state::apply_all_pad_states(buttons, axes);
 
     for (const auto &[_, controller] : emuenv.ctrl.controllers) {
         SDL_Gamepad *gp = controller.controller.get();
@@ -600,6 +603,7 @@ void reset_app_state(EmuEnvState &state) {
     state.clear_app_launch_request();
 
     state.ctrl.reset_runtime();
+    emucorev::input_state::reset_all();
     cheat::unload(state.cheat);
     set_current_config(state, "");
 

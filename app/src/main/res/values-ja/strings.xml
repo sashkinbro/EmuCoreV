@@ -1480,4 +1480,66 @@
     <string name="settings_show_quick_bar">クイックアクションバーを表示</string>
     <string name="settings_help_show_quick_bar">ゲーム画面をダブルタップすると、セーブ、ロード、スクリーンショット、一時停止、メニューのボタンを表示します。</string>
     <string name="install_dialog_archive_requires_base">アーカイブのメタデータでは、%1$s の更新データとされています。先にゲーム本体をインストールしてください。</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">キーボードとマウス</string>
+    <string name="settings_keyboard_input">キーボード入力</string>
+    <string name="settings_keyboard_input_desc">物理キーボードをエミュレートされたコントローラーに割り当てます。</string>
+    <string name="settings_keyboard_target_player">キーボードプレイヤー</string>
+    <string name="settings_keyboard_mapping_title">キーボードマッピング</string>
+    <string name="settings_keyboard_mapping_desc">各コントローラー操作を有効にするキーを選択します。</string>
+    <string name="settings_mouse_input">マウス入力</string>
+    <string name="settings_mouse_input_desc">マウスボタンを割り当て、必要に応じてアナログエイムに使用します。</string>
+    <string name="settings_mouse_target_player">マウスプレイヤー</string>
+    <string name="settings_mouse_mapping_title">マウスマッピング</string>
+    <string name="settings_mouse_mapping_desc">各コントローラー操作を有効にするマウスボタンを選択します。</string>
+    <string name="settings_keyboard_mapping_listening_title">キーを押してください</string>
+    <string name="settings_keyboard_mapping_listening_desc">割り当てるキーボードのキーを押してください。戻るでキャンセルします。</string>
+    <string name="settings_mouse_mapping_listening_title">マウスボタンをクリック</string>
+    <string name="settings_mouse_mapping_listening_desc">割り当てるマウスボタンをクリックしてください。戻るでキャンセルします。</string>
+    <string name="settings_keyboard_connected">キーボード接続済み</string>
+    <string name="settings_mouse_connected">マウス接続済み</string>
+    <string name="settings_mouse_aim_mode">マウスエイム</string>
+    <string name="settings_mouse_aim_off">オフ</string>
+    <string name="settings_mouse_aim_right_stick">右スティック</string>
+    <string name="settings_mouse_aim_left_stick">左スティック</string>
+    <string name="settings_mouse_aim_mode_desc">マウスでアナログスティックを動かします。</string>
+    <string name="settings_mouse_sensitivity">マウス感度</string>
+    <string name="settings_mouse_sensitivity_desc">マウスでエミュレートされたスティックを動かす量を調整します。</string>
+    <string name="settings_mouse_invert_y">マウスY軸を反転</string>
+    <string name="settings_mouse_invert_y_desc">マウスの縦方向のエイムを反転します。</string>
+    <string name="settings_mouse_capture">マウスカーソルをキャプチャ</string>
+    <string name="settings_mouse_capture_desc">マウスエイム中はポインターを隠して固定します。</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">キーボード/マウスマッピングをリセット</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">このプレイヤーのキーボードとマウスの既定マッピングを復元します。</string>
+    <string name="settings_keyboard_mouse_global_note">キーボードとマウスのマッピングは全ゲーム共通です。</string>
+    <string name="settings_keyboard_mouse_source_keyboard">キーボード</string>
+    <string name="settings_keyboard_mouse_source_mouse">マウス</string>
+    <string name="settings_keyboard_mouse_game_desc">これらの設定はこのゲームにのみ適用されます。</string>
+    <string name="settings_keyboard_mouse_use_global">グローバルなキーボード/マウス設定を使用</string>
+    <string name="settings_keyboard_mouse_use_global_desc">このゲーム専用のキーボードとマウスの上書きを削除します。</string>
+    <string name="settings_mouse_smoothing">マウススムージング</string>
+    <string name="settings_mouse_smoothing_desc">小さなマウス移動を滑らかにして照準を安定させます。</string>
+    <string name="settings_mouse_invert_x">マウスX軸を反転</string>
+    <string name="settings_mouse_invert_x_desc">マウスの横方向のエイムを反転します。</string>
+    <string name="settings_mouse_left_handed">左利き用マウス</string>
+    <string name="settings_mouse_left_handed_desc">マウスの左右ボタンを入れ替えます。</string>
+    <string name="settings_mouse_wheel">マウスホイール</string>
+    <string name="settings_mouse_wheel_off">オフ</string>
+    <string name="settings_mouse_wheel_dpad">十字キー上下</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">左スティック上下</string>
+    <string name="settings_mouse_wheel_right_stick">右スティック上下</string>
+    <string name="settings_mouse_deadzone">エイムのデッドゾーン</string>
+    <string name="settings_mouse_wheel_pulse">ホイール押下時間</string>
+    <string name="settings_mouse_vertical_sensitivity">縦方向の感度</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">このゲームのゲームパッドボタン割り当てを削除します。</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">プレイヤー 1</string>
+    <string name="settings_gamepad_player_2">プレイヤー 2</string>
+    <string name="settings_not_set">未設定</string>
+    <string name="settings_gamepad_mapping_clear">クリア</string>
+    <string name="settings_gamepad_mapping_auto_format">自動</string>
 </resources>

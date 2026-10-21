@@ -85,6 +85,7 @@ import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.common.SettingHelpButton
 import com.sbro.emucorev.ui.emulation.TouchControlLayoutRepository
+import com.sbro.emucorev.ui.settings.PerGameKeyboardMouseSettingsSection
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
@@ -199,7 +200,14 @@ fun GameManagerScreen(
                     GameManagerTab.Performance -> PerformanceProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
                     GameManagerTab.Audio -> AudioProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
                     GameManagerTab.Overlay -> OverlayProfileSection(uiState.selectedTitleId, uiState.config, uiState.defaults, viewModel::updateSelected)
-                    GameManagerTab.Gamepad -> GamepadProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
+                    GameManagerTab.Gamepad -> Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                        GamepadProfileSection(uiState.config, uiState.defaults, viewModel::updateSelected)
+                        PerGameKeyboardMouseSettingsSection(
+                            override = uiState.keyboardMouse,
+                            globalSettings = uiState.globalKeyboardMouse,
+                            onOverrideChange = viewModel::updateSelectedKeyboardMouse
+                        )
+                    }
                     GameManagerTab.Controls -> GameManagerTouchLayoutSection(
                         hasOverride = hasTouchLayoutOverride,
                         onEdit = { onOpenTouchLayoutEditor(uiState.selectedTitleId) },

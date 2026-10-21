@@ -31,6 +31,14 @@ target_include_directories(vita3k PRIVATE
 
 target_compile_definitions(vita3k PRIVATE EMUCOREV_ANDROID_BRIDGE=1)
 
+# Core static libraries that merge the EmuCoreV keyboard/mouse source state.
+if(TARGET ctrl)
+    target_include_directories(ctrl PRIVATE "${EMUCOREV_BRIDGE_DIR}/include")
+endif()
+if(TARGET app)
+    target_include_directories(app PRIVATE "${EMUCOREV_BRIDGE_DIR}/include")
+endif()
+
 emucorev_filter_vita3k_target(vita3k "${VITA3K_VENDOR_DIR}" "${VITA3K_CORE_DIR}")
 
 # Drop the upstream file-dialog JNI from vita3k's shared library: it exports
@@ -60,6 +68,8 @@ set(EMUCOREV_BRIDGE_SOURCES
     "${EMUCOREV_BRIDGE_DIR}/src/stats_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/cheat_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/input_overlay_bridge.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/input_state.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/keyboard_mouse_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/emu_surface_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/native_lib_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/savestate_bridge.cpp"

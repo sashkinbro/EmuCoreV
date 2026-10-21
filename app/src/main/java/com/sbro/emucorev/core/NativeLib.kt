@@ -7,6 +7,14 @@ object NativeLib {
     external fun isInitialized(): Boolean
     external fun refreshAppsList()
     external fun setControlsEditorActive(active: Boolean)
+    external fun setKeyboardMousePadState(
+        padIndex: Int,
+        buttons: Int,
+        leftX: Float,
+        leftY: Float,
+        rightX: Float,
+        rightY: Float
+    )
     /** Silence verbose upstream spdlog in release (see native_lib_bridge.cpp). */
     external fun applyReleaseLogging()
 }

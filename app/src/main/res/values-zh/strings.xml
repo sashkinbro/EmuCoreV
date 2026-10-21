@@ -1475,4 +1475,66 @@
     <string name="settings_show_quick_bar">显示快捷操作栏</string>
     <string name="settings_help_show_quick_bar">双击游戏画面可显示保存、加载、截图、暂停和菜单按钮。</string>
     <string name="install_dialog_archive_requires_base">根据元数据，此压缩包包含 %1$s 的更新。请先安装游戏本体。</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">键盘和鼠标</string>
+    <string name="settings_keyboard_input">键盘输入</string>
+    <string name="settings_keyboard_input_desc">将物理键盘映射到模拟控制器。</string>
+    <string name="settings_keyboard_target_player">键盘玩家</string>
+    <string name="settings_keyboard_mapping_title">键盘映射</string>
+    <string name="settings_keyboard_mapping_desc">选择用于触发每个控制器操作的按键。</string>
+    <string name="settings_mouse_input">鼠标输入</string>
+    <string name="settings_mouse_input_desc">映射鼠标按键，并可选择使用鼠标进行模拟摇杆瞄准。</string>
+    <string name="settings_mouse_target_player">鼠标玩家</string>
+    <string name="settings_mouse_mapping_title">鼠标映射</string>
+    <string name="settings_mouse_mapping_desc">选择用于触发每个控制器操作的鼠标按键。</string>
+    <string name="settings_keyboard_mapping_listening_title">按下按键</string>
+    <string name="settings_keyboard_mapping_listening_desc">按下要分配的键盘按键。按返回键取消。</string>
+    <string name="settings_mouse_mapping_listening_title">点击鼠标按键</string>
+    <string name="settings_mouse_mapping_listening_desc">点击要分配的鼠标按键。按返回键取消。</string>
+    <string name="settings_keyboard_connected">键盘已连接</string>
+    <string name="settings_mouse_connected">鼠标已连接</string>
+    <string name="settings_mouse_aim_mode">鼠标瞄准</string>
+    <string name="settings_mouse_aim_off">关闭</string>
+    <string name="settings_mouse_aim_right_stick">右摇杆</string>
+    <string name="settings_mouse_aim_left_stick">左摇杆</string>
+    <string name="settings_mouse_aim_mode_desc">使用鼠标移动模拟摇杆。</string>
+    <string name="settings_mouse_sensitivity">鼠标灵敏度</string>
+    <string name="settings_mouse_sensitivity_desc">调整鼠标移动模拟摇杆的幅度。</string>
+    <string name="settings_mouse_invert_y">反转鼠标 Y 轴</string>
+    <string name="settings_mouse_invert_y_desc">反转鼠标垂直瞄准方向。</string>
+    <string name="settings_mouse_capture">捕获鼠标光标</string>
+    <string name="settings_mouse_capture_desc">鼠标瞄准时隐藏并锁定指针。</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">重置键盘/鼠标映射</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">恢复此玩家的默认键盘和鼠标映射。</string>
+    <string name="settings_keyboard_mouse_global_note">键盘和鼠标映射为全局设置，适用于所有游戏。</string>
+    <string name="settings_keyboard_mouse_source_keyboard">键盘</string>
+    <string name="settings_keyboard_mouse_source_mouse">鼠标</string>
+    <string name="settings_keyboard_mouse_game_desc">这些设置仅适用于此游戏。</string>
+    <string name="settings_keyboard_mouse_use_global">使用全局键盘/鼠标设置</string>
+    <string name="settings_keyboard_mouse_use_global_desc">移除此游戏的键盘和鼠标覆盖设置。</string>
+    <string name="settings_mouse_smoothing">鼠标平滑</string>
+    <string name="settings_mouse_smoothing_desc">平滑鼠标的小幅移动，使瞄准更稳定。</string>
+    <string name="settings_mouse_invert_x">反转鼠标 X 轴</string>
+    <string name="settings_mouse_invert_x_desc">反转鼠标水平瞄准方向。</string>
+    <string name="settings_mouse_left_handed">左手鼠标</string>
+    <string name="settings_mouse_left_handed_desc">交换鼠标左右键。</string>
+    <string name="settings_mouse_wheel">鼠标滚轮</string>
+    <string name="settings_mouse_wheel_off">关闭</string>
+    <string name="settings_mouse_wheel_dpad">十字键上/下</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">左摇杆上/下</string>
+    <string name="settings_mouse_wheel_right_stick">右摇杆上/下</string>
+    <string name="settings_mouse_deadzone">瞄准死区</string>
+    <string name="settings_mouse_wheel_pulse">滚轮按住时长</string>
+    <string name="settings_mouse_vertical_sensitivity">垂直灵敏度</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">移除此游戏的游戏手柄按键覆盖。</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">玩家 1</string>
+    <string name="settings_gamepad_player_2">玩家 2</string>
+    <string name="settings_not_set">未設定</string>
+    <string name="settings_gamepad_mapping_clear">清除</string>
+    <string name="settings_gamepad_mapping_auto_format">自動</string>
 </resources>

@@ -10,11 +10,16 @@ target_include_directories(vita3k PRIVATE
     "${VITA3K_CORE_DIR}"
     "${VITA3K_CORE_DIR}/android/jni"
 )
+# Core static libraries that merge EmuCoreV input state need the adapter header.
+target_include_directories(ctrl PRIVATE "${EMUCOREV_BRIDGE_DIR}/include")
+target_include_directories(app PRIVATE "${EMUCOREV_BRIDGE_DIR}/include")
 target_compile_definitions(vita3k PRIVATE EMUCOREV_ANDROID_BRIDGE=1)
 set(EMUCOREV_BRIDGE_SOURCES
     src/layer_contract.cpp
     src/vita_install_bridge.cpp
     src/runtime_bridge.cpp
     src/input_overlay_bridge.cpp
+    src/input_state.cpp
+    src/keyboard_mouse_bridge.cpp
 )
 target_sources(vita3k PRIVATE ${EMUCOREV_BRIDGE_SOURCES})

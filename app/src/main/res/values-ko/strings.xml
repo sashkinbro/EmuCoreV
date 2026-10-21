@@ -1479,4 +1479,66 @@
     <string name="settings_show_quick_bar">빠른 작업 표시줄 표시</string>
     <string name="settings_help_show_quick_bar">게임 화면을 두 번 탭하면 저장, 불러오기, 스크린샷, 일시 정지, 메뉴 버튼이 표시됩니다.</string>
     <string name="install_dialog_archive_requires_base">메타데이터에 따르면 이 압축 파일은 %1$s의 업데이트입니다. 먼저 기본 게임을 설치하세요.</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">키보드 및 마우스</string>
+    <string name="settings_keyboard_input">키보드 입력</string>
+    <string name="settings_keyboard_input_desc">물리 키보드를 에뮬레이션된 컨트롤러에 매핑합니다.</string>
+    <string name="settings_keyboard_target_player">키보드 플레이어</string>
+    <string name="settings_keyboard_mapping_title">키보드 매핑</string>
+    <string name="settings_keyboard_mapping_desc">각 컨트롤러 동작을 활성화할 키를 선택합니다.</string>
+    <string name="settings_mouse_input">마우스 입력</string>
+    <string name="settings_mouse_input_desc">마우스 버튼을 매핑하고 선택적으로 마우스로 아날로그 조준을 사용합니다.</string>
+    <string name="settings_mouse_target_player">마우스 플레이어</string>
+    <string name="settings_mouse_mapping_title">마우스 매핑</string>
+    <string name="settings_mouse_mapping_desc">각 컨트롤러 동작을 활성화할 마우스 버튼을 선택합니다.</string>
+    <string name="settings_keyboard_mapping_listening_title">키를 누르세요</string>
+    <string name="settings_keyboard_mapping_listening_desc">할당할 키보드 키를 누르세요. 취소하려면 뒤로를 누르세요.</string>
+    <string name="settings_mouse_mapping_listening_title">마우스 버튼을 클릭하세요</string>
+    <string name="settings_mouse_mapping_listening_desc">할당할 마우스 버튼을 클릭하세요. 취소하려면 뒤로를 누르세요.</string>
+    <string name="settings_keyboard_connected">키보드 연결됨</string>
+    <string name="settings_mouse_connected">마우스 연결됨</string>
+    <string name="settings_mouse_aim_mode">마우스 조준</string>
+    <string name="settings_mouse_aim_off">끔</string>
+    <string name="settings_mouse_aim_right_stick">오른쪽 스틱</string>
+    <string name="settings_mouse_aim_left_stick">왼쪽 스틱</string>
+    <string name="settings_mouse_aim_mode_desc">마우스로 아날로그 스틱을 움직입니다.</string>
+    <string name="settings_mouse_sensitivity">마우스 감도</string>
+    <string name="settings_mouse_sensitivity_desc">마우스가 에뮬레이션된 스틱을 얼마나 움직일지 조정합니다.</string>
+    <string name="settings_mouse_invert_y">마우스 Y 반전</string>
+    <string name="settings_mouse_invert_y_desc">세로 마우스 조준을 반전합니다.</string>
+    <string name="settings_mouse_capture">마우스 커서 캡처</string>
+    <string name="settings_mouse_capture_desc">마우스 조준 중에 포인터를 숨기고 고정합니다.</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">키보드/마우스 매핑 초기화</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">이 플레이어의 기본 키보드 및 마우스 매핑을 복원합니다.</string>
+    <string name="settings_keyboard_mouse_global_note">키보드 및 마우스 매핑은 전역이며 모든 게임에 적용됩니다.</string>
+    <string name="settings_keyboard_mouse_source_keyboard">키보드</string>
+    <string name="settings_keyboard_mouse_source_mouse">마우스</string>
+    <string name="settings_keyboard_mouse_game_desc">이 설정은 이 게임에만 적용됩니다.</string>
+    <string name="settings_keyboard_mouse_use_global">전역 키보드/마우스 설정 사용</string>
+    <string name="settings_keyboard_mouse_use_global_desc">이 게임의 키보드 및 마우스 재정의를 제거합니다.</string>
+    <string name="settings_mouse_smoothing">마우스 스무딩</string>
+    <string name="settings_mouse_smoothing_desc">작은 마우스 움직임을 부드럽게 하여 조준을 안정화합니다.</string>
+    <string name="settings_mouse_invert_x">마우스 X 반전</string>
+    <string name="settings_mouse_invert_x_desc">가로 마우스 조준을 반전합니다.</string>
+    <string name="settings_mouse_left_handed">왼손잡이 마우스</string>
+    <string name="settings_mouse_left_handed_desc">마우스 왼쪽과 오른쪽 버튼을 바꿉니다.</string>
+    <string name="settings_mouse_wheel">마우스 휠</string>
+    <string name="settings_mouse_wheel_off">끔</string>
+    <string name="settings_mouse_wheel_dpad">십자 키 위/아래</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">왼쪽 스틱 위/아래</string>
+    <string name="settings_mouse_wheel_right_stick">오른쪽 스틱 위/아래</string>
+    <string name="settings_mouse_deadzone">조준 데드존</string>
+    <string name="settings_mouse_wheel_pulse">휠 누름 시간</string>
+    <string name="settings_mouse_vertical_sensitivity">세로 민감도</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">이 게임의 게임패드 버튼 재정의를 제거합니다.</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">플레이어 1</string>
+    <string name="settings_gamepad_player_2">플레이어 2</string>
+    <string name="settings_not_set">설정되지 않음</string>
+    <string name="settings_gamepad_mapping_clear">지우기</string>
+    <string name="settings_gamepad_mapping_auto_format">자동</string>
 </resources>

@@ -1480,4 +1480,66 @@
     <string name="settings_show_quick_bar">نمایش نوار اقدامات سریع</string>
     <string name="settings_help_show_quick_bar">برای نمایش دکمه‌های ذخیره، بارگذاری، تصویر صفحه، توقف موقت و منو، دو بار روی صفحهٔ بازی بزنید.</string>
     <string name="install_dialog_archive_requires_base">طبق فراداده‌ها، این آرشیو یک به‌روزرسانی برای %1$s است. ابتدا بازی اصلی را نصب کنید.</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">صفحه‌کلید و ماوس</string>
+    <string name="settings_keyboard_input">ورودی صفحه‌کلید</string>
+    <string name="settings_keyboard_input_desc">یک صفحه‌کلید فیزیکی را به دسته شبیه‌سازی‌شده متصل کنید.</string>
+    <string name="settings_keyboard_target_player">بازیکن صفحه‌کلید</string>
+    <string name="settings_keyboard_mapping_title">نگاشت صفحه‌کلید</string>
+    <string name="settings_keyboard_mapping_desc">انتخاب کنید کدام کلید هر عملکرد دسته را فعال کند.</string>
+    <string name="settings_mouse_input">ورودی ماوس</string>
+    <string name="settings_mouse_input_desc">دکمه‌های ماوس را نگاشت کنید و به‌صورت اختیاری از ماوس برای نشانه‌گیری آنالوگ استفاده کنید.</string>
+    <string name="settings_mouse_target_player">بازیکن ماوس</string>
+    <string name="settings_mouse_mapping_title">نگاشت ماوس</string>
+    <string name="settings_mouse_mapping_desc">انتخاب کنید کدام دکمه ماوس هر عملکرد دسته را فعال کند.</string>
+    <string name="settings_keyboard_mapping_listening_title">یک کلید فشار دهید</string>
+    <string name="settings_keyboard_mapping_listening_desc">کلید صفحه‌کلیدی را که می‌خواهید اختصاص دهید فشار دهید. برای لغو، بازگشت را بزنید.</string>
+    <string name="settings_mouse_mapping_listening_title">روی دکمه ماوس کلیک کنید</string>
+    <string name="settings_mouse_mapping_listening_desc">روی دکمه ماوسی که می‌خواهید اختصاص دهید کلیک کنید. برای لغو، بازگشت را بزنید.</string>
+    <string name="settings_keyboard_connected">صفحه‌کلید متصل است</string>
+    <string name="settings_mouse_connected">ماوس متصل است</string>
+    <string name="settings_mouse_aim_mode">نشانه‌گیری با ماوس</string>
+    <string name="settings_mouse_aim_off">خاموش</string>
+    <string name="settings_mouse_aim_right_stick">استیک راست</string>
+    <string name="settings_mouse_aim_left_stick">استیک چپ</string>
+    <string name="settings_mouse_aim_mode_desc">یک استیک آنالوگ را با ماوس حرکت دهید.</string>
+    <string name="settings_mouse_sensitivity">حساسیت ماوس</string>
+    <string name="settings_mouse_sensitivity_desc">تنظیم کنید ماوس چقدر استیک شبیه‌سازی‌شده را حرکت دهد.</string>
+    <string name="settings_mouse_invert_y">معکوس‌کردن محور Y ماوس</string>
+    <string name="settings_mouse_invert_y_desc">نشانه‌گیری عمودی ماوس را معکوس می‌کند.</string>
+    <string name="settings_mouse_capture">گرفتن نشانگر ماوس</string>
+    <string name="settings_mouse_capture_desc">هنگام فعال‌بودن نشانه‌گیری با ماوس، نشانگر را پنهان و قفل می‌کند.</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">بازنشانی نگاشت صفحه‌کلید/ماوس</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">نگاشت‌های پیش‌فرض صفحه‌کلید و ماوس را برای این بازیکن بازگردانی می‌کند.</string>
+    <string name="settings_keyboard_mouse_global_note">نگاشت صفحه‌کلید و ماوس سراسری است و برای همه بازی‌ها اعمال می‌شود.</string>
+    <string name="settings_keyboard_mouse_source_keyboard">صفحه‌کلید</string>
+    <string name="settings_keyboard_mouse_source_mouse">ماوس</string>
+    <string name="settings_keyboard_mouse_game_desc">این تنظیمات فقط برای این بازی اعمال می‌شوند.</string>
+    <string name="settings_keyboard_mouse_use_global">استفاده از تنظیمات سراسری صفحه‌کلید/ماوس</string>
+    <string name="settings_keyboard_mouse_use_global_desc">حذف بازنویسی صفحه‌کلید و ماوس مخصوص این بازی.</string>
+    <string name="settings_mouse_smoothing">نرم‌کردن ماوس</string>
+    <string name="settings_mouse_smoothing_desc">حرکات کوچک ماوس را برای نشانه‌گیری پایدارتر نرم می‌کند.</string>
+    <string name="settings_mouse_invert_x">معکوس‌کردن محور X ماوس</string>
+    <string name="settings_mouse_invert_x_desc">نشانه‌گیری افقی ماوس را معکوس می‌کند.</string>
+    <string name="settings_mouse_left_handed">ماوس چپ‌دست</string>
+    <string name="settings_mouse_left_handed_desc">دکمه‌های چپ و راست ماوس را جابه‌جا می‌کند.</string>
+    <string name="settings_mouse_wheel">چرخ ماوس</string>
+    <string name="settings_mouse_wheel_off">خاموش</string>
+    <string name="settings_mouse_wheel_dpad">دکمه‌های جهت بالا/پایین</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">استیک چپ بالا/پایین</string>
+    <string name="settings_mouse_wheel_right_stick">استیک راست بالا/پایین</string>
+    <string name="settings_mouse_deadzone">ناحیه مرده نشانه‌گیری</string>
+    <string name="settings_mouse_wheel_pulse">مدت فشار چرخ ماوس</string>
+    <string name="settings_mouse_vertical_sensitivity">حساسیت عمودی</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">بازنویسی‌های دکمه‌های دسته بازی برای این بازی حذف می‌شود.</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">بازیکن 1</string>
+    <string name="settings_gamepad_player_2">بازیکن 2</string>
+    <string name="settings_not_set">تنظیم نشده</string>
+    <string name="settings_gamepad_mapping_clear">پاک کردن</string>
+    <string name="settings_gamepad_mapping_auto_format">خودکار</string>
 </resources>

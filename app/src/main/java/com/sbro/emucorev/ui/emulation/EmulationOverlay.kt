@@ -104,6 +104,7 @@ import com.sbro.emucorev.core.AndroidTouchHaptics
 import com.sbro.emucorev.core.AndroidTouchHaptics.ButtonPhase
 import com.sbro.emucorev.core.CHEATS_ENABLED
 import com.sbro.emucorev.core.CheatBridge
+import com.sbro.emucorev.core.KeyboardMouseManager
 import com.sbro.emucorev.core.SaveStateResult
 import com.sbro.emucorev.core.VitaLaunchBridge
 import com.sbro.emucorev.core.SaveStateRepository
@@ -117,10 +118,12 @@ import com.sbro.emucorev.core.vita.Emulator
 import com.sbro.emucorev.core.vita.overlay.InputOverlay
 import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.CustomizationPreferences
+import com.sbro.emucorev.data.KeyboardMouseSettings
 import com.sbro.emucorev.data.TouchControlPressEffect
 import com.sbro.emucorev.data.TouchControlVisualStyle
 import com.sbro.emucorev.ui.common.VectorAnalogStick
 import com.sbro.emucorev.ui.common.VectorOverlayButton
+import com.sbro.emucorev.ui.settings.KeyboardMouseSettingsDialog
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
@@ -173,7 +176,16 @@ fun EmulationOverlayHost(
         overlayBridge.sendAxis(InputOverlay.ControlId.axis_right_x, 0.toShort())
         overlayBridge.sendAxis(InputOverlay.ControlId.axis_right_y, 0.toShort())
     }
-    var config by remember(activity, gameId) { mutableStateOf(repository.loadEffective(gameId)) }
+    val initialProfile = remember(activity, gameId) { repository.loadProfile(gameId) }
+    var config by remember(activity, gameId) { mutableStateOf(initialProfile.config) }
+    var keyboardMouseOverride by remember(activity, gameId) {
+        mutableStateOf<KeyboardMouseSettings?>(initialProfile.keyboardMouse)
+    }
+    val globalKeyboardMouseSettings by KeyboardMouseManager.globalSettings.collectAsState()
+    var showKeyboardMouseSettings by remember(gameId) { mutableStateOf(false) }
+    LaunchedEffect(keyboardMouseOverride) {
+        KeyboardMouseManager.setPerGameOverride(keyboardMouseOverride)
+    }
     var controlLayout by remember(activity) { mutableStateOf(controlLayoutRepository.load()) }
     var controlsEditMode by remember { mutableStateOf(false) }
     var editorProfileRevision by remember { mutableIntStateOf(0) }
@@ -355,6 +367,49 @@ fun EmulationOverlayHost(
                 saveStateBusySaving = false
                 saveStateBusyLoading = false
                 Toast.makeText(activity, messageRes, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun requestQuickSave() {
+        val exists = saveStateSlots.firstOrNull { it.slot == SaveStateRepository.QUICK_SLOT }?.exists == true
+        if (exists && confirmSaveStateActions) {
+            pendingSaveStateAction = SaveStateAction.Save(SaveStateRepository.QUICK_SLOT, overwrite = true)
+        } else {
+            performSaveStateAction(SaveStateAction.Save(SaveStateRepository.QUICK_SLOT, overwrite = exists))
+        }
+    }
+
+    fun requestQuickLoad() {
+        val quick = saveStateSlots.firstOrNull { it.slot == SaveStateRepository.QUICK_SLOT }
+        if (quick == null || !quick.exists) {
+            Toast.makeText(activity, R.string.emulation_savestate_empty, Toast.LENGTH_SHORT).show()
+        } else {
+            if (confirmSaveStateActions) {
+                pendingSaveStateAction = SaveStateAction.Load(SaveStateRepository.QUICK_SLOT)
+            } else {
+                performSaveStateAction(SaveStateAction.Load(SaveStateRepository.QUICK_SLOT))
+            }
+        }
+    }
+
+    val keyboardMouseInputActive = inputResumed && !menuOpen && !controlsEditMode && !userPaused &&
+        !nativeImeActive && !activity.exitInProgress && !saveStateBusy && !waitingForStateFrame &&
+        pendingSaveStateAction == null && !launchStateLoading.active
+    LaunchedEffect(keyboardMouseInputActive) {
+        KeyboardMouseManager.setEmulationInputEnabled(keyboardMouseInputActive)
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            KeyboardMouseManager.setEmulationInputEnabled(false)
+            KeyboardMouseManager.setPerGameOverride(null)
+        }
+    }
+    LaunchedEffect(activity) {
+        KeyboardMouseManager.shortcuts.collect { shortcut ->
+            when (shortcut) {
+                KeyboardMouseManager.ShortcutAction.QUICK_SAVE -> requestQuickSave()
+                KeyboardMouseManager.ShortcutAction.QUICK_LOAD -> requestQuickLoad()
             }
         }
     }
@@ -645,6 +700,7 @@ fun EmulationOverlayHost(
                     }
                 }
             },
+            onOpenKeyboardMouseSettings = { showKeyboardMouseSettings = true },
             onResetOverlay = {
                 editorProfileRevision++
                 controlLayoutRepository.reset()
@@ -743,24 +799,8 @@ fun EmulationOverlayHost(
                 }
             },
             onSaveStateDelete = { slot -> pendingSaveStateAction = SaveStateAction.Delete(slot) },
-            onQuickSaveState = {
-                val exists = saveStateSlots.firstOrNull { it.slot == SaveStateRepository.QUICK_SLOT }?.exists == true
-                if (exists && confirmSaveStateActions) {
-                    pendingSaveStateAction = SaveStateAction.Save(SaveStateRepository.QUICK_SLOT, overwrite = true)
-                } else {
-                    performSaveStateAction(SaveStateAction.Save(SaveStateRepository.QUICK_SLOT, overwrite = exists))
-                }
-            },
-            onQuickLoadState = {
-                val quick = saveStateSlots.firstOrNull { it.slot == SaveStateRepository.QUICK_SLOT }
-                if (quick == null || !quick.exists) {
-                    Toast.makeText(activity, R.string.emulation_savestate_empty, Toast.LENGTH_SHORT).show()
-                } else {
-                    if (confirmSaveStateActions) {
-                        pendingSaveStateAction = SaveStateAction.Load(SaveStateRepository.QUICK_SLOT)
-                    } else performSaveStateAction(SaveStateAction.Load(SaveStateRepository.QUICK_SLOT))
-                }
-            }
+            onQuickSaveState = { requestQuickSave() },
+            onQuickLoadState = { requestQuickLoad() }
         )
 
         AnimatedVisibility(
@@ -894,6 +934,31 @@ fun EmulationOverlayHost(
                         Text(text = stringResource(R.string.emulation_exit_cancel_action))
                     }
                 }
+            )
+        }
+
+        if (showKeyboardMouseSettings) {
+            KeyboardMouseSettingsDialog(
+                settings = keyboardMouseOverride ?: globalKeyboardMouseSettings,
+                onSettingsChange = { updated ->
+                    keyboardMouseOverride = updated
+                    KeyboardMouseManager.setPerGameOverride(updated)
+                    if (gameId.isNotBlank()) {
+                        repository.updateKeyboardMouse(gameId, updated)
+                    }
+                },
+                onUseGlobal = if (keyboardMouseOverride != null) {
+                    {
+                        keyboardMouseOverride = null
+                        KeyboardMouseManager.setPerGameOverride(null)
+                        if (gameId.isNotBlank()) {
+                            repository.updateKeyboardMouse(gameId, null)
+                        }
+                    }
+                } else {
+                    null
+                },
+                onDismiss = { showKeyboardMouseSettings = false }
             )
         }
 

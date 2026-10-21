@@ -45,6 +45,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.FileOpen
+import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -768,6 +769,18 @@ private fun ControlsTab(config: VitaCoreConfig, controlsVisible: Boolean, callba
             valueRange = 10f..100f,
             steps = 8,
             onValueChange = { callbacks.onOverlayOpacity(it.roundToInt()) }
+        )
+    }
+    MenuSection(
+        title = stringResource(R.string.settings_keyboard_mouse_section),
+        subtitle = stringResource(R.string.settings_keyboard_mouse_game_desc),
+        badge = null
+    ) {
+        MenuActionRow(
+            icon = Icons.Rounded.Keyboard,
+            title = stringResource(R.string.settings_keyboard_mapping_title),
+            subtitle = stringResource(R.string.settings_mouse_mapping_desc),
+            onClick = callbacks.onOpenKeyboardMouseSettings
         )
     }
 }
@@ -1738,6 +1751,7 @@ data class EmulationMenuCallbacks(
     val onExit: () -> Unit,
     val onEditControls: () -> Unit,
     val onControlsVisibility: () -> Unit,
+    val onOpenKeyboardMouseSettings: () -> Unit,
     val onResetOverlay: () -> Unit,
     val onTouchSwitch: (Boolean) -> Unit,
     val onOverlayScale: (Float) -> Unit,

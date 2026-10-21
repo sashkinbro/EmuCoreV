@@ -1476,4 +1476,66 @@
     <string name="settings_show_quick_bar">Mostrar barra de acciones rápidas</string>
     <string name="settings_help_show_quick_bar">Toca dos veces la pantalla del juego para mostrar los botones de guardar, cargar, captura de pantalla, pausa y menú.</string>
     <string name="install_dialog_archive_requires_base">Según los metadatos, el archivo contiene una actualización para %1$s. Instala primero el juego base.</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">Teclado y ratón</string>
+    <string name="settings_keyboard_input">Entrada de teclado</string>
+    <string name="settings_keyboard_input_desc">Asigna un teclado físico al mando emulado.</string>
+    <string name="settings_keyboard_target_player">Jugador de teclado</string>
+    <string name="settings_keyboard_mapping_title">Asignación de teclado</string>
+    <string name="settings_keyboard_mapping_desc">Elige qué tecla activa cada acción del mando.</string>
+    <string name="settings_mouse_input">Entrada de ratón</string>
+    <string name="settings_mouse_input_desc">Asigna los botones del ratón y usa el ratón para apuntar de forma analógica.</string>
+    <string name="settings_mouse_target_player">Jugador de ratón</string>
+    <string name="settings_mouse_mapping_title">Asignación de ratón</string>
+    <string name="settings_mouse_mapping_desc">Elige qué botón del ratón activa cada acción del mando.</string>
+    <string name="settings_keyboard_mapping_listening_title">Pulsa una tecla</string>
+    <string name="settings_keyboard_mapping_listening_desc">Pulsa la tecla del teclado que quieras asignar. Pulsa Atrás para cancelar.</string>
+    <string name="settings_mouse_mapping_listening_title">Haz clic con un botón del ratón</string>
+    <string name="settings_mouse_mapping_listening_desc">Haz clic con el botón del ratón que quieras asignar. Pulsa Atrás para cancelar.</string>
+    <string name="settings_keyboard_connected">Teclado conectado</string>
+    <string name="settings_mouse_connected">Ratón conectado</string>
+    <string name="settings_mouse_aim_mode">Apuntado con ratón</string>
+    <string name="settings_mouse_aim_off">Desactivado</string>
+    <string name="settings_mouse_aim_right_stick">Stick derecho</string>
+    <string name="settings_mouse_aim_left_stick">Stick izquierdo</string>
+    <string name="settings_mouse_aim_mode_desc">Mueve un stick analógico con el ratón.</string>
+    <string name="settings_mouse_sensitivity">Sensibilidad del ratón</string>
+    <string name="settings_mouse_sensitivity_desc">Ajusta cuánto mueve el ratón el stick emulado.</string>
+    <string name="settings_mouse_invert_y">Invertir Y del ratón</string>
+    <string name="settings_mouse_invert_y_desc">Invierte el apuntado vertical del ratón.</string>
+    <string name="settings_mouse_capture">Capturar cursor del ratón</string>
+    <string name="settings_mouse_capture_desc">Oculta y bloquea el puntero mientras el apuntado con ratón está activo.</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">Restablecer asignación de teclado/ratón</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">Restaura las asignaciones predeterminadas de teclado y ratón para este jugador.</string>
+    <string name="settings_keyboard_mouse_global_note">Las asignaciones de teclado y ratón son globales y se aplican a todos los juegos.</string>
+    <string name="settings_keyboard_mouse_source_keyboard">Teclado</string>
+    <string name="settings_keyboard_mouse_source_mouse">Ratón</string>
+    <string name="settings_keyboard_mouse_game_desc">Estos ajustes solo se aplican a este juego.</string>
+    <string name="settings_keyboard_mouse_use_global">Usar ajustes globales de teclado/ratón</string>
+    <string name="settings_keyboard_mouse_use_global_desc">Eliminar la asignación de teclado y ratón específica del juego.</string>
+    <string name="settings_mouse_smoothing">Suavizado del ratón</string>
+    <string name="settings_mouse_smoothing_desc">Suaviza los movimientos pequeños del ratón para apuntar con más estabilidad.</string>
+    <string name="settings_mouse_invert_x">Invertir X del ratón</string>
+    <string name="settings_mouse_invert_x_desc">Invierte el apuntado horizontal del ratón.</string>
+    <string name="settings_mouse_left_handed">Ratón para zurdos</string>
+    <string name="settings_mouse_left_handed_desc">Intercambia los botones izquierdo y derecho del ratón.</string>
+    <string name="settings_mouse_wheel">Rueda del ratón</string>
+    <string name="settings_mouse_wheel_off">Desactivado</string>
+    <string name="settings_mouse_wheel_dpad">D-pad arriba/abajo</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">Stick izquierdo arriba/abajo</string>
+    <string name="settings_mouse_wheel_right_stick">Stick derecho arriba/abajo</string>
+    <string name="settings_mouse_deadzone">Zona muerta de apuntado</string>
+    <string name="settings_mouse_wheel_pulse">Duración de pulsación de la rueda</string>
+    <string name="settings_mouse_vertical_sensitivity">Sensibilidad vertical</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">Elimina las asignaciones de botones del mando para este juego.</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">Jugador 1</string>
+    <string name="settings_gamepad_player_2">Jugador 2</string>
+    <string name="settings_not_set">No establecido</string>
+    <string name="settings_gamepad_mapping_clear">Borrar</string>
+    <string name="settings_gamepad_mapping_auto_format">Automático</string>
 </resources>

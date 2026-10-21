@@ -1480,4 +1480,66 @@
     <string name="settings_show_quick_bar">إظهار شريط الإجراءات السريعة</string>
     <string name="settings_help_show_quick_bar">انقر مرتين على شاشة اللعبة لإظهار أزرار الحفظ والتحميل ولقطة الشاشة والإيقاف المؤقت والقائمة.</string>
     <string name="install_dialog_archive_requires_base">تشير بيانات الأرشيف إلى أنه تحديث للعبة %1$s. ثبّت اللعبة الأساسية أولًا.</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">لوحة المفاتيح والفأرة</string>
+    <string name="settings_keyboard_input">إدخال لوحة المفاتيح</string>
+    <string name="settings_keyboard_input_desc">اربط لوحة مفاتيح فعلية بذراع التحكم المحاكى.</string>
+    <string name="settings_keyboard_target_player">لاعب لوحة المفاتيح</string>
+    <string name="settings_keyboard_mapping_title">تعيين لوحة المفاتيح</string>
+    <string name="settings_keyboard_mapping_desc">اختر المفتاح الذي ينشّط كل إجراء في ذراع التحكم.</string>
+    <string name="settings_mouse_input">إدخال الفأرة</string>
+    <string name="settings_mouse_input_desc">اربط أزرار الفأرة واستخدمها اختياريًا للتصويب التناظري.</string>
+    <string name="settings_mouse_target_player">لاعب الفأرة</string>
+    <string name="settings_mouse_mapping_title">تعيين الفأرة</string>
+    <string name="settings_mouse_mapping_desc">اختر زر الفأرة الذي ينشّط كل إجراء في ذراع التحكم.</string>
+    <string name="settings_keyboard_mapping_listening_title">اضغط مفتاحًا</string>
+    <string name="settings_keyboard_mapping_listening_desc">اضغط مفتاح لوحة المفاتيح الذي تريد تعيينه. اضغط رجوع للإلغاء.</string>
+    <string name="settings_mouse_mapping_listening_title">انقر زر الفأرة</string>
+    <string name="settings_mouse_mapping_listening_desc">انقر زر الفأرة الذي تريد تعيينه. اضغط رجوع للإلغاء.</string>
+    <string name="settings_keyboard_connected">لوحة المفاتيح متصلة</string>
+    <string name="settings_mouse_connected">الفأرة متصلة</string>
+    <string name="settings_mouse_aim_mode">تصويب الفأرة</string>
+    <string name="settings_mouse_aim_off">إيقاف</string>
+    <string name="settings_mouse_aim_right_stick">العصا اليمنى</string>
+    <string name="settings_mouse_aim_left_stick">العصا اليسرى</string>
+    <string name="settings_mouse_aim_mode_desc">حرّك عصا تناظرية باستخدام الفأرة.</string>
+    <string name="settings_mouse_sensitivity">حساسية الفأرة</string>
+    <string name="settings_mouse_sensitivity_desc">اضبط مدى حركة الفأرة للعصا المحاكاة.</string>
+    <string name="settings_mouse_invert_y">عكس المحور Y للفأرة</string>
+    <string name="settings_mouse_invert_y_desc">اعكس التصويب العمودي بالفأرة.</string>
+    <string name="settings_mouse_capture">تثبيت مؤشر الفأرة</string>
+    <string name="settings_mouse_capture_desc">أخفِ المؤشر وثبّته أثناء تفعيل تصويب الفأرة.</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">إعادة تعيين تعيين لوحة المفاتيح/الفأرة</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">استعد تعيينات لوحة المفاتيح والفأرة الافتراضية لهذا اللاعب.</string>
+    <string name="settings_keyboard_mouse_global_note">تعيينات لوحة المفاتيح والفأرة عامة وتُطبق على كل الألعاب.</string>
+    <string name="settings_keyboard_mouse_source_keyboard">لوحة المفاتيح</string>
+    <string name="settings_keyboard_mouse_source_mouse">الفأرة</string>
+    <string name="settings_keyboard_mouse_game_desc">تُطبق هذه الإعدادات على هذه اللعبة فقط.</string>
+    <string name="settings_keyboard_mouse_use_global">استخدام إعدادات لوحة المفاتيح/الفأرة العامة</string>
+    <string name="settings_keyboard_mouse_use_global_desc">إزالة تجاوز لوحة المفاتيح والفأرة الخاص بهذه اللعبة.</string>
+    <string name="settings_mouse_smoothing">تنعيم الفأرة</string>
+    <string name="settings_mouse_smoothing_desc">تنعيم حركات الفأرة الصغيرة لتصويب أكثر ثباتًا.</string>
+    <string name="settings_mouse_invert_x">عكس المحور X للفأرة</string>
+    <string name="settings_mouse_invert_x_desc">اعكس التصويب الأفقي بالفأرة.</string>
+    <string name="settings_mouse_left_handed">فأرة لليد اليسرى</string>
+    <string name="settings_mouse_left_handed_desc">تبديل زري الفأرة الأيسر والأيمن.</string>
+    <string name="settings_mouse_wheel">عجلة الفأرة</string>
+    <string name="settings_mouse_wheel_off">إيقاف</string>
+    <string name="settings_mouse_wheel_dpad">أعلى/أسفل الاتجاهات</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">أعلى/أسفل العصا اليسرى</string>
+    <string name="settings_mouse_wheel_right_stick">أعلى/أسفل العصا اليمنى</string>
+    <string name="settings_mouse_deadzone">المنطقة الميتة للتصويب</string>
+    <string name="settings_mouse_wheel_pulse">مدة ضغط عجلة الفأرة</string>
+    <string name="settings_mouse_vertical_sensitivity">حساسية عمودية</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">إزالة تجاوزات أزرار ذراع التحكم لهذه اللعبة.</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">اللاعب 1</string>
+    <string name="settings_gamepad_player_2">اللاعب 2</string>
+    <string name="settings_not_set">غير محدد</string>
+    <string name="settings_gamepad_mapping_clear">مسح</string>
+    <string name="settings_gamepad_mapping_auto_format">تلقائي</string>
 </resources>

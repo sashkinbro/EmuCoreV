@@ -1479,4 +1479,66 @@
     <string name="settings_show_quick_bar">Pokazuj pasek szybkich akcji</string>
     <string name="settings_help_show_quick_bar">Dotknij dwukrotnie ekranu gry, aby wyświetlić przyciski zapisu, wczytywania, zrzutu ekranu, pauzy i menu.</string>
     <string name="install_dialog_archive_requires_base">Według metadanych archiwum zawiera aktualizację gry %1$s. Najpierw zainstaluj podstawową wersję gry.</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">Klawiatura i mysz</string>
+    <string name="settings_keyboard_input">Wejście klawiatury</string>
+    <string name="settings_keyboard_input_desc">Przypisz fizyczną klawiaturę do emulowanego pada.</string>
+    <string name="settings_keyboard_target_player">Gracz klawiatury</string>
+    <string name="settings_keyboard_mapping_title">Mapowanie klawiatury</string>
+    <string name="settings_keyboard_mapping_desc">Wybierz, który klawisz aktywuje daną akcję pada.</string>
+    <string name="settings_mouse_input">Wejście myszy</string>
+    <string name="settings_mouse_input_desc">Przypisz przyciski myszy i opcjonalnie używaj myszy do celowania analogowego.</string>
+    <string name="settings_mouse_target_player">Gracz myszy</string>
+    <string name="settings_mouse_mapping_title">Mapowanie myszy</string>
+    <string name="settings_mouse_mapping_desc">Wybierz, który przycisk myszy aktywuje daną akcję pada.</string>
+    <string name="settings_keyboard_mapping_listening_title">Naciśnij klawisz</string>
+    <string name="settings_keyboard_mapping_listening_desc">Naciśnij klawisz klawiatury do przypisania. Naciśnij Wstecz, aby anulować.</string>
+    <string name="settings_mouse_mapping_listening_title">Kliknij przycisk myszy</string>
+    <string name="settings_mouse_mapping_listening_desc">Kliknij przycisk myszy do przypisania. Naciśnij Wstecz, aby anulować.</string>
+    <string name="settings_keyboard_connected">Klawiatura podłączona</string>
+    <string name="settings_mouse_connected">Mysz podłączona</string>
+    <string name="settings_mouse_aim_mode">Celowanie myszą</string>
+    <string name="settings_mouse_aim_off">Wyłączone</string>
+    <string name="settings_mouse_aim_right_stick">Prawy drążek</string>
+    <string name="settings_mouse_aim_left_stick">Lewy drążek</string>
+    <string name="settings_mouse_aim_mode_desc">Poruszaj analogowym drążkiem za pomocą myszy.</string>
+    <string name="settings_mouse_sensitivity">Czułość myszy</string>
+    <string name="settings_mouse_sensitivity_desc">Dostosuj, jak daleko mysz porusza emulowanym drążkiem.</string>
+    <string name="settings_mouse_invert_y">Odwróć oś Y myszy</string>
+    <string name="settings_mouse_invert_y_desc">Odwraca pionowe celowanie myszą.</string>
+    <string name="settings_mouse_capture">Przechwyć kursor myszy</string>
+    <string name="settings_mouse_capture_desc">Ukrywa i blokuje wskaźnik podczas celowania myszą.</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">Resetuj mapowanie klawiatury/myszy</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">Przywraca domyślne mapowania klawiatury i myszy dla tego gracza.</string>
+    <string name="settings_keyboard_mouse_global_note">Mapowania klawiatury i myszy są globalne i dotyczą wszystkich gier.</string>
+    <string name="settings_keyboard_mouse_source_keyboard">Klawiatura</string>
+    <string name="settings_keyboard_mouse_source_mouse">Mysz</string>
+    <string name="settings_keyboard_mouse_game_desc">Te ustawienia dotyczą tylko tej gry.</string>
+    <string name="settings_keyboard_mouse_use_global">Użyj globalnych ustawień klawiatury/myszy</string>
+    <string name="settings_keyboard_mouse_use_global_desc">Usuń ustawienia klawiatury i myszy dla tej gry.</string>
+    <string name="settings_mouse_smoothing">Wygładzanie myszy</string>
+    <string name="settings_mouse_smoothing_desc">Wygładza drobne ruchy myszy dla stabilniejszego celowania.</string>
+    <string name="settings_mouse_invert_x">Odwróć oś X myszy</string>
+    <string name="settings_mouse_invert_x_desc">Odwraca poziome celowanie myszą.</string>
+    <string name="settings_mouse_left_handed">Mysz dla leworęcznych</string>
+    <string name="settings_mouse_left_handed_desc">Zamienia lewy i prawy przycisk myszy.</string>
+    <string name="settings_mouse_wheel">Kółko myszy</string>
+    <string name="settings_mouse_wheel_off">Wyłączone</string>
+    <string name="settings_mouse_wheel_dpad">D-pad góra/dół</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">Lewy drążek góra/dół</string>
+    <string name="settings_mouse_wheel_right_stick">Prawy drążek góra/dół</string>
+    <string name="settings_mouse_deadzone">Martwa strefa celowania</string>
+    <string name="settings_mouse_wheel_pulse">Czas naciśnięcia kółka</string>
+    <string name="settings_mouse_vertical_sensitivity">Czułość pionowa</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">Usuwa przypisania przycisków pada dla tej gry.</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">Gracz 1</string>
+    <string name="settings_gamepad_player_2">Gracz 2</string>
+    <string name="settings_not_set">Nie ustawiono</string>
+    <string name="settings_gamepad_mapping_clear">Wyczyść przypisanie</string>
+    <string name="settings_gamepad_mapping_auto_format">Auto</string>
 </resources>

@@ -1480,4 +1480,66 @@
     <string name="settings_show_quick_bar">Tampilkan bilah tindakan cepat</string>
     <string name="settings_help_show_quick_bar">Ketuk layar game dua kali untuk menampilkan tombol Simpan, Muat, Tangkapan Layar, Jeda, dan Menu.</string>
     <string name="install_dialog_archive_requires_base">Menurut metadata, arsip ini berisi pembaruan untuk %1$s. Instal game dasar terlebih dahulu.</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">Keyboard &amp; Mouse</string>
+    <string name="settings_keyboard_input">Input keyboard</string>
+    <string name="settings_keyboard_input_desc">Petakan keyboard fisik ke controller yang diemulasi.</string>
+    <string name="settings_keyboard_target_player">Pemain keyboard</string>
+    <string name="settings_keyboard_mapping_title">Pemetaan keyboard</string>
+    <string name="settings_keyboard_mapping_desc">Pilih tombol yang mengaktifkan setiap aksi controller.</string>
+    <string name="settings_mouse_input">Input mouse</string>
+    <string name="settings_mouse_input_desc">Petakan tombol mouse dan secara opsional gunakan mouse untuk membidik analog.</string>
+    <string name="settings_mouse_target_player">Pemain mouse</string>
+    <string name="settings_mouse_mapping_title">Pemetaan mouse</string>
+    <string name="settings_mouse_mapping_desc">Pilih tombol mouse yang mengaktifkan setiap aksi controller.</string>
+    <string name="settings_keyboard_mapping_listening_title">Tekan tombol</string>
+    <string name="settings_keyboard_mapping_listening_desc">Tekan tombol keyboard yang ingin ditetapkan. Tekan Kembali untuk membatalkan.</string>
+    <string name="settings_mouse_mapping_listening_title">Klik tombol mouse</string>
+    <string name="settings_mouse_mapping_listening_desc">Klik tombol mouse yang ingin ditetapkan. Tekan Kembali untuk membatalkan.</string>
+    <string name="settings_keyboard_connected">Keyboard terhubung</string>
+    <string name="settings_mouse_connected">Mouse terhubung</string>
+    <string name="settings_mouse_aim_mode">Membidik dengan mouse</string>
+    <string name="settings_mouse_aim_off">Nonaktif</string>
+    <string name="settings_mouse_aim_right_stick">Stik kanan</string>
+    <string name="settings_mouse_aim_left_stick">Stik kiri</string>
+    <string name="settings_mouse_aim_mode_desc">Gerakkan stik analog dengan mouse.</string>
+    <string name="settings_mouse_sensitivity">Sensitivitas mouse</string>
+    <string name="settings_mouse_sensitivity_desc">Atur seberapa jauh mouse menggerakkan stik yang diemulasi.</string>
+    <string name="settings_mouse_invert_y">Balikkan Y mouse</string>
+    <string name="settings_mouse_invert_y_desc">Membalikkan bidikan vertikal mouse.</string>
+    <string name="settings_mouse_capture">Tangkap kursor mouse</string>
+    <string name="settings_mouse_capture_desc">Sembunyikan dan kunci pointer saat bidikan mouse aktif.</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">Reset pemetaan keyboard/mouse</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">Pulihkan pemetaan keyboard dan mouse default untuk pemain ini.</string>
+    <string name="settings_keyboard_mouse_global_note">Pemetaan keyboard dan mouse bersifat global dan berlaku untuk semua game.</string>
+    <string name="settings_keyboard_mouse_source_keyboard">Keyboard</string>
+    <string name="settings_keyboard_mouse_source_mouse">Mouse</string>
+    <string name="settings_keyboard_mouse_game_desc">Pengaturan ini hanya berlaku untuk game ini.</string>
+    <string name="settings_keyboard_mouse_use_global">Gunakan pengaturan keyboard/mouse global</string>
+    <string name="settings_keyboard_mouse_use_global_desc">Hapus penimpaan keyboard dan mouse khusus game ini.</string>
+    <string name="settings_mouse_smoothing">Penghalusan mouse</string>
+    <string name="settings_mouse_smoothing_desc">Haluskan gerakan mouse kecil agar bidikan lebih stabil.</string>
+    <string name="settings_mouse_invert_x">Balikkan X mouse</string>
+    <string name="settings_mouse_invert_x_desc">Membalikkan bidikan horizontal mouse.</string>
+    <string name="settings_mouse_left_handed">Mouse kidal</string>
+    <string name="settings_mouse_left_handed_desc">Tukar tombol kiri dan kanan mouse.</string>
+    <string name="settings_mouse_wheel">Roda mouse</string>
+    <string name="settings_mouse_wheel_off">Nonaktif</string>
+    <string name="settings_mouse_wheel_dpad">D-pad atas/bawah</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">Stik kiri atas/bawah</string>
+    <string name="settings_mouse_wheel_right_stick">Stik kanan atas/bawah</string>
+    <string name="settings_mouse_deadzone">Zona mati bidik</string>
+    <string name="settings_mouse_wheel_pulse">Durasi tekan roda mouse</string>
+    <string name="settings_mouse_vertical_sensitivity">Sensitivitas vertikal</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">Hapus penggantian tombol gamepad untuk game ini.</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">Pemain 1</string>
+    <string name="settings_gamepad_player_2">Pemain 2</string>
+    <string name="settings_not_set">Belum diatur</string>
+    <string name="settings_gamepad_mapping_clear">Bersihkan</string>
+    <string name="settings_gamepad_mapping_auto_format">Otomatis</string>
 </resources>

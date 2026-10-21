@@ -1476,4 +1476,66 @@
     <string name="settings_show_quick_bar">Schnellaktionsleiste anzeigen</string>
     <string name="settings_help_show_quick_bar">Tippe zweimal auf den Spielbildschirm, um die Tasten zum Speichern, Laden, Aufnehmen eines Screenshots, Pausieren und Öffnen des Menüs anzuzeigen.</string>
     <string name="install_dialog_archive_requires_base">Laut Metadaten enthält das Archiv ein Update für %1$s. Installiere zuerst das Hauptspiel.</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">Tastatur &amp; Maus</string>
+    <string name="settings_keyboard_input">Tastatureingabe</string>
+    <string name="settings_keyboard_input_desc">Ordne eine physische Tastatur dem emulierten Controller zu.</string>
+    <string name="settings_keyboard_target_player">Tastaturspieler</string>
+    <string name="settings_keyboard_mapping_title">Tastaturzuordnung</string>
+    <string name="settings_keyboard_mapping_desc">Wähle, welche Taste welche Controller-Aktion auslöst.</string>
+    <string name="settings_mouse_input">Mauseingabe</string>
+    <string name="settings_mouse_input_desc">Ordne Maustasten zu und nutze die Maus optional für analoges Zielen.</string>
+    <string name="settings_mouse_target_player">Mausspieler</string>
+    <string name="settings_mouse_mapping_title">Mauszuordnung</string>
+    <string name="settings_mouse_mapping_desc">Wähle, welche Maustaste welche Controller-Aktion auslöst.</string>
+    <string name="settings_keyboard_mapping_listening_title">Taste drücken</string>
+    <string name="settings_keyboard_mapping_listening_desc">Drücke die Taste, die du zuweisen möchtest. Mit Zurück abbrechen.</string>
+    <string name="settings_mouse_mapping_listening_title">Maustaste klicken</string>
+    <string name="settings_mouse_mapping_listening_desc">Klicke die Maustaste, die du zuweisen möchtest. Mit Zurück abbrechen.</string>
+    <string name="settings_keyboard_connected">Tastatur verbunden</string>
+    <string name="settings_mouse_connected">Maus verbunden</string>
+    <string name="settings_mouse_aim_mode">Mauszielen</string>
+    <string name="settings_mouse_aim_off">Aus</string>
+    <string name="settings_mouse_aim_right_stick">Rechter Stick</string>
+    <string name="settings_mouse_aim_left_stick">Linker Stick</string>
+    <string name="settings_mouse_aim_mode_desc">Bewege einen Analogstick mit der Maus.</string>
+    <string name="settings_mouse_sensitivity">Mausempfindlichkeit</string>
+    <string name="settings_mouse_sensitivity_desc">Passe an, wie weit die Maus den emulierten Stick bewegt.</string>
+    <string name="settings_mouse_invert_y">Maus-Y invertieren</string>
+    <string name="settings_mouse_invert_y_desc">Kehrt das vertikale Mauszielen um.</string>
+    <string name="settings_mouse_capture">Mauszeiger erfassen</string>
+    <string name="settings_mouse_capture_desc">Blendet den Zeiger aus und sperrt ihn beim Mauszielen.</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">Tastatur-/Mauszuordnung zurücksetzen</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">Stellt die Standardzuordnungen für Tastatur und Maus für diesen Spieler wieder her.</string>
+    <string name="settings_keyboard_mouse_global_note">Tastatur- und Mauszuordnungen gelten global für alle Spiele.</string>
+    <string name="settings_keyboard_mouse_source_keyboard">Tastatur</string>
+    <string name="settings_keyboard_mouse_source_mouse">Maus</string>
+    <string name="settings_keyboard_mouse_game_desc">Diese Einstellungen gelten nur für dieses Spiel.</string>
+    <string name="settings_keyboard_mouse_use_global">Globale Tastatur-/Mauseinstellungen verwenden</string>
+    <string name="settings_keyboard_mouse_use_global_desc">Die spielspezifische Tastatur- und Mauszuordnung entfernen.</string>
+    <string name="settings_mouse_smoothing">Mausglättung</string>
+    <string name="settings_mouse_smoothing_desc">Glättet kleine Mausbewegungen für ruhigeres Zielen.</string>
+    <string name="settings_mouse_invert_x">Maus-X invertieren</string>
+    <string name="settings_mouse_invert_x_desc">Kehrt das horizontale Mauszielen um.</string>
+    <string name="settings_mouse_left_handed">Maus für Linkshänder</string>
+    <string name="settings_mouse_left_handed_desc">Tauscht linke und rechte Maustaste.</string>
+    <string name="settings_mouse_wheel">Mausrad</string>
+    <string name="settings_mouse_wheel_off">Aus</string>
+    <string name="settings_mouse_wheel_dpad">D-Pad hoch/runter</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">Linker Stick hoch/runter</string>
+    <string name="settings_mouse_wheel_right_stick">Rechter Stick hoch/runter</string>
+    <string name="settings_mouse_deadzone">Ziel-Deadzone</string>
+    <string name="settings_mouse_wheel_pulse">Druckdauer des Mausrads</string>
+    <string name="settings_mouse_vertical_sensitivity">Vertikale Empfindlichkeit</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">Entfernt die Gamepad-Tastenbelegung für dieses Spiel.</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">Spieler 1</string>
+    <string name="settings_gamepad_player_2">Spieler 2</string>
+    <string name="settings_not_set">Nicht festgelegt</string>
+    <string name="settings_gamepad_mapping_clear">Löschen</string>
+    <string name="settings_gamepad_mapping_auto_format">Auto</string>
 </resources>

@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import com.sbro.emucorev.core.KeyboardMouseManager
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.CustomizationPreferences
 import com.sbro.emucorev.core.review.AndroidInAppReviewAttemptStore
@@ -41,6 +44,7 @@ class MainActivity : ComponentActivity() {
         preferences.applyAppLanguage()
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        KeyboardMouseManager.ensureInitialized(this)
         inAppReviewCoordinator = InAppReviewCoordinator(
             progressSource = PlayTimeReviewProgressSource(applicationContext),
             store = AndroidInAppReviewAttemptStore(applicationContext),
@@ -85,9 +89,25 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        KeyboardMouseManager.cancelBindingCapture()
         reviewPromptJob?.cancel()
         reviewPromptJob = null
         super.onPause()
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (KeyboardMouseManager.handleKeyBindingCapture(event)) return true
+        return super.dispatchKeyEvent(event)
+    }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (KeyboardMouseManager.handleMouseBindingCapture(event)) return true
+        return super.dispatchGenericMotionEvent(event)
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (KeyboardMouseManager.handleMouseBindingCapture(event)) return true
+        return super.dispatchTouchEvent(event)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

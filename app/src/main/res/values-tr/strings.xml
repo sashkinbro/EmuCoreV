@@ -1476,4 +1476,66 @@
     <string name="settings_show_quick_bar">Hızlı işlem çubuğunu göster</string>
     <string name="settings_help_show_quick_bar">Kaydet, Yükle, Ekran Görüntüsü, Duraklat ve Menü düğmelerini göstermek için oyun ekranına iki kez dokunun.</string>
     <string name="install_dialog_archive_requires_base">Arşiv meta verilerine göre bu, %1$s için bir güncellemedir. Önce temel oyunu yükleyin.</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">Klavye ve Fare</string>
+    <string name="settings_keyboard_input">Klavye girişi</string>
+    <string name="settings_keyboard_input_desc">Fiziksel klavyeyi emüle edilen denetleyiciye eşleyin.</string>
+    <string name="settings_keyboard_target_player">Klavye oyuncusu</string>
+    <string name="settings_keyboard_mapping_title">Klavye eşlemesi</string>
+    <string name="settings_keyboard_mapping_desc">Her denetleyici eylemini hangi tuşun etkinleştireceğini seçin.</string>
+    <string name="settings_mouse_input">Fare girişi</string>
+    <string name="settings_mouse_input_desc">Fare düğmelerini eşleyin ve isteğe bağlı olarak fareyi analog nişan alma için kullanın.</string>
+    <string name="settings_mouse_target_player">Fare oyuncusu</string>
+    <string name="settings_mouse_mapping_title">Fare eşlemesi</string>
+    <string name="settings_mouse_mapping_desc">Her denetleyici eylemini hangi fare düğmesinin etkinleştireceğini seçin.</string>
+    <string name="settings_keyboard_mapping_listening_title">Bir tuşa basın</string>
+    <string name="settings_keyboard_mapping_listening_desc">Atamak istediğiniz klavye tuşuna basın. İptal için Geri\'ye basın.</string>
+    <string name="settings_mouse_mapping_listening_title">Bir fare düğmesine tıklayın</string>
+    <string name="settings_mouse_mapping_listening_desc">Atamak istediğiniz fare düğmesine tıklayın. İptal için Geri\'ye basın.</string>
+    <string name="settings_keyboard_connected">Klavye bağlı</string>
+    <string name="settings_mouse_connected">Fare bağlı</string>
+    <string name="settings_mouse_aim_mode">Fareyle nişan alma</string>
+    <string name="settings_mouse_aim_off">Kapalı</string>
+    <string name="settings_mouse_aim_right_stick">Sağ çubuk</string>
+    <string name="settings_mouse_aim_left_stick">Sol çubuk</string>
+    <string name="settings_mouse_aim_mode_desc">Analog çubuğu fareyle hareket ettirin.</string>
+    <string name="settings_mouse_sensitivity">Fare hassasiyeti</string>
+    <string name="settings_mouse_sensitivity_desc">Farenin emüle edilen çubuğu ne kadar hareket ettireceğini ayarlayın.</string>
+    <string name="settings_mouse_invert_y">Fare Y eksenini ters çevir</string>
+    <string name="settings_mouse_invert_y_desc">Fareyle dikey nişan almayı ters çevirir.</string>
+    <string name="settings_mouse_capture">Fare imlecini yakala</string>
+    <string name="settings_mouse_capture_desc">Fareyle nişan alma etkinken imleci gizler ve kilitler.</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">Klavye/fare eşlemesini sıfırla</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">Bu oyuncu için varsayılan klavye ve fare eşlemelerini geri yükler.</string>
+    <string name="settings_keyboard_mouse_global_note">Klavye ve fare eşlemeleri geneldir ve tüm oyunlara uygulanır.</string>
+    <string name="settings_keyboard_mouse_source_keyboard">Klavye</string>
+    <string name="settings_keyboard_mouse_source_mouse">Fare</string>
+    <string name="settings_keyboard_mouse_game_desc">Bu ayarlar yalnızca bu oyun için geçerlidir.</string>
+    <string name="settings_keyboard_mouse_use_global">Genel klavye/fare ayarlarını kullan</string>
+    <string name="settings_keyboard_mouse_use_global_desc">Bu oyuna özel klavye ve fare geçersiz kılmasını kaldır.</string>
+    <string name="settings_mouse_smoothing">Fare yumuşatma</string>
+    <string name="settings_mouse_smoothing_desc">Daha sabit nişan alma için küçük fare hareketlerini yumuşatır.</string>
+    <string name="settings_mouse_invert_x">Fare X eksenini ters çevir</string>
+    <string name="settings_mouse_invert_x_desc">Fareyle yatay nişan almayı ters çevirir.</string>
+    <string name="settings_mouse_left_handed">Sol elli fare</string>
+    <string name="settings_mouse_left_handed_desc">Farenin sol ve sağ düğmelerini değiştirir.</string>
+    <string name="settings_mouse_wheel">Fare tekerleği</string>
+    <string name="settings_mouse_wheel_off">Kapalı</string>
+    <string name="settings_mouse_wheel_dpad">D-pad yukarı/aşağı</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">Sol çubuk yukarı/aşağı</string>
+    <string name="settings_mouse_wheel_right_stick">Sağ çubuk yukarı/aşağı</string>
+    <string name="settings_mouse_deadzone">Nişan ölü bölgesi</string>
+    <string name="settings_mouse_wheel_pulse">Tekerlek basılı tutma süresi</string>
+    <string name="settings_mouse_vertical_sensitivity">Dikey hassasiyet</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">Bu oyun için denetleyici düğmesi atamalarını kaldırır.</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">1. Oyuncu</string>
+    <string name="settings_gamepad_player_2">2. Oyuncu</string>
+    <string name="settings_not_set">Ayarlanmadı</string>
+    <string name="settings_gamepad_mapping_clear">Temizle</string>
+    <string name="settings_gamepad_mapping_auto_format">Oto</string>
 </resources>

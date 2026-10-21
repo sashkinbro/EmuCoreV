@@ -10,11 +10,13 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.edit
 import androidx.core.os.LocaleListCompat
 import androidx.documentfile.provider.DocumentFile
+import com.sbro.emucorev.core.KeyboardMouseBindings
 import com.sbro.emucorev.ui.theme.ThemeMode
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import org.json.JSONObject
 
 enum class AppLanguage(val storageValue: Int, val languageTag: String) {
     SYSTEM(0, ""),
@@ -47,6 +49,28 @@ enum class LibraryLayoutMode { LIST, GRID }
 class AppPreferences(context: Context) {
     private val appContext = context.applicationContext
     private val prefs = context.getSharedPreferences("emucorev_prefs", Context.MODE_PRIVATE)
+
+    var keyboardMouseSettings: KeyboardMouseSettings
+        get() = runCatching {
+            KeyboardMouseSettingsCodec.decode(
+                prefs.getString(KEY_KEYBOARD_MOUSE_SETTINGS, null)?.let { raw ->
+                    runCatching { JSONObject(raw) }.getOrNull()
+                }
+            )
+        }.getOrNull() ?: KeyboardMouseSettings()
+        set(value) = prefs.edit {
+            putString(KEY_KEYBOARD_MOUSE_SETTINGS, KeyboardMouseSettingsCodec.encode(value).toString())
+        }
+
+    val keyboardMouseSettingsFlow: Flow<KeyboardMouseSettings>
+        get() = callbackFlow {
+            val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key == KEY_KEYBOARD_MOUSE_SETTINGS) trySend(keyboardMouseSettings)
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(keyboardMouseSettings)
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }.distinctUntilChanged()
 
     var packagesFolderUri: String?
         get() = prefs.getString(KEY_PACKAGES_FOLDER_URI, null)
@@ -236,6 +260,36 @@ class AppPreferences(context: Context) {
     }
 
     companion object {
+        const val DEFAULT_MOUSE_SENSITIVITY = KeyboardMouseBindings.DEFAULT_MOUSE_SENSITIVITY
+        const val MOUSE_SENSITIVITY_MIN = KeyboardMouseBindings.MOUSE_SENSITIVITY_MIN
+        const val MOUSE_SENSITIVITY_MAX = KeyboardMouseBindings.MOUSE_SENSITIVITY_MAX
+        const val DEFAULT_MOUSE_VERTICAL_SENSITIVITY =
+            KeyboardMouseBindings.DEFAULT_MOUSE_VERTICAL_SENSITIVITY
+        const val MOUSE_VERTICAL_SENSITIVITY_MIN =
+            KeyboardMouseBindings.MOUSE_VERTICAL_SENSITIVITY_MIN
+        const val MOUSE_VERTICAL_SENSITIVITY_MAX =
+            KeyboardMouseBindings.MOUSE_VERTICAL_SENSITIVITY_MAX
+        const val DEFAULT_MOUSE_SMOOTHING = 0
+        const val MOUSE_SMOOTHING_MIN = 0
+        const val MOUSE_SMOOTHING_MAX = 90
+        const val DEFAULT_MOUSE_DEADZONE = KeyboardMouseBindings.DEFAULT_MOUSE_DEADZONE
+        const val MOUSE_DEADZONE_MIN = KeyboardMouseBindings.MOUSE_DEADZONE_MIN
+        const val MOUSE_DEADZONE_MAX = KeyboardMouseBindings.MOUSE_DEADZONE_MAX
+        const val DEFAULT_MOUSE_WHEEL_PULSE_MS =
+            KeyboardMouseBindings.DEFAULT_MOUSE_WHEEL_PULSE_MS
+        const val MOUSE_WHEEL_PULSE_MIN_MS = KeyboardMouseBindings.MOUSE_WHEEL_PULSE_MIN_MS
+        const val MOUSE_WHEEL_PULSE_MAX_MS = KeyboardMouseBindings.MOUSE_WHEEL_PULSE_MAX_MS
+        const val MOUSE_AIM_OFF = KeyboardMouseBindings.MOUSE_AIM_OFF
+        const val MOUSE_AIM_RIGHT_STICK = KeyboardMouseBindings.MOUSE_AIM_RIGHT_STICK
+        const val MOUSE_AIM_LEFT_STICK = KeyboardMouseBindings.MOUSE_AIM_LEFT_STICK
+        const val MOUSE_WHEEL_OFF = KeyboardMouseBindings.MOUSE_WHEEL_OFF
+        const val MOUSE_WHEEL_DPAD = KeyboardMouseBindings.MOUSE_WHEEL_DPAD
+        const val MOUSE_WHEEL_TRIGGERS = KeyboardMouseBindings.MOUSE_WHEEL_TRIGGERS
+        const val MOUSE_WHEEL_LEFT_STICK = KeyboardMouseBindings.MOUSE_WHEEL_LEFT_STICK
+        const val MOUSE_WHEEL_RIGHT_STICK = KeyboardMouseBindings.MOUSE_WHEEL_RIGHT_STICK
+        const val MOUSE_WHEEL_SHOULDERS = KeyboardMouseBindings.MOUSE_WHEEL_SHOULDERS
+
+        private const val KEY_KEYBOARD_MOUSE_SETTINGS = "keyboard_mouse_settings"
         private const val KEY_PACKAGES_FOLDER_URI = "packages_folder_uri"
         private const val KEY_VITA_STORAGE_ROOT_PATH = "vita_storage_root_path"
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"

@@ -23,6 +23,7 @@
 #include <config/state.h>
 #include <display/functions.h>
 #include <display/state.h>
+#include <emucorev/input_state.h>
 #include <kernel/state.h>
 #include <kernel/input_read_continuation.h>
 #include <util/log.h>
@@ -267,6 +268,7 @@ static void retrieve_ctrl_data(EmuEnvState &emuenv, int port, bool is_v2, bool n
         if (port == 1) {
             apply_keyboard(&buttons, axes.data(), is_v2, emuenv);
         }
+        emucorev::input_state::apply_pad_state(port - 1, buttons, axes.data());
         for (const auto &[_, controller] : state.controllers) {
             if (controller.port + 1 == port) {
                 // sceCtrl ports are 1-based and SDL_GameController index is 0-based. Need to convert.
@@ -276,6 +278,7 @@ static void retrieve_ctrl_data(EmuEnvState &emuenv, int port, bool is_v2, bool n
     } else if (port == 1) {
         // If not in PSTV mode, every controller input is considered as a port 1 input
         apply_keyboard(&buttons, axes.data(), is_v2, emuenv);
+        emucorev::input_state::apply_all_pad_states(buttons, axes.data());
         for (const auto &[_, controller] : state.controllers) {
             apply_controller(emuenv, &buttons, axes.data(), controller.controller.get(), is_v2);
         }

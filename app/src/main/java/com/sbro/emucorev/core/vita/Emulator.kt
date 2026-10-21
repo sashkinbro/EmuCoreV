@@ -46,6 +46,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.sbro.emucorev.MainActivity
 import com.sbro.emucorev.core.CoreMaintenanceRepository
 import com.sbro.emucorev.core.BackupSessionGate
+import com.sbro.emucorev.core.KeyboardMouseManager
 import com.sbro.emucorev.core.MenuPauseQueue
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.PlayTimeRepository
@@ -313,6 +314,13 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
         super.onCreate(savedInstanceState)
         if (isFinishing) return
+        KeyboardMouseManager.ensureInitialized(this)
+        KeyboardMouseManager.setPointerCaptureListener { enabled ->
+            runOnUiThread { updatePointerCapture(enabled) }
+        }
+        window.decorView.setOnCapturedPointerListener { _, event ->
+            KeyboardMouseManager.handleCapturedPointerEvent(event)
+        }
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         EmulatorStorage.prepareRuntime(this)
         VitaCoreConfigRepository(this).ensureDefaultsPersisted()
@@ -329,6 +337,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun onResume() {
         super.onResume()
         if (rebirthRequested || isFinishing) return
+        KeyboardMouseManager.refreshConnectionState()
+        KeyboardMouseManager.refreshPointerCapture()
         DiscordIntegration.setPaused(false)
         composeOwners.handleResume()
         attachComposeOverlay()
@@ -342,6 +352,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onPause() {
+        KeyboardMouseManager.releaseAll()
+        updatePointerCapture(false)
         cancelActiveTouches()
         keyboardRequestGeneration++ // Invalidate delayed show/fallback work while backgrounded.
         DiscordIntegration.setPaused(true)
@@ -371,6 +383,9 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onDestroy() {
+        KeyboardMouseManager.setEmulationInputEnabled(false)
+        KeyboardMouseManager.setPointerCaptureListener(null)
+        KeyboardMouseManager.releaseAll()
         menuPauseQueue.close()
         cancelActiveTouches()
         keyboardRequestGeneration++
@@ -389,9 +404,17 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
-        if (!hasFocus) cancelActiveTouches()
+        if (!hasFocus) {
+            cancelActiveTouches()
+            KeyboardMouseManager.releaseAll()
+            updatePointerCapture(false)
+        }
         super.onWindowFocusChanged(hasFocus)
         if (rebirthRequested || isFinishing) return
+        if (hasFocus) {
+            KeyboardMouseManager.refreshConnectionState()
+            KeyboardMouseManager.refreshPointerCapture()
+        }
         if (hasFocus && menuPaused) {
             applyMenuPauseState(true)
         }
@@ -762,6 +785,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 else -> true
             }
         }
+        if (KeyboardMouseManager.handleKeyBindingCapture(event)) return true
+        if (!nativeKeyboardRequested && KeyboardMouseManager.handleKeyEvent(event)) return true
         if (event.keyCode == KeyEvent.KEYCODE_BACK &&
             event.action == KeyEvent.ACTION_UP &&
             !event.isCanceled
@@ -774,7 +799,37 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
         if (launchStateLoading.active || stateFrameWaiting) return true
+        if (KeyboardMouseManager.handleMouseBindingCapture(event)) return true
+        if (!nativeKeyboardRequested) {
+            val keyboardMouseHandled = KeyboardMouseManager.handleMouseButtonEvent(event) ||
+                KeyboardMouseManager.handleMouseWheelEvent(event) ||
+                KeyboardMouseManager.handleMouseMotionEvent(event)
+            if (keyboardMouseHandled) return true
+        }
         return super.dispatchGenericMotionEvent(event)
+    }
+
+    private fun updatePointerCapture(enabled: Boolean) {
+        val decorView = window.decorView
+        if (enabled && hasWindowFocus()) {
+            decorView.isFocusable = true
+            decorView.isFocusableInTouchMode = true
+            if (!decorView.hasFocus()) decorView.requestFocus()
+            if (!decorView.hasPointerCapture()) {
+                decorView.post {
+                    if (!isFinishing && hasWindowFocus() && !decorView.hasPointerCapture()) {
+                        decorView.requestPointerCapture()
+                    }
+                }
+            }
+        } else {
+            if (decorView.hasPointerCapture()) {
+                decorView.releasePointerCapture()
+            }
+            decorView.isFocusable = false
+            decorView.isFocusableInTouchMode = false
+            decorView.clearFocus()
+        }
     }
 
     override fun onScreenKeyboardFocusLost(): Boolean {
@@ -857,6 +912,12 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (rebirthRequested) return true
         if (launchStateLoading.active || stateFrameWaiting) return true
+        if (KeyboardMouseManager.handleMouseBindingCapture(event)) return true
+        if (!nativeKeyboardRequested) {
+            val keyboardMouseHandled = KeyboardMouseManager.handleMouseButtonEvent(event) ||
+                KeyboardMouseManager.handleMouseMotionEvent(event)
+            if (keyboardMouseHandled) return true
+        }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP -> {
                 activeTouchSnapshot?.recycle()

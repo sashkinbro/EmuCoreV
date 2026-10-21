@@ -1479,4 +1479,66 @@
     <string name="settings_show_quick_bar">Показывать панель быстрых действий</string>
     <string name="settings_help_show_quick_bar">Дважды коснитесь экрана игры, чтобы показать кнопки сохранения, загрузки, снимка экрана, паузы и меню.</string>
     <string name="install_dialog_archive_requires_base">Согласно метаданным, архив содержит обновление для %1$s. Сначала установите базовую игру.</string>
+
+
+    <!-- Keyboard and mouse input -->
+    <string name="settings_keyboard_mouse_section">Клавиатура и мышь</string>
+    <string name="settings_keyboard_input">Ввод с клавиатуры</string>
+    <string name="settings_keyboard_input_desc">Назначьте физическую клавиатуру эмулируемому контроллеру.</string>
+    <string name="settings_keyboard_target_player">Игрок с клавиатурой</string>
+    <string name="settings_keyboard_mapping_title">Назначение клавиш</string>
+    <string name="settings_keyboard_mapping_desc">Выберите, какая клавиша активирует каждое действие контроллера.</string>
+    <string name="settings_mouse_input">Ввод с мыши</string>
+    <string name="settings_mouse_input_desc">Назначьте кнопки мыши и при желании используйте мышь для аналогового прицеливания.</string>
+    <string name="settings_mouse_target_player">Игрок с мышью</string>
+    <string name="settings_mouse_mapping_title">Назначение кнопок мыши</string>
+    <string name="settings_mouse_mapping_desc">Выберите, какая кнопка мыши активирует каждое действие контроллера.</string>
+    <string name="settings_keyboard_mapping_listening_title">Нажмите клавишу</string>
+    <string name="settings_keyboard_mapping_listening_desc">Нажмите клавишу, которую хотите назначить. Нажмите «Назад» для отмены.</string>
+    <string name="settings_mouse_mapping_listening_title">Нажмите кнопку мыши</string>
+    <string name="settings_mouse_mapping_listening_desc">Нажмите кнопку мыши, которую хотите назначить. Нажмите «Назад» для отмены.</string>
+    <string name="settings_keyboard_connected">Клавиатура подключена</string>
+    <string name="settings_mouse_connected">Мышь подключена</string>
+    <string name="settings_mouse_aim_mode">Прицеливание мышью</string>
+    <string name="settings_mouse_aim_off">Выкл.</string>
+    <string name="settings_mouse_aim_right_stick">Правый стик</string>
+    <string name="settings_mouse_aim_left_stick">Левый стик</string>
+    <string name="settings_mouse_aim_mode_desc">Двигайте аналоговый стик мышью.</string>
+    <string name="settings_mouse_sensitivity">Чувствительность мыши</string>
+    <string name="settings_mouse_sensitivity_desc">Настройте, насколько мышь двигает эмулируемый стик.</string>
+    <string name="settings_mouse_invert_y">Инвертировать Y мыши</string>
+    <string name="settings_mouse_invert_y_desc">Инвертирует вертикальное прицеливание мышью.</string>
+    <string name="settings_mouse_capture">Захватывать курсор мыши</string>
+    <string name="settings_mouse_capture_desc">Скрывает и блокирует указатель при прицеливании мышью.</string>
+    <string name="settings_keyboard_mouse_mapping_reset_title">Сбросить назначение клавиш/мыши</string>
+    <string name="settings_keyboard_mouse_mapping_reset_desc">Восстанавливает стандартные назначения клавиатуры и мыши для этого игрока.</string>
+    <string name="settings_keyboard_mouse_global_note">Назначения клавиатуры и мыши общие и применяются ко всем играм.</string>
+    <string name="settings_keyboard_mouse_source_keyboard">Клавиатура</string>
+    <string name="settings_keyboard_mouse_source_mouse">Мышь</string>
+    <string name="settings_keyboard_mouse_game_desc">Эти настройки применяются только к этой игре.</string>
+    <string name="settings_keyboard_mouse_use_global">Использовать глобальные настройки клавиатуры/мыши</string>
+    <string name="settings_keyboard_mouse_use_global_desc">Удалить настройки клавиатуры и мыши для этой игры.</string>
+    <string name="settings_mouse_smoothing">Сглаживание мыши</string>
+    <string name="settings_mouse_smoothing_desc">Сглаживает небольшие движения мыши для более стабильного прицеливания.</string>
+    <string name="settings_mouse_invert_x">Инвертировать X мыши</string>
+    <string name="settings_mouse_invert_x_desc">Инвертирует горизонтальное прицеливание мышью.</string>
+    <string name="settings_mouse_left_handed">Мышь для левши</string>
+    <string name="settings_mouse_left_handed_desc">Меняет местами левую и правую кнопки мыши.</string>
+    <string name="settings_mouse_wheel">Колесо мыши</string>
+    <string name="settings_mouse_wheel_off">Выкл.</string>
+    <string name="settings_mouse_wheel_dpad">Крестовина вверх/вниз</string>
+    <string name="settings_mouse_wheel_triggers">L2 / R2</string>
+    <string name="settings_mouse_wheel_left_stick">Левый стик вверх/вниз</string>
+    <string name="settings_mouse_wheel_right_stick">Правый стик вверх/вниз</string>
+    <string name="settings_mouse_deadzone">Мёртвая зона прицеливания</string>
+    <string name="settings_mouse_wheel_pulse">Длительность нажатия колеса</string>
+    <string name="settings_mouse_vertical_sensitivity">Вертикальная чувствительность</string>
+    <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
+    <string name="settings_gamepad_mapping_use_global_desc">Убрать переопределения кнопок геймпада для этой игры.</string>
+    <!-- Keyboard and mouse per-game settings -->
+    <string name="settings_gamepad_player_1">Игрок 1</string>
+    <string name="settings_gamepad_player_2">Игрок 2</string>
+    <string name="settings_not_set">Не установлено</string>
+    <string name="settings_gamepad_mapping_clear">Очистить</string>
+    <string name="settings_gamepad_mapping_auto_format">Авто</string>
 </resources>
