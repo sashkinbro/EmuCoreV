@@ -144,10 +144,12 @@ fun EmuCoreVTheme(
             LocalCustomizationSettings provides customization,
             LocalNeonTheme provides (themeMode == ThemeMode.NEON)
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                content()
-                if (themeMode == ThemeMode.NEON && enableCrtOverlay) {
-                    NeonCrtOverlay()
+            WindowAwareRipple {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    content()
+                    if (themeMode == ThemeMode.NEON && enableCrtOverlay) {
+                        NeonCrtOverlay()
+                    }
                 }
             }
         }

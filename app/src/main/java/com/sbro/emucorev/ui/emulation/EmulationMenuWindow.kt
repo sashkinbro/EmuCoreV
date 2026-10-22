@@ -21,6 +21,7 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.sbro.emucorev.ui.theme.WindowAwareRipple
 
 /**
  * The game controls use a software Activity window to avoid game-driver HWUI fence ANRs.
@@ -46,7 +47,7 @@ internal fun EmulationMenuWindow(content: @Composable () -> Unit) {
             setViewTreeLifecycleOwner(anchor.findViewTreeLifecycleOwner())
             setViewTreeViewModelStoreOwner(anchor.findViewTreeViewModelStoreOwner())
             setViewTreeSavedStateRegistryOwner(anchor.findViewTreeSavedStateRegistryOwner())
-            setContent { currentContent() }
+            setContent { WindowAwareRipple { currentContent() } }
         }
         dialog.setContentView(host, ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
