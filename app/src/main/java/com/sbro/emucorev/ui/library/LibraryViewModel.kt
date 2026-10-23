@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.sbro.emucorev.core.InstallStateBus
 import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.InstalledVitaGame
+import com.sbro.emucorev.ui.common.localBitmapLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +17,8 @@ import kotlinx.coroutines.withContext
 data class LibraryUiState(
     val items: List<InstalledVitaGame> = emptyList(),
     val query: String = "",
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val artworkVersion: Long = 0L
 )
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
@@ -41,7 +43,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = _uiState.value.copy(isLoading = true)
             allItems = repository.loadInstalledGames(context)
-            publishState()
+            publishState(artworkVersion = localBitmapLoader.invalidate())
         }
     }
 
@@ -65,7 +67,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         publishState()
     }
 
-    private fun publishState() {
+    private fun publishState(artworkVersion: Long = _uiState.value.artworkVersion) {
         val query = _uiState.value.query.trim()
         val filteredItems = allItems.filter {
             query.isBlank() ||
@@ -74,7 +76,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
         _uiState.value = _uiState.value.copy(
             items = filteredItems,
-            isLoading = false
+            isLoading = false,
+            artworkVersion = artworkVersion
         )
     }
 }

@@ -84,7 +84,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.LibraryLayoutMode
-import com.sbro.emucorev.ui.common.LocalImage
 import com.sbro.emucorev.ui.common.CustomizationBackground
 import com.sbro.emucorev.ui.common.NavigationMenuButton
 import com.sbro.emucorev.ui.common.ScreenTopBarSurface
@@ -361,6 +360,7 @@ fun LibraryScreen(
                         ) {
                             LibraryGameArtwork(
                                 path = game.iconPath,
+                                artworkVersion = uiState.artworkVersion,
                                 title = game.title,
                                 modifier = Modifier.width(92.dp),
                                 artworkAspectRatio = 1f
@@ -455,8 +455,9 @@ fun LibraryScreen(
                                 shadowElevation = 8.dp,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
                             ) {
-                                LocalImage(
+                                LibraryLocalImage(
                                     path = game.iconPath,
+                                    artworkVersion = uiState.artworkVersion,
                                     contentDescription = game.title,
                                     fallbackLabel = game.title,
                                     modifier = Modifier.fillMaxWidth().aspectRatio(1f)
@@ -673,6 +674,7 @@ private fun LibraryGameContextMenuDivider() {
 @Composable
 private fun LibraryGameArtwork(
     path: String?,
+    artworkVersion: Long,
     title: String,
     modifier: Modifier = Modifier,
     artworkAspectRatio: Float = 2f / 3f
@@ -683,8 +685,9 @@ private fun LibraryGameArtwork(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
-        LocalImage(
+        LibraryLocalImage(
             path = path,
+            artworkVersion = artworkVersion,
             contentDescription = title,
             fallbackLabel = title,
             modifier = Modifier
