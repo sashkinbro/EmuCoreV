@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import com.sbro.emucorev.ui.theme.neon.neonShape
 
@@ -144,6 +145,15 @@ fun LibraryScreen(
             customization.coverSizePercent
         )
     }
+    val libraryState = rememberLazyListState()
+    val coverPrefetchWindow = remember(uiState.items, layoutMode, gridColumns) {
+        val rowSize = if (layoutMode == LibraryLayoutMode.LIST) 1 else gridColumns.coerceAtLeast(1)
+        LibraryCoverPrefetchWindow(uiState.items.chunked(rowSize).map { row ->
+            LibraryCoverPrefetchRow(row.first().titleId, row.map { it.iconPath })
+        })
+    }
+    LibraryCoverPrefetch(libraryState, coverPrefetchWindow,
+        enabled = !uiState.isLoading, artworkVersion = uiState.artworkVersion)
 
     Box(
         modifier = Modifier
@@ -163,6 +173,7 @@ fun LibraryScreen(
             )
         }
         LazyColumn(
+            state = libraryState,
             modifier = Modifier
                 .fillMaxSize()
                 .navigationBarsPadding(),

@@ -14,10 +14,17 @@ internal class LocalBitmapLoader(private val decode: (String) -> Bitmap? = ::dec
         override fun sizeOf(key: ImageKey, value: Bitmap): Int = value.allocationByteCount
     }
     private val decoders = Semaphore(4)
+    private val prefetches = Semaphore(1)
     @Volatile private var version = 0L
 
     fun cached(path: String?, artworkVersion: Long = version): Bitmap? =
         path?.let { cache.get(ImageKey(it, artworkVersion)) }
+
+    /** Speculation shares visible artwork cache/version and leaves three decoder slots free. */
+    suspend fun prefetch(path: String?, artworkVersion: Long = version) {
+        if (path.isNullOrBlank() || cached(path, artworkVersion) != null) return
+        prefetches.withPermit { load(path, artworkVersion) }
+    }
 
     @Synchronized
     fun invalidate(): Long {

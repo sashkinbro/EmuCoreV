@@ -17,6 +17,25 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class LocalBitmapLoaderTest {
+    @Test fun prefetchedArtworkSharesTheVisibleCacheAndRefreshVersion() = runBlocking {
+        var decodes = 0
+        val loader = LocalBitmapLoader { _ ->
+            decodes++
+            Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888)
+        }
+        loader.prefetch("cover.png", 0)
+        val warmed = requireNotNull(loader.cached("cover.png", 0))
+        assertSame(warmed, loader.load("cover.png", 0))
+        assertEquals(1, decodes)
+        val refreshed = loader.invalidate()
+        // An old speculative completion must not populate the new artwork version.
+        loader.prefetch("stale.png", 0)
+        assertNull(loader.cached("stale.png", refreshed))
+        loader.prefetch("cover.png", refreshed)
+        assertNotSame(warmed, loader.load("cover.png", refreshed))
+        assertEquals(3, decodes)
+    }
+
     @Test fun decodingLeavesTheCallingThreadAndReusesCachedBitmap() = runBlocking {
         val caller = Thread.currentThread()
         var decodes = 0
