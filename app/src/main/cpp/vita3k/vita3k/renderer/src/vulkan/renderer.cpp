@@ -155,13 +155,6 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_report_callback(
 }
 
 #endif
-const static std::vector<const char *> required_device_extensions = {
-    vk::KHRSwapchainExtensionName,
-    // needed in order to use storage buffers
-    vk::KHRStorageBufferStorageClassExtensionName,
-    // needed in order to use negative viewport height
-    vk::KHRMaintenance1ExtensionName
-};
 
 // Android 17 rejects an instance that asks for Vulkan 1.0 when the loader advertises 1.1+
 static uint32_t instance_api_version(const vk::detail::DispatchLoaderDynamic &dispatch) {
@@ -202,19 +195,26 @@ static bool detect_patch_bcn(bool *support_dxt) {
         .pApplicationInfo = &application_info
     };
 
-    vk::UniqueInstance instance = vk::createInstanceUnique(instance_info);
-    // we need these 2 functions for the following part of the code
-    VULKAN_HPP_DEFAULT_DISPATCHER.vkEnumeratePhysicalDevices = reinterpret_cast<PFN_vkEnumeratePhysicalDevices>(VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr(instance.get(), "vkEnumeratePhysicalDevices"));
-    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties>(VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr(instance.get(), "vkGetPhysicalDeviceProperties"));
-    VULKAN_HPP_DEFAULT_DISPATCHER.vkDestroyInstance = reinterpret_cast<PFN_vkDestroyInstance>(VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr(instance.get(), "vkDestroyInstance"));
+    // Keep the temporary instance on its own dispatcher. Overwriting the global
+    // dispatcher's instance-specific entry points leaves the real instance with
+    // pointers bound to a destroyed instance, and custom drivers (MaliSX2) then
+    // report no physical devices at all.
+    vk::detail::DispatchLoaderDynamic patch_dispatch;
+    patch_dispatch.init(VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr);
+    vk::UniqueInstance instance = vk::createInstanceUnique(instance_info, nullptr, patch_dispatch);
+    patch_dispatch.init(instance.get());
+
+    const std::vector<vk::PhysicalDevice> physical_devices = instance->enumeratePhysicalDevices(patch_dispatch);
+    if (physical_devices.empty())
+        return true;
 
     // assume there is only one gpu
-    vk::PhysicalDevice gpu = instance->enumeratePhysicalDevices().front();
-    vk::PhysicalDeviceProperties properties = gpu.getProperties();
+    vk::PhysicalDevice gpu = physical_devices.front();
+    vk::PhysicalDeviceProperties properties = gpu.getProperties(patch_dispatch);
 
     const auto type = adrenotools_get_bcn_type(VK_VERSION_MAJOR(properties.driverVersion), VK_VERSION_MINOR(properties.driverVersion), properties.vendorID);
     if (type == ADRENOTOOLS_BCN_PATCH) {
-        void *function_to_patch = reinterpret_cast<void *>(VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr(instance.get(), "vkGetPhysicalDeviceFormatProperties"));
+        void *function_to_patch = reinterpret_cast<void *>(patch_dispatch.vkGetInstanceProcAddr(instance.get(), "vkGetPhysicalDeviceFormatProperties"));
         if (patch_bcn_once(function_to_patch)) {
             LOG_INFO("Applied BCeNabler patch");
         } else {
@@ -278,10 +278,24 @@ static bool select_linux_surface_extension(VKState &vk_state, const renderer::Di
 }
 #endif
 
-static bool device_is_compatible(const vk::PhysicalDevice &device) {
-    const std::vector<vk::ExtensionProperties> available_extensions = device.enumerateDeviceExtensionProperties();
+// Maintenance1 and storage_buffer_storage_class were promoted to Vulkan 1.1
+// core. A 1.1+ driver (Mesa/PanVK) may stop advertising them as extensions, so
+// only require the extension names when the device is still a Vulkan 1.0 one.
+static std::vector<const char *> required_device_extensions_for(const vk::PhysicalDeviceProperties &properties) {
+    std::vector<const char *> extensions{ vk::KHRSwapchainExtensionName };
+    if (properties.apiVersion < VK_API_VERSION_1_1) {
+        extensions.push_back(vk::KHRMaintenance1ExtensionName);
+        extensions.push_back(vk::KHRStorageBufferStorageClassExtensionName);
+    }
+    return extensions;
+}
 
-    std::set<std::string> required_extensions(required_device_extensions.begin(), required_device_extensions.end());
+static bool device_is_compatible(const vk::PhysicalDevice &device) {
+    const vk::PhysicalDeviceProperties properties = device.getProperties();
+    const std::vector<vk::ExtensionProperties> available_extensions = device.enumerateDeviceExtensionProperties();
+    const std::vector<const char *> required = required_device_extensions_for(properties);
+
+    std::set<std::string> required_extensions(required.begin(), required.end());
     for (const auto &extension : available_extensions)
         required_extensions.erase(extension.extensionName);
 
@@ -628,7 +642,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                     physical_device_properties.vendorID,
                     physical_device_properties.driverVersion,
                     physical_device_properties.deviceName.data()))
-                LOG_INFO("Custom Adreno driver {} injected successfully", config.current_config.custom_driver_name);
+                LOG_INFO("Custom GPU driver {} injected successfully", config.current_config.custom_driver_name);
             else
                 LOG_WARN("Custom Adreno driver {} fell back to the system Vulkan loader", config.current_config.custom_driver_name);
         }
@@ -679,7 +693,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         };
 
         // look for optional extensions
-        std::vector<const char *> device_extensions(required_device_extensions);
+        std::vector<const char *> device_extensions = required_device_extensions_for(physical_device_properties);
         bool temp_bool;
         bool support_global_priority = false;
         bool support_buffer_device_address = false;
@@ -1259,6 +1273,25 @@ void VKState::log_device_fault() {
 }
 
 void VKState::cleanup() {
+    // Renderer creation can fail before a logical device exists (unsupported
+    // driver, no physical device, surface failure). Cleanup still runs from the
+    // session controller, so never call device entry points in that state.
+    if (!device) {
+#ifndef NDEBUG
+        if (debug_messenger && instance) {
+            instance.destroyDebugUtilsMessengerEXT(debug_messenger);
+            debug_messenger = nullptr;
+        }
+        if (debug_report && instance) {
+            instance.destroyDebugReportCallbackEXT(debug_report);
+            debug_report = nullptr;
+        }
+#endif
+        if (instance)
+            instance.destroy();
+        return;
+    }
+
     const auto release_descriptor_sets = [](FrameDescriptor &descriptor) {
         std::vector<vk::DescriptorSet>().swap(descriptor.sets);
         descriptor.descriptors_idx = 0;
