@@ -912,7 +912,7 @@ private fun SaveStatesTab(gameId: String, saveStates: SaveStateMenuState, callba
                     icon = Icons.Rounded.Save,
                     contentDescription = stringResource(R.string.emulation_savestate_save_action),
                     enabled = !busy,
-                    showProgress = busy && saveStates.busySaving,
+                    showProgress = saveStates.busy && saveStates.busySaving,
                     onClick = { callbacks.onSaveStateSave(selected) },
                     modifier = Modifier.weight(1f)
                 )
@@ -920,7 +920,7 @@ private fun SaveStatesTab(gameId: String, saveStates: SaveStateMenuState, callba
                     icon = Icons.Rounded.Restore,
                     contentDescription = stringResource(R.string.emulation_savestate_load_action),
                     enabled = hasState && !busy,
-                    showProgress = busy && !saveStates.busySaving,
+                    showProgress = saveStates.busy && !saveStates.busySaving,
                     onClick = { callbacks.onSaveStateLoad(selected) },
                     modifier = Modifier.weight(1f)
                 )

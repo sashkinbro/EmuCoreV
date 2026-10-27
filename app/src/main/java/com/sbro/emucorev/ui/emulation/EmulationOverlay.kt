@@ -852,8 +852,9 @@ fun EmulationOverlayHost(
                             saveStates = SaveStateMenuState(
                                 slots = saveStateSlots,
                                 selectedSlot = selectedSaveStateSlot,
-                                busy = saveStateBusy || activity.exitInProgress,
-                                busySaving = saveStateBusySaving || autoSaving
+                                busy = saveStateBusy,
+                                busySaving = saveStateBusySaving || autoSaving,
+                                canInteract = !activity.exitInProgress
                             ),
                             paused = effectivePaused,
                             sessionElapsedMs = sessionElapsedMs,
