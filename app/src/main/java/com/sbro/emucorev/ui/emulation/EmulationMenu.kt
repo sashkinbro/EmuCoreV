@@ -124,7 +124,6 @@ import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private val LiveBadgeColor = Color(0xFF34D27A)
-private val RestartBadgeColor = Color(0xFFE0A82E)
 private val BrokenBadgeColor = Color(0xFFE0575B)
 private val LocalMenuScrollInset = compositionLocalOf { 7.dp }
 
@@ -792,15 +791,6 @@ private fun DisplayTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks
         subtitle = "",
         badge = null
     ) {
-        MenuSliderRow(
-            label = stringResource(R.string.settings_resolution_multiplier),
-            value = config.resolutionMultiplier,
-            valueText = stringResource(R.string.emulation_menu_resolution_value, config.resolutionMultiplier),
-            valueRange = 1f..8f,
-            steps = 13,
-            badge = MenuBadge.Restart,
-            onValueChange = { callbacks.onResolutionMultiplier((it * 2f).roundToInt() / 2f) }
-        )
         MenuToggleRow(
             label = stringResource(R.string.settings_vsync),
             checked = config.vSync,
@@ -810,12 +800,6 @@ private fun DisplayTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks
             label = stringResource(R.string.settings_stretch_display_area),
             checked = config.stretchDisplayArea,
             onCheckedChange = callbacks.onStretchDisplay
-        )
-        MenuToggleRow(
-            label = stringResource(R.string.settings_core_high_accuracy),
-            checked = config.highAccuracy,
-            badge = MenuBadge.Restart,
-            onCheckedChange = callbacks.onHighAccuracy
         )
     }
 
@@ -1760,10 +1744,8 @@ data class EmulationMenuCallbacks(
     val onBgmVolume: (Int) -> Unit,
     val onInfoBar: (Boolean) -> Unit,
     val onTouchpadCursor: (Boolean) -> Unit,
-    val onResolutionMultiplier: (Float) -> Unit,
     val onVsync: (Boolean) -> Unit,
     val onStretchDisplay: (Boolean) -> Unit,
-    val onHighAccuracy: (Boolean) -> Unit,
     val onFpsHack: (Boolean) -> Unit,
     val onFrameLimit: (Int) -> Unit,
     val onTurboMode: (Boolean) -> Unit,
@@ -1803,7 +1785,7 @@ data class SaveStateMenuState(
     val canInteract: Boolean = true
 )
 
-private enum class MenuBadge { Live, Restart, Broken }
+private enum class MenuBadge { Live, Broken }
 
 @Composable
 private fun SheetHandle() {
@@ -1948,10 +1930,6 @@ private fun MenuSection(
                     text = stringResource(R.string.emulation_menu_badge_live),
                     color = LiveBadgeColor
                 )
-                MenuBadge.Restart -> Badge(
-                    text = stringResource(R.string.emulation_menu_badge_restart),
-                    color = RestartBadgeColor
-                )
                 MenuBadge.Broken -> Badge(
                     text = stringResource(R.string.emulation_cheats_broken),
                     color = BrokenBadgeColor
@@ -2091,10 +2069,6 @@ private fun RowBadge(badge: MenuBadge?) {
                 MenuBadge.Live -> Badge(
                     text = stringResource(R.string.emulation_menu_badge_live),
                     color = LiveBadgeColor
-                )
-                MenuBadge.Restart -> Badge(
-                    text = stringResource(R.string.emulation_menu_badge_restart),
-                    color = RestartBadgeColor
                 )
                 MenuBadge.Broken -> Badge(
                     text = stringResource(R.string.emulation_cheats_broken),

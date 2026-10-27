@@ -508,10 +508,10 @@ private fun GraphicsProfileSection(
             description = stringResource(R.string.settings_help_resolution),
             valueText = stringResource(R.string.settings_core_resolution_value, config.resolutionMultiplier),
             value = config.resolutionMultiplier,
-            valueRange = 0.5f..4f,
-            steps = 13,
+            valueRange = 0.5f..8f,
+            steps = 14,
             onReset = { onUpdate { it.copy(resolutionMultiplier = defaults.resolutionMultiplier) } },
-            onChange = { value -> onUpdate { it.copy(resolutionMultiplier = (value * 4).toInt() / 4f) } }
+            onChange = { value -> onUpdate { it.copy(resolutionMultiplier = (value * 2).toInt() / 2f) } }
         )
         SliderRow(
             title = stringResource(R.string.settings_core_anisotropic_label),
