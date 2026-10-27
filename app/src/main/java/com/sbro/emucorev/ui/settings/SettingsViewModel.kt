@@ -18,6 +18,7 @@ import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.NativeLibraryLoader
 import com.sbro.emucorev.core.RemoteGpuDriver
 import com.sbro.emucorev.core.SettingsBackupRepository
+import com.sbro.emucorev.core.vendor
 import com.sbro.emucorev.core.StorageMigrationProgress
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
@@ -521,7 +522,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         gpuDriverDownloads = _uiState.value.gpuDriverDownloads + (driver.id to progress)
                     )
                 }
-                val driverName = gpuDriverManager.installFromArchive(archive)
+                val driverName = gpuDriverManager.installFromArchive(archive, driver.vendor)
                 val installedDrivers = gpuDriverManager.listInstalledDrivers()
                 if (applyGlobally) {
                     val updated = _uiState.value.coreConfig.copy(customDriverName = driverName)

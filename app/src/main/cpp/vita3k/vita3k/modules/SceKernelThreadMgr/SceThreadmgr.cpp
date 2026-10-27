@@ -514,6 +514,9 @@ EXPORT(SceInt32, _sceKernelGetThreadInfo, SceUID threadId, Ptr<SceKernelThreadIn
     // TODO: SCE_KERNEL_ERROR_ILLEGAL_CONTEXT check
 
     const std::lock_guard<std::mutex> lock(thread->mutex);
+    memset(info, 0, sizeof(*info));
+    info->size = sizeof(*info);
+    info->processId = 1;
     strncpy(info->name, thread->name.c_str(), KERNELOBJECT_MAX_NAME_LENGTH);
     info->stack = Ptr<void>(thread->stack.get());
     info->stackSize = thread->stack_size;
@@ -521,6 +524,9 @@ EXPORT(SceInt32, _sceKernelGetThreadInfo, SceUID threadId, Ptr<SceKernelThreadIn
     info->currentPriority = thread->priority;
     info->initCpuAffinityMask = thread->affinity_mask; // Todo Give init affinity
     info->currentCpuAffinityMask = thread->affinity_mask;
+    const uint32_t user_cpus = (static_cast<uint32_t>(thread->affinity_mask) >> 16) & 0x7;
+    info->currentCpuId = (user_cpus & 1) ? 0 : (user_cpus & 2) ? 1 : (user_cpus & 4) ? 2 : 0;
+    info->lastExecutedCpuId = info->currentCpuId;
     info->entry = SceKernelThreadEntry(thread->entry_point);
     info->status = std::to_underlying(thread->status);
     info->waitType = thread->wait_target.type;

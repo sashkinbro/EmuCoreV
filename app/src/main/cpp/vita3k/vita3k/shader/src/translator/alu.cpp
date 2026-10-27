@@ -1236,6 +1236,10 @@ bool shader::usse::USSETranslatorVisitor::sop2m(Imm2 pred,
 
     result = utils::convert_to_int(m_b, m_util_funcs, result, DataType::UINT8, true);
 
+    const bool lanes_packed_from_x = (wmask & (wmask + 1)) == 0;
+    if (!lanes_packed_from_x)
+        result = utils::finalize(m_b, result, result, SWIZZLE_CHANNEL_4_DEFAULT, m_b.makeIntConstant(0), wmask);
+
     // Final result. Do binary operation and then store
     store(inst.opr.dest, result, wmask, 0);
 

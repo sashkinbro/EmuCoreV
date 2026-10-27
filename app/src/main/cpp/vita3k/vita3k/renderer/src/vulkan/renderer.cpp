@@ -163,6 +163,14 @@ const static std::vector<const char *> required_device_extensions = {
     vk::KHRMaintenance1ExtensionName
 };
 
+// Android 17 rejects an instance that asks for Vulkan 1.0 when the loader advertises 1.1+
+static uint32_t instance_api_version(const vk::detail::DispatchLoaderDynamic &dispatch) {
+    uint32_t version = VK_API_VERSION_1_0;
+    if (!dispatch.vkEnumerateInstanceVersion || dispatch.vkEnumerateInstanceVersion(&version) != VK_SUCCESS)
+        return VK_API_VERSION_1_0;
+    return std::min<uint32_t>(version, VK_API_VERSION_1_1);
+}
+
 namespace renderer::vulkan {
 
 #if defined(__ANDROID__) && defined(USE_ADRENO_TOOLS)
@@ -188,7 +196,7 @@ static bool detect_patch_bcn(bool *support_dxt) {
 
     // create an instance to get the patch address
     vk::ApplicationInfo application_info{
-        .apiVersion = VK_API_VERSION_1_0
+        .apiVersion = instance_api_version(VULKAN_HPP_DEFAULT_DISPATCHER)
     };
     vk::InstanceCreateInfo instance_info{
         .pApplicationInfo = &application_info
@@ -400,7 +408,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             .applicationVersion = VK_MAKE_API_VERSION(0, 0, 0, 1), // App Version
             .pEngineName = org_name, // Engine Name, using org instead.
             .engineVersion = VK_MAKE_API_VERSION(0, 0, 0, 1), // Engine Version
-            .apiVersion = VK_API_VERSION_1_0
+            .apiVersion = instance_api_version(VULKAN_HPP_DEFAULT_DISPATCHER)
         };
 
         std::vector<const char *> instance_extensions;
@@ -2280,7 +2288,7 @@ renderer::VulkanDeviceInfo renderer::enumerate_vulkan_devices(const std::string 
 #endif
 
         vk::ApplicationInfo app_info{
-            .apiVersion = VK_API_VERSION_1_0
+            .apiVersion = instance_api_version(dispatch)
         };
 
         std::vector<const char *> instance_extensions;

@@ -16,6 +16,8 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include <algorithm>
+#include <cstring>
+#include <limits>
 #include <vector>
 
 #include <gxm/functions.h>
@@ -46,75 +48,96 @@ static constexpr bool use_gpu_depth_transfer = true;
 
 template <typename T, SceGxmTransferColorKeyMode mode, SceGxmTransferType src_type, SceGxmTransferType dst_type>
 static void perform_transfer_copy_impl(MemState &mem, const SceGxmTransferImage &src, const SceGxmTransferImage &dst, uint32_t key_value, uint32_t key_mask) {
-    T *__restrict__ src_ptr = src.address.cast<T>().get(mem);
-    T *__restrict__ dst_ptr = dst.address.cast<T>().get(mem);
+    const uint8_t *src_ptr = src.address.cast<uint8_t>().get(mem);
+    uint8_t *dst_ptr = dst.address.cast<uint8_t>().get(mem);
 
-    // Fast path: LINEAR→LINEAR, no color key, contiguous rows → use memmove
-    // (handles overlapping src/dst correctly, which the per-element loop does not)
-    if constexpr (src_type == SCE_GXM_TRANSFER_LINEAR && dst_type == SCE_GXM_TRANSFER_LINEAR && mode == SCE_GXM_TRANSFER_COLORKEY_NONE) {
-        const int32_t src_stride_pixel = src.stride / sizeof(T);
-        const int32_t dst_stride_pixel = dst.stride / sizeof(T);
-        if (src.x == 0 && src.y == 0 && dst.x == 0 && dst.y == 0
-            && src_stride_pixel == static_cast<int32_t>(src.width)
-            && dst_stride_pixel == static_cast<int32_t>(dst.width)) {
-            memmove(dst_ptr, src_ptr, static_cast<size_t>(src.width) * src.height * sizeof(T));
-            return;
+    if (src.width == 0 || src.height == 0)
+        return;
+
+    auto compute_offset = [&](uint32_t dx, uint32_t dy, const SceGxmTransferImage &img, SceGxmTransferType type) -> int64_t {
+        constexpr int64_t pixel_bytes = sizeof(T);
+        if (type == SCE_GXM_TRANSFER_LINEAR) {
+            return dy * static_cast<int64_t>(img.stride) + dx * pixel_bytes;
+        } else if (type == SCE_GXM_TRANSFER_TILED) {
+            // tiles are 32x32, you have the offset within the tile then the offset of the tile
+            const int64_t stride_pixel = img.stride / pixel_bytes;
+            const uint32_t texel_offset_in_tile = ((dy % 32) * 32) + (dx % 32);
+            const int64_t tile_address = (stride_pixel / 32) * (dy / 32) + (dx / 32);
+
+            return (tile_address * 1024 + texel_offset_in_tile) * pixel_bytes;
+        } else {
+            return texture::encode_morton(dx, dy, img.width, img.height) * pixel_bytes;
         }
-        // Row-by-row memmove for strided LINEAR→LINEAR (handles overlap within each row)
-        if (src.x == 0 && dst.x == 0
-            && src_stride_pixel >= static_cast<int32_t>(src.width)
-            && dst_stride_pixel >= static_cast<int32_t>(dst.width)) {
-            const uint8_t *s = reinterpret_cast<const uint8_t *>(src_ptr) + src.y * src.stride;
-            uint8_t *d = reinterpret_cast<uint8_t *>(dst_ptr) + dst.y * dst.stride;
-            const size_t row_bytes = static_cast<size_t>(src.width) * sizeof(T);
-            if (reinterpret_cast<uintptr_t>(d) <= reinterpret_cast<uintptr_t>(s)) {
-                for (uint32_t dy = 0; dy < src.height; dy++) {
-                    memmove(d + dy * dst.stride, s + dy * src.stride, row_bytes);
-                }
-            } else {
-                for (int32_t dy = static_cast<int32_t>(src.height) - 1; dy >= 0; dy--) {
-                    memmove(d + dy * dst.stride, s + dy * src.stride, row_bytes);
-                }
-            }
+    };
+
+    if constexpr (src_type == SCE_GXM_TRANSFER_LINEAR && dst_type == SCE_GXM_TRANSFER_LINEAR && mode == SCE_GXM_TRANSFER_COLORKEY_NONE) {
+        const size_t row_bytes = static_cast<size_t>(src.width) * sizeof(T);
+        if (src.stride == static_cast<int64_t>(row_bytes) && dst.stride == static_cast<int64_t>(row_bytes)) {
+            memmove(dst_ptr + compute_offset(dst.x, dst.y, dst, dst_type),
+                src_ptr + compute_offset(src.x, src.y, src, src_type), row_bytes * src.height);
             return;
         }
     }
 
-    auto compute_offset = [&](uint32_t dx, uint32_t dy, const SceGxmTransferImage &img, SceGxmTransferType type) -> int32_t {
-        const int32_t stride_pixel = img.stride / sizeof(T);
+    auto transfer_range = [&](const uint8_t *base, const SceGxmTransferImage &image, SceGxmTransferType type) {
+        int64_t first = std::numeric_limits<int64_t>::max();
+        int64_t last = std::numeric_limits<int64_t>::min();
+        auto include = [&](uint32_t x, uint32_t y) {
+            const int64_t offset = compute_offset(x, y, image, type);
+            first = std::min(first, offset);
+            last = std::max(last, offset);
+        };
         if (type == SCE_GXM_TRANSFER_LINEAR) {
-            return dy * stride_pixel + dx;
-        } else if (type == SCE_GXM_TRANSFER_TILED) {
-            const uint32_t texel_offset_in_tile = ((dy % 32) * 32) + (dx % 32);
-            const int32_t tile_address = (stride_pixel / 32) * (dy / 32) + (dx / 32);
-
-            return tile_address * 1024 + texel_offset_in_tile;
+            include(image.x, image.y);
+            include(image.x + src.width - 1, image.y);
+            include(image.x, image.y + src.height - 1);
+            include(image.x + src.width - 1, image.y + src.height - 1);
         } else {
-            return texture::encode_morton(dx, dy, img.width, img.height);
+            for (uint32_t dy = 0; dy < src.height; ++dy) {
+                if (type == SCE_GXM_TRANSFER_SWIZZLED) {
+                    for (uint32_t dx = 0; dx < src.width; ++dx)
+                        include(image.x + dx, image.y + dy);
+                } else {
+                    include(image.x, image.y + dy);
+                    include(image.x + src.width - 1, image.y + dy);
+                }
+            }
         }
+        return std::pair{ reinterpret_cast<uintptr_t>(base + first), reinterpret_cast<uintptr_t>(base + last + sizeof(T)) };
     };
+    const auto [src_begin, src_end] = transfer_range(src_ptr, src, src_type);
+    const auto [dst_begin, dst_end] = transfer_range(dst_ptr, dst, dst_type);
+    const bool overlaps = src_begin < dst_end && dst_begin < src_end;
 
-    // Check for overlap and use a snapshot of source data if needed
-    const uintptr_t src_start = reinterpret_cast<uintptr_t>(src_ptr);
-    const uintptr_t dst_start = reinterpret_cast<uintptr_t>(dst_ptr);
-    const size_t src_span = (src.y + src.height) * (src.stride ? src.stride : src.width * sizeof(T));
-    const size_t dst_span = (dst.y + dst.height) * (dst.stride ? dst.stride : dst.width * sizeof(T));
-    const bool overlaps = src_start < dst_start + dst_span && dst_start < src_start + src_span;
-
+    // Snapshot only the transferred pixels; copying whole strides can read padding or unrelated tiles.
     std::vector<T> src_copy;
-    const T *safe_src = src_ptr;
+    auto read_source = [&](int64_t offset) {
+        T value;
+        memcpy(&value, src_ptr + offset, sizeof(T));
+        return value;
+    };
     if (overlaps) {
-        const size_t src_elements = src_span / sizeof(T);
-        src_copy.assign(src_ptr, src_ptr + src_elements);
-        safe_src = src_copy.data();
+        src_copy.resize(static_cast<size_t>(src.width) * src.height);
+        for (uint32_t dy = 0; dy < src.height; ++dy) {
+            for (uint32_t dx = 0; dx < src.width; ++dx)
+                src_copy[static_cast<size_t>(dy) * src.width + dx] = read_source(compute_offset(src.x + dx, src.y + dy, src, src_type));
+        }
+    } else if constexpr (src_type == SCE_GXM_TRANSFER_LINEAR && dst_type == SCE_GXM_TRANSFER_LINEAR && mode == SCE_GXM_TRANSFER_COLORKEY_NONE) {
+        for (uint32_t dy = 0; dy < src.height; ++dy) {
+            memcpy(dst_ptr + compute_offset(dst.x, dst.y + dy, dst, dst_type),
+                src_ptr + compute_offset(src.x, src.y + dy, src, src_type), static_cast<size_t>(src.width) * sizeof(T));
+        }
+        return;
     }
 
     for (uint32_t dy = 0; dy < src.height; dy++) {
         for (uint32_t dx = 0; dx < src.width; dx++) {
-            uint32_t src_offset = compute_offset(src.x + dx, src.y + dy, src, src_type);
-            uint32_t dst_offset = compute_offset(dst.x + dx, dst.y + dy, dst, dst_type);
+            // compute offset depending on the texture type used
+            // the function compute_offset gets inlined
+            const int64_t src_offset = compute_offset(src.x + dx, src.y + dy, src, src_type);
+            const int64_t dst_offset = compute_offset(dst.x + dx, dst.y + dy, dst, dst_type);
 
-            T value = safe_src[src_offset];
+            T value = overlaps ? src_copy[static_cast<size_t>(dy) * src.width + dx] : read_source(src_offset);
             if constexpr (mode == SCE_GXM_TRANSFER_COLORKEY_PASS) {
                 if ((value & key_mask) != key_value)
                     continue;
@@ -123,7 +146,7 @@ static void perform_transfer_copy_impl(MemState &mem, const SceGxmTransferImage 
                     continue;
             }
 
-            dst_ptr[dst_offset] = value;
+            memcpy(dst_ptr + dst_offset, &value, sizeof(T));
         }
     }
 }

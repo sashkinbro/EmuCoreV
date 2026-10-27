@@ -321,8 +321,8 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
 
     logical->superframe_staging.clear();
 
-    state->samples_generated_since_key_on += decoded_size * params->channels;
-    state->samples_generated_total += decoded_size * params->channels;
+    state->samples_generated_since_key_on += decoded_size * SCE_NGS_MAX_SYSTEM_CHANNELS;
+    state->samples_generated_total += decoded_size * SCE_NGS_MAX_SYSTEM_CHANNELS;
     state->bytes_consumed_since_key_on += superframe_size;
     state->total_bytes_consumed += superframe_size;
     runtime->decoder->export_state(&logical->saved_state);

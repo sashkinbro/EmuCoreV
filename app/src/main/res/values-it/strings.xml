@@ -290,8 +290,8 @@
     <string name="settings_gpu_driver_system">Di sistema</string>
     <string name="settings_gpu_driver_custom">Personalizzato</string>
     <string name="settings_gpu_driver_installed">Driver installati</string>
-    <string name="settings_help_gpu_driver">Scegli tra il driver Vulkan di sistema e un driver personalizzato.\n\nUn driver personalizzato è utile soprattutto su Adreno compatibili quando il driver Vulkan di sistema ha bug grafici o prestazioni deboli. Usa il driver di sistema su Mali, PowerVR, GPU sconosciute o se il driver personalizzato causa crash.</string>
-    <string name="settings_help_gpu_driver_installed">Scegli quale driver personalizzato installato utilizzare.\n\nUn driver personalizzato è utile soprattutto su Adreno compatibili quando il driver Vulkan di sistema ha bug grafici o prestazioni deboli. Usa il driver di sistema su Mali, PowerVR, GPU sconosciute o se il driver personalizzato causa crash.</string>
+    <string name="settings_help_gpu_driver">Consente di selezionare un pacchetto driver GPU personalizzato (come PanVK per Mali o Vortek per Xclipse) per sostituire il driver di sistema predefinito. I driver personalizzati possono migliorare notevolmente le prestazioni o correggere difetti grafici in alcuni giochi su dispositivi Mali e Xclipse supportati. In caso di arresti anomali, torna al driver di sistema.</string>
+    <string name="settings_help_gpu_driver_installed">Consente di selezionare un pacchetto driver GPU personalizzato (come PanVK per Mali o Vortek per Xclipse) per sostituire il driver di sistema predefinito. I driver personalizzati possono migliorare notevolmente le prestazioni o correggere difetti grafici in alcuni giochi su dispositivi Mali e Xclipse supportati. In caso di arresti anomali, torna al driver di sistema.</string>
     <string name="settings_gpu_driver_install">Installa driver</string>
     <string name="settings_gpu_driver_remove">Rimuovi driver</string>
     <string name="settings_gpu_driver_none_installed">Nessun driver GPU personalizzato ancora installato.</string>
@@ -474,7 +474,7 @@
     <string name="settings_app_language_italian">Italiano</string>
     <string name="settings_gpu_driver_manage">Gestisci driver</string>
     <string name="settings_gpu_driver_manager_title">Driver GPU</string>
-    <string name="settings_gpu_driver_manager_subtitle">Installa, scarica, applica o rimuovi i driver Adreno.</string>
+    <string name="settings_gpu_driver_manager_subtitle">Installa, scarica, applica o rimuovi i driver GPU.</string>
     <string name="settings_gpu_driver_active_title">Driver attivo</string>
     <string name="settings_gpu_driver_install_from_file">Installa da file</string>
     <string name="settings_gpu_driver_catalog">Catalogo driver</string>
@@ -1052,6 +1052,11 @@
     <string name="settings_gpu_driver_detected_device">Rilevato: %1$s · %2$s</string>
     <string name="settings_gpu_driver_device_hint">I driver compatibili sono mostrati per primi. Tocca una scheda per vedere i chip Snapdragon supportati.</string>
     <string name="settings_gpu_driver_compatibility">Compatibilità Snapdragon</string>
+    <string name="settings_gpu_driver_other_family_generic">Famiglia GPU diversa</string>
+    <string name="settings_gpu_driver_compatibility_generic">Compatibilità GPU</string>
+    <string name="settings_gpu_driver_compatibility_xclipse">Compatibilità Xclipse</string>
+    <string name="settings_gpu_driver_compatibility_mali">Compatibilità Mali</string>
+    <string name="settings_gpu_driver_device_hint_generic">I driver compatibili vengono mostrati per primi. Tocca una scheda driver per i dettagli.</string>
     <string name="settings_gpu_driver_best_match">Migliore corrispondenza</string>
     <string name="settings_gpu_driver_compatible">Compatibile</string>
     <string name="settings_gpu_driver_other_family">Altra famiglia Adreno</string>

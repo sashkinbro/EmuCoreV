@@ -290,8 +290,8 @@
     <string name="settings_gpu_driver_system">सिस्टम</string>
     <string name="settings_gpu_driver_custom">कस्टम</string>
     <string name="settings_gpu_driver_installed">इंस्टॉल किए गए ड्राइवर</string>
-    <string name="settings_help_gpu_driver">सिस्टम Vulkan ड्राइवर और कस्टम ड्राइवर के बीच चुनें।\n\nCustom driver मुख्य रूप से compatible Adreno devices पर उपयोगी है जब system Vulkan driver में graphics bugs या weak performance हो। Mali, PowerVR, unknown GPUs या custom driver crashes में system driver रखें।</string>
-    <string name="settings_help_gpu_driver_installed">चुनें कि किस इंस्टॉल किए गए कस्टम ड्राइवर का उपयोग करना है।\n\nCustom driver मुख्य रूप से compatible Adreno devices पर उपयोगी है जब system Vulkan driver में graphics bugs या weak performance हो। Mali, PowerVR, unknown GPUs या custom driver crashes में system driver रखें।</string>
+    <string name="settings_help_gpu_driver">आपको डिफ़ॉल्ट सिस्टम ड्राइवर की जगह कस्टम GPU ड्राइवर पैकेज (जैसे Mali के लिए PanVK या Xclipse के लिए Vortek) चुनने देता है। कस्टम ड्राइवर समर्थित Mali और Xclipse डिवाइस पर कुछ गेम्स में प्रदर्शन काफ़ी सुधार सकते हैं या ग्राफ़िक समस्याएँ ठीक कर सकते हैं। क्रैश होने पर सिस्टम ड्राइवर पर लौटें।</string>
+    <string name="settings_help_gpu_driver_installed">आपको डिफ़ॉल्ट सिस्टम ड्राइवर की जगह कस्टम GPU ड्राइवर पैकेज (जैसे Mali के लिए PanVK या Xclipse के लिए Vortek) चुनने देता है। कस्टम ड्राइवर समर्थित Mali और Xclipse डिवाइस पर कुछ गेम्स में प्रदर्शन काफ़ी सुधार सकते हैं या ग्राफ़िक समस्याएँ ठीक कर सकते हैं। क्रैश होने पर सिस्टम ड्राइवर पर लौटें।</string>
     <string name="settings_gpu_driver_install">ड्राइवर इंस्टॉल करें</string>
     <string name="settings_gpu_driver_remove">ड्राइवर हटाएं</string>
     <string name="settings_gpu_driver_none_installed">अभी तक कोई कस्टम GPU ड्राइवर इंस्टॉल नहीं किया गया है।</string>
@@ -474,7 +474,7 @@
     <string name="settings_app_language_italian">इतालवी</string>
     <string name="settings_gpu_driver_manage">ड्राइवर प्रबंधित करें</string>
     <string name="settings_gpu_driver_manager_title">GPU ड्राइवर</string>
-    <string name="settings_gpu_driver_manager_subtitle">Adreno ड्राइवर इंस्टॉल, डाउनलोड, लागू या निकालें।</string>
+    <string name="settings_gpu_driver_manager_subtitle">GPU ड्राइवर इंस्टॉल, डाउनलोड, लागू या हटाएँ।</string>
     <string name="settings_gpu_driver_active_title">सक्रिय ड्राइवर</string>
     <string name="settings_gpu_driver_install_from_file">फ़ाइल से इंस्टॉल करें</string>
     <string name="settings_gpu_driver_catalog">ड्राइवर कैटलॉग</string>
@@ -1052,6 +1052,11 @@
     <string name="settings_gpu_driver_detected_device">पता चला: %1$s · %2$s</string>
     <string name="settings_gpu_driver_device_hint">संगत ड्राइवर पहले दिखाए जाते हैं। समर्थित Snapdragon चिप देखने के लिए ड्राइवर कार्ड पर टैप करें।</string>
     <string name="settings_gpu_driver_compatibility">Snapdragon संगतता</string>
+    <string name="settings_gpu_driver_other_family_generic">भिन्न GPU फ़ैमिली</string>
+    <string name="settings_gpu_driver_compatibility_generic">GPU संगतता</string>
+    <string name="settings_gpu_driver_compatibility_xclipse">Xclipse संगतता</string>
+    <string name="settings_gpu_driver_compatibility_mali">Mali संगतता</string>
+    <string name="settings_gpu_driver_device_hint_generic">संगत ड्राइवर पहले दिखाए जाते हैं। विवरण के लिए ड्राइवर कार्ड पर टैप करें।</string>
     <string name="settings_gpu_driver_best_match">सबसे अच्छा मेल</string>
     <string name="settings_gpu_driver_compatible">संगत</string>
     <string name="settings_gpu_driver_other_family">अलग Adreno परिवार</string>

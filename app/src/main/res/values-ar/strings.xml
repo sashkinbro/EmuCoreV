@@ -428,12 +428,12 @@
     <string name="settings_gpu_driver_system">النظام</string>
     <string name="settings_gpu_driver_custom">مخصص</string>
     <string name="settings_gpu_driver_installed">التعريفات المثبتة</string>
-    <string name="settings_help_gpu_driver">اختر بين تعريف Vulkan الخاص بالنظام وتعريف مخصص.\n\nاستخدم تعريفاً مخصصاً بشكل أساسي على أجهزة Adreno المتوافقة عندما يحتوي تعريف Vulkan للنظام على أخطاء رسومية أو أداء ضعيف. التزم بتعريف النظام على أجهزة Mali أو PowerVR أو وحدات معالجة الرسومات غير المعروفة، أو عندما يتسبب التعريف المخصص في حدوث أعطال.</string>
-    <string name="settings_help_gpu_driver_installed">اختر التعريف المخصص المثبت الذي تريد استخدامه.\n\nاستخدم تعريفاً مخصصاً بشكل أساسي على أجهزة Adreno المتوافقة عندما يحتوي تعريف Vulkan للنظام على أخطاء رسومية أو أداء ضعيف. التزم بتعريف النظام على أجهزة Mali أو PowerVR أو وحدات معالجة الرسومات غير المعروفة، أو عندما يتسبب التعريف المخصص في حدوث أعطال.</string>
+    <string name="settings_help_gpu_driver">يتيح لك اختيار حزمة برنامج تشغيل GPU مخصصة (مثل PanVK لأجهزة Mali أو Vortek لأجهزة Xclipse) لاستبدال برنامج التشغيل الافتراضي. يمكن أن تحسن برامج التشغيل المخصصة الأداء بشكل كبير أو إصلاح مشاكل رسومية في بعض الألعاب على أجهزة Mali وXclipse المدعومة. إذا واجهت أعطالاً، ارجع إلى برنامج تشغيل النظام.</string>
+    <string name="settings_help_gpu_driver_installed">يتيح لك اختيار حزمة برنامج تشغيل GPU مخصصة (مثل PanVK لأجهزة Mali أو Vortek لأجهزة Xclipse) لاستبدال برنامج التشغيل الافتراضي. يمكن أن تحسن برامج التشغيل المخصصة الأداء بشكل كبير أو إصلاح مشاكل رسومية في بعض الألعاب على أجهزة Mali وXclipse المدعومة. إذا واجهت أعطالاً، ارجع إلى برنامج تشغيل النظام.</string>
     <string name="settings_gpu_driver_install">تثبيت التعريف</string>
     <string name="settings_gpu_driver_manage">إدارة التعريفات</string>
     <string name="settings_gpu_driver_manager_title">تعريفات وحدة معالجة الرسومات (GPU)</string>
-    <string name="settings_gpu_driver_manager_subtitle">تثبيت، تنزيل، تطبيق، أو إزالة تعريفات Adreno.</string>
+    <string name="settings_gpu_driver_manager_subtitle">تثبيت برامج تشغيل GPU أو تنزيلها أو تطبيقها أو إزالتها.</string>
     <string name="settings_gpu_driver_active_title">التعريف النشط</string>
     <string name="settings_gpu_driver_install_from_file">تثبيت من ملف</string>
     <string name="settings_gpu_driver_catalog">كتالوج التعريفات</string>
@@ -1056,6 +1056,11 @@
     <string name="settings_gpu_driver_detected_device">تم الاكتشاف: %1$s · %2$s</string>
     <string name="settings_gpu_driver_device_hint">تظهر برامج التشغيل المتوافقة أولاً. اضغط على بطاقة برنامج التشغيل لرؤية شرائح Snapdragon المدعومة.</string>
     <string name="settings_gpu_driver_compatibility">التوافق مع Snapdragon</string>
+    <string name="settings_gpu_driver_other_family_generic">عائلة GPU مختلفة</string>
+    <string name="settings_gpu_driver_compatibility_generic">توافق GPU</string>
+    <string name="settings_gpu_driver_compatibility_xclipse">توافق Xclipse</string>
+    <string name="settings_gpu_driver_compatibility_mali">توافق Mali</string>
+    <string name="settings_gpu_driver_device_hint_generic">يتم عرض برامج التشغيل المتوافقة أولاً. اضغط على بطاقة برنامج التشغيل لعرض التفاصيل.</string>
     <string name="settings_gpu_driver_best_match">أفضل تطابق</string>
     <string name="settings_gpu_driver_compatible">متوافق</string>
     <string name="settings_gpu_driver_other_family">عائلة Adreno مختلفة</string>

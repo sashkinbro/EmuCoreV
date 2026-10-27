@@ -151,6 +151,7 @@ void io_deinit(IOState &io) {
     io.app_path.clear();
 
     io.cachemap.clear();
+    io.indexed_roots.clear();
 
     {
         std::lock_guard<std::mutex> lock(io.overlay_mutex);
@@ -202,12 +203,16 @@ bool find_case_isens_path(IOState &io, VitaIoDevice &device, const fs::path &tra
     }
     }
 
+    if (io.indexed_roots.contains(final_path))
+        return true;
+
     if (!fs::exists(final_path))
         return false;
 
     for (const auto &file : fs::recursive_directory_iterator(final_path)) {
         io.cachemap.emplace(string_utils::tolower(file.path().string()), file.path().string());
     }
+    io.indexed_roots.insert(final_path);
 
     return true;
 }

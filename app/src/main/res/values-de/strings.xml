@@ -290,8 +290,8 @@
     <string name="settings_gpu_driver_system">System</string>
     <string name="settings_gpu_driver_custom">Benutzerdefiniert</string>
     <string name="settings_gpu_driver_installed">Installierte Treiber</string>
-    <string name="settings_help_gpu_driver">Wähle zwischen dem System-Vulkan-Treiber und einem benutzerdefinierten Treiber.\n\nEin eigener Treiber lohnt sich vor allem auf kompatiblen Adreno-Geräten, wenn der System-Vulkan-Treiber Grafikfehler oder schwache Leistung hat. Bleib beim Systemtreiber auf Mali, PowerVR, unbekannten GPUs oder bei Abstürzen.</string>
-    <string name="settings_help_gpu_driver_installed">Wähle, welcher installierte benutzerdefinierte Treiber verwendet werden soll.\n\nEin eigener Treiber lohnt sich vor allem auf kompatiblen Adreno-Geräten, wenn der System-Vulkan-Treiber Grafikfehler oder schwache Leistung hat. Bleib beim Systemtreiber auf Mali, PowerVR, unbekannten GPUs oder bei Abstürzen.</string>
+    <string name="settings_help_gpu_driver">Ermöglicht die Auswahl eines benutzerdefinierten GPU-Treiberpakets (z. B. PanVK für Mali oder Vortek für Xclipse) als Ersatz für den Standardsystemtreiber. Benutzerdefinierte Treiber können die Leistung deutlich verbessern oder Grafikfehler in bestimmten Spielen auf unterstützten Mali- und Xclipse-Geräten beheben. Bei Abstürzen zum Systemtreiber zurückkehren.</string>
+    <string name="settings_help_gpu_driver_installed">Ermöglicht die Auswahl eines benutzerdefinierten GPU-Treiberpakets (z. B. PanVK für Mali oder Vortek für Xclipse) als Ersatz für den Standardsystemtreiber. Benutzerdefinierte Treiber können die Leistung deutlich verbessern oder Grafikfehler in bestimmten Spielen auf unterstützten Mali- und Xclipse-Geräten beheben. Bei Abstürzen zum Systemtreiber zurückkehren.</string>
     <string name="settings_gpu_driver_install">Treiber installieren</string>
     <string name="settings_gpu_driver_remove">Treiber entfernen</string>
     <string name="settings_gpu_driver_none_installed">Noch keine benutzerdefinierten GPU-Treiber installiert.</string>
@@ -474,7 +474,7 @@
     <string name="settings_app_language_italian">Italienisch</string>
     <string name="settings_gpu_driver_manage">Treiber verwalten</string>
     <string name="settings_gpu_driver_manager_title">GPU-Treiber</string>
-    <string name="settings_gpu_driver_manager_subtitle">Adreno-Treiber installieren, herunterladen, anwenden oder entfernen.</string>
+    <string name="settings_gpu_driver_manager_subtitle">GPU-Treiber installieren, herunterladen, anwenden oder entfernen.</string>
     <string name="settings_gpu_driver_active_title">Aktiver Treiber</string>
     <string name="settings_gpu_driver_install_from_file">Aus Datei installieren</string>
     <string name="settings_gpu_driver_catalog">Treiberkatalog</string>
@@ -1052,6 +1052,11 @@
     <string name="settings_gpu_driver_detected_device">Erkannt: %1$s · %2$s</string>
     <string name="settings_gpu_driver_device_hint">Kompatible Treiber werden zuerst angezeigt. Tippe auf eine Treiberkarte, um unterstützte Snapdragon-Chips zu sehen.</string>
     <string name="settings_gpu_driver_compatibility">Snapdragon-Kompatibilität</string>
+    <string name="settings_gpu_driver_other_family_generic">Andere GPU-Familie</string>
+    <string name="settings_gpu_driver_compatibility_generic">GPU-Kompatibilität</string>
+    <string name="settings_gpu_driver_compatibility_xclipse">Xclipse-Kompatibilität</string>
+    <string name="settings_gpu_driver_compatibility_mali">Mali-Kompatibilität</string>
+    <string name="settings_gpu_driver_device_hint_generic">Kompatible Treiber werden zuerst angezeigt. Tippe auf eine Treiberkarte für Details.</string>
     <string name="settings_gpu_driver_best_match">Beste Übereinstimmung</string>
     <string name="settings_gpu_driver_compatible">Kompatibel</string>
     <string name="settings_gpu_driver_other_family">Andere Adreno-Familie</string>

@@ -267,6 +267,11 @@ spv::Id shader::usse::USSETranslatorVisitor::do_fetch_texture(const spv::Id tex,
 
         spv::Id scaled = m_b.createBinOp(spv::OpVectorTimesScalar, type_f32_v[4], image_sample, m_b.makeFloatConstant(65535.0f));
         spv::Id rounded = m_b.createBuiltinCall(type_f32_v[4], std_builtins, GLSLstd450Round, { scaled });
+        const spv::Id zero_f4 = m_b.createCompositeConstruct(type_f32_v[4], std::vector<spv::Id>(4, m_b.makeFloatConstant(0.0f)));
+        const spv::Id max_f4 = m_b.createCompositeConstruct(type_f32_v[4], std::vector<spv::Id>(4, m_b.makeFloatConstant(65535.0f)));
+        const spv::Id rounded_is_nan = m_b.createUnaryOp(spv::OpIsNan, m_b.makeVectorType(type_bool, 4), rounded);
+        rounded = m_b.createBuiltinCall(type_f32_v[4], std_builtins, GLSLstd450FClamp, { rounded, zero_f4, max_f4 });
+        rounded = m_b.createTriOp(spv::OpSelect, type_f32_v[4], rounded_is_nan, zero_f4, rounded);
         spv::Id halves = m_b.createUnaryOp(spv::OpConvertFToU, type_u32_v4, rounded);
 
         auto word = [&](int lo, int hi) {

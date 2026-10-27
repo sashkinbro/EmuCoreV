@@ -74,6 +74,45 @@ class GpuDriverCompatibilityTest {
     }
 
     @Test
+    fun `detects Mali and Xclipse devices for vendor aware drivers`() {
+        assertEquals(GpuDriverVendor.MALI, GpuDriverCompatibility.deviceVendor("MediaTek Dimensity 930 Mali-G57"))
+        assertEquals(GpuDriverVendor.MALI, GpuDriverCompatibility.deviceVendor("Samsung Exynos 990 Mali-G77"))
+        assertEquals(GpuDriverVendor.XCLIPSE, GpuDriverCompatibility.deviceVendor("Samsung Exynos 2400 Xclipse 940"))
+        assertTrue(GpuDriverCompatibility.supportsCustomDrivers("Unisoc T820 Mali-G57"))
+        assertTrue(GpuDriverCompatibility.supportsCustomDrivers("Samsung Exynos 2200"))
+        assertEquals(false, GpuDriverCompatibility.supportsCustomDrivers("PowerVR GE8320"))
+    }
+
+    @Test
+    fun `classifies catalog packages by vendor`() {
+        assertEquals(GpuDriverVendor.MALI, GpuDriverCompatibility.vendorOfCatalogGpu("Mali Bifrost/Valhall"))
+        assertEquals(GpuDriverVendor.MALI, GpuDriverCompatibility.vendorOfCatalogGpu("PanVK (Valhall)"))
+        assertEquals(GpuDriverVendor.XCLIPSE, GpuDriverCompatibility.vendorOfCatalogGpu("Xclipse (Exynos 2400)"))
+        assertEquals(GpuDriverVendor.ADRENO, GpuDriverCompatibility.vendorOfCatalogGpu("Adreno 6xx/7xx"))
+    }
+
+    @Test
+    fun `refuses cross vendor packages but allows unknown vendors`() {
+        assertEquals(false, GpuDriverCompatibility.isVendorCompatible(GpuDriverVendor.MALI, GpuDriverVendor.ADRENO))
+        assertEquals(false, GpuDriverCompatibility.isVendorCompatible(GpuDriverVendor.ADRENO, GpuDriverVendor.MALI))
+        assertEquals(true, GpuDriverCompatibility.isVendorCompatible(GpuDriverVendor.MALI, GpuDriverVendor.MALI))
+        assertEquals(true, GpuDriverCompatibility.isVendorCompatible(GpuDriverVendor.UNKNOWN, GpuDriverVendor.ADRENO))
+        assertEquals(true, GpuDriverCompatibility.isVendorCompatible(GpuDriverVendor.MALI, GpuDriverVendor.UNKNOWN))
+    }
+
+    @Test
+    fun `matches Mali and Xclipse packages against the device vendor`() {
+        val mali = driver(gpu = "Mali Bifrost/Valhall")
+        val xclipse = driver(gpu = "Xclipse (Exynos 2400)")
+        val adreno = driver(gpu = "Adreno 6xx/7xx")
+
+        assertEquals(GpuDriverMatch.COMPATIBLE, GpuDriverRecommendations.match(mali, null, GpuDriverVendor.MALI))
+        assertEquals(GpuDriverMatch.OTHER_FAMILY, GpuDriverRecommendations.match(mali, null, GpuDriverVendor.ADRENO))
+        assertEquals(GpuDriverMatch.COMPATIBLE, GpuDriverRecommendations.match(xclipse, null, GpuDriverVendor.XCLIPSE))
+        assertEquals(GpuDriverMatch.OTHER_FAMILY, GpuDriverRecommendations.match(adreno, null, GpuDriverVendor.MALI))
+    }
+
+    @Test
     fun `enables custom drivers for Qualcomm platform identifiers`() {
         assertTrue(GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers("qcom SM8250 kona"))
         assertTrue(GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers("Qualcomm Snapdragon 865 Adreno"))

@@ -290,8 +290,8 @@
     <string name="settings_gpu_driver_system">Système</string>
     <string name="settings_gpu_driver_custom">Personnalisé</string>
     <string name="settings_gpu_driver_installed">Pilotes installés</string>
-    <string name="settings_help_gpu_driver">Choisissez entre le pilote Vulkan du système et un pilote personnalisé.\n\nUn pilote personnalisé est surtout utile sur les Adreno compatibles quand le pilote Vulkan système a des bugs graphiques ou de faibles performances. Gardez le pilote système sur Mali, PowerVR, GPU inconnus ou si le pilote personnalisé plante.</string>
-    <string name="settings_help_gpu_driver_installed">Choisissez quel pilote personnalisé installé utiliser.\n\nUn pilote personnalisé est surtout utile sur les Adreno compatibles quand le pilote Vulkan système a des bugs graphiques ou de faibles performances. Gardez le pilote système sur Mali, PowerVR, GPU inconnus ou si le pilote personnalisé plante.</string>
+    <string name="settings_help_gpu_driver">Permet de sélectionner un paquet de pilote GPU personnalisé (comme PanVK pour Mali ou Vortek pour Xclipse) pour remplacer le pilote système par défaut. Les pilotes personnalisés peuvent nettement améliorer les performances ou corriger des défauts graphiques dans certains jeux sur les appareils Mali et Xclipse pris en charge. En cas de plantage, revenez au pilote système.</string>
+    <string name="settings_help_gpu_driver_installed">Permet de sélectionner un paquet de pilote GPU personnalisé (comme PanVK pour Mali ou Vortek pour Xclipse) pour remplacer le pilote système par défaut. Les pilotes personnalisés peuvent nettement améliorer les performances ou corriger des défauts graphiques dans certains jeux sur les appareils Mali et Xclipse pris en charge. En cas de plantage, revenez au pilote système.</string>
     <string name="settings_gpu_driver_install">Installer un pilote</string>
     <string name="settings_gpu_driver_remove">Supprimer le pilote</string>
     <string name="settings_gpu_driver_none_installed">Aucun pilote GPU personnalisé installé pour le moment.</string>
@@ -474,7 +474,7 @@
     <string name="settings_app_language_italian">Italien</string>
     <string name="settings_gpu_driver_manage">Gérer les pilotes</string>
     <string name="settings_gpu_driver_manager_title">Pilotes GPU</string>
-    <string name="settings_gpu_driver_manager_subtitle">Installer, télécharger, appliquer ou supprimer les pilotes Adreno.</string>
+    <string name="settings_gpu_driver_manager_subtitle">Installez, téléchargez, appliquez ou supprimez des pilotes GPU.</string>
     <string name="settings_gpu_driver_active_title">Pilote actif</string>
     <string name="settings_gpu_driver_install_from_file">Installer à partir d\'un fichier</string>
     <string name="settings_gpu_driver_catalog">Catalogue de pilotes</string>
@@ -1052,6 +1052,11 @@
     <string name="settings_gpu_driver_detected_device">Détecté : %1$s · %2$s</string>
     <string name="settings_gpu_driver_device_hint">Les pilotes compatibles sont affichés en premier. Touchez une fiche pour voir les puces Snapdragon prises en charge.</string>
     <string name="settings_gpu_driver_compatibility">Compatibilité Snapdragon</string>
+    <string name="settings_gpu_driver_other_family_generic">Famille de GPU différente</string>
+    <string name="settings_gpu_driver_compatibility_generic">Compatibilité GPU</string>
+    <string name="settings_gpu_driver_compatibility_xclipse">Compatibilité Xclipse</string>
+    <string name="settings_gpu_driver_compatibility_mali">Compatibilité Mali</string>
+    <string name="settings_gpu_driver_device_hint_generic">Les pilotes compatibles sont affichés en premier. Touchez une carte de pilote pour voir les détails.</string>
     <string name="settings_gpu_driver_best_match">Meilleur choix</string>
     <string name="settings_gpu_driver_compatible">Compatible</string>
     <string name="settings_gpu_driver_other_family">Autre famille Adreno</string>

@@ -290,8 +290,8 @@
     <string name="settings_gpu_driver_system">Системний</string>
     <string name="settings_gpu_driver_custom">Власний</string>
     <string name="settings_gpu_driver_installed">Встановлені драйвери</string>
-    <string name="settings_help_gpu_driver">Виберіть між системним драйвером Vulkan та власним драйвером.\n\nКористувацький драйвер має сенс переважно на сумісних Adreno, коли системний Vulkan дає графічні помилки або слабку швидкість. Залишайте системний драйвер для Mali, PowerVR, невідомих GPU або якщо кастомний драйвер викликає вильоти.</string>
-    <string name="settings_help_gpu_driver_installed">Виберіть, який встановлений власний драйвер використовувати.\n\nКористувацький драйвер має сенс переважно на сумісних Adreno, коли системний Vulkan дає графічні помилки або слабку швидкість. Залишайте системний драйвер для Mali, PowerVR, невідомих GPU або якщо кастомний драйвер викликає вильоти.</string>
+    <string name="settings_help_gpu_driver">Дозволяє вибрати сторонній пакет драйвера GPU (наприклад, PanVK для Mali або Vortek для Xclipse) замість стандартного системного драйвера. Сторонні драйвери можуть суттєво підвищити продуктивність або виправити графічні дефекти в деяких іграх на підтримуваних пристроях Mali та Xclipse. Якщо трапляються збої, поверніться до системного драйвера.</string>
+    <string name="settings_help_gpu_driver_installed">Дозволяє вибрати сторонній пакет драйвера GPU (наприклад, PanVK для Mali або Vortek для Xclipse) замість стандартного системного драйвера. Сторонні драйвери можуть суттєво підвищити продуктивність або виправити графічні дефекти в деяких іграх на підтримуваних пристроях Mali та Xclipse. Якщо трапляються збої, поверніться до системного драйвера.</string>
     <string name="settings_gpu_driver_install">Встановити драйвер</string>
     <string name="settings_gpu_driver_remove">Видалити драйвер</string>
     <string name="settings_gpu_driver_none_installed">Власні драйвери GPU ще не встановлені.</string>
@@ -460,7 +460,7 @@
     <string name="settings_app_language_italian">Італійська</string>
     <string name="settings_gpu_driver_manage">Керування драйверами</string>
     <string name="settings_gpu_driver_manager_title">Драйвери GPU</string>
-    <string name="settings_gpu_driver_manager_subtitle">Встановлення, завантаження, застосування або видалення драйверів Adreno.</string>
+    <string name="settings_gpu_driver_manager_subtitle">Встановлення, завантаження, застосування або видалення драйверів GPU.</string>
     <string name="settings_gpu_driver_active_title">Активний драйвер</string>
     <string name="settings_gpu_driver_install_from_file">Встановити з файлу</string>
     <string name="settings_gpu_driver_catalog">Каталог драйверів</string>
@@ -1041,6 +1041,11 @@
     <string name="settings_gpu_driver_detected_device">Виявлено: %1$s · %2$s</string>
     <string name="settings_gpu_driver_device_hint">Сумісні драйвери показано першими. Натисніть картку драйвера, щоб переглянути підтримувані чипи Snapdragon.</string>
     <string name="settings_gpu_driver_compatibility">Сумісність зі Snapdragon</string>
+    <string name="settings_gpu_driver_other_family_generic">Інша родина GPU</string>
+    <string name="settings_gpu_driver_compatibility_generic">Сумісність GPU</string>
+    <string name="settings_gpu_driver_compatibility_xclipse">Сумісність з Xclipse</string>
+    <string name="settings_gpu_driver_compatibility_mali">Сумісність з Mali</string>
+    <string name="settings_gpu_driver_device_hint_generic">Сумісні драйвери показано першими. Натисніть картку драйвера, щоб переглянути подробиці.</string>
     <string name="settings_gpu_driver_best_match">Найкращий вибір</string>
     <string name="settings_gpu_driver_compatible">Сумісний</string>
     <string name="settings_gpu_driver_other_family">Інше покоління Adreno</string>

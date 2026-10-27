@@ -27,6 +27,7 @@
 #endif
 
 #include <io/state.h>
+#include <util/log.h>
 
 static const uint32_t page_size = []() -> uint32_t {
 #ifdef _WIN32
@@ -45,14 +46,21 @@ SceOff FileStats::read(void *input_data, const int element_size, const SceSize e
     if (element_size == 0 || element_count == 0)
         return 0;
 
-    // we are filling this buffer this data, why would we have to set some parts to 0 before ?
+    // we are filling this buffer this data, why would we have to touch some parts before ?
     // that's because host io does not work well with memory trapping and read-only buffer
-    // so set 1 byte to 0 in all pages to trigger all possible pagefaults in this range
+    // so rewrite 1 byte of every page with its own value to trigger all possible pagefaults in this range
     // todo: call a mem function to check this instead
+    // a guest may pass a null or a tiny buffer which the pre-touch loop below would write to and then die on
+    if (!input_data || reinterpret_cast<uintptr_t>(input_data) < 0x1000) {
+        LOG_ERROR("FileStats::read called with an unusable buffer {} (element_size {}, count {}) - failing the read instead of faulting",
+            input_data, element_size, element_count);
+        return -1;
+    }
+
     volatile uint8_t *input_addr = reinterpret_cast<volatile uint8_t *>(input_data);
     for (int i = 0; i < element_size * element_count; i += page_size)
-        input_addr[i] = 0;
-    input_addr[element_size * element_count - 1] = 0;
+        input_addr[i] = input_addr[i];
+    input_addr[element_size * element_count - 1] = input_addr[element_size * element_count - 1];
 
     return fread(input_data, element_size, element_count, wrapped_file.get());
 }

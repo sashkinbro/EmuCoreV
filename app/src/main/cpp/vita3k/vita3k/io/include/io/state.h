@@ -23,6 +23,7 @@
 
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 
 // Class for all needed information to access files on Vita3K.
 class FileStats : public VitaStats {
@@ -122,6 +123,7 @@ struct IOState {
     DirEntries dir_entries;
 
     std::unordered_map<std::string, std::string> cachemap;
+    std::unordered_set<std::string> indexed_roots;
     bool case_isens_find_enabled = false;
 
     std::mutex overlay_mutex;

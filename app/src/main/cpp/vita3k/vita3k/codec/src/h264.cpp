@@ -23,32 +23,36 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
+#include <algorithm>
 #include <cassert>
 
 void copy_yuv_data_from_frame(AVFrame *frame, uint8_t *dest, const uint32_t width, const uint32_t height, bool is_p3) {
-    for (size_t i = 0; i < height; i++) {
-        memcpy(dest, &frame->data[0][frame->linesize[0] * i], width);
-        dest += width;
-    }
+    // the buffer can be larger than the picture (titles pass their maximum size until a picture reports its own)
+    const uint32_t copy_width = std::min(width, static_cast<uint32_t>(frame->width));
+    const uint32_t copy_height = std::min(height, static_cast<uint32_t>(frame->height));
 
+    for (uint32_t i = 0; i < copy_height; i++)
+        memcpy(dest + i * width, &frame->data[0][frame->linesize[0] * i], copy_width);
+
+    uint8_t *const chroma = dest + width * height;
     if (is_p3) {
-        for (size_t i = 0; i < height / 2; i++) {
-            memcpy(dest, &frame->data[1][frame->linesize[1] * i], width / 2);
-            dest += width / 2;
-        }
-        for (size_t i = 0; i < height / 2; i++) {
-            memcpy(dest, &frame->data[2][frame->linesize[2] * i], width / 2);
-            dest += width / 2;
+        const size_t uv_pitch = width / 2;
+        uint8_t *const v_plane = chroma + uv_pitch * (height / 2);
+        for (uint32_t i = 0; i < copy_height / 2; i++) {
+            memcpy(chroma + i * uv_pitch, &frame->data[1][frame->linesize[1] * i], copy_width / 2);
+            memcpy(v_plane + i * uv_pitch, &frame->data[2][frame->linesize[2] * i], copy_width / 2);
         }
     } else {
         // p2 format, U and V are interleaved
-        for (size_t i = 0; i < height / 2; i++) {
+        const size_t uv_pitch = width;
+        for (uint32_t i = 0; i < copy_height / 2; i++) {
             const uint8_t *src_u = &frame->data[1][frame->linesize[1] * i];
             const uint8_t *src_v = &frame->data[2][frame->linesize[2] * i];
-            for (size_t j = 0; j < width / 2; j++) {
-                dest[0] = src_u[j];
-                dest[1] = src_v[j];
-                dest += 2;
+            uint8_t *row = chroma + i * uv_pitch;
+            for (uint32_t j = 0; j < copy_width / 2; j++) {
+                row[0] = src_u[j];
+                row[1] = src_v[j];
+                row += 2;
             }
         }
     }

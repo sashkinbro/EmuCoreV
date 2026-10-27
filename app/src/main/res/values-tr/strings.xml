@@ -299,12 +299,12 @@
     <string name="settings_gpu_driver_system">Sistem</string>
     <string name="settings_gpu_driver_custom">Özel</string>
     <string name="settings_gpu_driver_installed">Yüklü sürücüler</string>
-    <string name="settings_help_gpu_driver">Sistem Vulkan sürücüsü ile özel bir sürücü arasında seçim yapın.\n\nÖzel sürücü çoğunlukla uyumlu Adreno cihazlarda, sistem Vulkan sürücüsü grafik hataları veya düşük performans verdiğinde yararlıdır. Mali, PowerVR, bilinmeyen GPU’lar veya özel sürücü çökme yapıyorsa sistem sürücüsünde kalın.</string>
-    <string name="settings_help_gpu_driver_installed">Hangi yüklü özel sürücünün kullanılacağını seçin.\n\nÖzel sürücü çoğunlukla uyumlu Adreno cihazlarda, sistem Vulkan sürücüsü grafik hataları veya düşük performans verdiğinde yararlıdır. Mali, PowerVR, bilinmeyen GPU’lar veya özel sürücü çökme yapıyorsa sistem sürücüsünde kalın.</string>
+    <string name="settings_help_gpu_driver">Varsayılan sistem sürücüsünün yerine özel bir GPU sürücü paketi (Mali için PanVK veya Xclipse için Vortek gibi) seçmenizi sağlar. Özel sürücüler, desteklenen Mali ve Xclipse cihazlarda bazı oyunlarda performansı önemli ölçüde artırabilir veya grafik sorunlarını düzeltebilir. Çökme yaşarsanız sistem sürücüsüne dönün.</string>
+    <string name="settings_help_gpu_driver_installed">Varsayılan sistem sürücüsünün yerine özel bir GPU sürücü paketi (Mali için PanVK veya Xclipse için Vortek gibi) seçmenizi sağlar. Özel sürücüler, desteklenen Mali ve Xclipse cihazlarda bazı oyunlarda performansı önemli ölçüde artırabilir veya grafik sorunlarını düzeltebilir. Çökme yaşarsanız sistem sürücüsüne dönün.</string>
     <string name="settings_gpu_driver_install">Sürücü yükle</string>
     <string name="settings_gpu_driver_manage">Sürücüleri yönet</string>
     <string name="settings_gpu_driver_manager_title">GPU sürücüleri</string>
-    <string name="settings_gpu_driver_manager_subtitle">Adreno sürücülerini yükleyin, indirin, uygulayın veya kaldırın.</string>
+    <string name="settings_gpu_driver_manager_subtitle">GPU sürücülerini yükleyin, indirin, uygulayın veya kaldırın.</string>
     <string name="settings_gpu_driver_active_title">Aktif sürücü</string>
     <string name="settings_gpu_driver_install_from_file">Dosyadan yükle</string>
     <string name="settings_gpu_driver_catalog">Sürücü kataloğu</string>
@@ -1052,6 +1052,11 @@
     <string name="settings_gpu_driver_detected_device">Algılandı: %1$s · %2$s</string>
     <string name="settings_gpu_driver_device_hint">Uyumlu sürücüler önce gösterilir. Desteklenen Snapdragon çiplerini görmek için sürücü kartına dokunun.</string>
     <string name="settings_gpu_driver_compatibility">Snapdragon uyumluluğu</string>
+    <string name="settings_gpu_driver_other_family_generic">Farklı GPU ailesi</string>
+    <string name="settings_gpu_driver_compatibility_generic">GPU uyumluluğu</string>
+    <string name="settings_gpu_driver_compatibility_xclipse">Xclipse uyumluluğu</string>
+    <string name="settings_gpu_driver_compatibility_mali">Mali uyumluluğu</string>
+    <string name="settings_gpu_driver_device_hint_generic">Uyumlu sürücüler önce gösterilir. Ayrıntılar için bir sürücü kartına dokunun.</string>
     <string name="settings_gpu_driver_best_match">En iyi eşleşme</string>
     <string name="settings_gpu_driver_compatible">Uyumlu</string>
     <string name="settings_gpu_driver_other_family">Farklı Adreno ailesi</string>

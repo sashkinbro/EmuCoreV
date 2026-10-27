@@ -238,7 +238,7 @@ private fun GeneralTab(
 private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel, onOpenGpuDriverSettings: () -> Unit) {
     val selectedDriver = uiState.installedGpuDrivers.firstOrNull { it.name == uiState.coreConfig.customDriverName }
     val customDriverAvailable = uiState.coreConfig.backendRenderer == "Vulkan" && selectedDriver?.isUsable == true
-    val customDriversSupported = remember { GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers() }
+    val customDriversSupported = remember { GpuDriverCompatibility.supportsCustomDrivers() }
 
     SectionCard(title = stringResource(R.string.settings_tab_graphics), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Chips(title = stringResource(R.string.settings_core_renderer_label), description = stringResource(R.string.settings_help_renderer), onResetDefault = { viewModel.updateCoreSettings { it.copy(backendRenderer = defaults.backendRenderer) } }) {

@@ -383,19 +383,18 @@ static vk::ComponentMapping translate_swizzle4_abgr(SceGxmColorSwizzle4Mode mode
     }
 }
 
-// Same as translate_swizzle4_abgr but for eA1R5G5B5UnormPack16
+// U1U5U5U5 is stored as eA1R5G5B5UnormPack16 (A in bit 15, R in bits 10-14, B in bits 0-4).
+// GXM names the fields from the most significant bit: ABGR is A1B5G5R5 and ARGB is A1R5G5B5.
+// RGBA/BGRA (U5U5U5U1) match ARGB/ABGR once their 1-bit field is moved to bit 15, which
+// is how their textures are uploaded (see texture::translate_swizzle).
 static vk::ComponentMapping translate_swizzle4_a1rgb(SceGxmColorSwizzle4Mode mode) {
     switch (mode) {
-    case SCE_GXM_COLOR_SWIZZLE4_ARGB:
-        return swizzle_rgba;
     case SCE_GXM_COLOR_SWIZZLE4_ABGR:
-        return swizzle_bgra;
-    case SCE_GXM_COLOR_SWIZZLE4_RGBA:
-        LOG_WARN_ONCE("Unsupported color format U5U5U5U1_RGBA, colors will be wrong");
-        return swizzle_rgba;
     case SCE_GXM_COLOR_SWIZZLE4_BGRA:
-        LOG_WARN_ONCE("Unsupported color format U5U5U5U1_BGRA, colors will be wrong");
         return swizzle_bgra;
+    case SCE_GXM_COLOR_SWIZZLE4_ARGB:
+    case SCE_GXM_COLOR_SWIZZLE4_RGBA:
+        return swizzle_rgba;
     default:
         LOG_ERROR("Unknown swizzle mode {}", log_hex(mode));
         return {};
@@ -685,29 +684,24 @@ static vk::ComponentMapping translate_swizzleyuv422(SceGxmTextureSwizzleYUV422Mo
     }
 }
 
-// Same as translate_swizzle4_abgr but for eA1R5G5B5UnormPack16
+// U1U5U5U5 is uploaded as eA1R5G5B5UnormPack16 (A in bit 15, R in bits 10-14, B in bits 0-4).
+// GXM names the fields from the most significant bit: ABGR is A1B5G5R5 and ARGB is A1R5G5B5.
+// The U5U5U5U1/U5U5U5X1 variants (RGBA, BGRA, RGB1, BGR1) keep their 1-bit field in bit 0;
+// the upload moves it to bit 15, which turns them into ARGB, ABGR, 1RGB and 1BGR.
 static vk::ComponentMapping translate_swizzle4_a1rgb(SceGxmTextureSwizzle4Mode mode) {
     switch (mode) {
-    case SCE_GXM_TEXTURE_SWIZZLE4_ARGB:
-        return swizzle_rgba;
     case SCE_GXM_TEXTURE_SWIZZLE4_ABGR:
-        return swizzle_bgra;
-    case SCE_GXM_TEXTURE_SWIZZLE4_1RGB:
-        return swizzle_rgb1;
-    case SCE_GXM_TEXTURE_SWIZZLE4_1BGR:
-        return swizzle_bgr1;
-    case SCE_GXM_TEXTURE_SWIZZLE4_RGBA:
-        LOG_WARN_ONCE("Unsupported texture format U5U5U5U1_RGBA, colors will be wrong");
-        return swizzle_rgba;
     case SCE_GXM_TEXTURE_SWIZZLE4_BGRA:
-        LOG_WARN_ONCE("Unsupported texture format U5U5U5U1_BGRA, colors will be wrong");
         return swizzle_bgra;
-    case SCE_GXM_TEXTURE_SWIZZLE4_RGB1:
-        LOG_WARN_ONCE("Unsupported texture format U5U5U5X1_RGB1, colors will be wrong");
-        return swizzle_rgb1;
+    case SCE_GXM_TEXTURE_SWIZZLE4_ARGB:
+    case SCE_GXM_TEXTURE_SWIZZLE4_RGBA:
+        return swizzle_rgba;
+    case SCE_GXM_TEXTURE_SWIZZLE4_1BGR:
     case SCE_GXM_TEXTURE_SWIZZLE4_BGR1:
-        LOG_WARN_ONCE("Unsupported texture format U5U5U5X1_BGR1, colors will be wrong");
         return swizzle_bgr1;
+    case SCE_GXM_TEXTURE_SWIZZLE4_1RGB:
+    case SCE_GXM_TEXTURE_SWIZZLE4_RGB1:
+        return swizzle_rgb1;
     default:
         LOG_ERROR("Unknown swizzle mode {}", log_hex(mode));
         return {};

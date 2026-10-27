@@ -186,7 +186,7 @@ static shader::GeneratedShader load_shader_generic(shader::Target target, const 
         }
     }
 
-    LOG_INFO("Generating {} shader {}", shader_type_str, hash_text);
+    LOG_DEBUG("Generating {} shader {}", shader_type_str, hash_text);
 
 #if defined(NDEBUG)
     constexpr bool write_shader_dumps = false;

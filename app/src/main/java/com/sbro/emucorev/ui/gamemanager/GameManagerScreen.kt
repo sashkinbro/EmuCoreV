@@ -491,7 +491,7 @@ private fun GraphicsProfileSection(
             onUpdate { cfg -> cfg.copy(backendRenderer = it) }
         }
         ToggleRow(stringResource(R.string.settings_use_angle), config.useAngle, stringResource(R.string.settings_help_use_angle), { onUpdate { it.copy(useAngle = defaults.useAngle) } }, enabled = config.backendRenderer == "OpenGL") { onUpdate { cfg -> cfg.copy(useAngle = it) } }
-        if (remember { GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers() }) {
+        if (remember { GpuDriverCompatibility.supportsCustomDrivers() }) {
             GpuDriverChoiceRow(
                 effectiveDriverName = config.customDriverName,
                 globalDriverName = defaults.customDriverName,

@@ -39,6 +39,7 @@
 #include <algorithm>
 #include <fstream>
 #include <functional>
+#include <limits>
 #include <list>
 #include <map>
 #include <optional>
@@ -2032,11 +2033,19 @@ static spv::Function *make_vert_finalize_function(spv::Builder &b, const SpirvSh
                     const spv::Id clip_w = b.createLoad(clip_w_ref, spv::NoPrecision);
                     const spv::Id clip_dist0_ref = utils::create_access_chain(b, spv::StorageClassOutput, clip_var, { b.makeIntConstant(0) });
                     const spv::Id clip_dist1_ref = utils::create_access_chain(b, spv::StorageClassOutput, clip_var, { b.makeIntConstant(1) });
-                    b.createStore(clip_w, clip_dist0_ref);
+                    const spv::Id bool_type = b.makeBoolType();
+                    const spv::Id on_eye_plane = b.createBinOp(spv::OpLogicalAnd, bool_type, b.createBinOp(spv::OpFOrdEqual, bool_type, clip_w, zero), b.createUnaryOp(spv::OpLogicalNot, bool_type, pred));
+                    b.createStore(b.createTriOp(spv::OpSelect, f32, on_eye_plane, b.makeFloatConstant(-std::numeric_limits<float>::min()), clip_w), clip_dist0_ref);
                     b.createStore(b.createBinOp(spv::OpFAdd, f32, clip_z, clip_w), clip_dist1_ref);
                 }
             } else if (vo == SCE_GXM_VERTEX_PROGRAM_OUTPUT_PSIZE) {
                 b.addDecoration(out_var, spv::DecorationBuiltIn, spv::BuiltInPointSize);
+                b.createStore(o_val, out_var);
+            } else if (vo == SCE_GXM_VERTEX_PROGRAM_OUTPUT_COLOR0 || vo == SCE_GXM_VERTEX_PROGRAM_OUTPUT_COLOR1) {
+                // the hardware clamps vertex colors before interpolation
+                const spv::Id zero = utils::make_uniform_vector_from_type(b, out_type, 0.0f);
+                const spv::Id one = utils::make_uniform_vector_from_type(b, out_type, 1.0f);
+                o_val = b.createBuiltinCall(out_type, utils.std_builtins, GLSLstd450FClamp, { o_val, zero, one });
                 b.createStore(o_val, out_var);
             } else {
                 b.createStore(o_val, out_var);

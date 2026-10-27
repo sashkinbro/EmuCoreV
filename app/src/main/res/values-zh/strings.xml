@@ -290,8 +290,8 @@
     <string name="settings_gpu_driver_system">系統</string>
     <string name="settings_gpu_driver_custom">自訂</string>
     <string name="settings_gpu_driver_installed">已安裝的驅動程式</string>
-    <string name="settings_help_gpu_driver">在系統 Vulkan 驅動程式與自訂驅動程式之間進行選擇。\n\n自定义驱动主要适合兼容的 Adreno 设备，用于解决系统 Vulkan 驱动的图形错误或性能不足。Mali、PowerVR、未知 GPU 或自定义驱动导致崩溃时请使用系统驱动。</string>
-    <string name="settings_help_gpu_driver_installed">選擇要使用哪個已安裝的自訂驅動程式。\n\n自定义驱动主要适合兼容的 Adreno 设备，用于解决系统 Vulkan 驱动的图形错误或性能不足。Mali、PowerVR、未知 GPU 或自定义驱动导致崩溃时请使用系统驱动。</string>
+    <string name="settings_help_gpu_driver">可選擇自訂 GPU 驅動程式套件（例如 Mali 的 PanVK 或 Xclipse 的 Vortek）來取代預設系統驅動程式。在支援的 Mali 與 Xclipse 裝置上，自訂驅動程式可大幅提升效能或修正某些遊戲的圖形問題。若發生當機，請切換回系統驅動程式。</string>
+    <string name="settings_help_gpu_driver_installed">可選擇自訂 GPU 驅動程式套件（例如 Mali 的 PanVK 或 Xclipse 的 Vortek）來取代預設系統驅動程式。在支援的 Mali 與 Xclipse 裝置上，自訂驅動程式可大幅提升效能或修正某些遊戲的圖形問題。若發生當機，請切換回系統驅動程式。</string>
     <string name="settings_gpu_driver_install">安裝驅動程式</string>
     <string name="settings_gpu_driver_remove">移除驅動程式</string>
     <string name="settings_gpu_driver_none_installed">尚未安裝自訂 GPU 驅動程式。</string>
@@ -473,7 +473,7 @@
     <string name="settings_app_language_italian">意大利语</string>
     <string name="settings_gpu_driver_manage">管理驱动程序</string>
     <string name="settings_gpu_driver_manager_title">GPU 驱动程序</string>
-    <string name="settings_gpu_driver_manager_subtitle">安装、下载、应用或卸载 Adreno 驱动程序。</string>
+    <string name="settings_gpu_driver_manager_subtitle">安装、下载、应用或移除 GPU 驱动程序。</string>
     <string name="settings_gpu_driver_active_title">当前驱动程序</string>
     <string name="settings_gpu_driver_install_from_file">从文件安装</string>
     <string name="settings_gpu_driver_catalog">驱动程序目录</string>
@@ -1051,6 +1051,11 @@
     <string name="settings_gpu_driver_detected_device">检测到：%1$s · %2$s</string>
     <string name="settings_gpu_driver_device_hint">兼容的驱动会优先显示。点按驱动卡片可查看支持的 Snapdragon 芯片。</string>
     <string name="settings_gpu_driver_compatibility">Snapdragon 兼容性</string>
+    <string name="settings_gpu_driver_other_family_generic">不同的 GPU 系列</string>
+    <string name="settings_gpu_driver_compatibility_generic">GPU 相容性</string>
+    <string name="settings_gpu_driver_compatibility_xclipse">Xclipse 相容性</string>
+    <string name="settings_gpu_driver_compatibility_mali">Mali 相容性</string>
+    <string name="settings_gpu_driver_device_hint_generic">相容的驅動程式會優先顯示。點擊驅動程式卡片以查看詳細資料。</string>
     <string name="settings_gpu_driver_best_match">最佳匹配</string>
     <string name="settings_gpu_driver_compatible">兼容</string>
     <string name="settings_gpu_driver_other_family">其他 Adreno 系列</string>
