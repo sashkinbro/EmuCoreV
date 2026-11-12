@@ -20,6 +20,7 @@ relinker = "1.4.5"
 googleShortcuts = "1.1.0"
 coreSplashscreen = "1.2.0"
 androidYoutubePlayer = "13.0.0"
+androidxBrowser = "1.10.0"
 commonsCompress = "1.28.0"
 firebaseBom = "35.1.0"
 googleServices = "4.5.0"
@@ -59,6 +60,7 @@ relinker = { group = "com.getkeepsafe.relinker", name = "relinker", version.ref 
 androidx-core-google-shortcuts = { group = "androidx.core", name = "core-google-shortcuts", version.ref = "googleShortcuts" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 android-youtube-player = { group = "com.pierfrancescosoffritti.androidyoutubeplayer", name = "core", version.ref = "androidYoutubePlayer" }
+androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "androidxBrowser" }
 commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }

@@ -243,6 +243,7 @@ dependencies {
     implementation(libs.androidx.documentfile)
     implementation(libs.androidx.core.google.shortcuts)
     implementation(libs.androidx.core.splashscreen)
+    implementation(libs.androidx.browser)
     implementation(libs.google.material)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.process.phoenix)
