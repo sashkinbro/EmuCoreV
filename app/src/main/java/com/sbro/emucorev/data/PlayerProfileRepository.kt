@@ -4,6 +4,12 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import com.google.android.gms.tasks.Task
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
@@ -16,6 +22,8 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import com.sbro.emucorev.R
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -363,6 +371,32 @@ class PlayerProfileRepository(context: Context) {
     }
 
     suspend fun signInWithGoogle(activity: Activity) {
+        try {
+            val option = GetSignInWithGoogleOption.Builder(activity.getString(R.string.default_web_client_id)).build()
+            val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
+            val response = CredentialManager.create(activity).getCredential(activity, request)
+            val credential = response.credential
+            if (credential is CustomCredential &&
+                credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+            ) {
+                val idToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
+                val result = auth.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null)).await()
+                result.user?.let { user ->
+                    ensureUserProfile(user.uid, user.email, user.displayName.cleanDisplayName(user.email), user.bestPhotoUrl())
+                }
+                return
+            }
+        } catch (_: GetCredentialCancellationException) {
+            return
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w("PlayerProfileRepository", "Credential Manager sign-in failed, falling back to browser", e)
+        }
+        signInWithGoogleBrowser(activity)
+    }
+
+    private suspend fun signInWithGoogleBrowser(activity: Activity) {
         val provider = OAuthProvider.newBuilder(GoogleAuthProvider.PROVIDER_ID)
             .addCustomParameter("prompt", "select_account")
             .build()
