@@ -34,6 +34,7 @@
 #include <util/align.h>
 
 #include <chrono>
+#include <exception>
 #include <util/log.h>
 #include <util/tracy.h>
 
@@ -353,33 +354,39 @@ void destroy(SceGxmSyncObject *sync, State &state, std::function<void()> dealloc
 }
 
 bool init(FrameHost &frame, std::unique_ptr<State> &state, Backend backend, const Config &config, const Root &root_paths) {
-    switch (backend) {
-    case Backend::OpenGL:
-        state = std::make_unique<gl::GLState>();
-        state->frame = &frame;
-        state->init_paths(root_paths);
-        if (!gl::create(state, config))
-            return false;
-        break;
+    try {
+        switch (backend) {
+        case Backend::OpenGL:
+            state = std::make_unique<gl::GLState>();
+            state->frame = &frame;
+            state->init_paths(root_paths);
+            if (!gl::create(state, config))
+                return false;
+            break;
 
-    case Backend::Vulkan:
-        state = std::make_unique<vulkan::VKState>(config.current_config.gpu_idx);
-        state->frame = &frame;
-        state->init_paths(root_paths);
-        if (!vulkan::create(state, config))
-            return false;
-        break;
+        case Backend::Vulkan:
+            state = std::make_unique<vulkan::VKState>(config.current_config.gpu_idx);
+            state->frame = &frame;
+            state->init_paths(root_paths);
+            if (!vulkan::create(state, config))
+                return false;
+            break;
 
-    default:
-        LOG_ERROR("Cannot create a renderer with unsupported backend {}.", static_cast<int>(backend));
+        default:
+            LOG_ERROR("Cannot create a renderer with unsupported backend {}.", static_cast<int>(backend));
+            return false;
+        }
+
+        state->current_backend = backend;
+
+        // Can change this
+        state->command_buffer_queue.maxPendingCount_ = 30;
+
+        return true;
+    } catch (const std::exception &error) {
+        // Keep the partially initialized state alive for the session controller's cleanup.
+        LOG_ERROR("Renderer initialization failed: {}", error.what());
         return false;
     }
-
-    state->current_backend = backend;
-
-    // Can change this
-    state->command_buffer_queue.maxPendingCount_ = 30;
-
-    return true;
 }
 } // namespace renderer

@@ -5,6 +5,7 @@ get_filename_component(NATIVE "${CMAKE_CURRENT_SOURCE_DIR}/../../main/cpp" ABSOL
 set(EXTERNAL "${NATIVE}/vita3k/external")
 add_executable(gpu-state-tests image_snapshot_tests.cpp
     surface_cache_snapshot_tests.cpp
+    surface_capability_selection_tests.cpp
     allocator.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../cpp/test_logging.cpp"
     "${NATIVE}/vita3k/vita3k/renderer/src/vulkan/surface_cache_snapshot_codec.cpp"

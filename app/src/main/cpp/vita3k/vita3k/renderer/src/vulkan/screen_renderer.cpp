@@ -16,6 +16,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include "renderer/vulkan/screen_renderer.h"
+#include "renderer/vulkan/surface_capability_selection.h"
 
 #include "renderer/vulkan/state.h"
 #include "util/log.h"
@@ -170,8 +171,10 @@ bool ScreenRenderer::create() {
 
 bool ScreenRenderer::setup() {
     const auto surface_formats = state.physical_device.getSurfaceFormatsKHR(surface);
-
-    bool surface_format_found = false;
+    if (!select_surface_format(surface_formats, surface_format)) {
+        LOG_ERROR("Vulkan surface reports no supported formats");
+        return false;
+    }
 
     // check for linear filtering on depth support
     // usefull because some device crashed if it's not supported
@@ -180,19 +183,6 @@ bool ScreenRenderer::setup() {
 
     bool support_d24u8 = static_cast<bool>(d24u8_support.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment);
     bool support_d32u8 = static_cast<bool>(d32u8_support.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment);
-
-    for (const auto &format : surface_formats) {
-        // actually we don't care that much because we will just be copying what the game rendered
-        // rgba8 or bgra8 should be the best as it matches the format output from the vita (we don't care about the swizzle)
-        if ((format.format == vk::Format::eB8G8R8A8Unorm || format.format == vk::Format::eR8G8B8A8Unorm)
-            && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
-            surface_format = format;
-            surface_format_found = true;
-            break;
-        }
-    }
-    if (!surface_format_found)
-        surface_format = surface_formats[0];
 
     if (support_d32u8) {
         LOG_INFO_ONCE("Your device support high deep stencil quality");
@@ -230,7 +220,8 @@ bool ScreenRenderer::setup() {
 
     create_render_pass();
 
-    create_swapchain();
+    if (!create_swapchain())
+        return false;
 
     // these functions do not need to be called when the swapchain is resized
     create_surface_image();
@@ -241,8 +232,13 @@ bool ScreenRenderer::setup() {
     return true;
 }
 
-void ScreenRenderer::create_swapchain() {
+bool ScreenRenderer::create_swapchain() {
     surface_capabilities = state.physical_device.getSurfaceCapabilitiesKHR(surface);
+    SwapchainCapabilitiesSelection capabilities_selection;
+    if (!select_swapchain_capabilities(surface_capabilities, !state.is_adreno_turnip, capabilities_selection)) {
+        LOG_ERROR("Vulkan surface has no supported swapchain capability combination");
+        return false;
+    }
 
     if (surface_capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         extent = surface_capabilities.currentExtent;
@@ -253,7 +249,7 @@ void ScreenRenderer::create_swapchain() {
     }
 
     if (extent.width == 0 || extent.height == 0)
-        return;
+        return false;
 
     swapchain_size = surface_capabilities.minImageCount + 1;
     if (surface_capabilities.maxImageCount != 0)
@@ -261,31 +257,15 @@ void ScreenRenderer::create_swapchain() {
 
     // Create Swapchain
     {
-        vk::ImageUsageFlags surface_usage = vk::ImageUsageFlagBits::eColorAttachment;
-        support_swapchain_transfer_dst = static_cast<bool>(surface_capabilities.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferDst);
-        if (support_swapchain_transfer_dst)
-            surface_usage |= vk::ImageUsageFlagBits::eTransferDst;
-        if (surface_capabilities.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc)
-            surface_usage |= vk::ImageUsageFlagBits::eTransferSrc;
-        vk::ImageUsageFlags fsr_flags = vk::ImageUsageFlagBits::eTransferDst;
-        if (!state.is_adreno_turnip)
-            // workaround for a Turnip driver bug: adding storage flag here breaks the swapchain
-            // and fsr works fine without this flag on Adreno
-            fsr_flags |= vk::ImageUsageFlagBits::eStorage;
+        const vk::ImageUsageFlags surface_usage = capabilities_selection.image_usage;
+        support_swapchain_transfer_dst = capabilities_selection.transfer_dst;
+        swapchain_has_storage = capabilities_selection.storage;
 
-        if (surface_capabilities.supportedUsageFlags & vk::ImageUsageFlagBits::eStorage)
-            // needed for FSR
-            surface_usage |= fsr_flags;
-        swapchain_has_storage = static_cast<bool>(surface_usage & vk::ImageUsageFlagBits::eStorage);
-
-        LOG_INFO("swapchain: format={} colorspace={} extent={}x{} supportedUsage=0x{:X} chosenUsage=0x{:X} images={} currentTransform={} usedTransform=Identity",
+        LOG_INFO("swapchain: format={} colorspace={} extent={}x{} supportedUsage=0x{:X} chosenUsage=0x{:X} images={} currentTransform={} usedTransform={}",
             vk::to_string(surface_format.format), vk::to_string(surface_format.colorSpace), extent.width, extent.height,
             static_cast<uint32_t>(surface_capabilities.supportedUsageFlags), static_cast<uint32_t>(surface_usage),
-            swapchain_size, vk::to_string(surface_capabilities.currentTransform));
-
-        vk::CompositeAlphaFlagBitsKHR comp_alpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
-        if (!(surface_capabilities.supportedCompositeAlpha & comp_alpha))
-            comp_alpha = vk::CompositeAlphaFlagBitsKHR::eInherit;
+            swapchain_size, vk::to_string(surface_capabilities.currentTransform),
+            vk::to_string(capabilities_selection.pre_transform));
 
         vk::SwapchainCreateInfoKHR swapchain_info{
             .surface = surface,
@@ -296,8 +276,8 @@ void ScreenRenderer::create_swapchain() {
             .imageArrayLayers = 1,
             .imageUsage = surface_usage,
             .imageSharingMode = vk::SharingMode::eExclusive,
-            .preTransform = vk::SurfaceTransformFlagBitsKHR::eIdentity,
-            .compositeAlpha = comp_alpha,
+            .preTransform = capabilities_selection.pre_transform,
+            .compositeAlpha = capabilities_selection.composite_alpha,
             .presentMode = present_mode,
             .clipped = true,
         };
@@ -348,6 +328,7 @@ void ScreenRenderer::create_swapchain() {
     }
 
     create_layout_sync();
+    return true;
 }
 
 void ScreenRenderer::destroy_swapchain() {
@@ -400,15 +381,22 @@ void ScreenRenderer::cleanup() {
     state.device.destroy(swapchain);
     swapchain = nullptr;
 
-    for (uint32_t i = 0; i <= swapchain_size; i++) {
-        if (i != swapchain_size)
-            state.device.destroy(fences[i]);
-
-        state.device.destroy(image_acquired_semaphores[i]);
-        state.device.destroy(image_ready_semaphores[i]);
+    for (vk::Fence fence : fences) {
+        if (fence)
+            state.device.destroy(fence);
     }
     fences.clear();
+
+    for (vk::Semaphore semaphore : image_acquired_semaphores) {
+        if (semaphore)
+            state.device.destroy(semaphore);
+    }
     image_acquired_semaphores.clear();
+
+    for (vk::Semaphore semaphore : image_ready_semaphores) {
+        if (semaphore)
+            state.device.destroy(semaphore);
+    }
     image_ready_semaphores.clear();
 
     command_buffers.clear();
@@ -758,7 +746,8 @@ bool ScreenRenderer::rebuild_swapchain_if_visible() {
         return false;
 #endif
 
-    create_swapchain();
+    if (!create_swapchain())
+        return false;
     size_mismatch_frames = 0;
     return static_cast<bool>(swapchain);
 }

@@ -25,6 +25,7 @@
 #include <renderer/vulkan/functions.h>
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/frame_runtime_reset.h>
+#include <renderer/vulkan/surface_capability_selection.h>
 
 #include <chrono>
 #include <future>
@@ -1059,7 +1060,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         LOG_WARN("Failed to initialize Vulkan overlay renderer, overlays will be disabled");
     }
 
-    support_fsr &= static_cast<bool>(screen_renderer.surface_capabilities.supportedUsageFlags & vk::ImageUsageFlagBits::eStorage);
+    support_fsr &= supports_fsr_surface(screen_renderer.surface_capabilities);
 
     return true;
 }
