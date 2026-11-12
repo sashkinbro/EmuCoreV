@@ -95,6 +95,7 @@ class MainActivity : ComponentActivity() {
         super.onPause()
     }
 
+    @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (KeyboardMouseManager.handleKeyBindingCapture(event)) return true
         return super.dispatchKeyEvent(event)
