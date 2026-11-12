@@ -118,7 +118,16 @@ fun SaveStatesScreen(
     fun loadState(game: SaveStatesGame, slot: SaveStateSlot) {
         if (viewModel.isRunning(game.titleId)) {
             viewModel.load(game.titleId, slot.slot) { result ->
-                Toast.makeText(context, describe(result, loadedMessage), Toast.LENGTH_LONG).show()
+                when (result) {
+                    is SaveStateLoadOutcome.Loaded -> {
+                        Toast.makeText(context, describe(result.result, loadedMessage), Toast.LENGTH_LONG).show()
+                    }
+                    is SaveStateLoadOutcome.Relaunched -> {
+                        if (result.result != VitaLaunchBridge.LaunchResult.Success) {
+                            Toast.makeText(context, launchResultMessage(result.result), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
             }
         } else {
             viewModel.launchWithState(game.titleId, slot.slot) { result ->

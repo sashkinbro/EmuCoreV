@@ -32,6 +32,30 @@ data class SaveStatesUiState(
     val runningTitleId: String = ""
 )
 
+internal sealed interface SaveStateLoadOutcome {
+    data class Loaded(val result: SaveStateResult) : SaveStateLoadOutcome
+    data class Relaunched(val result: VitaLaunchBridge.LaunchResult) : SaveStateLoadOutcome
+}
+
+internal suspend fun loadSaveStateForRunningTitle(
+    titleId: String,
+    slot: Int,
+    load: suspend () -> SaveStateResult,
+    launchWithState: suspend (String, Int) -> VitaLaunchBridge.LaunchResult
+): SaveStateLoadOutcome {
+    val result = load()
+    if (!result.requiresRendererRestart) return SaveStateLoadOutcome.Loaded(result)
+
+    val launchResult = try {
+        launchWithState(titleId, slot)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        VitaLaunchBridge.LaunchResult.Failure
+    }
+    return SaveStateLoadOutcome.Relaunched(launchResult)
+}
+
 class SaveStatesViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = SaveStateRepository(application)
@@ -77,15 +101,26 @@ class SaveStatesViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun load(titleId: String, slot: Int, onComplete: (SaveStateResult) -> Unit) {
+    internal fun load(titleId: String, slot: Int, onComplete: (SaveStateLoadOutcome) -> Unit) {
         if (!beginAction(titleId, slot)) return
         viewModelScope.launch(Dispatchers.IO) {
             val result = try {
-                repository.load(titleId, slot)
+                loadSaveStateForRunningTitle(
+                    titleId = titleId,
+                    slot = slot,
+                    load = { repository.load(titleId, slot) },
+                    launchWithState = { requestedTitleId, requestedSlot ->
+                        VitaLaunchBridge.launchInstalledTitleWithSaveState(
+                            getApplication(),
+                            requestedTitleId,
+                            repository.stateFile(requestedTitleId, requestedSlot).absolutePath
+                        )
+                    }
+                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                ioError(titleId, error)
+                SaveStateLoadOutcome.Loaded(ioError(titleId, error))
             } finally {
                 endAction()
             }
