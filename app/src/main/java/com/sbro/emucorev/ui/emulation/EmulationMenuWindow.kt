@@ -59,8 +59,13 @@ internal fun EmulationMenuWindow(content: @Composable () -> Unit) {
             systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
         onDispose {
-            dialog.dismiss()
-            host.disposeComposition()
+            try {
+                // Cancel any platform ripple animators while their host RenderNodes are still
+                // attached. A released press can still be fading when this window is closed.
+                host.disposeComposition()
+            } finally {
+                dialog.dismiss()
+            }
         }
     }
 }
