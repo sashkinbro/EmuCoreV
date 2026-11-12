@@ -978,8 +978,9 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         };
 
         vma::AllocatorCreateInfo allocator_info = {
-            // everything vma-related is done on one thread, no need for thread safety
-            .flags = vma::AllocatorCreateFlagBits::eExternallySynchronized,
+            // Guest mappings, the render worker and presentation can allocate concurrently,
+            // including during cold state restoration. Keep VMA's internal locking enabled.
+            .flags = {},
             .physicalDevice = physical_device,
             .device = device,
             .pVulkanFunctions = &vulkan_functions,
