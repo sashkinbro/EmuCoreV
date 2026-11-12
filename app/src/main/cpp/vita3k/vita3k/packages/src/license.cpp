@@ -32,7 +32,11 @@
 
 #include <b64/cdecode.h>
 
+#include <algorithm>
+#include <cctype>
 #include <cstring>
+#include <iterator>
+#include <utility>
 
 bool validate_zrif(const std::string &zRIF) {
     if (zRIF.empty())
@@ -55,25 +59,66 @@ static bool open_license(const fs::path &license_path, SceNpDrmLicense &license_
     fs::ifstream license(license_path, std::ios::in | std::ios::binary);
     if (license.is_open()) {
         license.read((char *)&license_buf, sizeof(SceNpDrmLicense));
+        const bool complete = license.gcount() == sizeof(SceNpDrmLicense);
         license.close();
-        return true;
+        return complete;
     }
 
     return false;
 }
 
+static bool get_license_content_ids(const SceNpDrmLicense &license_buf, std::string &content_id, std::string &title_id) {
+    const auto content_id_end = std::find(std::begin(license_buf.content_id), std::end(license_buf.content_id), '\0');
+    if (content_id_end == std::end(license_buf.content_id))
+        return false;
+
+    const std::string parsed_content_id(license_buf.content_id, content_id_end);
+    // Vita content IDs have a six-character publisher, a nine-character title
+    // ID, a two-digit content index and a sixteen-character product suffix.
+    // The content index can vary (for example, updates need not use _00-).
+    if (parsed_content_id.size() != 36 || parsed_content_id[6] != '-' ||
+        parsed_content_id[16] != '_' || !std::isdigit(static_cast<unsigned char>(parsed_content_id[17])) ||
+        !std::isdigit(static_cast<unsigned char>(parsed_content_id[18])) || parsed_content_id[19] != '-')
+        return false;
+
+    const auto is_filename_id_char = [](char value) {
+        return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z') ||
+            (value >= '0' && value <= '9') || value == '_' || value == '-';
+    };
+    if (!std::all_of(parsed_content_id.begin(), parsed_content_id.begin() + 6, is_filename_id_char) ||
+        !std::all_of(parsed_content_id.begin() + 7, parsed_content_id.begin() + 16, is_filename_id_char) ||
+        !std::all_of(parsed_content_id.begin() + 20, parsed_content_id.end(), is_filename_id_char))
+        return false;
+
+    const auto title_begin = parsed_content_id.begin() + 7;
+    if (!std::all_of(title_begin, title_begin + 4, [](char value) { return value >= 'A' && value <= 'Z'; }) ||
+        !std::all_of(title_begin + 4, title_begin + 9, [](char value) { return value >= '0' && value <= '9'; }))
+        return false;
+
+    content_id = parsed_content_id;
+    title_id = parsed_content_id.substr(7, 9);
+    return true;
+}
+
 bool copy_license(EmuEnvState &emuenv, const fs::path &license_path) {
     SceNpDrmLicense license_buf;
     if (open_license(license_path, license_buf)) {
-        emuenv.license_content_id = license_buf.content_id;
-        emuenv.license_title_id = emuenv.license_content_id.substr(7, 9);
-        const auto dst_path{ emuenv.vita_fs_path / "ux0/license" / emuenv.license_title_id };
+        std::string content_id;
+        std::string title_id;
+        if (!get_license_content_ids(license_buf, content_id, title_id)) {
+            LOG_ERROR("License file has an invalid content ID: {}", license_path);
+            return false;
+        }
+
+        const auto dst_path{ emuenv.vita_fs_path / "ux0/license" / title_id };
         fs::create_directories(dst_path);
 
-        const auto license_dst_path{ dst_path / fmt::format("{}.rif", emuenv.license_content_id) };
+        const auto license_dst_path{ dst_path / fmt::format("{}.rif", content_id) };
         if (license_path != license_dst_path) {
             fs::copy_file(license_path, license_dst_path, fs::copy_options::overwrite_existing);
             if (fs::exists(license_dst_path)) {
+                emuenv.license_content_id = std::move(content_id);
+                emuenv.license_title_id = std::move(title_id);
                 LOG_INFO("Success copy license file to: {}", license_dst_path);
                 return true;
             } else
