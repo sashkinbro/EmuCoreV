@@ -463,15 +463,16 @@ np::trophy::ContextHandle create_trophy_context(NpState &np, IOState *io, const 
 }
 
 np::trophy::Context *get_trophy_context(NpTrophyState &state, const np::trophy::ContextHandle handle) {
-    if (handle < 0 || handle > static_cast<np::trophy::ContextHandle>(state.contexts.size())) {
+    if (handle <= 0 || handle > static_cast<np::trophy::ContextHandle>(state.contexts.size())) {
         return nullptr;
     }
 
-    return &state.contexts[handle - 1];
+    auto &context = state.contexts[handle - 1];
+    return context.valid ? &context : nullptr;
 }
 
 bool destroy_trophy_context(NpTrophyState &state, const np::trophy::ContextHandle handle) {
-    if (handle < 0 || handle > static_cast<np::trophy::ContextHandle>(state.contexts.size())) {
+    if (handle <= 0 || handle > static_cast<np::trophy::ContextHandle>(state.contexts.size())) {
         return false;
     }
 
