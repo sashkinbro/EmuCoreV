@@ -893,6 +893,8 @@ bool SDL_CameraThreadIterate(SDL_Camera *device)
             output_surface->h = acquired->h;
             output_surface->pixels = acquired->pixels;
             output_surface->pitch = acquired->pitch;
+            // The backend can report a different color range for each frame.
+            SDL_SetSurfaceColorspace(output_surface, SDL_GetSurfaceColorspace(acquired));
         } else {  // convert/scale into a different surface.
             #if DEBUG_CAMERA
             SDL_Log("CAMERA: Frame is getting converted!");

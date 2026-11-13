@@ -58,6 +58,8 @@
 #include <camera/NdkCameraManager.h>
 #include <media/NdkImage.h>
 #include <media/NdkImageReader.h>
+#include <android/data_space.h>
+#include <android/native_window.h>
 
 #include "../../core/android/SDL_android.h"
 #include "SDL_camera_android_yuv.h"
@@ -144,6 +146,12 @@ static pfnACaptureSessionOutput_create pACaptureSessionOutput_create = NULL;
 static void *libmediandk = NULL;
 typedef void (*pfnAImage_delete)(AImage*);
 typedef media_status_t (*pfnAImage_getTimestamp)(const AImage*, int64_t*);
+// API 34: optional so older Android devices can still initialize the driver.
+typedef media_status_t (*pfnAImage_getDataSpace)(const AImage*, int32_t*);
+static pfnAImage_getDataSpace pAImage_getDataSpace = NULL;
+static void *libnativewindow = NULL;
+typedef int32_t (*pfnANativeWindow_getBuffersDataSpace)(ANativeWindow*);
+static pfnANativeWindow_getBuffersDataSpace pANativeWindow_getBuffersDataSpace = NULL;
 typedef media_status_t (*pfnAImage_getNumberOfPlanes)(const AImage*, int32_t*);
 typedef media_status_t (*pfnAImage_getPlanePixelStride)(const AImage*, int, int32_t*);
 static pfnAImage_getPlanePixelStride pAImage_getPlanePixelStride = NULL;
@@ -341,6 +349,49 @@ static bool ANDROIDCAMERA_WaitDevice(SDL_Camera *device)
     return true;
 }
 
+static void ECV_LoadAndroidCameraWindowDataSpace(void)
+{
+    // The getter lives in libnativewindow, not libandroid. Keep it optional.
+    libnativewindow = dlopen("libnativewindow.so", RTLD_NOW | RTLD_LOCAL);
+    pANativeWindow_getBuffersDataSpace = libnativewindow
+        ? (pfnANativeWindow_getBuffersDataSpace)dlsym(libnativewindow, "ANativeWindow_getBuffersDataSpace") : NULL;
+    if (libnativewindow && !pANativeWindow_getBuffersDataSpace) {
+        dlclose(libnativewindow);
+        libnativewindow = NULL;
+    }
+}
+
+static void ECV_UnloadAndroidCameraWindowDataSpace(void)
+{
+    pANativeWindow_getBuffersDataSpace = NULL;
+    if (libnativewindow) dlclose(libnativewindow);
+    libnativewindow = NULL;
+}
+
+static int32_t ECV_AndroidCameraDataSpace(SDL_Camera *device, const AImage *image)
+{
+    int32_t dataspace = 0;
+    if (pAImage_getDataSpace && pAImage_getDataSpace(image, &dataspace) == AMEDIA_OK && dataspace > 0)
+        return dataspace;
+    // API 28 window metadata is also available on the application's API 29 floor.
+    dataspace = pANativeWindow_getBuffersDataSpace && device->hidden->window
+        ? pANativeWindow_getBuffersDataSpace(device->hidden->window) : 0;
+    return dataspace > 0 ? dataspace : 0;
+}
+
+static SDL_Colorspace ECV_AndroidCameraColorspace(int32_t dataspace, SDL_Colorspace fallback)
+{
+    const int standard = dataspace & ADATASPACE_STANDARD_MASK;
+    const int range = dataspace & ADATASPACE_RANGE_MASK;
+    if (range != ADATASPACE_RANGE_FULL && range != ADATASPACE_RANGE_LIMITED)
+        return fallback;
+    if (standard == ADATASPACE_STANDARD_BT601_625 || standard == ADATASPACE_STANDARD_BT601_525)
+        return range == ADATASPACE_RANGE_FULL ? SDL_COLORSPACE_BT601_FULL : SDL_COLORSPACE_BT601_LIMITED;
+    if (standard == ADATASPACE_STANDARD_BT709)
+        return range == ADATASPACE_RANGE_FULL ? SDL_COLORSPACE_BT709_FULL : SDL_COLORSPACE_BT709_LIMITED;
+    return fallback;
+}
+
 static SDL_CameraFrameResult ANDROIDCAMERA_AcquireFrame(SDL_Camera *device, SDL_Surface *frame, Uint64 *timestampNS)
 {
     SDL_CameraFrameResult result = SDL_CAMERA_FRAME_READY;
@@ -369,6 +420,8 @@ static SDL_CameraFrameResult ANDROIDCAMERA_AcquireFrame(SDL_Camera *device, SDL_
 
     // YUV_420_888 is NOT necessarily NV12. Repack using all three plane strides.
     if (frame->format == SDL_PIXELFORMAT_NV12) {
+        const int32_t dataspace = ECV_AndroidCameraDataSpace(device, image);
+        SDL_SetSurfaceColorspace(frame, ECV_AndroidCameraColorspace(dataspace, device->hidden->requested_spec.colorspace));
         uint8_t *data[3] = { NULL, NULL, NULL };
         int length[3] = { 0, 0, 0 };
         int32_t rows[3] = { 0, 0, 0 }, pixels[3] = { 0, 0, 0 };
@@ -392,7 +445,7 @@ static SDL_CameraFrameResult ANDROIDCAMERA_AcquireFrame(SDL_Camera *device, SDL_
 #if defined(__ANDROID__) && !defined(NDEBUG)
         const unsigned int diag_frame = device->hidden->diag_frames < 121 ? ++device->hidden->diag_frames : 121;
         if (diag_frame <= 3 || diag_frame == 30 || diag_frame == 60 || diag_frame == 120) {
-            SDL_Log("ECV_CAMERA_DIAG raw frame=%u size=%dx%d result=%d valid=%d timestamp=%llu", diag_frame, frame->w, frame->h, result, valid, (unsigned long long)*timestampNS);
+            SDL_Log("ECV_CAMERA_DIAG raw frame=%u size=%dx%d result=%d valid=%d timestamp=%llu dataspace=0x%x colorspace=0x%x image_dataspace_api=%d", diag_frame, frame->w, frame->h, result, valid, (unsigned long long)*timestampNS, (unsigned int)dataspace, (unsigned int)SDL_GetSurfaceColorspace(frame), pAImage_getDataSpace != NULL);
             for (int i = 0; i < 3; ++i) {
                 unsigned long long stats[6];
                 const int ok = valid && ECV_CameraDiagStats(data[i], length[i] > 0 ? (size_t)length[i] : 0,
@@ -845,6 +898,7 @@ static void ANDROIDCAMERA_Deinitialize(void)
 {
     pACameraManager_unregisterAvailabilityCallback(cameraMgr, &camera_availability_listener);
     DestroyCameraManager();
+    ECV_UnloadAndroidCameraWindowDataSpace();
 
     dlclose(libcamera2ndk);
     libcamera2ndk = NULL;
@@ -877,6 +931,7 @@ static void ANDROIDCAMERA_Deinitialize(void)
     libmediandk = NULL;
     pAImage_delete = NULL;
     pAImage_getTimestamp = NULL;
+    pAImage_getDataSpace = NULL;
     pAImage_getNumberOfPlanes = NULL;
     pAImage_getPlanePixelStride = NULL;
     pAImage_getPlaneRowStride = NULL;
@@ -947,6 +1002,7 @@ static bool ANDROIDCAMERA_Init(SDL_CameraDriverImpl *impl)
     LOADSYM(libmedia, AImage_getHeight);
 
     #undef LOADSYM
+    pAImage_getDataSpace = (pfnAImage_getDataSpace)dlsym(libmedia, "AImage_getDataSpace");
 
     if (!okay) {
         dlclose(libmedia);
@@ -961,6 +1017,7 @@ static bool ANDROIDCAMERA_Init(SDL_CameraDriverImpl *impl)
 
     libcamera2ndk = libcamera2;
     libmediandk = libmedia;
+    ECV_LoadAndroidCameraWindowDataSpace();
 
     impl->DetectDevices = ANDROIDCAMERA_DetectDevices;
     impl->OpenDevice = ANDROIDCAMERA_OpenDevice;
