@@ -566,7 +566,7 @@ private fun CatalogGameCard(
         onClick = openClick
     ) {
         Column {
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(GameCoverAspectRatio)
@@ -627,7 +627,12 @@ private fun CatalogGameCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(6.dp)
+                            .padding(
+                                start = 6.dp,
+                                top = 6.dp + if (is3dCover) maxHeight * 0.12f else 0.dp,
+                                end = 6.dp + if (is3dCover) maxWidth * 0.04f else 0.dp,
+                                bottom = 6.dp
+                            )
                 ) {
                     IconButton(
                         onClick = { showProfileMenu = true },

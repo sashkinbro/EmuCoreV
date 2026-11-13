@@ -34,8 +34,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -463,6 +465,7 @@ private fun ShelfCoverCard(
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
     val showMenu = remember(game.titleId) { mutableStateOf(false) }
+    var is3dCover by remember(game.titleId, artworkVersion) { mutableStateOf(false) }
     val coverAspectRatio = 2f / 3f
     val horizontalCoverPadding = if (isActive) 6.dp else 8.dp
     val verticalCoverPadding = if (isActive) 6.dp else 4.dp
@@ -520,7 +523,8 @@ private fun ShelfCoverCard(
                 showIdleBorder = false,
                 shape = shape,
                 interactionSource = interactionSource,
-                addFocusTarget = false
+                addFocusTarget = false,
+                focusBorderVerticalInsetFraction = if (is3dCover) 0.07f else 0f
             ),
         shape = shape,
         color = Color.Transparent,
@@ -533,6 +537,7 @@ private fun ShelfCoverCard(
                 artworkVersion = artworkVersion,
                 contentDescription = game.title,
                 fallbackTitle = game.title,
+                onPresentationChanged = { is3dCover = it },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = horizontalCoverPadding, vertical = verticalCoverPadding)

@@ -21,10 +21,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalContext
@@ -65,7 +70,8 @@ fun Modifier.gamepadFocusableCard(
     shape: Shape? = null,
     interactionSource: MutableInteractionSource? = null,
     addFocusTarget: Boolean = true,
-    showIdleBorder: Boolean = true
+    showIdleBorder: Boolean = true,
+    focusBorderVerticalInsetFraction: Float = 0f
 ): Modifier = composed {
     val effectiveShape = shape ?: neonShape(18.dp)
     val source = interactionSource ?: remember { MutableInteractionSource() }
@@ -81,7 +87,24 @@ fun Modifier.gamepadFocusableCard(
     var result = this.graphicsLayer { scaleX = scale; scaleY = scale }
         .shadow(if (shouldHighlight) 14.dp else 0.dp, effectiveShape, clip = false)
         .clip(effectiveShape)
-    if (border != null) result = result.border(border, effectiveShape)
+    if (border != null) {
+        val inset = if (shouldHighlight) focusBorderVerticalInsetFraction.coerceIn(0f, 0.45f) else 0f
+        result = if (inset == 0f) result.border(border, effectiveShape) else result.drawWithCache {
+            // Inset decoration only: layout, artwork, focus and pointer bounds stay unchanged.
+            val strokeWidth = border.width.toPx()
+            val outline = effectiveShape.createOutline(
+                Size((size.width - strokeWidth).coerceAtLeast(0f),
+                    (size.height * (1f - 2f * inset) - strokeWidth).coerceAtLeast(0f)),
+                layoutDirection, this
+            )
+            onDrawWithContent {
+                drawContent()
+                translate(left = strokeWidth / 2f, top = size.height * inset + strokeWidth / 2f) {
+                    drawOutline(outline, brush = border.brush, style = Stroke(strokeWidth))
+                }
+            }
+        }
+    }
     if (addFocusTarget) result.focusable(enabled, source) else result
 }
 
