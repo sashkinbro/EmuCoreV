@@ -2,6 +2,7 @@
 #include <emucorev/savestate/kernel_state_io.h>
 #include <emucorev/savestate/memory_image.h>
 #include <cstring>
+#include <limits>
 #include <set>
 
 namespace emucorev::savestate {
@@ -29,6 +30,28 @@ bool unique_map(BufferReader &reader, Map &output, size_t minimum_bytes, Read re
     return true;
 }
 } // namespace
+
+bool kernel_process_elapsed_at_capture(uint64_t start_tick, uint64_t base_tick,
+    uint64_t captured_host_time_us, uint64_t &elapsed_us) {
+    if (base_tick > std::numeric_limits<uint64_t>::max() - captured_host_time_us)
+        return false;
+    const uint64_t captured_rtc_tick = base_tick + captured_host_time_us;
+    if (captured_rtc_tick < start_tick)
+        return false;
+    elapsed_us = captured_rtc_tick - start_tick;
+    return true;
+}
+
+bool rebase_kernel_process_start_tick(uint64_t base_tick, uint64_t elapsed_us,
+    uint64_t restored_host_time_us, uint64_t &start_tick) {
+    if (base_tick > std::numeric_limits<uint64_t>::max() - restored_host_time_us)
+        return false;
+    const uint64_t restored_rtc_tick = base_tick + restored_host_time_us;
+    if (restored_rtc_tick < elapsed_us)
+        return false;
+    start_tick = restored_rtc_tick - elapsed_us;
+    return true;
+}
 
 bool parse_kernel_base(const std::vector<uint8_t> &data, KernelBaseSnapshot &snapshot, std::string &error) {
     error.clear();

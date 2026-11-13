@@ -2175,6 +2175,13 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         result.error = error;
         return result;
     }
+    uint64_t saved_process_elapsed_us = 0;
+    if (!kernel_process_elapsed_at_capture(kernel_snapshot.start_tick, kernel_snapshot.base_tick,
+            sync_snapshot.saved_time, saved_process_elapsed_us)) {
+        result.status = Status::InvalidFile;
+        result.error = "invalid saved process clock epoch";
+        return result;
+    }
     if (gpu_snapshot.schema_version == 3) {
         auto page_section = reader.open_section(SectionId::GpuBufferPages, error);
         if (!page_section
@@ -2504,6 +2511,14 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     }
 #endif
 
+    uint64_t restored_start_tick = 0;
+    if (!rebase_kernel_process_start_tick(kernel.base_tick.tick, saved_process_elapsed_us,
+            host_time_us(), restored_start_tick)) {
+        result.status = Status::InternalError;
+        result.error = "unable to rebase restored process clock";
+        return result;
+    }
+    kernel.start_tick = restored_start_tick;
 
     report(progress, 1.0f, "done");
     world.release();

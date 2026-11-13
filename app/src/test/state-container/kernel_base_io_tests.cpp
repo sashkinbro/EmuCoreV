@@ -79,4 +79,40 @@ TEST(KernelBaseIo, RetainsMultipleBindingsForTheSameNidAndGuestAddresses) {
     EXPECT_EQ(snapshot.var_binding_infos.count(0x1234), 2u);
     EXPECT_EQ(snapshot.var_binding_infos.begin()->second.entries, 0x3000u);
 }
+
+TEST(KernelBaseIo, RebasesProcessElapsedTimeWithoutChangingRtcWallClockBase) {
+    constexpr uint64_t base_tick = 62'135'596'800'000'000ull;
+    constexpr uint64_t saved_host_time_us = 8'000'000'000ull;
+    constexpr uint64_t elapsed_at_save_us = 45'400'000ull;
+    constexpr uint64_t away_time_us = 220'600'000ull;
+    constexpr uint64_t active_after_restore_us = 1'234'000ull;
+    const uint64_t saved_start_tick = base_tick + saved_host_time_us - elapsed_at_save_us;
+
+    uint64_t saved_elapsed_us = 0;
+    ASSERT_TRUE(kernel_process_elapsed_at_capture(saved_start_tick, base_tick,
+        saved_host_time_us, saved_elapsed_us));
+    ASSERT_EQ(saved_elapsed_us, elapsed_at_save_us);
+
+    uint64_t restored_start_tick = 0;
+    const uint64_t restored_base_tick = base_tick;
+    ASSERT_TRUE(rebase_kernel_process_start_tick(base_tick, saved_elapsed_us,
+        saved_host_time_us + away_time_us, restored_start_tick));
+    EXPECT_EQ(restored_base_tick, base_tick);
+    EXPECT_EQ(base_tick + saved_host_time_us + away_time_us - restored_start_tick,
+        elapsed_at_save_us);
+    EXPECT_EQ(base_tick + saved_host_time_us + away_time_us + active_after_restore_us - restored_start_tick,
+        elapsed_at_save_us + active_after_restore_us);
+}
+
+TEST(KernelBaseIo, RejectsInvalidProcessClockArithmetic) {
+    uint64_t result = 123;
+    EXPECT_FALSE(kernel_process_elapsed_at_capture(100, UINT64_MAX, 1, result));
+    EXPECT_EQ(result, 123u);
+    EXPECT_FALSE(kernel_process_elapsed_at_capture(200, 100, 50, result));
+    EXPECT_EQ(result, 123u);
+    EXPECT_FALSE(rebase_kernel_process_start_tick(UINT64_MAX, 0, 1, result));
+    EXPECT_EQ(result, 123u);
+    EXPECT_FALSE(rebase_kernel_process_start_tick(100, 101, 0, result));
+    EXPECT_EQ(result, 123u);
+}
 } // namespace

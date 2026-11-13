@@ -48,4 +48,11 @@ struct KernelBaseSnapshot {
 bool parse_kernel_base(const std::vector<uint8_t> &data, KernelBaseSnapshot &snapshot, std::string &error);
 bool validate_kernel_base(const KernelBaseSnapshot &snapshot, const MemoryImage &memory, std::string &error);
 bool validate_kernel_modules(const KernelBaseSnapshot &snapshot, const MemoryImage &memory, std::string &error);
+// KernelSync schema 2 records the same high-resolution-clock epoch used by
+// RTC ticks. These helpers preserve process elapsed time while leaving the
+// wall-clock RTC base unchanged across save-state restore.
+bool kernel_process_elapsed_at_capture(uint64_t start_tick, uint64_t base_tick,
+    uint64_t captured_host_time_us, uint64_t &elapsed_us);
+bool rebase_kernel_process_start_tick(uint64_t base_tick, uint64_t elapsed_us,
+    uint64_t restored_host_time_us, uint64_t &start_tick);
 } // namespace emucorev::savestate
