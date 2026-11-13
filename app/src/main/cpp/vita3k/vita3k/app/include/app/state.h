@@ -29,7 +29,7 @@ namespace app {
 
 struct User {
     std::string id;
-    std::string name = "Vita3K";
+    std::string name = "EmuCore";
     std::string theme_id = "default";
     bool use_theme_bg = true;
     std::string start_type = "default";

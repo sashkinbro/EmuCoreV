@@ -1,6 +1,9 @@
 #include <util/tracy.h>
 #include <io/types.h>
 #include <io/state.h>
+#include <app/functions.h>
+#include <app/state.h>
+#include <util/fs.h>
 #include <emuenv/app_util.h>
 #include <emuenv/state.h>
 #include <SceAppUtil/SceAppUtil.h>
@@ -16,6 +19,7 @@
 #include <array>
 #include <cstring>
 #include <future>
+#include <iterator>
 #include <thread>
 
 namespace {
@@ -314,3 +318,4 @@ using KernelHostLifetimeEnv = EmuEnvState;
 #include "gxm_raw_f16_tests.inc"
 #include "cheat_lifecycle_tests.inc"
 #include "startup_gpu_config_tests.inc"
+#include "app_user_tests.inc"

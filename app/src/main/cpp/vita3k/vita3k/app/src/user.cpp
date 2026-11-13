@@ -48,11 +48,22 @@ static std::string next_free_id(const std::map<std::string, User> &users) {
     return fmt::format("{:0>2d}", id);
 }
 
+static bool is_legacy_default_profile(const User &user) {
+    return user.id == "00"
+        && user.name == "Vita3K"
+        && user.theme_id == "default"
+        && user.use_theme_bg
+        && user.start_type == "default"
+        && user.start_path.empty()
+        && user.backgrounds.empty();
+}
+
 } // namespace
 
 void load_users(EmuEnvState &emuenv) {
     auto &user_list = emuenv.app.user_list;
     user_list.users.clear();
+    bool migrated_default_name = false;
 
     const auto user_path = emuenv.vita_fs_path / "ux0/user";
     if (!fs::exists(user_path) || fs::is_empty(user_path))
@@ -95,7 +106,18 @@ void load_users(EmuEnvState &emuenv) {
 
         for (const auto &bg : user_child.child("backgrounds"))
             user.backgrounds.emplace_back(bg.text().as_string());
+
+        // Older builds created the first, otherwise untouched profile as
+        // "Vita3K". Keep its profile ID so its savedata remains associated,
+        // and leave customized profiles with that name unchanged.
+        if (is_legacy_default_profile(user)) {
+            user.name = "EmuCore";
+            migrated_default_name = true;
+        }
     }
+
+    if (migrated_default_name)
+        save_user(emuenv, "00");
 }
 
 void save_user(EmuEnvState &emuenv, const std::string &user_id) {

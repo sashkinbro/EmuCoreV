@@ -168,7 +168,7 @@ bool ensure_current_user(EmuEnvState &emuenv) {
     const auto &users = emuenv.app.user_list.users;
 
     if (users.empty()) {
-        const std::string id = create_user(emuenv, "Vita3K");
+        const std::string id = create_user(emuenv, "EmuCore");
         if (id.empty() || !activate_user(emuenv, id))
             return false;
 
@@ -209,7 +209,7 @@ bool switch_emulator_path(EmuEnvState &emuenv, const fs::path &vita_fs_path) {
 
     const auto &users = emuenv.app.user_list.users;
     if (users.empty()) {
-        const std::string id = create_user(emuenv, "Vita3K");
+        const std::string id = create_user(emuenv, "EmuCore");
         if (id.empty() || !activate_user(emuenv, id))
             return false;
         emuenv.cfg.user_id = id;

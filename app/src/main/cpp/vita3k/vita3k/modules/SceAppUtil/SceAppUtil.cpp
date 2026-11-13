@@ -566,9 +566,9 @@ EXPORT(int, sceAppUtilSystemParamGetString, unsigned int paramId, SceChar8 *buf,
                 std::strncpy(reinterpret_cast<char *>(buf), devname, copySize - 1);
                 buf[copySize - 1] = '\0';
             }
-            // double fallback to "Vita3K"
+            // double fallback to the default player name
             if (buf[0] == '\0') {
-                std::strncpy(reinterpret_cast<char *>(buf), "Vita3K", copySize - 1);
+                std::strncpy(reinterpret_cast<char *>(buf), "EmuCore", copySize - 1);
                 buf[copySize - 1] = '\0';
             }
         }
