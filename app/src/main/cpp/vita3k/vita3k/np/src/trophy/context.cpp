@@ -80,6 +80,8 @@ int Context::copy_file_data_from_trophy_file(const char *filename, void *buffer,
         *size);
 
     std::uint32_t size_left = *size;
+    if (size_left == 0)
+        return 0;
 
     trophy_file.get_entry_data(static_cast<std::uint32_t>(file_index), [&](void *source, std::uint32_t source_size) -> bool {
         if (size_left == 0)
@@ -89,7 +91,8 @@ int Context::copy_file_data_from_trophy_file(const char *filename, void *buffer,
         std::copy_n(static_cast<std::uint8_t *>(source), source_size, static_cast<std::uint8_t *>(buffer));
 
         buffer = static_cast<std::uint8_t *>(buffer) + source_size;
-        return true;
+        size_left -= source_size;
+        return size_left != 0;
     });
 
     return 0;
