@@ -140,8 +140,14 @@ static constexpr const char *watched_read_file_fragment = nullptr;
 EXPORT(SceSSize, _sceIoPread, SceUID fd, void *buf, SceSize nbyte, SceOff offset) {
     TRACY_FUNC(_sceIoPread, fd, buf, nbyte, offset);
     if (watched_read_file_fragment && *watched_read_file_fragment) {
-        const auto file = emuenv.io.std_files.find(fd);
-        if (file != emuenv.io.std_files.end() && std::string_view(file->second.get_vita_loc()).find(watched_read_file_fragment) != std::string_view::npos) {
+        std::string vita_path;
+        {
+            const std::lock_guard<std::mutex> lock(emuenv.io.file_mutex);
+            const auto file = emuenv.io.std_files.find(fd);
+            if (file != emuenv.io.std_files.end())
+                vita_path = file->second.get_vita_loc();
+        }
+        if (std::string_view(vita_path).find(watched_read_file_fragment) != std::string_view::npos) {
             const ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
             LOG_ERROR("[CUESTACK] pread {} off={} size={} thread='{}' guest stack:\n{}",
                 watched_read_file_fragment, offset, nbyte, thread ? thread->name : "?",
