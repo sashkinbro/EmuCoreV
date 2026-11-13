@@ -556,7 +556,7 @@
     <string name="settings_gpu_driver_manager_title">GPUドライバー</string>
     <string name="settings_gpu_driver_game_title">ゲームのGPUドライバー</string>
     <string name="settings_gpu_driver_manager_subtitle">GPUドライバーのインストール、ダウンロード、適用、削除を行います。</string>
-    <string name="settings_gpu_driver_active_title">有効なドライバー</string>
+    <string name="settings_gpu_driver_active_title">選択したドライバー</string>
     <string name="settings_gpu_driver_install_from_file">ファイルからインストール</string>
     <string name="settings_gpu_driver_catalog">ドライバーカタログ</string>
     <string name="settings_gpu_driver_refresh">更新</string>
@@ -566,7 +566,7 @@
     <string name="settings_gpu_driver_download_apply">ダウンロード &amp; 適用</string>
     <string name="settings_gpu_driver_downloaded">ダウンロード済み</string>
     <string name="settings_gpu_driver_apply">適用</string>
-    <string name="settings_gpu_driver_applied">適用済み</string>
+    <string name="settings_gpu_driver_applied">選択済み</string>
     <string name="settings_gpu_driver_remove_short">削除</string>
     <string name="settings_gpu_driver_recommended">推奨</string>
     <string name="settings_gpu_driver_source">ソース</string>
@@ -579,15 +579,15 @@
     <string name="settings_gpu_driver_none_installed">カスタムGPUドライバーはまだインストールされていません。</string>
     <string name="settings_gpu_driver_install_failed">GPUドライバーのインストールに失敗しました。</string>
     <string name="settings_gpu_driver_install_success">GPUドライバーをインストールしました: %1$s</string>
-    <string name="settings_gpu_driver_status_system">システムのVulkanドライバーが有効です</string>
+    <string name="settings_gpu_driver_status_system">システムのVulkanドライバーを選択中</string>
     <string name="settings_gpu_driver_status_global">グローバルGPUドライバーを使用中: %1$s</string>
     <string name="settings_gpu_driver_status_global_system">グローバルGPUドライバーを使用中: システムのVulkan</string>
     <string name="settings_gpu_driver_status_global_desc">このゲームはグローバルGPUドライバーの選択に従います。</string>
     <string name="settings_gpu_driver_status_game_system">ゲームの上書き: システムのVulkanドライバー</string>
     <string name="settings_gpu_driver_status_game_active">ゲームの上書き: %1$s</string>
-    <string name="settings_gpu_driver_status_system_desc">カスタムドライバーが選択されていないため、システムのVulkanドライバーが使用されています。</string>
-    <string name="settings_gpu_driver_status_active">カスタムドライバーが有効: %1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">このドライバーはVulkanで使用する準備ができています。実際のサポートは依然としてデバイスの互換性に依存します。</string>
+    <string name="settings_gpu_driver_status_system_desc">次回の起動にはシステムのVulkanドライバーが選択されています。</string>
+    <string name="settings_gpu_driver_status_active">カスタムドライバーを選択中: %1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">Vulkan用に選択されています。現在使用中のドライバーは確認されていません。</string>
     <string name="settings_gpu_driver_status_renderer">カスタムドライバーが選択されていますが、レンダラーは%1$sです</string>
     <string name="settings_gpu_driver_status_renderer_desc">カスタムGPUドライバーはVulkanでのみ動作します。このドライバーを使用するには、レンダラーをVulkanに切り替えてください。</string>
     <string name="settings_gpu_driver_status_broken">ドライバーアーカイブが不完全です: %1$sが見つかりません</string>
@@ -1600,4 +1600,12 @@
     <string name="rear_touch_clear">割り当てを解除</string>
     <string name="rear_touch_hint">押している間は背面をタッチし、離すとタッチを解除します。割り当てた入力は通常の操作に代わります。前面タッチも引き続き使えます。</string>
     <string name="rear_touch_screen_position">画面ボタンの位置</string>
+    <string name="settings_gpu_driver_status_missing_selection">選択したドライバーを利用できません: %1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">選択したドライバーはこのGPUに対応していません。</string>
+    <string name="settings_gpu_driver_status_unverified_selection">このGPUとドライバーの互換性は未確認です。</string>
+    <string name="settings_gpu_driver_status_native_unverified">Vulkan用に選択されています。この端末での対応状況は未確認です。</string>
+    <string name="settings_gpu_driver_status_native_unsupported">現在のエミュレーターのビルドはこのドライバーに対応していません。</string>
+    <string name="settings_gpu_driver_status_invalid_selection">選択したドライバーのファイルが無効です。再インストールしてください。</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s（端末カタログ）</string>
+    <string name="settings_gpu_driver_device_unknown">GPUハードウェアを識別できませんでした。</string>
 </resources>

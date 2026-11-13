@@ -556,7 +556,7 @@
     <string name="settings_gpu_driver_manager_title">Driver GPU</string>
     <string name="settings_gpu_driver_game_title">Driver GPU game</string>
     <string name="settings_gpu_driver_manager_subtitle">Pasang, unduh, terapkan, atau hapus driver GPU.</string>
-    <string name="settings_gpu_driver_active_title">Driver aktif</string>
+    <string name="settings_gpu_driver_active_title">Driver terpilih</string>
     <string name="settings_gpu_driver_install_from_file">Pasang dari file</string>
     <string name="settings_gpu_driver_catalog">Katalog driver</string>
     <string name="settings_gpu_driver_refresh">Segarkan</string>
@@ -566,7 +566,7 @@
     <string name="settings_gpu_driver_download_apply">Unduh &amp; terapkan</string>
     <string name="settings_gpu_driver_downloaded">Terunduh</string>
     <string name="settings_gpu_driver_apply">Terapkan</string>
-    <string name="settings_gpu_driver_applied">Diterapkan</string>
+    <string name="settings_gpu_driver_applied">Dipilih</string>
     <string name="settings_gpu_driver_remove_short">Hapus</string>
     <string name="settings_gpu_driver_recommended">Direkomendasikan</string>
     <string name="settings_gpu_driver_source">Sumber</string>
@@ -579,15 +579,15 @@
     <string name="settings_gpu_driver_none_installed">Belum ada driver GPU kustom yang terpasang.</string>
     <string name="settings_gpu_driver_install_failed">Pemasangan driver GPU gagal.</string>
     <string name="settings_gpu_driver_install_success">Driver GPU terpasang: %1$s</string>
-    <string name="settings_gpu_driver_status_system">Driver Vulkan sistem aktif</string>
+    <string name="settings_gpu_driver_status_system">Driver Vulkan sistem dipilih</string>
     <string name="settings_gpu_driver_status_global">Menggunakan driver GPU global: %1$s</string>
     <string name="settings_gpu_driver_status_global_system">Menggunakan driver GPU global: Vulkan Sistem</string>
     <string name="settings_gpu_driver_status_global_desc">Game ini mengikuti pilihan driver GPU global.</string>
     <string name="settings_gpu_driver_status_game_system">Penggantian game: Driver Vulkan sistem</string>
     <string name="settings_gpu_driver_status_game_active">Penggantian game: %1$s</string>
-    <string name="settings_gpu_driver_status_system_desc">Tidak ada driver kustom yang dipilih, jadi driver Vulkan sistem yang digunakan.</string>
-    <string name="settings_gpu_driver_status_active">Driver kustom aktif: %1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">Driver ini siap digunakan dengan Vulkan. Dukungan sebenarnya tetap bergantung pada kompatibilitas perangkat.</string>
+    <string name="settings_gpu_driver_status_system_desc">Driver Vulkan sistem dipilih untuk peluncuran berikutnya.</string>
+    <string name="settings_gpu_driver_status_active">Driver kustom dipilih: %1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">Dipilih untuk Vulkan. Driver yang sedang digunakan belum dikonfirmasi.</string>
     <string name="settings_gpu_driver_status_renderer">Driver kustom dipilih, tetapi renderer adalah %1$s</string>
     <string name="settings_gpu_driver_status_renderer_desc">Driver GPU kustom hanya berfungsi dengan Vulkan. Ganti renderer ke Vulkan untuk menggunakan driver ini.</string>
     <string name="settings_gpu_driver_status_broken">Arsip driver tidak lengkap: %1$s tidak ditemukan</string>
@@ -1600,4 +1600,12 @@
     <string name="rear_touch_clear">Hapus penetapan</string>
     <string name="rear_touch_hint">Tahan untuk menyentuh panel belakang; lepaskan untuk mengangkat sentuhan. Input yang ditetapkan menggantikan aksi biasanya. Sentuhan depan tetap tersedia.</string>
     <string name="rear_touch_screen_position">Posisi tombol layar</string>
+    <string name="settings_gpu_driver_status_missing_selection">Driver terpilih tidak tersedia: %1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">Driver terpilih tidak kompatibel dengan GPU ini.</string>
+    <string name="settings_gpu_driver_status_unverified_selection">Kompatibilitas driver dengan GPU ini belum diverifikasi.</string>
+    <string name="settings_gpu_driver_status_native_unverified">Dipilih untuk Vulkan. Dukungan pada perangkat ini belum diverifikasi.</string>
+    <string name="settings_gpu_driver_status_native_unsupported">Versi emulator saat ini tidak mendukung driver ini.</string>
+    <string name="settings_gpu_driver_status_invalid_selection">Berkas driver terpilih tidak valid. Instal ulang driver.</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s (katalog perangkat)</string>
+    <string name="settings_gpu_driver_device_unknown">Perangkat keras GPU belum dikenali.</string>
 </resources>

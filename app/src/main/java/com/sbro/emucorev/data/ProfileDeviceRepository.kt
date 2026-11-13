@@ -11,8 +11,8 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.sbro.emucorev.BuildConfig
+import com.sbro.emucorev.core.DeviceGpuInfoProvider
 import com.sbro.emucorev.core.GpuHardwareProfiles
-import com.sbro.emucorev.core.MobileSocNameMapper
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -36,7 +36,8 @@ data class PlayerDevice(
     val coreVersion: String,
     val isCurrent: Boolean,
     val isPublic: Boolean,
-    val lastSeenAtMs: Long?
+    val lastSeenAtMs: Long?,
+    val gpuModel: String = ""
 )
 
 data class PublicPlayerDevice(
@@ -46,7 +47,8 @@ data class PublicPlayerDevice(
     val ramMb: Long,
     val androidVersion: String,
     val appVersion: String,
-    val coreVersion: String
+    val coreVersion: String,
+    val gpuModel: String = ""
 )
 
 object ProfileDeviceInfoProvider {
@@ -91,7 +93,7 @@ object ProfileDeviceInfoProvider {
             displayName = displayName,
             manufacturer = manufacturer.take(80),
             model = model.take(120),
-            soc = MobileSocNameMapper.currentDeviceName().trim().ifBlank {
+            soc = DeviceGpuInfoProvider.cpuName().trim().ifBlank {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL.orEmpty() else Build.HARDWARE.orEmpty()
             }.take(160),
             gpuFamily = gpuFamily,
@@ -101,7 +103,8 @@ object ProfileDeviceInfoProvider {
             coreVersion = CORE_VERSION,
             isCurrent = true,
             isPublic = isPublic,
-            lastSeenAtMs = System.currentTimeMillis()
+            lastSeenAtMs = System.currentTimeMillis(),
+            gpuModel = DeviceGpuInfoProvider.get(appContext).model?.displayName.orEmpty().take(160)
         )
     }
 
@@ -145,6 +148,7 @@ class ProfileDeviceRepository(context: Context) {
 
     suspend fun registerCurrentDevice(): PlayerDevice? {
         val uid = auth.currentUser?.uid ?: return null
+        DeviceGpuInfoProvider.ensureLoaded(appContext)
         val ref = firestore.collection(USERS).document(uid).collection(DEVICES)
         val local = currentDevice()
         val existing = ref.document(local.deviceId).get().await()
@@ -233,6 +237,7 @@ class ProfileDeviceRepository(context: Context) {
         "model" to model,
         "soc" to soc,
         "gpuFamily" to gpuFamily,
+        "gpuModel" to gpuModel,
         "ramMb" to ramMb,
         "androidVersion" to androidVersion,
         "appVersion" to appVersion,
@@ -248,6 +253,7 @@ class ProfileDeviceRepository(context: Context) {
         "displayName" to displayName,
         "soc" to soc,
         "gpuFamily" to gpuFamily,
+        "gpuModel" to gpuModel,
         "ramMb" to ramMb,
         "androidVersion" to androidVersion,
         "appVersion" to appVersion,
@@ -269,7 +275,8 @@ class ProfileDeviceRepository(context: Context) {
             coreVersion = getString("coreVersion").orEmpty(),
             isCurrent = getBoolean(FIELD_CURRENT) == true,
             isPublic = getBoolean(FIELD_PUBLIC) == true,
-            lastSeenAtMs = getTimestamp(FIELD_LAST_SEEN)?.toDate()?.time
+            lastSeenAtMs = getTimestamp(FIELD_LAST_SEEN)?.toDate()?.time,
+            gpuModel = getString("gpuModel").orEmpty()
         )
     }
 

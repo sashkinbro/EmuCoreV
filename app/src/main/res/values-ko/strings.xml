@@ -556,7 +556,7 @@
     <string name="settings_gpu_driver_manager_title">GPU 드라이버</string>
     <string name="settings_gpu_driver_game_title">게임 GPU 드라이버</string>
     <string name="settings_gpu_driver_manager_subtitle">GPU 드라이버를 설치, 다운로드, 적용 또는 제거합니다.</string>
-    <string name="settings_gpu_driver_active_title">활성 드라이버</string>
+    <string name="settings_gpu_driver_active_title">선택한 드라이버</string>
     <string name="settings_gpu_driver_install_from_file">파일에서 설치</string>
     <string name="settings_gpu_driver_catalog">드라이버 카탈로그</string>
     <string name="settings_gpu_driver_refresh">새로 고침</string>
@@ -566,7 +566,7 @@
     <string name="settings_gpu_driver_download_apply">다운로드 &amp; 적용</string>
     <string name="settings_gpu_driver_downloaded">다운로드됨</string>
     <string name="settings_gpu_driver_apply">적용</string>
-    <string name="settings_gpu_driver_applied">적용됨</string>
+    <string name="settings_gpu_driver_applied">선택됨</string>
     <string name="settings_gpu_driver_remove_short">제거</string>
     <string name="settings_gpu_driver_recommended">권장</string>
     <string name="settings_gpu_driver_source">출처</string>
@@ -579,15 +579,15 @@
     <string name="settings_gpu_driver_none_installed">아직 설치된 사용자 지정 GPU 드라이버가 없습니다.</string>
     <string name="settings_gpu_driver_install_failed">GPU 드라이버 설치에 실패했습니다.</string>
     <string name="settings_gpu_driver_install_success">GPU 드라이버 설치됨: %1$s</string>
-    <string name="settings_gpu_driver_status_system">시스템 Vulkan 드라이버가 활성화되어 있습니다</string>
+    <string name="settings_gpu_driver_status_system">시스템 Vulkan 드라이버 선택됨</string>
     <string name="settings_gpu_driver_status_global">전역 GPU 드라이버 사용 중: %1$s</string>
     <string name="settings_gpu_driver_status_global_system">전역 GPU 드라이버 사용 중: 시스템 Vulkan</string>
     <string name="settings_gpu_driver_status_global_desc">이 게임은 전역 GPU 드라이버 선택을 따릅니다.</string>
     <string name="settings_gpu_driver_status_game_system">게임 재정의: 시스템 Vulkan 드라이버</string>
     <string name="settings_gpu_driver_status_game_active">게임 재정의: %1$s</string>
-    <string name="settings_gpu_driver_status_system_desc">사용자 지정 드라이버가 선택되지 않아 시스템 Vulkan 드라이버를 사용합니다.</string>
-    <string name="settings_gpu_driver_status_active">사용자 지정 드라이버 활성: %1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">이 드라이버는 Vulkan과 함께 사용할 준비가 되었습니다. 실제 지원 여부는 기기 호환성에 따라 달라집니다.</string>
+    <string name="settings_gpu_driver_status_system_desc">다음 실행에 시스템 Vulkan 드라이버가 선택되어 있습니다.</string>
+    <string name="settings_gpu_driver_status_active">사용자 지정 드라이버 선택됨: %1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">Vulkan용으로 선택되었습니다. 현재 사용 중인 드라이버는 확인되지 않았습니다.</string>
     <string name="settings_gpu_driver_status_renderer">사용자 지정 드라이버가 선택되었지만 렌더러는 %1$s입니다</string>
     <string name="settings_gpu_driver_status_renderer_desc">사용자 지정 GPU 드라이버는 Vulkan에서만 작동합니다. 이 드라이버를 사용하려면 렌더러를 Vulkan으로 전환하세요.</string>
     <string name="settings_gpu_driver_status_broken">드라이버 아카이브가 불완전합니다: %1$s을(를) 찾을 수 없음</string>
@@ -1599,4 +1599,12 @@
     <string name="rear_touch_clear">할당 지우기</string>
     <string name="rear_touch_hint">누르고 있는 동안 후면 패널을 터치하며 놓으면 터치가 해제됩니다. 할당한 입력은 기존 동작을 대체합니다. 전면 터치도 계속 사용할 수 있습니다.</string>
     <string name="rear_touch_screen_position">화면 버튼 위치</string>
+    <string name="settings_gpu_driver_status_missing_selection">선택한 드라이버를 사용할 수 없습니다: %1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">선택한 드라이버는 이 GPU와 호환되지 않습니다.</string>
+    <string name="settings_gpu_driver_status_unverified_selection">이 GPU와 드라이버의 호환성을 확인하지 못했습니다.</string>
+    <string name="settings_gpu_driver_status_native_unverified">Vulkan용으로 선택되었습니다. 이 기기에서의 지원 여부는 확인되지 않았습니다.</string>
+    <string name="settings_gpu_driver_status_native_unsupported">현재 에뮬레이터 빌드는 이 드라이버를 지원하지 않습니다.</string>
+    <string name="settings_gpu_driver_status_invalid_selection">선택한 드라이버 파일이 잘못되었습니다. 드라이버를 다시 설치하세요.</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s (기기 카탈로그)</string>
+    <string name="settings_gpu_driver_device_unknown">GPU 하드웨어를 식별하지 못했습니다.</string>
 </resources>

@@ -5,6 +5,8 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorev.core.InstallStateBus
+import com.sbro.emucorev.core.DeviceGpuInfoProvider
+import com.sbro.emucorev.core.GpuDriverCompatibility
 import com.sbro.emucorev.core.GpuDriverManager
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.VitaCoreConfig
@@ -159,6 +161,12 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
     fun selectCustomDriverOverride(driverName: String?) {
         val titleId = _uiState.value.selectedTitleId ?: return
         val defaults = _uiState.value.defaults
+        // Inherit and System are always explicit user choices, even if global points at a
+        // missing package. A new custom choice must have exact, eligible package evidence.
+        if (!driverName.isNullOrBlank() && !GpuDriverCompatibility.resolveSelection(
+                defaults.customDriverName, driverName, DeviceGpuInfoProvider.get(getApplication<Application>()),
+                _uiState.value.installedGpuDrivers
+            ).requestable) return
         val updated = _uiState.value.config.copy(customDriverName = driverName ?: defaults.customDriverName)
         _uiState.value = _uiState.value.copy(
             config = updated,

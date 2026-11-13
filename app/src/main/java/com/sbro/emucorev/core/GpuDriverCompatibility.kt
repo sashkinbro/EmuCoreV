@@ -30,7 +30,24 @@ data class GpuDriverDevice(
 
 /** Catalog driver package extension: which vendor the package targets. */
 val RemoteGpuDriver.vendor: GpuDriverVendor
-    get() = GpuDriverCompatibility.vendorOfCatalogGpu(gpu)
+    get() = when (family) {
+        GpuDriverFamily.TURNIP -> GpuDriverVendor.ADRENO
+        GpuDriverFamily.PANVK, GpuDriverFamily.MALI_SX2 -> GpuDriverVendor.MALI
+        GpuDriverFamily.VORTEK -> GpuDriverVendor.XCLIPSE
+        else -> GpuDriverCompatibility.vendorOfCatalogGpu(gpu)
+    }
+
+internal fun GpuDriverVendor.toGpuVendor(): GpuVendor = when (this) {
+    GpuDriverVendor.ADRENO -> GpuVendor.ADRENO
+    GpuDriverVendor.MALI -> GpuVendor.MALI
+    GpuDriverVendor.XCLIPSE -> GpuVendor.XCLIPSE
+    GpuDriverVendor.POWERVR -> GpuVendor.POWERVR
+    GpuDriverVendor.UNKNOWN -> GpuVendor.UNKNOWN
+}
+
+internal fun InstalledGpuDriver.toPackageEvidence() = GpuDriverPackageEvidence(
+    name, vendor.toGpuVendor(), family, supportedGpuModels.toSet(), fileState, nativeCapability
+)
 
 enum class AdrenoFamily(val catalogToken: String) {
     A6XX("6xx"),
@@ -47,13 +64,13 @@ enum class GpuDriverMatch {
 /** Maps the detected Snapdragon SoC to the Adreno families used by driver packages. */
 object GpuDriverRecommendations {
     fun currentDeviceProfile(): SnapdragonGpuProfile? =
-        profileForSoc(MobileSocNameMapper.currentDeviceName())
+        profileForGpu(MobileSocNameMapper.currentDeviceName(), GpuDriverCompatibility.deviceSnapshot().model)
 
     internal fun profileForSoc(socName: String): SnapdragonGpuProfile? =
         profileForGpu(socName, null)
 
     internal fun profileForGpu(socName: String, gpu: GpuModelInfo?): SnapdragonGpuProfile? {
-        val model = SocGpuCatalog.forSoc(socName) ?: gpu ?: return null
+        val model = gpu ?: SocGpuCatalog.forSoc(socName) ?: return null
         if (model.vendor != GpuVendor.ADRENO) return null
         val family = model.adrenoFamily ?: adrenoFamilyOf(model.displayName) ?: return null
         return SnapdragonGpuProfile(
@@ -94,12 +111,16 @@ object GpuDriverRecommendations {
             return GpuDriverMatch.OTHER_FAMILY
         }
 
+        return matchRequirements(driver.gpu, profile)
+    }
+
+    internal fun matchRequirements(gpu: String, profile: SnapdragonGpuProfile?): GpuDriverMatch {
         profile ?: return GpuDriverMatch.UNKNOWN
-        val supportedFamilies = supportedFamilies(driver.gpu)
+        val supportedFamilies = supportedFamilies(gpu)
         if (supportedFamilies.isEmpty()) return GpuDriverMatch.UNKNOWN
         if (profile.family !in supportedFamilies) return GpuDriverMatch.OTHER_FAMILY
 
-        val explicitModels = EXPLICIT_ADRENO_MODEL.find(driver.gpu)
+        val explicitModels = EXPLICIT_ADRENO_MODEL.find(gpu)
             ?.groupValues
             ?.getOrNull(1)
             ?.split('/', ',', ' ')
@@ -196,12 +217,13 @@ object GpuDriverCompatibility {
     private const val DRIVER_VENDOR_METADATA = "driver_vendor.txt"
     private const val MALI_SX2_CATALOG_ID_PREFIX = "mali-sx2-"
     private const val MALI_SX2_LIBRARY_NAME = "libvulkan_malisx2.so"
-    private val MALI_SX2_SUPPORTED_MODEL = Regex(
-        """^(?:mali|immortalis)-g(?:52|57|68|77|78(?:ae)?|615|715)(?:mc\d{1,2}|mp\d{1,2})?$""",
-        RegexOption.IGNORE_CASE
-    )
+    internal fun deviceSnapshot(): DeviceGpuSnapshot = DeviceGpuInfoProvider.snapshot.value
+        ?: DeviceGpuInfoResolver.resolve(null, MobileSocNameMapper.currentDeviceName())
 
-    fun deviceVendor(): GpuDriverVendor = deviceVendor(currentDeviceInfo())
+    fun deviceVendor(): GpuDriverVendor = vendorOfGpu(deviceSnapshot().model)
+
+    internal fun resolveDeviceVendor(deviceInfo: String, deviceGpu: DeviceGpuSnapshot?): GpuDriverVendor =
+        deviceGpu?.model?.let(::vendorOfGpu)?.takeIf { it != GpuDriverVendor.UNKNOWN } ?: deviceVendor(deviceInfo)
 
     fun vendorOfGpu(model: GpuModelInfo?): GpuDriverVendor = when (model?.vendor) {
         GpuVendor.ADRENO -> GpuDriverVendor.ADRENO
@@ -234,32 +256,106 @@ object GpuDriverCompatibility {
 
     fun isCatalogDriverCompatible(
         driver: RemoteGpuDriver,
-        deviceVendor: GpuDriverVendor = deviceVendor()
+        deviceVendor: GpuDriverVendor = deviceVendor(),
+        deviceGpu: DeviceGpuSnapshot? = null
     ): Boolean = isVendorCompatible(driver.vendor, deviceVendor) &&
-        (!driver.id.startsWith(MALI_SX2_CATALOG_ID_PREFIX, ignoreCase = true) || supportsMaliSx2Gpu())
+        catalogCompatibility(driver, deviceGpu ?: deviceSnapshot()).state == GpuDriverCompatibilityState.COMPATIBLE
 
     fun isInstalledDriverCompatible(
         mainLibraryName: String,
         driverVendor: GpuDriverVendor,
-        deviceVendor: GpuDriverVendor = deviceVendor()
-    ): Boolean = isVendorCompatible(driverVendor, deviceVendor) &&
-        (!mainLibraryName.substringAfterLast('/').substringAfterLast('\\')
-            .equals(MALI_SX2_LIBRARY_NAME, ignoreCase = true) || supportsMaliSx2Gpu())
+        deviceVendor: GpuDriverVendor = deviceVendor(),
+        deviceGpu: DeviceGpuSnapshot? = null,
+        supportedGpuModels: List<String> = emptyList(),
+        family: GpuDriverFamily = GpuDriverFamily.OTHER
+    ): Boolean = isVendorCompatible(driverVendor, deviceVendor) && GpuDriverSelectionPolicy.compatibility(
+        deviceGpu ?: deviceSnapshot(), GpuDriverPackageEvidence(
+            mainLibraryName, driverVendor.toGpuVendor(),
+            if (mainLibraryName.substringAfterLast('/').substringAfterLast('\\')
+                .equals(MALI_SX2_LIBRARY_NAME, true)) GpuDriverFamily.MALI_SX2 else family,
+            supportedGpuModels.toSet()
+        )
+    ).state == GpuDriverCompatibilityState.COMPATIBLE
 
-    internal fun supportsMaliSx2Gpu(): Boolean {
-        val socName = MobileSocNameMapper.currentDeviceName()
-        val model = SocGpuCatalog.forSoc(socName) ?: return true
-        if (model.vendor != GpuVendor.MALI) return false
-        val normalized = model.displayName.lowercase(Locale.US).replace(" ", "")
-        return MALI_SX2_SUPPORTED_MODEL.matches(normalized)
+    internal fun supportsMaliSx2Gpu(
+        device: DeviceGpuSnapshot = deviceSnapshot(), supportedModels: List<String> = emptyList()
+    ): Boolean = GpuDriverSelectionPolicy.compatibility(device, GpuDriverPackageEvidence(
+        "SX2", GpuVendor.MALI, GpuDriverFamily.MALI_SX2, supportedModels.toSet()
+    )).state == GpuDriverCompatibilityState.COMPATIBLE
+
+    fun catalogCompatibility(driver: RemoteGpuDriver, device: DeviceGpuSnapshot): GpuDriverSelectionCompatibility =
+        applyPackageRequirements(GpuDriverSelectionPolicy.compatibility(device, GpuDriverPackageEvidence(
+            driver.id, driver.vendor.toGpuVendor(), driver.family, driver.supportedGpuModels.toSet()
+        )), driver.vendor, driver.gpu, device)
+
+    internal fun installedCompatibility(driver: InstalledGpuDriver, device: DeviceGpuSnapshot): GpuDriverSelectionCompatibility =
+        applyPackageRequirements(GpuDriverSelectionPolicy.compatibility(device, driver.toPackageEvidence()),
+            driver.vendor, driver.gpu, device)
+
+    private fun applyPackageRequirements(
+        basic: GpuDriverSelectionCompatibility, vendor: GpuDriverVendor, gpu: String, device: DeviceGpuSnapshot
+    ): GpuDriverSelectionCompatibility {
+        if (basic.state != GpuDriverCompatibilityState.COMPATIBLE || vendor != GpuDriverVendor.ADRENO) return basic
+        return when (GpuDriverRecommendations.matchRequirements(gpu,
+            GpuDriverRecommendations.profileForGpu("", device.model))) {
+            GpuDriverMatch.COMPATIBLE -> basic
+            GpuDriverMatch.OTHER_FAMILY -> GpuDriverSelectionCompatibility(
+                GpuDriverCompatibilityState.INCOMPATIBLE, GpuDriverCompatibilityReason.PACKAGE_MODEL_NOT_DECLARED)
+            GpuDriverMatch.UNKNOWN -> GpuDriverSelectionCompatibility(
+                GpuDriverCompatibilityState.UNVERIFIED, GpuDriverCompatibilityReason.PACKAGE_REQUIREMENTS_UNVERIFIED)
+        }
     }
 
-    fun currentDevice(): GpuDriverDevice {
-        val vendor = deviceVendor()
+    fun resolveSelection(
+        globalName: String, gameOverride: String?, device: DeviceGpuSnapshot,
+        installed: List<InstalledGpuDriver>, runtime: GpuDriverRuntimeEvidence? = null
+    ): GpuDriverSelectionResult {
+        val result = GpuDriverSelectionPolicy.resolve(globalName, gameOverride, device,
+            installed.map { it.toPackageEvidence() }, runtime)
+        val pkg = installed.singleOrNull { it.name == result.requestedName } ?: return result
+        val verified = installedCompatibility(pkg, device)
+        if (verified.state == GpuDriverCompatibilityState.COMPATIBLE) return result
+        // Known Turnip on known Adreno may be attempted without a catalog generation declaration.
+        // Keep that package compatibility UNVERIFIED; this never claims native loading succeeded.
+        val manualTurnipAttempt = result.requestable && pkg.family == GpuDriverFamily.TURNIP &&
+            verified.reason == GpuDriverCompatibilityReason.PACKAGE_REQUIREMENTS_UNVERIFIED
+        if (manualTurnipAttempt) return result.copy(compatibility = verified,
+            decision = GpuDriverSelectionDecision.UNVERIFIED_HARDWARE, requestable = true,
+            nextLaunchName = result.requestedName)
+        val decision = when (result.decision) {
+            GpuDriverSelectionDecision.INVALID_FILE, GpuDriverSelectionDecision.MISSING_FILE,
+            GpuDriverSelectionDecision.UNVERIFIED_FILE, GpuDriverSelectionDecision.NATIVE_UNSUPPORTED -> result.decision
+            else -> if (verified.state == GpuDriverCompatibilityState.INCOMPATIBLE)
+                GpuDriverSelectionDecision.INCOMPATIBLE_HARDWARE else GpuDriverSelectionDecision.UNVERIFIED_HARDWARE
+        }
+        return result.copy(compatibility = verified, decision = decision, requestable = false, nextLaunchName = "")
+    }
+
+    fun catalogFamily(raw: String, id: String, name: String, gpu: String): GpuDriverFamily {
+        val text = "$raw $id $name $gpu".lowercase(Locale.US)
+        return when {
+            id.startsWith(MALI_SX2_CATALOG_ID_PREFIX, true) || "malisx2" in text -> GpuDriverFamily.MALI_SX2
+            "vortek" in text -> GpuDriverFamily.VORTEK
+            "panvk" in text || "panfrost" in text -> GpuDriverFamily.PANVK
+            raw.equals("Turnip", true) || "turnip" in text -> GpuDriverFamily.TURNIP
+            else -> GpuDriverFamily.OTHER
+        }
+    }
+
+    internal fun familyOfDriverLibrary(file: File): GpuDriverFamily = when {
+        file.name.equals(MALI_SX2_LIBRARY_NAME, true) -> GpuDriverFamily.MALI_SX2
+        file.containsAsciiMarker("vortek") -> GpuDriverFamily.VORTEK
+        file.containsAsciiMarker("panvk") || file.containsAsciiMarker("panfrost") -> GpuDriverFamily.PANVK
+        file.containsAsciiMarker("turnip") || file.containsAsciiMarker("freedreno") -> GpuDriverFamily.TURNIP
+        else -> GpuDriverFamily.OTHER
+    }
+
+    fun currentDevice(device: DeviceGpuSnapshot = deviceSnapshot()): GpuDriverDevice {
+        val vendor = vendorOfGpu(device.model)
         val socName = MobileSocNameMapper.currentDeviceName()
             .takeIf { it.isNotBlank() }
             ?: socLabel().ifBlank { vendor.displayName }
-        val catalogModel = SocGpuCatalog.forSoc(socName)
+        val catalogModel = device.model
         val gpuName = catalogModel?.displayName ?: when (vendor) {
             GpuDriverVendor.ADRENO ->
                 GpuDriverRecommendations.currentDeviceProfile()?.adrenoName ?: vendor.displayName
@@ -286,7 +382,7 @@ object GpuDriverCompatibility {
     fun vendorOfCatalogGpu(gpu: String): GpuDriverVendor {
         val normalized = gpu.lowercase(Locale.US)
         return when {
-            "xclipse" in normalized || "exynos" in normalized -> GpuDriverVendor.XCLIPSE
+            "xclipse" in normalized || "vortek" in normalized -> GpuDriverVendor.XCLIPSE
             "mali" in normalized || "panvk" in normalized || "panfrost" in normalized -> GpuDriverVendor.MALI
             "adreno" in normalized || "freedreno" in normalized || "turnip" in normalized -> GpuDriverVendor.ADRENO
             "powervr" in normalized || "imgtec" in normalized || "imagination" in normalized -> GpuDriverVendor.POWERVR
@@ -327,15 +423,14 @@ object GpuDriverCompatibility {
         driverVendor: GpuDriverVendor,
         deviceVendor: GpuDriverVendor = deviceVendor()
     ): Boolean {
-        if (driverVendor == GpuDriverVendor.UNKNOWN || deviceVendor == GpuDriverVendor.UNKNOWN) return true
-        return driverVendor == deviceVendor
+        return driverVendor.supportsCustomDrivers && deviceVendor.supportsCustomDrivers && driverVendor == deviceVendor
     }
 
     /** Reads the vendor recorded next to an installed library, if any. */
     fun installedDriverVendor(libraryFile: File): GpuDriverVendor {
         val metadata = libraryFile.parentFile?.let { File(it, DRIVER_VENDOR_METADATA) } ?: return GpuDriverVendor.UNKNOWN
         if (!metadata.isFile) return GpuDriverVendor.UNKNOWN
-        val stored = runCatching { metadata.readText().trim() }.getOrNull().orEmpty()
+        val stored = runCatching { metadata.readText(Charsets.UTF_8).trim() }.getOrNull().orEmpty()
         return GpuDriverVendor.entries.firstOrNull { it.name.equals(stored, ignoreCase = true) }
             ?: GpuDriverVendor.UNKNOWN
     }
@@ -343,7 +438,7 @@ object GpuDriverCompatibility {
     fun writeInstalledDriverVendor(libraryFile: File, vendor: GpuDriverVendor) {
         if (vendor == GpuDriverVendor.UNKNOWN) return
         runCatching {
-            libraryFile.parentFile?.let { File(it, DRIVER_VENDOR_METADATA).writeText(vendor.name) }
+            libraryFile.parentFile?.let { File(it, DRIVER_VENDOR_METADATA).writeText(vendor.name, Charsets.UTF_8) }
         }
     }
 

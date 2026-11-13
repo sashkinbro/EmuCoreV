@@ -297,10 +297,10 @@
     <string name="settings_gpu_driver_none_installed">Власні драйвери GPU ще не встановлені.</string>
     <string name="settings_gpu_driver_install_failed">Не вдалося встановити драйвер GPU.</string>
     <string name="settings_gpu_driver_install_success">Встановлено драйвер GPU: %1$s</string>
-    <string name="settings_gpu_driver_status_system">Активний системний драйвер Vulkan</string>
-    <string name="settings_gpu_driver_status_system_desc">Власний драйвер не вибрано, тому використовується системний драйвер Vulkan.</string>
-    <string name="settings_gpu_driver_status_active">Активний власний драйвер: %1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">Цей драйвер готовий до використання з Vulkan. Фактична підтримка все ще залежить від сумісності пристрою.</string>
+    <string name="settings_gpu_driver_status_system">Вибрано системний драйвер Vulkan</string>
+    <string name="settings_gpu_driver_status_system_desc">Для наступного запуску вибрано системний драйвер Vulkan.</string>
+    <string name="settings_gpu_driver_status_active">Вибрано власний драйвер: %1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">Вибрано для Vulkan. Драйвер, що працює зараз, не підтверджено.</string>
     <string name="settings_gpu_driver_status_renderer">Власний драйвер вибрано, але рендер — %1$s</string>
     <string name="settings_gpu_driver_status_renderer_desc">Власні драйвери GPU працюють лише з Vulkan. Перемкніть рендер на Vulkan, щоб використовувати цей драйвер.</string>
     <string name="settings_gpu_driver_status_broken">Архів драйвера неповний: %1$s не знайдено</string>
@@ -461,7 +461,7 @@
     <string name="settings_gpu_driver_manage">Керування драйверами</string>
     <string name="settings_gpu_driver_manager_title">Драйвери GPU</string>
     <string name="settings_gpu_driver_manager_subtitle">Встановлення, завантаження, застосування або видалення драйверів GPU.</string>
-    <string name="settings_gpu_driver_active_title">Активний драйвер</string>
+    <string name="settings_gpu_driver_active_title">Вибраний драйвер</string>
     <string name="settings_gpu_driver_install_from_file">Встановити з файлу</string>
     <string name="settings_gpu_driver_catalog">Каталог драйверів</string>
     <string name="settings_gpu_driver_refresh">Оновити</string>
@@ -471,7 +471,7 @@
     <string name="settings_gpu_driver_download_apply">Завантажити та застосувати</string>
     <string name="settings_gpu_driver_downloaded">Завантажено</string>
     <string name="settings_gpu_driver_apply">Застосувати</string>
-    <string name="settings_gpu_driver_applied">Застосовано</string>
+    <string name="settings_gpu_driver_applied">Вибрано</string>
     <string name="settings_gpu_driver_remove_short">Видалити</string>
     <string name="settings_gpu_driver_recommended">Рекомендовано</string>
     <string name="settings_gpu_driver_source">Джерело</string>
@@ -1599,4 +1599,12 @@
     <string name="rear_touch_clear">Прибрати призначення</string>
     <string name="rear_touch_hint">Утримуйте для дотику до задньої панелі; відпустіть, щоб підняти палець. Призначені кнопки замінюють звичну дію. Передній сенсор залишається доступним.</string>
     <string name="rear_touch_screen_position">Позиція екранної кнопки</string>
+    <string name="settings_gpu_driver_status_missing_selection">Вибраний драйвер недоступний: %1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">Вибраний драйвер несумісний із цим GPU.</string>
+    <string name="settings_gpu_driver_status_unverified_selection">Сумісність драйвера з цим GPU не перевірено.</string>
+    <string name="settings_gpu_driver_status_native_unverified">Вибрано для Vulkan. Підтримку на цьому пристрої не перевірено.</string>
+    <string name="settings_gpu_driver_status_native_unsupported">Поточна збірка емулятора не підтримує цей драйвер.</string>
+    <string name="settings_gpu_driver_status_invalid_selection">Файли вибраного драйвера пошкоджені. Перевстановіть драйвер.</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s (каталог пристроїв)</string>
+    <string name="settings_gpu_driver_device_unknown">Модель GPU не визначено.</string>
 </resources>

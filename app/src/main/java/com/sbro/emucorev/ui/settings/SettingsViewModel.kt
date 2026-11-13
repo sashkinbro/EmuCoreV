@@ -16,6 +16,8 @@ import com.sbro.emucorev.core.GpuDriverManager
 import com.sbro.emucorev.core.InstallStateBus
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.NativeLibraryLoader
+import com.sbro.emucorev.core.DeviceGpuInfoProvider
+import com.sbro.emucorev.core.GpuDriverCompatibility
 import com.sbro.emucorev.core.RemoteGpuDriver
 import com.sbro.emucorev.core.SettingsBackupRepository
 import com.sbro.emucorev.core.vendor
@@ -74,7 +76,8 @@ data class SettingsUiState(
     val trophySound: TrophySoundSettings = TrophySoundSettings(),
     val trophySoundError: Boolean = false,
     val appUpdate: AppUpdateUiState = AppUpdateUiState(),
-    val cacheSizeBytes: Long = 0L
+    val cacheSizeBytes: Long = 0L,
+    val gpuDriverPackagesLoaded: Boolean = false
 )
 
 data class StorageMigrationUiState(
@@ -131,7 +134,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             storagePath = EmulatorStorage.vitaRoot(application).absolutePath,
             storageLocations = EmulatorStorage.availableStorageLocations(application),
             coreConfig = initialCoreConfig,
-            installedGpuDrivers = gpuDriverManager.listInstalledDrivers(),
             appLanguage = preferences.appLanguage,
             confirmSaveStateActions = preferences.confirmSaveStateActions,
             showEmulationQuickBar = preferences.showEmulationQuickBar,
@@ -144,6 +146,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val coverCacheClearInProgress: StateFlow<Boolean> = _coverCacheClearInProgress.asStateFlow()
 
     init {
+        viewModelScope.launch(Dispatchers.IO) {
+            val installedDrivers = gpuDriverManager.listInstalledDrivers()
+            _uiState.update { it.copy(installedGpuDrivers = installedDrivers, gpuDriverPackagesLoaded = true) }
+        }
         viewModelScope.launch(Dispatchers.IO) {
             trophySoundRepository.refreshCustomAvailability()
             val settings = trophySoundRepository.current()
@@ -267,6 +273,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     storageLocations = EmulatorStorage.availableStorageLocations(context),
                     coreConfig = restoredConfig,
                     installedGpuDrivers = gpuDriverManager.listInstalledDrivers(),
+                    gpuDriverPackagesLoaded = true,
                     appLanguage = preferences.appLanguage,
                     trophySound = trophySoundRepository.current(),
                     trophySoundError = false
@@ -285,6 +292,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 storagePath = EmulatorStorage.vitaRoot(getApplication()).absolutePath,
                 storageLocations = EmulatorStorage.availableStorageLocations(getApplication()),
                 installedGpuDrivers = gpuDriverManager.listInstalledDrivers(),
+                gpuDriverPackagesLoaded = true,
                 appLanguage = preferences.appLanguage
             )
         }
@@ -498,15 +506,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             val result = runCatching {
                 val driverName = gpuDriverManager.installFromArchive(uri)
                 val installedDrivers = gpuDriverManager.listInstalledDrivers()
-                if (applyGlobally) {
+                val device = DeviceGpuInfoProvider.ensureLoaded(getApplication<Application>())
+                val eligible = GpuDriverCompatibility.resolveSelection(driverName, null, device, installedDrivers).requestable
+                if (applyGlobally && eligible) {
                     val updated = _uiState.value.coreConfig.copy(customDriverName = driverName)
                     coreConfigRepository.save(updated)
                     _uiState.value = _uiState.value.copy(
                         coreConfig = updated,
-                        installedGpuDrivers = installedDrivers
+                        installedGpuDrivers = installedDrivers,
+                        gpuDriverPackagesLoaded = true
                     )
                 } else {
-                    _uiState.value = _uiState.value.copy(installedGpuDrivers = installedDrivers)
+                    _uiState.value = _uiState.value.copy(installedGpuDrivers = installedDrivers, gpuDriverPackagesLoaded = true)
                 }
                 driverName
             }
@@ -552,17 +563,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         gpuDriverDownloads = _uiState.value.gpuDriverDownloads + (driver.id to progress)
                     )
                 }
-                val driverName = gpuDriverManager.installFromArchive(archive, driver.vendor)
+                val driverName = gpuDriverManager.installFromArchive(archive, driver.vendor, catalogDriver = driver)
                 val installedDrivers = gpuDriverManager.listInstalledDrivers()
-                if (applyGlobally) {
+                val device = DeviceGpuInfoProvider.ensureLoaded(getApplication<Application>())
+                val eligible = GpuDriverCompatibility.resolveSelection(driverName, null, device, installedDrivers).requestable
+                if (applyGlobally && eligible) {
                     val updated = _uiState.value.coreConfig.copy(customDriverName = driverName)
                     coreConfigRepository.save(updated)
                     _uiState.value = _uiState.value.copy(
                         coreConfig = updated,
-                        installedGpuDrivers = installedDrivers
+                        installedGpuDrivers = installedDrivers,
+                        gpuDriverPackagesLoaded = true
                     )
                 } else {
-                    _uiState.value = _uiState.value.copy(installedGpuDrivers = installedDrivers)
+                    _uiState.value = _uiState.value.copy(installedGpuDrivers = installedDrivers, gpuDriverPackagesLoaded = true)
                 }
                 driverName
             }
@@ -580,22 +594,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun selectGpuDriver(driverName: String) {
+        val selection = GpuDriverCompatibility.resolveSelection(
+            driverName, null, DeviceGpuInfoProvider.get(getApplication<Application>()), _uiState.value.installedGpuDrivers
+        )
+        if (!selection.requestable) return
         updateCoreSettings { it.copy(customDriverName = driverName) }
     }
 
     fun removeGpuDriver(driverName: String) {
         viewModelScope.launch(Dispatchers.IO) {
             gpuDriverManager.remove(driverName)
-            val updated = if (_uiState.value.coreConfig.customDriverName == driverName) {
-                _uiState.value.coreConfig.copy(customDriverName = "")
-            } else {
-                _uiState.value.coreConfig
-            }
-            coreConfigRepository.save(updated)
-            _uiState.value = _uiState.value.copy(
-                coreConfig = updated,
-                installedGpuDrivers = gpuDriverManager.listInstalledDrivers()
-            )
+            // Removing files does not change the user's requested selection. Missing selections
+            // remain visible until the user explicitly chooses System or another exact package.
+            val installedDrivers = gpuDriverManager.listInstalledDrivers()
+            _uiState.update { it.copy(installedGpuDrivers = installedDrivers, gpuDriverPackagesLoaded = true) }
         }
     }
 

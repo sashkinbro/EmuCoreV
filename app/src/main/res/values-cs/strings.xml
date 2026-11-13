@@ -556,7 +556,7 @@
     <string name="settings_gpu_driver_manager_title">Ovladače GPU</string>
     <string name="settings_gpu_driver_game_title">Ovladač GPU pro hru</string>
     <string name="settings_gpu_driver_manager_subtitle">Instalace, stažení, použití nebo odebrání ovladačů GPU.</string>
-    <string name="settings_gpu_driver_active_title">Aktivní ovladač</string>
+    <string name="settings_gpu_driver_active_title">Vybraný ovladač</string>
     <string name="settings_gpu_driver_install_from_file">Nainstalovat ze souboru</string>
     <string name="settings_gpu_driver_catalog">Katalog ovladačů</string>
     <string name="settings_gpu_driver_refresh">Aktualizovat</string>
@@ -566,7 +566,7 @@
     <string name="settings_gpu_driver_download_apply">Stáhnout &amp; použít</string>
     <string name="settings_gpu_driver_downloaded">Staženo</string>
     <string name="settings_gpu_driver_apply">Použít</string>
-    <string name="settings_gpu_driver_applied">Použito</string>
+    <string name="settings_gpu_driver_applied">Vybráno</string>
     <string name="settings_gpu_driver_remove_short">Odebrat</string>
     <string name="settings_gpu_driver_recommended">Doporučeno</string>
     <string name="settings_gpu_driver_source">Zdroj</string>
@@ -579,15 +579,15 @@
     <string name="settings_gpu_driver_none_installed">Zatím nejsou nainstalovány žádné vlastní ovladače GPU.</string>
     <string name="settings_gpu_driver_install_failed">Instalace ovladače GPU se nezdařila.</string>
     <string name="settings_gpu_driver_install_success">Nainstalován ovladač GPU: %1$s</string>
-    <string name="settings_gpu_driver_status_system">Je aktivní systémový ovladač Vulkan</string>
+    <string name="settings_gpu_driver_status_system">Vybrán systémový ovladač Vulkan</string>
     <string name="settings_gpu_driver_status_global">Používá se globální ovladač GPU: %1$s</string>
     <string name="settings_gpu_driver_status_global_system">Používá se globální ovladač GPU: Systémový Vulkan</string>
     <string name="settings_gpu_driver_status_global_desc">Tato hra používá globální volbu ovladače GPU.</string>
     <string name="settings_gpu_driver_status_game_system">Přepis hry: systémový ovladač Vulkan</string>
     <string name="settings_gpu_driver_status_game_active">Přepis hry: %1$s</string>
-    <string name="settings_gpu_driver_status_system_desc">Není vybrán žádný vlastní ovladač, proto se používá systémový ovladač Vulkan.</string>
-    <string name="settings_gpu_driver_status_active">Aktivní vlastní ovladač: %1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">Tento ovladač je připraven k použití s Vulkanem. Skutečná podpora stále závisí na kompatibilitě zařízení.</string>
+    <string name="settings_gpu_driver_status_system_desc">Pro příští spuštění je vybrán systémový ovladač Vulkan.</string>
+    <string name="settings_gpu_driver_status_active">Vybrán vlastní ovladač: %1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">Vybráno pro Vulkan. Aktuálně používaný ovladač nebyl potvrzen.</string>
     <string name="settings_gpu_driver_status_renderer">Je vybrán vlastní ovladač, ale renderer je %1$s</string>
     <string name="settings_gpu_driver_status_renderer_desc">Vlastní ovladače GPU fungují pouze s Vulkanem. Chcete-li tento ovladač použít, přepněte renderer na Vulkan.</string>
     <string name="settings_gpu_driver_status_broken">Archiv ovladače je neúplný: %1$s nebyl nalezen</string>
@@ -1600,4 +1600,12 @@
     <string name="rear_touch_clear">Zrušit přiřazení</string>
     <string name="rear_touch_hint">Podržte pro dotyk zadního panelu; uvolněte pro ukončení dotyku. Přiřazené vstupy nahrazují běžnou akci. Přední dotyk zůstává dostupný.</string>
     <string name="rear_touch_screen_position">Poloha tlačítka na obrazovce</string>
+    <string name="settings_gpu_driver_status_missing_selection">Vybraný ovladač není dostupný: %1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">Vybraný ovladač není kompatibilní s tímto GPU.</string>
+    <string name="settings_gpu_driver_status_unverified_selection">Kompatibilita ovladače s tímto GPU nebyla ověřena.</string>
+    <string name="settings_gpu_driver_status_native_unverified">Vybráno pro Vulkan. Podpora na tomto zařízení nebyla ověřena.</string>
+    <string name="settings_gpu_driver_status_native_unsupported">Aktuální verze emulátoru tento ovladač nepodporuje.</string>
+    <string name="settings_gpu_driver_status_invalid_selection">Soubory vybraného ovladače jsou neplatné. Nainstalujte ovladač znovu.</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s (katalog zařízení)</string>
+    <string name="settings_gpu_driver_device_unknown">Hardware GPU nebyl rozpoznán.</string>
 </resources>

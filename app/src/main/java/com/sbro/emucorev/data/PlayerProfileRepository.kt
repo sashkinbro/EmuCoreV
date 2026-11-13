@@ -734,7 +734,8 @@ class PlayerProfileRepository(context: Context) {
             ramMb = (device["ramMb"] as? Number)?.toLong() ?: 0L,
             androidVersion = device["androidVersion"] as? String ?: "",
             appVersion = device["appVersion"] as? String ?: "",
-            coreVersion = device["coreVersion"] as? String ?: ""
+            coreVersion = device["coreVersion"] as? String ?: "",
+            gpuModel = device["gpuModel"] as? String ?: ""
         )
     }
 

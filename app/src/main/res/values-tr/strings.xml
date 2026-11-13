@@ -305,7 +305,7 @@
     <string name="settings_gpu_driver_manage">Sürücüleri yönet</string>
     <string name="settings_gpu_driver_manager_title">GPU sürücüleri</string>
     <string name="settings_gpu_driver_manager_subtitle">GPU sürücülerini yükleyin, indirin, uygulayın veya kaldırın.</string>
-    <string name="settings_gpu_driver_active_title">Aktif sürücü</string>
+    <string name="settings_gpu_driver_active_title">Seçilen sürücü</string>
     <string name="settings_gpu_driver_install_from_file">Dosyadan yükle</string>
     <string name="settings_gpu_driver_catalog">Sürücü kataloğu</string>
     <string name="settings_gpu_driver_refresh">Yenile</string>
@@ -315,7 +315,7 @@
     <string name="settings_gpu_driver_download_apply">İndir ve uygula</string>
     <string name="settings_gpu_driver_downloaded">İndirildi</string>
     <string name="settings_gpu_driver_apply">Uygula</string>
-    <string name="settings_gpu_driver_applied">Uygulandı</string>
+    <string name="settings_gpu_driver_applied">Seçildi</string>
     <string name="settings_gpu_driver_remove_short">Kaldır</string>
     <string name="settings_gpu_driver_recommended">Önerilen</string>
     <string name="settings_gpu_driver_source">Kaynak</string>
@@ -328,10 +328,10 @@
     <string name="settings_gpu_driver_none_installed">Henüz yüklü özel bir GPU sürücüsü yok.</string>
     <string name="settings_gpu_driver_install_failed">GPU sürücüsü yüklemesi başarısız oldu.</string>
     <string name="settings_gpu_driver_install_success">Yüklenen GPU sürücüsü: %1$s</string>
-    <string name="settings_gpu_driver_status_system">Sistem Vulkan sürücüsü aktif</string>
-    <string name="settings_gpu_driver_status_system_desc">Özel bir sürücü seçilmedi, bu nedenle sistem Vulkan sürücüsü kullanılıyor.</string>
-    <string name="settings_gpu_driver_status_active">Özel sürücü aktif: %1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">Bu sürücü Vulkan ile kullanıma hazır. Gerçek destek hala cihaz uyumluluğuna bağlıdır.</string>
+    <string name="settings_gpu_driver_status_system">Sistem Vulkan sürücüsü seçildi</string>
+    <string name="settings_gpu_driver_status_system_desc">Bir sonraki başlatma için sistem Vulkan sürücüsü seçildi.</string>
+    <string name="settings_gpu_driver_status_active">Özel sürücü seçildi: %1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">Vulkan için seçildi. Kullanılan sürücü doğrulanmadı.</string>
     <string name="settings_gpu_driver_status_renderer">Özel sürücü seçildi, ancak işleyici %1$s</string>
     <string name="settings_gpu_driver_status_renderer_desc">Özel GPU sürücüleri yalnızca Vulkan ile çalışır. Bu sürücüyü kullanmak için işleyiciyi Vulkan olarak değiştirin.</string>
     <string name="settings_gpu_driver_status_broken">Sürücü arşivi eksik: %1$s bulunamadı</string>
@@ -1596,4 +1596,12 @@
     <string name="rear_touch_clear">Atamayı temizle</string>
     <string name="rear_touch_hint">Arka panele dokunmak için basılı tutun, dokunmayı bitirmek için bırakın. Atanan girişler normal eylemlerinin yerine geçer. Ön dokunmatik kullanılabilir kalır.</string>
     <string name="rear_touch_screen_position">Ekran düğmesinin konumu</string>
+    <string name="settings_gpu_driver_status_missing_selection">Seçilen sürücü kullanılamıyor: %1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">Seçilen sürücü bu GPU ile uyumlu değil.</string>
+    <string name="settings_gpu_driver_status_unverified_selection">Sürücünün bu GPU ile uyumluluğu doğrulanmadı.</string>
+    <string name="settings_gpu_driver_status_native_unverified">Vulkan için seçildi. Bu cihazdaki destek doğrulanmadı.</string>
+    <string name="settings_gpu_driver_status_native_unsupported">Emülatörün mevcut sürümü bu sürücüyü desteklemiyor.</string>
+    <string name="settings_gpu_driver_status_invalid_selection">Seçilen sürücünün dosyaları geçersiz. Sürücüyü yeniden yükleyin.</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s (cihaz kataloğu)</string>
+    <string name="settings_gpu_driver_device_unknown">GPU donanımı belirlenemedi.</string>
 </resources>

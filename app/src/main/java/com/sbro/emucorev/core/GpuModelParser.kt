@@ -13,16 +13,19 @@ object GpuModelParser {
         "qemu"
     )
 
-    private val ADRENO = Regex("""adreno[\s\-]*(?:\(tm\)\s*)?(\d{3})""", RegexOption.IGNORE_CASE)
+    private val ADRENO = Regex("""adreno[\s\-]*(?:\(tm\)\s*)?(\d{3})(?!\d)""", RegexOption.IGNORE_CASE)
     private val IMMORTALIS =
         Regex("""immortalis[\s\-]*g\s*(\d{3})(?:\s*((?:mc|mp)\s*\d{1,2}))?""", RegexOption.IGNORE_CASE)
     private val MALI_NEXT_GEN =
         Regex(
-            """mali[\s\-]*g\s*([12])(?:[\s\-]+(ultra(?:[\s\-]+nx)?))?(?:[\s\-]*((?:mc|mp)\s*\d{1,2}))?""",
+            """mali[\s\-]*g\s*([12])(?!\d)(?:[\s\-]+(ultra(?:[\s\-]+nx)?))?(?:[\s\-]*((?:mc|mp)\s*\d{1,2})(?!\d))?""",
             RegexOption.IGNORE_CASE
         )
     private val MALI =
-        Regex("""mali[\s\-]*(g|t)?\s*(\d{2,4})(?:\s*((?:mc|mp)\s*\d{1,2}))?""", RegexOption.IGNORE_CASE)
+        Regex(
+            """mali[\s\-]*(g|t)?\s*(\d{2,4})(?!\d)(?:\s+r\d+(?:p\d+)?)?(?:[\s\-]+\d+ee)?(?:\s*((?:mc|mp)\s*\d{1,2})(?!\d))?""",
+            RegexOption.IGNORE_CASE
+        )
     private val XCLIPSE = Regex("""xclipse[\s\-]*(\d{3})""", RegexOption.IGNORE_CASE)
     private val MALEOON = Regex("""maleoon[\s\-]*(\d{3})""", RegexOption.IGNORE_CASE)
     private val POWERVR_CXT =

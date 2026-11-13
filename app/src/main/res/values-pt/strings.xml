@@ -297,10 +297,10 @@
     <string name="settings_gpu_driver_none_installed">Nenhum driver de GPU personalizado foi instalado ainda.</string>
     <string name="settings_gpu_driver_install_failed">A instalação do driver da GPU falhou.</string>
     <string name="settings_gpu_driver_install_success">Driver de GPU instalado: %1$s</string>
-    <string name="settings_gpu_driver_status_system">Driver Vulkan do sistema está ativo</string>
-    <string name="settings_gpu_driver_status_system_desc">Nenhum driver personalizado está selecionado, portanto, o driver Vulkan do sistema está sendo usado.</string>
-    <string name="settings_gpu_driver_status_active">Driver personalizado ativo: %1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">Este driver está pronto para uso com o Vulkan. O suporte real ainda depende da compatibilidade do dispositivo.</string>
+    <string name="settings_gpu_driver_status_system">Driver Vulkan do sistema selecionado</string>
+    <string name="settings_gpu_driver_status_system_desc">O driver Vulkan do sistema está selecionado para a próxima inicialização.</string>
+    <string name="settings_gpu_driver_status_active">Driver personalizado selecionado: %1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">Selecionado para Vulkan. O driver em uso não foi confirmado.</string>
     <string name="settings_gpu_driver_status_renderer">O driver personalizado está selecionado, mas o renderizador é %1$s</string>
     <string name="settings_gpu_driver_status_renderer_desc">Drivers de GPU personalizados funcionam apenas com o Vulkan. Altere o renderizador para Vulkan para poder usar este driver.</string>
     <string name="settings_gpu_driver_status_broken">O arquivo do driver está incompleto: %1$s não foi encontrado</string>
@@ -475,7 +475,7 @@
     <string name="settings_gpu_driver_manage">Gerenciar drivers</string>
     <string name="settings_gpu_driver_manager_title">Drivers de GPU</string>
     <string name="settings_gpu_driver_manager_subtitle">Instale, baixe, aplique ou remova drivers de GPU.</string>
-    <string name="settings_gpu_driver_active_title">Driver ativo</string>
+    <string name="settings_gpu_driver_active_title">Driver selecionado</string>
     <string name="settings_gpu_driver_install_from_file">Instalar do arquivo</string>
     <string name="settings_gpu_driver_catalog">Catálogo de drivers</string>
     <string name="settings_gpu_driver_refresh">Atualizar</string>
@@ -485,7 +485,7 @@
     <string name="settings_gpu_driver_download_apply">Baixar e aplicar</string>
     <string name="settings_gpu_driver_downloaded">Baixado</string>
     <string name="settings_gpu_driver_apply">Aplicar</string>
-    <string name="settings_gpu_driver_applied">Aplicado</string>
+    <string name="settings_gpu_driver_applied">Selecionado</string>
     <string name="settings_gpu_driver_remove_short">Remover</string>
     <string name="settings_gpu_driver_recommended">Recomendado</string>
     <string name="settings_gpu_driver_source">Fonte</string>
@@ -1596,4 +1596,12 @@
     <string name="rear_touch_clear">Limpar atribuição</string>
     <string name="rear_touch_hint">Mantenha premido para tocar no painel traseiro; solte para levantar o toque. As entradas atribuídas substituem a ação habitual. O toque frontal continua disponível.</string>
     <string name="rear_touch_screen_position">Posição do botão no ecrã</string>
+    <string name="settings_gpu_driver_status_missing_selection">O driver selecionado está indisponível: %1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">O driver selecionado é incompatível com esta GPU.</string>
+    <string name="settings_gpu_driver_status_unverified_selection">A compatibilidade do driver com esta GPU não foi verificada.</string>
+    <string name="settings_gpu_driver_status_native_unverified">Selecionado para Vulkan. O suporte neste dispositivo não foi verificado.</string>
+    <string name="settings_gpu_driver_status_native_unsupported">A versão atual do emulador não oferece suporte a este driver.</string>
+    <string name="settings_gpu_driver_status_invalid_selection">Os arquivos do driver selecionado são inválidos. Reinstale o driver.</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s (catálogo de dispositivos)</string>
+    <string name="settings_gpu_driver_device_unknown">O hardware da GPU não foi identificado.</string>
 </resources>

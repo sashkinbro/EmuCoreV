@@ -6,6 +6,7 @@ import com.sbro.emucorev.data.KeyboardMouseSettings
 import com.sbro.emucorev.data.KeyboardMouseSettingsCodec
 import org.json.JSONObject
 import org.w3c.dom.Element
+import org.w3c.dom.Document
 import java.io.File
 import java.io.StringWriter
 import javax.xml.parsers.DocumentBuilderFactory
@@ -40,7 +41,9 @@ class VitaGameSettingsRepository(private val context: Context) {
     fun customConfigFile(titleId: String): File = File(configDirectory, "config_${titleId.trim()}.xml")
 
     fun hasCustomConfig(titleId: String): Boolean {
-        return titleId.isNotBlank() && customConfigFile(titleId).exists()
+        if (titleId.isBlank()) return false
+        val file = customConfigFile(titleId)
+        return file.isFile && !isLaunchOnlyConfig(file)
     }
 
     fun loadEffective(titleId: String): VitaCoreConfig {
@@ -117,16 +120,30 @@ class VitaGameSettingsRepository(private val context: Context) {
         keyboardMouse: KeyboardMouseSettings?
     ) {
         if (titleId.isBlank()) return
-        if (keyboardMouse == null && !customConfigFile(titleId).exists()) return
+        if (keyboardMouse == null && !hasCustomConfig(titleId)) return
         saveProfile(titleId, config, customDriverOverride, keyboardMouse)
     }
 
-    fun syncEffectiveDriverForLaunch(titleId: String): VitaCoreConfig {
+    /** Existing launch callers run on Dispatchers.IO or SDLThread; never starts an EGL probe. */
+    fun syncEffectiveDriverForLaunch(titleId: String): VitaCoreConfig = synchronized(CONFIG_IO_LOCK) {
         val profile = loadProfile(titleId)
-        if (titleId.isNotBlank() && customConfigFile(titleId).exists()) {
-            saveProfile(titleId, profile.config, profile.customDriverOverride)
+        val effectiveName = resolveGpuDriverForLaunch(profile.config.customDriverName,
+            profile.config.backendRenderer, DeviceGpuInfoProvider.get(context),
+            if (profile.config.customDriverName.isBlank()) emptyList() else GpuDriverManager(context).listInstalledDrivers())
+        val effective = profile.config.copy(customDriverName = effectiveName)
+        if (titleId.isBlank()) return@synchronized effective
+        val file = customConfigFile(titleId)
+        val realProfile = file.isFile && !isLaunchOnlyConfig(file)
+        if (!realProfile && effectiveName == profile.config.customDriverName) {
+            // A prior temporary fallback must not pin future global settings or look like a profile.
+            if (file.exists()) check(file.delete()) { "Could not remove temporary launch config" }
+        } else if (!realProfile) {
+            configDirectory.mkdirs()
+            writeCustomConfig(file, effective, DRIVER_MODE_GLOBAL, null, launchOnly = true)
+        } else {
+            writeLaunchProjection(file, effective, profile.customDriverOverride)
         }
-        return profile.config
+        effective
     }
 
     fun update(titleId: String, transform: (VitaCoreConfig) -> VitaCoreConfig): VitaCoreConfig {
@@ -146,9 +163,13 @@ class VitaGameSettingsRepository(private val context: Context) {
     private fun readCustomConfig(file: File, base: VitaCoreConfig): VitaGameSettingsProfile {
         val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file)
         val root = doc.documentElement ?: return VitaGameSettingsProfile(base, null)
+        if (root.childElement("emucorev")?.boolAttr(LAUNCH_ONLY_ATTRIBUTE, false) == true) {
+            return VitaGameSettingsProfile(base, null)
+        }
         var config = base
         var rawDriverName: String? = null
         var driverMode: String? = null
+        var requestedDriverName: String? = null
         var keyboardMouse: KeyboardMouseSettings? = null
 
         root.childElement("core")?.let { core ->
@@ -219,6 +240,7 @@ class VitaGameSettingsRepository(private val context: Context) {
         }
         root.childElement("emucorev")?.let { own ->
             driverMode = own.stringAttrOrNull("gpu-driver-mode")
+            requestedDriverName = own.stringAttrOrNull(REQUESTED_DRIVER_ATTRIBUTE)
             keyboardMouse = own.childElement("keyboard-mouse")
                 ?.textContent
                 ?.takeIf { it.isNotBlank() }
@@ -261,7 +283,8 @@ class VitaGameSettingsRepository(private val context: Context) {
             )
         }
 
-        val customDriverOverride = resolveDriverOverride(driverMode, rawDriverName, base)
+        val customDriverOverride = resolveDriverOverride(driverMode,
+            if (driverMode == DRIVER_MODE_CUSTOM) requestedDriverName ?: rawDriverName else rawDriverName, base)
         return VitaGameSettingsProfile(
             config = config.copy(customDriverName = customDriverOverride ?: base.customDriverName),
             customDriverOverride = customDriverOverride,
@@ -273,7 +296,8 @@ class VitaGameSettingsRepository(private val context: Context) {
         file: File,
         config: VitaCoreConfig,
         driverMode: String,
-        keyboardMouse: KeyboardMouseSettings?
+        keyboardMouse: KeyboardMouseSettings?,
+        launchOnly: Boolean = false
     ) {
         val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
         val root = doc.createElement("config")
@@ -342,6 +366,8 @@ class VitaGameSettingsRepository(private val context: Context) {
         })
         root.appendChild(doc.createElement("emucorev").apply {
             setAttribute("gpu-driver-mode", driverMode)
+            if (driverMode == DRIVER_MODE_CUSTOM) setAttribute(REQUESTED_DRIVER_ATTRIBUTE, config.customDriverName)
+            if (launchOnly) setAttribute(LAUNCH_ONLY_ATTRIBUTE, "true")
             setAttribute("enable-gamepad-overlay", config.enableGamepadOverlay.toString())
             setAttribute("overlay-show-touch-switch", config.overlayShowTouchSwitch.toString())
             setAttribute("overlay-scale", config.overlayScale.toString())
@@ -378,6 +404,34 @@ class VitaGameSettingsRepository(private val context: Context) {
             }
         })
 
+        writeDocument(file, doc)
+    }
+
+    private fun isLaunchOnlyConfig(file: File): Boolean = runCatching {
+        DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file).documentElement
+            ?.childElement("emucorev")?.boolAttr(LAUNCH_ONLY_ATTRIBUTE, false) == true
+    }.getOrDefault(false)
+
+    /** Only driver projection metadata changes; unrelated native and app elements stay in the DOM. */
+    private fun writeLaunchProjection(file: File, effective: VitaCoreConfig, requestedOverride: String?) {
+        val doc = runCatching { DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file) }.getOrNull()
+        val root = doc?.documentElement
+        if (root == null) {
+            writeCustomConfig(file, effective, requestedOverride.driverMode(), null)
+            return
+        }
+        val gpu = root.childElement("gpu") ?: doc.createElement("gpu").also(root::appendChild)
+        gpu.setAttribute("custom-driver-name", effective.customDriverName)
+        val own = root.childElement("emucorev") ?: doc.createElement("emucorev").also(root::appendChild)
+        own.setAttribute("gpu-driver-mode", requestedOverride.driverMode())
+        own.removeAttribute(LAUNCH_ONLY_ATTRIBUTE)
+        if (requestedOverride != null && requestedOverride.isNotBlank()) {
+            own.setAttribute(REQUESTED_DRIVER_ATTRIBUTE, requestedOverride)
+        } else own.removeAttribute(REQUESTED_DRIVER_ATTRIBUTE)
+        writeDocument(file, doc)
+    }
+
+    private fun writeDocument(file: File, doc: Document) {
         val output = StringWriter()
         TransformerFactory.newInstance().newTransformer().apply {
             setOutputProperty(OutputKeys.INDENT, "yes")
@@ -436,5 +490,14 @@ class VitaGameSettingsRepository(private val context: Context) {
         private const val DRIVER_MODE_GLOBAL = "global"
         private const val DRIVER_MODE_SYSTEM = "system"
         private const val DRIVER_MODE_CUSTOM = "custom"
+        private const val REQUESTED_DRIVER_ATTRIBUTE = "gpu-driver-requested"
+        private const val LAUNCH_ONLY_ATTRIBUTE = "gpu-driver-launch-only"
     }
 }
+
+/** Requested settings stay unchanged; this value is only for the native next-launch projection. */
+internal fun resolveGpuDriverForLaunch(
+    requestedName: String, backendRenderer: String, device: DeviceGpuSnapshot, installed: List<InstalledGpuDriver>
+): String = if (backendRenderer != "Vulkan") "" else GpuDriverCompatibility.resolveSelection(
+    requestedName, null, device, installed
+).nextLaunchName

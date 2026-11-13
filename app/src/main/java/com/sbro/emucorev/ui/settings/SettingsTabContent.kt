@@ -54,6 +54,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -78,7 +79,8 @@ import com.sbro.emucorev.BuildConfig
 import com.sbro.emucorev.core.AndroidGyroscopeInput
 import com.sbro.emucorev.core.CHEATS_ENABLED
 import com.sbro.emucorev.core.GpuDriverCompatibility
-import com.sbro.emucorev.core.InstalledGpuDriver
+import com.sbro.emucorev.core.DeviceGpuInfoProvider
+import com.sbro.emucorev.core.GpuDriverSelectionResult
 import com.sbro.emucorev.core.FrameLimit
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaStorageLocation
@@ -249,9 +251,13 @@ private fun GeneralTab(
 
 @Composable
 private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel, onOpenGpuDriverSettings: () -> Unit) {
-    val selectedDriver = uiState.installedGpuDrivers.firstOrNull { it.name == uiState.coreConfig.customDriverName }
-    val customDriverAvailable = uiState.coreConfig.backendRenderer == "Vulkan" && selectedDriver?.isUsable == true
-    val customDriversSupported = remember { GpuDriverCompatibility.supportsCustomDrivers() }
+    val context = LocalContext.current
+    val publishedDevice by DeviceGpuInfoProvider.snapshot.collectAsState()
+    val device = publishedDevice ?: DeviceGpuInfoProvider.get(context)
+    LaunchedEffect(context) { DeviceGpuInfoProvider.ensureLoaded(context) }
+    val selection = GpuDriverCompatibility.resolveSelection(
+        uiState.coreConfig.customDriverName, null, device, uiState.installedGpuDrivers
+    )
 
     SectionCard(title = stringResource(R.string.settings_tab_graphics), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Chips(title = stringResource(R.string.settings_core_renderer_label), description = stringResource(R.string.settings_help_renderer), onResetDefault = { viewModel.updateCoreSettings { it.copy(backendRenderer = defaults.backendRenderer) } }) {
@@ -266,46 +272,38 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
                 viewModel
             ) { config, value -> config.copy(backendRenderer = value) }
         }
-        if (customDriversSupported) {
-            Chips(
-                title = stringResource(R.string.settings_gpu_driver),
-                description = stringResource(R.string.settings_help_gpu_driver),
-                onResetDefault = { viewModel.updateCoreSettings { it.copy(customDriverName = defaults.customDriverName) } }
-            ) {
-                FilterChip(
-                    colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
-                    shape = neonChipShape(),
-                    selected = uiState.coreConfig.customDriverName.isBlank(),
-                    onClick = { viewModel.updateCoreSettings { it.copy(customDriverName = "") } },
-                    label = { Text(stringResource(R.string.settings_gpu_driver_system)) }
-                )
-                FilterChip(
-                    colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
-                    shape = neonChipShape(),
-                    selected = uiState.coreConfig.customDriverName.isNotBlank(),
-                    onClick = {
-                        val firstDriver = uiState.installedGpuDrivers.firstOrNull()
-                        if (firstDriver != null) {
-                            viewModel.updateCoreSettings { it.copy(customDriverName = firstDriver.name) }
-                        }
-                    },
-                    enabled = uiState.installedGpuDrivers.isNotEmpty(),
-                    label = { Text(stringResource(R.string.settings_gpu_driver_custom)) }
-                )
-            }
-            GpuDriverStatus(
-                selectedDriver = selectedDriver,
-                backendRenderer = uiState.coreConfig.backendRenderer,
-                isActive = customDriverAvailable,
-                modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
+        Chips(
+            title = stringResource(R.string.settings_gpu_driver),
+            description = stringResource(R.string.settings_help_gpu_driver),
+            onResetDefault = { viewModel.updateCoreSettings { it.copy(customDriverName = defaults.customDriverName) } }
+        ) {
+            FilterChip(
+                colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
+                shape = neonChipShape(),
+                selected = uiState.coreConfig.customDriverName.isBlank(),
+                onClick = viewModel::useSystemGpuDriver,
+                label = { Text(stringResource(R.string.settings_gpu_driver_system)) }
             )
-            Button(
-                shape = neonButtonShape(),
+            FilterChip(
+                colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
+                shape = neonChipShape(),
+                selected = uiState.coreConfig.customDriverName.isNotBlank(),
                 onClick = onOpenGpuDriverSettings,
-                modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
-            ) {
-                Text(stringResource(R.string.settings_gpu_driver_manage))
-            }
+                label = { Text(stringResource(R.string.settings_gpu_driver_custom)) }
+            )
+        }
+        GpuDriverStatus(
+            selection = selection,
+            backendRenderer = uiState.coreConfig.backendRenderer,
+            loading = !uiState.gpuDriverPackagesLoaded,
+            modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
+        )
+        Button(
+            shape = neonButtonShape(),
+            onClick = onOpenGpuDriverSettings,
+            modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
+        ) {
+            Text(stringResource(R.string.settings_gpu_driver_manage))
         }
         Toggle(stringResource(R.string.settings_use_angle), stringResource(R.string.settings_help_use_angle), uiState.coreConfig.useAngle, { enabled -> viewModel.updateCoreSettings { it.copy(useAngle = enabled) } }, { viewModel.updateCoreSettings { it.copy(useAngle = defaults.useAngle) } }, enabled = uiState.coreConfig.backendRenderer == "OpenGL")
         Toggle(stringResource(R.string.settings_core_high_accuracy), stringResource(R.string.settings_help_high_accuracy), uiState.coreConfig.highAccuracy, { enabled -> viewModel.updateCoreSettings { it.copy(highAccuracy = enabled) } }, { viewModel.updateCoreSettings { it.copy(highAccuracy = defaults.highAccuracy) } })
@@ -358,23 +356,14 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
 
 @Composable
 private fun GpuDriverStatus(
-    selectedDriver: InstalledGpuDriver?,
+    selection: GpuDriverSelectionResult,
     backendRenderer: String,
-    isActive: Boolean,
+    loading: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val text = when {
-        selectedDriver == null -> stringResource(R.string.settings_gpu_driver_status_system)
-        !selectedDriver.isUsable -> stringResource(R.string.settings_gpu_driver_status_broken, selectedDriver.name)
-        backendRenderer != "Vulkan" -> stringResource(R.string.settings_gpu_driver_status_renderer, backendRenderer)
-        else -> stringResource(R.string.settings_gpu_driver_status_active, selectedDriver.name)
-    }
-    val supporting = when {
-        selectedDriver == null -> stringResource(R.string.settings_gpu_driver_status_system_desc)
-        !selectedDriver.isUsable -> stringResource(R.string.settings_gpu_driver_status_broken_desc)
-        !isActive -> stringResource(R.string.settings_gpu_driver_status_renderer_desc)
-        else -> stringResource(R.string.settings_gpu_driver_status_active_desc)
-    }
+    val (title, detail) = gpuDriverSelectionSummary(selection, backendRenderer, false)
+    val text = if (loading) stringResource(R.string.common_loading) else title
+    val supporting = if (loading) "" else detail
 
     Surface(
         modifier = modifier
@@ -389,7 +378,7 @@ private fun GpuDriverStatus(
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Text(
+            if (supporting.isNotEmpty()) Text(
                 text = supporting,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

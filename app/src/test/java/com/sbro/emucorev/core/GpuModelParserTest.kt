@@ -6,6 +6,33 @@ import org.junit.Test
 
 class GpuModelParserTest {
     @Test
+    fun `does not truncate longer numeric model identifiers`() {
+        assertNull(GpuModelParser.parse("Adreno 8300"))
+        assertEquals("Mali-G100", GpuModelParser.parse("Mali-G100")?.displayName)
+        assertEquals("Mali-G200", GpuModelParser.parse("Mali-G200")?.displayName)
+        assertNull(GpuModelParser.parse("Mali-G52000"))
+    }
+
+    @Test
+    fun `Mali revision and execution engines do not replace shader core count`() {
+        assertEquals("Mali-G52 MC2", GpuModelParser.parse("Mali-G52 r1 MC2")?.displayName)
+        assertEquals("Mali-G52 MC1", GpuModelParser.parse("Mali-G52 r1p0 2EE MC1")?.displayName)
+        assertEquals("Mali-G52 MC1", GpuModelParser.parse("Mali-G52 3EE MC1")?.displayName)
+        assertEquals("Mali-G52", GpuModelParser.parse("Mali-G52-2EE")?.displayName)
+        assertEquals("Mali-G52", GpuModelParser.parse("Mali-G52 r1p0 2EE")?.displayName)
+        assertEquals("Mali-G52", GpuModelParser.parse("Mali-G52 MC123")?.displayName)
+    }
+
+    @Test
+    fun `V name adapter preserves canonical parsing and software rejection`() {
+        assertEquals("Mali-G100", parseGpuModelName("Mali-G100"))
+        assertEquals("Adreno 640", parseGpuModelName("Adreno (TM) 640"))
+        listOf("SwiftShader Adreno 640", "llvmpipe Mali-G52", "QEMU Adreno 830").forEach {
+            assertNull(parseGpuModelName(it))
+        }
+    }
+
+    @Test
     fun `parses Adreno renderer strings`() {
         assertEquals("Adreno 610", GpuModelParser.parse("Adreno (TM) 610")?.displayName)
         assertEquals(GpuVendor.ADRENO, GpuModelParser.parse("Adreno (TM) 610")?.vendor)

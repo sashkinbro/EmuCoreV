@@ -297,10 +297,10 @@
     <string name="settings_gpu_driver_none_installed">Noch keine benutzerdefinierten GPU-Treiber installiert.</string>
     <string name="settings_gpu_driver_install_failed">GPU-Treiberinstallation fehlgeschlagen.</string>
     <string name="settings_gpu_driver_install_success">Installierter GPU-Treiber: %1$s</string>
-    <string name="settings_gpu_driver_status_system">System-Vulkan-Treiber ist aktiv</string>
-    <string name="settings_gpu_driver_status_system_desc">Es ist kein benutzerdefinierter Treiber ausgewählt, daher wird der System-Vulkan-Treiber verwendet.</string>
-    <string name="settings_gpu_driver_status_active">Benutzerdefinierter Treiber aktiv: %1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">Dieser Treiber ist bereit für die Verwendung mit Vulkan. Die tatsächliche Unterstützung hängt weiterhin von der Gerätekompatibilität ab.</string>
+    <string name="settings_gpu_driver_status_system">System-Vulkan-Treiber ausgewählt</string>
+    <string name="settings_gpu_driver_status_system_desc">Der System-Vulkan-Treiber ist für den nächsten Start ausgewählt.</string>
+    <string name="settings_gpu_driver_status_active">Benutzerdefinierter Treiber ausgewählt: %1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">Für Vulkan ausgewählt. Der aktuell verwendete Treiber wurde nicht bestätigt.</string>
     <string name="settings_gpu_driver_status_renderer">Benutzerdefinierter Treiber ausgewählt, aber Renderer ist %1$s</string>
     <string name="settings_gpu_driver_status_renderer_desc">Benutzerdefinierte GPU-Treiber funktionieren nur mit Vulkan. Wechsle den Renderer auf Vulkan, um diesen Treiber zu nutzen.</string>
     <string name="settings_gpu_driver_status_broken">Treiber-Archiv ist unvollständig: %1$s nicht gefunden</string>
@@ -475,7 +475,7 @@
     <string name="settings_gpu_driver_manage">Treiber verwalten</string>
     <string name="settings_gpu_driver_manager_title">GPU-Treiber</string>
     <string name="settings_gpu_driver_manager_subtitle">GPU-Treiber installieren, herunterladen, anwenden oder entfernen.</string>
-    <string name="settings_gpu_driver_active_title">Aktiver Treiber</string>
+    <string name="settings_gpu_driver_active_title">Ausgewählter Treiber</string>
     <string name="settings_gpu_driver_install_from_file">Aus Datei installieren</string>
     <string name="settings_gpu_driver_catalog">Treiberkatalog</string>
     <string name="settings_gpu_driver_refresh">Aktualisieren</string>
@@ -485,7 +485,7 @@
     <string name="settings_gpu_driver_download_apply">Herunterladen &amp; anwenden</string>
     <string name="settings_gpu_driver_downloaded">Heruntergeladen</string>
     <string name="settings_gpu_driver_apply">Anwenden</string>
-    <string name="settings_gpu_driver_applied">Angewendet</string>
+    <string name="settings_gpu_driver_applied">Ausgewählt</string>
     <string name="settings_gpu_driver_remove_short">Entfernen</string>
     <string name="settings_gpu_driver_recommended">Empfohlen</string>
     <string name="settings_gpu_driver_source">Quelle</string>
@@ -1596,4 +1596,12 @@
     <string name="rear_touch_clear">Zuweisung löschen</string>
     <string name="rear_touch_hint">Zum Berühren gedrückt halten; zum Loslassen lösen. Zugewiesene Eingaben ersetzen ihre normale Aktion. Vordere Berührungen bleiben verfügbar.</string>
     <string name="rear_touch_screen_position">Position der Bildschirmtaste</string>
+    <string name="settings_gpu_driver_status_missing_selection">Ausgewählter Treiber nicht verfügbar: %1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">Der ausgewählte Treiber ist mit dieser GPU nicht kompatibel.</string>
+    <string name="settings_gpu_driver_status_unverified_selection">Die Treiberkompatibilität mit dieser GPU wurde nicht überprüft.</string>
+    <string name="settings_gpu_driver_status_native_unverified">Für Vulkan ausgewählt. Die Unterstützung auf diesem Gerät wurde nicht überprüft.</string>
+    <string name="settings_gpu_driver_status_native_unsupported">Dieser Treiber wird von der aktuellen Emulatorversion nicht unterstützt.</string>
+    <string name="settings_gpu_driver_status_invalid_selection">Die Dateien des ausgewählten Treibers sind ungültig. Installiere den Treiber erneut.</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s (Gerätekatalog)</string>
+    <string name="settings_gpu_driver_device_unknown">Die GPU-Hardware wurde nicht erkannt.</string>
 </resources>

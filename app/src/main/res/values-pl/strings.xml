@@ -556,7 +556,7 @@
     <string name="settings_gpu_driver_manager_title">Sterowniki GPU</string>
     <string name="settings_gpu_driver_game_title">Sterownik GPU gry</string>
     <string name="settings_gpu_driver_manager_subtitle">Instaluj, pobieraj, stosuj lub usuwaj sterowniki GPU.</string>
-    <string name="settings_gpu_driver_active_title">Aktywny sterownik</string>
+    <string name="settings_gpu_driver_active_title">Wybrany sterownik</string>
     <string name="settings_gpu_driver_install_from_file">Zainstaluj z pliku</string>
     <string name="settings_gpu_driver_catalog">Katalog sterowników</string>
     <string name="settings_gpu_driver_refresh">Odśwież</string>
@@ -566,7 +566,7 @@
     <string name="settings_gpu_driver_download_apply">Pobierz &amp; zastosuj</string>
     <string name="settings_gpu_driver_downloaded">Pobrano</string>
     <string name="settings_gpu_driver_apply">Zastosuj</string>
-    <string name="settings_gpu_driver_applied">Zastosowano</string>
+    <string name="settings_gpu_driver_applied">Wybrano</string>
     <string name="settings_gpu_driver_remove_short">Usuń</string>
     <string name="settings_gpu_driver_recommended">Zalecany</string>
     <string name="settings_gpu_driver_source">Źródło</string>
@@ -579,15 +579,15 @@
     <string name="settings_gpu_driver_none_installed">Nie zainstalowano jeszcze niestandardowych sterowników GPU.</string>
     <string name="settings_gpu_driver_install_failed">Instalacja sterownika GPU nie powiodła się.</string>
     <string name="settings_gpu_driver_install_success">Zainstalowano sterownik GPU: %1$s</string>
-    <string name="settings_gpu_driver_status_system">Aktywny jest systemowy sterownik Vulkan</string>
+    <string name="settings_gpu_driver_status_system">Wybrano systemowy sterownik Vulkan</string>
     <string name="settings_gpu_driver_status_global">Używany jest globalny sterownik GPU: %1$s</string>
     <string name="settings_gpu_driver_status_global_system">Używany jest globalny sterownik GPU: systemowy Vulkan</string>
     <string name="settings_gpu_driver_status_global_desc">Ta gra używa globalnego wyboru sterownika GPU.</string>
     <string name="settings_gpu_driver_status_game_system">Nadpisanie gry: systemowy sterownik Vulkan</string>
     <string name="settings_gpu_driver_status_game_active">Nadpisanie gry: %1$s</string>
-    <string name="settings_gpu_driver_status_system_desc">Nie wybrano niestandardowego sterownika, więc używany jest systemowy sterownik Vulkan.</string>
-    <string name="settings_gpu_driver_status_active">Aktywny niestandardowy sterownik: %1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">Ten sterownik jest gotowy do użycia z Vulkan. Rzeczywista obsługa nadal zależy od zgodności urządzenia.</string>
+    <string name="settings_gpu_driver_status_system_desc">Systemowy sterownik Vulkan został wybrany do następnego uruchomienia.</string>
+    <string name="settings_gpu_driver_status_active">Wybrano niestandardowy sterownik: %1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">Wybrano dla Vulkan. Nie potwierdzono aktualnie używanego sterownika.</string>
     <string name="settings_gpu_driver_status_renderer">Wybrano niestandardowy sterownik, ale renderer to %1$s</string>
     <string name="settings_gpu_driver_status_renderer_desc">Niestandardowe sterowniki GPU działają tylko z Vulkan. Przełącz renderer na Vulkan, aby użyć tego sterownika.</string>
     <string name="settings_gpu_driver_status_broken">Archiwum sterownika jest niekompletne: nie znaleziono %1$s</string>
@@ -1599,4 +1599,12 @@
     <string name="rear_touch_clear">Usuń przypisanie</string>
     <string name="rear_touch_hint">Przytrzymaj, aby dotknąć tylnego panelu; puść, aby zakończyć dotyk. Przypisane wejścia zastępują zwykłą akcję. Przedni dotyk pozostaje dostępny.</string>
     <string name="rear_touch_screen_position">Pozycja przycisku ekranowego</string>
+    <string name="settings_gpu_driver_status_missing_selection">Wybrany sterownik jest niedostępny: %1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">Wybrany sterownik jest niezgodny z tym GPU.</string>
+    <string name="settings_gpu_driver_status_unverified_selection">Nie zweryfikowano zgodności sterownika z tym GPU.</string>
+    <string name="settings_gpu_driver_status_native_unverified">Wybrano dla Vulkan. Nie zweryfikowano obsługi na tym urządzeniu.</string>
+    <string name="settings_gpu_driver_status_native_unsupported">Obecna wersja emulatora nie obsługuje tego sterownika.</string>
+    <string name="settings_gpu_driver_status_invalid_selection">Pliki wybranego sterownika są nieprawidłowe. Zainstaluj sterownik ponownie.</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s (katalog urządzeń)</string>
+    <string name="settings_gpu_driver_device_unknown">Nie rozpoznano sprzętu GPU.</string>
 </resources>

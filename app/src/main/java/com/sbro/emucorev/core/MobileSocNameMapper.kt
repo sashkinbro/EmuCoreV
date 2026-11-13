@@ -325,13 +325,57 @@ object MobileSocNameMapper {
         put("TEGRA124", "NVIDIA Tegra K1")
         put("TEGRA114", "NVIDIA Tegra 4")
         put("TEGRA30", "NVIDIA Tegra 3")
+
+        // Reference part names; shared Allwinner BSPs are resolved separately below.
+        put("A523", "Allwinner A523")
+        put("A527", "Allwinner A527")
+        put("T527", "Allwinner T527")
+        put("H728", "Allwinner H728")
+        put("A333", "Allwinner A333")
+        put("A537", "Allwinner A537")
+        put("MR527", "Allwinner MR527")
+        put("A133P", "Allwinner A133P")
+        put("A133", "Allwinner A133")
+        put("H700", "Allwinner H700")
+        put("H616", "Allwinner H616")
+        put("H618", "Allwinner H618")
     }
 
-    private val aliasesByLength = socNames.keys.sortedByDescending(String::length)
+    private const val ALPHANUMERIC = "[\\p{L}\\p{N}]"
+    private val codePatterns = socNames.keys
+        .filterNot { socNames.getValue(it).startsWith("Allwinner") }
+        .sortedByDescending(String::length)
+        .map { alias ->
+            val spelling = alias.map { Regex.escape(it.toString()) }.joinToString("[\\s_/-]*")
+            val suffix = if (alias.any(Char::isDigit)) "(?:[A-Z]+[A-Z0-9]*)?" else ""
+            alias to Regex("(?<!$ALPHANUMERIC)$spelling$suffix(?!$ALPHANUMERIC)")
+        }
+    private val allwinnerCode = Regex(
+        "(?<!$ALPHANUMERIC)(?:ALLWINNER[ ,_-]*)?" +
+            "(A133P?|A333|A523|A527|A537|T527|MR527|H616|H618|H700|H728)" +
+            "(?:[A-Z]+[A-Z0-9]*)?(?!$ALPHANUMERIC)"
+    )
+    private val samsungModelPrefix = Regex("(?<!$ALPHANUMERIC)SM[\\s_/-]+$")
+    private val allwinnerMarketingPart = Regex("^ALLWINNER\\s+[A-Z]{1,2}\\d{1,4}[A-Z0-9]*$", RegexOption.IGNORE_CASE)
+    private val eliteBoard = Regex("(?<!$ALPHANUMERIC)SUN(?!$ALPHANUMERIC)")
+    private val allwinnerPlatforms = listOf(
+        Regex("(?<!$ALPHANUMERIC)SUN55IW3(?:P\\d+)?(?!$ALPHANUMERIC)") to "Allwinner A523/A527/H728/T527",
+        Regex("(?<!$ALPHANUMERIC)SUN50IW9(?:P\\d+)?(?!$ALPHANUMERIC)") to "Allwinner H616/H618/H700",
+        Regex("(?<!$ALPHANUMERIC)SUN50IW10(?:P\\d+)?(?!$ALPHANUMERIC)") to "Allwinner A100/A133"
+    )
+    private val marketingBrand = Regex(
+        "(?<!$ALPHANUMERIC)(?:snapdragon|dimensity|helio|exynos|tensor|kirin|" +
+            "unisoc|spreadtrum|rockchip|amlogic|tegra|allwinner)(?=$|[\\s(]|\\d)",
+        RegexOption.IGNORE_CASE
+    )
+    private val vendorPatterns = listOf(
+        "qualcomm", "mediatek", "samsung", "google", "hisilicon", "unisoc",
+        "spreadtrum", "rockchip", "amlogic", "allwinner", "nvidia"
+    ).associateWith { Regex("(?<!$ALPHANUMERIC)$it(?!$ALPHANUMERIC)", RegexOption.IGNORE_CASE) }
 
     internal fun knownSocNames(): List<String> = socNames.values.distinct()
 
-    private val SAMSUNG_DEVICE_MODEL = Regex("""^SM-[A-Z0-9]""", RegexOption.IGNORE_CASE)
+    private val SAMSUNG_DEVICE_MODEL = Regex("""^SM[\s_/-]+[A-Z]\d""", RegexOption.IGNORE_CASE)
 
     private val GENERIC_MARKETING_NAMES = setOf(
         "snapdragon",
@@ -348,6 +392,7 @@ object MobileSocNameMapper {
         "spreadtrum",
         "rockchip",
         "amlogic",
+        "allwinner",
         "nvidia tegra",
         "tegra"
     )
@@ -373,28 +418,39 @@ object MobileSocNameMapper {
         manufacturer: String? = null,
         model: String? = null,
         device: String? = null,
-        product: String? = null
+        product: String? = null,
+        additionalIdentifiers: List<String> = emptyList()
     ): String {
-        val candidates = listOf(socModel, hardware, board, device, product, model)
+        val candidates = (listOf(socModel) + additionalIdentifiers + listOf(hardware, board, device, product, model))
             .mapNotNull { it?.trim()?.takeIf(String::isNotEmpty) }
-
-        candidates.firstOrNull(::isSpecificMarketingName)?.let { return cleanDisplayName(it) }
 
         candidates.forEach { candidate ->
             if (SAMSUNG_DEVICE_MODEL.containsMatchIn(candidate)) return@forEach
             resolveKnownCode(candidate)?.let { return it }
+            if (isSpecificMarketingName(candidate)) return cleanDisplayName(candidate)
         }
 
-        candidates.firstOrNull(::isReadableMarketingName)?.let { return cleanDisplayName(it) }
+        val handheldNames = listOfNotNull(model, device, product).map(::normalize)
+        if (handheldNames.any { it == "TG5050" || it == "TRIMUISMARTPROS" }) return "Allwinner A523"
+        candidates.forEach { candidate -> resolvePlatformFamily(candidate)?.let { return it } }
+        candidates.firstOrNull { it.lowercase(Locale.US) in GENERIC_MARKETING_NAMES }
+            ?.let { return cleanDisplayName(it) }
 
         return inferVendorFamily(candidates, manufacturer) ?: "Unknown SoC"
     }
 
     internal fun resolveKnownCode(value: String): String? {
-        val normalized = normalize(value)
-        val alias = aliasesByLength.firstOrNull(normalized::contains) ?: return null
-        return socNames.getValue(alias)
+        val upper = value.uppercase(Locale.US)
+        allwinnerCode.findAll(upper)
+            .firstOrNull { !samsungModelPrefix.containsMatchIn(upper.substring(0, it.range.first)) }
+            ?.groupValues?.get(1)?.let { return socNames[it] }
+        codePatterns.firstOrNull { (_, pattern) -> pattern.containsMatchIn(upper) }
+            ?.let { (alias, _) -> return socNames.getValue(alias) }
+        return if (eliteBoard.containsMatchIn(upper)) "Snapdragon 8 Elite" else null
     }
+
+    internal fun resolvePlatformFamily(value: String): String? = allwinnerPlatforms
+        .firstOrNull { (pattern, _) -> pattern.containsMatchIn(value.uppercase(Locale.US)) }?.second
 
     private fun normalize(value: String): String = value
         .uppercase(Locale.US)
@@ -402,34 +458,37 @@ object MobileSocNameMapper {
 
     private fun isSpecificMarketingName(value: String): Boolean {
         if (!isReadableMarketingName(value)) return false
-        return value.trim().lowercase(Locale.US) !in GENERIC_MARKETING_NAMES
+        // A device model/year is not an Allwinner part number. Known aliases were already
+        // resolved above; preserve other readable part-shaped names without claiming a table match.
+        if (vendorPatterns.getValue("allwinner").containsMatchIn(value)) {
+            return allwinnerMarketingPart.matches(value.trim())
+        }
+        return value.trim().lowercase(Locale.US) !in GENERIC_MARKETING_NAMES &&
+            (value.any(Char::isDigit) || value.trim().equals("Google Tensor", ignoreCase = true))
     }
 
     private fun isReadableMarketingName(value: String): Boolean {
-        val normalized = value.lowercase(Locale.US)
-        return listOf(
-            "snapdragon", "dimensity", "helio", "exynos", "tensor", "kirin",
-            "unisoc", "spreadtrum", "rockchip", "amlogic", "tegra"
-        ).any(normalized::contains)
+        return marketingBrand.containsMatchIn(value)
     }
 
     private fun inferVendorFamily(candidates: List<String>, manufacturer: String?): String? {
         val identifiers = candidates
             .filterNot { SAMSUNG_DEVICE_MODEL.containsMatchIn(it) }
             .map(::normalize)
-        val vendor = normalize(manufacturer.orEmpty())
+        fun vendor(name: String) = vendorPatterns.getValue(name).containsMatchIn(manufacturer.orEmpty())
 
         return when {
-            identifiers.any { it.startsWith("SM") || it.startsWith("MSM") || it.startsWith("SDM") || it.startsWith("APQ") || it.startsWith("QM") } ||
-                vendor.contains("QUALCOMM") -> "Snapdragon"
-            identifiers.any { it.startsWith("MT") } || vendor.contains("MEDIATEK") -> "MediaTek"
-            identifiers.any { it.startsWith("S5E") || it.startsWith("UNIVERSAL") } || vendor.contains("SAMSUNG") -> "Samsung Exynos"
-            identifiers.any { it.startsWith("GS") || it.contains("ZUMA") || it.contains("LAGUNA") } || vendor.contains("GOOGLE") -> "Google Tensor"
-            identifiers.any { it.startsWith("HI") || it.startsWith("KIRIN") } || vendor.contains("HISILICON") -> "Kirin"
-            identifiers.any { it.startsWith("UMS") } || vendor.contains("UNISOC") || vendor.contains("SPREADTRUM") -> "Unisoc"
-            identifiers.any { it.startsWith("RK") } || vendor.contains("ROCKCHIP") -> "Rockchip"
-            vendor.contains("AMLOGIC") -> "Amlogic"
-            identifiers.any { it.startsWith("TEGRA") } || vendor.contains("NVIDIA") -> "NVIDIA Tegra"
+            identifiers.any { Regex("^(?:SM|MSM|SDM|APQ|QM)\\d").containsMatchIn(it) } || vendor("qualcomm") -> "Snapdragon"
+            identifiers.any { Regex("^MT\\d").containsMatchIn(it) || it == "MTK" } || vendor("mediatek") -> "MediaTek"
+            identifiers.any { Regex("^(?:S5E|UNIVERSAL)\\d").containsMatchIn(it) } || vendor("samsung") -> "Samsung Exynos"
+            identifiers.any { Regex("^GS\\d").containsMatchIn(it) } || vendor("google") -> "Google Tensor"
+            identifiers.any { Regex("^(?:HI|KIRIN)\\d").containsMatchIn(it) } || vendor("hisilicon") -> "Kirin"
+            identifiers.any { Regex("^UMS\\d").containsMatchIn(it) } || vendor("unisoc") || vendor("spreadtrum") -> "Unisoc"
+            identifiers.any { Regex("^RK\\d").containsMatchIn(it) } || vendor("rockchip") -> "Rockchip"
+            vendor("amlogic") -> "Amlogic"
+            identifiers.any { it == "SUNXI" || Regex("^SUN\\d+I").containsMatchIn(it) } ||
+                candidates.any { vendorPatterns.getValue("allwinner").containsMatchIn(it) } || vendor("allwinner") -> "Allwinner"
+            identifiers.any { Regex("^TEGRA\\d").containsMatchIn(it) } || vendor("nvidia") -> "NVIDIA Tegra"
             else -> null
         }
     }

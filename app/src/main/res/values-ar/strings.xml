@@ -434,7 +434,7 @@
     <string name="settings_gpu_driver_manage">إدارة التعريفات</string>
     <string name="settings_gpu_driver_manager_title">تعريفات وحدة معالجة الرسومات (GPU)</string>
     <string name="settings_gpu_driver_manager_subtitle">تثبيت برامج تشغيل GPU أو تنزيلها أو تطبيقها أو إزالتها.</string>
-    <string name="settings_gpu_driver_active_title">التعريف النشط</string>
+    <string name="settings_gpu_driver_active_title">برنامج التشغيل المحدد</string>
     <string name="settings_gpu_driver_install_from_file">تثبيت من ملف</string>
     <string name="settings_gpu_driver_catalog">كتالوج التعريفات</string>
     <string name="settings_gpu_driver_refresh">تحديث</string>
@@ -444,7 +444,7 @@
     <string name="settings_gpu_driver_download_apply">تنزيل وتطبيق</string>
     <string name="settings_gpu_driver_downloaded">تم التنزيل</string>
     <string name="settings_gpu_driver_apply">تطبيق</string>
-    <string name="settings_gpu_driver_applied">تم التطبيق</string>
+    <string name="settings_gpu_driver_applied">تم التحديد</string>
     <string name="settings_gpu_driver_remove_short">إزالة</string>
     <string name="settings_gpu_driver_recommended">موصى به</string>
     <string name="settings_gpu_driver_source">المصدر</string>
@@ -457,10 +457,10 @@
     <string name="settings_gpu_driver_none_installed">لم يتم تثبيت أي تعريفات مخصصة لـ GPU بعد.</string>
     <string name="settings_gpu_driver_install_failed">فشل تثبيت تعريف GPU.</string>
     <string name="settings_gpu_driver_install_success">تم تثبيت تعريف GPU: %1$s</string>
-    <string name="settings_gpu_driver_status_system">تعريف Vulkan الخاص بالنظام نشط</string>
-    <string name="settings_gpu_driver_status_system_desc">لم يتم اختيار أي تعريف مخصص، لذلك يتم استخدام تعريف Vulkan الخاص بالنظام.</string>
-    <string name="settings_gpu_driver_status_active">التعريف المخصص نشط: %1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">هذا التعريف جاهز للاستخدام مع Vulkan. لا يزال الدعم الفعلي يعتمد على توافق الجهاز.</string>
+    <string name="settings_gpu_driver_status_system">تم تحديد برنامج تشغيل Vulkan للنظام</string>
+    <string name="settings_gpu_driver_status_system_desc">تم تحديد برنامج تشغيل Vulkan للنظام للتشغيل التالي.</string>
+    <string name="settings_gpu_driver_status_active">تم تحديد برنامج تشغيل مخصص: %1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">تم تحديده لـ Vulkan. لم يتم تأكيد برنامج التشغيل المستخدم حاليًا.</string>
     <string name="settings_gpu_driver_status_renderer">تم تحديد تعريف مخصص، لكن المُصيّر هو %1$s</string>
     <string name="settings_gpu_driver_status_renderer_desc">تعمل تعريفات GPU المخصصة فقط مع Vulkan. قم بتبديل المُصيّر إلى Vulkan لاستخدام هذا التعريف.</string>
     <string name="settings_gpu_driver_status_broken">أرشيف التعريف غير مكتمل: لم يتم العثور على %1$s</string>
@@ -1600,4 +1600,12 @@
     <string name="rear_touch_clear">مسح التعيين</string>
     <string name="rear_touch_hint">اضغط باستمرار للمس اللوحة الخلفية، ثم اترك الزر لرفع اللمس. تحل المدخلات المعيّنة محل وظيفتها المعتادة. يبقى اللمس الأمامي متاحًا.</string>
     <string name="rear_touch_screen_position">موضع الزر على الشاشة</string>
+    <string name="settings_gpu_driver_status_missing_selection">برنامج التشغيل المحدد غير متاح: %1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">برنامج التشغيل المحدد غير متوافق مع وحدة GPU هذه.</string>
+    <string name="settings_gpu_driver_status_unverified_selection">لم يتم التحقق من توافق برنامج التشغيل مع وحدة GPU هذه.</string>
+    <string name="settings_gpu_driver_status_native_unverified">تم تحديده لـ Vulkan. لم يتم التحقق من الدعم على هذا الجهاز.</string>
+    <string name="settings_gpu_driver_status_native_unsupported">إصدار المحاكي الحالي لا يدعم برنامج التشغيل هذا.</string>
+    <string name="settings_gpu_driver_status_invalid_selection">ملفات برنامج التشغيل المحدد غير صالحة. أعد تثبيت برنامج التشغيل.</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s (دليل الأجهزة)</string>
+    <string name="settings_gpu_driver_device_unknown">لم يتم التعرف على عتاد GPU.</string>
 </resources>

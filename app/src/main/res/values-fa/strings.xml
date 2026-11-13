@@ -556,7 +556,7 @@
     <string name="settings_gpu_driver_manager_title">درایورهای GPU</string>
     <string name="settings_gpu_driver_game_title">درایور GPU بازی</string>
     <string name="settings_gpu_driver_manager_subtitle">نصب، دانلود، اعمال یا حذف درایورهای GPU.</string>
-    <string name="settings_gpu_driver_active_title">درایور فعال</string>
+    <string name="settings_gpu_driver_active_title">درایور انتخاب‌شده</string>
     <string name="settings_gpu_driver_install_from_file">نصب از فایل</string>
     <string name="settings_gpu_driver_catalog">فهرست درایورها</string>
     <string name="settings_gpu_driver_refresh">بازخوانی</string>
@@ -566,7 +566,7 @@
     <string name="settings_gpu_driver_download_apply">دانلود و اعمال</string>
     <string name="settings_gpu_driver_downloaded">دانلودشده</string>
     <string name="settings_gpu_driver_apply">اعمال</string>
-    <string name="settings_gpu_driver_applied">اعمال‌شده</string>
+    <string name="settings_gpu_driver_applied">انتخاب شد</string>
     <string name="settings_gpu_driver_remove_short">حذف</string>
     <string name="settings_gpu_driver_recommended">توصیه‌شده</string>
     <string name="settings_gpu_driver_source">منبع</string>
@@ -579,15 +579,15 @@
     <string name="settings_gpu_driver_none_installed">هنوز هیچ درایور GPU سفارشی نصب نشده است.</string>
     <string name="settings_gpu_driver_install_failed">نصب درایور GPU ناموفق بود.</string>
     <string name="settings_gpu_driver_install_success">درایور GPU نصب شد: %1$s</string>
-    <string name="settings_gpu_driver_status_system">درایور Vulkan سیستم فعال است</string>
+    <string name="settings_gpu_driver_status_system">درایور Vulkan سیستم انتخاب شد</string>
     <string name="settings_gpu_driver_status_global">استفاده از درایور GPU عمومی: %1$s</string>
     <string name="settings_gpu_driver_status_global_system">استفاده از درایور GPU عمومی: Vulkan سیستم</string>
     <string name="settings_gpu_driver_status_global_desc">این بازی از انتخاب درایور GPU عمومی پیروی می‌کند.</string>
     <string name="settings_gpu_driver_status_game_system">بازنویسی بازی: درایور Vulkan سیستم</string>
     <string name="settings_gpu_driver_status_game_active">بازنویسی بازی: %1$s</string>
-    <string name="settings_gpu_driver_status_system_desc">هیچ درایور سفارشی انتخاب نشده است، بنابراین از درایور Vulkan سیستم استفاده می‌شود.</string>
-    <string name="settings_gpu_driver_status_active">درایور سفارشی فعال: %1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">این درایور آماده استفاده با Vulkan است. پشتیبانی واقعی همچنان به سازگاری دستگاه بستگی دارد.</string>
+    <string name="settings_gpu_driver_status_system_desc">درایور Vulkan سیستم برای اجرای بعدی انتخاب شده است.</string>
+    <string name="settings_gpu_driver_status_active">درایور سفارشی انتخاب شد: %1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">برای Vulkan انتخاب شده است. درایور در حال اجرا تأیید نشده است.</string>
     <string name="settings_gpu_driver_status_renderer">درایور سفارشی انتخاب شده است، اما رندرکننده %1$s است</string>
     <string name="settings_gpu_driver_status_renderer_desc">درایورهای GPU سفارشی فقط با Vulkan کار می‌کنند. برای استفاده از این درایور، رندرکننده را به Vulkan تغییر دهید.</string>
     <string name="settings_gpu_driver_status_broken">آرشیو درایور ناقص است: %1$s پیدا نشد</string>
@@ -1600,4 +1600,12 @@
     <string name="rear_touch_clear">پاک کردن تخصیص</string>
     <string name="rear_touch_hint">برای لمس صفحهٔ پشتی نگه دارید و برای پایان لمس رها کنید. ورودی‌های اختصاص‌یافته جایگزین عملکرد معمول می‌شوند. لمس جلو همچنان در دسترس است.</string>
     <string name="rear_touch_screen_position">موقعیت دکمه روی صفحه</string>
+    <string name="settings_gpu_driver_status_missing_selection">درایور انتخاب‌شده در دسترس نیست: %1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">درایور انتخاب‌شده با این GPU سازگار نیست.</string>
+    <string name="settings_gpu_driver_status_unverified_selection">سازگاری درایور با این GPU تأیید نشده است.</string>
+    <string name="settings_gpu_driver_status_native_unverified">برای Vulkan انتخاب شده است. پشتیبانی در این دستگاه تأیید نشده است.</string>
+    <string name="settings_gpu_driver_status_native_unsupported">نسخهٔ فعلی شبیه‌ساز از این درایور پشتیبانی نمی‌کند.</string>
+    <string name="settings_gpu_driver_status_invalid_selection">فایل‌های درایور انتخاب‌شده نامعتبرند. درایور را دوباره نصب کنید.</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s (فهرست دستگاه‌ها)</string>
+    <string name="settings_gpu_driver_device_unknown">سخت‌افزار GPU شناسایی نشده است.</string>
 </resources>

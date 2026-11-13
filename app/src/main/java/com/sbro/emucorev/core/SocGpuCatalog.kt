@@ -345,6 +345,31 @@ object SocGpuCatalog {
         entry("Amlogic S905W", mali("Mali-450 MP3")),
         entry("Amlogic S905", mali("Mali-450 MP3")),
 
+        // A523/A527/T527/H728: GPU-enablement patch reviewed by Arm's Andre Przywara.
+        // https://lists.infradead.org/pipermail/linux-arm-kernel/2025-July/1044533.html
+        // A333/A537 official GPU specifications (documented representative submodels).
+        // https://www.allwinnertech.com/index.php?a=index&c=product&id=137
+        // https://www.allwinnertech.com/index.php?a=index&c=product&id=138
+        entry("Allwinner A523", mali("Mali-G57 MC1")),
+        entry("Allwinner A527", mali("Mali-G57 MC1")),
+        entry("Allwinner T527", mali("Mali-G57 MC1")),
+        entry("Allwinner H728", mali("Mali-G57 MC1")),
+        entry("Allwinner A333", mali("Mali-G57 MC1")),
+        entry("Allwinner A537", mali("Mali-G57 MC1")),
+        // The MR527 product specification identifies G57 without a shader-core count.
+        // https://www.allwinnertech.com/index.php?a=index&c=product&id=121
+        entry("Allwinner MR527", mali("Mali-G57")),
+        // A133 manufacturer brief; A133P independently specified by the TRIMUI Brick OEM page.
+        // https://www.allwinnertech.com/uploads/pdf/20210803142431e6.pdf
+        // https://trimui.com/blogs/news/introducing-the-trimui-brick-a-retro-inspired-handheld-game-console-coming-soon
+        entry("Allwinner A133P", powerVr("PowerVR GE8300")),
+        entry("Allwinner A133", powerVr("PowerVR GE8300")),
+        // H700: https://win.anbernic.com/product/364.html
+        // H616/H618: https://lists.infradead.org/pipermail/linux-arm-kernel/2025-February/1003335.html
+        entry("Allwinner H700", mali("Mali-G31 MP2")),
+        entry("Allwinner H616", mali("Mali-G31 MP2")),
+        entry("Allwinner H618", mali("Mali-G31 MP2")),
+
         entry("NVIDIA Tegra X1", GpuModelInfo(GpuVendor.UNKNOWN, "NVIDIA Maxwell")),
         entry("NVIDIA Tegra K1", GpuModelInfo(GpuVendor.UNKNOWN, "NVIDIA Kepler")),
         entry("NVIDIA Tegra 4", GpuModelInfo(GpuVendor.UNKNOWN, "NVIDIA ULP GeForce")),
@@ -357,7 +382,20 @@ object SocGpuCatalog {
 
     fun forSoc(socName: String?): GpuModelInfo? {
         if (socName.isNullOrBlank()) return null
-        nameVariants(socName).forEach { variant ->
+        val variants = nameVariants(socName)
+        val fullName = variants.first()
+        bySocName[fullName]?.let { return it }
+        if (fullName.startsWith("allwinner ") && '/' in fullName) {
+            // A shared BSP identifies a GPU only when every candidate part agrees.
+            // Never infer A100 from the known A133 member of an A100/A133 family.
+            if (fullName.split('/').any { it.isBlank() }) return null
+            val models = variants.drop(1).map { bySocName[it] ?: return null }
+            val first = models.firstOrNull() ?: return null
+            return first.takeIf {
+                models.all { model -> model.vendor == first.vendor && model.displayName == first.displayName }
+            }
+        }
+        variants.forEach { variant ->
             bySocName[variant]?.let { return it }
         }
         return null

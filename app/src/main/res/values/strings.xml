@@ -556,7 +556,7 @@
     <string name="settings_gpu_driver_manager_title">GPU drivers</string>
     <string name="settings_gpu_driver_game_title">Game GPU driver</string>
     <string name="settings_gpu_driver_manager_subtitle">Install, download, apply, or remove GPU drivers.</string>
-    <string name="settings_gpu_driver_active_title">Active driver</string>
+    <string name="settings_gpu_driver_active_title">Selected driver</string>
     <string name="settings_gpu_driver_install_from_file">Install from file</string>
     <string name="settings_gpu_driver_catalog">Driver catalog</string>
     <string name="settings_gpu_driver_refresh">Refresh</string>
@@ -566,7 +566,7 @@
     <string name="settings_gpu_driver_download_apply">Download &amp; apply</string>
     <string name="settings_gpu_driver_downloaded">Downloaded</string>
     <string name="settings_gpu_driver_apply">Apply</string>
-    <string name="settings_gpu_driver_applied">Applied</string>
+    <string name="settings_gpu_driver_applied">Selected</string>
     <string name="settings_gpu_driver_remove_short">Remove</string>
     <string name="settings_gpu_driver_recommended">Recommended</string>
     <string name="settings_gpu_driver_source">Source</string>
@@ -579,15 +579,15 @@
     <string name="settings_gpu_driver_none_installed">No custom GPU drivers installed yet.</string>
     <string name="settings_gpu_driver_install_failed">GPU driver installation failed.</string>
     <string name="settings_gpu_driver_install_success">Installed GPU driver: %1$s</string>
-    <string name="settings_gpu_driver_status_system">System Vulkan driver is active</string>
+    <string name="settings_gpu_driver_status_system">System Vulkan driver selected</string>
     <string name="settings_gpu_driver_status_global">Using global GPU driver: %1$s</string>
     <string name="settings_gpu_driver_status_global_system">Using global GPU driver: System Vulkan</string>
     <string name="settings_gpu_driver_status_global_desc">This game follows the global GPU driver selection.</string>
     <string name="settings_gpu_driver_status_game_system">Game override: System Vulkan driver</string>
     <string name="settings_gpu_driver_status_game_active">Game override: %1$s</string>
-    <string name="settings_gpu_driver_status_system_desc">No custom driver is selected, so the system Vulkan driver is being used.</string>
-    <string name="settings_gpu_driver_status_active">Custom driver active: %1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">This driver is ready to use with Vulkan. Actual support still depends on device compatibility.</string>
+    <string name="settings_gpu_driver_status_system_desc">The system Vulkan driver is selected for the next launch.</string>
+    <string name="settings_gpu_driver_status_active">Custom driver selected: %1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">Selected for Vulkan. The running driver has not been confirmed.</string>
     <string name="settings_gpu_driver_status_renderer">Custom driver is selected, but renderer is %1$s</string>
     <string name="settings_gpu_driver_status_renderer_desc">Custom GPU drivers only work with Vulkan. Switch the renderer to Vulkan to use this driver.</string>
     <string name="settings_gpu_driver_status_broken">Driver archive is incomplete: %1$s not found</string>
@@ -1600,4 +1600,12 @@
     <string name="rear_touch_clear">Clear binding</string>
     <string name="rear_touch_hint">Hold to touch the rear panel; release to lift. Assigned inputs replace their usual action. Front touch stays available.</string>
     <string name="rear_touch_screen_position">On-screen button position</string>
+    <string name="settings_gpu_driver_status_missing_selection">Selected driver is unavailable: %1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">Selected driver is incompatible with this GPU.</string>
+    <string name="settings_gpu_driver_status_unverified_selection">Driver compatibility has not been verified for this GPU.</string>
+    <string name="settings_gpu_driver_status_native_unverified">Selected for Vulkan. Support on this device is unverified.</string>
+    <string name="settings_gpu_driver_status_native_unsupported">This driver is not supported by the current emulator build.</string>
+    <string name="settings_gpu_driver_status_invalid_selection">Selected driver files are invalid. Reinstall the driver.</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s (device catalog)</string>
+    <string name="settings_gpu_driver_device_unknown">GPU hardware has not been identified.</string>
 </resources>

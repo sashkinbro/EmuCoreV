@@ -20,11 +20,11 @@ class GpuDriverCompatibilityTest {
     }
 
     @Test
-    fun `prefers the catalog mapping over a stale renderer string`() {
-        val staleRenderer = GpuModelInfo(GpuVendor.ADRENO, "Adreno 710")
+    fun `prefers measured physical GPU over conflicting SoC catalog`() {
+        val measuredRenderer = GpuModelInfo(GpuVendor.ADRENO, "Adreno 710")
         assertEquals(
-            "Adreno 810",
-            GpuDriverRecommendations.profileForGpu("Snapdragon 7s Gen 3", staleRenderer)?.adrenoName
+            "Adreno 710",
+            GpuDriverRecommendations.profileForGpu("Snapdragon 7s Gen 3", measuredRenderer)?.adrenoName
         )
     }
 
@@ -92,12 +92,12 @@ class GpuDriverCompatibilityTest {
     }
 
     @Test
-    fun `refuses cross vendor packages but allows unknown vendors`() {
+    fun `refuses cross vendor packages and leaves unknown vendors unverified`() {
         assertEquals(false, GpuDriverCompatibility.isVendorCompatible(GpuDriverVendor.MALI, GpuDriverVendor.ADRENO))
         assertEquals(false, GpuDriverCompatibility.isVendorCompatible(GpuDriverVendor.ADRENO, GpuDriverVendor.MALI))
         assertEquals(true, GpuDriverCompatibility.isVendorCompatible(GpuDriverVendor.MALI, GpuDriverVendor.MALI))
-        assertEquals(true, GpuDriverCompatibility.isVendorCompatible(GpuDriverVendor.UNKNOWN, GpuDriverVendor.ADRENO))
-        assertEquals(true, GpuDriverCompatibility.isVendorCompatible(GpuDriverVendor.MALI, GpuDriverVendor.UNKNOWN))
+        assertEquals(false, GpuDriverCompatibility.isVendorCompatible(GpuDriverVendor.UNKNOWN, GpuDriverVendor.ADRENO))
+        assertEquals(false, GpuDriverCompatibility.isVendorCompatible(GpuDriverVendor.MALI, GpuDriverVendor.UNKNOWN))
     }
 
     @Test

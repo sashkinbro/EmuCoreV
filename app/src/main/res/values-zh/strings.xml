@@ -297,10 +297,10 @@
     <string name="settings_gpu_driver_none_installed">尚未安裝自訂 GPU 驅動程式。</string>
     <string name="settings_gpu_driver_install_failed">GPU 驅動程式安裝失敗。</string>
     <string name="settings_gpu_driver_install_success">已安裝 GPU 驅動程式：%1$s</string>
-    <string name="settings_gpu_driver_status_system">系統 Vulkan 驅動程式使用中</string>
-    <string name="settings_gpu_driver_status_system_desc">未選擇自訂驅動程式，因此正使用系統 Vulkan 驅動程式。</string>
-    <string name="settings_gpu_driver_status_active">自訂驅動程式使用中：%1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">此驅動程式已準備好與 Vulkan 搭配使用。實際支援程度仍取決於裝置的相容性。</string>
+    <string name="settings_gpu_driver_status_system">已选择系统 Vulkan 驱动</string>
+    <string name="settings_gpu_driver_status_system_desc">已为下次启动选择系统 Vulkan 驱动。</string>
+    <string name="settings_gpu_driver_status_active">已选择自定义驱动：%1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">已为 Vulkan 选择。尚未确认当前运行的驱动。</string>
     <string name="settings_gpu_driver_status_renderer">已選擇自訂驅動程式，但渲染器為 %1$s</string>
     <string name="settings_gpu_driver_status_renderer_desc">自訂 GPU 驅動程式僅適用於 Vulkan。請將渲染器切換至 Vulkan 以使用此驅動程式。</string>
     <string name="settings_gpu_driver_status_broken">驅動程式壓縮檔不完整：找不到 %1$s</string>
@@ -474,7 +474,7 @@
     <string name="settings_gpu_driver_manage">管理驱动程序</string>
     <string name="settings_gpu_driver_manager_title">GPU 驱动程序</string>
     <string name="settings_gpu_driver_manager_subtitle">安装、下载、应用或移除 GPU 驱动程序。</string>
-    <string name="settings_gpu_driver_active_title">当前驱动程序</string>
+    <string name="settings_gpu_driver_active_title">所选驱动</string>
     <string name="settings_gpu_driver_install_from_file">从文件安装</string>
     <string name="settings_gpu_driver_catalog">驱动程序目录</string>
     <string name="settings_gpu_driver_refresh">刷新</string>
@@ -484,7 +484,7 @@
     <string name="settings_gpu_driver_download_apply">下载并应用</string>
     <string name="settings_gpu_driver_downloaded">已下载</string>
     <string name="settings_gpu_driver_apply">应用</string>
-    <string name="settings_gpu_driver_applied">已应用</string>
+    <string name="settings_gpu_driver_applied">已选择</string>
     <string name="settings_gpu_driver_remove_short">移除</string>
     <string name="settings_gpu_driver_recommended">推荐</string>
     <string name="settings_gpu_driver_source">来源</string>
@@ -1595,4 +1595,12 @@
     <string name="rear_touch_clear">清除绑定</string>
     <string name="rear_touch_hint">按住即可触摸背面触摸板，松开即可抬起触点。已分配的输入将替代原有操作。正面触摸仍可使用。</string>
     <string name="rear_touch_screen_position">屏幕按钮位置</string>
+    <string name="settings_gpu_driver_status_missing_selection">所选驱动不可用：%1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">所选驱动与此 GPU 不兼容。</string>
+    <string name="settings_gpu_driver_status_unverified_selection">尚未验证此 GPU 与驱动的兼容性。</string>
+    <string name="settings_gpu_driver_status_native_unverified">已为 Vulkan 选择。尚未验证此设备的支持情况。</string>
+    <string name="settings_gpu_driver_status_native_unsupported">当前模拟器版本不支持此驱动。</string>
+    <string name="settings_gpu_driver_status_invalid_selection">所选驱动文件无效。请重新安装驱动。</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s（设备目录）</string>
+    <string name="settings_gpu_driver_device_unknown">尚未识别 GPU 硬件。</string>
 </resources>

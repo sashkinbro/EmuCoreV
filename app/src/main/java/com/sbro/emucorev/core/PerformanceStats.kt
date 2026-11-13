@@ -42,7 +42,7 @@ internal fun parseNativePerformanceStats(text: String): NativePerformanceStats =
     fun positive(key: String) = (json.opt(key) as? Number)?.toLong()
         ?.takeIf { it in 1..Int.MAX_VALUE }?.toInt()
     fun name(key: String) = (json.opt(key) as? String)?.trim()?.takeIf { it.isNotEmpty() }
-    NativePerformanceStats(positive("fps"), positive("frameMs"), parseGpuModelName(name("gpu")), name("backend"), name("core"),
+    NativePerformanceStats(positive("fps"), positive("frameMs"), PerformanceHardwareLabels.gpu(name("gpu"), null)?.text, name("backend"), name("core"),
         positive("width"), positive("height"), json.optBoolean("paused", false))
 }.getOrDefault(NativePerformanceStats())
 
@@ -81,10 +81,10 @@ object PerformanceStatsBridge {
 class PerformanceStatsSampler(context: Context) {
     private val context = context.applicationContext
     private val cpu = ProcessCpuMeter(Runtime.getRuntime().availableProcessors())
-    private val cpuModel = MobileSocNameMapper.currentDeviceName()
     private val gpuBusy = File("/sys/class/kgsl/kgsl-3d0/gpubusy")
 
     suspend fun sample(): PerformanceStatsSample = withContext(Dispatchers.IO) {
+        DeviceGpuInfoProvider.ensureLoaded(context)
         val native = PerformanceStatsBridge.snapshot()
         val memory = runCatching { Debug.MemoryInfo().also(Debug::getMemoryInfo).totalPss.takeIf { it > 0 }?.div(1024.0) }.getOrNull()
         val battery = runCatching { context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) }
@@ -96,6 +96,6 @@ class PerformanceStatsSampler(context: Context) {
         // Read only this documented KGSL interface. Other GPU drivers/denied access remain unavailable.
         val gpu = runCatching { gpuBusy.bufferedReader().use { it.readLine()?.let(::parseKgslBusyPercent) } }.getOrNull()
         PerformanceStatsSample(native, cpu.sample(SystemClock.elapsedRealtime(), android.os.Process.getElapsedCpuTime()),
-            cpuModel, gpu, memory, battery, thermal)
+            DeviceGpuInfoProvider.cpuName(), gpu, memory, battery, thermal)
     }
 }

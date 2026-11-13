@@ -96,9 +96,58 @@ class SocGpuCatalogTest {
     }
 
     @Test
+    fun `maps verified Allwinner parts without inventing unspecified core counts`() {
+        val expected = listOf(
+            Triple("Allwinner A523", GpuVendor.MALI, "Mali-G57 MC1"),
+            Triple("Allwinner A527", GpuVendor.MALI, "Mali-G57 MC1"),
+            Triple("Allwinner T527", GpuVendor.MALI, "Mali-G57 MC1"),
+            Triple("Allwinner H728", GpuVendor.MALI, "Mali-G57 MC1"),
+            Triple("Allwinner A333", GpuVendor.MALI, "Mali-G57 MC1"),
+            Triple("Allwinner A537", GpuVendor.MALI, "Mali-G57 MC1"),
+            Triple("Allwinner MR527", GpuVendor.MALI, "Mali-G57"),
+            Triple("Allwinner A133P", GpuVendor.POWERVR, "PowerVR GE8300"),
+            Triple("Allwinner A133", GpuVendor.POWERVR, "PowerVR GE8300"),
+            Triple("Allwinner H700", GpuVendor.MALI, "Mali-G31 MP2"),
+            Triple("Allwinner H616", GpuVendor.MALI, "Mali-G31 MP2"),
+            Triple("Allwinner H618", GpuVendor.MALI, "Mali-G31 MP2")
+        )
+        expected.forEach { (soc, vendor, name) ->
+            val actual = SocGpuCatalog.forSoc(soc)
+            assertEquals(soc, vendor, actual?.vendor)
+            assertEquals(soc, name, actual?.displayName)
+        }
+        assertEquals("Mali-G57 MC1", SocGpuCatalog.forSoc("allwinner a523")?.displayName)
+    }
+
+    @Test
+    fun `Allwinner exact parts reject neighbouring identities`() {
+        listOf("Allwinner A5230", "Allwinner A133PX", "Allwinner A5370", "Allwinner H7000", "Allwinner")
+            .forEach { assertNull(it, SocGpuCatalog.forSoc(it)) }
+    }
+
+    @Test
+    fun `Allwinner slash groups require every component known and the same GPU`() {
+        assertEquals("Mali-G57 MC1", SocGpuCatalog.forSoc("Allwinner A523/A527/H728/T527")?.displayName)
+        assertEquals("Mali-G31 MP2", SocGpuCatalog.forSoc("Allwinner H616/H618/H700")?.displayName)
+        assertEquals("PowerVR GE8300", SocGpuCatalog.forSoc("Allwinner A133/A133P")?.displayName)
+        assertEquals("Mali-G57 MC1", SocGpuCatalog.forSoc("Allwinner A523 / Allwinner A527")?.displayName)
+        listOf(
+            "Allwinner A100/A133", "Allwinner A133/A100", "Allwinner A523/H700",
+            "Allwinner H700/A523", "Allwinner MR527/A523", "Allwinner A523/Unknown",
+            "Allwinner A523/", "Allwinner A523//A527"
+        ).forEach { assertNull(it, SocGpuCatalog.forSoc(it)) }
+    }
+
+    @Test
+    fun `non Allwinner exact groups and existing partial lookup stay unchanged`() {
+        assertEquals("Mali-G610 MC6", SocGpuCatalog.forSoc("Dimensity 8000/8100")?.displayName)
+        assertEquals("Adreno 750", SocGpuCatalog.forSoc("Snapdragon 8 Gen 3/Unknown")?.displayName)
+    }
+
+    @Test
     fun `returns null for unknown SoCs and blank input`() {
         assertNull(SocGpuCatalog.forSoc("Unknown SoC"))
-        assertNull(SocGpuCatalog.forSoc("Allwinner H618"))
+        assertNull(SocGpuCatalog.forSoc("Allwinner A5230"))
         assertEquals("Mali-450 MP2", SocGpuCatalog.forSoc("Rockchip RK3528")?.displayName)
         assertNull(SocGpuCatalog.forSoc(null))
         assertNull(SocGpuCatalog.forSoc(""))

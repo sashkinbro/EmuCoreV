@@ -17,7 +17,12 @@ data class RemoteGpuDriver(
     val downloadUrl: String,
     val sourceUrl: String,
     val credits: String,
-    val sizeBytes: Long?
+    val sizeBytes: Long?,
+    val supportedGpuModels: List<String> = emptyList(),
+    val family: GpuDriverFamily = GpuDriverFamily.OTHER,
+    val version: String = "",
+    val tag: String = "",
+    val archiveSha256: String? = null
 )
 
 class GpuDriverCatalogRepository(private val context: Context) {
@@ -73,35 +78,15 @@ class GpuDriverCatalogRepository(private val context: Context) {
         } finally {
             connection.disconnect()
         }
+        if (driver.archiveSha256 != null && gpuDriverSha256(target) != driver.archiveSha256.lowercase()) {
+            target.delete()
+            throw IOException("Driver archive checksum does not match the catalog package")
+        }
         onProgress(1f)
         return target
     }
 
-    private fun parseCatalog(json: String): List<RemoteGpuDriver> {
-        val array = JSONArray(json)
-        return buildList {
-            for (index in 0 until array.length()) {
-                val item = array.getJSONObject(index)
-                val downloadUrl = item.optString("downloadUrl")
-                val id = item.optString("id")
-                if (id.isBlank() || downloadUrl.isBlank()) continue
-                add(
-                    RemoteGpuDriver(
-                        id = id,
-                        name = item.optString("name", id),
-                        variant = item.optString("variant"),
-                        gpu = item.optString("gpu", "Adreno"),
-                        description = item.optString("description"),
-                        recommended = item.optBoolean("recommended", false),
-                        downloadUrl = downloadUrl,
-                        sourceUrl = item.optString("sourceUrl"),
-                        credits = item.optString("credits"),
-                        sizeBytes = item.optLong("sizeBytes").takeIf { it > 0L }
-                    )
-                )
-            }
-        }
-    }
+    private fun parseCatalog(json: String): List<RemoteGpuDriver> = parseGpuDriverCatalog(json)
 
     private fun RemoteGpuDriver.safeArchiveName(): String {
         val rawName = downloadUrl.substringBefore('?').substringAfterLast('/').ifBlank { "$id.zip" }
@@ -135,3 +120,42 @@ class GpuDriverCatalogRepository(private val context: Context) {
         )
     }
 }
+
+/** Package declarations belong to their exact row/version, never a newest-family lookup. */
+internal fun parseGpuDriverCatalog(json: String): List<RemoteGpuDriver> {
+        val array = JSONArray(json)
+        return buildList {
+            for (index in 0 until array.length()) {
+                val item = array.getJSONObject(index)
+                val downloadUrl = item.optString("downloadUrl")
+                val id = item.optString("id")
+                if (id.isBlank() || downloadUrl.isBlank()) continue
+                add(
+                    RemoteGpuDriver(
+                        id = id,
+                        name = item.optString("name", id),
+                        variant = item.optString("variant"),
+                        gpu = item.optString("gpu"),
+                        description = item.optString("description"),
+                        recommended = item.optBoolean("recommended", false),
+                        downloadUrl = downloadUrl,
+                        sourceUrl = item.optString("sourceUrl"),
+                        credits = item.optString("credits"),
+                        sizeBytes = item.optLong("sizeBytes").takeIf { it > 0L },
+                        supportedGpuModels = item.optJSONArray("supportedGpuModels")?.let { models ->
+                            (0 until models.length()).mapNotNull { i ->
+                                (models.opt(i) as? String)?.trim()?.takeIf(String::isNotEmpty)
+                            }.distinct()
+                        }.orEmpty(),
+                        family = GpuDriverCompatibility.catalogFamily(
+                            item.optString("family"), id, item.optString("name"), item.optString("gpu")
+                        ),
+                        version = item.optString("version"),
+                        tag = item.optString("tag"),
+                        archiveSha256 = item.optString("sha256").lowercase()
+                            .takeIf { it.matches(Regex("[a-f0-9]{64}")) }
+                    )
+                )
+            }
+        }
+    }

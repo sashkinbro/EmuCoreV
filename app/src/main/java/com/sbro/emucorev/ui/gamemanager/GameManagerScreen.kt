@@ -76,7 +76,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.FrameLimit
+import com.sbro.emucorev.core.DeviceGpuInfoProvider
+import com.sbro.emucorev.core.DeviceGpuSnapshot
 import com.sbro.emucorev.core.GpuDriverCompatibility
+import com.sbro.emucorev.ui.settings.gpuDriverSelectionSummary
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.GameGpuRecommendation
@@ -107,6 +110,9 @@ fun GameManagerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val publishedDevice by DeviceGpuInfoProvider.snapshot.collectAsState()
+    val device = publishedDevice ?: DeviceGpuInfoProvider.get(context)
+    androidx.compose.runtime.LaunchedEffect(context) { DeviceGpuInfoProvider.ensureLoaded(context) }
     val touchLayoutRepository = remember(context) { TouchControlLayoutRepository(context) }
     var hasTouchLayoutOverride by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -193,6 +199,7 @@ fun GameManagerScreen(
                 when (selectedTab) {
                     GameManagerTab.Graphics -> GraphicsProfileSection(
                         config = uiState.config,
+                        device = device,
                         gameDbRecommendation = uiState.gameDbRecommendation,
                         defaults = uiState.defaults,
                         installedGpuDrivers = uiState.installedGpuDrivers,
@@ -468,6 +475,7 @@ private fun GamePicker(
 @Composable
 private fun GraphicsProfileSection(
     config: VitaCoreConfig,
+    device: DeviceGpuSnapshot,
     gameDbRecommendation: GameGpuRecommendation?,
     defaults: VitaCoreConfig,
     installedGpuDrivers: List<InstalledGpuDriver>,
@@ -493,18 +501,15 @@ private fun GraphicsProfileSection(
             onUpdate { cfg -> cfg.copy(backendRenderer = it) }
         }
         ToggleRow(stringResource(R.string.settings_use_angle), config.useAngle, stringResource(R.string.settings_help_use_angle), { onUpdate { it.copy(useAngle = defaults.useAngle) } }, enabled = config.backendRenderer == "OpenGL") { onUpdate { cfg -> cfg.copy(useAngle = it) } }
-        if (remember { GpuDriverCompatibility.supportsCustomDrivers() }) {
-            GpuDriverChoiceRow(
-                effectiveDriverName = config.customDriverName,
-                globalDriverName = defaults.customDriverName,
-                customDriverOverride = customDriverOverride,
-                backendRenderer = config.backendRenderer,
-                installedGpuDrivers = installedGpuDrivers,
-                onOpenGpuDriverManager = onOpenGpuDriverManager,
-                onReset = { onDriverOverrideSelected(null) },
-                onSelected = onDriverOverrideSelected
-            )
-        }
+        GpuDriverChoiceRow(
+            device = device,
+            globalDriverName = defaults.customDriverName,
+            customDriverOverride = customDriverOverride,
+            backendRenderer = config.backendRenderer,
+            installedGpuDrivers = installedGpuDrivers,
+            onOpenGpuDriverManager = onOpenGpuDriverManager,
+            onReset = { onDriverOverrideSelected(null) }
+        )
         SliderRow(
             title = stringResource(R.string.settings_core_resolution_label),
             description = stringResource(R.string.settings_help_resolution),
@@ -564,25 +569,17 @@ private fun GraphicsProfileSection(
 
 @Composable
 private fun GpuDriverChoiceRow(
-    effectiveDriverName: String,
+    device: DeviceGpuSnapshot,
     globalDriverName: String,
     customDriverOverride: String?,
     backendRenderer: String,
     installedGpuDrivers: List<InstalledGpuDriver>,
     onOpenGpuDriverManager: () -> Unit,
-    onReset: () -> Unit,
-    onSelected: (String?) -> Unit
+    onReset: () -> Unit
 ) {
-    val selectedDriver = installedGpuDrivers.firstOrNull { it.name == effectiveDriverName }
-    val status = when {
-        customDriverOverride == null && globalDriverName.isBlank() -> stringResource(R.string.settings_gpu_driver_status_global_system)
-        customDriverOverride == null -> stringResource(R.string.settings_gpu_driver_status_global, globalDriverName)
-        customDriverOverride.isBlank() -> stringResource(R.string.settings_gpu_driver_status_game_system)
-        selectedDriver == null -> stringResource(R.string.settings_gpu_driver_status_broken, effectiveDriverName)
-        !selectedDriver.isUsable -> stringResource(R.string.settings_gpu_driver_status_broken, selectedDriver.name)
-        backendRenderer != "Vulkan" -> stringResource(R.string.settings_gpu_driver_status_renderer, backendRenderer)
-        else -> stringResource(R.string.settings_gpu_driver_status_game_active, selectedDriver.name)
-    }
+    val selection = GpuDriverCompatibility.resolveSelection(globalDriverName, customDriverOverride, device, installedGpuDrivers)
+    val (selectionTitle, selectionDetail) = gpuDriverSelectionSummary(selection, backendRenderer, true)
+    val status = if (selectionDetail.isEmpty()) selectionTitle else selectionTitle + "\n" + selectionDetail
 
     SettingContainer(
         title = stringResource(R.string.settings_gpu_driver),

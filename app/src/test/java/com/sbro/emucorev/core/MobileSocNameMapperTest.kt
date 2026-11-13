@@ -1,6 +1,7 @@
 package com.sbro.emucorev.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class MobileSocNameMapperTest {
@@ -85,12 +86,12 @@ class MobileSocNameMapperTest {
     }
 
     @Test
-    fun doesNotMapAllwinnerDevicesToProcessorNames() {
-        assertEquals("Unknown SoC", MobileSocNameMapper.resolve("Allwinner"))
-        assertEquals("Unknown SoC", MobileSocNameMapper.resolve("Allwinner H618"))
-        assertEquals("Unknown SoC", MobileSocNameMapper.resolve("sun50iw9"))
+    fun keepsUnspecifiedAllwinnerPartsAtTheHonestFamilyLevel() {
+        assertEquals("Allwinner", MobileSocNameMapper.resolve("Allwinner"))
+        assertEquals("Allwinner H618", MobileSocNameMapper.resolve("Allwinner H618"))
+        assertEquals("Allwinner H616/H618/H700", MobileSocNameMapper.resolve("sun50iw9"))
         assertEquals(
-            "Unknown SoC",
+            "Allwinner",
             MobileSocNameMapper.resolve(
                 socModel = null,
                 hardware = "unknown",
@@ -99,4 +100,91 @@ class MobileSocNameMapperTest {
             )
         )
     }
+
+    @Test
+    fun codeAliasesRejectEmbeddedWordsAndLongerNumbers() {
+        listOf("landscape", "konafoo", "notrk3566", "SM85500", "MT67680", "T6180", "RK35660", "éSM8550", "SM8550я")
+            .forEach { assertNull(it, MobileSocNameMapper.resolveKnownCode(it)) }
+        listOf("A5230", "notA523", "H7000", "Samsung SM-A527", "Samsung SM_A527")
+            .forEach { assertNull(it, MobileSocNameMapper.resolveKnownCode(it)) }
+    }
+
+    @Test
+    fun authoritativeSocCodeBeatsLaterDeviceMarketingText() {
+        assertEquals("Snapdragon 8 Gen 3", MobileSocNameMapper.resolve("SM8650", model = "Snapdragon 8 Gen 2"))
+        assertEquals("Snapdragon 8 Gen 3", MobileSocNameMapper.resolve("SM8650", model = "Allwinner A523"))
+    }
+
+    @Test
+    fun resolvesExplicitAllwinnerPartsAndSharedBspFamilies() {
+        listOf("A523", "A527", "T527", "H728", "A333", "A537", "MR527", "A133", "A133P", "H700", "H616", "H618")
+            .forEach { assertEquals("Allwinner $it", MobileSocNameMapper.resolve(it)) }
+        assertEquals("Allwinner A537", MobileSocNameMapper.resolve("Allwinner A537PX"))
+        assertEquals("Allwinner T527", MobileSocNameMapper.resolve("T527M02"))
+        assertEquals("Allwinner A523", MobileSocNameMapper.resolve("allwinner,sun55i-a523"))
+        assertEquals("Allwinner A523/A527/H728/T527", MobileSocNameMapper.resolve("sun55iw3p1"))
+        assertEquals("Allwinner H616/H618/H700", MobileSocNameMapper.resolve("sun50iw9"))
+        assertEquals("Allwinner A100/A133", MobileSocNameMapper.resolve("sun50iw10p1"))
+    }
+
+    @Test
+    fun narrowHandheldFallbackDoesNotOverrideExplicitSilicon() {
+        listOf("TG5050", "TrimUI Smart Pro S").forEach {
+            assertEquals("Allwinner A523", MobileSocNameMapper.resolve(null, hardware = "sun55iw3p1", model = it))
+        }
+        assertEquals("Allwinner T527", MobileSocNameMapper.resolve("T527", model = "TG5050"))
+        assertEquals("Unknown SoC", MobileSocNameMapper.resolve(null, model = "TrimUI Smart Pro"))
+    }
+
+    @Test
+    fun marketingBrandsDoNotMatchInsideWordsOrSwallowDeviceTreeFamilies() {
+        assertEquals("Unknown SoC", MobileSocNameMapper.resolve("NotSnapdragon123"))
+        assertEquals("Unknown SoC", MobileSocNameMapper.resolve("unrelatedexynos2400"))
+        listOf("SMALL", "MTVdevice", "hiking", "NotAllwinner123", "notzuma").forEach {
+            assertEquals(it, "Unknown SoC", MobileSocNameMapper.resolve(it))
+        }
+        assertEquals("Allwinner A523/A527/H728/T527", MobileSocNameMapper.resolve("allwinner,sun55iw3"))
+    }
+
+    @Test
+    fun boundedSunBoardAliasDoesNotMatchOtherNames() {
+        assertEquals("Snapdragon 8 Elite", MobileSocNameMapper.resolve(null, hardware = "qcom", board = "sun"))
+        listOf("samsung", "sunmi", "sunstone").forEach {
+            assertEquals(it, "Unknown SoC", MobileSocNameMapper.resolve(it))
+        }
+    }
+
+    @Test
+    fun supplementalIdentifiersRespectAuthorityAndExplicitPartsBeatSharedFamilies() {
+        assertEquals("Snapdragon 8 Gen 3", MobileSocNameMapper.resolve("SM8650",
+            hardware = "SM8550", additionalIdentifiers = listOf("A523")))
+        assertEquals("Snapdragon 8 Elite", MobileSocNameMapper.resolve("unknown",
+            hardware = "SM8650", additionalIdentifiers = listOf("", "qcom,sm8750")))
+        assertEquals("Allwinner A537", MobileSocNameMapper.resolve(null,
+            hardware = "sun55iw3", additionalIdentifiers = listOf("Allwinner", "A537")))
+        assertEquals("Allwinner T527", MobileSocNameMapper.resolve("allwinner,sun55iw3",
+            additionalIdentifiers = listOf("T527"), model = "TG5050"))
+        assertEquals("Snapdragon 8 Gen 2", MobileSocNameMapper.resolve("SM-8550"))
+        assertNull(MobileSocNameMapper.resolveKnownCode("SM-A527"))
+    }
+    @Test
+    fun allwinnerDeviceMarketingNumbersDoNotIdentifySilicon() {
+        listOf("Allwinner Game Console 2025", "Allwinner Handheld 2", "Allwinner Model 133").forEach {
+            assertEquals(it, "Allwinner", MobileSocNameMapper.resolve(null, manufacturer = "Allwinner", model = it))
+        }
+        assertEquals("Allwinner A64", MobileSocNameMapper.resolve("Allwinner A64"))
+        assertEquals("Allwinner H618", MobileSocNameMapper.resolve("Allwinner H618"))
+    }
+
+    @Test
+    fun samsungDevicePrefixSeparatorsCannotBecomeAllwinnerAliases() {
+        listOf("SM - A527", "SM  A527", "SM_ - A527", "SM / A527", "SM\t-\tA527").forEach {
+            assertNull(it, MobileSocNameMapper.resolveKnownCode("Samsung $it"))
+            assertEquals(it, "Samsung Exynos", MobileSocNameMapper.resolve(it, manufacturer = "Samsung"))
+        }
+        assertEquals("Snapdragon 8 Gen 2", MobileSocNameMapper.resolve("SM - 8550"))
+        assertEquals("Allwinner A527", MobileSocNameMapper.resolve("SM unrelated A527"))
+        assertEquals("Allwinner H700", MobileSocNameMapper.resolveKnownCode("Samsung SM - A527; Allwinner H700"))
+    }
+
 }

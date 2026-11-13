@@ -47,14 +47,14 @@ class PerformanceStatsTest {
         assertEquals("Xclipse 940", parseGpuModelName("Samsung Xclipse 940 Vulkan"))
     }
 
-    @Test fun unknownAndSoftwareRenderersStayUnavailableInsteadOfBeingMisidentified() {
+    @Test fun unknownAndSoftwareRenderersRetainNativeTextWithoutMisidentifyingHardware() {
         assertNull(parseGpuModelName("Qualcomm Vulkan Driver 1.3.280"))
         assertNull(parseGpuModelName("Adreno-like 750 driver"))
         assertNull(parseGpuModelName("Turnip SwiftShader Device"))
         assertNull(parseGpuModelName("Android Emulator OpenGL ES Translator"))
 
         val sample = parseNativePerformanceStats("""{"gpu":"Qualcomm Vulkan Driver 1.3.280"}""")
-        assertNull(sample.gpu)
+        assertEquals("Qualcomm Vulkan Driver 1.3.280", sample.gpu)
     }
 
     @Test fun cpuModelUsesTheSharedSocCatalogForMultipleVendorsAndUnknownFallback() {

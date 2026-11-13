@@ -297,10 +297,10 @@
     <string name="settings_gpu_driver_none_installed">अभी तक कोई कस्टम GPU ड्राइवर इंस्टॉल नहीं किया गया है।</string>
     <string name="settings_gpu_driver_install_failed">GPU ड्राइवर इंस्टॉलेशन विफल रहा।</string>
     <string name="settings_gpu_driver_install_success">इंस्टॉल किया गया GPU ड्राइवर: %1$s</string>
-    <string name="settings_gpu_driver_status_system">सिस्टम Vulkan ड्राइवर सक्रिय है</string>
-    <string name="settings_gpu_driver_status_system_desc">कोई कस्टम ड्राइवर नहीं चुना गया है, इसलिए सिस्टम Vulkan ड्राइवर का उपयोग किया जा रहा है।</string>
-    <string name="settings_gpu_driver_status_active">कस्टम ड्राइवर सक्रिय है: %1$s</string>
-    <string name="settings_gpu_driver_status_active_desc">यह ड्राइवर Vulkan के साथ उपयोग के लिए तैयार है। वास्तविक समर्थन अभी भी डिवाइस संगतता पर निर्भर करता है।</string>
+    <string name="settings_gpu_driver_status_system">सिस्टम Vulkan ड्राइवर चुना गया</string>
+    <string name="settings_gpu_driver_status_system_desc">अगली बार शुरू करने के लिए सिस्टम Vulkan ड्राइवर चुना गया है।</string>
+    <string name="settings_gpu_driver_status_active">कस्टम ड्राइवर चुना गया: %1$s</string>
+    <string name="settings_gpu_driver_status_active_desc">Vulkan के लिए चुना गया है। चल रहे ड्राइवर की पुष्टि नहीं हुई है।</string>
     <string name="settings_gpu_driver_status_renderer">कस्टम ड्राइवर चुना गया है, लेकिन रेंडरर %1$s है</string>
     <string name="settings_gpu_driver_status_renderer_desc">कस्टम GPU ड्राइवर केवल Vulkan के साथ काम करते हैं। इस ड्राइवर का उपयोग करने के लिए रेंडरर को Vulkan पर स्विच करें।</string>
     <string name="settings_gpu_driver_status_broken">ड्राइवर आर्काइव अपूर्ण है: %1$s नहीं मिला</string>
@@ -475,7 +475,7 @@
     <string name="settings_gpu_driver_manage">ड्राइवर प्रबंधित करें</string>
     <string name="settings_gpu_driver_manager_title">GPU ड्राइवर</string>
     <string name="settings_gpu_driver_manager_subtitle">GPU ड्राइवर इंस्टॉल, डाउनलोड, लागू या हटाएँ।</string>
-    <string name="settings_gpu_driver_active_title">सक्रिय ड्राइवर</string>
+    <string name="settings_gpu_driver_active_title">चुना गया ड्राइवर</string>
     <string name="settings_gpu_driver_install_from_file">फ़ाइल से इंस्टॉल करें</string>
     <string name="settings_gpu_driver_catalog">ड्राइवर कैटलॉग</string>
     <string name="settings_gpu_driver_refresh">रीफ़्रेश करें</string>
@@ -485,7 +485,7 @@
     <string name="settings_gpu_driver_download_apply">डाउनलोड करें और लागू करें</string>
     <string name="settings_gpu_driver_downloaded">डाउनलोड किया गया</string>
     <string name="settings_gpu_driver_apply">लागू करें</string>
-    <string name="settings_gpu_driver_applied">लागू किया गया</string>
+    <string name="settings_gpu_driver_applied">चुना गया</string>
     <string name="settings_gpu_driver_remove_short">निकालें</string>
     <string name="settings_gpu_driver_recommended">अनुशंसित</string>
     <string name="settings_gpu_driver_source">स्रोत</string>
@@ -1596,4 +1596,12 @@
     <string name="rear_touch_clear">असाइनमेंट हटाएँ</string>
     <string name="rear_touch_hint">पिछले पैनल को छूने के लिए दबाकर रखें; स्पर्श हटाने के लिए छोड़ें। जोड़े गए इनपुट अपनी सामान्य क्रिया की जगह लेते हैं। सामने का टच उपलब्ध रहता है।</string>
     <string name="rear_touch_screen_position">स्क्रीन बटन की स्थिति</string>
+    <string name="settings_gpu_driver_status_missing_selection">चुना गया ड्राइवर उपलब्ध नहीं है: %1$s</string>
+    <string name="settings_gpu_driver_status_incompatible_selection">चुना गया ड्राइवर इस GPU के अनुकूल नहीं है।</string>
+    <string name="settings_gpu_driver_status_unverified_selection">इस GPU के साथ ड्राइवर की अनुकूलता सत्यापित नहीं है।</string>
+    <string name="settings_gpu_driver_status_native_unverified">Vulkan के लिए चुना गया है। इस डिवाइस पर समर्थन सत्यापित नहीं है।</string>
+    <string name="settings_gpu_driver_status_native_unsupported">एम्युलेटर का मौजूदा संस्करण इस ड्राइवर का समर्थन नहीं करता।</string>
+    <string name="settings_gpu_driver_status_invalid_selection">चुने गए ड्राइवर की फ़ाइलें अमान्य हैं। ड्राइवर फिर से इंस्टॉल करें।</string>
+    <string name="settings_gpu_driver_device_catalog">%1$s (डिवाइस कैटलॉग)</string>
+    <string name="settings_gpu_driver_device_unknown">GPU हार्डवेयर की पहचान नहीं हुई है।</string>
 </resources>
