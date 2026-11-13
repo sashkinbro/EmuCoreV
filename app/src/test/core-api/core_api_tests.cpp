@@ -323,3 +323,5 @@ using KernelHostLifetimeEnv = EmuEnvState;
 #include "trophy_stream_copy_tests.inc"
 #include "trophy_context_lifecycle_tests.inc"
 #include "trophy_stream_lifetime_tests.inc"
+#include "kernel_mutex_validation_tests.inc"
+#include "kernel_condition_signal_tests.inc"

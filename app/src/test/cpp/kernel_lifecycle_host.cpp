@@ -37,3 +37,5 @@ SceInt32 uid_class_query(KernelUidClassEnv &env, SceUID uid, bool) {
 #include "../core-api/kernel_uid_class_tests.inc"
 
 #include "../core-api/kernel_mutex_cache_tests.inc"
+#include "../core-api/kernel_mutex_validation_tests.inc"
+#include "../core-api/kernel_condition_signal_tests.inc"

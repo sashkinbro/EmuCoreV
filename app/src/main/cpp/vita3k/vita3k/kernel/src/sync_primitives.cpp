@@ -600,7 +600,7 @@ SceUID mutex_create(KernelState &kernel, MemState &mem, const char *export_name,
     if (init_count < 0) {
         return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_COUNT);
     }
-    if (init_count > 1 && (attr & SCE_KERNEL_MUTEX_ATTR_RECURSIVE)) {
+    if (init_count > 1 && !(attr & SCE_KERNEL_MUTEX_ATTR_RECURSIVE)) {
         return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_COUNT);
     }
 
@@ -686,6 +686,8 @@ inline static int mutex_lock_impl(KernelState &kernel, MemState &mem, const char
         return unknown_mutex_id(export_name, weight);
 
     bool is_recursive = (mutex->attr & SCE_KERNEL_MUTEX_ATTR_RECURSIVE);
+    if (lock_count <= 0 || (!is_recursive && lock_count > 1))
+        return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_COUNT);
 
     // Already owned
     if (mutex->lock_count > 0 || resumed_queue) {
@@ -771,6 +773,11 @@ inline static int mutex_unlock_impl(KernelState &kernel, MemState &mem, const ch
     auto mutex_lock = mutex->lock();
     if (!mutex_lock)
         return unknown_mutex_id(export_name, mutex->workarea ? SyncWeight::Light : SyncWeight::Heavy);
+
+    if (unlock_count <= 0 || (!(mutex->attr & SCE_KERNEL_MUTEX_ATTR_RECURSIVE) && unlock_count > 1))
+        return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_COUNT);
+    if (current_thread != mutex->owner)
+        return RET_ERROR(mutex->workarea ? SCE_KERNEL_ERROR_LW_MUTEX_NOT_OWNED : SCE_KERNEL_ERROR_MUTEX_NOT_OWNED);
 
     if (current_thread == mutex->owner) {
         if (unlock_count > mutex->lock_count) {
@@ -1256,6 +1263,9 @@ int condvar_signal(KernelState &kernel, const char *export_name, SceUID thread_i
             LOG_ERROR("[SYNCLOST] {}: SignalCondTo target {} is NOT waiting on cv {}", export_name, signal_target.thread_id, condid);
             return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
         }
+    } else if (target_type == Condvar::SignalTarget::Type::Any) {
+        if (auto *waiter = condvar->waiters.front())
+            condvar->waiters.wake(*waiter);
     } else {
         condvar->waiters.wake_all();
     }
