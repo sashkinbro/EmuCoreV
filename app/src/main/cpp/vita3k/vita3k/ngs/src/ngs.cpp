@@ -199,7 +199,7 @@ bool ModuleData::invoke_callback(KernelState &kernel, const MemState &mem, const
         reason1, reason2, reason_ptr);
     // The guest callback may synchronously release this Rack, destroying this
     // ModuleData and its parent Voice. Read only scheduler-owned state after it.
-    return scheduler->abort_update_after_callback;
+    return scheduler->abort_update_after_callback();
 }
 
 void Voice::init(Rack *mama) {
@@ -400,7 +400,7 @@ bool Voice::invoke_callback(KernelState &kernel, const MemState &mem, const SceU
 
     thread->run_callback(callback.address(), { callback_info_addr });
     stack_free(*thread->cpu, sizeof(SceNgsCallbackInfo));
-    return scheduler->abort_update_after_callback;
+    return scheduler->abort_update_after_callback();
 }
 
 uint32_t System::get_required_memspace_size(SceNgsSystemInitParams *parameters) {

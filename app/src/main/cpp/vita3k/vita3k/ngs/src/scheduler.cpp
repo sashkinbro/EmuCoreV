@@ -148,8 +148,8 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
     std::unique_lock<std::recursive_mutex> scheduler_lock(mutex);
     update_thread_id = thread_id;
     is_updating = true;
-    callback_kind = UpdateCallbackKind::None;
-    abort_update_after_callback = false;
+    set_callback_kind(UpdateCallbackKind::None);
+    set_abort_update_after_callback(false);
 
 
     // make a copy of the queue, this way we have no issue if it is modified in a callback
@@ -298,10 +298,10 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
                 {
                     CallbackContextScope callback_context(*this, UpdateCallbackKind::ModuleProcess);
                     module_finished = voice->rack->modules[i]->process(kern, mem, thread_id, voice->datas[i], scheduler_lock, voice_lock);
-                    if (abort_update_after_callback)
+                    if (abort_update_after_callback())
                         scheduler_lock.lock();
                 }
-                if (abort_update_after_callback)
+                if (abort_update_after_callback())
                     break;
                 if (module_finished) {
                     finished = true;
@@ -309,7 +309,7 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
                 }
             }
         }
-        if (abort_update_after_callback) {
+        if (abort_update_after_callback()) {
             // A module callback released a Rack. The module process returned
             // without touching its destroyed Voice/ModuleData; detach the
             // unlocked voice lock and stop before examining any queue copies.
@@ -373,8 +373,8 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
 
     update_thread_id = 0;
     is_updating = false;
-    callback_kind = UpdateCallbackKind::None;
-    abort_update_after_callback = false;
+    set_callback_kind(UpdateCallbackKind::None);
+    set_abort_update_after_callback(false);
     condvar.notify_all();
 }
 

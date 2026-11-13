@@ -90,9 +90,31 @@ struct VoiceScheduler {
     std::recursive_mutex mutex;
     std::condition_variable_any condvar;
     bool is_updating = false;
+    // Reuse the three padding bytes before update_thread_id instead of growing
+    // System beyond the 256-byte guest allocation used by existing games.
+    uint8_t callback_context_flags = 0;
     SceUID update_thread_id = 0;
-    UpdateCallbackKind callback_kind = UpdateCallbackKind::None;
-    bool abort_update_after_callback = false;
+
+    static constexpr uint8_t kCallbackKindMask = 0x03;
+    static constexpr uint8_t kAbortUpdateAfterCallbackMask = 0x04;
+
+    UpdateCallbackKind callback_kind() const {
+        return static_cast<UpdateCallbackKind>(callback_context_flags & kCallbackKindMask);
+    }
+
+    void set_callback_kind(UpdateCallbackKind kind) {
+        callback_context_flags = static_cast<uint8_t>((callback_context_flags & ~kCallbackKindMask)
+            | (static_cast<uint8_t>(kind) & kCallbackKindMask));
+    }
+
+    bool abort_update_after_callback() const {
+        return (callback_context_flags & kAbortUpdateAfterCallbackMask) != 0;
+    }
+
+    void set_abort_update_after_callback(bool abort) {
+        callback_context_flags = static_cast<uint8_t>((callback_context_flags & ~kAbortUpdateAfterCallbackMask)
+            | (abort ? kAbortUpdateAfterCallbackMask : 0));
+    }
 
     struct CallbackContextScope {
         VoiceScheduler &scheduler;
@@ -100,12 +122,12 @@ struct VoiceScheduler {
 
         CallbackContextScope(VoiceScheduler &scheduler, UpdateCallbackKind kind)
             : scheduler(scheduler)
-            , previous(scheduler.callback_kind) {
-            scheduler.callback_kind = kind;
+            , previous(scheduler.callback_kind()) {
+            scheduler.set_callback_kind(kind);
         }
 
         ~CallbackContextScope() {
-            scheduler.callback_kind = previous;
+            scheduler.set_callback_kind(previous);
         }
     };
 
@@ -126,14 +148,14 @@ struct VoiceScheduler {
             return RackReleaseAction::Immediate;
         if (has_callback)
             return RackReleaseAction::DeferCallback;
-        if (is_update_thread(thread_id) && callback_kind == UpdateCallbackKind::VoiceFinished)
+        if (is_update_thread(thread_id) && callback_kind() == UpdateCallbackKind::VoiceFinished)
             return RackReleaseAction::ReleaseFinishedCallback;
-        if (is_update_thread(thread_id) && callback_kind == UpdateCallbackKind::ModuleProcess)
+        if (is_update_thread(thread_id) && callback_kind() == UpdateCallbackKind::ModuleProcess)
             return RackReleaseAction::ReleaseModuleCallback;
         // Completion callbacks run after their pending operation has been
         // removed. A guest may reuse the released buffer there and immediately
         // release the new Rack; no update queue entry still refers to the old one.
-        if (is_update_thread(thread_id) && callback_kind == UpdateCallbackKind::RackReleaseCompletion)
+        if (is_update_thread(thread_id) && callback_kind() == UpdateCallbackKind::RackReleaseCompletion)
             return RackReleaseAction::Immediate;
         if (is_update_thread(thread_id))
             return RackReleaseAction::RejectReentrant;
@@ -152,11 +174,13 @@ struct VoiceScheduler {
     }
 
     bool consume_update_abort_after_callback() {
-        return std::exchange(abort_update_after_callback, false);
+        const bool requested = abort_update_after_callback();
+        set_abort_update_after_callback(false);
+        return requested;
     }
 
     void request_update_abort_after_callback() {
-        abort_update_after_callback = true;
+        set_abort_update_after_callback(true);
     }
 
     void wait_for_update_to_finish(std::unique_lock<std::recursive_mutex> &lock) {

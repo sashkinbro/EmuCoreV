@@ -400,7 +400,7 @@ EXPORT(SceInt32, sceNgsRackRelease, ngs::Rack *rack, Ptr<void> callback) {
         // would falsely signal completion and leave a stale Rack pointer, so
         // reject this call and let the guest retry outside the update.
         LOG_CRITICAL("Synchronous NGS rack release rejected inside its active {} callback: rack={:x} system={:x} caller_thread={} update_thread={}; rack buffer remains live",
-            ngs::update_callback_kind_name(scheduler.callback_kind), rack_address, Ptr<void>(rack_system, emuenv.mem).address(), thread_id, scheduler.update_thread_id);
+            ngs::update_callback_kind_name(scheduler.callback_kind()), rack_address, Ptr<void>(rack_system, emuenv.mem).address(), thread_id, scheduler.update_thread_id);
         return RET_ERROR(SCE_NGS_ERROR_INVALID_STATE);
     } else if (release_action == ngs::RackReleaseAction::RejectAlreadyPending) {
         LOG_CRITICAL("NGS rack release rejected because release is already pending: rack={:x} system={:x} caller_thread={} callback={:x}",

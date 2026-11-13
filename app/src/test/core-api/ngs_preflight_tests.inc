@@ -9,6 +9,8 @@
 #include <mutex>
 
 namespace {
+static_assert(sizeof(ngs::System) <= 0x100, "NGS System must fit existing 256-byte guest allocations");
+
 class NgsPreflight : public testing::Test {
 protected:
     emucorev::savestate::NgsSnapshot snapshot;
@@ -128,6 +130,12 @@ TEST_F(NgsPreflight, AcceptsActualFactoryLayoutAndHistoricalQueueOffset) {
     EXPECT_TRUE(validate()) << error;
     snapshot.systems[0].queued_voices[0].first = 0;
     EXPECT_FALSE(validate());
+}
+
+TEST_F(NgsPreflight, AcceptsLegacy256ByteSystemGuestAllocation) {
+    snapshot.systems.front().memspace_size = 0x100;
+    EXPECT_LE(sizeof(ngs::System), 0x100u);
+    EXPECT_TRUE(validate()) << error;
 }
 
 TEST_F(NgsPreflight, RejectsNegativeCountsAndDuplicateObjectStorage) {
