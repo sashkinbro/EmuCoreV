@@ -119,7 +119,9 @@ import com.sbro.emucorev.data.VitaTrophySet
 import com.sbro.emucorev.ui.common.LocalImage
 import com.sbro.emucorev.ui.common.formatPlayDuration
 import com.sbro.emucorev.ui.common.horizontalBleed
-import com.sbro.emucorev.ui.cheats.groupCheatEntries
+import com.sbro.emucorev.ui.cheats.cheatPackFingerprint
+import com.sbro.emucorev.ui.cheats.indexCheatEntries
+import com.sbro.emucorev.ui.cheats.category
 import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
 import com.sbro.emucorev.ui.theme.LocalCustomizationSettings
 import com.sbro.emucorev.ui.theme.neon.NeonCrtOverlay
@@ -485,7 +487,7 @@ private fun MenuSelectedContent(
             )
             EmulationMenuTab.Controls -> ControlsTab(config = config, controlsVisible = controlsVisible, callbacks = callbacks)
             EmulationMenuTab.Display -> DisplayTab(config = config, callbacks = callbacks)
-            EmulationMenuTab.Cheats -> if (cheatsAvailable) CheatsTab(cheats = cheats, callbacks = callbacks)
+            EmulationMenuTab.Cheats -> if (cheatsAvailable) CheatsTab(gameId = gameId, cheats = cheats, callbacks = callbacks)
             EmulationMenuTab.System -> SystemTab(config = config, callbacks = callbacks)
             EmulationMenuTab.Achievements -> AchievementsTab(gameId = gameId)
             EmulationMenuTab.Gamepad -> GamepadTab(
@@ -556,9 +558,13 @@ private fun GameTab(
 }
 
 @Composable
-private fun CheatsTab(cheats: VitaCheatSnapshot, callbacks: EmulationMenuCallbacks) {
+private fun CheatsTab(gameId: String, cheats: VitaCheatSnapshot, callbacks: EmulationMenuCallbacks) {
     val palette = emulationMenuPalette()
-    val groups = remember(cheats.cheats) { groupCheatEntries(cheats.cheats) }
+    val groups = remember(cheats.cheats) {
+        indexCheatEntries(cheats.cheats).groupBy { it.entry.category() }
+            .toSortedMap(compareBy { it.ordinal })
+    }
+    val packsBusy = EmulationCheatsSection(gameId, cheats, callbacks.onCheatsReload)
     MenuSection(
         title = stringResource(R.string.emulation_menu_section_cheats),
         subtitle = stringResource(R.string.emulation_menu_section_cheats_desc),
@@ -567,6 +573,7 @@ private fun CheatsTab(cheats: VitaCheatSnapshot, callbacks: EmulationMenuCallbac
         MenuToggleRow(
             label = stringResource(R.string.emulation_cheats_master),
             checked = cheats.masterEnabled,
+            enabled = !packsBusy,
             onCheckedChange = callbacks.onCheatsMaster
         )
         if (!cheats.masterEnabled) {
@@ -595,23 +602,25 @@ private fun CheatsTab(cheats: VitaCheatSnapshot, callbacks: EmulationMenuCallbac
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(start = 4.dp, top = 4.dp)
                 )
-                entries.forEach { cheat ->
+                entries.forEach { row ->
+                    val cheat = row.entry
                     MenuToggleRow(
                         label = cheat.name,
-                        checked = cheat.enabled,
-                        enabled = cheats.masterEnabled,
+                        checked = cheat.enabled && !cheat.broken,
+                        enabled = cheats.masterEnabled && !packsBusy && !cheat.broken,
                         badge = if (cheat.broken) MenuBadge.Broken else null,
                         onCheckedChange = { enabled ->
-                            callbacks.onCheatToggle(cheats.cheats.indexOf(cheat), enabled)
+                            callbacks.onCheatToggle(cheatPackFingerprint(cheats), row.sourceIndex, enabled)
                         }
                     )
                 }
+                val runnableEntries = entries.filterNot { it.entry.broken }
                 MenuToggleRow(
                     label = stringResource(R.string.emulation_cheats_group_enable),
-                    checked = entries.all { it.enabled },
-                    enabled = cheats.masterEnabled,
+                    checked = runnableEntries.isNotEmpty() && runnableEntries.all { it.entry.enabled },
+                    enabled = cheats.masterEnabled && !packsBusy && runnableEntries.isNotEmpty(),
                     onCheckedChange = { enabled ->
-                        callbacks.onCheatsGroupToggle(entries.map { cheats.cheats.indexOf(it) }, enabled)
+                        callbacks.onCheatsGroupToggle(cheatPackFingerprint(cheats), runnableEntries.map { it.sourceIndex }, enabled)
                     }
                 )
             }
@@ -620,6 +629,7 @@ private fun CheatsTab(cheats: VitaCheatSnapshot, callbacks: EmulationMenuCallbac
             icon = Icons.Rounded.FileOpen,
             title = stringResource(R.string.emulation_cheats_import),
             subtitle = stringResource(R.string.emulation_cheats_import_desc),
+            enabled = !packsBusy,
             onClick = callbacks.onCheatsImport
         )
     }
@@ -1020,7 +1030,7 @@ private fun GamepadTab(
         } else {
             stringResource(R.string.emulation_menu_section_gamepad_disconnected)
         },
-        badge = MenuBadge.Live
+        badge = null
     ) {
         MenuSliderRow(
             label = stringResource(R.string.settings_gamepad_deadzone),
@@ -1646,7 +1656,7 @@ private fun emulationMenuTabs(): List<EmulationMenuTabItem> = listOf(
     )
 ).filter { it.tab != EmulationMenuTab.Cheats || CHEATS_ENABLED }
 
-/** Callbacks bag — keeps `EmulationGameMenu` signature compact and testable. */
+/** Callbacks bag вЂ” keeps `EmulationGameMenu` signature compact and testable. */
 data class EmulationMenuCallbacks(
     val onPauseToggle: () -> Unit,
     val onExit: () -> Unit,
@@ -1682,9 +1692,10 @@ data class EmulationMenuCallbacks(
     val onGamepadInvertLeftY: (Boolean) -> Unit,
     val onGamepadInvertRightY: (Boolean) -> Unit,
     val onCheatsMaster: (Boolean) -> Unit,
-    val onCheatToggle: (Int, Boolean) -> Unit,
-    val onCheatsGroupToggle: (List<Int>, Boolean) -> Unit,
+    val onCheatToggle: (String, Int, Boolean) -> Unit,
+    val onCheatsGroupToggle: (String, List<Int>, Boolean) -> Unit,
     val onCheatsImport: () -> Unit,
+    val onCheatsReload: suspend () -> Unit = {},
     val onSaveStateSlotSelected: (Int) -> Unit,
     val onSaveStateSave: (Int) -> Unit,
     val onSaveStateLoad: (Int) -> Unit,

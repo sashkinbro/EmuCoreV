@@ -2,8 +2,12 @@ package com.sbro.emucorev.ui.cheats
 
 import android.content.Context
 import com.sbro.emucorev.core.CheatBridge
+import com.sbro.emucorev.core.CheatOperationQueue
 import com.sbro.emucorev.core.VitaCheatSnapshot
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
@@ -62,7 +66,9 @@ class CheatCatalogRepository(private val context: Context) {
         if (!force && fresh) return@withContext parse(file.readText())
 
         for (url in CATALOG_URLS) {
-            val body = runCatching { httpGetText(url, MAX_CATALOG_BYTES) }.getOrNull() ?: continue
+            val body = try { httpGetText(url, MAX_CATALOG_BYTES) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { continue }
             val entries = parse(body)
             if (entries.isEmpty()) continue
             runCatching {
@@ -75,14 +81,18 @@ class CheatCatalogRepository(private val context: Context) {
         if (file.isFile) parse(file.readText()) else emptyList()
     }
 
-    suspend fun download(entry: CheatCatalogEntry): VitaCheatSnapshot? = withContext(Dispatchers.IO) {
+    suspend fun download(entry: CheatCatalogEntry, canCommit: () -> Boolean = { true }): VitaCheatSnapshot? = withContext(Dispatchers.IO) {
         val bytes = downloadPack(entry) ?: return@withContext null
 
         val temp = File.createTempFile("cheat_download_", ".tmp", context.cacheDir)
         try {
             temp.writeBytes(bytes)
-            val snapshot = CheatBridge.importFile(entry.titleId, temp.absolutePath, "${entry.titleId}.psv")
-            if (snapshot.cheats.isEmpty()) return@withContext null
+            val snapshot = withContext(CheatOperationQueue.dispatcher) {
+                commitCheatPackIfCurrent(canCommit) {
+                    CheatBridge.importFile(entry.titleId, temp.absolutePath, "${entry.titleId}.psv")
+                }
+            } ?: return@withContext null
+            if (snapshot.cheats.isEmpty() || !snapshot.titleId.equals(entry.titleId, ignoreCase = true)) return@withContext null
             val key = entry.titleId.uppercase()
             installedPacks.edit().putString("$key.id", entry.id)
                 .putString("$key.fingerprint", cheatPackFingerprint(snapshot)).apply()
@@ -92,7 +102,7 @@ class CheatCatalogRepository(private val context: Context) {
         }
     }
 
-    private fun downloadPack(entry: CheatCatalogEntry): ByteArray? {
+    private suspend fun downloadPack(entry: CheatCatalogEntry): ByteArray? {
         val path = entry.downloadUrl.substringAfter("/EmuCoreV-Cheat/main/", "files/${entry.titleId}.psv")
         val urls = listOf(
             entry.downloadUrl,
@@ -100,7 +110,9 @@ class CheatCatalogRepository(private val context: Context) {
             "https://cdn.jsdelivr.net/gh/sashkinbro/EmuCoreV-Cheat@main/$path"
         )
         for (url in urls) {
-            val bytes = runCatching { httpGetBytes(url, MAX_PACK_BYTES) }.getOrNull()
+            val bytes = try { httpGetBytes(url, MAX_PACK_BYTES) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { continue }
             if (bytes != null && bytes.isNotEmpty() && verifyCheatPack(bytes, entry.sha256)) return bytes
         }
         return null
@@ -134,12 +146,13 @@ class CheatCatalogRepository(private val context: Context) {
         }
     }.getOrDefault(emptyList())
 
-    private fun httpGetText(url: String, maxBytes: Int): String {
+    private suspend fun httpGetText(url: String, maxBytes: Int): String {
         val bytes = httpGetBytes(url, maxBytes)
         return bytes.toString(Charsets.UTF_8).removePrefix("\uFEFF")
     }
 
-    private fun httpGetBytes(url: String, maxBytes: Int): ByteArray {
+    private suspend fun httpGetBytes(url: String, maxBytes: Int): ByteArray {
+        currentCoroutineContext().ensureActive()
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 10_000
             readTimeout = 20_000
@@ -153,6 +166,7 @@ class CheatCatalogRepository(private val context: Context) {
             val buffer = ByteArray(16 * 1024)
             val output = java.io.ByteArrayOutputStream()
             while (true) {
+                currentCoroutineContext().ensureActive()
                 val read = stream.read(buffer)
                 if (read < 0) break
                 output.write(buffer, 0, read)

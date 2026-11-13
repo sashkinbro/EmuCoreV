@@ -211,6 +211,7 @@ fun CheatManagerScreen(
                         }
                         Switch(
                             checked = state.snapshot.masterEnabled,
+                            enabled = !state.busy,
                             onCheckedChange = viewModel::setMasterEnabled
                         )
                     }
@@ -232,6 +233,7 @@ fun CheatManagerScreen(
                 games = state.games,
                 selectedTitleId = state.selectedTitleId,
                 selectedGame = selectedGame,
+                enabled = !state.busy,
                 onSelect = {
                     selectedCategory = null
                     cheatSearchVisible = false
@@ -438,7 +440,7 @@ fun CheatManagerScreen(
                 items(visibleBlocks, key = { it.key }) { row ->
                     CheatToggleCard(
                         entry = row.entry,
-                        masterEnabled = state.snapshot.masterEnabled,
+                        masterEnabled = state.snapshot.masterEnabled && !state.busy,
                         onToggle = { enabled -> viewModel.setCheatEnabled(row.sourceIndex, enabled) }
                     )
                 }
@@ -470,7 +472,7 @@ fun CheatManagerScreen(
             items(visibleBlocks, key = { it.key }) { row ->
                 CheatToggleCard(
                     entry = row.entry,
-                    masterEnabled = state.snapshot.masterEnabled,
+                    masterEnabled = state.snapshot.masterEnabled && !state.busy,
                     onToggle = { enabled -> viewModel.setCheatEnabled(row.sourceIndex, enabled) }
                 )
             }
@@ -645,7 +647,7 @@ private fun CheatToggleCard(
 ) {
     Surface(
         onClick = { onToggle(!entry.enabled) },
-        enabled = masterEnabled,
+        enabled = masterEnabled && !entry.broken,
         modifier = (Modifier
             .fillMaxWidth()
             .padding(horizontal = ScreenHorizontalPadding)).controllerFocus(shape = neonShape(16.dp)),
@@ -672,8 +674,8 @@ private fun CheatToggleCard(
                 }
             }
             Switch(
-                checked = entry.enabled,
-                enabled = masterEnabled,
+                checked = entry.enabled && !entry.broken,
+                enabled = masterEnabled && !entry.broken,
                 onCheckedChange = null
             )
         }
@@ -705,12 +707,11 @@ internal fun CheatCatalogCard(
     hasInstalledPack: Boolean,
     compatibility: CheatVersionCompatibility,
     busy: Boolean,
-    onDownload: () -> Unit
+    onDownload: () -> Unit,
+    modifier: Modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = ScreenHorizontalPadding),
+        modifier = modifier.fillMaxWidth(),
         shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
         contentColor = MaterialTheme.colorScheme.onSurface
@@ -807,6 +808,7 @@ private fun CheatGamePicker(
     games: List<InstalledVitaGame>,
     selectedTitleId: String?,
     selectedGame: InstalledVitaGame?,
+    enabled: Boolean,
     onSelect: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -833,6 +835,7 @@ private fun CheatGamePicker(
                 Surface(
         modifier = Modifier.controllerFocus(shape = neonShape(18.dp)),
                     onClick = { onSelect(game.titleId) },
+                    enabled = enabled,
                     shape = neonShape(18.dp),
                     color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
                     border = BorderStroke(

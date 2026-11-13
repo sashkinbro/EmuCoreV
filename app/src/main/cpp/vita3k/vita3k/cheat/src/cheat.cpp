@@ -135,6 +135,7 @@ public:
             ++executed;
             if (!execute(m_cheat.lines[m_index])) {
                 m_cheat.broken = true;
+                m_cheat.enabled = false;
                 break;
             }
         }
@@ -143,11 +144,16 @@ public:
 private:
     // Addresses become relative to a module segment once a `$B2` code has been seen.
     uint32_t resolve(uint32_t address) const {
-        return m_relative_base + address;
+        const uint64_t resolved = static_cast<uint64_t>(m_relative_base) + address;
+        if (resolved > UINT32_MAX) {
+            m_address_overflow = true;
+            return 0;
+        }
+        return static_cast<uint32_t>(resolved);
     }
 
     bool write(uint32_t address, CodeWidth width, uint32_t value) {
-        return write_value(m_mem, address, width, value);
+        return !m_address_overflow && write_value(m_mem, address, width, value);
     }
     size_t code_line_count(size_t index) const {
         if (index >= m_cheat.lines.size())
@@ -186,6 +192,13 @@ private:
     }
 
     bool execute(const CodeLine &line) {
+        const auto type = line.type();
+        if ((type == CodeType::write || type == CodeType::pointer_write ||
+             type == CodeType::compression || type == CodeType::mov ||
+             type == CodeType::pointer_compression || type == CodeType::pointer_mov) && line.op() > 2)
+            return false;
+        if (type == CodeType::arm_write && line.op() != 1 && line.op() != 2)
+            return false;
         switch (line.type()) {
         case CodeType::write:
             return execute_write(line);
@@ -216,8 +229,7 @@ private:
     // `$0X00 <address> <value>`
     bool execute_write(const CodeLine &line) {
         ++m_index;
-        write(resolve(line.first), static_cast<CodeWidth>(line.op()), line.second);
-        return true;
+        return write(resolve(line.first), static_cast<CodeWidth>(line.op()), line.second);
     }
 
     // `$5X00 <destination> <source>`
@@ -226,10 +238,8 @@ private:
 
         const auto width = static_cast<CodeWidth>(line.op());
         uint32_t value = 0;
-        if (read_value(m_mem, resolve(line.second), width, value))
+        return read_value(m_mem, resolve(line.second), width, value) &&
             write(resolve(line.first), width, value);
-
-        return true;
     }
 
     // `$4X01 <address> <value>` followed by `$<count> <address gap> <value gap>`
@@ -245,8 +255,12 @@ private:
         const auto width = static_cast<CodeWidth>(line.op());
         // The whole control word of the second line is the iteration count.
         const uint32_t count = gaps.control;
-        for (uint32_t i = 0; i < count; ++i)
-            write(resolve(line.first) + (i * gaps.first), width, line.second + (i * gaps.second));
+        const uint32_t base = resolve(line.first);
+        for (uint32_t i = 0; i < count; ++i) {
+            const uint64_t address = static_cast<uint64_t>(base) + static_cast<uint64_t>(i) * gaps.first;
+            if (address > UINT32_MAX || !write(static_cast<uint32_t>(address), width, line.second + (i * gaps.second)))
+                return false;
+        }
 
         return true;
     }
@@ -258,10 +272,8 @@ private:
             return false;
 
         uint32_t address = 0;
-        if (follow_pointers(block, address))
+        return follow_pointers(block, address) &&
             write(address, static_cast<CodeWidth>(line.op()), block.closing.second);
-
-        return true;
     }
 
     // `$8X<level> ...` writes to `$8<4|5|6><level> ...`, both blocks closed by a `$88` / `$89` line.
@@ -289,13 +301,11 @@ private:
         uint32_t destination_address = 0;
         uint32_t source_address = 0;
         if (!follow_pointers(destination, destination_address) || !follow_pointers(source, source_address))
-            return true;
+            return false;
 
         uint32_t value = 0;
-        if (read_value(m_mem, source_address, width, value))
-            write_value(m_mem, destination_address, width, value);
-
-        return true;
+        return read_value(m_mem, source_address, width, value) &&
+            write(destination_address, width, value);
     }
 
     // A `$3` block followed by the `$<count> <address gap> <value gap>` line of a `$4` code.
@@ -314,12 +324,15 @@ private:
 
         uint32_t address = 0;
         if (!follow_pointers(block, address))
-            return true;
+            return false;
 
         const auto width = static_cast<CodeWidth>(line.op());
         const uint32_t count = gaps.control;
-        for (uint32_t i = 0; i < count; ++i)
-            write_value(m_mem, address + (i * gaps.first), width, block.closing.second + (i * gaps.second));
+        for (uint32_t i = 0; i < count; ++i) {
+            const uint64_t target = static_cast<uint64_t>(address) + static_cast<uint64_t>(i) * gaps.first;
+            if (target > UINT32_MAX || !write(static_cast<uint32_t>(target), width, block.closing.second + (i * gaps.second)))
+                return false;
+        }
 
         return true;
     }
@@ -335,7 +348,7 @@ private:
 
         uint32_t current = 0;
         if (!read_value(m_mem, address, width, current))
-            return true;
+            return false;
 
         // Patching guest code once is enough, only pay for the recompiler flush when it changed.
         if (current == value)
@@ -348,11 +361,13 @@ private:
             saved.address = address;
             saved.bytes.resize(size);
             if (!read_bytes(m_mem, address, saved.bytes.data(), size))
-                return true;
+                return false;
             m_cheat.saved_memory.push_back(std::move(saved));
         }
 
-        if (write_value(m_mem, address, width, value) && m_invalidate_jit)
+        if (!write(address, width, value))
+            return false;
+        if (m_invalidate_jit)
             m_invalidate_jit(address, size);
 
         return true;
@@ -455,11 +470,16 @@ private:
 
     bool follow_pointers(const PointerBlock &block, uint32_t &address) const {
         address = resolve(block.address);
+        if (m_address_overflow)
+            return false;
         for (const uint32_t offset : block.offsets) {
             uint32_t pointer = 0;
             if (!read_value(m_mem, address, CodeWidth::bits32, pointer))
                 return false;
-            address = pointer + offset;
+            const uint64_t next = static_cast<uint64_t>(pointer) + offset;
+            if (pointer == 0 || next > UINT32_MAX)
+                return false;
+            address = static_cast<uint32_t>(next);
         }
 
         return true;
@@ -473,6 +493,7 @@ private:
 
     size_t m_index = 0;
     uint32_t m_relative_base = 0;
+    mutable bool m_address_overflow = false;
 };
 
 void restore_cheat(Cheat &cheat, MemState &mem, const JitInvalidate &invalidate_jit) {
@@ -546,35 +567,48 @@ void apply(CheatState &state, MemState &mem, const JitInvalidate &invalidate_jit
     for (auto &cheat : state.file.cheats) {
         if (state.enabled && cheat.enabled && !cheat.broken) {
             Interpreter(state, cheat, mem, buttons, invalidate_jit).run();
+            // A failed line must not leave an enabled claim or a partial ARM patch.
+            if (cheat.broken)
+                restore_cheat(cheat, mem, invalidate_jit);
         } else if (!cheat.saved_memory.empty()) {
             restore_cheat(cheat, mem, invalidate_jit);
         }
     }
 }
 
-void set_cheat_enabled(CheatState &state, size_t index, bool enabled, MemState &mem, const JitInvalidate &invalidate_jit) {
+bool set_cheat_enabled(CheatState &state, size_t index, bool enabled, MemState &mem, const JitInvalidate &invalidate_jit) {
     const std::lock_guard<std::mutex> lock(state.mutex);
 
     if (index >= state.file.cheats.size())
-        return;
+        return false;
 
     Cheat &cheat = state.file.cheats[index];
+    if (enabled && cheat.broken)
+        return false; // Reload/reimport resets a failed code; toggling is not a retry.
     if (cheat.enabled == enabled)
-        return;
+        return true;
 
     cheat.enabled = enabled;
     if (!enabled)
         restore_cheat(cheat, mem, invalidate_jit);
+    return true;
 }
 
-void set_all_cheats_enabled(CheatState &state, bool enabled, MemState &mem, const JitInvalidate &invalidate_jit) {
+bool set_all_cheats_enabled(CheatState &state, bool enabled, MemState &mem, const JitInvalidate &invalidate_jit) {
     const std::lock_guard<std::mutex> lock(state.mutex);
 
+    bool accepted = false;
     for (auto &cheat : state.file.cheats) {
+        if (enabled && cheat.broken) {
+            cheat.enabled = false;
+            continue;
+        }
+        accepted = true;
         cheat.enabled = enabled;
         if (!enabled)
             restore_cheat(cheat, mem, invalidate_jit);
     }
+    return accepted;
 }
 
 void set_enabled(CheatState &state, bool enabled, MemState &mem, const JitInvalidate &invalidate_jit) {
@@ -594,7 +628,7 @@ size_t enabled_cheat_count(const CheatState &state) {
     const std::lock_guard<std::mutex> lock(state.mutex);
 
     return std::count_if(state.file.cheats.begin(), state.file.cheats.end(),
-        [](const Cheat &cheat) { return cheat.enabled; });
+        [](const Cheat &cheat) { return cheat.enabled && !cheat.broken; });
 }
 
 CheatFile snapshot(const CheatState &state) {

@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.CheatBridge
+import com.sbro.emucorev.core.CheatOperationQueue
 import com.sbro.emucorev.core.VitaCheatSnapshot
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.data.InstalledGameRepository
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -54,7 +56,7 @@ class CheatManagerViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun selectGame(titleId: String) {
-        if (titleId == _state.value.selectedTitleId) return
+        if (_state.value.busy || titleId == _state.value.selectedTitleId) return
         _state.update { it.copy(selectedTitleId = titleId) }
         refreshCheats()
     }
@@ -71,24 +73,28 @@ class CheatManagerViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun setMasterEnabled(enabled: Boolean) {
-        CheatBridge.setCheatsEnabled(enabled)
+        if (_state.value.busy) return
+        if (!CheatBridge.setCheatsEnabled(enabled)) {
+            _state.update { it.copy(messageRes = R.string.emulation_cheats_save_failed) }
+            return
+        }
         coreConfigRepository.save(coreConfigRepository.load().copy(enableCheats = enabled))
         refreshCheats()
     }
 
     fun setCheatEnabled(index: Int, enabled: Boolean) {
         val titleId = _state.value.selectedTitleId
-        if (titleId.isBlank()) return
-        CheatBridge.setCheatEnabled(titleId, index, enabled)
-        CheatBridge.saveCheats(titleId)
+        if (titleId.isBlank() || _state.value.busy) return
+        if (!CheatBridge.setCheatEnabled(titleId, index, enabled) || !CheatBridge.saveCheats(titleId))
+            _state.update { it.copy(messageRes = R.string.emulation_cheats_save_failed) }
         refreshCheats()
     }
 
     fun setAllCheatsEnabled(enabled: Boolean) {
         val titleId = _state.value.selectedTitleId
-        if (titleId.isBlank()) return
-        CheatBridge.setAllCheatsEnabled(titleId, enabled)
-        CheatBridge.saveCheats(titleId)
+        if (titleId.isBlank() || _state.value.busy) return
+        if (!CheatBridge.setAllCheatsEnabled(titleId, enabled) || !CheatBridge.saveCheats(titleId))
+            _state.update { it.copy(messageRes = R.string.emulation_cheats_save_failed) }
         refreshCheats()
     }
 
@@ -97,6 +103,7 @@ class CheatManagerViewModel(application: Application) : AndroidViewModel(applica
         if (titleId.isBlank() || _state.value.busy) return
         _state.update { it.copy(busy = true) }
         viewModelScope.launch {
+            try {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     val name = queryDisplayName(uri)
@@ -107,11 +114,18 @@ class CheatManagerViewModel(application: Application) : AndroidViewModel(applica
                         input.use { stream ->
                             temp.outputStream().use { output -> stream.copyTo(output) }
                         }
-                        CheatBridge.importFile(titleId, temp.absolutePath, name ?: "$titleId.psv")
+                        withContext(CheatOperationQueue.dispatcher) {
+                            commitCheatPackIfCurrent({ viewModelScope.isActive }) {
+                                CheatBridge.importFile(titleId, temp.absolutePath, name ?: "$titleId.psv")
+                            }
+                        } ?: VitaCheatSnapshot.EMPTY
                     } finally {
                         temp.delete()
                     }
-                }.getOrDefault(VitaCheatSnapshot.EMPTY)
+                }.getOrElse { failure ->
+                    if (failure is CancellationException) throw failure
+                    VitaCheatSnapshot.EMPTY
+                }
             }
             val success = result.cheats.isNotEmpty()
             _state.update {
@@ -121,6 +135,9 @@ class CheatManagerViewModel(application: Application) : AndroidViewModel(applica
                 )
             }
             refreshCheats()
+            } finally {
+                _state.update { it.copy(busy = false) }
+            }
         }
     }
 
@@ -134,29 +151,25 @@ class CheatManagerViewModel(application: Application) : AndroidViewModel(applica
         if (_state.value.busy) return
         _state.update { it.copy(busy = true) }
         viewModelScope.launch {
-            val snapshot = try {
-                catalogRepository.download(entry)
+            try {
+                val success = catalogRepository.download(entry) != null
+                _state.update { it.copy(messageRes = if (success)
+                    R.string.cheat_catalog_download_success else R.string.cheat_catalog_download_failed) }
+                if (success && entry.titleId.equals(_state.value.selectedTitleId, ignoreCase = true))
+                    refreshCheats()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                null
+                _state.update { it.copy(messageRes = R.string.cheat_catalog_download_failed) }
+            } finally {
+                _state.update { it.copy(busy = false) }
             }
-            val success = snapshot != null
-            _state.update {
-                it.copy(
-                    busy = false,
-                    messageRes = if (success) R.string.cheat_catalog_download_success else R.string.cheat_catalog_download_failed
-                )
-            }
-            if (!success) return@launch
-            if (entry.titleId.equals(_state.value.selectedTitleId, ignoreCase = true))
-                refreshCheats()
         }
     }
 
     fun deleteCheats() {
         val titleId = _state.value.selectedTitleId
-        if (titleId.isBlank()) return
+        if (titleId.isBlank() || _state.value.busy) return
         val deleted = CheatBridge.deleteCheats(titleId)
         _state.update {
             it.copy(messageRes = if (deleted) R.string.cheat_manager_delete_success else R.string.cheat_manager_delete_failed)
@@ -165,10 +178,19 @@ class CheatManagerViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun loadCatalog(force: Boolean = false) {
+        if (_state.value.catalogLoading) return
+        _state.update { it.copy(catalogLoading = true, catalogFailed = false) }
         viewModelScope.launch {
-            _state.update { it.copy(catalogLoading = true, catalogFailed = false) }
-            val entries = catalogRepository.load(force)
-            _state.update { it.copy(catalog = entries, catalogLoading = false, catalogFailed = entries.isEmpty()) }
+            try {
+                val entries = catalogRepository.load(force)
+                _state.update { it.copy(catalog = entries, catalogFailed = entries.isEmpty()) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.update { it.copy(catalogFailed = true) }
+            } finally {
+                _state.update { it.copy(catalogLoading = false) }
+            }
         }
     }
 

@@ -325,3 +325,4 @@ using KernelHostLifetimeEnv = EmuEnvState;
 #include "trophy_stream_lifetime_tests.inc"
 #include "kernel_mutex_validation_tests.inc"
 #include "kernel_condition_signal_tests.inc"
+#include "cheat_execution_failure_tests.inc"

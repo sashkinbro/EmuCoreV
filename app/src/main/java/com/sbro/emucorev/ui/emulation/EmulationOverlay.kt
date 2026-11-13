@@ -104,6 +104,8 @@ import com.sbro.emucorev.core.AndroidTouchHaptics
 import com.sbro.emucorev.core.AndroidTouchHaptics.ButtonPhase
 import com.sbro.emucorev.core.CHEATS_ENABLED
 import com.sbro.emucorev.core.CheatBridge
+import com.sbro.emucorev.core.CheatOperationQueue
+import com.sbro.emucorev.ui.cheats.cheatPackFingerprint
 import com.sbro.emucorev.core.KeyboardMouseManager
 import com.sbro.emucorev.core.SaveStateResult
 import com.sbro.emucorev.core.VitaLaunchBridge
@@ -156,7 +158,7 @@ fun EmulationOverlayHost(
     val autoSaving = activity.autoSaveInProgress
     val repository = remember(activity) { VitaGameSettingsRepository(activity) }
     val coreConfigRepository = remember(activity) { VitaCoreConfigRepository(activity) }
-    val cheatWorkDispatcher = remember(activity) { Dispatchers.IO.limitedParallelism(1) }
+    val cheatWorkDispatcher = CheatOperationQueue.dispatcher
     val appPreferences = remember(activity) { AppPreferences(activity) }
     val confirmSaveStateActions by appPreferences.confirmSaveStateActionsFlow.collectAsState(
         initial = appPreferences.confirmSaveStateActions
@@ -783,25 +785,36 @@ fun EmulationOverlayHost(
                     }
                 }
             },
-            onCheatToggle = { index, enabled ->
+            onCheatToggle = { expectedPack, index, enabled ->
                 overlayScope.launch {
-                    cheatSnapshot = withContext(cheatWorkDispatcher) {
-                        CheatBridge.setCheatEnabled(gameId, index, enabled)
-                        CheatBridge.saveCheats(gameId)
-                        CheatBridge.snapshot(gameId)
+                    val result = CheatOperationQueue.mutate(expectedPack,
+                        { cheatPackFingerprint(CheatBridge.snapshot(gameId)) }) {
+                        val applied = CheatBridge.setCheatEnabled(gameId, index, enabled)
+                        val saved = CheatBridge.saveCheats(gameId)
+                        CheatBridge.snapshot(gameId) to (applied && saved)
                     }
+                    cheatSnapshot = result?.first ?: withContext(cheatWorkDispatcher) { CheatBridge.snapshot(gameId) }
+                    if (result != null && !result.second)
+                        Toast.makeText(activity, R.string.emulation_cheats_save_failed, Toast.LENGTH_SHORT).show()
                 }
             },
-            onCheatsGroupToggle = { indices, enabled ->
+            onCheatsGroupToggle = { expectedPack, indices, enabled ->
                 overlayScope.launch {
-                    cheatSnapshot = withContext(cheatWorkDispatcher) {
-                        indices.forEach { index -> CheatBridge.setCheatEnabled(gameId, index, enabled) }
-                        CheatBridge.saveCheats(gameId)
-                        CheatBridge.snapshot(gameId)
+                    val result = CheatOperationQueue.mutate(expectedPack,
+                        { cheatPackFingerprint(CheatBridge.snapshot(gameId)) }) {
+                        val applied = indices.map { CheatBridge.setCheatEnabled(gameId, it, enabled) }.all { it }
+                        val saved = CheatBridge.saveCheats(gameId)
+                        CheatBridge.snapshot(gameId) to (applied && saved)
                     }
+                    cheatSnapshot = result?.first ?: withContext(cheatWorkDispatcher) { CheatBridge.snapshot(gameId) }
+                    if (result != null && !result.second)
+                        Toast.makeText(activity, R.string.emulation_cheats_save_failed, Toast.LENGTH_SHORT).show()
                 }
             },
             onCheatsImport = { activity.requestCheatImport() },
+            onCheatsReload = {
+                cheatSnapshot = withContext(cheatWorkDispatcher) { CheatBridge.snapshot(gameId) }
+            },
             onSaveStateSlotSelected = { slot -> selectedSaveStateSlot = slot },
             onSaveStateSave = { slot ->
                 val exists = saveStateSlots.firstOrNull { it.slot == slot }?.exists == true

@@ -164,8 +164,7 @@ Java_com_sbro_emucorev_core_CheatBridge_setCheatEnabled(
 
     const std::string title = jstring_to_string(env, title_id);
     if (is_live_title(emuenv, title)) {
-        cheat::set_cheat_enabled(emuenv->cheat, static_cast<size_t>(index), enabled == JNI_TRUE, emuenv->mem, make_invalidate(*emuenv));
-        return JNI_TRUE;
+        return cheat::set_cheat_enabled(emuenv->cheat, static_cast<size_t>(index), enabled == JNI_TRUE, emuenv->mem, make_invalidate(*emuenv)) ? JNI_TRUE : JNI_FALSE;
     }
 
     cheat::CheatFile file = load_cheat_file(*emuenv, title);
@@ -189,8 +188,7 @@ Java_com_sbro_emucorev_core_CheatBridge_setAllCheatsEnabled(
 
     const std::string title = jstring_to_string(env, title_id);
     if (is_live_title(emuenv, title)) {
-        cheat::set_all_cheats_enabled(emuenv->cheat, enabled == JNI_TRUE, emuenv->mem, make_invalidate(*emuenv));
-        return JNI_TRUE;
+        return cheat::set_all_cheats_enabled(emuenv->cheat, enabled == JNI_TRUE, emuenv->mem, make_invalidate(*emuenv)) ? JNI_TRUE : JNI_FALSE;
     }
 
     cheat::CheatFile file = load_cheat_file(*emuenv, title);

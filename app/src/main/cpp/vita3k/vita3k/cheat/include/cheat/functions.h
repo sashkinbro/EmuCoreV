@@ -48,9 +48,9 @@ void set_buttons(CheatState &state, uint32_t buttons);
 
 void apply(CheatState &state, MemState &mem, const JitInvalidate &invalidate_jit);
 
-void set_cheat_enabled(CheatState &state, size_t index, bool enabled, MemState &mem, const JitInvalidate &invalidate_jit);
+bool set_cheat_enabled(CheatState &state, size_t index, bool enabled, MemState &mem, const JitInvalidate &invalidate_jit);
 
-void set_all_cheats_enabled(CheatState &state, bool enabled, MemState &mem, const JitInvalidate &invalidate_jit);
+bool set_all_cheats_enabled(CheatState &state, bool enabled, MemState &mem, const JitInvalidate &invalidate_jit);
 
 // Mirrors the `enable-cheats` setting, turning it off restores every ARM write.
 void set_enabled(CheatState &state, bool enabled, MemState &mem, const JitInvalidate &invalidate_jit);
