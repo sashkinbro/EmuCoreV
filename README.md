@@ -7,11 +7,11 @@
 
 <a href="https://play.google.com/store/apps/details?id=com.sbro.emucorev"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="60"/></a>
 
-EmuCoreV is a PlayStation Vita emulator for Android. It combines a custom Android interface, library and catalog UX, installer flows, and runtime controls with a Vita3K-based emulation core adapted for this app.
+EmuCoreV is a PlayStation Vita emulator for Android powered by **ECV**, its modified emulation core actively developed by EmuCore with its own fixes and improvements. The Android application remains **EmuCoreV**, with a custom interface, library and catalog UX, installer flows, and runtime controls.
 
 ## Highlights
 
-- Vita3K-based native core integrated into a Kotlin + Jetpack Compose Android app
+- ECV native core integrated into a Kotlin + Jetpack Compose Android app
 - Library and catalog screens with cover art, metadata, media, and compatibility badges
 - Firmware, update, `VPK`, `ZIP`, `PKG`, `zRIF`, `RIF`, and `work.bin` install flows
 - In-game overlay, per-game settings, and Android-first storage and setup flows
@@ -35,16 +35,16 @@ In-game captures running on a Snapdragon 8 Elite Gen 5 device with the Vulkan re
 
 ## What This Repository Contains
 
-This repository contains the Android application, Compose UI, JNI bridge code, bundled Vita3K source tree, catalog assets, and supporting build tooling used by EmuCoreV.
+This repository contains the Android application, Compose UI, JNI bridge code, ECV core source and changes, catalog assets, and supporting build tooling used by EmuCoreV. Existing technical source paths retain their upstream names where needed.
 
 ## Tech Stack
 
 - Kotlin + Jetpack Compose
 - Android DataStore
 - JNI bridge to native C++
-- Vita3K-based emulation core and Android integration layer
+- ECV emulation core and Android integration layer
 - Android NDK + CMake
-- Local compatibility sync against Vita3K compatibility data
+- Local compatibility sync against public upstream compatibility data
 
 ## Current App Scope
 
@@ -53,7 +53,8 @@ EmuCoreV currently targets Android with:
 - `minSdk 29` (Android 10+)
 - `targetSdk 37`
 - package id `com.sbro.emucorev`
-- version `0.2.4` (build `84`)
+- app version and build number defined in `app/build.gradle.kts`
+- modified core `ECV 0.3`
 - ABI `arm64-v8a`
 
 ## Building Locally
@@ -82,7 +83,7 @@ EmuCoreV currently targets Android with:
 
 - `app/` Android application module
 - `app/src/main/java/com/sbro/emucorev` Kotlin app code
-- `app/src/main/cpp` Native bridge and Vita3K-based sources
+- `app/src/main/cpp` Native bridge and ECV sources
 - `app/src/main/assets` Catalog data and bundled assets
 - `tools/` Local helper scripts and ignored machine-specific native build inputs
 
@@ -90,16 +91,17 @@ EmuCoreV currently targets Android with:
 
 - Firmware files, licenses, keys, and game content are not distributed with this repository.
 - Use only your own legally obtained firmware and game dumps.
-- Compatibility data shown in the catalog and detail screens is derived from Vita3K's public compatibility data.
+- Compatibility data shown in the catalog and detail screens is derived from public upstream compatibility data.
 - Releases marked as "parallel" are identical to the primary build but use an alternate package ID to allow side-by-side installation.
 
 ## Credits
 
-EmuCoreV builds on the Vita3K project and its ecosystem, then layers a custom Android interface, catalog, installer flow, storage handling, and handheld-focused UX on top.
+ECV started as a fork of the Vita3K core and is now developed by EmuCore with its own fixes and improvements.
 
-- Vita3K: https://github.com/Vita3K/Vita3K
-- Vita3K Compatibility: https://github.com/Vita3K/compatibility
-- Vita3K Compatibility Page: https://vita3k.org/compatibility.html?lang=en
+EmuCoreV adds its own Android interface, catalog, installer flow, storage handling, and handheld-focused UX. The ECV name identifies this modified core; upstream contributors retain credit for their work, and existing copyright notices, licenses, and source history are preserved.
+
+- [EmuCoreV and ECV source](https://github.com/sashkinbro/EmuCoreV)
+- [Project license](LICENSE)
 
 ## Support
 
@@ -114,6 +116,6 @@ If you want to support ongoing development or join the community:
 
 ## License
 
-This project includes and derives from GPL-licensed Vita3K code, so the repository is distributed under the GNU General Public License v2.0 or later.
+EmuCoreV and its ECV core include and derive from GPL-licensed upstream code, so the repository is distributed under the GNU General Public License v2.0 or later. Renaming the modified core does not change the upstream attribution or license obligations.
 
 See [LICENSE](LICENSE) for details.

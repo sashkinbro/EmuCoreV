@@ -47,18 +47,21 @@ internal fun TrophySoundSettingsSection(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             FilterChip(
+                colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                 selected = settings.mode == TrophySoundMode.SYSTEM,
                 onClick = { onModeSelected(TrophySoundMode.SYSTEM) },
                 shape = neonChipShape(),
                 label = { Text(stringResource(R.string.settings_trophy_sound_system)) }
             )
             FilterChip(
+                colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                 selected = settings.mode == TrophySoundMode.OFF,
                 onClick = { onModeSelected(TrophySoundMode.OFF) },
                 shape = neonChipShape(),
                 label = { Text(stringResource(R.string.settings_trophy_sound_off)) }
             )
             FilterChip(
+                colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                 selected = settings.mode == TrophySoundMode.CUSTOM,
                 onClick = {
                     if (settings.customUri == null) onChooseAudio()

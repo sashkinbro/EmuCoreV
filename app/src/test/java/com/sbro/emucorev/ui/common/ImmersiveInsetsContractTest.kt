@@ -34,7 +34,8 @@ class ImmersiveInsetsContractTest {
             .readText()
         assertTrue(
             "The sidebar must render its content and navigation rail as separate surfaces",
-            "Spacer(modifier = Modifier.width(12.dp))" in emulationMenu &&
+            Regex("""Spacer\(\s*(?:modifier\s*=\s*)?Modifier\.width\(12\.dp\)\s*\)""")
+                .containsMatchIn(emulationMenu) &&
                 ".width(74.dp)" in emulationMenu &&
                 ".widthIn(min = 300.dp, max = 420.dp)" in emulationMenu
         )

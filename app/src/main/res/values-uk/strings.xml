@@ -16,9 +16,9 @@
     <string name="home_empty_library_body">Встановіть прошивку, пакет оновлення прошивки та додайте свої ігри на екрані «Ігри». Вони з\'являться тут автоматично.</string>
     <string name="home_recent_titles_title">Нещодавно запущені</string>
     <string name="home_disclaimer_title">Про EmuCoreV</string>
-    <string name="home_disclaimer_body">EmuCoreV — це емулятор PS Vita для Android, створений на базі Vita3K.</string>
+    <string name="home_disclaimer_body">EmuCoreV — це емулятор PS Vita для Android на базі ядра ECV.</string>
     <string name="onboarding_page_1_title">PlayStation Vita на Android</string>
-    <string name="onboarding_page_1_body">Грайте в ігри PS Vita на Android за допомогою ядра Vita3K.</string>
+    <string name="onboarding_page_1_body">Грайте в ігри PS Vita на Android за допомогою ядра ECV.</string>
     <string name="onboarding_page_2_title">Ваша бібліотека ігор</string>
     <string name="onboarding_page_2_body">Ваші встановлені ігри зібрані в одній бібліотеці.</string>
     <string name="onboarding_page_3_title">Вбудований каталог</string>
@@ -188,7 +188,7 @@
     <string name="settings_storage_title">Сховище</string>
     <string name="settings_storage_body">Дані емулятора зберігаються в каталозі файлів програми в папці vita/. Встановлені ігри знаходяться в ux0/app, кеш шейдерів — у cache, а патчі — у patch.</string>
     <string name="settings_about_title">Про EmuCoreV</string>
-    <string name="settings_about_body">EmuCoreV — це емулятор PS Vita для Android, створений на базі проекту Vita3K з відкритим вихідним кодом.</string>
+    <string name="settings_about_body">EmuCoreV — це емулятор PS Vita для Android на базі ядра ECV.</string>
     <string name="settings_help_content_description">Відкрити довідку з налаштування</string>
     <string name="settings_help_dialog_label">Підказка налаштування</string>
     <string name="settings_help_dialog_tip">Змінюйте по одній настройці й перевіряйте ту саму сцену гри, щоб точно бачити, що стало краще.</string>
@@ -330,12 +330,12 @@
     <string name="settings_help_check_for_updates">Зберігає увімкненою перевірку оновлень.\n\nВикористовуйте це, коли хочете налаштувати інтерфейс емулятора або системне відображення в грі під себе. Залишайте стандарт, якщо додаткова інформація або візуальна зміна не потрібні.</string>
     <string name="settings_about_emucorev">Про EmuCoreV</string>
     <string name="settings_emulation_core">Ядро емуляції</string>
-    <string name="settings_based_on_vita3k">На базі Vita3K</string>
+    <string name="settings_based_on_vita3k">ECV базується на ядрі Vita3K та активно розвивається EmuCore з власними виправленнями й поліпшеннями.</string>
     <string name="settings_developer">Розробник</string>
     <string name="settings_created_by_sbro">Створено Sashkin Apps</string>
     <string name="settings_play_store_profile">Профіль Play Маркет</string>
     <string name="settings_core_source_code">Вихідний код ядра</string>
-    <string name="settings_core_source_description">EmuCoreV використовує власний інтерфейс Android. На Vita3K базується тільки емуляційне ядро.</string>
+    <string name="settings_core_source_description">EmuCoreV використовує власний інтерфейс Android. ECV базується на ядрі Vita3K та активно розвивається EmuCore з власними виправленнями й поліпшеннями.</string>
     <string name="settings_open_github">Відкрити GitHub</string>
     <string name="emulator_choose_file">Виберіть файл</string>
     <string name="emulator_choose_folder">Виберіть папку</string>
@@ -515,7 +515,7 @@
     <string name="settings_tab_updates">Оновлення</string>
     <string name="settings_about_version">Версія додатка</string>
     <string name="settings_about_version_value">Версія %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV переносить емуляцію PS Vita на Android, пропонуючи зручний мобільний інтерфейс, керування локальною бібліотекою та ядро емуляції на базі Vita3K.</string>
+    <string name="settings_about_body_extended">EmuCoreV — це емулятор PS Vita для Android на базі ядра ECV. ECV базується на ядрі Vita3K та активно розвивається EmuCore з власними виправленнями й поліпшеннями.</string>
     <string name="settings_about_community_title">Спільнота та підтримка</string>
     <string name="settings_about_repository">Репозиторій EmuCoreV</string>
     <string name="settings_about_repository_desc">Переглядайте вихідний код, повідомляйте про помилки та слідкуйте за розробкою на GitHub.</string>
@@ -1546,4 +1546,57 @@
     <string name="settings_not_set">Не встановлено</string>
     <string name="settings_gamepad_mapping_clear">Очистити</string>
     <string name="settings_gamepad_mapping_auto_format">Авто</string>
+    <string name="library_view_shelf">Показати полицю з обкладинками</string>
+    <string name="library_exit_shelf">Закрити полицю з обкладинками</string>
+    <string name="library_shelf_games_counter">%1$d з %2$d</string>
+    <string name="settings_help_dialog_eyebrow">Підказка щодо налаштувань</string>
+    <string name="settings_help_reset_tip_title">Швидке скидання</string>
+    <string name="settings_help_reset_tip_body">Натисніть і утримуйте назву налаштування, щоб відновити його значення за замовчуванням.</string>
+    <string name="feedback_game_loading">Завантаження вашої бібліотеки ігор…</string>
+    <string name="feedback_game_no_matches">Немає відповідних ігор</string>
+
+    <string name="library_options">Параметри бібліотеки</string>
+    <string name="library_sort_title_asc">Назва А-Я</string>
+    <string name="library_sort_title_desc">Название Я-А</string>
+    <string name="library_sort_recent_desc">Нещодавно оновлені</string>
+    <string name="library_sort_recent_asc">Найстаріші оновлені</string>
+    <string name="library_sort_size_desc">Найбільші</string>
+    <string name="library_sort_size_asc">Найменші</string>
+    <string name="library_view_grid">Показати сіткою</string>
+    <string name="library_view_list">Показати списком</string>
+    <string name="settings_ecv_source">Вихідний код ECV</string>
+    <string name="settings_ecv_source_desc">Відкрити вихідний код модифікованого ядра ECV і застосунку EmuCoreV на GitHub.</string>
+    <string name="settings_vita3k_license">Ліцензія початкового проєкту Vita3K</string>
+    <string name="settings_vita3k_license_desc">Відкрити початкову ліцензію GNU GPL версії 2.0 або пізнішої.</string>
+    <string name="settings_core_upstream_version">Версія початкового ядра</string>
+
+    <string name="settings_cover_art_style">Стиль обкладинки</string>
+    <string name="settings_cover_art_style_flat">Пласка</string>
+    <string name="settings_cover_art_style_3d">3D-коробка</string>
+    <string name="settings_help_cover_art_style">Вибирає тип обкладинки за замовчуванням, що використовується під час завантаження зображень. Пласкі обкладинки відповідають класичному вигляду передньої частини коробки, тоді як 3D-коробка використовує кутові рендери коробок, якщо джерело їх надає. 3D-обкладинки можуть виглядати більш ефектно, але їхня доступність може бути трохи гіршою, ніж у пласких зображень.</string>
+    <string name="settings_clear_cover_cache">Очистити кеш обкладинок</string>
+    <string name="settings_clear_cover_cache_desc">Видалити тимчасово завантажені обкладинки й повторити невдалі завантаження.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Очистити кеш обкладинок?</string>
+    <string name="settings_clear_cover_cache_confirm_body">Завантажені обкладинки буде видалено й автоматично завантажено знову. Власні обкладинки та файли ігор не зміняться.</string>
+    <string name="settings_clear_cover_cache_action">Очистити</string>
+    <string name="settings_clear_cover_cache_success">Кеш обкладинок очищено. Обкладинки автоматично завантажаться знову.</string>
+    <string name="settings_clear_cover_cache_partial">Не всі кешовані обкладинки вдалося видалити. Спробуйте ще раз після завершення поточних завантажень.</string>
+
+    <!-- Rear panel input bindings -->
+    <string name="rear_touch_title">Задня сенсорна панель</string>
+    <string name="rear_touch_desc">Призначте точки задньої панелі кнопкам, клавішам, тригерам або миші.</string>
+    <string name="rear_touch_point">Задня точка %1$d</string>
+    <string name="rear_touch_bind">Призначити кнопку</string>
+    <string name="rear_touch_capture">Натисніть кнопку контролера чи клавіатури, тригер, відхиліть стік або натисніть кнопку миші.</string>
+    <string name="rear_touch_screen">Показувати екранну кнопку</string>
+    <string name="rear_touch_position">Позиція дотику</string>
+    <string name="rear_touch_drag">Перетягування на екрані</string>
+    <string name="rear_touch_fixed">Фіксована точка</string>
+    <string name="rear_touch_pointer">Вказівник миші</string>
+    <string name="rear_touch_global">Глобальний профіль</string>
+    <string name="rear_touch_game">Ця гра</string>
+    <string name="rear_touch_inherit">Використовувати глобальний профіль</string>
+    <string name="rear_touch_clear">Прибрати призначення</string>
+    <string name="rear_touch_hint">Утримуйте для дотику до задньої панелі; відпустіть, щоб підняти палець. Призначені кнопки замінюють звичну дію. Передній сенсор залишається доступним.</string>
+    <string name="rear_touch_screen_position">Позиція екранної кнопки</string>
 </resources>

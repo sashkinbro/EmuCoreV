@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sbro.emucorev.BuildConfig
 import com.sbro.emucorev.R
+import com.sbro.emucorev.ui.common.formatCoreDisplayName
 import com.sbro.emucorev.core.PerformanceStatsSample
 import com.sbro.emucorev.core.PerformanceStatsSampler
 import com.sbro.emucorev.data.PerformanceStatsPreferences
@@ -187,7 +188,7 @@ internal fun PerformanceStatsHud(settings: PerformanceStatsSettings, sample: Per
                 val firstFooter = inFooter && !footerStarted
                 if (inFooter) footerStarted = true
                 val value = when (metric) {
-                    StatsMetric.VERSION -> "EmuCoreV ${BuildConfig.VERSION_NAME} | ${sample.native.core ?: "Vita3K"}"
+                    StatsMetric.VERSION -> "EmuCoreV ${BuildConfig.VERSION_NAME} | ${formatCoreDisplayName(sample.native.core)}"
                     StatsMetric.FPS -> if (sample.native.paused) paused else sample.native.fps?.toString() ?: unavailable
                     StatsMetric.FRAME_TIME -> if (sample.native.paused) paused else sample.native.frameMs?.let { "$it ms" } ?: unavailable
                     StatsMetric.CPU -> listOfNotNull(sample.cpuModel, sample.cpuPercent?.let { number(it, "%") }).joinToString(" · ").ifEmpty { unavailable }
@@ -201,7 +202,7 @@ internal fun PerformanceStatsHud(settings: PerformanceStatsSettings, sample: Per
                 }
                 Text(text = buildAnnotatedString {
                     if (metric != StatsMetric.VERSION) {
-                        withStyle(SpanStyle(color = Color(0xFF9DD7FF).copy(alpha = opacity))) { append("${when (metric) { StatsMetric.TEMPERATURE -> "Temp"; StatsMetric.THERMAL -> "Thermal"; else -> statsMetricLabel(metric) }}: ") }
+                        withStyle(SpanStyle(color = Color(0xFF9DD7FF).copy(alpha = opacity))) { append("${statsMetricLabel(metric)}: ") }
                     }
                     withStyle(SpanStyle(color = (if (metric == StatsMetric.FPS) Color(0xFFB9F7CF) else Color.White.copy(alpha = 0.97f)).copy(alpha = opacity))) { append(value) }
                 },

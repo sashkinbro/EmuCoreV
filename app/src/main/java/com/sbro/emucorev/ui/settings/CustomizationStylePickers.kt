@@ -1,5 +1,11 @@
 package com.sbro.emucorev.ui.settings
 
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.draw.clip
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.sbro.emucorev.ui.common.gamepadFocusableCard
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -64,6 +70,7 @@ internal fun TouchControlStyleSection(
         ) {
             items(TouchControlVisualStyle.entries, key = { it.name }) { style ->
                 FilterChip(
+                    colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                     shape = neonChipShape(),
                     selected = settings.touchControlVisualStyle == style,
                     onClick = { onStyleSelected(style) },
@@ -83,6 +90,7 @@ internal fun TouchControlStyleSection(
         ) {
             items(TouchControlPressEffect.entries, key = { it.name }) { effect ->
                 FilterChip(
+                    colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                     shape = neonChipShape(),
                     selected = settings.touchControlPressEffect == effect,
                     onClick = { onPressEffectSelected(effect) },
@@ -145,45 +153,55 @@ internal fun StylePreviewCard(
     onClick: () -> Unit,
     preview: @Composable () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = neonShape(18.dp)
     Surface(
         modifier = Modifier
             .width(176.dp)
             .height(132.dp)
-            .clickable(onClick = onClick),
-        shape = neonShape(20.dp),
+            .gamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
+        shape = shape,
         color = if (selected) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)
         } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f)
         },
         border = BorderStroke(
             if (selected) 2.dp else 1.dp,
-            if (selected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.54f)
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
         )
     ) {
         Column(
             modifier = Modifier.padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(
-                        MaterialTheme.colorScheme.background,
-                        neonShape(14.dp)
-                    ),
-                contentAlignment = Alignment.Center
+                    .clip(neonShape(12.dp))
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.72f))
+                    .padding(7.dp)
             ) {
                 preview()
             }
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                color = if (selected) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurface
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

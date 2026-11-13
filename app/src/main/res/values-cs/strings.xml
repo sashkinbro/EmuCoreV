@@ -16,9 +16,9 @@
     <string name="home_empty_library_body">Nainstalujte firmware, nainstalujte balíček aktualizace firmwaru a přidejte své hry na obrazovce Hry. Zobrazí se zde automaticky.</string>
     <string name="home_recent_titles_title">Naposledy hrané</string>
     <string name="home_disclaimer_title">O aplikaci EmuCoreV</string>
-    <string name="home_disclaimer_body">EmuCoreV je emulátor PS Vita pro Android postavený na Vita3K.</string>
+    <string name="home_disclaimer_body">EmuCoreV je emulátor PS Vita pro Android s jádrem ECV.</string>
     <string name="onboarding_page_1_title">PlayStation Vita na Androidu</string>
-    <string name="onboarding_page_1_body">Hrajte své hry pro PS Vita na Androidu s jádrem Vita3K.</string>
+    <string name="onboarding_page_1_body">Hrajte své hry pro PS Vita na Androidu s jádrem ECV.</string>
     <string name="onboarding_page_2_title">Vaše knihovna her</string>
     <string name="onboarding_page_2_body">Vaše nainstalované hry jsou shromážděny v jedné knihovně.</string>
     <string name="onboarding_page_3_title">Vestavěný katalog</string>
@@ -419,7 +419,7 @@
     <string name="settings_clear_cache_failed">Mezipaměť se nepodařilo vymazat.</string>
     <string name="settings_pro_support_more_hint">Je již zahrnuto v kterékoli možnosti níže — větší zvolte jen v případě, že chcete vývoj podpořit ještě více.</string>
     <string name="settings_about_title">O aplikaci EmuCoreV</string>
-    <string name="settings_about_body">EmuCoreV je emulátor PS Vita pro Android postavený na open-source projektu Vita3K.</string>
+    <string name="settings_about_body">EmuCoreV je emulátor PS Vita pro Android s jádrem ECV.</string>
     <string name="settings_help_content_description">Otevřít nápovědu k nastavení</string>
     <string name="settings_help_dialog_label">Průvodce nastavením</string>
     <string name="settings_help_dialog_tip">Měňte vždy jen jednu možnost a poté otestujte stejnou scénu ve hře, ať vidíte, co se skutečně zlepšilo.</string>
@@ -618,7 +618,7 @@
     <string name="settings_about_emucorev">O aplikaci EmuCoreV</string>
     <string name="settings_about_version">Verze aplikace</string>
     <string name="settings_about_version_value">Verze %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV přináší emulaci PS Vita na Android s cíleným mobilním rozhraním, správou místní knihovny a emulačním jádrem založeným na Vita3K.</string>
+    <string name="settings_about_body_extended">EmuCoreV je emulátor PS Vita pro Android s jádrem ECV. ECV vychází z jádra Vita3K a EmuCore jej aktivně dále vyvíjí vlastními opravami a vylepšeními.</string>
     <string name="settings_about_community_title">Komunita a podpora</string>
     <string name="settings_about_website">Oficiální web</string>
     <string name="settings_about_website_desc">Otevřete web EmuCoreV pro stažení, novinky a odkazy k projektu.</string>
@@ -629,13 +629,13 @@
     <string name="settings_about_support">Podpořte EmuCoreV</string>
     <string name="settings_about_support_desc">Pomozte pokračovat vývoji členstvím na Patreonu.</string>
     <string name="settings_emulation_core">Emulační jádro</string>
-    <string name="settings_based_on_vita3k">Založeno na Vita3K</string>
+    <string name="settings_based_on_vita3k">ECV vychází z jádra Vita3K a EmuCore jej aktivně dále vyvíjí vlastními opravami a vylepšeními.</string>
     <string name="settings_developer">Vývojář</string>
     <string name="settings_created_by_sbro">Vytvořil Sashkin Apps</string>
     <string name="settings_play_store_profile">Profil na Play Store</string>
     <string name="settings_play_store_profile_desc">Zobrazte další aplikace pro Android od vývojáře.</string>
     <string name="settings_core_source_code">Zdrojový kód jádra</string>
-    <string name="settings_core_source_description">EmuCoreV používá vlastní rozhraní pro Android. Na Vita3K je založeno pouze emulační jádro.</string>
+    <string name="settings_core_source_description">EmuCoreV používá vlastní rozhraní pro Android. ECV vychází z jádra Vita3K a EmuCore jej aktivně dále vyvíjí vlastními opravami a vylepšeními.</string>
     <string name="settings_open_github">Otevřít GitHub</string>
     <string name="settings_vita3k_repository_desc">Otevřete upstream repozitář projektu Vita3K.</string>
     <string name="settings_updates_checking_title">Kontrola aktualizací</string>
@@ -1547,4 +1547,57 @@
     <string name="settings_not_set">Nenastaveno</string>
     <string name="settings_gamepad_mapping_clear">Vymazat</string>
     <string name="settings_gamepad_mapping_auto_format">Auto</string>
+    <string name="library_view_shelf">Zobrazit poličku s přebaly</string>
+    <string name="library_exit_shelf">Opustit poličku s přebaly</string>
+    <string name="library_shelf_games_counter">%1$d z %2$d</string>
+    <string name="settings_help_dialog_eyebrow">Tip pro nastavení</string>
+    <string name="settings_help_reset_tip_title">Rychlý reset</string>
+    <string name="settings_help_reset_tip_body">Dlouhým stisknutím názvu nastavení obnovíte tuto možnost na její výchozí hodnotu.</string>
+    <string name="feedback_game_loading">Načítání vaší herní knihovny…</string>
+    <string name="feedback_game_no_matches">Žádné odpovídající hry</string>
+
+    <string name="library_options">Možnosti knihovny</string>
+    <string name="library_sort_title_asc">Název A-Z</string>
+    <string name="library_sort_title_desc">Název Z-A</string>
+    <string name="library_sort_recent_desc">Nedávno aktualizované</string>
+    <string name="library_sort_recent_asc">Nejstarší aktualizované</string>
+    <string name="library_sort_size_desc">Největší</string>
+    <string name="library_sort_size_asc">Nejmenší</string>
+    <string name="library_view_grid">Zobrazit jako mřížku</string>
+    <string name="library_view_list">Zobrazit jako seznam</string>
+    <string name="settings_ecv_source">Zdrojový kód ECV</string>
+    <string name="settings_ecv_source_desc">Zobrazit zdrojový kód upraveného jádra ECV a aplikace EmuCoreV na GitHubu.</string>
+    <string name="settings_vita3k_license">Licence původního Vita3K</string>
+    <string name="settings_vita3k_license_desc">Přečíst původní licenci GNU GPL verze 2.0 nebo novější.</string>
+    <string name="settings_core_upstream_version">Verze původního jádra</string>
+
+    <string name="settings_cover_art_style">Styl přebalu</string>
+    <string name="settings_cover_art_style_flat">Plochý</string>
+    <string name="settings_cover_art_style_3d">3D krabička</string>
+    <string name="settings_help_cover_art_style">Vybírá výchozí typ přebalu používaný při stahování grafiky. Možnost "Plochý" (Flat) odpovídá klasickému vzhledu přední strany krabičky, zatímco "3D Box" používá úhlové rendery krabičky, pokud je zdroj poskytuje. 3D přebaly mohou vypadat dramatičtěji, ale jejich dostupnost může být o něco horší než u ploché grafiky.</string>
+    <string name="settings_clear_cover_cache">Vymazat mezipaměť obalů</string>
+    <string name="settings_clear_cover_cache_desc">Odstraní dočasně stažené obaly a znovu zkusí neúspěšná stahování.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Vymazat mezipaměť obalů?</string>
+    <string name="settings_clear_cover_cache_confirm_body">Stažené obaly budou odstrěněny a automaticky staženy znovu. Vlastní obaly a soubory her nebudou změněny.</string>
+    <string name="settings_clear_cover_cache_action">Vymazat</string>
+    <string name="settings_clear_cover_cache_success">Mezipaměť obalů byla vymazána. Obaly se znovu automaticky stáhnou.</string>
+    <string name="settings_clear_cover_cache_partial">Některé obaly v mezipaměti se nepodařilo odstranit. Zkuste to znovu po dokončení aktuálních stahování.</string>
+
+    <!-- Rear panel input bindings -->
+    <string name="rear_touch_title">Zadní dotykový panel</string>
+    <string name="rear_touch_desc">Přiřaďte zadní body tlačítkům, klávesám, spouštím nebo myši.</string>
+    <string name="rear_touch_point">Zadní bod %1$d</string>
+    <string name="rear_touch_bind">Přiřadit tlačítko</string>
+    <string name="rear_touch_capture">Stiskněte tlačítko ovladače nebo klávesnice, spoušť, směr páčky nebo tlačítko myši.</string>
+    <string name="rear_touch_screen">Zobrazit tlačítko na obrazovce</string>
+    <string name="rear_touch_position">Poloha dotyku</string>
+    <string name="rear_touch_drag">Tažení na obrazovce</string>
+    <string name="rear_touch_fixed">Pevný bod</string>
+    <string name="rear_touch_pointer">Ukazatel myši</string>
+    <string name="rear_touch_global">Globální profil</string>
+    <string name="rear_touch_game">Tato hra</string>
+    <string name="rear_touch_inherit">Použít globální profil</string>
+    <string name="rear_touch_clear">Zrušit přiřazení</string>
+    <string name="rear_touch_hint">Podržte pro dotyk zadního panelu; uvolněte pro ukončení dotyku. Přiřazené vstupy nahrazují běžnou akci. Přední dotyk zůstává dostupný.</string>
+    <string name="rear_touch_screen_position">Poloha tlačítka na obrazovce</string>
 </resources>

@@ -303,15 +303,17 @@ object DiscordIntegration {
         gameSerial = serial.orEmpty().trim()
         gameCoverUrl = ""
         gamePaused = false
+        val requestedTitle = gameTitle
+        val requestedSerial = gameSerial
         scope.launch {
-            gameCoverUrl = withContext(Dispatchers.IO) {
+            val resolvedCover = withContext(Dispatchers.IO) {
                 runCatching {
-                    val catalog = com.sbro.emucorev.data.VitaCatalogRepository(appContext)
-                    val cover = catalog.findBySerial(serial.orEmpty())?.coverUrl
-                        ?: catalog.findBestMatch(title)?.coverUrl
-                    cover.orEmpty()
+                    com.sbro.emucorev.data.CoverArtRepository.get(appContext)
+                        .buildPublicCoverUrl(titleId = requestedSerial).orEmpty()
                 }.getOrDefault("")
             }
+            if (gameTitle != requestedTitle || gameSerial != requestedSerial) return@launch
+            gameCoverUrl = resolvedCover
             pushPresence()
         }
     }

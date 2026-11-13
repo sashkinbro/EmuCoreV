@@ -1,11 +1,17 @@
 package com.sbro.emucorev.ui.settings
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.sbro.emucorev.ui.common.gamepadFocusableCard
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -26,60 +32,78 @@ import com.sbro.emucorev.ui.theme.neon.neonShape
 import com.sbro.emucorev.ui.theme.neon.neonPillShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.TextFields
-import androidx.compose.material3.AlertDialog
+import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppFont
 import com.sbro.emucorev.data.AppPreferences
+import com.sbro.emucorev.data.CoverArtRepository
+import com.sbro.emucorev.data.VitaCoverStyle
 import com.sbro.emucorev.data.CustomizationSettings
 import com.sbro.emucorev.data.TouchControlVisualStyle
 import com.sbro.emucorev.ui.common.SectionCard
+import com.sbro.emucorev.ui.common.GameCoverAspectRatio
 import com.sbro.emucorev.ui.common.horizontalBleed
+import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.ThemeMode
+import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
+import com.sbro.emucorev.ui.theme.neon.NeonBlack
+import com.sbro.emucorev.ui.theme.neon.NeonBlue
+import com.sbro.emucorev.ui.theme.neon.neonAccentColor
+import com.sbro.emucorev.ui.theme.neon.neonCornerAccent
 import com.sbro.emucorev.ui.library.LibraryGridSizing
 import java.io.File
 
 @Composable
 fun CustomizationTab(
     settings: CustomizationSettings,
-    viewModel: SettingsViewModel
+    viewModel: SettingsViewModel,
+    libraryContentWidthDp: Float
 ) {
     val context = LocalContext.current
     val preferences = remember(context) { AppPreferences(context) }
+    val coverArt = remember(context) { CoverArtRepository.get(context) }
+    val coverStyle by coverArt.style.collectAsState()
+    val clearingCoverCache by viewModel.coverCacheClearInProgress.collectAsState()
     val themeMode by preferences.themeModeFlow.collectAsState(initial = preferences.themeMode)
     val backgroundImported = stringResource(R.string.customization_background_imported)
     val backgroundFailed = stringResource(R.string.customization_background_failed)
     val fontImported = stringResource(R.string.customization_font_imported)
     val fontFailed = stringResource(R.string.customization_font_failed)
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
+    var showClearCoverCacheDialog by rememberSaveable { mutableStateOf(false) }
+    val coverCacheClearedMessage = stringResource(R.string.settings_clear_cover_cache_success)
+    val coverCachePartiallyClearedMessage = stringResource(R.string.settings_clear_cover_cache_partial)
 
     val backgroundPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -103,12 +127,30 @@ fun CustomizationTab(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        CustomizationPreview(settings)
+        CustomizationPreview(settings, libraryContentWidthDp)
 
         SectionCard(
             title = stringResource(R.string.customization_library_layout),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp)
         ) {
+            SettingChoiceRow(
+                title = stringResource(R.string.settings_cover_art_style),
+                description = stringResource(R.string.settings_help_cover_art_style),
+                onResetDefault = { coverArt.setStyle(VitaCoverStyle.THREE_D) }
+            ) {
+                VitaCoverStyle.entries.forEach { style ->
+                    FilterChip(
+                        selected = coverStyle == style,
+                        onClick = { coverArt.setStyle(style) },
+                        shape = com.sbro.emucorev.ui.theme.neon.neonChipShape(),
+                        colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
+                        label = {
+                            Text(stringResource(if (style == VitaCoverStyle.THREE_D)
+                                R.string.settings_cover_art_style_3d else R.string.settings_cover_art_style_flat))
+                        }
+                    )
+                }
+            }
             CustomizationSlider(
                 title = stringResource(R.string.customization_cover_size),
                 valueLabel = stringResource(
@@ -119,6 +161,10 @@ fun CustomizationTab(
                 range = CustomizationSettings.MIN_COVER_SIZE_PERCENT..
                     CustomizationSettings.MAX_COVER_SIZE_PERCENT,
                 onValueChange = viewModel::updateCoverSizePercent
+            )
+            CoverCacheActionRow(
+                busy = clearingCoverCache,
+                onClick = { showClearCoverCacheDialog = true }
             )
         }
 
@@ -282,6 +328,43 @@ fun CustomizationTab(
         }
     }
 
+    if (showClearCoverCacheDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearCoverCacheDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Rounded.DeleteOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text(stringResource(R.string.settings_clear_cover_cache_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_clear_cover_cache_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    enabled = !clearingCoverCache,
+                    onClick = {
+                        showClearCoverCacheDialog = false
+                        viewModel.clearCoverCache { result ->
+                            Toast.makeText(
+                                context,
+                                if (result.fullyCleared) coverCacheClearedMessage else coverCachePartiallyClearedMessage,
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.settings_clear_cover_cache_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearCoverCacheDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
+    }
+
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
@@ -291,6 +374,7 @@ fun CustomizationTab(
                 TextButton(
                     onClick = {
                         viewModel.resetCustomization()
+                        coverArt.setStyle(VitaCoverStyle.THREE_D)
                         showResetDialog = false
                     }
                 ) {
@@ -306,6 +390,79 @@ fun CustomizationTab(
     }
 }
 
+/** X SettingsItem cover action, hosted in V's existing Customization section. */
+@Composable
+private fun CoverCacheActionRow(busy: Boolean, onClick: () -> Unit) {
+    val label = stringResource(R.string.settings_clear_cover_cache)
+    val busyLabel = stringResource(R.string.common_loading)
+    val enabled = !busy
+    val debouncedClick = rememberDebouncedClick(onClick = onClick)
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = neonShape(18.dp)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .neonCornerAccent(accent = neonAccentColor(label.hashCode().mod(3)), markSize = 9.dp)
+            .gamepadFocusableCard(
+                enabled = enabled,
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            )
+            .then(if (busy) Modifier.semantics { stateDescription = busyLabel } else Modifier),
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        interactionSource = interactionSource,
+        enabled = enabled,
+        onClick = debouncedClick
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(neonShape(12.dp))
+                        .then(
+                            if (LocalNeonTheme.current) {
+                                Modifier
+                                    .background(if (enabled) NeonBlack else NeonBlack.copy(alpha = 0.6f))
+                                    .border(1.dp, NeonBlue.copy(alpha = if (enabled) 0.35f else 0.18f), neonShape(12.dp))
+                            } else {
+                                Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 0.1f else 0.05f))
+                            }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.DeleteOutline,
+                        contentDescription = null,
+                        tint = (if (LocalNeonTheme.current) NeonBlue else MaterialTheme.colorScheme.primary)
+                            .copy(alpha = if (enabled) 1f else 0.5f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.5f)
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_clear_cover_cache_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.6f)
+                    )
+                }
+            }
+            if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
 @Composable
 private fun ThemeChip(
     selected: Boolean,
@@ -314,6 +471,7 @@ private fun ThemeChip(
     onClick: () -> Unit
 ) {
     FilterChip(
+        colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
         shape = neonChipShape(),
         selected = selected,
         onClick = onClick,
@@ -323,15 +481,16 @@ private fun ThemeChip(
 }
 
 @Composable
-private fun CustomizationPreview(settings: CustomizationSettings) {
-    val density = LocalDensity.current
+private fun CustomizationPreview(settings: CustomizationSettings, libraryContentWidthDp: Float) {
     val windowInfo = LocalWindowInfo.current
-    val containerWidthDp = with(density) { windowInfo.containerSize.width.toDp() }
+    val containerWidthDp = libraryContentWidthDp
+    val isLandscape = windowInfo.containerSize.width > windowInfo.containerSize.height
     val coverScale = settings.coverSizePercent / 100f
-    val columns = remember(containerWidthDp, settings.coverSizePercent) {
+    val columns = remember(containerWidthDp, settings.coverSizePercent, isLandscape) {
         LibraryGridSizing.columnsForWidth(
-            containerWidthDp.value,
-            settings.coverSizePercent
+            containerWidthDp,
+            settings.coverSizePercent,
+            isLandscape = isLandscape
         )
     }
     SectionCard(
@@ -402,14 +561,14 @@ private fun CustomizationPreview(settings: CustomizationSettings) {
                     repeat(columns) { index ->
                         val colors = listOf(
                             Color(0xFF17345E),
-                            Color(0xFF30255C),
-                            Color(0xFF704054),
+                            Color(0xFF10233D),
+                            Color(0xFF1E1E24),
                             Color(0xFF225C55)
                         )
                         Surface(
                             modifier = Modifier
                                 .width(52.dp * coverScale)
-                                .aspectRatio(0.72f),
+                                .aspectRatio(GameCoverAspectRatio),
                             shape = neonShape(12.dp),
                             color = colors[index % colors.size]
                         ) {}
@@ -463,6 +622,7 @@ private fun FontChip(
     onClick: () -> Unit
 ) {
     FilterChip(
+        colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
         shape = neonChipShape(),
         selected = selected,
         onClick = onClick,
@@ -479,43 +639,43 @@ private fun CustomizationActionRow(
     onClick: () -> Unit
 ) {
     val accent = if (selected) Color(0xFF4FC3A1) else MaterialTheme.colorScheme.primary
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = neonShape(18.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = neonShape(22.dp),
+            .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
+        shape = shape,
         color = if (selected) {
             accent.copy(alpha = 0.12f)
         } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
         },
-        border = BorderStroke(
-            if (selected) 2.dp else 1.dp,
-            if (selected) accent.copy(alpha = 0.72f)
-            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-        )
+        border = if (selected) BorderStroke(2.dp, accent.copy(alpha = 0.72f)) else null
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                modifier = Modifier.size(48.dp),
-                shape = neonShape(16.dp),
-                color = accent.copy(alpha = 0.14f)
+                modifier = Modifier.size(38.dp),
+                shape = neonShape(12.dp),
+                color = accent.copy(alpha = 0.10f)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = accent)
+                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
                 }
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium)
+                    style = MaterialTheme.typography.bodyLarge
                 )
                 Text(
                     text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

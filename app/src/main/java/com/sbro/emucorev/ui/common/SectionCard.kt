@@ -70,16 +70,9 @@ fun SectionCard(
                 .padding(horizontal = ScreenHorizontalPadding),
             shape = neonShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = if (neon) 2.dp else 3.dp,
-            shadowElevation = if (neon) 0.dp else 6.dp,
-            border = BorderStroke(
-                width = 1.dp,
-                color = if (neon) {
-                    NeonYellow.copy(alpha = 0.14f)
-                } else {
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-                }
-            )
+            tonalElevation = 2.dp,
+            shadowElevation = 0.dp,
+            border = if (neon) BorderStroke(1.dp, NeonYellow.copy(alpha = 0.14f)) else null
         ) {
             Column(
                 modifier = Modifier.padding(contentPadding),

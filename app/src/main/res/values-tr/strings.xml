@@ -16,9 +16,9 @@
     <string name="home_empty_library_body">Firmware\'i yükleyin, firmware güncelleme paketini kurun ve Oyunlar ekranından oyunlarınızı ekleyin. Burada otomatik olarak görüneceklerdir.</string>
     <string name="home_recent_titles_title">Son oynananlar</string>
     <string name="home_disclaimer_title">EmuCoreV Hakkında</string>
-    <string name="home_disclaimer_body">EmuCoreV, Vita3K tabanlı, Android için bir PS Vita emülatörüdür.</string>
+    <string name="home_disclaimer_body">EmuCoreV, ECV çekirdeğini kullanan, Android için bir PS Vita emülatörüdür.</string>
     <string name="onboarding_page_1_title">Android\'de PlayStation Vita</string>
-    <string name="onboarding_page_1_body">Vita3K çekirdeği ile PS Vita oyunlarınızı Android\'de oynayın.</string>
+    <string name="onboarding_page_1_body">ECV çekirdeği ile PS Vita oyunlarınızı Android’de oynayın.</string>
     <string name="onboarding_page_2_title">Oyun kütüphaneniz</string>
     <string name="onboarding_page_2_body">Yüklü oyunlarınız tek bir kütüphanede toplanır.</string>
     <string name="onboarding_page_3_title">Yerleşik katalog</string>
@@ -190,7 +190,7 @@
     <string name="settings_storage_title">Depolama</string>
     <string name="settings_storage_body">Emülatör verileri, uygulama dosyaları dizininde vita/ altında saklanır. Yüklü oyunlar ux0/app içindedir, gölgelendirici önbelleği cache klasöründedir ve yamalar patch içerisindedir.</string>
     <string name="settings_about_title">EmuCoreV Hakkında</string>
-    <string name="settings_about_body">EmuCoreV, açık kaynaklı Vita3K projesi üzerine inşa edilmiş, Android için bir PS Vita emülatörüdür.</string>
+    <string name="settings_about_body">EmuCoreV, ECV çekirdeğini kullanan, Android için bir PS Vita emülatörüdür.</string>
     <string name="settings_help_content_description">Ayar yardımını aç</string>
     <string name="settings_help_dialog_label">Ayar rehberi</string>
     <string name="settings_help_dialog_tip">Her seferinde yalnızca bir seçeneği değiştirin ve gerçekten neyin iyileştiğini görmek için aynı oyun sahnesini test edin.</string>
@@ -361,12 +361,12 @@
     <string name="settings_help_check_for_updates">Güncelleme kontrollerini etkin tutar.\n\nEmülatör arayüzünü veya oyun içi sistem görünümünü tercihinize uydurmak istediğinizde kullanın. Ek bilgiye veya görsel değişikliğe ihtiyacınız yoksa varsayılanda bırakın.</string>
     <string name="settings_about_emucorev">EmuCoreV Hakkında</string>
     <string name="settings_emulation_core">Emülasyon Çekirdeği</string>
-    <string name="settings_based_on_vita3k">Vita3K tabanlıdır</string>
+    <string name="settings_based_on_vita3k">ECV, Vita3K çekirdeğini temel alır ve EmuCore tarafından kendi düzeltmeleri ve iyileştirmeleriyle aktif olarak geliştirilmeye devam eder.</string>
     <string name="settings_developer">Geliştirici</string>
     <string name="settings_created_by_sbro">Sashkin Apps tarafından oluşturulmuştur</string>
     <string name="settings_play_store_profile">Play Store Profili</string>
     <string name="settings_core_source_code">Çekirdek Kaynak Kodu</string>
-    <string name="settings_core_source_description">EmuCoreV kendi Android arayüzünü kullanır. Yalnızca emülasyon çekirdeği Vita3K tabanlıdır.</string>
+    <string name="settings_core_source_description">EmuCoreV kendi Android arayüzünü kullanır. ECV, Vita3K çekirdeğini temel alır ve EmuCore tarafından kendi düzeltmeleri ve iyileştirmeleriyle aktif olarak geliştirilmeye devam eder.</string>
     <string name="settings_open_github">GitHub\'ı Aç</string>
     <string name="emulator_choose_file">Bir dosya seçin</string>
     <string name="emulator_choose_folder">Bir klasör seçin</string>
@@ -529,7 +529,7 @@
     <string name="settings_tab_updates">Güncellemeler</string>
     <string name="settings_about_version">Uygulama sürümü</string>
     <string name="settings_about_version_value">Sürüm %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV, odaklanmış bir mobil arayüz, yerel kütüphane yönetimi ve Vita3K tabanlı bir emülasyon çekirdeği ile PS Vita emülasyonunu Android\'e getiriyor.</string>
+    <string name="settings_about_body_extended">EmuCoreV, ECV çekirdeğini kullanan, Android için bir PS Vita emülatörüdür. ECV, Vita3K çekirdeğini temel alır ve EmuCore tarafından kendi düzeltmeleri ve iyileştirmeleriyle aktif olarak geliştirilmeye devam eder.</string>
     <string name="settings_about_community_title">Topluluk ve destek</string>
     <string name="settings_about_repository">EmuCoreV deposu</string>
     <string name="settings_about_repository_desc">Kaynak kodunu görüntüleyin, sorunları bildirin ve GitHub\'daki geliştirmeleri takip edin.</string>
@@ -1543,4 +1543,57 @@
     <string name="settings_not_set">Ayarlanmadı</string>
     <string name="settings_gamepad_mapping_clear">Temizle</string>
     <string name="settings_gamepad_mapping_auto_format">Oto</string>
+    <string name="library_view_shelf">Kapak rafını göster</string>
+    <string name="library_exit_shelf">Kapak rafından çık</string>
+    <string name="library_shelf_games_counter">%1$d / %2$d</string>
+    <string name="settings_help_dialog_eyebrow">Ayar ipucu</string>
+    <string name="settings_help_reset_tip_title">Hızlı sıfırlama</string>
+    <string name="settings_help_reset_tip_body">Seçeneği varsayılan değerine geri yüklemek için bir ayar adına uzun basın.</string>
+    <string name="feedback_game_loading">Oyun kütüphaneniz yükleniyor…</string>
+    <string name="feedback_game_no_matches">Eşleşen oyun yok</string>
+
+    <string name="library_options">Kitaplık seçenekleri</string>
+    <string name="library_sort_title_asc">İsim A-Z</string>
+    <string name="library_sort_title_desc">İsim Z-A</string>
+    <string name="library_sort_recent_desc">Son güncellenenler</string>
+    <string name="library_sort_recent_asc">En eski güncellenenler</string>
+    <string name="library_sort_size_desc">En büyük</string>
+    <string name="library_sort_size_asc">En küçük</string>
+    <string name="library_view_grid">Izgara olarak göster</string>
+    <string name="library_view_list">Liste olarak göster</string>
+    <string name="settings_ecv_source">ECV kaynak kodu</string>
+    <string name="settings_ecv_source_desc">Değiştirilmiş ECV çekirdeğinin ve EmuCoreV uygulamasının kaynak kodunu GitHub’da görüntüleyin.</string>
+    <string name="settings_vita3k_license">Vita3K üst proje lisansı</string>
+    <string name="settings_vita3k_license_desc">Üst projenin GNU GPL sürüm 2.0 veya üzeri lisansını okuyun.</string>
+    <string name="settings_core_upstream_version">Üst proje çekirdek sürümü</string>
+
+    <string name="settings_cover_art_style">Kapak Stili</string>
+    <string name="settings_cover_art_style_flat">Düz</string>
+    <string name="settings_cover_art_style_3d">3D Kutu</string>
+    <string name="settings_help_cover_art_style">Kapak resimleri indirilirken kullanılan varsayılan kapak türünü seçer. Düz (Flat) kapaklar klasik ön kutu görünümüne uyarken, 3D Kutu (3D Box), kaynak sağladığında açılı kutu görselleri kullanır. 3D kapaklar daha dramatik görünebilir, ancak bulunabilirlik düz kapaklardan biraz daha kötü olabilir.</string>
+    <string name="settings_clear_cover_cache">Kapak önbelleğini temizle</string>
+    <string name="settings_clear_cover_cache_desc">Geçici olarak indirilen kapakları kaldırır ve başarısız indirmeleri yeniden dener.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Kapak önbelleği temizlensin mi?</string>
+    <string name="settings_clear_cover_cache_confirm_body">İndirilen kapaklar kaldırılacak ve otomatik olarak yeniden indirilecektir. Özel kapaklar ve oyun dosyaları değiştirilmeyecektir.</string>
+    <string name="settings_clear_cover_cache_action">Temizle</string>
+    <string name="settings_clear_cover_cache_success">Kapak önbelleği temizlendi. Kapaklar otomatik olarak yeniden indirilecek.</string>
+    <string name="settings_clear_cover_cache_partial">Önbellekteki bazı kapaklar kaldırılamadı. Mevcut indirmeler tamamlandıktan sonra tekrar deneyin.</string>
+
+    <!-- Rear panel input bindings -->
+    <string name="rear_touch_title">Arka dokunmatik panel</string>
+    <string name="rear_touch_desc">Arka noktaları düğmelere, tuşlara, tetiklere veya fareye atayın.</string>
+    <string name="rear_touch_point">Arka nokta %1$d</string>
+    <string name="rear_touch_bind">Düğme ata</string>
+    <string name="rear_touch_capture">Kumanda veya klavye düğmesine, tetiğe, çubuk yönüne ya da fare düğmesine basın.</string>
+    <string name="rear_touch_screen">Ekran düğmesini göster</string>
+    <string name="rear_touch_position">Dokunma konumu</string>
+    <string name="rear_touch_drag">Ekranda sürükle</string>
+    <string name="rear_touch_fixed">Sabit nokta</string>
+    <string name="rear_touch_pointer">Fare işaretçisi</string>
+    <string name="rear_touch_global">Genel profil</string>
+    <string name="rear_touch_game">Bu oyun</string>
+    <string name="rear_touch_inherit">Genel profili kullan</string>
+    <string name="rear_touch_clear">Atamayı temizle</string>
+    <string name="rear_touch_hint">Arka panele dokunmak için basılı tutun, dokunmayı bitirmek için bırakın. Atanan girişler normal eylemlerinin yerine geçer. Ön dokunmatik kullanılabilir kalır.</string>
+    <string name="rear_touch_screen_position">Ekran düğmesinin konumu</string>
 </resources>

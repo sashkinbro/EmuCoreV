@@ -16,9 +16,9 @@
     <string name="home_empty_library_body">Pasang firmware, pasang paket pembaruan firmware, dan tambahkan game Anda di layar Game. Game akan muncul di sini secara otomatis.</string>
     <string name="home_recent_titles_title">Terakhir dimainkan</string>
     <string name="home_disclaimer_title">Tentang EmuCoreV</string>
-    <string name="home_disclaimer_body">EmuCoreV adalah emulator PS Vita untuk Android yang dibangun di atas Vita3K.</string>
+    <string name="home_disclaimer_body">EmuCoreV adalah emulator PS Vita untuk Android yang menggunakan inti ECV.</string>
     <string name="onboarding_page_1_title">PlayStation Vita di Android</string>
-    <string name="onboarding_page_1_body">Mainkan game PS Vita Anda di Android dengan inti Vita3K.</string>
+    <string name="onboarding_page_1_body">Mainkan game PS Vita Anda di Android dengan inti ECV.</string>
     <string name="onboarding_page_2_title">Pustaka game Anda</string>
     <string name="onboarding_page_2_body">Game terpasang Anda dikumpulkan dalam satu pustaka.</string>
     <string name="onboarding_page_3_title">Katalog bawaan</string>
@@ -419,7 +419,7 @@
     <string name="settings_clear_cache_failed">Gagal menghapus cache.</string>
     <string name="settings_pro_support_more_hint">Sudah tercakup oleh opsi mana pun di bawah ini — pilih yang lebih besar hanya jika Anda ingin mendukung pengembangan lebih lanjut.</string>
     <string name="settings_about_title">Tentang EmuCoreV</string>
-    <string name="settings_about_body">EmuCoreV adalah emulator PS Vita untuk Android yang dibangun di atas proyek sumber terbuka Vita3K.</string>
+    <string name="settings_about_body">EmuCoreV adalah emulator PS Vita untuk Android yang menggunakan inti ECV.</string>
     <string name="settings_help_content_description">Buka bantuan pengaturan</string>
     <string name="settings_help_dialog_label">Panduan pengaturan</string>
     <string name="settings_help_dialog_tip">Ubah satu opsi pada satu waktu, lalu uji adegan game yang sama agar Anda dapat melihat apa yang benar-benar meningkat.</string>
@@ -618,7 +618,7 @@
     <string name="settings_about_emucorev">Tentang EmuCoreV</string>
     <string name="settings_about_version">Versi aplikasi</string>
     <string name="settings_about_version_value">Versi %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV menghadirkan emulasi PS Vita ke Android dengan antarmuka seluler yang fokus, pengelolaan pustaka lokal, dan inti emulasi berbasis Vita3K.</string>
+    <string name="settings_about_body_extended">EmuCoreV adalah emulator PS Vita untuk Android yang menggunakan inti ECV. ECV berbasis inti Vita3K dan terus dikembangkan secara aktif oleh EmuCore dengan perbaikan dan peningkatannya sendiri.</string>
     <string name="settings_about_community_title">Komunitas dan dukungan</string>
     <string name="settings_about_website">Situs web resmi</string>
     <string name="settings_about_website_desc">Buka situs web EmuCoreV untuk unduhan, berita, dan tautan proyek.</string>
@@ -629,13 +629,13 @@
     <string name="settings_about_support">Dukung EmuCoreV</string>
     <string name="settings_about_support_desc">Bantu pengembangan berlanjut melalui keanggotaan Patreon.</string>
     <string name="settings_emulation_core">Inti Emulasi</string>
-    <string name="settings_based_on_vita3k">Berbasis Vita3K</string>
+    <string name="settings_based_on_vita3k">ECV berbasis inti Vita3K dan terus dikembangkan secara aktif oleh EmuCore dengan perbaikan dan peningkatannya sendiri.</string>
     <string name="settings_developer">Pengembang</string>
     <string name="settings_created_by_sbro">Dibuat oleh Sashkin Apps</string>
     <string name="settings_play_store_profile">Profil Play Store</string>
     <string name="settings_play_store_profile_desc">Lihat lebih banyak aplikasi Android dari pengembang.</string>
     <string name="settings_core_source_code">Kode Sumber Inti</string>
-    <string name="settings_core_source_description">EmuCoreV menggunakan antarmuka Android miliknya sendiri. Hanya inti emulasi yang berbasis Vita3K.</string>
+    <string name="settings_core_source_description">EmuCoreV menggunakan antarmuka Android miliknya sendiri. ECV berbasis inti Vita3K dan terus dikembangkan secara aktif oleh EmuCore dengan perbaikan dan peningkatannya sendiri.</string>
     <string name="settings_open_github">Buka GitHub</string>
     <string name="settings_vita3k_repository_desc">Buka repositori proyek Vita3K upstream.</string>
     <string name="settings_updates_checking_title">Memeriksa pembaruan</string>
@@ -1547,4 +1547,57 @@
     <string name="settings_not_set">Belum diatur</string>
     <string name="settings_gamepad_mapping_clear">Bersihkan</string>
     <string name="settings_gamepad_mapping_auto_format">Otomatis</string>
+    <string name="library_view_shelf">Tampilkan rak sampul</string>
+    <string name="library_exit_shelf">Keluar dari rak sampul</string>
+    <string name="library_shelf_games_counter">%1$d dari %2$d</string>
+    <string name="settings_help_dialog_eyebrow">Kiat pengaturan</string>
+    <string name="settings_help_reset_tip_title">Reset cepat</string>
+    <string name="settings_help_reset_tip_body">Tekan lama nama pengaturan untuk mengembalikan opsi tersebut ke nilai default-nya.</string>
+    <string name="feedback_game_loading">Memuat pustaka game Anda…</string>
+    <string name="feedback_game_no_matches">Tidak ada game yang cocok</string>
+
+    <string name="library_options">Opsi pustaka</string>
+    <string name="library_sort_title_asc">Judul A-Z</string>
+    <string name="library_sort_title_desc">Judul Z-A</string>
+    <string name="library_sort_recent_desc">Baru diperbarui</string>
+    <string name="library_sort_recent_asc">Pembaruan terlama</string>
+    <string name="library_sort_size_desc">Terbesar</string>
+    <string name="library_sort_size_asc">Terkecil</string>
+    <string name="library_view_grid">Tampilkan sebagai kisi</string>
+    <string name="library_view_list">Tampilkan sebagai daftar</string>
+    <string name="settings_ecv_source">Kode sumber ECV</string>
+    <string name="settings_ecv_source_desc">Lihat kode sumber inti ECV yang dimodifikasi dan aplikasi EmuCoreV di GitHub.</string>
+    <string name="settings_vita3k_license">Lisensi Vita3K asal</string>
+    <string name="settings_vita3k_license_desc">Baca lisensi asli GNU GPL versi 2.0 atau yang lebih baru.</string>
+    <string name="settings_core_upstream_version">Versi inti asal</string>
+
+    <string name="settings_cover_art_style">Gaya Sampul</string>
+    <string name="settings_cover_art_style_flat">Datar</string>
+    <string name="settings_cover_art_style_3d">Kotak 3D</string>
+    <string name="settings_help_cover_art_style">Memilih jenis sampul default yang digunakan saat mengunduh karya seni (art). Sampul datar cocok dengan tampilan depan kotak klasik, sedangkan Kotak 3D menggunakan render kotak bersudut saat sumbernya menyediakannya. Sampul 3D dapat terlihat lebih dramatis, namun ketersediaannya mungkin sedikit lebih buruk daripada seni datar.</string>
+    <string name="settings_clear_cover_cache">Hapus cache sampul</string>
+    <string name="settings_clear_cover_cache_desc">Hapus sampul unduhan sementara dan coba lagi unduhan yang gagal.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Hapus cache sampul?</string>
+    <string name="settings_clear_cover_cache_confirm_body">Sampul yang diunduh akan dihapus dan diunduh lagi secara otomatis. Sampul kustom dan file game tidak akan diubah.</string>
+    <string name="settings_clear_cover_cache_action">Hapus</string>
+    <string name="settings_clear_cover_cache_success">Cache sampul telah dihapus. Sampul akan diunduh lagi secara otomatis.</string>
+    <string name="settings_clear_cover_cache_partial">Beberapa sampul dalam cache tidak dapat dihapus. Coba lagi setelah unduhan saat ini selesai.</string>
+
+    <!-- Rear panel input bindings -->
+    <string name="rear_touch_title">Panel sentuh belakang</string>
+    <string name="rear_touch_desc">Tetapkan titik belakang ke tombol, tombol keyboard, pemicu, atau mouse.</string>
+    <string name="rear_touch_point">Titik belakang %1$d</string>
+    <string name="rear_touch_bind">Tetapkan tombol</string>
+    <string name="rear_touch_capture">Tekan tombol pengontrol atau keyboard, pemicu, arah stik, atau tombol mouse.</string>
+    <string name="rear_touch_screen">Tampilkan tombol layar</string>
+    <string name="rear_touch_position">Posisi sentuhan</string>
+    <string name="rear_touch_drag">Seret di layar</string>
+    <string name="rear_touch_fixed">Titik tetap</string>
+    <string name="rear_touch_pointer">Penunjuk mouse</string>
+    <string name="rear_touch_global">Profil global</string>
+    <string name="rear_touch_game">Game ini</string>
+    <string name="rear_touch_inherit">Gunakan profil global</string>
+    <string name="rear_touch_clear">Hapus penetapan</string>
+    <string name="rear_touch_hint">Tahan untuk menyentuh panel belakang; lepaskan untuk mengangkat sentuhan. Input yang ditetapkan menggantikan aksi biasanya. Sentuhan depan tetap tersedia.</string>
+    <string name="rear_touch_screen_position">Posisi tombol layar</string>
 </resources>

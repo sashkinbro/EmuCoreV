@@ -14,7 +14,7 @@ class LaunchStateLoadingLocaleTest {
     fun loadingLabelExistsAndIsTranslatedInEverySupportedLocale() {
         val root = locateResourceRoot()
         val defaultText = readLabel(root.resolve("values/strings.xml"))
-        assertEquals("Loading save state…", defaultText)
+        assertEquals("Loading…", defaultText)
 
         val locales = Files.list(root).use { paths ->
             paths.filter {

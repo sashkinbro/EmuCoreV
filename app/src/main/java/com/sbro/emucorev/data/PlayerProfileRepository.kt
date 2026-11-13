@@ -477,6 +477,12 @@ class PlayerProfileRepository(context: Context) {
             userRef.collection(ACTIVITY_COLLECTION).document(day)
         }
 
+        // Resolve once before the transaction, which Firestore may retry on its worker.
+        val shareableCovers = validEntries.associate { (gameKey, entry) ->
+            gameKey to shareableGameCoverPath(entry.coverArtPath, entry.titleId) { serial, candidate ->
+                CoverArtRepository.get(appContext).buildPublicCoverUrl(titleId = serial, candidatePath = candidate)
+            }
+        }
         firestore.runTransaction { transaction ->
             val snapshot = transaction.get(userRef)
             val activitySnapshots = activityRefs.mapValues { (_, reference) -> transaction.get(reference) }
@@ -491,7 +497,7 @@ class PlayerProfileRepository(context: Context) {
                     put(GAME_SESSIONS, existingGame.longValue(GAME_SESSIONS) + entry.sessionCount)
                     put(GAME_LAST_PLAYED_AT_MS, entry.lastPlayedAtMs)
                     entry.titleId.takeIf { it.isNotBlank() }?.let { put(GAME_SERIAL, it.take(MAX_SERIAL_LENGTH)) }
-                    buildShareableCoverPath(entry.coverArtPath, entry.titleId, cleanTitle)?.let {
+                    shareableCovers[gameKey]?.let {
                         put(GAME_COVER_ART_PATH, it.take(MAX_COVER_PATH_LENGTH))
                     }
                 }
@@ -851,14 +857,6 @@ class PlayerProfileRepository(context: Context) {
 
     private fun activityDayKey(timestampMs: Long): String {
         return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(timestampMs))
-    }
-
-    private fun buildShareableCoverPath(coverArtPath: String?, titleId: String?, title: String?): String? {
-        val cover = coverArtPath?.trim().orEmpty()
-        return when {
-            cover.startsWith("http://") || cover.startsWith("https://") -> cover
-            else -> catalogCoverUrl(titleId, title)
-        }
     }
 
     private fun resolveReadableCoverPath(coverArtPath: String, titleId: String?, title: String?): String? {

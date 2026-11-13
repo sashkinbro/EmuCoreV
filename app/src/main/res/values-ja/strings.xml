@@ -16,9 +16,9 @@
     <string name="home_empty_library_body">ファームウェアとファームウェア更新パッケージをインストールし、ゲーム画面でゲームを追加してください。ここに自動的に表示されます。</string>
     <string name="home_recent_titles_title">最近プレイしたゲーム</string>
     <string name="home_disclaimer_title">EmuCoreVについて</string>
-    <string name="home_disclaimer_body">EmuCoreVはVita3KをベースにしたAndroid向けPS Vitaエミュレーターです。</string>
+    <string name="home_disclaimer_body">EmuCoreVはECVコアを使用するAndroid向けPS Vitaエミュレーターです。</string>
     <string name="onboarding_page_1_title">AndroidでPlayStation Vita</string>
-    <string name="onboarding_page_1_body">Vita3KコアでPS VitaゲームをAndroidでプレイできます。</string>
+    <string name="onboarding_page_1_body">ECVコアでPS VitaゲームをAndroidでプレイできます。</string>
     <string name="onboarding_page_2_title">ゲームライブラリ</string>
     <string name="onboarding_page_2_body">インストールしたゲームは1つのライブラリにまとめられます。</string>
     <string name="onboarding_page_3_title">内蔵カタログ</string>
@@ -419,7 +419,7 @@
     <string name="settings_clear_cache_failed">キャッシュのクリアに失敗しました。</string>
     <string name="settings_pro_support_more_hint">以下のいずれかのオプションにすでに含まれています。開発をさらに支援したい場合にのみ、より大きなオプションを選択してください。</string>
     <string name="settings_about_title">EmuCoreVについて</string>
-    <string name="settings_about_body">EmuCoreVは、オープンソースのVita3KプロジェクトをベースにしたAndroid向けPS Vitaエミュレーターです。</string>
+    <string name="settings_about_body">EmuCoreVはECVコアを使用するAndroid向けPS Vitaエミュレーターです。</string>
     <string name="settings_help_content_description">設定のヘルプを開く</string>
     <string name="settings_help_dialog_label">設定ガイド</string>
     <string name="settings_help_dialog_tip">一度に1つのオプションだけ変更し、同じゲームシーンでテストすると、本当に改善された点を確認できます。</string>
@@ -618,7 +618,7 @@
     <string name="settings_about_emucorev">EmuCoreVについて</string>
     <string name="settings_about_version">アプリのバージョン</string>
     <string name="settings_about_version_value">バージョン %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreVは、モバイル向けに最適化されたインターフェース、ローカルライブラリ管理、Vita3Kベースのエミュレーションコアを備え、AndroidにPS Vitaエミュレーションを提供します。</string>
+    <string name="settings_about_body_extended">EmuCoreVはECVコアを使用するAndroid向けPS Vitaエミュレーターです。 ECVはVita3Kコアをベースにしており、EmuCoreが独自の修正と改善を加えながら、継続的かつ積極的に開発しています。</string>
     <string name="settings_about_community_title">コミュニティとサポート</string>
     <string name="settings_about_website">公式ウェブサイト</string>
     <string name="settings_about_website_desc">ダウンロード、ニュース、プロジェクトのリンクについては、EmuCoreVのウェブサイトを開いてください。</string>
@@ -629,13 +629,13 @@
     <string name="settings_about_support">EmuCoreVを支援</string>
     <string name="settings_about_support_desc">Patreonメンバーシップを通じて開発の継続を支援します。</string>
     <string name="settings_emulation_core">エミュレーションコア</string>
-    <string name="settings_based_on_vita3k">Vita3Kベース</string>
+    <string name="settings_based_on_vita3k">ECVはVita3Kコアをベースにしており、EmuCoreが独自の修正と改善を加えながら、継続的かつ積極的に開発しています。</string>
     <string name="settings_developer">開発者</string>
     <string name="settings_created_by_sbro">Sashkin Appsが開発</string>
     <string name="settings_play_store_profile">Playストアプロフィール</string>
     <string name="settings_play_store_profile_desc">開発者による他のAndroidアプリを見る。</string>
     <string name="settings_core_source_code">コアのソースコード</string>
-    <string name="settings_core_source_description">EmuCoreVは独自のAndroidインターフェースを使用しています。Vita3Kベースなのはエミュレーションコアのみです。</string>
+    <string name="settings_core_source_description">EmuCoreVは独自のAndroidインターフェースを使用しています。 ECVはVita3Kコアをベースにしており、EmuCoreが独自の修正と改善を加えながら、継続的かつ積極的に開発しています。</string>
     <string name="settings_open_github">GitHubを開く</string>
     <string name="settings_vita3k_repository_desc">上流のVita3Kプロジェクトリポジトリを開きます。</string>
     <string name="settings_updates_checking_title">更新を確認中</string>
@@ -1547,4 +1547,57 @@
     <string name="settings_not_set">未設定</string>
     <string name="settings_gamepad_mapping_clear">クリア</string>
     <string name="settings_gamepad_mapping_auto_format">自動</string>
+    <string name="library_view_shelf">カバーシェルフ表示</string>
+    <string name="library_exit_shelf">カバーシェルフを閉じる</string>
+    <string name="library_shelf_games_counter">%1$d / %2$d</string>
+    <string name="settings_help_dialog_eyebrow">設定のヒント</string>
+    <string name="settings_help_reset_tip_title">クイックリセット</string>
+    <string name="settings_help_reset_tip_body">設定名を長押しすると、そのオプションがデフォルト値に復元されます。</string>
+    <string name="feedback_game_loading">ゲームライブラリを読み込んでいます…</string>
+    <string name="feedback_game_no_matches">一致するゲームがありません</string>
+
+    <string name="library_options">ライブラリのオプション</string>
+    <string name="library_sort_title_asc">タイトル昇順 (A-Z)</string>
+    <string name="library_sort_title_desc">タイトル降順 (Z-A)</string>
+    <string name="library_sort_recent_desc">最近の更新</string>
+    <string name="library_sort_recent_asc">古い更新</string>
+    <string name="library_sort_size_desc">サイズが大きい順</string>
+    <string name="library_sort_size_asc">サイズが小さい順</string>
+    <string name="library_view_grid">グリッド表示</string>
+    <string name="library_view_list">リスト表示</string>
+    <string name="settings_ecv_source">ECVのソースコード</string>
+    <string name="settings_ecv_source_desc">変更を加えたECVコアとEmuCoreVアプリのソースコードをGitHubで表示します。</string>
+    <string name="settings_vita3k_license">Vita3K原作のライセンス</string>
+    <string name="settings_vita3k_license_desc">原作のGNU GPLバージョン2.0以降のライセンスを確認します。</string>
+    <string name="settings_core_upstream_version">ベースとなるコアのバージョン</string>
+
+    <string name="settings_cover_art_style">カバースタイル</string>
+    <string name="settings_cover_art_style_flat">フラット</string>
+    <string name="settings_cover_art_style_3d">3Dボックス</string>
+    <string name="settings_help_cover_art_style">アートワークをダウンロードするときに使用されるデフォルトのカバータイプを選択します。フラットカバーはクラシックなフロントボックスの外観に一致し、3Dボックスはソースが提供する場合に角度の付いたボックスレンダーを使用します。3Dカバーはよりドラマチックに見える場合がありますが、可用性はフラットアートよりもわずかに劣る可能性があります。</string>
+    <string name="settings_clear_cover_cache">カバーのキャッシュを消去</string>
+    <string name="settings_clear_cover_cache_desc">一時的にダウンロードしたカバーを削除し、失敗したダウンロードを再試行します。</string>
+    <string name="settings_clear_cover_cache_confirm_title">カバーのキャッシュを消去しますか？</string>
+    <string name="settings_clear_cover_cache_confirm_body">ダウンロード済みのカバーを削除し、自動的に再ダウンロードします。カスタムカバーとゲームファイルは変更されません。</string>
+    <string name="settings_clear_cover_cache_action">消去</string>
+    <string name="settings_clear_cover_cache_success">カバーのキャッシュを消去しました。カバーは自動的に再ダウンロードされます。</string>
+    <string name="settings_clear_cover_cache_partial">一部のキャッシュ済みカバーを削除できませんでした。現在のダウンロードが完了してから再試行してください。</string>
+
+    <!-- Rear panel input bindings -->
+    <string name="rear_touch_title">背面タッチパネル</string>
+    <string name="rear_touch_desc">背面のタッチ位置をボタン、キー、トリガー、マウスに割り当てます。</string>
+    <string name="rear_touch_point">背面ポイント %1$d</string>
+    <string name="rear_touch_bind">ボタンを割り当て</string>
+    <string name="rear_touch_capture">コントローラーやキーボードのボタン、トリガー、スティックの方向、またはマウスボタンを押してください。</string>
+    <string name="rear_touch_screen">画面ボタンを表示</string>
+    <string name="rear_touch_position">タッチ位置</string>
+    <string name="rear_touch_drag">画面をドラッグ</string>
+    <string name="rear_touch_fixed">固定位置</string>
+    <string name="rear_touch_pointer">マウスポインター</string>
+    <string name="rear_touch_global">共通プロファイル</string>
+    <string name="rear_touch_game">このゲーム</string>
+    <string name="rear_touch_inherit">共通プロファイルを使用</string>
+    <string name="rear_touch_clear">割り当てを解除</string>
+    <string name="rear_touch_hint">押している間は背面をタッチし、離すとタッチを解除します。割り当てた入力は通常の操作に代わります。前面タッチも引き続き使えます。</string>
+    <string name="rear_touch_screen_position">画面ボタンの位置</string>
 </resources>

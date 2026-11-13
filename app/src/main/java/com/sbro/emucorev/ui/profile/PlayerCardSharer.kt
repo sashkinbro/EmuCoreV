@@ -121,7 +121,7 @@ object PlayerCardSharer {
     private fun accentColor(accent: String): Int = when (accent) {
         "crimson" -> Color.rgb(220, 65, 79)
         "blue" -> Color.rgb(77, 158, 255)
-        "violet" -> Color.rgb(157, 109, 255)
+        "violet" -> Color.rgb(79, 132, 216)
         "emerald" -> Color.rgb(54, 196, 142)
         else -> Color.rgb(216, 180, 95)
     }

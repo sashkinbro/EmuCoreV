@@ -2,6 +2,7 @@
 
 package com.sbro.emucorev.ui.cheats
 
+import com.sbro.emucorev.ui.common.controllerFocus
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,7 +38,7 @@ import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.AlertDialog
+import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -68,6 +69,7 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.core.VitaCheatEntry
 import com.sbro.emucorev.data.InstalledVitaGame
 import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.GameCoverArt
 import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
@@ -588,9 +590,9 @@ private fun CheatCategoryCard(
 ) {
     Surface(
         onClick = onClick,
-        modifier = Modifier
+        modifier = (Modifier
             .fillMaxWidth()
-            .padding(horizontal = ScreenHorizontalPadding),
+            .padding(horizontal = ScreenHorizontalPadding)).controllerFocus(shape = neonShape(18.dp)),
         shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -644,9 +646,9 @@ private fun CheatToggleCard(
     Surface(
         onClick = { onToggle(!entry.enabled) },
         enabled = masterEnabled,
-        modifier = Modifier
+        modifier = (Modifier
             .fillMaxWidth()
-            .padding(horizontal = ScreenHorizontalPadding),
+            .padding(horizontal = ScreenHorizontalPadding)).controllerFocus(shape = neonShape(16.dp)),
         shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface
@@ -829,6 +831,7 @@ private fun CheatGamePicker(
             items(games, key = { it.titleId }) { game ->
                 val selected = game.titleId == selectedTitleId
                 Surface(
+        modifier = Modifier.controllerFocus(shape = neonShape(18.dp)),
                     onClick = { onSelect(game.titleId) },
                     shape = neonShape(18.dp),
                     color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -843,15 +846,15 @@ private fun CheatGamePicker(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Surface(
-                            modifier = Modifier.size(48.dp),
-                            shape = neonShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                            modifier = Modifier.size(width = 32.dp, height = 48.dp),
+                            shape = androidx.compose.ui.graphics.RectangleShape,
+                            color = androidx.compose.ui.graphics.Color.Transparent,
                         ) {
-                            LocalImage(
-                                path = game.iconPath,
+                            GameCoverArt(
+                                titleId = game.titleId,
+                                fallbackIconPath = game.iconPath,
                                 contentDescription = game.title,
-                                fallbackLabel = game.title,
+                                fallbackTitle = game.title,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }

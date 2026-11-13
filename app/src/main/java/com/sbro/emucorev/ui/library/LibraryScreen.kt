@@ -1,7 +1,32 @@
 package com.sbro.emucorev.ui.library
 
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import android.widget.Toast
+import com.sbro.emucorev.data.CoverArtRepository
+import com.sbro.emucorev.ui.common.prefetchGameCoverArt
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.EaseIn
+import androidx.compose.animation.core.EaseOut
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.sbro.emucorev.ui.common.gamepadFocusableCard
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -36,7 +61,12 @@ import androidx.compose.foundation.lazy.items
 import com.sbro.emucorev.ui.theme.neon.neonShape
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ViewList
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.SortByAlpha
+import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.ViewAgenda
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.EmojiEvents
@@ -48,8 +78,10 @@ import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.ViewModule
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.rounded.ViewCarousel
+import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -77,6 +109,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -86,6 +120,8 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.LibraryLayoutMode
 import com.sbro.emucorev.ui.common.CustomizationBackground
+import com.sbro.emucorev.ui.common.GameCoverArt
+import com.sbro.emucorev.ui.common.GameCoverAspectRatio
 import com.sbro.emucorev.ui.common.NavigationMenuButton
 import com.sbro.emucorev.ui.common.ScreenTopBarSurface
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
@@ -106,6 +142,8 @@ fun LibraryScreen(
     onOpenPlayTime: (String) -> Unit,
     onOpenAchievements: (String) -> Unit,
     onMenuClick: (() -> Unit)? = null,
+    shelfMode: Boolean = false,
+    onShelfModeChanged: (Boolean) -> Unit = {},
     viewModel: LibraryViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -138,27 +176,87 @@ fun LibraryScreen(
     val deleteGameConfirmTitle = stringResource(R.string.detail_delete_game_confirm_title)
     val deleteGameConfirmBody = stringResource(R.string.detail_delete_game_confirm_body)
     val deleteGameFailedMessage = stringResource(R.string.detail_delete_game_failed)
-    val containerWidthDp = with(density) { windowInfo.containerSize.width.toDp() }
-    val gridColumns = remember(containerWidthDp, customization.coverSizePercent) {
+    var measuredContentWidthPx by remember { mutableIntStateOf(0) }
+    val containerWidthDp = with(density) { (measuredContentWidthPx.takeIf { it > 0 } ?: windowInfo.containerSize.width).toDp() }
+    val isLandscape = windowInfo.containerSize.width > windowInfo.containerSize.height
+    val gridColumns = remember(containerWidthDp, customization.coverSizePercent, isLandscape) {
         LibraryGridSizing.columnsForWidth(
             containerWidthDp.value,
-            customization.coverSizePercent
+            customization.coverSizePercent,
+            isLandscape = isLandscape
         )
     }
+    BackHandler(enabled = shelfMode) { onShelfModeChanged(false) }
     val libraryState = rememberLazyListState()
     val coverPrefetchWindow = remember(uiState.items, layoutMode, gridColumns) {
         val rowSize = if (layoutMode == LibraryLayoutMode.LIST) 1 else gridColumns.coerceAtLeast(1)
         LibraryCoverPrefetchWindow(uiState.items.chunked(rowSize).map { row ->
-            LibraryCoverPrefetchRow(row.first().titleId, row.map { it.iconPath })
+            LibraryCoverPrefetchRow(row.first().titleId, row.map { it.titleId })
         })
     }
+    val coverArt = remember(context) { CoverArtRepository.get(context) }
+    val coverStyle by coverArt.style.collectAsState()
+    val prefetchCover: suspend (String) -> Unit = remember(context, uiState.items, uiState.artworkVersion, coverStyle) {
+        val gamesById = uiState.items.associateBy { it.titleId }
+        val load: suspend (String) -> Unit = { titleId ->
+            gamesById[titleId]?.let { game ->
+                prefetchGameCoverArt(context, titleId = game.titleId, fallbackIconPath = game.iconPath,
+                    styleOverride = coverStyle, artworkVersion = uiState.artworkVersion)
+            }
+        }
+        load
+    }
     LibraryCoverPrefetch(libraryState, coverPrefetchWindow,
-        enabled = !uiState.isLoading, artworkVersion = uiState.artworkVersion)
+        enabled = !uiState.isLoading && !shelfMode, artworkVersion = uiState.artworkVersion,
+        load = prefetchCover)
+
+    val gameContextMenu: @Composable (com.sbro.emucorev.data.InstalledVitaGame, Boolean, () -> Unit) -> Unit = { game, expanded, dismiss ->
+        LibraryGameContextMenu(
+        expanded = expanded,
+        onDismiss = dismiss,
+        addShortcutLabel = addShortcutLabel,
+        onAddShortcut = {
+            val message = when (GameShortcutInstaller.requestPinnedShortcut(context, game.titleId, game.title, game.iconPath)) {
+                GameShortcutInstaller.Result.Requested -> shortcutRequestedMessage
+                GameShortcutInstaller.Result.Unsupported -> shortcutUnsupportedMessage
+                GameShortcutInstaller.Result.Failed -> shortcutFailedMessage
+            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            dismiss()
+        },
+        manageGameSettingsLabel = manageGameSettingsLabel,
+        onManageGameSettings = {
+            onOpenGameManager(game.titleId)
+            dismiss()
+        },
+        playTimeLabel = playTimeLabel,
+        onOpenPlayTime = {
+            onOpenPlayTime(game.titleId)
+            dismiss()
+        },
+        achievementsLabel = achievementsLabel,
+        onOpenAchievements = {
+            onOpenAchievements(game.titleId)
+            dismiss()
+        },
+        manageSaveStatesLabel = manageSaveStatesLabel,
+        onOpenSaveStates = {
+            onOpenSaveStates(game.titleId)
+            dismiss()
+        },
+        deleteGameLabel = deleteGameLabel,
+        onDeleteGame = {
+            deleteGameId = game.titleId
+            dismiss()
+        }
+    )
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .onSizeChanged { measuredContentWidthPx = it.width }
     ) {
         CustomizationBackground(
             path = customization.backgroundPath,
@@ -172,6 +270,37 @@ fun LibraryScreen(
                     .background(MaterialTheme.colorScheme.background.copy(alpha = 0.72f))
             )
         }
+        AnimatedContent(
+            targetState = shelfMode,
+            transitionSpec = {
+                if (targetState) {
+                    (slideInHorizontally(initialOffsetX = { it / 5 }, animationSpec = tween(440, easing = EaseOut)) +
+                        fadeIn(tween(360, easing = EaseOut)) + scaleIn(initialScale = 0.97f, animationSpec = tween(440, easing = EaseOut))) togetherWith
+                        (slideOutHorizontally(targetOffsetX = { -it / 8 }, animationSpec = tween(300, easing = EaseIn)) +
+                            fadeOut(tween(260, easing = EaseIn)) + scaleOut(targetScale = 0.985f, animationSpec = tween(300, easing = EaseIn)))
+                } else {
+                    (slideInHorizontally(initialOffsetX = { -it / 5 }, animationSpec = tween(420, easing = EaseOut)) +
+                        fadeIn(tween(350, easing = EaseOut)) + scaleIn(initialScale = 0.985f, animationSpec = tween(420, easing = EaseOut))) togetherWith
+                        (slideOutHorizontally(targetOffsetX = { it / 5 }, animationSpec = tween(340, easing = EaseIn)) +
+                            fadeOut(tween(290, easing = EaseIn)) + scaleOut(targetScale = 0.97f, animationSpec = tween(340, easing = EaseIn)))
+                }
+            },
+            label = "library-mode",
+            modifier = Modifier.fillMaxSize()
+        ) { showShelf ->
+            if (showShelf && uiState.items.isNotEmpty()) {
+                LibraryShelfMode(
+                    games = uiState.items,
+                    artworkVersion = uiState.artworkVersion,
+                    initialTitleId = uiState.recentTitleId,
+                    topInset = 0.dp,
+                    bottomInset = 0.dp,
+                    horizontalInset = ScreenHorizontalPadding,
+                    onExitShelfMode = { onShelfModeChanged(false) },
+                    onGameClick = { onLaunchGame(it.titleId) },
+                    contextMenu = gameContextMenu
+                )
+            } else {
         LazyColumn(
             state = libraryState,
             modifier = Modifier
@@ -201,78 +330,36 @@ fun LibraryScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = stringResource(R.string.nav_library),
-                                style = (if (neon) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineSmall)
-                                    .copy(fontWeight = FontWeight.Bold),
-                                color = if (neon) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onBackground,
+                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = gameCountSubtitle,
-                                style = if (neon) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
-                    val headerActions: @Composable () -> Unit = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                modifier = Modifier.size(42.dp),
-                                onClick = {
-                                    if (searchExpanded) {
-                                        searchExpanded = false
-                                        viewModel.updateQuery("")
-                                    } else {
-                                        searchExpanded = true
-                                    }
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = if (searchExpanded) Icons.Rounded.Close else Icons.Rounded.Search,
-                                    contentDescription = stringResource(R.string.library_search_hint),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            if (neon) LibraryHeaderActionDivider()
-                            IconButton(
-                                modifier = Modifier.size(42.dp),
-                                onClick = { preferences.libraryLayoutMode = if (preferences.libraryLayoutMode == LibraryLayoutMode.LIST) LibraryLayoutMode.GRID else LibraryLayoutMode.LIST }
-                            ) {
-                                Icon(
-                                    imageVector = if (layoutMode == LibraryLayoutMode.LIST) Icons.Rounded.ViewModule else Icons.AutoMirrored.Rounded.ViewList,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            if (neon) LibraryHeaderActionDivider()
-                            IconButton(
-                                modifier = Modifier.size(42.dp),
-                                onClick = refreshClick
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Refresh,
-                                    contentDescription = stringResource(R.string.library_refresh),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                    LibraryHeaderActions(
+                        isRefreshing = uiState.isLoading || uiState.isSorting,
+                        searchExpanded = searchExpanded,
+                        sortOption = uiState.sortOption,
+                        layoutMode = layoutMode,
+                        onRefresh = refreshClick,
+                        onToggleSearch = {
+                            searchExpanded = !searchExpanded
+                            if (!searchExpanded) viewModel.updateQuery("")
+                        },
+                        onSortSelected = viewModel::updateSortOption,
+                        onShowShelf = { onShelfModeChanged(true) },
+                        onToggleLayout = {
+                            preferences.libraryLayoutMode = if (layoutMode == LibraryLayoutMode.LIST) LibraryLayoutMode.GRID else LibraryLayoutMode.LIST
                         }
-                    }
-                    if (neon) {
-                        Surface(
-                            shape = neonShape(18.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
-                            border = BorderStroke(
-                                1.dp,
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)
-                            )
-                        ) {
-                            headerActions()
-                        }
-                    } else {
-                        headerActions()
-                    }
+                    )
                 }
 
                 AnimatedVisibility(
@@ -287,6 +374,14 @@ fun LibraryScreen(
                             onValueChange = viewModel::updateQuery,
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text(stringResource(R.string.library_search_hint)) },
+                            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                            trailingIcon = if (uiState.query.isNotEmpty()) {
+                                {
+                                    IconButton(onClick = { viewModel.updateQuery("") }) {
+                                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.catalog_search_clear))
+                                    }
+                                }
+                            } else null,
                             singleLine = true,
                             shape = neonShape(20.dp),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -347,42 +442,49 @@ fun LibraryScreen(
         } else if (layoutMode == LibraryLayoutMode.LIST) {
             items(uiState.items, key = { it.titleId }) { game ->
                 val selectGameClick = rememberDebouncedClick { onLaunchGame(game.titleId) }
-                val shape = neonShape(24.dp)
+                val shape = neonShape(16.dp)
                 var menuExpanded by remember(game.titleId) { mutableStateOf(false) }
+                val cardInteraction = remember(game.titleId) { MutableInteractionSource() }
+                val pressed by cardInteraction.collectIsPressedAsState()
+                val pressScale by animateFloatAsState(if (pressed) 0.985f else 1f, tween(100), label = "library-list-press")
                 Box {
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
                             .clip(shape)
+                            .gamepadFocusableCard(shape = shape, interactionSource = cardInteraction, addFocusTarget = false, showIdleBorder = false)
                             .combinedClickable(
+                                interactionSource = cardInteraction,
+                                indication = null,
                                 onClick = selectGameClick,
                                 onLongClick = { menuExpanded = true }
                             ),
                         shape = shape,
                         color = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 3.dp,
-                        shadowElevation = 8.dp,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp
                     ) {
                         Row(
-                            modifier = Modifier.padding(CardContentPadding),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.Top
                         ) {
                             LibraryGameArtwork(
+                                titleId = game.titleId,
                                 path = game.iconPath,
                                 artworkVersion = uiState.artworkVersion,
                                 title = game.title,
-                                modifier = Modifier.width(92.dp),
-                                artworkAspectRatio = 1f
+                                modifier = Modifier.width(52.dp),
+                                artworkAspectRatio = 2f / 3f
                             )
                             Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                modifier = Modifier.weight(1f).heightIn(min = 78.dp),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
                             ) {
                                 Text(
                                     text = game.title,
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -397,45 +499,7 @@ fun LibraryScreen(
                             }
                         }
                     }
-                    LibraryGameContextMenu(
-                        expanded = menuExpanded,
-                        onDismiss = { menuExpanded = false },
-                        addShortcutLabel = addShortcutLabel,
-                        onAddShortcut = {
-                            val message = when (GameShortcutInstaller.requestPinnedShortcut(context, game.titleId, game.title, game.iconPath)) {
-                                GameShortcutInstaller.Result.Requested -> shortcutRequestedMessage
-                                GameShortcutInstaller.Result.Unsupported -> shortcutUnsupportedMessage
-                                GameShortcutInstaller.Result.Failed -> shortcutFailedMessage
-                            }
-                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                            menuExpanded = false
-                        },
-                        manageGameSettingsLabel = manageGameSettingsLabel,
-                        onManageGameSettings = {
-                            onOpenGameManager(game.titleId)
-                            menuExpanded = false
-                        },
-                        playTimeLabel = playTimeLabel,
-                        onOpenPlayTime = {
-                            onOpenPlayTime(game.titleId)
-                            menuExpanded = false
-                        },
-                        achievementsLabel = achievementsLabel,
-                        onOpenAchievements = {
-                            onOpenAchievements(game.titleId)
-                            menuExpanded = false
-                        },
-                        manageSaveStatesLabel = manageSaveStatesLabel,
-                        onOpenSaveStates = {
-                            onOpenSaveStates(game.titleId)
-                            menuExpanded = false
-                        },
-                        deleteGameLabel = deleteGameLabel,
-                        onDeleteGame = {
-                            deleteGameId = game.titleId
-                            menuExpanded = false
-                        }
-                    )
+                    gameContextMenu(game, menuExpanded) { menuExpanded = false }
                 }
             }
         } else {
@@ -449,70 +513,43 @@ fun LibraryScreen(
                 ) {
                     rowItems.forEach { game ->
                         val selectGameClick = rememberDebouncedClick { onLaunchGame(game.titleId) }
-                        val shape = neonShape(24.dp)
+                        val shape = RectangleShape
                         var menuExpanded by remember(game.titleId) { mutableStateOf(false) }
+                        var is3dCover by remember(game.titleId, game.iconPath, uiState.artworkVersion, coverStyle) {
+                            mutableStateOf(false)
+                        }
+                        val cardInteraction = remember(game.titleId) { MutableInteractionSource() }
+                        val pressed by cardInteraction.collectIsPressedAsState()
+                        val pressScale by animateFloatAsState(if (pressed) 0.96f else 1f, tween(100), label = "library-grid-press")
                         Box(modifier = Modifier.weight(1f)) {
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(shape)
+                                    .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
+                                    .gamepadFocusableCard(shape = shape, interactionSource = cardInteraction, addFocusTarget = false, showIdleBorder = !is3dCover)
                                     .combinedClickable(
+                                        interactionSource = cardInteraction,
+                                        indication = null,
                                         onClick = selectGameClick,
                                         onLongClick = { menuExpanded = true }
                                     ),
                                 shape = shape,
-                                color = MaterialTheme.colorScheme.surface,
-                                tonalElevation = 3.dp,
-                                shadowElevation = 8.dp,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+                                color = if (is3dCover) Color.Transparent else MaterialTheme.colorScheme.surface,
+                                tonalElevation = 0.dp,
+                                shadowElevation = 0.dp,
+                                border = if (!is3dCover && MaterialTheme.colorScheme.background.luminance() > 0.5f) BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.34f)) else null
                             ) {
-                                LibraryLocalImage(
-                                    path = game.iconPath,
+                                GameCoverArt(
+                                    titleId = game.titleId,
+                                    fallbackIconPath = game.iconPath,
                                     artworkVersion = uiState.artworkVersion,
                                     contentDescription = game.title,
-                                    fallbackLabel = game.title,
-                                    modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+                                    fallbackTitle = game.title,
+                                    onPresentationChanged = { is3dCover = it },
+                                    modifier = Modifier.fillMaxWidth().aspectRatio(GameCoverAspectRatio)
                                 )
                             }
-                            LibraryGameContextMenu(
-                                expanded = menuExpanded,
-                                onDismiss = { menuExpanded = false },
-                                addShortcutLabel = addShortcutLabel,
-                                onAddShortcut = {
-                                    val message = when (GameShortcutInstaller.requestPinnedShortcut(context, game.titleId, game.title, game.iconPath)) {
-                                        GameShortcutInstaller.Result.Requested -> shortcutRequestedMessage
-                                        GameShortcutInstaller.Result.Unsupported -> shortcutUnsupportedMessage
-                                        GameShortcutInstaller.Result.Failed -> shortcutFailedMessage
-                                    }
-                                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                                    menuExpanded = false
-                                },
-                                manageGameSettingsLabel = manageGameSettingsLabel,
-                                onManageGameSettings = {
-                                    onOpenGameManager(game.titleId)
-                                    menuExpanded = false
-                                },
-                                playTimeLabel = playTimeLabel,
-                                onOpenPlayTime = {
-                                    onOpenPlayTime(game.titleId)
-                                    menuExpanded = false
-                                },
-                                achievementsLabel = achievementsLabel,
-                                onOpenAchievements = {
-                                    onOpenAchievements(game.titleId)
-                                    menuExpanded = false
-                                },
-                                manageSaveStatesLabel = manageSaveStatesLabel,
-                                onOpenSaveStates = {
-                                    onOpenSaveStates(game.titleId)
-                                    menuExpanded = false
-                                },
-                                deleteGameLabel = deleteGameLabel,
-                                onDeleteGame = {
-                                    deleteGameId = game.titleId
-                                    menuExpanded = false
-                                }
-                            )
+                            gameContextMenu(game, menuExpanded) { menuExpanded = false }
                         }
                     }
                     repeat(gridColumns - rowItems.size) {
@@ -521,6 +558,8 @@ fun LibraryScreen(
                 }
             }
         }
+        }
+    }
         }
     }
 
@@ -556,6 +595,127 @@ fun LibraryScreen(
 }
 
 @Composable
+private fun LibraryHeaderActions(
+    isRefreshing: Boolean,
+    searchExpanded: Boolean,
+    sortOption: LibrarySortOption,
+    layoutMode: LibraryLayoutMode,
+    onRefresh: () -> Unit,
+    onToggleSearch: () -> Unit,
+    onSortSelected: (LibrarySortOption) -> Unit,
+    onShowShelf: () -> Unit,
+    onToggleLayout: () -> Unit
+) {
+    var showLibraryOptions by remember { mutableStateOf(false) }
+    val optionsDescription = stringResource(R.string.library_options)
+    val menuMaxHeight = with(LocalDensity.current) {
+        (LocalWindowInfo.current.containerSize.height.toDp() - 24.dp).coerceAtLeast(240.dp)
+    }
+    Surface(
+        shape = neonShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f))
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box {
+                IconButton(
+                    modifier = Modifier.size(42.dp).semantics { contentDescription = optionsDescription },
+                    onClick = { showLibraryOptions = true }
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(19.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.MoreVert,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                DropdownMenu(
+                    expanded = showLibraryOptions,
+                    onDismissRequest = { showLibraryOptions = false },
+                    modifier = Modifier.widthIn(min = 248.dp, max = 310.dp)
+                        .heightIn(max = menuMaxHeight).compensateDropdownMenuPadding(),
+                    shape = neonShape(20.dp),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 12.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+                ) {
+                    Spacer(Modifier.height(8.dp))
+                    LibraryGameContextMenuItem(
+                        text = stringResource(R.string.library_refresh),
+                        icon = Icons.Rounded.Refresh,
+                        emphasized = true,
+                        enabled = !isRefreshing,
+                        onClick = { showLibraryOptions = false; onRefresh() }
+                    )
+                    LibraryGameContextMenuItem(
+                        text = stringResource(R.string.library_search_hint),
+                        icon = Icons.Rounded.Search,
+                        selected = searchExpanded,
+                        onClick = { showLibraryOptions = false; onToggleSearch() }
+                    )
+                    LibraryGameContextMenuDivider()
+                    LibrarySortOption.entries.forEach { option ->
+                        val label = when (option) {
+                            LibrarySortOption.TITLE_ASC -> R.string.library_sort_title_asc
+                            LibrarySortOption.TITLE_DESC -> R.string.library_sort_title_desc
+                            LibrarySortOption.RECENT_DESC -> R.string.library_sort_recent_desc
+                            LibrarySortOption.RECENT_ASC -> R.string.library_sort_recent_asc
+                            LibrarySortOption.SIZE_DESC -> R.string.library_sort_size_desc
+                            LibrarySortOption.SIZE_ASC -> R.string.library_sort_size_asc
+                        }
+                        LibraryGameContextMenuItem(
+                            text = stringResource(label),
+                            icon = when (option) {
+                                LibrarySortOption.TITLE_ASC, LibrarySortOption.TITLE_DESC -> Icons.Rounded.SortByAlpha
+                                LibrarySortOption.RECENT_DESC, LibrarySortOption.RECENT_ASC -> Icons.Rounded.History
+                                LibrarySortOption.SIZE_DESC, LibrarySortOption.SIZE_ASC -> Icons.Rounded.Storage
+                            },
+                            selected = sortOption == option,
+                            onClick = { showLibraryOptions = false; onSortSelected(option) }
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+            LibraryHeaderActionDivider()
+            IconButton(modifier = Modifier.size(42.dp), onClick = onShowShelf) {
+                Icon(
+                    imageVector = Icons.Rounded.ViewCarousel,
+                    contentDescription = stringResource(R.string.library_view_shelf),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            LibraryHeaderActionDivider()
+            IconButton(modifier = Modifier.size(42.dp), onClick = onToggleLayout) {
+                Icon(
+                    imageVector = if (layoutMode == LibraryLayoutMode.LIST) Icons.Rounded.ViewModule else Icons.Rounded.ViewAgenda,
+                    contentDescription = stringResource(if (layoutMode == LibraryLayoutMode.LIST) R.string.library_view_grid else R.string.library_view_list),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+// Match X: let menu items scroll through the entire surface instead of fixed 8dp bands.
+private fun Modifier.compensateDropdownMenuPadding(): Modifier = layout { measurable, constraints ->
+    val padding = 8.dp.roundToPx()
+    val childMaxHeight = if (constraints.hasBoundedHeight) constraints.maxHeight + padding * 2 else Constraints.Infinity
+    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = childMaxHeight))
+    layout(placeable.width, (placeable.height - padding * 2).coerceAtLeast(0)) {
+        placeable.place(0, -padding)
+    }
+}
+
+@Composable
 private fun LibraryHeaderActionDivider() {
     Box(
         modifier = Modifier
@@ -585,13 +745,14 @@ private fun LibraryGameContextMenu(
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
-        modifier = Modifier.widthIn(min = 248.dp, max = 310.dp),
+        modifier = Modifier.widthIn(min = 248.dp, max = 310.dp).compensateDropdownMenuPadding(),
         shape = neonShape(20.dp),
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         shadowElevation = 12.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
     ) {
+        Spacer(Modifier.height(8.dp))
         LibraryGameContextMenuItem(
             text = addShortcutLabel,
             icon = Icons.Rounded.Add,
@@ -625,6 +786,7 @@ private fun LibraryGameContextMenu(
             onClick = onDeleteGame,
             destructive = true
         )
+        Spacer(Modifier.height(8.dp))
     }
 }
 
@@ -633,33 +795,48 @@ private fun LibraryGameContextMenuItem(
     text: String,
     icon: ImageVector,
     onClick: () -> Unit,
-    destructive: Boolean = false
+    destructive: Boolean = false,
+    emphasized: Boolean = false,
+    enabled: Boolean = true,
+    selected: Boolean = false
 ) {
-    val itemColor = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    val contentAlpha = if (enabled) 1f else 0.38f
+    val itemColor = when {
+        destructive -> MaterialTheme.colorScheme.error
+        emphasized -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurface
+    }.copy(alpha = contentAlpha)
     val iconContainerColor = if (destructive) {
         MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.78f)
+    } else if (emphasized) {
+        MaterialTheme.colorScheme.primaryContainer
     } else {
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)
     }
-    val iconColor = if (destructive) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    val iconColor = when {
+        destructive -> MaterialTheme.colorScheme.onErrorContainer
+        emphasized -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }.copy(alpha = contentAlpha)
 
     DropdownMenuItem(
         text = {
             Text(
                 text = text,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Medium),
                 color = itemColor,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
         },
         onClick = onClick,
+        enabled = enabled,
         leadingIcon = {
             Box(
                 modifier = Modifier
                     .size(34.dp)
                     .clip(neonShape(11.dp))
-                    .background(iconContainerColor),
+                    .background(iconContainerColor.copy(alpha = iconContainerColor.alpha * contentAlpha)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -670,6 +847,12 @@ private fun LibraryGameContextMenuItem(
                 )
             }
         },
+        trailingIcon = if (selected) {
+            {
+                Icon(Icons.Rounded.CheckCircle, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            }
+        } else null,
         contentPadding = PaddingValues(horizontal = 12.dp)
     )
 }
@@ -684,6 +867,7 @@ private fun LibraryGameContextMenuDivider() {
 
 @Composable
 private fun LibraryGameArtwork(
+    titleId: String,
     path: String?,
     artworkVersion: Long,
     title: String,
@@ -692,15 +876,15 @@ private fun LibraryGameArtwork(
 ) {
     Surface(
         modifier = modifier,
-        shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        shape = RectangleShape,
+        color = Color.Transparent
     ) {
-        LibraryLocalImage(
-            path = path,
+        GameCoverArt(
+            titleId = titleId,
+            fallbackIconPath = path,
             artworkVersion = artworkVersion,
             contentDescription = title,
-            fallbackLabel = title,
+            fallbackTitle = title,
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(artworkAspectRatio)

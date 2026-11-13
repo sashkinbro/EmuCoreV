@@ -1,5 +1,7 @@
 package com.sbro.emucorev.ui.profile
 
+import com.sbro.emucorev.ui.common.controllerFocus
+import com.sbro.emucorev.ui.common.formatCoreDisplayName
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -29,11 +31,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -111,6 +115,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -124,7 +129,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import com.sbro.emucorev.ui.common.AppDialog as Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
@@ -141,9 +146,15 @@ import com.sbro.emucorev.data.PublicPlayerDevice
 import com.sbro.emucorev.data.ProfileFeedEvent
 import com.sbro.emucorev.data.ProfileFriendship
 import com.sbro.emucorev.data.FriendshipStatus
-import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.GameCoverArt
+import com.sbro.emucorev.ui.common.GameCoverAspectRatio
+import com.sbro.emucorev.data.VitaCoverIndex
+import androidx.compose.ui.graphics.RectangleShape
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.ScreenTopBar
+import com.sbro.emucorev.ui.common.gamepadFocusableCard
+import com.sbro.emucorev.ui.theme.neon.neonPillShape
+import com.sbro.emucorev.ui.common.shimmer
 import com.sbro.emucorev.ui.common.UrlImage
 import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
@@ -547,6 +558,10 @@ private fun ProfileBottomNav(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(selectedIndex, tabs.size) {
+        listState.animateScrollToItem(selectedIndex.coerceIn(0, tabs.lastIndex))
+    }
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = neonShape(28.dp),
@@ -554,21 +569,29 @@ private fun ProfileBottomNav(
         tonalElevation = 4.dp,
         border = profileCardBorder()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        LazyRow(
+            state = listState,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            tabs.forEachIndexed { index, tab ->
+            items(tabs.size) { index ->
+                val tab = tabs[index]
                 val selected = selectedIndex == index
+                val interactionSource = remember(tab) { MutableInteractionSource() }
                 Surface(
                     onClick = { onSelect(index) },
                     modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp),
+                        .width(60.dp)
+                        .height(56.dp)
+                        .gamepadFocusableCard(
+                            shape = neonShape(22.dp),
+                            interactionSource = interactionSource,
+                            addFocusTarget = false
+                        ),
                     shape = neonShape(22.dp),
+                    interactionSource = interactionSource,
                     color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent
                 ) {
                     Column(
@@ -850,7 +873,9 @@ private fun ReadOnlyProfileCard(profile: PlayerProfile) {
                                 .background(
                                     if (profile.isProMember) accent.copy(alpha = 0.22f)
                                     else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                ),
+                                )
+                                .padding(if (profile.isProMember) 3.dp else 0.dp)
+                                .clip(CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             UrlImage(
@@ -989,7 +1014,7 @@ private fun PlayerSocialActions(
 private fun MyListsActionCard(onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonShape(24.dp)),
         shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
@@ -1040,7 +1065,7 @@ private fun ProfileProUpsellCard(onClick: () -> Unit) {
     val gold = Color(0xFFFFC857)
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonShape(20.dp)),
         shape = neonShape(20.dp),
         color = gold.copy(alpha = 0.10f),
         border = BorderStroke(1.dp, gold.copy(alpha = 0.5f))
@@ -1237,6 +1262,7 @@ private fun TrophyFilterRow(selected: String, onSelect: (String) -> Unit) {
             "completed" to R.string.profile_trophy_filter_completed
         ).forEach { (key, label) ->
             FilterChip(
+                colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                 shape = neonChipShape(),
                 selected = selected == key,
                 onClick = { onSelect(key) },
@@ -1251,7 +1277,7 @@ private fun TrophyFilterRow(selected: String, onSelect: (String) -> Unit) {
 private fun TrophySetRow(stat: PlayerTrophyStat, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonShape(22.dp)),
         shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
         border = profileCardBorder(alpha = if (stat.completed) 0.8f else 0.45f)
@@ -1262,14 +1288,14 @@ private fun TrophySetRow(stat: PlayerTrophyStat, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                modifier = Modifier.size(48.dp),
-                shape = neonShape(14.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
+                modifier = Modifier.width(48.dp).aspectRatio(GameCoverAspectRatio),
+                shape = RectangleShape,
+                color = Color.Transparent
             ) {
-                LocalImage(
-                    path = stat.iconPath,
-                    contentDescription = stat.gameTitle,
-                    fallbackLabel = stat.gameTitle,
+                GameCoverArt(
+                    titleId = stat.titleId,
+                    fallbackIconPath = stat.iconPath,
+                    fallbackTitle = stat.gameTitle,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -1358,7 +1384,7 @@ private fun ProfileNotificationsDialog(
     ProfileFeatureDialog(title = stringResource(R.string.profile_social_center_title), onDismiss = onDismiss) {
         Text(
             text = stringResource(R.string.profile_friend_requests),
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
         )
         if (incoming.isEmpty()) {
             Text(
@@ -1384,9 +1410,12 @@ private fun ProfileNotificationsDialog(
                 )
             }
         }
+        if (feed.isNotEmpty()) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        }
         Text(
             text = stringResource(R.string.profile_recent_events),
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
         )
         if (feed.isEmpty()) {
             Text(
@@ -1453,7 +1482,7 @@ private fun ProfileFriendsDialog(
         }
     }
     pendingRemove?.let { friendship ->
-        androidx.compose.material3.AlertDialog(
+        com.sbro.emucorev.ui.common.ImmersiveMaterialAlertDialog(
             onDismissRequest = { pendingRemove = null },
             title = { Text(stringResource(R.string.profile_friend_remove_title)) },
             text = {
@@ -1525,13 +1554,13 @@ private fun SocialIdentityRow(
     Surface(
         onClick = { onOpen?.invoke() },
         enabled = onOpen != null,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonShape(18.dp)),
         shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
     ) {
         Row(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1550,7 +1579,7 @@ private fun SocialIdentityRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = profile?.displayName ?: uid.take(8),
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1592,31 +1621,28 @@ private fun ProfileDevicesDialog(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = neonShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
             ) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Rounded.Devices,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(9.dp))
                         Text(
                             text = device.displayName.ifBlank { device.model },
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                             modifier = Modifier.weight(1f)
                         )
                         if (device.isCurrent) {
-                            Surface(
-                                shape = neonChipShape(),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.profile_device_current),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                )
-                            }
+                            Text(
+                                text = stringResource(R.string.profile_device_current),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                     Text(
@@ -1640,11 +1666,15 @@ private fun ProfileDevicesDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${stringResource(R.string.profile_device_app_core)}: ${device.appVersion} • ${device.coreVersion}",
+                        text = "${stringResource(R.string.profile_device_app_core)}: ${device.appVersion} • ${device.coreVersion.takeIf { it.isNotBlank() }?.let { formatCoreDisplayName(it) }.orEmpty()}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         OutlinedButton(
                             shape = neonButtonShape(),
                             enabled = !isLoading,
@@ -1660,7 +1690,11 @@ private fun ProfileDevicesDialog(
                         }
                         if (!device.isCurrent) {
                             IconButton(enabled = !isLoading, onClick = { onDelete(device.deviceId) }) {
-                                Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.profile_device_delete))
+                                Icon(
+                                    Icons.Rounded.Delete,
+                                    contentDescription = stringResource(R.string.profile_device_delete),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
                             }
                         }
                     }
@@ -1688,12 +1722,14 @@ internal fun CloudProfilesDialog(
         if (firebaseAvailable) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
+                    colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                     shape = neonChipShape(),
                     selected = cloudTab == 0,
                     onClick = { cloudTab = 0 },
                     label = { Text(stringResource(R.string.drive_settings_tab)) }
                 )
                 FilterChip(
+                    colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                     shape = neonChipShape(),
                     selected = cloudTab == 1,
                     onClick = { cloudTab = 1 },
@@ -1741,7 +1777,7 @@ internal fun CloudProfilesDialog(
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(profile.name, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
                     Text(
-                        text = stringResource(R.string.profile_cloud_version, profile.appVersion, profile.coreVersion),
+                        text = stringResource(R.string.profile_cloud_version, profile.appVersion, profile.coreVersion.takeIf { it.isNotBlank() }?.let { formatCoreDisplayName(it) }.orEmpty()),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1788,36 +1824,30 @@ internal fun CloudProfilesDialog(
 
 @Composable
 private fun PublicDeviceDialog(device: PublicPlayerDevice, onDismiss: () -> Unit) {
-    ProfileFeatureDialog(title = stringResource(R.string.profile_devices_title), onDismiss = onDismiss) {
-        Text(
-            text = device.displayName,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-        )
-        Text(
-            text = "${stringResource(R.string.profile_device_soc)}: ${device.soc.ifBlank { "—" }}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = "${stringResource(R.string.profile_device_gpu)}: ${device.gpuFamily.ifBlank { "—" }}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = "${stringResource(R.string.profile_device_ram)}: ${device.ramMb}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = "${stringResource(R.string.profile_device_android)}: ${device.androidVersion}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = "${stringResource(R.string.profile_device_app_core)}: ${device.appVersion} • ${device.coreVersion}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    ProfileFeatureDialog(title = device.displayName, onDismiss = onDismiss) {
+        listOf(
+            R.string.profile_device_soc to device.soc.ifBlank { "—" },
+            R.string.profile_device_gpu to device.gpuFamily.ifBlank { "—" },
+            R.string.profile_device_ram to device.ramMb.toString(),
+            R.string.profile_device_android to device.androidVersion,
+            R.string.profile_device_app_core to "${device.appVersion} • ${device.coreVersion.takeIf { it.isNotBlank() }?.let { formatCoreDisplayName(it) }.orEmpty()}"
+        ).forEach { (label, value) ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = stringResource(label),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = value,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.weight(1f).padding(start = 12.dp)
+                )
+            }
+        }
     }
 }
 
@@ -1829,38 +1859,34 @@ private fun ProfileFeatureDialog(
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
-            modifier = Modifier
-                .widthIn(max = 620.dp)
-                .fillMaxWidth()
-                .padding(20.dp)
-                .heightIn(max = 720.dp),
+            modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth().padding(20.dp).heightIn(max = 720.dp),
             shape = neonShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
             border = profileCardBorder()
         ) {
             Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_close))
+                modifier = Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                content = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            title,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_close))
+                        }
                     }
+                    content()
                 }
-                content()
-            }
+            )
         }
     }
 }
@@ -1906,71 +1932,102 @@ private fun ProfileOverview(
         tonalElevation = 2.dp,
         border = if (profile?.isProMember == true) BorderStroke(1.dp, accent.copy(alpha = 0.72f)) else profileCardBorder()
     ) {
-        if (isLoading && profile == null) {
-            ProfileOverviewSkeletonContent(showAccountActions = true, showRank = true, showProActions = isProUnlocked)
+        AnimatedContent(
+            targetState = isLoading && profile == null,
+            modifier = Modifier.padding(16.dp).animateContentSize(tween(260, easing = FastOutSlowInEasing)),
+            transitionSpec = {
+                fadeIn(tween(220, easing = FastOutSlowInEasing)) togetherWith fadeOut(tween(140))
+            },
+            label = "profile-overview-content"
+        ) { showSkeleton ->
+        if (showSkeleton) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                ProfileOverviewSkeletonContent(showAccountActions = true, showRank = true, showProActions = isProUnlocked)
+            }
         } else {
             Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(86.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (profile?.isProMember == true) accent.copy(alpha = 0.22f)
-                                else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        UrlImage(
-                            imageUrl = avatarUrl,
-                            contentDescription = profile?.displayName.orEmpty(),
-                            fallbackLabel = profile?.displayName ?: email.orEmpty(),
-                            modifier = Modifier.fillMaxSize(),
-                            pinInMemory = true
-                        )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (profile?.isProMember == true) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            ProBadge(accent)
+                        }
                     }
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier.size(72.dp).clip(CircleShape)
+                                .background(
+                                    if (profile?.isProMember == true) accent.copy(alpha = 0.22f)
+                                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                )
+                                .padding(if (profile?.isProMember == true) 3.dp else 0.dp)
+                                .clip(CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
+                            UrlImage(
+                                imageUrl = avatarUrl,
+                                contentDescription = profile?.displayName.orEmpty(),
+                                fallbackLabel = profile?.displayName ?: email.orEmpty(),
+                                modifier = Modifier.fillMaxSize(),
+                                pinInMemory = true
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = profile?.displayName ?: stringResource(R.string.profile_player),
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                            if (profile?.isProMember == true) {
-                                ProBadge(accent)
-                            }
-                        }
-                        profile?.playerTag?.takeIf { it.isNotBlank() }?.let { tag ->
-                            Text(
-                                text = stringResource(R.string.profile_player_id_format, tag),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        email?.takeIf { it.isNotBlank() }?.let { mail ->
-                            Text(
-                                text = mail,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                            profile?.playerTag?.takeIf { it.isNotBlank() }?.let { tag ->
+                                Text(
+                                    text = stringResource(R.string.profile_player_id_format, tag),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (profile?.isProMember == true) accent else MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            email?.takeIf { it.isNotBlank() }?.let { mail ->
+                                Text(
+                                    text = mail,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
-                    IconButton(enabled = !isActionLoading, onClick = { showEditName = true }) {
-                        Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.profile_edit_name))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        shape = neonButtonShape(),
+                        enabled = !isActionLoading,
+                        onClick = { showEditName = true },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.profile_edit_name), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    OutlinedButton(
+                        shape = neonButtonShape(),
+                        enabled = !isActionLoading,
+                        onClick = onSignOut,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.profile_sign_out), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
 
@@ -2064,18 +2121,10 @@ private fun ProfileOverview(
                 } else {
                     ProfileProUpsellCard(onClick = { showProDialog = true })
                 }
-                OutlinedButton(
-                    shape = neonButtonShape(),
-                    enabled = !isActionLoading,
-                    onClick = onSignOut,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.profile_sign_out))
-                }
+
             }
         }
+    }
     }
 }
 
@@ -2091,26 +2140,55 @@ private fun EditProfileNameDialog(
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            contentAlignment = Alignment.Center
+        ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 520.dp)
-                .padding(20.dp),
-            shape = neonShape(26.dp),
+                .widthIn(max = 560.dp)
+                .fillMaxWidth(),
+            shape = neonShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp,
-            border = profileCardBorder()
+            tonalElevation = 6.dp,
+            border = profileCardBorder(alpha = 0.82f)
         ) {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text(
-                    text = stringResource(R.string.profile_edit_name),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                )
-                Text(
-                    text = stringResource(R.string.profile_edit_name_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = neonShape(16.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Edit,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.profile_edit_name),
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.profile_edit_name_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
                 OutlinedTextField(
                     value = value,
                     onValueChange = { value = it.take(32) },
@@ -2120,6 +2198,7 @@ private fun EditProfileNameDialog(
                     singleLine = true,
                     shape = neonShape(18.dp),
                     label = { Text(stringResource(R.string.profile_display_name)) },
+                    leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null) },
                     keyboardActions = androidx.compose.foundation.text.KeyboardActions(
                         onDone = {
                             keyboard?.hide()
@@ -2157,6 +2236,7 @@ private fun EditProfileNameDialog(
                     }
                 }
             }
+        }
         }
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
     }
@@ -2216,12 +2296,13 @@ private fun FavoriteGamesShowcase(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(138.dp),
-                        shape = neonShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant
+                            .aspectRatio(GameCoverAspectRatio),
+                        shape = RectangleShape,
+                        color = Color.Transparent
                     ) {
                         ProfileCoverArt(
                             path = game.coverArtPath,
+                            titleId = game.serial,
                             title = game.title,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -2303,7 +2384,7 @@ private fun ProProfileCustomizationDialog(
     var favoriteKeys by rememberSaveable(profile.favoriteGameKeys) {
         mutableStateOf(profile.favoriteGameKeys.take(3))
     }
-    val accents = listOf("gold", "crimson", "blue", "violet", "emerald")
+    val accents = listOf("gold", "crimson", "blue", "emerald")
     val sortedGames = remember(games) { games.sortedByDescending { it.totalPlayTimeMs }.take(30) }
     val windowSize = LocalWindowInfo.current.containerSize
     val density = LocalDensity.current
@@ -2337,73 +2418,113 @@ private fun ProProfileCustomizationDialog(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth(if (isLandscape) 0.98f else 0.94f)
-                    .widthIn(max = if (isLandscape) 1600.dp else 720.dp)
-                    .heightIn(max = maxDialogHeight),
+                    .widthIn(max = if (isLandscape) 1600.dp else 720.dp),
                 shape = neonShape(30.dp),
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp,
-                border = profileCardBorder()
+                border = profileCardBorder(alpha = 0.6f)
             ) {
                 Column(
                     modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = maxDialogHeight)
                         .verticalScroll(rememberScrollState())
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                        .padding(horizontal = 22.dp, vertical = 22.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(
-                        text = stringResource(R.string.profile_customize_pro_title),
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(58.dp),
+                            shape = neonShape(18.dp),
+                            color = profileAccentColor(accent).copy(alpha = 0.18f),
+                            border = BorderStroke(1.dp, profileAccentColor(accent).copy(alpha = 0.34f))
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.WorkspacePremium,
+                                    contentDescription = null,
+                                    tint = profileAccentColor(accent),
+                                    modifier = Modifier.size(30.dp)
+                                )
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.pro_title),
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                color = profileAccentColor(accent)
+                            )
+                            Text(
+                                text = stringResource(R.string.profile_customize_pro_title),
+                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
+
                     ProCustomizationSection(
                         title = stringResource(R.string.profile_customize_pro_accent),
                         description = stringResource(R.string.profile_customize_pro_accent_help)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalBleed(14.dp)
-                                .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 14.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            maxItemsInEachRow = 2
                         ) {
-                            accents.forEach { item ->
+                            accents.forEach { option ->
                                 ProfileAccentChoice(
-                                    accent = item,
-                                    selected = accent == item,
-                                    onClick = { accent = item }
+                                    accent = option,
+                                    selected = accent == option,
+                                    onClick = { accent = option }
                                 )
                             }
                         }
                     }
+
                     ProCustomizationSection(
                         title = stringResource(R.string.profile_customize_pro_games),
                         description = stringResource(R.string.profile_customize_pro_games_help),
                         trailing = stringResource(R.string.profile_showcase_count_format, favoriteKeys.size, 3)
                     ) {
-                        sortedGames.forEach { game ->
-                            ProShowcaseGameChoice(
-                                game = game,
-                                selected = game.gameKey in favoriteKeys,
-                                enabled = game.gameKey in favoriteKeys || favoriteKeys.size < 3,
-                                onClick = {
-                                    favoriteKeys = if (game.gameKey in favoriteKeys) {
-                                        favoriteKeys - game.gameKey
-                                    } else {
-                                        (favoriteKeys + game.gameKey).take(3)
-                                    }
-                                }
+                        if (sortedGames.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.profile_games_empty),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                sortedGames.forEach { game ->
+                                    val selected = game.gameKey in favoriteKeys
+                                    ProShowcaseGameChoice(
+                                        game = game,
+                                        selected = selected,
+                                        enabled = selected || favoriteKeys.size < 3,
+                                        onClick = {
+                                            favoriteKeys = if (selected) {
+                                                favoriteKeys - game.gameKey
+                                            } else {
+                                                favoriteKeys + game.gameKey
+                                            }
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedButton(
-                            shape = neonButtonShape(),
-                            onClick = onDismiss,
-                            modifier = Modifier.weight(1f)
-                        ) {
+                            shape = neonButtonShape(),onClick = onDismiss, modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.common_cancel))
                         }
                         Button(
@@ -2425,68 +2546,73 @@ private fun ProCustomizationSection(
     title: String,
     description: String,
     trailing: String? = null,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+        shape = neonShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+        border = profileCardBorder(alpha = 0.38f)
     ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
                 trailing?.let {
                     Text(
                         text = it,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             content()
         }
     }
 }
 
 @Composable
-private fun ProfileAccentChoice(accent: String, selected: Boolean, onClick: () -> Unit) {
+private fun ProfileAccentChoice(
+    accent: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
     val color = profileAccentColor(accent)
     Surface(
         onClick = onClick,
+        modifier = (Modifier
+            .width(132.dp)
+            .height(52.dp)).controllerFocus(shape = neonShape(16.dp)),
         shape = neonShape(16.dp),
-        color = if (selected) color.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
-        border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) color else MaterialTheme.colorScheme.outlineVariant)
+        color = if (selected) color.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+        border = BorderStroke(1.dp, if (selected) color.copy(alpha = 0.72f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(color)
-            )
+            Box(Modifier.size(16.dp).clip(CircleShape).background(color))
             Text(
                 text = stringResource(accentNameRes(accent)),
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 1
             )
             if (selected) {
-                Icon(
-                    imageVector = Icons.Rounded.CheckCircle,
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(16.dp)
-                )
+                Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -2502,44 +2628,42 @@ private fun ProShowcaseGameChoice(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(16.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+        modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonShape(17.dp)),
+        shape = neonShape(17.dp),
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.13f) else MaterialTheme.colorScheme.surface.copy(alpha = if (enabled) 0.72f else 0.32f),
+        border = BorderStroke(
+            1.dp,
+            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.42f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
+        )
     ) {
         Row(
-            modifier = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(9.dp),
+            horizontalArrangement = Arrangement.spacedBy(11.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                modifier = Modifier
-                    .size(width = 42.dp, height = 56.dp),
-                shape = neonShape(10.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                ProfileCoverArt(path = game.coverArtPath, title = game.title, modifier = Modifier.fillMaxSize())
-            }
+            ProfileCoverArt(path = game.coverArtPath, titleId = game.serial, title = game.title, modifier = Modifier
+                    .width(42.dp)
+                    .aspectRatio(GameCoverAspectRatio))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = game.title,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                    maxLines = 1,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = formatDuration(game.totalPlayTimeMs),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Rounded.CheckCircle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
+            Icon(
+                imageVector = Icons.Rounded.CheckCircle,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
@@ -2558,7 +2682,7 @@ private fun AdvancedStatsContent(
     if (!isProUnlocked) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = neonShape(24.dp),
+            shape = neonShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             border = profileCardBorder()
         ) {
@@ -2568,18 +2692,18 @@ private fun AdvancedStatsContent(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.WorkspacePremium,
+                    Icons.Rounded.WorkspacePremium,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(38.dp)
+                    tint = Color(0xFFFFC857),
+                    modifier = Modifier.size(42.dp)
                 )
                 Text(
-                    text = stringResource(R.string.profile_stats_locked_title),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    textAlign = TextAlign.Center
+                    stringResource(R.string.profile_stats_locked_title),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
                 Text(
-                    text = stringResource(R.string.profile_stats_locked_body),
+                    stringResource(R.string.profile_stats_locked_body),
+                    modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -2588,108 +2712,144 @@ private fun AdvancedStatsContent(
         }
         return
     }
-
+    if (isProfileLoading && profile == null) {
+        AdvancedStatsSkeleton()
+        return
+    }
+    val sorted = remember(activity) { activity.sortedBy { it.day } }
+    val last7 = remember(sorted) { playTimeWithinDays(sorted, 7) }
+    val last30 = remember(sorted) { playTimeWithinDays(sorted, 30) }
+    val streaks = remember(sorted) { calculateStreaks(sorted) }
+    val totalSessions = remember(activity) { activity.sumOf { it.sessions } }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (isProfileLoading && profile == null) {
-            StatChipSkeleton()
-            StatChipSkeleton()
-        } else {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = neonShape(24.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = profileCardBorder()
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = neonShape(26.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = profileCardBorder(alpha = 0.72f)
+        ) {
+            Row(
+                modifier = Modifier.padding(18.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    modifier = Modifier.size(52.dp),
+                    shape = neonShape(17.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.EmojiEvents,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(
                         text = stringResource(R.string.profile_stats_lifetime_title),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        StatChip(
-                            icon = Icons.Rounded.Schedule,
-                            label = stringResource(R.string.profile_stats_this_week),
-                            value = formatDuration(playTimeWithinDays(activity, 7)),
-                            modifier = Modifier.weight(1f)
-                        )
-                        StatChip(
-                            icon = Icons.Rounded.BarChart,
-                            label = stringResource(R.string.profile_stats_this_month),
-                            value = formatDuration(playTimeWithinDays(activity, 30)),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        StatChip(
-                            icon = Icons.Rounded.SportsEsports,
-                            label = stringResource(R.string.profile_stats_total_sessions),
-                            value = activity.sumOf { it.sessions }.toString(),
-                            modifier = Modifier.weight(1f)
-                        )
-                        val streaks = calculateStreaks(activity)
-                        StatChip(
-                            icon = Icons.Rounded.EmojiEvents,
-                            label = stringResource(R.string.profile_stats_current_streak),
-                            value = stringResource(R.string.profile_stats_days_format, streaks.first),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    val bestStreak = calculateStreaks(activity).second
-                    Text(
-                        text = "${stringResource(R.string.profile_stats_best_streak)}: " +
-                            stringResource(R.string.profile_stats_days_format, bestStreak),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = stringResource(R.string.profile_stats_lifetime_body),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    rankInsights?.let { rank ->
-                        Text(
-                            text = stringResource(
-                                R.string.profile_rank_insights,
-                                rank.rank,
-                                rank.totalPlayers,
-                                rank.percentile
-                            ),
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                            color = MaterialTheme.colorScheme.primary
+                }
+                Surface(
+                    onClick = onRefresh,
+                    enabled = !isLoading,
+                    modifier = Modifier.size(44.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                    border = profileCardBorder(alpha = 0.52f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = stringResource(R.string.profile_stats_refresh),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(21.dp)
                         )
                     }
                 }
             }
         }
-        Surface(
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatChip(
+                Icons.Rounded.Schedule,
+                stringResource(R.string.profile_total_time),
+                formatDuration(profile?.totalPlayTimeMs ?: 0L),
+                Modifier.weight(1f)
+            )
+            StatChip(
+                Icons.Rounded.SportsEsports,
+                stringResource(R.string.profile_games_played),
+                (profile?.gamesPlayed ?: 0).toString(),
+                Modifier.weight(1f)
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatChip(
+                Icons.Rounded.Leaderboard,
+                stringResource(R.string.profile_rank),
+                rankInsights?.let { "#${it.rank}" } ?: "—",
+                Modifier.weight(1f)
+            )
+            StatChip(
+                Icons.Rounded.AccountCircle,
+                stringResource(R.string.profile_stats_total_sessions),
+                totalSessions.toString(),
+                Modifier.weight(1f)
+            )
+        }
+
+        rankInsights?.let { rank ->
+            Text(
+                text = stringResource(R.string.profile_rank_insights, rank.rank, rank.totalPlayers, rank.percentile),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Text(
+            text = stringResource(R.string.profile_stats_activity),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+        )
+
+        val activityState = when {
+            isLoading || !hasAttemptedLoad -> StatsActivityState.Loading
+            sorted.isEmpty() -> StatsActivityState.Empty
+            else -> StatsActivityState.Ready
+        }
+        AnimatedContent(
+            targetState = activityState,
             modifier = Modifier.fillMaxWidth(),
-            shape = neonShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = profileCardBorder()
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = stringResource(R.string.profile_stats_activity),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = onRefresh) {
-                        Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.profile_stats_refresh))
+            transitionSpec = {
+                fadeIn(tween(220, easing = FastOutSlowInEasing)) togetherWith
+                    fadeOut(tween(140))
+            },
+            label = "profile-stats-activity"
+        ) { state ->
+            when (state) {
+                StatsActivityState.Loading -> StatsActivitySkeleton()
+                StatsActivityState.Empty -> EmptyActivityCard()
+                StatsActivityState.Ready -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatChip(Icons.Rounded.Schedule, stringResource(R.string.profile_stats_this_week), formatDuration(last7), Modifier.weight(1f))
+                        StatChip(Icons.Rounded.Schedule, stringResource(R.string.profile_stats_this_month), formatDuration(last30), Modifier.weight(1f))
                     }
-                }
-                when {
-                    isLoading && activity.isEmpty() -> StatsActivitySkeleton()
-                    hasAttemptedLoad && !isLoading && activity.isEmpty() -> EmptyActivityCard()
-                    activity.isEmpty() -> StatsActivitySkeleton()
-                    else -> {
-                        Text(
-                            text = stringResource(R.string.profile_stats_weekly_chart),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        ActivityChart(activity)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatChip(Icons.Rounded.SportsEsports, stringResource(R.string.profile_stats_current_streak), stringResource(R.string.profile_stats_days_format, streaks.first), Modifier.weight(1f))
+                        StatChip(Icons.Rounded.EmojiEvents, stringResource(R.string.profile_stats_best_streak), stringResource(R.string.profile_stats_days_format, streaks.second), Modifier.weight(1f))
                     }
+                    ActivityChart(activity)
                 }
             }
         }
@@ -2700,78 +2860,90 @@ private fun AdvancedStatsContent(
 private fun EmptyActivityCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+        shape = neonShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = profileCardBorder()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        Row(
+            modifier = Modifier.padding(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Rounded.BarChart,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = stringResource(R.string.profile_stats_history_empty_title),
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-            )
-            Text(
-                text = stringResource(R.string.profile_stats_empty),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
+            Surface(
+                modifier = Modifier.size(46.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Rounded.Schedule,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(R.string.profile_stats_history_empty_title),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stringResource(R.string.profile_stats_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun ActivityChart(activity: List<PlayerActivityDay>) {
-    val days = activity.takeLast(14)
-    if (days.isEmpty()) return
-    val maxValue = days.maxOf { it.playTimeMs }.coerceAtLeast(1L)
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(days, key = { it.day }) { day ->
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.width(44.dp)
+    val maxMs = activity.maxOfOrNull { it.playTimeMs }?.coerceAtLeast(1L) ?: 1L
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = neonShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = profileCardBorder()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                stringResource(R.string.profile_stats_weekly_chart),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+            )
+            LazyRow(
+                modifier = Modifier.height(150.dp),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                verticalAlignment = Alignment.Bottom
             ) {
-                Text(
-                    text = formatDuration(day.playTimeMs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-                Box(
-                    modifier = Modifier
-                        .height(90.dp)
-                        .width(26.dp),
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(
-                                (90f * (day.playTimeMs.toFloat() / maxValue.toFloat()))
-                                    .coerceAtLeast(6f)
-                                    .dp
-                            ),
-                        shape = neonShapeCorners(8.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f)
-                    ) {}
+                items(activity, key = { it.day }) { day ->
+                    val barHeight = (92f * day.playTimeMs / maxMs).coerceAtLeast(4f).dp
+                    Column(
+                        modifier = Modifier.width(34.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Bottom
+                    ) {
+                        Text(
+                            formatDuration(day.playTimeMs),
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Box(
+                            Modifier
+                                .width(24.dp)
+                                .height(barHeight)
+                                .clip(neonShapeCorners(topStart = 7.dp, topEnd = 7.dp))
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+                        Spacer(Modifier.height(5.dp))
+                        Text(day.day.takeLast(5), style = MaterialTheme.typography.labelSmall)
+                    }
                 }
-                Text(
-                    text = day.day.takeLast(5),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
             }
         }
     }
@@ -2783,19 +2955,66 @@ private fun ProfileOverviewSkeletonContent(
     showRank: Boolean,
     showProActions: Boolean
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            SkeletonBlock(modifier = Modifier.size(72.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SkeletonBlock(modifier = Modifier.fillMaxWidth(0.6f).height(20.dp))
-                SkeletonBlock(modifier = Modifier.fillMaxWidth(0.4f).height(14.dp))
-            }
+    if (showProActions) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            SkeletonBlock(
+                modifier = Modifier
+                    .width(68.dp)
+                    .height(24.dp)
+                    .clip(neonShape(10.dp))
+            )
         }
-        StatChipSkeleton()
-        StatChipSkeleton()
-        if (showRank) SkeletonBlock(modifier = Modifier.fillMaxWidth().height(44.dp))
-        if (showProActions) SkeletonButtonRow()
-        if (showAccountActions) SkeletonBlock(modifier = Modifier.fillMaxWidth().height(42.dp))
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SkeletonBlock(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            SkeletonBlock(
+                modifier = Modifier
+                    .fillMaxWidth(0.72f)
+                    .height(24.dp)
+                    .clip(neonShape(10.dp))
+            )
+            SkeletonBlock(
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .height(16.dp)
+                    .clip(neonShape(8.dp))
+            )
+        }
+    }
+
+    if (showAccountActions) {
+        SkeletonButtonRow()
+    }
+
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        StatChipSkeleton(Modifier.weight(1f))
+        StatChipSkeleton(Modifier.weight(1f))
+    }
+    if (showRank) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatChipSkeleton(Modifier.weight(1f))
+            StatChipSkeleton(Modifier.weight(1f))
+        }
+    }
+    if (showProActions) {
+        SkeletonButtonRow()
     }
 }
 
@@ -2822,54 +3041,74 @@ private fun ReadOnlyProfileSkeletonCard() {
 }
 
 @Composable
-private fun GamePlayStatRow(game: PlayerGamePlayStat, onClick: (() -> Unit)?) {
-    Surface(
-        onClick = { onClick?.invoke() },
-        enabled = onClick != null,
-        modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = profileCardBorder()
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Surface(
-                modifier = Modifier
-                    .size(width = 54.dp, height = 72.dp),
-                shape = neonShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
+private fun GamePlayStatRow(
+    game: PlayerGamePlayStat,
+    onClick: (() -> Unit)? = null
+) {
+    val content: @Composable () -> Unit = {
+        Box {
+            Row(
+                modifier = Modifier.padding(
+                    start = 14.dp,
+                    top = 14.dp,
+                    end = 14.dp,
+                    bottom = 50.dp
+                ),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.Top
             ) {
-                ProfileCoverArt(path = game.coverArtPath, title = game.title, modifier = Modifier.fillMaxSize())
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(
-                    text = game.title,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = stringResource(R.string.profile_game_sessions_format, game.sessions),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                game.lastPlayedAtMs?.let { lastPlayed ->
+                ProfileCoverArt(path = game.coverArtPath, titleId = game.serial, title = game.title, modifier = Modifier
+                        .width(84.dp)
+                        .aspectRatio(GameCoverAspectRatio))
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = stringResource(R.string.profile_game_last_played_format, formatDate(lastPlayed)),
-                        style = MaterialTheme.typography.bodySmall,
+                        text = game.title,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = stringResource(R.string.profile_game_sessions_format, game.sessions),
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    game.lastPlayedAtMs?.let { lastPlayed ->
+                        Text(
+                            text = stringResource(R.string.profile_game_last_played_format, formatDate(lastPlayed)),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
-            Text(
+            TopGameTimeBadge(
                 text = formatDuration(game.totalPlayTimeMs),
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 14.dp, bottom = 12.dp)
             )
         }
+    }
+    if (onClick != null) {
+        Surface(
+            onClick = onClick,
+            modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonShape(20.dp)),
+            shape = neonShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp,
+            border = profileCardBorder(alpha = 0.48f),
+            content = content
+        )
+    } else {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = neonShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp,
+            border = profileCardBorder(alpha = 0.48f),
+            content = content
+        )
     }
 }
 
@@ -2879,19 +3118,56 @@ private fun GamePlayStatSkeletonRow() {
         modifier = Modifier.fillMaxWidth(),
         shape = neonShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = profileCardBorder()
+        tonalElevation = 1.dp,
+        border = profileCardBorder(alpha = 0.48f)
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            SkeletonBlock(modifier = Modifier.size(width = 54.dp, height = 72.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SkeletonBlock(modifier = Modifier.fillMaxWidth(0.7f).height(16.dp))
-                SkeletonBlock(modifier = Modifier.fillMaxWidth(0.45f).height(12.dp))
+        Box {
+            Row(
+                modifier = Modifier.padding(
+                    start = 14.dp,
+                    top = 14.dp,
+                    end = 14.dp,
+                    bottom = 50.dp
+                ),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                SkeletonBlock(
+                    modifier = Modifier
+                        .width(84.dp)
+                        .aspectRatio(GameCoverAspectRatio)
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SkeletonBlock(
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .height(18.dp)
+                            .clip(neonShape(8.dp))
+                    )
+                    SkeletonBlock(
+                        modifier = Modifier
+                            .fillMaxWidth(0.68f)
+                            .height(18.dp)
+                            .clip(neonShape(8.dp))
+                    )
+                    SkeletonBlock(
+                        modifier = Modifier
+                            .fillMaxWidth(0.5f)
+                            .height(14.dp)
+                            .clip(neonShape(7.dp))
+                    )
+                }
             }
-            SkeletonBlock(modifier = Modifier.size(width = 52.dp, height = 18.dp))
+            SkeletonBlock(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 14.dp, bottom = 12.dp)
+                    .size(width = 66.dp, height = 28.dp)
+                    .clip(neonShape(999.dp))
+            )
         }
     }
 }
@@ -2900,36 +3176,153 @@ private fun GamePlayStatSkeletonRow() {
 private fun LeaderboardRowSkeleton() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(20.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = profileCardBorder()
+        tonalElevation = 2.dp,
+        border = profileCardBorder(alpha = 0.5f)
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
         ) {
-            SkeletonBlock(modifier = Modifier.size(42.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SkeletonBlock(modifier = Modifier.fillMaxWidth(0.55f).height(16.dp))
-                SkeletonBlock(modifier = Modifier.fillMaxWidth(0.35f).height(12.dp))
+            SkeletonBlock(Modifier.size(88.dp).clip(CircleShape))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(112.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SkeletonBlock(
+                            Modifier
+                                .width(28.dp)
+                                .height(20.dp)
+                                .clip(neonShape(8.dp))
+                        )
+                        SkeletonBlock(
+                            Modifier
+                                .fillMaxWidth(0.62f)
+                                .height(20.dp)
+                                .clip(neonShape(9.dp))
+                        )
+                    }
+                    SkeletonBlock(
+                        Modifier
+                            .fillMaxWidth(0.58f)
+                            .height(14.dp)
+                            .clip(neonShape(7.dp))
+                    )
+                    SkeletonBlock(
+                        Modifier
+                            .width(88.dp)
+                            .height(24.dp)
+                            .clip(neonShape(999.dp))
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    SkeletonBlock(
+                        Modifier
+                            .width(72.dp)
+                            .height(28.dp)
+                            .clip(neonShape(999.dp))
+                    )
+                }
             }
-            SkeletonBlock(modifier = Modifier.size(width = 60.dp, height = 18.dp))
         }
     }
 }
 
 @Composable
 private fun StatsActivitySkeleton() {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SkeletonBlock(modifier = Modifier.fillMaxWidth(0.4f).height(14.dp))
-        SkeletonBlock(modifier = Modifier.fillMaxWidth().height(110.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatChipSkeleton(Modifier.weight(1f))
+            StatChipSkeleton(Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatChipSkeleton(Modifier.weight(1f))
+            StatChipSkeleton(Modifier.weight(1f))
+        }
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = neonShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = profileCardBorder()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SkeletonBlock(
+                    Modifier
+                        .width(138.dp)
+                        .height(18.dp)
+                        .clip(neonShape(8.dp))
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    listOf(48, 82, 60, 108, 72, 126, 94).forEach { height ->
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            SkeletonBlock(
+                                Modifier
+                                    .width(24.dp)
+                                    .height(height.dp)
+                                    .clip(neonShapeCorners(topStart = 7.dp, topEnd = 7.dp))
+                            )
+                            SkeletonBlock(
+                                Modifier
+                                    .width(28.dp)
+                                    .height(10.dp)
+                                    .clip(neonShape(5.dp))
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun StatChipSkeleton(modifier: Modifier = Modifier) {
-    SkeletonBlock(modifier = modifier.fillMaxWidth().height(64.dp))
+    Surface(
+        modifier = modifier,
+        shape = neonShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
+        border = profileCardBorder(alpha = 0.34f)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            SkeletonBlock(Modifier.size(24.dp).clip(CircleShape))
+            SkeletonBlock(
+                Modifier
+                    .fillMaxWidth(0.54f)
+                    .height(22.dp)
+                    .clip(neonShape(9.dp))
+            )
+            SkeletonBlock(
+                Modifier
+                    .fillMaxWidth(0.76f)
+                    .height(15.dp)
+                    .clip(neonShape(7.dp))
+            )
+        }
+    }
 }
 
 @Composable
@@ -2937,41 +3330,48 @@ private fun RecentGamesCard(
     games: List<PlayerGamePlayStat>,
     onGameClick: (PlayerGamePlayStat) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = stringResource(R.string.profile_recently_played),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-        )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(games, key = { it.gameKey }) { game ->
-                Surface(
-                    onClick = { onGameClick(game) },
-                    modifier = Modifier.width(112.dp),
-                    shape = neonShape(16.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = profileCardBorder()
-                ) {
-                    Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = neonShape(28.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp,
+        border = profileCardBorder()
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.profile_recently_played),
+                modifier = Modifier.padding(horizontal = 16.dp),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(games, key = { it.gameKey }) { game ->
+                    Column(
+                        modifier = Modifier.width(96.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
                         Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(138.dp),
-                            shape = neonShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant
+                            modifier = Modifier.controllerFocus(shape = RectangleShape),
+                            onClick = { onGameClick(game) },
+                            shape = RectangleShape,
+                            color = Color.Transparent
                         ) {
-                            ProfileCoverArt(path = game.coverArtPath, title = game.title, modifier = Modifier.fillMaxSize())
+                            ProfileCoverArt(path = game.coverArtPath, titleId = game.serial, title = game.title, modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(GameCoverAspectRatio))
                         }
                         Text(
                             text = game.title,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.heightIn(min = 28.dp)
-                        )
-                        Text(
-                            text = formatDuration(game.totalPlayTimeMs),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -2982,9 +3382,54 @@ private fun RecentGamesCard(
 
 @Composable
 private fun RecentGamesSkeletonCard() {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SkeletonBlock(modifier = Modifier.fillMaxWidth(0.4f).height(18.dp))
-        SkeletonBlock(modifier = Modifier.fillMaxWidth().height(180.dp))
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = neonShape(28.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp,
+        border = profileCardBorder()
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SkeletonBlock(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .width(148.dp)
+                    .height(22.dp)
+                    .clip(neonShape(10.dp))
+            )
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(4) {
+                    Column(
+                        modifier = Modifier.width(96.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        SkeletonBlock(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(GameCoverAspectRatio)
+                        )
+                        SkeletonBlock(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(14.dp)
+                                .clip(neonShape(7.dp))
+                        )
+                        SkeletonBlock(
+                            modifier = Modifier
+                                .fillMaxWidth(0.68f)
+                                .height(12.dp)
+                                .clip(neonShape(6.dp))
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -2994,64 +3439,110 @@ private fun LeaderboardRow(
     currentUid: String?,
     onClick: () -> Unit
 ) {
-    val accent = profileAccentColor(entry.profileAccent)
+    val isCurrentUser = entry.uid == currentUid
+    val proAccent = profileAccentColor(entry.profileAccent)
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = if (entry.uid == currentUid) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)) else profileCardBorder()
+        modifier = Modifier.fillMaxWidth().controllerFocus(shape = neonShape(18.dp)),
+        shape = neonShape(18.dp),
+        color = if (isCurrentUser) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp,
+        border = if (isCurrentUser) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.28f))
+        } else {
+            profileCardBorder(alpha = 0.5f)
+        }
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            RankBadge(entry.rank)
-            Surface(
-                modifier = Modifier.size(42.dp),
-                shape = CircleShape,
-                color = accent.copy(alpha = 0.16f)
+        Box {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                UrlImage(
-                    imageUrl = entry.photoURL,
-                    contentDescription = entry.displayName,
-                    fallbackLabel = entry.displayName,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = entry.displayName,
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    if (entry.isProMember) ProBadge(accent)
-                }
-                entry.playerTag.takeIf { it.isNotBlank() }?.let { tag ->
-                    Text(
-                        text = tag,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
+                Box(
+                    modifier = Modifier
+                        .size(88.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (entry.isProMember) proAccent.copy(alpha = 0.72f)
+                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        )
+                        .padding(if (entry.isProMember) 3.dp else 0.dp)
+                        .clip(CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    UrlImage(
+                        imageUrl = entry.photoURL,
+                        contentDescription = entry.displayName,
+                        fallbackLabel = entry.displayName,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
-                Text(
-                    text = stringResource(R.string.profile_leaderboard_games_format, entry.gamesPlayed),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(112.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.Top,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = entry.rank?.let { "#$it" } ?: "—",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = if (entry.rank != null && entry.rank <= 3) {
+                                    colorForRank(entry.rank)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                }
+                            )
+                            Text(
+                                text = entry.displayName,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = if (entry.isProMember) 74.dp else 0.dp),
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        entry.playerTag.takeIf { it.isNotBlank() }?.let { tag ->
+                            Text(
+                                text = tag,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                color = if (entry.isProMember) proAccent else MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        TopGameMetaPill(
+                            icon = Icons.Rounded.SportsEsports,
+                            text = stringResource(R.string.profile_leaderboard_games_format, entry.gamesPlayed)
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TopGameTimeBadge(text = formatDuration(entry.totalPlayTimeMs))
+                    }
+                }
+            }
+            if (entry.isProMember) {
+                ProBadge(
+                    accent = proAccent,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
                 )
             }
-            Text(
-                text = formatDuration(entry.totalPlayTimeMs),
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary
-            )
         }
     }
 }
+
 
 @Composable
 private fun RankBadge(rank: Int?) {
@@ -3082,21 +3573,7 @@ private fun RankBadge(rank: Int?) {
 
 @Composable
 private fun SkeletonBlock(modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "profile-skeleton")
-    val alpha by transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.85f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "profile-skeleton-alpha"
-    )
-    Box(
-        modifier = modifier
-            .clip(neonShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha))
-    )
+    Box(modifier = modifier.shimmer())
 }
 
 @Composable
@@ -3118,18 +3595,16 @@ private fun RevealOnEnter(revealKey: Any?, content: @Composable () -> Unit) {
 private fun EmptyProfileState(text: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(22.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = profileCardBorder()
+        tonalElevation = 1.dp,
+        border = profileCardBorder(alpha = 0.48f)
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 26.dp)
+            modifier = Modifier.padding(18.dp)
         )
     }
 }
@@ -3143,49 +3618,48 @@ private fun StatChip(
 ) {
     Surface(
         modifier = modifier,
-        shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+        shape = neonShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
+        border = profileCardBorder(alpha = 0.34f)
     ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
-            )
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                color = MaterialTheme.colorScheme.onSurface
             )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
-private fun ProfileCoverArt(path: String?, title: String, modifier: Modifier = Modifier) {
-    val normalized = path?.takeIf { it.isNotBlank() }
-    if (normalized != null && !normalized.startsWith("http://") && !normalized.startsWith("https://")) {
-        LocalImage(
-            path = normalized,
-            contentDescription = title,
-            fallbackLabel = title,
-            modifier = modifier
-        )
-    } else {
+private fun ProfileCoverArt(
+    path: String?,
+    title: String,
+    modifier: Modifier = Modifier,
+    titleId: String? = null
+) {
+    val normalized = path?.trim()?.takeIf { it.isNotBlank() }
+    val managed = normalized?.let(VitaCoverIndex::isManagedRemoteUrl) == true
+    val customRemote = normalized != null && !managed &&
+        (normalized.startsWith("http://") || normalized.startsWith("https://"))
+    if (customRemote) {
+        // Explicit independent remote artwork keeps precedence over managed covers.
         UrlImage(
             imageUrl = normalized,
             contentDescription = title,
             fallbackLabel = title,
+            contentScale = ContentScale.Fit,
+            modifier = modifier.aspectRatio(GameCoverAspectRatio)
+        )
+    } else {
+        GameCoverArt(
+            titleId = titleId,
+            // Profile paths can contain old fuzzy catalog matches; exact serial wins.
+            coverPath = normalized.takeUnless { titleId != null && managed },
+            fallbackTitle = title,
             modifier = modifier
         )
     }
@@ -3249,7 +3723,7 @@ private fun colorForRank(rank: Int?): Color = when (rank) {
 private fun profileAccentColor(accent: String): Color = when (accent) {
     "crimson" -> Color(0xFFDC414F)
     "blue" -> Color(0xFF4D9EFF)
-    "violet" -> Color(0xFF9D6DFF)
+    "violet" -> Color(0xFF4F84D8)
     "emerald" -> Color(0xFF36C48E)
     else -> Color(0xFFD8B45F)
 }
@@ -3257,7 +3731,7 @@ private fun profileAccentColor(accent: String): Color = when (accent) {
 private fun accentNameRes(accent: String): Int = when (accent) {
     "crimson" -> R.string.profile_accent_crimson
     "blue" -> R.string.profile_accent_blue
-    "violet" -> R.string.profile_accent_violet
+    "violet" -> R.string.profile_accent_blue
     "emerald" -> R.string.profile_accent_emerald
     else -> R.string.profile_accent_gold
 }
@@ -3309,4 +3783,109 @@ private fun formatDuration(durationMs: Long): String {
 
 private fun formatDate(timestampMs: Long): String {
     return DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(timestampMs))
+}
+
+@Composable
+private fun TopGameTimeBadge(text: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = neonPillShape(),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+@Composable
+private fun TopGameMetaPill(icon: ImageVector, text: String) {
+    Surface(
+        shape = neonPillShape(),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp)
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+private enum class StatsActivityState { Loading, Empty, Ready }
+
+@Composable
+private fun AdvancedStatsSkeleton() {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = neonShape(26.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = profileCardBorder(alpha = 0.72f)
+        ) {
+            Row(
+                modifier = Modifier.padding(18.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SkeletonBlock(Modifier.size(52.dp).clip(neonShape(17.dp)))
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    SkeletonBlock(
+                        Modifier
+                            .fillMaxWidth(0.58f)
+                            .height(20.dp)
+                            .clip(neonShape(9.dp))
+                    )
+                    SkeletonBlock(
+                        Modifier
+                            .fillMaxWidth(0.92f)
+                            .height(14.dp)
+                            .clip(neonShape(7.dp))
+                    )
+                    SkeletonBlock(
+                        Modifier
+                            .fillMaxWidth(0.72f)
+                            .height(14.dp)
+                            .clip(neonShape(7.dp))
+                    )
+                }
+                SkeletonBlock(Modifier.size(44.dp).clip(CircleShape))
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatChipSkeleton(Modifier.weight(1f))
+            StatChipSkeleton(Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatChipSkeleton(Modifier.weight(1f))
+            StatChipSkeleton(Modifier.weight(1f))
+        }
+        SkeletonBlock(
+            Modifier
+                .padding(start = 4.dp, top = 4.dp)
+                .width(90.dp)
+                .height(20.dp)
+                .clip(neonShape(9.dp))
+        )
+        StatsActivitySkeleton()
+    }
 }

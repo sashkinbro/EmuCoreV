@@ -14,13 +14,12 @@ class ProfilePlayTimeSyncer(private val context: Context) {
     private val appContext = context.applicationContext
     private val cache = PlayTimeSyncCacheRepository(appContext)
     private val profileRepository = PlayerProfileRepository(appContext)
-    private val catalogRepository = VitaCatalogRepository(appContext)
+    private val coverArtRepository = CoverArtRepository.get(appContext)
 
     suspend fun recordSession(titleId: String, title: String, durationMs: Long) {
         if (titleId.isBlank() || durationMs <= 0L) return
         val coverUrl = runCatching {
-            catalogRepository.findBySerial(titleId)?.coverUrl
-                ?: catalogRepository.findBestMatch(title)?.coverUrl
+            coverArtRepository.buildPublicCoverUrl(titleId = titleId)
         }.getOrNull()
         cache.add(
             PlayerPlayTimeDelta(

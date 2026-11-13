@@ -39,7 +39,7 @@ import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.AlertDialog
+import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,6 +73,7 @@ import com.sbro.emucorev.data.SaveDataBulkImportResult
 import com.sbro.emucorev.data.SaveDataImportResult
 import com.sbro.emucorev.data.VitaSaveDataEntry
 import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.GameCoverArt
 import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
@@ -338,11 +339,11 @@ private fun SaveBackupCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(24.dp),
+        shape = neonShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 3.dp,
-        shadowElevation = 8.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+        tonalElevation = 1.dp,
+        shadowElevation = 3.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
     ) {
         Column(
             modifier = Modifier.padding(CardContentPadding),
@@ -426,11 +427,11 @@ private fun SaveDataCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(24.dp),
+        shape = neonShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 3.dp,
-        shadowElevation = 8.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+        tonalElevation = 1.dp,
+        shadowElevation = 3.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
     ) {
         Column(
             modifier = Modifier.padding(CardContentPadding),
@@ -441,14 +442,15 @@ private fun SaveDataCard(
                 verticalAlignment = Alignment.Top
             ) {
                 Surface(
-                    modifier = Modifier.size(64.dp),
-                    shape = neonShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh
+                    modifier = Modifier.size(width = (64f * 2f / 3f).dp, height = 64.dp),
+                    shape = androidx.compose.ui.graphics.RectangleShape,
+                    color = androidx.compose.ui.graphics.Color.Transparent
                 ) {
-                    LocalImage(
-                        path = save.iconPath,
+                    GameCoverArt(
+                        titleId = save.titleId,
+                        fallbackIconPath = save.iconPath,
                         contentDescription = save.title,
-                        fallbackLabel = save.title,
+                        fallbackTitle = save.title,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -522,14 +524,16 @@ private fun EmptySaveState(
     focusTitle: String?,
     onImportClick: () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 360.dp),
-        contentAlignment = Alignment.Center
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = neonShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        shadowElevation = 3.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
     ) {
         Column(
-            modifier = Modifier.widthIn(max = 520.dp),
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -538,7 +542,7 @@ private fun EmptySaveState(
                     ?: stringResource(R.string.save_manager_empty_title),
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onBackground,
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )
             Text(

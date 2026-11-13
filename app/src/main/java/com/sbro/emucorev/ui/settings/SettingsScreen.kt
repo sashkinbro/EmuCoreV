@@ -1,5 +1,13 @@
 package com.sbro.emucorev.ui.settings
 
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.draw.clip
+import com.sbro.emucorev.ui.common.controllerFocus
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import com.sbro.emucorev.ui.theme.neon.neonAccentColor
@@ -21,6 +29,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import com.sbro.emucorev.ui.common.StickyTabHeader
 import com.sbro.emucorev.ui.common.stickyTabTopInset
 import com.sbro.emucorev.ui.common.rememberStickyTabHeaderPinned
+import com.sbro.emucorev.ui.common.gamepadFocusableCard
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -64,7 +73,7 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.SystemUpdateAlt
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Vibration
-import androidx.compose.material3.AlertDialog
+import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -76,6 +85,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -105,8 +115,10 @@ import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 
 internal val SettingsRowHorizontalPadding = ScreenHorizontalPadding
+internal val LocalSettingsItemIcon = staticCompositionLocalOf { Icons.Rounded.Tune }
+
 private val SettingsRowInnerHorizontalPadding = 14.dp
-private val SettingsRowInnerVerticalPadding = 14.dp
+private val SettingsRowInnerVerticalPadding = 10.dp
 
 enum class SettingsTab(@param:StringRes val titleRes: Int, val icon: ImageVector) {
     General(R.string.settings_tab_general, Icons.Rounded.Tune),
@@ -185,9 +197,17 @@ fun SettingsScreen(
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
     var showRestoreBackupDialog by rememberSaveable { mutableStateOf(false) }
 
+    var measuredContentWidthPx by remember { mutableIntStateOf(0) }
+    val windowInfo = LocalWindowInfo.current
+    val density = LocalDensity.current
+    val libraryContentWidthDp = with(density) {
+        (measuredContentWidthPx.takeIf { it > 0 } ?: windowInfo.containerSize.width).toDp().value
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .onSizeChanged { measuredContentWidthPx = it.width }
             .background(MaterialTheme.colorScheme.background)
     ) {
         LazyColumn(
@@ -259,7 +279,8 @@ fun SettingsScreen(
                                 createBackupClick = createBackupClick,
                                 restoreBackupClick = { showRestoreBackupDialog = true },
                                 onOpenTrophySoundPicker = { trophySoundPicker.launch(arrayOf("audio/*")) },
-                                onOpenTouchLayoutEditor = onOpenTouchLayoutEditor
+                                onOpenTouchLayoutEditor = onOpenTouchLayoutEditor,
+                                libraryContentWidthDp = libraryContentWidthDp
                             )
                         }
                     }
@@ -425,13 +446,12 @@ private fun SettingsHeaderIconButton(
     content: @Composable () -> Unit
 ) {
     Surface(
-        modifier = Modifier.size(40.dp),
+        modifier = (Modifier.size(40.dp)).controllerFocus(shape = neonShape(14.dp)),
         shape = neonShape(14.dp),
-        color = MaterialTheme.colorScheme.surface,
+        color = androidx.compose.ui.graphics.Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 3.dp,
-        shadowElevation = 5.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
         onClick = rememberDebouncedClick(onClick = onClick)
     ) {
         Box(
@@ -487,14 +507,7 @@ private fun SettingsTabRow(
                 shape = neonChipShape(),
                 selected = selectedTab == tab,
                 onClick = { onSelected(tab) },
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    labelColor = MaterialTheme.colorScheme.onSurface,
-                    iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
-                ),
+                colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                 label = { Text(stringResource(tab.titleRes)) },
                 leadingIcon = {
                     Icon(
@@ -520,7 +533,8 @@ fun SettingToggleRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     onResetDefault: () -> Unit,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    icon: ImageVector = LocalSettingsItemIcon.current
 ) {
     val context = LocalContext.current
     val resetToastMessage = stringResource(R.string.settings_reset_toast, title)
@@ -534,9 +548,11 @@ fun SettingToggleRow(
                 accent = neonAccentColor(title.hashCode().mod(3)),
                 markSize = 9.dp
             )
+            .gamepadFocusableCard(enabled = enabled, shape = neonShape(18.dp), interactionSource = interactionSource, addFocusTarget = false, showIdleBorder = false)
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
+                enabled = enabled,
                 onClick = { if (enabled) onCheckedChange(!checked) },
                 onLongClick = {
                     if (enabled) {
@@ -546,10 +562,10 @@ fun SettingToggleRow(
                 }
             ),
         shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 1.dp,
-        shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
         Row(
             modifier = Modifier
@@ -557,10 +573,25 @@ fun SettingToggleRow(
                 .padding(horizontal = SettingsRowInnerHorizontalPadding, vertical = SettingsRowInnerVerticalPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(neonShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 0.1f else 0.05f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.5f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.width(14.dp))
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(end = 12.dp)
+                    .padding(end = 16.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -574,12 +605,19 @@ fun SettingToggleRow(
                     )
                     SettingHelpButton(title = title, description = description)
                 }
+                Text(
+                    text = description.substringBefore("\n\n"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.5f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange,
+                onCheckedChange = null,
                 enabled = enabled,
-                modifier = Modifier.padding(start = 4.dp)
+                modifier = Modifier.padding(end = 2.dp)
             )
         }
     }

@@ -210,8 +210,8 @@ fun VectorOverlayButton(
         TouchControlVisualStyle.ARCADE -> Brush.radialGradient(
             listOf(
                 Color(0xFFFFD166).copy(alpha = if (isActivelyPressed) 0.96f else 0.84f),
-                Color(0xFFD94C78).copy(alpha = 0.92f),
-                Color(0xFF281126).copy(alpha = 0.98f)
+                Color(0xFF2F66BE).copy(alpha = 0.92f),
+                Color(0xFF10233D).copy(alpha = 0.98f)
             )
         )
         TouchControlVisualStyle.MINIMAL -> Brush.verticalGradient(
@@ -381,7 +381,7 @@ private fun AlternativeControlGlyph(
             R.drawable.ic_controller_triangle_button -> Color(0xFF63D59A)
             R.drawable.ic_controller_circle_button -> Color(0xFFFF6C82)
             R.drawable.ic_controller_cross_button -> Color(0xFF78A6FF)
-            R.drawable.ic_controller_square_button -> Color(0xFFE58BEF)
+            R.drawable.ic_controller_square_button -> Color(0xFF7CC8FF)
             else -> baseColor
         }
         when (drawableRes) {
@@ -833,7 +833,7 @@ fun VectorAnalogStick(
                     )
                 )
                 TouchControlVisualStyle.ARCADE -> Brush.radialGradient(
-                    listOf(Color(0xFF8D2F62).copy(alpha = 0.72f), Color(0xFF1D1021).copy(alpha = 0.94f))
+                    listOf(Color(0xFF2F66BE).copy(alpha = 0.72f), Color(0xFF0A1728).copy(alpha = 0.94f))
                 )
                 TouchControlVisualStyle.MINIMAL -> Brush.verticalGradient(
                     listOf(
@@ -1012,7 +1012,7 @@ fun VectorAnalogStick(
                             .clip(CircleShape)
                             .background(
                                 Brush.radialGradient(
-                                    listOf(Color(0xFFB63D70), Color(0xFF4A193A), Color(0xFF170B18))
+                                    listOf(Color(0xFF4F84D8), Color(0xFF17345A), Color(0xFF080F19))
                                 )
                             )
                             .border(2.5.dp, gold.copy(alpha = 0.92f), CircleShape)
@@ -1039,7 +1039,7 @@ fun VectorAnalogStick(
                             .clip(CircleShape)
                             .background(
                                 Brush.radialGradient(
-                                    listOf(Color(0xFFFFE6A8), gold, Color(0xFFD94C78))
+                                    listOf(Color(0xFFFFE6A8), gold, Color(0xFF2F66BE))
                                 )
                             )
                             .border(2.dp, Color.White.copy(alpha = 0.66f), CircleShape),
@@ -1049,7 +1049,7 @@ fun VectorAnalogStick(
                             modifier = Modifier
                                 .fillMaxSize(0.68f)
                                 .clip(CircleShape)
-                                .border(1.dp, Color(0xFF7A254E).copy(alpha = 0.78f), CircleShape)
+                                .border(1.dp, Color(0xFF1F4E99).copy(alpha = 0.78f), CircleShape)
                         )
                     }
                 }

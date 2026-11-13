@@ -92,6 +92,7 @@ import com.sbro.emucorev.ui.theme.EmuCoreVTheme
 import java.io.File
 
 class Emulator : SDLActivity(), InputManager.InputDeviceListener {
+    val rearTouchInput = com.sbro.emucorev.core.input.RearTouchInput()
     // Private backing state so that Compose observes changes when the native
     // core calls setCurrentGameId(). Using a separate computed property avoids
     // a JVM signature clash between the property setter and the JNI callback method.
@@ -319,7 +320,13 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             runOnUiThread { updatePointerCapture(enabled) }
         }
         window.decorView.setOnCapturedPointerListener { _, event ->
-            KeyboardMouseManager.handleCapturedPointerEvent(event)
+            val rear = rearTouchInput.motion(event, window.decorView.width, window.decorView.height)
+            if (rear.consumed) true else {
+                try {
+                    val mouseEvent = if (event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS || event.actionMasked == MotionEvent.ACTION_BUTTON_RELEASE) event else rear.event ?: event
+                    KeyboardMouseManager.handleCapturedPointerEvent(mouseEvent)
+                } finally { rear.event?.recycle() }
+            }
         }
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         EmulatorStorage.prepareRuntime(this)
@@ -337,6 +344,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun onResume() {
         super.onResume()
         if (rebirthRequested || isFinishing) return
+        com.sbro.emucorev.core.input.RearTouchNative.setCamerasSuspended(false)
         KeyboardMouseManager.refreshConnectionState()
         KeyboardMouseManager.refreshPointerCapture()
         DiscordIntegration.setPaused(false)
@@ -352,6 +360,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onPause() {
+        rearTouchInput.setActive(false)
+        com.sbro.emucorev.core.input.RearTouchNative.setCamerasSuspended(true)
         KeyboardMouseManager.releaseAll()
         updatePointerCapture(false)
         cancelActiveTouches()
@@ -785,6 +795,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 else -> true
             }
         }
+        if (rearTouchInput.key(event)) return true
         if (KeyboardMouseManager.handleKeyBindingCapture(event)) return true
         if (!nativeKeyboardRequested && KeyboardMouseManager.handleKeyEvent(event)) return true
         if (event.keyCode == KeyEvent.KEYCODE_BACK &&
@@ -799,14 +810,22 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
         if (launchStateLoading.active || stateFrameWaiting) return true
-        if (KeyboardMouseManager.handleMouseBindingCapture(event)) return true
-        if (!nativeKeyboardRequested) {
-            val keyboardMouseHandled = KeyboardMouseManager.handleMouseButtonEvent(event) ||
-                KeyboardMouseManager.handleMouseWheelEvent(event) ||
-                KeyboardMouseManager.handleMouseMotionEvent(event)
-            if (keyboardMouseHandled) return true
-        }
-        return super.dispatchGenericMotionEvent(event)
+        val rear = rearTouchInput.motion(event, window.decorView.width, window.decorView.height)
+        if (rear.consumed) return true
+        val filtered = rear.event ?: event
+        try {
+            if (KeyboardMouseManager.handleMouseBindingCapture(filtered)) return true
+            if (!nativeKeyboardRequested) {
+                // Preserve actionButton for unrelated mouse button mappings; SDL receives
+                // the masked copy when the keyboard/mouse path does not handle it.
+                val buttonEvent = if (event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS || event.actionMasked == MotionEvent.ACTION_BUTTON_RELEASE) event else filtered
+                val keyboardMouseHandled = KeyboardMouseManager.handleMouseButtonEvent(buttonEvent) ||
+                    KeyboardMouseManager.handleMouseWheelEvent(filtered) ||
+                    KeyboardMouseManager.handleMouseMotionEvent(filtered)
+                if (keyboardMouseHandled) return true
+            }
+            return super.dispatchGenericMotionEvent(filtered)
+        } finally { rear.event?.recycle() }
     }
 
     private fun updatePointerCapture(enabled: Boolean) {
@@ -851,6 +870,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onInputDeviceRemoved(deviceId: Int) {
+        rearTouchInput.removeDevice(deviceId)
         InputDeviceClassifier.invalidateDevice(deviceId)
         refreshPhysicalGamepadState()
     }
@@ -912,26 +932,33 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (rebirthRequested) return true
         if (launchStateLoading.active || stateFrameWaiting) return true
-        if (KeyboardMouseManager.handleMouseBindingCapture(event)) return true
-        if (!nativeKeyboardRequested) {
-            val keyboardMouseHandled = KeyboardMouseManager.handleMouseButtonEvent(event) ||
-                KeyboardMouseManager.handleMouseMotionEvent(event)
+        val rear = rearTouchInput.motion(event, window.decorView.width, window.decorView.height)
+        if (rear.consumed) return true
+        val filtered = rear.event ?: event
+        try {
+          if (KeyboardMouseManager.handleMouseBindingCapture(filtered)) return true
+          if (!nativeKeyboardRequested) {
+            val buttonEvent = if (event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS || event.actionMasked == MotionEvent.ACTION_BUTTON_RELEASE) event else filtered
+            val keyboardMouseHandled = KeyboardMouseManager.handleMouseButtonEvent(buttonEvent) ||
+                KeyboardMouseManager.handleMouseMotionEvent(filtered)
             if (keyboardMouseHandled) return true
-        }
-        when (event.actionMasked) {
+          }
+          when (filtered.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP -> {
                 activeTouchSnapshot?.recycle()
-                activeTouchSnapshot = MotionEvent.obtainNoHistory(event)
+                activeTouchSnapshot = MotionEvent.obtainNoHistory(filtered)
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 activeTouchSnapshot?.recycle()
                 activeTouchSnapshot = null
             }
         }
-        return super.dispatchTouchEvent(event)
+          return super.dispatchTouchEvent(filtered)
+        } finally { rear.event?.recycle() }
     }
 
     private fun cancelActiveTouches() {
+        rearTouchInput.releaseAll()
         val event = activeTouchSnapshot ?: return
         activeTouchSnapshot = null
         try {

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,7 +47,6 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -78,6 +78,9 @@ import com.sbro.emucorev.data.VitaTrophyGrade
 import com.sbro.emucorev.data.VitaTrophyGroup
 import com.sbro.emucorev.data.VitaTrophySet
 import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.GameCoverArt
+import com.sbro.emucorev.ui.common.controllerFocus
+import com.sbro.emucorev.ui.common.premiumFilterChipColors
 import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.StickyTabHeader
 import com.sbro.emucorev.ui.common.rememberStickyTabHeaderPinned
@@ -231,10 +234,7 @@ private fun TrophySetSelector(
                     shape = neonChipShape(),
                     selected = selected,
                     onClick = { onSelect(set.communicationId) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
+                    colors = premiumFilterChipColors(),
                     label = {
                         Text(
                             text = set.gameTitle,
@@ -260,24 +260,25 @@ private fun TrophySetHeader(
     val progress = if (set.trophyCount > 0) set.unlockedCount / set.trophyCount.toFloat() else 0f
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = neonShape(22.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Surface(
-                modifier = Modifier.size(64.dp),
-                shape = neonShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh
+                modifier = Modifier.size(width = (76f * 2f / 3f).dp, height = 76.dp),
+                shape = androidx.compose.ui.graphics.RectangleShape,
+                color = androidx.compose.ui.graphics.Color.Transparent
             ) {
-                LocalImage(
-                    path = set.gameIconPath,
+                GameCoverArt(
+                    titleId = set.titleId,
+                    fallbackIconPath = set.gameIconPath,
                     contentDescription = set.gameTitle,
-                    fallbackLabel = set.gameTitle,
+                    fallbackTitle = set.gameTitle,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -328,13 +329,13 @@ private fun TrophyGroupCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = neonShape(22.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -397,24 +398,26 @@ private fun TrophyRow(
     val hiddenLocked = trophy.hidden && !trophy.unlocked
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.52f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f))
+        shape = neonShape(26.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, if (trophy.unlocked) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
     ) {
         Column(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Surface(
                     modifier = Modifier
-                        .size(56.dp)
-                        .clip(neonShape(14.dp)),
-                    shape = neonShape(14.dp),
-                    color = if (trophy.unlocked) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)
+                        .size(76.dp)
+                        .clip(neonShape(20.dp)),
+                    shape = neonShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    border = if (trophy.unlocked) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)) else null
                 ) {
                     if (hiddenLocked) {
                         Icon(
@@ -438,10 +441,10 @@ private fun TrophyRow(
                 ) {
                     Text(
                         text = if (hiddenLocked) stringResource(R.string.achievements_hidden_trophy) else trophy.name.ifBlank { stringResource(R.string.achievements_trophy) },
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = if (trophy.unlocked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (trophy.unlocked) 1f else 0.6f)
                     )
                     Text(
                         text = if (hiddenLocked) {
@@ -449,10 +452,10 @@ private fun TrophyRow(
                         } else {
                             trophy.detail
                         },
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         maxLines = 4,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (trophy.unlocked) 1f else 0.6f)
                     )
                     trophy.unlockedAtEpochSeconds?.let { epochSeconds ->
                         Text(
@@ -490,6 +493,7 @@ private fun TrophyRow(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TrophyAssistActions(
     canTranslate: Boolean,
@@ -499,10 +503,11 @@ private fun TrophyAssistActions(
     onHint: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    FlowRow(
         modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+        itemVerticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         AssistActionChip(
             text = stringResource(R.string.achievements_how_to_unlock),
@@ -547,6 +552,7 @@ private fun TranslateIconButton(
         modifier = Modifier
             .size(30.dp)
             .scale(if (loading) pulse else 1f)
+            .controllerFocus(shape = CircleShape, enabled = !loading)
             .clip(CircleShape)
             .clickable(enabled = !loading, onClick = onClick),
         shape = CircleShape,
@@ -581,6 +587,7 @@ private fun AssistActionChip(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
         modifier = Modifier
+            .controllerFocus(shape = neonPillShape(), enabled = !loading)
             .clip(neonPillShape())
             .clickable(enabled = !loading, onClick = onClick)
     ) {

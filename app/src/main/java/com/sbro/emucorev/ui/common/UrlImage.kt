@@ -26,7 +26,8 @@ fun UrlImage(
     contentDescription: String,
     fallbackLabel: String,
     modifier: Modifier = Modifier,
-    pinInMemory: Boolean = false
+    pinInMemory: Boolean = false,
+    contentScale: ContentScale = ContentScale.Crop
 ) {
     val context = LocalContext.current
     val bitmap = produceState(
@@ -60,7 +61,7 @@ fun UrlImage(
             bitmap = bitmap.asImageBitmap(),
             contentDescription = contentDescription,
             modifier = modifier,
-            contentScale = ContentScale.Crop
+            contentScale = contentScale
         )
     } else {
         Box(

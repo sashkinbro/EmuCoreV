@@ -3,6 +3,7 @@ package com.sbro.emucorev.core
 import android.content.Context
 import android.net.Uri
 import com.sbro.emucorev.data.AppPreferences
+import com.sbro.emucorev.data.CoverArtRepository
 import com.sbro.emucorev.data.AppFont
 import com.sbro.emucorev.data.CustomizationPreferences
 import com.sbro.emucorev.data.KeyboardMouseSettingsCodec
@@ -41,6 +42,7 @@ class SettingsBackupRepository(
                 "customization",
                 JSONObject()
                     .put("coverSizePercent", customizationPreferences.current.coverSizePercent)
+                    .put("coverArtStyle", CoverArtRepository.get(context).style.value.name)
                     .put(
                         "appFont",
                         customizationPreferences.current.appFont
@@ -111,6 +113,8 @@ class SettingsBackupRepository(
             trophySoundRepository.refreshCustomAvailability()
         }
         if (applyCustomization) root.optJSONObject("customization")?.let { customization ->
+            val coverArt = CoverArtRepository.get(context)
+            coverArt.setStyle(customization.optEnum("coverArtStyle", coverArt.style.value))
             customizationPreferences.setCoverSizePercent(
                 customization.optInt(
                     "coverSizePercent",

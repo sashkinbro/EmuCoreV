@@ -1,5 +1,8 @@
 package com.sbro.emucorev.ui.gamemanager
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.sbro.emucorev.ui.common.gamepadFocusableCard
+import com.sbro.emucorev.ui.common.controllerFocus
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import com.sbro.emucorev.ui.common.StickyTabHeader
@@ -79,6 +82,7 @@ import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.GameGpuRecommendation
 import com.sbro.emucorev.data.InstalledVitaGame
 import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.GameCoverArt
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.SectionCard
@@ -263,10 +267,7 @@ private fun GameManagerTabs(
                 shape = neonChipShape(),
                 selected = selectedTab == tab,
                 onClick = { onSelected(tab) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-                ),
+                colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                 label = {
                     Text(
                         text = when (tab) {
@@ -415,6 +416,7 @@ private fun GamePicker(
             items(games, key = { it.titleId }) { game ->
                 val selected = game.titleId == selectedTitleId
                 Surface(
+        modifier = Modifier.controllerFocus(shape = neonShape(18.dp)),
                     onClick = { onSelect(game.titleId) },
                     shape = neonShape(18.dp),
                     color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -429,15 +431,15 @@ private fun GamePicker(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Surface(
-                            modifier = Modifier.size(48.dp),
-                            shape = neonShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                            modifier = Modifier.size(width = 32.dp, height = 48.dp),
+                            shape = androidx.compose.ui.graphics.RectangleShape,
+                            color = androidx.compose.ui.graphics.Color.Transparent,
                         ) {
-                            LocalImage(
-                                path = game.iconPath,
+                            GameCoverArt(
+                                titleId = game.titleId,
+                                fallbackIconPath = game.iconPath,
                                 contentDescription = game.title,
-                                fallbackLabel = game.title,
+                                fallbackTitle = game.title,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -602,10 +604,7 @@ private fun GpuDriverChoiceRow(
                 shape = neonChipShape(),
                 selected = true,
                 onClick = onOpenGpuDriverManager,
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-                ),
+                colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                 label = {
                     Text(
                         text = selectedLabel,
@@ -881,10 +880,7 @@ private fun ChoiceRow(
                 shape = neonChipShape(),
                 selected = selected == option,
                 onClick = { onSelected(option) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-                ),
+                colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                 label = { Text(option) }
             )
         }
@@ -941,10 +937,7 @@ private fun IntChoiceRow(
                     selected = selected == value,
                     enabled = enabled,
                     onClick = { onSelected(value) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
+                    colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                     label = { Text(label) }
                 )
             }
@@ -961,13 +954,36 @@ internal fun ToggleRow(
     enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    SettingContainer(title = title, description = description, onReset = onReset, enabled = enabled) {
+    val shape = neonShape(18.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .gamepadFocusableCard(enabled = enabled, shape = shape, interactionSource = interactionSource, addFocusTarget = false, showIdleBorder = false)
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                onClick = { onCheckedChange(!checked) },
+                onLongClick = onReset
+            ),
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.End
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.5f)
+            )
+            SettingHelpButton(title = title, description = description)
+            Switch(checked = checked, onCheckedChange = null, enabled = enabled)
         }
     }
 }
@@ -1014,12 +1030,14 @@ private fun SettingContainer(
             .fillMaxWidth()
             .clip(cardShape)
             .combinedClickable(
+                enabled = enabled,
                 onClick = {},
                 onLongClick = { onReset?.invoke() }
             ),
         shape = cardShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 1.dp,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
         Column(

@@ -52,7 +52,8 @@ data class PublicPlayerDevice(
 object ProfileDeviceInfoProvider {
     private const val PREFS = "profile_device"
     private const val DEVICE_ID = "device_id"
-    const val CORE_VERSION = "Vita3K"
+    const val CORE_VERSION = "ECV 0.3"
+    const val UPSTREAM_CORE_VERSION = "Vita3K 0.2.1"
 
     fun current(context: Context, isPublic: Boolean = false): PlayerDevice {
         val appContext = context.applicationContext

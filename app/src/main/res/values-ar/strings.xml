@@ -16,9 +16,9 @@
     <string name="home_empty_library_body">قم بتثبيت البرامج الثابتة، وتثبيت حزمة تحديث البرامج الثابتة، وأضف ألعابك من شاشة الألعاب. ستظهر هنا تلقائياً.</string>
     <string name="home_recent_titles_title">تم لعبها مؤخراً</string>
     <string name="home_disclaimer_title">حول EmuCoreV</string>
-    <string name="home_disclaimer_body">EmuCoreV هو محاكي PS Vita لنظام Android مبني على Vita3K.</string>
+    <string name="home_disclaimer_body">EmuCoreV هو محاكي PS Vita لنظام Android يعمل بنواة ECV.</string>
     <string name="onboarding_page_1_title">PlayStation Vita على Android</string>
-    <string name="onboarding_page_1_body">العب ألعاب PS Vita الخاصة بك على Android باستخدام نواة Vita3K.</string>
+    <string name="onboarding_page_1_body">العب ألعاب PS Vita الخاصة بك على Android باستخدام نواة ECV.</string>
     <string name="onboarding_page_2_title">مكتبة ألعابك</string>
     <string name="onboarding_page_2_body">يتم جمع ألعابك المثبتة في مكتبة واحدة.</string>
     <string name="onboarding_page_3_title">كتالوج مدمج</string>
@@ -312,7 +312,7 @@
     <string name="settings_clear_cache_failed">تعذر مسح ذاكرة التخزين المؤقت.</string>
     <string name="settings_pro_support_more_hint">كل خيار أدناه يتضمن كل المزايا بالفعل — اختر خيارًا أكبر فقط إذا كنت ترغب في دعم التطوير أكثر.</string>
     <string name="settings_about_title">حول EmuCoreV</string>
-    <string name="settings_about_body">EmuCoreV هو محاكي PS Vita لنظام Android مبني على مشروع Vita3K مفتوح المصدر.</string>
+    <string name="settings_about_body">EmuCoreV هو محاكي PS Vita لنظام Android يعمل بنواة ECV.</string>
     <string name="settings_help_content_description">فتح مساعدة الإعدادات</string>
     <string name="settings_help_dialog_label">دليل الإعدادات</string>
     <string name="settings_help_dialog_tip">قم بتغيير خيار واحد في كل مرة، ثم اختبر نفس المشهد في اللعبة حتى تتمكن من رؤية ما تحسن بالفعل.</string>
@@ -491,7 +491,7 @@
     <string name="settings_about_emucorev">حول EmuCoreV</string>
     <string name="settings_about_version">إصدار التطبيق</string>
     <string name="settings_about_version_value">الإصدار %1$s</string>
-    <string name="settings_about_body_extended">يجلب EmuCoreV محاكاة PS Vita إلى Android مع واجهة محمولة مخصصة، إدارة مكتبة محلية، ونواة محاكاة مبنية على Vita3K.</string>
+    <string name="settings_about_body_extended">EmuCoreV هو محاكي PS Vita لنظام Android يعمل بنواة ECV. تعتمد ECV على نواة Vita3K، وتواصل EmuCore تطويرها بنشاط بإصلاحاتها وتحسيناتها الخاصة.</string>
     <string name="settings_about_community_title">المجتمع والدعم</string>
     <string name="settings_about_repository">مستودع EmuCoreV</string>
     <string name="settings_about_repository_desc">عرض الكود المصدري، الإبلاغ عن المشاكل، ومتابعة التطوير على GitHub.</string>
@@ -500,13 +500,13 @@
     <string name="settings_about_support">دعم EmuCoreV</string>
     <string name="settings_about_support_desc">ساعد في استمرار التطوير من خلال عضوية Patreon.</string>
     <string name="settings_emulation_core">نواة المحاكاة</string>
-    <string name="settings_based_on_vita3k">مبني على Vita3K</string>
+    <string name="settings_based_on_vita3k">تعتمد ECV على نواة Vita3K، وتواصل EmuCore تطويرها بنشاط بإصلاحاتها وتحسيناتها الخاصة.</string>
     <string name="settings_developer">المطور</string>
     <string name="settings_created_by_sbro">تم الإنشاء بواسطة Sashkin Apps</string>
     <string name="settings_play_store_profile">ملف متجر Play</string>
     <string name="settings_play_store_profile_desc">شاهد المزيد من تطبيقات Android من المطور.</string>
     <string name="settings_core_source_code">الكود المصدري للنواة</string>
-    <string name="settings_core_source_description">يستخدم EmuCoreV واجهة Android الخاصة به. النواة فقط هي المبنية على Vita3K.</string>
+    <string name="settings_core_source_description">يستخدم EmuCoreV واجهة Android الخاصة به. تعتمد ECV على نواة Vita3K، وتواصل EmuCore تطويرها بنشاط بإصلاحاتها وتحسيناتها الخاصة.</string>
     <string name="settings_open_github">فتح GitHub</string>
     <string name="settings_vita3k_repository_desc">فتح مستودع مشروع Vita3K الأساسي.</string>
     <string name="settings_updates_checking_title">جاري التحقق من التحديثات</string>
@@ -1547,4 +1547,57 @@
     <string name="settings_not_set">غير محدد</string>
     <string name="settings_gamepad_mapping_clear">مسح</string>
     <string name="settings_gamepad_mapping_auto_format">تلقائي</string>
+    <string name="library_view_shelf">Ш№Ш±Ш¶ ЩѓШ±ЩЃ ШЈШєЩ„ЩЃШ©</string>
+    <string name="library_exit_shelf">Ш§Щ„Ш®Ш±Щ€Ш¬ Щ…Щ† Ш±ЩЃ Ш§Щ„ШЈШєЩ„ЩЃШ©</string>
+    <string name="library_shelf_games_counter">%1$d Щ…Щ† %2$d</string>
+    <string name="settings_help_dialog_eyebrow">تلميح الإعداد</string>
+    <string name="settings_help_reset_tip_title">إعادة تعيين سريع</string>
+    <string name="settings_help_reset_tip_body">اضغط مطولاً على اسم الإعداد لاستعادة هذا الخيار إلى قيمته الافتراضية.</string>
+    <string name="feedback_game_loading">جاري تحميل مكتبة الألعاب…</string>
+    <string name="feedback_game_no_matches">لا توجد ألعاب مطابقة</string>
+
+    <string name="library_options">خيارات المكتبة</string>
+    <string name="library_sort_title_asc">العنوان أ-ي</string>
+    <string name="library_sort_title_desc">العنوان ي-أ</string>
+    <string name="library_sort_recent_desc">تم تحديثها مؤخرًا</string>
+    <string name="library_sort_recent_asc">الأقدم تحديثًا</string>
+    <string name="library_sort_size_desc">الأكبر حجمًا</string>
+    <string name="library_sort_size_asc">الأصغر حجمًا</string>
+    <string name="library_view_grid">عرض كشبكة</string>
+    <string name="library_view_list">عرض كقائمة</string>
+    <string name="settings_ecv_source">الشيفرة المصدرية لـ ECV</string>
+    <string name="settings_ecv_source_desc">اعرض مصدر نواة ECV المعدّلة وتطبيق EmuCoreV على GitHub.</string>
+    <string name="settings_vita3k_license">ترخيص Vita3K الأصلي</string>
+    <string name="settings_vita3k_license_desc">اقرأ ترخيص المشروع الأصلي GNU GPL بالإصدار 2.0 أو أحدث.</string>
+    <string name="settings_core_upstream_version">إصدار النواة الأصلية</string>
+
+    <string name="settings_cover_art_style">نمط الغلاف</string>
+    <string name="settings_cover_art_style_flat">مسطح</string>
+    <string name="settings_cover_art_style_3d">صندوق 3D</string>
+    <string name="settings_help_cover_art_style">يختار نوع الغلاف الافتراضي المستخدم عند تنزيل العمل الفني. تتطابق الأغلفة المسطحة مع المظهر الكلاسيكي للعلبة الأمامية، بينما يستخدم الصندوق 3D تصيير الصندوق المائل عندما يوفرها المصدر. يمكن أن تبدو الأغلفة ثلاثية الأبعاد أكثر إثارة، ولكن قد يكون التوفر أسوأ قليلاً من الفن المسطح.</string>
+    <string name="settings_clear_cover_cache">مسح ذاكرة أغلفة الألعاب المؤقتة</string>
+    <string name="settings_clear_cover_cache_desc">إزالة الأغلفة المنزّلة مؤقتًا وإعادة محاولة التنزيلات التي فشلت.</string>
+    <string name="settings_clear_cover_cache_confirm_title">هل تريد مسح ذاكرة الأغلفة المؤقتة؟</string>
+    <string name="settings_clear_cover_cache_confirm_body">ستُحذف الأغلفة المنزّلة ويُعاد تنزيلها تلقائيًا. لن تتغير الأغلفة المخصصة أو ملفات الألعاب.</string>
+    <string name="settings_clear_cover_cache_action">مسح</string>
+    <string name="settings_clear_cover_cache_success">تم مسح ذاكرة الأغلفة المؤقتة. ستُنزّل الأغلفة تلقائيًا من جديد.</string>
+    <string name="settings_clear_cover_cache_partial">تعذرت إزالة بعض الأغلفة المؤقتة. حاول مجددًا بعد انتهاء التنزيلات الحالية.</string>
+
+    <!-- Rear panel input bindings -->
+    <string name="rear_touch_title">لوحة اللمس الخلفية</string>
+    <string name="rear_touch_desc">عيّن نقاط اللوحة الخلفية لأزرار وحدة التحكم أو لوحة المفاتيح أو الزناد أو الفأرة.</string>
+    <string name="rear_touch_point">النقطة الخلفية %1$d</string>
+    <string name="rear_touch_bind">تعيين زر</string>
+    <string name="rear_touch_capture">اضغط زرًا في وحدة التحكم أو لوحة المفاتيح أو الزناد أو اتجاه العصا أو زر الفأرة.</string>
+    <string name="rear_touch_screen">إظهار زر على الشاشة</string>
+    <string name="rear_touch_position">موضع اللمس</string>
+    <string name="rear_touch_drag">سحب على الشاشة</string>
+    <string name="rear_touch_fixed">نقطة ثابتة</string>
+    <string name="rear_touch_pointer">مؤشر الفأرة</string>
+    <string name="rear_touch_global">ملف عام</string>
+    <string name="rear_touch_game">هذه اللعبة</string>
+    <string name="rear_touch_inherit">استخدام الملف العام</string>
+    <string name="rear_touch_clear">مسح التعيين</string>
+    <string name="rear_touch_hint">اضغط باستمرار للمس اللوحة الخلفية، ثم اترك الزر لرفع اللمس. تحل المدخلات المعيّنة محل وظيفتها المعتادة. يبقى اللمس الأمامي متاحًا.</string>
+    <string name="rear_touch_screen_position">موضع الزر على الشاشة</string>
 </resources>

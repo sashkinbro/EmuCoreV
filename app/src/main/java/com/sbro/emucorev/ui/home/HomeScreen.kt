@@ -4,6 +4,10 @@ import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +17,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,6 +38,7 @@ import androidx.compose.material.icons.rounded.AutoAwesomeMotion
 import androidx.compose.material.icons.rounded.Games
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.QueryStats
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.Tune
@@ -54,8 +60,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -63,12 +73,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.InstalledVitaGame
 import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.GameCoverArt
+import com.sbro.emucorev.ui.common.GameCoverAspectRatio
 import com.sbro.emucorev.ui.common.CustomizationBackground
 import com.sbro.emucorev.ui.common.NavigationMenuButton
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.ScreenTopBarSurface
 import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
+import com.sbro.emucorev.ui.common.gamepadFocusableCard
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.CompactCardContentPadding
 import com.sbro.emucorev.ui.theme.GradientEnd
@@ -91,6 +104,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val customization = LocalCustomizationSettings.current
+    val isLandscape = LocalWindowInfo.current.containerSize.let { it.width > it.height }
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val openLibraryClick = rememberDebouncedClick {
         viewModel.refresh()
@@ -160,8 +174,8 @@ fun HomeScreen(
                     }
                     IconButton(onClick = refreshClick) {
                         Icon(
-                            imageVector = Icons.Rounded.AutoAwesomeMotion,
-                            contentDescription = null,
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = stringResource(R.string.library_refresh),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -247,7 +261,9 @@ fun HomeScreen(
                                     game = game,
                                     onClick = { onLaunchGame(game.titleId) },
                                     onOpenGameManager = { onOpenGameManager(game.titleId) },
-                                    onOpenPlayTime = { onOpenPlayTime(game.titleId) }
+                                    onOpenPlayTime = { onOpenPlayTime(game.titleId) },
+                                    compact = isLandscape,
+                                    coverScale = customization.coverSizePercent.coerceIn(70, 150) / 100f
                                 )
                             }
                         }
@@ -302,29 +318,44 @@ private fun FeaturedGameCard(
     game: InstalledVitaGame,
     onClick: () -> Unit,
     onOpenGameManager: () -> Unit,
-    onOpenPlayTime: () -> Unit
+    onOpenPlayTime: () -> Unit,
+    compact: Boolean,
+    coverScale: Float
 ) {
     val guardedClick = rememberDebouncedClick(onClick = onClick)
     var menuExpanded by remember(game.titleId) { mutableStateOf(false) }
+    var is3dCover by remember(game.titleId, game.iconPath) { mutableStateOf(false) }
+    val interactionSource = remember(game.titleId) { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(if (pressed) 0.95f else 1f, tween(100), label = "home-recent-press")
+    val shape = RectangleShape
     Box {
         Surface(
             modifier = Modifier
-                .width(156.dp)
+                .width((if (compact) 98.dp else 108.dp) * coverScale)
+                .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
+                .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false, showIdleBorder = !is3dCover)
                 .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
                     onClick = guardedClick,
                     onLongClick = { menuExpanded = true }
                 ),
-            shape = neonShape(18.dp),
-            color = MaterialTheme.colorScheme.surface
+            shape = shape,
+            color = if (is3dCover) Color.Transparent else MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp
         ) {
             Column {
-                LocalImage(
-                    path = game.iconPath,
+                GameCoverArt(
+                    titleId = game.titleId,
+                    fallbackIconPath = game.iconPath,
                     contentDescription = game.title,
-                    fallbackLabel = game.title,
+                    fallbackTitle = game.title,
+                    onPresentationChanged = { is3dCover = it },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(106.dp)
+                        .aspectRatio(GameCoverAspectRatio)
                 )
                 Column(
                     modifier = Modifier.padding(CardContentPadding),
@@ -388,7 +419,7 @@ private fun HomeGameContextMenuItem(
                 text = text,
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
         },

@@ -452,8 +452,15 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             composable(
                 ROUTE_LIBRARY
             ) {
+                val libraryUiPreferences = remember(context) {
+                    context.getSharedPreferences("emucorev_library_ui", android.content.Context.MODE_PRIVATE)
+                }
+                var shelfMode by rememberSaveable {
+                    mutableStateOf(libraryUiPreferences.getBoolean("shelf_mode", false))
+                }
                 AdaptiveShell(
                     selected = PrimaryDestination.Library,
+                    immersiveContent = shelfMode,
                     onNavigateSetup = {
                         navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
                     },
@@ -480,6 +487,11 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onInstallContent = openInstallChoiceDialog
                 ) { openDrawer ->
                     LibraryScreen(
+                        shelfMode = shelfMode,
+                        onShelfModeChanged = {
+                            shelfMode = it
+                            libraryUiPreferences.edit().putBoolean("shelf_mode", it).apply()
+                        },
                         onLaunchGame = launchInstalledGame,
                         onOpenSaveManager = { titleId ->
                             navController.navigate(saveManagerRoute(titleId)) { launchSingleTop = true }

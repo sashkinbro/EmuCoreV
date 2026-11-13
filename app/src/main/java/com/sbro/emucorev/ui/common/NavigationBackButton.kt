@@ -40,7 +40,7 @@ fun NavigationBackButton(
     shadowElevation: Dp = 0.dp
 ) {
     Surface(
-        modifier = modifier.size(44.dp),
+        modifier = (modifier.size(44.dp)).controllerFocus(shape = neonShape(14.dp)),
         shape = neonShape(14.dp),
         color = containerColor,
         tonalElevation = tonalElevation,

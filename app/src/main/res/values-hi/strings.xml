@@ -16,9 +16,9 @@
     <string name="home_empty_library_body">फ़र्मवेयर इंस्टॉल करें, फ़र्मवेयर अपडेट पैकेज इंस्टॉल करें, और गेम स्क्रीन पर अपने गेम जोड़ें। वे यहां अपने आप दिखाई देंगे।</string>
     <string name="home_recent_titles_title">हाल ही में खेले गए</string>
     <string name="home_disclaimer_title">EmuCoreV के बारे में</string>
-    <string name="home_disclaimer_body">EmuCoreV Vita3K पर आधारित Android के लिए एक PS Vita एमुलेटर है।</string>
+    <string name="home_disclaimer_body">EmuCoreV ECV कोर पर चलने वाला Android के लिए एक PS Vita एमुलेटर है।</string>
     <string name="onboarding_page_1_title">Android पर PlayStation Vita</string>
-    <string name="onboarding_page_1_body">Vita3K कोर के साथ Android पर अपने PS Vita गेम खेलें।</string>
+    <string name="onboarding_page_1_body">ECV कोर के साथ Android पर अपने PS Vita गेम खेलें।</string>
     <string name="onboarding_page_2_title">आपकी गेम लाइब्रेरी</string>
     <string name="onboarding_page_2_body">आपके इंस्टॉल किए गए गेम एक लाइब्रेरी में एकत्र किए जाते हैं।</string>
     <string name="onboarding_page_3_title">इन-बिल्ट कैटलॉग</string>
@@ -188,7 +188,7 @@
     <string name="settings_storage_title">स्टोरेज</string>
     <string name="settings_storage_body">एमुलेटर डेटा ऐप फ़ाइल निर्देशिका में vita/ के अंतर्गत संग्रहीत होता है। इंस्टॉल किए गए गेम ux0/app में हैं, शेडर कैश cache में है, और पैच patch में हैं।</string>
     <string name="settings_about_title">EmuCoreV के बारे में</string>
-    <string name="settings_about_body">EmuCoreV एक PS Vita एमुलेटर है जो Android के लिए ओपन-सोर्स Vita3K प्रोजेक्ट पर बनाया गया है।</string>
+    <string name="settings_about_body">EmuCoreV ECV कोर पर चलने वाला Android के लिए एक PS Vita एमुलेटर है।</string>
     <string name="settings_help_content_description">सेटिंग सहायता खोलें</string>
     <string name="settings_help_dialog_label">सेटिंग गाइड</string>
     <string name="settings_help_dialog_tip">एक बार में केवल एक विकल्प बदलें, फिर उसी गेम सीन को टेस्ट करें ताकि असली सुधार साफ दिखे।</string>
@@ -330,12 +330,12 @@
     <string name="settings_help_check_for_updates">अपडेट जाँच सक्षम रखता है।\n\nEmulator interface या in-game system presentation को अपनी पसंद के अनुसार करने के लिए इस्तेमाल करें। Extra information या visual change न चाहिए तो default रखें।</string>
     <string name="settings_about_emucorev">EmuCoreV के बारे में</string>
     <string name="settings_emulation_core">एमुलेशन कोर</string>
-    <string name="settings_based_on_vita3k">Vita3K पर आधारित</string>
+    <string name="settings_based_on_vita3k">ECV, Vita3K कोर पर आधारित है और EmuCore अपने सुधारों और संवर्द्धनों के साथ इसका सक्रिय विकास जारी रखता है।</string>
     <string name="settings_developer">डेवलपर</string>
     <string name="settings_created_by_sbro">Sashkin Apps द्वारा निर्मित</string>
     <string name="settings_play_store_profile">Play Store प्रोफ़ाइल</string>
     <string name="settings_core_source_code">कोर सोर्स कोड</string>
-    <string name="settings_core_source_description">EmuCoreV अपना Android इंटरफ़ेस उपयोग करता है। केवल एमुलेशन कोर Vita3K पर आधारित है।</string>
+    <string name="settings_core_source_description">EmuCoreV अपना Android इंटरफ़ेस उपयोग करता है। ECV, Vita3K कोर पर आधारित है और EmuCore अपने सुधारों और संवर्द्धनों के साथ इसका सक्रिय विकास जारी रखता है।</string>
     <string name="settings_open_github">GitHub खोलें</string>
     <string name="emulator_choose_file">एक फ़ाइल चुनें</string>
     <string name="emulator_choose_folder">एक फ़ोल्डर चुनें</string>
@@ -529,7 +529,7 @@
     <string name="settings_tab_updates">अपडेट</string>
     <string name="settings_about_version">ऐप का वर्ज़न</string>
     <string name="settings_about_version_value">वर्ज़न %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV, PS Vita एमुलेशन को Android पर एक फोकस मोबाइल इंटरफ़ेस, लोकल लाइब्रेरी मैनेजमेंट और Vita3K-आधारित एमुलेशन कोर के साथ लाता है।</string>
+    <string name="settings_about_body_extended">EmuCoreV ECV कोर पर चलने वाला Android के लिए एक PS Vita एमुलेटर है। ECV, Vita3K कोर पर आधारित है और EmuCore अपने सुधारों और संवर्द्धनों के साथ इसका सक्रिय विकास जारी रखता है।</string>
     <string name="settings_about_community_title">कम्युनिटी और सपोर्ट</string>
     <string name="settings_about_repository">EmuCoreV रिपॉजिटरी</string>
     <string name="settings_about_repository_desc">सोर्स कोड देखें, समस्याएँ रिपोर्ट करें और GitHub पर डेवलपमेंट को फ़ॉलो करें।</string>
@@ -1543,4 +1543,57 @@
     <string name="settings_not_set">सेट नहीं है</string>
     <string name="settings_gamepad_mapping_clear">साफ़ करें</string>
     <string name="settings_gamepad_mapping_auto_format">स्वतः</string>
+    <string name="library_view_shelf">कवर शेल्फ दिखाएं</string>
+    <string name="library_exit_shelf">कवर शेल्फ से बाहर निकलें</string>
+    <string name="library_shelf_games_counter">%2$d में से %1$d</string>
+    <string name="settings_help_dialog_eyebrow">सेटिंग टिप</string>
+    <string name="settings_help_reset_tip_title">त्वरित रीसेट</string>
+    <string name="settings_help_reset_tip_body">किसी सेटिंग को उसके डिफ़ॉल्ट मान पर पुनर्स्थापित करने के लिए उसके नाम को देर तक दबाएं।</string>
+    <string name="feedback_game_loading">आपकी गेम लाइब्रेरी लोड हो रही है…</string>
+    <string name="feedback_game_no_matches">कोई मेल खाने वाला गेम नहीं</string>
+
+    <string name="library_options">लाइब्रेरी विकल्प</string>
+    <string name="library_sort_title_asc">शीर्षक A-Z</string>
+    <string name="library_sort_title_desc">शीर्षक Z-A</string>
+    <string name="library_sort_recent_desc">हाल ही में अपडेट किए गए</string>
+    <string name="library_sort_recent_asc">सबसे पुराने अपडेट किए गए</string>
+    <string name="library_sort_size_desc">सबसे बड़े</string>
+    <string name="library_sort_size_asc">सबसे छोटे</string>
+    <string name="library_view_grid">ग्रिड के रूप में दिखाएं</string>
+    <string name="library_view_list">लिस्ट के रूप में दिखाएं</string>
+    <string name="settings_ecv_source">ECV का स्रोत कोड</string>
+    <string name="settings_ecv_source_desc">संशोधित ECV कोर और EmuCoreV ऐप का स्रोत कोड GitHub पर देखें।</string>
+    <string name="settings_vita3k_license">मूल Vita3K का लाइसेंस</string>
+    <string name="settings_vita3k_license_desc">मूल GNU GPL संस्करण 2.0 या बाद का लाइसेंस पढ़ें।</string>
+    <string name="settings_core_upstream_version">मूल कोर का संस्करण</string>
+
+    <string name="settings_cover_art_style">कवर स्टाइल</string>
+    <string name="settings_cover_art_style_flat">फ्लैट</string>
+    <string name="settings_cover_art_style_3d">3D बॉक्स</string>
+    <string name="settings_help_cover_art_style">आर्टवर्क डाउनलोड करते समय उपयोग किए जाने वाले डिफ़ॉल्ट कवर प्रकार को चुनता है। फ्लैट कवर क्लासिक फ्रंट-बॉक्स लुक से मेल खाते हैं, जबकि 3D बॉक्स एंगल्ड बॉक्स रेंडर का उपयोग करते हैं जब स्रोत उन्हें प्रदान करता है। 3D कवर अधिक नाटकीय दिख सकते हैं, लेकिन उपलब्धता फ्लैट कला की तुलना में थोड़ी खराब हो सकती है।</string>
+    <string name="settings_clear_cover_cache">कवर कैश साफ़ करें</string>
+    <string name="settings_clear_cover_cache_desc">अस्थायी रूप से डाउनलोड किए गए कवर हटाएँ और विफल डाउनलोड फिर से आज़माएँ।</string>
+    <string name="settings_clear_cover_cache_confirm_title">कवर कैश साफ़ करें?</string>
+    <string name="settings_clear_cover_cache_confirm_body">डाउनलोड किए गए कवर हटा दिए जाएँगे और अपने आप फिर डाउनलोड होंगे। कस्टम कवर और गेम फ़ाइलों में कोई बदलाव नहीं होगा।</string>
+    <string name="settings_clear_cover_cache_action">साफ़ करें</string>
+    <string name="settings_clear_cover_cache_success">कवर कैश साफ़ हो गया। कवर अपने आप फिर डाउनलोड होंगे।</string>
+    <string name="settings_clear_cover_cache_partial">कुछ कैश किए गए कवर हटाए नहीं जा सके। मौजूदा डाउनलोड पूरे होने के बाद फिर कोशिश करें।</string>
+
+    <!-- Rear panel input bindings -->
+    <string name="rear_touch_title">पिछला टच पैनल</string>
+    <string name="rear_touch_desc">पिछले पैनल के बिंदुओं को बटन, कुंजियों, ट्रिगर या माउस से जोड़ें।</string>
+    <string name="rear_touch_point">पिछला बिंदु %1$d</string>
+    <string name="rear_touch_bind">बटन जोड़ें</string>
+    <string name="rear_touch_capture">कंट्रोलर या कीबोर्ड बटन, ट्रिगर, स्टिक की दिशा या माउस बटन दबाएँ।</string>
+    <string name="rear_touch_screen">स्क्रीन बटन दिखाएँ</string>
+    <string name="rear_touch_position">स्पर्श की स्थिति</string>
+    <string name="rear_touch_drag">स्क्रीन पर खींचें</string>
+    <string name="rear_touch_fixed">स्थिर बिंदु</string>
+    <string name="rear_touch_pointer">माउस पॉइंटर</string>
+    <string name="rear_touch_global">वैश्विक प्रोफ़ाइल</string>
+    <string name="rear_touch_game">यह गेम</string>
+    <string name="rear_touch_inherit">वैश्विक प्रोफ़ाइल इस्तेमाल करें</string>
+    <string name="rear_touch_clear">असाइनमेंट हटाएँ</string>
+    <string name="rear_touch_hint">पिछले पैनल को छूने के लिए दबाकर रखें; स्पर्श हटाने के लिए छोड़ें। जोड़े गए इनपुट अपनी सामान्य क्रिया की जगह लेते हैं। सामने का टच उपलब्ध रहता है।</string>
+    <string name="rear_touch_screen_position">स्क्रीन बटन की स्थिति</string>
 </resources>

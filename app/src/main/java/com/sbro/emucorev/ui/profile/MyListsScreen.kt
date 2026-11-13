@@ -1,5 +1,8 @@
 package com.sbro.emucorev.ui.profile
 
+import androidx.compose.ui.draw.clip
+import com.sbro.emucorev.ui.common.AppAlertDialog
+import com.sbro.emucorev.ui.common.controllerFocus
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -87,7 +90,9 @@ import com.sbro.emucorev.ui.common.NavigationBackButton
 import com.sbro.emucorev.ui.common.NavigationMenuButton
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.ScreenTopBarSurface
-import com.sbro.emucorev.ui.common.UrlImage
+import com.sbro.emucorev.ui.common.GameCoverArt
+import com.sbro.emucorev.ui.common.GameCoverAspectRatio
+import androidx.compose.ui.graphics.RectangleShape
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.CompactCardContentPadding
@@ -493,6 +498,7 @@ private fun MyListsCloudCard(
             }
             message?.let { text ->
                 Surface(
+        modifier = Modifier.controllerFocus(shape = neonPillShape()),
                     shape = neonPillShape(),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
                     onClick = onDismissMessage
@@ -569,73 +575,43 @@ private fun ProfileGameCardMenuDialog(
 ) {
     val profileStatus = game.profile.status
     val isFavorite = game.profile.isFavorite
-    Dialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            val scrollState = rememberScrollState()
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 620.dp)
-                    .heightIn(max = maxHeight),
-                shape = neonShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tonalElevation = 10.dp,
-                shadowElevation = 18.dp,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(scrollState)
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(52.dp),
-                            shape = neonShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                        ) {
-                            UrlImage(
-                                imageUrl = game.catalog.coverUrl,
-                                contentDescription = game.catalog.name,
-                                fallbackLabel = game.catalog.name,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.catalog_profile_menu),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = game.catalog.name,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_close))
-                        }
-                    }
-
+        showEyebrow = false,
+        showIconContainer = false,
+        icon = {
+            GameCoverArt(
+                igdbId = game.catalog.igdbId,
+                contentDescription = game.catalog.name,
+                fallbackTitle = game.catalog.name,
+                modifier = Modifier.widthIn(max = 52.dp)
+                    .aspectRatio(GameCoverAspectRatio, matchHeightConstraintsFirst = true)
+            )
+        },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.catalog_profile_menu),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = game.catalog.name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_close))
+                }
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                     ProfileMenuOption(
@@ -681,10 +657,11 @@ private fun ProfileGameCardMenuDialog(
                             color = MaterialTheme.colorScheme.error
                         )
                     }
-                }
+
             }
-        }
-    }
+        },
+        confirmButton = {}
+    )
 }
 
 @Composable
@@ -695,7 +672,7 @@ private fun ProfileMenuOption(
     icon: ImageVector? = null
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonShape(18.dp)),
         shape = neonShape(18.dp),
         color = if (selected) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
@@ -750,23 +727,29 @@ private fun ProfileGridGameCard(
 ) {
     val openClick = rememberDebouncedClick(onClick = onClick)
     var showProfileMenu by remember { mutableStateOf(false) }
+    var is3dCover by remember(game.catalog.igdbId) { mutableStateOf(false) }
     Surface(
-        modifier = modifier,
-        shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surface,
+        modifier = (modifier).controllerFocus(shape = RectangleShape),
+        shape = RectangleShape,
+        color = if (is3dCover) Color.Transparent else MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        border = null,
         onClick = openClick
     ) {
         Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(2f / 3f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                    .aspectRatio(GameCoverAspectRatio)
+                    .background(if (is3dCover) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
             ) {
-                UrlImage(
-                    imageUrl = game.catalog.coverUrl,
+                GameCoverArt(
+                    igdbId = game.catalog.igdbId,
                     contentDescription = game.catalog.name,
-                    fallbackLabel = game.catalog.name,
+                    fallbackTitle = game.catalog.name,
+                    onPresentationChanged = { is3dCover = it },
                     modifier = Modifier.fillMaxSize()
                 )
                 IconButton(
@@ -789,7 +772,7 @@ private fun ProfileGridGameCard(
                     .fillMaxWidth()
                     .heightIn(min = if (compact) 76.dp else 84.dp)
                     .padding(
-                        horizontal = if (compact) CompactCardContentPadding else CardContentPadding,
+                        horizontal = if (compact) 10.dp else 12.dp,
                         vertical = if (compact) 8.dp else 10.dp
                     )
             )
@@ -828,7 +811,7 @@ private fun ProfileListGameCard(
     val openClick = rememberDebouncedClick(onClick = onClick)
     var showProfileMenu by remember { mutableStateOf(false) }
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonShape(18.dp)),
         shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         onClick = openClick
@@ -839,14 +822,14 @@ private fun ProfileListGameCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Surface(
-                modifier = Modifier.size(width = 58.dp, height = 86.dp),
-                shape = neonShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                modifier = Modifier.width(58.dp).aspectRatio(GameCoverAspectRatio),
+                shape = RectangleShape,
+                color = Color.Transparent
             ) {
-                UrlImage(
-                    imageUrl = game.catalog.coverUrl,
+                GameCoverArt(
+                    igdbId = game.catalog.igdbId,
                     contentDescription = game.catalog.name,
-                    fallbackLabel = game.catalog.name,
+                    fallbackTitle = game.catalog.name,
                     modifier = Modifier.fillMaxSize()
                 )
             }

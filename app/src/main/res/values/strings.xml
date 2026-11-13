@@ -16,9 +16,9 @@
     <string name="home_empty_library_body">Install the firmware, install the firmware update package, and add your games on the Games screen. They will appear here automatically.</string>
     <string name="home_recent_titles_title">Recently played</string>
     <string name="home_disclaimer_title">About EmuCoreV</string>
-    <string name="home_disclaimer_body">EmuCoreV is a PS Vita emulator for Android built on Vita3K.</string>
+    <string name="home_disclaimer_body">EmuCoreV is a PS Vita emulator for Android powered by the ECV core.</string>
     <string name="onboarding_page_1_title">PlayStation Vita on Android</string>
-    <string name="onboarding_page_1_body">Play your PS Vita games on Android with the Vita3K core.</string>
+    <string name="onboarding_page_1_body">Play your PS Vita games on Android with the ECV core.</string>
     <string name="onboarding_page_2_title">Your game library</string>
     <string name="onboarding_page_2_body">Your installed games are collected in one library.</string>
     <string name="onboarding_page_3_title">Built-in catalog</string>
@@ -419,7 +419,7 @@
     <string name="settings_clear_cache_failed">Failed to clear cache.</string>
     <string name="settings_pro_support_more_hint">Already covered by any option below — pick a larger one only if you want to support development further.</string>
     <string name="settings_about_title">About EmuCoreV</string>
-    <string name="settings_about_body">EmuCoreV is a PS Vita emulator for Android built on the open-source Vita3K project.</string>
+    <string name="settings_about_body">EmuCoreV is a PS Vita emulator for Android powered by the ECV core.</string>
     <string name="settings_help_content_description">Open setting help</string>
     <string name="settings_help_dialog_label">Setting guide</string>
     <string name="settings_help_dialog_tip">Change one option at a time, then test the same game scene so you can see what really improved.</string>
@@ -618,7 +618,7 @@
     <string name="settings_about_emucorev">About EmuCoreV</string>
     <string name="settings_about_version">App version</string>
     <string name="settings_about_version_value">Version %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV brings PS Vita emulation to Android with a focused mobile interface, local library management, and a Vita3K-based emulation core.</string>
+    <string name="settings_about_body_extended">EmuCoreV is a PS Vita emulator for Android powered by the ECV core. ECV is based on the Vita3K core and is actively developed further by EmuCore with its own fixes and improvements.</string>
     <string name="settings_about_community_title">Community and support</string>
     <string name="settings_about_website">Official website</string>
     <string name="settings_about_website_desc">Open the EmuCoreV website for downloads, news, and project links.</string>
@@ -629,13 +629,13 @@
     <string name="settings_about_support">Support EmuCoreV</string>
     <string name="settings_about_support_desc">Help development continue through Patreon membership.</string>
     <string name="settings_emulation_core">Emulation Core</string>
-    <string name="settings_based_on_vita3k">Based on Vita3K</string>
+    <string name="settings_based_on_vita3k">ECV is based on the Vita3K core and is actively developed further by EmuCore with its own fixes and improvements.</string>
     <string name="settings_developer">Developer</string>
     <string name="settings_created_by_sbro">Created by Sashkin Apps</string>
     <string name="settings_play_store_profile">Play Store Profile</string>
     <string name="settings_play_store_profile_desc">See more Android apps from the developer.</string>
     <string name="settings_core_source_code">Core Source Code</string>
-    <string name="settings_core_source_description">EmuCoreV uses its own Android interface. Only the emulation core is based on Vita3K.</string>
+    <string name="settings_core_source_description">EmuCoreV uses its own Android interface. ECV is based on the Vita3K core and is actively developed further by EmuCore with its own fixes and improvements.</string>
     <string name="settings_open_github">Open GitHub</string>
     <string name="settings_vita3k_repository_desc">Open the upstream Vita3K project repository.</string>
     <string name="settings_updates_checking_title">Checking for updates</string>
@@ -1547,4 +1547,57 @@
     <string name="settings_not_set">Not set</string>
     <string name="settings_gamepad_mapping_clear">Clear</string>
     <string name="settings_gamepad_mapping_auto_format">Auto</string>
+    <string name="library_view_shelf">Show cover shelf</string>
+    <string name="library_exit_shelf">Exit cover shelf</string>
+    <string name="library_shelf_games_counter">%1$d of %2$d</string>
+    <string name="settings_help_dialog_eyebrow">Setting tip</string>
+    <string name="settings_help_reset_tip_title">Quick reset</string>
+    <string name="settings_help_reset_tip_body">Long-press a setting name to restore that option to its default value.</string>
+    <string name="feedback_game_loading">Loading your game library…</string>
+    <string name="feedback_game_no_matches">No matching games</string>
+
+    <string name="library_options">Library options</string>
+    <string name="library_sort_title_asc">Title A-Z</string>
+    <string name="library_sort_title_desc">Title Z-A</string>
+    <string name="library_sort_recent_desc">Recently updated</string>
+    <string name="library_sort_recent_asc">Oldest updated</string>
+    <string name="library_sort_size_desc">Largest</string>
+    <string name="library_sort_size_asc">Smallest</string>
+    <string name="library_view_grid">Show as grid</string>
+    <string name="library_view_list">Show as list</string>
+    <string name="settings_ecv_source">ECV source code</string>
+    <string name="settings_ecv_source_desc">View the modified ECV core and EmuCoreV app source on GitHub.</string>
+    <string name="settings_vita3k_license">Vita3K upstream license</string>
+    <string name="settings_vita3k_license_desc">Read the upstream GNU GPL v2.0 or later license.</string>
+    <string name="settings_core_upstream_version">Upstream core version</string>
+
+    <string name="settings_cover_art_style">Cover Style</string>
+    <string name="settings_cover_art_style_flat">Flat</string>
+    <string name="settings_cover_art_style_3d">3D Box</string>
+    <string name="settings_help_cover_art_style">Chooses the default cover type used when downloading artwork. Flat covers match the classic front-box look, while 3D Box uses angled box renders when the source provides them. 3D covers can look more dramatic, but availability may be slightly worse than flat art.</string>
+    <string name="settings_clear_cover_cache">Clear cover cache</string>
+    <string name="settings_clear_cover_cache_desc">Remove temporary downloaded covers and retry failed downloads.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Clear cover cache?</string>
+    <string name="settings_clear_cover_cache_confirm_body">Downloaded covers will be removed and downloaded again automatically. Custom covers and game files will not be changed.</string>
+    <string name="settings_clear_cover_cache_action">Clear</string>
+    <string name="settings_clear_cover_cache_success">Cover cache cleared. Covers will download again automatically.</string>
+    <string name="settings_clear_cover_cache_partial">Some cached covers could not be removed. Try again after current downloads finish.</string>
+
+    <!-- Rear panel input bindings -->
+    <string name="rear_touch_title">Rear touch</string>
+    <string name="rear_touch_desc">Assign rear panel points to buttons, keys, triggers or mouse input.</string>
+    <string name="rear_touch_point">Rear point %1$d</string>
+    <string name="rear_touch_bind">Assign a button</string>
+    <string name="rear_touch_capture">Press a controller or keyboard button, a trigger, a stick direction, or a mouse button.</string>
+    <string name="rear_touch_screen">Show on-screen button</string>
+    <string name="rear_touch_position">Touch position</string>
+    <string name="rear_touch_drag">Screen drag</string>
+    <string name="rear_touch_fixed">Fixed point</string>
+    <string name="rear_touch_pointer">Mouse pointer</string>
+    <string name="rear_touch_global">Global profile</string>
+    <string name="rear_touch_game">This game</string>
+    <string name="rear_touch_inherit">Use global profile</string>
+    <string name="rear_touch_clear">Clear binding</string>
+    <string name="rear_touch_hint">Hold to touch the rear panel; release to lift. Assigned inputs replace their usual action. Front touch stays available.</string>
+    <string name="rear_touch_screen_position">On-screen button position</string>
 </resources>

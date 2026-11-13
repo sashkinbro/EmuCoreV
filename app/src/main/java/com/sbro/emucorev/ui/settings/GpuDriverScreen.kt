@@ -1,5 +1,7 @@
 package com.sbro.emucorev.ui.settings
 
+import com.sbro.emucorev.ui.common.gamepadFocusableCard
+import com.sbro.emucorev.ui.common.controllerFocus
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import android.net.Uri
@@ -485,6 +487,7 @@ private fun FilterChipRow(
         items(filters) { filter ->
             FilterChip(
                 shape = neonChipShape(),
+        colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                 selected = selected == filter,
                 onClick = { onSelected(filter) },
                 label = { Text(if (filter == GPU_DRIVER_FILTER_ALL) stringResource(R.string.settings_gpu_driver_filter_all) else filter) }
@@ -538,7 +541,7 @@ private fun HeaderIconButton(
     content: @Composable () -> Unit
 ) {
     Surface(
-        modifier = Modifier.size(40.dp),
+        modifier = (Modifier.size(40.dp)).controllerFocus(shape = neonShape(14.dp)),
         shape = neonShape(14.dp),
         color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
@@ -596,6 +599,7 @@ private fun ActiveDriverCard(
                 if (isGameScoped) {
                     FilterChip(
                         shape = neonChipShape(),
+        colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                         selected = gameDriverOverride == null,
                         onClick = onUseGlobal,
                         modifier = Modifier.fillMaxWidth(),
@@ -604,6 +608,7 @@ private fun ActiveDriverCard(
                 }
                 FilterChip(
                     shape = neonChipShape(),
+        colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                     selected = if (isGameScoped) gameDriverOverride != null && gameDriverOverride.isBlank() else selectedDriver == null,
                     onClick = onUseSystem,
                     modifier = Modifier.fillMaxWidth(),
@@ -685,12 +690,15 @@ private fun InstalledDriverRow(
     onSelect: () -> Unit,
     onRemove: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = (Modifier.fillMaxWidth()).gamepadFocusableCard(enabled = driver.isUsable, shape = neonShape(18.dp), interactionSource = interactionSource, addFocusTarget = false),
         shape = neonShape(18.dp),
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f)),
-        onClick = { if (driver.isUsable) onSelect() }
+        interactionSource = interactionSource,
+        enabled = driver.isUsable,
+        onClick = onSelect
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -747,6 +755,7 @@ private fun RemoteDriverRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,

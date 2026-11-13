@@ -1,5 +1,12 @@
 package com.sbro.emucorev.navigation
 
+import android.view.KeyEvent as AndroidKeyEvent
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.text.style.TextOverflow
 import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -95,6 +102,7 @@ private val LocalDrawerVisualStyle = staticCompositionLocalOf { DrawerVisualStyl
 @Composable
 fun AdaptiveShell(
     selected: PrimaryDestination,
+    immersiveContent: Boolean = false,
     onNavigateSetup: () -> Unit,
     onNavigateLibrary: () -> Unit,
     onNavigateGameManager: () -> Unit,
@@ -153,15 +161,15 @@ fun AdaptiveShell(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(
-                        when (drawerVisualStyle) {
+                        if (immersiveContent) 0.dp else when (drawerVisualStyle) {
                             DrawerVisualStyle.COMPACT -> 272.dp
                             DrawerVisualStyle.CONSOLE -> 348.dp
                             else -> 320.dp
                         }
                     )
-                    .padding(start = 12.dp, top = 12.dp, bottom = 12.dp)
+                    .padding(start = if (immersiveContent) 0.dp else 12.dp, top = 12.dp, bottom = 12.dp)
             ) {
-                navContent()
+                if (!immersiveContent) navContent()
             }
             Box(
                 modifier = Modifier
@@ -174,6 +182,7 @@ fun AdaptiveShell(
     } else {
         CompactAdaptiveShell(
             selected = selected,
+            immersiveContent = immersiveContent,
             onNavigateSetup = onNavigateSetup,
             onNavigateLibrary = onNavigateLibrary,
             onNavigateGameManager = onNavigateGameManager,
@@ -203,6 +212,7 @@ fun AdaptiveShell(
 @Composable
 private fun CompactAdaptiveShell(
     selected: PrimaryDestination,
+    immersiveContent: Boolean,
     onNavigateSetup: () -> Unit,
     onNavigateLibrary: () -> Unit,
     onNavigateGameManager: () -> Unit,
@@ -264,7 +274,7 @@ private fun CompactAdaptiveShell(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = mobileLeadingAction == MobileLeadingAction.Drawer,
+        gesturesEnabled = !immersiveContent && mobileLeadingAction == MobileLeadingAction.Drawer,
         scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f),
         drawerContent = {
             ModalDrawerSheet(
@@ -662,23 +672,37 @@ private fun ShellAction(
     onClick: () -> Unit
 ) {
     val style = LocalDrawerVisualStyle.current
+    val shape = when (style) {
+        DrawerVisualStyle.COMPACT -> neonShape(9.dp)
+        DrawerVisualStyle.GLASS -> neonShape(22.dp)
+        DrawerVisualStyle.CONSOLE -> neonShape(6.dp)
+        DrawerVisualStyle.CLASSIC -> neonShape(18.dp)
+    }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val border = if (isFocused) {
+        BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.95f))
+    } else {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+    }
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .focusable(),
-        shape = when (style) {
-            DrawerVisualStyle.COMPACT -> neonShape(9.dp)
-            DrawerVisualStyle.GLASS -> neonShape(22.dp)
-            DrawerVisualStyle.CONSOLE -> neonShape(6.dp)
-            DrawerVisualStyle.CLASSIC -> neonShape(18.dp)
-        },
+            .activateDrawerItemOnGamepad(onClick)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .focusable(interactionSource = interactionSource),
+        shape = shape,
         color = when (style) {
             DrawerVisualStyle.COMPACT -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.08f)
             DrawerVisualStyle.GLASS -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
             DrawerVisualStyle.CONSOLE -> MaterialTheme.colorScheme.surfaceContainerHigh
-            DrawerVisualStyle.CLASSIC -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
+            DrawerVisualStyle.CLASSIC -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f)
         },
-        onClick = onClick
+        border = border
     ) {
         Row(
             modifier = Modifier.padding(
@@ -695,13 +719,21 @@ private fun ShellAction(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(if (style == DrawerVisualStyle.COMPACT) 17.dp else 18.dp)
             )
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelLarge,
+                style = if (style == DrawerVisualStyle.CONSOLE) {
+                    MaterialTheme.typography.titleMedium
+                } else {
+                    MaterialTheme.typography.labelLarge
+                },
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = 12.dp)
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp)
             )
         }
     }
@@ -709,49 +741,64 @@ private fun ShellAction(
 
 @Composable
 private fun ShellItem(
+    modifier: Modifier = Modifier,
     icon: ImageVector,
     label: String,
     selected: Boolean,
     onClick: () -> Unit
 ) {
     val style = LocalDrawerVisualStyle.current
+    val shape = when (style) {
+        DrawerVisualStyle.COMPACT -> neonShape(9.dp)
+        DrawerVisualStyle.GLASS -> neonShape(22.dp)
+        DrawerVisualStyle.CONSOLE -> neonShape(6.dp)
+        DrawerVisualStyle.CLASSIC -> neonShape(18.dp)
+    }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val border = if (isFocused) {
+        BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.95f))
+    } else {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+    }
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .focusable(),
-        shape = when (style) {
-            DrawerVisualStyle.COMPACT -> neonShape(9.dp)
-            DrawerVisualStyle.GLASS -> neonShape(22.dp)
-            DrawerVisualStyle.CONSOLE -> neonShape(6.dp)
-            DrawerVisualStyle.CLASSIC -> neonShape(18.dp)
-        },
+            .activateDrawerItemOnGamepad(onClick)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .focusable(interactionSource = interactionSource),
+        shape = shape,
         color = when {
             selected && style == DrawerVisualStyle.CONSOLE -> MaterialTheme.colorScheme.primaryContainer
-            selected -> MaterialTheme.colorScheme.primary.copy(
-                alpha = if (style == DrawerVisualStyle.GLASS) 0.22f else 0.16f
-            )
+            selected -> MaterialTheme.colorScheme.primary.copy(alpha = if (style == DrawerVisualStyle.GLASS) 0.22f else 0.16f)
             style == DrawerVisualStyle.COMPACT -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.06f)
             style == DrawerVisualStyle.GLASS -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.26f)
             style == DrawerVisualStyle.CONSOLE -> MaterialTheme.colorScheme.surfaceContainerHigh
-            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f)
+            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f)
         },
-        onClick = onClick
+        border = border
     ) {
         Row(
-            modifier = Modifier.padding(
-                horizontal = if (style == DrawerVisualStyle.COMPACT) 12.dp else 16.dp,
-                vertical = when (style) {
-                    DrawerVisualStyle.COMPACT -> 10.dp
-                    DrawerVisualStyle.CONSOLE -> 16.dp
-                    else -> 14.dp
-                }
-            ),
+            modifier = Modifier
+                .clip(shape)
+                .padding(
+                    horizontal = if (style == DrawerVisualStyle.COMPACT) 12.dp else 16.dp,
+                    vertical = when (style) {
+                        DrawerVisualStyle.COMPACT -> 10.dp
+                        DrawerVisualStyle.CONSOLE -> 16.dp
+                        else -> 14.dp
+                    }
+                ),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(if (style == DrawerVisualStyle.CONSOLE) 22.dp else 20.dp)
             )
             Text(
@@ -761,9 +808,33 @@ private fun ShellItem(
                     DrawerVisualStyle.CONSOLE -> MaterialTheme.typography.titleMedium
                     else -> MaterialTheme.typography.titleMedium
                 },
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = 12.dp)
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp)
             )
+        }
+    }
+}
+
+private fun Modifier.activateDrawerItemOnGamepad(onClick: () -> Unit): Modifier {
+    return onPreviewKeyEvent { keyEvent ->
+        val nativeEvent = keyEvent.nativeKeyEvent
+        if (nativeEvent.action != AndroidKeyEvent.ACTION_DOWN || nativeEvent.repeatCount != 0) {
+            return@onPreviewKeyEvent false
+        }
+        when (nativeEvent.keyCode) {
+            AndroidKeyEvent.KEYCODE_BUTTON_A,
+            AndroidKeyEvent.KEYCODE_BUTTON_1,
+            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+            AndroidKeyEvent.KEYCODE_ENTER,
+            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                onClick()
+                true
+            }
+            else -> false
         }
     }
 }

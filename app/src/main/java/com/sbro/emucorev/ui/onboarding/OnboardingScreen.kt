@@ -2,6 +2,13 @@
 
 package com.sbro.emucorev.ui.onboarding
 
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.SdStorage
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.sbro.emucorev.ui.common.gamepadFocusableCard
+import com.sbro.emucorev.ui.common.SettingsStyledDialog
+import com.sbro.emucorev.ui.common.controllerFocus
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import android.widget.Toast
@@ -89,7 +96,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
+import com.sbro.emucorev.ui.common.AppDialog as Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
@@ -429,7 +436,8 @@ private fun OnboardingHero(
     subtitle: String
 ) {
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.widthIn(max = 480.dp)
     ) {
         Box(
             modifier = Modifier
@@ -448,9 +456,9 @@ private fun OnboardingHero(
         Spacer(modifier = Modifier.height(36.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.displayLarge.copy(
+            style = MaterialTheme.typography.displaySmall.copy(
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 0.sp
+                letterSpacing = (-0.5).sp
             ),
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center
@@ -461,7 +469,7 @@ private fun OnboardingHero(
             style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 6.dp)
+            modifier = Modifier.padding(horizontal = 8.dp)
         )
     }
 }
@@ -663,90 +671,65 @@ private fun OnboardingStorageDialog(
     onDismiss: () -> Unit
 ) {
     if (!visible) return
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+    SettingsStyledDialog(
+        title = stringResource(R.string.onboarding_storage_choose_title),
+        eyebrow = stringResource(R.string.app_name_emucorev),
+        icon = Icons.Rounded.SdStorage,
+        onDismissRequest = onDismiss
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp)
-                .widthIn(max = 560.dp),
-            shape = neonShape(28.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            shadowElevation = 10.dp
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+        Text(
+            text = stringResource(if (storageLocations.size > 1) R.string.settings_storage_change_note else R.string.onboarding_storage_only_default),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        storageLocations.forEachIndexed { index, location ->
+            val interactionSource = remember { MutableInteractionSource() }
+            val shape = neonShape(18.dp)
+            val contentAlpha = if (enabled) 1f else 0.52f
+            Surface(
+                modifier = Modifier.fillMaxWidth()
+                    .gamepadFocusableCard(enabled = enabled, shape = shape, interactionSource = interactionSource, addFocusTarget = false),
+                shape = shape,
+                color = if (location.selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f),
+                border = androidx.compose.foundation.BorderStroke(
+                    if (location.selected) 2.dp else 1.dp,
+                    if (location.selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                ),
+                interactionSource = interactionSource,
+                enabled = enabled,
+                onClick = { if (enabled) onSelected(location) }
             ) {
-                Text(
-                    text = stringResource(R.string.onboarding_storage_choose_title),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = if (storageLocations.size > 1) {
-                        stringResource(R.string.settings_storage_change_note)
-                    } else {
-                        stringResource(R.string.onboarding_storage_only_default)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                storageLocations.forEachIndexed { index, location ->
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = neonShape(18.dp),
-                        color = if (location.selected) {
-                            MaterialTheme.colorScheme.secondaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
-                        },
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (location.selected) {
-                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.42f)
-                            } else {
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)
-                            }
-                        ),
-                        onClick = { if (enabled) onSelected(location) }
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = storageLocationLabel(location, index),
-                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                                color = if (location.selected) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                }
-                            )
-                            Text(
-                                text = location.vitaPath,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (location.selected) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f)
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                        }
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (location.removable) Icons.Rounded.SdStorage else Icons.Rounded.PhoneAndroid,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = contentAlpha),
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = storageLocationLabel(location, index),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
+                        )
+                        Text(
+                            text = location.vitaPath,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha)
+                        )
+                    }
+                    if (location.selected) {
+                        Spacer(Modifier.width(8.dp))
+                        Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     }
                 }
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text(stringResource(R.string.common_close))
-                }
             }
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.common_close))
         }
     }
 }
@@ -792,10 +775,10 @@ private fun SetupCard(
 ) {
     val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     Surface(
-        modifier = Modifier
+        modifier = (Modifier
             .fillMaxWidth()
-            .padding(vertical = 3.dp),
-        shape = neonShape(26.dp),
+            .padding(vertical = 4.dp)).controllerFocus(shape = neonShape(32.dp)),
+        shape = neonShape(32.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
         tonalElevation = 2.dp,
         onClick = onClick,
@@ -804,14 +787,14 @@ private fun SetupCard(
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (isDarkTheme) 0.45f else 0.7f)
         )
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)) {
             Row(
                 verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(52.dp)
                         .clip(neonShape(16.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
                     contentAlignment = Alignment.Center
@@ -820,7 +803,7 @@ private fun SetupCard(
                         imageVector = icon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(26.dp)
                     )
                 }
 
@@ -941,10 +924,10 @@ private fun FirmwareInfoButton(onClick: () -> Unit) {
         label = "firmware-info-alpha"
     )
     Surface(
-        modifier = Modifier.graphicsLayer {
+        modifier = (Modifier.graphicsLayer {
             scaleX = scale
             scaleY = scale
-        },
+        }).controllerFocus(shape = CircleShape),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
         contentColor = MaterialTheme.colorScheme.primary,

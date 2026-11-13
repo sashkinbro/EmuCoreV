@@ -52,139 +52,120 @@ fun InstallGameChoiceDialog(
     onInstallPkg: (String) -> Unit,
     onInstallDlc: (String) -> Unit
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+    com.sbro.emucorev.ui.common.SettingsStyledDialog(
+        title = stringResource(R.string.install_choice_title),
+        eyebrow = stringResource(R.string.app_name_emucorev),
+        icon = Icons.Rounded.Inventory2,
+        onDismissRequest = onDismiss
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp)
-                .widthIn(max = 560.dp),
-            shape = neonShape(28.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            shadowElevation = 10.dp
+
+        Text(
+            text = stringResource(R.string.install_choice_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        InstallChoiceCard(
+            icon = Icons.Rounded.Inventory2,
+            title = stringResource(R.string.install_choice_archive_title),
+            body = stringResource(R.string.install_choice_archive_body)
         ) {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+            Button(
+                shape = neonButtonShape(),
+                onClick = onInstallArchive,
+                modifier = Modifier.fillMaxWidth()
             ) {
+                Text(stringResource(R.string.setup_content_button))
+            }
+            FilledTonalButton(
+                shape = neonButtonShape(),
+                onClick = onRepairArchive,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Rounded.Build, contentDescription = null)
                 Text(
-                    text = stringResource(R.string.install_choice_title),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface
+                    text = stringResource(R.string.install_choice_archive_repair_button),
+                    modifier = Modifier.padding(start = 8.dp)
                 )
-                Text(
-                    text = stringResource(R.string.install_choice_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                InstallChoiceCard(
-                    icon = Icons.Rounded.Inventory2,
-                    title = stringResource(R.string.install_choice_archive_title),
-                    body = stringResource(R.string.install_choice_archive_body)
-                ) {
-                    Button(
-                        shape = neonButtonShape(),
-                        onClick = onInstallArchive,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(stringResource(R.string.setup_content_button))
-                    }
-                    FilledTonalButton(
-                        shape = neonButtonShape(),
-                        onClick = onRepairArchive,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Rounded.Build, contentDescription = null)
-                        Text(
-                            text = stringResource(R.string.install_choice_archive_repair_button),
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
-                    }
-                }
-
-                InstallChoiceCard(
-                    icon = Icons.Rounded.VpnKey,
-                    title = stringResource(R.string.install_choice_pkg_title),
-                    body = stringResource(R.string.install_choice_pkg_body)
-                ) {
-                    FilledTonalButton(
-                        shape = neonButtonShape(),
-                        onClick = onInstallLicense,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(stringResource(R.string.setup_pkg_license_button))
-                    }
-                    Text(
-                        text = stringResource(R.string.setup_pkg_zrif_or),
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
-                    )
-                    OutlinedTextField(
-                        value = zrif,
-                        onValueChange = onZrifChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.setup_pkg_zrif_label)) },
-                        placeholder = { Text(stringResource(R.string.setup_pkg_zrif_placeholder)) },
-                        minLines = 2,
-                        shape = neonShape(22.dp)
-                    )
-                    OutlinedButton(
-                        shape = neonButtonShape(),
-                        onClick = { onInstallPkg(zrif.trim()) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Rounded.FileOpen, contentDescription = null)
-                        Text(
-                            text = stringResource(R.string.setup_pkg_button),
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
-                    }
-                    Text(
-                        text = stringResource(R.string.install_choice_pkg_without_license_note),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                InstallChoiceCard(
-                    icon = Icons.Rounded.Extension,
-                    title = stringResource(R.string.install_choice_dlc_title),
-                    body = stringResource(R.string.install_choice_dlc_body)
-                ) {
-                    OutlinedButton(
-                        shape = neonButtonShape(),
-                        onClick = { onInstallDlc(zrif.trim()) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Rounded.FileOpen, contentDescription = null)
-                        Text(
-                            text = stringResource(R.string.install_choice_dlc_button),
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
-                    }
-                    Text(
-                        text = stringResource(R.string.install_choice_dlc_note),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text(stringResource(R.string.common_cancel))
-                }
             }
         }
+
+        InstallChoiceCard(
+            icon = Icons.Rounded.VpnKey,
+            title = stringResource(R.string.install_choice_pkg_title),
+            body = stringResource(R.string.install_choice_pkg_body)
+        ) {
+            FilledTonalButton(
+                shape = neonButtonShape(),
+                onClick = onInstallLicense,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.setup_pkg_license_button))
+            }
+            Text(
+                text = stringResource(R.string.setup_pkg_zrif_or),
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+            OutlinedTextField(
+                value = zrif,
+                onValueChange = onZrifChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.setup_pkg_zrif_label)) },
+                placeholder = { Text(stringResource(R.string.setup_pkg_zrif_placeholder)) },
+                minLines = 2,
+                shape = neonShape(22.dp)
+            )
+            OutlinedButton(
+                shape = neonButtonShape(),
+                onClick = { onInstallPkg(zrif.trim()) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Rounded.FileOpen, contentDescription = null)
+                Text(
+                    text = stringResource(R.string.setup_pkg_button),
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            Text(
+                text = stringResource(R.string.install_choice_pkg_without_license_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        InstallChoiceCard(
+            icon = Icons.Rounded.Extension,
+            title = stringResource(R.string.install_choice_dlc_title),
+            body = stringResource(R.string.install_choice_dlc_body)
+        ) {
+            OutlinedButton(
+                shape = neonButtonShape(),
+                onClick = { onInstallDlc(zrif.trim()) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Rounded.FileOpen, contentDescription = null)
+                Text(
+                    text = stringResource(R.string.install_choice_dlc_button),
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            Text(
+                text = stringResource(R.string.install_choice_dlc_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        TextButton(
+            onClick = onDismiss,
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Text(stringResource(R.string.common_cancel))
+        }
+
     }
 }
 

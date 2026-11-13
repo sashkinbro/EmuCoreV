@@ -1,5 +1,8 @@
 package com.sbro.emucorev.ui.profile
 
+import com.sbro.emucorev.ui.common.ImmersiveMaterialAlertDialog as AlertDialog
+import com.sbro.emucorev.ui.common.formatCoreDisplayName
+
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -164,6 +167,7 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
                 ) {
                     listOf(0, 6, 12, 24).forEach { hours ->
                         FilterChip(
+                            colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                             shape = neonChipShape(),selected = settings.intervalHours == hours, enabled = !state.busy,
                             onClick = { viewModel.configure { it.copy(intervalHours = hours) } },
                             label = { Text(if (hours == 0) stringResource(R.string.drive_manual) else stringResource(R.string.drive_hours, hours)) })
@@ -182,6 +186,7 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
                 ) {
                     listOf(1, 3, 5, 10, 20).forEach { count ->
                         FilterChip(
+                            colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                             shape = neonChipShape(),selected = settings.keepCopies == count, enabled = !state.busy,
                             onClick = { viewModel.configure { it.copy(keepCopies = count) } }, label = { Text(count.toString()) })
                     }
@@ -224,7 +229,7 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(copy.device, fontWeight = FontWeight.SemiBold)
                         Text(date(copy.createdAt), style = MaterialTheme.typography.bodyMedium)
-                        Text("${Formatter.formatFileSize(context, copy.size)} · ${copy.coreVersion}", style = MaterialTheme.typography.bodySmall)
+                        Text("${Formatter.formatFileSize(context, copy.size)} · ${copy.coreVersion.takeIf { it.isNotBlank() }?.let { formatCoreDisplayName(it) }.orEmpty()}", style = MaterialTheme.typography.bodySmall)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             TextButton(onClick = { restore = copy }, enabled = !state.busy) {
                                 Icon(Icons.Default.Restore, null); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.drive_restore))

@@ -23,7 +23,8 @@ internal fun LibraryLocalImage(
     contentDescription: String,
     fallbackLabel: String,
     artworkVersion: Long,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop
 ) {
     val bitmap by key(path, artworkVersion) {
         produceState<Bitmap?>(initialValue = localBitmapLoader.cached(path, artworkVersion)) {
@@ -35,7 +36,7 @@ internal fun LibraryLocalImage(
             bitmap = bitmap!!.asImageBitmap(),
             contentDescription = contentDescription,
             modifier = modifier,
-            contentScale = ContentScale.Crop
+            contentScale = contentScale
         )
     } else {
         Box(

@@ -46,7 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import com.sbro.emucorev.ui.common.AppDialog as Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.sbro.emucorev.R
 import kotlin.math.roundToInt
@@ -115,13 +115,13 @@ fun SetupInstallDialog(
         ) {
             Surface(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 560.dp)
+                    .fillMaxWidth(if (maxWidth > maxHeight) 0.98f else 0.94f)
+                    .widthIn(max = if (maxWidth > maxHeight) 1600.dp else 720.dp)
                     .heightIn(max = maxHeight),
                 shape = neonShape(30.dp),
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp,
-                shadowElevation = 16.dp,
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
                 border = BorderStroke(
                     1.dp,
                     MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f)

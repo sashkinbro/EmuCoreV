@@ -16,9 +16,9 @@
     <string name="home_empty_library_body">فریمور را نصب کنید، بسته به‌روزرسانی فریمور را نصب کنید و بازی‌های خود را در صفحه بازی‌ها اضافه کنید. آن‌ها به‌طور خودکار اینجا نمایش داده می‌شوند.</string>
     <string name="home_recent_titles_title">اخیراً بازی شده</string>
     <string name="home_disclaimer_title">درباره EmuCoreV</string>
-    <string name="home_disclaimer_body">EmuCoreV یک شبیه‌ساز PS Vita برای اندروید است که بر پایه Vita3K ساخته شده است.</string>
+    <string name="home_disclaimer_body">EmuCoreV یک شبیه‌ساز PS Vita برای Android با هسته ECV است.</string>
     <string name="onboarding_page_1_title">PlayStation Vita روی اندروید</string>
-    <string name="onboarding_page_1_body">بازی‌های PS Vita خود را با هسته Vita3K روی اندروید بازی کنید.</string>
+    <string name="onboarding_page_1_body">بازی‌های PS Vita خود را با هسته ECV روی Android بازی کنید.</string>
     <string name="onboarding_page_2_title">کتابخانه بازی‌های شما</string>
     <string name="onboarding_page_2_body">بازی‌های نصب‌شده شما در یک کتابخانه گردآوری می‌شوند.</string>
     <string name="onboarding_page_3_title">فهرست داخلی</string>
@@ -419,7 +419,7 @@
     <string name="settings_clear_cache_failed">پاک کردن حافظه نهان ناموفق بود.</string>
     <string name="settings_pro_support_more_hint">توسط هر گزینه‌ای در پایین پوشش داده می‌شود — تنها اگر می‌خواهید از توسعه بیشتر حمایت کنید، گزینه بزرگ‌تری را انتخاب کنید.</string>
     <string name="settings_about_title">درباره EmuCoreV</string>
-    <string name="settings_about_body">EmuCoreV یک شبیه‌ساز PS Vita برای اندروید است که بر پایه پروژه متن‌باز Vita3K ساخته شده است.</string>
+    <string name="settings_about_body">EmuCoreV یک شبیه‌ساز PS Vita برای Android با هسته ECV است.</string>
     <string name="settings_help_content_description">باز کردن راهنمای تنظیم</string>
     <string name="settings_help_dialog_label">راهنمای تنظیمات</string>
     <string name="settings_help_dialog_tip">هر بار یک گزینه را تغییر دهید، سپس همان صحنه بازی را آزمایش کنید تا ببینید واقعاً چه چیزی بهتر شده است.</string>
@@ -618,7 +618,7 @@
     <string name="settings_about_emucorev">درباره EmuCoreV</string>
     <string name="settings_about_version">نسخه برنامه</string>
     <string name="settings_about_version_value">نسخه %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV شبیه‌سازی PS Vita را با رابطی متمرکز برای موبایل، مدیریت کتابخانه محلی و هسته شبیه‌سازی مبتنی بر Vita3K به اندروید می‌آورد.</string>
+    <string name="settings_about_body_extended">EmuCoreV یک شبیه‌ساز PS Vita برای Android با هسته ECV است. ECV بر پایه هسته Vita3K است و EmuCore فعالانه توسعه آن را با رفع اشکال‌ها و بهبودهای اختصاصی خود ادامه می‌دهد.</string>
     <string name="settings_about_community_title">انجمن و پشتیبانی</string>
     <string name="settings_about_website">وب‌سایت رسمی</string>
     <string name="settings_about_website_desc">وب‌سایت EmuCoreV را برای دانلودها، اخبار و پیوندهای پروژه باز کنید.</string>
@@ -629,13 +629,13 @@
     <string name="settings_about_support">حمایت از EmuCoreV</string>
     <string name="settings_about_support_desc">با عضویت در Patreon به ادامه توسعه کمک کنید.</string>
     <string name="settings_emulation_core">هسته شبیه‌سازی</string>
-    <string name="settings_based_on_vita3k">بر پایه Vita3K</string>
+    <string name="settings_based_on_vita3k">ECV بر پایه هسته Vita3K است و EmuCore فعالانه توسعه آن را با رفع اشکال‌ها و بهبودهای اختصاصی خود ادامه می‌دهد.</string>
     <string name="settings_developer">توسعه‌دهنده</string>
     <string name="settings_created_by_sbro">ساخته‌شده توسط Sashkin Apps</string>
     <string name="settings_play_store_profile">پروفایل فروشگاه Play</string>
     <string name="settings_play_store_profile_desc">برنامه‌های اندرویدی بیشتری از توسعه‌دهنده ببینید.</string>
     <string name="settings_core_source_code">کد منبع هسته</string>
-    <string name="settings_core_source_description">EmuCoreV از رابط اندرویدی اختصاصی خود استفاده می‌کند. فقط هسته شبیه‌سازی بر پایه Vita3K است.</string>
+    <string name="settings_core_source_description">EmuCoreV از رابط Android اختصاصی خود استفاده می‌کند. ECV بر پایه هسته Vita3K است و EmuCore فعالانه توسعه آن را با رفع اشکال‌ها و بهبودهای اختصاصی خود ادامه می‌دهد.</string>
     <string name="settings_open_github">باز کردن گیت‌هاب</string>
     <string name="settings_vita3k_repository_desc">مخزن پروژه بالادستی Vita3K را باز کنید.</string>
     <string name="settings_updates_checking_title">بررسی به‌روزرسانی‌ها</string>
@@ -1547,4 +1547,57 @@
     <string name="settings_not_set">تنظیم نشده</string>
     <string name="settings_gamepad_mapping_clear">پاک کردن</string>
     <string name="settings_gamepad_mapping_auto_format">خودکار</string>
+    <string name="library_view_shelf">نمایش قفسه کاورها</string>
+    <string name="library_exit_shelf">خروج از قفسه کاورها</string>
+    <string name="library_shelf_games_counter">%1$d از %2$d</string>
+    <string name="settings_help_dialog_eyebrow">نکته تنظیمات</string>
+    <string name="settings_help_reset_tip_title">بازنشانی سریع</string>
+    <string name="settings_help_reset_tip_body">نام یک تنظیم را نگه دارید تا آن گزینه به مقدار پیش‌فرض خود بازگردد.</string>
+    <string name="feedback_game_loading">در حال بارگذاری کتابخانه بازی شما…</string>
+    <string name="feedback_game_no_matches">بازی مطابق یافت نشد</string>
+
+    <string name="library_options">گزینه‌های کتابخانه</string>
+    <string name="library_sort_title_asc">عنوان الف-ی</string>
+    <string name="library_sort_title_desc">عنوان ی-الف</string>
+    <string name="library_sort_recent_desc">اخیراً به‌روز شده</string>
+    <string name="library_sort_recent_asc">قدیمی‌ترین به‌روزرسانی</string>
+    <string name="library_sort_size_desc">بزرگترین</string>
+    <string name="library_sort_size_asc">کوچکترین</string>
+    <string name="library_view_grid">نمایش به صورت شبکه</string>
+    <string name="library_view_list">نمایش به صورت لیست</string>
+    <string name="settings_ecv_source">کد منبع ECV</string>
+    <string name="settings_ecv_source_desc">کد منبع هسته اصلاح‌شده ECV و برنامه EmuCoreV را در GitHub ببینید.</string>
+    <string name="settings_vita3k_license">مجوز پروژه اصلی Vita3K</string>
+    <string name="settings_vita3k_license_desc">مجوز اصلی GNU GPL نسخه 2.0 یا بالاتر را بخوانید.</string>
+    <string name="settings_core_upstream_version">نسخه هسته اصلی</string>
+
+    <string name="settings_cover_art_style">سبک کاور</string>
+    <string name="settings_cover_art_style_flat">تخت</string>
+    <string name="settings_cover_art_style_3d">جعبه سه‌بعدی</string>
+    <string name="settings_help_cover_art_style">نوع کاور پیش‌فرض مورد استفاده در هنگام دانلود آثار هنری را انتخاب می‌کند.</string>
+    <string name="settings_clear_cover_cache">پاک کردن حافظه نهان کاورها</string>
+    <string name="settings_clear_cover_cache_desc">کاورهای موقت دانلودشده را حذف می‌کند و دانلودهای ناموفق را دوباره انجام می‌دهد.</string>
+    <string name="settings_clear_cover_cache_confirm_title">حافظه نهان کاورها پاک شود؟</string>
+    <string name="settings_clear_cover_cache_confirm_body">کاورهای دانلودشده حذف و به‌طور خودکار دوباره دانلود می‌شوند. کاورهای سفارشی و فایل‌های بازی تغییر نمی‌کنند.</string>
+    <string name="settings_clear_cover_cache_action">پاک کردن</string>
+    <string name="settings_clear_cover_cache_success">حافظه نهان کاورها پاک شد. کاورها به‌طور خودکار دوباره دانلود می‌شوند.</string>
+    <string name="settings_clear_cover_cache_partial">برخی کاورهای ذخیره‌شده حذف نشدند. پس از پایان دانلودهای فعلی دوباره تلاش کنید.</string>
+
+    <!-- Rear panel input bindings -->
+    <string name="rear_touch_title">صفحهٔ لمسی پشتی</string>
+    <string name="rear_touch_desc">نقاط پشتی را به دکمه‌ها، کلیدها، ماشه‌ها یا ماوس اختصاص دهید.</string>
+    <string name="rear_touch_point">نقطهٔ پشتی %1$d</string>
+    <string name="rear_touch_bind">اختصاص دکمه</string>
+    <string name="rear_touch_capture">دکمهٔ دسته یا صفحه‌کلید، ماشه، جهت آنالوگ یا دکمهٔ ماوس را فشار دهید.</string>
+    <string name="rear_touch_screen">نمایش دکمه روی صفحه</string>
+    <string name="rear_touch_position">موقعیت لمس</string>
+    <string name="rear_touch_drag">کشیدن روی صفحه</string>
+    <string name="rear_touch_fixed">نقطهٔ ثابت</string>
+    <string name="rear_touch_pointer">نشانگر ماوس</string>
+    <string name="rear_touch_global">پروفایل عمومی</string>
+    <string name="rear_touch_game">این بازی</string>
+    <string name="rear_touch_inherit">استفاده از پروفایل عمومی</string>
+    <string name="rear_touch_clear">پاک کردن تخصیص</string>
+    <string name="rear_touch_hint">برای لمس صفحهٔ پشتی نگه دارید و برای پایان لمس رها کنید. ورودی‌های اختصاص‌یافته جایگزین عملکرد معمول می‌شوند. لمس جلو همچنان در دسترس است.</string>
+    <string name="rear_touch_screen_position">موقعیت دکمه روی صفحه</string>
 </resources>

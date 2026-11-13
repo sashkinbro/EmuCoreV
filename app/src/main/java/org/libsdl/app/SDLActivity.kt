@@ -6,6 +6,8 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
+import com.sbro.emucorev.ui.common.ImmersiveDialogWindowBinding
+import com.sbro.emucorev.ui.common.ImmersiveMode
 import android.app.UiModeManager
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -955,6 +957,16 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
                 .setPositiveButton("Exit") { _, _ -> mSingleton?.finish() }
                 .setCancelable(false)
                 .create()
+                .apply {
+                    val immersive = ImmersiveDialogWindowBinding(requireNotNull(window), restoreParent = {
+                        this@SDLActivity.window.decorView.post {
+                            if (this@SDLActivity.window.decorView.isAttachedToWindow) {
+                                ImmersiveMode.applyToDialog(this@SDLActivity.window)
+                            }
+                        }
+                    })
+                    setOnDismissListener { immersive.close() }
+                }
                 .show()
             return
         }
@@ -1434,11 +1446,20 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         }
 
         val dialog = AlertDialog.Builder(this).create()
+        val immersive = ImmersiveDialogWindowBinding(requireNotNull(dialog.window), restoreParent = {
+            window.decorView.post {
+                if (window.decorView.isAttachedToWindow) ImmersiveMode.applyToDialog(window)
+            }
+        })
         dialog.setTitle(args.getString("title"))
         dialog.setCancelable(false)
         dialog.setOnDismissListener {
-            synchronized(messageboxSelection) {
-                (messageboxSelection as java.lang.Object).notify()
+            try {
+                immersive.close()
+            } finally {
+                synchronized(messageboxSelection) {
+                    (messageboxSelection as java.lang.Object).notify()
+                }
             }
         }
 

@@ -219,7 +219,7 @@ class NeonThemeContractTest {
     }
 
     @Test
-    fun proSupportDialogUsesTheStyledLayoutOnlyForNeon() {
+    fun proSupportDialogUsesXScaffoldAndDedicatedNeonLayout() {
         val source = sourceRoot().resolve("ui/pro/ProPurchaseUi.kt").readText()
 
         assertTrue(
@@ -230,8 +230,9 @@ class NeonThemeContractTest {
                 "heightIn(max = maxHeight)" in source
         )
         assertTrue(
-            "Other themes must keep the existing Material dialog",
-            "AlertDialog(" in source
+            "Other themes must use the transferred X support-dialog scaffold",
+            "SettingsStyledDialog(" in source.substringAfter("private fun ProSupportDialog(")
+                .substringBefore("private fun NeonProSupportDialog(")
         )
         assertFalse(
             "Neon tier cards must not expose the verbose Play product title",

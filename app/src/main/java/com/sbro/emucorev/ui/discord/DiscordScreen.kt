@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.discord
 
+import com.sbro.emucorev.ui.common.controllerFocus
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -50,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -62,7 +64,11 @@ import com.sbro.emucorev.discord.DiscordConnectionStatus
 import com.sbro.emucorev.discord.DiscordFriend
 import com.sbro.emucorev.discord.DiscordIntegration
 import com.sbro.emucorev.ui.common.ScreenTopBar
+import com.sbro.emucorev.ui.common.SettingsStyledDialog
+import androidx.compose.ui.layout.ContentScale
 import com.sbro.emucorev.ui.common.UrlImage
+import com.sbro.emucorev.ui.common.GameCoverArt
+import com.sbro.emucorev.data.VitaCoverIndex
 import com.sbro.emucorev.ui.profile.profileCardBorder
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorev.ui.theme.neon.neonShape
@@ -73,6 +79,7 @@ fun DiscordScreen(onBackClick: () -> Unit) {
     val state by DiscordIntegration.state.collectAsState()
     var showInfo by remember { mutableStateOf(false) }
     val preview = DiscordIntegration.previewPayload()
+    val previewIsGameArt = VitaCoverIndex.isManagedRemoteUrl(preview.coverUrl)
     val uriHandler = LocalUriHandler.current
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -130,7 +137,7 @@ fun DiscordScreen(onBackClick: () -> Unit) {
                             modifier = Modifier
                                 .size(54.dp)
                                 .clip(neonShape(18.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)),
+                                .background(if (preview.coverUrl.isBlank()) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f) else Color.Transparent),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -322,19 +329,25 @@ fun DiscordScreen(onBackClick: () -> Unit) {
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(54.dp)
-                                .clip(neonShape(15.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)),
+                                .size(width = if (previewIsGameArt) 36.dp else 54.dp, height = 54.dp)
+                                .clip(if (previewIsGameArt) androidx.compose.ui.graphics.RectangleShape else neonShape(15.dp))
+                                .background(if (preview.coverUrl.isBlank()) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f) else Color.Transparent),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (preview.coverUrl.isNotBlank()) {
+                            if (previewIsGameArt) {
+                                GameCoverArt(
+                                    coverPath = preview.coverUrl,
+                                    contentDescription = preview.details,
+                                    fallbackTitle = preview.details,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else if (preview.coverUrl.isNotBlank()) {
                                 UrlImage(
                                     imageUrl = preview.coverUrl,
                                     contentDescription = preview.details,
                                     fallbackLabel = preview.details,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(3.dp)
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Fit
                                 )
                             } else {
                                 Icon(
@@ -417,56 +430,24 @@ fun DiscordScreen(onBackClick: () -> Unit) {
 
 @Composable
 private fun DiscordInfoDialog(onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(
-            modifier = Modifier
-                .widthIn(max = 620.dp)
-                .fillMaxWidth()
-                .padding(20.dp)
-                .heightIn(max = 720.dp),
-            shape = neonShape(28.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            border = profileCardBorder()
-        ) {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.discord_rich_presence_title),
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_close))
-                    }
-                }
-                Text(
-                    text = stringResource(R.string.discord_intro),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = stringResource(R.string.discord_privacy_note),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Button(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = neonShape(18.dp)
-                ) {
-                    Text(stringResource(R.string.common_close))
-                }
-            }
+    SettingsStyledDialog(
+        title = stringResource(R.string.discord_rich_presence_title),
+        eyebrow = stringResource(R.string.discord_title),
+        icon = Icons.Rounded.Info,
+        onDismissRequest = onDismiss
+    ) {
+        Text(
+            text = stringResource(R.string.discord_intro),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = stringResource(R.string.discord_privacy_note),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), shape = neonShape(18.dp)) {
+            Text(stringResource(R.string.common_close))
         }
     }
 }
@@ -620,9 +601,9 @@ private fun DiscordToggleRow(
     onCheckedChange: (Boolean) -> Unit
 ) {
     Surface(
-        modifier = Modifier
+        modifier = (Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp)).controllerFocus(shape = neonShape(18.dp)),
         onClick = { onCheckedChange(!checked) },
         enabled = enabled,
         shape = neonShape(18.dp),

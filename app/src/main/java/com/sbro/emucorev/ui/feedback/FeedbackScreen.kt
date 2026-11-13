@@ -5,6 +5,15 @@ package com.sbro.emucorev.ui.feedback
 import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -39,7 +48,7 @@ import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Collections
 import androidx.compose.material.icons.rounded.UploadFile
-import androidx.compose.material3.AlertDialog
+import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -84,12 +93,16 @@ import kotlinx.coroutines.withContext
 private data class FeedbackCategory(val id: String, val label: String)
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun FeedbackScreen(onBackClick: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val attachments = remember { mutableStateListOf<FeedbackAttachment>() }
     var category by rememberSaveable { mutableStateOf("compatibility") }
     var selectedGameId by rememberSaveable { mutableStateOf<String?>(null) }
+    var categoryMenuExpanded by remember { mutableStateOf(false) }
+    var gameMenuExpanded by remember { mutableStateOf(false) }
+    var isLoadingLibrary by remember { mutableStateOf(true) }
     var manualGame by rememberSaveable { mutableStateOf("") }
     var games by remember { mutableStateOf(emptyList<InstalledVitaGame>()) }
     var message by rememberSaveable { mutableStateOf("") }
@@ -123,9 +136,16 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
         games = withContext(Dispatchers.IO) {
             InstalledGameRepository().loadInstalledGames(context)
         }
+        isLoadingLibrary = false
     }
     val selectedGame = remember(games, selectedGameId) {
         selectedGameId?.let { id -> games.firstOrNull { it.titleId == id } }
+    }
+
+    val filteredGames = remember(games, manualGame, selectedGameId, gameMenuExpanded) {
+        val query = manualGame.trim()
+        (if (!gameMenuExpanded || selectedGameId != null || query.isBlank()) games
+        else games.filter { it.title.contains(query, ignoreCase = true) || it.titleId.contains(query, ignoreCase = true) }).take(100)
     }
 
     fun acceptUris(newUris: List<Uri>) {
@@ -196,14 +216,16 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
         contentPadding = PaddingValues(
             start = 8.dp,
             top = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding(),
             end = 8.dp,
             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 18.dp
         ),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         item {
@@ -211,179 +233,303 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                 title = stringResource(R.string.feedback_title),
                 subtitle = stringResource(R.string.feedback_subtitle),
                 onBackClick = requestBack,
-                modifier = Modifier.fillMaxWidth().widthIn(max = 780.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 760.dp)
+                    .padding(top = 12.dp, bottom = 2.dp),
                 titleMaxLines = 2,
                 subtitleMaxLines = 2
             )
         }
         if (!FeedbackUploadScheduler.isConfigured) {
-            item { FeedbackConfigurationWarning(Modifier.widthIn(max = 780.dp)) }
+            item { FeedbackConfigurationWarning(Modifier.widthIn(max = 760.dp)) }
         }
         item {
-            FeedbackCard(
-                title = stringResource(R.string.feedback_category_title),
-                modifier = Modifier.widthIn(max = 780.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalBleed(16.dp)
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    categories.forEach { item ->
-                        FilterChip(
-                            shape = neonChipShape(),
-                            selected = category == item.id,
-                            onClick = { category = item.id },
-                            label = { Text(item.label) }
-                        )
-                    }
-                }
-            }
-        }
-        item {
-            FeedbackCard(
-                title = stringResource(R.string.feedback_details_title),
-                modifier = Modifier.widthIn(max = 780.dp)
-            ) {
-                OutlinedTextField(
-                    value = selectedGame?.let { "${it.title} · ${it.titleId}" } ?: manualGame,
-                    onValueChange = {
-                        selectedGameId = null
-                        manualGame = it.take(FeedbackLimits.MAX_GAME_LENGTH)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.feedback_game_label)) },
-                    placeholder = { Text(stringResource(R.string.feedback_game_placeholder)) },
-                    trailingIcon = if (selectedGame != null) {
-                        {
-                            IconButton(onClick = {
-                                selectedGameId = null
-                                manualGame = ""
-                            }) {
-                                Icon(
-                                    Icons.Rounded.Close,
-                                    contentDescription = stringResource(R.string.feedback_game_clear_selection)
-                                )
-                            }
-                        }
-                    } else {
-                        null
-                    },
-                    singleLine = true,
-                    shape = neonShape(16.dp)
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 760.dp),
+                shape = neonShape(20.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.22f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
                 )
-                if (games.isNotEmpty()) {
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
                     Text(
-                        text = stringResource(R.string.feedback_game_label),
+                        text = stringResource(R.string.feedback_category_title),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalBleed(16.dp)
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ExposedDropdownMenuBox(
+                        expanded = categoryMenuExpanded,
+                        onExpandedChange = { categoryMenuExpanded = it }
                     ) {
-                        games.take(16).forEach { game ->
-                            FilterChip(
-                                shape = neonChipShape(),
-                                selected = selectedGameId == game.titleId,
-                                onClick = {
-                                    selectedGameId = if (selectedGameId == game.titleId) null else game.titleId
-                                    manualGame = ""
-                                },
-                                label = {
-                                    Text(
-                                        game.title,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
+                        OutlinedTextField(
+                            value = categories.firstOrNull { it.id == category }?.label.orEmpty(),
+                            onValueChange = {},
+                            readOnly = true,
+                            singleLine = true,
+                            shape = neonShape(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryMenuExpanded)
+                            },
+                            colors = feedbackTextFieldColors()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = categoryMenuExpanded,
+                            onDismissRequest = { categoryMenuExpanded = false },
+                            modifier = Modifier.heightIn(max = 384.dp),
+                            shape = neonShape(18.dp),
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                            border = BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.38f)
                             )
+                        ) {
+                            categories.forEach { item ->
+                                val isSelected = item.id == category
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            item.label,
+                                            color = if (isSelected) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface
+                                            },
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        if (isSelected) {
+                                            Icon(
+                                                Icons.Rounded.Check,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        category = item.id
+                                        categoryMenuExpanded = false
+                                    }
+                                )
+                            }
                         }
                     }
-                } else {
-                    Text(
-                        text = stringResource(R.string.feedback_game_library_empty),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                OutlinedTextField(
-                    value = message,
-                    onValueChange = { message = it.take(FeedbackLimits.MAX_MESSAGE_LENGTH) },
-                    modifier = Modifier.fillMaxWidth().height(180.dp),
-                    label = { Text(stringResource(R.string.feedback_message_label)) },
-                    placeholder = { Text(stringResource(R.string.feedback_message_placeholder)) },
-                    minLines = 4,
-                    maxLines = 8,
-                    shape = neonShape(16.dp),
-                    supportingText = {
-                        Text(
-                            stringResource(
-                                R.string.feedback_character_counter,
-                                message.length,
-                                FeedbackLimits.MAX_MESSAGE_LENGTH
+
+                    ExposedDropdownMenuBox(
+                        expanded = gameMenuExpanded,
+                        onExpandedChange = {
+                            if (!isLoadingLibrary && games.isNotEmpty()) gameMenuExpanded = it
+                        }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedGame?.let { "${it.title} · ${it.titleId}" } ?: manualGame,
+                            onValueChange = { value ->
+                                selectedGameId = null
+                                manualGame = value.take(FeedbackLimits.MAX_GAME_LENGTH)
+                                gameMenuExpanded = games.isNotEmpty()
+                            },
+                            singleLine = true,
+                            shape = neonShape(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+                            label = { Text(stringResource(R.string.feedback_game_label)) },
+                            placeholder = {
+                                Text(
+                                    stringResource(
+                                        if (isLoadingLibrary) R.string.feedback_game_loading
+                                        else R.string.feedback_game_placeholder
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            trailingIcon = {
+                                if (selectedGame != null) {
+                                    IconButton(
+                                        onClick = {
+                                            selectedGameId = null
+                                            manualGame = ""
+                                        }
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Close,
+                                            contentDescription = stringResource(R.string.feedback_game_clear_selection)
+                                        )
+                                    }
+                                } else if (games.isNotEmpty()) {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = gameMenuExpanded)
+                                }
+                            },
+                            colors = feedbackTextFieldColors()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = gameMenuExpanded,
+                            onDismissRequest = { gameMenuExpanded = false },
+                            modifier = Modifier.heightIn(max = 360.dp),
+                            shape = neonShape(18.dp),
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                            border = BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.38f)
                             )
+                        ) {
+                            if (filteredGames.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.feedback_game_no_matches)) },
+                                    onClick = { gameMenuExpanded = false },
+                                    enabled = false
+                                )
+                            } else {
+                                filteredGames.forEach { game ->
+                                    val isSelected = selectedGameId == game.titleId
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(
+                                                    game.title,
+                                                    color = if (isSelected) {
+                                                        MaterialTheme.colorScheme.primary
+                                                    } else {
+                                                        MaterialTheme.colorScheme.onSurface
+                                                    },
+                                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    game.titleId,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        },
+                                        trailingIcon = {
+                                            if (isSelected) {
+                                                Icon(
+                                                    Icons.Rounded.Check,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            selectedGameId = game.titleId
+                                            manualGame = ""
+                                            gameMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (games.isEmpty() && !isLoadingLibrary) {
+                        Text(
+                            text = stringResource(R.string.feedback_game_library_empty),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                )
+
+                    OutlinedTextField(
+                        value = message,
+                        onValueChange = { message = it.take(FeedbackLimits.MAX_MESSAGE_LENGTH) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(170.dp),
+                        shape = neonShape(16.dp),
+                        label = { Text(stringResource(R.string.feedback_message_label)) },
+                        placeholder = { Text(stringResource(R.string.feedback_message_placeholder)) },
+                        minLines = 4,
+                        maxLines = 7,
+                        colors = feedbackTextFieldColors(),
+                        supportingText = {
+                            Text(
+                                stringResource(
+                                    R.string.feedback_character_counter,
+                                    message.length,
+                                    FeedbackLimits.MAX_MESSAGE_LENGTH
+                                )
+                            )
+                        }
+                    )
+
+                    Button(
+                        shape = neonButtonShape(),
+                        onClick = { showAttachmentSourceDialog = true },
+                        enabled = !isInspectingAttachments && attachments.size < FeedbackLimits.MAX_ATTACHMENTS,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        Icon(Icons.Rounded.AttachFile, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text(stringResource(R.string.feedback_add_attachment))
+                    }
+                    attachments.forEach { attachment ->
+                        AttachmentRow(
+                            attachment = attachment,
+                            onRemove = { attachments.remove(attachment) }
+                        )
+                    }
+
+                }
             }
         }
         item {
-            FeedbackCard(
-                title = stringResource(R.string.feedback_attachments_title),
-                modifier = Modifier.widthIn(max = 780.dp)
-            ) {
-                Text(
-                    text = stringResource(
-                        R.string.feedback_attachments_help,
-                        FeedbackLimits.MAX_ATTACHMENTS,
-                        FeedbackLimits.MAX_ATTACHMENT_BYTES / 1024 / 1024,
-                        FeedbackLimits.MAX_TOTAL_BYTES / 1024 / 1024
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 760.dp),
+                shape = neonShape(20.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.14f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
                 )
-                Button(
-                    shape = neonButtonShape(),
-                    onClick = { showAttachmentSourceDialog = true },
-                    enabled = !isInspectingAttachments && attachments.size < FeedbackLimits.MAX_ATTACHMENTS,
-                    modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.Rounded.AttachFile, contentDescription = null)
-                    Spacer(Modifier.size(8.dp))
-                    Text(stringResource(R.string.feedback_add_attachment))
+                    Text(
+                        text = stringResource(R.string.feedback_tip_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = stringResource(R.string.feedback_tip_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.feedback_attachment_counter,
+                            attachments.size,
+                            FeedbackLimits.MAX_ATTACHMENTS
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
-                attachments.forEach { attachment ->
-                    AttachmentRow(attachment = attachment, onRemove = { attachments.remove(attachment) })
-                }
-            }
-        }
-        item {
-            FeedbackCard(
-                title = stringResource(R.string.feedback_tip_title),
-                modifier = Modifier.widthIn(max = 780.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.feedback_tip_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = stringResource(
-                        R.string.feedback_attachment_counter,
-                        attachments.size,
-                        FeedbackLimits.MAX_ATTACHMENTS
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
             }
         }
         item {
@@ -391,7 +537,10 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                 shape = neonButtonShape(),
                 onClick = submitFeedback,
                 enabled = !isQueueing && !isInspectingAttachments && FeedbackUploadScheduler.isConfigured,
-                modifier = Modifier.fillMaxWidth().widthIn(max = 780.dp).height(52.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 760.dp)
+                    .height(50.dp)
             ) {
                 if (isQueueing) {
                     CircularProgressIndicator(
@@ -400,7 +549,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null)
+                    Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(19.dp))
                 }
                 Spacer(Modifier.size(8.dp))
                 Text(stringResource(if (isQueueing) R.string.feedback_queueing else R.string.feedback_send))
@@ -498,11 +647,11 @@ private fun FeedbackCard(
 private fun AttachmentRow(attachment: FeedbackAttachment, onRemove: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(14.dp),
+        shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Row(
-            modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+            modifier = Modifier.padding(start = 14.dp, top = 8.dp, bottom = 8.dp, end = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(Icons.Rounded.AttachFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -533,7 +682,7 @@ private fun AttachmentRow(attachment: FeedbackAttachment, onRemove: () -> Unit) 
 private fun FeedbackConfigurationWarning(modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = neonShape(18.dp),
+        shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.errorContainer
     ) {
         Text(
@@ -552,3 +701,12 @@ private fun formatFileSize(bytes: Long): String {
         String.format(Locale.getDefault(), "%.0f KB", bytes / 1024.0)
     }
 }
+
+@Composable
+private fun feedbackTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.42f),
+    unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.28f),
+    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.78f),
+    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.38f),
+    cursorColor = MaterialTheme.colorScheme.primary
+)

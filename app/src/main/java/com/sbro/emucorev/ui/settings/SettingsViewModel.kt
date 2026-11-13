@@ -30,6 +30,8 @@ import com.sbro.emucorev.data.AppFont
 import com.sbro.emucorev.data.CustomizationFileStore
 import com.sbro.emucorev.data.CustomizationPreferences
 import com.sbro.emucorev.data.CustomizationSettings
+import com.sbro.emucorev.data.CoverArtRepository
+import com.sbro.emucorev.data.CoverCacheClearResult
 import com.sbro.emucorev.data.DrawerVisualStyle
 import com.sbro.emucorev.data.GameMenuLayoutStyle
 import com.sbro.emucorev.data.TouchControlPressEffect
@@ -39,6 +41,8 @@ import com.sbro.emucorev.data.TrophySoundRepository
 import com.sbro.emucorev.data.TrophySoundSettings
 import com.sbro.emucorev.data.TrophySoundSelectionResult
 import com.sbro.emucorev.core.TrophySoundPlayer
+import com.sbro.emucorev.ui.common.clearCoverImageMemoryCache
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -136,6 +140,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    private val _coverCacheClearInProgress = MutableStateFlow(false)
+    val coverCacheClearInProgress: StateFlow<Boolean> = _coverCacheClearInProgress.asStateFlow()
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -303,6 +309,30 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             refreshCacheSize()
             withContext(Dispatchers.Main) {
                 onComplete(result)
+            }
+        }
+    }
+
+    fun clearCoverCache(onComplete: (CoverCacheClearResult) -> Unit) {
+        if (!_coverCacheClearInProgress.compareAndSet(false, true)) return
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    try {
+                        CoverArtRepository.get(getApplication()).clearManagedCache()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        Log.w(TAG, "Could not completely clear the cover cache", error)
+                        CoverCacheClearResult(deletedFiles = 0, freedBytes = 0L, failedFiles = 1)
+                    } finally {
+                        clearCoverImageMemoryCache()
+                    }
+                }
+                refreshCacheSize()
+                onComplete(result)
+            } finally {
+                _coverCacheClearInProgress.value = false
             }
         }
     }

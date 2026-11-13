@@ -1,5 +1,13 @@
 package com.sbro.emucorev.ui.settings
 
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.SdStorage
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.sbro.emucorev.ui.common.gamepadFocusableCard
+import com.sbro.emucorev.ui.common.SettingsStyledDialog
+import com.sbro.emucorev.ui.common.rememberControllerConnected
+import com.sbro.emucorev.ui.common.controllerFocus
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import com.sbro.emucorev.ui.theme.neon.neonAccentColor
@@ -34,7 +42,7 @@ import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
-import androidx.compose.material3.AlertDialog
+import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -44,6 +52,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
@@ -61,9 +70,8 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import com.sbro.emucorev.ui.common.AppDialog as Dialog
 import androidx.compose.ui.window.DialogProperties
-import android.view.InputDevice
 import android.widget.Toast
 import com.sbro.emucorev.R
 import com.sbro.emucorev.BuildConfig
@@ -74,9 +82,10 @@ import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.FrameLimit
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaStorageLocation
-import com.sbro.emucorev.core.input.InputDeviceClassifier
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.ui.common.SectionCard
+import com.sbro.emucorev.ui.common.formatCoreDisplayName
+import com.sbro.emucorev.ui.common.upstreamCoreDisplayName
 import com.sbro.emucorev.ui.pro.ProBenefitCards
 import com.sbro.emucorev.ui.pro.ProPurchasePanel
 import com.sbro.emucorev.ui.profile.CloudProfilesDialog
@@ -92,6 +101,7 @@ private const val EmuCoreDiscordUrl = "https://discord.gg/c5EBeNRpz2"
 private const val EmuCoreSupportUrl = "https://www.patreon.com/c/emucore/membership"
 private const val SashkinAppsPlayStoreUrl = "https://play.google.com/store/apps/dev?id=7136622298887775989"
 private const val Vita3KRepositoryUrl = "https://github.com/Vita3K/Vita3K"
+private const val Vita3KLicenseUrl = "https://github.com/Vita3K/Vita3K/blob/master/COPYING.txt"
 private const val PrivacyPolicyUrl = "https://sites.google.com/view/privacy-policy-for-emucorev/%D0%B3%D0%BE%D0%BB%D0%BE%D0%B2%D0%BD%D0%B0-%D1%81%D1%82%D0%BE%D1%80%D1%96%D0%BD%D0%BA%D0%B0"
 
 private data class VitaSystemLanguageOption(
@@ -138,40 +148,43 @@ fun SettingsTabContent(
     createBackupClick: () -> Unit,
     restoreBackupClick: () -> Unit,
     onOpenTrophySoundPicker: () -> Unit = {},
-    onOpenTouchLayoutEditor: () -> Unit = {}
+    onOpenTouchLayoutEditor: () -> Unit = {},
+    libraryContentWidthDp: Float
 ) {
-    when (selectedTab) {
-        SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings, onOpenVitaLanguageSettings)
-        SettingsTab.Customization -> CustomizationTab(uiState.customization, viewModel)
-        SettingsTab.Pro -> Column(
-            modifier = Modifier.padding(horizontal = ScreenHorizontalPadding),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            ProBenefitCards()
-            ProPurchasePanel(showFeatures = false)
-        }
-        SettingsTab.Graphics -> GraphicsTab(uiState, defaults, viewModel, onOpenGpuDriverSettings)
-        SettingsTab.Audio -> AudioTab(uiState, defaults, viewModel, refreshCoreSettingsClick, onOpenTrophySoundPicker)
-        SettingsTab.Overlay -> OverlayTab(uiState, defaults, viewModel)
-        SettingsTab.Controls -> ControlsTab(uiState, defaults, viewModel, onOpenTouchLayoutEditor)
-        SettingsTab.Camera -> CameraTab(uiState, defaults, viewModel)
-        SettingsTab.System -> SystemTab(uiState, defaults, viewModel)
-        SettingsTab.Advanced -> AdvancedTab(uiState, defaults, viewModel)
-        SettingsTab.Storage -> StorageTab(
-            uiState = uiState,
-            viewModel = viewModel,
-            selectStorageLocation = viewModel::selectStorageLocation,
-            dismissStorageMigrationDialog = viewModel::dismissStorageMigrationDialog,
-            createBackupClick = createBackupClick,
-            restoreBackupClick = restoreBackupClick
-        )
-        SettingsTab.About -> AboutTab(onOpenDiscord)
-        SettingsTab.Updates -> AppUpdateTab(
-            state = uiState.appUpdate,
-            onLoadReleaseHistory = { forceRefresh ->
-                viewModel.loadAppReleaseHistory(showErrors = true, forceRefresh = forceRefresh)
+    CompositionLocalProvider(LocalSettingsItemIcon provides selectedTab.icon) {
+        when (selectedTab) {
+            SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings, onOpenVitaLanguageSettings)
+            SettingsTab.Customization -> CustomizationTab(uiState.customization, viewModel, libraryContentWidthDp)
+            SettingsTab.Pro -> Column(
+                modifier = Modifier.padding(horizontal = ScreenHorizontalPadding),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ProBenefitCards()
+                ProPurchasePanel(showFeatures = false)
             }
-        )
+            SettingsTab.Graphics -> GraphicsTab(uiState, defaults, viewModel, onOpenGpuDriverSettings)
+            SettingsTab.Audio -> AudioTab(uiState, defaults, viewModel, refreshCoreSettingsClick, onOpenTrophySoundPicker)
+            SettingsTab.Overlay -> OverlayTab(uiState, defaults, viewModel)
+            SettingsTab.Controls -> ControlsTab(uiState, defaults, viewModel, onOpenTouchLayoutEditor)
+            SettingsTab.Camera -> CameraTab(uiState, defaults, viewModel)
+            SettingsTab.System -> SystemTab(uiState, defaults, viewModel)
+            SettingsTab.Advanced -> AdvancedTab(uiState, defaults, viewModel)
+            SettingsTab.Storage -> StorageTab(
+                uiState = uiState,
+                viewModel = viewModel,
+                selectStorageLocation = viewModel::selectStorageLocation,
+                dismissStorageMigrationDialog = viewModel::dismissStorageMigrationDialog,
+                createBackupClick = createBackupClick,
+                restoreBackupClick = restoreBackupClick
+            )
+            SettingsTab.About -> AboutTab(onOpenDiscord)
+            SettingsTab.Updates -> AppUpdateTab(
+                state = uiState.appUpdate,
+                onLoadReleaseHistory = { forceRefresh ->
+                    viewModel.loadAppReleaseHistory(showErrors = true, forceRefresh = forceRefresh)
+                }
+            )
+        }
     }
 }
 
@@ -260,12 +273,14 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
                 onResetDefault = { viewModel.updateCoreSettings { it.copy(customDriverName = defaults.customDriverName) } }
             ) {
                 FilterChip(
+                    colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                     shape = neonChipShape(),
                     selected = uiState.coreConfig.customDriverName.isBlank(),
                     onClick = { viewModel.updateCoreSettings { it.copy(customDriverName = "") } },
                     label = { Text(stringResource(R.string.settings_gpu_driver_system)) }
                 )
                 FilterChip(
+                    colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                     shape = neonChipShape(),
                     selected = uiState.coreConfig.customDriverName.isNotBlank(),
                     onClick = {
@@ -448,11 +463,7 @@ private fun ControlsTab(
     onOpenTouchLayoutEditor: () -> Unit
 ) {
     val context = LocalContext.current
-    val gamepadConnected = remember {
-        InputDevice.getDeviceIds().any { id ->
-            InputDeviceClassifier.isPhysicalGameController(id)
-        }
-    }
+    val gamepadConnected = rememberControllerConnected()
     SectionCard(title = stringResource(R.string.settings_tab_controls), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Toggle(stringResource(R.string.settings_core_touchpad_cursor), stringResource(R.string.settings_help_touchpad_cursor), uiState.coreConfig.showTouchpadCursor, { enabled -> viewModel.updateCoreSettings { it.copy(showTouchpadCursor = enabled) } }, { viewModel.updateCoreSettings { it.copy(showTouchpadCursor = defaults.showTouchpadCursor) } })
         Toggle(stringResource(R.string.settings_core_disable_motion), stringResource(R.string.settings_help_disable_motion), uiState.coreConfig.disableMotion, { enabled -> viewModel.updateCoreSettings { it.copy(disableMotion = enabled) } }, { viewModel.updateCoreSettings { it.copy(disableMotion = defaults.disableMotion) } })
@@ -614,9 +625,9 @@ private fun ControlsTab(
             TextChip(VitaCoreConfig.GAMEPAD_PROFILE_SWAP_CROSS_CIRCLE, stringResource(R.string.settings_gamepad_profile_swap_cross_circle), uiState.coreConfig.gamepadButtonProfile, viewModel, enabled = gamepadConnected) { config, value -> config.copy(gamepadButtonProfile = value) }
             TextChip(VitaCoreConfig.GAMEPAD_PROFILE_NINTENDO_FACE, stringResource(R.string.settings_gamepad_profile_nintendo_face), uiState.coreConfig.gamepadButtonProfile, viewModel, enabled = gamepadConnected) { config, value -> config.copy(gamepadButtonProfile = value) }
         }
-        Toggle(stringResource(R.string.settings_gamepad_swap_sticks), stringResource(R.string.settings_help_gamepad_swap_sticks), uiState.coreConfig.gamepadSwapSticks, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadSwapSticks = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadSwapSticks = defaults.gamepadSwapSticks) } })
-        Toggle(stringResource(R.string.settings_gamepad_invert_left_y), stringResource(R.string.settings_help_gamepad_invert_y), uiState.coreConfig.gamepadInvertLeftY, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadInvertLeftY = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadInvertLeftY = defaults.gamepadInvertLeftY) } })
-        Toggle(stringResource(R.string.settings_gamepad_invert_right_y), stringResource(R.string.settings_help_gamepad_invert_y), uiState.coreConfig.gamepadInvertRightY, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadInvertRightY = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadInvertRightY = defaults.gamepadInvertRightY) } })
+        Toggle(stringResource(R.string.settings_gamepad_swap_sticks), stringResource(R.string.settings_help_gamepad_swap_sticks), uiState.coreConfig.gamepadSwapSticks, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadSwapSticks = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadSwapSticks = defaults.gamepadSwapSticks) } }, enabled = gamepadConnected)
+        Toggle(stringResource(R.string.settings_gamepad_invert_left_y), stringResource(R.string.settings_help_gamepad_invert_y), uiState.coreConfig.gamepadInvertLeftY, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadInvertLeftY = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadInvertLeftY = defaults.gamepadInvertLeftY) } }, enabled = gamepadConnected)
+        Toggle(stringResource(R.string.settings_gamepad_invert_right_y), stringResource(R.string.settings_help_gamepad_invert_y), uiState.coreConfig.gamepadInvertRightY, { enabled -> if (gamepadConnected) viewModel.updateCoreSettings { it.copy(gamepadInvertRightY = enabled) } }, { viewModel.updateCoreSettings { it.copy(gamepadInvertRightY = defaults.gamepadInvertRightY) } }, enabled = gamepadConnected)
     }
     GlobalKeyboardMouseSettingsSection()
 }
@@ -658,6 +669,7 @@ private fun SystemTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMo
         Chips(stringResource(R.string.settings_frame_limit), stringResource(R.string.settings_help_frame_limit), { viewModel.updateCoreSettings { it.copy(frameLimit = defaults.frameLimit) } }) {
             FrameLimit.supportedValues.forEach { limit ->
                 FilterChip(
+                    colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),
                     shape = neonChipShape(),
                     selected = uiState.coreConfig.frameLimit == limit,
                     onClick = { viewModel.updateCoreSettings { it.copy(frameLimit = limit) } },
@@ -818,31 +830,30 @@ private fun SettingsActionRow(
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier
+        modifier = (Modifier
             .fillMaxWidth()
             .padding(horizontal = SettingsSectionRowPadding)
             .neonCornerAccent(
                 accent = neonAccentColor(title.hashCode().mod(3)),
                 markSize = 9.dp
-            ),
+            )).controllerFocus(shape = neonShape(18.dp)),
         shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 1.dp,
-        shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
         onClick = onClick
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = SettingsCardInnerPadding, vertical = SettingsCardInnerPadding),
+                .padding(horizontal = SettingsCardInnerPadding, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(neonShape(14.dp))
+                    .size(38.dp)
+                    .clip(neonShape(12.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -1094,89 +1105,65 @@ private fun SettingsStorageDialog(
     onDismiss: () -> Unit
 ) {
     if (!visible) return
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+    SettingsStyledDialog(
+        title = stringResource(R.string.settings_change_storage),
+        eyebrow = stringResource(R.string.app_name_emucorev),
+        icon = Icons.Rounded.SdStorage,
+        onDismissRequest = onDismiss
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp),
-            shape = neonShape(28.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            shadowElevation = 10.dp
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+        Text(
+            text = stringResource(if (storageLocations.size > 1) R.string.settings_storage_change_note else R.string.onboarding_storage_only_default),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        storageLocations.forEachIndexed { index, location ->
+            val interactionSource = remember { MutableInteractionSource() }
+            val shape = neonShape(18.dp)
+            val contentAlpha = if (enabled) 1f else 0.52f
+            Surface(
+                modifier = Modifier.fillMaxWidth()
+                    .gamepadFocusableCard(enabled = enabled, shape = shape, interactionSource = interactionSource, addFocusTarget = false),
+                shape = shape,
+                color = if (location.selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f),
+                border = androidx.compose.foundation.BorderStroke(
+                    if (location.selected) 2.dp else 1.dp,
+                    if (location.selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                ),
+                interactionSource = interactionSource,
+                enabled = enabled,
+                onClick = { if (enabled) onSelected(location) }
             ) {
-                Text(
-                    text = stringResource(R.string.settings_change_storage),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = if (storageLocations.size > 1) {
-                        stringResource(R.string.settings_storage_change_note)
-                    } else {
-                        stringResource(R.string.onboarding_storage_only_default)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                storageLocations.forEachIndexed { index, location ->
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = neonShape(18.dp),
-                        color = if (location.selected) {
-                            MaterialTheme.colorScheme.secondaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
-                        },
-                        border = BorderStroke(
-                            1.dp,
-                            if (location.selected) {
-                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.42f)
-                            } else {
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)
-                            }
-                        ),
-                        onClick = { if (enabled) onSelected(location) }
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = storageLocationLabel(location, index),
-                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                                color = if (location.selected) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                }
-                            )
-                            Text(
-                                text = location.vitaPath,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (location.selected) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f)
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                        }
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (location.removable) Icons.Rounded.SdStorage else Icons.Rounded.PhoneAndroid,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = contentAlpha),
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = storageLocationLabel(location, index),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
+                        )
+                        Text(
+                            text = location.vitaPath,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha)
+                        )
+                    }
+                    if (location.selected) {
+                        Spacer(Modifier.width(8.dp))
+                        Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     }
                 }
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text(stringResource(R.string.common_close))
-                }
             }
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.common_close))
         }
     }
 }
@@ -1200,6 +1187,7 @@ private fun AboutTab(onOpenDiscord: () -> Unit) {
         }
     }
     val versionName = packageInfo?.versionName ?: "1.0.0"
+    val upstreamCore = upstreamCoreDisplayName()
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionCard(
@@ -1215,9 +1203,17 @@ private fun AboutTab(onOpenDiscord: () -> Unit) {
             LinkItem(
                 icon = Icons.Rounded.Memory,
                 title = stringResource(R.string.settings_emulation_core),
-                subtitle = stringResource(R.string.settings_based_on_vita3k),
+                subtitle = formatCoreDisplayName(null),
                 onClick = {}
             )
+            if (upstreamCore != null) {
+                LinkItem(
+                    icon = Icons.Rounded.Memory,
+                    title = stringResource(R.string.settings_core_upstream_version),
+                    subtitle = upstreamCore,
+                    onClick = { uriHandler.openUri(Vita3KRepositoryUrl) }
+                )
+            }
             Text(
                 text = stringResource(R.string.settings_about_body_extended),
                 style = MaterialTheme.typography.bodyMedium,
@@ -1296,6 +1292,18 @@ private fun AboutTab(onOpenDiscord: () -> Unit) {
                 subtitle = stringResource(R.string.settings_vita3k_repository_desc),
                 onClick = { uriHandler.openUri(Vita3KRepositoryUrl) }
             )
+            LinkItem(
+                icon = Icons.Rounded.Code,
+                title = stringResource(R.string.settings_ecv_source),
+                subtitle = stringResource(R.string.settings_ecv_source_desc),
+                onClick = { uriHandler.openUri(EmuCoreRepositoryUrl) }
+            )
+            LinkItem(
+                icon = Icons.Rounded.Link,
+                title = stringResource(R.string.settings_vita3k_license),
+                subtitle = stringResource(R.string.settings_vita3k_license_desc),
+                onClick = { uriHandler.openUri(Vita3KLicenseUrl) }
+            )
         }
     }
 }
@@ -1308,17 +1316,16 @@ private fun LinkItem(
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier
+        modifier = (Modifier
             .fillMaxWidth()
             .neonCornerAccent(
                 accent = neonAccentColor(title.hashCode().mod(3)),
                 markSize = 9.dp
-            ),
+            )).controllerFocus(shape = neonShape(18.dp)),
         shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 1.dp,
-        shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
         onClick = onClick
     ) {
         Row(
@@ -1425,18 +1432,17 @@ private fun AppLanguageSettingRow(
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier
+        modifier = (Modifier
             .fillMaxWidth()
             .padding(horizontal = SettingsSectionRowPadding)
             .neonCornerAccent(
                 accent = neonAccentColor(stringResource(R.string.settings_app_language).hashCode().mod(3)),
                 markSize = 9.dp
-            ),
+            )).controllerFocus(shape = neonShape(18.dp)),
         shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 1.dp,
-        shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
         onClick = onClick
     ) {
         Row(
@@ -1448,8 +1454,8 @@ private fun AppLanguageSettingRow(
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(neonShape(14.dp))
+                    .size(38.dp)
+                    .clip(neonShape(12.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -1482,18 +1488,17 @@ private fun VitaLanguageSettingRow(
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier
+        modifier = (Modifier
             .fillMaxWidth()
             .padding(horizontal = SettingsSectionRowPadding)
             .neonCornerAccent(
                 accent = neonAccentColor(stringResource(R.string.settings_system_language).hashCode().mod(3)),
                 markSize = 9.dp
-            ),
+            )).controllerFocus(shape = neonShape(18.dp)),
         shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 1.dp,
-        shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
         onClick = onClick
     ) {
         Row(
@@ -1505,8 +1510,8 @@ private fun VitaLanguageSettingRow(
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(neonShape(14.dp))
+                    .size(38.dp)
+                    .clip(neonShape(12.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -1647,11 +1652,4 @@ private fun TextChip(
 }
 
 @Composable
-private fun appFilterChipColors() = FilterChipDefaults.filterChipColors(
-    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    labelColor = MaterialTheme.colorScheme.onSurface,
-    iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-    selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
-)
+private fun appFilterChipColors() = com.sbro.emucorev.ui.common.premiumFilterChipColors()

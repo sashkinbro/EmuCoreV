@@ -15,6 +15,14 @@ import androidx.core.view.WindowInsetsControllerCompat
  * firmware, so activities call this again when they resume or regain focus.
  */
 internal object ImmersiveMode {
+    /** Hide a modal's bars without changing its sizing, secure flags or IME resize policy. */
+    fun applyToDialog(window: Window) {
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
     @Suppress("DEPRECATION")
     fun apply(window: Window) {
         window.clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)

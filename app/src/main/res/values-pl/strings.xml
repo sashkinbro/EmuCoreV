@@ -16,9 +16,9 @@
     <string name="home_empty_library_body">Zainstaluj firmware, zainstaluj pakiet aktualizacji firmware i dodaj swoje gry na ekranie Gry. Pojawią się tu automatycznie.</string>
     <string name="home_recent_titles_title">Ostatnio grane</string>
     <string name="home_disclaimer_title">O EmuCoreV</string>
-    <string name="home_disclaimer_body">EmuCoreV to emulator PS Vita na Androida oparty na Vita3K.</string>
+    <string name="home_disclaimer_body">EmuCoreV to emulator PS Vita na Androida korzystający z rdzenia ECV.</string>
     <string name="onboarding_page_1_title">PlayStation Vita na Androidzie</string>
-    <string name="onboarding_page_1_body">Graj w swoje gry na PS Vita na Androidzie dzięki rdzeniowi Vita3K.</string>
+    <string name="onboarding_page_1_body">Graj w swoje gry na PS Vita na Androidzie dzięki rdzeniowi ECV.</string>
     <string name="onboarding_page_2_title">Twoja biblioteka gier</string>
     <string name="onboarding_page_2_body">Twoje zainstalowane gry są gromadzone w jednej bibliotece.</string>
     <string name="onboarding_page_3_title">Wbudowany katalog</string>
@@ -419,7 +419,7 @@
     <string name="settings_clear_cache_failed">Nie udało się wyczyścić pamięci podręcznej.</string>
     <string name="settings_pro_support_more_hint">Każda z opcji poniżej już to obejmuje — wybierz większą tylko wtedy, gdy chcesz dodatkowo wesprzeć rozwój.</string>
     <string name="settings_about_title">O EmuCoreV</string>
-    <string name="settings_about_body">EmuCoreV to emulator PS Vita na Androida oparty na otwartoźródłowym projekcie Vita3K.</string>
+    <string name="settings_about_body">EmuCoreV to emulator PS Vita na Androida korzystający z rdzenia ECV.</string>
     <string name="settings_help_content_description">Otwórz pomoc ustawienia</string>
     <string name="settings_help_dialog_label">Przewodnik po ustawieniach</string>
     <string name="settings_help_dialog_tip">Zmieniaj jedną opcję naraz, a następnie przetestuj tę samą scenę w grze, aby zobaczyć, co naprawdę się poprawiło.</string>
@@ -618,7 +618,7 @@
     <string name="settings_about_emucorev">O EmuCoreV</string>
     <string name="settings_about_version">Wersja aplikacji</string>
     <string name="settings_about_version_value">Wersja %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV przenosi emulację PS Vita na Androida dzięki dopracowanemu interfejsowi mobilnemu, lokalnemu zarządzaniu biblioteką i rdzeniowi emulacji opartemu na Vita3K.</string>
+    <string name="settings_about_body_extended">EmuCoreV to emulator PS Vita na Androida korzystający z rdzenia ECV. ECV bazuje na rdzeniu Vita3K i jest aktywnie rozwijany przez EmuCore, z własnymi poprawkami i ulepszeniami.</string>
     <string name="settings_about_community_title">Społeczność i wsparcie</string>
     <string name="settings_about_website">Oficjalna strona</string>
     <string name="settings_about_website_desc">Otwórz stronę EmuCoreV, aby pobrać aplikację, przeczytać nowości i znaleźć linki do projektu.</string>
@@ -629,13 +629,13 @@
     <string name="settings_about_support">Wesprzyj EmuCoreV</string>
     <string name="settings_about_support_desc">Pomóż w dalszym rozwoju projektu dzięki członkostwu na Patreon.</string>
     <string name="settings_emulation_core">Rdzeń emulacji</string>
-    <string name="settings_based_on_vita3k">Oparty na Vita3K</string>
+    <string name="settings_based_on_vita3k">ECV bazuje na rdzeniu Vita3K i jest aktywnie rozwijany przez EmuCore, z własnymi poprawkami i ulepszeniami.</string>
     <string name="settings_developer">Deweloper</string>
     <string name="settings_created_by_sbro">Stworzone przez Sashkin Apps</string>
     <string name="settings_play_store_profile">Profil w Play Store</string>
     <string name="settings_play_store_profile_desc">Zobacz więcej aplikacji na Androida od tego dewelopera.</string>
     <string name="settings_core_source_code">Kod źródłowy rdzenia</string>
-    <string name="settings_core_source_description">EmuCoreV korzysta z własnego interfejsu Android. Tylko rdzeń emulacji jest oparty na Vita3K.</string>
+    <string name="settings_core_source_description">EmuCoreV korzysta z własnego interfejsu Android. ECV bazuje na rdzeniu Vita3K i jest aktywnie rozwijany przez EmuCore, z własnymi poprawkami i ulepszeniami.</string>
     <string name="settings_open_github">Otwórz GitHub</string>
     <string name="settings_vita3k_repository_desc">Otwórz repozytorium nadrzędnego projektu Vita3K.</string>
     <string name="settings_updates_checking_title">Sprawdzanie aktualizacji</string>
@@ -1546,4 +1546,57 @@
     <string name="settings_not_set">Nie ustawiono</string>
     <string name="settings_gamepad_mapping_clear">Wyczyść przypisanie</string>
     <string name="settings_gamepad_mapping_auto_format">Auto</string>
+    <string name="library_view_shelf">Pokaż okładki na półce</string>
+    <string name="library_exit_shelf">Wyjdź z widoku półki</string>
+    <string name="library_shelf_games_counter">%1$d z %2$d</string>
+    <string name="settings_help_dialog_eyebrow">Porada</string>
+    <string name="settings_help_reset_tip_title">Szybki reset</string>
+    <string name="settings_help_reset_tip_body">Przytrzymaj nazwę ustawienia, aby przywrócić tę opcję do jej domyślnej wartości.</string>
+    <string name="feedback_game_loading">Ładowanie Twojej biblioteki gier…</string>
+    <string name="feedback_game_no_matches">Brak pasujących gier</string>
+
+    <string name="library_options">Opcje biblioteki</string>
+    <string name="library_sort_title_asc">Tytuł A-Z</string>
+    <string name="library_sort_title_desc">Tytuł Z-A</string>
+    <string name="library_sort_recent_desc">Ostatnio aktualizowane</string>
+    <string name="library_sort_recent_asc">Najdawniej aktualizowane</string>
+    <string name="library_sort_size_desc">Największe</string>
+    <string name="library_sort_size_asc">Najmniejsze</string>
+    <string name="library_view_grid">Pokaż jako siatkę</string>
+    <string name="library_view_list">Pokaż jako listę</string>
+    <string name="settings_ecv_source">Kod źródłowy ECV</string>
+    <string name="settings_ecv_source_desc">Zobacz kod zmodyfikowanego rdzenia ECV i aplikacji EmuCoreV na GitHubie.</string>
+    <string name="settings_vita3k_license">Licencja oryginalnego Vita3K</string>
+    <string name="settings_vita3k_license_desc">Przeczytaj oryginalną licencję GNU GPL w wersji 2.0 lub nowszej.</string>
+    <string name="settings_core_upstream_version">Wersja oryginalnego rdzenia</string>
+
+    <string name="settings_cover_art_style">Styl okładki</string>
+    <string name="settings_cover_art_style_flat">Płaskie</string>
+    <string name="settings_cover_art_style_3d">Pudełko 3D</string>
+    <string name="settings_help_cover_art_style">Wybiera domyślny typ okładek używany podczas pobierania grafik. Płaskie okładki przypominają klasyczny przedni przód pudełka, natomiast 3D Box używa renderów 3D pod kątem (jeśli źródło je udostępnia). Okładki 3D mogą wyglądać bardziej dramatycznie, ale ich dostępność może być nieco mniejsza niż płaskich.</string>
+    <string name="settings_clear_cover_cache">Wyczyść pamięć podręczną z zasobami okładek u gier z list z pobraniami do kaset  </string>
+    <string name="settings_clear_cover_cache_desc">Zrzuć ze sprzętu stare chwasty lub pobrane pliki podmienne o okładkach. Przeprowadź nowo po awariach z przerwanych opcji pobierających okładkę bez spacji (Usuń i wyrzuć za pobraniem) </string>
+    <string name="settings_clear_cover_cache_confirm_title">Uwolnij balast pamięci oznaczany pod kasetowe obrazki z bazy okładek?</string>
+    <string name="settings_clear_cover_cache_confirm_body">Odcięcie korzeni pod stary rzut zrzutowych piktogramów na okładkę do gry spowoduje uśmiercenie starych. Okna, za to system w tle na czysto odbierze bez zwady okładki nowe do opcji bazy i odświeży. Pozostały zasób z rąk (u użytkownika w formach bazy dla opcji np okładek na gry od niestandardowych bądz modów gry z paczek z systemami) pozostanie pod nietykalnością od nożycy u czyszczących botów z emulatora w apce  </string>
+    <string name="settings_clear_cover_cache_action">Pozbądź się zaległości z bazy opcji okładek (Wyczyść na czysto)</string>
+    <string name="settings_clear_cover_cache_success">Śmietnik z bazy plikowej od pamięci z zasobów okładek rzucony był w kąt po czystce i zamieniony w błysk do zera. Zdjęcia same nowo narzucą sobie przymus rzutu ze skanerem online na uświeżenie paska.</string>
+    <string name="settings_clear_cover_cache_partial">Część zaklepanych zdjęć opatulonych okładkami przy systemowych opcjach blokad bądź trwającym pobraniu uwięzła z nożami od opcji czyścika (Było bez opcji utylizacji przez proces w błędy bądź zajęte okno na uśpieniu na chmurkach systemu ze zdarzeń wewnątrz o działaniach bądz system zajętościami błędu zrzucił obronę na blok bazy poboru.) Podejście drugie z opcją na wyrzut zalecane pod zamknięciem wszystkich kanałów u opcji na ściągnięcie grafik bazy. </string>
+
+    <!-- Rear panel input bindings -->
+    <string name="rear_touch_title">Tylny panel dotykowy</string>
+    <string name="rear_touch_desc">Przypisz punkty tylnego panelu do przycisków, klawiszy, spustów lub myszy.</string>
+    <string name="rear_touch_point">Tylny punkt %1$d</string>
+    <string name="rear_touch_bind">Przypisz przycisk</string>
+    <string name="rear_touch_capture">Naciśnij przycisk kontrolera lub klawiatury, spust, kierunek drążka albo przycisk myszy.</string>
+    <string name="rear_touch_screen">Pokaż przycisk ekranowy</string>
+    <string name="rear_touch_position">Pozycja dotyku</string>
+    <string name="rear_touch_drag">Przeciąganie na ekranie</string>
+    <string name="rear_touch_fixed">Stały punkt</string>
+    <string name="rear_touch_pointer">Wskaźnik myszy</string>
+    <string name="rear_touch_global">Profil globalny</string>
+    <string name="rear_touch_game">Ta gra</string>
+    <string name="rear_touch_inherit">Użyj profilu globalnego</string>
+    <string name="rear_touch_clear">Usuń przypisanie</string>
+    <string name="rear_touch_hint">Przytrzymaj, aby dotknąć tylnego panelu; puść, aby zakończyć dotyk. Przypisane wejścia zastępują zwykłą akcję. Przedni dotyk pozostaje dostępny.</string>
+    <string name="rear_touch_screen_position">Pozycja przycisku ekranowego</string>
 </resources>

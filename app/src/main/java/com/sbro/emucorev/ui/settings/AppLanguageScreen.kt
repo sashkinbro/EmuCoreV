@@ -1,7 +1,10 @@
 package com.sbro.emucorev.ui.settings
 
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.sbro.emucorev.ui.common.gamepadFocusableCard
 import androidx.annotation.StringRes
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import com.sbro.emucorev.ui.theme.neon.neonShape
 
 import androidx.compose.material3.MaterialTheme
@@ -28,14 +29,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
@@ -127,88 +126,88 @@ private fun AppLanguageOptionRow(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val containerColor = if (selected) {
-        MaterialTheme.colorScheme.secondaryContainer
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-    val contentColor = if (selected) {
-        MaterialTheme.colorScheme.onSecondaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
-    val secondaryColor = if (selected) {
-        MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.74f)
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val subtitle = option.nativeLabel
+    SettingsLanguageOptionCard(
+        badgeText = option.shortLabel,
+        title = stringResource(option.titleRes),
+        subtitle = option.nativeLabel?.takeIf { it.isNotEmpty() },
+        selected = selected,
+        onClick = onClick
+    )
+}
 
+@Composable
+internal fun SettingsLanguageOptionCard(
+    badgeText: String,
+    title: String,
+    subtitle: String?,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = neonShape(20.dp)
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(22.dp),
-        color = containerColor,
-        tonalElevation = if (selected) 4.dp else 1.dp,
-        shadowElevation = if (selected) 5.dp else 2.dp,
-        border = BorderStroke(
-            1.dp,
-            if (selected) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f)
-            }
-        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .gamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            ),
+        shape = shape,
+        color = if (selected) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        },
+        interactionSource = interactionSource,
         onClick = onClick
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(42.dp)
                     .clip(neonShape(14.dp))
                     .background(
-                        if (selected) {
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
-                        }
+                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = option.shortLabel,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    text = badgeText,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                     color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(option.titleRes),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = contentColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (!subtitle.isNullOrEmpty()) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = secondaryColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                     )
+                    subtitle?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
             if (selected) {
-                Spacer(
+                Box(
                     modifier = Modifier
-                        .size(12.dp)
-                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
                 )
             }
         }

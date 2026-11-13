@@ -1,5 +1,9 @@
 package com.sbro.emucorev.ui.pro
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.sbro.emucorev.ui.common.gamepadFocusableCard
+import com.sbro.emucorev.ui.common.SettingsStyledDialog
+import com.sbro.emucorev.ui.common.controllerFocus
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import android.app.Activity
 import android.content.Context
@@ -34,7 +38,7 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.QueryStats
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material3.AlertDialog
+import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -61,7 +65,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import com.sbro.emucorev.ui.common.AppDialog as Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.ProProductOffer
@@ -338,39 +342,112 @@ private fun ProSupportDialog(
     onDismiss: () -> Unit
 ) {
     if (LocalNeonTheme.current) {
-        NeonProSupportDialog(
-            offers = offers,
-            purchaseInProgress = purchaseInProgress,
-            onPurchase = onPurchase,
-            onDismiss = onDismiss
-        )
+        NeonProSupportDialog(offers, purchaseInProgress, onPurchase, onDismiss)
         return
     }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Rounded.Star, contentDescription = null, tint = ProGold) },
-        title = { Text(stringResource(R.string.settings_pro_feature_support_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(stringResource(R.string.settings_pro_feature_support_desc))
-                offers.forEach { offer ->
-                    OutlinedButton(
-                        shape = neonButtonShape(),
-                        onClick = { onPurchase(offer.tier) },
+    SettingsStyledDialog(
+        title = stringResource(R.string.settings_pro_support_dialog_title),
+        eyebrow = stringResource(R.string.settings_pro_support_dialog_eyebrow),
+        icon = Icons.Rounded.Star,
+        onDismissRequest = onDismiss
+    ) {
+        Text(
+            text = stringResource(R.string.settings_pro_support_dialog_desc),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        offers.forEach { offer ->
+            val title = stringResource(
+                when (offer.tier) {
+                    ProPurchaseTier.SUPPORTER -> R.string.settings_pro_supporter_title
+                    ProPurchaseTier.PATRON -> R.string.settings_pro_patron_title
+                    ProPurchaseTier.BASE -> R.string.pro_title
+                }
+            )
+            val description = stringResource(
+                when (offer.tier) {
+                    ProPurchaseTier.SUPPORTER -> R.string.settings_pro_supporter_desc
+                    ProPurchaseTier.PATRON -> R.string.settings_pro_patron_desc
+                    ProPurchaseTier.BASE -> R.string.settings_pro_feature_support_desc
+                }
+            )
+            val interactionSource = remember(offer.tier) { MutableInteractionSource() }
+            val shape = neonShape(18.dp)
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .gamepadFocusableCard(
                         enabled = !purchaseInProgress,
-                        modifier = Modifier.fillMaxWidth()
+                        shape = shape,
+                        interactionSource = interactionSource,
+                        addFocusTarget = false
+                    ),
+                enabled = !purchaseInProgress,
+                onClick = { onPurchase(offer.tier) },
+                interactionSource = interactionSource,
+                shape = shape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(neonShape(14.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("${offer.title} · ${offer.formattedPrice}")
+                        Icon(
+                            imageVector = Icons.Rounded.Star,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = offer.formattedPrice,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1
+                    )
                 }
             }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
         }
-    )
+        Text(
+            text = stringResource(R.string.settings_pro_support_same_features),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        TextButton(
+            onClick = onDismiss,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.common_close))
+        }
+    }
 }
 
 @Composable
@@ -380,110 +457,44 @@ private fun NeonProSupportDialog(
     onPurchase: (ProPurchaseTier) -> Unit,
     onDismiss: () -> Unit
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+    SettingsStyledDialog(
+        title = stringResource(R.string.settings_pro_support_dialog_title),
+        eyebrow = stringResource(R.string.settings_pro_support_dialog_eyebrow),
+        icon = Icons.Rounded.Star,
+        onDismissRequest = onDismiss
     ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            contentAlignment = Alignment.Center
+        Text(
+            text = stringResource(R.string.settings_pro_support_dialog_desc),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        offers.forEachIndexed { index, offer ->
+            NeonSupportOfferCard(
+                offer = offer,
+                accent = neonAccentColor(index),
+                enabled = !purchaseInProgress,
+                onClick = { onPurchase(offer.tier) }
+            )
+        }
+
+        Text(
+            text = stringResource(R.string.settings_pro_support_same_features),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Button(
+            shape = neonButtonShape(),
+            onClick = onDismiss,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 560.dp)
-                    .heightIn(max = maxHeight),
-                shape = neonShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                border = BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
-                ),
-                tonalElevation = 0.dp,
-                shadowElevation = 18.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(neonShape(16.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Star,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.settings_pro_support_dialog_eyebrow),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = stringResource(R.string.settings_pro_support_dialog_title),
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = stringResource(R.string.settings_pro_support_dialog_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    offers.forEachIndexed { index, offer ->
-                        NeonSupportOfferCard(
-                            offer = offer,
-                            accent = neonAccentColor(index),
-                            enabled = !purchaseInProgress,
-                            onClick = { onPurchase(offer.tier) }
-                        )
-                    }
-
-                    Text(
-                        text = stringResource(R.string.settings_pro_support_same_features),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Button(
-                        shape = neonButtonShape(),
-                        onClick = onDismiss,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = stringResource(R.string.common_close),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        )
-                    }
-                }
-            }
+            Text(
+                text = stringResource(R.string.common_close),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
         }
     }
 }
@@ -506,7 +517,7 @@ private fun NeonSupportOfferCard(
         ProPurchaseTier.BASE -> R.string.settings_pro_feature_support_desc
     }
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonShape(18.dp)),
         enabled = enabled,
         onClick = onClick,
         shape = neonShape(18.dp),

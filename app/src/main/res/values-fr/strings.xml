@@ -16,9 +16,9 @@
     <string name="home_empty_library_body">Installez le firmware, le paquet de mise à jour du firmware, et ajoutez vos jeux sur l\'écran Jeux. Ils apparaîtront ici automatiquement.</string>
     <string name="home_recent_titles_title">Récemment joués</string>
     <string name="home_disclaimer_title">À propos d\'EmuCoreV</string>
-    <string name="home_disclaimer_body">EmuCoreV est un émulateur PS Vita pour Android basé sur Vita3K.</string>
+    <string name="home_disclaimer_body">EmuCoreV est un émulateur PS Vita pour Android utilisant le cœur ECV.</string>
     <string name="onboarding_page_1_title">PlayStation Vita sur Android</string>
-    <string name="onboarding_page_1_body">Jouez à vos jeux PS Vita sur Android avec le cœur Vita3K.</string>
+    <string name="onboarding_page_1_body">Jouez à vos jeux PS Vita sur Android avec le cœur ECV.</string>
     <string name="onboarding_page_2_title">Votre bibliothèque de jeux</string>
     <string name="onboarding_page_2_body">Vos jeux installés sont rassemblés dans une seule bibliothèque.</string>
     <string name="onboarding_page_3_title">Catalogue intégré</string>
@@ -188,7 +188,7 @@
     <string name="settings_storage_title">Stockage</string>
     <string name="settings_storage_body">Les données de l\'émulateur sont stockées dans le répertoire des fichiers de l\'application sous vita/. Les jeux installés sont dans ux0/app, le cache des shaders dans cache, et les patchs dans patch.</string>
     <string name="settings_about_title">À propos d\'EmuCoreV</string>
-    <string name="settings_about_body">EmuCoreV est un émulateur PS Vita pour Android basé sur le projet open-source Vita3K.</string>
+    <string name="settings_about_body">EmuCoreV est un émulateur PS Vita pour Android utilisant le cœur ECV.</string>
     <string name="settings_help_content_description">Ouvrir l\'aide des paramètres</string>
     <string name="settings_help_dialog_label">Guide du réglage</string>
     <string name="settings_help_dialog_tip">Modifiez une seule option à la fois, puis testez la même scène du jeu pour voir ce qui s’améliore vraiment.</string>
@@ -330,12 +330,12 @@
     <string name="settings_help_check_for_updates">Garde les vérifications de mise à jour activées.\n\nUtilisez ce réglage pour adapter l’interface de l’émulateur ou la présentation système en jeu. Gardez le défaut si vous n’avez pas besoin d’informations ou de changements visuels.</string>
     <string name="settings_about_emucorev">À propos d\'EmuCoreV</string>
     <string name="settings_emulation_core">Cœur d\'émulation</string>
-    <string name="settings_based_on_vita3k">Basé sur Vita3K</string>
+    <string name="settings_based_on_vita3k">ECV est basé sur le cœur Vita3K et EmuCore poursuit activement son développement avec ses propres corrections et améliorations.</string>
     <string name="settings_developer">Développeur</string>
     <string name="settings_created_by_sbro">Créé par Sashkin Apps</string>
     <string name="settings_play_store_profile">Profil Play Store</string>
     <string name="settings_core_source_code">Code source du cœur</string>
-    <string name="settings_core_source_description">EmuCoreV utilise sa propre interface Android. Seul le cœur d’émulation est basé sur Vita3K.</string>
+    <string name="settings_core_source_description">EmuCoreV utilise sa propre interface Android. ECV est basé sur le cœur Vita3K et EmuCore poursuit activement son développement avec ses propres corrections et améliorations.</string>
     <string name="settings_open_github">Ouvrir GitHub</string>
     <string name="emulator_choose_file">Choisir un fichier</string>
     <string name="emulator_choose_folder">Choisir un dossier</string>
@@ -529,7 +529,7 @@
     <string name="settings_tab_updates">Mises à jour</string>
     <string name="settings_about_version">Version de l\'application</string>
     <string name="settings_about_version_value">Version %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV apporte l\'émulation PS Vita sur Android avec une interface mobile ciblée, une gestion de bibliothèque locale et un cœur d\'émulation basé sur Vita3K.</string>
+    <string name="settings_about_body_extended">EmuCoreV est un émulateur PS Vita pour Android utilisant le cœur ECV. ECV est basé sur le cœur Vita3K et EmuCore poursuit activement son développement avec ses propres corrections et améliorations.</string>
     <string name="settings_about_community_title">Communauté et support</string>
     <string name="settings_about_repository">Dépôt EmuCoreV</string>
     <string name="settings_about_repository_desc">Voir le code source, signaler des problèmes et suivre le développement sur GitHub.</string>
@@ -1543,4 +1543,57 @@
     <string name="settings_not_set">Non défini</string>
     <string name="settings_gamepad_mapping_clear">Effacer</string>
     <string name="settings_gamepad_mapping_auto_format">Auto</string>
+    <string name="library_view_shelf">Afficher l\'étagère de jaquettes</string>
+    <string name="library_exit_shelf">Quitter l\'étagère de jaquettes</string>
+    <string name="library_shelf_games_counter">%1$d sur %2$d</string>
+    <string name="settings_help_dialog_eyebrow">Astuce de paramètre</string>
+    <string name="settings_help_reset_tip_title">Réinitialisation rapide</string>
+    <string name="settings_help_reset_tip_body">Appuyez longuement sur le nom d\'un paramètre pour restaurer sa valeur par défaut.</string>
+    <string name="feedback_game_loading">Chargement de votre bibliothèque de jeux…</string>
+    <string name="feedback_game_no_matches">Aucun jeu correspondant</string>
+
+    <string name="library_options">Options de la bibliothèque</string>
+    <string name="library_sort_title_asc">Titre A-Z</string>
+    <string name="library_sort_title_desc">Titre Z-A</string>
+    <string name="library_sort_recent_desc">Récemment mis à jour</string>
+    <string name="library_sort_recent_asc">Mis à jour il y a longtemps</string>
+    <string name="library_sort_size_desc">Plus grand</string>
+    <string name="library_sort_size_asc">Plus petit</string>
+    <string name="library_view_grid">Afficher en grille</string>
+    <string name="library_view_list">Afficher en liste</string>
+    <string name="settings_ecv_source">Code source d’ECV</string>
+    <string name="settings_ecv_source_desc">Voir le code du cœur ECV modifié et de l’application EmuCoreV sur GitHub.</string>
+    <string name="settings_vita3k_license">Licence du projet Vita3K original</string>
+    <string name="settings_vita3k_license_desc">Lire la licence originale GNU GPL version 2.0 ou ultérieure.</string>
+    <string name="settings_core_upstream_version">Version du cœur d’origine</string>
+
+    <string name="settings_cover_art_style">Style de jaquette</string>
+    <string name="settings_cover_art_style_flat">Plat</string>
+    <string name="settings_cover_art_style_3d">Boîte 3D</string>
+    <string name="settings_help_cover_art_style">Choisit le type de jaquette par défaut utilisé lors du téléchargement d\'images. Les jaquettes plates correspondent à l\'aspect classique de la face avant de la boîte, tandis que Boîte 3D utilise des rendus de boîtes inclinées lorsque la source les fournit. Les jaquettes 3D peuvent paraître plus spectaculaires, mais leur disponibilité peut être légèrement inférieure à celle des images plates.</string>
+    <string name="settings_clear_cover_cache">Vider le cache des jaquettes</string>
+    <string name="settings_clear_cover_cache_desc">Supprime les jaquettes téléchargées temporairement et relance les téléchargements échoués.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Vider le cache des jaquettes ?</string>
+    <string name="settings_clear_cover_cache_confirm_body">Les jaquettes téléchargées seront supprimées puis téléchargées à nouveau automatiquement. Les jaquettes personnalisées et les fichiers de jeu ne seront pas modifiés.</string>
+    <string name="settings_clear_cover_cache_action">Vider</string>
+    <string name="settings_clear_cover_cache_success">Cache des jaquettes vidé. Les jaquettes seront téléchargées à nouveau automatiquement.</string>
+    <string name="settings_clear_cover_cache_partial">Certaines jaquettes en cache n’ont pas pu être supprimées. Réessayez après la fin des téléchargements en cours.</string>
+
+    <!-- Rear panel input bindings -->
+    <string name="rear_touch_title">Pavé tactile arrière</string>
+    <string name="rear_touch_desc">Associez les points arrière aux boutons, touches, gâchettes ou à la souris.</string>
+    <string name="rear_touch_point">Point arrière %1$d</string>
+    <string name="rear_touch_bind">Associer un bouton</string>
+    <string name="rear_touch_capture">Appuyez sur un bouton de manette ou du clavier, une gâchette, une direction du stick ou un bouton de souris.</string>
+    <string name="rear_touch_screen">Afficher le bouton tactile</string>
+    <string name="rear_touch_position">Position du contact</string>
+    <string name="rear_touch_drag">Glisser sur l’écran</string>
+    <string name="rear_touch_fixed">Point fixe</string>
+    <string name="rear_touch_pointer">Pointeur de souris</string>
+    <string name="rear_touch_global">Profil global</string>
+    <string name="rear_touch_game">Ce jeu</string>
+    <string name="rear_touch_inherit">Utiliser le profil global</string>
+    <string name="rear_touch_clear">Effacer l’association</string>
+    <string name="rear_touch_hint">Maintenez pour toucher le pavé arrière ; relâchez pour lever le contact. Les entrées associées remplacent leur action habituelle. Le tactile avant reste disponible.</string>
+    <string name="rear_touch_screen_position">Position du bouton tactile</string>
 </resources>

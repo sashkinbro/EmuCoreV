@@ -1,29 +1,24 @@
 package com.sbro.emucorev.ui.settings
 
+import com.sbro.emucorev.ui.common.AppAlertDialog
+import com.sbro.emucorev.ui.common.SettingsStyledDialog
+import com.sbro.emucorev.ui.common.controllerFocus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Mouse
 import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -55,8 +50,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.KeyboardMouseActions
 import com.sbro.emucorev.core.KeyboardMouseBindings
@@ -125,75 +118,23 @@ fun KeyboardMouseSettingsDialog(
     onUseGlobal: (() -> Unit)? = null
 ) {
     val connection by KeyboardMouseManager.connection.collectAsState()
-    Dialog(
+    SettingsStyledDialog(
+        title = stringResource(R.string.settings_keyboard_mouse_section),
+        eyebrow = stringResource(R.string.app_name_emucorev),
+        icon = Icons.Rounded.Keyboard,
         onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+        edgeToEdgeContent = true
     ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 720.dp)
-                    .heightIn(max = maxHeight),
-                shape = neonShape(28.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp,
-                shadowElevation = 18.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 18.dp, vertical = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(neonShape(14.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Keyboard,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        Text(
-                            text = stringResource(R.string.settings_keyboard_mouse_section),
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-                    KeyboardMouseSettingsContent(
-                        settings = settings,
-                        onSettingsChange = onSettingsChange,
-                        connection = connection,
-                        showTitle = false,
-                        contextNote = stringResource(R.string.settings_keyboard_mouse_game_desc),
-                        onUseGlobal = onUseGlobal
-                    )
-                    TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.close))
-                    }
-                }
-            }
+        KeyboardMouseSettingsContent(
+            settings = settings,
+            onSettingsChange = onSettingsChange,
+            connection = connection,
+            showTitle = false,
+            contextNote = stringResource(R.string.settings_keyboard_mouse_game_desc),
+            onUseGlobal = onUseGlobal
+        )
+        TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.close))
         }
     }
 }
@@ -417,7 +358,7 @@ private fun KeyboardMouseSettingsContent(
             content()
         }
     } else {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             content()
         }
     }
@@ -456,219 +397,159 @@ private fun KeyboardMouseMappingDialog(
         KeyboardMouseMappingSource.KEYBOARD
     }
 
-    Dialog(
+    SettingsStyledDialog(
+        title = stringResource(if (mappingSource == KeyboardMouseMappingSource.MOUSE) R.string.settings_mouse_mapping_title else R.string.settings_keyboard_mapping_title),
+        eyebrow = stringResource(R.string.app_name_emucorev),
+        icon = if (mappingSource == KeyboardMouseMappingSource.MOUSE) Icons.Rounded.Mouse else Icons.Rounded.Keyboard,
         onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+        edgeToEdgeContent = true
     ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 720.dp)
-                    .heightIn(max = maxHeight),
-                shape = neonShape(28.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp,
-                shadowElevation = 18.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 18.dp, vertical = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(neonShape(14.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
-                                    Icons.Rounded.Mouse
-                                } else {
-                                    Icons.Rounded.Keyboard
-                                },
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(0, 1).forEach { padIndex ->
+                FilterChip(
+                    shape = neonChipShape(),
+                    selected = selectedPad == padIndex,
+                    onClick = { selectedPad = padIndex },
+                    colors = keyboardMouseChipColors(),
+                    label = {
                         Text(
-                            text = stringResource(
-                                if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
-                                    R.string.settings_mouse_mapping_title
+                            stringResource(
+                                if (padIndex == 0) {
+                                    R.string.settings_gamepad_player_1
                                 } else {
-                                    R.string.settings_keyboard_mapping_title
-                                }
-                            ),
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(0, 1).forEach { padIndex ->
-                            FilterChip(
-                                shape = neonChipShape(),
-                                selected = selectedPad == padIndex,
-                                onClick = { selectedPad = padIndex },
-                                colors = keyboardMouseChipColors(),
-                                label = {
-                                    Text(
-                                        stringResource(
-                                            if (padIndex == 0) {
-                                                R.string.settings_gamepad_player_1
-                                            } else {
-                                                R.string.settings_gamepad_player_2
-                                            }
-                                        )
-                                    )
+                                    R.string.settings_gamepad_player_2
                                 }
                             )
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            shape = neonChipShape(),
-                            selected = mappingSource == KeyboardMouseMappingSource.KEYBOARD,
-                            onClick = { source = KeyboardMouseMappingSource.KEYBOARD.ordinal },
-                            colors = keyboardMouseChipColors(),
-                            label = { Text(stringResource(R.string.settings_keyboard_mouse_source_keyboard)) }
-                        )
-                        FilterChip(
-                            shape = neonChipShape(),
-                            selected = mappingSource == KeyboardMouseMappingSource.MOUSE,
-                            onClick = { source = KeyboardMouseMappingSource.MOUSE.ordinal },
-                            colors = keyboardMouseChipColors(),
-                            label = { Text(stringResource(R.string.settings_keyboard_mouse_source_mouse)) }
                         )
                     }
-                    Text(
-                        text = stringResource(
-                            if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
-                                R.string.settings_mouse_mapping_desc
-                            } else {
-                                R.string.settings_keyboard_mapping_desc
-                            }
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    val customBindings = if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
-                        settings.mouseBindingsByPad[selectedPad].orEmpty()
-                    } else {
-                        settings.keyboardBindingsByPad[selectedPad].orEmpty()
-                    }
-                    for (action in KeyboardMouseActions.all) {
-                        val resolved = if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
-                            KeyboardMouseBindings.resolveMouseBinding(action.id, customBindings)
-                        } else {
-                            KeyboardMouseBindings.resolveKeyboardBinding(action.id, customBindings)
-                        }
-                        val hasCustom = customBindings.containsKey(action.id)
-                        val value = when {
-                            resolved == null -> stringResource(R.string.settings_not_set)
-                            mappingSource == KeyboardMouseMappingSource.MOUSE ->
-                                KeyboardMouseBindings.mouseButtonLabel(resolved)
-                            else -> KeyboardMouseBindings.keyboardKeyLabel(resolved)
-                        }
-                        KeyboardMouseBindingRow(
-                            title = keyboardMouseActionLabel(action.id),
-                            value = value,
-                            autoLabel = if (!hasCustom && resolved != null) {
-                                stringResource(R.string.settings_gamepad_mapping_auto_format)
-                            } else {
-                                null
-                            },
-                            icon = if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
-                                Icons.Rounded.Mouse
-                            } else {
-                                Icons.Rounded.Keyboard
-                            },
-                            onBindClick = {
-                                if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
-                                    KeyboardMouseManager.startMouseBindingCapture(selectedPad, action.id) { button ->
-                                        val updated = KeyboardMouseBindings.assign(customBindings, action.id, button)
-                                        onSettingsChange(
-                                            settings.copy(
-                                                mouseBindingsByPad = settings.mouseBindingsByPad +
-                                                    (selectedPad to updated)
-                                            )
-                                        )
-                                    }
-                                } else {
-                                    KeyboardMouseManager.startKeyboardBindingCapture(selectedPad, action.id) { keyCode ->
-                                        val updated = KeyboardMouseBindings.assign(customBindings, action.id, keyCode)
-                                        onSettingsChange(
-                                            settings.copy(
-                                                keyboardBindingsByPad = settings.keyboardBindingsByPad +
-                                                    (selectedPad to updated)
-                                            )
-                                        )
-                                    }
-                                }
-                            },
-                            onClearClick = if (hasCustom || resolved != null) {
-                                {
-                                    val updated = KeyboardMouseBindings.clear(customBindings, action.id)
-                                    onSettingsChange(
-                                        if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
-                                            settings.copy(
-                                                mouseBindingsByPad = settings.mouseBindingsByPad +
-                                                    (selectedPad to updated)
-                                            )
-                                        } else {
-                                            settings.copy(
-                                                keyboardBindingsByPad = settings.keyboardBindingsByPad +
-                                                    (selectedPad to updated)
-                                            )
-                                        }
-                                    )
-                                }
-                            } else {
-                                null
-                            }
-                        )
-                    }
-                    KeyboardMouseBindingRow(
-                        title = stringResource(R.string.settings_keyboard_mouse_mapping_reset_title),
-                        value = stringResource(R.string.settings_keyboard_mouse_mapping_reset_desc),
-                        autoLabel = null,
-                        icon = Icons.Rounded.SettingsSuggest,
-                        valueColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        onBindClick = {
-                            onSettingsChange(
-                                if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
-                                    settings.copy(mouseBindingsByPad = settings.mouseBindingsByPad - selectedPad)
-                                } else {
-                                    settings.copy(keyboardBindingsByPad = settings.keyboardBindingsByPad - selectedPad)
-                                }
-                            )
-                        },
-                        onClearClick = null
-                    )
-                    TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.close))
-                    }
-                }
+                )
             }
         }
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                shape = neonChipShape(),
+                selected = mappingSource == KeyboardMouseMappingSource.KEYBOARD,
+                onClick = { source = KeyboardMouseMappingSource.KEYBOARD.ordinal },
+                colors = keyboardMouseChipColors(),
+                label = { Text(stringResource(R.string.settings_keyboard_mouse_source_keyboard)) }
+            )
+            FilterChip(
+                shape = neonChipShape(),
+                selected = mappingSource == KeyboardMouseMappingSource.MOUSE,
+                onClick = { source = KeyboardMouseMappingSource.MOUSE.ordinal },
+                colors = keyboardMouseChipColors(),
+                label = { Text(stringResource(R.string.settings_keyboard_mouse_source_mouse)) }
+            )
+        }
+        Text(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            text = stringResource(
+                if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
+                    R.string.settings_mouse_mapping_desc
+                } else {
+                    R.string.settings_keyboard_mapping_desc
+                }
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        val customBindings = if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
+            settings.mouseBindingsByPad[selectedPad].orEmpty()
+        } else {
+            settings.keyboardBindingsByPad[selectedPad].orEmpty()
+        }
+        for (action in KeyboardMouseActions.all) {
+            val resolved = if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
+                KeyboardMouseBindings.resolveMouseBinding(action.id, customBindings)
+            } else {
+                KeyboardMouseBindings.resolveKeyboardBinding(action.id, customBindings)
+            }
+            val hasCustom = customBindings.containsKey(action.id)
+            val value = when {
+                resolved == null -> stringResource(R.string.settings_not_set)
+                mappingSource == KeyboardMouseMappingSource.MOUSE ->
+                    KeyboardMouseBindings.mouseButtonLabel(resolved)
+                else -> KeyboardMouseBindings.keyboardKeyLabel(resolved)
+            }
+            KeyboardMouseBindingRow(
+                title = keyboardMouseActionLabel(action.id),
+                value = value,
+                autoLabel = if (!hasCustom && resolved != null) {
+                    stringResource(R.string.settings_gamepad_mapping_auto_format)
+                } else {
+                    null
+                },
+                icon = if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
+                    Icons.Rounded.Mouse
+                } else {
+                    Icons.Rounded.Keyboard
+                },
+                onBindClick = {
+                    if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
+                        KeyboardMouseManager.startMouseBindingCapture(selectedPad, action.id) { button ->
+                            val updated = KeyboardMouseBindings.assign(customBindings, action.id, button)
+                            onSettingsChange(
+                                settings.copy(
+                                    mouseBindingsByPad = settings.mouseBindingsByPad +
+                                        (selectedPad to updated)
+                                )
+                            )
+                        }
+                    } else {
+                        KeyboardMouseManager.startKeyboardBindingCapture(selectedPad, action.id) { keyCode ->
+                            val updated = KeyboardMouseBindings.assign(customBindings, action.id, keyCode)
+                            onSettingsChange(
+                                settings.copy(
+                                    keyboardBindingsByPad = settings.keyboardBindingsByPad +
+                                        (selectedPad to updated)
+                                )
+                            )
+                        }
+                    }
+                },
+                onClearClick = if (hasCustom || resolved != null) {
+                    {
+                        val updated = KeyboardMouseBindings.clear(customBindings, action.id)
+                        onSettingsChange(
+                            if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
+                                settings.copy(
+                                    mouseBindingsByPad = settings.mouseBindingsByPad +
+                                        (selectedPad to updated)
+                                )
+                            } else {
+                                settings.copy(
+                                    keyboardBindingsByPad = settings.keyboardBindingsByPad +
+                                        (selectedPad to updated)
+                                )
+                            }
+                        )
+                    }
+                } else {
+                    null
+                }
+            )
+        }
+        KeyboardMouseBindingRow(
+            title = stringResource(R.string.settings_keyboard_mouse_mapping_reset_title),
+            value = stringResource(R.string.settings_keyboard_mouse_mapping_reset_desc),
+            autoLabel = null,
+            icon = Icons.Rounded.SettingsSuggest,
+            valueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            onBindClick = {
+                onSettingsChange(
+                    if (mappingSource == KeyboardMouseMappingSource.MOUSE) {
+                        settings.copy(mouseBindingsByPad = settings.mouseBindingsByPad - selectedPad)
+                    } else {
+                        settings.copy(keyboardBindingsByPad = settings.keyboardBindingsByPad - selectedPad)
+                    }
+                )
+            },
+            onClearClick = null
+        )
+        TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.close))
+        }
+
     }
 
     val activeCapture = capture
@@ -683,75 +564,36 @@ private fun KeyboardMouseCapturePrompt(capture: KeyboardMouseManager.BindingCapt
     LaunchedEffect(capture) {
         focusRequester.requestFocus()
     }
-    Dialog(
+    AppAlertDialog(
         onDismissRequest = { KeyboardMouseManager.cancelBindingCapture() },
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 480.dp),
-                shape = neonShape(24.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp,
-                shadowElevation = 18.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester)
-                        .focusable()
-                        .onPreviewKeyEvent { event ->
-                            KeyboardMouseManager.handleKeyBindingCapture(event.nativeKeyEvent)
-                        }
-                        .pointerInteropFilter { event ->
-                            KeyboardMouseManager.handleMouseBindingCapture(event)
-                        }
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = stringResource(
-                            if (capture.source == KeyboardMouseManager.BindingSource.MOUSE) {
-                                R.string.settings_mouse_mapping_listening_title
-                            } else {
-                                R.string.settings_keyboard_mapping_listening_title
-                            }
-                        ),
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(
-                            if (capture.source == KeyboardMouseManager.BindingSource.MOUSE) {
-                                R.string.settings_mouse_mapping_listening_desc
-                            } else {
-                                R.string.settings_keyboard_mapping_listening_desc
-                            }
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    TextButton(
-                        onClick = { KeyboardMouseManager.cancelBindingCapture() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(stringResource(R.string.close))
-                    }
-                }
+        modifier = Modifier
+            .focusRequester(focusRequester)
+            .focusable()
+            .onPreviewKeyEvent { event ->
+                KeyboardMouseManager.handleKeyBindingCapture(event.nativeKeyEvent)
+            }
+            .pointerInteropFilter { event ->
+                KeyboardMouseManager.handleMouseBindingCapture(event)
+            },
+        icon = {
+            Icon(
+                imageVector = if (capture.source == KeyboardMouseManager.BindingSource.MOUSE) Icons.Rounded.Mouse else Icons.Rounded.Keyboard,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = {
+            Text(stringResource(if (capture.source == KeyboardMouseManager.BindingSource.MOUSE) R.string.settings_mouse_mapping_listening_title else R.string.settings_keyboard_mapping_listening_title))
+        },
+        text = {
+            Text(stringResource(if (capture.source == KeyboardMouseManager.BindingSource.MOUSE) R.string.settings_mouse_mapping_listening_desc else R.string.settings_keyboard_mapping_listening_desc))
+        },
+        confirmButton = {
+            TextButton(onClick = { KeyboardMouseManager.cancelBindingCapture() }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.close))
             }
         }
-    }
+    )
 }
 
 @Composable
@@ -763,7 +605,7 @@ private fun KeyboardMouseToggleRow(
     onCheckedChange: (Boolean) -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonShape(18.dp)),
         shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
         onClick = { onCheckedChange(!checked) }
@@ -788,7 +630,7 @@ private fun KeyboardMouseToggleRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
+            Switch(checked = checked, onCheckedChange = null)
         }
     }
 }
@@ -840,7 +682,7 @@ private fun KeyboardMouseClickRow(
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonChipShape()),
         shape = neonChipShape(),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
         onClick = onClick
@@ -880,7 +722,7 @@ private fun KeyboardMouseBindingRow(
     onClearClick: (() -> Unit)?
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = (Modifier.fillMaxWidth().padding(horizontal = 16.dp)).controllerFocus(shape = neonChipShape()),
         shape = neonChipShape(),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
         onClick = onBindClick
@@ -1001,10 +843,7 @@ private fun KeyboardMouseSliderItem(
 }
 
 @Composable
-private fun keyboardMouseChipColors() = FilterChipDefaults.filterChipColors(
-    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-)
+private fun keyboardMouseChipColors() = com.sbro.emucorev.ui.common.premiumFilterChipColors()
 
 @Composable
 private fun keyboardMouseActionLabel(actionId: String): String = when (actionId) {

@@ -1,5 +1,8 @@
 package com.sbro.emucorev.ui.catalog
 
+import androidx.compose.ui.draw.clip
+import com.sbro.emucorev.ui.common.AppAlertDialog
+import com.sbro.emucorev.ui.common.controllerFocus
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
@@ -95,7 +98,9 @@ import com.sbro.emucorev.data.VitaCompatibilitySummary
 import com.sbro.emucorev.data.VitaCatalogEntry
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.ScreenTopBar
-import com.sbro.emucorev.ui.common.UrlImage
+import com.sbro.emucorev.ui.common.GameCoverArt
+import com.sbro.emucorev.ui.common.GameCoverAspectRatio
+import androidx.compose.ui.graphics.RectangleShape
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.CompactCardContentPadding
@@ -314,7 +319,7 @@ private fun CatalogTopBarAction(
 ) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.size(48.dp),
+        modifier = (Modifier.size(48.dp)).controllerFocus(shape = neonShape(16.dp)),
         shape = neonShape(16.dp),
         color = if (selected) {
             MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
@@ -356,6 +361,7 @@ private fun CatalogSearchPanel(
             if (query.isNotBlank()) {
                 val clearClick = rememberDebouncedClick { onQueryChange("") }
                 Surface(
+        modifier = Modifier.controllerFocus(shape = neonPillShape()),
                     shape = neonPillShape(),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                     onClick = clearClick
@@ -404,15 +410,10 @@ private fun CatalogFiltersPanel(
     onMinRating: (Float?) -> Unit,
     onClear: () -> Unit
 ) {
-    Surface(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(22.dp),
-        color = MaterialTheme.colorScheme.surface
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(CardContentPadding),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
             Text(
                 text = stringResource(R.string.catalog_filters_title),
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
@@ -500,7 +501,6 @@ private fun CatalogFiltersPanel(
                     }
                 }
             }
-        }
     }
 }
 
@@ -515,7 +515,7 @@ private fun FilterMenuChip(
 ) {
     Box {
         Surface(
-            modifier = modifier,
+            modifier = (modifier).controllerFocus(shape = neonPillShape()),
             shape = neonPillShape(),
             color = MaterialTheme.colorScheme.surface,
             onClick = { onExpandedChange(true) }
@@ -554,23 +554,29 @@ private fun CatalogGameCard(
 ) {
     val openClick = rememberDebouncedClick(onClick = onClick)
     var showProfileMenu by remember { mutableStateOf(false) }
+    var is3dCover by remember(game.igdbId) { mutableStateOf(false) }
     Surface(
-        modifier = modifier,
-        shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surface,
+        modifier = (modifier).controllerFocus(shape = RectangleShape),
+        shape = RectangleShape,
+        color = if (is3dCover) Color.Transparent else MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        border = null,
         onClick = openClick
     ) {
         Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(2f / 3f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                    .aspectRatio(GameCoverAspectRatio)
+                    .background(if (is3dCover) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
             ) {
-                UrlImage(
-                    imageUrl = game.coverUrl,
+                GameCoverArt(
+                    igdbId = game.igdbId,
                     contentDescription = game.name,
-                    fallbackLabel = game.name,
+                    fallbackTitle = game.name,
+                    onPresentationChanged = { is3dCover = it },
                     modifier = Modifier.fillMaxSize()
                 )
                 game.compatibility?.let { compatibility ->
@@ -579,14 +585,14 @@ private fun CatalogGameCard(
                         compact = compact,
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .padding(10.dp)
+                            .padding(8.dp)
                     )
                 }
                 profileStatus?.let { status ->
                     Surface(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .padding(10.dp),
+                            .padding(8.dp),
                         shape = neonPillShape(),
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)
                     ) {
@@ -604,7 +610,7 @@ private fun CatalogGameCard(
                     Surface(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(10.dp),
+                            .padding(8.dp),
                         shape = neonPillShape(),
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)
                     ) {
@@ -640,7 +646,7 @@ private fun CatalogGameCard(
                     .fillMaxWidth()
                     .heightIn(min = if (compact) 76.dp else 84.dp)
                     .padding(
-                        horizontal = if (compact) CompactCardContentPadding else CardContentPadding,
+                        horizontal = if (compact) 10.dp else 12.dp,
                         vertical = if (compact) 8.dp else 10.dp
                     ),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -707,77 +713,47 @@ private fun CatalogProfileDialog(
     onClearStatus: () -> Unit,
     onFavorite: (Boolean) -> Unit
 ) {
-    Dialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            val scrollState = rememberScrollState()
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 620.dp)
-                    .heightIn(max = maxHeight),
-                shape = neonShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tonalElevation = 10.dp,
-                shadowElevation = 18.dp,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(scrollState)
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(52.dp),
-                            shape = neonShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                        ) {
-                            UrlImage(
-                                imageUrl = game.coverUrl,
-                                contentDescription = game.name,
-                                fallbackLabel = game.name,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.catalog_profile_menu),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = game.name,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_close))
-                        }
-                    }
-
+        showEyebrow = false,
+        showIconContainer = false,
+        icon = {
+            GameCoverArt(
+                igdbId = game.igdbId,
+                contentDescription = game.name,
+                fallbackTitle = game.name,
+                modifier = Modifier.widthIn(max = 52.dp)
+                    .aspectRatio(GameCoverAspectRatio, matchHeightConstraintsFirst = true)
+            )
+        },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.catalog_profile_menu),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = game.name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_close))
+                }
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                     Surface(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonShape(18.dp)),
                         shape = neonShape(18.dp),
                         color = if (isFavorite) {
                             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
@@ -822,7 +798,7 @@ private fun CatalogProfileDialog(
 
                     ProfileGameStatus.entries.forEach { status ->
                         Surface(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonShape(18.dp)),
                             shape = neonShape(18.dp),
                             color = if (profileStatus == status) {
                                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
@@ -862,10 +838,11 @@ private fun CatalogProfileDialog(
                             Text(stringResource(R.string.catalog_profile_clear_status))
                         }
                     }
-                }
+
             }
-        }
-    }
+        },
+        confirmButton = {}
+    )
 }
 
 @Composable
@@ -911,6 +888,7 @@ private fun ScrollToTopButton(
         modifier = modifier
     ) {
         Surface(
+        modifier = Modifier.controllerFocus(shape = neonShape(18.dp)),
             shape = neonShape(18.dp),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
             onClick = guardedClick
@@ -960,19 +938,20 @@ private fun CompatibilityBadge(
     val content = compatibilityContentColor(compatibility.state)
     Surface(
         modifier = modifier,
-        shape = neonPillShape(),
+        shape = neonShape(8.dp),
         color = background,
-        shadowElevation = 6.dp
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
     ) {
         Text(
             text = stringResource(compatibility.state.labelResId()),
             modifier = Modifier.padding(
-                horizontal = if (compact) 9.dp else 11.dp,
-                vertical = if (compact) 6.dp else 7.dp
+                horizontal = 8.dp,
+                vertical = 3.dp
             ),
-            style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             color = content,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Bold,
             maxLines = 1
         )
     }

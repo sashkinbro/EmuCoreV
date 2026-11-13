@@ -1,5 +1,8 @@
 package com.sbro.emucorev.ui.detail
 
+import com.sbro.emucorev.ui.common.shimmer
+
+import com.sbro.emucorev.ui.common.controllerFocus
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -63,7 +66,7 @@ import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.VideoLibrary
-import androidx.compose.material3.AlertDialog
+import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -87,6 +90,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalLayoutDirection
+import com.sbro.emucorev.ui.common.gamepadFocusableCard
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -103,7 +110,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
+import com.sbro.emucorev.ui.common.AppDialog as Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
@@ -119,12 +126,11 @@ import com.sbro.emucorev.core.VitaLaunchBridge
 import com.sbro.emucorev.core.VitaLaunchBridge.LaunchResult
 import com.sbro.emucorev.data.VitaCompatibilityState
 import com.sbro.emucorev.data.VitaCompatibilitySummary
-import com.sbro.emucorev.data.VitaCatalogDetails
-import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.GameCoverArt
+import com.sbro.emucorev.ui.common.GameCoverAspectRatio
 import com.sbro.emucorev.ui.common.ImmersiveMode
 import com.sbro.emucorev.ui.common.NavigationBackButton
 import com.sbro.emucorev.ui.common.SectionCard
-import com.sbro.emucorev.ui.common.UrlImage
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.CompactCardContentPadding
@@ -181,9 +187,11 @@ fun GameDetailScreen(
 
     val game = uiState.game
     val catalog = uiState.catalogEntry
+    var is3dCover by remember(game?.titleId, if (game == null) catalog?.igdbId else null) {
+        mutableStateOf(false)
+    }
     val compatibility = uiState.compatibility
     val displayTitle = game?.title ?: catalog?.name ?: stringResource(R.string.common_not_available)
-    val heroImage = catalogDetailImageUrl(catalog) ?: game?.iconPath
     val knownTitleIds = remember(game?.titleId, catalog?.serials) {
         buildList {
             game?.titleId?.takeIf(String::isNotBlank)?.let(::add)
@@ -322,25 +330,17 @@ fun GameDetailScreen(
                                 modifier = Modifier
                                     .padding(top = 10.dp, bottom = 10.dp, start = 8.dp)
                                     .width(heroMaxWidth)
-                                    .aspectRatio(2f / 3f)
-                                    .clip(neonShape(28.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                                    .aspectRatio(GameCoverAspectRatio)
+                                    .background(if (is3dCover) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                             ) {
-                                if (heroImage == game?.iconPath) {
-                                    LocalImage(
-                                        path = game?.iconPath,
-                                        contentDescription = displayTitle,
-                                        fallbackLabel = displayTitle,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                } else {
-                                    UrlImage(
-                                        imageUrl = heroImage,
-                                        contentDescription = displayTitle,
-                                        fallbackLabel = displayTitle,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                }
+                                GameCoverArt(
+                                    titleId = game?.titleId,
+                                    igdbId = if (game == null) catalog?.igdbId else null,
+                                    fallbackIconPath = game?.iconPath,
+                                    fallbackTitle = displayTitle,
+                                    onPresentationChanged = { is3dCover = it },
+                                    modifier = Modifier.fillMaxSize()
+                                )
                             }
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
@@ -399,25 +399,17 @@ fun GameDetailScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .widthIn(max = heroMaxWidth)
-                                    .aspectRatio(2f / 3f)
-                                    .clip(neonShape(28.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                                    .aspectRatio(GameCoverAspectRatio)
+                                    .background(if (is3dCover) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                             ) {
-                                if (heroImage == game?.iconPath) {
-                                    LocalImage(
-                                        path = game?.iconPath,
-                                        contentDescription = displayTitle,
-                                        fallbackLabel = displayTitle,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                } else {
-                                    UrlImage(
-                                        imageUrl = heroImage,
-                                        contentDescription = displayTitle,
-                                        fallbackLabel = displayTitle,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                }
+                                GameCoverArt(
+                                    titleId = game?.titleId,
+                                    igdbId = if (game == null) catalog?.igdbId else null,
+                                    fallbackIconPath = game?.iconPath,
+                                    fallbackTitle = displayTitle,
+                                    onPresentationChanged = { is3dCover = it },
+                                    modifier = Modifier.fillMaxSize()
+                                )
                             }
                         }
 
@@ -698,15 +690,6 @@ fun GameDetailScreen(
     }
 }
 
-private fun catalogDetailImageUrl(catalog: VitaCatalogDetails?): String? {
-    val sourceUrl = catalog?.coverUrl ?: catalog?.heroUrl ?: return null
-    return if (sourceUrl.contains("/image/upload/", ignoreCase = true)) {
-        sourceUrl.replace(Regex("/t_[^/]+/"), "/t_1080p/")
-    } else {
-        sourceUrl
-    }
-}
-
 @Composable
 private fun DetailSkeleton(horizontalInset: Dp) {
     Column(
@@ -717,8 +700,7 @@ private fun DetailSkeleton(horizontalInset: Dp) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = horizontalInset)
-                .aspectRatio(2f / 3f)
-                .clip(neonShape(28.dp))
+                .aspectRatio(GameCoverAspectRatio)
         )
         SkeletonBlock(
             modifier = Modifier
@@ -744,8 +726,8 @@ private fun DetailSkeleton(horizontalInset: Dp) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = horizontalInset)
-                .height(56.dp)
-                .clip(neonShape(16.dp))
+                .height(58.dp)
+                .clip(neonShape(18.dp))
         )
         SkeletonBlock(
             modifier = Modifier
@@ -780,7 +762,7 @@ private fun DetailSkeleton(horizontalInset: Dp) {
 @Composable
 private fun SkeletonBlock(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        modifier = modifier.shimmer()
     )
 }
 
@@ -907,22 +889,41 @@ private fun ExpandableInfoSection(
         expanded || !canExpand -> trimmedValue
         else -> trimmedValue.take(collapsedMaxChars).trimEnd() + "..."
     }
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = neonShape(16.dp)
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (canExpand) {
+                    Modifier
+                        .gamepadFocusableCard(
+                            shape = shape,
+                            interactionSource = interactionSource,
+                            addFocusTarget = false
+                        )
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = { expanded = !expanded }
+                        )
+                } else {
+                    Modifier
+                }
+            )
             .animateContentSize(
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioNoBouncy,
                     stiffness = Spring.StiffnessLow
                 )
             ),
-        shape = neonShape(16.dp),
+        shape = shape,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp
     ) {
         Column(
-            modifier = Modifier.padding(CardContentPadding),
+            modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
@@ -936,16 +937,14 @@ private fun ExpandableInfoSection(
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (canExpand) {
-                TextButton(
-                    onClick = { expanded = !expanded },
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text(
-                        text = stringResource(
-                            if (expanded) R.string.detail_show_less else R.string.detail_show_more
-                        )
-                    )
-                }
+                Text(
+                    text = stringResource(
+                        if (expanded) R.string.detail_show_less
+                        else R.string.detail_show_more
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }
@@ -999,10 +998,19 @@ private fun ScreenshotCard(
     title: String,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = neonShape(18.dp)
     Surface(
-        modifier = Modifier.width(220.dp),
-        shape = neonShape(18.dp),
+        modifier = Modifier
+            .width(220.dp)
+            .gamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            ),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+        interactionSource = interactionSource,
         onClick = onClick
     ) {
         Box(
@@ -1011,11 +1019,11 @@ private fun ScreenshotCard(
                 .height(130.dp)
                 .clip(neonShape(18.dp))
         ) {
-            UrlImage(
+            RemoteBitmapImage(
                 imageUrl = imageUrl,
                 contentDescription = title,
-                fallbackLabel = title,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
             )
         }
     }
@@ -1027,10 +1035,19 @@ private fun VideoCard(
     title: String,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = neonShape(18.dp)
     Surface(
-        modifier = Modifier.width(232.dp),
-        shape = neonShape(18.dp),
+        modifier = Modifier
+            .width(232.dp)
+            .gamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            ),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+        interactionSource = interactionSource,
         onClick = onClick
     ) {
         Box(
@@ -1040,11 +1057,11 @@ private fun VideoCard(
                 .clip(neonShape(18.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
         ) {
-            UrlImage(
+            RemoteBitmapImage(
                 imageUrl = youtubeThumbnailUrl(youtubeId),
                 contentDescription = title,
-                fallbackLabel = title,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
             )
             Box(
                 modifier = Modifier
@@ -1322,50 +1339,116 @@ private fun VideoPlayerOverlay(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ViewerTopBar(
     title: String,
     counter: String,
-    onSave: (() -> Unit)?,
+    onSave: (() -> Unit)? = null,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+    respectStatusBar: Boolean = true,
+    fillWidthBackground: Boolean = true,
+    closeAtEnd: Boolean = false,
+    extraTopPadding: Dp = 0.dp
 ) {
-    Row(
-        modifier = modifier
+    val layoutDirection = LocalLayoutDirection.current
+    val statusInsets = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues()
+    val topSafePadding = if (respectStatusBar) {
+        WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
+    } else {
+        0.dp
+    }
+    val startSafePadding = statusInsets.calculateLeftPadding(layoutDirection)
+    val endSafePadding = statusInsets.calculateRightPadding(layoutDirection)
+    val horizontalPadding = if (compact) 12.dp else 8.dp
+    val topPadding = topSafePadding + extraTopPadding + if (compact) 8.dp else 12.dp
+    val bottomPadding = if (compact) 10.dp else 16.dp
+    val rowModifier = if (fillWidthBackground) {
+        Modifier
             .fillMaxWidth()
-            .windowInsetsPadding(WindowInsets.displayCutout)
-            .padding(horizontal = 20.dp, vertical = 20.dp),
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Black.copy(alpha = 0.48f),
+                        Color.Black.copy(alpha = 0.18f),
+                        Color.Transparent
+                    )
+                )
+            )
+    } else {
+        Modifier
+            .padding(top = 4.dp)
+            .clip(neonShape(22.dp))
+            .background(Color.Black.copy(alpha = 0.44f))
+    }
+
+    Row(
+        modifier = modifier.then(rowModifier)
+            .padding(
+                start = startSafePadding + horizontalPadding,
+                end = endSafePadding + horizontalPadding,
+                top = topPadding,
+                bottom = bottomPadding
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = counter,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.8f)
-            )
-        }
-        if (onSave != null) {
-            IconButton(onClick = onSave) {
+        val closeButton: @Composable () -> Unit = {
+            IconButton(onClick = onDismiss) {
                 Icon(
-                    imageVector = Icons.Rounded.Save,
-                    contentDescription = stringResource(R.string.detail_save_screenshot),
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = stringResource(R.string.common_back),
                     tint = Color.White
                 )
             }
         }
-        IconButton(onClick = onDismiss) {
-            Icon(
-                imageVector = Icons.Rounded.Close,
-                contentDescription = stringResource(R.string.common_close),
-                tint = Color.White
+        val saveButton: @Composable (() -> Unit)? = onSave?.let { saveAction ->
+            {
+                IconButton(onClick = saveAction) {
+                    Icon(
+                        imageVector = Icons.Rounded.Save,
+                        contentDescription = stringResource(R.string.detail_save_screenshot),
+                        tint = Color.White
+                    )
+                }
+            }
+        }
+
+        val textBlock: @Composable (Modifier) -> Unit = { modifier ->
+            Column(modifier = modifier) {
+                if (!compact || fillWidthBackground) {
+                    Text(
+                        text = title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1
+                    )
+                }
+                Text(
+                    text = counter,
+                    color = Color.White.copy(alpha = 0.74f),
+                    style = if (compact) {
+                        MaterialTheme.typography.labelMedium
+                    } else {
+                        MaterialTheme.typography.bodySmall
+                    }
+                )
+            }
+        }
+
+        if (closeAtEnd) {
+            textBlock(
+                Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp, end = 8.dp)
             )
+            saveButton?.invoke()
+            closeButton()
+        } else {
+            closeButton()
+            saveButton?.invoke()
+            textBlock(Modifier.padding(start = 4.dp, end = if (compact) 2.dp else 8.dp))
         }
     }
 }
@@ -1530,7 +1613,7 @@ private fun YouTubePlayerBlock(
         if (loadedVideoId != null && loadedVideoId != youtubeId) {
             currentPosition = 0f
         }
-        
+
         val player = playerState.value ?: return@LaunchedEffect
         if (loadedVideoId != youtubeId) {
             player.loadVideo(youtubeId, currentPosition)
@@ -1571,6 +1654,7 @@ private fun LandscapeVideoTopBar(
         }
 
         Surface(
+        modifier = Modifier.controllerFocus(shape = CircleShape),
             shape = CircleShape,
             color = Color.Black.copy(alpha = 0.42f),
             onClick = onDismiss
@@ -1637,6 +1721,7 @@ private fun LandscapeViewerTopBar(
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Surface(
+        modifier = Modifier.controllerFocus(shape = CircleShape),
                 shape = CircleShape,
                 color = Color.Black.copy(alpha = 0.42f),
                 onClick = onSave
@@ -1654,6 +1739,7 @@ private fun LandscapeViewerTopBar(
             }
 
             Surface(
+        modifier = Modifier.controllerFocus(shape = CircleShape),
                 shape = CircleShape,
                 color = Color.Black.copy(alpha = 0.42f),
                 onClick = onDismiss

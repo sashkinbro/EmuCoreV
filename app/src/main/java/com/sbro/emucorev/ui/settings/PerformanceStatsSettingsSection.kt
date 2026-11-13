@@ -1,8 +1,10 @@
 package com.sbro.emucorev.ui.settings
 
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -16,7 +18,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.foundation.layout.RowScope
 import com.sbro.emucorev.ui.gamemanager.ChoiceContainer as GameManagerChoiceContainer
 import com.sbro.emucorev.ui.gamemanager.ToggleRow as GameManagerToggleRow
@@ -29,7 +30,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -75,6 +75,7 @@ fun PerformanceStatsSettingsSection(
     val labelPadding = if (compact) 0.dp else extraRowPadding
     val content: @Composable () -> Unit = {
         Row(Modifier.fillMaxWidth().clip(neonShape(12.dp)).background(rowBackground)
+            .border(1.dp, textSecondary.copy(alpha = 0.18f), neonShape(12.dp))
             .padding(horizontal = if (compact) 12.dp else labelPadding, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.stats_enabled), Modifier.weight(1f),
@@ -84,7 +85,8 @@ fun PerformanceStatsSettingsSection(
         Text(stringResource(R.string.stats_mode), Modifier.padding(horizontal = labelPadding), style = MaterialTheme.typography.labelLarge, color = textSecondary)
         StatsChipRow(scrollBleed, labelPadding) {
             listOf(StatsMode.FPS, StatsMode.DETAILED).forEach { mode ->
-                FilterChip(shape = neonChipShape(), selected = settings.rememberedMode == mode,
+                FilterChip(
+                    colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),shape = neonChipShape(), selected = settings.rememberedMode == mode,
                     onClick = { preferences.selectMode(mode) },
                     modifier = Modifier.testTag("stats_mode_${mode.name.lowercase(java.util.Locale.ROOT)}"),
                     label = { Text(stringResource(if (mode == StatsMode.FPS) R.string.stats_mode_fps else R.string.stats_mode_detailed)) })
@@ -94,7 +96,8 @@ fun PerformanceStatsSettingsSection(
             Text(stringResource(R.string.stats_position), Modifier.padding(horizontal = labelPadding), style = MaterialTheme.typography.labelLarge, color = textSecondary)
             StatsChipRow(scrollBleed, labelPadding) {
                 StatsPosition.entries.forEach { position ->
-                    FilterChip(shape = neonChipShape(), selected = settings.position == position, onClick = { preferences.update { it.copy(position = position) } },
+                    FilterChip(
+                        colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),shape = neonChipShape(), selected = settings.position == position, onClick = { preferences.update { it.copy(position = position) } },
                         label = { Text(stringResource(when (position) {
                             StatsPosition.TOP_LEFT -> R.string.stats_top_left
                             StatsPosition.TOP_RIGHT -> R.string.stats_top_right
@@ -109,7 +112,8 @@ fun PerformanceStatsSettingsSection(
                 Text(stringResource(R.string.stats_metrics), Modifier.padding(horizontal = labelPadding), style = MaterialTheme.typography.labelLarge, color = textSecondary)
                 StatsChipRow(scrollBleed, labelPadding) {
                     StatsMetric.selectable.forEach { metric ->
-                        FilterChip(shape = neonChipShape(), selected = settings.shows(metric),
+                        FilterChip(
+                            colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(),shape = neonChipShape(), selected = settings.shows(metric),
                             onClick = { preferences.update { it.copy(metricMask = it.metricMask xor metric.selectionMask) } },
                             label = { Text(statsMetricLabel(metric)) })
                     }
@@ -153,6 +157,7 @@ private fun StatsChipRow(bleed: Dp, extraRowPadding: Dp, content: @Composable ()
 private fun StatsSlider(label: String, value: Int, range: ClosedFloatingPointRange<Float>,
     textPrimary: Color, textSecondary: Color, rowBackground: Color, compact: Boolean, extraRowPadding: Dp, change: (Int) -> Unit) {
     Column(Modifier.fillMaxWidth().clip(neonShape(12.dp)).background(rowBackground)
+            .border(1.dp, textSecondary.copy(alpha = 0.18f), neonShape(12.dp))
         .padding(horizontal = if (compact) 12.dp else extraRowPadding, vertical = 9.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = textPrimary)
@@ -241,8 +246,5 @@ private fun StatsScreenChoiceRow(title: String, description: String, gameManager
 private fun StatsScreenChip(selected: Boolean, gameManagerStyle: Boolean,
     modifier: Modifier = Modifier, onClick: () -> Unit, label: @Composable () -> Unit) {
     FilterChip(selected = selected, onClick = onClick, modifier = modifier, shape = neonChipShape(),
-        colors = if (gameManagerStyle) FilterChipDefaults.filterChipColors(
-            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-        ) else FilterChipDefaults.filterChipColors(), label = label)
+        colors = com.sbro.emucorev.ui.common.premiumFilterChipColors(), label = label)
 }

@@ -32,7 +32,7 @@ private val Exo2FontFamily = FontFamily(
 @Composable
 internal fun rememberCustomizedTypography(settings: CustomizationSettings): Typography {
     val fontFamily = when (settings.appFont) {
-        AppFont.SYSTEM -> null
+        AppFont.SYSTEM -> FontFamily.Default
         AppFont.RUBIK -> RubikFontFamily
         AppFont.EXO2 -> Exo2FontFamily
         AppFont.CUSTOM -> remember(settings.customFontPath) {
@@ -67,7 +67,8 @@ private fun Typography.withCustomization(fontFamily: FontFamily?, scale: Float):
 private fun TextStyle.customized(fontFamily: FontFamily?, scale: Float): TextStyle = copy(
     fontFamily = fontFamily,
     fontSize = fontSize.scaled(scale),
-    lineHeight = lineHeight.scaled(scale)
+    lineHeight = lineHeight.scaled(scale),
+    letterSpacing = letterSpacing.scaled(scale)
 )
 
 private fun TextUnit.scaled(scale: Float): TextUnit {

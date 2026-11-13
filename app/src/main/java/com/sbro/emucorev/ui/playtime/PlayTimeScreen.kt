@@ -1,5 +1,12 @@
 package com.sbro.emucorev.ui.playtime
 
+import com.sbro.emucorev.ui.theme.neon.NeonRed
+import com.sbro.emucorev.ui.theme.neon.NeonYellow
+import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import com.sbro.emucorev.ui.common.controllerFocus
 import com.sbro.emucorev.ui.theme.neon.neonChipShape
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.BorderStroke
@@ -61,6 +68,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.PlayTimeSession
 import com.sbro.emucorev.ui.common.LocalImage
+import com.sbro.emucorev.ui.common.GameCoverArt
 import com.sbro.emucorev.ui.common.ScreenTopBar
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.theme.CardContentPadding
@@ -278,6 +286,7 @@ private fun GameSelectorCard(
     onClick: () -> Unit
 ) {
     Surface(
+        modifier = Modifier.controllerFocus(shape = neonShape(18.dp)),
         onClick = onClick,
         shape = neonShape(18.dp),
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
@@ -292,14 +301,15 @@ private fun GameSelectorCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Surface(
-                modifier = Modifier.size(46.dp),
-                shape = neonShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh
+                modifier = Modifier.size(width = 46.dp, height = 69.dp),
+                shape = androidx.compose.ui.graphics.RectangleShape,
+                color = androidx.compose.ui.graphics.Color.Transparent
             ) {
-                LocalImage(
-                    path = game.iconPath,
+                GameCoverArt(
+                    titleId = game.titleId,
+                    fallbackIconPath = game.iconPath,
                     contentDescription = game.title,
-                    fallbackLabel = game.title,
+                    fallbackTitle = game.title,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -394,22 +404,32 @@ private fun PlayTimeSection(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+    val neon = LocalNeonTheme.current
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onBackground
+            text = if (neon) title.uppercase() else title,
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = if (neon) 1.2.sp else MaterialTheme.typography.titleLarge.letterSpacing
+            ),
+            color = if (neon) NeonYellow else MaterialTheme.colorScheme.onBackground
         )
+        if (neon) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(1.dp).background(
+                    Brush.horizontalGradient(listOf(NeonRed, NeonYellow, Color.Transparent))
+                )
+            )
+        }
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = neonShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 3.dp,
-            shadowElevation = 6.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+            tonalElevation = 2.dp,
+            border = if (neon) BorderStroke(1.dp, NeonYellow.copy(alpha = 0.14f)) else null
         ) {
             Column(
                 modifier = Modifier.padding(CardContentPadding),

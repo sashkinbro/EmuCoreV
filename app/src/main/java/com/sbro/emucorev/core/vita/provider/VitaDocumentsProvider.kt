@@ -9,6 +9,7 @@ import android.provider.DocumentsProvider
 import android.webkit.MimeTypeMap
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.EmulatorStorage
+import com.sbro.emucorev.data.ProfileDeviceInfoProvider
 import java.io.File
 import java.io.FileNotFoundException
 
@@ -79,7 +80,7 @@ class VitaDocumentsProvider : DocumentsProvider() {
 
         val row = cursor.newRow()
         row.add(DocumentsContract.Document.COLUMN_DOCUMENT_ID, resolvedDocumentId)
-            .add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, if (isRoot) "Vita3K" else resolvedFile.name)
+            .add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, if (isRoot) ProfileDeviceInfoProvider.CORE_VERSION.substringBefore(' ') else resolvedFile.name)
             .add(DocumentsContract.Document.COLUMN_SIZE, resolvedFile.length())
             .add(DocumentsContract.Document.COLUMN_MIME_TYPE, getMimeType(resolvedFile))
             .add(DocumentsContract.Document.COLUMN_LAST_MODIFIED, resolvedFile.lastModified())
@@ -98,7 +99,7 @@ class VitaDocumentsProvider : DocumentsProvider() {
                 DocumentsContract.Root.COLUMN_FLAGS,
                 DocumentsContract.Root.FLAG_SUPPORTS_CREATE or DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD
             )
-            .add(DocumentsContract.Root.COLUMN_TITLE, "Vita3K")
+            .add(DocumentsContract.Root.COLUMN_TITLE, ProfileDeviceInfoProvider.CORE_VERSION.substringBefore(' '))
             .add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, getDocumentId(storageDir))
             .add(DocumentsContract.Root.COLUMN_MIME_TYPES, "*/*")
             .add(DocumentsContract.Root.COLUMN_AVAILABLE_BYTES, storageDir.freeSpace)

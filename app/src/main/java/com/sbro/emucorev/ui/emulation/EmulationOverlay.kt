@@ -51,7 +51,7 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.AlertDialog
+import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -162,6 +162,10 @@ fun EmulationOverlayHost(
         initial = appPreferences.confirmSaveStateActions
     )
     val controlLayoutRepository = remember(activity) { TouchControlLayoutRepository(activity) }
+    val rearTouchRepository = remember(activity) { com.sbro.emucorev.core.input.RearTouchProfileRepository(activity) }
+    var rearTouchProfile by remember(activity, gameId) { mutableStateOf(rearTouchRepository.effective(gameId)) }
+    var showRearTouchSettings by remember(gameId) { mutableStateOf(false) }
+    LaunchedEffect(rearTouchProfile) { activity.rearTouchInput.configure(rearTouchProfile) }
     val customizationPreferences = remember(activity) { CustomizationPreferences(activity) }
     val customization by customizationPreferences.settings.collectAsState()
     val overlayBridge = remember(activity) { activity.getmOverlay() }
@@ -242,6 +246,13 @@ fun EmulationOverlayHost(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(effectivePaused, inputResumed, nativeImeActive, showRearTouchSettings, waitingForStateFrame) {
+        activity.rearTouchInput.setActive(inputResumed && !effectivePaused && !nativeImeActive && !showRearTouchSettings && !waitingForStateFrame)
+        com.sbro.emucorev.core.input.RearTouchNative.setCamerasSuspended(!inputResumed || effectivePaused || showRearTouchSettings)
+    }
+    DisposableEffect(activity) {
+        onDispose { activity.rearTouchInput.setActive(false); activity.rearTouchInput.capture = null }
     }
     LaunchedEffect(showTouchControls, menuOpen, nativeImeActive) {
         if (!showTouchControls || menuOpen || nativeImeActive) resetOverlayAxes()
@@ -484,6 +495,7 @@ fun EmulationOverlayHost(
     }
 
     DisposableEffect(config) {
+        activity.rearTouchInput.stretchDisplay = config.stretchDisplayArea
         overlayBridge.synchronizeConfig(config)
         applyRuntimeCoreSettings()
         onDispose {}
@@ -659,10 +671,20 @@ fun EmulationOverlayHost(
             )
         }
 
+        if (inputResumed && !effectivePaused && !nativeImeActive && !waitingForStateFrame && !activity.exitInProgress) {
+            RearTouchControls(rearTouchProfile, activity.rearTouchInput)
+        }
+        if (showRearTouchSettings) {
+            RearTouchSettingsDialog(rearTouchRepository, gameId, activity.rearTouchInput,
+                onProfileChanged = { rearTouchProfile = it }, onDismiss = { showRearTouchSettings = false })
+        }
+
         val configuration = LocalConfiguration.current
         val useSidePanel = configuration.screenWidthDp > configuration.screenHeightDp
 
         val menuCallbacks = EmulationMenuCallbacks(
+            onCloseMenu = { menuOpen = false },
+            onRearTouchSettings = { showRearTouchSettings = true },
             onPauseToggle = {
                 if (effectivePaused) {
                     userPaused = false
@@ -2301,7 +2323,7 @@ private fun touchVisualPalette(style: TouchControlVisualStyle): TouchVisualPalet
     )
     TouchControlVisualStyle.ARCADE -> TouchVisualPalette(
         accent = Color(0xFFFFD166),
-        fill = Color(0xFF653754).copy(alpha = 0.72f),
+        fill = Color(0xFF24466A).copy(alpha = 0.72f),
         borderWidth = 2.dp,
         colorFilter = ColorFilter.tint(Color(0xFFFFD166))
     )
