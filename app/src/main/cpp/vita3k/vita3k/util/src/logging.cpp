@@ -105,7 +105,7 @@ ExitCode init(const Root &root_paths, bool use_stdout) {
     sinks.clear();
     if (use_stdout)
 #ifdef __ANDROID__
-        sinks.push_back(std::make_shared<spdlog::sinks::android_sink_mt>("Vita3K"));
+        sinks.push_back(std::make_shared<spdlog::sinks::android_sink_mt>("EmuCoreV"));
 #else
         sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
 #endif
@@ -116,7 +116,7 @@ ExitCode init(const Root &root_paths, bool use_stdout) {
 
     if (add_sink(root_paths.get_log_path() / LOG_FILE_NAME) != Success)
         return InitConfigFailed;
-    LOG_INFO("================= Vita3K session start =================");
+    LOG_INFO("================= EmuCoreV session start =================");
 
     std::set_terminate([]() {
         if (const std::exception_ptr eptr = std::current_exception()) {
@@ -142,7 +142,7 @@ ExitCode init(const Root &root_paths, bool use_stdout) {
 #ifdef _WIN32
     // set console codepage to UTF-8
     SetConsoleOutputCP(65001);
-    SetConsoleTitle("Vita3K PSVita Emulator");
+    SetConsoleTitle("EmuCoreV PS Vita Emulator");
 #endif
 
 #ifdef __ANDROID__
@@ -192,7 +192,7 @@ void rebuild_default_logger() {
         duplicate_filter->add_sink(sink);
 
     auto logger = std::make_shared<spdlog::async_logger>(
-        "vita3k logger",
+        "EmuCoreV logger",
         duplicate_filter,
         spdlog::thread_pool(),
         spdlog::async_overflow_policy::overrun_oldest);

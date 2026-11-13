@@ -329,7 +329,7 @@ ExitCode init_config(Config &cfg, int argc, char **argv, const Root &root_paths,
     }
 
     // Declare all options
-    CLI::App app{ "Vita3K Command Line Interface" }; // "--help,-h" is automatically generated
+    CLI::App app{ "EmuCoreV (ECV) Command Line Interface" }; // "--help,-h" is automatically generated
     app.allow_windows_style_options();
     app.allow_extras();
     app.enabled_by_default();
@@ -344,7 +344,7 @@ ExitCode init_config(Config &cfg, int argc, char **argv, const Root &root_paths,
         ->default_str({});
 
     // Grouped options
-    auto input = app.add_option_group("Input", "Special options for Vita3K");
+    auto input = app.add_option_group("Input", "Special options for EmuCoreV");
     input->add_flag("--console,-z", command_line.console, "Start the emulator in console mode.")
        ->default_val(false)->group("Input");
     input->add_option("--app-args,-Z", command_line.app_args, "Argument for app, use ', ' to separate arguments.")
@@ -369,14 +369,14 @@ ExitCode init_config(Config &cfg, int argc, char **argv, const Root &root_paths,
     input_pkg->needs(input_zrif);
     input_zrif->needs(input_pkg);
 
-    auto config = app.add_option_group("Configuration", "Modify Vita3K's config.yml file");
+    auto config = app.add_option_group("Configuration", "Modify EmuCoreV's config.yml file");
     config->add_flag("--archive-log,-A", command_line.archive_log, "Make a duplicate of the log file with TITLE_ID and Game ID as title")
         ->group("Logging");
     config->add_option("--backend-renderer,-B", command_line.backend_renderer, "Renderer backend to use")
         ->ignore_case()->check(CLI::IsMember(std::set<std::string>{ "OpenGL", "Vulkan" }))->group("Vita Emulation");
     config->add_flag("--color-surface-debug,-C", command_line.color_surface_debug, "Save color surfaces")
         ->group("Vita Emulation");
-    config->add_option("--config-location,-c", command_line.config_path, "Get a configuration file from a given location. If a filename is given, it must end with \".yml\", otherwise it will be assumed to be a directory. \nDefault loaded: <Vita3K>/config.yml \nDefaults: <Vita3K>/data/config/default.yml")
+    config->add_option("--config-location,-c", command_line.config_path, "Get a configuration file from a given location. If a filename is given, it must end with \".yml\", otherwise it will be assumed to be a directory. \nDefault loaded: <config directory>/config.yml \nDefaults: <runtime assets>/data/config/default.yml")
         ->group("YML");
     config->add_flag("!--keep-config,!-w", command_line.overwrite_config, "Do not modify the configuration file after loading.")
         ->group("YML");

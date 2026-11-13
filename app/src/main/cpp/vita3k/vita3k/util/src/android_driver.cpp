@@ -1,6 +1,7 @@
 #ifdef __ANDROID__
 
 #include <util/android_driver.h>
+#include <emucorev/branding.h>
 
 #include <util/fs.h>
 #include <util/log.h>
@@ -263,9 +264,9 @@ std::optional<DriverFingerprint> probe_driver_fingerprint(PFN_vkGetInstanceProcA
 
     const VkApplicationInfo app_info{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pApplicationName = "Vita3K",
+        .pApplicationName = emucorev::branding::product_name,
         .applicationVersion = VK_MAKE_API_VERSION(0, 0, 0, 1),
-        .pEngineName = "Vita3K",
+        .pEngineName = emucorev::branding::product_name,
         .engineVersion = VK_MAKE_API_VERSION(0, 0, 0, 1),
         .apiVersion = VK_API_VERSION_1_0,
     };

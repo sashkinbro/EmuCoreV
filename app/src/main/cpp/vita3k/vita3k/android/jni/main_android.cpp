@@ -26,6 +26,7 @@
 #include <emucorev/savestate/savestate.h>
 #include <emucorev/savestate/operation_mutex.h>
 #include <emucorev/savestate/session_pause.h>
+#include <emucorev/branding.h>
 #include <ime/functions.h>
 #include <ime/keyboard.h>
 #include <io/state.h>
@@ -493,7 +494,7 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
             break;
         }
 
-        SDL_SetStringProperty(window_props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Vita3K");
+        SDL_SetStringProperty(window_props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, emucorev::branding::product_name);
         SDL_SetNumberProperty(window_props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, 960);
         SDL_SetNumberProperty(window_props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, 544);
         SDL_SetNumberProperty(window_props, SDL_PROP_WINDOW_CREATE_FLAGS_NUMBER, window_flags);

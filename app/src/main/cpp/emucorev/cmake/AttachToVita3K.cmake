@@ -38,6 +38,12 @@ endif()
 if(TARGET app)
     target_include_directories(app PRIVATE "${EMUCOREV_BRIDGE_DIR}/include")
 endif()
+if(TARGET util)
+    target_include_directories(util PRIVATE "${EMUCOREV_BRIDGE_DIR}/include")
+endif()
+if(TARGET renderer)
+    target_include_directories(renderer PRIVATE "${EMUCOREV_BRIDGE_DIR}/include")
+endif()
 
 emucorev_filter_vita3k_target(vita3k "${VITA3K_VENDOR_DIR}" "${VITA3K_CORE_DIR}")
 

@@ -340,7 +340,7 @@ std::string get_web_response(const std::string &url) {
         return {};
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "Vita3K Emulator");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "EmuCoreV ECV");
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, true); // Follow redirects
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
 

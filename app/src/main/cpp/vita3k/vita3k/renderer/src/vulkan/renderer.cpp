@@ -34,7 +34,7 @@
 
 #include <config/state.h>
 #include <renderer/vulkan/native_buffer_memory.h>
-#include <config/version.h>
+#include <emucorev/branding.h>
 #include <display/state.h>
 #include <kernel/state.h>
 #include <mem/functions.h>
@@ -419,9 +419,9 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
 #endif
 
         vk::ApplicationInfo app_info{
-            .pApplicationName = app_name, // App Name
+            .pApplicationName = emucorev::branding::product_name, // App Name
             .applicationVersion = VK_MAKE_API_VERSION(0, 0, 0, 1), // App Version
-            .pEngineName = org_name, // Engine Name, using org instead.
+            .pEngineName = emucorev::branding::product_name, // Engine Name
             .engineVersion = VK_MAKE_API_VERSION(0, 0, 0, 1), // Engine Version
             .apiVersion = instance_api_version(VULKAN_HPP_DEFAULT_DISPATCHER)
         };

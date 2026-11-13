@@ -83,7 +83,7 @@ void update_presence(const std::string &state, const std::string &details, bool 
         activity.SetDetails(details.c_str());
         activity.SetState(state.c_str());
         activity.GetAssets().SetLargeImage("vita3k-logo");
-        activity.GetAssets().SetLargeText("Vita3K is the world's first functional PlayStation Vita emulator");
+        activity.GetAssets().SetLargeText("EmuCoreV (ECV), based on Vita3K");
         activity.SetType(discord::ActivityType::Playing);
         if (reset_timer) {
             activity.GetTimestamps().SetStart(time(nullptr));
