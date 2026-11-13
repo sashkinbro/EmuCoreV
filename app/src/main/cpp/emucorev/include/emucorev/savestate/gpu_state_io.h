@@ -1,5 +1,6 @@
 #pragma once
 
+#include <emucorev/savestate/gpu_buffer_stream.h>
 #include <renderer/vulkan/surface_cache_snapshot.h>
 #include <renderer/vulkan/context_snapshot.h>
 #include <cstdint>
@@ -12,15 +13,8 @@ namespace emucorev::savestate {
 class MemoryImage;
 struct GxmSnapshot;
 
-struct GpuBufferPage {
-    uint32_t offset = 0;
-    std::vector<uint8_t> bytes;
-};
-struct GpuBufferSnapshot {
-    Address address = 0;
-    uint32_t size = 0;
-    std::vector<GpuBufferPage> pages;
-};
+using GpuBufferPage = GpuSnapshotPage;
+using GpuBufferSnapshot = GpuSnapshotBuffer;
 struct GpuTargetSnapshot {
     Address address = 0;
     vkutil::ImageSnapshot color;
@@ -32,12 +26,14 @@ struct GpuContextClock {
     uint64_t scene = 0;
 };
 struct GpuSnapshot {
+    uint32_t schema_version = 2;
     uint32_t mapping_method = 0;
     float resolution = 1;
     int32_t last_scene = 0;
     int32_t current_frame = 0;
     renderer::vulkan::SurfaceCacheSnapshot surfaces;
     std::vector<GpuBufferSnapshot> buffers;
+    std::shared_ptr<GpuPageStore> page_store;
     std::vector<GpuTargetSnapshot> targets;
     std::vector<GpuContextClock> clocks;
     std::vector<renderer::vulkan::VKContextSnapshot> contexts;
@@ -46,11 +42,16 @@ struct GpuSnapshot {
 // Rendering must be frozen between command batches, with GPU waits drained.
 bool capture_gpu_state(EmuEnvState &, GpuSnapshot &, std::string &error);
 bool encode_gpu_state(const GpuSnapshot &, std::vector<uint8_t> &, std::string &error);
+bool encode_gpu_state_metadata(const GpuSnapshot &, std::vector<uint8_t> &, std::string &error);
 bool parse_gpu_state(const std::vector<uint8_t> &, GpuSnapshot &, std::string &error);
+bool write_gpu_buffer_pages(Writer &, const GpuSnapshot &, std::string &error);
+bool parse_gpu_buffer_pages(SectionReader &, GpuSnapshot &, const fs::path &staging_directory, std::string &error);
+uint64_t gpu_buffer_page_payload_bound(const GpuSnapshot &);
 bool validate_gpu_state(const GpuSnapshot &, const MemoryImage &, std::string &error);
 bool validate_gpu_gxm_references(const GpuSnapshot &, const GxmSnapshot &, std::string &error);
 bool capture_gpu_buffer_pages(const uint8_t *cpu, const uint8_t *gpu, uint32_t mapping_size,
-    uint64_t allocation_size, uint64_t byte_budget, std::vector<GpuBufferPage> &, std::string &error);
+    uint64_t allocation_size, uint64_t byte_budget, std::vector<GpuBufferPage> &, std::string &error,
+    uint64_t *required_payload_bytes = nullptr);
 // Wait for device work and every live Vulkan request-reader CPU handler before capture.
 bool wait_gpu_snapshot_idle(EmuEnvState &, std::string &error);
 // Drain and stop old GPU request readers before destroying GXM contexts.

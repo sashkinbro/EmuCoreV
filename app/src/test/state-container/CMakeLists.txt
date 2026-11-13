@@ -7,6 +7,7 @@ set(EXTERNAL "${NATIVE}/vita3k/external")
 file(GLOB BOOST_FILESYSTEM_SOURCES "${EXTERNAL}/boost/libs/filesystem/src/*.cpp")
 add_executable(state-container-tests
     archive_tests.cpp
+    gpu_buffer_stream_tests.cpp
     memory_image_tests.cpp
     ngs_state_io_tests.cpp
     kernel_base_io_tests.cpp
@@ -15,6 +16,7 @@ add_executable(state-container-tests
     save_state_operation_tests.cpp
     save_state_operation_peer.cpp
     "${NATIVE}/emucorev/src/savestate/archive.cpp"
+    "${NATIVE}/emucorev/src/savestate/gpu_buffer_stream.cpp"
     "${NATIVE}/emucorev/src/savestate/memory_image.cpp"
     "${NATIVE}/emucorev/src/savestate/display_state_io.cpp"
     "${NATIVE}/emucorev/src/savestate/ngs_state_io.cpp"

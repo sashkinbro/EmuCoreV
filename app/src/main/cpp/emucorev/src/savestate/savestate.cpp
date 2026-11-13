@@ -1959,7 +1959,7 @@ Result save_state(EmuEnvState &emuenv, const fs::path &path, const std::string &
         result.error = error;
         return result;
     }
-    if (!capture_gpu_state(emuenv, gpu_snapshot, error) || !encode_gpu_state(gpu_snapshot, gpu_data, error)) {
+    if (!capture_gpu_state(emuenv, gpu_snapshot, error) || !encode_gpu_state_metadata(gpu_snapshot, gpu_data, error)) {
         result.status = Status::InternalError;
         result.error = error;
         return result;
@@ -2010,6 +2010,8 @@ Result save_state(EmuEnvState &emuenv, const fs::path &path, const std::string &
     if (!write_gxm(emuenv, writer, error))
         return fail(Status::IoError, error);
     if (!writer.write_section(SectionId::Gpu, gpu_data.data(), gpu_data.size(), true, error))
+        return fail(Status::IoError, error);
+    if (!write_gpu_buffer_pages(writer, gpu_snapshot, error))
         return fail(Status::IoError, error);
 
     if (!write_ngs(emuenv, writer, error))
@@ -2165,10 +2167,29 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         || !validate_kernel_import_abis(thread_snapshots, *memory_image, error)
         || !validate_kernel_thread_allocations(thread_snapshots, kernel_snapshot.tls_msize, *memory_image, error)
         || !parse_gpu_state(gpu_data, gpu_snapshot, error)
-        || !validate_gpu_state(gpu_snapshot, *memory_image, error)
         || !parse_gxm_state(gxm_data, gxm_snapshot, error)
         || !validate_gxm_state(gxm_snapshot, *memory_image, error)
-        || !validate_gpu_gxm_references(gpu_snapshot, gxm_snapshot, error)
+        || !validate_gpu_state(gpu_snapshot, *memory_image, error)
+        || !validate_gpu_gxm_references(gpu_snapshot, gxm_snapshot, error)) {
+        result.status = Status::InvalidFile;
+        result.error = error;
+        return result;
+    }
+    if (gpu_snapshot.schema_version == 3) {
+        auto page_section = reader.open_section(SectionId::GpuBufferPages, error);
+        if (!page_section
+            || !parse_gpu_buffer_pages(*page_section, gpu_snapshot,
+                emuenv.cache_path / "savestate-staging", error)) {
+            result.status = Status::InvalidFile;
+            result.error = error.empty() ? "save state is missing GPU buffer pages" : error;
+            return result;
+        }
+    } else if (reader.has_section(SectionId::GpuBufferPages)) {
+        result.status = Status::InvalidFile;
+        result.error = "legacy GPU snapshot has an unexpected GPU buffer page section";
+        return result;
+    }
+    if (!validate_gpu_state(gpu_snapshot, *memory_image, error)
         || !parse_sysmem_state(objstore_data, sysmem_snapshot, error)
         || !validate_sysmem_state(sysmem_snapshot, *memory_image, error)
         || !validate_gxm_display_continuations(gxm_snapshot, thread_snapshots, *memory_image, error, &sysmem_snapshot)

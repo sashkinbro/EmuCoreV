@@ -13,12 +13,15 @@
 #include <renderer/vulkan/snapshot_request_barrier.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstring>
 #include <exception>
+#include <iomanip>
 #include <map>
 #include <set>
+#include <sstream>
 
 namespace emucorev::savestate {
 namespace {
@@ -132,7 +135,8 @@ bool read_context(BufferReader &reader, renderer::vulkan::VKContextSnapshot &con
 }
 
 bool capture_gpu_buffer_pages(const uint8_t *cpu, const uint8_t *gpu, uint32_t mapping_size,
-    uint64_t allocation_size, uint64_t byte_budget, std::vector<GpuBufferPage> &pages, std::string &error) {
+    uint64_t allocation_size, uint64_t byte_budget, std::vector<GpuBufferPage> &pages, std::string &error,
+    uint64_t *required_payload_bytes) {
     if (!cpu || !gpu || !mapping_size || mapping_size % page_size
         || mapping_size > UINT32_MAX - page_size || allocation_size != uint64_t(mapping_size) + page_size) {
         error = "invalid GPU buffer snapshot layout";
@@ -146,11 +150,44 @@ bool capture_gpu_buffer_pages(const uint8_t *cpu, const uint8_t *gpu, uint32_t m
             : std::memcmp(gpu + offset, cpu + offset, page_size) != 0;
         if (!differs) continue;
         if (byte_budget - std::min(byte_budget, copied) < page_size) {
-            error = "GPU buffer snapshot exceeds size limit";
+            if (required_payload_bytes)
+                *required_payload_bytes = copied + page_size;
+            std::ostringstream message;
+            message << "GPU buffer snapshot exceeds size limit (first over-budget page at mapping offset "
+                    << offset << ')';
+            error = message.str();
             return false;
         }
         copied += page_size;
         staged.push_back({ static_cast<uint32_t>(offset), { gpu + offset, gpu + offset + page_size } });
+    }
+    pages = std::move(staged);
+    return true;
+}
+
+bool capture_gpu_buffer_pages_to_store(const uint8_t *cpu, const uint8_t *gpu, uint32_t mapping_size,
+    uint64_t allocation_size, uint64_t max_payload_bytes, GpuPageStore &store,
+    std::vector<GpuBufferPage> &pages, std::string &error) {
+    if (!cpu || !gpu || !mapping_size || mapping_size % page_size
+        || mapping_size > UINT32_MAX - page_size || allocation_size != uint64_t(mapping_size) + page_size) {
+        error = "invalid GPU buffer snapshot layout";
+        return false;
+    }
+    std::vector<GpuBufferPage> staged;
+    for (uint64_t offset = 0; offset < allocation_size; offset += page_size) {
+        const bool differs = offset == mapping_size
+            ? std::any_of(gpu + offset, gpu + offset + page_size, [](uint8_t byte) { return byte != 0; })
+            : std::memcmp(gpu + offset, cpu + offset, page_size) != 0;
+        if (!differs)
+            continue;
+        if (store.size() > max_payload_bytes || page_size > max_payload_bytes - store.size()) {
+            error = "GPU buffer page payload exceeds validated mapping bound";
+            return false;
+        }
+        uint64_t staged_offset = UINT64_MAX;
+        if (!store.append(gpu + offset, page_size, staged_offset, error))
+            return false;
+        staged.push_back({ static_cast<uint32_t>(offset), {}, staged_offset });
     }
     pages = std::move(staged);
     return true;
@@ -210,6 +247,7 @@ bool capture_gpu_state(EmuEnvState &env, GpuSnapshot &snapshot, std::string &err
     }
     auto &state = static_cast<renderer::vulkan::VKState &>(*env.renderer);
     GpuSnapshot staged;
+    staged.schema_version = 3;
     staged.mapping_method = static_cast<uint32_t>(state.mapping_method);
     staged.resolution = state.res_multiplier;
     staged.last_scene = state.last_scene_id;
@@ -228,12 +266,15 @@ bool capture_gpu_state(EmuEnvState &env, GpuSnapshot &snapshot, std::string &err
         staged.clocks.push_back({ address, context.frame_timestamp, context.scene_timestamp });
     }
     uint64_t copied = 0;
+    uint64_t surface_bytes = 0;
     if (!renderer::vulkan::capture_surface_cache_snapshot(state.surface_cache, image_device(state), staged.surfaces, error))
         return false;
     for (const auto &color : staged.surfaces.colors)
-        copied += color.texture.image.bytes.size() + color.raw_image.image.bytes.size();
-    for (const auto &ds : staged.surfaces.depth_stencil) copied += ds.texture.image.bytes.size();
+        surface_bytes += color.texture.image.bytes.size() + color.raw_image.image.bytes.size();
+    for (const auto &ds : staged.surfaces.depth_stencil) surface_bytes += ds.texture.image.bytes.size();
+    copied = surface_bytes;
     if (copied > kMaxBufferedSectionSize) { error = "GPU surface snapshot exceeds size limit"; return false; }
+    uint64_t render_target_bytes = 0;
     for (const auto &[address, target_ptr] : gxm::runtime_render_targets(env)) {
         auto &target = static_cast<renderer::vulkan::VKRenderTarget &>(*target_ptr);
         GpuTargetSnapshot target_snapshot;
@@ -241,7 +282,9 @@ bool capture_gpu_state(EmuEnvState &env, GpuSnapshot &snapshot, std::string &err
         if (!vkutil::capture_image_snapshot(image_device(state), target.color, target_snapshot.color, error)
             || !vkutil::capture_image_snapshot(image_device(state), target.depthstencil, target_snapshot.depth_stencil, error))
             return false;
-        copied += target_snapshot.color.bytes.size() + target_snapshot.depth_stencil.bytes.size();
+        const uint64_t target_bytes = target_snapshot.color.bytes.size() + target_snapshot.depth_stencil.bytes.size();
+        render_target_bytes += target_bytes;
+        copied += target_bytes;
         if (copied > kMaxBufferedSectionSize) {
             error = "GPU target snapshot exceeds size limit";
             return false;
@@ -249,6 +292,33 @@ bool capture_gpu_state(EmuEnvState &env, GpuSnapshot &snapshot, std::string &err
         staged.targets.push_back(std::move(target_snapshot));
     }
     if (state.mapping_method == MappingMethod::DoubleBuffer) {
+        uint64_t maximum_page_payload = 0;
+        uint64_t previous_mapping_end = 0;
+        std::vector<Address> mapping_addresses;
+        mapping_addresses.reserve(state.mapped_memories.size());
+        for (const auto &[address, _] : state.mapped_memories)
+            mapping_addresses.push_back(address);
+        std::sort(mapping_addresses.begin(), mapping_addresses.end());
+        for (size_t i = 0; i < mapping_addresses.size(); ++i) {
+            const auto address = mapping_addresses[i];
+            const auto &mapping = state.mapped_memories.at(address);
+            const uint64_t mapping_end = uint64_t(address) + mapping.size;
+            const uint64_t mapping_payload = uint64_t(mapping.size) + page_size;
+            if (!mapping.size || mapping.size % page_size || mapping.size > UINT32_MAX - page_size
+                || (i && address < previous_mapping_end)
+                || mapping_end > (uint64_t{1} << 32)
+                || mapping_payload > ((uint64_t{1} << 32) + uint64_t(max_objects) * page_size) - maximum_page_payload) {
+                error = "invalid GPU mapped-buffer directory for snapshot";
+                return false;
+            }
+            maximum_page_payload += mapping_payload;
+            previous_mapping_end = mapping_end;
+        }
+        if (!state.mapped_memories.empty()) {
+            staged.page_store = std::make_shared<GpuPageStore>();
+            if (!staged.page_store->open(env.cache_path / "savestate-staging", error))
+                return false;
+        }
         for (const auto &[address, mapping] : state.mapped_memories) {
             const auto *buffer = std::get_if<vkutil::Buffer>(&mapping.buffer_impl);
             if (!buffer || !buffer->mapped_data || buffer->size != uint64_t(mapping.size) + page_size) {
@@ -258,11 +328,19 @@ bool capture_gpu_state(EmuEnvState &env, GpuSnapshot &snapshot, std::string &err
             GpuBufferSnapshot saved{ address, mapping.size, {} };
             const auto *gpu = static_cast<const uint8_t *>(buffer->mapped_data);
             const auto *cpu = Ptr<const uint8_t>(address).get(env.mem);
-            if (!capture_gpu_buffer_pages(cpu, gpu, mapping.size, buffer->size,
-                    kMaxBufferedSectionSize - copied, saved.pages, error)) return false;
-            for (const auto &page : saved.pages) copied += page.bytes.size();
+            if (!capture_gpu_buffer_pages_to_store(cpu, gpu, mapping.size, buffer->size,
+                    maximum_page_payload, *staged.page_store, saved.pages, error)) {
+                std::ostringstream message;
+                message << error << " (mapping address=0x" << std::hex << std::uppercase << address << std::dec
+                        << ", mapping size=" << mapping.size << " bytes, allocation size=" << buffer->size
+                        << " bytes, staged pages=" << staged.page_store->size() / page_size
+                        << ", validated page bound=" << maximum_page_payload << " bytes)";
+                error = message.str();
+                return false;
+            }
             staged.buffers.push_back(std::move(saved));
         }
+        sort_gpu_snapshot_buffers(staged.buffers);
     }
     snapshot = std::move(staged);
     return true;
@@ -318,10 +396,81 @@ bool encode_gpu_state(const GpuSnapshot &snapshot, std::vector<uint8_t> &data, s
     return true;
 }
 
+bool encode_gpu_state_metadata(const GpuSnapshot &snapshot, std::vector<uint8_t> &data, std::string &error) {
+    std::vector<uint8_t> surfaces;
+    if (!renderer::vulkan::encode_surface_cache_snapshot(snapshot.surfaces, surfaces, error))
+        return false;
+    uint64_t size = surfaces.size() + 64 + snapshot.clocks.size() * 20 + snapshot.contexts.size() * 111;
+    for (const auto &target : snapshot.targets)
+        size += 44 + target.color.bytes.size() + target.depth_stencil.bytes.size();
+    size += snapshot.buffers.size() * 12;
+    if (size > kMaxBufferedSectionSize) {
+        error = "GPU snapshot metadata exceeds section size limit";
+        return false;
+    }
+    BufferWriter writer;
+    writer.u32(3);
+    writer.u32(snapshot.mapping_method);
+    writer.value(snapshot.resolution);
+    writer.i32(snapshot.last_scene);
+    writer.i32(snapshot.current_frame);
+    write_bytes(writer, surfaces);
+    writer.u32(static_cast<uint32_t>(snapshot.targets.size()));
+    for (const auto &target : snapshot.targets) {
+        writer.u32(target.address);
+        write_image(writer, target.color);
+        write_image(writer, target.depth_stencil);
+    }
+    writer.u32(static_cast<uint32_t>(snapshot.buffers.size()));
+    for (const auto &buffer : snapshot.buffers) {
+        writer.u32(buffer.address);
+        writer.u32(buffer.size);
+        writer.u32(static_cast<uint32_t>(buffer.pages.size()));
+    }
+    writer.u32(static_cast<uint32_t>(snapshot.clocks.size()));
+    for (const auto &clock : snapshot.clocks) {
+        writer.u32(clock.address);
+        writer.u64(clock.frame);
+        writer.u64(clock.scene);
+    }
+    writer.u32(static_cast<uint32_t>(snapshot.contexts.size()));
+    for (const auto &context : snapshot.contexts)
+        write_context(writer, context);
+    data = std::move(writer.data());
+    return true;
+}
+
+uint64_t gpu_buffer_page_payload_bound(const GpuSnapshot &snapshot) {
+    uint64_t total = 0;
+    for (const auto &buffer : snapshot.buffers) {
+        const uint64_t maximum = uint64_t(buffer.size) + page_size;
+        if (maximum > UINT64_MAX - total)
+            return UINT64_MAX;
+        total += maximum;
+    }
+    return total;
+}
+
+bool write_gpu_buffer_pages(Writer &writer, const GpuSnapshot &snapshot, std::string &error) {
+    return write_gpu_buffer_page_section(writer, snapshot.buffers, snapshot.page_store.get(),
+        gpu_buffer_page_payload_bound(snapshot), error);
+}
+
+bool parse_gpu_buffer_pages(SectionReader &reader, GpuSnapshot &snapshot,
+    const fs::path &staging_directory, std::string &error) {
+    if (snapshot.schema_version != 3) {
+        error = "GPU page stream requires schema 3 metadata";
+        return false;
+    }
+    return read_gpu_buffer_page_section(reader, snapshot.buffers, snapshot.page_store,
+        staging_directory, gpu_buffer_page_payload_bound(snapshot), error);
+}
+
 bool parse_gpu_state(const std::vector<uint8_t> &data, GpuSnapshot &snapshot, std::string &error) {
     BufferReader reader(data.data(), data.size());
     GpuSnapshot staged;
-    if (reader.u32() != 2) { error = "unsupported GPU snapshot schema"; return false; }
+    staged.schema_version = reader.u32();
+    if (staged.schema_version != 2 && staged.schema_version != 3) { error = "unsupported GPU snapshot schema"; return false; }
     staged.mapping_method = reader.u32();
     staged.resolution = reader.value<float>();
     staged.last_scene = reader.i32();
@@ -339,16 +488,29 @@ bool parse_gpu_state(const std::vector<uint8_t> &data, GpuSnapshot &snapshot, st
     }
     if (!count(reader, amount, 12)) return false;
     staged.buffers.resize(amount);
+    uint64_t declared_page_total = 0;
     for (auto &buffer : staged.buffers) {
         buffer.address = reader.u32();
         buffer.size = reader.u32();
         const auto pages = reader.u32();
-        if (!reader.ok() || pages > (uint64_t(buffer.size) + page_size) / page_size
-            || pages > reader.remaining() / (page_size + 8)) return false;
-        buffer.pages.resize(pages);
-        for (auto &page : buffer.pages) {
-            page.offset = reader.u32();
-            if (!read_bytes(reader, page.bytes) || page.bytes.size() != page_size) return false;
+        const uint64_t page_limit = (uint64_t(buffer.size) + page_size) / page_size;
+        if (!reader.ok() || pages > page_limit
+            || (staged.schema_version == 2 && pages > reader.remaining() / (page_size + 8))) return false;
+        declared_page_total += pages;
+        if (declared_page_total > ((uint64_t{1} << 32) + uint64_t(max_objects) * page_size) / page_size) {
+            error = "GPU snapshot page count exceeds mapped guest memory bound";
+            return false;
+        }
+        if (staged.schema_version == 2) {
+            buffer.pages.resize(pages);
+        } else {
+            buffer.expected_page_count = pages;
+        }
+        if (staged.schema_version == 2) {
+            for (auto &page : buffer.pages) {
+                page.offset = reader.u32();
+                if (!read_bytes(reader, page.bytes) || page.bytes.size() != page_size) return false;
+            }
         }
     }
     if (!count(reader, amount, 20)) return false;
@@ -368,7 +530,8 @@ bool parse_gpu_state(const std::vector<uint8_t> &data, GpuSnapshot &snapshot, st
 
 bool validate_gpu_state(const GpuSnapshot &snapshot, const MemoryImage &memory, std::string &error) {
     const auto fail = [&] { error = "invalid GPU snapshot references"; return false; };
-    if (snapshot.mapping_method > static_cast<uint32_t>(MappingMethod::NativeBuffer)
+    if ((snapshot.schema_version != 2 && snapshot.schema_version != 3)
+        || snapshot.mapping_method > static_cast<uint32_t>(MappingMethod::NativeBuffer)
         || !std::isfinite(snapshot.resolution) || snapshot.resolution <= 0 || snapshot.resolution > 16
         || snapshot.current_frame < 0 || snapshot.current_frame >= renderer::vulkan::MAX_FRAMES_RENDERING
         || snapshot.targets.size() > max_objects || snapshot.buffers.size() > max_objects || snapshot.clocks.size() > max_objects
@@ -385,9 +548,25 @@ bool validate_gpu_state(const GpuSnapshot &snapshot, const MemoryImage &memory, 
     for (const auto &buffer : snapshot.buffers) {
         if (!buffer.size || buffer.size % page_size || buffer.size > UINT32_MAX - page_size
             || !ranges.emplace(buffer.address, buffer.size).second || !memory.contains(buffer.address, buffer.size)) return fail();
+        const uint64_t declared_page_count = snapshot.schema_version == 3
+            ? buffer.expected_page_count : buffer.pages.size();
+        if (declared_page_count > (uint64_t(buffer.size) + page_size) / page_size)
+            return fail();
+        if (snapshot.schema_version == 3 && !snapshot.page_store) {
+            if (!buffer.pages.empty())
+                return fail();
+            continue;
+        }
+        if (snapshot.schema_version == 3 && buffer.expected_page_count)
+            return fail();
         uint64_t end = 0;
         for (const auto &page : buffer.pages) {
-            if (page.offset % page_size || page.offset < end || page.bytes.size() != page_size
+            const bool legacy_payload = snapshot.schema_version == 2 && page.bytes.size() == page_size;
+            const bool staged_payload = snapshot.schema_version == 3 && page.bytes.empty()
+                && page.staged_offset != UINT64_MAX && snapshot.page_store
+                && page.staged_offset <= snapshot.page_store->size()
+                && page_size <= snapshot.page_store->size() - page.staged_offset;
+            if (page.offset % page_size || page.offset < end || (!legacy_payload && !staged_payload)
                 || uint64_t(page.offset) + page_size > uint64_t(buffer.size) + page_size) return fail();
             end = uint64_t(page.offset) + page_size;
         }
@@ -506,7 +685,19 @@ bool restore_gpu_state(EmuEnvState &env, const GpuSnapshot &snapshot, std::strin
         auto *gpu = static_cast<uint8_t *>(buffer->mapped_data);
         std::memcpy(gpu, Ptr<const void>(saved.address).get(env.mem), saved.size);
         std::memset(gpu + saved.size, 0, page_size);
-        for (const auto &page : saved.pages) std::memcpy(gpu + page.offset, page.bytes.data(), page.bytes.size());
+        std::array<uint8_t, page_size> staged_page{};
+        for (const auto &page : saved.pages) {
+            if (page.bytes.size() == page_size) {
+                std::memcpy(gpu + page.offset, page.bytes.data(), page.bytes.size());
+            } else if (snapshot.page_store
+                && snapshot.page_store->read(page.staged_offset, staged_page.data(), staged_page.size(), error)) {
+                std::memcpy(gpu + page.offset, staged_page.data(), staged_page.size());
+            } else {
+                if (error.empty())
+                    error = "GPU snapshot page payload is unavailable during restore";
+                return false;
+            }
+        }
         state.allocator.flushAllocation(buffer->allocation, 0, buffer->size);
     }
     for (const auto &clock : snapshot.clocks) {

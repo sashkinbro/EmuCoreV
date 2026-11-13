@@ -74,6 +74,7 @@ set(EMUCOREV_BRIDGE_SOURCES
     "${EMUCOREV_BRIDGE_DIR}/src/native_lib_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/savestate_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/savestate/archive.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/savestate/gpu_buffer_stream.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/savestate/memory_image.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/savestate/gpu_state_io.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/savestate/gxm_state_io.cpp"
