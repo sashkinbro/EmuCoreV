@@ -16,7 +16,7 @@ void reset_frame_runtime_after_idle(Frames &frames, Drain drain, ResetPools rese
         for (auto &descriptor : frame.vert_descriptors) descriptor.descriptors_idx = 0;
         for (auto &descriptor : frame.frag_descriptors) descriptor.descriptors_idx = 0;
         frame.color_descriptor.descriptors_idx = 0;
-        frame.frame_timestamp = 0;
+        frame.pool_epoch = 0;
     }
 }
 

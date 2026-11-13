@@ -69,7 +69,7 @@ TEST(GpuGxmPreflight, FrameResetDropsAllOldFenceAliasesBeforeDestroyingAnyFrame)
     std::array<renderer::vulkan::FrameObject, 3> frames{};
     for (size_t i = 0; i < frames.size(); ++i) {
         frames[i].rendered_fences.push_back(vk::Fence(std::bit_cast<VkFence>(uint64_t(i + 1))));
-        frames[i].frame_timestamp = 100 + i;
+        frames[i].pool_epoch = 100 + i;
         frames[i].vert_descriptors[0].descriptors_idx = 7;
         frames[i].frag_descriptors[15].descriptors_idx = 9;
         frames[i].color_descriptor.descriptors_idx = 11;
@@ -87,7 +87,7 @@ TEST(GpuGxmPreflight, FrameResetDropsAllOldFenceAliasesBeforeDestroyingAnyFrame)
     EXPECT_EQ(drained, frames.size());
     EXPECT_EQ(reset, frames.size());
     for (const auto &frame : frames) {
-        EXPECT_EQ(frame.frame_timestamp, 0u);
+        EXPECT_EQ(frame.pool_epoch, 0u);
         for (const auto &descriptor : frame.vert_descriptors) EXPECT_EQ(descriptor.descriptors_idx, 0);
         for (const auto &descriptor : frame.frag_descriptors) EXPECT_EQ(descriptor.descriptors_idx, 0);
         EXPECT_EQ(frame.color_descriptor.descriptors_idx, 0);

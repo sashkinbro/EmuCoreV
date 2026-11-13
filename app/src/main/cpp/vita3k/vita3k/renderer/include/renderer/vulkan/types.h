@@ -21,6 +21,7 @@
 
 #include <renderer/types.h>
 #include <shader/uniform_block.h>
+#include <renderer/vulkan/frame_command_buffer_cursor.h>
 #include <unordered_map>
 #include <vkutil/objects.h>
 
@@ -114,8 +115,8 @@ struct FrameObject {
     vk::CommandPool prerender_pool;
 
     std::vector<vk::Fence> rendered_fences;
-    // equals to context.frame_timestamp when the frame object is used
-    uint64_t frame_timestamp;
+    // Changes whenever this shared frame slot's command pools are reset.
+    uint64_t pool_epoch = 0;
 
     // there are at most 16 different textures for a given stage
     // stage_descriptor[i] is the descriptor when using (i+1) textures
@@ -397,8 +398,6 @@ struct VKRenderTarget : public renderer::RenderTarget {
     vkutil::Image color;
     vkutil::Image depthstencil;
 
-    uint64_t last_used_frame = 0;
-
     // sync objects
     std::vector<vk::Fence> fences;
     // the current fence we're at
@@ -407,8 +406,7 @@ struct VKRenderTarget : public renderer::RenderTarget {
     std::array<std::vector<vk::CommandBuffer>, MAX_FRAMES_RENDERING> cmd_buffers;
     // command buffers used for the pre-render, can be reset
     std::array<std::vector<vk::CommandBuffer>, MAX_FRAMES_RENDERING> pre_cmd_buffers;
-    // the command buffer index we're at in a frame
-    int cmd_buffer_idx = 0;
+    FrameCommandBufferCursor<MAX_FRAMES_RENDERING> command_buffer_cursor;
 
     VKRenderTarget(VKState &state, const SceGxmRenderTargetParams &params);
     ~VKRenderTarget() override;

@@ -394,25 +394,23 @@ void VKContext::start_recording(bool first_in_scene) {
         return;
     }
 
-    if (render_target->last_used_frame != frame_timestamp) {
-        // reset idx if we are in a new frame
-        render_target->cmd_buffer_idx = 0;
-        render_target->last_used_frame = frame_timestamp;
-    }
+    const std::size_t frame_idx = static_cast<std::size_t>(state.current_frame_idx);
+    FrameObject &frame = state.frame();
+    const std::size_t cmd_buffer_idx = render_target->command_buffer_cursor.acquire(frame_idx, frame.pool_epoch);
 
     // safety check
-    if (render_target->cmd_buffer_idx == render_target->cmd_buffers[state.current_frame_idx].size()) {
+    if (cmd_buffer_idx >= render_target->cmd_buffers[frame_idx].size()) {
         LOG_WARN_ONCE("Render Target is using more scenes per frame than what was planned!");
 
         // add additional cmd buffers, fences and semaphores
         vk::CommandBufferAllocateInfo cmd_buffer_info{
-            .commandPool = state.frame().render_pool,
+            .commandPool = frame.render_pool,
             .commandBufferCount = 1
         };
-        render_target->cmd_buffers[state.current_frame_idx].push_back(state.device.allocateCommandBuffers(cmd_buffer_info)[0]);
+        render_target->cmd_buffers[frame_idx].push_back(state.device.allocateCommandBuffers(cmd_buffer_info)[0]);
 
-        cmd_buffer_info.commandPool = state.frame().prerender_pool;
-        render_target->pre_cmd_buffers[state.current_frame_idx].push_back(state.device.allocateCommandBuffers(cmd_buffer_info)[0]);
+        cmd_buffer_info.commandPool = frame.prerender_pool;
+        render_target->pre_cmd_buffers[frame_idx].push_back(state.device.allocateCommandBuffers(cmd_buffer_info)[0]);
 
         // we only use one fence per scene anyway
         vk::FenceCreateInfo fence_info{};
@@ -429,9 +427,8 @@ void VKContext::start_recording(bool first_in_scene) {
         render_target->fence_idx = (render_target->fence_idx + 1) % render_target->fences.size();
     }
 
-    render_cmd = render_target->cmd_buffers[state.current_frame_idx][render_target->cmd_buffer_idx];
-    prerender_cmd = render_target->pre_cmd_buffers[state.current_frame_idx][render_target->cmd_buffer_idx];
-    render_target->cmd_buffer_idx++;
+    render_cmd = render_target->cmd_buffers[frame_idx][cmd_buffer_idx];
+    prerender_cmd = render_target->pre_cmd_buffers[frame_idx][cmd_buffer_idx];
 
     vk::CommandBufferBeginInfo begin_info{
         .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
@@ -833,6 +830,7 @@ void new_frame(VKContext &context) {
     }
 
     context.frame_timestamp++;
+    context.state.frame_epoch++;
     context.state.current_frame_idx = context.frame_timestamp % MAX_FRAMES_RENDERING;
 
     vk::Device device = context.state.device;
@@ -882,7 +880,7 @@ void new_frame(VKContext &context) {
     context.last_vert_texture_count = ~0;
     context.last_frag_texture_count = ~0;
 
-    frame.frame_timestamp = context.frame_timestamp;
+    frame.pool_epoch = context.state.frame_epoch;
 }
 
 void signal_sync_object(VKState &state, SceGxmSyncObject *sync_object, uint32_t timestamp) {

@@ -98,6 +98,8 @@ struct VKState : public renderer::State {
     std::array<FrameObject, MAX_FRAMES_RENDERING> frames;
     // start at 1 because last_frame_waited is set to 0
     int current_frame_idx = 1;
+    // Monotonic epoch for shared frame-slot pool resets; context frame counters are local.
+    uint64_t frame_epoch = 1;
 
     // vector of descriptor pools used for the frame descriptor, they are not really used anywhere
     // but it's better to keep a reference to them somewhere

@@ -1401,6 +1401,7 @@ void VKState::cleanup() {
     shaders_cache_hashs.clear();
     request_queue.reset();
     current_frame_idx = 1;
+    frame_epoch = 1;
     last_scene_id = 0;
     shaders_count_compiled = 0;
     programs_count_pre_compiled = 0;
@@ -2057,6 +2058,7 @@ bool VKState::reset_frame_runtime_for_restore(std::string &error) {
                 device.resetCommandPool(frame.render_pool);
             });
         current_frame_idx = 1;
+        frame_epoch = 1;
         last_scene_id = 0;
         reset_gpu_requests_after_join(request_queue);
         return true;
