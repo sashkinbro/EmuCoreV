@@ -1627,4 +1627,11 @@
     <string name="ecv_compatibility_notes">Notes : %1$s</string>
     <string name="ecv_compatibility_settings">Paramètres de rendu</string>
     <string name="ecv_compatibility_evidence">Preuve : %1$s</string>
+    <string name="installer_archive_unsupported">Ce format d’archive n’est pas pris en charge. Choisissez un fichier ZIP, 7z, RAR, VPK ou PKG.</string>
+    <string name="installer_archive_encrypted_unsupported">Les archives chiffrées et les méthodes de compression non prises en charge ne peuvent pas être installées.</string>
+    <string name="installer_archive_unsafe">Cette archive contient des chemins non sécurisés ou en double, ou des liens symboliques.</string>
+    <string name="installer_archive_limits">Cette archive dépasse les limites d’extraction sécurisées.</string>
+    <string name="installer_archive_space">L’espace de stockage disponible est insuffisant pour préparer cette archive.</string>
+    <string name="installer_archive_multiple_packages">Plusieurs paquets ont été trouvés. Choisissez celui à installer.</string>
+    <string name="installer_archive_corrupt">L’archive est endommagée ou son contenu n’a pas pu être vérifié.</string>
 </resources>

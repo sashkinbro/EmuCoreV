@@ -1630,4 +1630,11 @@
     <string name="ecv_compatibility_notes">메모: %1$s</string>
     <string name="ecv_compatibility_settings">렌더러 설정</string>
     <string name="ecv_compatibility_evidence">검증 자료: %1$s</string>
+    <string name="installer_archive_unsupported">이 아카이브 형식은 지원되지 않습니다. ZIP, 7z, RAR, VPK 또는 PKG 파일을 선택하세요.</string>
+    <string name="installer_archive_encrypted_unsupported">암호화된 아카이브 또는 지원되지 않는 압축 방식은 설치할 수 없습니다.</string>
+    <string name="installer_archive_unsafe">이 아카이브에 안전하지 않거나 중복된 경로 또는 심볼릭 링크가 포함되어 있습니다.</string>
+    <string name="installer_archive_limits">이 아카이브가 안전한 압축 해제 한도를 초과했습니다.</string>
+    <string name="installer_archive_space">이 아카이브를 준비할 저장 공간이 부족합니다.</string>
+    <string name="installer_archive_multiple_packages">패키지가 여러 개 발견되었습니다. 설치할 패키지를 선택하세요.</string>
+    <string name="installer_archive_corrupt">아카이브가 손상되었거나 콘텐츠를 확인할 수 없습니다.</string>
 </resources>

@@ -14,7 +14,8 @@ data class VitaArchiveInspection(
     val hasInstallMetadata: Boolean,
     val unsupportedCompressionEntries: Int,
     val errorMessage: String? = null,
-    val patchTitleIds: Set<String> = emptySet()
+    val patchTitleIds: Set<String> = emptySet(),
+    val hasValidInstallSfo: Boolean = false
 ) {
     val supportedCompression: Boolean
         get() = unsupportedCompressionEntries == 0
@@ -27,6 +28,36 @@ object VitaArchiveInspector {
 
     fun isVitaminDump(path: String): Boolean {
         return inspect(path).vitaminDump
+    }
+
+    /** True when the ZIP has Vita install metadata that can identify a title and category. */
+    fun isInstallableVpk(path: String): Boolean {
+        val inspection = inspect(path)
+        return inspection.readable && inspection.hasValidInstallSfo
+    }
+
+    /** Finds extracted game roots using a valid Vita title ID and category in param.sfo. */
+    internal fun findInstallableContentRoots(root: File): List<File> {
+        if (!root.isDirectory) return emptyList()
+        return root.walkTopDown()
+            .maxDepth(InstallerExpansionLimits().maxEntries.coerceAtMost(50_000))
+            .filter { file ->
+                file.isFile && file.name.equals("param.sfo", ignoreCase = true) &&
+                    file.parentFile?.name.equals("sce_sys", ignoreCase = true)
+            }
+            .mapNotNull { sfoFile ->
+                runCatching {
+                    if (sfoFile.length() !in 20L..(1024L * 1024L)) return@runCatching null
+                    val bytes = sfoFile.readBytes()
+                    val metadata = VitaSfoParser.parse(bytes)
+                    val titleId = metadata.titleId
+                    if (titleId != null && Regex("[A-Z]{4}[0-9]{5}").matches(titleId) &&
+                        !metadata.category.isNullOrBlank()) sfoFile.parentFile?.parentFile else null
+                }.getOrNull()
+            }
+            .filterNotNull()
+            .distinctBy { runCatching { it.canonicalPath }.getOrDefault(it.absolutePath) }
+            .toList()
     }
 
     fun inspect(path: String): VitaArchiveInspection {
@@ -47,6 +78,7 @@ object VitaArchiveInspector {
             ZipFile.builder().setFile(archive).get().use { zip ->
                 var vitaminDump = false
                 var hasInstallMetadata = false
+                var hasValidInstallSfo = false
                 var unsupportedCompressionEntries = 0
                 val patchTitleIds = linkedSetOf<String>()
 
@@ -63,6 +95,10 @@ object VitaArchiveInspector {
                     if (!entry.isDirectory && (name == SFO_MARKER || name.endsWith("/$SFO_MARKER"))) {
                         val metadata = readMetadata(zip, entry)
                         val titleId = metadata?.titleId
+                        if (titleId != null && Regex("[A-Z]{4}[0-9]{5}").matches(titleId) &&
+                            metadata.category?.isNotBlank() == true) {
+                            hasValidInstallSfo = true
+                        }
                         if (metadata?.category?.contains("gp") == true && titleId != null &&
                             Regex("[A-Z]{4}[0-9]{5}").matches(titleId)) patchTitleIds += titleId
                     }
@@ -81,7 +117,8 @@ object VitaArchiveInspector {
                     vitaminDump = vitaminDump,
                     hasInstallMetadata = hasInstallMetadata,
                     unsupportedCompressionEntries = unsupportedCompressionEntries,
-                    patchTitleIds = patchTitleIds
+                    patchTitleIds = patchTitleIds,
+                    hasValidInstallSfo = hasValidInstallSfo
                 )
             }
         }.getOrElse { error ->

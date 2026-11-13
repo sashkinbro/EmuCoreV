@@ -35,6 +35,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -54,7 +55,8 @@ import kotlin.math.roundToInt
 @Composable
 fun SetupInstallDialog(
     uiState: SetupInstallUiState,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onCancel: () -> Unit = {}
 ) {
     if (!uiState.visible) return
 
@@ -147,6 +149,14 @@ fun SetupInstallDialog(
                             itemProgress = itemProgress,
                             detail = uiState.detail
                         )
+                        if (uiState.cancellable) {
+                            TextButton(
+                                onClick = onCancel,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(stringResource(R.string.common_cancel))
+                            }
+                        }
                     } else {
                         InstallResultContent(
                             status = uiState.status,

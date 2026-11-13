@@ -10,6 +10,13 @@ import java.util.zip.Deflater
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import java.nio.file.FileVisitResult
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
+import java.util.UUID
 
 data class ArchiveRepackProgress(
     val progress: Float,
@@ -23,8 +30,7 @@ object VitaArchiveRepacker {
     private const val CACHE_DIR_NAME = "install_repack_cache"
 
     fun canRepack(path: String): Boolean {
-        val extension = File(path).extension.lowercase(Locale.US)
-        return extension == "vpk" || extension == "zip"
+        return InstallerArchiveSafety.detectContainerFormat(File(path)) == InstallerArchiveFormat.ZIP
     }
 
     fun repackToInstallZip(
@@ -109,6 +115,94 @@ object VitaArchiveRepacker {
             partialOutput?.delete()
             logError("Failed to repack archive: $sourcePath", error)
         }.getOrNull()
+    }
+
+    /** Packs a native-expanded Vita content directory to the ZIP accepted by the existing installer. */
+    internal fun repackDirectoryToInstallZip(
+        contentRoot: File,
+        outputRoot: File,
+        maxBytes: Long,
+        freeSpaceReserveBytes: Long = 0L,
+        isCancelled: () -> Boolean = { false },
+        onProgress: (EmbeddedPackageProgress) -> Unit = {}
+    ): File? {
+        if (!contentRoot.isDirectory || Files.isSymbolicLink(contentRoot.toPath()) || maxBytes <= 0L) return null
+        var partial: File? = null
+        var output: File? = null
+        return runCatching {
+            val root = contentRoot.canonicalFile.toPath()
+            val files = mutableListOf<Path>()
+            var totalBytes = 0L
+            Files.walkFileTree(root, object : SimpleFileVisitor<Path>() {
+                override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                    if (attrs.isSymbolicLink || Files.isSymbolicLink(dir)) throw IOException("Directory contains a symbolic link")
+                    if (!dir.toRealPath(LinkOption.NOFOLLOW_LINKS).startsWith(root)) throw IOException("Directory escaped the selected game root")
+                    return FileVisitResult.CONTINUE
+                }
+
+                override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                    if (!attrs.isRegularFile || attrs.isSymbolicLink || Files.isSymbolicLink(file)) throw IOException("Game content contains a non-regular file")
+                    val relative = root.relativize(file).toString().replace('\\', '/')
+                    if (normalizeArchiveEntryName(relative) == null) throw IOException("Unsafe extracted game path")
+                    val size = attrs.size()
+                    if (size < 0L || size > maxBytes - totalBytes) throw IOException("Extracted game exceeds byte limit")
+                    totalBytes += size
+                    files.add(file)
+                    return FileVisitResult.CONTINUE
+                }
+            })
+            if (files.isEmpty()) throw IOException("Extracted game content is empty")
+            if (totalBytes > Long.MAX_VALUE - freeSpaceReserveBytes ||
+                outputRoot.usableSpace < totalBytes + freeSpaceReserveBytes) {
+                throw IOException("Not enough free space to repack extracted game content")
+            }
+            files.sortBy { root.relativize(it).toString().replace('\\', '/') }
+            val target = File(outputRoot, "expanded-game-${UUID.randomUUID()}.zip")
+            val temporary = File(outputRoot, ".${target.name}.partial")
+            output = target
+            partial = temporary
+            val seen = mutableSetOf<String>()
+            var copied = 0L
+            ZipOutputStream(temporary.outputStream().buffered()).use { zipOut ->
+                zipOut.setLevel(Deflater.DEFAULT_COMPRESSION)
+                files.forEach { file ->
+                    checkArchiveCancelled(isCancelled)
+                    val relative = root.relativize(file).toString().replace('\\', '/')
+                    val normalized = normalizeArchiveEntryName(relative) ?: throw IOException("Unsafe extracted game path")
+                    if (!seen.add(normalized.lowercase(Locale.ROOT))) throw IOException("Duplicate extracted game path")
+                    val entry = ZipEntry(normalized).apply { method = ZipEntry.DEFLATED }
+                    zipOut.putNextEntry(entry)
+                    Files.newInputStream(file).use { input ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            checkArchiveCancelled(isCancelled)
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            if (count == 0) continue
+                            copied += count
+                            if (copied > maxBytes) throw IOException("Extracted game exceeds byte limit")
+                            zipOut.write(buffer, 0, count)
+                            onProgress(EmbeddedPackageProgress(copied, totalBytes, normalized))
+                        }
+                    }
+                    zipOut.closeEntry()
+                }
+            }
+            if (isCancelled() || Thread.currentThread().isInterrupted) throw IOException("Archive preparation was cancelled")
+            try {
+                Files.move(temporary.toPath(), target.toPath(), java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                Files.move(temporary.toPath(), target.toPath())
+            }
+            target
+        }.onFailure {
+            partial?.delete()
+            output?.delete()
+        }.getOrNull()
+    }
+
+    private fun checkArchiveCancelled(isCancelled: () -> Boolean) {
+        if (isCancelled() || Thread.currentThread().isInterrupted) throw IOException("Archive preparation was cancelled")
     }
 
     internal fun normalizeArchiveEntryName(name: String): String? {

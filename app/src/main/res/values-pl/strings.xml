@@ -1630,4 +1630,11 @@
     <string name="ecv_compatibility_notes">Uwagi: %1$s</string>
     <string name="ecv_compatibility_settings">Ustawienia renderowania</string>
     <string name="ecv_compatibility_evidence">Dowód: %1$s</string>
+    <string name="installer_archive_unsupported">Ten format archiwum nie jest obsługiwany. Wybierz plik ZIP, 7z, RAR, VPK lub PKG.</string>
+    <string name="installer_archive_encrypted_unsupported">Nie można zainstalować zaszyfrowanych archiwów ani archiwów używających nieobsługiwanej metody kompresji.</string>
+    <string name="installer_archive_unsafe">Archiwum zawiera niebezpieczne lub zduplikowane ścieżki albo dowiązania symboliczne.</string>
+    <string name="installer_archive_limits">Archiwum przekracza bezpieczne limity rozpakowywania.</string>
+    <string name="installer_archive_space">Za mało wolnego miejsca, aby przygotować to archiwum.</string>
+    <string name="installer_archive_multiple_packages">Znaleziono więcej niż jeden pakiet. Wybierz pakiet do zainstalowania.</string>
+    <string name="installer_archive_corrupt">Archiwum jest uszkodzone lub nie udało się zweryfikować jego zawartości.</string>
 </resources>

@@ -1631,4 +1631,11 @@
     <string name="ecv_compatibility_notes">Catatan: %1$s</string>
     <string name="ecv_compatibility_settings">Pengaturan perender</string>
     <string name="ecv_compatibility_evidence">Bukti: %1$s</string>
+    <string name="installer_archive_unsupported">Format arsip ini tidak didukung. Pilih file ZIP, 7z, RAR, VPK, atau PKG.</string>
+    <string name="installer_archive_encrypted_unsupported">Arsip terenkripsi atau metode kompresi yang tidak didukung tidak dapat diinstal.</string>
+    <string name="installer_archive_unsafe">Arsip ini berisi jalur yang tidak aman atau duplikat, atau tautan simbolis.</string>
+    <string name="installer_archive_limits">Arsip ini melampaui batas ekstraksi yang aman.</string>
+    <string name="installer_archive_space">Ruang penyimpanan kosong tidak cukup untuk menyiapkan arsip ini.</string>
+    <string name="installer_archive_multiple_packages">Ditemukan lebih dari satu paket. Pilih paket yang akan diinstal.</string>
+    <string name="installer_archive_corrupt">Arsip rusak atau isinya tidak dapat diverifikasi.</string>
 </resources>

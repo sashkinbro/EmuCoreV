@@ -1627,4 +1627,11 @@
     <string name="ecv_compatibility_notes">Notlar: %1$s</string>
     <string name="ecv_compatibility_settings">İşleyici ayarları</string>
     <string name="ecv_compatibility_evidence">Kanıt: %1$s</string>
+    <string name="installer_archive_unsupported">Bu arşiv biçimi desteklenmiyor. Bir ZIP, 7z, RAR, VPK veya PKG dosyası seçin.</string>
+    <string name="installer_archive_encrypted_unsupported">Şifrelenmiş arşivler veya desteklenmeyen sıkıştırma yöntemleri yüklenemez.</string>
+    <string name="installer_archive_unsafe">Bu arşiv güvenli olmayan veya yinelenen yollar ya da sembolik bağlantılar içeriyor.</string>
+    <string name="installer_archive_limits">Bu arşiv güvenli çıkarma sınırlarını aşıyor.</string>
+    <string name="installer_archive_space">Bu arşivi hazırlamak için yeterli boş depolama alanı yok.</string>
+    <string name="installer_archive_multiple_packages">Birden fazla paket bulundu. Yüklenecek paketi seçin.</string>
+    <string name="installer_archive_corrupt">Arşiv bozuk veya içeriği doğrulanamadı.</string>
 </resources>

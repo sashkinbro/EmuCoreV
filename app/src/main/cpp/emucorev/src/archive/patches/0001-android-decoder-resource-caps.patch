@@ -1,0 +1,166 @@
+--- a/libarchive/archive_read_support_format_rar.c
++++ b/libarchive/archive_read_support_format_rar.c
+@@ -2374,6 +2374,13 @@
+         return (ARCHIVE_FAILED);
+       }
+ 
++      /* EmuCoreV mobile cap: reject oversized RAR4 PPMd dictionaries before allocation. */
++      if (rar->dictionary_size > (32U * 1024U * 1024U)) {
++        archive_set_error(&a->archive, ARCHIVE_ERRNO_FILE_FORMAT,
++                          "RAR PPMd dictionary exceeds the mobile memory limit");
++        return (ARCHIVE_FAILED);
++      }
++
+       if (!__archive_ppmd7_functions.Ppmd7_Alloc(&rar->ppmd7_context,
+         rar->dictionary_size))
+       {
+--- a/libarchive/archive_read_support_format_rar5.c
++++ b/libarchive/archive_read_support_format_rar5.c
+@@ -1974,7 +1974,8 @@
+ 
+ 	/* Check if window_size is a sane value. Also, if the file is not
+ 	 * declared as a directory, disallow window_size == 0. */
+-	if(window_size > (64 * 1024 * 1024) ||
++	/* EmuCoreV mobile cap: window_buf and filtered_buf each use this size. */
++	if(window_size > (32 * 1024 * 1024) ||
+ 	    (rar5->file.dir == 0 && window_size == 0))
+ 	{
+ 		archive_set_error(&a->archive, ARCHIVE_ERRNO_FILE_FORMAT,
+--- a/libarchive/archive_read_support_format_7zip.c
++++ b/libarchive/archive_read_support_format_7zip.c
+@@ -396,7 +396,11 @@
+ /* Maximum entry size. This limitation prevents reading intentional
+  * corrupted 7-zip files on assuming there are not so many entries in
+  * the files. */
+-#define UMAX_ENTRY	ARCHIVE_LITERAL_LL(100000000)
++#define UMAX_ENTRY	ARCHIVE_LITERAL_LL(2147483647)
++#define EMUCOREV_7Z_MAX_DICTIONARY	(32U * 1024U * 1024U)
++#define EMUCOREV_7Z_MAX_BCJ2_STREAM	(32U * 1024U * 1024U)
++#define EMUCOREV_7Z_MAX_HEADER	(32U * 1024U * 1024U)
++#define EMUCOREV_7Z_MAX_FILES	50000
+ 
+ /* Don't try to read more than 16 MB at a time */
+ #define MAX_READ	16 * 1024 * 1024
+@@ -1551,6 +1555,13 @@
+ 			set_error(a, r);
+ 			return (ARCHIVE_FAILED);
+ 		}
++		if (((lzma_options_lzma *)ff->options)->dict_size >
++		    EMUCOREV_7Z_MAX_DICTIONARY) {
++			free(ff->options);
++			archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++			    "7-Zip dictionary exceeds the mobile memory limit");
++			return (ARCHIVE_FAILED);
++		}
+ 		fi++;
+ 
+ 		filters[fi].id = LZMA_VLI_UNKNOWN;
+@@ -1668,7 +1679,8 @@
+ 		order = coder1->properties[0];
+ 		msize = archive_le32dec(&(coder1->properties[1]));
+ 		if (order < PPMD7_MIN_ORDER || order > PPMD7_MAX_ORDER ||
+-		    msize < PPMD7_MIN_MEM_SIZE || msize > PPMD7_MAX_MEM_SIZE) {
++		    msize < PPMD7_MIN_MEM_SIZE || msize > PPMD7_MAX_MEM_SIZE ||
++		    msize > EMUCOREV_7Z_MAX_DICTIONARY) {
+ 			archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
+ 			    "Malformed PPMd parameter");
+ 			return (ARCHIVE_FAILED);
+@@ -2301,7 +2313,8 @@
+ 	 */
+ 	if (parse_7zip_size(a, &(pi->numPackStreams)) < 0)
+ 		return (-1);
+-	if (pi->numPackStreams == 0)
++	if (pi->numPackStreams == 0 ||
++	    pi->numPackStreams > EMUCOREV_7Z_MAX_FILES)
+ 		return (-1);
+ 
+ 	/*
+@@ -2433,6 +2446,9 @@
+ 			if (parse_7zip_size(
+ 			    a, &(f->coders[i].numOutStreams)) < 0)
+ 				return (-1);
++			if (f->coders[i].numInStreams > EMUCOREV_7Z_MAX_FILES ||
++			    f->coders[i].numOutStreams > EMUCOREV_7Z_MAX_FILES)
++				return (-1);
+ 		}
+ 
+ 		if (attr) {
+@@ -2453,7 +2469,9 @@
+ 		if (archive_ckd_add_size(&numInStreamsTotal,
+ 		    numInStreamsTotal, f->coders[i].numInStreams) ||
+ 		    archive_ckd_add_size(&numOutStreamsTotal,
+-		    numOutStreamsTotal, f->coders[i].numOutStreams))
++		    numOutStreamsTotal, f->coders[i].numOutStreams) ||
++		    numInStreamsTotal > EMUCOREV_7Z_MAX_FILES ||
++		    numOutStreamsTotal > EMUCOREV_7Z_MAX_FILES)
+ 			return (-1);
+ 	}
+ 
+@@ -2544,7 +2562,8 @@
+ 	 * left in the header cannot be honored and is rejected here
+ 	 * before it is used to size the folders allocation.
+ 	 */
+-	if (ci->numFolders > (uint64_t)zip->header_bytes_remaining)
++	if (ci->numFolders > (uint64_t)zip->header_bytes_remaining ||
++	    ci->numFolders > EMUCOREV_7Z_MAX_FILES)
+ 		goto failed;
+ 
+ 	/*
+@@ -2681,6 +2700,8 @@
+ 			if (archive_ckd_add_size(&unpack_streams,
+ 			    unpack_streams, f[i].numUnpackStreams))
+ 				return (-1);
++			if (unpack_streams > EMUCOREV_7Z_MAX_FILES)
++				return (-1);
+ 		}
+ 		if ((p = header_bytes(a, 1)) == NULL)
+ 			return (-1);
+@@ -2688,7 +2709,7 @@
+ 	} else
+ 		unpack_streams = numFolders;
+ 
+-	if (unpack_streams > UMAX_ENTRY)
++	if (unpack_streams > EMUCOREV_7Z_MAX_FILES)
+ 		return (-1);
+ 
+ 	if (type != kSize) {
+@@ -2974,8 +2995,12 @@
+ 	if (*p != kFilesInfo)
+ 		return (-1);
+ 
+-	if (parse_7zip_size(a, &(zip->numFiles)) < 0)
++	if (parse_7zip_size(a, &(zip->numFiles)) < 0 ||
++	    zip->numFiles > EMUCOREV_7Z_MAX_FILES) {
++		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++		    "7-Zip file count exceeds the mobile limit");
+ 		return (-1);
++	}
+ 	if (!files_info_numfiles_is_sane(zip))
+ 		return (-1);
+ 
+@@ -3443,6 +3468,11 @@
+ 	next_header_size = archive_le64dec(p + 20);
+ 	if (next_header_size < 0) {
+ 		archive_set_error(&a->archive, -1, "Malformed 7-Zip archive");
++		return (ARCHIVE_FATAL);
++	}
++	if (next_header_size > EMUCOREV_7Z_MAX_HEADER) {
++		archive_set_error(&a->archive, -1,
++		    "7-Zip header exceeds the mobile memory limit");
+ 		return (ARCHIVE_FATAL);
+ 	}
+ 	next_header_crc = archive_le32dec(p + 28);
+@@ -4175,6 +4205,13 @@
+ 				    "platform maximum");
+ 				return (ARCHIVE_FATAL);
+ 			}
++			if (zip->folder_outbytes_remaining < 0 ||
++			    (uint64_t)zip->folder_outbytes_remaining > EMUCOREV_7Z_MAX_BCJ2_STREAM) {
++				free(b[0]); free(b[1]); free(b[2]);
++				archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++				    "7-Zip BCJ2 stream exceeds the mobile memory limit");
++				return (ARCHIVE_FATAL);
++			}
+ 			b[i] = malloc((size_t)zip->folder_outbytes_remaining);
+ 			if (b[i] == NULL) {
+ 				free(b[0]); free(b[1]); free(b[2]);

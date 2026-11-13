@@ -1631,4 +1631,11 @@
     <string name="ecv_compatibility_notes">ملاحظات: %1$s</string>
     <string name="ecv_compatibility_settings">إعدادات التصيير</string>
     <string name="ecv_compatibility_evidence">الدليل: %1$s</string>
+    <string name="installer_archive_unsupported">تنسيق الأرشيف غير مدعوم. اختر ملف ZIP أو 7z أو RAR أو VPK أو PKG.</string>
+    <string name="installer_archive_encrypted_unsupported">لا يمكن تثبيت الأرشيفات المشفرة أو التي تستخدم طريقة ضغط غير مدعومة.</string>
+    <string name="installer_archive_unsafe">يحتوي الأرشيف على مسارات غير آمنة أو مكررة أو روابط رمزية.</string>
+    <string name="installer_archive_limits">يتجاوز الأرشيف حدود فك الضغط الآمنة.</string>
+    <string name="installer_archive_space">لا توجد مساحة تخزين كافية لتجهيز هذا الأرشيف.</string>
+    <string name="installer_archive_multiple_packages">تم العثور على أكثر من حزمة. اختر الحزمة التي تريد تثبيتها.</string>
+    <string name="installer_archive_corrupt">الأرشيف تالف أو تعذر التحقق من محتوياته.</string>
 </resources>

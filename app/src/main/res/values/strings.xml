@@ -1631,4 +1631,11 @@
     <string name="ecv_compatibility_notes">Notes: %1$s</string>
     <string name="ecv_compatibility_settings">Renderer settings</string>
     <string name="ecv_compatibility_evidence">Evidence: %1$s</string>
+    <string name="installer_archive_unsupported">Unsupported archive format. Choose a ZIP, 7z, RAR, VPK, or PKG file.</string>
+    <string name="installer_archive_encrypted_unsupported">Encrypted archives or unsupported compression methods cannot be installed.</string>
+    <string name="installer_archive_unsafe">This archive contains unsafe or duplicate paths, or symbolic links.</string>
+    <string name="installer_archive_limits">This archive exceeds safe extraction limits.</string>
+    <string name="installer_archive_space">Not enough free storage to prepare this archive.</string>
+    <string name="installer_archive_multiple_packages">More than one package was found. Select the package to install.</string>
+    <string name="installer_archive_corrupt">The archive is damaged or its contents could not be verified.</string>
 </resources>

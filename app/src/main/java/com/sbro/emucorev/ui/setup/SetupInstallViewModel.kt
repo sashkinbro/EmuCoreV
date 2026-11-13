@@ -14,7 +14,18 @@ import com.sbro.emucorev.core.VitaArchiveInspector
 import com.sbro.emucorev.core.VitaArchiveRepacker
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.VitaInstallBridge
+import com.sbro.emucorev.core.InstallerArchiveSafety
+import com.sbro.emucorev.core.InstallerArchiveFormat
+import com.sbro.emucorev.core.InstallerExpansionException
+import com.sbro.emucorev.core.InstallerExpansionFailure
+import com.sbro.emucorev.core.InstallerPackageCandidate
+import com.sbro.emucorev.core.InstallerPackageKind
+import com.sbro.emucorev.core.NativeArchiveExpander
+import com.sbro.emucorev.core.InstallerArchiveNativeFailure
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,11 +55,19 @@ data class SetupInstallUiState(
     val current: Int? = null,
     val total: Int? = null,
     val detail: String? = null,
-    val message: String? = null
+    val message: String? = null,
+    val cancellable: Boolean = false
 ) {
     val visible: Boolean
         get() = status != InstallStatus.Idle
 }
+
+data class InstallPackageChoice(val id: Int, val label: String, val type: String)
+
+data class ArchivePackageSelectionUiState(
+    val message: String,
+    val choices: List<InstallPackageChoice>
+)
 
 class SetupInstallViewModel(application: Application) : AndroidViewModel(application) {
     private val appContext = getApplication<Application>()
@@ -58,6 +77,11 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
     private var nativeProgressOffset = 0f
     private var nativeProgressScale = 1f
     private val stagedFilesToCleanup = mutableListOf<String>()
+    private val _archivePackageSelection = MutableStateFlow<ArchivePackageSelectionUiState?>(null)
+    val archivePackageSelection: StateFlow<ArchivePackageSelectionUiState?> = _archivePackageSelection.asStateFlow()
+    private var pendingPackageChoice: CompletableDeferred<InstallerPackageCandidate?>? = null
+    private var pendingPackageChoices: Map<Int, InstallerPackageCandidate> = emptyMap()
+    private var runningInstallJob: Job? = null
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -71,6 +95,18 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
     fun dismissDialog() {
         if (_uiState.value.status == InstallStatus.Running) return
         _uiState.value = SetupInstallUiState()
+    }
+
+    fun chooseArchivePackage(id: Int) {
+        pendingPackageChoices[id]?.let { pendingPackageChoice?.complete(it) }
+    }
+
+    fun cancelArchivePackageChoice() {
+        pendingPackageChoice?.complete(null)
+    }
+
+    fun cancelArchivePreparation() {
+        if (_uiState.value.cancellable) runningInstallJob?.cancel()
     }
 
     fun installFirmware(uriString: String) {
@@ -95,6 +131,108 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
             if (path == null) {
                 finishError(appContext.getString(R.string.install_dialog_content_failed))
                 return@runInstall
+            }
+            val detectedFormat = InstallerArchiveSafety.detectContainerFormat(File(path))
+            val directInstallableZip = detectedFormat == InstallerArchiveFormat.ZIP && VitaArchiveInspector.isInstallableVpk(path)
+            if (detectedFormat != null && (!directInstallableZip || !repairArchive)) {
+                val installJob = currentCoroutineContext()[Job]
+                _uiState.value = _uiState.value.copy(
+                    cancellable = true,
+                    detail = appContext.getString(R.string.install_dialog_repack_preparing)
+                )
+                try {
+                    val plan = VitaInstallBridge.scanArchivePackages(
+                        appContext,
+                        path,
+                        isCancelled = { installJob?.isActive != true }
+                    ) { progress ->
+                        _uiState.value = _uiState.value.copy(
+                            current = progress.copiedBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                            total = progress.totalBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                            detail = appContext.getString(
+                                R.string.install_dialog_repack_entry,
+                                progress.archiveEntryPath
+                            )
+                        )
+                    }
+                    if (plan != null) {
+                        plan.use { preparedPlan ->
+                            val selected = if (preparedPlan.candidates.size == 1) {
+                                preparedPlan.candidates.single()
+                            } else {
+                                awaitArchivePackageChoice(preparedPlan.candidates)
+                            }
+                            if (selected == null) {
+                                finishCancelled()
+                                return@runInstall
+                            }
+                            preparedPlan.prepare(selected).use { prepared ->
+                                _uiState.value = _uiState.value.copy(
+                                    progress = 10f,
+                                    current = null,
+                                    total = null,
+                                    detail = appContext.getString(R.string.install_dialog_repack_installing),
+                                    cancellable = false
+                                )
+                                val result = VitaInstallBridge.installPreparedEmbeddedPackage(
+                                    appContext,
+                                    prepared,
+                                    systemLanguage()
+                                )
+                                if (result.success) {
+                                    if (result.kind == InstallerPackageKind.PKG) {
+                                        finishSuccess(
+                                            appContext.getString(
+                                                if (result.pkgInfo?.isDlc == true) {
+                                                    R.string.install_dialog_dlc_done
+                                                } else {
+                                                    R.string.install_dialog_pkg_done
+                                                }
+                                            )
+                                        )
+                                    } else {
+                                        finishSuccess(
+                                            appContext.resources.getQuantityString(
+                                                R.plurals.install_dialog_content_done,
+                                                result.installedContentCount,
+                                                result.installedContentCount
+                                            )
+                                        )
+                                    }
+                                } else {
+                                    finishError(
+                                        if (result.kind == InstallerPackageKind.PKG) {
+                                            appContext.getString(R.string.install_dialog_pkg_failed)
+                                        } else {
+                                            appContext.getString(R.string.install_dialog_content_failed)
+                                        },
+                                        result.pkgInfo?.contentId?.takeIf(String::isNotBlank)
+                                    )
+                                }
+                            }
+                        }
+                        return@runInstall
+                    }
+                    if (detectedFormat != InstallerArchiveFormat.ZIP) {
+                        finishError(
+                            appContext.getString(R.string.install_dialog_content_failed),
+                            appContext.getString(R.string.installer_archive_unsupported)
+                        )
+                        return@runInstall
+                    }
+                } catch (error: Throwable) {
+                    if (error is InstallerExpansionException && error.failure == InstallerExpansionFailure.CANCELLED ||
+                        error is InstallerArchiveNativeFailure && error.status == NativeArchiveExpander.CANCELLED ||
+                        error is kotlinx.coroutines.CancellationException) {
+                        finishCancelled()
+                    } else {
+                        finishError(
+                            appContext.getString(R.string.install_dialog_content_failed),
+                            archiveExpansionFailureDetail(error)
+                        )
+                    }
+                    return@runInstall
+                }
             }
             val inspection = VitaArchiveInspector.inspect(path)
             Log.i(
@@ -223,7 +361,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
 
     private fun runInstall(
         operation: InstallOperation,
-        block: () -> Unit
+        block: suspend () -> Unit
     ) {
         if (_uiState.value.status == InstallStatus.Running) return
         nativeProgressOffset = 0f
@@ -234,7 +372,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
             operation = operation
         )
 
-        viewModelScope.launch(Dispatchers.IO) {
+        runningInstallJob = viewModelScope.launch(Dispatchers.IO) {
             VitaInstallBridge.setListener { progress -> handleProgress(progress) }
             try {
                 block()
@@ -251,11 +389,77 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                     DocumentPathResolver.cleanupStagedFile(appContext, staged)
                 }
                 stagedFilesToCleanup.clear()
+                _archivePackageSelection.value = null
+                pendingPackageChoice = null
+                pendingPackageChoices = emptyMap()
+                if (runningInstallJob === coroutineContext[Job]) runningInstallJob = null
                 VitaInstallBridge.setListener(null)
                 nativeProgressOffset = 0f
                 nativeProgressScale = 1f
             }
         }
+    }
+
+    private suspend fun awaitArchivePackageChoice(
+        candidates: List<InstallerPackageCandidate>
+    ): InstallerPackageCandidate? {
+        val deferred = CompletableDeferred<InstallerPackageCandidate?>()
+        val byId = candidates.mapIndexed { index, candidate -> index to candidate }.toMap()
+        pendingPackageChoices = byId
+        pendingPackageChoice = deferred
+        _archivePackageSelection.value = ArchivePackageSelectionUiState(
+            message = appContext.getString(R.string.installer_archive_multiple_packages),
+            choices = candidates.mapIndexed { index, candidate ->
+                val type = when (candidate.kind) {
+                    InstallerPackageKind.PKG -> "PKG"
+                    InstallerPackageKind.VPK -> "VPK"
+                    InstallerPackageKind.CONTENT_DIRECTORY -> appContext.getString(R.string.install_choice_archive_title)
+                }
+                InstallPackageChoice(index, candidate.displayName, type)
+            }
+        )
+        return try {
+            deferred.await()
+        } finally {
+            if (pendingPackageChoice === deferred) {
+                pendingPackageChoice = null
+                pendingPackageChoices = emptyMap()
+                _archivePackageSelection.value = null
+            }
+        }
+    }
+
+    private fun archiveExpansionFailureDetail(error: Throwable): String {
+        val nativeStatus = (error as? InstallerArchiveNativeFailure)?.status
+        if (nativeStatus != null) return when (nativeStatus) {
+            NativeArchiveExpander.UNSUPPORTED_FORMAT -> appContext.getString(R.string.installer_archive_unsupported)
+            NativeArchiveExpander.ENCRYPTED_ARCHIVE -> appContext.getString(R.string.installer_archive_encrypted_unsupported)
+            NativeArchiveExpander.UNSAFE_PATH,
+            NativeArchiveExpander.DUPLICATE_ENTRY,
+            NativeArchiveExpander.LINK_OR_SPECIAL_ENTRY -> appContext.getString(R.string.installer_archive_unsafe)
+            NativeArchiveExpander.ENTRY_LIMIT,
+            NativeArchiveExpander.EXPANDED_BYTES_LIMIT,
+            NativeArchiveExpander.DECODER_MEMORY_LIMIT -> appContext.getString(R.string.installer_archive_limits)
+            NativeArchiveExpander.INSUFFICIENT_SPACE -> appContext.getString(R.string.installer_archive_space)
+            else -> appContext.getString(R.string.installer_archive_corrupt)
+        }
+        return when ((error as? InstallerExpansionException)?.failure) {
+            InstallerExpansionFailure.UNSUPPORTED_PATH,
+            InstallerExpansionFailure.LINK_ENTRY,
+            InstallerExpansionFailure.DUPLICATE_ENTRY,
+            InstallerExpansionFailure.DUPLICATE_ARCHIVE -> appContext.getString(R.string.installer_archive_unsafe)
+            InstallerExpansionFailure.DEPTH_LIMIT,
+            InstallerExpansionFailure.ARCHIVE_COUNT_LIMIT,
+            InstallerExpansionFailure.ENTRY_COUNT_LIMIT,
+            InstallerExpansionFailure.EXPANDED_BYTES_LIMIT,
+            InstallerExpansionFailure.DECODER_MEMORY_LIMIT -> appContext.getString(R.string.installer_archive_limits)
+            InstallerExpansionFailure.INSUFFICIENT_SPACE -> appContext.getString(R.string.installer_archive_space)
+            else -> appContext.getString(R.string.installer_archive_corrupt)
+        }
+    }
+
+    private fun finishCancelled() {
+        _uiState.value = SetupInstallUiState()
     }
 
     /**

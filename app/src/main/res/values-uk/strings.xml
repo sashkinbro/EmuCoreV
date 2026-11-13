@@ -1630,4 +1630,11 @@
     <string name="ecv_compatibility_notes">Примітки: %1$s</string>
     <string name="ecv_compatibility_settings">Налаштування рендерера</string>
     <string name="ecv_compatibility_evidence">Підтвердження: %1$s</string>
+    <string name="installer_archive_unsupported">Цей формат архіву не підтримується. Виберіть файл ZIP, 7z, RAR, VPK або PKG.</string>
+    <string name="installer_archive_encrypted_unsupported">Зашифрований архів або архів із непідтримуваним методом стиснення неможливо встановити.</string>
+    <string name="installer_archive_unsafe">Архів містить небезпечні або повторювані шляхи чи символічні посилання.</string>
+    <string name="installer_archive_limits">Архів перевищує безпечні обмеження розпакування.</string>
+    <string name="installer_archive_space">Недостатньо вільного місця для підготовки архіву.</string>
+    <string name="installer_archive_multiple_packages">Знайдено кілька пакетів. Виберіть пакет для встановлення.</string>
+    <string name="installer_archive_corrupt">Архів пошкоджений або його вміст не вдалося перевірити.</string>
 </resources>

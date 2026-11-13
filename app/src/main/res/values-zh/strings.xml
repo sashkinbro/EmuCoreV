@@ -1626,4 +1626,11 @@
     <string name="ecv_compatibility_notes">备注：%1$s</string>
     <string name="ecv_compatibility_settings">渲染器设置</string>
     <string name="ecv_compatibility_evidence">验证资料：%1$s</string>
+    <string name="installer_archive_unsupported">不支持此压缩包格式。请选择 ZIP、7z、RAR、VPK 或 PKG 文件。</string>
+    <string name="installer_archive_encrypted_unsupported">无法安装加密压缩包或使用不支持的压缩方式的压缩包。</string>
+    <string name="installer_archive_unsafe">此压缩包包含不安全或重复的路径，或符号链接。</string>
+    <string name="installer_archive_limits">此压缩包超出安全解压限制。</string>
+    <string name="installer_archive_space">可用存储空间不足，无法准备此压缩包。</string>
+    <string name="installer_archive_multiple_packages">发现多个安装包。请选择要安装的安装包。</string>
+    <string name="installer_archive_corrupt">压缩包已损坏或无法验证其内容。</string>
 </resources>

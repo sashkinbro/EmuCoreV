@@ -28,6 +28,13 @@ data class VitaPkgInfo(
     }
 }
 
+internal data class VitaEmbeddedInstallResult(
+    val kind: InstallerPackageKind,
+    val success: Boolean,
+    val pkgInfo: VitaPkgInfo? = null,
+    val installedContentCount: Int = 0
+)
+
 object VitaInstallBridge {
     fun interface Listener {
         fun onProgress(progress: NativeInstallProgress)
@@ -38,6 +45,74 @@ object VitaInstallBridge {
 
     fun setListener(listener: Listener?) {
         this.listener = listener
+    }
+
+    /** Inspects ZIP wrappers using signatures and valid nested Vita SFO metadata. */
+    internal fun scanEmbeddedPackages(
+        context: Context,
+        archivePath: String,
+        isCancelled: () -> Boolean = { false }
+    ): InstallerPackageSelection = VitaEmbeddedPackageSupport.scanZip(
+        archivePath = archivePath,
+        stagingRoot = EmulatorStorage.cacheRoot(context),
+        isCancelled = isCancelled
+    )
+
+    /** Stages only the selected member into a private, atomically promoted cache session. */
+    internal fun prepareEmbeddedPackage(
+        context: Context,
+        archivePath: String,
+        candidate: InstallerPackageCandidate,
+        isCancelled: () -> Boolean = { false },
+        onProgress: (EmbeddedPackageProgress) -> Unit = {}
+    ): PreparedEmbeddedPackage = VitaEmbeddedPackageSupport.extractSelected(
+        archivePath = archivePath,
+        candidate = candidate,
+        stagingRoot = EmulatorStorage.cacheRoot(context),
+        isCancelled = isCancelled,
+        onProgress = onProgress
+    )
+
+    /** Opens a signature-identified ZIP/RAR/7z container and recursively finds staged Vita packages. */
+    internal fun scanArchivePackages(
+        context: Context,
+        archivePath: String,
+        isCancelled: () -> Boolean = { false },
+        onProgress: (EmbeddedPackageProgress) -> Unit = {}
+    ): VitaArchivePackagePlan? {
+        CoreMaintenanceRepository(context).ensureCoreUpdated()
+        NativeLibraryLoader.ensureLoaded(context)
+        return VitaArchiveContainerSupport.scan(
+            archivePath = archivePath,
+            stagingRoot = EmulatorStorage.cacheRoot(context),
+            isCancelled = isCancelled,
+            onProgress = onProgress
+        )
+    }
+
+    /** Routes selected content through the existing native VPK or licensed PKG installer. */
+    internal fun installPreparedEmbeddedPackage(
+        context: Context,
+        prepared: PreparedEmbeddedPackage,
+        systemLanguage: Int,
+        zrif: String = ""
+    ): VitaEmbeddedInstallResult = when (prepared.candidate.kind) {
+        InstallerPackageKind.VPK, InstallerPackageKind.CONTENT_DIRECTORY -> {
+            val count = installContent(context, prepared.file.absolutePath, systemLanguage)
+            VitaEmbeddedInstallResult(prepared.candidate.kind, count > 0, installedContentCount = count)
+        }
+        InstallerPackageKind.PKG -> {
+            val pkgInfo = inspectPkg(context, prepared.file.absolutePath)
+            if (pkgInfo.kind == VitaPkgInfo.KIND_UNKNOWN || pkgInfo.contentId.isBlank()) {
+                VitaEmbeddedInstallResult(InstallerPackageKind.PKG, false, pkgInfo)
+            } else {
+                VitaEmbeddedInstallResult(
+                    InstallerPackageKind.PKG,
+                    installPkg(context, prepared.file.absolutePath, zrif, systemLanguage),
+                    pkgInfo
+                )
+            }
+        }
     }
 
     fun installFirmware(

@@ -26,7 +26,7 @@ class PkgInstallSafetyTest {
     @Before
     fun loadNativeLibrary() {
         SDL.setContext(context)
-        SDL.loadLibrary("Vita3K", context)
+        SDL.loadLibrary("ECV", context)
         SDL.setupJNI()
     }
 

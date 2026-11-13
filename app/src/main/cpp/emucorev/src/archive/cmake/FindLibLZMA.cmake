@@ -1,0 +1,23 @@
+# Use the pinned in-tree xz/liblzma target instead of discovering a host copy.
+if(NOT TARGET liblzma)
+    set(LIBLZMA_FOUND FALSE)
+    return()
+endif()
+
+set(LIBLZMA_FOUND TRUE)
+set(LIBLZMA_INCLUDE_DIR "${EMUCOREV_XZ_SOURCE_DIR}/src/liblzma/api")
+set(LIBLZMA_INCLUDE_DIRS "${LIBLZMA_INCLUDE_DIR}")
+set(LIBLZMA_LIBRARY liblzma)
+set(LIBLZMA_LIBRARIES liblzma)
+set(LIBLZMA_VERSION_STRING 5.8.3)
+set(LIBLZMA_VERSION 5.8.3)
+set(LIBLZMA_HAS_AUTO_DECODER TRUE)
+set(LIBLZMA_HAS_EASY_ENCODER TRUE)
+set(LIBLZMA_HAS_LZMA_PRESET TRUE)
+
+if(NOT TARGET LibLZMA::LibLZMA)
+    add_library(LibLZMA::LibLZMA INTERFACE IMPORTED GLOBAL)
+    set_target_properties(LibLZMA::LibLZMA PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${LIBLZMA_INCLUDE_DIR}"
+        INTERFACE_LINK_LIBRARIES liblzma)
+endif()

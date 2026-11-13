@@ -1631,4 +1631,11 @@
     <string name="ecv_compatibility_notes">メモ: %1$s</string>
     <string name="ecv_compatibility_settings">レンダラー設定</string>
     <string name="ecv_compatibility_evidence">検証資料: %1$s</string>
+    <string name="installer_archive_unsupported">このアーカイブ形式には対応していません。ZIP、7z、RAR、VPK、PKG ファイルを選択してください。</string>
+    <string name="installer_archive_encrypted_unsupported">暗号化されたアーカイブや未対応の圧縮方式はインストールできません。</string>
+    <string name="installer_archive_unsafe">このアーカイブには安全でないパス、重複したパス、またはシンボリックリンクが含まれています。</string>
+    <string name="installer_archive_limits">このアーカイブは安全な展開上限を超えています。</string>
+    <string name="installer_archive_space">このアーカイブを準備するための空き容量が不足しています。</string>
+    <string name="installer_archive_multiple_packages">複数のパッケージが見つかりました。インストールするパッケージを選択してください。</string>
+    <string name="installer_archive_corrupt">アーカイブが破損しているか、内容を検証できませんでした。</string>
 </resources>

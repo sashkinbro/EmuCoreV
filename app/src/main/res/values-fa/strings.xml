@@ -1631,4 +1631,11 @@
     <string name="ecv_compatibility_notes">یادداشت‌ها: %1$s</string>
     <string name="ecv_compatibility_settings">تنظیمات رندر</string>
     <string name="ecv_compatibility_evidence">مدرک: %1$s</string>
+    <string name="installer_archive_unsupported">این قالب آرشیو پشتیبانی نمی‌شود. یک فایل ZIP، 7z، RAR، VPK یا PKG انتخاب کنید.</string>
+    <string name="installer_archive_encrypted_unsupported">آرشیوهای رمزگذاری‌شده یا دارای روش فشرده‌سازی پشتیبانی‌نشده قابل نصب نیستند.</string>
+    <string name="installer_archive_unsafe">این آرشیو دارای مسیرهای ناامن یا تکراری، یا پیوندهای نمادین است.</string>
+    <string name="installer_archive_limits">این آرشیو از محدودیت‌های امن استخراج فراتر می‌رود.</string>
+    <string name="installer_archive_space">برای آماده‌سازی این آرشیو فضای ذخیره‌سازی کافی نیست.</string>
+    <string name="installer_archive_multiple_packages">بیش از یک بسته پیدا شد. بسته‌ای را برای نصب انتخاب کنید.</string>
+    <string name="installer_archive_corrupt">آرشیو آسیب دیده است یا محتوای آن قابل تأیید نیست.</string>
 </resources>

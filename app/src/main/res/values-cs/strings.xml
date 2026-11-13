@@ -1631,4 +1631,11 @@
     <string name="ecv_compatibility_notes">Poznámky: %1$s</string>
     <string name="ecv_compatibility_settings">Nastavení vykreslování</string>
     <string name="ecv_compatibility_evidence">Doklad: %1$s</string>
+    <string name="installer_archive_unsupported">Formát archivu není podporován. Vyberte soubor ZIP, 7z, RAR, VPK nebo PKG.</string>
+    <string name="installer_archive_encrypted_unsupported">Šifrované archivy ani nepodporované metody komprese nelze nainstalovat.</string>
+    <string name="installer_archive_unsafe">Archiv obsahuje nebezpečné nebo duplicitní cesty či symbolické odkazy.</string>
+    <string name="installer_archive_limits">Archiv překračuje bezpečné limity rozbalení.</string>
+    <string name="installer_archive_space">K přípravě tohoto archivu není dost volného místa.</string>
+    <string name="installer_archive_multiple_packages">Bylo nalezeno více balíčků. Vyberte balíček k instalaci.</string>
+    <string name="installer_archive_corrupt">Archiv je poškozený nebo se nepodařilo ověřit jeho obsah.</string>
 </resources>

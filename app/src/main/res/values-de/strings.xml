@@ -1627,4 +1627,11 @@
     <string name="ecv_compatibility_notes">Notizen: %1$s</string>
     <string name="ecv_compatibility_settings">Renderer-Einstellungen</string>
     <string name="ecv_compatibility_evidence">Nachweis: %1$s</string>
+    <string name="installer_archive_unsupported">Dieses Archivformat wird nicht unterstützt. Wähle eine ZIP-, 7z-, RAR-, VPK- oder PKG-Datei.</string>
+    <string name="installer_archive_encrypted_unsupported">Verschlüsselte Archive oder nicht unterstützte Komprimierungsmethoden können nicht installiert werden.</string>
+    <string name="installer_archive_unsafe">Dieses Archiv enthält unsichere oder doppelte Pfade oder symbolische Links.</string>
+    <string name="installer_archive_limits">Dieses Archiv überschreitet die sicheren Entpackgrenzen.</string>
+    <string name="installer_archive_space">Zum Vorbereiten dieses Archivs ist nicht genügend Speicherplatz frei.</string>
+    <string name="installer_archive_multiple_packages">Es wurden mehrere Pakete gefunden. Wähle das zu installierende Paket aus.</string>
+    <string name="installer_archive_corrupt">Das Archiv ist beschädigt oder sein Inhalt konnte nicht überprüft werden.</string>
 </resources>

@@ -71,6 +71,7 @@ import com.sbro.emucorev.ui.settings.SettingsViewModel
 import com.sbro.emucorev.ui.settings.VitaLanguageScreen
 import com.sbro.emucorev.ui.settings.settingsTabFromRoute
 import com.sbro.emucorev.ui.setup.InstallGameChoiceDialog
+import com.sbro.emucorev.ui.setup.ArchivePackageSelectionDialog
 import com.sbro.emucorev.ui.setup.SetupInstallDialog
 import com.sbro.emucorev.ui.setup.SetupInstallViewModel
 import com.sbro.emucorev.ui.setup.SetupScreen
@@ -138,6 +139,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     val installViewModel: SetupInstallViewModel = viewModel()
     val settingsViewModel: SettingsViewModel = viewModel()
     val installUiState by installViewModel.uiState.collectAsState()
+    val archivePackageSelection by installViewModel.archivePackageSelection.collectAsState()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
     var firmwareInstalled by remember(context) { mutableStateOf(EmulatorStorage.hasInstalledFirmware(context)) }
@@ -146,7 +148,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     stringResource(R.string.core_install_firmware_failed)
     val unsupportedFirmware = stringResource(R.string.core_install_firmware_unsupported)
     stringResource(R.string.core_install_content_failed)
-    val unsupportedContent = stringResource(R.string.core_install_content_unsupported)
     stringResource(R.string.core_install_pkg_failed)
     val unsupportedPkg = stringResource(R.string.core_install_pkg_unsupported)
     val gameLaunchFailed = stringResource(R.string.game_launch_failed)
@@ -196,14 +197,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         val repairArchive = pendingContentRepair
         pendingContentRepair = false
         uri ?: return@rememberLauncherForActivityResult
-        val fileName = DocumentPathResolver.getDisplayName(context, uri.toString())
-        val extension = fileName.substringAfterLast('.', "").lowercase()
-        val supported = extension in setOf("vpk", "zip")
-        if (!supported) {
-            Toast.makeText(context, unsupportedContent, Toast.LENGTH_SHORT).show()
-        } else {
-            installViewModel.installContent(uri.toString(), repairArchive = repairArchive)
-        }
+        installViewModel.installContent(uri.toString(), repairArchive = repairArchive)
     }
 
     val licensePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -244,13 +238,21 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     }
 
     val openFirmwareInstall = { firmwarePicker.launch(arrayOf("*/*")) }
+    val archiveMimeTypes = arrayOf(
+        "application/zip",
+        "application/x-7z-compressed",
+        "application/x-rar-compressed",
+        "application/vnd.rar",
+        "application/octet-stream",
+        "*/*"
+    )
     val openContentInstall = {
         pendingContentRepair = false
-        contentPicker.launch(arrayOf("*/*"))
+        contentPicker.launch(archiveMimeTypes)
     }
     val openRepairContentInstall = {
         pendingContentRepair = true
-        contentPicker.launch(arrayOf("*/*"))
+        contentPicker.launch(archiveMimeTypes)
     }
     val openLicenseInstall = { licensePicker.launch(arrayOf("*/*")) }
     val openPkgInstall: (String) -> Unit = { zrif ->
@@ -1200,7 +1202,14 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
 
     SetupInstallDialog(
         uiState = installUiState,
-        onDismiss = installViewModel::dismissDialog
+        onDismiss = installViewModel::dismissDialog,
+        onCancel = installViewModel::cancelArchivePreparation
+    )
+
+    ArchivePackageSelectionDialog(
+        state = archivePackageSelection,
+        onSelect = installViewModel::chooseArchivePackage,
+        onCancel = installViewModel::cancelArchivePackageChoice
     )
 
     if (

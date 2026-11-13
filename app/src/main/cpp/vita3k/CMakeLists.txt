@@ -320,3 +320,10 @@ add_subdirectory(external)
 add_subdirectory(vita3k)
 add_subdirectory(tools/gen-modules)
 
+# Dependency subdirectories must be created before deferred bridge attachment.
+if(ANDROID AND DEFINED EMUCOREV_LAYER_DIR)
+    set(EMUCOREV_BRIDGE_DIR "${EMUCOREV_LAYER_DIR}")
+    include("${EMUCOREV_BRIDGE_DIR}/src/archive/ArchiveDependencies.cmake")
+    emucorev_add_archive_dependencies()
+endif()
+

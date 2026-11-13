@@ -1627,4 +1627,11 @@
     <string name="ecv_compatibility_notes">टिप्पणियाँ: %1$s</string>
     <string name="ecv_compatibility_settings">रेंडरर सेटिंग्स</string>
     <string name="ecv_compatibility_evidence">साक्ष्य: %1$s</string>
+    <string name="installer_archive_unsupported">यह आर्काइव फ़ॉर्मैट समर्थित नहीं है। ZIP, 7z, RAR, VPK या PKG फ़ाइल चुनें।</string>
+    <string name="installer_archive_encrypted_unsupported">एन्क्रिप्ट किए गए आर्काइव या असमर्थित कंप्रेशन विधियाँ इंस्टॉल नहीं की जा सकतीं।</string>
+    <string name="installer_archive_unsafe">इस आर्काइव में असुरक्षित या डुप्लिकेट पाथ, या सिम्बॉलिक लिंक हैं।</string>
+    <string name="installer_archive_limits">यह आर्काइव सुरक्षित एक्सट्रैक्शन सीमाओं से बड़ा है।</string>
+    <string name="installer_archive_space">इस आर्काइव को तैयार करने के लिए पर्याप्त खाली स्टोरेज नहीं है।</string>
+    <string name="installer_archive_multiple_packages">एक से अधिक पैकेज मिले। इंस्टॉल करने के लिए एक पैकेज चुनें।</string>
+    <string name="installer_archive_corrupt">आर्काइव क्षतिग्रस्त है या इसकी सामग्री सत्यापित नहीं की जा सकी।</string>
 </resources>
