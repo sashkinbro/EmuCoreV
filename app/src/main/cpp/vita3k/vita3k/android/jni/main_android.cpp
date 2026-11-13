@@ -639,6 +639,10 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
 
                 case SDL_EVENT_GAMEPAD_ADDED:
                 case SDL_EVENT_GAMEPAD_REMOVED:
+                    if (event.type == SDL_EVENT_GAMEPAD_REMOVED) {
+                        const std::lock_guard input_operation(emucorev::savestate::save_state_operation_mutex());
+                        release_touchpad_device(emuenv->touch, event.gdevice.which);
+                    }
                     refresh_controllers(emuenv->ctrl, *emuenv);
                     break;
 

@@ -20,12 +20,76 @@
 #include <array>
 #include <camera/camera.h>
 #include <camera/state.h>
+#include <camera/frame_copy.h>
+#include <camera/frame_convert.h>
 #include <rtc/rtc.h>
 #include <stb_image.h>
 #include <util/log.h>
 
 #include <SDL3/SDL_camera.h>
 #include <SDL3/SDL_timer.h>
+
+#if defined(__ANDROID__) && !defined(NDEBUG)
+#include <SDL3/SDL_log.h>
+
+static int ECV_CameraDiagStats(const unsigned char *data, size_t length, int width, int height, int row_stride, int pixel_stride, unsigned long long out[6])
+{
+    if (!data || !out || !length || width <= 0 || height <= 0 || row_stride <= 0 || pixel_stride <= 0)
+        return 0;
+    if ((size_t)(width - 1) > (length - 1) / (size_t)pixel_stride)
+        return 0;
+    const size_t row_bytes = (size_t)(width - 1) * pixel_stride + 1;
+    if (row_bytes > (size_t)row_stride || (size_t)(height - 1) > (length - row_bytes) / (size_t)row_stride)
+        return 0;
+    unsigned int hash = 2166136261u;
+    unsigned long long lo = 255, hi = 0, sum = 0, count = 0, nonzero = 0;
+    for (int row = 0; row < height; ++row) {
+        for (int col = 0; col < width; ++col) {
+            const unsigned int value = data[(size_t)row * row_stride + (size_t)col * pixel_stride];
+            if (value < lo) lo = value;
+            if (value > hi) hi = value;
+            sum += value; ++count; nonzero += value != 0;
+            hash = (hash ^ value) * 16777619u;
+        }
+    }
+    out[0] = lo; out[1] = hi; out[2] = sum; out[3] = count; out[4] = nonzero; out[5] = hash;
+    return 1;
+}
+
+static void ecv_camera_diag_plane(const char *stage, unsigned int ordinal, int plane,
+    const unsigned char *data, size_t capacity, int width, int height, int stride, int pixel_stride = 1) {
+    unsigned long long stats[6];
+    if (ECV_CameraDiagStats(data, capacity, width, height, stride, pixel_stride, stats))
+        SDL_Log("ECV_CAMERA_DIAG %s frame=%u plane=%d stride=%d min=%llu max=%llu mean=%llu nonzero=%llu count=%llu checksum=%llx", stage, ordinal, plane, stride, stats[0], stats[1], stats[2] / stats[3], stats[4], stats[3], stats[5]);
+    else SDL_Log("ECV_CAMERA_DIAG %s frame=%u plane=%d aggregate rejected capacity=%llu size=%dx%d stride=%d pixel=%d", stage, ordinal, plane, (unsigned long long)capacity, width, height, stride, pixel_stride);
+}
+
+static void ecv_camera_diag_surface(const char *stage, unsigned int ordinal, SDL_Surface *surface) {
+    if (!surface) { SDL_Log("ECV_CAMERA_DIAG %s frame=%u null surface: %s", stage, ordinal, SDL_GetError()); return; }
+    SDL_Log("ECV_CAMERA_DIAG %s frame=%u format=%s size=%dx%d pitch=%d colorspace=%u", stage, ordinal, SDL_GetPixelFormatName(surface->format), surface->w, surface->h, surface->pitch, (unsigned int)SDL_GetSurfaceColorspace(surface));
+    if (!surface->pixels || surface->w <= 0 || surface->h <= 0 || surface->pitch <= 0) return;
+    const auto *pixels = static_cast<const unsigned char *>(surface->pixels);
+    const size_t luma_bytes = static_cast<size_t>(surface->pitch) * surface->h;
+    if (surface->format == SDL_PIXELFORMAT_NV12 || surface->format == SDL_PIXELFORMAT_YV12) {
+        if ((surface->w & 1) || (surface->h & 1) || surface->pitch < surface->w) return;
+        ecv_camera_diag_plane(stage, ordinal, 0, pixels, luma_bytes, surface->w, surface->h, surface->pitch);
+        if (surface->format == SDL_PIXELFORMAT_NV12) {
+            const size_t chroma_bytes = static_cast<size_t>(surface->pitch) * (surface->h / 2);
+            ecv_camera_diag_plane(stage, ordinal, 1, pixels + luma_bytes, chroma_bytes, surface->w / 2, surface->h / 2, surface->pitch, 2);
+            if (chroma_bytes) ecv_camera_diag_plane(stage, ordinal, 2, pixels + luma_bytes + 1, chroma_bytes - 1, surface->w / 2, surface->h / 2, surface->pitch, 2);
+        } else {
+            const int chroma_pitch = (surface->pitch + 1) / 2;
+            const size_t chroma_bytes = static_cast<size_t>(chroma_pitch) * (surface->h / 2);
+            ecv_camera_diag_plane(stage, ordinal, 2, pixels + luma_bytes, chroma_bytes, surface->w / 2, surface->h / 2, chroma_pitch);
+            ecv_camera_diag_plane(stage, ordinal, 1, pixels + luma_bytes + chroma_bytes, chroma_bytes, surface->w / 2, surface->h / 2, chroma_pitch);
+        }
+    } else if (!SDL_ISPIXELFORMAT_FOURCC(surface->format) || surface->format == SDL_PIXELFORMAT_YUY2) {
+        const int bytes = surface->format == SDL_PIXELFORMAT_YUY2 ? 2 : SDL_BYTESPERPIXEL(surface->format);
+        if (bytes > 0 && surface->w <= surface->pitch / bytes)
+            ecv_camera_diag_plane(stage, ordinal, 0, pixels, luma_bytes, surface->w * bytes, surface->h, surface->pitch);
+    }
+}
+#endif
 
 struct stbi_deleter {
     void operator()(stbi_uc *d) const { stbi_image_free(d); }
@@ -50,8 +114,13 @@ using SDL_CameraListPtr = std::unique_ptr<SDL_CameraID[], SDL_Deleter>;
 
 class Camera::CameraImpl {
 public:
+#if defined(__ANDROID__) && !defined(NDEBUG)
+    unsigned int diag_frames = 0;
+#endif
     SDL_CameraPtr sdl_camera;
-    SDL_CameraID device_id;
+    SDL_CameraID device_id{};
+    bool suspended = false;
+    int reverse = SCE_CAMERA_REVERSE_OFF;
     SDL_SurfacePtr frame;
     SDL_PixelFormat format;
     SDL_Colorspace colorspace;
@@ -74,8 +143,12 @@ static bool init_web_camera(Camera *self) {
     for (int i = 0; i < num_cameras; i++) {
         auto camera_name = SDL_GetCameraName(cameras[i]);
         if (camera_name && self->id == camera_name) {
+            if (self->pImpl->device_id != 0) {
+                LOG_ERROR("Ambiguous camera name '{}'; refusing to select a different sensor", self->id);
+                self->pImpl->device_id = 0;
+                return false;
+            }
             self->pImpl->device_id = cameras[i];
-            break;
         }
     }
     if (self->pImpl->device_id == 0) {
@@ -100,12 +173,34 @@ static bool init_web_camera(Camera *self) {
         .framerate_numerator = framerate_numerator, /**< Frame rate numerator ((num / denom) == FPS, (denom / num) == duration in seconds) */
         .framerate_denominator = framerate_denominator /**< Frame rate demoninator ((num / denom) == FPS, (denom / num) == duration in seconds) */
     };
-    self->pImpl->sdl_camera.reset(SDL_OpenCamera(self->pImpl->device_id, &camera_spec));
+    int format_count = 0;
+    auto **formats = SDL_GetCameraSupportedFormats(self->pImpl->device_id, &format_count);
+    SDL_CameraSpec capture_spec = camera_spec;
+    int64_t best_score = INT64_MAX;
+    for (int i = 0; formats && i < format_count; ++i) {
+        const auto &f = *formats[i];
+        LOG_INFO("Camera '{}' supports {}x{} {} {}/{} FPS", self->id, f.width, f.height,
+            SDL_GetPixelFormatName(f.format), f.framerate_numerator, f.framerate_denominator);
+        const int64_t size_distance = std::abs(f.width - self->info.width) + std::abs(f.height - self->info.height);
+        const int64_t fps_distance = f.framerate_denominator > 0
+            ? std::abs(int64_t(f.framerate_numerator) * framerate_denominator - int64_t(framerate_numerator) * f.framerate_denominator) / f.framerate_denominator : 1000;
+        const int64_t score = (f.format == SDL_PIXELFORMAT_NV12 ? 0 : 1000000000000LL) + size_distance * 1000000 + fps_distance;
+        if (score < best_score) { best_score = score; capture_spec = f; }
+    }
+    SDL_free(formats);
+    // Open an exact native mode. Guest resizing/range conversion is explicit below,
+    // avoiding SDL's generic camera scaler silently failing on FOURCC surfaces.
+    self->pImpl->sdl_camera.reset(SDL_OpenCamera(self->pImpl->device_id, &capture_spec));
     if (!self->pImpl->sdl_camera) {
         LOG_ERROR("Failed to open camera: {}", SDL_GetError());
         return false;
     }
     return true;
+}
+
+static SDL_SurfacePtr convert_camera_frame(Camera *self, SDL_Surface *source) {
+    return SDL_SurfacePtr(ecv_camera_convert_surface(source, self->pImpl->format,
+        self->pImpl->colorspace, self->info.width, self->info.height));
 }
 
 static bool init_image(Camera *self) {
@@ -175,32 +270,25 @@ static bool init_solid_color(Camera *self) {
     return true;
 }
 
-static void refresh_camera_image(Camera *self) {
-    const std::lock_guard lock(self->pImpl->frame_mutex);
-
+static bool refresh_camera_image(Camera *self) {
     self->pImpl->sdl_camera.reset();
     self->pImpl->frame.reset();
-    if (self->type == CameraType::WebCamera) {
-        if (!init_web_camera(self))
-            self->type = CameraType::Image;
+    switch (self->type) {
+    case CameraType::WebCamera: return init_web_camera(self);
+    case CameraType::Image: return init_image(self);
+    case CameraType::SolidColor: return init_solid_color(self);
     }
-    if (self->type == CameraType::Image) {
-        if (!init_image(self))
-            self->type = CameraType::SolidColor;
-    }
-    if (self->type == CameraType::SolidColor) {
-        if (!init_solid_color(self))
-            self->pImpl->frame.reset();
-    }
+    return false;
 }
 
 int Camera::get_attribute(CameraAttributes attribute) {
+    const std::lock_guard lock(pImpl->frame_mutex);
     switch (attribute) {
     case CameraAttributes::Saturation: return SCE_CAMERA_SATURATION_10;
     case CameraAttributes::Brightness: return 128; // 0-255
     case CameraAttributes::Contrast: return 128; // random default value  0-255
     case CameraAttributes::Sharpness: return SCE_CAMERA_SHARPNESS_100;
-    case CameraAttributes::Reverse: return SCE_CAMERA_REVERSE_OFF;
+    case CameraAttributes::Reverse: return pImpl->reverse;
     case CameraAttributes::Effect: return SCE_CAMERA_EFFECT_NORMAL;
     case CameraAttributes::EV: return 0;
     case CameraAttributes::Zoom: return 10; // 10-40
@@ -221,26 +309,42 @@ int Camera::get_attribute(CameraAttributes attribute) {
 }
 
 int Camera::set_attribute(CameraAttributes attribute, int value) {
-    return 0;
+    const std::lock_guard lock(pImpl->frame_mutex);
+    if (attribute == CameraAttributes::Reverse) {
+        if (value < SCE_CAMERA_REVERSE_OFF || value > SCE_CAMERA_REVERSE_MIRROR_FLIP)
+            return SCE_CAMERA_ERROR_PARAM;
+        pImpl->reverse = value;
+        return 0;
+    }
+    // Never claim a host camera control changed when it was not implemented.
+    return SCE_CAMERA_ERROR_ATTRIBUTE_UNKNOWN;
 }
 
 int Camera::open(SceCameraInfo *info, uint64_t base_tick, uint64_t start_tick) {
+    const std::lock_guard lock(pImpl->frame_mutex);
+    if (info->format == SCE_CAMERA_FORMAT_RAW8)
+        return SCE_CAMERA_ERROR_FORMAT_UNKNOWN;
     tick_diff_us = rtc_get_ticks(base_tick) - start_tick - (SDL_GetTicksNS() / SDL_NS_PER_US);
     this->is_opened = true;
+    this->is_started = false;
+    this->frame_idx = 0;
+    this->last_frame_timestamp_us = 0;
+    this->next_frame_timestamp_us = 0;
+    pImpl->reverse = SCE_CAMERA_REVERSE_OFF;
     this->info = {};
     memcpy(&(this->info), info, std::min<size_t>(sizeof(SceCameraInfo), info->size));
     switch (this->info.format) {
     case SCE_CAMERA_FORMAT_YUV420_PLANE: // YUV 4:2:0 planar
         this->pImpl->format = SDL_PIXELFORMAT_YV12;
-        this->pImpl->colorspace = SDL_COLORSPACE_YUV_DEFAULT;
+        this->pImpl->colorspace = SDL_COLORSPACE_BT601_FULL;
         break;
     case SCE_CAMERA_FORMAT_YUV422_PLANE: // YUV 4:2:2 planar
         this->pImpl->format = SDL_PIXELFORMAT_YUY2; // use packed format cause SDL does not have YUV 4:2:2 planar
-        this->pImpl->colorspace = SDL_COLORSPACE_YUV_DEFAULT;
+        this->pImpl->colorspace = SDL_COLORSPACE_BT601_FULL;
         break;
     case SCE_CAMERA_FORMAT_YUV422_PACKED: // YUV 4:2:2 packed
         this->pImpl->format = SDL_PIXELFORMAT_YUY2;
-        this->pImpl->colorspace = SDL_COLORSPACE_YUV_DEFAULT;
+        this->pImpl->colorspace = SDL_COLORSPACE_BT601_FULL;
         break;
     case SCE_CAMERA_FORMAT_ARGB: // ARGB format
         this->pImpl->format = SDL_PIXELFORMAT_ARGB8888;
@@ -256,7 +360,7 @@ int Camera::open(SceCameraInfo *info, uint64_t base_tick, uint64_t start_tick) {
         this->pImpl->colorspace = SDL_COLORSPACE_RGB_DEFAULT;
     }
 
-    if (this->info.range == SCE_CAMERA_DATA_RANGE_BT601) {
+    if (this->info.range == SCE_CAMERA_DATA_RANGE_BT601 && this->info.format <= SCE_CAMERA_FORMAT_YUV420_PLANE) {
         this->pImpl->colorspace = SDL_COLORSPACE_BT601_LIMITED;
     }
 
@@ -264,125 +368,198 @@ int Camera::open(SceCameraInfo *info, uint64_t base_tick, uint64_t start_tick) {
 }
 
 int Camera::start() {
-    refresh_camera_image(this);
-    this->is_started = true;
-    this->frame_idx = 0;
+    const std::lock_guard lock(pImpl->frame_mutex);
+    if (pImpl->suspended)
+        return SCE_CAMERA_ERROR_NOT_ACTIVE;
+    const uint64_t numerator = info.framerate == SCE_CAMERA_FRAMERATE_3_FPS ? 375
+        : info.framerate == SCE_CAMERA_FRAMERATE_7_FPS ? 750 : info.framerate * 100;
+    frame_interval_us = SDL_US_PER_SECOND * 100 / numerator;
+    if (!refresh_camera_image(this))
+        return SCE_CAMERA_ERROR_NOT_MOUNTED;
+    is_started = true; // A capture request; IsActive stays zero while permission is pending.
+    frame_idx = 0;
+    last_frame_timestamp_us = 0;
+    next_frame_timestamp_us = 0;
     return 0;
 }
 
-int Camera::read(SceCameraRead *read, void *pIBase, void *pUBase, void *pVBase, SceSize sizeIBase, SceSize sizeUBase, SceSize sizeVBase) {
+static bool camera_disconnected(Camera *self) {
+    return self->pImpl->sdl_camera && SDL_GetBooleanProperty(
+        SDL_GetCameraProperties(self->pImpl->sdl_camera.get()), "emucorev.camera.disconnected", false);
+}
+
+int Camera::is_active() {
     const std::lock_guard lock(pImpl->frame_mutex);
-    constexpr uint64_t minimal_delay_ns = SDL_NS_PER_US; // arbitrary value
-    uint64_t sdl_current_time_ns = SDL_GetTicksNS();
-    uint64_t sdl_current_time_us = sdl_current_time_ns / SDL_NS_PER_US;
-    if (next_frame_timestamp_us == 0) {
-        next_frame_timestamp_us = sdl_current_time_us;
+    if (!is_started || pImpl->suspended) return 0;
+    if (type != CameraType::WebCamera) return pImpl->frame ? 1 : 0;
+    return pImpl->sdl_camera && !camera_disconnected(this)
+        && SDL_GetCameraPermissionState(pImpl->sdl_camera.get()) > 0 ? 1 : 0;
+}
+
+int Camera::read(SceCameraRead *read, void *pIBase, void *pUBase, void *pVBase, SceSize sizeIBase, SceSize sizeUBase, SceSize sizeVBase) {
+    std::unique_lock lock(pImpl->frame_mutex);
+    read->frame = frame_idx;
+    read->timestamp = last_frame_timestamp_us;
+    read->status = SCE_CAMERA_STATUS_IS_NOT_ACTIVE;
+    if (!is_started) return SCE_CAMERA_ERROR_NOT_START;
+    if (pImpl->suspended) {
+        read->status = SCE_CAMERA_STATUS_IS_FORCED_STOP;
+        return SCE_CAMERA_ERROR_NOT_ACTIVE;
+    }
+    if (read->mode != SCE_CAMERA_READ_MODE_WAIT_NEXTFRAME_ON && read->mode != SCE_CAMERA_READ_MODE_WAIT_NEXTFRAME_OFF)
+        return SCE_CAMERA_ERROR_PARAM;
+    const auto deadline = SDL_GetTicksNS() + SDL_NS_PER_SECOND;
+    const auto now_us = SDL_GetTicksNS() / SDL_NS_PER_US;
+    if (next_frame_timestamp_us && now_us < next_frame_timestamp_us) {
+        if (read->mode == SCE_CAMERA_READ_MODE_WAIT_NEXTFRAME_OFF) {
+            read->status = SCE_CAMERA_STATUS_IS_ALREADY_READ;
+            return 0;
+        }
+        const auto delay_ns = (next_frame_timestamp_us - now_us) * SDL_NS_PER_US;
+        lock.unlock();
+        SDL_DelayNS(delay_ns);
+        lock.lock();
+        if (!is_started) return SCE_CAMERA_ERROR_NOT_START;
+        if (pImpl->suspended) return SCE_CAMERA_ERROR_NOT_ACTIVE;
+    }
+#if defined(__ANDROID__) && !defined(NDEBUG)
+    unsigned int diag_frame = 0;
+    bool diag_sample = false;
+#endif
+    Uint64 timestamp_ns = 0;
+    if (type == CameraType::WebCamera) {
+        for (;;) {
+            if (!pImpl->sdl_camera || camera_disconnected(this))
+                return SCE_CAMERA_ERROR_NOT_MOUNTED;
+            const int permission = SDL_GetCameraPermissionState(pImpl->sdl_camera.get());
+            if (permission < 0) return SCE_CAMERA_ERROR_NOT_MOUNTED;
+            if (permission == 0) {
+                read->status = SCE_CAMERA_STATUS_IS_NOT_STABLE;
+                return SCE_CAMERA_ERROR_NOT_ACTIVE;
+            }
+            SDL_Surface *surface = SDL_AcquireCameraFrame(pImpl->sdl_camera.get(), &timestamp_ns);
+            if (surface) {
+                // Drain the small FIFO, returning only a genuine newly acquired frame.
+                for (int i = 0; i < 16; ++i) {
+                    Uint64 next_timestamp = 0;
+                    auto *next = SDL_AcquireCameraFrame(pImpl->sdl_camera.get(), &next_timestamp);
+                    if (!next) break;
+                    SDL_ReleaseCameraFrame(pImpl->sdl_camera.get(), surface);
+                    surface = next;
+                    timestamp_ns = next_timestamp;
+                }
+                if (camera_disconnected(this)) {
+                    SDL_ReleaseCameraFrame(pImpl->sdl_camera.get(), surface);
+                    return SCE_CAMERA_ERROR_NOT_MOUNTED;
+                }
+#if defined(__ANDROID__) && !defined(NDEBUG)
+                diag_frame = pImpl->diag_frames < 121 ? ++pImpl->diag_frames : 121;
+                diag_sample = diag_frame <= 3 || diag_frame == 30 || diag_frame == 60 || diag_frame == 120;
+                if (diag_sample) ecv_camera_diag_surface("SDL acquired", diag_frame, surface);
+#endif
+                pImpl->frame = convert_camera_frame(this, surface);
+#if defined(__ANDROID__) && !defined(NDEBUG)
+                if (diag_sample) ecv_camera_diag_surface("converted", diag_frame, pImpl->frame.get());
+#endif
+                SDL_ReleaseCameraFrame(pImpl->sdl_camera.get(), surface);
+                if (!pImpl->frame) return SCE_CAMERA_ERROR_FATAL;
+                break;
+            }
+            if (read->mode == SCE_CAMERA_READ_MODE_WAIT_NEXTFRAME_OFF) {
+                read->status = frame_idx ? SCE_CAMERA_STATUS_IS_ALREADY_READ : SCE_CAMERA_STATUS_IS_NOT_STABLE;
+                return frame_idx ? 0 : SCE_CAMERA_ERROR_NOT_ACTIVE;
+            }
+            if (SDL_GetTicksNS() >= deadline) return SCE_CAMERA_ERROR_TIMEOUT;
+            lock.unlock();
+            SDL_Delay(1);
+            lock.lock();
+            if (!is_started) return SCE_CAMERA_ERROR_NOT_START;
+            if (pImpl->suspended) return SCE_CAMERA_ERROR_NOT_ACTIVE;
+        }
     } else {
-        uint64_t wait_time_ns = (sdl_current_time_ns < next_frame_timestamp_us * SDL_NS_PER_US) ? (next_frame_timestamp_us * SDL_NS_PER_US - sdl_current_time_ns) : 0;
-        if (wait_time_ns > minimal_delay_ns) {
-            if (read->mode == SCE_CAMERA_READ_MODE_WAIT_NEXTFRAME_ON) {
-                SDL_DelayPrecise(wait_time_ns);
-            } else {
-                read->frame = frame_idx;
-                read->timestamp = last_frame_timestamp_us;
+        // Explicit desktop image/solid-color sources remain available; never fallback to them.
+        const auto now = SDL_GetTicksNS() / SDL_NS_PER_US;
+        if (next_frame_timestamp_us && now < next_frame_timestamp_us) {
+            if (read->mode == SCE_CAMERA_READ_MODE_WAIT_NEXTFRAME_OFF) {
                 read->status = SCE_CAMERA_STATUS_IS_ALREADY_READ;
                 return 0;
             }
+            const auto delay = next_frame_timestamp_us - now;
+            lock.unlock();
+            SDL_DelayNS(delay * SDL_NS_PER_US);
+            lock.lock();
+            if (!is_started) return SCE_CAMERA_ERROR_NOT_START;
         }
+        timestamp_ns = SDL_GetTicksNS();
+        next_frame_timestamp_us = timestamp_ns / SDL_NS_PER_US + frame_interval_us;
     }
-    // next frame
-    last_frame_timestamp_us = next_frame_timestamp_us;
-    next_frame_timestamp_us = next_frame_timestamp_us + frame_interval_us;
-    if (type == CameraType::WebCamera) {
-        Uint64 timestampNS = 0;
-        auto surface = SDL_AcquireCameraFrame(pImpl->sdl_camera.get(), &timestampNS);
-        // drains all buffered frames to get the latest one
-        Uint64 next_timestampNS;
-        auto next_surface = SDL_AcquireCameraFrame(pImpl->sdl_camera.get(), &next_timestampNS);
-        int i = 16; // Safety counter to avoid endless loop.
-                    // sdl buffer is 8 surfaces, so if we read much more than 8 times, something go really wrong
-        while (next_surface && i > 0) {
-            SDL_ReleaseCameraFrame(pImpl->sdl_camera.get(), surface);
-            surface = next_surface;
-            timestampNS = next_timestampNS;
-            next_surface = SDL_AcquireCameraFrame(pImpl->sdl_camera.get(), &next_timestampNS);
-            i--;
-        }
-        if (next_surface)
-            SDL_ReleaseCameraFrame(pImpl->sdl_camera.get(), next_surface);
-        if (surface) {
-            pImpl->frame.reset(SDL_DuplicateSurface(surface));
-            SDL_ReleaseCameraFrame(pImpl->sdl_camera.get(), surface);
-            LOG_ERROR_IF(!pImpl->frame, "Failed to duplicate camera surface: {}", SDL_GetError());
-            last_frame_timestamp_us = timestampNS / SDL_NS_PER_US + tick_diff_us;
-        }
-    }
-    read->frame = frame_idx++;
-    read->status = SCE_CAMERA_STATUS_IS_ACTIVE;
-    read->timestamp = last_frame_timestamp_us;
-    if (pImpl->frame) {
-        sizeIBase = std::min(sizeIBase, (SceSize)(pImpl->frame->pitch * pImpl->frame->h)); // here pitch is width in bytes
-        if (this->info.format == SCE_CAMERA_FORMAT_YUV420_PLANE) {
-            sizeUBase = std::min(sizeUBase, (SceSize)(pImpl->frame->pitch * pImpl->frame->h / 4));
-            sizeVBase = std::min(sizeVBase, (SceSize)(pImpl->frame->pitch * pImpl->frame->h / 4));
-            memcpy(pIBase, (uint8_t *)pImpl->frame->pixels, sizeIBase);
-            memcpy(pVBase, (uint8_t *)pImpl->frame->pixels + (pImpl->frame->pitch * pImpl->frame->h), sizeUBase);
-            memcpy(pUBase, (uint8_t *)pImpl->frame->pixels + (pImpl->frame->pitch * pImpl->frame->h * 5 / 4), sizeVBase);
-        } else if (this->info.format == SCE_CAMERA_FORMAT_YUV422_PLANE) {
-            // convert SDL_PIXELFORMAT_YUY2 Y0+U0+Y1+V0 to planar format
-            const int width = pImpl->frame->w;
-            const int height = pImpl->frame->h;
-            if (!SDL_LockSurface(pImpl->frame.get())) {
-                LOG_ERROR("Failed to lock camera frame surface: {}", SDL_GetError());
-                goto BAD_FRAME;
-            };
-            uint8_t const *packed = (uint8_t *)pImpl->frame->pixels;
-            uint8_t *Y = (uint8_t *)pIBase;
-            uint8_t *U = (uint8_t *)pUBase;
-            uint8_t *V = (uint8_t *)pVBase;
-            int pitch = pImpl->frame->pitch;
-            for (ptrdiff_t y = 0; y < height; y++) {
-                uint8_t const *row = packed + y * pitch;
-                for (ptrdiff_t x = 0; x < width; x += 2) {
-                    const size_t y_index = y * width + x;
-                    const size_t uv_index = y_index / 2;
-                    if (y_index < sizeIBase)
-                        Y[y_index] = row[x * 2];
-                    if (y_index + 1 < sizeIBase)
-                        Y[y_index + 1] = row[x * 2 + 2];
-                    if (uv_index < sizeUBase)
-                        U[uv_index] = row[x * 2 + 1];
-                    if (uv_index < sizeVBase)
-                        V[uv_index] = row[x * 2 + 3];
-                }
+    if (!pImpl->frame || pImpl->frame->w != info.width || pImpl->frame->h != info.height)
+        return SCE_CAMERA_ERROR_FATAL;
+    auto *frame = pImpl->frame.get();
+    const size_t source_size = info.format == SCE_CAMERA_FORMAT_YUV420_PLANE
+        ? static_cast<size_t>(frame->pitch) * frame->h + static_cast<size_t>((frame->pitch + 1) / 2) * frame->h
+        : static_cast<size_t>(frame->pitch) * frame->h;
+    if (!SDL_LockSurface(frame)) return SCE_CAMERA_ERROR_FATAL;
+    const bool copied = ecv_camera_copy(info.format, info.width, info.height, info.pitch, pImpl->reverse,
+        static_cast<const unsigned char *>(frame->pixels), frame->pitch, source_size,
+        static_cast<unsigned char *>(pIBase), sizeIBase, static_cast<unsigned char *>(pUBase), sizeUBase,
+        static_cast<unsigned char *>(pVBase), sizeVBase);
+    SDL_UnlockSurface(frame);
+#if defined(__ANDROID__) && !defined(NDEBUG)
+    if (diag_sample) {
+        SDL_Log("ECV_CAMERA_DIAG guest copy frame=%u copied=%d format=%u size=%ux%u padding=%u capacity=%u/%u/%u", diag_frame, copied, (unsigned int)info.format, info.width, info.height, info.pitch, sizeIBase, sizeUBase, sizeVBase);
+        if (copied) {
+            const int bytes = info.format == SCE_CAMERA_FORMAT_ARGB || info.format == SCE_CAMERA_FORMAT_ABGR ? 4 : (info.format == SCE_CAMERA_FORMAT_YUV422_PACKED ? 2 : 1);
+            ecv_camera_diag_plane("guest written", diag_frame, 0, static_cast<const unsigned char *>(pIBase), sizeIBase, info.width * bytes, info.height, info.width * bytes + info.pitch);
+            if (info.format == SCE_CAMERA_FORMAT_YUV420_PLANE || info.format == SCE_CAMERA_FORMAT_YUV422_PLANE) {
+                const int height = info.format == SCE_CAMERA_FORMAT_YUV420_PLANE ? info.height / 2 : info.height;
+                const int pitch = (info.width + info.pitch + 1) / 2;
+                ecv_camera_diag_plane("guest written", diag_frame, 1, static_cast<const unsigned char *>(pUBase), sizeUBase, info.width / 2, height, pitch);
+                ecv_camera_diag_plane("guest written", diag_frame, 2, static_cast<const unsigned char *>(pVBase), sizeVBase, info.width / 2, height, pitch);
             }
-            SDL_UnlockSurface(pImpl->frame.get());
-        } else {
-            memcpy(pIBase, pImpl->frame->pixels, sizeIBase);
         }
-    } else {
-    BAD_FRAME:
-        LOG_ERROR_ONCE("No camera frame available.");
-        memset(pIBase, 0, sizeIBase);
-        if (pUBase && sizeUBase)
-            memset(pUBase, 127, sizeUBase);
-        if (pVBase && sizeVBase)
-            memset(pVBase, 127, sizeVBase);
     }
+#endif
+    if (!copied) return SCE_CAMERA_ERROR_PARAM;
+    last_frame_timestamp_us = timestamp_ns / SDL_NS_PER_US + tick_diff_us;
+    next_frame_timestamp_us = SDL_GetTicksNS() / SDL_NS_PER_US + frame_interval_us;
+    read->frame = ++frame_idx;
+    read->timestamp = last_frame_timestamp_us;
+    read->status = SCE_CAMERA_STATUS_IS_ACTIVE;
+    read->exposure_time = 0; // Not reported by SDL; do not fabricate sensor exposure.
+    read->exposure_time_gap = 0;
+    read->raw8_format = SCE_CAMERA_RAW8_FORMAT_UNKNOWN;
     return 0;
 }
 
 int Camera::close() {
-    this->is_started = false;
-    this->is_opened = false;
+    const std::lock_guard lock(pImpl->frame_mutex);
+    is_started = false;
+    is_opened = false;
+    pImpl->frame.reset();
+    pImpl->sdl_camera.reset();
+    last_frame_timestamp_us = next_frame_timestamp_us = 0;
     return 0;
 }
 
 int Camera::stop() {
-    this->is_started = false;
+    const std::lock_guard lock(pImpl->frame_mutex);
+    is_started = false;
     pImpl->frame.reset();
     pImpl->sdl_camera.reset();
+    last_frame_timestamp_us = next_frame_timestamp_us = 0;
     return 0;
+}
+
+void Camera::set_suspended(bool suspended) {
+    const std::lock_guard lock(pImpl->frame_mutex);
+    if (pImpl->suspended == suspended) return;
+    pImpl->suspended = suspended;
+    pImpl->frame.reset();
+    pImpl->sdl_camera.reset();
+    last_frame_timestamp_us = next_frame_timestamp_us = 0;
+    if (!suspended && is_started && !refresh_camera_image(this))
+        LOG_WARN("Could not resume camera '{}'", id);
 }
 
 void Camera::update_config(int type, const std::string &id, const std::string &image, uint32_t color) {
@@ -392,8 +569,10 @@ void Camera::update_config(int type, const std::string &id, const std::string &i
     this->id = id;
     this->image = image;
     this->color = color;
-    if (is_started)
+    if (is_started && !pImpl->suspended) {
+        const std::lock_guard lock(pImpl->frame_mutex);
         refresh_camera_image(this);
+    }
 }
 
 void CameraState::deinit() {
@@ -416,34 +595,56 @@ void CameraState::deinit() {
 BOOST_DESCRIBE_ENUM(SDL_CameraPosition, SDL_CAMERA_POSITION_UNKNOWN, SDL_CAMERA_POSITION_FRONT_FACING, SDL_CAMERA_POSITION_BACK_FACING)
 
 void init_default_cameras(Config &cfg) {
+#ifdef __ANDROID__
+    // Older Android runs persisted the no-hardware solid-color fallback. Migrate
+    // those selections to actual facing cameras; never expose a fake Android feed.
+    if (cfg.front_camera_type != WebCamera) cfg.front_camera_id.clear();
+    if (cfg.back_camera_type != WebCamera) cfg.back_camera_id.clear();
+    cfg.front_camera_type = cfg.back_camera_type = WebCamera;
+#endif
+#ifndef __ANDROID__
     if (!((cfg.front_camera_type == WebCamera && cfg.front_camera_id.empty()) || (cfg.back_camera_type == WebCamera && cfg.back_camera_id.empty())))
         return;
+#endif
     LOG_DEBUG("Initialize default cameras...");
-    int num_cameras;
+    int num_cameras = 0;
     SDL_CameraListPtr cameras(SDL_GetCameras(&num_cameras));
+    if (!cameras) return;
+    std::string default_front, default_back;
+    bool front_valid = false, back_valid = false;
     for (int i = 0; i < num_cameras; i++) {
         auto position = SDL_GetCameraPosition(cameras[i]);
+        const char *name = SDL_GetCameraName(cameras[i]);
+        if (!name) continue;
         LOG_TRACE("Found camera: name='{}' position={}", SDL_GetCameraName(cameras[i]), position);
         if (position == SDL_CAMERA_POSITION_FRONT_FACING) {
+#ifdef __ANDROID__
+            if (default_front.empty()) default_front = name;
+            front_valid = front_valid || cfg.front_camera_id == name;
+#else
             cfg.front_camera_id = SDL_GetCameraName(cameras[i]);
             cfg.front_camera_type = WebCamera;
+#endif
         }
         if (position == SDL_CAMERA_POSITION_BACK_FACING) {
+#ifdef __ANDROID__
+            if (default_back.empty()) default_back = name;
+            back_valid = back_valid || cfg.back_camera_id == name;
+#else
             cfg.back_camera_id = SDL_GetCameraName(cameras[i]);
             cfg.back_camera_type = WebCamera;
+#endif
         }
     }
+#ifdef __ANDROID__
+    // SDL names include stable Camera2 IDs. Preserve a valid selected sensor,
+    // migrate legacy vendor-version names, and never assign unknown-facing USB cameras.
+    if (!front_valid) cfg.front_camera_id = default_front;
+    if (!back_valid) cfg.back_camera_id = default_back;
+#else
     if (num_cameras > 0) {
-        if (cfg.front_camera_id.empty()) {
-            cfg.front_camera_id = SDL_GetCameraName(cameras[0]);
-            cfg.front_camera_type = WebCamera;
-        }
-        if (cfg.back_camera_id.empty()) {
-            cfg.back_camera_id = SDL_GetCameraName(cameras[0]);
-            cfg.back_camera_type = WebCamera;
-        }
-    } else {
-        cfg.front_camera_type = SolidColor;
-        cfg.back_camera_type = SolidColor;
+        if (cfg.front_camera_id.empty()) cfg.front_camera_id = SDL_GetCameraName(cameras[0]);
+        if (cfg.back_camera_id.empty()) cfg.back_camera_id = SDL_GetCameraName(cameras[0]);
     }
+#endif
 }

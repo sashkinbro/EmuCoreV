@@ -5,8 +5,10 @@
 #include <touch/touch.h>
 
 #include <algorithm>
+#include <mutex>
 
 struct TouchState {
+    mutable std::recursive_mutex mutex;
     SceTouchSamplingState touch_mode[2] = { SCE_TOUCH_SAMPLING_STATE_STOP, SCE_TOUCH_SAMPLING_STATE_STOP };
 
     float mouse_x = 0;
@@ -21,6 +23,10 @@ struct TouchState {
     bool is_touchpad = false;
     SDL_TouchFingerEvent finger_buffer[8] = {};
     SDL_GamepadTouchpadEvent touchpad_buffer[8] = {};
+    SDL_TouchID finger_devices[8] = {};
+    SDL_JoystickID touchpad_devices[8] = {};
+    SceTouchReport rear_contacts[4] = {};
+    bool rear_contact_down[4] = {};
     uint8_t finger_count = 0;
     uint8_t touchpad_finger_count = 0;
     bool is_touched[2] = { false, false };
@@ -36,6 +42,7 @@ struct TouchState {
     SceInt16 pinch_speed = 40;
 
     void reset_runtime() {
+        const std::lock_guard lock(mutex);
         touch_mode[0] = SCE_TOUCH_SAMPLING_STATE_STOP;
         touch_mode[1] = SCE_TOUCH_SAMPLING_STATE_STOP;
         mouse_x = 0.f;
@@ -50,6 +57,10 @@ struct TouchState {
         is_touchpad = false;
         std::fill_n(finger_buffer, 8, SDL_TouchFingerEvent{});
         std::fill_n(touchpad_buffer, 8, SDL_GamepadTouchpadEvent{});
+        std::fill_n(finger_devices, 8, SDL_TouchID{});
+        std::fill_n(touchpad_devices, 8, SDL_JoystickID{});
+        std::fill_n(rear_contacts, 4, SceTouchReport{});
+        std::fill_n(rear_contact_down, 4, false);
         finger_count = 0;
         touchpad_finger_count = 0;
         is_touched[0] = false;

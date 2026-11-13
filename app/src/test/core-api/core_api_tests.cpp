@@ -319,5 +319,6 @@ using KernelHostLifetimeEnv = EmuEnvState;
 #include "cheat_lifecycle_tests.inc"
 #include "startup_gpu_config_tests.inc"
 #include "app_user_tests.inc"
+#include "peripherals_tests.inc"
 #include "trophy_stream_copy_tests.inc"
 #include "trophy_context_lifecycle_tests.inc"

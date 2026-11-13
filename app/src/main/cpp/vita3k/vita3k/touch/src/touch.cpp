@@ -33,7 +33,34 @@
 #include <cmath>
 #include <cstring>
 
+void clear_touch_contacts(TouchState &state) {
+    const std::lock_guard lock(state.mutex);
+    state.finger_count = 0;
+    state.touchpad_finger_count = 0;
+    state.is_touchpad = false;
+    state.mouse_button_left = false;
+    state.mouse_button_right = false;
+    state.pinch_modifier_enabled = false;
+    state.pinch_velocity = 0.f;
+    state.pinch_dist = TouchState::initial_pinch_dist;
+    std::fill_n(state.finger_buffer, 8, SDL_TouchFingerEvent{});
+    std::fill_n(state.touchpad_buffer, 8, SDL_GamepadTouchpadEvent{});
+    std::fill_n(state.finger_devices, 8, SDL_TouchID{});
+    std::fill_n(state.touchpad_devices, 8, SDL_JoystickID{});
+    std::fill_n(state.rear_contacts, 4, SceTouchReport{});
+    std::fill_n(state.rear_contact_down, 4, false);
+    std::fill_n(state.is_touched, 2, false);
+    for (auto &ports : state.touch_buffers)
+        for (auto &data : ports)
+            data.reportNum = 0;
+}
+
 void set_touch_mode(TouchState &state, int mode) {
+    const std::lock_guard lock(state.mutex);
+    if (mode < 0 || mode > 2) return;
+    if (state.touchscreen_port != (mode == 1 ? SCE_TOUCH_PORT_BACK : SCE_TOUCH_PORT_FRONT)
+        || state.touchscreen_both != (mode == 2))
+        clear_touch_contacts(state);
     state.touchscreen_port = (mode == 1) ? SCE_TOUCH_PORT_BACK : SCE_TOUCH_PORT_FRONT;
     state.touchscreen_both = (mode == 2);
 }
@@ -56,6 +83,28 @@ static bool normalized_touch_to_report(float x, float y, SceTouchPortType port, 
         ? static_cast<SceInt16>(std::lround(y * 1087.f))
         : static_cast<SceInt16>(108 + std::lround(y * 781.f));
     return true;
+}
+
+void set_rear_touch_contact(TouchState &state, int slot, bool pressed, float x, float y) {
+    const std::lock_guard lock(state.mutex);
+    if (slot < 0 || slot >= 4) return;
+    if (!pressed) {
+        state.rear_contact_down[slot] = false;
+        return;
+    }
+    auto &report = state.rear_contacts[slot];
+    if (!normalized_touch_to_report(x, y, SCE_TOUCH_PORT_BACK, report)) return;
+    // Reserved IDs cannot collide with physical contact IDs (0..119).
+    report.id = static_cast<uint8_t>(120 + slot);
+    state.rear_contact_down[slot] = true;
+}
+
+void set_touch_sampling_state(TouchState &state, int port, SceTouchSamplingState mode) {
+    const std::lock_guard lock(state.mutex);
+    state.touch_mode[port] = mode;
+    if (mode == SCE_TOUCH_SAMPLING_STATE_STOP)
+        for (auto &ports : state.touch_buffers)
+            ports[port].reportNum = 0;
 }
 
 static SceTouchData recover_touch_events(const EmuEnvState &emuenv, SceTouchPortType port) {
@@ -103,6 +152,7 @@ static SceTouchData recover_touchpad_events(const EmuEnvState &emuenv, SceTouchP
 
 void touch_vsync_update(EmuEnvState &emuenv) {
     auto &touch = emuenv.touch;
+    const std::lock_guard lock(touch.mutex);
     std::chrono::time_point<std::chrono::steady_clock> ts = std::chrono::steady_clock::now();
     uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(ts.time_since_epoch()).count();
 
@@ -112,7 +162,8 @@ void touch_vsync_update(EmuEnvState &emuenv) {
 #else
     constexpr bool on_android = false;
 #endif
-    if (touch.finger_count > 0 || touch.touchpad_finger_count > 0 || on_android) {
+    if (touch.finger_count > 0 || touch.touchpad_finger_count > 0 || on_android
+        || std::any_of(std::begin(touch.rear_contact_down), std::end(touch.rear_contact_down), [](bool down) { return down; })) {
         SceTouchData *buffers = touch.touch_buffers[(touch.touch_buffer_idx + 1) % MAX_TOUCH_BUFFER_SAVED];
         for (int port = 0; port < 2; port++) {
             buffers[port].status = 0;
@@ -120,12 +171,28 @@ void touch_vsync_update(EmuEnvState &emuenv) {
             buffers[port].timeStamp = timestamp;
         }
         for (int port = 0; port < 2; ++port) {
-            if (!touch.touchscreen_both && port != touch.touchscreen_port)
+            if (emuenv.drop_inputs || emuenv.ctrl.overlay_input_intercepted.load(std::memory_order_relaxed)
+                || touch.touch_mode[port] == SCE_TOUCH_SAMPLING_STATE_STOP)
                 continue;
             const auto touch_port = static_cast<SceTouchPortType>(port);
-            auto data = touch.is_touchpad ? recover_touchpad_events(emuenv, touch_port) : recover_touch_events(emuenv, touch_port);
+            auto &data = buffers[port];
+            const unsigned int limit = port == SCE_TOUCH_PORT_BACK ? 4 : 6;
+            if (port == SCE_TOUCH_PORT_BACK) {
+                for (int slot = 0; slot < 4; ++slot) {
+                    if (!touch.rear_contact_down[slot]) continue;
+                    auto report = touch.rear_contacts[slot];
+                    report.force = touch.force_touch_enabled[port] ? 128 : 0;
+                    data.report[data.reportNum++] = report;
+                }
+            }
+            if (touch.touchscreen_both || port == touch.touchscreen_port) {
+                const auto screen = recover_touch_events(emuenv, touch_port);
+                const auto pad = recover_touchpad_events(emuenv, touch_port);
+                for (const auto *source : { &screen, &pad })
+                    for (unsigned int i = 0; i < source->reportNum && data.reportNum < limit; ++i)
+                        data.report[data.reportNum++] = source->report[i];
+            }
             data.timeStamp = timestamp;
-            buffers[port] = data;
         }
 
     } else {
@@ -218,11 +285,27 @@ void pinch_automove(TouchState &state, float velocity) {
     state.pinch_velocity = velocity;
 }
 
+static int next_physical_touch_id(TouchState &state) {
+    // A long-held finger must not collide when other contacts wrap the ID counter.
+    for (int attempt = 0; attempt < 120; ++attempt) {
+        const int candidate = state.next_touch_id;
+        state.next_touch_id = (state.next_touch_id + 1) % 120;
+        bool used = false;
+        for (int i = 0; i < state.finger_count; ++i)
+            used = used || state.finger_buffer[i].touchID == candidate;
+        for (int i = 0; i < state.touchpad_finger_count; ++i)
+            used = used || state.touchpad_buffer[i].which == candidate;
+        if (!used) return candidate;
+    }
+    return 0; // At most 16 physical contacts can be live, so exhaustion is unreachable.
+}
+
 int handle_touch_event(TouchState &state, SDL_TouchFingerEvent &finger) {
+    const std::lock_guard lock(state.mutex);
     switch (finger.type) {
     case SDL_EVENT_FINGER_DOWN: {
         for (uint8_t i = 0; i < state.finger_count; ++i) {
-            if (finger.fingerID == state.finger_buffer[i].fingerID) {
+            if (finger.fingerID == state.finger_buffer[i].fingerID && finger.touchID == state.finger_devices[i]) {
                 const SDL_TouchID touch_id = state.finger_buffer[i].touchID;
                 state.finger_buffer[i] = finger;
                 state.finger_buffer[i].touchID = touch_id;
@@ -233,8 +316,8 @@ int handle_touch_event(TouchState &state, SDL_TouchFingerEvent &finger) {
             return 0;
 
         state.finger_buffer[state.finger_count] = finger;
-        state.finger_buffer[state.finger_count].touchID = state.next_touch_id;
-        state.next_touch_id = (state.next_touch_id + 1) % 128;
+        state.finger_devices[state.finger_count] = finger.touchID;
+        state.finger_buffer[state.finger_count].touchID = next_physical_touch_id(state);
         state.finger_count++;
         break;
     }
@@ -242,22 +325,24 @@ int handle_touch_event(TouchState &state, SDL_TouchFingerEvent &finger) {
     case SDL_EVENT_FINGER_CANCELED: {
         int finger_index = -1;
         for (int i = 0; i < state.finger_count; i++) {
-            if (finger.fingerID == state.finger_buffer[i].fingerID) {
+            if (finger.fingerID == state.finger_buffer[i].fingerID && finger.touchID == state.finger_devices[i]) {
                 finger_index = i;
                 break;
             }
         }
         if (finger_index < 0)
             return 0;
-        for (int i = finger_index + 1; i < state.finger_count; ++i)
+        for (int i = finger_index + 1; i < state.finger_count; ++i) {
             state.finger_buffer[i - 1] = state.finger_buffer[i];
+            state.finger_devices[i - 1] = state.finger_devices[i];
+        }
         --state.finger_count;
         break;
     }
 
     case SDL_EVENT_FINGER_MOTION: {
         for (int i = 0; i < state.finger_count; i++) {
-            if (finger.fingerID == state.finger_buffer[i].fingerID) {
+            if (finger.fingerID == state.finger_buffer[i].fingerID && finger.touchID == state.finger_devices[i]) {
                 SDL_TouchID touch_id = state.finger_buffer[i].touchID;
                 state.finger_buffer[i] = finger;
                 state.finger_buffer[i].touchID = touch_id;
@@ -271,10 +356,12 @@ int handle_touch_event(TouchState &state, SDL_TouchFingerEvent &finger) {
 }
 
 int handle_touchpad_event(TouchState &state, SDL_GamepadTouchpadEvent &touchpad) {
+    const std::lock_guard lock(state.mutex);
     switch (touchpad.type) {
     case SDL_EVENT_GAMEPAD_TOUCHPAD_DOWN:
         for (uint8_t i = 0; i < state.touchpad_finger_count; ++i) {
-            if (touchpad.finger == state.touchpad_buffer[i].finger) {
+            if (touchpad.finger == state.touchpad_buffer[i].finger && touchpad.which == state.touchpad_devices[i]
+                && touchpad.touchpad == state.touchpad_buffer[i].touchpad) {
                 const auto touch_id = state.touchpad_buffer[i].which;
                 state.touchpad_buffer[i] = touchpad;
                 state.touchpad_buffer[i].which = touch_id;
@@ -285,28 +372,32 @@ int handle_touchpad_event(TouchState &state, SDL_GamepadTouchpadEvent &touchpad)
             return 0;
 
         state.touchpad_buffer[state.touchpad_finger_count] = touchpad;
-        state.touchpad_buffer[state.touchpad_finger_count].which = state.next_touch_id;
-        state.next_touch_id = (state.next_touch_id + 1) % 128;
+        state.touchpad_devices[state.touchpad_finger_count] = touchpad.which;
+        state.touchpad_buffer[state.touchpad_finger_count].which = next_physical_touch_id(state);
         state.touchpad_finger_count++;
         break;
     case SDL_EVENT_GAMEPAD_TOUCHPAD_UP: {
         int finger_index = -1;
         for (uint8_t i = 0; i < state.touchpad_finger_count; ++i) {
-            if (touchpad.finger == state.touchpad_buffer[i].finger) {
+            if (touchpad.finger == state.touchpad_buffer[i].finger && touchpad.which == state.touchpad_devices[i]
+                && touchpad.touchpad == state.touchpad_buffer[i].touchpad) {
                 finger_index = i;
                 break;
             }
         }
         if (finger_index < 0)
             return 0;
-        for (int i = finger_index + 1; i < state.touchpad_finger_count; ++i)
+        for (int i = finger_index + 1; i < state.touchpad_finger_count; ++i) {
             state.touchpad_buffer[i - 1] = state.touchpad_buffer[i];
+            state.touchpad_devices[i - 1] = state.touchpad_devices[i];
+        }
         --state.touchpad_finger_count;
         break;
     }
     case SDL_EVENT_GAMEPAD_TOUCHPAD_MOTION:
         for (int i = 0; i < state.touchpad_finger_count; i++) {
-            if (touchpad.finger == state.touchpad_buffer[i].finger) {
+            if (touchpad.finger == state.touchpad_buffer[i].finger && touchpad.which == state.touchpad_devices[i]
+                && touchpad.touchpad == state.touchpad_buffer[i].touchpad) {
                 const auto touch_id = state.touchpad_buffer[i].which;
                 state.touchpad_buffer[i] = touchpad;
                 state.touchpad_buffer[i].which = touch_id;
@@ -320,7 +411,38 @@ int handle_touchpad_event(TouchState &state, SDL_GamepadTouchpadEvent &touchpad)
     return 0;
 }
 
+void release_touchpad_device(TouchState &state, uint32_t device_id) {
+    const std::lock_guard lock(state.mutex);
+    uint8_t removed_ids[8]{};
+    int removed_count = 0;
+    int kept = 0;
+    for (int i = 0; i < state.touchpad_finger_count; ++i) {
+        if (state.touchpad_devices[i] == device_id) {
+            removed_ids[removed_count++] = static_cast<uint8_t>(state.touchpad_buffer[i].which);
+        } else {
+            state.touchpad_buffer[kept] = state.touchpad_buffer[i];
+            state.touchpad_devices[kept++] = state.touchpad_devices[i];
+        }
+    }
+    state.touchpad_finger_count = static_cast<uint8_t>(kept);
+    state.is_touchpad = kept > 0;
+    // Remove only this device's reports from history; other active inputs survive.
+    for (auto &ports : state.touch_buffers) {
+        for (auto &data : ports) {
+            unsigned int count = 0;
+            for (unsigned int i = 0; i < data.reportNum; ++i) {
+                bool removed = false;
+                for (int j = 0; j < removed_count; ++j)
+                    removed = removed || data.report[i].id == removed_ids[j];
+                if (!removed) data.report[count++] = data.report[i];
+            }
+            data.reportNum = count;
+        }
+    }
+}
+
 std::vector<SceFVector2> get_touchpad_fingers_pos(const TouchState &state, SceTouchPortType &port) {
+    const std::lock_guard lock(state.mutex);
     if (!state.is_touchpad)
         return {};
 
@@ -336,12 +458,7 @@ std::vector<SceFVector2> get_touchpad_fingers_pos(const TouchState &state, SceTo
 }
 
 int toggle_touchscreen(TouchState &state) {
-    state.touchscreen_both = false;
-    if (state.touchscreen_port == SCE_TOUCH_PORT_FRONT) {
-        state.touchscreen_port = SCE_TOUCH_PORT_BACK;
-    } else {
-        state.touchscreen_port = SCE_TOUCH_PORT_FRONT;
-    }
+    set_touch_mode(state, state.touchscreen_port == SCE_TOUCH_PORT_FRONT ? 1 : 0);
     return 0;
 }
 
@@ -378,6 +495,7 @@ int touch_get(const SceUID thread_id, EmuEnvState &emuenv, const SceUInt32 &port
         }
     }
 
+    const std::lock_guard lock(emuenv.touch.mutex);
     int corr_buffer_idx;
     if (is_peek) {
         corr_buffer_idx = emuenv.touch.touch_buffer_idx;
@@ -387,6 +505,8 @@ int touch_get(const SceUID thread_id, EmuEnvState &emuenv, const SceUInt32 &port
     }
     for (int32_t i = 0; i < nb_returned_data; i++) {
         pData[i] = emuenv.touch.touch_buffers[corr_buffer_idx][port_idx];
+        if (emuenv.touch.touch_mode[port_idx] == SCE_TOUCH_SAMPLING_STATE_STOP)
+            pData[i].reportNum = 0;
         if (emuenv.touch.force_touch_enabled[port_idx]) {
             for (int32_t j = 0; j < pData[i].reportNum; j++) {
                 pData[i].report[j].force = 128;
@@ -403,5 +523,6 @@ int touch_get(const SceUID thread_id, EmuEnvState &emuenv, const SceUInt32 &port
 }
 
 void touch_set_force_mode(TouchState &state, int port, bool mode) {
+    const std::lock_guard lock(state.mutex);
     state.force_touch_enabled[port] = mode;
 }

@@ -24,6 +24,7 @@
 #include <ctrl/functions.h>
 #include <jni.h>
 #include <touch/functions.h>
+#include <emucorev/savestate/operation_mutex.h>
 
 static int virtual_joystick_id = -1;
 static SDL_Joystick *virtual_joystick = nullptr;
@@ -61,7 +62,7 @@ bool attach_overlay_virtual_controller() {
     desc.type = SDL_JOYSTICK_TYPE_GAMEPAD;
     desc.naxes = SDL_GAMEPAD_AXIS_COUNT;
     desc.nbuttons = SDL_GAMEPAD_BUTTON_COUNT;
-    desc.name = "Vita3K Virtual Controller";
+    desc.name = "EmuCoreV Virtual Controller";
 
     virtual_joystick_id = SDL_AttachVirtualJoystick(&desc);
     if (virtual_joystick_id == 0) {
@@ -122,11 +123,28 @@ Java_org_vita3k_emulator_overlay_InputOverlay_setButton(JNIEnv *env, jobject thi
 
 JNIEXPORT void JNICALL
 Java_org_vita3k_emulator_overlay_InputOverlay_setTouchState(JNIEnv *env, jobject thiz, jint mode) {
+    const std::lock_guard input_operation(emucorev::savestate::save_state_operation_mutex());
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return;
 
     set_touch_mode(emuenv->touch, static_cast<int>(mode));
+}
+
+JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_core_input_RearTouchNative_setContact(JNIEnv *, jobject, jint slot, jboolean pressed, jfloat x, jfloat y) {
+    const std::lock_guard input_operation(emucorev::savestate::save_state_operation_mutex());
+    auto *emuenv = get_emuenv();
+    auto *controller = get_app_session_controller();
+    if (!emuenv || !controller || !controller->is_running()) return;
+    if (pressed && (emuenv->drop_inputs || emuenv->ctrl.overlay_input_intercepted.load(std::memory_order_relaxed))) return;
+    set_rear_touch_contact(emuenv->touch, slot, pressed == JNI_TRUE, x, y);
+}
+
+JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_core_input_RearTouchNative_clearContacts(JNIEnv *, jobject) {
+    const std::lock_guard input_operation(emucorev::savestate::save_state_operation_mutex());
+    if (auto *emuenv = get_emuenv()) clear_touch_contacts(emuenv->touch);
 }
 
 } // extern "C"

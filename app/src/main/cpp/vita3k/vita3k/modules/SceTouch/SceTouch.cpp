@@ -291,7 +291,7 @@ EXPORT(int, sceTouchSetSamplingState, SceUInt32 port, SceTouchSamplingState stat
     if (state != SCE_TOUCH_SAMPLING_STATE_STOP && state != SCE_TOUCH_SAMPLING_STATE_START) {
         return RET_ERROR(SCE_TOUCH_ERROR_INVALID_ARG);
     }
-    emuenv.touch.touch_mode[port] = state;
+    set_touch_sampling_state(emuenv.touch, port, state);
     return SCE_TOUCH_OK;
 }
 

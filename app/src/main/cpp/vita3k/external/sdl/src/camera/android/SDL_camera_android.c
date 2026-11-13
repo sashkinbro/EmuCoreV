@@ -60,6 +60,36 @@
 #include <media/NdkImageReader.h>
 
 #include "../../core/android/SDL_android.h"
+#include "SDL_camera_android_yuv.h"
+
+/* EmuCoreV modification: flexible YUV planes and observable capture failure. */
+
+#if defined(__ANDROID__) && !defined(NDEBUG)
+/* Debug aggregates read active samples only, after independent bounds checks. */
+static int ECV_CameraDiagStats(const unsigned char *data, size_t length, int width, int height, int row_stride, int pixel_stride, unsigned long long out[6])
+{
+    if (!data || !out || !length || width <= 0 || height <= 0 || row_stride <= 0 || pixel_stride <= 0)
+        return 0;
+    if ((size_t)(width - 1) > (length - 1) / (size_t)pixel_stride)
+        return 0;
+    const size_t row_bytes = (size_t)(width - 1) * pixel_stride + 1;
+    if (row_bytes > (size_t)row_stride || (size_t)(height - 1) > (length - row_bytes) / (size_t)row_stride)
+        return 0;
+    unsigned int hash = 2166136261u;
+    unsigned long long lo = 255, hi = 0, sum = 0, count = 0, nonzero = 0;
+    for (int row = 0; row < height; ++row) {
+        for (int col = 0; col < width; ++col) {
+            const unsigned int value = data[(size_t)row * row_stride + (size_t)col * pixel_stride];
+            if (value < lo) lo = value;
+            if (value > hi) hi = value;
+            sum += value; ++count; nonzero += value != 0;
+            hash = (hash ^ value) * 16777619u;
+        }
+    }
+    out[0] = lo; out[1] = hi; out[2] = sum; out[3] = count; out[4] = nonzero; out[5] = hash;
+    return 1;
+}
+#endif
 
 static void *libcamera2ndk = NULL;
 typedef ACameraManager* (*pfnACameraManager_create)(void);
@@ -115,6 +145,9 @@ static void *libmediandk = NULL;
 typedef void (*pfnAImage_delete)(AImage*);
 typedef media_status_t (*pfnAImage_getTimestamp)(const AImage*, int64_t*);
 typedef media_status_t (*pfnAImage_getNumberOfPlanes)(const AImage*, int32_t*);
+typedef media_status_t (*pfnAImage_getPlanePixelStride)(const AImage*, int, int32_t*);
+static pfnAImage_getPlanePixelStride pAImage_getPlanePixelStride = NULL;
+
 typedef media_status_t (*pfnAImage_getPlaneRowStride)(const AImage*, int, int32_t*);
 typedef media_status_t (*pfnAImage_getPlaneData)(const AImage*, int, uint8_t**, int*);
 typedef media_status_t (*pfnAImageReader_acquireNextImage)(AImageReader*, AImage**);
@@ -140,6 +173,10 @@ static pfnAImage_getHeight pAImage_getHeight = NULL;
 
 struct SDL_PrivateCameraData
 {
+#if defined(__ANDROID__) && !defined(NDEBUG)
+    unsigned int diag_frames;
+#endif
+    Uint32 generation;
     ACameraDevice *device;
     AImageReader *reader;
     ANativeWindow *window;
@@ -150,6 +187,12 @@ struct SDL_PrivateCameraData
     ACameraCaptureSession *session;
     SDL_CameraSpec requested_spec;
 };
+
+typedef struct SDL_CameraPermissionRequest {
+    SDL_Camera *device;
+    Uint32 generation;
+} SDL_CameraPermissionRequest;
+static SDL_AtomicInt camera_open_generation;
 
 static bool SetErrorStr(const char *what, const char *errstr, const int rc)
 {
@@ -257,11 +300,11 @@ static void format_android_to_sdl(Uint32 fmt, SDL_PixelFormat *format, SDL_Color
 {
     switch (fmt) {
         #define CASE(x, y, z)  case x: *format = y; *colorspace = z; return
-        CASE(AIMAGE_FORMAT_YUV_420_888, SDL_PIXELFORMAT_NV12, SDL_COLORSPACE_BT709_LIMITED);
+        CASE(AIMAGE_FORMAT_YUV_420_888, SDL_PIXELFORMAT_NV12, SDL_COLORSPACE_BT601_LIMITED);
         CASE(AIMAGE_FORMAT_RGB_565,     SDL_PIXELFORMAT_RGB565, SDL_COLORSPACE_SRGB);
-        CASE(AIMAGE_FORMAT_RGB_888,     SDL_PIXELFORMAT_XRGB8888, SDL_COLORSPACE_SRGB);
-        CASE(AIMAGE_FORMAT_RGBA_8888,   SDL_PIXELFORMAT_RGBA8888, SDL_COLORSPACE_SRGB);
-        CASE(AIMAGE_FORMAT_RGBX_8888,   SDL_PIXELFORMAT_RGBX8888, SDL_COLORSPACE_SRGB);
+        CASE(AIMAGE_FORMAT_RGB_888,     SDL_PIXELFORMAT_RGB24, SDL_COLORSPACE_SRGB);
+        CASE(AIMAGE_FORMAT_RGBA_8888,   SDL_PIXELFORMAT_RGBA32, SDL_COLORSPACE_SRGB);
+        CASE(AIMAGE_FORMAT_RGBX_8888,   SDL_PIXELFORMAT_RGBX32, SDL_COLORSPACE_SRGB);
         CASE(AIMAGE_FORMAT_RGBA_FP16,   SDL_PIXELFORMAT_RGBA64_FLOAT, SDL_COLORSPACE_SRGB);
         #undef CASE
         default: break;
@@ -281,9 +324,9 @@ static Uint32 format_sdl_to_android(SDL_PixelFormat fmt)
         #define CASE(x, y)  case y: return x
         CASE(AIMAGE_FORMAT_YUV_420_888, SDL_PIXELFORMAT_NV12);
         CASE(AIMAGE_FORMAT_RGB_565,     SDL_PIXELFORMAT_RGB565);
-        CASE(AIMAGE_FORMAT_RGB_888,     SDL_PIXELFORMAT_XRGB8888);
-        CASE(AIMAGE_FORMAT_RGBA_8888,   SDL_PIXELFORMAT_RGBA8888);
-        CASE(AIMAGE_FORMAT_RGBX_8888,   SDL_PIXELFORMAT_RGBX8888);
+        CASE(AIMAGE_FORMAT_RGB_888,     SDL_PIXELFORMAT_RGB24);
+        CASE(AIMAGE_FORMAT_RGBA_8888,   SDL_PIXELFORMAT_RGBA32);
+        CASE(AIMAGE_FORMAT_RGBX_8888,   SDL_PIXELFORMAT_RGBX32);
         #undef CASE
         default:
             return 0;
@@ -292,7 +335,10 @@ static Uint32 format_sdl_to_android(SDL_PixelFormat fmt)
 
 static bool ANDROIDCAMERA_WaitDevice(SDL_Camera *device)
 {
-    return true;  // this isn't used atm, since we run our own thread via onImageAvailable callbacks.
+    // The SDL-owned thread is joined before any surfaces/readers are destroyed.
+    // Polling avoids an ImageReader callback converting frames during close.
+    SDL_Delay(2);
+    return true;
 }
 
 static SDL_CameraFrameResult ANDROIDCAMERA_AcquireFrame(SDL_Camera *device, SDL_Surface *frame, Uint64 *timestampNS)
@@ -305,9 +351,11 @@ static SDL_CameraFrameResult ANDROIDCAMERA_AcquireFrame(SDL_Camera *device, SDL_
     // We could also use this one:
     //res = AImageReader_acquireLatestImage(device->hidden->reader, &image);
 
-    SDL_assert(res != AMEDIA_IMGREADER_NO_BUFFER_AVAILABLE);  // we should only be here if onImageAvailable was called.
+    if (res == AMEDIA_IMGREADER_NO_BUFFER_AVAILABLE)
+        return SDL_CAMERA_FRAME_SKIP;
 
     if (res != AMEDIA_OK) {
+        SDL_SetBooleanProperty(SDL_GetCameraProperties(device), "emucorev.camera.disconnected", true);
         SetMediaError("Error AImageReader_acquireNextImage", res);
         return SDL_CAMERA_FRAME_ERROR;
     }
@@ -319,50 +367,65 @@ static SDL_CameraFrameResult ANDROIDCAMERA_AcquireFrame(SDL_Camera *device, SDL_
         *timestampNS = 0;
     }
 
-    // !!! FIXME: this currently copies the data to the surface (see FIXME about non-contiguous planar surfaces, but in theory we could just keep this locked until ReleaseFrame...
-    int32_t num_planes = 0;
-    pAImage_getNumberOfPlanes(image, &num_planes);
-
-    if ((num_planes == 3) && (device->spec.format == SDL_PIXELFORMAT_NV12)) {
-        num_planes--;   // treat the interleaved planes as one.
-    }
-
-    size_t buflen = 0;
-    pAImage_getPlaneRowStride(image, 0, &frame->pitch);
-    for (int i = 0; (i < num_planes) && (i < 3); i++) {
-        int32_t expected;
-        if (i == 0) {
-            expected = frame->pitch * frame->h;
-        } else {
-            expected = frame->pitch * (frame->h + 1) / 2;
+    // YUV_420_888 is NOT necessarily NV12. Repack using all three plane strides.
+    if (frame->format == SDL_PIXELFORMAT_NV12) {
+        uint8_t *data[3] = { NULL, NULL, NULL };
+        int length[3] = { 0, 0, 0 };
+        int32_t rows[3] = { 0, 0, 0 }, pixels[3] = { 0, 0, 0 };
+        bool valid = true;
+        for (int i = 0; i < 3; ++i) {
+            valid = valid && pAImage_getPlaneData(image, i, &data[i], &length[i]) == AMEDIA_OK;
+            valid = valid && pAImage_getPlaneRowStride(image, i, &rows[i]) == AMEDIA_OK;
+            valid = valid && pAImage_getPlanePixelStride(image, i, &pixels[i]) == AMEDIA_OK;
         }
-        buflen += expected;
-    }
-
-    frame->pixels = SDL_aligned_alloc(SDL_GetSIMDAlignment(), buflen);
-    if (frame->pixels == NULL) {
-        result = SDL_CAMERA_FRAME_ERROR;
-    } else {
-        Uint8 *dst = frame->pixels;
-
-        for (int i = 0; (i < num_planes) && (i < 3); i++) {
-            uint8_t *data = NULL;
-            int32_t datalen = 0;
-            int32_t expected;
-            if (i == 0) {
-                expected = frame->pitch * frame->h;
-            } else {
-                expected = frame->pitch * (frame->h + 1) / 2;
+        frame->pitch = frame->w;
+        const size_t buflen = (size_t)frame->w * frame->h * 3 / 2;
+        frame->pixels = SDL_aligned_alloc(SDL_GetSIMDAlignment(), buflen);
+        if (!frame->pixels || !valid || !ECV_PackAndroidYuv420(frame->pixels, buflen, frame->w, frame->h,
+                data[0], length[0], rows[0], pixels[0], data[1], length[1], rows[1], pixels[1],
+                data[2], length[2], rows[2], pixels[2])) {
+            SDL_aligned_free(frame->pixels);
+            frame->pixels = NULL;
+            SDL_SetError("Invalid Android YUV_420_888 plane layout");
+            result = SDL_CAMERA_FRAME_ERROR;
+        }
+#if defined(__ANDROID__) && !defined(NDEBUG)
+        const unsigned int diag_frame = device->hidden->diag_frames < 121 ? ++device->hidden->diag_frames : 121;
+        if (diag_frame <= 3 || diag_frame == 30 || diag_frame == 60 || diag_frame == 120) {
+            SDL_Log("ECV_CAMERA_DIAG raw frame=%u size=%dx%d result=%d valid=%d timestamp=%llu", diag_frame, frame->w, frame->h, result, valid, (unsigned long long)*timestampNS);
+            for (int i = 0; i < 3; ++i) {
+                unsigned long long stats[6];
+                const int ok = valid && ECV_CameraDiagStats(data[i], length[i] > 0 ? (size_t)length[i] : 0,
+                    i ? frame->w / 2 : frame->w, i ? frame->h / 2 : frame->h, rows[i], pixels[i], stats);
+                if (ok) SDL_Log("ECV_CAMERA_DIAG raw plane=%d length=%d row=%d pixel=%d min=%llu max=%llu mean=%llu nonzero=%llu count=%llu checksum=%llx", i, length[i], rows[i], pixels[i], stats[0], stats[1], stats[2] / stats[3], stats[4], stats[3], stats[5]);
+                else SDL_Log("ECV_CAMERA_DIAG raw plane=%d rejected length=%d row=%d pixel=%d", i, length[i], rows[i], pixels[i]);
             }
-            pAImage_getPlaneData(image, i, &data, &datalen);
-
-            int32_t row_stride = 0;
-            pAImage_getPlaneRowStride(image, i, &row_stride);
-            SDL_assert(row_stride == frame->pitch);
-            SDL_memcpy(dst, data, SDL_min(expected, datalen));
-            dst += expected;
+            unsigned long long stats[6];
+            if (result == SDL_CAMERA_FRAME_READY && ECV_CameraDiagStats(frame->pixels, buflen, frame->w, frame->h + frame->h / 2, frame->pitch, 1, stats))
+                SDL_Log("ECV_CAMERA_DIAG packed NV12 min=%llu max=%llu mean=%llu nonzero=%llu count=%llu checksum=%llx", stats[0], stats[1], stats[2] / stats[3], stats[4], stats[3], stats[5]);
+        }
+#endif
+    } else {
+        uint8_t *data = NULL;
+        int length = 0;
+        int32_t row_stride = 0;
+        if (pAImage_getPlaneData(image, 0, &data, &length) != AMEDIA_OK
+            || pAImage_getPlaneRowStride(image, 0, &row_stride) != AMEDIA_OK
+            || !data || row_stride <= 0 || length < row_stride * (frame->h - 1) + frame->w * SDL_BYTESPERPIXEL(frame->format)) {
+            result = SDL_CAMERA_FRAME_ERROR;
+        } else {
+            frame->pitch = row_stride;
+            const size_t buflen = (size_t)row_stride * frame->h;
+            frame->pixels = SDL_aligned_alloc(SDL_GetSIMDAlignment(), buflen);
+            if (!frame->pixels) result = SDL_CAMERA_FRAME_ERROR;
+            else {
+                SDL_memset(frame->pixels, 0, buflen);
+                SDL_memcpy(frame->pixels, data, SDL_min(buflen, (size_t)length));
+            }
         }
     }
+    if (result == SDL_CAMERA_FRAME_ERROR)
+        SDL_SetBooleanProperty(SDL_GetCameraProperties(device), "emucorev.camera.disconnected", true);
 
     pAImage_delete(image);
 
@@ -375,21 +438,18 @@ static void ANDROIDCAMERA_ReleaseFrame(SDL_Camera *device, SDL_Surface *frame)
     SDL_aligned_free(frame->pixels);
 }
 
-static void onImageAvailable(void *context, AImageReader *reader)
-{
-    #if DEBUG_CAMERA
-    SDL_Log("CAMERA: CB onImageAvailable");
-    #endif
-    SDL_Camera *device = (SDL_Camera *) context;
-    SDL_CameraThreadIterate(device);
-}
-
 static void onDisconnected(void *context, ACameraDevice *device)
 {
     #if DEBUG_CAMERA
     SDL_Log("CAMERA: CB onDisconnected");
     #endif
-    SDL_CameraDisconnected((SDL_Camera *) context);
+    SDL_Camera *camera = (SDL_Camera *)context;
+    SDL_LockMutex(camera->lock);
+    if (!SDL_GetAtomicInt(&camera->shutdown) && camera->hidden && camera->hidden->device == device) {
+        SDL_SetBooleanProperty(SDL_GetCameraProperties(camera), "emucorev.camera.disconnected", true);
+        SDL_CameraDisconnected(camera);
+    }
+    SDL_UnlockMutex(camera->lock);
 }
 
 static void onError(void *context, ACameraDevice *device, int error)
@@ -397,7 +457,7 @@ static void onError(void *context, ACameraDevice *device, int error)
     #if DEBUG_CAMERA
     SDL_Log("CAMERA: CB onError");
     #endif
-    SDL_CameraDisconnected((SDL_Camera *) context);
+    onDisconnected(context, device);
 }
 
 static void onClosed(void* context, ACameraCaptureSession *session)
@@ -489,10 +549,6 @@ static bool PrepareCamera(SDL_Camera *device)
     capture_callbacks.onReady = onReady;
     capture_callbacks.onActive = onActive;
 
-    AImageReader_ImageListener imglistener;
-    SDL_zero(imglistener);
-    imglistener.context = device;
-    imglistener.onImageAvailable = onImageAvailable;
 
     // just in case SDL_OpenCamera is overwriting device->spec as CameraPermissionCallback runs, we work from a different copy.
     const SDL_CameraSpec *spec = &device->hidden->requested_spec;
@@ -519,8 +575,6 @@ static bool PrepareCamera(SDL_Camera *device)
         return SetCameraError("Error ACameraDevice_createCaptureSession", res);
     } else if ((res = pACameraCaptureSession_setRepeatingRequest(device->hidden->session, NULL, 1, &device->hidden->request, NULL)) != ACAMERA_OK) {
         return SetCameraError("Error ACameraCaptureSession_setRepeatingRequest", res);
-    } else if ((res2 = pAImageReader_setImageListener(device->hidden->reader, &imglistener)) != AMEDIA_OK) {
-        return SetMediaError("Error AImageReader_setImageListener", res2);
     }
 
     return true;
@@ -528,19 +582,24 @@ static bool PrepareCamera(SDL_Camera *device)
 
 static void SDLCALL CameraPermissionCallback(void *userdata, const char *permission, bool granted)
 {
-    SDL_Camera *device = (SDL_Camera *) userdata;
-    if (device->hidden != NULL) {   // if device was already closed, don't send an event.
+    SDL_CameraPermissionRequest *request = (SDL_CameraPermissionRequest *)userdata;
+    SDL_Camera *device = request->device;
+    SDL_LockMutex(device->lock);
+    // A permission result from an old, closed session must not open its replacement.
+    if (!SDL_GetAtomicInt(&device->shutdown) && device->hidden != NULL && device->hidden->generation == request->generation) {
         if (!granted) {
             SDL_CameraPermissionOutcome(device, false);  // sorry, permission denied.
         } else if (!PrepareCamera(device)) {  // permission given? Actually open the camera now.
             // uhoh, setup failed; since the app thinks we already "opened" the device, mark it as disconnected and don't report the permission.
+            SDL_SetBooleanProperty(SDL_GetCameraProperties(device), "emucorev.camera.disconnected", true);
             SDL_CameraDisconnected(device);
         } else {
             // okay! We have permission to use the camera _and_ opening the hardware worked out, report that the camera is usable!
             SDL_CameraPermissionOutcome(device, true);  // go go go!
         }
     }
-
+    SDL_UnlockMutex(device->lock);
+    SDL_free(request);
     UnrefPhysicalCamera(device);   // we ref'd this in OpenDevice, release the extra reference.
 }
 
@@ -565,12 +624,19 @@ static bool ANDROIDCAMERA_OpenDevice(SDL_Camera *device, const SDL_CameraSpec *s
     if (device->hidden == NULL) {
         return false;
     }
+    device->hidden->generation = (Uint32)SDL_AddAtomicInt(&camera_open_generation, 1) + 1;
+    SDL_CameraPermissionRequest *request = (SDL_CameraPermissionRequest *)SDL_malloc(sizeof(*request));
+    if (!request) return false;
+    request->device = device;
+    request->generation = device->hidden->generation;
 
+    SDL_SetBooleanProperty(SDL_GetCameraProperties(device), "emucorev.camera.disconnected", false);
     RefPhysicalCamera(device);  // ref'd until permission callback fires.
 
     // just in case SDL_OpenCamera is overwriting device->spec as CameraPermissionCallback runs, we work from a different copy.
     SDL_copyp(&device->hidden->requested_spec, spec);
-    if (!SDL_RequestAndroidPermission("android.permission.CAMERA", CameraPermissionCallback, device)) {
+    if (!SDL_RequestAndroidPermission("android.permission.CAMERA", CameraPermissionCallback, request)) {
+        SDL_free(request);
         UnrefPhysicalCamera(device);
         return false;
     }
@@ -591,7 +657,7 @@ static void GatherCameraSpecs(const char *devid, CameraFormatAddData *add_data, 
 
     ACameraMetadata *metadata = NULL;
     ACameraMetadata_const_entry cfgentry;
-    ACameraMetadata_const_entry durentry;
+    ACameraMetadata_const_entry durentry = {0};
     ACameraMetadata_const_entry infoentry;
 
     // This can fail with an "unknown error" (with `adb logcat` reporting "no such file or directory")
@@ -606,12 +672,11 @@ static void GatherCameraSpecs(const char *devid, CameraFormatAddData *add_data, 
         pACameraMetadata_free(metadata);
         return;  // oh well.
     } else if (pACameraMetadata_getConstEntry(metadata, ACAMERA_SCALER_AVAILABLE_MIN_FRAME_DURATIONS, &durentry) != ACAMERA_OK) {
-        pACameraMetadata_free(metadata);
-        return;  // oh well.
+        SDL_zero(durentry); // Capture still works; rate will be measured from frame timestamps.
     }
 
     *fullname = NULL;
-    if (pACameraMetadata_getConstEntry(metadata, ACAMERA_INFO_VERSION, &infoentry) == ACAMERA_OK) {
+    if (pACameraMetadata_getConstEntry(metadata, ACAMERA_INFO_VERSION, &infoentry) == ACAMERA_OK && infoentry.count > 0 && infoentry.data.u8) {
         *fullname = (char *) SDL_malloc(infoentry.count + 1);
         if (*fullname) {
             SDL_strlcpy(*fullname, (const char *) infoentry.data.u8, infoentry.count + 1);
@@ -619,7 +684,7 @@ static void GatherCameraSpecs(const char *devid, CameraFormatAddData *add_data, 
     }
 
     ACameraMetadata_const_entry posentry;
-    if (pACameraMetadata_getConstEntry(metadata, ACAMERA_LENS_FACING, &posentry) == ACAMERA_OK) {  // ignore this if it fails.
+    if (pACameraMetadata_getConstEntry(metadata, ACAMERA_LENS_FACING, &posentry) == ACAMERA_OK && posentry.count > 0) {
         if (*posentry.data.u8 == ACAMERA_LENS_FACING_FRONT) {
             *position = SDL_CAMERA_POSITION_FRONT_FACING;
             if (!*fullname) {
@@ -636,9 +701,18 @@ static void GatherCameraSpecs(const char *devid, CameraFormatAddData *add_data, 
     if (!*fullname) {
         *fullname = SDL_strdup("Generic camera");   // we tried.
     }
+    // INFO_VERSION describes a vendor implementation, not a unique sensor.
+    // Keep the stable Camera2 ID in the SDL name used by persisted camera choices.
+    if (*fullname) {
+        char *unique_name = NULL;
+        if (SDL_asprintf(&unique_name, "%s [%s]", *fullname, devid) >= 0) {
+            SDL_free(*fullname);
+            *fullname = unique_name;
+        }
+    }
 
     const int32_t *i32ptr = cfgentry.data.i32;
-    for (int i = 0; i < cfgentry.count; i++, i32ptr += 4) {
+    for (unsigned int i = 0; i + 3 < cfgentry.count; i += 4, i32ptr += 4) {
         const int32_t fmt = i32ptr[0];
         const int w = i32ptr[1];
         const int h = i32ptr[2];
@@ -657,21 +731,23 @@ static void GatherCameraSpecs(const char *devid, CameraFormatAddData *add_data, 
             }
         }
 
-#if 0 // !!! FIXME: these all come out with 0 durations on my test phone.  :(
+        int rate_known = 0;
         const int64_t *i64ptr = durentry.data.i64;
-        for (int j = 0; j < durentry.count; j++, i64ptr += 4) {
+        for (unsigned int j = 0; j + 3 < durentry.count; j += 4, i64ptr += 4) {
             const int32_t fpsfmt = (int32_t) i64ptr[0];
             const int fpsw = (int) i64ptr[1];
             const int fpsh = (int) i64ptr[2];
             const long long duration = (long long) i64ptr[3];
-            SDL_Log("CAMERA: possible fps %s %dx%d duration=%lld", SDL_GetPixelFormatName(sdlfmt), fpsw, fpsh, duration);
-            if ((duration > 0) && (fpsfmt == fmt) && (fpsw == w) && (fpsh == h)) {
-                SDL_AddCameraFormat(add_data, sdlfmt, colorspace, w, h, 1000000000, duration);
+            if ((duration > 0) && duration <= INT32_MAX && (fpsfmt == fmt) && (fpsw == w) && (fpsh == h)) {
+                SDL_AddCameraFormat(add_data, sdlfmt, colorspace, w, h, 1000000000, (int)duration);
+                rate_known = 1;
+                break;
             }
         }
-#else
-        SDL_AddCameraFormat(add_data, sdlfmt, colorspace, w, h, 30, 1);
-#endif
+        if (!rate_known) {
+            SDL_Log("CAMERA: %dx%d frame duration unknown; using nominal 30 FPS, actual timestamps determine capture rate", w, h);
+            SDL_AddCameraFormat(add_data, sdlfmt, colorspace, w, h, 30, 1);
+        }
     }
 
     pACameraMetadata_free(metadata);
@@ -802,6 +878,7 @@ static void ANDROIDCAMERA_Deinitialize(void)
     pAImage_delete = NULL;
     pAImage_getTimestamp = NULL;
     pAImage_getNumberOfPlanes = NULL;
+    pAImage_getPlanePixelStride = NULL;
     pAImage_getPlaneRowStride = NULL;
     pAImage_getPlaneData = NULL;
     pAImageReader_acquireNextImage = NULL;
@@ -858,6 +935,7 @@ static bool ANDROIDCAMERA_Init(SDL_CameraDriverImpl *impl)
     LOADSYM(libmedia, AImage_delete);
     LOADSYM(libmedia, AImage_getTimestamp);
     LOADSYM(libmedia, AImage_getNumberOfPlanes);
+    LOADSYM(libmedia, AImage_getPlanePixelStride);
     LOADSYM(libmedia, AImage_getPlaneRowStride);
     LOADSYM(libmedia, AImage_getPlaneData);
     LOADSYM(libmedia, AImageReader_acquireNextImage);
@@ -893,7 +971,7 @@ static bool ANDROIDCAMERA_Init(SDL_CameraDriverImpl *impl)
     impl->FreeDeviceHandle = ANDROIDCAMERA_FreeDeviceHandle;
     impl->Deinitialize = ANDROIDCAMERA_Deinitialize;
 
-    impl->ProvidesOwnCallbackThread = true;
+    impl->ProvidesOwnCallbackThread = false;
 
     return true;
 }

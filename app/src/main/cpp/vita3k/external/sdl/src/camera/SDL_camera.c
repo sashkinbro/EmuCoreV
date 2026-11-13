@@ -235,7 +235,11 @@ static void ClosePhysicalCamera(SDL_Camera *device)
         return;
     }
 
+    // Serialize shutdown with asynchronous permission setup. Release before joining
+    // so the SDL producer and platform callbacks can finish without a lock cycle.
+    SDL_LockMutex(device->lock);
     SDL_SetAtomicInt(&device->shutdown, 1);
+    SDL_UnlockMutex(device->lock);
 
 // !!! FIXME: the close_cond stuff from audio might help the race condition here.
 
@@ -257,6 +261,7 @@ static void ClosePhysicalCamera(SDL_Camera *device)
     camera_driver.impl.CloseDevice(device);
 
     SDL_DestroyProperties(device->props);
+    device->props = 0;
 
     SDL_DestroySurface(device->acquire_surface);
     device->acquire_surface = NULL;
@@ -535,6 +540,9 @@ void SDL_CameraDisconnected(SDL_Camera *device)
 
     const bool first_disconnect = SDL_CompareAndSwapAtomicInt(&device->zombie, 0, 1);
     if (first_disconnect) {   // if already disconnected this device, don't do it twice.
+        /* EmuCoreV: expose failure before the fallback starts yielding blank frames. */
+        if (device->props)
+            SDL_SetBooleanProperty(device->props, "emucorev.camera.disconnected", true);
         // Swap in "Zombie" versions of the usual platform interfaces, so the device will keep
         // making progress until the app closes it. Otherwise, streams might continue to
         // accumulate waste data that never drains, apps that depend on audio callbacks to

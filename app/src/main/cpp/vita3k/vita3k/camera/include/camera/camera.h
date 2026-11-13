@@ -330,10 +330,10 @@ class Camera {
 public:
     class CameraImpl;
     std::unique_ptr<CameraImpl> pImpl; // opaque type here
-    CameraType type;
+    CameraType type = WebCamera;
     std::string id;
     std::string image;
-    uint32_t color;
+    uint32_t color = 0xFFFFFFFF;
 
     SceCameraInfo info;
     bool is_opened{};
@@ -349,6 +349,8 @@ public:
     int close();
     int start();
     int stop();
+    int is_active();
+    void set_suspended(bool suspended);
     int read(SceCameraRead *read, void *pIBase, void *pUBase, void *pVBase, SceSize sizeIBase, SceSize sizeUBase, SceSize sizeVBase);
     Camera();
     ~Camera();

@@ -45,6 +45,7 @@
 #include <ngs/state.h>
 #include <renderer/functions.h>
 #include <renderer/state.h>
+#include <touch/functions.h>
 #include <touch/state.h>
 #include <util/log.h>
 
@@ -1496,16 +1497,20 @@ bool write_input(EmuEnvState &emuenv, Writer &writer, std::string &error) {
     for (int i = 0; i < 5; i++)
         buffer.u64(emuenv.ctrl.last_vcount[i]);
     buffer.u32(kTouchInputFormatVersion);
-    for (int port = 0; port < 2; ++port) {
-        buffer.i32(emuenv.touch.touch_mode[port]);
-        buffer.boolean(emuenv.touch.force_touch_enabled[port]);
-        buffer.u64(emuenv.touch.last_vcount[port]);
-        buffer.i32(emuenv.touch.curr_touch_id[port]);
+    {
+        // Vblank sampling continues outside the save-operation mutex.
+        const std::lock_guard touch_lock(emuenv.touch.mutex);
+        for (int port = 0; port < 2; ++port) {
+            buffer.i32(emuenv.touch.touch_mode[port]);
+            buffer.boolean(emuenv.touch.force_touch_enabled[port]);
+            buffer.u64(emuenv.touch.last_vcount[port]);
+            buffer.i32(emuenv.touch.curr_touch_id[port]);
+        }
+        buffer.i32(emuenv.touch.touch_buffer_idx);
+        for (const auto &ports : emuenv.touch.touch_buffers)
+            for (const auto &sample : ports)
+                buffer.value(sample);
     }
-    buffer.i32(emuenv.touch.touch_buffer_idx);
-    for (const auto &ports : emuenv.touch.touch_buffers)
-        for (const auto &sample : ports)
-            buffer.value(sample);
     write_motion_snapshot(buffer, emuenv.motion.capture_snapshot());
     if (!preflight_input(buffer.data(), error))
         return false;
@@ -1608,31 +1613,25 @@ bool read_input(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::stri
     emuenv.ctrl.input_mode = static_cast<SceCtrlPadInputMode>(snapshot.input_mode);
     emuenv.ctrl.input_mode_ext = static_cast<SceCtrlPadInputMode>(snapshot.input_mode_ext);
     std::copy(snapshot.last_vcount.begin(), snapshot.last_vcount.end(), emuenv.ctrl.last_vcount);
-    auto &touch = emuenv.touch;
-    // Physical contacts belong to the live host, not to the restored guest.
-    // Preserve the user's selected front/back routing and layout preferences.
-    touch.finger_count = 0;
-    touch.touchpad_finger_count = 0;
-    touch.is_touchpad = false;
-    touch.mouse_button_left = false;
-    touch.mouse_button_right = false;
-    touch.pinch_modifier_enabled = false;
-    touch.pinch_velocity = 0.f;
-    touch.pinch_dist = TouchState::initial_pinch_dist;
-    std::fill_n(touch.finger_buffer, 8, SDL_TouchFingerEvent{});
-    std::fill_n(touch.touchpad_buffer, 8, SDL_GamepadTouchpadEvent{});
-    for (int port = 0; port < 2; ++port) {
-        touch.last_vcount[port] = snapshot.touch_last_vcount[port];
-        touch.curr_touch_id[port] = snapshot.curr_touch_id[port];
-        touch.is_touched[port] = false;
-        if (snapshot.has_touch) {
-            touch.touch_mode[port] = static_cast<SceTouchSamplingState>(snapshot.touch_mode[port]);
-            touch.force_touch_enabled[port] = snapshot.force_touch_enabled[port];
+    {
+        auto &touch = emuenv.touch;
+        const std::lock_guard touch_lock(touch.mutex);
+        // Preserve the user's selected front/back routing and layout preferences.
+        for (int port = 0; port < 2; ++port) {
+            touch.last_vcount[port] = snapshot.touch_last_vcount[port];
+            touch.curr_touch_id[port] = snapshot.curr_touch_id[port];
+            if (snapshot.has_touch) {
+                touch.touch_mode[port] = static_cast<SceTouchSamplingState>(snapshot.touch_mode[port]);
+                touch.force_touch_enabled[port] = snapshot.force_touch_enabled[port];
+            }
         }
+        touch.touch_buffer_idx = snapshot.touch_buffer_idx;
+        for (int i = 0; i < MAX_TOUCH_BUFFER_SAVED; ++i)
+            std::copy(snapshot.touch_buffers[i].begin(), snapshot.touch_buffers[i].end(), touch.touch_buffers[i]);
+        // Physical fingers and mapped holds belong to the current host session.
+        // Clear after restoring history so old pressed reports cannot be replayed.
+        clear_touch_contacts(touch);
     }
-    touch.touch_buffer_idx = snapshot.touch_buffer_idx;
-    for (int i = 0; i < MAX_TOUCH_BUFFER_SAVED; ++i)
-        std::copy(snapshot.touch_buffers[i].begin(), snapshot.touch_buffers[i].end(), touch.touch_buffers[i]);
     if (!emuenv.motion.apply_snapshot(snapshot.motion, error))
         return false;
     return true;

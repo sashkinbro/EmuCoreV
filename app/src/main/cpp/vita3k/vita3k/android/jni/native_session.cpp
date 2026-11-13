@@ -12,6 +12,7 @@
 #include <ime/keyboard.h>
 #include <io/state.h>
 #include <motion/functions.h>
+#include <camera/include/camera/state.h>
 
 #include <SDL3/SDL_events.h>
 #include <jni.h>
@@ -57,6 +58,14 @@ std::vector<std::string> read_string_array(JNIEnv *env, jobjectArray array) {
 } // namespace
 
 extern "C" {
+
+JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_core_input_RearTouchNative_setCamerasSuspended(JNIEnv *, jobject, jboolean suspended) {
+    auto *emuenv = get_emuenv();
+    if (!emuenv) return;
+    for (auto &camera : emuenv->camera.cameras)
+        camera.set_suspended(suspended == JNI_TRUE);
+}
 
 JNIEXPORT jboolean JNICALL
 Java_org_vita3k_emulator_NativeLib_setInputIntercepted(JNIEnv *, jclass, jboolean intercepted) {

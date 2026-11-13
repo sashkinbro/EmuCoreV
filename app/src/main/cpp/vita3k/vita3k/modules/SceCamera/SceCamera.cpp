@@ -20,32 +20,78 @@
 #include "camera/state.h"
 
 #include <camera/camera.h>
+#include <camera/read_abi.h>
 #include <kernel/state.h>
 
 #include <util/tracy.h>
 TRACY_MODULE_NAME(SceCamera);
 
+#if defined(__ANDROID__) && !defined(NDEBUG)
+#include <SDL3/SDL_log.h>
+#include <atomic>
+
+namespace {
+enum class EcvCameraDiagEntry { Open, Close, Start, Stop, Read, Active, Get, Set };
+class EcvCameraApiTrace {
+    const char *name;
+    int device;
+    unsigned int ordinal;
+    bool sampled;
+public:
+    EcvCameraApiTrace(EcvCameraDiagEntry entry, int devnum, const char *label) : name(label), device(devnum) {
+        static std::atomic<unsigned int> counters[8][3]{};
+        auto &counter = counters[static_cast<unsigned int>(entry)][devnum == 0 ? 0 : (devnum == 1 ? 1 : 2)];
+        unsigned int previous = counter.load(std::memory_order_relaxed);
+        while (previous < 121 && !counter.compare_exchange_weak(previous, previous + 1, std::memory_order_relaxed)) {}
+        ordinal = previous < 121 ? previous + 1 : 121;
+        sampled = ordinal <= 3 || ordinal == 30 || ordinal == 60 || ordinal == 120;
+        if (sampled) SDL_Log("ECV_CAMERA_DIAG api=%s call=%u device=%d enter", name, ordinal, device);
+    }
+    bool sample() const { return sampled; }
+    int finish(int result) const {
+        if (sampled) SDL_Log("ECV_CAMERA_DIAG api=%s call=%u device=%d result=%08x", name, ordinal, device, static_cast<unsigned int>(result));
+        return result;
+    }
+};
+}
+#define ECV_CAMERA_DIAG_BEGIN(entry, label) EcvCameraApiTrace ecv_camera_trace(EcvCameraDiagEntry::entry, static_cast<int>(devnum), label)
+#define ECV_CAMERA_DIAG_RETURN(value) return ecv_camera_trace.finish((value))
+#else
+#define ECV_CAMERA_DIAG_BEGIN(entry, label) ((void)0)
+#define ECV_CAMERA_DIAG_RETURN(value) return (value)
+#endif
+
 EXPORT(int, sceCameraOpen, SceCameraDevice devnum, SceCameraInfo *pInfo) {
+    ECV_CAMERA_DIAG_BEGIN(Open, "open");
     TRACY_FUNC(sceCameraOpen, devnum, pInfo);
     if (emuenv.cfg.pstv_mode)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED));
     if (devnum != SCE_CAMERA_DEVICE_BACK && devnum != SCE_CAMERA_DEVICE_FRONT)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
     if (!pInfo)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
 
     // Validate pInfo size
     // in disasmed code 40 - 48 is correct
     if (pInfo->size > sizeof(SceCameraInfo) || pInfo->size < sizeof(SceCameraInfo) - 4)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
 
+    // A 44-byte legacy open has no pitch/buffer tail; default to SETBYOPEN.
+    auto *guest_info = pInfo;
+    SceCameraInfo normalized_info{};
+    memcpy(&normalized_info, pInfo, pInfo->size);
+    pInfo = &normalized_info;
+
+#if defined(__ANDROID__) && !defined(NDEBUG)
+    if (ecv_camera_trace.sample()) SDL_Log("ECV_CAMERA_DIAG open size=%u priority=%u format=%u resolution=%u fps=%u range=%u pitch=%u buffer=%u capacity=%u/%u/%u bases=%08x/%08x/%08x", pInfo->size, (unsigned int)pInfo->priority, (unsigned int)pInfo->format, (unsigned int)pInfo->resolution, (unsigned int)pInfo->framerate, pInfo->range, pInfo->pitch, pInfo->buffer, pInfo->sizeIBase, pInfo->sizeUBase, pInfo->sizeVBase, pInfo->pIBase.address(), pInfo->pUBase.address(), pInfo->pVBase.address());
+#endif
     // Validate priority
     if (pInfo->priority != SCE_CAMERA_PRIORITY_SHARE && pInfo->priority != SCE_CAMERA_PRIORITY_EXCLUSIVE)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
 
     // Validate format
     if (pInfo->format == SCE_CAMERA_FORMAT_INVALID || pInfo->format > SCE_CAMERA_FORMAT_RAW8)
-        return RET_ERROR(SCE_CAMERA_ERROR_FORMAT_UNKNOWN);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_FORMAT_UNKNOWN));
 
     // Validate framerate
     switch (pInfo->framerate) {
@@ -60,26 +106,26 @@ EXPORT(int, sceCameraOpen, SceCameraDevice devnum, SceCameraInfo *pInfo) {
     case SCE_CAMERA_FRAMERATE_120_FPS:
         break;
     default:
-        return RET_ERROR(SCE_CAMERA_ERROR_BAD_FRAMERATE);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_BAD_FRAMERATE));
     }
 
     // Validate buffer type
     if (pInfo->buffer != SCE_CAMERA_BUFFER_SETBYOPEN && pInfo->buffer != SCE_CAMERA_BUFFER_SETBYREAD)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
 
     // Validate buffer pointers and sizes for SETBYOPEN mode
     if (pInfo->size < sizeof(SceCameraInfo) || pInfo->buffer == SCE_CAMERA_BUFFER_SETBYOPEN) {
         if (!pInfo->pIBase || pInfo->sizeIBase == 0)
-            return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+            ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
         if (pInfo->format == SCE_CAMERA_FORMAT_YUV420_PLANE || pInfo->format == SCE_CAMERA_FORMAT_YUV422_PLANE) {
             if (!pInfo->pUBase || pInfo->sizeUBase == 0 || !pInfo->pVBase || pInfo->sizeVBase == 0)
-                return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+                ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
         }
     }
 
     // Validate data range
     if (pInfo->range != SCE_CAMERA_DATA_RANGE_FULL && pInfo->range != SCE_CAMERA_DATA_RANGE_BT601)
-        return RET_ERROR(SCE_CAMERA_ERROR_DATA_RANGE_UNKNOWN);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_DATA_RANGE_UNKNOWN));
 
     // Validate resolution and set width/height
     switch (pInfo->resolution) {
@@ -112,12 +158,12 @@ EXPORT(int, sceCameraOpen, SceCameraDevice devnum, SceCameraInfo *pInfo) {
         pInfo->height = 360;
         break;
     default:
-        return RET_ERROR(SCE_CAMERA_ERROR_RESOLUTION_UNKNOWN);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_RESOLUTION_UNKNOWN));
     }
 
     auto &camera = emuenv.camera.cameras[devnum];
     if (camera.is_opened) {
-        return RET_ERROR(SCE_CAMERA_ERROR_ALREADY_OPEN);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_ALREADY_OPEN));
     }
     init_default_cameras(emuenv.cfg);
     if (devnum == SCE_CAMERA_DEVICE_FRONT)
@@ -125,78 +171,99 @@ EXPORT(int, sceCameraOpen, SceCameraDevice devnum, SceCameraInfo *pInfo) {
     else
         camera.update_config(emuenv.cfg.back_camera_type, emuenv.cfg.back_camera_id, emuenv.cfg.back_camera_image, emuenv.cfg.back_camera_color);
     auto res = camera.open(pInfo, emuenv.kernel.base_tick.tick, emuenv.kernel.start_tick);
-
-    return res;
+    if (res == 0) {
+        guest_info->width = pInfo->width;
+        guest_info->height = pInfo->height;
+    }
+    ECV_CAMERA_DIAG_RETURN(res);
 }
 
 EXPORT(int, sceCameraClose, SceCameraDevice devnum) {
+    ECV_CAMERA_DIAG_BEGIN(Close, "close");
     TRACY_FUNC(sceCameraClose, devnum);
     if (emuenv.cfg.pstv_mode)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED));
     if (devnum != SCE_CAMERA_DEVICE_BACK && devnum != SCE_CAMERA_DEVICE_FRONT)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
     auto &camera = emuenv.camera.cameras[devnum];
     if (!camera.is_opened) {
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN));
     }
-    return camera.close();
+    ECV_CAMERA_DIAG_RETURN(camera.close());
 }
 
 EXPORT(int, sceCameraStart, SceCameraDevice devnum) {
+    ECV_CAMERA_DIAG_BEGIN(Start, "start");
     TRACY_FUNC(sceCameraStart, devnum);
     if (emuenv.cfg.pstv_mode)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED));
     if (devnum != SCE_CAMERA_DEVICE_BACK && devnum != SCE_CAMERA_DEVICE_FRONT)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
     auto &camera = emuenv.camera.cameras[devnum];
     if (!camera.is_opened) {
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN));
     }
     if (camera.is_started) {
-        return RET_ERROR(SCE_CAMERA_ERROR_ALREADY_START);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_ALREADY_START));
     }
-    return camera.start();
+    ECV_CAMERA_DIAG_RETURN(camera.start());
 }
 
 EXPORT(int, sceCameraStop, SceCameraDevice devnum) {
+    ECV_CAMERA_DIAG_BEGIN(Stop, "stop");
     TRACY_FUNC(sceCameraStop, devnum);
     if (emuenv.cfg.pstv_mode)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED));
     if (devnum != SCE_CAMERA_DEVICE_BACK && devnum != SCE_CAMERA_DEVICE_FRONT)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
     auto &camera = emuenv.camera.cameras[devnum];
     if (!camera.is_opened) {
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN));
     }
     if (!camera.is_started) {
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_START);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_START));
     }
-    return camera.stop();
+    ECV_CAMERA_DIAG_RETURN(camera.stop());
 }
 
 EXPORT(int, sceCameraRead, SceCameraDevice devnum, SceCameraRead *pRead) {
+    ECV_CAMERA_DIAG_BEGIN(Read, "read");
     TRACY_FUNC(sceCameraRead, devnum, pRead);
 
     if (emuenv.cfg.pstv_mode)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED));
     if (devnum != SCE_CAMERA_DEVICE_BACK && devnum != SCE_CAMERA_DEVICE_FRONT)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
     if (!pRead)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
+#if defined(__ANDROID__) && !defined(NDEBUG)
+    if (ecv_camera_trace.sample()) SDL_Log("ECV_CAMERA_DIAG read guest_size=%u", pRead->size);
+#endif
     // conditions from disassembled code
     if (pRead->size <= 24 || pRead->size > sizeof(SceCameraRead)) {
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
     }
+    auto *guest_read = pRead;
+    const SceSize guest_size = pRead->size;
     SceCameraRead read{};
-    if (pRead->size != sizeof(SceCameraRead)) {
-        memcpy(&read, pRead, std::min<size_t>(pRead->size, sizeof(SceCameraRead)));
-        pRead = &read;
-    }
+    memcpy(&read, pRead, std::min<size_t>(guest_size, 32));
+    unsigned int buffers[6]{};
+    const bool has_read_buffers = ecv_camera_read_buffers(reinterpret_cast<const unsigned char *>(pRead), guest_size, buffers);
+    read.sizeIBase = buffers[0];
+    read.sizeUBase = buffers[1];
+    read.sizeVBase = buffers[2];
+    read.pIBase = Ptr<void>(buffers[3]);
+    read.pUBase = Ptr<void>(buffers[4]);
+    read.pVBase = Ptr<void>(buffers[5]);
+    pRead = &read;
     auto &camera = emuenv.camera.cameras[devnum];
     if (!camera.is_opened)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN));
     if (!camera.is_started)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_START);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_START));
+#if defined(__ANDROID__) && !defined(NDEBUG)
+    if (ecv_camera_trace.sample()) SDL_Log("ECV_CAMERA_DIAG read mode=%d ABI=%u decoded=%d buffer=%u guest_format=%u size=%ux%u padding=%u read_capacity=%u/%u/%u read_bases=%08x/%08x/%08x", read.mode, guest_size, has_read_buffers, camera.info.buffer, (unsigned int)camera.info.format, camera.info.width, camera.info.height, camera.info.pitch, read.sizeIBase, read.sizeUBase, read.sizeVBase, read.pIBase.address(), read.pUBase.address(), read.pVBase.address());
+#endif
     void *pIBase;
     void *pUBase;
     void *pVBase;
@@ -204,6 +271,8 @@ EXPORT(int, sceCameraRead, SceCameraDevice devnum, SceCameraRead *pRead) {
     SceSize sizeUBase;
     SceSize sizeVBase;
     if (camera.info.buffer == SCE_CAMERA_BUFFER_SETBYREAD) {
+        if (!has_read_buffers)
+            ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
         pIBase = pRead->pIBase.get(emuenv.mem);
         pUBase = pRead->pUBase.get(emuenv.mem);
         pVBase = pRead->pVBase.get(emuenv.mem);
@@ -211,10 +280,10 @@ EXPORT(int, sceCameraRead, SceCameraDevice devnum, SceCameraRead *pRead) {
         sizeUBase = pRead->sizeUBase;
         sizeVBase = pRead->sizeVBase;
         if (!pIBase || sizeIBase == 0)
-            return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+            ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
         if (camera.info.format == SCE_CAMERA_FORMAT_YUV420_PLANE || camera.info.format == SCE_CAMERA_FORMAT_YUV422_PLANE) {
             if (!pUBase || sizeUBase == 0 || !pVBase || sizeVBase == 0)
-                return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+                ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
         }
     } else {
         pIBase = camera.info.pIBase.get(emuenv.mem);
@@ -225,56 +294,72 @@ EXPORT(int, sceCameraRead, SceCameraDevice devnum, SceCameraRead *pRead) {
         sizeVBase = camera.info.sizeVBase;
     }
     auto res = camera.read(pRead, pIBase, pUBase, pVBase, sizeIBase, sizeUBase, sizeVBase);
-    return res;
+#if defined(__ANDROID__) && !defined(NDEBUG)
+    if (ecv_camera_trace.sample()) SDL_Log("ECV_CAMERA_DIAG read output result=%08x status=%d frame=%llu timestamp=%llu actual_capacity=%u/%u/%u", static_cast<unsigned int>(res), read.status, (unsigned long long)read.frame, (unsigned long long)read.timestamp, sizeIBase, sizeUBase, sizeVBase);
+#endif
+    // Return metadata to the caller even for old ABIs; never overwrite their buffer tail.
+    memcpy(guest_read, &read, std::min<size_t>(guest_size, 32));
+    if (guest_size == sizeof(SceCameraRead)) {
+        guest_read->exposure_time = read.exposure_time;
+        guest_read->exposure_time_gap = read.exposure_time_gap;
+        guest_read->raw8_format = read.raw8_format;
+    }
+    ECV_CAMERA_DIAG_RETURN(res);
 }
 
 EXPORT(int, sceCameraIsActive, SceCameraDevice devnum) {
+    ECV_CAMERA_DIAG_BEGIN(Active, "active");
     TRACY_FUNC(sceCameraIsActive, devnum);
     if (emuenv.cfg.pstv_mode)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED));
     if (devnum != SCE_CAMERA_DEVICE_BACK && devnum != SCE_CAMERA_DEVICE_FRONT)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
     auto &camera = emuenv.camera.cameras[devnum];
     if (!camera.is_opened) {
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN));
     }
     if (!camera.is_started) {
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_START);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_START));
     }
     // 0 means camera is used by system and camera image cannot be obtained. 1 means that camera image can be obtained.
-    return 1;
+    ECV_CAMERA_DIAG_RETURN(camera.is_active());
 }
 
 static int camera_get_attribute(EmuEnvState &emuenv, SceUID thread_id, const char *export_name, SceCameraDevice devnum, CameraAttributes attribute, int *pValue) {
+    ECV_CAMERA_DIAG_BEGIN(Get, export_name);
     if (emuenv.cfg.pstv_mode)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED));
     if (devnum != SCE_CAMERA_DEVICE_BACK && devnum != SCE_CAMERA_DEVICE_FRONT)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
     if (!pValue)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
     auto &camera = emuenv.camera.cameras[devnum];
     if (!camera.is_opened)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN));
     if (!camera.is_started)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_START);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_START));
 
     *pValue = camera.get_attribute(attribute);
-    return STUBBED("Default value");
+    ECV_CAMERA_DIAG_RETURN(STUBBED("Default value"));
 }
 
 static int camera_set_attribute(EmuEnvState &emuenv, SceUID thread_id, const char *export_name, SceCameraDevice devnum, CameraAttributes attribute, int value) {
+    ECV_CAMERA_DIAG_BEGIN(Set, export_name);
     if (emuenv.cfg.pstv_mode)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_MOUNTED));
     if (devnum != SCE_CAMERA_DEVICE_BACK && devnum != SCE_CAMERA_DEVICE_FRONT)
-        return RET_ERROR(SCE_CAMERA_ERROR_PARAM);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_PARAM));
+#if defined(__ANDROID__) && !defined(NDEBUG)
+    if (ecv_camera_trace.sample()) SDL_Log("ECV_CAMERA_DIAG attribute=%u value=%d", static_cast<unsigned int>(attribute), value);
+#endif
     auto &camera = emuenv.camera.cameras[devnum];
     if (!camera.is_opened)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_OPEN));
     if (!camera.is_started)
-        return RET_ERROR(SCE_CAMERA_ERROR_NOT_START);
+        ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_START));
 
     UNIMPLEMENTED();
-    return camera.set_attribute(attribute, value);
+    ECV_CAMERA_DIAG_RETURN(camera.set_attribute(attribute, value));
 }
 
 EXPORT(int, sceCameraGetSaturation, SceCameraDevice devnum, int *pValue) {
