@@ -77,6 +77,9 @@ struct VoiceInfo {
 
 struct RackInitInfo {
     Address address = 0;
+    /// Runtime identity distinguishes a Rack from a later placement-new reuse
+    /// of the same guest buffer while a release waiter is asleep.
+    uint64_t instance_id = 0;
     Address system_address = 0;
     Ptr<System> system;
     SceNgsBufferInfo info{};
@@ -146,6 +149,17 @@ struct State {
     mutable std::mutex rack_infos_mutex;
     std::vector<RackInitInfo> rack_infos;
     std::vector<RackVectorIntegrity> rack_vector_integrity;
+    uint64_t next_rack_instance_id = 1;
+
+    std::optional<uint64_t> rack_instance_id(Address address) const {
+        const std::lock_guard lock(rack_infos_mutex);
+        const auto info = std::find_if(rack_infos.begin(), rack_infos.end(), [address](const RackInitInfo &entry) {
+            return entry.address == address;
+        });
+        if (info == rack_infos.end())
+            return std::nullopt;
+        return info->instance_id;
+    }
 
     bool rack_address_in_use(Address address) const {
         const std::lock_guard lock(rack_infos_mutex);

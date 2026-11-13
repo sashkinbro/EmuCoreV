@@ -23,6 +23,7 @@
 
 #include <condition_variable>
 #include <queue>
+#include <utility>
 #include <vector>
 
 struct MemState;
@@ -39,8 +40,11 @@ struct State;
 
 enum class RackReleaseAction : std::uint8_t {
     Immediate,
+    ReleaseFinishedCallback,
+    ReleaseModuleCallback,
     Wait,
     RejectReentrant,
+    RejectAlreadyPending,
     DeferCallback,
 };
 
@@ -48,6 +52,22 @@ enum class PendingType {
     ReleaseRack
     // TODO add voice operations during system lock
 };
+
+enum class UpdateCallbackKind : std::uint8_t {
+    None,
+    ModuleProcess,
+    VoiceFinished,
+    RackReleaseCompletion,
+};
+
+inline const char *update_callback_kind_name(UpdateCallbackKind kind) {
+    switch (kind) {
+    case UpdateCallbackKind::ModuleProcess: return "module-process";
+    case UpdateCallbackKind::VoiceFinished: return "voice-finished";
+    case UpdateCallbackKind::RackReleaseCompletion: return "rack-release-completion";
+    default: return "none";
+    }
+}
 
 struct OperationPending {
     PendingType type;
@@ -71,6 +91,23 @@ struct VoiceScheduler {
     std::condition_variable_any condvar;
     bool is_updating = false;
     SceUID update_thread_id = 0;
+    UpdateCallbackKind callback_kind = UpdateCallbackKind::None;
+    bool abort_update_after_callback = false;
+
+    struct CallbackContextScope {
+        VoiceScheduler &scheduler;
+        UpdateCallbackKind previous;
+
+        CallbackContextScope(VoiceScheduler &scheduler, UpdateCallbackKind kind)
+            : scheduler(scheduler)
+            , previous(scheduler.callback_kind) {
+            scheduler.callback_kind = kind;
+        }
+
+        ~CallbackContextScope() {
+            scheduler.callback_kind = previous;
+        }
+    };
 
     // Caller must hold mutex. A release from this thread is re-entering the
     // active update through a guest callback and cannot wait for itself.
@@ -79,13 +116,51 @@ struct VoiceScheduler {
     }
 
     RackReleaseAction rack_release_action(SceUID thread_id, bool has_callback) const {
+        return rack_release_action(thread_id, has_callback, false);
+    }
+
+    RackReleaseAction rack_release_action(SceUID thread_id, bool has_callback, bool release_already_pending) const {
+        if (release_already_pending)
+            return RackReleaseAction::RejectAlreadyPending;
         if (!is_updating)
             return RackReleaseAction::Immediate;
         if (has_callback)
             return RackReleaseAction::DeferCallback;
+        if (is_update_thread(thread_id) && callback_kind == UpdateCallbackKind::VoiceFinished)
+            return RackReleaseAction::ReleaseFinishedCallback;
+        if (is_update_thread(thread_id) && callback_kind == UpdateCallbackKind::ModuleProcess)
+            return RackReleaseAction::ReleaseModuleCallback;
+        // Completion callbacks run after their pending operation has been
+        // removed. A guest may reuse the released buffer there and immediately
+        // release the new Rack; no update queue entry still refers to the old one.
+        if (is_update_thread(thread_id) && callback_kind == UpdateCallbackKind::RackReleaseCompletion)
+            return RackReleaseAction::Immediate;
         if (is_update_thread(thread_id))
             return RackReleaseAction::RejectReentrant;
         return RackReleaseAction::Wait;
+    }
+
+    bool has_pending_rack_release(const Rack *rack) const {
+        auto pending = operations_pending;
+        while (!pending.empty()) {
+            const OperationPending &operation = pending.front();
+            if (operation.type == PendingType::ReleaseRack && operation.release_data.rack == rack)
+                return true;
+            pending.pop();
+        }
+        return false;
+    }
+
+    bool consume_update_abort_after_callback() {
+        return std::exchange(abort_update_after_callback, false);
+    }
+
+    void request_update_abort_after_callback() {
+        abort_update_after_callback = true;
+    }
+
+    void wait_for_update_to_finish(std::unique_lock<std::recursive_mutex> &lock) {
+        condvar.wait(lock, [this] { return !is_updating; });
     }
 
 protected:

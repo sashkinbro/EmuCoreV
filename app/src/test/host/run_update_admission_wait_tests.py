@@ -17,10 +17,13 @@ source = r'''
 #include <ngs/update_admission.h>
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <future>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 
 int main() {
@@ -77,13 +80,85 @@ int main() {
     check(scheduler.is_update_thread(42), "active updater recognizes same-thread callback re-entry");
     check(!scheduler.is_update_thread(43), "active updater does not classify another thread as re-entry");
     check(scheduler.rack_release_action(42, false) == ngs::RackReleaseAction::RejectReentrant,
-        "same-thread synchronous release is rejected instead of queued");
+        "same-thread synchronous release is rejected outside a finished callback");
     check(scheduler.rack_release_action(42, true) == ngs::RackReleaseAction::DeferCallback,
         "callback-based asynchronous release keeps its existing deferred path");
+    scheduler.callback_kind = ngs::UpdateCallbackKind::VoiceFinished;
+    check(scheduler.rack_release_action(42, false) == ngs::RackReleaseAction::ReleaseFinishedCallback,
+        "finished callback can release synchronously with an update abort");
+    scheduler.callback_kind = ngs::UpdateCallbackKind::ModuleProcess;
+    check(scheduler.rack_release_action(42, false) == ngs::RackReleaseAction::ReleaseModuleCallback,
+        "module-processing callback can release synchronously with process-stack abort");
+    auto *pending_rack = reinterpret_cast<ngs::Rack *>(static_cast<uintptr_t>(0x2000));
+    ngs::OperationPending pending_release{};
+    pending_release.type = ngs::PendingType::ReleaseRack;
+    pending_release.release_data.rack = pending_rack;
+    scheduler.operations_pending.push(pending_release);
+    check(scheduler.has_pending_rack_release(pending_rack)
+            && scheduler.rack_release_action(42, false, scheduler.has_pending_rack_release(pending_rack))
+                == ngs::RackReleaseAction::RejectAlreadyPending,
+        "duplicate synchronous release is rejected while its callback release is pending");
+    scheduler.operations_pending.pop();
+    check(!scheduler.has_pending_rack_release(pending_rack), "pending release record clears after pop");
+    auto *another_pending_rack = reinterpret_cast<ngs::Rack *>(static_cast<uintptr_t>(0x3000));
+    pending_release.release_data.rack = another_pending_rack;
+    scheduler.operations_pending.push(pending_release);
+    scheduler.callback_kind = ngs::UpdateCallbackKind::VoiceFinished;
+    check(!scheduler.has_pending_rack_release(pending_rack)
+            && scheduler.rack_release_action(42, false, scheduler.has_pending_rack_release(pending_rack))
+                == ngs::RackReleaseAction::ReleaseFinishedCallback,
+        "a pending release for another Rack does not block this Rack's finished callback release");
+    scheduler.operations_pending.pop();
+    scheduler.abort_update_after_callback = true;
+    check(scheduler.consume_update_abort_after_callback() && !scheduler.consume_update_abort_after_callback(),
+        "finished callback abort flag is consumed once");
+    scheduler.callback_kind = ngs::UpdateCallbackKind::None;
     check(scheduler.rack_release_action(43, false) == ngs::RackReleaseAction::Wait,
         "other-thread synchronous release retains its wait path");
     scheduler.is_updating = false;
     check(!scheduler.is_update_thread(42), "inactive scheduler ignores stale thread id");
+    {
+        ngs::VoiceScheduler::CallbackContextScope module_context(scheduler, ngs::UpdateCallbackKind::ModuleProcess);
+        check(scheduler.callback_kind == ngs::UpdateCallbackKind::ModuleProcess, "callback context identifies module processing");
+        {
+            ngs::VoiceScheduler::CallbackContextScope finished_context(scheduler, ngs::UpdateCallbackKind::VoiceFinished);
+            check(std::string(ngs::update_callback_kind_name(scheduler.callback_kind)) == "voice-finished",
+                "nested callback context identifies finished callback");
+        }
+        check(scheduler.callback_kind == ngs::UpdateCallbackKind::ModuleProcess, "nested callback context restores prior kind");
+    }
+    check(scheduler.callback_kind == ngs::UpdateCallbackKind::None, "callback context returns to none on scope exit");
+    try {
+        ngs::VoiceScheduler::CallbackContextScope module_context(scheduler, ngs::UpdateCallbackKind::ModuleProcess);
+        throw std::runtime_error("callback unwind");
+    } catch (const std::runtime_error &) {
+        check(scheduler.callback_kind == ngs::UpdateCallbackKind::None,
+            "callback context restores after exception unwind");
+    }
+
+    ngs::VoiceScheduler wait_scheduler;
+    wait_scheduler.is_updating = true;
+    std::promise<void> entered_wait;
+    auto waiter = std::async(std::launch::async, [&] {
+        std::unique_lock<std::recursive_mutex> lock(wait_scheduler.mutex);
+        entered_wait.set_value();
+        wait_scheduler.wait_for_update_to_finish(lock);
+    });
+    entered_wait.get_future().wait();
+    {
+        std::lock_guard<std::recursive_mutex> lock(wait_scheduler.mutex);
+        wait_scheduler.condvar.notify_all(); // A spurious wake must not release the Rack.
+    }
+    check(waiter.wait_for(std::chrono::milliseconds(20)) == std::future_status::timeout,
+        "Rack release waiter remains blocked after a spurious update notification");
+    {
+        std::lock_guard<std::recursive_mutex> lock(wait_scheduler.mutex);
+        wait_scheduler.is_updating = false;
+    }
+    wait_scheduler.condvar.notify_all();
+    check(waiter.wait_for(std::chrono::seconds(1)) == std::future_status::ready,
+        "Rack release waiter proceeds after updater completion");
+    waiter.get();
 
     ngs::State registry;
     ngs::RackInitInfo info;
@@ -96,6 +171,14 @@ int main() {
     const auto overlap = registry.overlapping_rack_buffer(info.address, info.info.size);
     check(overlap.has_value() && overlap->address == info.address && overlap->size == info.info.size,
         "live rack buffer range is available for overlap diagnostics");
+    registry.rack_infos[0].instance_id = 17;
+    const auto waited_instance = registry.rack_instance_id(info.address);
+    check(waited_instance == 17, "release waiter can snapshot the live Rack instance id");
+    registry.rack_infos.erase(registry.rack_infos.begin());
+    registry.rack_infos.push_back(info);
+    registry.rack_infos[0].instance_id = 18;
+    check(registry.rack_instance_id(info.address) != waited_instance,
+        "release waiter distinguishes a placement-new Rack reusing the same guest address");
     check(ngs::rack_buffer_ranges_overlap(0x1000, 0x1000, 0x1800, 0x1000),
         "overlap probe detects intersecting rack buffers");
     check(!ngs::rack_buffer_ranges_overlap(0x1000, 0x800, 0x1800, 0x1000),
@@ -147,6 +230,11 @@ vector_guard = ngs_source.index("check_rack_vector(rack", capture_start)
 first_vector_access = ngs_source.index("rack->voices.size()", capture_start)
 assert vector_guard < first_vector_access, "capture must validate the Rack vector object before size/index access"
 
+scheduler_source = (root / "app/src/main/cpp/vita3k/vita3k/ngs/src/scheduler.cpp").read_text()
+assert "UpdateCallbackKind::ModuleProcess" in scheduler_source
+assert "UpdateCallbackKind::VoiceFinished" in scheduler_source
+assert "UpdateCallbackKind::RackReleaseCompletion" in scheduler_source
+
 def function_body(text, marker):
     start = text.index(marker)
     opening = text.index("{", start)
@@ -156,6 +244,83 @@ def function_body(text, marker):
         if depth == 0:
             return text[opening:end + 1]
     raise AssertionError(f"unterminated function: {marker}")
+
+update_body = function_body(scheduler_source, "void VoiceScheduler::update(")
+finish_callback = update_body.index("voice->invoke_callback(")
+reacquire_scheduler = update_body.index("scheduler_lock.lock();", finish_callback)
+abort_check = update_body.index("if (consume_update_abort_after_callback())", reacquire_scheduler)
+detach_voice_lock = update_body.index("voice_lock.release();", abort_check)
+abort_break = update_body.index("break;", detach_voice_lock)
+reacquire_voice = update_body.index("voice_lock.lock();", abort_break)
+master_route = update_body.index("const bool can_route_to_master", reacquire_voice)
+assert finish_callback < reacquire_scheduler < abort_check < detach_voice_lock < abort_break < reacquire_voice < master_route, \
+    "finished-callback release must abort and detach the destroyed voice lock before touching queue-copy, master, or routing pointers"
+assert update_body.index("std::vector<ngs::Voice *> queue_copy = queue;") < finish_callback
+assert update_body.index("ngs::Voice *implicit_master = nullptr;") < finish_callback
+assert update_body.index("std::vector<ngs::Voice *> implicit_sources;") < finish_callback
+process_abort_check = update_body.index("if (abort_update_after_callback)")
+scope_reacquire = update_body.index("scheduler_lock.lock();", process_abort_check)
+inner_abort_break = update_body.index("if (abort_update_after_callback)\n                    break;", scope_reacquire)
+module_finished_check = update_body.index("if (module_finished)", inner_abort_break)
+post_loop_abort = update_body.index("if (abort_update_after_callback)", module_finished_check)
+detach_voice_lock = update_body.index("voice_lock.release();", post_loop_abort)
+abort_break = update_body.index("break;", detach_voice_lock)
+finished_voice_handling = update_body.index("if (finished)", abort_break)
+assert process_abort_check < scope_reacquire < inner_abort_break < module_finished_check < post_loop_abort < detach_voice_lock < abort_break < finished_voice_handling, \
+    "module callback release must return from the module loop, reacquire only the scheduler, and detach the unlocked voice lock before finished/routing logic"
+
+finished_release_branch = sngs_source.index("} else if (release_action == ngs::RackReleaseAction::ReleaseFinishedCallback")
+finished_release_end = sngs_source.index("} else if (release_action == ngs::RackReleaseAction::RejectReentrant)", finished_release_branch)
+finished_release_body = sngs_source[finished_release_branch:finished_release_end]
+assert "RackReleaseAction::ReleaseModuleCallback" in finished_release_body
+assert finished_release_body.index("ngs::release_rack(") < finished_release_body.index("scheduler.request_update_abort_after_callback();"), \
+    "module/finished callback must synchronously release guest storage before returning success and requesting update abort"
+
+pending_drain = update_body[update_body.index("while (!operations_pending.empty())"):]
+pending_front = pending_drain.index("operations_pending.front()")
+pending_pop = pending_drain.index("operations_pending.pop()")
+pending_release_rack = pending_drain.index("release_rack(")
+completion_callback = pending_drain.index("run_callback(op.release_data.callback")
+assert pending_front < pending_pop < pending_release_rack < completion_callback
+completion_callback_end = pending_drain.index(";", completion_callback) + 1
+assert "op." not in pending_drain[completion_callback_end:], \
+    "pending-release completion must not retain or dereference its Rack operation after guest callback re-entry"
+assert "UpdateCallbackKind::RackReleaseCompletion" in (root / "app/src/main/cpp/vita3k/vita3k/ngs/include/ngs/scheduler.h").read_text()
+
+for relative_path in (
+    "app/src/main/cpp/vita3k/vita3k/ngs/src/modules/player.cpp",
+    "app/src/main/cpp/vita3k/vita3k/ngs/src/modules/atrac9.cpp",
+):
+    module_source = (root / relative_path).read_text()
+    cursor = 0
+    while True:
+        callback_pos = module_source.find("data.invoke_callback(", cursor)
+        if callback_pos < 0:
+            break
+        resume_lock = module_source.find("scheduler_lock.lock();", callback_pos)
+        if resume_lock < 0:
+            resume_lock = len(module_source)
+        assert "return false;" in module_source[callback_pos:resume_lock], \
+            f"{relative_path}: module callback abort must return before reacquiring locks or dereferencing destroyed ModuleData"
+        cursor = callback_pos + len("data.invoke_callback(")
+
+module_data_body = function_body(ngs_source, "bool ModuleData::invoke_callback(")
+module_callback_call = module_data_body.index("parent->invoke_callback(")
+module_callback_end = module_data_body.index("reason2, reason_ptr);", module_callback_call) + len("reason2, reason_ptr);")
+assert "parent->" not in module_data_body[module_callback_end:], \
+    "ModuleData callback wrapper must not touch the destroyed parent after guest callback return"
+voice_callback_body = function_body(ngs_source, "bool Voice::invoke_callback(")
+guest_callback_call = voice_callback_body.index("thread->run_callback(")
+voice_callback_tail = voice_callback_body[guest_callback_call:]
+assert voice_callback_tail.index("stack_free(") < voice_callback_tail.index("return scheduler->abort_update_after_callback;")
+
+wait_release_branch = sngs_source.index("} else if (release_action == ngs::RackReleaseAction::Wait)", finished_release_end)
+wait_release_end = sngs_source.index("} else if (release_action == ngs::RackReleaseAction::DeferCallback)", wait_release_branch)
+wait_release_body = sngs_source[wait_release_branch:wait_release_end]
+assert wait_release_body.index("scheduler.wait_for_update_to_finish(lock);") < wait_release_body.index("rack_instance_id(rack_address) == rack_instance_id")
+assert "!is_updating" in (root / "app/src/main/cpp/vita3k/vita3k/ngs/include/ngs/scheduler.h").read_text()
+assert "rack->system" not in wait_release_body and "rack->" not in wait_release_body.split("scheduler.wait_for_update_to_finish(lock);", 1)[1], \
+    "a release waiter must not dereference a Rack after waking because its buffer may have been reused"
 
 def depth_at(body, pos):
     depth = 0

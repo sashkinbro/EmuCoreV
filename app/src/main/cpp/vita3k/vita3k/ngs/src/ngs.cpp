@@ -192,10 +192,14 @@ bool ModuleData::unlock_params(const MemState &mem) {
     return false;
 }
 
-void ModuleData::invoke_callback(KernelState &kernel, const MemState &mem, const SceUID thread_id, const uint32_t reason1,
+bool ModuleData::invoke_callback(KernelState &kernel, const MemState &mem, const SceUID thread_id, const uint32_t reason1,
     const uint32_t reason2, Address reason_ptr) {
-    return parent->invoke_callback(kernel, mem, thread_id, callback, user_data, parent->rack->modules[index]->module_id(),
+    VoiceScheduler *const scheduler = &parent->rack->system->voice_scheduler;
+    parent->invoke_callback(kernel, mem, thread_id, callback, user_data, parent->rack->modules[index]->module_id(),
         reason1, reason2, reason_ptr);
+    // The guest callback may synchronously release this Rack, destroying this
+    // ModuleData and its parent Voice. Read only scheduler-owned state after it.
+    return scheduler->abort_update_after_callback;
 }
 
 void Voice::init(Rack *mama) {
@@ -375,12 +379,13 @@ bool Voice::set_preset(const MemState &mem, const SceNgsVoicePreset *preset) {
     return true;
 }
 
-void Voice::invoke_callback(KernelState &kernel, const MemState &mem, const SceUID thread_id, Ptr<void> callback, Ptr<void> user_data,
+bool Voice::invoke_callback(KernelState &kernel, const MemState &mem, const SceUID thread_id, Ptr<void> callback, Ptr<void> user_data,
     const uint32_t module_id, const uint32_t reason1, const uint32_t reason2, Address reason_ptr) {
     if (!callback) {
-        return;
+        return false;
     }
 
+    VoiceScheduler *const scheduler = &rack->system->voice_scheduler;
     const ThreadStatePtr thread = kernel.get_thread(thread_id);
     const Address callback_info_addr = stack_alloc(*thread->cpu, sizeof(SceNgsCallbackInfo));
 
@@ -395,6 +400,7 @@ void Voice::invoke_callback(KernelState &kernel, const MemState &mem, const SceU
 
     thread->run_callback(callback.address(), { callback_info_addr });
     stack_free(*thread->cpu, sizeof(SceNgsCallbackInfo));
+    return scheduler->abort_update_after_callback;
 }
 
 uint32_t System::get_required_memspace_size(SceNgsSystemInitParams *parameters) {
@@ -880,6 +886,7 @@ bool init_rack(State &ngs, const MemState &mem, System *system, SceNgsBufferInfo
 
     RackInitInfo info;
     info.address = init_info->data.address();
+    info.instance_id = ngs.next_rack_instance_id++;
     info.system_address = Ptr<const void>(system, mem).address();
     info.system = Ptr<System>(system, mem);
     info.info = *init_info;

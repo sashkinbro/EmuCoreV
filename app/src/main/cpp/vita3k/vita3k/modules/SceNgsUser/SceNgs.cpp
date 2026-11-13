@@ -372,23 +372,39 @@ EXPORT(SceInt32, sceNgsRackRelease, ngs::Rack *rack, Ptr<void> callback) {
 
     auto &scheduler = rack->system->voice_scheduler;
     std::unique_lock<std::recursive_mutex> lock(scheduler.mutex);
-    const auto release_action = scheduler.rack_release_action(thread_id, bool(callback));
+    const Address rack_address = Ptr<void>(rack, emuenv.mem).address();
+    ngs::System *const rack_system = rack->system;
+    const auto rack_instance_id = emuenv.ngs.rack_instance_id(rack_address);
+    const auto release_action = scheduler.rack_release_action(thread_id, bool(callback), scheduler.has_pending_rack_release(rack));
     if (release_action == ngs::RackReleaseAction::Immediate) {
-        const Address released_handle = Ptr<void>(rack, emuenv.mem).address();
+        const Address released_handle = rack_address;
         const Address release_cb = callback.address();
-        ngs::release_rack(emuenv.ngs, emuenv.mem, rack->system, rack);
+        ngs::release_rack(emuenv.ngs, emuenv.mem, rack_system, rack);
         if (release_cb) {
             lock.unlock();
             const ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
             if (thread)
                 thread->run_callback(release_cb, { released_handle });
         }
+    } else if (release_action == ngs::RackReleaseAction::ReleaseFinishedCallback
+        || release_action == ngs::RackReleaseAction::ReleaseModuleCallback) {
+        // Release synchronously so the guest may reuse its buffer as soon as
+        // this call returns. The finished-callback path checks the abort after
+        // Voice::invoke_callback; module callbacks propagate it out of the
+        // native process stack before SystemUpdate uses any retained pointers.
+        ngs::release_rack(emuenv.ngs, emuenv.mem, rack_system, rack);
+        scheduler.request_update_abort_after_callback();
     } else if (release_action == ngs::RackReleaseAction::RejectReentrant) {
         // A successful synchronous release means the caller may reuse its
         // guest buffer immediately. Deferring destruction past this callback
         // would falsely signal completion and leave a stale Rack pointer, so
         // reject this call and let the guest retry outside the update.
-        LOG_WARN_ONCE("sceNgsRackRelease rejected from its active update callback");
+        LOG_CRITICAL("Synchronous NGS rack release rejected inside its active {} callback: rack={:x} system={:x} caller_thread={} update_thread={}; rack buffer remains live",
+            ngs::update_callback_kind_name(scheduler.callback_kind), rack_address, Ptr<void>(rack_system, emuenv.mem).address(), thread_id, scheduler.update_thread_id);
+        return RET_ERROR(SCE_NGS_ERROR_INVALID_STATE);
+    } else if (release_action == ngs::RackReleaseAction::RejectAlreadyPending) {
+        LOG_CRITICAL("NGS rack release rejected because release is already pending: rack={:x} system={:x} caller_thread={} callback={:x}",
+            rack_address, Ptr<void>(rack_system, emuenv.mem).address(), thread_id, callback.address());
         return RET_ERROR(SCE_NGS_ERROR_INVALID_STATE);
     } else if (release_action == ngs::RackReleaseAction::Wait) {
         // wait for the update to finish
@@ -398,8 +414,12 @@ EXPORT(SceInt32, sceNgsRackRelease, ngs::Rack *rack, Ptr<void> callback) {
 
         auto wait_lease = ngs::system_update_admission().track_wait(ngs::UpdateAdmission::WaitKind::RackRelease);
         guest_sched_release_for_block();
-        scheduler.condvar.wait(lock);
-        ngs::release_rack(emuenv.ngs, emuenv.mem, rack->system, rack);
+        scheduler.wait_for_update_to_finish(lock);
+        // A finished callback can release this Rack while the waiter sleeps,
+        // then reuse the same guest address for a new placement-constructed
+        // Rack. Release only the exact instance that requested the wait.
+        if (rack_instance_id && emuenv.ngs.rack_instance_id(rack_address) == rack_instance_id)
+            ngs::release_rack(emuenv.ngs, emuenv.mem, rack_system, rack);
     } else if (release_action == ngs::RackReleaseAction::DeferCallback) {
         // destroy rack asynchronously
         ngs::OperationPending op;

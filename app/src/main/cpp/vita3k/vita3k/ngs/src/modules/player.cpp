@@ -109,6 +109,7 @@ bool PlayerModule::process(KernelState &kern, const MemState &mem, const SceUID 
     PlayerLogicalState *logical = data.get_logical_state<PlayerLogicalState>();
     PlayerRuntimeState *runtime = data.get_runtime_state<PlayerRuntimeState>();
     bool finished = false;
+    bool callback_requested_update_abort = false;
 
     const int32_t sample_rate = data.parent->rack->system->sample_rate;
     const int32_t granularity = data.parent->rack->system->granularity;
@@ -172,7 +173,9 @@ bool PlayerModule::process(KernelState &kern, const MemState &mem, const SceUID 
             return false;
         voice_lock.unlock();
         scheduler_lock.unlock();
-        data.invoke_callback(kern, mem, thread_id, SCE_NGS_PLAYER_SWAPPED_BUFFER, buf, buf_addr);
+        callback_requested_update_abort = data.invoke_callback(kern, mem, thread_id, SCE_NGS_PLAYER_SWAPPED_BUFFER, buf, buf_addr);
+        if (callback_requested_update_abort)
+            return false;
         scheduler_lock.lock();
         voice_lock.lock();
         params = data.get_parameters<SceNgsPlayerParams>(mem);
@@ -189,8 +192,10 @@ bool PlayerModule::process(KernelState &kern, const MemState &mem, const SceUID 
             || !params->buffer_params[state->current_buffer].buffer
             || (params->buffer_params[state->current_buffer].bytes_count == 0)) {
             if (state->bytes_consumed_since_key_on == 0) {
-                if (request_initial_buffer()
-                    && state->current_buffer != -1
+                const bool initial_buffer_requested = request_initial_buffer();
+                if (callback_requested_update_abort)
+                    return false;
+                if (initial_buffer_requested && state->current_buffer != -1
                     && params->buffer_params[state->current_buffer].buffer
                     && params->buffer_params[state->current_buffer].bytes_count > 0)
                     continue;
@@ -204,7 +209,8 @@ bool PlayerModule::process(KernelState &kern, const MemState &mem, const SceUID 
             if (state->current_buffer != -1) {
                 voice_lock.unlock();
                 scheduler_lock.unlock();
-                data.invoke_callback(kern, mem, thread_id, SCE_NGS_PLAYER_END_OF_DATA, 0, 0);
+                if (data.invoke_callback(kern, mem, thread_id, SCE_NGS_PLAYER_END_OF_DATA, 0, 0))
+                    return false;
                 scheduler_lock.lock();
                 voice_lock.lock();
             }
@@ -225,7 +231,8 @@ bool PlayerModule::process(KernelState &kern, const MemState &mem, const SceUID 
                 logical->current_loop_count = 0;
 
                 if (state->current_buffer == -1) {
-                    data.invoke_callback(kern, mem, thread_id, SCE_NGS_PLAYER_END_OF_DATA, 0, 0);
+                    if (data.invoke_callback(kern, mem, thread_id, SCE_NGS_PLAYER_END_OF_DATA, 0, 0))
+                        return false;
 
                     // we are done
                     finished = true;
@@ -233,12 +240,14 @@ bool PlayerModule::process(KernelState &kern, const MemState &mem, const SceUID 
                     voice_lock.lock();
                     break;
                 } else {
-                    data.invoke_callback(kern, mem, thread_id, SCE_NGS_PLAYER_SWAPPED_BUFFER, prev_index,
-                        params->buffer_params[state->current_buffer].buffer.address());
+                    if (data.invoke_callback(kern, mem, thread_id, SCE_NGS_PLAYER_SWAPPED_BUFFER, prev_index,
+                            params->buffer_params[state->current_buffer].buffer.address()))
+                        return false;
                 }
             } else {
-                data.invoke_callback(kern, mem, thread_id, SCE_NGS_PLAYER_LOOPED_BUFFER, logical->current_loop_count,
-                    params->buffer_params[state->current_buffer].buffer.address());
+                if (data.invoke_callback(kern, mem, thread_id, SCE_NGS_PLAYER_LOOPED_BUFFER, logical->current_loop_count,
+                        params->buffer_params[state->current_buffer].buffer.address()))
+                    return false;
             }
 
             scheduler_lock.lock();

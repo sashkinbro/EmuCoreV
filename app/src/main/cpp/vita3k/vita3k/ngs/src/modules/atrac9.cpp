@@ -74,7 +74,7 @@ void Atrac9Module::on_param_change(const MemState &mem, ModuleData &data) {
     }
 }
 
-bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, const SceUID thread_id, ModuleData &data, const SceNgsAT9Params *params, SceNgsAT9States *state, Atrac9LogicalState *logical, Atrac9RuntimeState *runtime, std::unique_lock<std::recursive_mutex> &scheduler_lock, std::unique_lock<std::mutex> &voice_lock) {
+bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, const SceUID thread_id, ModuleData &data, const SceNgsAT9Params *params, SceNgsAT9States *state, Atrac9LogicalState *logical, Atrac9RuntimeState *runtime, bool &callback_requested_update_abort, std::unique_lock<std::recursive_mutex> &scheduler_lock, std::unique_lock<std::mutex> &voice_lock) {
     const SceNgsAT9BufferParams &bufparam = params->buffer_params[state->current_buffer];
 
     const bool config_changed = (params->config_data != logical->decoder_config);
@@ -106,7 +106,9 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
             logical->current_loop_count = 0;
 
             if (state->current_buffer == -1) {
-                data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_END_OF_DATA, 0, 0);
+                callback_requested_update_abort = data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_END_OF_DATA, 0, 0);
+                if (callback_requested_update_abort)
+                    return false;
 
                 // we are done
                 scheduler_lock.lock();
@@ -115,15 +117,19 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
             } else if (!params->buffer_params[state->current_buffer].buffer
                 || (params->buffer_params[state->current_buffer].bytes_count == 0)) {
                 // Chain continues but the next buffer is empty: prod the streamer and wait.
-                data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_SWAPPED_BUFFER, prev_index,
+                callback_requested_update_abort = data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_SWAPPED_BUFFER, prev_index,
                     params->buffer_params[state->current_buffer].buffer.address());
+                if (callback_requested_update_abort)
+                    return false;
                 scheduler_lock.lock();
                 voice_lock.lock();
                 logical->in_underrun_wait = true;
                 return false;
             } else {
-                data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_SWAPPED_BUFFER, prev_index,
+                callback_requested_update_abort = data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_SWAPPED_BUFFER, prev_index,
                     params->buffer_params[state->current_buffer].buffer.address());
+                if (callback_requested_update_abort)
+                    return false;
             }
         } else {
             if (!logical->superframe_staging.empty()) {
@@ -132,8 +138,10 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
                 std::memset(&logical->saved_state, 0, sizeof(logical->saved_state));
                 runtime->decoder = std::make_unique<Atrac9DecoderState>(params->config_data);
             }
-            data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_LOOPED_BUFFER, logical->current_loop_count,
+            callback_requested_update_abort = data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_LOOPED_BUFFER, logical->current_loop_count,
                 params->buffer_params[state->current_buffer].buffer.address());
+            if (callback_requested_update_abort)
+                return false;
         }
 
         scheduler_lock.lock();
@@ -308,8 +316,10 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
         voice_lock.unlock();
         scheduler_lock.unlock();
 
-        data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_DECODE_ERROR, state->current_byte_position_in_buffer,
+        callback_requested_update_abort = data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_DECODE_ERROR, state->current_byte_position_in_buffer,
             params->buffer_params[state->current_buffer].buffer.address());
+        if (callback_requested_update_abort)
+            return false;
 
         scheduler_lock.lock();
         voice_lock.lock();
@@ -356,7 +366,8 @@ bool Atrac9Module::process(KernelState &kern, const MemState &mem, const SceUID 
         // never recovered: deliver the end the stream never reached, then finish
         voice_lock.unlock();
         scheduler_lock.unlock();
-        data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_END_OF_DATA, 0, 0);
+        if (data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_END_OF_DATA, 0, 0))
+            return false;
         scheduler_lock.lock();
         voice_lock.lock();
         return true;
@@ -368,7 +379,10 @@ bool Atrac9Module::process(KernelState &kern, const MemState &mem, const SceUID 
     bool is_finished = false;
     // call decode more data until we either have an error or reached end of data
     while (static_cast<int32_t>(logical->decoded_pcm.available_frames()) < data.parent->rack->system->granularity) {
-        if (!decode_more_data(kern, mem, thread_id, data, params, state, logical, runtime, scheduler_lock, voice_lock)) {
+        bool callback_requested_update_abort = false;
+        if (!decode_more_data(kern, mem, thread_id, data, params, state, logical, runtime, callback_requested_update_abort, scheduler_lock, voice_lock)) {
+            if (callback_requested_update_abort)
+                return false;
             is_finished = !logical->in_underrun_wait;
             logical->in_underrun_wait = false;
             break;
@@ -399,7 +413,8 @@ bool Atrac9Module::process(KernelState &kern, const MemState &mem, const SceUID 
         LOG_DEBUG("Finishing ATRAC9 stream after {} silent superframes", logical->diag_silent_streak);
         voice_lock.unlock();
         scheduler_lock.unlock();
-        data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_END_OF_DATA, 0, 0);
+        if (data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_END_OF_DATA, 0, 0))
+            return false;
         scheduler_lock.lock();
         voice_lock.lock();
         return true;

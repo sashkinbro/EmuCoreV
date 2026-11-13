@@ -148,6 +148,8 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
     std::unique_lock<std::recursive_mutex> scheduler_lock(mutex);
     update_thread_id = thread_id;
     is_updating = true;
+    callback_kind = UpdateCallbackKind::None;
+    abort_update_after_callback = false;
 
 
     // make a copy of the queue, this way we have no issue if it is modified in a callback
@@ -292,11 +294,28 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
                 // inconsistent host state.
                 if (voice->datas[i].needs_reinit)
                     continue;
-                if (voice->rack->modules[i]->process(kern, mem, thread_id, voice->datas[i], scheduler_lock, voice_lock)) {
+                bool module_finished = false;
+                {
+                    CallbackContextScope callback_context(*this, UpdateCallbackKind::ModuleProcess);
+                    module_finished = voice->rack->modules[i]->process(kern, mem, thread_id, voice->datas[i], scheduler_lock, voice_lock);
+                    if (abort_update_after_callback)
+                        scheduler_lock.lock();
+                }
+                if (abort_update_after_callback)
+                    break;
+                if (module_finished) {
                     finished = true;
                     finished_module = voice->rack->modules[i]->module_id();
                 }
             }
+        }
+        if (abort_update_after_callback) {
+            // A module callback released a Rack. The module process returned
+            // without touching its destroyed Voice/ModuleData; detach the
+            // unlocked voice lock and stop before examining any queue copies.
+            consume_update_abort_after_callback();
+            voice_lock.release();
+            break;
         }
         if (finished) {
             voice->is_keyed_off = true;
@@ -304,10 +323,19 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
             voice->is_keyed_off = false;
             stop(mem, voice);
             if (voice->finished_callback) {
+                CallbackContextScope callback_context(*this, UpdateCallbackKind::VoiceFinished);
                 voice_lock.unlock();
                 scheduler_lock.unlock();
                 voice->invoke_callback(kern, mem, thread_id, voice->finished_callback, voice->finished_callback_user_data, finished_module);
                 scheduler_lock.lock();
+                if (consume_update_abort_after_callback()) {
+                    // The callback may have synchronously released this Rack.
+                    // Detach the now-unlocked unique_lock without touching its
+                    // destroyed mutex, and stop before routing or using any
+                    // pointers retained by queue_copy/implicit_sources.
+                    voice_lock.release();
+                    break;
+                }
                 voice_lock.lock();
             }
         }
@@ -327,21 +355,26 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
     }
 
     while (!operations_pending.empty()) {
-        OperationPending &op = operations_pending.front();
+        const OperationPending op = operations_pending.front();
+        operations_pending.pop();
 
         switch (op.type) {
         case PendingType::ReleaseRack:
+            {
+            const Address released_handle = Ptr<void>(op.release_data.rack, mem).address();
             release_rack(*op.release_data.state, mem, op.system, op.release_data.rack);
             // run callback (we know it is defined)
-            kern.get_thread(thread_id)->run_callback(op.release_data.callback, { Ptr<void>(op.release_data.rack, mem).address() });
+            CallbackContextScope callback_context(*this, UpdateCallbackKind::RackReleaseCompletion);
+            kern.get_thread(thread_id)->run_callback(op.release_data.callback, { released_handle });
             break;
+            }
         }
-
-        operations_pending.pop();
     }
 
     update_thread_id = 0;
     is_updating = false;
+    callback_kind = UpdateCallbackKind::None;
+    abort_update_after_callback = false;
     condvar.notify_all();
 }
 

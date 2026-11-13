@@ -3,7 +3,10 @@
 #include <emucorev/savestate/state_io.h>
 #include <ngs/system.h>
 #include <ngs/modules/player.h>
+#include <chrono>
 #include <cstring>
+#include <future>
+#include <mutex>
 
 namespace {
 class NgsPreflight : public testing::Test {
@@ -273,6 +276,49 @@ protected:
     void TearDown() override { ngs::deinit(state, memory); }
 };
 
+struct ModuleCallbackReleaseProbe {
+    ngs::State *state = nullptr;
+    MemState *memory = nullptr;
+    ngs::System *system = nullptr;
+    ngs::Rack *rack = nullptr;
+    SceNgsRackDescription description{};
+    SceNgsBufferInfo buffer{};
+    ngs::RackReleaseAction action = ngs::RackReleaseAction::Immediate;
+    bool released = false;
+    bool reinitialized = false;
+    std::optional<uint64_t> old_instance;
+};
+
+class ReleaseRackDuringModuleProcess final : public ngs::Module {
+    ModuleCallbackReleaseProbe &probe;
+
+public:
+    explicit ReleaseRackDuringModuleProcess(ModuleCallbackReleaseProbe &probe)
+        : probe(probe) {}
+
+    bool process(KernelState &, const MemState &, SceUID thread_id,
+        ngs::ModuleData &, std::unique_lock<std::recursive_mutex> &scheduler_lock,
+        std::unique_lock<std::mutex> &voice_lock) override {
+        ModuleCallbackReleaseProbe *const probe_ptr = &probe;
+        voice_lock.unlock();
+        scheduler_lock.unlock();
+        std::unique_lock<std::recursive_mutex> callback_lock(probe_ptr->system->voice_scheduler.mutex);
+        auto &scheduler = probe_ptr->system->voice_scheduler;
+        probe_ptr->action = scheduler.rack_release_action(thread_id, false, scheduler.has_pending_rack_release(probe_ptr->rack));
+        if (probe_ptr->action != ngs::RackReleaseAction::ReleaseModuleCallback)
+            return false;
+        ngs::release_rack(*probe_ptr->state, *probe_ptr->memory, probe_ptr->system, probe_ptr->rack);
+        SceNgsBufferInfo reused_buffer = probe_ptr->buffer;
+        probe_ptr->reinitialized = ngs::init_rack(*probe_ptr->state, *probe_ptr->memory, probe_ptr->system,
+            &reused_buffer, &probe_ptr->description);
+        scheduler.request_update_abort_after_callback();
+        probe_ptr->released = true;
+        return false;
+    }
+
+    uint32_t get_buffer_parameter_size() const override { return 0x20; }
+};
+
 TEST_F(NgsQueueRestore, CyclicPatchDependenciesPreserveExactSavedQueueOrder) {
     SceNgsSystemInitParams parameters{2, 4, 64, 48000, 0};
     ASSERT_TRUE(ngs::init_system(state, memory, &parameters, Ptr<void>(0x2000), 0x1000));
@@ -300,6 +346,200 @@ TEST_F(NgsQueueRestore, CyclicPatchDependenciesPreserveExactSavedQueueOrder) {
     EXPECT_EQ(system->voice_scheduler.queue[1], b.get(memory));
     EXPECT_EQ(a.get(memory)->patches[0][0].get(memory)->dest, b);
     EXPECT_EQ(b.get(memory)->patches[0][0].get(memory)->dest, a);
+}
+
+TEST_F(NgsQueueRestore, RackReleaseWaitPredicateIgnoresSpuriousNotifications) {
+    ngs::VoiceScheduler scheduler;
+    scheduler.is_updating = true;
+    std::promise<void> entered_wait;
+    auto waiter = std::async(std::launch::async, [&] {
+        std::unique_lock<std::recursive_mutex> lock(scheduler.mutex);
+        entered_wait.set_value();
+        scheduler.wait_for_update_to_finish(lock);
+    });
+    entered_wait.get_future().wait();
+    {
+        std::lock_guard<std::recursive_mutex> lock(scheduler.mutex);
+        scheduler.condvar.notify_all();
+    }
+    EXPECT_EQ(waiter.wait_for(std::chrono::milliseconds(20)), std::future_status::timeout);
+    {
+        std::lock_guard<std::recursive_mutex> lock(scheduler.mutex);
+        scheduler.is_updating = false;
+    }
+    scheduler.condvar.notify_all();
+    ASSERT_EQ(waiter.wait_for(std::chrono::seconds(1)), std::future_status::ready);
+    waiter.get();
+}
+
+TEST_F(NgsQueueRestore, FinishedCallbackReleaseRequestsOneShotUpdateAbort) {
+    ngs::VoiceScheduler scheduler;
+    EXPECT_EQ(scheduler.rack_release_action(42, false), ngs::RackReleaseAction::Immediate);
+    scheduler.is_updating = true;
+    scheduler.update_thread_id = 42;
+    EXPECT_EQ(scheduler.rack_release_action(42, false), ngs::RackReleaseAction::RejectReentrant);
+    {
+        ngs::VoiceScheduler::CallbackContextScope finished_callback(scheduler, ngs::UpdateCallbackKind::VoiceFinished);
+        EXPECT_EQ(scheduler.rack_release_action(42, false), ngs::RackReleaseAction::ReleaseFinishedCallback);
+        scheduler.request_update_abort_after_callback();
+    }
+    EXPECT_TRUE(scheduler.consume_update_abort_after_callback());
+    EXPECT_FALSE(scheduler.consume_update_abort_after_callback());
+}
+
+TEST_F(NgsQueueRestore, ModuleProcessCallbackReleaseSelectsAbortableAction) {
+    ngs::VoiceScheduler scheduler;
+    scheduler.is_updating = true;
+    scheduler.update_thread_id = 42;
+    {
+        ngs::VoiceScheduler::CallbackContextScope module_callback(scheduler, ngs::UpdateCallbackKind::ModuleProcess);
+        EXPECT_EQ(scheduler.rack_release_action(42, false), ngs::RackReleaseAction::ReleaseModuleCallback);
+    }
+    EXPECT_EQ(scheduler.rack_release_action(42, false), ngs::RackReleaseAction::RejectReentrant);
+}
+
+TEST_F(NgsQueueRestore, ReleaseCompletionCanReinitializeAndSynchronouslyReleaseNewRackGeneration) {
+    SceNgsSystemInitParams parameters{2, 4, 64, 48000, 0};
+    ASSERT_TRUE(ngs::init_system(state, memory, &parameters, Ptr<void>(0x2000), 0x1000));
+    auto *system = Ptr<ngs::System>(0x2000).get(memory);
+    SceNgsRackDescription description{state.definitions, 1, 2, 1, 1, Ptr<void>()};
+    SceNgsBufferInfo released_buffer{Ptr<void>(0x4000), 0x5000};
+    SceNgsBufferInfo other_buffer{Ptr<void>(0xD000), 0x5000};
+    ASSERT_TRUE(ngs::init_rack(state, memory, system, &released_buffer, &description));
+    ASSERT_TRUE(ngs::init_rack(state, memory, system, &other_buffer, &description));
+    auto *released_rack = released_buffer.data.cast<ngs::Rack>().get(memory);
+    auto *other_rack = other_buffer.data.cast<ngs::Rack>().get(memory);
+    const auto old_instance = state.rack_instance_id(released_buffer.data.address());
+    ASSERT_TRUE(old_instance.has_value());
+
+    auto &scheduler = system->voice_scheduler;
+    std::lock_guard<std::recursive_mutex> scheduler_lock(scheduler.mutex);
+    ngs::OperationPending current_release{};
+    current_release.type = ngs::PendingType::ReleaseRack;
+    current_release.system = system;
+    current_release.release_data.state = &state;
+    current_release.release_data.rack = released_rack;
+    current_release.release_data.callback = 0x100;
+    scheduler.operations_pending.push(current_release);
+    ngs::OperationPending later_release = current_release;
+    later_release.release_data.rack = other_rack;
+    scheduler.operations_pending.push(later_release);
+
+    // Match the production drain: take a value copy and remove the current
+    // operation before invoking the guest completion callback.
+    const ngs::OperationPending completed = scheduler.operations_pending.front();
+    scheduler.operations_pending.pop();
+    ASSERT_FALSE(scheduler.has_pending_rack_release(released_rack));
+    ASSERT_TRUE(scheduler.has_pending_rack_release(other_rack));
+    ngs::release_rack(state, memory, system, completed.release_data.rack);
+
+    scheduler.is_updating = true;
+    scheduler.update_thread_id = 42;
+    {
+        ngs::VoiceScheduler::CallbackContextScope completion_callback(scheduler, ngs::UpdateCallbackKind::RackReleaseCompletion);
+        ASSERT_TRUE(ngs::init_rack(state, memory, system, &released_buffer, &description));
+        auto *new_rack = released_buffer.data.cast<ngs::Rack>().get(memory);
+        const auto new_instance = state.rack_instance_id(released_buffer.data.address());
+        ASSERT_TRUE(new_instance.has_value());
+        EXPECT_NE(new_instance, old_instance);
+        EXPECT_FALSE(scheduler.has_pending_rack_release(new_rack));
+        EXPECT_TRUE(scheduler.has_pending_rack_release(other_rack));
+        EXPECT_EQ(scheduler.rack_release_action(42, false, scheduler.has_pending_rack_release(new_rack)),
+            ngs::RackReleaseAction::Immediate);
+        ngs::release_rack(state, memory, system, new_rack);
+    }
+    scheduler.is_updating = false;
+    scheduler.update_thread_id = 0;
+    scheduler.operations_pending.pop();
+    EXPECT_FALSE(state.rack_instance_id(released_buffer.data.address()).has_value());
+}
+
+TEST_F(NgsQueueRestore, ModuleCallbackReleaseUnwindsBeforeStaleQueueAndMasterPatchUse) {
+    SceNgsSystemInitParams parameters{2, 4, 64, 48000, 0};
+    ASSERT_TRUE(ngs::init_system(state, memory, &parameters, Ptr<void>(0x2000), 0x1000));
+    auto *system = Ptr<ngs::System>(0x2000).get(memory);
+    const Address master_definition_address = state.definitions.address()
+        + static_cast<uint32_t>(ngs::BussType::BUSS_MASTER) * sizeof(ngs::VoiceDefinition);
+    *Ptr<ngs::VoiceDefinition>(master_definition_address).get(memory) = {ngs::BussType::BUSS_MASTER, 1};
+
+    SceNgsRackDescription source_description{state.definitions, 1, 2, 1, 1, Ptr<void>()};
+    SceNgsBufferInfo source_buffer{Ptr<void>(0x4000), 0x8000};
+    ASSERT_TRUE(ngs::init_rack(state, memory, system, &source_buffer, &source_description));
+    auto *source_rack = source_buffer.data.cast<ngs::Rack>().get(memory);
+    ngs::Voice *source_voice = source_rack->voices[0].get(memory);
+    const Address source_voice_address = Ptr<void>(source_voice, memory).address();
+
+    SceNgsRackDescription master_description{Ptr<ngs::VoiceDefinition>(master_definition_address), 1, 2, 1, 1, Ptr<void>()};
+    SceNgsBufferInfo master_buffer{Ptr<void>(0xD000), 0x8000};
+    ASSERT_TRUE(ngs::init_rack(state, memory, system, &master_buffer, &master_description));
+    auto *master_rack = master_buffer.data.cast<ngs::Rack>().get(memory);
+    ngs::Voice *master_voice = master_rack->voices[0].get(memory);
+    ASSERT_TRUE(master_voice->patch(memory, 0, 0, 0, Ptr<ngs::Voice>(master_voice, memory), Ptr<ngs::Voice>(source_voice, memory)));
+    source_voice->state = master_voice->state = ngs::VOICE_STATE_ACTIVE;
+    system->voice_scheduler.queue = {source_voice, master_voice};
+
+    ModuleCallbackReleaseProbe probe;
+    probe.state = &state;
+    probe.memory = &memory;
+    probe.system = system;
+    probe.rack = source_rack;
+    probe.description = source_description;
+    probe.buffer = source_buffer;
+    probe.old_instance = state.rack_instance_id(source_buffer.data.address());
+    source_rack->modules[0] = std::make_unique<ReleaseRackDuringModuleProcess>(probe);
+    KernelState kernel;
+    system->voice_scheduler.update(kernel, memory, 42);
+
+    EXPECT_EQ(probe.action, ngs::RackReleaseAction::ReleaseModuleCallback);
+    EXPECT_TRUE(probe.released);
+    EXPECT_TRUE(probe.reinitialized);
+    const auto new_instance = state.rack_instance_id(source_buffer.data.address());
+    ASSERT_TRUE(new_instance.has_value());
+    EXPECT_NE(new_instance, probe.old_instance);
+    ASSERT_EQ(system->voice_scheduler.queue.size(), 1u);
+    EXPECT_EQ(system->voice_scheduler.queue[0], master_voice);
+    EXPECT_EQ(master_voice->frame_count, 0u);
+    ASSERT_EQ(master_voice->patches[0].size(), 1u);
+    EXPECT_EQ(master_voice->patches[0][0].get(memory)->dest.address(), source_voice_address);
+}
+
+TEST_F(NgsQueueRestore, ReleasingRackLeavesOtherQueuedRackAndWaitTokenRejectsAddressReuse) {
+    SceNgsSystemInitParams parameters{2, 4, 64, 48000, 0};
+    ASSERT_TRUE(ngs::init_system(state, memory, &parameters, Ptr<void>(0x2000), 0x1000));
+    auto *system = Ptr<ngs::System>(0x2000).get(memory);
+    const Address master_definition_address = state.definitions.address()
+        + static_cast<uint32_t>(ngs::BussType::BUSS_MASTER) * sizeof(ngs::VoiceDefinition);
+    *Ptr<ngs::VoiceDefinition>(master_definition_address).get(memory) = {ngs::BussType::BUSS_MASTER, 1};
+
+    SceNgsRackDescription source_description{state.definitions, 1, 2, 1, 1, Ptr<void>()};
+    SceNgsBufferInfo source_buffer{Ptr<void>(0x4000), 0x5000};
+    ASSERT_TRUE(ngs::init_rack(state, memory, system, &source_buffer, &source_description));
+    auto *source_rack = source_buffer.data.cast<ngs::Rack>().get(memory);
+    ngs::Voice *source_voice = source_rack->voices[0].get(memory);
+
+    SceNgsRackDescription master_description{Ptr<ngs::VoiceDefinition>(master_definition_address), 1, 2, 1, 1, Ptr<void>()};
+    SceNgsBufferInfo master_buffer{Ptr<void>(0xA000), 0x5000};
+    ASSERT_TRUE(ngs::init_rack(state, memory, system, &master_buffer, &master_description));
+    auto *master_rack = master_buffer.data.cast<ngs::Rack>().get(memory);
+    ngs::Voice *master_voice = master_rack->voices[0].get(memory);
+    system->voice_scheduler.queue = {source_voice, master_voice};
+
+    const auto old_instance = state.rack_instance_id(source_buffer.data.address());
+    ASSERT_TRUE(old_instance.has_value());
+    {
+        std::lock_guard<std::recursive_mutex> lock(system->voice_scheduler.mutex);
+        ngs::release_rack(state, memory, system, source_rack);
+    }
+    ASSERT_EQ(system->voice_scheduler.queue.size(), 1u);
+    EXPECT_EQ(system->voice_scheduler.queue[0], master_voice);
+    EXPECT_FALSE(state.rack_instance_id(source_buffer.data.address()).has_value());
+
+    ASSERT_TRUE(ngs::init_rack(state, memory, system, &source_buffer, &source_description));
+    const auto new_instance = state.rack_instance_id(source_buffer.data.address());
+    ASSERT_TRUE(new_instance.has_value());
+    EXPECT_NE(new_instance, old_instance);
+    EXPECT_EQ(system->voice_scheduler.queue.size(), 1u);
+    EXPECT_EQ(system->voice_scheduler.queue[0], master_voice);
 }
 
 TEST_F(NgsQueueRestore, InvalidRackVoicePointerRejectsCaptureWithoutDereference) {

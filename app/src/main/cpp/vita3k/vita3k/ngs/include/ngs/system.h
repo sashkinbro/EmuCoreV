@@ -214,7 +214,7 @@ struct ModuleData {
         return info.data.cast<T>().get(mem);
     }
 
-    void invoke_callback(KernelState &kern, const MemState &mem, const SceUID thread_id, const uint32_t reason1,
+    bool invoke_callback(KernelState &kern, const MemState &mem, const SceUID thread_id, const uint32_t reason1,
         const uint32_t reason2, Address reason_ptr);
 
     SceNgsBufferInfo *lock_params(const MemState &mem);
@@ -326,7 +326,7 @@ struct Voice {
     SceInt32 parse_params_block(const MemState &mem, const SceNgsModuleParamHeader *header, const SceUInt32 size);
     bool set_preset(const MemState &mem, const SceNgsVoicePreset *preset);
 
-    void invoke_callback(KernelState &kernel, const MemState &mem, const SceUID thread_id, Ptr<void> callback, Ptr<void> user_data,
+    bool invoke_callback(KernelState &kernel, const MemState &mem, const SceUID thread_id, Ptr<void> callback, Ptr<void> user_data,
         const uint32_t module_id, const uint32_t reason = 0, const uint32_t reason2 = 0, Address reason_ptr = 0);
 };
 
