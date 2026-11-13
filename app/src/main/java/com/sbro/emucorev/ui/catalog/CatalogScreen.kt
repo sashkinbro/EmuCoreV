@@ -93,7 +93,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.ProfileGameListRepository
 import com.sbro.emucorev.data.ProfileGameStatus
-import com.sbro.emucorev.ui.common.EcvCompatibilitySummaryChip
 import com.sbro.emucorev.data.VitaCatalogEntry
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.ScreenTopBar
@@ -646,7 +645,6 @@ private fun CatalogGameCard(
                     ),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                EcvCompatibilitySummaryChip(runs = game.compatibility)
                 Text(
                     text = game.name,
                     style = if (compact) {

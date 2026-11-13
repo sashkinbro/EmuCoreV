@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.settings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -160,6 +161,7 @@ internal fun SettingsLanguageOptionCard(
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         },
         interactionSource = interactionSource,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         onClick = onClick
     ) {
         Row(

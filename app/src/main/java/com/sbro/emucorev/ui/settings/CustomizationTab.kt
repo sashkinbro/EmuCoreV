@@ -414,6 +414,7 @@ private fun CoverCacheActionRow(busy: Boolean, onClick: () -> Unit) {
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
         interactionSource = interactionSource,
         enabled = enabled,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         onClick = debouncedClick
     ) {
         Column(

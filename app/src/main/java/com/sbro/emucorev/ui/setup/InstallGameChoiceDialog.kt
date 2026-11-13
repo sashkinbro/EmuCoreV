@@ -2,6 +2,7 @@ package com.sbro.emucorev.ui.setup
 
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -178,8 +179,10 @@ private fun InstallChoiceCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        shape = neonShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
         Column(
             modifier = Modifier.padding(14.dp),

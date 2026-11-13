@@ -837,10 +837,10 @@ private fun CheatGamePicker(
                     onClick = { onSelect(game.titleId) },
                     enabled = enabled,
                     shape = neonShape(18.dp),
-                    color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f) else MaterialTheme.colorScheme.surface,
                     border = BorderStroke(
-                        1.dp,
-                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.68f) else MaterialTheme.colorScheme.outlineVariant
+                        if (selected) 2.dp else 1.dp,
+                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
                     )
                 ) {
                     Row(

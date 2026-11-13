@@ -91,7 +91,8 @@ fun EcvCompatibilityResults(runs: List<EcvCompatibilityUiRun>, modifier: Modifie
             Surface(
                 shape = neonShape(18.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
             ) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     EcvEvidenceLine(R.string.ecv_compatibility_title_id, row.titleId, emphasized = true)

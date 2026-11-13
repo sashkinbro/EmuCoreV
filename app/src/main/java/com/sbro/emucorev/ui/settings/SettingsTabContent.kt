@@ -87,7 +87,6 @@ import com.sbro.emucorev.core.VitaStorageLocation
 import com.sbro.emucorev.data.AppLanguage
 import com.sbro.emucorev.ui.common.SectionCard
 import com.sbro.emucorev.ui.common.formatCoreDisplayName
-import com.sbro.emucorev.ui.common.upstreamCoreDisplayName
 import com.sbro.emucorev.ui.pro.ProBenefitCards
 import com.sbro.emucorev.ui.pro.ProPurchasePanel
 import com.sbro.emucorev.ui.profile.CloudProfilesDialog
@@ -370,6 +369,7 @@ private fun GpuDriverStatus(
             .fillMaxWidth()
             .padding(top = 4.dp),
         shape = neonShape(18.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
     ) {
         Column(modifier = Modifier.padding(horizontal = SettingsCardInnerPadding, vertical = SettingsCardInnerPadding)) {
@@ -830,6 +830,7 @@ private fun SettingsActionRow(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         onClick = onClick
     ) {
         Row(
@@ -1176,7 +1177,6 @@ private fun AboutTab(onOpenDiscord: () -> Unit) {
         }
     }
     val versionName = packageInfo?.versionName ?: "1.0.0"
-    val upstreamCore = upstreamCoreDisplayName()
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionCard(
@@ -1195,14 +1195,6 @@ private fun AboutTab(onOpenDiscord: () -> Unit) {
                 subtitle = formatCoreDisplayName(null),
                 onClick = {}
             )
-            if (upstreamCore != null) {
-                LinkItem(
-                    icon = Icons.Rounded.Memory,
-                    title = stringResource(R.string.settings_core_upstream_version),
-                    subtitle = upstreamCore,
-                    onClick = { uriHandler.openUri(Vita3KRepositoryUrl) }
-                )
-            }
             Text(
                 text = stringResource(R.string.settings_about_body_extended),
                 style = MaterialTheme.typography.bodyMedium,
@@ -1315,6 +1307,7 @@ private fun LinkItem(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         onClick = onClick
     ) {
         Row(
@@ -1432,7 +1425,7 @@ private fun AppLanguageSettingRow(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         onClick = onClick
     ) {
         Row(
@@ -1489,7 +1482,7 @@ private fun VitaLanguageSettingRow(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         onClick = onClick
     ) {
         Row(

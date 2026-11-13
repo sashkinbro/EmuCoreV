@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -71,8 +72,9 @@ internal fun EmulationCheatPacksSection(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
         Column(
             Modifier.animateContentSize().padding(14.dp),

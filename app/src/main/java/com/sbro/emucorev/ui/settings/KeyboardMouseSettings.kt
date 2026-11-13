@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.settings
 
+import androidx.compose.foundation.BorderStroke
 import com.sbro.emucorev.ui.common.AppAlertDialog
 import com.sbro.emucorev.ui.common.SettingsStyledDialog
 import com.sbro.emucorev.ui.common.controllerFocus
@@ -608,6 +609,7 @@ private fun KeyboardMouseToggleRow(
         modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonShape(18.dp)),
         shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         onClick = { onCheckedChange(!checked) }
     ) {
         Row(
@@ -685,6 +687,7 @@ private fun KeyboardMouseClickRow(
         modifier = (Modifier.fillMaxWidth()).controllerFocus(shape = neonChipShape()),
         shape = neonChipShape(),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         onClick = onClick
     ) {
         Row(
@@ -725,6 +728,7 @@ private fun KeyboardMouseBindingRow(
         modifier = (Modifier.fillMaxWidth().padding(horizontal = 16.dp)).controllerFocus(shape = neonChipShape()),
         shape = neonChipShape(),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         onClick = onBindClick
     ) {
         Row(
@@ -791,6 +795,7 @@ private fun KeyboardMouseNote(text: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = neonShape(14.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
     ) {
         Text(

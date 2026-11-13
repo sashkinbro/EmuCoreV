@@ -2,6 +2,7 @@ package com.sbro.emucorev.ui.setup
 
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -107,11 +108,7 @@ fun SetupScreen(
 
         SectionCard(title = stringResource(R.string.setup_pkg_title)) {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text(
-                    text = stringResource(R.string.setup_pkg_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                SetupInfoRow(icon = Icons.Rounded.VpnKey, text = stringResource(R.string.setup_pkg_body))
                 SetupStep(
                     number = 1,
                     icon = Icons.Rounded.VpnKey,
@@ -262,8 +259,10 @@ private fun SetupStep(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = neonShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        shape = neonShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
         Column(
             modifier = Modifier.padding(14.dp),

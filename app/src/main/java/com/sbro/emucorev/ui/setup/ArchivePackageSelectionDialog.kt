@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.R
 import com.sbro.emucorev.ui.common.SettingsStyledDialog
+import com.sbro.emucorev.ui.theme.neon.neonButtonShape
 
 @Composable
 fun ArchivePackageSelectionDialog(
@@ -45,6 +46,7 @@ fun ArchivePackageSelectionDialog(
         ) {
             state.choices.forEach { choice ->
                 FilledTonalButton(
+                    shape = neonButtonShape(),
                     onClick = { onSelect(choice.id) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -68,6 +70,7 @@ fun ArchivePackageSelectionDialog(
             }
         }
         androidx.compose.material3.TextButton(
+            shape = neonButtonShape(),
             onClick = onCancel,
             modifier = Modifier.fillMaxWidth()
         ) {

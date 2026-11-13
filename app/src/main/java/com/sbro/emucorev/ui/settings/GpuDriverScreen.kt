@@ -972,6 +972,7 @@ private fun DeviceCompatibilityCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = neonShape(18.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
     ) {
         Column(
@@ -1132,6 +1133,7 @@ private fun LoadingCard(text: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = neonShape(18.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1146,6 +1148,7 @@ private fun ErrorCard(title: String, message: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = neonShape(18.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         color = MaterialTheme.colorScheme.errorContainer
     ) {
         Column(modifier = Modifier.padding(16.dp)) {

@@ -289,10 +289,10 @@ private fun GameSelectorCard(
         modifier = Modifier.controllerFocus(shape = neonShape(18.dp)),
         onClick = onClick,
         shape = neonShape(18.dp),
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f) else MaterialTheme.colorScheme.surface,
         border = BorderStroke(
-            1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f)
+            if (selected) 2.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f)
         )
     ) {
         Row(
@@ -542,7 +542,7 @@ private fun SessionRow(session: PlayTimeSession) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = neonShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
     ) {
         Row(
