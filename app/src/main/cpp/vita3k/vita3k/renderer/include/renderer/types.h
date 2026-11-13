@@ -27,6 +27,7 @@
 #include <array>
 #include <bitset>
 #include <map>
+#include <memory>
 #include <vector>
 
 static constexpr auto DEFAULT_RES_WIDTH = 960;
@@ -178,6 +179,8 @@ struct Context {
 typedef std::bitset<SCE_GXM_MAX_TEXTURE_UNITS> TextureInfo;
 
 struct ShaderProgram {
+    // Host-only ownership: guest wrappers keep their original Ptr and ABI size.
+    std::shared_ptr<const std::vector<uint8_t>> program_source;
     Sha256Hash hash;
     UniformBufferSizes uniform_buffer_sizes; // Size of the buffer in 4-bytes unit
     UniformBufferSizes uniform_buffer_data_offsets; // Offset of the buffer in 4-bytes unit

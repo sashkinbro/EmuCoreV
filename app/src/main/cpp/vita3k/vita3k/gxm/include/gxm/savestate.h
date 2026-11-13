@@ -14,6 +14,7 @@
 #include <renderer/command_snapshot.h>
 
 #include <cstdint>
+#include <memory>
 #include <map>
 #include <vector>
 
@@ -70,6 +71,7 @@ struct RenderTargetSnapshot {
 struct FragmentProgramSnapshot {
     Address address = 0;
     Ptr<const SceGxmProgram> program;
+    std::shared_ptr<const std::vector<uint8_t>> program_source;
     bool has_blend = false;
     SceGxmBlendInfo blend{};
     bool is_mask_update = false;
@@ -79,6 +81,7 @@ struct FragmentProgramSnapshot {
 struct VertexProgramSnapshot {
     Address address = 0;
     Ptr<const SceGxmProgram> program;
+    std::shared_ptr<const std::vector<uint8_t>> program_source;
     std::vector<SceGxmVertexAttribute> attributes;
     std::vector<SceGxmVertexStream> streams;
     uint64_t key_hash = 0;

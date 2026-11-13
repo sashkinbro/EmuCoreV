@@ -15,6 +15,7 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <renderer/program_source.h>
 #include <renderer/profile.h>
 #include <renderer/shaders.h>
 #include <renderer/shader_variant.h>
@@ -269,7 +270,7 @@ SharedGLObject compile_program(GLState &renderer, GLContext &context, const GxmR
     context.shader_hints.color_format = state.color_surface.colorFormat;
     context.shader_hints.attributes = &vertex_program_gxm.attributes;
 
-    const SharedGLObject fragment_shader = get_or_compile_shader(fragment_program_gxm.program.get(mem), features, fragment_hash, renderer.fragment_shader_cache,
+    const SharedGLObject fragment_shader = get_or_compile_shader(renderer::get_program(fragment_program_gxm, mem), features, fragment_hash, renderer.fragment_shader_cache,
         GL_FRAGMENT_SHADER, context.shader_hints, shader_cache, spirv, maskupdate, renderer.shaders_path, renderer.shaders_log_path, renderer.shader_version, renderer.shaders_count_compiled);
 
     if (!fragment_shader) {
@@ -277,7 +278,7 @@ SharedGLObject compile_program(GLState &renderer, GLContext &context, const GxmR
         return SharedGLObject();
     }
 
-    const SharedGLObject vertex_shader = get_or_compile_shader(vertex_program_gxm.program.get(mem), features, vertex_program.hash, renderer.vertex_shader_cache,
+    const SharedGLObject vertex_shader = get_or_compile_shader(renderer::get_program(vertex_program_gxm, mem), features, vertex_program.hash, renderer.vertex_shader_cache,
         GL_VERTEX_SHADER, context.shader_hints, shader_cache, spirv, maskupdate, renderer.shaders_path, renderer.shaders_log_path, renderer.shader_version, renderer.shaders_count_compiled);
 
     if (!vertex_shader) {

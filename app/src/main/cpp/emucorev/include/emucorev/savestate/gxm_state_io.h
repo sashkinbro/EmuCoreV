@@ -4,6 +4,7 @@
 #include <renderer/finish.h>
 namespace emucorev::savestate {
 class MemoryImage;
+class BufferWriter;
 struct GxmSnapshot {
     SceGxmInitializeParams params{};
     uint32_t global_timestamp = 0, last_display_global = 0;
@@ -26,4 +27,7 @@ struct GxmSnapshot {
 };
 bool parse_gxm_state(const std::vector<uint8_t> &, GxmSnapshot &, std::string &);
 bool validate_gxm_state(const GxmSnapshot &, const MemoryImage &, std::string &);
+// Append the optional, bounded GXP source extension used by new save states.
+bool append_gxm_program_source_extension(BufferWriter &, const std::vector<gxm::FragmentProgramSnapshot> &,
+    const std::vector<gxm::VertexProgramSnapshot> &, std::string &);
 }

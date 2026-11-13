@@ -669,10 +669,18 @@ bool validate_gpu_state(const GpuSnapshot &snapshot, const MemoryImage &memory, 
             guest_height /= 2;
         }
         const uint64_t guest_samples = uint64_t(ds.stride_samples) * guest_height;
-        if (ds.surface.depth_data && !memory.contains(ds.surface.depth_data.address(), guest_samples * depth_bytes))
-            return fail("depth surface address is outside saved memory: " + address_text(ds.surface.depth_data.address()));
-        if (ds.surface.stencil_data && !memory.contains(ds.surface.stencil_data.address(), guest_samples))
-            return fail("stencil surface address is outside saved memory: " + address_text(ds.surface.stencil_data.address()));
+        if (ds.surface.depth_data) {
+            const Address address = ds.surface.depth_data.address();
+            if (!memory.contains(address, 4)
+                || (ds.depth_content_stored && !memory.contains(address, guest_samples * depth_bytes)))
+                return fail("depth surface address is outside saved memory: " + address_text(address));
+        }
+        if (ds.surface.stencil_data) {
+            const Address address = ds.surface.stencil_data.address();
+            if (!memory.contains(address, 4)
+                || (ds.depth_content_stored && !memory.contains(address, guest_samples)))
+                return fail("stencil surface address is outside saved memory: " + address_text(address));
+        }
     }
     if (!renderer::vulkan::validate_surface_cache_snapshot(snapshot.surfaces, error))
         return fail("surface cache: " + error);

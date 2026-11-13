@@ -15,6 +15,7 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <renderer/program_source.h>
 #include <renderer/vulkan/functions.h>
 
 #include <algorithm>
@@ -398,7 +399,7 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
             VertexProgram *vp_data = gxm_vp->renderer_data.get();
             if (vp_data->varying_location_mask == 0xFFFFFFFFu) {
                 uint32_t written_mask = 0;
-                const SceGxmProgram *vp_gxp = gxm_vp->program.get(mem);
+                const SceGxmProgram *vp_gxp = renderer::get_program(*gxm_vp, mem);
                 if (vp_gxp) {
                     const SceGxmVertexProgramOutputs vo_mask = gxp::get_vertex_outputs(*vp_gxp);
                     static constexpr struct {
@@ -471,7 +472,7 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     }
 
     const SceGxmFragmentProgram &gxm_fragment_program = *context.record.fragment_program.get(mem);
-    const SceGxmProgram &fragment_program_gxp = *gxm_fragment_program.program.get(mem);
+    const SceGxmProgram &fragment_program_gxp = *renderer::get_program(gxm_fragment_program, mem);
 
     if (context.state.features.preserve_f16_nan_as_u16) {
         const VKFragmentProgram &vk_frag_program = *reinterpret_cast<VKFragmentProgram *>(gxm_fragment_program.renderer_data.get());

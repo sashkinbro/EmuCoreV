@@ -15,6 +15,7 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <renderer/program_source.h>
 #include <renderer/profile.h>
 
 #include <renderer/gl/functions.h>
@@ -63,7 +64,7 @@ void draw(GLState &renderer, GLContext &context, const FeatureState &features, S
     GLuint program_id = context.last_draw_program;
 
     const SceGxmFragmentProgram &gxm_fragment_program = *context.record.fragment_program.get(mem);
-    const SceGxmProgram &fragment_program_gxp = *gxm_fragment_program.program.get(mem);
+    const SceGxmProgram &fragment_program_gxp = *renderer::get_program(gxm_fragment_program, mem);
 
     if (!renderer.features.use_mask_bit && gxm_fragment_program.is_maskupdate) {
         static bool has_happened = false;

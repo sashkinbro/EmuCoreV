@@ -44,6 +44,7 @@ struct Hints;
 namespace renderer {
 
 struct GxmRecordState;
+struct ProgramSource;
 
 namespace vulkan {
 struct VKState;
@@ -106,7 +107,7 @@ private:
     // each pipeline compiler thread uses this function as its entrypoint
     void compiler_thread(MemState &mem);
 
-    vk::Pipeline compile_pipeline(SceGxmPrimitiveType type, vk::RenderPass render_pass, const SceGxmVertexProgram &vertex_program_gxm, const SceGxmFragmentProgram &fragment_program_gxm, const GxmRecordState &record, const shader::Hints &hints, MemState &mem);
+    vk::Pipeline compile_pipeline(SceGxmPrimitiveType type, vk::RenderPass render_pass, const SceGxmVertexProgram &vertex_program_gxm, const SceGxmFragmentProgram &fragment_program_gxm, const ProgramSource &vertex_source, const ProgramSource &fragment_source, const GxmRecordState &record, const shader::Hints &hints, MemState &mem);
 
 public:
     // if not 0, next time the pipeline cache should be saved (in seconds since epoch)

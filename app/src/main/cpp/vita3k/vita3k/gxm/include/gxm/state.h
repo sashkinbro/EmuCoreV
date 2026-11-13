@@ -25,10 +25,12 @@
 
 #include <atomic>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 struct EmuEnvState;
 struct SceGxmContext;
@@ -71,6 +73,9 @@ struct MemoryMapInfo {
 // process restart. The save-state engine rebuilds renderer objects from these.
 struct FragmentProgramInfo {
     Ptr<const SceGxmProgram> program;
+    // A fragment program can outlive the caller's GXP allocation. Keep the
+    // original bytes so renderer state can be rebuilt after a save/load.
+    std::shared_ptr<const std::vector<uint8_t>> program_source;
     bool has_blend = false;
     SceGxmBlendInfo blend{};
     bool is_mask_update = false;
@@ -78,6 +83,7 @@ struct FragmentProgramInfo {
 
 struct VertexProgramInfo {
     Ptr<const SceGxmProgram> program;
+    std::shared_ptr<const std::vector<uint8_t>> program_source;
     std::vector<SceGxmVertexAttribute> attributes;
     std::vector<SceGxmVertexStream> streams;
     uint64_t key_hash = 0;

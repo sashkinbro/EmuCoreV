@@ -1023,6 +1023,9 @@ bool write_gxm(EmuEnvState &emuenv, Writer &writer, std::string &error) {
         buffer.u32(entry.second.perm);
     });
 
+    if (!append_gxm_program_source_extension(buffer, fragment_programs, vertex_programs, error))
+        return false;
+
     return writer.write_section(SectionId::Gxm, buffer.data().data(), buffer.size(), true, error);
 }
 

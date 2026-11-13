@@ -15,6 +15,7 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <renderer/program_source.h>
 #include <array>
 #include <chrono>
 #include <cpu/functions.h>
@@ -87,7 +88,7 @@ static bool is_sane_fragment_program(const MemState &mem, const SceGxmFragmentPr
     const uint32_t refs = program->reference_count.load();
     if (refs == 0)
         return false;
-    const SceGxmProgram *gxp = program->program.get(mem);
+    const SceGxmProgram *gxp = renderer::get_program(*program, mem);
     return gxp && gxp->magic == 0x00505847; // "GXP\0"
 }
 
@@ -97,7 +98,7 @@ static bool is_sane_vertex_program(const MemState &mem, const SceGxmVertexProgra
     const uint32_t refs = program->reference_count.load();
     if (refs == 0)
         return false;
-    const SceGxmProgram *gxp = program->program.get(mem);
+    const SceGxmProgram *gxp = renderer::get_program(*program, mem);
     return gxp && gxp->magic == 0x00505847 && gxp->is_vertex();
 }
 

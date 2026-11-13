@@ -18,6 +18,7 @@
 #include <renderer/vulkan/pipeline_cache.h>
 
 #include <renderer/functions.h>
+#include <renderer/program_source.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/vertex_stream.h>
@@ -69,6 +70,8 @@ struct CompileRequest {
     vk::RenderPass render_pass;
     SceGxmVertexProgram *vertex_program_gxm;
     SceGxmFragmentProgram *fragment_program_gxm;
+    ProgramSource vertex_source;
+    ProgramSource fragment_source;
     shader::Hints hints;
 
     // Compilation also reads color_surface beyond the hashed fixed-state prefix.
@@ -844,7 +847,7 @@ void PipelineCache::compiler_thread(MemState &mem) {
             // use this as an instruction to stop the thread
             break;
 
-        vk::Pipeline pipeline = compile_pipeline(request->type, request->render_pass, *request->vertex_program_gxm, *request->fragment_program_gxm, *request->get_record(), request->hints, mem);
+        vk::Pipeline pipeline = compile_pipeline(request->type, request->render_pass, *request->vertex_program_gxm, *request->fragment_program_gxm, request->vertex_source, request->fragment_source, *request->get_record(), request->hints, mem);
         // mark a refused pipeline as failed rather than leaving it null, which would make every
         // later draw queue the same doomed compilation again
         *request->pipeline = pipeline ? pipeline : kPipelineFailed;
@@ -870,9 +873,9 @@ static vk::StencilOpState convert_op_state(const GxmStencilStateOp &state) {
     };
 }
 
-vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::RenderPass render_pass, const SceGxmVertexProgram &vertex_program_gxm, const SceGxmFragmentProgram &fragment_program_gxm, const GxmRecordState &record, const shader::Hints &hints, MemState &mem) {
+vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::RenderPass render_pass, const SceGxmVertexProgram &vertex_program_gxm, const SceGxmFragmentProgram &fragment_program_gxm, const ProgramSource &vertex_source, const ProgramSource &fragment_source, const GxmRecordState &record, const shader::Hints &hints, MemState &mem) {
     const VertexProgram &vertex_program = *vertex_program_gxm.renderer_data;
-    const SceGxmProgram *gxm_fragment_shader = fragment_program_gxm.program.get(mem);
+    const SceGxmProgram *gxm_fragment_shader = fragment_source.get();
     const VKFragmentProgram &fragment_program = *reinterpret_cast<VKFragmentProgram *>(
         fragment_program_gxm.renderer_data.get());
 
@@ -888,7 +891,7 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
     // Include it in both shader cache identities so async and disk caches agree.
     fragment_hints.vertex_output_mask = vertex_program.varying_location_mask;
 
-    const vk::PipelineShaderStageCreateInfo vertex_shader = retrieve_shader(vertex_program_gxm.program.get(mem), vertex_program.hash, true, fragment_program_gxm.is_maskupdate, mem, hints);
+    const vk::PipelineShaderStageCreateInfo vertex_shader = retrieve_shader(vertex_source.get(), vertex_program.hash, true, fragment_program_gxm.is_maskupdate, mem, hints);
     const vk::PipelineShaderStageCreateInfo fragment_shader = retrieve_shader(gxm_fragment_shader, fragment_program.hash, false, fragment_program_gxm.is_maskupdate, mem, fragment_hints, record.is_gamma_corrected);
     const vk::PipelineShaderStageCreateInfo shader_stages[] = { vertex_shader, fragment_shader };
     // disable the fragment shader if gxm asks us to
@@ -1050,7 +1053,9 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
     }
 
     // get the correct renderpass here
-    const SceGxmProgram *gxm_fragment_shader = fragment_program_gxm.program.get(mem);
+    const auto vertex_source = capture_program_source(vertex_program_gxm, mem);
+    const auto fragment_source = capture_program_source(fragment_program_gxm, mem);
+    const SceGxmProgram *gxm_fragment_shader = fragment_source.get();
     const bool use_shader_interlock = state.features.support_shader_interlock && gxm_fragment_shader->is_frag_color_used();
     const vk::RenderPass render_pass = use_shader_interlock ? context.current_shader_interlock_pass : context.current_render_pass;
     // update the shader hints
@@ -1069,6 +1074,8 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
             .render_pass = render_pass,
             .vertex_program_gxm = &vertex_program_gxm,
             .fragment_program_gxm = &fragment_program_gxm,
+            .vertex_source = vertex_source,
+            .fragment_source = fragment_source,
             .hints = context.shader_hints,
             .record = record
         };
@@ -1083,7 +1090,7 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
         return nullptr;
     } else {
         // can't wait, compile it right now
-        vk::Pipeline result = compile_pipeline(type, render_pass, vertex_program_gxm, fragment_program_gxm, record, context.shader_hints, mem);
+        vk::Pipeline result = compile_pipeline(type, render_pass, vertex_program_gxm, fragment_program_gxm, vertex_source, fragment_source, record, context.shader_hints, mem);
 
         const auto time_s = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         next_pipeline_cache_save = time_s + pipeline_cache_save_delay;
