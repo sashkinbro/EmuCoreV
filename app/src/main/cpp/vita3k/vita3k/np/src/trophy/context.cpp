@@ -30,12 +30,19 @@ Context::Context(const CommunicationID &comm_id, IOState *io, const SceUID troph
     , trophy_file_stream(trophy_stream)
     , trophy_progress_output_file_path(output_progress_path)
     , io(io) {
-    trophy_file.read_func = [this](void *dest, std::uint32_t amount) -> bool {
-        return read_file(dest, *this->io, this->trophy_file_stream, amount, "parse_trophy_file");
+    bind_trophy_stream(io, trophy_stream);
+}
+
+void Context::bind_trophy_stream(IOState *io, const SceUID trophy_stream) {
+    this->io = io;
+    trophy_file_stream = trophy_stream;
+    // Contexts move when their vector grows. Keep callbacks independent of this.
+    trophy_file.read_func = [io, trophy_stream](void *dest, std::uint32_t amount) -> bool {
+        return read_file(dest, *io, trophy_stream, amount, "parse_trophy_file");
     };
 
-    trophy_file.seek_func = [this](std::uint32_t amount) -> bool {
-        return seek_file(this->trophy_file_stream, amount, SCE_SEEK_SET, *this->io, "parse_trophy_file");
+    trophy_file.seek_func = [io, trophy_stream](std::uint32_t amount) -> bool {
+        return seek_file(trophy_stream, amount, SCE_SEEK_SET, *io, "parse_trophy_file");
     };
 }
 
@@ -428,7 +435,7 @@ np::trophy::ContextHandle create_trophy_context(NpState &np, IOState *io, const 
     for (auto &context : np.trophy_state.contexts) {
         if (!context.valid) {
             context.comm_id = *custom_comm;
-            context.trophy_file_stream = trophy_file;
+            context.bind_trophy_stream(io, trophy_file);
             context.trophy_progress_output_file_path = trophy_progress_save_file;
             context.valid = true;
 

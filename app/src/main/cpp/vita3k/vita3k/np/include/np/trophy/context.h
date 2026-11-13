@@ -74,6 +74,7 @@ struct Context {
     IOState *io;
     fs::path vita_fs_path;
 
+    void bind_trophy_stream(IOState *io, SceUID trophy_stream);
     void save_trophy_progress_file();
     bool load_trophy_progress_file(const SceUID &progress_input_file);
 
