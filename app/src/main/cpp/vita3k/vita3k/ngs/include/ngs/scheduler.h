@@ -37,6 +37,13 @@ struct Rack;
 struct System;
 struct State;
 
+enum class RackReleaseAction : std::uint8_t {
+    Immediate,
+    Wait,
+    RejectReentrant,
+    DeferCallback,
+};
+
 enum class PendingType {
     ReleaseRack
     // TODO add voice operations during system lock
@@ -63,6 +70,23 @@ struct VoiceScheduler {
     std::recursive_mutex mutex;
     std::condition_variable_any condvar;
     bool is_updating = false;
+    SceUID update_thread_id = 0;
+
+    // Caller must hold mutex. A release from this thread is re-entering the
+    // active update through a guest callback and cannot wait for itself.
+    bool is_update_thread(SceUID thread_id) const {
+        return is_updating && update_thread_id == thread_id;
+    }
+
+    RackReleaseAction rack_release_action(SceUID thread_id, bool has_callback) const {
+        if (!is_updating)
+            return RackReleaseAction::Immediate;
+        if (has_callback)
+            return RackReleaseAction::DeferCallback;
+        if (is_update_thread(thread_id))
+            return RackReleaseAction::RejectReentrant;
+        return RackReleaseAction::Wait;
+    }
 
 protected:
     void deque_insert(const MemState &mem, Voice *voice);

@@ -264,6 +264,8 @@ protected:
         // A flat bounded guest arena is enough for the real NGS pool/factory
         // paths; this test creates no CPUs, renderer, or audio device.
         memory.memory = Memory(new uint8_t[0x20000]{}, [](uint8_t *p) { delete[] p; });
+        memory.allocator.set_maximum(0x20000 / 0x1000);
+        ASSERT_EQ(memory.allocator.allocate_at(0, 0x20000 / 0x1000), 0);
         state.definitions = Ptr<ngs::VoiceDefinition>(0x1000);
         auto *definition = state.definitions.get(memory);
         *definition = {ngs::BussType::BUSS_MIXER, 1};
@@ -298,5 +300,97 @@ TEST_F(NgsQueueRestore, CyclicPatchDependenciesPreserveExactSavedQueueOrder) {
     EXPECT_EQ(system->voice_scheduler.queue[1], b.get(memory));
     EXPECT_EQ(a.get(memory)->patches[0][0].get(memory)->dest, b);
     EXPECT_EQ(b.get(memory)->patches[0][0].get(memory)->dest, a);
+}
+
+TEST_F(NgsQueueRestore, InvalidRackVoicePointerRejectsCaptureWithoutDereference) {
+    SceNgsSystemInitParams parameters{2, 4, 64, 48000, 0};
+    ASSERT_TRUE(ngs::init_system(state, memory, &parameters, Ptr<void>(0x2000), 0x1000));
+    auto *system = Ptr<ngs::System>(0x2000).get(memory);
+    SceNgsRackDescription description{state.definitions, 2, 2, 1, 1, Ptr<void>()};
+    SceNgsBufferInfo buffer{Ptr<void>(0x4000), 0x10000};
+    ASSERT_TRUE(ngs::init_rack(state, memory, system, &buffer, &description));
+    auto *rack = buffer.data.cast<ngs::Rack>().get(memory);
+    const Ptr<ngs::Voice> valid_voice = rack->voices[0];
+    rack->voices[0] = Ptr<ngs::Voice>(0x80000000);
+
+    Ptr<ngs::VoiceDefinition> definitions(0x1234);
+    std::vector<ngs::SystemInitInfo> systems(1);
+    systems[0].address = 0x5678;
+    std::vector<ngs::RackInitInfo> racks(1);
+    racks[0].address = 0x9ABC;
+    std::string error;
+    EXPECT_FALSE(ngs::capture_state(state, memory, definitions, systems, racks, &error));
+    EXPECT_NE(error.find("invalid voice pointer"), std::string::npos);
+    EXPECT_EQ(definitions.address(), 0x1234u);
+    ASSERT_EQ(systems.size(), 1u);
+    EXPECT_EQ(systems[0].address, 0x5678u);
+    ASSERT_EQ(racks.size(), 1u);
+    EXPECT_EQ(racks[0].address, 0x9ABCu);
+
+    // Keep fixture teardown on the valid live rack so it can free the system.
+    rack->voices[0] = valid_voice;
+}
+
+TEST_F(NgsQueueRestore, CorruptRackVectorControlBlockRejectsCaptureBeforeFollowingBackingPointer) {
+    SceNgsSystemInitParams parameters{2, 4, 64, 48000, 0};
+    ASSERT_TRUE(ngs::init_system(state, memory, &parameters, Ptr<void>(0x2000), 0x1000));
+    auto *system = Ptr<ngs::System>(0x2000).get(memory);
+    SceNgsRackDescription description{state.definitions, 2, 2, 1, 1, Ptr<void>()};
+    SceNgsBufferInfo buffer{Ptr<void>(0x4000), 0x10000};
+    ASSERT_TRUE(ngs::init_rack(state, memory, system, &buffer, &description));
+    auto *rack = buffer.data.cast<ngs::Rack>().get(memory);
+
+    std::array<std::byte, sizeof(rack->voices)> original{};
+    std::memcpy(original.data(), &rack->voices, sizeof(rack->voices));
+    const uintptr_t invalid_begin = 1;
+    std::memcpy(&rack->voices, &invalid_begin, sizeof(invalid_begin));
+
+    Ptr<ngs::VoiceDefinition> definitions(0x1234);
+    std::vector<ngs::SystemInitInfo> systems;
+    std::vector<ngs::RackInitInfo> racks;
+    std::string error;
+    const bool captured = ngs::capture_state(state, memory, definitions, systems, racks, &error);
+    std::memcpy(&rack->voices, original.data(), sizeof(rack->voices));
+
+    EXPECT_FALSE(captured);
+    EXPECT_NE(error.find("corrupted rack voices vector"), std::string::npos);
+    EXPECT_EQ(definitions.address(), 0x1234u);
+    EXPECT_TRUE(systems.empty());
+    EXPECT_TRUE(racks.empty());
+}
+
+TEST_F(NgsQueueRestore, RackInitRejectsPartialCrossSystemOverlapButAllowsTouchingBuffers) {
+    SceNgsSystemInitParams parameters{2, 4, 64, 48000, 0};
+    ASSERT_TRUE(ngs::init_system(state, memory, &parameters, Ptr<void>(0x2000), 0x1000));
+    ASSERT_TRUE(ngs::init_system(state, memory, &parameters, Ptr<void>(0x3000), 0x1000));
+    auto *first_system = Ptr<ngs::System>(0x2000).get(memory);
+    auto *second_system = Ptr<ngs::System>(0x3000).get(memory);
+    SceNgsRackDescription description{state.definitions, 1, 2, 1, 1, Ptr<void>()};
+    SceNgsBufferInfo first_buffer{Ptr<void>(0x4000), 0x5000}; // [0x4000, 0x9000)
+    ASSERT_TRUE(ngs::init_rack(state, memory, first_system, &first_buffer, &description));
+    auto *first_rack = first_buffer.data.cast<ngs::Rack>().get(memory);
+    const auto *first_voice_storage = first_rack->voices.data();
+
+    SceNgsBufferInfo partial_overlap{Ptr<void>(0x8800), 0x1000}; // [0x8800, 0x9800)
+    bool overlap_rejected = false;
+    EXPECT_FALSE(ngs::init_rack(state, memory, second_system, &partial_overlap, &description, &overlap_rejected));
+    EXPECT_TRUE(overlap_rejected);
+    ASSERT_EQ(state.rack_infos.size(), 1u);
+    ASSERT_EQ(state.rack_vector_integrity.size(), 1u);
+    EXPECT_EQ(first_rack->voices.data(), first_voice_storage);
+    EXPECT_TRUE(state.overlapping_rack_buffer(partial_overlap.data.address(), partial_overlap.size).has_value());
+
+    SceNgsBufferInfo touching{Ptr<void>(0x9000), 0x1000}; // starts exactly at the first range's end
+    overlap_rejected = false;
+    EXPECT_TRUE(ngs::init_rack(state, memory, second_system, &touching, &description, &overlap_rejected));
+    EXPECT_FALSE(overlap_rejected);
+    EXPECT_EQ(state.rack_infos.size(), 2u);
+}
+
+TEST(NgsRackRanges, DetectsOverlapWithoutOverflowingAddressArithmetic) {
+    EXPECT_TRUE(ngs::rack_buffer_ranges_overlap(0x1000, 0x1000, 0x1800, 0x1000));
+    EXPECT_FALSE(ngs::rack_buffer_ranges_overlap(0x1000, 0x800, 0x1800, 0x1000));
+    EXPECT_FALSE(ngs::rack_buffer_ranges_overlap(0x1000, 0x1000, 0x3000, 0x1000));
+    EXPECT_TRUE(ngs::rack_buffer_ranges_overlap(0xFFFFFF00u, 0x200, 0xFFFFFFFFu, 1));
 }
 } // namespace

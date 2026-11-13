@@ -30,7 +30,50 @@
 
 #include <util/vector_utils.h>
 
+#include <cstring>
+#include <limits>
+
 namespace ngs {
+namespace {
+std::string rack_vector_mismatch_details(const RackVectorIntegrity &integrity, const Rack *rack) {
+    // Both supported Android libc++ and host libstdc++ store vector begin,
+    // end, and capacity as three pointer-sized words. Read only the object's
+    // bytes here; never ask the potentially corrupted vector to compute size
+    // or dereference its backing storage.
+    if constexpr (sizeof(std::vector<Ptr<Voice>>) == 3 * sizeof(uintptr_t)) {
+        std::array<uintptr_t, 3> actual{};
+        std::array<uintptr_t, 3> expected{};
+        std::memcpy(actual.data(), &rack->voices, sizeof(rack->voices));
+        std::memcpy(expected.data(), integrity.vector_object.data(), sizeof(rack->voices));
+        return "NGS snapshot rejected corrupted rack voices vector at " + std::to_string(integrity.address)
+            + " buffer_size=" + std::to_string(integrity.buffer_size)
+            + " current_begin=" + std::to_string(actual[0])
+            + " current_end=" + std::to_string(actual[1])
+            + " current_capacity=" + std::to_string(actual[2])
+            + " expected_begin=" + std::to_string(expected[0])
+            + " expected_end=" + std::to_string(expected[1])
+            + " expected_capacity=" + std::to_string(expected[2])
+            + " expected_count=" + std::to_string(integrity.voice_count)
+            + " expected_capacity_count=" + std::to_string(integrity.voice_capacity)
+            + " rack_object_reservation=" + std::to_string(integrity.rack_object_reservation)
+            + " voice_vector_offset=" + std::to_string(integrity.voice_vector_offset)
+            + " allocated_bytes=" + std::to_string(integrity.allocated_bytes)
+            + " allocation_high_water=" + std::to_string(integrity.allocation_high_water);
+    } else {
+        return "NGS snapshot rejected corrupted rack voices vector at " + std::to_string(integrity.address)
+            + " buffer_size=" + std::to_string(integrity.buffer_size)
+            + " vector-object-bytes-differ expected_begin=" + std::to_string(integrity.voice_data)
+            + " expected_count=" + std::to_string(integrity.voice_count)
+            + " expected_capacity_count=" + std::to_string(integrity.voice_capacity)
+            + " rack_object_reservation=" + std::to_string(integrity.rack_object_reservation)
+            + " voice_vector_offset=" + std::to_string(integrity.voice_vector_offset)
+            + " allocated_bytes=" + std::to_string(integrity.allocated_bytes)
+            + " allocation_high_water=" + std::to_string(integrity.allocation_high_water);
+    }
+}
+
+} // namespace
+
 Rack::Rack(System *mama, const Ptr<void> memspace, const uint32_t memspace_size)
     : MempoolObject(memspace, memspace_size)
     , system(mama) {}
@@ -381,11 +424,25 @@ void deinit(State &ngs, MemState &mem) {
     Atrac9Module::free_swr_contexts();
 
     ngs.system_infos.clear();
-    ngs.rack_infos.clear();
+    {
+        const std::lock_guard lock(ngs.rack_infos_mutex);
+        ngs.rack_infos.clear();
+        ngs.rack_vector_integrity.clear();
+    }
     ngs.definitions = Ptr<VoiceDefinition>(0);
 }
 
-bool capture_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> &out_definitions, std::vector<SystemInitInfo> &out_system_infos, std::vector<RackInitInfo> &out_rack_infos) {
+bool capture_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> &out_definitions, std::vector<SystemInitInfo> &out_system_infos, std::vector<RackInitInfo> &out_rack_infos, std::string *error) {
+    if (error)
+        error->clear();
+    const auto reject_invalid_pointer = [error](const char *object, Address address, Address owner, size_t index) {
+        const std::string message = "NGS snapshot rejected invalid " + std::string(object) + " pointer "
+            + std::to_string(address) + " (owner " + std::to_string(owner) + ", slot " + std::to_string(index) + ")";
+        LOG_ERROR("{}", message);
+        if (error)
+            *error = message;
+        return false;
+    };
     // A guest callback can park the updater with these locks released. Blocking
     // here after stopping the guest world would deadlock that callback. Retain
     // all scheduler locks only if each updater is already between ticks.
@@ -401,13 +458,42 @@ bool capture_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> &out_de
     }
     const Ptr<VoiceDefinition> definitions = ngs.definitions;
     std::vector<SystemInitInfo> system_infos = ngs.system_infos;
-    std::vector<RackInitInfo> rack_infos = ngs.rack_infos;
+    std::vector<RackInitInfo> rack_infos;
+    std::vector<RackVectorIntegrity> rack_vector_integrity;
+    {
+        const std::lock_guard lock(ngs.rack_infos_mutex);
+        rack_infos = ngs.rack_infos;
+        rack_vector_integrity = ngs.rack_vector_integrity;
+    }
+    const auto check_rack_vector = [&rack_vector_integrity, error](Rack *rack, Address address) {
+        const auto integrity = std::find_if(rack_vector_integrity.begin(), rack_vector_integrity.end(), [address](const RackVectorIntegrity &entry) {
+            return entry.address == address;
+        });
+        if (integrity == rack_vector_integrity.end() || integrity->object != rack) {
+            const std::string message = "NGS snapshot found unregistered rack object at " + std::to_string(address);
+            LOG_ERROR("{} (object={:x})", message, reinterpret_cast<uintptr_t>(rack));
+            if (error)
+                *error = message;
+            return false;
+        }
+        if (!integrity->matches(rack, rack->voices)) {
+            const std::string message = rack_vector_mismatch_details(*integrity, rack);
+            LOG_CRITICAL("{}", message);
+            if (error)
+                *error = message;
+            return false;
+        }
+        return true;
+    };
     for (SystemInitInfo &info : system_infos)
         info.queued_voices.clear();
 
     // Active voices of each scheduler, as (rack, voice) indices.
     for (SystemInitInfo &info : system_infos) {
-        System *system = Ptr<System>(info.address).get(mem);
+        const Ptr<System> system_ptr(info.address);
+        if (system_ptr && !system_ptr.valid(mem))
+            return reject_invalid_pointer("system", system_ptr.address(), 0, 0);
+        System *system = system_ptr.get(mem);
         if (!system)
             continue;
         for (Voice *voice : system->voice_scheduler.queue) {
@@ -415,9 +501,16 @@ bool capture_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> &out_de
                 Rack *rack = system->racks[r];
                 if (!rack)
                     continue;
+                if (!check_rack_vector(rack, Ptr<void>(rack, mem).address()))
+                    return false;
                 bool found = false;
                 for (size_t v = 0; v < rack->voices.size(); v++) {
-                    if (rack->voices[v].get(mem) == voice) {
+                    const Ptr<Voice> &voice_ptr = rack->voices[v];
+                    if (!voice_ptr)
+                        continue;
+                    if (!voice_ptr.valid(mem))
+                        return reject_invalid_pointer("voice", voice_ptr.address(), Ptr<void>(rack, mem).address(), v);
+                    if (voice_ptr.get(mem) == voice) {
                         info.queued_voices.emplace_back(static_cast<uint32_t>(r), static_cast<uint32_t>(v));
                         found = true;
                         break;
@@ -430,13 +523,23 @@ bool capture_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> &out_de
     }
 
     for (RackInitInfo &info : rack_infos) {
-        Rack *rack = info.info.data.cast<Rack>().get(mem);
+        const Ptr<Rack> rack_ptr = info.info.data.cast<Rack>();
+        if (rack_ptr && !rack_ptr.valid(mem))
+            return reject_invalid_pointer("rack", rack_ptr.address(), info.system_address, 0);
+        Rack *rack = rack_ptr.get(mem);
         if (!rack)
             continue;
+        if (!check_rack_vector(rack, info.address))
+            return false;
         info.blocks = rack->allocator.blocks;
         info.voices.resize(rack->voices.size());
         for (size_t v = 0; v < rack->voices.size(); v++) {
-            Voice *voice = rack->voices[v].get(mem);
+            const Ptr<Voice> &voice_ptr = rack->voices[v];
+            if (!voice_ptr)
+                continue;
+            if (!voice_ptr.valid(mem))
+                return reject_invalid_pointer("voice", voice_ptr.address(), info.address, v);
+            Voice *voice = voice_ptr.get(mem);
             if (!voice)
                 continue;
             VoiceInfo &voice_info = info.voices[v];
@@ -513,7 +616,11 @@ bool validate_logical_state_blob(const std::vector<uint8_t> &blob) {
 bool restore_state(State &ngs, const MemState &mem, Ptr<VoiceDefinition> definitions, const std::vector<SystemInitInfo> &system_infos, const std::vector<RackInitInfo> &rack_infos) {
     ngs.definitions = definitions;
     ngs.system_infos.clear();
-    ngs.rack_infos.clear();
+    {
+        const std::lock_guard lock(ngs.rack_infos_mutex);
+        ngs.rack_infos.clear();
+        ngs.rack_vector_integrity.clear();
+    }
 
     for (const SystemInitInfo &info : system_infos) {
         SceNgsSystemInitParams params = info.params;
@@ -680,7 +787,11 @@ bool init_system(State &ngs, const MemState &mem, SceNgsSystemInitParams *parame
 }
 
 void release_system(State &ngs, const MemState &mem, System *system) {
-    // this function assumes no ngs mutex is being held
+    // Lock in the same scheduler-then-registry order as rack initialization.
+    // Keep the registry locked until all guest rack memory is no longer being
+    // touched, so another system cannot reuse a rack address mid-teardown.
+    std::unique_lock scheduler_lock(system->voice_scheduler.mutex);
+    std::unique_lock rack_infos_lock(ngs.rack_infos_mutex);
     const Address system_address = Ptr<const void>(system, mem).address();
 
     for (Rack *rack : system->racks) {
@@ -698,10 +809,26 @@ void release_system(State &ngs, const MemState &mem, System *system) {
     vector_utils::erase_first(ngs.systems, system);
     std::erase_if(ngs.system_infos, [system_address](const SystemInitInfo &info) { return info.address == system_address; });
     std::erase_if(ngs.rack_infos, [system_address](const RackInitInfo &info) { return info.system_address == system_address; });
+    std::erase_if(ngs.rack_vector_integrity, [system_address](const RackVectorIntegrity &info) { return info.system_address == system_address; });
+    scheduler_lock.unlock();
     system->~System();
 }
 
-bool init_rack(State &ngs, const MemState &mem, System *system, SceNgsBufferInfo *init_info, const SceNgsRackDescription *description) {
+bool init_rack(State &ngs, const MemState &mem, System *system, SceNgsBufferInfo *init_info, const SceNgsRackDescription *description, bool *buffer_overlap) {
+    if (buffer_overlap)
+        *buffer_overlap = false;
+    const std::lock_guard lock(ngs.rack_infos_mutex);
+    const Address rack_address = init_info->data.address();
+    for (const RackInitInfo &existing : ngs.rack_infos) {
+        if (rack_buffer_ranges_overlap(rack_address, init_info->size, existing.address, existing.info.size)) {
+            LOG_CRITICAL("NGS rack buffer ranges overlap; rejecting init: new={:x}+{} existing={:x}+{}",
+                rack_address, init_info->size, existing.address, existing.info.size);
+            if (buffer_overlap)
+                *buffer_overlap = true;
+            return false;
+        }
+    }
+
     Rack *rack = init_info->data.cast<Rack>().get(mem);
     rack = new (rack) Rack(system, init_info->data, init_info->size);
 
@@ -758,6 +885,24 @@ bool init_rack(State &ngs, const MemState &mem, System *system, SceNgsBufferInfo
     info.info = *init_info;
     info.description = *description;
     ngs.rack_infos.push_back(info);
+    uint64_t allocated_bytes = 0;
+    uint32_t allocation_high_water = 0;
+    uint32_t rack_object_reservation = 0;
+    for (const MemspaceBlockAllocator::Block &block : rack->allocator.blocks) {
+        if (block.offset == 0)
+            rack_object_reservation = block.size;
+        if (!block.free) {
+            allocated_bytes += block.size;
+            allocation_high_water = std::max(allocation_high_water, block.offset + block.size);
+        }
+    }
+    const uint32_t voice_vector_offset = static_cast<uint32_t>(reinterpret_cast<const std::byte *>(&rack->voices) - reinterpret_cast<const std::byte *>(rack));
+    if (allocated_bytes > std::numeric_limits<uint32_t>::max())
+        allocated_bytes = std::numeric_limits<uint32_t>::max();
+    RackVectorIntegrity integrity;
+    integrity.capture(rack, rack_address, init_info->size, info.system_address, rack->voices, rack_object_reservation,
+        voice_vector_offset, static_cast<uint32_t>(allocated_bytes), allocation_high_water);
+    ngs.rack_vector_integrity.push_back(integrity);
 
     return true;
 }
@@ -767,8 +912,13 @@ void release_rack(State &ngs, const MemState &mem, System *system, Rack *rack) {
     if (!rack)
         return;
 
+    // Preserve the address reservation until all host resources and the guest
+    // Rack object have been destroyed. Another System may use a different
+    // scheduler mutex while asking for the same guest buffer address.
+    const std::lock_guard rack_infos_lock(ngs.rack_infos_mutex);
     const Address rack_address = Ptr<const void>(rack, mem).address();
     std::erase_if(ngs.rack_infos, [rack_address](const RackInitInfo &info) { return info.address == rack_address; });
+    std::erase_if(ngs.rack_vector_integrity, [rack_address](const RackVectorIntegrity &info) { return info.address == rack_address; });
 
     // remove all queued voices
     for (const auto &voice : rack->voices) {

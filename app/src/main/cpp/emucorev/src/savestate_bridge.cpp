@@ -127,7 +127,16 @@ Java_com_sbro_emucorev_core_SaveStateBridge_nativeSaveState(JNIEnv *env, jobject
         != ngs::UpdateAdmission::DrainStatus::drained) {
         emucorev::savestate::Result result;
         result.status = emucorev::savestate::Status::InternalError;
-        result.error = "audio callback did not complete before capture";
+        const auto *controller = get_app_session_controller();
+        const auto pause_reasons = controller ? controller->pause_reasons() : 0;
+        auto &admission = ngs::system_update_admission();
+        const auto active_updates = admission.active_update_count();
+        const auto rack_release_waits = admission.active_wait_count(ngs::UpdateAdmission::WaitKind::RackRelease);
+        const auto system_release_waits = admission.active_wait_count(ngs::UpdateAdmission::WaitKind::SystemRelease);
+        result.error = "audio callback did not complete before capture [pause_reasons=" + std::to_string(pause_reasons)
+            + "; active_ngs_updates=" + std::to_string(active_updates)
+            + "; rack_release_waits=" + std::to_string(rack_release_waits)
+            + "; system_release_waits=" + std::to_string(system_release_waits) + "]";
         LOG_ERROR("Save state failed: {}", result.error);
         return result_to_json(env, result);
     }

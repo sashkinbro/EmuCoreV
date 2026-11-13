@@ -1141,8 +1141,9 @@ bool write_ngs(EmuEnvState &emuenv, Writer &writer, std::string &error) {
     Ptr<ngs::VoiceDefinition> definitions;
     std::vector<ngs::SystemInitInfo> systems;
     std::vector<ngs::RackInitInfo> racks;
-    if (!ngs::capture_state(emuenv.ngs, emuenv.mem, definitions, systems, racks)) {
-        error = "audio processing has not reached a snapshot boundary";
+    std::string ngs_error;
+    if (!ngs::capture_state(emuenv.ngs, emuenv.mem, definitions, systems, racks, &ngs_error)) {
+        error = ngs_error.empty() ? "audio processing has not reached a snapshot boundary" : std::move(ngs_error);
         return false;
     }
 

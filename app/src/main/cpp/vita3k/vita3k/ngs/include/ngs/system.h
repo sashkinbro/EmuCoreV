@@ -368,7 +368,7 @@ inline constexpr bool use_implicit_master_routing = true;
 
 bool init_system(State &ngs, const MemState &mem, SceNgsSystemInitParams *parameters, Ptr<void> memspace, const uint32_t memspace_size);
 void release_system(State &ngs, const MemState &mem, System *system);
-bool init_rack(State &ngs, const MemState &mem, System *system, SceNgsBufferInfo *init_info, const SceNgsRackDescription *description);
+bool init_rack(State &ngs, const MemState &mem, System *system, SceNgsBufferInfo *init_info, const SceNgsRackDescription *description, bool *buffer_overlap = nullptr);
 void release_rack(State &ngs, const MemState &mem, System *system, Rack *rack);
 
 void voice_definition_init(State &ngs, MemState &mem);

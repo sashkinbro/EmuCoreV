@@ -238,11 +238,13 @@ void AppSessionController::stop(const AppSessionStopReason reason) {
 void AppSessionController::apply_runtime_state_locked() {
     const uint32_t reasons = active_pause_reasons.load(std::memory_order_relaxed);
     const bool paused = reasons != 0 || save_state_draining;
-    const uint32_t drain_blockers = to_pause_mask(AppSessionPauseReason::Background)
-        | to_pause_mask(AppSessionPauseReason::SaveState);
+    const uint32_t capture_pause = to_pause_mask(AppSessionPauseReason::SaveState);
     // Guest callbacks must be able to return before their host audio-update
-    // stack can be captured. Keep presentation/input/audio paused throughout.
-    const bool guest_paused = reasons != 0 && (!save_state_draining || (reasons & drain_blockers));
+    // stack can be captured. A background pause that arrives mid-drain must
+    // not suspend that callback; presentation/input/audio stay paused, and the
+    // background reason takes effect as soon as the drain ends. SaveState is
+    // the point where guest execution must stop for capture.
+    const bool guest_paused = reasons != 0 && (!save_state_draining || (reasons & capture_pause));
     const bool currently_paused = emuenv.kernel.is_threads_paused();
     if (currently_paused != guest_paused) {
         if (guest_paused)

@@ -146,6 +146,7 @@ bool VoiceScheduler::off(const MemState &mem, Voice *voice) {
 
 void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID thread_id) {
     std::unique_lock<std::recursive_mutex> scheduler_lock(mutex);
+    update_thread_id = thread_id;
     is_updating = true;
 
 
@@ -339,6 +340,7 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
         operations_pending.pop();
     }
 
+    update_thread_id = 0;
     is_updating = false;
     condvar.notify_all();
 }

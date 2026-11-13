@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <array>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
@@ -22,6 +24,11 @@ namespace ngs {
 // admission and drains existing calls before it pauses the session.
 class UpdateAdmission {
 public:
+    enum class WaitKind : std::size_t {
+        RackRelease,
+        SystemRelease,
+    };
+
     enum class DrainStatus {
         drained,
         timed_out,
@@ -108,6 +115,44 @@ public:
         UpdateAdmission *admission_ = nullptr;
     };
 
+    class WaitLease {
+    public:
+        WaitLease() = default;
+        WaitLease(const WaitLease &) = delete;
+        WaitLease &operator=(const WaitLease &) = delete;
+
+        WaitLease(WaitLease &&other) noexcept
+            : admission_(std::exchange(other.admission_, nullptr)), kind_(other.kind_) {}
+
+        WaitLease &operator=(WaitLease &&other) noexcept {
+            if (this != &other) {
+                release();
+                admission_ = std::exchange(other.admission_, nullptr);
+                kind_ = other.kind_;
+            }
+            return *this;
+        }
+
+        ~WaitLease() {
+            release();
+        }
+
+    private:
+        friend class UpdateAdmission;
+        WaitLease(UpdateAdmission *admission, WaitKind kind)
+            : admission_(admission), kind_(kind) {}
+
+        void release() {
+            if (admission_) {
+                admission_->leave_wait(kind_);
+                admission_ = nullptr;
+            }
+        }
+
+        UpdateAdmission *admission_ = nullptr;
+        WaitKind kind_ = WaitKind::RackRelease;
+    };
+
     UpdateLease try_enter_update() {
         std::lock_guard lock(mutex_);
         if (closed_ || active_updates_ == std::numeric_limits<std::size_t>::max())
@@ -139,6 +184,20 @@ public:
         return DrainStatus::drained;
     }
 
+    std::size_t active_update_count() {
+        const std::lock_guard lock(mutex_);
+        return active_updates_;
+    }
+
+    WaitLease track_wait(WaitKind kind) {
+        active_waits_[static_cast<std::size_t>(kind)].fetch_add(1, std::memory_order_relaxed);
+        return WaitLease(this, kind);
+    }
+
+    std::size_t active_wait_count(WaitKind kind) const {
+        return active_waits_[static_cast<std::size_t>(kind)].load(std::memory_order_relaxed);
+    }
+
 private:
     void leave_update() {
         std::lock_guard lock(mutex_);
@@ -154,10 +213,15 @@ private:
         drained_.notify_all();
     }
 
+    void leave_wait(WaitKind kind) {
+        active_waits_[static_cast<std::size_t>(kind)].fetch_sub(1, std::memory_order_relaxed);
+    }
+
     std::mutex mutex_;
     std::condition_variable drained_;
     std::size_t active_updates_ = 0;
     bool closed_ = false;
+    std::array<std::atomic<std::size_t>, 2> active_waits_{};
 };
 
 inline UpdateAdmission &system_update_admission() {

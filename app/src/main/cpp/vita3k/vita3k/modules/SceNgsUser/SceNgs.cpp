@@ -344,7 +344,17 @@ EXPORT(SceUInt32, sceNgsRackInit, ngs::System *system, SceNgsBufferInfo *info, c
         return RET_ERROR(SCE_NGS_ERROR_INVALID_ARG);
     }
 
-    if (!ngs::init_rack(emuenv.ngs, emuenv.mem, system, info, description)) {
+    std::lock_guard<std::recursive_mutex> scheduler_lock(system->voice_scheduler.mutex);
+    if (const auto existing = emuenv.ngs.overlapping_rack_buffer(info->data.address(), info->size)) {
+        LOG_CRITICAL("NGS rack buffer ranges overlap; rejecting init: new={:x}+{} existing={:x}+{}",
+            info->data.address(), info->size, existing->address, existing->size);
+        return RET_ERROR(SCE_NGS_ERROR_INVALID_STATE);
+    }
+
+    bool buffer_overlap = false;
+    if (!ngs::init_rack(emuenv.ngs, emuenv.mem, system, info, description, &buffer_overlap)) {
+        if (buffer_overlap)
+            return RET_ERROR(SCE_NGS_ERROR_INVALID_STATE);
         return RET_ERROR(SCE_NGS_ERROR);
     }
 
@@ -360,8 +370,10 @@ EXPORT(SceInt32, sceNgsRackRelease, ngs::Rack *rack, Ptr<void> callback) {
     if (!rack)
         return RET_ERROR(SCE_NGS_ERROR_INVALID_ARG);
 
-    std::unique_lock<std::recursive_mutex> lock(rack->system->voice_scheduler.mutex);
-    if (!rack->system->voice_scheduler.is_updating) {
+    auto &scheduler = rack->system->voice_scheduler;
+    std::unique_lock<std::recursive_mutex> lock(scheduler.mutex);
+    const auto release_action = scheduler.rack_release_action(thread_id, bool(callback));
+    if (release_action == ngs::RackReleaseAction::Immediate) {
         const Address released_handle = Ptr<void>(rack, emuenv.mem).address();
         const Address release_cb = callback.address();
         ngs::release_rack(emuenv.ngs, emuenv.mem, rack->system, rack);
@@ -371,16 +383,24 @@ EXPORT(SceInt32, sceNgsRackRelease, ngs::Rack *rack, Ptr<void> callback) {
             if (thread)
                 thread->run_callback(release_cb, { released_handle });
         }
-    } else if (!callback) {
+    } else if (release_action == ngs::RackReleaseAction::RejectReentrant) {
+        // A successful synchronous release means the caller may reuse its
+        // guest buffer immediately. Deferring destruction past this callback
+        // would falsely signal completion and leave a stale Rack pointer, so
+        // reject this call and let the guest retry outside the update.
+        LOG_WARN_ONCE("sceNgsRackRelease rejected from its active update callback");
+        return RET_ERROR(SCE_NGS_ERROR_INVALID_STATE);
+    } else if (release_action == ngs::RackReleaseAction::Wait) {
         // wait for the update to finish
         // if this is called in an interrupt handler it will softlock ngs
         // but I don't think this is allowed (and if it is I don't know how to prevent this)
         LOG_WARN_ONCE("sceNgsRackRelease called in a synchronous way during a ngs update, contact devs if your game softlocks now.");
 
+        auto wait_lease = ngs::system_update_admission().track_wait(ngs::UpdateAdmission::WaitKind::RackRelease);
         guest_sched_release_for_block();
-        rack->system->voice_scheduler.condvar.wait(lock);
+        scheduler.condvar.wait(lock);
         ngs::release_rack(emuenv.ngs, emuenv.mem, rack->system, rack);
-    } else {
+    } else if (release_action == ngs::RackReleaseAction::DeferCallback) {
         // destroy rack asynchronously
         ngs::OperationPending op;
         op.type = ngs::PendingType::ReleaseRack;
@@ -444,6 +464,7 @@ EXPORT(SceInt32, sceNgsSystemRelease, ngs::System *system) {
         if (system->voice_scheduler.is_updating) {
             LOG_WARN_ONCE("sceNgsSystemRelease called during a ngs update, contact devs if your game softlocks now.");
 
+            auto wait_lease = ngs::system_update_admission().track_wait(ngs::UpdateAdmission::WaitKind::SystemRelease);
             guest_sched_release_for_block();
             system->voice_scheduler.condvar.wait(lock);
         }
