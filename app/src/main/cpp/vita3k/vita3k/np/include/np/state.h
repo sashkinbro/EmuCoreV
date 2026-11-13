@@ -81,6 +81,8 @@ struct SceNpMatching2ContextEvent {
 
 struct NpMatching2State {
     std::mutex mutex;
+    uint64_t callback_generation = 0;
+    bool dispatching = false;
     Address context_cb_pc = 0;
     Address context_cb_arg = 0;
     uint32_t next_ctx_id = 1;
@@ -88,11 +90,13 @@ struct NpMatching2State {
 };
 
 struct NpState {
+    std::mutex mutex;
     bool inited = false;
+    uint64_t generation = 0;
     np_callbacks cbs;
-    SceUID state_cb_id;
+    SceUID state_cb_id = 0;
 
     NpTrophyState trophy_state;
     NpMatching2State matching2;
-    np::CommunicationID comm_id;
+    np::CommunicationID comm_id{};
 };

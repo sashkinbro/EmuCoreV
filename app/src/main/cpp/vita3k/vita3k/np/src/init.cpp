@@ -22,21 +22,32 @@
 #include <io/functions.h>
 
 bool init(NpState &state, const np::CommunicationID *comm_id) {
-    state.inited = true;
+    const std::lock_guard<std::mutex> lock(state.mutex);
+    if (state.inited)
+        return false;
 
-    if (comm_id) {
-        state.comm_id = *comm_id;
-    }
+    ++state.generation;
+    state.inited = true;
+    state.comm_id = comm_id ? *comm_id : np::CommunicationID{};
 
     return true;
 }
 
 bool deinit(NpState &state) {
+    const std::scoped_lock lock(state.mutex, state.matching2.mutex);
+    // App teardown also calls this when only trophies or Matching2 were used.
+    ++state.generation;
     deinit(state.trophy_state);
 
     state.cbs.clear();
     state.state_cb_id = 0;
     state.comm_id = {};
+    ++state.matching2.callback_generation;
+    state.matching2.dispatching = false;
+    state.matching2.context_cb_pc = 0;
+    state.matching2.context_cb_arg = 0;
+    state.matching2.next_ctx_id = 1;
+    state.matching2.pending.clear();
     state.inited = false;
     return true;
 }

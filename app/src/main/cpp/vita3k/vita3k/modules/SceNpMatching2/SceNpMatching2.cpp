@@ -155,6 +155,9 @@ EXPORT(int, sceNpMatching2RegisterContextCallback, Ptr<void> cbFunc, Ptr<void> c
     TRACY_FUNC(sceNpMatching2RegisterContextCallback, cbFunc, cbFuncArg);
     NpMatching2State &matching2 = emuenv.np.matching2;
     std::lock_guard<std::mutex> lock(matching2.mutex);
+    ++matching2.callback_generation;
+    matching2.dispatching = false;
+    matching2.pending.clear();
     matching2.context_cb_pc = cbFunc.address();
     matching2.context_cb_arg = cbFuncArg.address();
     return 0;
@@ -252,6 +255,8 @@ EXPORT(int, sceNpMatching2Term) {
     TRACY_FUNC(sceNpMatching2Term);
     NpMatching2State &matching2 = emuenv.np.matching2;
     std::lock_guard<std::mutex> lock(matching2.mutex);
+    ++matching2.callback_generation;
+    matching2.dispatching = false;
     matching2.context_cb_pc = 0;
     matching2.context_cb_arg = 0;
     matching2.pending.clear();
