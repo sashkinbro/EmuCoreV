@@ -1424,8 +1424,8 @@
     <string name="emulation_savestate_loaded_toast">已读取</string>
     <string name="emulation_savestate_deleted_toast">已删除</string>
     <string name="emulation_savestate_failed_toast">操作失败</string>
-    <string name="emulation_savestate_session_mismatch_toast">此状态属于之前的游戏会话，暂时无法读取</string>
-    <string name="emulation_savestate_title_mismatch_toast">此状态属于其他游戏</string>
+    <string name="emulation_savestate_session_mismatch_toast">此存档属于之前的游戏会话，暂时无法读取</string>
+    <string name="emulation_savestate_title_mismatch_toast">此存档属于其他游戏</string>
     <string name="emulation_savestate_confirm_save_title">覆盖存档？</string>
     <string name="emulation_savestate_confirm_save_body">%1$s 已有存档。它将被当前时刻替换。</string>
     <string name="emulation_savestate_confirm_load_title">读取存档？</string>
@@ -1442,7 +1442,7 @@
     <string name="savestate_manager_empty_title">尚无即时存档</string>
     <string name="savestate_manager_empty_body">可在游戏内菜单或使用快速保存按钮创建。</string>
     <string name="nav_save_states">快速存档</string>
-    <string name="emulation_savestate_load_starts_game">将启动游戏并恢复到此状态。</string>
+    <string name="emulation_savestate_load_starts_game">将启动游戏并读取此存档。</string>
 
     <!-- Trophy notification audio -->
     <string name="settings_trophy_sound_title">獎盃解鎖音效</string>

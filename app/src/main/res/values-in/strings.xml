@@ -1412,7 +1412,7 @@
     <string name="emulation_savestate_slot_picker">Slot</string>
     <string name="emulation_savestate_quick_label">Cepat</string>
     <string name="emulation_savestate_slot_label">Slot %1$d</string>
-    <string name="emulation_savestate_preview">Pratinjau state</string>
+    <string name="emulation_savestate_preview">Pratinjau simpanan</string>
     <string name="emulation_savestate_empty">Kosong</string>
     <string name="emulation_savestate_saved_at">Disimpan %1$s</string>
     <string name="emulation_savestate_size">Ukuran: %1$s</string>
@@ -1424,30 +1424,30 @@
     <string name="emulation_savestate_load_action">Muat</string>
     <string name="emulation_savestate_load_desc">Pulihkan emulator ke snapshot ini</string>
     <string name="emulation_savestate_delete_action">Hapus</string>
-    <string name="emulation_savestate_delete_desc">Hapus save state ini</string>
+    <string name="emulation_savestate_delete_desc">Hapus simpanan ini</string>
     <string name="emulation_savestate_saved_toast">Disimpan</string>
     <string name="emulation_savestate_loaded_toast">Dimuat</string>
     <string name="emulation_savestate_deleted_toast">Dihapus</string>
     <string name="emulation_savestate_failed_toast">Operasi tidak dapat diselesaikan</string>
-    <string name="emulation_savestate_session_mismatch_toast">State ini milik sesi game sebelumnya dan belum dapat dimuat</string>
-    <string name="emulation_savestate_title_mismatch_toast">State ini milik game lain</string>
+    <string name="emulation_savestate_session_mismatch_toast">Simpanan ini berasal dari sesi game sebelumnya dan belum dapat dimuat</string>
+    <string name="emulation_savestate_title_mismatch_toast">Simpanan ini berasal dari game lain</string>
     <string name="emulation_savestate_confirm_save_title">Timpa simpanan?</string>
-    <string name="emulation_savestate_confirm_save_body">%1$s sudah berisi state. Akan digantikan dengan momen saat ini.</string>
+    <string name="emulation_savestate_confirm_save_body">%1$s sudah memiliki simpanan. Simpanan ini akan digantikan dengan momen saat ini.</string>
     <string name="emulation_savestate_confirm_load_title">Muat simpanan?</string>
     <string name="emulation_savestate_confirm_load_body">Progres setelah snapshot ini di %1$s akan hilang.</string>
     <string name="emulation_savestate_confirm_delete_title">Hapus simpanan?</string>
     <string name="emulation_savestate_confirm_delete_body">%1$s akan dihapus secara permanen.</string>
-    <string name="emulation_savestate_load_needs_session">Jalankan game untuk memuat state dari layar ini.</string>
+    <string name="emulation_savestate_load_needs_session">Jalankan game untuk memuat simpanan dari layar ini.</string>
     <string name="emulation_quickbar_quick_save">Simpan cepat</string>
     <string name="emulation_quickbar_quick_load">Muat cepat</string>
     <string name="savestate_manager_title">Simpanan</string>
     <string name="savestate_manager_subtitle">Snapshot emulator, terpisah dari simpanan dalam game</string>
     <string name="savestate_manager_refresh">Segarkan</string>
     <string name="savestate_manager_open_for_game">Simpanan</string>
-    <string name="savestate_manager_empty_title">Belum ada save state</string>
+    <string name="savestate_manager_empty_title">Belum ada simpanan</string>
     <string name="savestate_manager_empty_body">Buat satu dari menu dalam game atau dengan tombol simpan cepat.</string>
     <string name="nav_save_states">Simpan cepat</string>
-    <string name="emulation_savestate_load_starts_game">Game akan dijalankan dan dipulihkan ke state ini.</string>
+    <string name="emulation_savestate_load_starts_game">Game akan dijalankan dan memuat simpanan ini.</string>
 
     <!-- Trophy notification audio -->
     <string name="settings_trophy_sound_title">Suara trofi terbuka</string>
@@ -1462,8 +1462,8 @@
     <string name="settings_trophy_sound_pick_error">Tidak dapat menggunakan file audio tersebut.</string>
     <string name="emulation_savestate_startup_loading">Memuat…</string>
     <string name="emulation_savestate_saving">Menyimpan…</string>
-    <string name="settings_savestate_confirmations">Konfirmasi tindakan save state</string>
-    <string name="settings_help_savestate_confirmations">Minta konfirmasi sebelum memuat atau menimpa save state. Penghapusan save state tetap selalu memerlukan konfirmasi.</string>
+    <string name="settings_savestate_confirmations">Konfirmasi tindakan penyimpanan</string>
+    <string name="settings_help_savestate_confirmations">Minta konfirmasi sebelum memuat atau mengganti simpanan. Penghapusan simpanan selalu memerlukan konfirmasi.</string>
     <string name="controls_button_l2">L2</string>
     <string name="controls_button_l1">L1</string>
     <string name="controls_button_r2">R2</string>
