@@ -71,7 +71,8 @@ internal fun EmulationCheatPacksSection(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
     ) {
         Column(
             Modifier.animateContentSize().padding(14.dp),

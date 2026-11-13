@@ -35,7 +35,7 @@ class CheatCatalogCardTest {
         compose.setContent {
             EmuCoreVTheme {
                 Surface {
-                CheatCatalogCard(entry, false, true, CheatVersionCompatibility.MATCH, false) { downloads++ }
+                CheatCatalogCard(entry, false, true, CheatVersionCompatibility.MATCH, false, onDownload = { downloads++ })
                 }
             }
         }
@@ -54,7 +54,7 @@ class CheatCatalogCardTest {
         compose.setContent {
             EmuCoreVTheme {
                 Surface {
-                CheatCatalogCard(entry, false, false, CheatVersionCompatibility.MISMATCH, false) {}
+                CheatCatalogCard(entry, false, false, CheatVersionCompatibility.MISMATCH, false, onDownload = {})
                 }
             }
         }
@@ -67,7 +67,7 @@ class CheatCatalogCardTest {
         compose.setContent {
             EmuCoreVTheme {
                 Surface {
-                CheatCatalogCard(entry.copy(version = ""), false, false, CheatVersionCompatibility.UNKNOWN, false) {}
+                CheatCatalogCard(entry.copy(version = ""), false, false, CheatVersionCompatibility.UNKNOWN, false, onDownload = {})
                 }
             }
         }
