@@ -17,13 +17,13 @@ internal class VitaCoverResolver(
     private val usableLocal: (String) -> Boolean
 ) {
     suspend fun resolve(titleId: String?, igdbId: Long?, candidatePath: String?, fallbackIconPath: String?,
-                        style: VitaCoverStyle): ResolvedVitaCover {
+                        style: VitaCoverStyle, cachedOnly: Boolean = false): ResolvedVitaCover {
         val custom = candidatePath?.takeIf { it.isNotBlank() && isLocal(it) &&
             !cache.isManagedPath(localFile(it)?.path ?: it) && !sameLocal(it, fallbackIconPath) && usableLocal(it) }
         if (custom != null) return ResolvedVitaCover(custom)
         val asset = index.find(titleId, igdbId, candidatePath, style)
         if (asset != null) {
-            cache.resolve(asset)?.let { file ->
+            (if (cachedOnly) cache.findCached(asset) else cache.resolve(asset))?.let { file ->
                 return ResolvedVitaCover(file.absolutePath, style == VitaCoverStyle.THREE_D, asset.igdbId, asset.url)
             }
         }

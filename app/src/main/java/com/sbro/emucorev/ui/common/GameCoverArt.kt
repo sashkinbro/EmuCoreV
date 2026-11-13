@@ -8,7 +8,9 @@ import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,13 +44,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 const val GameCoverAspectRatio: Float = 2f / 3f
 
 private val coverLoads = CoverLoadCoordinator()
 private val bitmapGeneration = CoverImageCacheGeneration()
 private data class DisplayedGameCover(val bitmap: Bitmap, val is3d: Boolean = false)
-private val bitmapCache = object : LruCache<String, Bitmap>(32 * 1024 * 1024) {
+private val bitmapCache = object : LruCache<String, Bitmap>(CoverImagePolicy.MEMORY_CACHE_BYTES) {
     override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
 }
 /** Whole managed or explicitly chosen artwork on one portrait canvas. */
@@ -71,15 +76,25 @@ fun GameCoverArt(
     val cacheVersion by repository.cacheVersion.collectAsState()
     val memoryVersion by bitmapGeneration.version.collectAsState()
     val style = styleOverride ?: sharedStyle
-    var artwork by remember(titleId, igdbId, coverPath, fallbackIconPath, style, artworkVersion, cacheVersion, memoryVersion) {
-        mutableStateOf<DisplayedGameCover?>(null)
+    BoxWithConstraints(modifier.aspectRatio(GameCoverAspectRatio)) {
+    val decodeWidth = CoverImagePolicy.decodeWidthForCanvas(constraints.maxWidth)
+    val decodeHeight = decodeWidth * 3 / 2
+    var artwork by remember(titleId, igdbId, coverPath, fallbackIconPath, style, artworkVersion, cacheVersion, memoryVersion, decodeWidth) {
+        val resolved = repository.peekResolvedCover(titleId, igdbId, coverPath, fallbackIconPath, style)
+        val bitmap = resolved?.path?.let { path ->
+            bitmapGeneration.getIfCurrent(memoryVersion) {
+                bitmapCache.get(bitmapKey(path, artworkVersion, style, cacheVersion, decodeWidth, decodeHeight))
+            }
+        }
+        mutableStateOf(bitmap?.let { DisplayedGameCover(it, resolved?.is3d == true) })
     }
     val presentationChanged by rememberUpdatedState(onPresentationChanged)
     val is3d = artwork?.is3d == true
     // Callback identity never becomes a key for network or decode work.
     LaunchedEffect(is3d) { presentationChanged?.invoke(is3d) }
 
-    LaunchedEffect(titleId, igdbId, coverPath, fallbackIconPath, style, artworkVersion, cacheVersion, memoryVersion) {
+    LaunchedEffect(titleId, igdbId, coverPath, fallbackIconPath, style, artworkVersion, cacheVersion, memoryVersion, decodeWidth) {
+        if (artwork != null) return@LaunchedEffect
         fun isCurrent() = repository.cacheVersion.value == cacheVersion && bitmapGeneration.version.value == memoryVersion
         coverLoads.loadVisible(
             localCustom = {
@@ -93,7 +108,7 @@ fun GameCoverArt(
                         fallbackIconPath = fallbackIconPath, styleOverride = style)
                     val customPath = local.path?.takeIf { it != fallbackIconPath }
                     val loaded = customPath?.let {
-                        withContext(Dispatchers.IO) { cachedDecode(app, it, artworkVersion, style, cacheVersion, memoryVersion) }
+                        withContext(Dispatchers.IO) { cachedDecode(app, it, artworkVersion, style, cacheVersion, memoryVersion, decodeWidth, decodeHeight) }
                     }
                     currentCoroutineContext().ensureActive()
                     if (loaded == null || !isCurrent()) false else {
@@ -102,11 +117,22 @@ fun GameCoverArt(
                     }
                 }
             },
+            cachedArtwork = {
+                val resolved = repository.resolveCover(titleId, igdbId, coverPath, fallbackIconPath, style, cachedOnly = true)
+                val loaded = withContext(Dispatchers.IO) {
+                    resolved.path?.let { cachedDecode(app, it, artworkVersion, style, cacheVersion, memoryVersion, decodeWidth, decodeHeight) }
+                }
+                currentCoroutineContext().ensureActive()
+                if (loaded == null || !isCurrent()) false else {
+                    artwork = DisplayedGameCover(loaded, resolved.is3d)
+                    true
+                }
+            },
             managedArtwork = {
                 val resolved = repository.resolveCover(titleId, igdbId, coverPath, fallbackIconPath, style)
                 val loaded = coverLoads.decode {
                     withContext(Dispatchers.IO) {
-                        resolved.path?.let { cachedDecode(app, it, artworkVersion, style, cacheVersion, memoryVersion) }
+                        resolved.path?.let { cachedDecode(app, it, artworkVersion, style, cacheVersion, memoryVersion, decodeWidth, decodeHeight) }
                     }
                 }
                 currentCoroutineContext().ensureActive()
@@ -116,7 +142,7 @@ fun GameCoverArt(
     }
 
     val art = artwork?.bitmap
-    val frame = modifier.aspectRatio(GameCoverAspectRatio)
+    val frame = Modifier.fillMaxSize()
     if (art != null) {
         Image(art.asImageBitmap(), contentDescription = contentDescription,
             contentScale = ContentScale.Fit, modifier = frame)
@@ -127,6 +153,23 @@ fun GameCoverArt(
                 maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(12.dp))
         }
     }
+    }
+}
+
+/** Prepare verified disk hits before publishing the library; never starts a download. */
+suspend fun warmCachedGameCoverArt(context: Context, titleIds: List<String>, artworkVersion: Long) = coroutineScope {
+    val app = context.applicationContext
+    val repository = CoverArtRepository.get(app)
+    val style = repository.style.value
+    val cacheVersion = repository.cacheVersion.value
+    val memoryVersion = bitmapGeneration.version.value
+    titleIds.distinct().take(48).map { titleId -> async(Dispatchers.IO) {
+        coverLoads.decode {
+            val result = repository.resolveCover(titleId = titleId, styleOverride = style, cachedOnly = true)
+            result.path?.let { cachedDecode(app, it, artworkVersion, style, cacheVersion, memoryVersion) }
+        }
+    } }.awaitAll()
+    Unit
 }
 
 /** Speculation is optional: it never queues ahead of an already waiting visible load. */
@@ -162,10 +205,12 @@ fun invalidateCoverImage(path: String?) {
 }
 
 private suspend fun cachedDecode(app: Context, path: String, version: Long, style: VitaCoverStyle,
-                                 cacheVersion: Long, memoryVersion: Long): Bitmap? {
+                                 cacheVersion: Long, memoryVersion: Long,
+                                 decodeWidth: Int = CoverImagePolicy.DECODE_WIDTH,
+                                 decodeHeight: Int = CoverImagePolicy.DECODE_HEIGHT): Bitmap? {
     val repository = CoverArtRepository.get(app)
     if (repository.cacheVersion.value != cacheVersion) return null
-    val key = "$path@$version:${style.name}:${CoverImagePolicy.DECODE_WIDTH}x${CoverImagePolicy.DECODE_HEIGHT}:r$cacheVersion"
+    val key = bitmapKey(path, version, style, cacheVersion, decodeWidth, decodeHeight)
     bitmapGeneration.getIfCurrent(memoryVersion) { bitmapCache.get(key) }?.let { return it }
     currentCoroutineContext().ensureActive()
     var unpublished: Bitmap? = null
@@ -177,14 +222,13 @@ private suspend fun cachedDecode(app: Context, path: String, version: Long, styl
         }
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         open()?.use { BitmapFactory.decodeStream(it, null, bounds); Unit } ?: return null
-        val sample = CoverImagePolicy.sampleSize(bounds.outWidth, bounds.outHeight) ?: return null
+        val sample = CoverImagePolicy.sampleSize(bounds.outWidth, bounds.outHeight, decodeWidth, decodeHeight) ?: return null
         currentCoroutineContext().ensureActive()
         val options = BitmapFactory.Options().apply { inSampleSize = sample; inPreferredConfig = Bitmap.Config.ARGB_8888 }
         val decoded = open()?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
         unpublished = decoded
         currentCoroutineContext().ensureActive()
-        val scale = minOf(1f, CoverImagePolicy.DECODE_WIDTH.toFloat() / decoded.width,
-            CoverImagePolicy.DECODE_HEIGHT.toFloat() / decoded.height)
+        val scale = minOf(1f, decodeWidth.toFloat() / decoded.width, decodeHeight.toFloat() / decoded.height)
         val bitmap = if (scale < 1f) Bitmap.createScaledBitmap(decoded,
             (decoded.width * scale).toInt().coerceAtLeast(1), (decoded.height * scale).toInt().coerceAtLeast(1), true)
             .also { if (it !== decoded) decoded.recycle() } else decoded
@@ -201,3 +245,6 @@ private suspend fun cachedDecode(app: Context, path: String, version: Long, styl
         unpublished?.recycle()
     }
 }
+
+private fun bitmapKey(path: String, version: Long, style: VitaCoverStyle, cacheVersion: Long,
+                      width: Int, height: Int) = "$path@$version:${style.name}:${width}x$height:r$cacheVersion"

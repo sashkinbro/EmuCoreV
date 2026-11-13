@@ -9,6 +9,28 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CoverDiskCacheTest {
+    @Test fun cachedCoverDoesNotWaitBehindFourNetworkMisses() = runBlocking { fixture { root ->
+        val expected = stored(root)
+        val release = CompletableDeferred<Unit>()
+        val started = CompletableDeferred<Unit>()
+        val starts = AtomicInteger()
+        val cache = CoverDiskCache(root, { _, _, _ ->
+            if (starts.incrementAndGet() == 4) started.complete(Unit)
+            release.await()
+            CoverFetchResult.RETRYABLE_FAILURE
+        }, { true })
+        val jobs = (101L..104L).map { id ->
+            launch { cache.resolve(asset().copy(igdbId = id, relativePath = "covers/3d/$id.webp")) }
+        }
+        try {
+            started.await()
+            val cached = withTimeoutOrNull(300) { cache.resolve(asset()) }
+            assertEquals("A verified disk hit must bypass downloads", expected, cached)
+        } finally {
+            release.complete(Unit)
+            jobs.joinAll()
+        }
+    } }
     private val valid = "small verified public image fixture".toByteArray()
     private fun hash(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
     private fun asset(style: VitaCoverStyle = VitaCoverStyle.THREE_D, revision: String = "a".repeat(40)) =

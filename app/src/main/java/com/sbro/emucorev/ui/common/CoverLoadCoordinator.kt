@@ -13,9 +13,11 @@ internal class CoverLoadCoordinator {
 
     suspend fun loadVisible(
         managedArtwork: suspend () -> Unit,
-        localCustom: suspend () -> Boolean = { false }
+        localCustom: suspend () -> Boolean = { false },
+        cachedArtwork: suspend () -> Boolean = { false }
     ) {
         if (decode(localCustom)) return
+        if (decode(cachedArtwork)) return
         managedLoads.withPermit { managedArtwork() }
     }
 

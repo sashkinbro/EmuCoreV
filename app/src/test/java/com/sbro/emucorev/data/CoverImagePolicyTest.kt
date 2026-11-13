@@ -8,14 +8,22 @@ import kotlinx.coroutines.flow.collect
 class CoverImagePolicyTest {
     @Test fun preservesLowResolutionSources() {
         assertEquals(1, CoverImagePolicy.sampleSize(320, 480))
-        assertEquals(1, CoverImagePolicy.sampleSize(720, 1080))
+        assertEquals(1, CoverImagePolicy.sampleSize(400, 600))
+        assertEquals(1, CoverImagePolicy.sampleSize(720, 1080, 720, 1080))
     }
     @Test fun bothPortraitAndLandscapeDecodeWithinBudget() {
         for ((width, height) in listOf(1441 to 2161, 8000 to 6000, 6000 to 8000, 16384 to 1, 1 to 16384)) {
             val sample = CoverImagePolicy.sampleSize(width, height)!!
-            assertTrue((width + sample - 1) / sample <= 720)
-            assertTrue((height + sample - 1) / sample <= 1080)
+            assertTrue((width + sample - 1) / sample <= CoverImagePolicy.DECODE_WIDTH)
+            assertTrue((height + sample - 1) / sample <= CoverImagePolicy.DECODE_HEIGHT)
         }
+    }
+    @Test fun visibleGridFitsMemoryWhileLargeArtworkRetainsItsResolution() {
+        assertTrue(48L * CoverImagePolicy.DECODE_WIDTH * CoverImagePolicy.DECODE_HEIGHT * 4 <= CoverImagePolicy.MEMORY_CACHE_BYTES)
+        assertEquals(400, CoverImagePolicy.decodeWidthForCanvas(224))
+        assertEquals(400, CoverImagePolicy.decodeWidthForCanvas(400))
+        assertEquals(720, CoverImagePolicy.decodeWidthForCanvas(620))
+        assertEquals(1, CoverImagePolicy.sampleSize(720, 1080, 720, 1080))
     }
     @Test fun invalidAndExtremeImageBoundsAreRejected() {
         for ((width, height) in listOf(0 to 100, -1 to 1, 17000 to 100, 100 to Int.MAX_VALUE, 16000 to 16000)) {

@@ -58,7 +58,16 @@ class CoverDiskCache(
     private val mutationLock = Any()
 
     suspend fun resolve(asset: VitaCoverAsset): File? = withContext(ioDispatcher) {
-        resolveShared(asset)
+        findCached(asset) ?: resolveShared(asset)
+    }
+
+    /** Disk hits never queue behind network requests, and never initiate a fetch. */
+    suspend fun findCached(asset: VitaCoverAsset): File? = withContext(ioDispatcher) {
+        val startedGeneration = generation.get()
+        val target = File(directory, asset.cacheKey)
+        if (!isManagedPath(target.path)) return@withContext null
+        if (!valid(target, asset.sha256)) return@withContext null
+        target.takeIf { generation.get() == startedGeneration }
     }
 
     private suspend fun resolveShared(asset: VitaCoverAsset): File? = supervisorScope {

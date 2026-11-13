@@ -27,7 +27,7 @@ class AppPreferencesLibraryLayoutTest {
     }
 
     @Test fun gridAndListSurvivePreferenceRecreation() {
-        assertEquals(LibraryLayoutMode.LIST, AppPreferences(context).libraryLayoutMode)
+        assertEquals(LibraryLayoutMode.GRID, AppPreferences(context).libraryLayoutMode)
         AppPreferences(context).libraryLayoutMode = LibraryLayoutMode.GRID
         assertEquals(LibraryLayoutMode.GRID, AppPreferences(context).libraryLayoutMode)
         AppPreferences(context).libraryLayoutMode = LibraryLayoutMode.LIST
@@ -37,9 +37,9 @@ class AppPreferencesLibraryLayoutTest {
     @Test fun unknownOrWrongTypedPersistedLayoutFallsBackWithoutThrowing() {
         val stored = context.getSharedPreferences("emucorev_prefs", Context.MODE_PRIVATE)
         stored.edit().putString("library_layout_mode", "UNKNOWN").commit()
-        assertEquals(LibraryLayoutMode.LIST, AppPreferences(context).libraryLayoutMode)
+        assertEquals(LibraryLayoutMode.GRID, AppPreferences(context).libraryLayoutMode)
         stored.edit().putInt("library_layout_mode", 1).commit()
-        assertEquals(LibraryLayoutMode.LIST, AppPreferences(context).libraryLayoutMode)
+        assertEquals(LibraryLayoutMode.GRID, AppPreferences(context).libraryLayoutMode)
         AppPreferences(context).libraryLayoutMode = LibraryLayoutMode.GRID
         assertEquals(LibraryLayoutMode.GRID, AppPreferences(context).libraryLayoutMode)
     }

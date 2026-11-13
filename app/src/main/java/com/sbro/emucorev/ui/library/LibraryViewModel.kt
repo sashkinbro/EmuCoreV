@@ -8,7 +8,7 @@ import com.sbro.emucorev.core.PlayTimeRepository
 import com.sbro.emucorev.core.InstallStateBus
 import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.InstalledVitaGame
-import com.sbro.emucorev.ui.common.localBitmapLoader
+import com.sbro.emucorev.ui.common.warmCachedGameCoverArt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -70,8 +70,40 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             sortMetadata = snapshot.second
             recentTitleIds = snapshot.third
             sizesLoaded = false
-            _uiState.value = _uiState.value.copy(isLoading = false)
-            publishState(artworkVersion = localBitmapLoader.invalidate())
+            // Reuse the current image key across a list refresh; cache identity changes are
+            // managed by the cover repository itself, not by catalog/list publication.
+            val artworkVersion = _uiState.value.artworkVersion
+            var published = false
+            while (!published) {
+                val state = _uiState.value
+                val titleIds = startupVisibleTitleIds(
+                    allItems = allItems,
+                    query = state.query,
+                    sortOption = state.sortOption,
+                    sortMetadata = sortMetadata
+                )
+                warmStartupCoverArtBeforePublish(
+                    titleIds = titleIds,
+                    artworkVersion = artworkVersion,
+                    warmCached = { ids, version ->
+                        warmCachedGameCoverArt(context, ids, version)
+                    },
+                    publish = {
+                        val latest = _uiState.value
+                        val latestTitleIds = startupVisibleTitleIds(
+                            allItems = allItems,
+                            query = latest.query,
+                            sortOption = latest.sortOption,
+                            sortMetadata = sortMetadata
+                        )
+                        if (titleIds == latestTitleIds) {
+                            _uiState.value = _uiState.value.copy(isLoading = false, artworkVersion = artworkVersion)
+                            publishState(artworkVersion = artworkVersion)
+                            published = true
+                        }
+                    }
+                )
+            }
             if (_uiState.value.sortOption.requiresSize) loadInstalledSizes()
         }
     }
@@ -119,14 +151,16 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun publishState(artworkVersion: Long = _uiState.value.artworkVersion) {
-        val query = _uiState.value.query.trim()
-        val filteredItems = allItems.filter {
-            query.isBlank() ||
-                it.title.contains(query, ignoreCase = true) ||
-                it.titleId.contains(query, ignoreCase = true)
-        }
+        if (_uiState.value.isLoading && _uiState.value.items.isEmpty()) return
+        val state = _uiState.value
+        val filteredItems = filterAndSortLibraryItems(
+            allItems = allItems,
+            query = state.query,
+            sortOption = state.sortOption,
+            sortMetadata = sortMetadata
+        )
         _uiState.value = _uiState.value.copy(
-            items = sortInstalledGames(filteredItems, _uiState.value.sortOption, sortMetadata),
+            items = filteredItems,
             artworkVersion = artworkVersion,
             recentTitleId = recentTitleIds.firstOrNull { id ->
                 filteredItems.any { it.titleId.equals(id, ignoreCase = true) }

@@ -5,6 +5,27 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CoverLoadCoordinatorTest {
+    @Test fun cachedArtworkDisplaysWhileNetworkSlotsAreFull() = runBlocking {
+        withTimeout(2_000) {
+            val loads = CoverLoadCoordinator()
+            val release = CompletableDeferred<Unit>()
+            val jobs = (1..4).map {
+                launch(start = CoroutineStart.UNDISPATCHED) { loads.loadVisible(managedArtwork = { release.await() }) }
+            }
+            var cachedDisplayed = false
+            var fetched = false
+            val fifth = launch(start = CoroutineStart.UNDISPATCHED) {
+                loads.loadVisible(cachedArtwork = { cachedDisplayed = true; true }, managedArtwork = { fetched = true })
+            }
+            try {
+                assertTrue(cachedDisplayed)
+                assertTrue(fifth.isCompleted)
+                assertFalse(fetched)
+            } finally {
+                release.complete(Unit); jobs.joinAll(); fifth.join()
+            }
+        }
+    }
     @Test fun managedImageUrlsNeverEnterTheIdentityFreeLocalProbe() {
         for (url in listOf(
             "https://images.igdb.com/igdb/image/upload/t_cover_big/coABC.jpg",

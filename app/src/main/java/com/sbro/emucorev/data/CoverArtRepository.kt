@@ -4,9 +4,11 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.LruCache
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -24,6 +26,9 @@ class CoverArtRepository private constructor(context: Context) {
     val style: StateFlow<VitaCoverStyle> = mutableStyle.asStateFlow()
     private val mutableCacheVersion = MutableStateFlow(0L)
     val cacheVersion: StateFlow<Long> = mutableCacheVersion.asStateFlow()
+    private data class Request(val titleId: String?, val igdbId: Long?, val candidatePath: String?,
+                               val iconPath: String?, val style: VitaCoverStyle, val generation: Long)
+    private val resolvedPaths = LruCache<Request, ResolvedVitaCover>(256)
 
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == STYLE_KEY) mutableStyle.value = readStyle()
@@ -33,8 +38,8 @@ class CoverArtRepository private constructor(context: Context) {
         download(asset, target, limit)
     }, ::validImageFile)
 
-    private val index: VitaCoverIndex by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-        val json = runCatching {
+    private val indexJson: String by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        runCatching {
             app.assets.open("catalog/vita_covers.json").bufferedReader().use { reader ->
                 val text = StringBuilder()
                 val buffer = CharArray(8192)
@@ -47,7 +52,16 @@ class CoverArtRepository private constructor(context: Context) {
                 text.toString()
             }
         }.getOrDefault("")
-        VitaCoverIndex.fromJson(json)
+    }
+    private val index: VitaCoverIndex by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        VitaCoverIndex.fromJson(indexJson)
+    }
+    private val identities by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        val fingerprint = MessageDigest.getInstance("SHA-256").digest(indexJson.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        CoverAssetIdentityCache(fingerprint, preferences::getStringForIdentity) { key, value ->
+            preferences.edit().putString(key, value).apply()
+        }
     }
 
     init { preferences.registerOnSharedPreferenceChangeListener(preferenceListener) }
@@ -66,11 +80,38 @@ class CoverArtRepository private constructor(context: Context) {
         igdbId: Long? = null,
         candidatePath: String? = null,
         fallbackIconPath: String? = null,
-        styleOverride: VitaCoverStyle? = null
+        styleOverride: VitaCoverStyle? = null,
+        cachedOnly: Boolean = false
     ): ResolvedVitaCover = withContext(Dispatchers.IO) {
-        VitaCoverResolver(index, cache, ::usableLocalArtwork)
-            .resolve(titleId, igdbId, candidatePath, fallbackIconPath, styleOverride ?: style.value)
+        val request = Request(titleId, igdbId, candidatePath, fallbackIconPath.takeIf { candidatePath != null },
+            styleOverride ?: style.value, cacheVersion.value)
+        val serialOnly = titleId != null && igdbId == null && candidatePath.isNullOrBlank()
+        val known = if (serialOnly) identities.find(titleId!!, request.style) else null
+        val result = if (serialOnly && identities.isKnownMissing(titleId!!, request.style)) {
+            ResolvedVitaCover(null)
+        } else if (known != null) {
+            val file = if (cachedOnly) cache.findCached(known) else cache.resolve(known)
+            ResolvedVitaCover(file?.absolutePath, file != null && request.style == VitaCoverStyle.THREE_D,
+                known.igdbId, known.url)
+        } else {
+            val resolved = VitaCoverResolver(index, cache, ::usableLocalArtwork)
+                .resolve(titleId, igdbId, candidatePath, fallbackIconPath, request.style, cachedOnly)
+            if (serialOnly) {
+                val asset = index.find(titleId, style = request.style)
+                if (asset != null) identities.remember(titleId!!, asset)
+                else identities.rememberMissing(titleId!!, request.style)
+            }
+            resolved
+        }
+        if (result.path != null && request.generation == cacheVersion.value) resolvedPaths.put(request, result)
+        result
     }
+
+    /** Memory-only identity lookup; safe during composition, without disk or network work. */
+    fun peekResolvedCover(titleId: String?, igdbId: Long?, candidatePath: String?,
+                          fallbackIconPath: String?, style: VitaCoverStyle): ResolvedVitaCover? =
+        resolvedPaths.get(Request(titleId, igdbId, candidatePath,
+            fallbackIconPath.takeIf { candidatePath != null }, style, cacheVersion.value))
 
     /** Stable shareable URL without fetching; local custom artwork is never uploaded. */
     suspend fun buildPublicCoverUrl(
@@ -90,6 +131,7 @@ class CoverArtRepository private constructor(context: Context) {
     } finally {
         // Also notify after a cancelled/partially completed clear so existing cards
         // cannot retain a disk-backed bitmap whose file may already be gone.
+        resolvedPaths.evictAll()
         mutableCacheVersion.update { it + 1 }
     }
 
@@ -159,3 +201,5 @@ class CoverArtRepository private constructor(context: Context) {
                 bounds.outMimeType?.startsWith("image/") == true
     }
 }
+
+private fun SharedPreferences.getStringForIdentity(key: String): String? = getString(key, null)

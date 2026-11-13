@@ -174,7 +174,7 @@ class AppPreferences(context: Context) {
 
     var libraryLayoutMode: LibraryLayoutMode
         get() = LibraryLayoutMode.entries.firstOrNull { it.name == prefs.all[KEY_LIBRARY_LAYOUT_MODE] }
-            ?: LibraryLayoutMode.LIST
+            ?: LibraryLayoutMode.GRID
         set(value) = prefs.edit { putString(KEY_LIBRARY_LAYOUT_MODE, value.name) }
 
     val libraryLayoutModeFlow: Flow<LibraryLayoutMode>

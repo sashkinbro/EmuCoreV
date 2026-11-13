@@ -13,6 +13,12 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, sdk = [29])
 class VitaCoverResolverTest {
+    @Test fun cachedOnlyLookupNeverDownloadsOrDisplaysAnIcon() = runBlocking { fixture { root ->
+        val icon = File(root, "icon.png").apply { writeBytes(bytes) }
+        val cache = CoverDiskCache(File(root, "cache"), { _, _, _ -> error("cache warming must never fetch") }, { true })
+        val resolver = VitaCoverResolver(index, cache) { File(it).isFile }
+        assertNull(resolver.resolve("PCSA00001", null, null, icon.path, VitaCoverStyle.THREE_D, cachedOnly = true).path)
+    } }
     private val bytes = "cover fixture".toByteArray()
     private val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
     private val index = VitaCoverIndex.fromJson("""{"schema_version":2,"asset_revision":"${"a".repeat(40)}",
