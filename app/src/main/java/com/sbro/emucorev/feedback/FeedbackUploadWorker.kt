@@ -119,7 +119,7 @@ class FeedbackUploadWorker(
         return linkedMapOf(
             "appVersion" to "EmuCoreV ${BuildConfig.VERSION_NAME}",
             "appBuild" to BuildConfig.VERSION_CODE.toString(),
-            "coreVersion" to "Vita3K core",
+            "coreVersion" to "ECV 0.3",
             "androidVersion" to "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
             "device" to listOf(Build.MANUFACTURER, Build.MODEL).filter(String::isNotBlank).joinToString(" "),
             "soc" to runCatching { MobileSocNameMapper.currentDeviceName() }.getOrDefault(Build.HARDWARE),

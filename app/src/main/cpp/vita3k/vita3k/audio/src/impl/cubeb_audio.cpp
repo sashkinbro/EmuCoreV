@@ -118,7 +118,7 @@ CubebAudioAdapter::~CubebAudioAdapter() {
 }
 
 bool CubebAudioAdapter::init() {
-    if (cubeb_init(&cubeb_ctx, "Vita3K audio", nullptr) != CUBEB_OK) {
+    if (cubeb_init(&cubeb_ctx, "EmuCoreV audio", nullptr) != CUBEB_OK) {
         LOG_ERROR("Could not initialize cubeb context");
         return false;
     }
@@ -141,7 +141,7 @@ static AudioOutPortPtr create_cubeb_audio_port(cubeb *context, int nb_channels, 
     uint32_t latency;
     cubeb_get_min_latency(context, &port->spec, &latency);
 
-    if (cubeb_stream_init(context, &port->out_stream, "Vita3K audio out", nullptr, nullptr, nullptr,
+    if (cubeb_stream_init(context, &port->out_stream, "EmuCoreV audio out", nullptr, nullptr, nullptr,
             &port->spec, latency, impl_cubeb_audio_callback, impl_cubeb_state_callback, port.get())
         != CUBEB_OK) {
         LOG_ERROR("Could not initialize cubeb stream");
