@@ -11,25 +11,6 @@ data class InstalledVitaGame(
     val installPath: String
 )
 
-enum class VitaCompatibilityState {
-    UNKNOWN,
-    NOTHING,
-    BOOTABLE,
-    INTRO,
-    MENU,
-    INGAME_LESS,
-    INGAME_MORE,
-    PLAYABLE
-}
-
-data class VitaCompatibilitySummary(
-    val matchedTitleId: String,
-    val issueId: Int,
-    val state: VitaCompatibilityState,
-    val updatedAtEpochSeconds: Long?,
-    val candidateTitleIds: List<String> = listOf(matchedTitleId)
-)
-
 data class VitaCatalogEntry(
     val igdbId: Long,
     val name: String,
@@ -40,7 +21,7 @@ data class VitaCatalogEntry(
     val heroUrl: String?,
     val genres: List<String> = emptyList(),
     val serials: List<String> = emptyList(),
-    val compatibility: VitaCompatibilitySummary? = null
+    val compatibility: List<EcvCompatibilityUiRun> = emptyList()
 )
 
 data class VitaCatalogDetails(
@@ -55,7 +36,7 @@ data class VitaCatalogDetails(
     val serials: List<String>,
     val screenshots: List<String>,
     val videos: List<String>,
-    val compatibility: VitaCompatibilitySummary? = null
+    val compatibility: List<EcvCompatibilityUiRun> = emptyList()
 )
 
 enum class ProfileGameStatus {

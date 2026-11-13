@@ -29,6 +29,12 @@ class VitaCoverIndex private constructor(
     private val imageIds: Map<String, List<Long>> = emptyMap()
 ) {
     private data class Game(val flat: VitaCoverAsset, val threeD: VitaCoverAsset, val imageId: String)
+    private val serialsByIgdbId = serials.entries.groupBy({ it.value }, { it.key })
+        .mapValues { (_, values) -> values.sorted() }
+
+    /** Only reviewed serial mappings for this exact known IGDB ID; no regional/name derivation. */
+    fun serialsForIgdbId(igdbId: Long): List<String> =
+        if (igdbId <= 0 || igdbId !in games) emptyList() else serialsByIgdbId[igdbId].orEmpty()
 
     fun find(titleId: String? = null, igdbId: Long? = null, candidateUrl: String? = null,
              style: VitaCoverStyle = VitaCoverStyle.THREE_D): VitaCoverAsset? {

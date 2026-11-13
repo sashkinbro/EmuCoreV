@@ -1608,4 +1608,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">ملفات برنامج التشغيل المحدد غير صالحة. أعد تثبيت برنامج التشغيل.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (دليل الأجهزة)</string>
     <string name="settings_gpu_driver_device_unknown">لم يتم التعرف على عتاد GPU.</string>
+    <string name="ecv_compatibility_title">التوافق مع ECV</string>
+    <string name="ecv_compatibility_not_tested">لم يُختبر على ECV</string>
+    <string name="ecv_compatibility_run_count">مرات الاختبار على ECV: %1$d</string>
+    <string name="ecv_compatibility_title_id">معرّف العنوان: %1$s</string>
+    <string name="ecv_compatibility_device">الجهاز: %1$s</string>
+    <string name="ecv_compatibility_app_version">التطبيق: %1$s</string>
+    <string name="ecv_compatibility_core_version">النواة: %1$s</string>
+    <string name="ecv_compatibility_tested_on">تاريخ الاختبار: %1$s</string>
+    <string name="ecv_compatibility_soc">المعالج: %1$s</string>
+    <string name="ecv_compatibility_gpu">معالج الرسومات: %1$s</string>
+    <string name="ecv_compatibility_gameplay">اللعب</string>
+    <string name="ecv_compatibility_graphics">الرسومات</string>
+    <string name="ecv_compatibility_audio">الصوت</string>
+    <string name="ecv_compatibility_quick_save">الحفظ السريع</string>
+    <string name="ecv_compatibility_warm_load">التحميل بعد التشغيل</string>
+    <string name="ecv_compatibility_cold_load">التحميل بعد بدء جديد</string>
+    <string name="ecv_compatibility_passed">ناجح</string>
+    <string name="ecv_compatibility_failed">فاشل</string>
+    <string name="ecv_compatibility_limited">محدود</string>
+    <string name="ecv_compatibility_unknown">لم يُختبر</string>
+    <string name="ecv_compatibility_notes">ملاحظات: %1$s</string>
+    <string name="ecv_compatibility_settings">إعدادات التصيير</string>
+    <string name="ecv_compatibility_evidence">الدليل: %1$s</string>
 </resources>

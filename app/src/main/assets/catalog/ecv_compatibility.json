@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "dataset_version": 2,
+  "source": "EmuCoreV",
+  "generated_on": "2026-11-13",
+  "records": [
+    {
+      "title_id": "PCSE00124",
+      "runs": [
+        {
+          "run_id": "manual-20261113-pcse00124-rg556",
+          "device": {
+            "manufacturer": "Anbernic",
+            "model": "RG556",
+            "soc": "Unisoc T820",
+            "gpu": "Mali-G57"
+          },
+          "app_version": "0.2.8 (95)",
+          "core_version": "ECV 0.3",
+          "tested_on": "2026-11-13",
+          "renderer_settings": {
+            "backend": "Vulkan"
+          },
+          "results": {
+            "gameplay": {
+              "status": "passed",
+              "evidence": [
+                "manual-20261113-pcse00124-rg556-gameplay"
+              ]
+            },
+            "graphics": {
+              "status": "not_tested",
+              "evidence": []
+            },
+            "audio": {
+              "status": "not_tested",
+              "evidence": []
+            },
+            "quick_save": {
+              "status": "passed",
+              "evidence": [
+                "manual-20261113-pcse00124-rg556-quick_save"
+              ]
+            },
+            "warm_load": {
+              "status": "passed",
+              "evidence": [
+                "manual-20261113-pcse00124-rg556-warm_load"
+              ]
+            },
+            "cold_load": {
+              "status": "passed",
+              "evidence": [
+                "manual-20261113-pcse00124-rg556-cold_load"
+              ]
+            }
+          },
+          "notes": "Short movement-tutorial smoke test, about 30 FPS. The character moved and the companion followed before saving and after in-game and standalone cold restores. Not a full-game compatibility certification."
+        }
+      ]
+    },
+    {
+      "title_id": "PCSB00669",
+      "runs": [
+        {
+          "run_id": "manual-20261113-pcsb00669-rg556",
+          "device": {
+            "manufacturer": "Anbernic",
+            "model": "RG556",
+            "soc": "Unisoc T820",
+            "gpu": "Mali-G57"
+          },
+          "app_version": "0.2.8 (95)",
+          "core_version": "ECV 0.3",
+          "tested_on": "2026-11-13",
+          "renderer_settings": {
+            "backend": "Vulkan"
+          },
+          "results": {
+            "gameplay": {
+              "status": "passed",
+              "evidence": [
+                "manual-20261113-pcsb00669-rg556-gameplay"
+              ]
+            },
+            "graphics": {
+              "status": "not_tested",
+              "evidence": []
+            },
+            "audio": {
+              "status": "not_tested",
+              "evidence": []
+            },
+            "quick_save": {
+              "status": "passed",
+              "evidence": [
+                "manual-20261113-pcsb00669-rg556-quick_save"
+              ]
+            },
+            "warm_load": {
+              "status": "passed",
+              "evidence": [
+                "manual-20261113-pcsb00669-rg556-warm_load"
+              ]
+            },
+            "cold_load": {
+              "status": "passed",
+              "evidence": [
+                "manual-20261113-pcsb00669-rg556-cold_load"
+              ]
+            }
+          },
+          "notes": "Short opening-level smoke test, about 27-31 FPS. Held touch moved the creature before saving and after in-game and standalone cold restores. Not a full-game compatibility certification."
+        }
+      ]
+    },
+    {
+      "title_id": "PCSE00457",
+      "runs": [
+        {
+          "run_id": "manual-20261113-pcse00457-tb710fu",
+          "device": {
+            "manufacturer": "Lenovo",
+            "model": "TB710FU",
+            "soc": "Snapdragon 8 Gen 3",
+            "gpu": "Adreno 750"
+          },
+          "app_version": "0.2.8 (95)",
+          "core_version": "ECV 0.3",
+          "tested_on": "2026-11-13",
+          "renderer_settings": {
+            "backend": "Vulkan"
+          },
+          "results": {
+            "gameplay": {
+              "status": "passed",
+              "evidence": [
+                "manual-20261113-pcse00457-tb710fu-gameplay"
+              ]
+            },
+            "graphics": {
+              "status": "not_tested",
+              "evidence": []
+            },
+            "audio": {
+              "status": "not_tested",
+              "evidence": []
+            },
+            "quick_save": {
+              "status": "passed",
+              "evidence": [
+                "manual-20261113-pcse00457-tb710fu-quick_save"
+              ]
+            },
+            "warm_load": {
+              "status": "passed",
+              "evidence": [
+                "manual-20261113-pcse00457-tb710fu-warm_load"
+              ]
+            },
+            "cold_load": {
+              "status": "passed",
+              "evidence": [
+                "manual-20261113-pcse00457-tb710fu-cold_load"
+              ]
+            }
+          },
+          "notes": "Short active puzzle-board smoke test. Movement, rotation and dropping remained controllable after both restores. Elapsed time advanced during restore checks; timer fidelity is unverified. Graphics and audio have not been rated."
+        }
+      ]
+    }
+  ]
+}

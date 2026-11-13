@@ -124,8 +124,9 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTube
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.VitaLaunchBridge
 import com.sbro.emucorev.core.VitaLaunchBridge.LaunchResult
-import com.sbro.emucorev.data.VitaCompatibilityState
-import com.sbro.emucorev.data.VitaCompatibilitySummary
+import com.sbro.emucorev.data.EcvCompatibilityUiRun
+import com.sbro.emucorev.ui.common.EcvCompatibilitySummaryChip
+import com.sbro.emucorev.ui.common.EcvCompatibilityResults
 import com.sbro.emucorev.ui.common.GameCoverArt
 import com.sbro.emucorev.ui.common.GameCoverAspectRatio
 import com.sbro.emucorev.ui.common.ImmersiveMode
@@ -192,12 +193,6 @@ fun GameDetailScreen(
     }
     val compatibility = uiState.compatibility
     val displayTitle = game?.title ?: catalog?.name ?: stringResource(R.string.common_not_available)
-    val knownTitleIds = remember(game?.titleId, catalog?.serials) {
-        buildList {
-            game?.titleId?.takeIf(String::isNotBlank)?.let(::add)
-            addAll(catalog?.serials.orEmpty().filter(String::isNotBlank))
-        }.distinct()
-    }
 
     Column(
         modifier = Modifier
@@ -514,70 +509,13 @@ fun GameDetailScreen(
                     }
 
                     SectionCard(
-                        title = stringResource(R.string.detail_compatibility_title),
+                        title = stringResource(R.string.ecv_compatibility_title),
                         modifier = Modifier
                             .align(Alignment.CenterHorizontally)
                             .widthIn(max = contentMaxWidth)
                             .padding(horizontal = horizontalInset)
                     ) {
-                        when {
-                            compatibility != null -> {
-                                MetadataRow(
-                                    stringResource(R.string.detail_compatibility_status),
-                                    stringResource(compatibility.state.labelResId())
-                                )
-                                MetadataRow(
-                                    stringResource(R.string.detail_compatibility_issue),
-                                    "#${compatibility.issueId}"
-                                )
-                                MetadataRow(
-                                    stringResource(R.string.detail_compatibility_title_id_label),
-                                    compatibility.matchedTitleId
-                                )
-                                compatibility.updatedAtEpochSeconds?.let { updatedAt ->
-                                    MetadataRow(
-                                        stringResource(R.string.detail_compatibility_updated),
-                                        formatCompatibilityUpdatedAt(updatedAt)
-                                    )
-                                }
-                                if (knownTitleIds.size > 1) {
-                                    MetadataRow(
-                                        stringResource(R.string.detail_compatibility_known_serials),
-                                        knownTitleIds.joinToString(", ")
-                                    )
-                                }
-                                DetailSourceCard(
-                                    text = stringResource(
-                                        R.string.detail_compatibility_source_note,
-                                        compatibility.issueId
-                                    )
-                                )
-                            }
-
-                            !uiState.isCompatibilityAvailable -> {
-                                Text(
-                                    text = stringResource(R.string.detail_compatibility_unavailable),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            knownTitleIds.isEmpty() -> {
-                                Text(
-                                    text = stringResource(R.string.detail_compatibility_unmapped),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            else -> {
-                                Text(
-                                    text = stringResource(R.string.detail_compatibility_missing_entry),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                        EcvCompatibilityResults(compatibility)
                     }
 
                     if (catalog != null) {
@@ -803,7 +741,7 @@ private fun MetaRow(
     year: Int?,
     rating: Double?,
     serial: String?,
-    compatibility: VitaCompatibilitySummary?
+    compatibility: List<EcvCompatibilityUiRun>
 ) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -812,7 +750,7 @@ private fun MetaRow(
         year?.let { MetaChip(Icons.Rounded.CalendarToday, it.toString()) }
         rating?.let { MetaChip(Icons.Rounded.Star, String.format(Locale.US, "%.1f", it / 10.0)) }
         serial?.takeIf { it.isNotBlank() }?.let { MetaChip(Icons.Rounded.ConfirmationNumber, it) }
-        compatibility?.let { CompatibilityMetaChip(it) }
+        EcvCompatibilitySummaryChip(compatibility)
     }
 }
 
@@ -856,22 +794,6 @@ private fun GenreChip(text: String) {
             modifier = Modifier.padding(horizontal = CompactCardContentPadding, vertical = 8.dp),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary
-        )
-    }
-}
-
-@Composable
-private fun CompatibilityMetaChip(compatibility: VitaCompatibilitySummary) {
-    Surface(
-        shape = neonPillShape(),
-        color = compatibilityContainerColor(compatibility.state)
-    ) {
-        Text(
-            text = stringResource(compatibility.state.labelResId()),
-            modifier = Modifier.padding(horizontal = CompactCardContentPadding, vertical = 8.dp),
-            style = MaterialTheme.typography.labelLarge,
-            color = compatibilityContentColor(compatibility.state),
-            fontWeight = FontWeight.SemiBold
         )
     }
 }
@@ -1769,54 +1691,6 @@ private fun normalizeYoutubeId(raw: String): String {
         value.contains("v=") -> value.substringAfter("v=").substringBefore("&").substringBefore("?")
         value.contains("youtu.be/") -> value.substringAfter("youtu.be/").substringBefore("?").substringBefore("&")
         else -> value.substringBefore("?").substringBefore("&")
-    }
-}
-
-private fun formatCompatibilityUpdatedAt(epochSeconds: Long): String {
-    return java.time.Instant.ofEpochSecond(epochSeconds)
-        .atZone(java.time.ZoneId.systemDefault())
-        .toLocalDate()
-        .toString()
-}
-
-@Composable
-private fun compatibilityContainerColor(state: VitaCompatibilityState): Color {
-    return when (state) {
-        VitaCompatibilityState.PLAYABLE -> Color(0x1F2E7D32)
-        VitaCompatibilityState.INGAME_MORE -> Color(0x1F00897B)
-        VitaCompatibilityState.INGAME_LESS -> Color(0x1F1E88E5)
-        VitaCompatibilityState.MENU -> Color(0x1F00ACC1)
-        VitaCompatibilityState.INTRO -> Color(0x1FF9A825)
-        VitaCompatibilityState.BOOTABLE -> Color(0x1FFF8F00)
-        VitaCompatibilityState.NOTHING -> Color(0x1FC62828)
-        VitaCompatibilityState.UNKNOWN -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-    }
-}
-
-@Composable
-private fun compatibilityContentColor(state: VitaCompatibilityState): Color {
-    return when (state) {
-        VitaCompatibilityState.PLAYABLE -> Color(0xFF2E7D32)
-        VitaCompatibilityState.INGAME_MORE -> Color(0xFF00897B)
-        VitaCompatibilityState.INGAME_LESS -> Color(0xFF1E88E5)
-        VitaCompatibilityState.MENU -> Color(0xFF00ACC1)
-        VitaCompatibilityState.INTRO -> Color(0xFFF9A825)
-        VitaCompatibilityState.BOOTABLE -> Color(0xFFFF8F00)
-        VitaCompatibilityState.NOTHING -> Color(0xFFC62828)
-        VitaCompatibilityState.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-}
-
-private fun VitaCompatibilityState.labelResId(): Int {
-    return when (this) {
-        VitaCompatibilityState.UNKNOWN -> R.string.compatibility_unknown
-        VitaCompatibilityState.NOTHING -> R.string.compatibility_nothing
-        VitaCompatibilityState.BOOTABLE -> R.string.compatibility_bootable
-        VitaCompatibilityState.INTRO -> R.string.compatibility_intro
-        VitaCompatibilityState.MENU -> R.string.compatibility_menu
-        VitaCompatibilityState.INGAME_LESS -> R.string.compatibility_ingame_less
-        VitaCompatibilityState.INGAME_MORE -> R.string.compatibility_ingame_more
-        VitaCompatibilityState.PLAYABLE -> R.string.compatibility_playable
     }
 }
 

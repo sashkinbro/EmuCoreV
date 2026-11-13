@@ -1607,4 +1607,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">Pliki wybranego sterownika są nieprawidłowe. Zainstaluj sterownik ponownie.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (katalog urządzeń)</string>
     <string name="settings_gpu_driver_device_unknown">Nie rozpoznano sprzętu GPU.</string>
+    <string name="ecv_compatibility_title">Zgodność z ECV</string>
+    <string name="ecv_compatibility_not_tested">Nie testowano w ECV</string>
+    <string name="ecv_compatibility_run_count">Liczba testów w ECV: %1$d</string>
+    <string name="ecv_compatibility_title_id">ID tytułu: %1$s</string>
+    <string name="ecv_compatibility_device">Urządzenie: %1$s</string>
+    <string name="ecv_compatibility_app_version">Aplikacja: %1$s</string>
+    <string name="ecv_compatibility_core_version">Rdzeń: %1$s</string>
+    <string name="ecv_compatibility_tested_on">Data testu: %1$s</string>
+    <string name="ecv_compatibility_soc">Procesor: %1$s</string>
+    <string name="ecv_compatibility_gpu">Procesor graficzny: %1$s</string>
+    <string name="ecv_compatibility_gameplay">Rozgrywka</string>
+    <string name="ecv_compatibility_graphics">Grafika</string>
+    <string name="ecv_compatibility_audio">Dźwięk</string>
+    <string name="ecv_compatibility_quick_save">Szybki zapis</string>
+    <string name="ecv_compatibility_warm_load">Wczytanie w trakcie sesji</string>
+    <string name="ecv_compatibility_cold_load">Wczytanie po nowym uruchomieniu</string>
+    <string name="ecv_compatibility_passed">Zaliczono</string>
+    <string name="ecv_compatibility_failed">Nie zaliczono</string>
+    <string name="ecv_compatibility_limited">Ograniczone</string>
+    <string name="ecv_compatibility_unknown">Nie testowano</string>
+    <string name="ecv_compatibility_notes">Uwagi: %1$s</string>
+    <string name="ecv_compatibility_settings">Ustawienia renderowania</string>
+    <string name="ecv_compatibility_evidence">Dowód: %1$s</string>
 </resources>

@@ -1608,4 +1608,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">Berkas driver terpilih tidak valid. Instal ulang driver.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (katalog perangkat)</string>
     <string name="settings_gpu_driver_device_unknown">Perangkat keras GPU belum dikenali.</string>
+    <string name="ecv_compatibility_title">Kompatibilitas ECV</string>
+    <string name="ecv_compatibility_not_tested">Belum diuji di ECV</string>
+    <string name="ecv_compatibility_run_count">Jumlah pengujian ECV: %1$d</string>
+    <string name="ecv_compatibility_title_id">ID judul: %1$s</string>
+    <string name="ecv_compatibility_device">Perangkat: %1$s</string>
+    <string name="ecv_compatibility_app_version">Aplikasi: %1$s</string>
+    <string name="ecv_compatibility_core_version">Inti: %1$s</string>
+    <string name="ecv_compatibility_tested_on">Diuji: %1$s</string>
+    <string name="ecv_compatibility_soc">Prosesor: %1$s</string>
+    <string name="ecv_compatibility_gpu">Prosesor grafis: %1$s</string>
+    <string name="ecv_compatibility_gameplay">Permainan</string>
+    <string name="ecv_compatibility_graphics">Grafis</string>
+    <string name="ecv_compatibility_audio">Audio</string>
+    <string name="ecv_compatibility_quick_save">Simpan cepat</string>
+    <string name="ecv_compatibility_warm_load">Muat saat sesi berjalan</string>
+    <string name="ecv_compatibility_cold_load">Muat setelah mulai ulang</string>
+    <string name="ecv_compatibility_passed">Lulus</string>
+    <string name="ecv_compatibility_failed">Gagal</string>
+    <string name="ecv_compatibility_limited">Terbatas</string>
+    <string name="ecv_compatibility_unknown">Belum diuji</string>
+    <string name="ecv_compatibility_notes">Catatan: %1$s</string>
+    <string name="ecv_compatibility_settings">Pengaturan perender</string>
+    <string name="ecv_compatibility_evidence">Bukti: %1$s</string>
 </resources>

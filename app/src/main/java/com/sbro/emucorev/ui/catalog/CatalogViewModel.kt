@@ -3,7 +3,8 @@ package com.sbro.emucorev.ui.catalog
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.sbro.emucorev.data.VitaCompatibilityRepository
+import com.sbro.emucorev.data.EcvCompatibilityDataset
+import com.sbro.emucorev.data.EcvCompatibilityRepository
 import com.sbro.emucorev.data.VitaCatalogEntry
 import com.sbro.emucorev.data.VitaCatalogRepository
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +35,7 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private val repository = VitaCatalogRepository(application)
-    private val compatibilityRepository = VitaCompatibilityRepository(application)
+    private val compatibilityRepository = EcvCompatibilityRepository(application)
     private var refreshJob: Job? = null
     private var loadMoreJob: Job? = null
     private var started = false
@@ -126,8 +127,8 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
             } else {
                 emptyList()
             }
-            val compatibilitySnapshot = compatibilityRepository.getSnapshot()
-            val results = rawResults.attachCompatibility(compatibilitySnapshot)
+            val compatibilityDataset = compatibilityRepository.load()
+            val results = rawResults.attachEcvCompatibility(compatibilityDataset)
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 hasCatalog = hasCatalog,
@@ -148,7 +149,7 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
         loadMoreJob = viewModelScope.launch(Dispatchers.IO) {
             val snapshot = _uiState.value
             _uiState.value = snapshot.copy(isLoadingMore = true)
-            val compatibilitySnapshot = compatibilityRepository.getSnapshot()
+            val compatibilityDataset = compatibilityRepository.load()
             val nextPage = repository.search(
                 query = snapshot.query,
                 genre = snapshot.selectedGenre,
@@ -156,7 +157,7 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
                 minRating = snapshot.minRating,
                 limit = PAGE_SIZE,
                 offset = snapshot.results.size
-            ).attachCompatibility(compatibilitySnapshot)
+            ).attachEcvCompatibility(compatibilityDataset)
             val merged = snapshot.results + nextPage.filterNot { next ->
                 snapshot.results.any { it.igdbId == next.igdbId }
             }
@@ -168,11 +169,11 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private fun List<VitaCatalogEntry>.attachCompatibility(
-        snapshot: com.sbro.emucorev.data.VitaCompatibilitySnapshot
-    ): List<VitaCatalogEntry> {
-        return map { entry ->
-            entry.copy(compatibility = snapshot.resolve(entry.serials, gameName = entry.name))
-        }
-    }
+}
+
+/** Catalog regions retain separate exact-ID runs; game names never imply a tested release. */
+internal fun List<VitaCatalogEntry>.attachEcvCompatibility(
+    dataset: EcvCompatibilityDataset
+): List<VitaCatalogEntry> = map { entry ->
+    entry.copy(compatibility = dataset.rowsFor(entry.serials))
 }

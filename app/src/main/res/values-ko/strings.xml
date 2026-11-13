@@ -1607,4 +1607,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">선택한 드라이버 파일이 잘못되었습니다. 드라이버를 다시 설치하세요.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (기기 카탈로그)</string>
     <string name="settings_gpu_driver_device_unknown">GPU 하드웨어를 식별하지 못했습니다.</string>
+    <string name="ecv_compatibility_title">ECV 호환성</string>
+    <string name="ecv_compatibility_not_tested">ECV에서 테스트하지 않음</string>
+    <string name="ecv_compatibility_run_count">ECV 테스트 횟수: %1$d</string>
+    <string name="ecv_compatibility_title_id">타이틀 ID: %1$s</string>
+    <string name="ecv_compatibility_device">기기: %1$s</string>
+    <string name="ecv_compatibility_app_version">앱: %1$s</string>
+    <string name="ecv_compatibility_core_version">코어: %1$s</string>
+    <string name="ecv_compatibility_tested_on">테스트 날짜: %1$s</string>
+    <string name="ecv_compatibility_soc">CPU: %1$s</string>
+    <string name="ecv_compatibility_gpu">GPU: %1$s</string>
+    <string name="ecv_compatibility_gameplay">게임 플레이</string>
+    <string name="ecv_compatibility_graphics">그래픽</string>
+    <string name="ecv_compatibility_audio">오디오</string>
+    <string name="ecv_compatibility_quick_save">빠른 저장</string>
+    <string name="ecv_compatibility_warm_load">실행 중 불러오기</string>
+    <string name="ecv_compatibility_cold_load">새로 시작한 뒤 불러오기</string>
+    <string name="ecv_compatibility_passed">성공</string>
+    <string name="ecv_compatibility_failed">실패</string>
+    <string name="ecv_compatibility_limited">제한적</string>
+    <string name="ecv_compatibility_unknown">테스트하지 않음</string>
+    <string name="ecv_compatibility_notes">메모: %1$s</string>
+    <string name="ecv_compatibility_settings">렌더러 설정</string>
+    <string name="ecv_compatibility_evidence">검증 자료: %1$s</string>
 </resources>

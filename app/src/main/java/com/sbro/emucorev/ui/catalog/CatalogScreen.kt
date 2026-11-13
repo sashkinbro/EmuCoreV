@@ -93,8 +93,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorev.R
 import com.sbro.emucorev.data.ProfileGameListRepository
 import com.sbro.emucorev.data.ProfileGameStatus
-import com.sbro.emucorev.data.VitaCompatibilityState
-import com.sbro.emucorev.data.VitaCompatibilitySummary
+import com.sbro.emucorev.ui.common.EcvCompatibilitySummaryChip
 import com.sbro.emucorev.data.VitaCatalogEntry
 import com.sbro.emucorev.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorev.ui.common.ScreenTopBar
@@ -579,15 +578,6 @@ private fun CatalogGameCard(
                     onPresentationChanged = { is3dCover = it },
                     modifier = Modifier.fillMaxSize()
                 )
-                game.compatibility?.let { compatibility ->
-                    CompatibilityBadge(
-                        compatibility = compatibility,
-                        compact = compact,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(8.dp)
-                    )
-                }
                 profileStatus?.let { status ->
                     Surface(
                         modifier = Modifier
@@ -656,6 +646,7 @@ private fun CatalogGameCard(
                     ),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                EcvCompatibilitySummaryChip(runs = game.compatibility)
                 Text(
                     text = game.name,
                     style = if (compact) {
@@ -930,75 +921,5 @@ private fun ProfileGameStatus.titleResId(): Int {
         ProfileGameStatus.WANT_TO_PLAY -> R.string.profile_status_want_to_play
         ProfileGameStatus.COMPLETED -> R.string.profile_status_completed
         ProfileGameStatus.DROPPED -> R.string.profile_status_dropped
-    }
-}
-
-@Composable
-private fun CompatibilityBadge(
-    compatibility: VitaCompatibilitySummary,
-    compact: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val background = compatibilityContainerColor(compatibility.state)
-    val content = compatibilityContentColor(compatibility.state)
-    Surface(
-        modifier = modifier,
-        shape = neonShape(8.dp),
-        color = background,
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
-    ) {
-        Text(
-            text = stringResource(compatibility.state.labelResId()),
-            modifier = Modifier.padding(
-                horizontal = 8.dp,
-                vertical = 3.dp
-            ),
-            style = MaterialTheme.typography.labelSmall,
-            color = content,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
-private fun compatibilityContainerColor(state: VitaCompatibilityState): Color {
-    return when (state) {
-        VitaCompatibilityState.PLAYABLE -> Color(0xEAF1FAEE)
-        VitaCompatibilityState.INGAME_MORE -> Color(0xEAEDF8F6)
-        VitaCompatibilityState.INGAME_LESS -> Color(0xEAEAF3FD)
-        VitaCompatibilityState.MENU -> Color(0xEAEAF8FB)
-        VitaCompatibilityState.INTRO -> Color(0xEAFDF4E3)
-        VitaCompatibilityState.BOOTABLE -> Color(0xEAFDF0E2)
-        VitaCompatibilityState.NOTHING -> Color(0xEAFCEAEA)
-        VitaCompatibilityState.UNKNOWN -> Color(0xEAF2F3F5)
-    }
-}
-
-@Composable
-private fun compatibilityContentColor(state: VitaCompatibilityState): Color {
-    return when (state) {
-        VitaCompatibilityState.PLAYABLE -> Color(0xFF2E7D32)
-        VitaCompatibilityState.INGAME_MORE -> Color(0xFF00897B)
-        VitaCompatibilityState.INGAME_LESS -> Color(0xFF1E88E5)
-        VitaCompatibilityState.MENU -> Color(0xFF00ACC1)
-        VitaCompatibilityState.INTRO -> Color(0xFFF9A825)
-        VitaCompatibilityState.BOOTABLE -> Color(0xFFFF8F00)
-        VitaCompatibilityState.NOTHING -> Color(0xFFC62828)
-        VitaCompatibilityState.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-}
-
-private fun VitaCompatibilityState.labelResId(): Int {
-    return when (this) {
-        VitaCompatibilityState.UNKNOWN -> R.string.compatibility_unknown
-        VitaCompatibilityState.NOTHING -> R.string.compatibility_nothing
-        VitaCompatibilityState.BOOTABLE -> R.string.compatibility_bootable
-        VitaCompatibilityState.INTRO -> R.string.compatibility_intro
-        VitaCompatibilityState.MENU -> R.string.compatibility_menu
-        VitaCompatibilityState.INGAME_LESS -> R.string.compatibility_ingame_less
-        VitaCompatibilityState.INGAME_MORE -> R.string.compatibility_ingame_more
-        VitaCompatibilityState.PLAYABLE -> R.string.compatibility_playable
     }
 }

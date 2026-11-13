@@ -1604,4 +1604,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">Os arquivos do driver selecionado são inválidos. Reinstale o driver.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (catálogo de dispositivos)</string>
     <string name="settings_gpu_driver_device_unknown">O hardware da GPU não foi identificado.</string>
+    <string name="ecv_compatibility_title">Compatibilidade com ECV</string>
+    <string name="ecv_compatibility_not_tested">Não testado no ECV</string>
+    <string name="ecv_compatibility_run_count">Testes no ECV: %1$d</string>
+    <string name="ecv_compatibility_title_id">ID do título: %1$s</string>
+    <string name="ecv_compatibility_device">Dispositivo: %1$s</string>
+    <string name="ecv_compatibility_app_version">Aplicativo: %1$s</string>
+    <string name="ecv_compatibility_core_version">Núcleo: %1$s</string>
+    <string name="ecv_compatibility_tested_on">Data do teste: %1$s</string>
+    <string name="ecv_compatibility_soc">Processador: %1$s</string>
+    <string name="ecv_compatibility_gpu">Processador gráfico: %1$s</string>
+    <string name="ecv_compatibility_gameplay">Jogabilidade</string>
+    <string name="ecv_compatibility_graphics">Gráficos</string>
+    <string name="ecv_compatibility_audio">Áudio</string>
+    <string name="ecv_compatibility_quick_save">Salvamento rápido</string>
+    <string name="ecv_compatibility_warm_load">Carregamento durante a sessão</string>
+    <string name="ecv_compatibility_cold_load">Carregamento após novo início</string>
+    <string name="ecv_compatibility_passed">Aprovado</string>
+    <string name="ecv_compatibility_failed">Falhou</string>
+    <string name="ecv_compatibility_limited">Limitado</string>
+    <string name="ecv_compatibility_unknown">Não testado</string>
+    <string name="ecv_compatibility_notes">Notas: %1$s</string>
+    <string name="ecv_compatibility_settings">Configurações do renderizador</string>
+    <string name="ecv_compatibility_evidence">Evidência: %1$s</string>
 </resources>

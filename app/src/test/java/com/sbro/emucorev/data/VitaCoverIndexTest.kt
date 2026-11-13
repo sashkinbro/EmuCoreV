@@ -20,6 +20,22 @@ class VitaCoverIndexTest {
     }""")
     private fun index(json: JSONObject = fixture()) = VitaCoverIndex.fromJson(json.toString())
 
+    @Test fun serialLookupUsesOnlyKnownExactIgdbMappingsInDeterministicOrder() {
+        val json = fixture()
+        json.getJSONObject("serials").put("PCSB00002", "42").put("PCSA00003", "43").put("PCSA99999", "999")
+        assertEquals(listOf("PCSA00001", "PCSB00002"), index(json).serialsForIgdbId(42))
+        assertEquals(listOf("PCSA00003"), index(json).serialsForIgdbId(43))
+        for (id in listOf(-1L, 0L, 999L, Long.MAX_VALUE)) assertTrue(index(json).serialsForIgdbId(id).isEmpty())
+    }
+
+    @Test fun serialLookupNeverResurrectsConflictsOrDerivesNeighboringRegions() {
+        val json = fixture()
+        json.getJSONObject("serials").put("pcsa-00001", "43").put("PCSE00001", "42")
+        assertEquals(listOf("PCSE00001"), index(json).serialsForIgdbId(42))
+        assertTrue(index(json).serialsForIgdbId(43).isEmpty())
+        assertFalse(index(json).serialsForIgdbId(42).contains("PCSB00001"))
+    }
+
     @Test fun exactIdentityAndStyles() {
         val cover = index().find("pcsa-00001")
         assertNotNull(cover)

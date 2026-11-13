@@ -1608,4 +1608,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">選択したドライバーのファイルが無効です。再インストールしてください。</string>
     <string name="settings_gpu_driver_device_catalog">%1$s（端末カタログ）</string>
     <string name="settings_gpu_driver_device_unknown">GPUハードウェアを識別できませんでした。</string>
+    <string name="ecv_compatibility_title">ECV互換性</string>
+    <string name="ecv_compatibility_not_tested">ECVでは未テスト</string>
+    <string name="ecv_compatibility_run_count">ECVテスト回数: %1$d</string>
+    <string name="ecv_compatibility_title_id">タイトルID: %1$s</string>
+    <string name="ecv_compatibility_device">端末: %1$s</string>
+    <string name="ecv_compatibility_app_version">アプリ: %1$s</string>
+    <string name="ecv_compatibility_core_version">コア: %1$s</string>
+    <string name="ecv_compatibility_tested_on">テスト日: %1$s</string>
+    <string name="ecv_compatibility_soc">CPU: %1$s</string>
+    <string name="ecv_compatibility_gpu">GPU: %1$s</string>
+    <string name="ecv_compatibility_gameplay">ゲームプレイ</string>
+    <string name="ecv_compatibility_graphics">グラフィックス</string>
+    <string name="ecv_compatibility_audio">音声</string>
+    <string name="ecv_compatibility_quick_save">クイックセーブ</string>
+    <string name="ecv_compatibility_warm_load">実行中の読み込み</string>
+    <string name="ecv_compatibility_cold_load">新規起動後の読み込み</string>
+    <string name="ecv_compatibility_passed">成功</string>
+    <string name="ecv_compatibility_failed">失敗</string>
+    <string name="ecv_compatibility_limited">制限あり</string>
+    <string name="ecv_compatibility_unknown">未テスト</string>
+    <string name="ecv_compatibility_notes">メモ: %1$s</string>
+    <string name="ecv_compatibility_settings">レンダラー設定</string>
+    <string name="ecv_compatibility_evidence">検証資料: %1$s</string>
 </resources>

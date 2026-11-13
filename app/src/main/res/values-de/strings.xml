@@ -1604,4 +1604,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">Die Dateien des ausgewählten Treibers sind ungültig. Installiere den Treiber erneut.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (Gerätekatalog)</string>
     <string name="settings_gpu_driver_device_unknown">Die GPU-Hardware wurde nicht erkannt.</string>
+    <string name="ecv_compatibility_title">ECV-Kompatibilität</string>
+    <string name="ecv_compatibility_not_tested">Nicht mit ECV getestet</string>
+    <string name="ecv_compatibility_run_count">ECV-Testläufe: %1$d</string>
+    <string name="ecv_compatibility_title_id">Titel-ID: %1$s</string>
+    <string name="ecv_compatibility_device">Gerät: %1$s</string>
+    <string name="ecv_compatibility_app_version">App: %1$s</string>
+    <string name="ecv_compatibility_core_version">Kern: %1$s</string>
+    <string name="ecv_compatibility_tested_on">Getestet: %1$s</string>
+    <string name="ecv_compatibility_soc">Prozessor: %1$s</string>
+    <string name="ecv_compatibility_gpu">Grafikprozessor: %1$s</string>
+    <string name="ecv_compatibility_gameplay">Spielablauf</string>
+    <string name="ecv_compatibility_graphics">Grafik</string>
+    <string name="ecv_compatibility_audio">Audio</string>
+    <string name="ecv_compatibility_quick_save">Schnellspeichern</string>
+    <string name="ecv_compatibility_warm_load">Laden im laufenden Betrieb</string>
+    <string name="ecv_compatibility_cold_load">Laden nach Neustart</string>
+    <string name="ecv_compatibility_passed">Bestanden</string>
+    <string name="ecv_compatibility_failed">Fehlgeschlagen</string>
+    <string name="ecv_compatibility_limited">Eingeschränkt</string>
+    <string name="ecv_compatibility_unknown">Nicht getestet</string>
+    <string name="ecv_compatibility_notes">Notizen: %1$s</string>
+    <string name="ecv_compatibility_settings">Renderer-Einstellungen</string>
+    <string name="ecv_compatibility_evidence">Nachweis: %1$s</string>
 </resources>

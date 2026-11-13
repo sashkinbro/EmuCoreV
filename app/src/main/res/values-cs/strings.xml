@@ -1608,4 +1608,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">Soubory vybraného ovladače jsou neplatné. Nainstalujte ovladač znovu.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (katalog zařízení)</string>
     <string name="settings_gpu_driver_device_unknown">Hardware GPU nebyl rozpoznán.</string>
+    <string name="ecv_compatibility_title">Kompatibilita s ECV</string>
+    <string name="ecv_compatibility_not_tested">V ECV netestováno</string>
+    <string name="ecv_compatibility_run_count">Počet testů v ECV: %1$d</string>
+    <string name="ecv_compatibility_title_id">ID titulu: %1$s</string>
+    <string name="ecv_compatibility_device">Zařízení: %1$s</string>
+    <string name="ecv_compatibility_app_version">Aplikace: %1$s</string>
+    <string name="ecv_compatibility_core_version">Jádro: %1$s</string>
+    <string name="ecv_compatibility_tested_on">Testováno: %1$s</string>
+    <string name="ecv_compatibility_soc">Procesor: %1$s</string>
+    <string name="ecv_compatibility_gpu">Grafický procesor: %1$s</string>
+    <string name="ecv_compatibility_gameplay">Hraní</string>
+    <string name="ecv_compatibility_graphics">Grafika</string>
+    <string name="ecv_compatibility_audio">Zvuk</string>
+    <string name="ecv_compatibility_quick_save">Rychlé uložení</string>
+    <string name="ecv_compatibility_warm_load">Načtení za běhu</string>
+    <string name="ecv_compatibility_cold_load">Načtení po novém spuštění</string>
+    <string name="ecv_compatibility_passed">Úspěšné</string>
+    <string name="ecv_compatibility_failed">Neúspěšné</string>
+    <string name="ecv_compatibility_limited">Omezené</string>
+    <string name="ecv_compatibility_unknown">Netestováno</string>
+    <string name="ecv_compatibility_notes">Poznámky: %1$s</string>
+    <string name="ecv_compatibility_settings">Nastavení vykreslování</string>
+    <string name="ecv_compatibility_evidence">Doklad: %1$s</string>
 </resources>

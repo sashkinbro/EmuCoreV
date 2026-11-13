@@ -1608,4 +1608,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">فایل‌های درایور انتخاب‌شده نامعتبرند. درایور را دوباره نصب کنید.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (فهرست دستگاه‌ها)</string>
     <string name="settings_gpu_driver_device_unknown">سخت‌افزار GPU شناسایی نشده است.</string>
+    <string name="ecv_compatibility_title">سازگاری با ECV</string>
+    <string name="ecv_compatibility_not_tested">در ECV آزمایش نشده</string>
+    <string name="ecv_compatibility_run_count">دفعات آزمایش در ECV: %1$d</string>
+    <string name="ecv_compatibility_title_id">شناسهٔ عنوان: %1$s</string>
+    <string name="ecv_compatibility_device">دستگاه: %1$s</string>
+    <string name="ecv_compatibility_app_version">برنامه: %1$s</string>
+    <string name="ecv_compatibility_core_version">هسته: %1$s</string>
+    <string name="ecv_compatibility_tested_on">تاریخ آزمایش: %1$s</string>
+    <string name="ecv_compatibility_soc">پردازنده: %1$s</string>
+    <string name="ecv_compatibility_gpu">پردازندهٔ گرافیکی: %1$s</string>
+    <string name="ecv_compatibility_gameplay">روند بازی</string>
+    <string name="ecv_compatibility_graphics">گرافیک</string>
+    <string name="ecv_compatibility_audio">صدا</string>
+    <string name="ecv_compatibility_quick_save">ذخیرهٔ سریع</string>
+    <string name="ecv_compatibility_warm_load">بارگذاری حین اجرا</string>
+    <string name="ecv_compatibility_cold_load">بارگذاری پس از شروع تازه</string>
+    <string name="ecv_compatibility_passed">موفق</string>
+    <string name="ecv_compatibility_failed">ناموفق</string>
+    <string name="ecv_compatibility_limited">محدود</string>
+    <string name="ecv_compatibility_unknown">آزمایش نشده</string>
+    <string name="ecv_compatibility_notes">یادداشت‌ها: %1$s</string>
+    <string name="ecv_compatibility_settings">تنظیمات رندر</string>
+    <string name="ecv_compatibility_evidence">مدرک: %1$s</string>
 </resources>

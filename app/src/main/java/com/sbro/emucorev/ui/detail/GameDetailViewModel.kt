@@ -6,8 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.sbro.emucorev.core.InstallStateBus
 import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.InstalledVitaGame
-import com.sbro.emucorev.data.VitaCompatibilityRepository
-import com.sbro.emucorev.data.VitaCompatibilitySummary
+import com.sbro.emucorev.data.EcvCompatibilityRepository
+import com.sbro.emucorev.data.EcvCompatibilityDataset
+import com.sbro.emucorev.data.EcvCompatibilityUiRun
 import com.sbro.emucorev.data.VitaCatalogDetails
 import com.sbro.emucorev.data.VitaCatalogRepository
 import kotlinx.coroutines.Dispatchers
@@ -21,16 +22,15 @@ data class GameDetailUiState(
     val isLoading: Boolean = true,
     val game: InstalledVitaGame? = null,
     val catalogEntry: VitaCatalogDetails? = null,
-    val compatibility: VitaCompatibilitySummary? = null,
-    val isCatalogAvailable: Boolean = false,
-    val isCompatibilityAvailable: Boolean = false
+    val compatibility: List<EcvCompatibilityUiRun> = emptyList(),
+    val isCatalogAvailable: Boolean = false
 )
 
 class GameDetailViewModel(application: Application) : AndroidViewModel(application) {
 
     private val installedRepository = InstalledGameRepository()
     private val catalogRepository = VitaCatalogRepository(application)
-    private val compatibilityRepository = VitaCompatibilityRepository(application)
+    private val compatibilityRepository = EcvCompatibilityRepository(application)
     private var loadedKey: String? = null
 
     private val _uiState = MutableStateFlow(GameDetailUiState())
@@ -56,19 +56,18 @@ class GameDetailViewModel(application: Application) : AndroidViewModel(applicati
                 hasCatalog && game != null -> game.title.let(catalogRepository::findBestMatchDetails)
                 else -> null
             }
-            val compatibilitySnapshot = compatibilityRepository.getSnapshot()
-            val compatibility = game?.titleId?.let(compatibilitySnapshot::resolve)
-                ?: compatibilitySnapshot.resolve(rawCatalogEntry?.serials.orEmpty(), gameName = rawCatalogEntry?.name)
+            val compatibilitySnapshot = compatibilityRepository.load()
+            // An installed title's unknown result must not inherit another region/catalog serial.
+            val compatibility = detailCompatibilityRows(compatibilitySnapshot, titleId, rawCatalogEntry?.serials.orEmpty())
             val catalogEntry = rawCatalogEntry?.copy(
-                compatibility = compatibilitySnapshot.resolve(rawCatalogEntry.serials, gameName = rawCatalogEntry.name)
+                compatibility = compatibilitySnapshot.rowsFor(rawCatalogEntry.serials)
             )
             _uiState.value = GameDetailUiState(
                 isLoading = false,
                 game = game,
                 catalogEntry = catalogEntry,
                 compatibility = compatibility,
-                isCatalogAvailable = hasCatalog,
-                isCompatibilityAvailable = compatibilitySnapshot.records.isNotEmpty()
+                isCatalogAvailable = hasCatalog
             )
         }
     }
@@ -87,3 +86,12 @@ class GameDetailViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 }
+
+/** Title ID presence is authoritative, even if absent from the reviewed dataset. */
+internal fun detailCompatibilityRows(
+    dataset: EcvCompatibilityDataset,
+    installedTitleId: String?,
+    catalogSerials: List<String>
+): List<EcvCompatibilityUiRun> = dataset.rowsFor(
+    if (installedTitleId != null) listOf(installedTitleId) else catalogSerials
+)

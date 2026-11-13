@@ -1604,4 +1604,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">Los archivos del controlador seleccionado no son válidos. Vuelve a instalarlo.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (catálogo de dispositivos)</string>
     <string name="settings_gpu_driver_device_unknown">No se ha identificado el hardware de la GPU.</string>
+    <string name="ecv_compatibility_title">Compatibilidad con ECV</string>
+    <string name="ecv_compatibility_not_tested">Sin probar en ECV</string>
+    <string name="ecv_compatibility_run_count">Pruebas en ECV: %1$d</string>
+    <string name="ecv_compatibility_title_id">ID del título: %1$s</string>
+    <string name="ecv_compatibility_device">Dispositivo: %1$s</string>
+    <string name="ecv_compatibility_app_version">Aplicación: %1$s</string>
+    <string name="ecv_compatibility_core_version">Núcleo: %1$s</string>
+    <string name="ecv_compatibility_tested_on">Fecha de prueba: %1$s</string>
+    <string name="ecv_compatibility_soc">Procesador: %1$s</string>
+    <string name="ecv_compatibility_gpu">Procesador gráfico: %1$s</string>
+    <string name="ecv_compatibility_gameplay">Jugabilidad</string>
+    <string name="ecv_compatibility_graphics">Gráficos</string>
+    <string name="ecv_compatibility_audio">Audio</string>
+    <string name="ecv_compatibility_quick_save">Guardado rápido</string>
+    <string name="ecv_compatibility_warm_load">Carga durante la ejecución</string>
+    <string name="ecv_compatibility_cold_load">Carga tras un inicio nuevo</string>
+    <string name="ecv_compatibility_passed">Correcto</string>
+    <string name="ecv_compatibility_failed">Fallido</string>
+    <string name="ecv_compatibility_limited">Limitado</string>
+    <string name="ecv_compatibility_unknown">Sin probar</string>
+    <string name="ecv_compatibility_notes">Notas: %1$s</string>
+    <string name="ecv_compatibility_settings">Ajustes del renderizador</string>
+    <string name="ecv_compatibility_evidence">Evidencia: %1$s</string>
 </resources>

@@ -1604,4 +1604,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">I file del driver selezionato non sono validi. Reinstalla il driver.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (catalogo dei dispositivi)</string>
     <string name="settings_gpu_driver_device_unknown">L’hardware della GPU non è stato identificato.</string>
+    <string name="ecv_compatibility_title">Compatibilità con ECV</string>
+    <string name="ecv_compatibility_not_tested">Non testato su ECV</string>
+    <string name="ecv_compatibility_run_count">Test su ECV: %1$d</string>
+    <string name="ecv_compatibility_title_id">ID del titolo: %1$s</string>
+    <string name="ecv_compatibility_device">Dispositivo: %1$s</string>
+    <string name="ecv_compatibility_app_version">Applicazione: %1$s</string>
+    <string name="ecv_compatibility_core_version">Nucleo: %1$s</string>
+    <string name="ecv_compatibility_tested_on">Data del test: %1$s</string>
+    <string name="ecv_compatibility_soc">Processore: %1$s</string>
+    <string name="ecv_compatibility_gpu">Processore grafico: %1$s</string>
+    <string name="ecv_compatibility_gameplay">Giocabilità</string>
+    <string name="ecv_compatibility_graphics">Grafica</string>
+    <string name="ecv_compatibility_audio">Audio</string>
+    <string name="ecv_compatibility_quick_save">Salvataggio rapido</string>
+    <string name="ecv_compatibility_warm_load">Caricamento durante la sessione</string>
+    <string name="ecv_compatibility_cold_load">Caricamento dopo un nuovo avvio</string>
+    <string name="ecv_compatibility_passed">Superato</string>
+    <string name="ecv_compatibility_failed">Non superato</string>
+    <string name="ecv_compatibility_limited">Limitato</string>
+    <string name="ecv_compatibility_unknown">Non testato</string>
+    <string name="ecv_compatibility_notes">Note: %1$s</string>
+    <string name="ecv_compatibility_settings">Impostazioni di rendering</string>
+    <string name="ecv_compatibility_evidence">Prova: %1$s</string>
 </resources>

@@ -1604,4 +1604,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">चुने गए ड्राइवर की फ़ाइलें अमान्य हैं। ड्राइवर फिर से इंस्टॉल करें।</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (डिवाइस कैटलॉग)</string>
     <string name="settings_gpu_driver_device_unknown">GPU हार्डवेयर की पहचान नहीं हुई है।</string>
+    <string name="ecv_compatibility_title">ECV अनुकूलता</string>
+    <string name="ecv_compatibility_not_tested">ECV पर परीक्षण नहीं हुआ</string>
+    <string name="ecv_compatibility_run_count">ECV परीक्षणों की संख्या: %1$d</string>
+    <string name="ecv_compatibility_title_id">शीर्षक आईडी: %1$s</string>
+    <string name="ecv_compatibility_device">डिवाइस: %1$s</string>
+    <string name="ecv_compatibility_app_version">ऐप: %1$s</string>
+    <string name="ecv_compatibility_core_version">कोर: %1$s</string>
+    <string name="ecv_compatibility_tested_on">परीक्षण की तारीख: %1$s</string>
+    <string name="ecv_compatibility_soc">प्रोसेसर: %1$s</string>
+    <string name="ecv_compatibility_gpu">ग्राफ़िक्स प्रोसेसर: %1$s</string>
+    <string name="ecv_compatibility_gameplay">गेमप्ले</string>
+    <string name="ecv_compatibility_graphics">ग्राफ़िक्स</string>
+    <string name="ecv_compatibility_audio">ऑडियो</string>
+    <string name="ecv_compatibility_quick_save">त्वरित सेव</string>
+    <string name="ecv_compatibility_warm_load">चलते सत्र में लोड</string>
+    <string name="ecv_compatibility_cold_load">नए सत्र में लोड</string>
+    <string name="ecv_compatibility_passed">सफल</string>
+    <string name="ecv_compatibility_failed">विफल</string>
+    <string name="ecv_compatibility_limited">सीमित</string>
+    <string name="ecv_compatibility_unknown">परीक्षण नहीं हुआ</string>
+    <string name="ecv_compatibility_notes">टिप्पणियाँ: %1$s</string>
+    <string name="ecv_compatibility_settings">रेंडरर सेटिंग्स</string>
+    <string name="ecv_compatibility_evidence">साक्ष्य: %1$s</string>
 </resources>

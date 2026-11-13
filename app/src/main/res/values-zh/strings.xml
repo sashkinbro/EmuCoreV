@@ -1603,4 +1603,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">所选驱动文件无效。请重新安装驱动。</string>
     <string name="settings_gpu_driver_device_catalog">%1$s（设备目录）</string>
     <string name="settings_gpu_driver_device_unknown">尚未识别 GPU 硬件。</string>
+    <string name="ecv_compatibility_title">ECV兼容性</string>
+    <string name="ecv_compatibility_not_tested">尚未在ECV上测试</string>
+    <string name="ecv_compatibility_run_count">ECV测试次数：%1$d</string>
+    <string name="ecv_compatibility_title_id">游戏ID：%1$s</string>
+    <string name="ecv_compatibility_device">设备：%1$s</string>
+    <string name="ecv_compatibility_app_version">应用：%1$s</string>
+    <string name="ecv_compatibility_core_version">核心：%1$s</string>
+    <string name="ecv_compatibility_tested_on">测试日期：%1$s</string>
+    <string name="ecv_compatibility_soc">处理器：%1$s</string>
+    <string name="ecv_compatibility_gpu">图形处理器：%1$s</string>
+    <string name="ecv_compatibility_gameplay">游戏运行</string>
+    <string name="ecv_compatibility_graphics">图形</string>
+    <string name="ecv_compatibility_audio">音频</string>
+    <string name="ecv_compatibility_quick_save">快速保存</string>
+    <string name="ecv_compatibility_warm_load">运行中加载</string>
+    <string name="ecv_compatibility_cold_load">重新启动后加载</string>
+    <string name="ecv_compatibility_passed">通过</string>
+    <string name="ecv_compatibility_failed">失败</string>
+    <string name="ecv_compatibility_limited">受限</string>
+    <string name="ecv_compatibility_unknown">未测试</string>
+    <string name="ecv_compatibility_notes">备注：%1$s</string>
+    <string name="ecv_compatibility_settings">渲染器设置</string>
+    <string name="ecv_compatibility_evidence">验证资料：%1$s</string>
 </resources>

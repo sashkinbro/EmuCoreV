@@ -4,10 +4,35 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import java.io.File
 import java.util.Locale
+import java.io.ByteArrayOutputStream
 
 class VitaCatalogRepository(private val context: Context) {
     private val assetName = "catalog/psvita_games.db"
     private val localDbName = "psvita_games.db"
+    private val reviewedSerialIndex: VitaCoverIndex by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        val json = runCatching {
+            context.assets.open("catalog/vita_covers.json").use { input ->
+                val output = ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                val limit = 32 * 1024 * 1024
+                var total = 0
+                while (true) {
+                    var count = input.read(buffer, 0, minOf(buffer.size, limit - total + 1))
+                    if (count < 0) break
+                    if (count == 0) {
+                        val next = input.read()
+                        if (next < 0) break
+                        buffer[0] = next.toByte(); count = 1
+                    }
+                    total += count
+                    require(total <= limit) { "Bundled Vita serial index exceeds its size limit" }
+                    output.write(buffer, 0, count)
+                }
+                output.toString(Charsets.UTF_8.name())
+            }
+        }.getOrDefault("")
+        VitaCoverIndex.fromJson(json)
+    }
 
     fun hasCatalog(): Boolean = getCatalogCount() > 0
 
@@ -332,7 +357,7 @@ class VitaCatalogRepository(private val context: Context) {
     }
 
     private fun loadSerials(database: SQLiteDatabase, igdbId: Long): List<String> {
-        return database.rawQuery(
+        val databaseSerials = database.rawQuery(
             """
             SELECT serial
             FROM game_serials
@@ -347,6 +372,7 @@ class VitaCatalogRepository(private val context: Context) {
                 }
             }
         }
+        return (databaseSerials + reviewedSerialIndex.serialsForIgdbId(igdbId)).distinct()
     }
 
     private fun loadVideos(database: SQLiteDatabase, igdbId: Long): List<String> {

@@ -1608,4 +1608,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">Selected driver files are invalid. Reinstall the driver.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (device catalog)</string>
     <string name="settings_gpu_driver_device_unknown">GPU hardware has not been identified.</string>
+    <string name="ecv_compatibility_title">ECV compatibility</string>
+    <string name="ecv_compatibility_not_tested">Not tested on ECV</string>
+    <string name="ecv_compatibility_run_count">ECV test runs: %1$d</string>
+    <string name="ecv_compatibility_title_id">Title ID: %1$s</string>
+    <string name="ecv_compatibility_device">Device: %1$s</string>
+    <string name="ecv_compatibility_app_version">App: %1$s</string>
+    <string name="ecv_compatibility_core_version">Core: %1$s</string>
+    <string name="ecv_compatibility_tested_on">Tested: %1$s</string>
+    <string name="ecv_compatibility_soc">CPU: %1$s</string>
+    <string name="ecv_compatibility_gpu">GPU: %1$s</string>
+    <string name="ecv_compatibility_gameplay">Gameplay</string>
+    <string name="ecv_compatibility_graphics">Graphics</string>
+    <string name="ecv_compatibility_audio">Audio</string>
+    <string name="ecv_compatibility_quick_save">Quick save</string>
+    <string name="ecv_compatibility_warm_load">Warm load</string>
+    <string name="ecv_compatibility_cold_load">Cold load</string>
+    <string name="ecv_compatibility_passed">Passed</string>
+    <string name="ecv_compatibility_failed">Failed</string>
+    <string name="ecv_compatibility_limited">Limited</string>
+    <string name="ecv_compatibility_unknown">Not tested</string>
+    <string name="ecv_compatibility_notes">Notes: %1$s</string>
+    <string name="ecv_compatibility_settings">Renderer settings</string>
+    <string name="ecv_compatibility_evidence">Evidence: %1$s</string>
 </resources>

@@ -1604,4 +1604,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">Seçilen sürücünün dosyaları geçersiz. Sürücüyü yeniden yükleyin.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (cihaz kataloğu)</string>
     <string name="settings_gpu_driver_device_unknown">GPU donanımı belirlenemedi.</string>
+    <string name="ecv_compatibility_title">ECV uyumluluğu</string>
+    <string name="ecv_compatibility_not_tested">ECV üzerinde test edilmedi</string>
+    <string name="ecv_compatibility_run_count">ECV test sayısı: %1$d</string>
+    <string name="ecv_compatibility_title_id">Oyun kimliği: %1$s</string>
+    <string name="ecv_compatibility_device">Cihaz: %1$s</string>
+    <string name="ecv_compatibility_app_version">Uygulama: %1$s</string>
+    <string name="ecv_compatibility_core_version">Çekirdek: %1$s</string>
+    <string name="ecv_compatibility_tested_on">Test tarihi: %1$s</string>
+    <string name="ecv_compatibility_soc">İşlemci: %1$s</string>
+    <string name="ecv_compatibility_gpu">Grafik işlemcisi: %1$s</string>
+    <string name="ecv_compatibility_gameplay">Oynanış</string>
+    <string name="ecv_compatibility_graphics">Grafikler</string>
+    <string name="ecv_compatibility_audio">Ses</string>
+    <string name="ecv_compatibility_quick_save">Hızlı kayıt</string>
+    <string name="ecv_compatibility_warm_load">Oturum sırasında yükleme</string>
+    <string name="ecv_compatibility_cold_load">Yeni başlangıçtan sonra yükleme</string>
+    <string name="ecv_compatibility_passed">Başarılı</string>
+    <string name="ecv_compatibility_failed">Başarısız</string>
+    <string name="ecv_compatibility_limited">Sınırlı</string>
+    <string name="ecv_compatibility_unknown">Test edilmedi</string>
+    <string name="ecv_compatibility_notes">Notlar: %1$s</string>
+    <string name="ecv_compatibility_settings">İşleyici ayarları</string>
+    <string name="ecv_compatibility_evidence">Kanıt: %1$s</string>
 </resources>

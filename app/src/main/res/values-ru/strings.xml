@@ -1607,4 +1607,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">Файлы выбранного драйвера повреждены. Переустановите драйвер.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (каталог устройств)</string>
     <string name="settings_gpu_driver_device_unknown">Модель GPU не определена.</string>
+    <string name="ecv_compatibility_title">Совместимость с ECV</string>
+    <string name="ecv_compatibility_not_tested">Не проверено в ECV</string>
+    <string name="ecv_compatibility_run_count">Тестовых запусков ECV: %1$d</string>
+    <string name="ecv_compatibility_title_id">ID игры: %1$s</string>
+    <string name="ecv_compatibility_device">Устройство: %1$s</string>
+    <string name="ecv_compatibility_app_version">Приложение: %1$s</string>
+    <string name="ecv_compatibility_core_version">Ядро: %1$s</string>
+    <string name="ecv_compatibility_tested_on">Дата теста: %1$s</string>
+    <string name="ecv_compatibility_soc">Процессор: %1$s</string>
+    <string name="ecv_compatibility_gpu">Графический процессор: %1$s</string>
+    <string name="ecv_compatibility_gameplay">Игровой процесс</string>
+    <string name="ecv_compatibility_graphics">Графика</string>
+    <string name="ecv_compatibility_audio">Звук</string>
+    <string name="ecv_compatibility_quick_save">Быстрое сохранение</string>
+    <string name="ecv_compatibility_warm_load">Загрузка в текущем сеансе</string>
+    <string name="ecv_compatibility_cold_load">Загрузка после нового запуска</string>
+    <string name="ecv_compatibility_passed">Успешно</string>
+    <string name="ecv_compatibility_failed">Ошибка</string>
+    <string name="ecv_compatibility_limited">Ограниченно</string>
+    <string name="ecv_compatibility_unknown">Не проверено</string>
+    <string name="ecv_compatibility_notes">Примечания: %1$s</string>
+    <string name="ecv_compatibility_settings">Настройки рендерера</string>
+    <string name="ecv_compatibility_evidence">Подтверждение: %1$s</string>
 </resources>

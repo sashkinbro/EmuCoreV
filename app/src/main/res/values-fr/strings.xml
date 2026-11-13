@@ -1604,4 +1604,27 @@
     <string name="settings_gpu_driver_status_invalid_selection">Les fichiers du pilote sélectionné sont invalides. Réinstallez le pilote.</string>
     <string name="settings_gpu_driver_device_catalog">%1$s (catalogue des appareils)</string>
     <string name="settings_gpu_driver_device_unknown">Le matériel GPU n’a pas été identifié.</string>
+    <string name="ecv_compatibility_title">Compatibilité ECV</string>
+    <string name="ecv_compatibility_not_tested">Non testé sur ECV</string>
+    <string name="ecv_compatibility_run_count">Tests sur ECV : %1$d</string>
+    <string name="ecv_compatibility_title_id">ID du titre : %1$s</string>
+    <string name="ecv_compatibility_device">Appareil : %1$s</string>
+    <string name="ecv_compatibility_app_version">Application : %1$s</string>
+    <string name="ecv_compatibility_core_version">Cœur : %1$s</string>
+    <string name="ecv_compatibility_tested_on">Testé le : %1$s</string>
+    <string name="ecv_compatibility_soc">Processeur : %1$s</string>
+    <string name="ecv_compatibility_gpu">Processeur graphique : %1$s</string>
+    <string name="ecv_compatibility_gameplay">Jouabilité</string>
+    <string name="ecv_compatibility_graphics">Graphismes</string>
+    <string name="ecv_compatibility_audio">Audio</string>
+    <string name="ecv_compatibility_quick_save">Sauvegarde rapide</string>
+    <string name="ecv_compatibility_warm_load">Chargement en cours de session</string>
+    <string name="ecv_compatibility_cold_load">Chargement après un nouveau démarrage</string>
+    <string name="ecv_compatibility_passed">Réussi</string>
+    <string name="ecv_compatibility_failed">Échec</string>
+    <string name="ecv_compatibility_limited">Limité</string>
+    <string name="ecv_compatibility_unknown">Non testé</string>
+    <string name="ecv_compatibility_notes">Notes : %1$s</string>
+    <string name="ecv_compatibility_settings">Paramètres de rendu</string>
+    <string name="ecv_compatibility_evidence">Preuve : %1$s</string>
 </resources>
