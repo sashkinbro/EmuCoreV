@@ -86,7 +86,8 @@ private val LightColorScheme = lightColorScheme(
     background = LightBackground,
     onBackground = LightOnBackground,
     surface = LightSurface,
-    surfaceTint = Color.Transparent,
+    // Material3 replaces tint alpha at elevation; transparent black would darken light cards.
+    surfaceTint = LightSurface,
     surfaceContainerLow = LightSurfaceContainerLow,
     surfaceContainer = LightSurfaceContainer,
     surfaceContainerHigh = LightSurfaceContainerHigh,
