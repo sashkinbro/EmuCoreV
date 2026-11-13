@@ -50,7 +50,7 @@ This repository contains the Android application, Compose UI, JNI bridge code, b
 
 EmuCoreV currently targets Android with:
 
-- `minSdk 28`
+- `minSdk 29` (Android 10+)
 - `targetSdk 37`
 - package id `com.sbro.emucorev`
 - version `0.2.4` (build `84`)

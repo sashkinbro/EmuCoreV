@@ -10,11 +10,11 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28])
+@Config(sdk = [29])
 @GraphicsMode(GraphicsMode.Mode.LEGACY)
 class DiscordCustomTabsCompatibilityTest {
     @Test
-    fun `discord custom tabs options are available on Android 9`() {
+    fun `discord custom tabs options are available on Android 10`() {
         val intent = CustomTabsIntent.Builder()
             .setBookmarksButtonEnabled(false)
             .setDownloadButtonEnabled(false)
