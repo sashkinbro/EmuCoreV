@@ -860,7 +860,7 @@ static void signal_handler(int sig, siginfo_t *info, void *uct) noexcept {
         ~DepthGuard() { --depth; }
     } depth_guard{ handler_depth };
 
-#ifdef __ANDROID__
+#if defined(__ANDROID__) && !defined(NDEBUG)
     if (sig == SIGBUS) {
         const uintptr_t pc = extract_fault_pc(context);
         const uintptr_t lr = extract_fault_lr(context);
