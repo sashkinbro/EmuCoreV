@@ -529,36 +529,61 @@ bool parse_gpu_state(const std::vector<uint8_t> &data, GpuSnapshot &snapshot, st
 }
 
 bool validate_gpu_state(const GpuSnapshot &snapshot, const MemoryImage &memory, std::string &error) {
-    const auto fail = [&] { error = "invalid GPU snapshot references"; return false; };
-    if ((snapshot.schema_version != 2 && snapshot.schema_version != 3)
-        || snapshot.mapping_method > static_cast<uint32_t>(MappingMethod::NativeBuffer)
-        || !std::isfinite(snapshot.resolution) || snapshot.resolution <= 0 || snapshot.resolution > 16
-        || snapshot.current_frame < 0 || snapshot.current_frame >= renderer::vulkan::MAX_FRAMES_RENDERING
-        || snapshot.targets.size() > max_objects || snapshot.buffers.size() > max_objects || snapshot.clocks.size() > max_objects
-        || snapshot.contexts.size() != snapshot.clocks.size())
-        return fail();
+    error.clear();
+    const auto fail = [&](const std::string &reason) {
+        error = "invalid GPU snapshot references: " + reason;
+        return false;
+    };
+    const auto address_text = [](Address address) {
+        std::ostringstream out;
+        out << "0x" << std::hex << std::uppercase << address;
+        return out.str();
+    };
+    if (snapshot.schema_version != 2 && snapshot.schema_version != 3)
+        return fail("unsupported schema version");
+    if (snapshot.mapping_method > static_cast<uint32_t>(MappingMethod::NativeBuffer))
+        return fail("mapping method is out of range");
+    if (!std::isfinite(snapshot.resolution) || snapshot.resolution <= 0 || snapshot.resolution > 16)
+        return fail("resolution is invalid");
+    if (snapshot.current_frame < 0 || snapshot.current_frame >= renderer::vulkan::MAX_FRAMES_RENDERING)
+        return fail("current frame is out of range");
+    if (snapshot.targets.size() > max_objects || snapshot.buffers.size() > max_objects || snapshot.clocks.size() > max_objects)
+        return fail("GPU object count exceeds limit");
+    if (snapshot.contexts.size() != snapshot.clocks.size())
+        return fail("context and clock counts differ");
     std::set<Address> addresses;
     for (const auto &target : snapshot.targets) {
-        if (!addresses.insert(target.address).second || !memory.contains(target.address, 4)
-            || !vkutil::validate_image_snapshot(target.color, error) || !vkutil::validate_image_snapshot(target.depth_stencil, error)) return fail();
+        if (!addresses.insert(target.address).second)
+            return fail("duplicate render target address " + address_text(target.address));
+        if (!memory.contains(target.address, 4))
+            return fail("render target address is outside saved memory: " + address_text(target.address));
+        if (!vkutil::validate_image_snapshot(target.color, error))
+            return fail("render target color image at " + address_text(target.address) + ": " + error);
+        if (!vkutil::validate_image_snapshot(target.depth_stencil, error))
+            return fail("render target depth image at " + address_text(target.address) + ": " + error);
     }
     addresses.clear();
-    uint64_t previous_end = 0;
     std::map<Address, uint32_t> ranges;
     for (const auto &buffer : snapshot.buffers) {
-        if (!buffer.size || buffer.size % page_size || buffer.size > UINT32_MAX - page_size
-            || !ranges.emplace(buffer.address, buffer.size).second || !memory.contains(buffer.address, buffer.size)) return fail();
+        if (!buffer.size || buffer.size % page_size)
+            return fail("mapped buffer has zero or unaligned size at " + address_text(buffer.address));
+        if (buffer.size > UINT32_MAX - page_size)
+            return fail("mapped buffer exceeds size limit at " + address_text(buffer.address));
+        if (!ranges.emplace(buffer.address, buffer.size).second)
+            return fail("duplicate mapped buffer address " + address_text(buffer.address));
+        if (!memory.contains(buffer.address, buffer.size))
+            return fail("mapped buffer is outside saved memory at " + address_text(buffer.address));
         const uint64_t declared_page_count = snapshot.schema_version == 3
             ? buffer.expected_page_count : buffer.pages.size();
         if (declared_page_count > (uint64_t(buffer.size) + page_size) / page_size)
-            return fail();
+            return fail("mapped buffer page count exceeds allocation at " + address_text(buffer.address));
         if (snapshot.schema_version == 3 && !snapshot.page_store) {
             if (!buffer.pages.empty())
-                return fail();
+                return fail("schema-v3 mapped buffer has pages before page stream at " + address_text(buffer.address));
             continue;
         }
         if (snapshot.schema_version == 3 && buffer.expected_page_count)
-            return fail();
+            return fail("schema-v3 mapped buffer retains an expected page count at " + address_text(buffer.address));
         uint64_t end = 0;
         for (const auto &page : buffer.pages) {
             const bool legacy_payload = snapshot.schema_version == 2 && page.bytes.size() == page_size;
@@ -566,31 +591,55 @@ bool validate_gpu_state(const GpuSnapshot &snapshot, const MemoryImage &memory, 
                 && page.staged_offset != UINT64_MAX && snapshot.page_store
                 && page.staged_offset <= snapshot.page_store->size()
                 && page_size <= snapshot.page_store->size() - page.staged_offset;
-            if (page.offset % page_size || page.offset < end || (!legacy_payload && !staged_payload)
-                || uint64_t(page.offset) + page_size > uint64_t(buffer.size) + page_size) return fail();
+            if (page.offset % page_size)
+                return fail("mapped buffer page offset is unaligned at " + address_text(buffer.address));
+            if (page.offset < end)
+                return fail("mapped buffer pages overlap or are unordered at " + address_text(buffer.address));
+            if (!legacy_payload && !staged_payload)
+                return fail("mapped buffer page payload is missing at " + address_text(buffer.address));
+            if (uint64_t(page.offset) + page_size > uint64_t(buffer.size) + page_size)
+                return fail("mapped buffer page exceeds allocation at " + address_text(buffer.address));
             end = uint64_t(page.offset) + page_size;
         }
     }
+    uint64_t previous_end = 0;
     for (const auto &[address, size] : ranges) {
-        if (address < previous_end) return fail();
+        if (address < previous_end)
+            return fail("mapped buffer ranges overlap at " + address_text(address));
         previous_end = uint64_t(address) + size;
     }
-    if (snapshot.mapping_method != static_cast<uint32_t>(MappingMethod::DoubleBuffer) && !snapshot.buffers.empty()) return fail();
+    if (snapshot.mapping_method != static_cast<uint32_t>(MappingMethod::DoubleBuffer) && !snapshot.buffers.empty())
+        return fail("mapped buffers are present for a non-double-buffer mapping method");
     for (const auto &clock : snapshot.clocks) {
-        if (!addresses.insert(clock.address).second || !memory.contains(clock.address, 4)
-            || !clock.frame || clock.frame == UINT64_MAX || !clock.scene || clock.scene == UINT64_MAX) return fail();
+        if (!addresses.insert(clock.address).second)
+            return fail("clock address is duplicated: " + address_text(clock.address));
+        if (!memory.contains(clock.address, 4))
+            return fail("clock address is outside saved memory: " + address_text(clock.address));
+        if (!clock.frame || clock.frame == UINT64_MAX)
+            return fail("clock frame is zero or reserved at " + address_text(clock.address));
+        if (!clock.scene || clock.scene == UINT64_MAX)
+            return fail("clock scene is zero or reserved at " + address_text(clock.address));
     }
     for (const auto &context : snapshot.contexts) {
-        if (addresses.erase(context.context_address) != 1
-            || !renderer::vulkan::validate_vk_context_snapshot(context, error)
-            || (context.visibility_buffer_address && !memory.contains(context.visibility_buffer_address, context.visibility_stride))) return fail();
+        if (addresses.erase(context.context_address) != 1)
+            return fail("context address has no matching clock: " + address_text(context.context_address));
+        if (!renderer::vulkan::validate_vk_context_snapshot(context, error))
+            return fail("context at " + address_text(context.context_address) + ": " + error);
+        if (context.visibility_buffer_address
+            && !memory.contains(context.visibility_buffer_address, context.visibility_stride))
+            return fail("visibility buffer is outside saved memory at " + address_text(context.visibility_buffer_address));
     }
     for (const auto &color : snapshot.surfaces.colors)
-        if (color.active && !memory.contains(color.guest_address, color.total_bytes)) return fail();
+        if (color.active && !memory.contains(color.guest_address, color.total_bytes))
+            return fail("color surface is outside saved memory at " + address_text(color.guest_address));
     for (const auto &ds : snapshot.surfaces.depth_stencil) {
         if (!ds.active) continue;
-        if (ds.memory_width < 0 || ds.memory_height < 0 || !ds.stride_samples
-            || ds.stride_samples != ds.surface.get_stride()) return fail();
+        if (ds.memory_width < 0 || ds.memory_height < 0)
+            return fail("depth surface has negative dimensions at " + address_text(ds.surface.depth_data.address()));
+        if (!ds.stride_samples)
+            return fail("depth surface has zero stride at " + address_text(ds.surface.depth_data.address()));
+        if (ds.stride_samples != ds.surface.get_stride())
+            return fail("depth surface stride does not match guest descriptor at " + address_text(ds.surface.depth_data.address()));
         const auto format = ds.surface.get_format();
         uint32_t depth_bytes;
         switch (format) {
@@ -601,16 +650,33 @@ bool validate_gpu_state(const GpuSnapshot &snapshot, const MemoryImage &memory, 
         case SCE_GXM_DEPTH_STENCIL_FORMAT_DF32M:
         case SCE_GXM_DEPTH_STENCIL_FORMAT_DF32M_S8:
         case SCE_GXM_DEPTH_STENCIL_FORMAT_S8D24: depth_bytes = 4; break;
-        default: return fail();
+        default: return fail("depth surface format is unsupported at " + address_text(ds.surface.depth_data.address()));
         }
         // memory_width describes the GPU target allocation, not the guest row
         // pitch. The cache producer sizes physical storage from pitch and height.
         const uint64_t samples = uint64_t(ds.stride_samples) * ds.memory_height;
-        if (uint64_t(ds.total_bytes) != samples * depth_bytes
-            || (ds.surface.depth_data && !memory.contains(ds.surface.depth_data.address(), samples * depth_bytes))
-            || (ds.surface.stencil_data && !memory.contains(ds.surface.stencil_data.address(), samples))) return fail();
+        if (uint64_t(ds.total_bytes) != samples * depth_bytes)
+            return fail("depth surface byte count does not match dimensions at " + address_text(ds.surface.depth_data.address()));
+        // memory_height is expanded to the physical sample-rate image when MSAA
+        // is active. Guest backing rows stay at the logical height; using the
+        // expanded image height here can run the reference into unrelated heap
+        // allocations and guard gaps.
+        uint32_t guest_height = static_cast<uint32_t>(ds.memory_height);
+        if (ds.multisample_mode != SCE_GXM_MULTISAMPLE_NONE) {
+            if (guest_height % 2)
+                return fail("multisampled depth surface has an odd physical height at "
+                    + address_text(ds.surface.depth_data.address()));
+            guest_height /= 2;
+        }
+        const uint64_t guest_samples = uint64_t(ds.stride_samples) * guest_height;
+        if (ds.surface.depth_data && !memory.contains(ds.surface.depth_data.address(), guest_samples * depth_bytes))
+            return fail("depth surface address is outside saved memory: " + address_text(ds.surface.depth_data.address()));
+        if (ds.surface.stencil_data && !memory.contains(ds.surface.stencil_data.address(), guest_samples))
+            return fail("stencil surface address is outside saved memory: " + address_text(ds.surface.stencil_data.address()));
     }
-    return renderer::vulkan::validate_surface_cache_snapshot(snapshot.surfaces, error);
+    if (!renderer::vulkan::validate_surface_cache_snapshot(snapshot.surfaces, error))
+        return fail("surface cache: " + error);
+    return true;
 }
 
 bool prepare_gpu_teardown(EmuEnvState &env, std::string &error) {

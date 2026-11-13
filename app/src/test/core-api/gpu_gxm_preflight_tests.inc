@@ -1,5 +1,134 @@
 #include <emucorev/savestate/gpu_state_io.h>
 #include <emucorev/savestate/gxm_state_io.h>
+#include <emucorev/savestate/memory_image.h>
+#include <emucorev/savestate/state_io.h>
+
+namespace {
+std::unique_ptr<emucorev::savestate::MemoryImage> make_gpu_depth_test_memory(
+    const fs::path &root, std::string &error) {
+    using namespace emucorev::savestate;
+    constexpr uint32_t base = 0x10000000;
+    constexpr uint32_t bytes = 2u << 20;
+    BufferWriter data;
+    data.u32(kMemoryImageFormatVersion);
+    data.u32(bytes);
+    data.u32(1);
+    data.u32(base);
+    data.u32(bytes / kMemoryImagePageSize);
+    data.u64(base);
+    data.u32(bytes);
+    data.u32(static_cast<uint32_t>(MemoryChunkEncoding::Zeros));
+    data.u32(0);
+    data.u32(0);
+
+    const auto path = root / "gpu-depth-memory.ecvs";
+    Writer writer;
+    if (!writer.open(path, error)
+        || !writer.write_section(SectionId::Memory, data.data().data(), data.size(), false, error)
+        || !writer.finalize(error))
+        return {};
+    Reader reader;
+    if (!reader.open(path, error) || !reader.validate_sections(error))
+        return {};
+    return MemoryImage::preflight(reader, root, error);
+}
+
+emucorev::savestate::GpuSnapshot make_gpu_depth_test_snapshot(bool stored) {
+    using namespace emucorev::savestate;
+    GpuSnapshot snapshot;
+    snapshot.surfaces.colors.resize(renderer::vulkan::surface_cache_snapshot_slots);
+    snapshot.surfaces.depth_stencil.resize(renderer::vulkan::surface_cache_snapshot_slots);
+    for (uint8_t slot = 0; slot < renderer::vulkan::surface_cache_snapshot_slots; ++slot) {
+        snapshot.surfaces.color_mru_order.push_back(slot);
+        snapshot.surfaces.depth_stencil_mru_order.push_back(slot);
+    }
+
+    auto &depth = snapshot.surfaces.depth_stencil[0];
+    depth.active = true;
+    depth.surface.depth_data = Ptr<void>(0x10000000);
+    depth.surface.set_stride(1920);
+    depth.surface.set_type(SCE_GXM_DEPTH_STENCIL_SURFACE_TILED);
+    depth.surface.set_format(SCE_GXM_DEPTH_STENCIL_FORMAT_D16);
+    depth.memory_width = 1920;
+    depth.memory_height = 1088; // Physical height for 4x MSAA; guest backing has 544 rows.
+    depth.stride_samples = 1920;
+    depth.multisample_mode = SCE_GXM_MULTISAMPLE_4X;
+    depth.depth_content_stored = stored;
+    depth.total_bytes = 1920u * 1088u * 2u;
+    depth.tiling = renderer::vulkan::SurfaceTiling::Tiled;
+    depth.texture.present = true;
+    depth.texture.usage = vk::ImageUsageFlagBits::eDepthStencilAttachment
+        | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst;
+    depth.texture.image.width = depth.texture.image.height = 1;
+    depth.texture.image.format = vk::Format::eD16Unorm;
+    depth.texture.image.layout = vkutil::ImageLayout::DepthStencilReadOnly;
+    depth.texture.image.bytes = { 0x34, 0x12 };
+    return snapshot;
+}
+} // namespace
+
+TEST(GpuGxmPreflight, LegacyGpuSchemaTwoCodecPreservesInlineBufferPages) {
+    using namespace emucorev::savestate;
+    GpuSnapshot source;
+    source.surfaces.colors.resize(renderer::vulkan::surface_cache_snapshot_slots);
+    source.surfaces.depth_stencil.resize(renderer::vulkan::surface_cache_snapshot_slots);
+    for (uint8_t slot = 0; slot < renderer::vulkan::surface_cache_snapshot_slots; ++slot) {
+        source.surfaces.color_mru_order.push_back(slot);
+        source.surfaces.depth_stencil_mru_order.push_back(slot);
+    }
+    GpuSnapshotBuffer buffer;
+    buffer.address = 0x10000000;
+    buffer.size = kGpuSnapshotPageSize;
+    GpuSnapshotPage page;
+    page.offset = 0;
+    page.bytes.resize(kGpuSnapshotPageSize);
+    for (size_t i = 0; i < page.bytes.size(); ++i)
+        page.bytes[i] = static_cast<uint8_t>((i * 37u + 11u) & 0xFF);
+    const auto expected_page = page.bytes;
+    buffer.pages.push_back(std::move(page));
+    source.buffers.push_back(std::move(buffer));
+
+    std::vector<uint8_t> encoded;
+    std::string error;
+    ASSERT_TRUE(encode_gpu_state(source, encoded, error)) << error;
+
+    GpuSnapshot decoded;
+    ASSERT_TRUE(parse_gpu_state(encoded, decoded, error)) << error;
+    EXPECT_EQ(decoded.schema_version, 2u);
+    ASSERT_EQ(decoded.buffers.size(), 1u);
+    EXPECT_EQ(decoded.buffers[0].address, 0x10000000u);
+    EXPECT_EQ(decoded.buffers[0].size, kGpuSnapshotPageSize);
+    ASSERT_EQ(decoded.buffers[0].pages.size(), 1u);
+    EXPECT_EQ(decoded.buffers[0].pages[0].offset, 0u);
+    EXPECT_EQ(decoded.buffers[0].pages[0].bytes, expected_page);
+}
+
+TEST(GpuGxmPreflight, FourXDepthBackingUsesGuestHeightAndRetainsCapturedGpuImage) {
+    using namespace emucorev::savestate;
+    const auto root = fs::temp_directory_path() / fs::unique_path("gpu-depth-preflight-%%%%-%%%%");
+    ASSERT_TRUE(fs::create_directories(root));
+    std::string error;
+    auto memory = make_gpu_depth_test_memory(root, error);
+    ASSERT_TRUE(memory) << error;
+    constexpr Address depth_address = 0x10000000;
+    constexpr uint64_t guest_bytes = 1920u * 544u * 2u;
+    EXPECT_TRUE(memory->contains(depth_address, guest_bytes));
+    EXPECT_FALSE(memory->contains(depth_address, 1920u * 1088u * 2u));
+
+    for (const bool stored : { false, true }) {
+        auto snapshot = make_gpu_depth_test_snapshot(stored);
+        ASSERT_TRUE(validate_gpu_state(snapshot, *memory, error)) << error;
+        EXPECT_EQ(snapshot.surfaces.depth_stencil[0].texture.image.bytes,
+            (std::vector<uint8_t>{ 0x34, 0x12 }));
+
+        snapshot.surfaces.depth_stencil[0].texture.present = false;
+        snapshot.surfaces.depth_stencil[0].texture.image = {};
+        EXPECT_FALSE(validate_gpu_state(snapshot, *memory, error));
+        EXPECT_NE(error.find("surface cache"), std::string::npos) << error;
+    }
+    memory.reset();
+    fs::remove_all(root);
+}
 
 TEST(GpuGxmPreflight, RejectsScaledMacroblocksThatWouldTruncateOrOverflowToZero) {
     using namespace emucorev::savestate;
