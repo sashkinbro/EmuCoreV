@@ -4,6 +4,10 @@ set(VITA3K_APP_VER_HI 0)
 set(VITA3K_APP_VER_MID 2)
 set(VITA3K_APP_VER_LO 1)
 set(VITA3K_APP_VERSION "v${VITA3K_APP_VER_HI}.${VITA3K_APP_VER_MID}.${VITA3K_APP_VER_LO}")
+set(EMUCOREV_APP_NAME "EmuCoreV")
+set(EMUCOREV_APP_VERSION "${EMUCOREV_VERSION_MAJOR}.${EMUCOREV_VERSION_MINOR}")
+set(EMUCOREV_CORE_VERSION "ECV ${EMUCOREV_APP_VERSION}")
+set(EMUCOREV_UPSTREAM_VERSION "Vita3K ${VITA3K_APP_VERSION}")
 
 execute_process(
 	COMMAND git rev-list HEAD --count
@@ -251,7 +255,11 @@ if(NOT ANDROID)
 		COMMENT "Updating Qt translation source file")
 endif()
 
-set_target_properties(vita3k PROPERTIES OUTPUT_NAME Vita3K)
+if(ANDROID)
+	set_target_properties(vita3k PROPERTIES OUTPUT_NAME ECV)
+else()
+	set_target_properties(vita3k PROPERTIES OUTPUT_NAME Vita3K)
+endif()
 
 if(NOT ANDROID)
 	set_target_properties(vita3k PROPERTIES

@@ -44,7 +44,7 @@ constexpr jint k_main_firmware_bit = 1 << 1;
 constexpr jint k_font_firmware_bit = 1 << 2;
 
 std::string format_app_version() {
-    std::string version = app_version;
+    std::string version = core_version;
     version += "-";
     version += std::to_string(app_number);
     version += "-";
@@ -90,7 +90,7 @@ bool initialize_session(
         emuenv = std::make_unique<EmuEnvState>();
 
         Config cfg{};
-        char arg0[] = "vita3k";
+        char arg0[] = "ECV";
         char *argv[] = { arg0, nullptr };
         if (config::init_config(cfg, 1, argv, root_paths, false) != Success) {
             LOG_ERROR("Failed to initialise config.");
@@ -179,7 +179,7 @@ Vita3K_initWithPaths(JNIEnv *env, jstring storage_path_str, jstring vita_path_st
     auto &session = android_session_state();
 
     if (session.emuenv) {
-        LOG_INFO("Vita3K Android already initialised, skipping.");
+        LOG_INFO("EmuCoreV Android already initialised, skipping.");
         return JNI_TRUE;
     }
 
@@ -194,7 +194,7 @@ Vita3K_initWithPaths(JNIEnv *env, jstring storage_path_str, jstring vita_path_st
     session.emuenv = std::move(emuenv);
     session.app_session_controller = std::make_unique<app::AppSessionController>(*session.emuenv);
 
-    LOG_INFO("Vita3K Android initialised.");
+    LOG_INFO("EmuCoreV Android initialised.");
     return JNI_TRUE;
 }
 

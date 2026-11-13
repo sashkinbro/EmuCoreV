@@ -24,7 +24,7 @@ object NativeLibraryLoader {
             synchronized(this) {
                 if (!loaded) {
                     SDL.setContext(appContext)
-                    SDL.loadLibrary("Vita3K", appContext)
+                    SDL.loadLibrary("ECV", appContext)
                     loaded = true
                     // Seed SDL's cached JNI globals (activity class, getContext,
                     // AssetManager) before any native call. Native init scans the

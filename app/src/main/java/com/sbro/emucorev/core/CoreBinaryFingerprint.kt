@@ -17,7 +17,7 @@ object CoreBinaryFingerprint {
 
     private const val TAG = "CoreFingerprint"
     private const val HASH_BUFFER_BYTES = 64 * 1024
-    private const val CORE_LIBRARY_NAME = "Vita3K"
+    private const val CORE_LIBRARY_NAME = "ECV"
 
     fun current(context: Context): String? = runCatching {
         val libraryName = System.mapLibraryName(CORE_LIBRARY_NAME)

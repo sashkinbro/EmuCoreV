@@ -240,7 +240,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
-    override fun getLibraries(): Array<String> = arrayOf("Vita3K")
+    override fun getLibraries(): Array<String> = arrayOf("ECV")
 
     override fun shouldForceFullscreen(): Boolean = true
 

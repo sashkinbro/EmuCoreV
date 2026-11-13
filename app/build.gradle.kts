@@ -81,13 +81,22 @@ val feedbackApiKey = localBuildProperties.getProperty("emucorev.feedback.apiKey"
 
 // AGP gives source-set JNI libraries precedence over CMake outputs. A locally
 // copied core would silently replace the core compiled for this variant,
-// including debug diagnostics and fixes. Only CMake supplies libVita3K.so.
+// including debug diagnostics and fixes. Only CMake supplies the current ECV core.
 val bundledJniLibraries = tasks.register<Sync>("prepareBundledJniLibraries") {
     from("src/main/jniLibs") {
+        exclude("**/libECV.so")
         exclude("**/libVita3K.so")
     }
     into(layout.buildDirectory.dir("generated/bundled-jni-libs"))
 }
+val bundledDebugNativeLibraries = tasks.register<Sync>("prepareBundledDebugNativeLibraries") {
+    from("src/main/cpp/vita3k/android/prebuilt") {
+        exclude("**/libECV.so")
+        exclude("**/libVita3K.so")
+    }
+    into(layout.buildDirectory.dir("generated/bundled-debug-native-libs"))
+}
+val bundledDebugNativeLibrariesDirectory = layout.buildDirectory.dir("generated/bundled-debug-native-libs").get().asFile
 
 android {
     namespace = "com.sbro.emucorev"
@@ -121,7 +130,7 @@ android {
                 arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
                 arguments += "-DOPENSSL_ROOT_DIR=${androidOpenSslRoot.invariantSeparatorsPath}"
                 arguments += "-DOPENSSL_USE_STATIC_LIBS=TRUE"
-                arguments += "-DCMAKE_PROJECT_Vita3K_INCLUDE=${emuCoreVNativeHook.invariantSeparatorsPath}"
+                arguments += "-DCMAKE_PROJECT_ECV_INCLUDE=${emuCoreVNativeHook.invariantSeparatorsPath}"
                 // Android dependencies are vendored by the Vita3K tree. Avoid vcpkg trying
                 // to build host tools with MSVC during ordinary Gradle/Android Studio builds.
                 arguments += "-DVCPKG_MANIFEST_INSTALL=OFF"
@@ -205,7 +214,7 @@ android {
         // Keep it for debug, drop it (~24 MB) from release; the in-app
         // validation setting disables itself gracefully when absent.
         getByName("debug") {
-            jniLibs.srcDir("src/main/cpp/vita3k/android/prebuilt")
+            jniLibs.srcDir(bundledDebugNativeLibrariesDirectory)
         }
     }
 
@@ -230,6 +239,14 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+    }
+}
+
+// SourceSet accepts only static paths. Add an explicit dependency so the filtered
+// generated debug JNI directory is ready before AGP merges native libraries.
+tasks.configureEach {
+    if (name == "mergeDebugJniLibFolders") {
+        dependsOn(bundledDebugNativeLibraries)
     }
 }
 

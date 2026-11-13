@@ -7,7 +7,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Android")
 	include("cmake/vcpkg_android.cmake")
 endif()
 
-project(Vita3K)
+set(EMUCOREV_VERSION_MAJOR 0)
+set(EMUCOREV_VERSION_MINOR 3)
+set(EMUCOREV_VERSION_PATCH 0)
+project(ECV VERSION ${EMUCOREV_VERSION_MAJOR}.${EMUCOREV_VERSION_MINOR}.${EMUCOREV_VERSION_PATCH})
 
 # Discord Social SDK is an optional local build input used by the isolated helper process.
 if(NOT DISCORD_SDK_DIR AND DEFINED ENV{DISCORD_SDK_DIR})

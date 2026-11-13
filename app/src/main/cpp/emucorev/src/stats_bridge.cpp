@@ -37,7 +37,7 @@ Java_com_sbro_emucorev_core_PerformanceStatsBridge_nativeSnapshot(JNIEnv *env, j
     std::ostringstream out;
     out << "{\"gpu\":" << quote(state.get_gpu_name())
         << ",\"backend\":" << quote(state.current_backend == renderer::Backend::Vulkan ? "Vulkan" : "OpenGL")
-        << ",\"core\":" << quote(std::string("Vita3K ") + app_version)
+        << ",\"core\":" << quote(core_version)
         << ",\"paused\":" << (controller->is_paused() ? "true" : "false");
     if (updated > 0 && renderer::PerformanceStatsTelemetry::now_ms() - updated < 3000 && !controller->is_paused())
         out << ",\"fps\":" << uint32_t(packed) << ",\"frameMs\":" << uint32_t(packed >> 32);
