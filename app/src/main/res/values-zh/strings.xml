@@ -1633,4 +1633,21 @@
     <string name="installer_archive_space">可用存储空间不足，无法准备此压缩包。</string>
     <string name="installer_archive_multiple_packages">发现多个安装包。请选择要安装的安装包。</string>
     <string name="installer_archive_corrupt">压缩包已损坏或无法验证其内容。</string>
+    <string name="shader_title">RetroArch 着色器</string>
+    <string name="shader_description">将 Slang 着色器链应用到 Vita 显示图像。</string>
+    <string name="shader_scope_global">全局着色器</string>
+    <string name="shader_scope_game">单游戏着色器</string>
+    <string name="shader_scope_ingame">游戏内着色器</string>
+    <string name="shader_inherited">正在使用全局着色器</string>
+    <string name="shader_use_global">使用全局设置</string>
+    <string name="shader_enabled">启用着色器链</string>
+    <string name="shader_unsupported">RetroArch 着色器需要 Vulkan 和兼容的着色器运行时。</string>
+    <string name="shader_choose_preset">预设</string>
+    <string name="shader_none">无</string>
+    <string name="shader_no_presets">未安装有效预设。</string>
+    <string name="shader_download">下载着色器包</string>
+    <string name="shader_import">导入 ZIP</string>
+    <string name="shader_installing">正在安装着色器包…</string>
+    <string name="shader_parameters">着色器参数</string>
+    <string name="shader_reset_parameters">重置参数</string>
 </resources>

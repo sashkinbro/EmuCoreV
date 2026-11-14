@@ -1484,6 +1484,8 @@ void VKState::render_frame(DisplayState &display, const GxmState &gxm, MemState 
         VKSurfaceCache::PresentSurfaceInfo present_surface{};
         vk::ImageView surface_handle = surface_cache.sourcing_color_surface_for_presentation(
             frame.base, frame.pitch, viewport, &present_surface);
+        emucorev::shaders::ShaderChainImage shader_source{};
+        bool can_run_shader_chain = false;
 
         // Stock Adreno drivers drop render passes under sustained GPU load
         static int last_present_path = -1;
@@ -1524,6 +1526,13 @@ void VKState::render_frame(DisplayState &display, const GxmState &gxm, MemState 
             vita_surface.transition_to(cmd_buffer, vkutil::ImageLayout::SampledImage);
 
             surface_handle = vita_surface.view;
+            shader_source = {
+                static_cast<VkImage>(vita_surface.image),
+                VK_FORMAT_R8G8B8A8_UNORM,
+                static_cast<uint32_t>(frame.image_size.x),
+                static_cast<uint32_t>(frame.image_size.y)
+            };
+            can_run_shader_chain = true;
             viewport = {
                 .offset_x = 0,
                 .offset_y = 0,
@@ -1533,6 +1542,14 @@ void VKState::render_frame(DisplayState &display, const GxmState &gxm, MemState 
                 .texture_height = static_cast<uint32_t>(frame.image_size.y)
             };
             layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        } else if (present_surface.plain_rgba8 && present_surface.image) {
+            shader_source = {
+                static_cast<VkImage>(present_surface.image),
+                VK_FORMAT_R8G8B8A8_UNORM,
+                viewport.texture_width,
+                viewport.texture_height
+            };
+            can_run_shader_chain = true;
         }
 
         const bool need_present_order_barrier = (mapping_method == MappingMethod::PageTable || mapping_method == MappingMethod::NativeBuffer)
@@ -1547,7 +1564,8 @@ void VKState::render_frame(DisplayState &display, const GxmState &gxm, MemState 
                 vk::DependencyFlags(), order_barrier, {}, {});
         }
 
-        screen_renderer.render(surface_handle, layout, viewport);
+        screen_renderer.render(surface_handle, layout, viewport,
+            can_run_shader_chain ? &shader_source : nullptr);
     } else if (has_overlays) {
         screen_renderer.begin_default_render_pass();
     }

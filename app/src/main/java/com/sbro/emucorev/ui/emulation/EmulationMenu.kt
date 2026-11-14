@@ -40,6 +40,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -122,6 +123,8 @@ import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.cheats.cheatPackFingerprint
 import com.sbro.emucorev.ui.cheats.indexCheatEntries
 import com.sbro.emucorev.ui.cheats.category
+import com.sbro.emucorev.ui.shaders.RetroArchShaderFeaturePanel
+import com.sbro.emucorev.ui.shaders.RetroArchShaderUiContext
 import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
 import com.sbro.emucorev.ui.theme.LocalCustomizationSettings
 import com.sbro.emucorev.ui.theme.neon.NeonCrtOverlay
@@ -132,7 +135,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
-private val LiveBadgeColor = Color(0xFF34D27A)
 private val BrokenBadgeColor = Color(0xFFE0575B)
 private val LocalMenuScrollInset = compositionLocalOf { 7.dp }
 
@@ -151,8 +153,9 @@ internal fun runtimeMenuBorder(
     focused: Boolean = false
 ): BorderStroke? = when (role) {
     RuntimeMenuSurfaceRole.Section, RuntimeMenuSurfaceRole.Slider,
-    RuntimeMenuSurfaceRole.Achievement, RuntimeMenuSurfaceRole.SaveSummary,
+    RuntimeMenuSurfaceRole.SaveSummary,
     RuntimeMenuSurfaceRole.Artwork -> null
+    RuntimeMenuSurfaceRole.Achievement -> BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.55f))
     RuntimeMenuSurfaceRole.Outer -> BorderStroke(1.dp, when (style) {
         GameMenuLayoutStyle.SIDEBAR -> scheme.onSurface.copy(alpha = 0.06f)
         GameMenuLayoutStyle.DASHBOARD -> scheme.outlineVariant.copy(alpha = 0.55f)
@@ -487,6 +490,11 @@ private fun MenuSelectedContent(
             )
             EmulationMenuTab.Controls -> ControlsTab(config = config, controlsVisible = controlsVisible, callbacks = callbacks)
             EmulationMenuTab.Display -> DisplayTab(config = config, callbacks = callbacks)
+            EmulationMenuTab.Shaders -> RetroArchShaderFeaturePanel(
+                context = RetroArchShaderUiContext.IN_GAME,
+                titleId = gameId,
+                vulkanRenderer = config.backendRenderer.equals("Vulkan", ignoreCase = true)
+            )
             EmulationMenuTab.Cheats -> if (cheatsAvailable) CheatsTab(gameId = gameId, cheats = cheats, callbacks = callbacks)
             EmulationMenuTab.System -> SystemTab(config = config, callbacks = callbacks)
             EmulationMenuTab.Achievements -> AchievementsTab(gameId = gameId)
@@ -505,6 +513,7 @@ private enum class EmulationMenuTab {
     SaveStates,
     Controls,
     Display,
+    Shaders,
     Cheats,
     System,
     Achievements,
@@ -568,7 +577,6 @@ private fun CheatsTab(gameId: String, cheats: VitaCheatSnapshot, callbacks: Emul
     MenuSection(
         title = stringResource(R.string.emulation_menu_section_cheats),
         subtitle = stringResource(R.string.emulation_menu_section_cheats_desc),
-        badge = MenuBadge.Live
     ) {
         MenuToggleRow(
             label = stringResource(R.string.emulation_cheats_master),
@@ -640,7 +648,6 @@ private fun ControlsTab(config: VitaCoreConfig, controlsVisible: Boolean, callba
     MenuSection(
         title = stringResource(R.string.emulation_menu_section_touch),
         subtitle = stringResource(R.string.emulation_menu_section_touch_desc),
-        badge = MenuBadge.Live
     ) {
         MenuActionRow(
             icon = Icons.Rounded.Edit,
@@ -727,7 +734,6 @@ private fun DisplayTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks
     MenuSection(
         title = stringResource(R.string.emulation_menu_section_performance),
         subtitle = "",
-        badge = MenuBadge.Live
     ) {
         MenuChipRow(
             label = stringResource(R.string.settings_frame_limit),
@@ -1642,7 +1648,8 @@ private fun emulationMenuTabs(): List<EmulationMenuTabItem> = listOf(
     EmulationMenuTabItem(EmulationMenuTab.SaveStates, stringResource(R.string.emulation_tab_savestates), Icons.Rounded.Save),
     EmulationMenuTabItem(EmulationMenuTab.Controls, stringResource(R.string.emulation_tab_controls), Icons.Rounded.Tune),
     EmulationMenuTabItem(EmulationMenuTab.Display, stringResource(R.string.emulation_tab_display), Icons.Rounded.Visibility),
-    EmulationMenuTabItem(EmulationMenuTab.Cheats, stringResource(R.string.emulation_tab_cheats), Icons.Rounded.AutoFixHigh),
+    EmulationMenuTabItem(EmulationMenuTab.Shaders, stringResource(R.string.shader_scope_ingame), Icons.Rounded.AutoFixHigh),
+    EmulationMenuTabItem(EmulationMenuTab.Cheats, stringResource(R.string.emulation_tab_cheats), Icons.Rounded.Extension),
     EmulationMenuTabItem(EmulationMenuTab.System, stringResource(R.string.emulation_tab_system), Icons.Rounded.Settings),
     EmulationMenuTabItem(
         EmulationMenuTab.Achievements,
@@ -1715,7 +1722,7 @@ data class SaveStateMenuState(
     val canInteract: Boolean = true
 )
 
-private enum class MenuBadge { Live, Broken }
+private enum class MenuBadge { Broken }
 
 @Composable
 private fun SheetHandle() {
@@ -1829,7 +1836,7 @@ private fun MenuHeader(
 private fun MenuSection(
     title: String,
     subtitle: String,
-    badge: MenuBadge?,
+    badge: MenuBadge? = null,
     content: @Composable () -> Unit
 ) {
     val palette = emulationMenuPalette()
@@ -1851,10 +1858,6 @@ private fun MenuSection(
                 modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
             )
             when (badge) {
-                MenuBadge.Live -> Badge(
-                    text = stringResource(R.string.emulation_menu_badge_live),
-                    color = LiveBadgeColor
-                )
                 MenuBadge.Broken -> Badge(
                     text = stringResource(R.string.emulation_cheats_broken),
                     color = BrokenBadgeColor
@@ -2000,10 +2003,6 @@ private fun RowBadge(badge: MenuBadge?) {
     if (badge != null) {
         Box(modifier = Modifier.padding(end = 8.dp)) {
             when (badge) {
-                MenuBadge.Live -> Badge(
-                    text = stringResource(R.string.emulation_menu_badge_live),
-                    color = LiveBadgeColor
-                )
                 MenuBadge.Broken -> Badge(
                     text = stringResource(R.string.emulation_cheats_broken),
                     color = BrokenBadgeColor

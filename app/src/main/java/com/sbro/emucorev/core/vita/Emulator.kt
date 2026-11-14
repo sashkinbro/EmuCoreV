@@ -8,6 +8,14 @@ import android.graphics.BitmapFactory
 import android.hardware.input.InputManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Looper
+import android.os.Handler
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.activity.result.ActivityResultRegistry
+import androidx.activity.result.ActivityResultRegistryOwner
+import androidx.activity.result.contract.ActivityResultContract
+import androidx.core.app.ActivityOptionsCompat
+import androidx.compose.runtime.CompositionLocalProvider
 import android.system.Os
 import android.text.InputType
 import android.content.pm.ActivityInfo
@@ -67,6 +75,7 @@ import com.sbro.emucorev.BuildConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -81,6 +90,7 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.ProfilePlayTimeSyncer
+import com.sbro.emucorev.data.RetroArchShaderSessionController
 import com.sbro.emucorev.data.TrophyCloudRepository
 import com.sbro.emucorev.data.TrophySoundRepository
 import com.sbro.emucorev.data.TrophySyncSessionGate
@@ -107,12 +117,30 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     val exitInProgress: Boolean get() = rebirthRequested
     private var sessionUsable = true
     private val exitScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var retroArchShaderSession: RetroArchShaderSessionController? = null
+    private var retroArchShaderApplyJob: Job? = null
+    private var retroArchShaderApplyGeneration = 0L
     private val exitCoordinator = SaveStateExitCoordinator()
     private val menuPauseQueue = MenuPauseQueue(exitScope) { paused -> setAppSessionMenuPaused(paused) }
     private var menuPauseCompletion: Deferred<Unit>? = null
     var autoSaveInProgress by mutableStateOf(false)
         private set
     private lateinit var composeOwners: ComposeOwners
+    private val composeResultOwner = object : ActivityResultRegistryOwner {
+        override val activityResultRegistry = object : ActivityResultRegistry() {
+            override fun <I, O> onLaunch(
+                requestCode: Int, contract: ActivityResultContract<I, O>, input: I,
+                options: ActivityOptionsCompat?
+            ) {
+                val result = contract.getSynchronousResult(this@Emulator, input)
+                if (result != null) {
+                    Handler(Looper.getMainLooper()).post { dispatchResult(requestCode, result.value) }
+                } else {
+                    startActivityForResult(contract.createIntent(this@Emulator, input), requestCode, options?.toBundle())
+                }
+            }
+        }
+    }
     private var inputManager: InputManager? = null
     private var overlayBackHandler: (() -> Boolean)? = null
     private var overlayMenuButtonRevealHandler: (() -> Unit)? = null
@@ -191,6 +219,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         _currentGameId = gameId
         refreshGamepadRuntimeInputSettings()
         startPlayTimeSessionIfNeeded()
+        requestRetroArchShaderReapply(gameId)
     }
 
     fun playTrophyUnlockSound() {
@@ -333,6 +362,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         VitaCoreConfigRepository(this).ensureDefaultsPersisted()
         refreshGamepadRuntimeInputSettings()
         startPlayTimeSessionIfNeeded()
+        requestRetroArchShaderReapply(currentGameIdOrIntent())
         composeOwners = ComposeOwners().also { it.performCreate(savedInstanceState) }
         inputManager = getSystemService(InputManager::class.java)
         refreshPhysicalGamepadState()
@@ -344,6 +374,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun onResume() {
         super.onResume()
         if (rebirthRequested || isFinishing) return
+        requestRetroArchShaderReapply(currentGameIdOrIntent())
         com.sbro.emucorev.core.input.RearTouchNative.setCamerasSuspended(false)
         KeyboardMouseManager.refreshConnectionState()
         KeyboardMouseManager.refreshPointerCapture()
@@ -385,6 +416,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         try {
             super.quitAfterShutdown()
         } finally {
+            stopRetroArchShaderSession()
             TrophySyncSessionGate.shared.gameStopped()
             runCatching {
                 runBlocking { TrophyCloudRepository(applicationContext).sync() }
@@ -400,6 +432,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         cancelActiveTouches()
         keyboardRequestGeneration++
         finishPlayTimeSessionIfNeeded()
+        stopRetroArchShaderSession()
         inputManager?.unregisterInputDeviceListener(this)
         inputManager = null
         if (::inputOverlay.isInitialized) {
@@ -517,6 +550,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (composeResultOwner.activityResultRegistry.dispatchResult(requestCode, resultCode, data)) return
         super.onActivityResult(requestCode, resultCode, data)
         when (requestCode) {
             CHEAT_IMPORT_CODE -> {
@@ -989,7 +1023,9 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             setContent {
                 val themeMode by preferences.themeModeFlow.collectAsState(initial = preferences.themeMode)
                 EmuCoreVTheme(themeMode = themeMode, enableCrtOverlay = false) {
-                    EmulationOverlayHost(activity = this@Emulator)
+                    CompositionLocalProvider(LocalActivityResultRegistryOwner provides composeResultOwner) {
+                        EmulationOverlayHost(activity = this@Emulator)
+                    }
                 }
             }
         }
@@ -1029,6 +1065,43 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         playTimeSessionLastSeenAt = session.lastSeenAt
         BackupSessionGate.gameStarted()
         DiscordIntegration.setPlaying(title, gameId)
+    }
+
+    private fun requestRetroArchShaderReapply(titleId: String) {
+        runOnUiThread {
+            if (rebirthRequested || isFinishing || isDestroyed) return@runOnUiThread
+            val normalizedTitleId = titleId.trim()
+            if (normalizedTitleId.isBlank()) return@runOnUiThread
+            retroArchShaderApplyJob?.cancel()
+            val generation = ++retroArchShaderApplyGeneration
+            val controller = retroArchShaderSession ?: RetroArchShaderSessionController(applicationContext)
+                .also { retroArchShaderSession = it }
+            retroArchShaderApplyJob = exitScope.launch {
+                try {
+                    controller.applyForTitle(normalizedTitleId) {
+                        generation == retroArchShaderApplyGeneration &&
+                            normalizedTitleId.equals(currentGameIdOrIntent().trim(), ignoreCase = true) &&
+                            !rebirthRequested && !isFinishing && !isDestroyed
+                    }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Log.w(TAG, "Unable to reapply the RetroArch shader selection", error)
+                }
+            }
+        }
+    }
+
+    private fun stopRetroArchShaderSession() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            runOnUiThread { stopRetroArchShaderSession() }
+            return
+        }
+        retroArchShaderApplyGeneration++
+        retroArchShaderApplyJob?.cancel()
+        retroArchShaderApplyJob = null
+        retroArchShaderSession?.stop()
+        retroArchShaderSession = null
     }
 
     private fun finishPlayTimeSessionIfNeeded(scheduleBackup: Boolean = true) {

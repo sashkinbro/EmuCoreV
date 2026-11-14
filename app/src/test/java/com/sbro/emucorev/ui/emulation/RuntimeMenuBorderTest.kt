@@ -13,7 +13,7 @@ class RuntimeMenuBorderTest {
     @Test fun flatContentDoesNotAcquireNestedFramesInAnyLayout() {
         for (style in GameMenuLayoutStyle.entries) {
             for (role in listOf(RuntimeMenuSurfaceRole.Section, RuntimeMenuSurfaceRole.Slider,
-                RuntimeMenuSurfaceRole.Achievement, RuntimeMenuSurfaceRole.SaveSummary, RuntimeMenuSurfaceRole.Artwork)) {
+                RuntimeMenuSurfaceRole.SaveSummary, RuntimeMenuSurfaceRole.Artwork)) {
                 assertNull("$style/$role", runtimeMenuBorder(role, scheme, style))
             }
         }
@@ -21,7 +21,7 @@ class RuntimeMenuBorderTest {
 
     @Test fun onlyActualCardAndNavigationRolesOwnFrames() {
         for (role in listOf(RuntimeMenuSurfaceRole.Outer, RuntimeMenuSurfaceRole.Header,
-            RuntimeMenuSurfaceRole.Settings, RuntimeMenuSurfaceRole.Action,
+            RuntimeMenuSurfaceRole.Settings, RuntimeMenuSurfaceRole.Action, RuntimeMenuSurfaceRole.Achievement,
             RuntimeMenuSurfaceRole.Navigation, RuntimeMenuSurfaceRole.RailNavigation)) {
             assertNotNull(role.name, runtimeMenuBorder(role, scheme))
         }

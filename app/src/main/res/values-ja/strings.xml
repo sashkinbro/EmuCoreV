@@ -1638,4 +1638,21 @@
     <string name="installer_archive_space">このアーカイブを準備するための空き容量が不足しています。</string>
     <string name="installer_archive_multiple_packages">複数のパッケージが見つかりました。インストールするパッケージを選択してください。</string>
     <string name="installer_archive_corrupt">アーカイブが破損しているか、内容を検証できませんでした。</string>
+    <string name="shader_title">RetroArch シェーダー</string>
+    <string name="shader_description">Vita の表示画像に Slang シェーダーチェーンを適用します。</string>
+    <string name="shader_scope_global">全体シェーダー</string>
+    <string name="shader_scope_game">ゲーム別シェーダー</string>
+    <string name="shader_scope_ingame">ゲーム内シェーダー</string>
+    <string name="shader_inherited">全体シェーダーを使用中</string>
+    <string name="shader_use_global">全体設定を使用</string>
+    <string name="shader_enabled">シェーダーチェーンを有効にする</string>
+    <string name="shader_unsupported">RetroArchシェーダーにはVulkanと互換性のあるシェーダーランタイムが必要です。</string>
+    <string name="shader_choose_preset">プリセット</string>
+    <string name="shader_none">なし</string>
+    <string name="shader_no_presets">有効なプリセットがインストールされていません。</string>
+    <string name="shader_download">シェーダーパックをダウンロード</string>
+    <string name="shader_import">ZIP をインポート</string>
+    <string name="shader_installing">シェーダーパックをインストール中…</string>
+    <string name="shader_parameters">シェーダーパラメーター</string>
+    <string name="shader_reset_parameters">パラメーターをリセット</string>
 </resources>

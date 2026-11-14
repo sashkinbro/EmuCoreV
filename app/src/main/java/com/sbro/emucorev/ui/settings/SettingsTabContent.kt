@@ -91,6 +91,8 @@ import com.sbro.emucorev.ui.pro.ProBenefitCards
 import com.sbro.emucorev.ui.pro.ProPurchasePanel
 import com.sbro.emucorev.ui.profile.CloudProfilesDialog
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
+import com.sbro.emucorev.ui.shaders.RetroArchShaderFeaturePanel
+import com.sbro.emucorev.ui.shaders.RetroArchShaderUiContext
 import kotlin.math.roundToInt
 
 private val SettingsSectionContentPadding = 14.dp
@@ -350,6 +352,11 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
         Toggle(stringResource(R.string.settings_import_textures), stringResource(R.string.settings_help_import_textures), uiState.coreConfig.importTextures, { enabled -> viewModel.updateCoreSettings { it.copy(importTextures = enabled) } }, { viewModel.updateCoreSettings { it.copy(importTextures = defaults.importTextures) } })
         Toggle(stringResource(R.string.settings_export_textures), stringResource(R.string.settings_help_export_textures), uiState.coreConfig.exportTextures, { enabled -> viewModel.updateCoreSettings { it.copy(exportTextures = enabled) } }, { viewModel.updateCoreSettings { it.copy(exportTextures = defaults.exportTextures) } })
         Toggle(stringResource(R.string.settings_export_as_png), stringResource(R.string.settings_help_export_as_png), uiState.coreConfig.exportAsPng, { enabled -> viewModel.updateCoreSettings { it.copy(exportAsPng = enabled) } }, { viewModel.updateCoreSettings { it.copy(exportAsPng = defaults.exportAsPng) } })
+        RetroArchShaderFeaturePanel(
+            context = RetroArchShaderUiContext.GLOBAL,
+            vulkanRenderer = uiState.coreConfig.backendRenderer.equals("Vulkan", ignoreCase = true),
+            modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
+        )
     }
 }
 

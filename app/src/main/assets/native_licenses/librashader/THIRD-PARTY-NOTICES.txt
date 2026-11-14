@@ -1,0 +1,146 @@
+librashader-capi Android Vulkan dependency notices
+
+Resolved with cargo metadata --locked --filter-platform aarch64-linux-android.
+The build uses librashader-capi 0.12.0, runtime-vulkan, default features disabled.
+Each package license expression below is taken from its Cargo manifest. Available full license/notice files are bundled under third-party/.
+
+adler2 2.0.1 | 0BSD OR MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/oyvindln/adler2/tree/89a031a0f42eeff31c70dc598b398cbf31f1680f
+aho-corasick 1.1.4 | Unlicense OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/BurntSushi/aho-corasick/tree/17f8b32e3b7c845ef3c5429b823804f552f14ec9
+allocator-api2 0.2.21 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/zakarumych/allocator-api2/tree/63cd7fcc2f8854b5821c7054d026e8a4647acde1
+arc-swap 1.9.1 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/vorner/arc-swap/tree/f100e6c2ee762fc08ea5f6ad9ed990e6be723559
+array-concat 0.5.5 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/inspier/array-concat/tree/79ac0b0b5cc878db605535ff060846b389dd7969
+arrayref 0.3.9 | BSD-2-Clause | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/droundy/arrayref/tree/f8d0299d863922db6c409d08098941e833b70d69
+arrayvec 0.7.6 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/bluss/arrayvec/tree/0aede877fe0bfb1ba5e3c2024df8c0958d503a83
+ash 0.38.0+1.3.281 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/ash-rs/ash/tree/b724b78dac8d83879ed7a1aad2b91bb9f2beb5cf/ash
+autocfg 1.5.1 | Apache-2.0 OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/cuviper/autocfg/tree/2799b09c24e6632f8e653c5cd8fc303e85a906ba
+bincode 2.0.1 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/bincode-org/bincode/tree/4673360aa638b2b907dff24538de54f258d157da
+bincode_derive 2.0.1 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/bincode-org/bincode/tree/4673360aa638b2b907dff24538de54f258d157da/derive
+bit-set 0.10.1 | Apache-2.0 OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/contain-rs/bit-set/tree/983a10881ae578c5bc6cf1eedecc3acc984ecbc8/set
+bit-set 0.8.0 | Apache-2.0 OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/contain-rs/bit-set/tree/2b8861d23b53d63d326d2694ddabde6e7b19fbd0
+bit-vec 0.10.0 | Apache-2.0 OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/contain-rs/bit-vec/tree/983a10881ae578c5bc6cf1eedecc3acc984ecbc8/vec
+bit-vec 0.8.0 | Apache-2.0 OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/contain-rs/bit-vec/tree/16d8d5ed27e9d379ae5d531ffcf7535cd02ef8f3
+bitflags 2.12.1 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/bitflags/bitflags/tree/9196a3a860f6bc367aec3a044fbbebea18a59d01
+blake3 1.8.5 | CC0-1.0 OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/BLAKE3-team/BLAKE3/tree/93a431c78a52d7ccf0f366f106467f5070e6075e
+bytecount 0.6.9 | Apache-2.0/MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/llogiq/bytecount/tree/f06647f90a45ab302d9423dbe85019d595abf8c2
+bytemuck 1.25.0 | Zlib OR Apache-2.0 OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/Lokathor/bytemuck/tree/164cedda0eae131bc6cb67902599f4ec253642ca
+bytemuck_derive 1.10.2 | Zlib OR Apache-2.0 OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/Lokathor/bytemuck/tree/abbebe597e02ac0828bb987c73a3f037cd8d62b5/derive
+byteorder-lite 0.1.0 | Unlicense OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/image-rs/byteorder-lite/tree/7d44da06a48fe10d7e23efd9a932d18a7a2def63
+cc 1.2.63 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/cc-rs/tree/b49589a6a1d207d9d61079ddf599c03ef89b3b55
+cfg-if 1.0.4 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/cfg-if/tree/3510ca6abea34cbbc702509a4e50ea9709925eda
+cfg_aliases 0.2.1 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/katharostech/cfg_aliases/tree/3d55ba79872b61265a7176110a5200df0c9d9e54
+codespan-reporting 0.13.1 | Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/brendanzab/codespan/tree/ef354877a16c83e678051830b260a8f9a53778bd/codespan-reporting
+constant_time_eq 0.4.2 | CC0-1.0 OR MIT-0 OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/cesarb/constant_time_eq/tree/86f38ed9ad4d0500c5472bb8cb2ddc4fe5ac7143
+crc 3.4.0 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/mrhooray/crc-rs/tree/2c8fd9615d620b5a5f8c9556b79a4ca173d6d401
+crc-catalog 2.5.0 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/akhilles/crc-catalog/tree/ed4ad631f22b05055c21a3a4127eb7cf6d75bb62
+crc32fast 1.5.0 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/srijs/rust-crc32fast/tree/dbf4f76cd71cdcc57d9164cbd46890d53ce0423c
+crossbeam-deque 0.8.6 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/crossbeam-rs/crossbeam/tree/ccd83ac4108a2a1b41e9c6e79c87267167d18dfa/crossbeam-deque
+crossbeam-epoch 0.9.18 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/crossbeam-rs/crossbeam/tree/9c3182abebb36bdc9446d75d4644190fef70fa01/crossbeam-epoch
+crossbeam-utils 0.8.21 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/crossbeam-rs/crossbeam/tree/ccd83ac4108a2a1b41e9c6e79c87267167d18dfa/crossbeam-utils
+data-encoding 2.11.0 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/ia0/data-encoding/tree/b4d20e0eeae49cd3514127f2f12048522165b198/lib
+dirs-next 1.0.2 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/xdg-rs/dirs/tree/40a22e6fcc2e2bf413578190bc8b649d8f452b29
+dirs-sys-next 0.1.2 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/xdg-rs/dirs/tree/master/dirs-sys/tree/a3b404648ab17c66dfe8321174c0d010d214f4fe
+either 1.16.0 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rayon-rs/either/tree/8f4ecd9964ea909a7f989a3668a2710310a0e62f
+encoding_rs 0.8.35 | (Apache-2.0 OR MIT) AND BSD-3-Clause | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/hsivonen/encoding_rs/tree/2fa58aecf537cc76ff52c0eb3d5e9f8fda466844
+equivalent 1.0.2 | Apache-2.0 OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/indexmap-rs/equivalent/tree/44cdd44f8b8ebb5f9ae096c7550a5e74ffb7d6ae
+fdeflate 0.3.7 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/image-rs/fdeflate/tree/c365c7e6ffa81feb2e1fb762eed7299f05c9b0ca
+find-msvc-tools 0.1.9 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/cc-rs/tree/0767349e1d1253e6849b4c2af2059db661f54343/find-msvc-tools
+fixedbitset 0.5.7 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/petgraph/fixedbitset/tree/f1db5d17dabc4b8f3ba68c1228a3ee7601c7f33c
+flate2 1.1.9 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/flate2-rs/tree/19ddb18bf11199858fbc6504d079448fafd1606e
+foldhash 0.1.5 | Zlib | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/orlp/foldhash/tree/42461756c3760f9165c90d9626a49e36980a1e47
+foldhash 0.2.0 | Zlib | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/orlp/foldhash/tree/8f878c636fda9c9e93384824ea45e06d03f009f5
+fs2 0.4.3 | MIT/Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index
+getrandom 0.3.4 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-random/getrandom/tree/38e4ad38309a85b56eef4fc759535ccfc322ba9a
+glob 0.3.3 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/glob/tree/952da299a3a98893805133ec852ab29877e64e98
+glslang 0.8.1 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/SnowflakePowered/glslang-rs/tree/877868f2f02ebdaa85f7dcf8575d984ebfdcbc00/glslang
+glslang-sys 0.8.1+275822a | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/SnowflakePowered/glslang-rs/tree/28a76e82a5969e8242119c4d540ffa10088d7c72/glslang-sys
+gpu-allocator 0.28.0 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/Traverse-Research/gpu-allocator/tree/3d4466e3331c43d1f85b937b775427b07d7a32fe
+half 2.7.1 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/VoidStarKat/half-rs/tree/8cc891f3e4aad956eca7fa79b1f42f87ecd141ae
+halfbrown 0.4.0 | Apache-2.0/MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/Licenser/halfbrown/tree/9747ebbf39a0780ab6f97cd310cb0a3940ee71dd
+hashbrown 0.15.5 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/hashbrown/tree/b751eef8e99ccf3652046ef4a9e1ec47c1bfb78d
+hashbrown 0.16.1 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/hashbrown/tree/1876e4f02708b93903d55ef598f68e82a826518f
+hashbrown 0.17.1 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/hashbrown/tree/c62a63a61b7caf2de8f9ecb7b06a66b0ab6bdf3d
+image 0.25.10 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/image-rs/image/tree/76e57184f22772dad1138e96954e57945406b15e
+indexmap 2.14.0 | Apache-2.0 OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/indexmap-rs/indexmap/tree/bcd165baeb12bdf6e57a31d9869e9839e25679c6
+jobserver 0.1.34 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/jobserver-rs/tree/4bcd123ffc997020367416a970ae20577a76a583
+libc 0.2.186 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/libc/tree/42620ffc4109dc32e02f1cae9e63a3f4311b4b71
+libloading 0.8.9 | ISC | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/nagisa/rust_libloading//tree/f4ec9e702de2d0778bccff8525dc44e4cacac2d1
+libm 0.2.16 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/compiler-builtins/tree/dfd2203a4d6110820ad7bb65cafe1bf331a03a3d/libm
+librashader 0.12.0 | MPL-2.0 OR GPL-3.0-only | workspace
+librashader-cache 0.12.0 | MPL-2.0 OR GPL-3.0-only | workspace
+librashader-capi 0.12.0 | MPL-2.0 OR GPL-3.0-only | workspace
+librashader-common 0.12.0 | MPL-2.0 OR GPL-3.0-only | workspace
+librashader-pack 0.12.0 | MPL-2.0 OR GPL-3.0-only | workspace
+librashader-preprocess 0.12.0 | MPL-2.0 OR GPL-3.0-only | workspace
+librashader-presets 0.12.0 | MPL-2.0 OR GPL-3.0-only | workspace
+librashader-reflect 0.12.0 | MPL-2.0 OR GPL-3.0-only | workspace
+librashader-runtime 0.12.0 | MPL-2.0 OR GPL-3.0-only | workspace
+librashader-runtime-vk 0.12.0 | MPL-2.0 OR GPL-3.0-only | workspace
+linked-hash-map 0.5.6 | MIT/Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/contain-rs/linked-hash-map/tree/dfc4a57278b79314b0c1892d6c3918f2e00e249b
+lock_api 0.4.14 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/Amanieu/parking_lot/tree/d7828fff7b5d6327ae608e82db45f888b344449a/lock_api
+log 0.4.32 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/log/tree/a5b5b2113e2767801250af184d6c3971e689ae3b
+memchr 2.8.1 | Unlicense OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/BurntSushi/memchr/tree/ff7dca72388ade97ec536f550271fe5acab0a05f
+miniz_oxide 0.8.9 | MIT OR Zlib OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide/tree/44e43c7786e379b2b1a7fde4aa0e63be719e583d/miniz_oxide
+moxcms 0.8.1 | BSD-3-Clause OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/awxkee/moxcms/tree/c4affa196727d17f21a7f6f148a558867decb470
+naga 30.0.0 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/gfx-rs/wgpu/tree/8bf3e5ff4ab45e2c150e0d6c70d01d25f5b126c1/naga
+naga-types 30.0.0 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/gfx-rs/wgpu/tree/8bf3e5ff4ab45e2c150e0d6c70d01d25f5b126c1/naga-types
+nom 8.0.0 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-bakery/nom/tree/2cec1b3e4c9ccac62c902d60c00de6d1549ccbe1
+nom_locate 5.0.0 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/fflorent/nom_locate/tree/965e7c0ab8605a9c60ffb0f529bde660eefc1da5
+num-derive 0.4.2 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-num/num-derive/tree/7cc33515dd2ae0eb43c5795c50ce49c554e8ba02
+num-traits 0.2.19 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-num/num-traits/tree/7ec3d41d39b28190ec1d42db38021107b3951f3a
+once_cell 1.21.4 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/matklad/once_cell/tree/80fe900b21f6d76c1a2ed74d3343e8a3a88c46d0
+parking_lot 0.12.5 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/Amanieu/parking_lot/tree/d7828fff7b5d6327ae608e82db45f888b344449a
+parking_lot_core 0.9.12 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/Amanieu/parking_lot/tree/d7828fff7b5d6327ae608e82db45f888b344449a/core
+paste 1.0.15 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/dtolnay/paste/tree/a2c7e27875277450ed28147623ba5218dd23e732
+persy 1.7.1 | MPL-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://gitlab.com/persy/persy/tree/152969e1e211b095013a231563633e3c1c81babc
+petgraph 0.8.3 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/petgraph/petgraph/tree/162903562ce5b00cdba390a0d9c1bb80f1c75bf5
+platform-dirs 0.3.0 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/cjbassi/platform-dirs-rs/tree/836c5412ea8d5980c8b24e867a093d9c97e5a4e2
+png 0.18.1 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/image-rs/image-png/tree/2a3f980245e3ae38b82ade96533e7b450e8477bb
+ppv-lite86 0.2.21 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/cryptocorrosion/cryptocorrosion/tree/000a6cd6bbcb0b091381dc5f8fe6d6efa480b818/utils-simd/ppv-lite86
+presser 0.3.1 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/EmbarkStudios/presser/tree/eea263995892b761aae6307b0c2952cc7170a6bb
+proc-macro2 1.0.106 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/dtolnay/proc-macro2/tree/58ab776b95a4c2865554badbb6629c50971a9118
+pxfm 0.1.29 | BSD-3-Clause OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/awxkee/pxfm/tree/fbf859ceb1f3f90e1daf5281aa5d60b8e01e009e
+quote 1.0.45 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/dtolnay/quote/tree/842ffde933fdd76cd1681a288bed136d8b95a97a
+rand 0.9.4 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-random/rand/tree/ba4c4c62d5a3dc73a5c975a53d9a139372c011cc
+rand_chacha 0.9.0 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-random/rand/tree/96f8df65ee6b4368d91a006f9c5b4a8050abae49/rand_chacha
+rand_core 0.9.5 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-random/rand/tree/a34dab266970cd0986ecbefe6b5b7afa619234f4
+rayon 1.12.0 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rayon-rs/rayon/tree/c9ced185ae3508246a9eb70c8407a1199bb1b77f
+rayon-core 1.13.0 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rayon-rs/rayon/tree/7af20d7692d5decbcb4adcaa079cd607e3e50814/rayon-core
+regex 1.12.3 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/regex/tree/b028e4f40eac8959d05e82abf8404906b1c565c0
+regex-automata 0.4.14 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/regex/tree/5e195de266e203441b2c8001d6ebefab1161a59e/regex-automata
+regex-syntax 0.8.10 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/regex/tree/839d16bc65b60e2006d3599d20bfa6efc14049d8/regex-syntax
+rspirv 0.13.0+sdk-1.4.341.0 | Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/gfx-rs/rspirv/tree/8afc3d0ac8e158128cd1410bb2e4b4c26ab11bb4/rspirv
+rustc-hash 1.1.0 | Apache-2.0/MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang-nursery/rustc-hash/tree/6fc9a706a9312ee801c7e77ca06c0782fa9eadef
+rustc-hash 2.1.2 | Apache-2.0 OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/rust-lang/rustc-hash/tree/fdb275c8a0135403067ce1c4be8e97e53c473764
+rustversion 1.0.22 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/dtolnay/rustversion/tree/9e86f839b6a34a7d9398f243d88bf400b7fa1f7c
+scopeguard 1.2.0 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/bluss/scopeguard/tree/bb988222848d39b0b9037b29da3a3a1eb05ebf4b
+serde 1.0.228 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/serde-rs/serde/tree/a866b336f14aa57a07f0d0be9f8762746e64ecb4/serde
+serde_core 1.0.228 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/serde-rs/serde/tree/a866b336f14aa57a07f0d0be9f8762746e64ecb4/serde_core
+serde_derive 1.0.228 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/serde-rs/serde/tree/a866b336f14aa57a07f0d0be9f8762746e64ecb4/serde_derive
+shlex 2.0.1 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/comex/rust-shlex/tree/e82b1411beb7c92871c2c078c9ab415bbcf207ef
+simd-adler32 0.3.9 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/mcountryman/simd-adler32/tree/0b94f6a278f5662f24d311c9c1f16bcf272b7f43
+smallvec 1.15.1 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/servo/rust-smallvec/tree/d0f47a3ea99296498ee940b5d99f59b403c498a2
+smartstring 1.0.1 | MPL-2.0+ | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/bodil/smartstring/tree/e407ca23c747257a812d2d2e70bf336412718c3a
+spirv 0.4.0+sdk-1.4.341.0 | Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/gfx-rs/rspirv/tree/8afc3d0ac8e158128cd1410bb2e4b4c26ab11bb4/spirv
+spirv-cross-sys 0.7.2+38681a3 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/SnowflakePowered/spirv-cross2/tree/64316855fdb6a1104be383940cbf35caeded7363/spirv-cross-sys
+spirv-cross2 0.7.1 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/SnowflakePowered/spirv-cross2/tree/23a81727600e72086f3b24a528511d4fd0949f3b/spirv-cross2
+spirv-cross2-derive 0.1.0 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/SnowflakePowered/spirv-cross2/tree/aded817c71e0b5fb6171cc3b396352075de6acda/spirv-cross2-derive
+sptr 0.3.2 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/Gankra/sptr/tree/e59792814876b4948279ec3121921fbe827b1077
+static_assertions 1.1.0 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/nvzqz/static-assertions-rs/tree/18bc65a094d890fe1faa5d3ccb70f12b89eabf56
+strumbra 0.6.0 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://gitlab.com/ltungv/strumbra/tree/daa1885666e50ae2b40ba963ae8e20ad5bee6579
+syn 2.0.117 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/dtolnay/syn/tree/7bcb37cdb3399977658c8b52d2441d37e42e48f2
+thiserror 1.0.69 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/dtolnay/thiserror/tree/41938bd3a03a70d34ed8e53d99c89c770c7c9c41
+thiserror 2.0.18 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/dtolnay/thiserror/tree/dc0f6a23a3fb6ae34ef117133ec43650450c4b32
+thiserror-impl 1.0.69 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/dtolnay/thiserror/tree/41938bd3a03a70d34ed8e53d99c89c770c7c9c41/impl
+thiserror-impl 2.0.18 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/dtolnay/thiserror/tree/dc0f6a23a3fb6ae34ef117133ec43650450c4b32/impl
+unicode-ident 1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/dtolnay/unicode-ident/tree/5b54a632702b5744a1c40ea01c127c0ac0498172
+unicode-width 0.2.2 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/unicode-rs/unicode-width/tree/9d98411769fe13c7c18cab0b3fbbab29ba8350ea
+unsigned-varint 0.8.0 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/paritytech/unsigned-varint/tree/10d55e5dbdd7f61b6495bd12a49d06df82e08612
+unty 0.0.4 | MIT OR Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/bincode-org/unty/tree/5455639ae05f42202a270f16bb4d79f6791d9b70
+vec_extract_if_polyfill 0.1.0 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/chyyran/vec_extract_if_polyfill/tree/11267b12cc4ec3350026bd496654eb17746eaed6
+version_check 0.9.5 | MIT/Apache-2.0 | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/SergioBenitez/version_check/tree/d77ef9f27cc336719b2d839d09ee6635dd22f758
+virtue 0.0.18 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/bincode-org/virtue/tree/1ecc01325a038c4f28aa8de25caae7c6eb91c66f
+zerocopy 0.8.50 | BSD-2-Clause OR Apache-2.0 OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/google/zerocopy/tree/f70e4224996ed73b2cd927719246361d977a629e
+zerocopy-derive 0.8.50 | BSD-2-Clause OR Apache-2.0 OR MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/google/zerocopy/tree/f70e4224996ed73b2cd927719246361d977a629e/zerocopy-derive
+zigzag 0.1.0 | MIT | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/That3Percent/zigzag/tree/f3e88ea38f99bd4b28b17fcc1afbba4071a98645
+zune-core 0.5.1 | MIT OR Apache-2.0 OR Zlib | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/etemesi254/zune-image/tree/bf30e1ecb9034964bfa251189173328a8a1380a8/crates/zune-core
+zune-jpeg 0.5.15 | MIT OR Apache-2.0 OR Zlib | registry+https://github.com/rust-lang/crates.io-index; vcs=https://github.com/etemesi254/zune-image/tree/dev/crates/zune-jpeg/tree/31d81fed7551c8ccea456d9d8e2b1fd8bebb6995/crates/zune-jpeg

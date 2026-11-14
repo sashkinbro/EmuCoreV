@@ -1634,4 +1634,21 @@
     <string name="installer_archive_space">इस आर्काइव को तैयार करने के लिए पर्याप्त खाली स्टोरेज नहीं है।</string>
     <string name="installer_archive_multiple_packages">एक से अधिक पैकेज मिले। इंस्टॉल करने के लिए एक पैकेज चुनें।</string>
     <string name="installer_archive_corrupt">आर्काइव क्षतिग्रस्त है या इसकी सामग्री सत्यापित नहीं की जा सकी।</string>
+    <string name="shader_title">RetroArch शेडर</string>
+    <string name="shader_description">Vita प्रस्तुति छवि पर Slang शेडर श्रृंखला लागू करें।</string>
+    <string name="shader_scope_global">वैश्विक शेडर</string>
+    <string name="shader_scope_game">प्रति-गेम शेडर</string>
+    <string name="shader_scope_ingame">गेम के दौरान शेडर</string>
+    <string name="shader_inherited">वैश्विक शेडर उपयोग में है</string>
+    <string name="shader_use_global">वैश्विक सेटिंग उपयोग करें</string>
+    <string name="shader_enabled">शेडर श्रृंखला सक्षम करें</string>
+    <string name="shader_unsupported">RetroArch शेडर के लिए Vulkan और संगत शेडर रनटाइम आवश्यक हैं।</string>
+    <string name="shader_choose_preset">प्रीसेट</string>
+    <string name="shader_none">कोई नहीं</string>
+    <string name="shader_no_presets">कोई मान्य प्रीसेट इंस्टॉल नहीं है।</string>
+    <string name="shader_download">शेडर पैक डाउनलोड करें</string>
+    <string name="shader_import">ZIP आयात करें</string>
+    <string name="shader_installing">शेडर पैक इंस्टॉल हो रहा है…</string>
+    <string name="shader_parameters">शेडर पैरामीटर</string>
+    <string name="shader_reset_parameters">पैरामीटर रीसेट करें</string>
 </resources>

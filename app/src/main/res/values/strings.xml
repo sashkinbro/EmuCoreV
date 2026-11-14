@@ -1638,4 +1638,21 @@
     <string name="installer_archive_space">Not enough free storage to prepare this archive.</string>
     <string name="installer_archive_multiple_packages">More than one package was found. Select the package to install.</string>
     <string name="installer_archive_corrupt">The archive is damaged or its contents could not be verified.</string>
+    <string name="shader_title">RetroArch shaders</string>
+    <string name="shader_description">Apply a Slang shader chain to the Vita presentation image.</string>
+    <string name="shader_scope_global">Global shader</string>
+    <string name="shader_scope_game">Per-game shader</string>
+    <string name="shader_scope_ingame">In-game shader</string>
+    <string name="shader_inherited">Using the global shader</string>
+    <string name="shader_use_global">Use global setting</string>
+    <string name="shader_enabled">Enable shader chain</string>
+    <string name="shader_unsupported">RetroArch shaders require Vulkan and a compatible shader runtime.</string>
+    <string name="shader_choose_preset">Preset</string>
+    <string name="shader_none">None</string>
+    <string name="shader_no_presets">No valid presets are installed.</string>
+    <string name="shader_download">Download shader pack</string>
+    <string name="shader_import">Import ZIP</string>
+    <string name="shader_installing">Installing shader pack…</string>
+    <string name="shader_parameters">Shader parameters</string>
+    <string name="shader_reset_parameters">Reset parameters</string>
 </resources>

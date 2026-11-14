@@ -35,13 +35,22 @@ function Invoke-Checked([string]$Executable, [string[]]$Arguments) {
 
 # Run separately from installed apps, with an explicit serial and a unique directory.
 $remote = '/data/local/tmp/emucorev-core-tests-' + [Guid]::NewGuid().ToString('N')
+$supportLibraries = @('liblibrashader_capi.so', 'libc++_shared.so') |
+    ForEach-Object { Join-Path $NativeDirectory $_ } |
+    Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
 Invoke-Checked $adb @('-s', $Serial, 'shell', 'mkdir', '-p', $remote)
 try {
     Invoke-Checked $adb @('-s', $Serial, 'push', (Join-Path $NativeDirectory 'emucorev-core-tests'), "$remote/tests")
     Invoke-Checked $adb @('-s', $Serial, 'push', $CoreLibrary, "$remote/$coreSoname")
+    foreach ($support in $supportLibraries) {
+        Invoke-Checked $adb @('-s', $Serial, 'push', $support, "$remote/$([IO.Path]::GetFileName($support))")
+    }
     Invoke-Checked $adb @('-s', $Serial, 'shell', 'chmod', '700', "$remote/tests")
     Invoke-Checked $adb @('-s', $Serial, 'shell', "LD_LIBRARY_PATH=$remote TMPDIR=$remote $remote/tests --gtest_filter=$Filter")
 } finally {
     & $adb -s $Serial shell rm -f "$remote/tests" "$remote/$coreSoname"
+    foreach ($support in $supportLibraries) {
+        & $adb -s $Serial shell rm -f "$remote/$([IO.Path]::GetFileName($support))"
+    }
     & $adb -s $Serial shell rmdir $remote
 }

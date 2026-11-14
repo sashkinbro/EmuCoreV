@@ -1637,4 +1637,21 @@
     <string name="installer_archive_space">Za mało wolnego miejsca, aby przygotować to archiwum.</string>
     <string name="installer_archive_multiple_packages">Znaleziono więcej niż jeden pakiet. Wybierz pakiet do zainstalowania.</string>
     <string name="installer_archive_corrupt">Archiwum jest uszkodzone lub nie udało się zweryfikować jego zawartości.</string>
+    <string name="shader_title">Shadery RetroArch</string>
+    <string name="shader_description">Zastosuj łańcuch shaderów Slang do obrazu Vita.</string>
+    <string name="shader_scope_global">Shader globalny</string>
+    <string name="shader_scope_game">Shader dla gry</string>
+    <string name="shader_scope_ingame">Shader w grze</string>
+    <string name="shader_inherited">Używany jest shader globalny</string>
+    <string name="shader_use_global">Użyj ustawienia globalnego</string>
+    <string name="shader_enabled">Włącz łańcuch shaderów</string>
+    <string name="shader_unsupported">Shadery RetroArch wymagają Vulkan i zgodnego środowiska wykonawczego shaderów.</string>
+    <string name="shader_choose_preset">Ustawienie wstępne</string>
+    <string name="shader_none">Brak</string>
+    <string name="shader_no_presets">Nie zainstalowano prawidłowych ustawień wstępnych.</string>
+    <string name="shader_download">Pobierz pakiet shaderów</string>
+    <string name="shader_import">Importuj ZIP</string>
+    <string name="shader_installing">Instalowanie pakietu shaderów…</string>
+    <string name="shader_parameters">Parametry shadera</string>
+    <string name="shader_reset_parameters">Resetuj parametry</string>
 </resources>

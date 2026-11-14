@@ -96,6 +96,8 @@ import com.sbro.emucorev.ui.settings.PerGameKeyboardMouseSettingsSection
 import com.sbro.emucorev.ui.theme.CardContentPadding
 import com.sbro.emucorev.ui.theme.ScreenContentBottomPadding
 import com.sbro.emucorev.ui.theme.ScreenHorizontalPadding
+import com.sbro.emucorev.ui.shaders.RetroArchShaderFeaturePanel
+import com.sbro.emucorev.ui.shaders.RetroArchShaderUiContext
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
@@ -198,6 +200,7 @@ fun GameManagerScreen(
             item {
                 when (selectedTab) {
                     GameManagerTab.Graphics -> GraphicsProfileSection(
+                        titleId = uiState.selectedTitleId,
                         config = uiState.config,
                         device = device,
                         gameDbRecommendation = uiState.gameDbRecommendation,
@@ -474,6 +477,7 @@ private fun GamePicker(
 
 @Composable
 private fun GraphicsProfileSection(
+    titleId: String?,
     config: VitaCoreConfig,
     device: DeviceGpuSnapshot,
     gameDbRecommendation: GameGpuRecommendation?,
@@ -565,6 +569,11 @@ private fun GraphicsProfileSection(
         ToggleRow(stringResource(R.string.settings_shader_cache), config.shaderCache, stringResource(R.string.settings_help_shader_cache), { onUpdate { it.copy(shaderCache = defaults.shaderCache) } }) { onUpdate { cfg -> cfg.copy(shaderCache = it) } }
         ToggleRow(stringResource(R.string.settings_core_shader_compilation_notice), config.showCompileShaders, stringResource(R.string.settings_help_shader_compilation_notice), { onUpdate { it.copy(showCompileShaders = defaults.showCompileShaders) } }) { onUpdate { cfg -> cfg.copy(showCompileShaders = it) } }
     }
+    RetroArchShaderFeaturePanel(
+        context = RetroArchShaderUiContext.PER_GAME,
+        titleId = titleId,
+        vulkanRenderer = config.backendRenderer.equals("Vulkan", ignoreCase = true)
+    )
 }
 
 @Composable

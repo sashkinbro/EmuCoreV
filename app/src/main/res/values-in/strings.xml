@@ -1638,4 +1638,21 @@
     <string name="installer_archive_space">Ruang penyimpanan kosong tidak cukup untuk menyiapkan arsip ini.</string>
     <string name="installer_archive_multiple_packages">Ditemukan lebih dari satu paket. Pilih paket yang akan diinstal.</string>
     <string name="installer_archive_corrupt">Arsip rusak atau isinya tidak dapat diverifikasi.</string>
+    <string name="shader_title">Shader RetroArch</string>
+    <string name="shader_description">Terapkan rangkaian shader Slang ke gambar tampilan Vita.</string>
+    <string name="shader_scope_global">Shader global</string>
+    <string name="shader_scope_game">Shader per game</string>
+    <string name="shader_scope_ingame">Shader dalam game</string>
+    <string name="shader_inherited">Shader global sedang digunakan</string>
+    <string name="shader_use_global">Gunakan setelan global</string>
+    <string name="shader_enabled">Aktifkan rangkaian shader</string>
+    <string name="shader_unsupported">Shader RetroArch memerlukan Vulkan dan runtime shader yang kompatibel.</string>
+    <string name="shader_choose_preset">Preset</string>
+    <string name="shader_none">Tidak ada</string>
+    <string name="shader_no_presets">Tidak ada preset valid yang terpasang.</string>
+    <string name="shader_download">Unduh paket shader</string>
+    <string name="shader_import">Impor ZIP</string>
+    <string name="shader_installing">Memasang paket shader…</string>
+    <string name="shader_parameters">Parameter shader</string>
+    <string name="shader_reset_parameters">Atur ulang parameter</string>
 </resources>

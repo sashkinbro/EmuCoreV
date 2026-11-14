@@ -1638,4 +1638,21 @@
     <string name="installer_archive_space">K přípravě tohoto archivu není dost volného místa.</string>
     <string name="installer_archive_multiple_packages">Bylo nalezeno více balíčků. Vyberte balíček k instalaci.</string>
     <string name="installer_archive_corrupt">Archiv je poškozený nebo se nepodařilo ověřit jeho obsah.</string>
+    <string name="shader_title">Shadery RetroArch</string>
+    <string name="shader_description">Použít řetězec shaderů Slang na obraz Vita.</string>
+    <string name="shader_scope_global">Globální shader</string>
+    <string name="shader_scope_game">Shader pro hru</string>
+    <string name="shader_scope_ingame">Shader ve hře</string>
+    <string name="shader_inherited">Používá se globální shader</string>
+    <string name="shader_use_global">Použít globální nastavení</string>
+    <string name="shader_enabled">Zapnout řetězec shaderů</string>
+    <string name="shader_unsupported">Shadery RetroArch vyžadují Vulkan a kompatibilní běhové prostředí shaderů.</string>
+    <string name="shader_choose_preset">Předvolba</string>
+    <string name="shader_none">Žádný</string>
+    <string name="shader_no_presets">Nejsou nainstalovány žádné platné předvolby.</string>
+    <string name="shader_download">Stáhnout balíček shaderů</string>
+    <string name="shader_import">Importovat ZIP</string>
+    <string name="shader_installing">Instaluje se balíček shaderů…</string>
+    <string name="shader_parameters">Parametry shaderu</string>
+    <string name="shader_reset_parameters">Obnovit parametry</string>
 </resources>

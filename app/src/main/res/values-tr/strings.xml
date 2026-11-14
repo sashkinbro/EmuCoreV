@@ -1634,4 +1634,21 @@
     <string name="installer_archive_space">Bu arşivi hazırlamak için yeterli boş depolama alanı yok.</string>
     <string name="installer_archive_multiple_packages">Birden fazla paket bulundu. Yüklenecek paketi seçin.</string>
     <string name="installer_archive_corrupt">Arşiv bozuk veya içeriği doğrulanamadı.</string>
+    <string name="shader_title">RetroArch gölgelendiricileri</string>
+    <string name="shader_description">Vita sunum görüntüsüne Slang gölgelendirici zinciri uygular.</string>
+    <string name="shader_scope_global">Genel gölgelendirici</string>
+    <string name="shader_scope_game">Oyuna özel gölgelendirici</string>
+    <string name="shader_scope_ingame">Oyun içi gölgelendirici</string>
+    <string name="shader_inherited">Genel gölgelendirici kullanılıyor</string>
+    <string name="shader_use_global">Genel ayarı kullan</string>
+    <string name="shader_enabled">Gölgelendirici zincirini etkinleştir</string>
+    <string name="shader_unsupported">RetroArch gölgelendiricileri Vulkan ve uyumlu bir gölgelendirici çalışma ortamı gerektirir.</string>
+    <string name="shader_choose_preset">Ön ayar</string>
+    <string name="shader_none">Yok</string>
+    <string name="shader_no_presets">Yüklü geçerli ön ayar yok.</string>
+    <string name="shader_download">Gölgelendirici paketini indir</string>
+    <string name="shader_import">ZIP içe aktar</string>
+    <string name="shader_installing">Gölgelendirici paketi yükleniyor…</string>
+    <string name="shader_parameters">Gölgelendirici parametreleri</string>
+    <string name="shader_reset_parameters">Parametreleri sıfırla</string>
 </resources>

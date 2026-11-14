@@ -20,6 +20,7 @@
 #include <vkutil/objects.h>
 
 #include "screen_filters.h"
+#include "emucorev/shaders/vulkan_shader_chain.h"
 
 #include <atomic>
 #include <memory>
@@ -96,9 +97,14 @@ public:
 
     bool acquire_swapchain_image();
     void begin_default_render_pass();
-    void render(vk::ImageView image_view, vk::ImageLayout layout, const Viewport &viewport);
+    void render(vk::ImageView image_view, vk::ImageLayout layout, const Viewport &viewport,
+        const emucorev::shaders::ShaderChainImage *shader_source = nullptr);
     bool swap_window();
     void set_filter(const std::string_view &filter);
+    void set_retroarch_shader_preset(std::string absolute_path);
+    void set_retroarch_shader_parameter(std::string name, float value);
+    void clear_retroarch_shader_parameters();
+    std::string retroarch_shader_error() const;
 
 private:
     void create_render_pass();
@@ -113,5 +119,7 @@ private:
     bool ensure_swapchain();
     bool rebuild_swapchain_if_visible();
     bool surface_matches_window_size();
+    vk::Viewport display_viewport() const;
+    emucorev::shaders::VulkanShaderChain shader_chain;
 };
 } // namespace renderer::vulkan

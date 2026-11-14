@@ -1,0 +1,6 @@
+Packages with missing or undeclared license file metadata:
+None
+
+Packages whose source distribution has no matching license text file; SPDX expressions remain in THIRD-PARTY-NOTICES.txt:
+sptr 0.3.2: MIT OR Apache-2.0 (upstream/package source has no license text file; see exact source URL in THIRD-PARTY-NOTICES.txt)
+vec_extract_if_polyfill 0.1.0: MIT (upstream/package source has no license text file; see exact source URL in THIRD-PARTY-NOTICES.txt)

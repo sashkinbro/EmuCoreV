@@ -1638,4 +1638,21 @@
     <string name="installer_archive_space">برای آماده‌سازی این آرشیو فضای ذخیره‌سازی کافی نیست.</string>
     <string name="installer_archive_multiple_packages">بیش از یک بسته پیدا شد. بسته‌ای را برای نصب انتخاب کنید.</string>
     <string name="installer_archive_corrupt">آرشیو آسیب دیده است یا محتوای آن قابل تأیید نیست.</string>
+    <string name="shader_title">سایه‌زن‌های RetroArch</string>
+    <string name="shader_description">اعمال زنجیرهٔ سایه‌زن Slang روی تصویر خروجی Vita.</string>
+    <string name="shader_scope_global">سایه‌زن سراسری</string>
+    <string name="shader_scope_game">سایه‌زن هر بازی</string>
+    <string name="shader_scope_ingame">سایه‌زن درون بازی</string>
+    <string name="shader_inherited">سایه‌زن سراسری استفاده می‌شود</string>
+    <string name="shader_use_global">استفاده از تنظیم سراسری</string>
+    <string name="shader_enabled">فعال‌کردن زنجیرهٔ سایه‌زن</string>
+    <string name="shader_unsupported">سایه‌زن‌های RetroArch به Vulkan و محیط اجرای سازگار سایه‌زن نیاز دارند.</string>
+    <string name="shader_choose_preset">پیش‌تنظیم</string>
+    <string name="shader_none">هیچ‌کدام</string>
+    <string name="shader_no_presets">هیچ پیش‌تنظیم معتبری نصب نشده است.</string>
+    <string name="shader_download">بارگیری بستهٔ سایه‌زن</string>
+    <string name="shader_import">درون‌ریزی ZIP</string>
+    <string name="shader_installing">در حال نصب بستهٔ سایه‌زن…</string>
+    <string name="shader_parameters">پارامترهای سایه‌زن</string>
+    <string name="shader_reset_parameters">بازنشانی پارامترها</string>
 </resources>

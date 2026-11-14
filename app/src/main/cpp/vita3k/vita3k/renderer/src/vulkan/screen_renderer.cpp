@@ -21,8 +21,11 @@
 #include "renderer/vulkan/state.h"
 #include "util/log.h"
 #include "vkutil/vkutil.h"
+#include "emucorev/shaders/vulkan_shader_chain.h"
+#include "emucorev/shaders/shader_preset_bridge.h"
 
 #include <cstdint>
+#include <cmath>
 #include <exception>
 
 #ifdef _WIN32
@@ -228,6 +231,7 @@ bool ScreenRenderer::setup() {
 
     filter = std::make_unique<BilinearScreenFilter>(*this);
     filter->init();
+    emucorev::shaders::registerScreenRenderer(this);
 
     return true;
 }
@@ -347,8 +351,10 @@ void ScreenRenderer::destroy_swapchain() {
 }
 
 void ScreenRenderer::cleanup() {
+    emucorev::shaders::unregisterScreenRenderer(this);
     state.device.waitIdle();
 
+    shader_chain.destroy();
     filter.reset();
 
     for (auto &img : vita_surface)
@@ -498,9 +504,142 @@ void ScreenRenderer::begin_default_render_pass() {
     current_cmd_buffer.beginRenderPass(pass_info, vk::SubpassContents::eInline);
 }
 
-void ScreenRenderer::render(vk::ImageView image_view, vk::ImageLayout layout, const Viewport &viewport) {
+void ScreenRenderer::render(vk::ImageView image_view, vk::ImageLayout layout, const Viewport &viewport,
+    const emucorev::shaders::ShaderChainImage *shader_source) {
     if (swapchain_image_idx == ~0 && !acquire_swapchain_image())
         return;
+
+    std::string shader_error;
+    const bool shader_chain_ready = shader_chain.applyPending(
+        static_cast<VkInstance>(state.instance),
+        static_cast<VkPhysicalDevice>(state.physical_device),
+        static_cast<VkDevice>(state.device),
+        static_cast<VkQueue>(state.general_queue),
+        VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr,
+        VULKAN_HPP_DEFAULT_DISPATCHER.vkDeviceWaitIdle,
+        shader_error);
+    if (!shader_error.empty())
+        LOG_ERROR("RetroArch shader preset could not be loaded: {}", shader_error);
+
+    const bool source_is_full_rgba_frame = shader_source && shader_source->image
+        && shader_source->format == VK_FORMAT_R8G8B8A8_UNORM
+        && viewport.offset_x == 0 && viewport.offset_y == 0
+        && viewport.width == viewport.texture_width && viewport.height == viewport.texture_height;
+    if (shader_chain_ready && source_is_full_rgba_frame) {
+        // Librashader records the complete multi-pass chain outside a render pass. Clear
+        // first so aspect-preserving output retains the same black letterbox as built-in
+        // filters, then provide the acquired swapchain image as the final pass target.
+        begin_default_render_pass();
+        current_cmd_buffer.endRenderPass();
+
+        const vk::Image source_image{ shader_source->image };
+        const vk::Image target_image = swapchain_images[swapchain_image_idx];
+        const auto source_read_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        const vk::ImageMemoryBarrier source_to_read{
+            .srcAccessMask = layout == vk::ImageLayout::eGeneral
+                ? vk::AccessFlagBits::eMemoryWrite | vk::AccessFlagBits::eMemoryRead
+                : vk::AccessFlags(),
+            .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+            .oldLayout = layout,
+            .newLayout = source_read_layout,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = source_image,
+            .subresourceRange = vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+        };
+        if (layout != source_read_layout) {
+            current_cmd_buffer.pipelineBarrier(
+                layout == vk::ImageLayout::eGeneral ? vk::PipelineStageFlagBits::eAllCommands : vk::PipelineStageFlagBits::eTopOfPipe,
+                vk::PipelineStageFlagBits::eFragmentShader, vk::DependencyFlags(), {}, {}, source_to_read);
+        }
+
+        const vk::ImageMemoryBarrier target_to_color{
+            .srcAccessMask = vk::AccessFlags(),
+            .dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
+            .oldLayout = vk::ImageLayout::ePresentSrcKHR,
+            .newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = target_image,
+            .subresourceRange = vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+        };
+        current_cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::DependencyFlags(), {}, {}, target_to_color);
+
+        const vk::Viewport viewport_rect = display_viewport();
+        emucorev::shaders::ShaderChainImage target{
+            static_cast<VkImage>(target_image),
+            static_cast<VkFormat>(surface_format.format),
+            extent.width,
+            extent.height
+        };
+        const emucorev::shaders::ShaderChainViewport output_view{
+            viewport_rect.x,
+            viewport_rect.y,
+            static_cast<uint32_t>(std::lround(viewport_rect.width)),
+            static_cast<uint32_t>(std::lround(viewport_rect.height))
+        };
+        const bool shader_rendered = shader_chain.frame(
+            static_cast<VkCommandBuffer>(current_cmd_buffer), *shader_source, target, output_view, shader_error);
+
+        if (layout != source_read_layout) {
+            const vk::ImageMemoryBarrier source_restore{
+                .srcAccessMask = vk::AccessFlagBits::eShaderRead,
+                .dstAccessMask = layout == vk::ImageLayout::eGeneral
+                    ? vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite
+                    : vk::AccessFlags(),
+                .oldLayout = source_read_layout,
+                .newLayout = layout,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = source_image,
+                .subresourceRange = vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+            };
+            current_cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eFragmentShader,
+                layout == vk::ImageLayout::eGeneral ? vk::PipelineStageFlagBits::eAllCommands : vk::PipelineStageFlagBits::eBottomOfPipe,
+                vk::DependencyFlags(), {}, {}, source_restore);
+        }
+
+        if (shader_rendered) {
+            const vk::ImageMemoryBarrier target_to_load{
+                .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
+                .dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
+                .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+                .newLayout = vk::ImageLayout::eGeneral,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = target_image,
+                .subresourceRange = vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+            };
+            current_cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::DependencyFlags(), {}, {}, target_to_load);
+            vk::RenderPassBeginInfo pass_info{
+                .renderPass = post_filter_render_pass,
+                .framebuffer = swapchain_framebuffers[swapchain_image_idx],
+                .renderArea = { .offset = { 0, 0 }, .extent = extent }
+            };
+            current_cmd_buffer.beginRenderPass(pass_info, vk::SubpassContents::eInline);
+        } else {
+            LOG_ERROR("RetroArch shader frame failed; using the selected built-in screen filter: {}", shader_error);
+            begin_default_render_pass();
+            filter->render(false, image_view, layout, viewport);
+        }
+
+#ifdef __ANDROID__
+        const bool keep_single_pass = state.mapping_method == MappingMethod::PageTable
+            || state.mapping_method == MappingMethod::NativeBuffer;
+        if (state.is_adreno_stock && !keep_single_pass) {
+            current_cmd_buffer.endRenderPass();
+            vk::RenderPassBeginInfo stock_pass_info{
+                .renderPass = stock_adreno_pass,
+                .framebuffer = swapchain_framebuffers[swapchain_image_idx],
+                .renderArea = { .offset = { 0, 0 }, .extent = extent }
+            };
+            current_cmd_buffer.beginRenderPass(stock_pass_info, vk::SubpassContents::eInline);
+        }
+#endif
+        return;
+    }
 
     // we need to apply the screen filter at the right moment (before or after we start the render pass depending on it)
     filter->render(true, image_view, layout, viewport);
@@ -534,6 +673,31 @@ void ScreenRenderer::render(vk::ImageView image_view, vk::ImageLayout layout, co
         current_cmd_buffer.beginRenderPass(pass_info, vk::SubpassContents::eInline);
     }
 #endif
+}
+
+vk::Viewport ScreenRenderer::display_viewport() const {
+    vk::Viewport viewport{};
+    const float window_aspect = static_cast<float>(extent.width) / extent.height;
+    constexpr float vita_aspect = static_cast<float>(DEFAULT_RES_WIDTH) / DEFAULT_RES_HEIGHT;
+    const bool fullscreen_hd_res_pixel_perfect_en = state.fullscreen_hd_res_pixel_perfect
+        && state.fullscreen && !(extent.width % DEFAULT_RES_WIDTH) && !(extent.height % (DEFAULT_RES_HEIGHT - 4));
+    if (state.stretch_the_display_area && !fullscreen_hd_res_pixel_perfect_en) {
+        viewport.width = static_cast<float>(extent.width);
+        viewport.height = static_cast<float>(extent.height);
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+    } else if (window_aspect > vita_aspect && !fullscreen_hd_res_pixel_perfect_en) {
+        viewport.width = extent.height * vita_aspect;
+        viewport.height = static_cast<float>(extent.height);
+        viewport.x = (extent.width - viewport.width) / 2.0f;
+        viewport.y = 0.0f;
+    } else {
+        viewport.width = static_cast<float>(extent.width);
+        viewport.height = extent.width / vita_aspect;
+        viewport.x = 0.0f;
+        viewport.y = (extent.height - viewport.height) / 2.0f;
+    }
+    return viewport;
 }
 
 bool ScreenRenderer::swap_window() {
@@ -603,6 +767,22 @@ void ScreenRenderer::set_filter(const std::string_view &filter) {
         this->filter = std::make_unique<BilinearScreenFilter>(*this);
 
     this->filter->init();
+}
+
+void ScreenRenderer::set_retroarch_shader_preset(std::string absolute_path) {
+    shader_chain.requestPreset(std::move(absolute_path));
+}
+
+void ScreenRenderer::set_retroarch_shader_parameter(std::string name, float value) {
+    shader_chain.setParameter(std::move(name), value);
+}
+
+void ScreenRenderer::clear_retroarch_shader_parameters() {
+    shader_chain.clearParameters();
+}
+
+std::string ScreenRenderer::retroarch_shader_error() const {
+    return shader_chain.lastError();
 }
 
 void ScreenRenderer::create_layout_sync() {

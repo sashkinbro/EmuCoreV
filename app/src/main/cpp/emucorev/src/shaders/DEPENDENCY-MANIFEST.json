@@ -1,0 +1,28 @@
+{
+  "name": "librashader-capi",
+  "version": "0.12.0",
+  "repository": "https://github.com/SnowflakePowered/librashader",
+  "sourceCommit": "87e8a97b50516d997defeaa168173dcd185d4022",
+  "cargoLockSha256": "DCEC8CD616D9572FF347127FD4026F23EE2A8D881EC02027E733675E106A2661",
+  "capiManifestSha256": "C2AE4F17F20531B5C6362EA2B3635EC205A491B9CF82C8DEF04C83A0BC9623DF",
+  "cHeaderSha256": "A20DA26F079E7E15E4736368FA553BB94DD4CC6039078D0AF81CD5427BAE5393",
+  "build": {
+    "crate": "librashader-capi/Cargo.toml",
+    "features": [
+      "runtime-vulkan"
+    ],
+    "defaultFeatures": false,
+    "androidAbi": "arm64-v8a",
+    "rustTarget": "aarch64-linux-android",
+    "artifact": "liblibrashader_capi.so",
+    "artifactSha256": "bd48911a2ecbc95b32ac187a9f735cc84e2f8faabf7555c899fa8f656ad56d73",
+    "artifactSha256Note": "Reference Android arm64 API 29 Cargo release artifact verified with the Vulkan integration; rebuild hashes may vary with toolchain."
+  },
+  "licenses": {
+    "selectedOption": "MPL-2.0",
+    "upstreamExpression": "MPL-2.0 OR GPL-3.0-only",
+    "mplLicenseSha256": "3F3D9E0024B1921B067D6F7F88DEB4A60CBE7A78E76C64E3F1D7FC3B779B9D04",
+    "sourceOffer": "https://github.com/SnowflakePowered/librashader/tree/87e8a97b50516d997defeaa168173dcd185d4022",
+    "noticeFile": "NOTICE.librashader"
+  }
+}

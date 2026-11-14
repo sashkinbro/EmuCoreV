@@ -1,0 +1,17 @@
+librashader C ABI and Vulkan runtime
+
+The build fetches librashader commit 87e8a97b50516d997defeaa168173dcd185d4022 from:
+https://github.com/SnowflakePowered/librashader/tree/87e8a97b50516d997defeaa168173dcd185d4022
+
+The librashader C header is SPDX MIT, Copyright 2022 chyyran. Its notice and warranty
+disclaimer are retained in the fetched `include/librashader.h`.
+
+The librashader and librashader-capi crates declare `MPL-2.0 OR GPL-3.0-only`. ECV
+distributes the library under the MPL-2.0 option; the complete MPL-2.0 text is in
+LICENSE-MPL-2.0 in this directory. The pinned, unmodified source is available at the
+GitHub URL above. Release packaging must include this notice and license text, and must
+provide recipients a reasonable way to obtain the corresponding pinned source.
+
+The librashader dependency's own transitive Rust crates retain their respective upstream
+license notices in Cargo metadata/source. The release license bundle must include those
+third-party notices for the resolved lockfile.

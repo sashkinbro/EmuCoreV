@@ -1637,4 +1637,21 @@
     <string name="installer_archive_space">Недостатньо вільного місця для підготовки архіву.</string>
     <string name="installer_archive_multiple_packages">Знайдено кілька пакетів. Виберіть пакет для встановлення.</string>
     <string name="installer_archive_corrupt">Архів пошкоджений або його вміст не вдалося перевірити.</string>
+    <string name="shader_title">Шейдери RetroArch</string>
+    <string name="shader_description">Застосувати ланцюжок шейдерів Slang до зображення Vita.</string>
+    <string name="shader_scope_global">Загальний шейдер</string>
+    <string name="shader_scope_game">Шейдер для гри</string>
+    <string name="shader_scope_ingame">Шейдер у грі</string>
+    <string name="shader_inherited">Використовується загальний шейдер</string>
+    <string name="shader_use_global">Використати загальні налаштування</string>
+    <string name="shader_enabled">Увімкнути ланцюжок шейдерів</string>
+    <string name="shader_unsupported">Для шейдерів RetroArch потрібні Vulkan і сумісне середовище виконання шейдерів.</string>
+    <string name="shader_choose_preset">Пресет</string>
+    <string name="shader_none">Немає</string>
+    <string name="shader_no_presets">Немає встановлених коректних пресетів.</string>
+    <string name="shader_download">Завантажити пакет шейдерів</string>
+    <string name="shader_import">Імпортувати ZIP</string>
+    <string name="shader_installing">Встановлення пакета шейдерів…</string>
+    <string name="shader_parameters">Параметри шейдера</string>
+    <string name="shader_reset_parameters">Скинути параметри</string>
 </resources>

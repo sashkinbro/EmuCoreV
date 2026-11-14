@@ -1638,4 +1638,21 @@
     <string name="installer_archive_space">لا توجد مساحة تخزين كافية لتجهيز هذا الأرشيف.</string>
     <string name="installer_archive_multiple_packages">تم العثور على أكثر من حزمة. اختر الحزمة التي تريد تثبيتها.</string>
     <string name="installer_archive_corrupt">الأرشيف تالف أو تعذر التحقق من محتوياته.</string>
+    <string name="shader_title">تظليلات RetroArch</string>
+    <string name="shader_description">تطبيق سلسلة تظليل Slang على صورة عرض Vita.</string>
+    <string name="shader_scope_global">تظليل عام</string>
+    <string name="shader_scope_game">تظليل لكل لعبة</string>
+    <string name="shader_scope_ingame">تظليل أثناء اللعب</string>
+    <string name="shader_inherited">يُستخدم التظليل العام</string>
+    <string name="shader_use_global">استخدام الإعداد العام</string>
+    <string name="shader_enabled">تفعيل سلسلة التظليل</string>
+    <string name="shader_unsupported">تتطلب مظللات RetroArch استخدام Vulkan وبيئة تشغيل مظللات متوافقة.</string>
+    <string name="shader_choose_preset">الإعداد المسبق</string>
+    <string name="shader_none">بلا تظليل</string>
+    <string name="shader_no_presets">لا توجد إعدادات مسبقة صالحة مثبتة.</string>
+    <string name="shader_download">تنزيل حزمة التظليل</string>
+    <string name="shader_import">استيراد ZIP</string>
+    <string name="shader_installing">جارٍ تثبيت حزمة التظليل…</string>
+    <string name="shader_parameters">معلمات التظليل</string>
+    <string name="shader_reset_parameters">إعادة ضبط المعلمات</string>
 </resources>

@@ -1634,4 +1634,21 @@
     <string name="installer_archive_space">Zum Vorbereiten dieses Archivs ist nicht genügend Speicherplatz frei.</string>
     <string name="installer_archive_multiple_packages">Es wurden mehrere Pakete gefunden. Wähle das zu installierende Paket aus.</string>
     <string name="installer_archive_corrupt">Das Archiv ist beschädigt oder sein Inhalt konnte nicht überprüft werden.</string>
+    <string name="shader_title">RetroArch-Shader</string>
+    <string name="shader_description">Eine Slang-Shaderkette auf das Vita-Ausgabebild anwenden.</string>
+    <string name="shader_scope_global">Globaler Shader</string>
+    <string name="shader_scope_game">Spielbezogener Shader</string>
+    <string name="shader_scope_ingame">Shader im Spiel</string>
+    <string name="shader_inherited">Globaler Shader wird verwendet</string>
+    <string name="shader_use_global">Globale Einstellung verwenden</string>
+    <string name="shader_enabled">Shaderkette aktivieren</string>
+    <string name="shader_unsupported">RetroArch-Shader benötigen Vulkan und eine kompatible Shader-Laufzeitumgebung.</string>
+    <string name="shader_choose_preset">Voreinstellung</string>
+    <string name="shader_none">Keine</string>
+    <string name="shader_no_presets">Keine gültigen Voreinstellungen installiert.</string>
+    <string name="shader_download">Shaderpaket herunterladen</string>
+    <string name="shader_import">ZIP importieren</string>
+    <string name="shader_installing">Shaderpaket wird installiert…</string>
+    <string name="shader_parameters">Shaderparameter</string>
+    <string name="shader_reset_parameters">Parameter zurücksetzen</string>
 </resources>
