@@ -92,7 +92,7 @@ class InputEnhancementsContractTest {
     @Test
     fun nativeTouchInputRejectsInvalidCoordinatesAndReleasesExactPointers() {
         val touch = appModule()
-            .resolve("src/main/cpp/emucorev/ECV/vita3k/touch/src/touch.cpp")
+            .resolve("src/main/cpp/emucorev/ECV/ECV/touch/src/touch.cpp")
             .readText()
 
         assertTrue("SDL cancellation must release a stranded touch", "SDL_EVENT_FINGER_CANCELED" in touch)
@@ -109,8 +109,8 @@ class InputEnhancementsContractTest {
         val overlay = root.resolve("ui/emulation/EmulationOverlay.kt").readText()
         val bridge = root.resolve("core/vita/overlay/InputOverlay.kt").readText()
         val nativeBridge = app.resolve("src/main/cpp/emucorev/src/input_overlay_bridge.cpp").readText()
-        val nativeInput = app.resolve("src/main/cpp/emucorev/ECV/vita3k/android/jni/input_overlay.cpp").readText()
-        val touch = app.resolve("src/main/cpp/emucorev/ECV/vita3k/touch/src/touch.cpp").readText()
+        val nativeInput = app.resolve("src/main/cpp/emucorev/ECV/ECV/android/jni/input_overlay.cpp").readText()
+        val touch = app.resolve("src/main/cpp/emucorev/ECV/ECV/touch/src/touch.cpp").readText()
 
         assertTrue("The switch must cycle front/back/both", "(touchMode + 1) % 3" in overlay)
         assertTrue("Kotlin must not narrow the mode to Boolean", "setTouchState(mode: Int)" in bridge)
@@ -123,7 +123,7 @@ class InputEnhancementsContractTest {
 
     @Test
     fun memoryPressureCallbacksDoNotDereferenceSessionObjects() {
-        val nativeRoot = appModule().resolve("src/main/cpp/emucorev/ECV/vita3k")
+        val nativeRoot = appModule().resolve("src/main/cpp/emucorev/ECV/ECV")
         val bootstrap = nativeRoot.resolve("android/jni/native_bootstrap.cpp").readText()
         val callback = bootstrap.substringAfter("NativeLib_onTrimMemory(")
             .substringBefore("JNIEXPORT")

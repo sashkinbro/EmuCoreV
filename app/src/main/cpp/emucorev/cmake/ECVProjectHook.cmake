@@ -14,6 +14,6 @@ if(NOT DEFINED EMUCOREV_VITA3K_PROJECT_HOOK_DEFERRED)
         DEFER
         DIRECTORY "${CMAKE_SOURCE_DIR}"
         CALL include
-            "${EMUCOREV_LAYER_DIR}/cmake/AttachToVita3K.cmake"
+            "${EMUCOREV_LAYER_DIR}/cmake/AttachToECV.cmake"
     )
 endif()

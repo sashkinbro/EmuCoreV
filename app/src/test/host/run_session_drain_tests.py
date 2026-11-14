@@ -8,7 +8,7 @@ out = root / 'app/build/session-drain-probe'
 out.mkdir(parents=True, exist_ok=True)
 if os.name == 'nt':
     os.environ['PATH'] = 'C:/msys64/ucrt64/bin;' + os.environ['PATH']
-source = (root / 'app/src/main/cpp/emucorev/ECV/vita3k/app/src/session_controller.cpp').read_text()
+source = (root / 'app/src/main/cpp/emucorev/ECV/ECV/app/src/session_controller.cpp').read_text()
 
 def block(marker, text=source):
     assert text.count(marker) == 1

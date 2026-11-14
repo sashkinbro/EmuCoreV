@@ -5,7 +5,7 @@ import os
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-source = (root/'app/src/main/cpp/emucorev/ECV/vita3k/renderer/src/state_set.cpp').read_text()
+source = (root/'app/src/main/cpp/emucorev/ECV/ECV/renderer/src/state_set.cpp').read_text()
 out = root/'app/build/gxm-program-validation-probe'
 out.mkdir(parents=True,exist_ok=True)
 def function(marker):

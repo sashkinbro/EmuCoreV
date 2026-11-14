@@ -65,7 +65,7 @@ else()
 	set(VITA3K_GIT_REV "${GIT_HASH}-${GIT_REPO}/${GIT_BRANCH}")
 endif()
 
-file(WRITE ${CMAKE_BINARY_DIR}/vita3k/config/gitver.h
+file(WRITE ${CMAKE_BINARY_DIR}/ECV/config/gitver.h
 	"#define ECV_VER_HI ${EMUCOREV_VERSION_MAJOR}\n"
 	"#define ECV_VER_MID ${EMUCOREV_VERSION_MINOR}\n"
 	"#define ECV_VER_LO ${EMUCOREV_VERSION_PATCH}\n"
@@ -75,7 +75,7 @@ file(WRITE ${CMAKE_BINARY_DIR}/vita3k/config/gitver.h
 	"#define APP_NUMBER ${GIT_COUNT}\n"
 )
 
-include_directories(${CMAKE_BINARY_DIR}/vita3k/config)
+include_directories(${CMAKE_BINARY_DIR}/ECV/config)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	set(LINUX TRUE)
@@ -160,7 +160,7 @@ add_subdirectory(packages)
 add_subdirectory(vkutil)
 
 if(ANDROID)
-	add_library(vita3k SHARED
+	add_library(ECV SHARED
 		android/jni/android_state.cpp
 		android/jni/filesystem_android.cpp
 		android/jni/main_android.cpp
@@ -177,8 +177,8 @@ if(ANDROID)
 		interface.cpp
 		performance.cpp
 	)
-	target_include_directories(vita3k PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-	target_link_libraries(vita3k PRIVATE SDL3::SDL3 pugixml::pugixml android)
+	target_include_directories(ECV PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+	target_link_libraries(ECV PRIVATE SDL3::SDL3 pugixml::pugixml android)
 
 	if(CMAKE_BUILD_TYPE STREQUAL "Release")
 		# we need to exclude all symbols except SDL
@@ -206,23 +206,23 @@ if(ANDROID)
 		foreach(lib IN LISTS LIBS_TO_EXCLUDE)
 			string(APPEND LIBS_TO_EXCLUDE_FLAG " -Wl,--exclude-libs,${lib}")
 		endforeach()
-		set_target_properties(vita3k PROPERTIES LINK_FLAGS "${LIBS_TO_EXCLUDE_FLAG}")
+		set_target_properties(ECV PROPERTIES LINK_FLAGS "${LIBS_TO_EXCLUDE_FLAG}")
 	endif()
 else()
-	add_executable(vita3k MACOSX_BUNDLE main.cpp interface.cpp interface.h performance.cpp)
+	add_executable(ECV MACOSX_BUNDLE main.cpp interface.cpp interface.h performance.cpp)
 endif()
 
 if(WIN32)
 	# This file is a bit special, it is run before anything else and must be added here
-	target_sources(vita3k PRIVATE util/src/vc_runtime_checker.cpp)
+	target_sources(ECV PRIVATE util/src/vc_runtime_checker.cpp)
 endif()
 
-target_link_libraries(vita3k PRIVATE app audio cheat codec compat config cppcommon ctrl dialog display ime lang gdbstub gxm io miniz modules motion packages patch renderer shader touch util psvpfsparser)
+target_link_libraries(ECV PRIVATE app audio cheat codec compat config cppcommon ctrl dialog display ime lang gdbstub gxm io miniz modules motion packages patch renderer shader touch util psvpfsparser)
 if(NOT ANDROID)
-	target_link_libraries(vita3k PRIVATE gui-qt)
+	target_link_libraries(ECV PRIVATE gui-qt)
 endif()
 if(USE_DISCORD_RICH_PRESENCE)
-	target_link_libraries(vita3k PRIVATE discord-rpc)
+	target_link_libraries(ECV PRIVATE discord-rpc)
 endif()
 
 if(NOT ANDROID)
@@ -244,7 +244,7 @@ if(NOT ANDROID)
 	endforeach()
 
 	add_custom_target(qt_app_translations DEPENDS ${VITA3K_QT_QM_FILES})
-	add_dependencies(vita3k qt_app_translations)
+	add_dependencies(ECV qt_app_translations)
 
 	add_custom_target(update_qt_translations
 		COMMAND $<TARGET_FILE:Qt6::lupdate>
@@ -258,14 +258,10 @@ if(NOT ANDROID)
 		COMMENT "Updating Qt translation source file")
 endif()
 
-if(ANDROID)
-	set_target_properties(vita3k PROPERTIES OUTPUT_NAME ECV)
-else()
-	set_target_properties(vita3k PROPERTIES OUTPUT_NAME Vita3K)
-endif()
+set_target_properties(ECV PROPERTIES OUTPUT_NAME ECV)
 
 if(NOT ANDROID)
-	set_target_properties(vita3k PROPERTIES
+	set_target_properties(ECV PROPERTIES
 		ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
@@ -273,29 +269,29 @@ endif()
 
 if(APPLE)
 	add_custom_command(
-		OUTPUT Vita3K.icns
-		COMMAND mkdir -p Vita3K.iconset
-		COMMAND sips -z 16 16     "${CMAKE_CURRENT_SOURCE_DIR}/Vita3K.png" --out Vita3K.iconset/icon_16x16.png
-		COMMAND sips -z 32 32     "${CMAKE_CURRENT_SOURCE_DIR}/Vita3K.png" --out Vita3K.iconset/icon_16x16@2x.png
-		COMMAND sips -z 32 32     "${CMAKE_CURRENT_SOURCE_DIR}/Vita3K.png" --out Vita3K.iconset/icon_32x32.png
-		COMMAND sips -z 64 64     "${CMAKE_CURRENT_SOURCE_DIR}/Vita3K.png" --out Vita3K.iconset/icon_32x32@2x.png
-		COMMAND sips -z 128 128   "${CMAKE_CURRENT_SOURCE_DIR}/Vita3K.png" --out Vita3K.iconset/icon_128x128.png
-		COMMAND sips -z 256 256   "${CMAKE_CURRENT_SOURCE_DIR}/Vita3K.png" --out Vita3K.iconset/icon_128x128@2x.png
-		COMMAND sips -z 256 256   "${CMAKE_CURRENT_SOURCE_DIR}/Vita3K.png" --out Vita3K.iconset/icon_256x256.png
-		COMMAND sips -z 512 512   "${CMAKE_CURRENT_SOURCE_DIR}/Vita3K.png" --out Vita3K.iconset/icon_256x256@2x.png
-		COMMAND sips -z 512 512   "${CMAKE_CURRENT_SOURCE_DIR}/Vita3K.png" --out Vita3K.iconset/icon_512x512.png
-		COMMAND cp "${CMAKE_CURRENT_SOURCE_DIR}/Vita3K.png" Vita3K.iconset/icon_512x512@2x.png
-		COMMAND iconutil -c icns Vita3K.iconset
-		COMMAND rm -r Vita3K.iconset
-		DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Vita3K.png")
-	set_source_files_properties(Vita3K.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+		OUTPUT ECV.icns
+		COMMAND mkdir -p ECV.iconset
+		COMMAND sips -z 16 16     "${CMAKE_CURRENT_SOURCE_DIR}/ECV.png" --out ECV.iconset/icon_16x16.png
+		COMMAND sips -z 32 32     "${CMAKE_CURRENT_SOURCE_DIR}/ECV.png" --out ECV.iconset/icon_16x16@2x.png
+		COMMAND sips -z 32 32     "${CMAKE_CURRENT_SOURCE_DIR}/ECV.png" --out ECV.iconset/icon_32x32.png
+		COMMAND sips -z 64 64     "${CMAKE_CURRENT_SOURCE_DIR}/ECV.png" --out ECV.iconset/icon_32x32@2x.png
+		COMMAND sips -z 128 128   "${CMAKE_CURRENT_SOURCE_DIR}/ECV.png" --out ECV.iconset/icon_128x128.png
+		COMMAND sips -z 256 256   "${CMAKE_CURRENT_SOURCE_DIR}/ECV.png" --out ECV.iconset/icon_128x128@2x.png
+		COMMAND sips -z 256 256   "${CMAKE_CURRENT_SOURCE_DIR}/ECV.png" --out ECV.iconset/icon_256x256.png
+		COMMAND sips -z 512 512   "${CMAKE_CURRENT_SOURCE_DIR}/ECV.png" --out ECV.iconset/icon_256x256@2x.png
+		COMMAND sips -z 512 512   "${CMAKE_CURRENT_SOURCE_DIR}/ECV.png" --out ECV.iconset/icon_512x512.png
+		COMMAND cp "${CMAKE_CURRENT_SOURCE_DIR}/ECV.png" ECV.iconset/icon_512x512@2x.png
+		COMMAND iconutil -c icns ECV.iconset
+		COMMAND rm -r ECV.iconset
+		DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/ECV.png")
+	set_source_files_properties(ECV.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
 	add_custom_command(
-		TARGET vita3k
+		TARGET ECV
 		POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../data" "$<TARGET_FILE_DIR:vita3k>/../Resources/data"
-		COMMAND ${CMAKE_COMMAND} -E copy_directory "${VITA3K_QT_QM_DIR}" "$<TARGET_FILE_DIR:vita3k>/../Resources/translations"
-		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/shaders-builtin/" "$<TARGET_FILE_DIR:vita3k>/../Resources/shaders-builtin")
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../data" "$<TARGET_FILE_DIR:ECV>/../Resources/data"
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${VITA3K_QT_QM_DIR}" "$<TARGET_FILE_DIR:ECV>/../Resources/translations"
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/shaders-builtin/" "$<TARGET_FILE_DIR:ECV>/../Resources/shaders-builtin")
 	if(USE_DISCORD_RICH_PRESENCE)
 		if(ARCHITECTURE STREQUAL "x86_64")
 			set(discord_dylib "${CMAKE_BINARY_DIR}/external/discord_game_sdk/lib/x86_64/discord_game_sdk.dylib")
@@ -306,36 +302,36 @@ if(APPLE)
 		endif()
 
 		add_custom_command(
-		TARGET vita3k
+		TARGET ECV
 		POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${discord_dylib}" "$<TARGET_FILE_DIR:vita3k>/../Resources")
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${discord_dylib}" "$<TARGET_FILE_DIR:ECV>/../Resources")
 	endif()
-	set_target_properties(vita3k PROPERTIES LINK_FLAGS "-rpath @loader_path/../Frameworks/ -rpath @loader_path/../Resources/ -ld64")
-	target_sources(vita3k PRIVATE Vita3K.icns)
-	set(MACOSX_BUNDLE_ICON_FILE Vita3K.icns)
+	set_target_properties(ECV PROPERTIES LINK_FLAGS "-rpath @loader_path/../Frameworks/ -rpath @loader_path/../Resources/ -ld64")
+	target_sources(ECV PRIVATE ECV.icns)
+	set(MACOSX_BUNDLE_ICON_FILE ECV.icns)
 	set(MACOSX_BUNDLE_GUI_IDENTIFIER "com.github.Vita3K.Vita3K")
 	set(MACOSX_BUNDLE_BUNDLE_NAME "Vita3K")
 
 	message(STATUS "MoltenVK dylib path: ${MOLTENVK_DYLIB}")
-	target_sources(vita3k PRIVATE ${MOLTENVK_DYLIB})
+	target_sources(ECV PRIVATE ${MOLTENVK_DYLIB})
 	set_source_files_properties(${MOLTENVK_DYLIB} PROPERTIES MACOSX_PACKAGE_LOCATION Frameworks)
 
-	qt_finalize_target(vita3k)
+	qt_finalize_target(ECV)
 	if(MACDEPLOYQT_EXECUTABLE)
-		add_custom_command(TARGET vita3k POST_BUILD
-			COMMAND "${MACDEPLOYQT_EXECUTABLE}" "$<TARGET_FILE_DIR:vita3k>/../.." "$<$<CONFIG:Debug,RelWithDebInfo>:-no-strip>")
+		add_custom_command(TARGET ECV POST_BUILD
+			COMMAND "${MACDEPLOYQT_EXECUTABLE}" "$<TARGET_FILE_DIR:ECV>/../.." "$<$<CONFIG:Debug,RelWithDebInfo>:-no-strip>")
 	endif()
 
 	add_custom_command(
-		TARGET vita3k
+		TARGET ECV
 		POST_BUILD
-		COMMAND codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime --sign - "$<TARGET_FILE_DIR:vita3k>/../..")
+		COMMAND codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime --sign - "$<TARGET_FILE_DIR:ECV>/../..")
 elseif(LINUX)
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath='$ORIGIN'")
 	if(BUILD_APPIMAGE)
 		set(APPDIR "${CMAKE_BINARY_DIR}/AppImage")
 		add_custom_command(
-			TARGET vita3k
+			TARGET ECV
 			POST_BUILD
 			COMMAND ${CMAKE_COMMAND} -E make_directory "${APPDIR}/usr/share/Vita3K"
 			COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../data" "${APPDIR}/usr/share/Vita3K/data"
@@ -350,69 +346,69 @@ elseif(LINUX)
 			set(DISCORD_LIB_APPIMAGE "")
 		endif()
 		add_custom_command(
-		TARGET vita3k
+		TARGET ECV
 		POST_BUILD
 		COMMAND ${LINUXDEPLOY_WRAPPER} ${LINUXDEPLOY_COMMAND} --appdir="${APPDIR}"
-			-e "$<TARGET_FILE:vita3k>" --icon-filename="vita3k"
-			-i "${CMAKE_CURRENT_SOURCE_DIR}/../data/image/icon.png" -d "${CMAKE_CURRENT_SOURCE_DIR}/../appimage/vita3k.desktop"
+			-e "$<TARGET_FILE:ECV>" --icon-filename="ECV"
+			-i "${CMAKE_CURRENT_SOURCE_DIR}/../data/image/icon.png" -d "${CMAKE_CURRENT_SOURCE_DIR}/../appimage/ECV.desktop"
 			--custom-apprun="${CMAKE_CURRENT_SOURCE_DIR}/../appimage/apprun.sh" --plugin qt --output=appimage ${DISCORD_LIB_APPIMAGE}
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_BINARY_DIR}/*.AppImage*" "$<TARGET_FILE_DIR:vita3k>/"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_BINARY_DIR}/*.AppImage*" "$<TARGET_FILE_DIR:ECV>/"
 		COMMAND ${CMAKE_COMMAND} -E rm "${CMAKE_CURRENT_BINARY_DIR}/*.AppImage*")
 	endif()
 	add_custom_command(
-		TARGET vita3k
+		TARGET ECV
 		POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../data" "$<TARGET_FILE_DIR:vita3k>/data"
-		COMMAND ${CMAKE_COMMAND} -E copy_directory "${VITA3K_QT_QM_DIR}" "$<TARGET_FILE_DIR:vita3k>/translations"
-		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/shaders-builtin" "$<TARGET_FILE_DIR:vita3k>/shaders-builtin"
-		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/icons" "$<TARGET_FILE_DIR:vita3k>/icons"
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/COPYING.txt" "$<TARGET_FILE_DIR:vita3k>/COPYING.txt"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/README.md" "$<TARGET_FILE_DIR:vita3k>/README.md"
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../data" "$<TARGET_FILE_DIR:ECV>/data"
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${VITA3K_QT_QM_DIR}" "$<TARGET_FILE_DIR:ECV>/translations"
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/shaders-builtin" "$<TARGET_FILE_DIR:ECV>/shaders-builtin"
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/icons" "$<TARGET_FILE_DIR:ECV>/icons"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/COPYING.txt" "$<TARGET_FILE_DIR:ECV>/COPYING.txt"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/README.md" "$<TARGET_FILE_DIR:ECV>/README.md"
 	)
 	if(USE_DISCORD_RICH_PRESENCE)
 		add_custom_command(
-		TARGET vita3k
+		TARGET ECV
 		POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_BINARY_DIR}/external/discord_game_sdk/lib/x86_64/libdiscord_game_sdk.so" "$<TARGET_FILE_DIR:vita3k>")
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_BINARY_DIR}/external/discord_game_sdk/lib/x86_64/libdiscord_game_sdk.so" "$<TARGET_FILE_DIR:ECV>")
 	endif()
 elseif(WIN32)
-	target_link_libraries(vita3k PRIVATE Version)
-	target_sources(vita3k PRIVATE resource.h Vita3K.ico Vita3K.rc Windows.manifest)
-	set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT vita3k)
-	set_target_properties(vita3k PROPERTIES WIN32_EXECUTABLE TRUE VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$(Configuration)")
+	target_link_libraries(ECV PRIVATE Version)
+	target_sources(ECV PRIVATE resource.h ECV.ico ECV.rc Windows.manifest)
+	set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ECV)
+	set_target_properties(ECV PROPERTIES WIN32_EXECUTABLE TRUE VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$(Configuration)")
 	add_custom_command(
-		TARGET vita3k
+		TARGET ECV
 		POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../data" "$<TARGET_FILE_DIR:vita3k>/data"
-		COMMAND ${CMAKE_COMMAND} -E copy_directory "${VITA3K_QT_QM_DIR}" "$<TARGET_FILE_DIR:vita3k>/translations"
-		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/shaders-builtin" "$<TARGET_FILE_DIR:vita3k>/shaders-builtin"
-		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/icons" "$<TARGET_FILE_DIR:vita3k>/icons"
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/COPYING.txt" "$<TARGET_FILE_DIR:vita3k>/COPYING.txt"
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../data" "$<TARGET_FILE_DIR:ECV>/data"
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${VITA3K_QT_QM_DIR}" "$<TARGET_FILE_DIR:ECV>/translations"
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/shaders-builtin" "$<TARGET_FILE_DIR:ECV>/shaders-builtin"
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/icons" "$<TARGET_FILE_DIR:ECV>/icons"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/COPYING.txt" "$<TARGET_FILE_DIR:ECV>/COPYING.txt"
 	)
 	if(USE_DISCORD_RICH_PRESENCE)
 		add_custom_command(
-		TARGET vita3k
+		TARGET ECV
 		POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_BINARY_DIR}/external/discord_game_sdk/lib/x86_64/discord_game_sdk.dll" "$<TARGET_FILE_DIR:vita3k>")
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_BINARY_DIR}/external/discord_game_sdk/lib/x86_64/discord_game_sdk.dll" "$<TARGET_FILE_DIR:ECV>")
 	endif()
 	if(EXISTS "${OPENSSL_ROOT_DIR}")
 		add_custom_command(
-		TARGET vita3k
+		TARGET ECV
 		POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${OPENSSL_ROOT_DIR}/bin/libssl-4-x64.dll" "$<TARGET_FILE_DIR:vita3k>"
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${OPENSSL_ROOT_DIR}/bin/libcrypto-4-x64.dll" "$<TARGET_FILE_DIR:vita3k>")
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${OPENSSL_ROOT_DIR}/bin/libssl-4-x64.dll" "$<TARGET_FILE_DIR:ECV>"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${OPENSSL_ROOT_DIR}/bin/libcrypto-4-x64.dll" "$<TARGET_FILE_DIR:ECV>")
 	endif()
 	if(WINDEPLOYQT_EXECUTABLE)
-		add_custom_command(TARGET vita3k POST_BUILD
+		add_custom_command(TARGET ECV POST_BUILD
 			COMMAND "${WINDEPLOYQT_EXECUTABLE}" --no-compiler-runtime --no-opengl-sw --no-patchqt
 				--no-system-d3d-compiler --no-system-dxc-compiler
-				--plugindir "$<IF:$<CXX_COMPILER_ID:MSVC>,$<TARGET_FILE_DIR:vita3k>/plugins,$<TARGET_FILE_DIR:vita3k>/share/qt6/plugins>"
-				--translationdir "$<IF:$<CXX_COMPILER_ID:MSVC>,$<TARGET_FILE_DIR:vita3k>/translations,$<TARGET_FILE_DIR:vita3k>/share/qt6/translations>"
-				--verbose 0 "$<TARGET_FILE:vita3k>")
+				--plugindir "$<IF:$<CXX_COMPILER_ID:MSVC>,$<TARGET_FILE_DIR:ECV>/plugins,$<TARGET_FILE_DIR:ECV>/share/qt6/plugins>"
+				--translationdir "$<IF:$<CXX_COMPILER_ID:MSVC>,$<TARGET_FILE_DIR:ECV>/translations,$<TARGET_FILE_DIR:ECV>/share/qt6/translations>"
+				--verbose 0 "$<TARGET_FILE:ECV>")
 	endif()
 elseif(ANDROID)
 	add_custom_command(
-		TARGET vita3k
+		TARGET ECV
 		POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../data" "${CMAKE_CURRENT_SOURCE_DIR}/../android/app/assets/data"
 		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/shaders-builtin" "${CMAKE_CURRENT_SOURCE_DIR}/../android/app/assets/shaders-builtin"
@@ -422,5 +418,5 @@ endif()
 
 if(TRACY_ENABLE_ON_CORE_COMPONENTS)
 	# Enable Tracy profiling on the main compilation target
-	target_link_libraries(vita3k PRIVATE tracy)
+	target_link_libraries(ECV PRIVATE tracy)
 endif()

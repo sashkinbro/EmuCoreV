@@ -25,7 +25,7 @@ class LaunchAndTouchRegressionContractTest {
     }
 
     @Test fun missingNativeAppStillRefreshesTheListOnDemand() {
-        val setup = native("vita3k/app/src/app.cpp").substringAfter("bool setup_game_launch").substringBefore("void prepare_game_launch_overlay")
+        val setup = native("ECV/app/src/app.cpp").substringAfter("bool setup_game_launch").substringBefore("void prepare_game_launch_overlay")
         assertTrue(setup.indexOf("if (!set_app_info") < setup.indexOf("scan_apps"))
         assertTrue(setup.contains("!scan_apps(emuenv) || !set_app_info(emuenv, app_path)"))
         val lookup = kotlin("data/InstalledGameRepository.kt").substringAfter("fun findByTitleId").substringBefore("fun deleteByTitleId")
@@ -50,7 +50,7 @@ class LaunchAndTouchRegressionContractTest {
     }
 
     @Test fun virtualTriggerReleaseMatchesTheBundledSdlAxisRange() {
-        val overlay = native("vita3k/android/jni/input_overlay.cpp")
+        val overlay = native("ECV/android/jni/input_overlay.cpp")
         assertTrue(overlay.contains("value ? SDL_MAX_SINT16 : SDL_MIN_SINT16"))
         val sdl = native("external/sdl/src/joystick/virtual/SDL_virtualjoystick.c")
         assertTrue(sdl.contains("hwdata->axes[axis_triggerleft] = SDL_JOYSTICK_AXIS_MIN"))
@@ -58,7 +58,7 @@ class LaunchAndTouchRegressionContractTest {
     }
 
     @Test fun nativeBufferKeepsAtomicAndNoncoherentSafetyChecks() {
-        val renderer = native("vita3k/renderer/src/vulkan/renderer.cpp")
+        val renderer = native("ECV/renderer/src/vulkan/renderer.cpp")
         val nativeBuffer = renderer.substringAfter("case MappingMethod::NativeBuffer:").substringBefore("case MappingMethod::PageTable:")
         val allocation = nativeBuffer.substringAfter("AHardwareBuffer_Desc")
         assertTrue(allocation.contains("test_arm64_atomics_on(mapped_location)"))

@@ -1,4 +1,4 @@
-# Include from the Android project's normal configure phase after vita3k exists.
+# Include from the Android project's normal configure phase after ECV exists.
 # Fetch pinned libarchive/xz sources and apply the committed decoder caps.
 function(emucorev_add_archive_dependencies)
     include(FetchContent)
@@ -121,7 +121,7 @@ function(emucorev_add_archive_dependencies)
         target_include_directories(emucorev_archive_adapter PRIVATE "${_android_include}")
     endif()
     target_link_libraries(emucorev_archive_adapter PRIVATE archive_static)
-    target_sources(vita3k PRIVATE $<TARGET_OBJECTS:emucorev_archive_adapter>)
+    target_sources(ECV PRIVATE $<TARGET_OBJECTS:emucorev_archive_adapter>)
     set_property(TARGET archive_static PROPERTY INTERFACE_INCLUDE_DIRECTORIES "")
-    target_link_libraries(vita3k PRIVATE archive_static)
+    target_link_libraries(ECV PRIVATE archive_static)
 endfunction()

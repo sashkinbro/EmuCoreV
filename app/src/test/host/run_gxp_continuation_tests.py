@@ -10,8 +10,8 @@ import re
 import shutil
 import subprocess
 
-root = next(p for p in Path(__file__).resolve().parents if (p / 'app/src/main/cpp/emucorev/ECV/vita3k').is_dir())
-native = root / 'app/src/main/cpp/emucorev/ECV/vita3k'
+root = next(p for p in Path(__file__).resolve().parents if (p / 'app/src/main/cpp/emucorev/ECV/ECV').is_dir())
+native = root / 'app/src/main/cpp/emucorev/ECV/ECV'
 out = root / 'tools/retro-crash/gxp-continuation-host'
 out.mkdir(parents=True, exist_ok=True)
 state = (native / 'renderer/src/state_set.cpp').read_text(encoding='utf-8')

@@ -378,7 +378,7 @@ void MainWindow::initialize() {
     setObjectName(QStringLiteral("main_window"));
 
     this->resize(1280, 720);
-    this->setWindowIcon(QIcon(":/Vita3K.png"));
+    this->setWindowIcon(QIcon(":/ECV.png"));
     this->setWindowTitle(QString::fromStdString(window_title));
 
     emuenv.compat.log_compat_warn = emuenv.cfg.log_compat_warn;

@@ -411,7 +411,7 @@ static void create_shortcut(EmuEnvState &emuenv, const std::string &app_path, co
     if (fs::exists(icon_path))
         fs::copy_file(icon_path, resources_dir / "icon.icns", fs::copy_options::overwrite_existing);
     else
-        fs::copy_file(emuenv.base_path / "Vita3K.icns", resources_dir / "icon.icns", fs::copy_options::overwrite_existing);
+        fs::copy_file(emuenv.base_path / "ECV.icns", resources_dir / "icon.icns", fs::copy_options::overwrite_existing);
 
     LOG_INFO("macOS app bundle shortcut created successfully at '{}'", app_bundle.string());
 #endif

@@ -15,7 +15,7 @@ class SaveStateContractTest {
 
     private fun kotlin(path: String) = app.resolve("src/main/java/com/sbro/emucorev/$path").readText()
     private fun bridge(path: String) = app.resolve("src/main/cpp/emucorev/$path").readText()
-    private fun core(path: String) = app.resolve("src/main/cpp/emucorev/ECV/vita3k/$path").readText()
+    private fun core(path: String) = app.resolve("src/main/cpp/emucorev/ECV/ECV/$path").readText()
 
     @Test
     fun jniBridgeSymbolsMatchKotlinExternals() {
@@ -76,7 +76,7 @@ class SaveStateContractTest {
 
     @Test
     fun buildIncludesSaveStateSources() {
-        val cmake = bridge("cmake/AttachToVita3K.cmake")
+        val cmake = bridge("cmake/AttachToECV.cmake")
         assertTrue(cmake.contains("src/savestate/archive.cpp"))
         assertTrue(cmake.contains("src/savestate/savestate.cpp"))
         assertTrue(cmake.contains("src/savestate_bridge.cpp"))

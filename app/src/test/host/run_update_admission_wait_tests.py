@@ -205,7 +205,7 @@ int main() {
 probe = out / "probe.cpp"
 probe.write_text(source)
 
-sngs_source = (root / "app/src/main/cpp/emucorev/ECV/vita3k/modules/SceNgsUser/SceNgs.cpp").read_text()
+sngs_source = (root / "app/src/main/cpp/emucorev/ECV/ECV/modules/SceNgsUser/SceNgs.cpp").read_text()
 rack_release_start = sngs_source.index("EXPORT(SceInt32, sceNgsRackRelease")
 reject_reentrant = sngs_source.index("return RET_ERROR(SCE_NGS_ERROR_INVALID_STATE);", rack_release_start)
 queue_release = sngs_source.index("operations_pending.push(op)", rack_release_start)
@@ -218,7 +218,7 @@ overlap_status = sngs_source.index("return RET_ERROR(SCE_NGS_ERROR_INVALID_STATE
 init_call = sngs_source.index("ngs::init_rack(", rack_init_start)
 assert address_guard < overlap_log < overlap_status < init_call, "rack init must diagnose and reject a live overlapping guest buffer before placement-new path"
 
-ngs_source = (root / "app/src/main/cpp/emucorev/ECV/vita3k/ngs/src/ngs.cpp").read_text()
+ngs_source = (root / "app/src/main/cpp/emucorev/ECV/ECV/ngs/src/ngs.cpp").read_text()
 init_rack_start = ngs_source.index("bool init_rack(")
 overlap_guard = ngs_source.index("rack_buffer_ranges_overlap(rack_address, init_info->size", init_rack_start)
 overlap_reject = ngs_source.index("return false;", overlap_guard)
@@ -230,7 +230,7 @@ vector_guard = ngs_source.index("check_rack_vector(rack", capture_start)
 first_vector_access = ngs_source.index("rack->voices.size()", capture_start)
 assert vector_guard < first_vector_access, "capture must validate the Rack vector object before size/index access"
 
-scheduler_source = (root / "app/src/main/cpp/emucorev/ECV/vita3k/ngs/src/scheduler.cpp").read_text()
+scheduler_source = (root / "app/src/main/cpp/emucorev/ECV/ECV/ngs/src/scheduler.cpp").read_text()
 assert "UpdateCallbackKind::ModuleProcess" in scheduler_source
 assert "UpdateCallbackKind::VoiceFinished" in scheduler_source
 assert "UpdateCallbackKind::RackReleaseCompletion" in scheduler_source
@@ -285,11 +285,11 @@ assert pending_front < pending_pop < pending_release_rack < completion_callback
 completion_callback_end = pending_drain.index(";", completion_callback) + 1
 assert "op." not in pending_drain[completion_callback_end:], \
     "pending-release completion must not retain or dereference its Rack operation after guest callback re-entry"
-assert "UpdateCallbackKind::RackReleaseCompletion" in (root / "app/src/main/cpp/emucorev/ECV/vita3k/ngs/include/ngs/scheduler.h").read_text()
+assert "UpdateCallbackKind::RackReleaseCompletion" in (root / "app/src/main/cpp/emucorev/ECV/ECV/ngs/include/ngs/scheduler.h").read_text()
 
 for relative_path in (
-    "app/src/main/cpp/emucorev/ECV/vita3k/ngs/src/modules/player.cpp",
-    "app/src/main/cpp/emucorev/ECV/vita3k/ngs/src/modules/atrac9.cpp",
+    "app/src/main/cpp/emucorev/ECV/ECV/ngs/src/modules/player.cpp",
+    "app/src/main/cpp/emucorev/ECV/ECV/ngs/src/modules/atrac9.cpp",
 ):
     module_source = (root / relative_path).read_text()
     cursor = 0
@@ -318,7 +318,7 @@ wait_release_branch = sngs_source.index("} else if (release_action == ngs::RackR
 wait_release_end = sngs_source.index("} else if (release_action == ngs::RackReleaseAction::DeferCallback)", wait_release_branch)
 wait_release_body = sngs_source[wait_release_branch:wait_release_end]
 assert wait_release_body.index("scheduler.wait_for_update_to_finish(lock);") < wait_release_body.index("rack_instance_id(rack_address) == rack_instance_id")
-assert "!is_updating" in (root / "app/src/main/cpp/emucorev/ECV/vita3k/ngs/include/ngs/scheduler.h").read_text()
+assert "!is_updating" in (root / "app/src/main/cpp/emucorev/ECV/ECV/ngs/include/ngs/scheduler.h").read_text()
 assert "rack->system" not in wait_release_body and "rack->" not in wait_release_body.split("scheduler.wait_for_update_to_finish(lock);", 1)[1], \
     "a release waiter must not dereference a Rack after waking because its buffer may have been reused"
 
@@ -349,7 +349,7 @@ if not compiler and os.name == "nt" and Path("C:/msys64/ucrt64/bin/g++.exe").is_
     compiler = "C:/msys64/ucrt64/bin/g++.exe"
 assert compiler, "A C++20 compiler is required"
 
-vita3k = root / "app/src/main/cpp/emucorev/ECV/vita3k"
+vita3k = root / "app/src/main/cpp/emucorev/ECV/ECV"
 include_dirs = [path for path in vita3k.rglob("include") if path.is_dir()]
 subprocess.run([
     compiler,

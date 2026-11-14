@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Vita3K
-Exec=Vita3K
-Icon=vita3k
+Name=EmuCoreV
+Exec=ECV
+Icon=ECV
 Categories=Game;Emulator;X-None;

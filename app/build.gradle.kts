@@ -4,7 +4,7 @@ import java.io.File
 import java.util.Properties
 
 val androidOpenSslRoot = rootProject.layout.projectDirectory.dir("tools/openssl-test/out").asFile
-val emuCoreVNativeHook = project.layout.projectDirectory.file("src/main/cpp/emucorev/cmake/Vita3KProjectHook.cmake").asFile
+val emuCoreVNativeHook = project.layout.projectDirectory.file("src/main/cpp/emucorev/cmake/ECVProjectHook.cmake").asFile
 val ecvNewAssetsDir = project.layout.projectDirectory.dir("src/main/cpp/emucorev/ECV/android/app/assets").asFile
 val ecvLegacyAssetsDir = project.layout.projectDirectory.dir("src/main/cpp/emucorev/ECV/android/assets").asFile
 val ecvAssetsDir = if (ecvNewAssetsDir.exists()) ecvNewAssetsDir else ecvLegacyAssetsDir

@@ -3,7 +3,7 @@
 from pathlib import Path
 import os,re,shutil,subprocess
 root=Path(__file__).resolve().parents[4]
-base=root/'app/src/main/cpp/emucorev/ECV/vita3k'
+base=root/'app/src/main/cpp/emucorev/ECV/ECV'
 out=root/'app/build/cold-gpu-idle-probe';out.mkdir(parents=True,exist_ok=True)
 source=(base/'renderer/src/vulkan/renderer.cpp').read_text()
 header=(base/'renderer/include/renderer/state.h').read_text()

@@ -4,7 +4,7 @@ from pathlib import Path
 import os, shutil, subprocess
 root=Path(__file__).resolve().parents[4]
 out=root/'app/build/startup-gpu-config-probe';out.mkdir(parents=True,exist_ok=True)
-source=(root/'app/src/main/cpp/emucorev/ECV/vita3k/Android/jni/main_android.cpp').read_text()
+source=(root/'app/src/main/cpp/emucorev/ECV/ECV/Android/jni/main_android.cpp').read_text()
 begin=source.index('        sync_current_game_id(launch_request.app_path);')
 end=source.index('        SDL_WindowFlags window_flags = 0;',begin)
 body=source[begin:end]

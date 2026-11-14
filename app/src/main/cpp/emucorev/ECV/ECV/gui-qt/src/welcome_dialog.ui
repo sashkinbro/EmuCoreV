@@ -15,7 +15,7 @@
 		</property>
 		<property name="windowIcon">
 			<iconset>
-				<normaloff>:/Vita3K.ico</normaloff>:/Vita3K.ico
+				<normaloff>:/ECV.ico</normaloff>:/ECV.ico
 			</iconset>
 		</property>
 		<layout class="QVBoxLayout" name="welcome_dialog_layout" stretch="0,0,0">

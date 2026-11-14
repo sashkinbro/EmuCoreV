@@ -8,7 +8,7 @@ from pathlib import Path
 import argparse, os, shutil, subprocess
 
 root = Path(__file__).resolve().parents[4]
-source_path = root / 'app/src/main/cpp/emucorev/ECV/vita3k/shader/src/usse_utilities.cpp'
+source_path = root / 'app/src/main/cpp/emucorev/ECV/ECV/shader/src/usse_utilities.cpp'
 out = root / 'app/build/shader-integer-pack-probe'
 out.mkdir(parents=True, exist_ok=True)
 parser = argparse.ArgumentParser()

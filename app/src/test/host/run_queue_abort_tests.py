@@ -8,7 +8,7 @@ is cleaned up by a second abort before joining, so the regression stays bounded.
 from pathlib import Path
 import subprocess,os,shutil
 root=Path(__file__).resolve().parents[4];out=root/'app/build/queue-abort-race-probe';out.mkdir(exist_ok=True)
-s=(root/'app/src/main/cpp/emucorev/ECV/vita3k/threads/include/threads/queue.h').read_text(encoding='utf-8')
+s=(root/'app/src/main/cpp/emucorev/ECV/ECV/threads/include/threads/queue.h').read_text(encoding='utf-8')
 a=s.index('    std::unique_ptr<T> pop(');b=s.index('    void push(',a);part=s[a:b];assert part.count('condempty_.wait(mlock);')==1
 part=part.replace('condempty_.wait(mlock);','before_pop_wait();\n                    condempty_.wait(mlock);');s=s[:a]+part+s[b:]
 a=s.index('    void push(');b=s.index('    // Guest waits',a);part=s[a:b];assert part.count('cond_.wait(mlock);')==1

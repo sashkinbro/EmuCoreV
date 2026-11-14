@@ -15,7 +15,7 @@ parser.add_argument("--cxx", default=shutil.which("g++") or "C:/msys64/ucrt64/bi
 parser.add_argument("--mutation-check", action="store_true")
 args = parser.parse_args()
 here = Path(__file__).resolve().parent
-core = here.parents[1] / "main/cpp/emucorev/ECV/vita3k"
+core = here.parents[1] / "main/cpp/emucorev/ECV/ECV"
 vendor = core.parent
 includes = [core / name / "include" for name in ("kernel", "cpu", "mem", "util")]
 includes.append(vendor / "external/fmt/include")

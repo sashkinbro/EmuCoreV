@@ -15,7 +15,7 @@ out = root / 'app/build/vitamin-native-probe'
 out.mkdir(parents=True, exist_ok=True)
 if os.name == 'nt' and Path('C:/msys64/ucrt64/bin').is_dir():
     os.environ['PATH'] = 'C:/msys64/ucrt64/bin;' + os.environ['PATH']
-source = (root / 'app/src/main/cpp/emucorev/ECV/vita3k/interface.cpp').read_text()
+source = (root / 'app/src/main/cpp/emucorev/ECV/ECV/interface.cpp').read_text()
 
 
 def block(marker):

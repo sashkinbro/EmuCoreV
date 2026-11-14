@@ -6,7 +6,7 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-base = root/'app/src/main/cpp/emucorev/ECV/vita3k/packages'
+base = root/'app/src/main/cpp/emucorev/ECV/ECV/packages'
 header = (base/'include/packages/sfo.h').read_text()
 types = header[header.index('enum SfoDataFormat'):header.index('namespace sfo {')]
 source = (base/'src/sfo.cpp').read_text()

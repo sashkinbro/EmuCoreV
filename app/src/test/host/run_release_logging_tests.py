@@ -13,7 +13,7 @@ import subprocess
 root = Path(__file__).resolve().parents[4]
 out = root / 'app/build/release-logging-probe'
 out.mkdir(parents=True, exist_ok=True)
-source = (root / 'app/src/main/cpp/emucorev/ECV/vita3k/util/include/util/log.h').read_text()
+source = (root / 'app/src/main/cpp/emucorev/ECV/ECV/util/include/util/log.h').read_text()
 prefix = source[source.index('#define SPDLOG_ACTIVE_LEVEL'):source.index('namespace logging')]
 # Keep the build guards before the level definition, if present.
 guard = source.rfind('#ifdef NDEBUG', 0, source.index('#define SPDLOG_ACTIVE_LEVEL'))
@@ -80,7 +80,7 @@ for mode in ('release', 'debug'):
     print(mode + ': ' + result.stdout + result.stderr)
     (out / (mode + '.log')).write_text(result.stdout + result.stderr)
     failed |= bool(result.returncode)
-logger = (root / 'app/src/main/cpp/emucorev/ECV/vita3k/util/src/logging.cpp').read_text()
+logger = (root / 'app/src/main/cpp/emucorev/ECV/ECV/util/src/logging.cpp').read_text()
 release = logger[logger.index('#ifdef NDEBUG') + len('#ifdef NDEBUG'):logger.index('#else', logger.index('#ifdef NDEBUG'))]
 logger_cpp = r'''
 #include <functional>

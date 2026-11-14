@@ -8,7 +8,7 @@ raw-alias and mask combinations exercised. No Vulkan device is needed.
 from pathlib import Path
 import os,re,subprocess,sys
 root=Path(__file__).resolve().parents[4]
-base='app/src/main/cpp/emucorev/ECV/vita3k/renderer/src/vulkan/'
+base='app/src/main/cpp/emucorev/ECV/ECV/renderer/src/vulkan/'
 def source(name):
  p=base+name
  return subprocess.check_output(['git','show','HEAD:'+p],cwd=root,text=True) if '--baseline' in sys.argv else (root/p).read_text()

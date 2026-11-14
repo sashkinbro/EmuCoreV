@@ -124,7 +124,7 @@ class GameCompatibilityDatabaseTest {
             .substringAfter("fun loadProfile(").substringBefore("fun save(")
         assertTrue(repository.indexOf("gameDatabase.applyDefaults") < repository.indexOf("readCustomConfig"))
         assertFalse(repository.substringAfter("readCustomConfig").contains("applyDefaults"))
-        val native = app.resolve("src/main/cpp/emucorev/ECV/vita3k/config/src/settings.cpp").readText()
+        val native = app.resolve("src/main/cpp/emucorev/ECV/ECV/config/src/settings.cpp").readText()
             .substringAfter("void set_current_config(Config &cfg").substringBefore("void copy_current_config_to_global")
         assertTrue(native.contains(GameCompatibilityDatabase.ASSET_PATH))
         assertTrue(native.indexOf("game_database::recommendation") < native.indexOf("load_custom_config"))

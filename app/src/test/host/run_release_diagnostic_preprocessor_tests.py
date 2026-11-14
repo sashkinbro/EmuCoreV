@@ -11,7 +11,7 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-core = 'app/src/main/cpp/emucorev/ECV/vita3k/'
+core = 'app/src/main/cpp/emucorev/ECV/ECV/'
 if os.name == 'nt' and Path('C:/msys64/ucrt64/bin').is_dir():
     os.environ['PATH'] = 'C:/msys64/ucrt64/bin;' + os.environ['PATH']
 compiler = os.environ.get('CXX') or shutil.which('g++') or shutil.which('clang++')

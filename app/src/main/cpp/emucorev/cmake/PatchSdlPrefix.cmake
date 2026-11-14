@@ -1,7 +1,7 @@
 # EmuCoreV adapter layer (Layer 2).
 #
 # Vanilla Vita3K's vendored SDL3 hardcodes SDL_JAVA_PREFIX inside two TUs
-# (SDL_android.c and hidapi/android/hid.cpp). To keep the vita3k tree
+# (SDL_android.c and hidapi/android/hid.cpp). To keep the ECV tree
 # untouched, we materialise patched copies into the build directory and swap
 # them into SDL3-shared / SDL3-static SOURCES.
 

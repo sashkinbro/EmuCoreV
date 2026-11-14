@@ -17,8 +17,8 @@
 
 #include "resource.h"
 
-IDI_ICON1 ICON "Vita3K.ico"
-FRAME_ICON ICON "Vita3K.ico"
+IDI_ICON1 ICON "ECV.ico"
+FRAME_ICON ICON "ECV.ico"
 
 #define APSTUDIO_READONLY_SYMBOLS
 /////////////////////////////////////////////////////////////////////////////
@@ -86,9 +86,9 @@ BEGIN
             VALUE "CompanyName", "https://github.com/sashkinbro/EmuCoreV"
             VALUE "FileDescription", "EmuCoreV ECV PS Vita Emulator"
             VALUE "FileVersion", FILE_VERSION_STR "\0"
-            VALUE "InternalName", "Vita3K.exe"
+            VALUE "InternalName", "ECV.exe"
             VALUE "LegalCopyright", "Copyright (C) 2018-2026"
-            VALUE "OriginalFilename", "Vita3K.exe"
+            VALUE "OriginalFilename", "ECV.exe"
             VALUE "ProductName", "EmuCoreV ECV"
             VALUE "ProductVersion", FILE_VERSION_STR "\0"
         END

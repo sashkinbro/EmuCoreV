@@ -6,7 +6,7 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-source = (root / 'app/src/main/cpp/emucorev/ECV/vita3k/io/src/io.cpp').read_text(encoding='utf-8')
+source = (root / 'app/src/main/cpp/emucorev/ECV/ECV/io/src/io.cpp').read_text(encoding='utf-8')
 
 
 def function_body(signature: str) -> str:

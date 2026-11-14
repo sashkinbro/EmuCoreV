@@ -13,7 +13,7 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-core = root / 'app/src/main/cpp/emucorev/ECV/vita3k'
+core = root / 'app/src/main/cpp/emucorev/ECV/ECV'
 glslang = root / 'app/src/main/cpp/emucorev/ECV/external/glslang'
 out = root / 'app/build/vertex-output-init-probe'
 out.mkdir(parents=True, exist_ok=True)

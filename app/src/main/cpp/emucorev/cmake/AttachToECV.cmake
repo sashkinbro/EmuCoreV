@@ -3,23 +3,23 @@ if(DEFINED EMUCOREV_VITA3K_LAYER_ATTACHED)
 endif()
 set(EMUCOREV_VITA3K_LAYER_ATTACHED TRUE)
 
-if(NOT TARGET vita3k)
+if(NOT TARGET ECV)
     message(FATAL_ERROR "EmuCoreV bridge must attach after the Vita3K target is created")
 endif()
 
 get_filename_component(EMUCOREV_BRIDGE_DIR "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 get_filename_component(VITA3K_VENDOR_DIR "${EMUCOREV_BRIDGE_DIR}/ECV" ABSOLUTE)
-set(VITA3K_CORE_DIR "${VITA3K_VENDOR_DIR}/vita3k")
+set(VITA3K_CORE_DIR "${VITA3K_VENDOR_DIR}/ECV")
 
 include("${EMUCOREV_BRIDGE_DIR}/cmake/CoreTargetFilter.cmake")
 include("${EMUCOREV_BRIDGE_DIR}/cmake/PatchSdlPrefix.cmake")
 
 # Rewrite vita3k's SDL TUs that hardcode SDL_JAVA_PREFIX = com_sbro_emucorev_core_sdl
-# back to the upstream org_libsdl_app, without modifying the vita3k tree.
+# back to the upstream org_libsdl_app, without modifying the ECV tree.
 # Our Kotlin SDL classes now live in package org.libsdl.app to match.
 emucorev_patch_sdl_prefix("${VITA3K_CORE_DIR}" "${VITA3K_VENDOR_DIR}")
 
-target_include_directories(vita3k PRIVATE
+target_include_directories(ECV PRIVATE
     "${EMUCOREV_BRIDGE_DIR}/include"
     "${VITA3K_CORE_DIR}"
     "${VITA3K_CORE_DIR}/android/jni"
@@ -29,7 +29,7 @@ target_include_directories(vita3k PRIVATE
     "${VITA3K_VENDOR_DIR}/external/concurrentqueue"
 )
 
-target_compile_definitions(vita3k PRIVATE EMUCOREV_ANDROID_BRIDGE=1)
+target_compile_definitions(ECV PRIVATE EMUCOREV_ANDROID_BRIDGE=1)
 
 # Core static libraries that merge the EmuCoreV keyboard/mouse source state.
 if(TARGET ctrl)
@@ -45,21 +45,21 @@ if(TARGET renderer)
     target_include_directories(renderer PRIVATE "${EMUCOREV_BRIDGE_DIR}/include")
 endif()
 
-emucorev_filter_vita3k_target(vita3k "${VITA3K_VENDOR_DIR}" "${VITA3K_CORE_DIR}")
+emucorev_filter_vita3k_target(ECV "${VITA3K_VENDOR_DIR}" "${VITA3K_CORE_DIR}")
 
 # Drop the upstream file-dialog JNI from vita3k's shared library: it exports
 # Java_org_vita3k_emulator_Emulator_filedialogReturn, which our Kotlin
 # Emulator (com.sbro.emucorev.core.vita) never calls. The replacement in
 # host_dialog below owns both the host::dialog::filesystem implementation and
 # our package's JNI symbol.
-get_target_property(_emucorev_vita3k_sources vita3k SOURCES)
+get_target_property(_emucorev_vita3k_sources ECV SOURCES)
 if(_emucorev_vita3k_sources)
     list(FILTER _emucorev_vita3k_sources EXCLUDE REGEX "android/jni/filesystem_android\\.cpp$")
-    set_target_properties(vita3k PROPERTIES SOURCES "${_emucorev_vita3k_sources}")
+    set_target_properties(ECV PROPERTIES SOURCES "${_emucorev_vita3k_sources}")
 endif()
 
 # Replace host_dialog's Android source (the upstream copy was removed from the
-# vita3k tree to keep it vanilla). host_dialog still publishes
+# ECV tree to keep it vanilla). host_dialog still publishes
 # host::dialog::filesystem to the rest of vita3k.
 if(TARGET host_dialog)
     set_target_properties(host_dialog PROPERTIES
@@ -93,11 +93,11 @@ set(EMUCOREV_BRIDGE_SOURCES
     "${EMUCOREV_BRIDGE_DIR}/src/savestate/savestate.cpp"
 )
 
-target_sources(vita3k PRIVATE ${EMUCOREV_BRIDGE_SOURCES})
+target_sources(ECV PRIVATE ${EMUCOREV_BRIDGE_SOURCES})
 
 # These private diagnostic archives expose no JNI API. Hide their symbols so
 # section GC can discard unused logging/debug-server implementations in release.
-target_link_options(vita3k PRIVATE
+target_link_options(ECV PRIVATE
     "$<$<NOT:$<CONFIG:Debug>>:-Wl,--exclude-libs,libspdlog.a:libgdbstub.a>"
 )
 
@@ -107,11 +107,11 @@ if(ANDROID)
     add_executable(emucorev-core-tests EXCLUDE_FROM_ALL
         "${EMUCOREV_BRIDGE_DIR}/../../../test/core-api/core_api_tests.cpp")
     target_include_directories(emucorev-core-tests PRIVATE
-        "$<TARGET_PROPERTY:vita3k,INCLUDE_DIRECTORIES>"
+        "$<TARGET_PROPERTY:ECV,INCLUDE_DIRECTORIES>"
         "${VITA3K_CORE_DIR}/modules"
         "$<TARGET_PROPERTY:cubeb,INCLUDE_DIRECTORIES>"
         "${VITA3K_VENDOR_DIR}/external/LibAtrac9/C/src")
-    target_link_libraries(emucorev-core-tests PRIVATE vita3k googletest)
+    target_link_libraries(emucorev-core-tests PRIVATE ECV googletest)
     target_compile_definitions(emucorev-core-tests PRIVATE
-        "$<TARGET_PROPERTY:vita3k,COMPILE_DEFINITIONS>")
+        "$<TARGET_PROPERTY:ECV,COMPILE_DEFINITIONS>")
 endif()

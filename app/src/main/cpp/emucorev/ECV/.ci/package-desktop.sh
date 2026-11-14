@@ -61,15 +61,15 @@ case "$PLATFORM" in
         pushd "$build_dir" > /dev/null
         create-dmg \
             --volname "Vita3K Installer" \
-            --volicon Vita3K.app/Contents/Resources/Vita3K.icns \
+            --volicon ECV.app/Contents/Resources/ECV.icns \
             --window-size 500 300 \
             --icon-size 100 \
-            --icon Vita3K.app 120 115 \
+            --icon ECV.app 120 115 \
             --app-drop-link 360 115 \
             "$dmg_name" \
-            Vita3K.app
+            ECV.app
         mv -f "$dmg_name" "$repo_root/$OUTPUT_DIR/"
-        rm -rf Vita3K.app
+        rm -rf ECV.app
         popd > /dev/null
         ;;
     windows-*)

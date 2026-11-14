@@ -4,7 +4,7 @@ from pathlib import Path
 import os, shutil, subprocess
 
 root = Path(__file__).resolve().parents[4]
-core = root / 'app/src/main/cpp/emucorev/ECV/vita3k'
+core = root / 'app/src/main/cpp/emucorev/ECV/ECV'
 source = (core / 'shader/src/spirv_recompiler.cpp').read_text()
 marker = 'static spv::Id create_fragment_iterator('
 assert marker in source, 'missing compile-time specialization of fragment iterator interface'

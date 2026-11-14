@@ -7,7 +7,7 @@ import subprocess
 
 root = Path(__file__).resolve().parents[4]
 native = root / 'app/src/main/cpp'
-android = (native / 'emucorev/ECV/vita3k/android/jni/main_android.cpp').read_text(encoding='utf-8')
+android = (native / 'emucorev/ECV/ECV/android/jni/main_android.cpp').read_text(encoding='utf-8')
 start = 'case SDL_EVENT_GAMEPAD_SENSOR_UPDATE:'
 end = 'default:'
 offset = android.index(start)

@@ -317,7 +317,7 @@ if (${BUILD_APPIMAGE})
 endif()
 
 add_subdirectory(external)
-add_subdirectory(vita3k)
+add_subdirectory(ECV)
 add_subdirectory(tools/gen-modules)
 
 # Dependency subdirectories must be created before deferred bridge attachment.

@@ -10,8 +10,8 @@ import re
 import shutil
 import subprocess
 
-root=next(p for p in Path(__file__).resolve().parents if (p/'app/src/main/cpp/emucorev/ECV/vita3k').is_dir())
-base=root/'app/src/main/cpp/emucorev/ECV/vita3k'
+root=next(p for p in Path(__file__).resolve().parents if (p/'app/src/main/cpp/emucorev/ECV/ECV').is_dir())
+base=root/'app/src/main/cpp/emucorev/ECV/ECV'
 out=root/'tools/system-services/trophy-context-host'
 out.mkdir(parents=True,exist_ok=True)
 source=(base/'np/src/trophy/context.cpp').read_text(encoding='utf-8')

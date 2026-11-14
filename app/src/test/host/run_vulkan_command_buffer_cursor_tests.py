@@ -5,9 +5,9 @@ import os
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-include = root / 'app/src/main/cpp/emucorev/ECV/vita3k/renderer/include'
+include = root / 'app/src/main/cpp/emucorev/ECV/ECV/renderer/include'
 types_path = include / 'renderer/vulkan/types.h'
-context_path = root / 'app/src/main/cpp/emucorev/ECV/vita3k/renderer/src/vulkan/context.cpp'
+context_path = root / 'app/src/main/cpp/emucorev/ECV/ECV/renderer/src/vulkan/context.cpp'
 state_path = include / 'renderer/vulkan/state.h'
 types = types_path.read_text()
 context = context_path.read_text()

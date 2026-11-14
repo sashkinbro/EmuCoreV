@@ -6,7 +6,7 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-core = root / 'app/src/main/cpp/emucorev/ECV/vita3k'
+core = root / 'app/src/main/cpp/emucorev/ECV/ECV'
 external = core.parent / 'external'
 out = root / 'app/build/ime-callback-probe'
 out.mkdir(parents=True, exist_ok=True)

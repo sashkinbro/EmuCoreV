@@ -118,7 +118,7 @@ WARN_LOGFILE           =
 #---------------------------------------------------------------------------
 # Configuration options related to the input files
 #---------------------------------------------------------------------------
-INPUT                  = ../vita3k \
+INPUT                  = ../ECV \
                          ../tools
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.c \

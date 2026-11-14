@@ -8,8 +8,8 @@ import subprocess
 import sys
 
 root = Path(__file__).resolve().parents[4]
-renderer = root / 'app/src/main/cpp/emucorev/ECV/vita3k/renderer'
-source_path = 'app/src/main/cpp/emucorev/ECV/vita3k/renderer/src/vulkan/context.cpp'
+renderer = root / 'app/src/main/cpp/emucorev/ECV/ECV/renderer'
+source_path = 'app/src/main/cpp/emucorev/ECV/ECV/renderer/src/vulkan/context.cpp'
 source = (subprocess.check_output(['git', 'show', 'HEAD:' + source_path], cwd=root, text=True)
           if '--baseline' in sys.argv else (root / source_path).read_text())
 clear = source[source.index('const vk::ClearDepthStencilValue ds_clear{'):]

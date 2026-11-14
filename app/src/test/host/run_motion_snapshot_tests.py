@@ -2,7 +2,7 @@
 """Real motion/filter state and production Input codec; SDL handles are host seams."""
 from pathlib import Path
 import os,subprocess,shutil,sys
-root=Path(__file__).resolve().parents[4];native=root/'app/src/main/cpp';motion=native/'emucorev/ECV/vita3k/motion'
+root=Path(__file__).resolve().parents[4];native=root/'app/src/main/cpp';motion=native/'emucorev/ECV/ECV/motion'
 source=(native/'emucorev/src/savestate/savestate.cpp').read_text(encoding='utf-8')
 start='bool preflight_input(const std::vector<uint8_t> &data, std::string &error);';end='bool preflight_io(const std::vector<uint8_t> &data, std::string &error);'
 production=source[source.index(start):source.index(end)]
@@ -64,6 +64,6 @@ saved.motion.stop_sensor_sampling();Writer stopped;check(write_input(saved,stopp
 '''
 (out/'probe.cpp').write_text(cpp,encoding='utf-8')
 os.environ['PATH']='C:/msys64/ucrt64/bin;'+os.environ['PATH'];compiler=shutil.which('g++');assert compiler
-includes=[native/'emucorev/include',motion/'include',native/'emucorev/ECV/vita3k/touch/include',native/'emucorev/ECV/vita3k/util/include',native/'emucorev/ECV/external/sdl/include',native/'emucorev/ECV/external/fmt/include']
+includes=[native/'emucorev/include',motion/'include',native/'emucorev/ECV/ECV/touch/include',native/'emucorev/ECV/ECV/util/include',native/'emucorev/ECV/external/sdl/include',native/'emucorev/ECV/external/fmt/include']
 subprocess.run([compiler,'-std=c++20','-O0',*(['-DMOTION_DTO_TESTS'] if '--dto' in sys.argv else []),*['-I'+str(p)for p in includes],str(out/'probe.cpp'),str(motion/'src/motion_input.cpp'),'-o',str(out/'probe.exe')],check=True)
 p=subprocess.run([str(out/'probe.exe')],capture_output=True,text=True);print(p.stdout,end='');(out/'result.log').write_text(p.stdout+p.stderr);raise SystemExit(p.returncode)

@@ -103,12 +103,12 @@ class SettingsPersistenceContractTest {
 
     @Test
     fun nativeShaderPreferencesFlowFromGlobalAndPerGameStorageToRendering() {
-        val configHeader = cppSource("emucorev/ECV/vita3k/config/include/config/config.h")
-        val stateHeader = cppSource("emucorev/ECV/vita3k/config/include/config/state.h")
-        val settings = cppSource("emucorev/ECV/vita3k/config/src/settings.cpp")
+        val configHeader = cppSource("emucorev/ECV/ECV/config/include/config/config.h")
+        val stateHeader = cppSource("emucorev/ECV/ECV/config/include/config/state.h")
+        val settings = cppSource("emucorev/ECV/ECV/config/src/settings.cpp")
         val runtime = cppSource("emucorev/src/runtime_bridge.cpp")
-        val appInit = cppSource("emucorev/ECV/vita3k/app/src/app_init.cpp")
-        val gui = cppSource("emucorev/ECV/vita3k/gui/src/gui.cpp")
+        val appInit = cppSource("emucorev/ECV/ECV/app/src/app_init.cpp")
+        val gui = cppSource("emucorev/ECV/ECV/gui/src/gui.cpp")
 
         assertTrue("show-shader-cache-warn must be a serialized global option", "\"show-shader-cache-warn\"" in configHeader)
         assertTrue("Per-game compile notice must default off", "bool show_compile_shaders = false;" in stateHeader)
@@ -124,11 +124,11 @@ class SettingsPersistenceContractTest {
 
     @Test
     fun accurateThreadSchedulingRoundTripsAndControlsTheGuestScheduler() {
-        val configHeader = cppSource("emucorev/ECV/vita3k/config/include/config/config.h")
-        val stateHeader = cppSource("emucorev/ECV/vita3k/config/include/config/state.h")
-        val settings = cppSource("emucorev/ECV/vita3k/config/src/settings.cpp")
-        val runtime = cppSource("emucorev/ECV/vita3k/interface.cpp")
-        val thread = cppSource("emucorev/ECV/vita3k/kernel/src/thread.cpp")
+        val configHeader = cppSource("emucorev/ECV/ECV/config/include/config/config.h")
+        val stateHeader = cppSource("emucorev/ECV/ECV/config/include/config/state.h")
+        val settings = cppSource("emucorev/ECV/ECV/config/src/settings.cpp")
+        val runtime = cppSource("emucorev/ECV/ECV/interface.cpp")
+        val thread = cppSource("emucorev/ECV/ECV/kernel/src/thread.cpp")
 
         listOf("accurate-thread-scheduling", "guest-cores").forEach { key ->
             assertTrue("Global config must serialize $key", key in configHeader)

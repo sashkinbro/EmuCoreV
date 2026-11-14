@@ -18,10 +18,10 @@ def block(s,marker):
   depth+=(s[i]=='{')-(s[i]=='}')
   if depth==0:return s[p:i+1]
  raise AssertionError(f'Unterminated production block: {marker}')
-controller=(root/'app/src/main/cpp/emucorev/ECV/vita3k/app/src/session_controller.cpp').read_text()
-android=(root/'app/src/main/cpp/emucorev/ECV/vita3k/android/jni/main_android.cpp').read_text()
+controller=(root/'app/src/main/cpp/emucorev/ECV/ECV/app/src/session_controller.cpp').read_text()
+android=(root/'app/src/main/cpp/emucorev/ECV/ECV/android/jni/main_android.cpp').read_text()
 if '--baseline' in sys.argv:
- android=subprocess.check_output(['git','show','HEAD:app/src/main/cpp/emucorev/ECV/vita3k/android/jni/main_android.cpp'],cwd=root,text=True)
+ android=subprocess.check_output(['git','show','HEAD:app/src/main/cpp/emucorev/ECV/ECV/android/jni/main_android.cpp'],cwd=root,text=True)
 bridge=(root/'app/src/main/cpp/emucorev/src/savestate_bridge.cpp').read_text()
 startup=block(android,'        if (!load_state_path.empty()) {')
 completion_marker='        if (startup_state_operation.owns_lock())'

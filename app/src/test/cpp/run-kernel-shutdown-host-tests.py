@@ -6,7 +6,7 @@ import tempfile
 
 here = Path(__file__).resolve().parent
 vendor = here.parents[1] / "main/cpp/emucorev/ECV"
-source = (vendor / "vita3k/kernel/src/kernel.cpp").read_text()
+source = (vendor / "ECV/kernel/src/kernel.cpp").read_text()
 signature = "void KernelState::process_exit()"
 start = source.index(signature)
 opening = source.index("{", start)
@@ -57,6 +57,6 @@ with tempfile.TemporaryDirectory(prefix="emucorev-shutdown-") as temporary:
     generated = Path(temporary) / "shutdown.cpp"
     generated.write_text(fixture + body + '\n#include "' + (here.parent / "core-api/kernel_shutdown_tests.inc").as_posix() + '"\n#include "' + (here.parent / "core-api/kernel_host_lifetime_tests.inc").as_posix() + '"\n')
     exe = Path(temporary) / "shutdown.exe"
-    includes = [vendor / "vita3k" / name / "include" for name in ("kernel", "mem", "util")]
+    includes = [vendor / "ECV" / name / "include" for name in ("kernel", "mem", "util")]
     subprocess.run([cxx, "-std=c++23", "-pthread", *["-I" + str(p) for p in includes], "-I" + str(gtest / "include"), "-I" + str(gtest), str(generated), str(gtest / "src/gtest-all.cc"), str(gtest / "src/gtest_main.cc"), "-o", str(exe)], check=True, env=env, timeout=60)
     subprocess.run([str(exe)], check=True, env=env, timeout=10)

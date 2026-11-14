@@ -3,7 +3,7 @@ from pathlib import Path
 import os, shutil, subprocess
 
 root = Path(__file__).resolve().parents[4]
-source = (root / 'app/src/main/cpp/emucorev/ECV/vita3k/app/src/session_controller.cpp').read_text()
+source = (root / 'app/src/main/cpp/emucorev/ECV/ECV/app/src/session_controller.cpp').read_text()
 start = source.index('bool AppSessionController::load_and_run(')
 end = source.index('\nbool AppSessionController::set_pause_reason', start)
 method = source[start:end]

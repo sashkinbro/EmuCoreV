@@ -7,7 +7,7 @@ neither behavior may change a lane that the guest instruction did not write.
 from pathlib import Path
 import argparse, os, shutil, subprocess
 root=Path(__file__).resolve().parents[4]
-core=root/'app/src/main/cpp/emucorev/ECV/vita3k'
+core=root/'app/src/main/cpp/emucorev/ECV/ECV'
 out=root/'app/build/shader-masked-pack-probe';out.mkdir(parents=True,exist_ok=True)
 parser=argparse.ArgumentParser();parser.add_argument('--baseline',action='store_true');args=parser.parse_args()
 path=core/'shader/src/usse_utilities.cpp'

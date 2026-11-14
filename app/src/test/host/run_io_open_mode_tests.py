@@ -9,9 +9,9 @@ root = Path(__file__).resolve().parents[4]
 native = root / 'app/src/main/cpp'
 source = (native / 'emucorev/src/savestate/savestate.cpp').read_text(encoding='utf-8')
 validator = source[source.index('bool valid_io_open_mode('):source.index('bool parse_io_state(')]
-types = (native / 'emucorev/ECV/vita3k/io/include/io/types.h').read_text(encoding='utf-8')
+types = (native / 'emucorev/ECV/ECV/io/include/io/types.h').read_text(encoding='utf-8')
 flags = types[types.index('typedef enum SceIoMode'):types.index('typedef enum SceIoAccessMode')]
-filesystem = (native / 'emucorev/ECV/vita3k/io/src/filesystem.cpp').read_text(encoding='utf-8')
+filesystem = (native / 'emucorev/ECV/ECV/io/src/filesystem.cpp').read_text(encoding='utf-8')
 translation = filesystem[filesystem.index('const char *translate_open_mode'):filesystem.rindex('#endif')]
 out = root / 'app/build/io-open-mode-probe'
 out.mkdir(parents=True, exist_ok=True)
