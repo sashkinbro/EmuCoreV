@@ -86,4 +86,4 @@ if(TRACY_ENABLE_ON_CORE_COMPONENTS)
 endif()
 
 # EmuCoreV RetroArch Slang post-processing backend (Vulkan/librashader).
-include("${CMAKE_CURRENT_LIST_DIR}/../../../emucorev/src/shaders/RetroArchShaderCMakeHook.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/../../../src/shaders/RetroArchShaderCMakeHook.cmake")

@@ -15,7 +15,7 @@ class LibraryInitRegistrationContractTest {
     private val libraryListRegex = Regex("""LIBRARY\(([A-Za-z_][A-Za-z0-9_]*)\)""")
 
     @Test fun everyLibraryInitIsRegisteredInLibraryInitList() {
-        val modulesDir = app.resolve("src/main/cpp/vita3k/vita3k/modules")
+        val modulesDir = app.resolve("src/main/cpp/emucorev/ECV/vita3k/modules")
         val declared = mutableSetOf<String>()
         Files.walk(modulesDir).use { paths ->
             paths.filter { it.toString().endsWith(".cpp") }.forEach { path ->
@@ -24,7 +24,7 @@ class LibraryInitRegistrationContractTest {
         }
 
         val registered = libraryListRegex.findAll(
-            app.resolve("src/main/cpp/vita3k/vita3k/modules/include/modules/library_init_list.inc").readText()
+            app.resolve("src/main/cpp/emucorev/ECV/vita3k/modules/include/modules/library_init_list.inc").readText()
         ).map { it.groupValues[1] }.toSet()
 
         assertTrue("No LIBRARY_INIT declarations found in $modulesDir", declared.isNotEmpty())

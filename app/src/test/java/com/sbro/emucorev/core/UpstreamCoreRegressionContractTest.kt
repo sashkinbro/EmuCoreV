@@ -11,7 +11,7 @@ class UpstreamCoreRegressionContractTest {
     private val app = sequenceOf(Path.of(System.getProperty("user.dir")), Path.of(System.getProperty("user.dir"), "app"))
         .first { Files.isDirectory(it.resolve("src/main")) }
 
-    private fun native(path: String) = app.resolve("src/main/cpp/vita3k/vita3k/$path").readText()
+    private fun native(path: String) = app.resolve("src/main/cpp/emucorev/ECV/vita3k/$path").readText()
 
     @Test fun invalidNgsPatchIsResolvedThroughOwnedVoicesBeforeDereference() {
         val source = native("modules/SceNgsUser/SceNgs.cpp")

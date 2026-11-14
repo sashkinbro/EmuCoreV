@@ -15,7 +15,7 @@ root = Path(__file__).resolve().parents[4]
 args = argparse.ArgumentParser()
 args.add_argument('--candidate', type=Path)
 options = args.parse_args()
-core = root / 'app/src/main/cpp/vita3k/vita3k'
+core = root / 'app/src/main/cpp/emucorev/ECV/vita3k'
 work = root / 'tools/cheats/sol-implementation/native-probe'
 work.mkdir(parents=True, exist_ok=True)
 candidate = options.candidate

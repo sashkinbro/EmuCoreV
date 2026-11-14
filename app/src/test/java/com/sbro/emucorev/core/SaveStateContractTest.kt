@@ -15,7 +15,7 @@ class SaveStateContractTest {
 
     private fun kotlin(path: String) = app.resolve("src/main/java/com/sbro/emucorev/$path").readText()
     private fun bridge(path: String) = app.resolve("src/main/cpp/emucorev/$path").readText()
-    private fun core(path: String) = app.resolve("src/main/cpp/vita3k/vita3k/$path").readText()
+    private fun core(path: String) = app.resolve("src/main/cpp/emucorev/ECV/vita3k/$path").readText()
 
     @Test
     fun jniBridgeSymbolsMatchKotlinExternals() {

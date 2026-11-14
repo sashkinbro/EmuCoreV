@@ -790,9 +790,9 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             val homeIntent = Intent(this, MainActivity::class.java).apply {
                 action = Intent.ACTION_MAIN
                 addCategory(Intent.CATEGORY_LAUNCHER)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
             }
-            triggerRebirthAfterNativeShutdown(homeIntent, allowAutoSave = autoSave)
+            triggerRebirthAfterNativeShutdown(homeIntent, allowAutoSave = autoSave, returnToLibrary = true)
         }
     }
 
@@ -1177,7 +1177,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     private fun triggerRebirthAfterNativeShutdown(targetIntent: Intent,
                                                 outgoingTitle: String = currentGameIdOrIntent(),
-                                                allowAutoSave: Boolean = true) {
+                                                allowAutoSave: Boolean = true,
+                                                returnToLibrary: Boolean = false) {
         runOnUiThread {
             if (rebirthRequested) return@runOnUiThread
             rebirthRequested = true
@@ -1210,7 +1211,17 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                         if (SDLActivity.mSDLThread?.isAlive == true) {
                             Log.w(TAG, "Proceeding with process rebirth while SDLThread is still alive; shader cache may not be fully flushed")
                         }
-                        ProcessPhoenix.triggerRebirth(applicationContext, targetIntent)
+                        if (returnToLibrary && canReuseNativeSession()) {
+                            // Preserve the library Activity, ViewModel and decoded covers.
+                            targetIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                            startActivity(targetIntent)
+                            finish()
+                            @Suppress("DEPRECATION")
+                            overridePendingTransition(0, 0)
+                        } else {
+                            // A timed-out native session cannot safely be reused.
+                            ProcessPhoenix.triggerRebirth(applicationContext, targetIntent)
+                        }
                     }
                 })
             }

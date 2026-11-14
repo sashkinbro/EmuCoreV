@@ -9,7 +9,7 @@ out = root / "app/build/license-read-probe"
 out.mkdir(parents=True, exist_ok=True)
 if os.name == "nt" and Path("C:/msys64/ucrt64/bin").is_dir():
     os.environ["PATH"] = "C:/msys64/ucrt64/bin;" + os.environ.get("PATH", "")
-source = (root / "app/src/main/cpp/vita3k/vita3k/packages/src/license.cpp").read_text()
+source = (root / "app/src/main/cpp/emucorev/ECV/vita3k/packages/src/license.cpp").read_text()
 
 
 def block(marker):

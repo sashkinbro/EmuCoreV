@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 
 here = Path(__file__).resolve().parent
-vendor = here.parents[1] / "main/cpp/vita3k"
+vendor = here.parents[1] / "main/cpp/emucorev/ECV"
 source = (vendor / "vita3k/kernel/src/kernel.cpp").read_text()
 signature = "void KernelState::process_exit()"
 start = source.index(signature)

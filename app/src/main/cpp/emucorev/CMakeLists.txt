@@ -3,7 +3,7 @@ if(NOT TARGET vita3k)
     message(FATAL_ERROR "EmuCoreV bridge must be added after the Vita3K target")
 endif()
 set(EMUCOREV_BRIDGE_DIR "${CMAKE_CURRENT_LIST_DIR}")
-set(VITA3K_VENDOR_DIR "${CMAKE_CURRENT_LIST_DIR}/../vita3k")
+set(VITA3K_VENDOR_DIR "${CMAKE_CURRENT_LIST_DIR}/ECV")
 set(VITA3K_CORE_DIR "${VITA3K_VENDOR_DIR}/vita3k")
 target_include_directories(vita3k PRIVATE
     "${EMUCOREV_BRIDGE_DIR}/include"

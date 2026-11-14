@@ -7,7 +7,7 @@ from pathlib import Path
 import os, shutil, subprocess, sys
 
 root = Path(__file__).resolve().parents[4]
-core = root / 'app/src/main/cpp/vita3k/vita3k'
+core = root / 'app/src/main/cpp/emucorev/ECV/vita3k'
 out = root / 'app/build/shader-integer-register-probe'
 out.mkdir(parents=True, exist_ok=True)
 

@@ -4,7 +4,7 @@ from pathlib import Path
 import os, shutil, subprocess, sys
 
 root=Path(__file__).resolve().parents[4]
-core=root/'app/src/main/cpp/vita3k/vita3k';ext=core.parent/'external'
+core=root/'app/src/main/cpp/emucorev/ECV/vita3k';ext=core.parent/'external'
 out=root/'app/build/ngs-output-patch-probe';out.mkdir(parents=True,exist_ok=True)
 if os.name=='nt':os.environ['PATH']='C:/msys64/ucrt64/bin;'+os.environ['PATH']
 
@@ -20,7 +20,7 @@ ngs=core/'ngs/src/ngs.cpp';api=core/'modules/SceNgsUser/SceNgs.cpp'
 baseline='--baseline' in sys.argv
 if baseline:
     api=out/'baseline-api.cpp'
-    api.write_bytes(subprocess.check_output(['git','show','HEAD:app/src/main/cpp/vita3k/vita3k/modules/SceNgsUser/SceNgs.cpp'],cwd=root))
+    api.write_bytes(subprocess.check_output(['git','show','HEAD:app/src/main/cpp/emucorev/ECV/vita3k/modules/SceNgsUser/SceNgs.cpp'],cwd=root))
 getter=block(api,'EXPORT(SceInt32, sceNgsVoiceGetOutputPatch,').replace('EXPORT(SceInt32, sceNgsVoiceGetOutputPatch, ngs::Voice *voice, const SceInt32 output_index, const SceInt32 output_subindex, Ptr<ngs::Patch> *patch)', 'SceInt32 get_output_patch(TestEnv &emuenv, ngs::Voice *voice, const SceInt32 output_index, const SceInt32 output_subindex, Ptr<ngs::Patch> *patch)')
 errors=block(api,'enum SceNgsErrorCode : uint32_t')+';'
 matrix_type=block(api,'struct SceNgsVolumeMatrix')+';'

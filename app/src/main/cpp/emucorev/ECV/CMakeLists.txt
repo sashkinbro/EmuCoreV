@@ -26,7 +26,7 @@ if(DISCORD_SDK_DIR AND EXISTS "${DISCORD_SDK_SO}" AND EXISTS "${DISCORD_SDK_INCL
 		IMPORTED_LOCATION "${DISCORD_SDK_SO}"
 		INTERFACE_INCLUDE_DIRECTORIES "${DISCORD_SDK_INCLUDE}")
 
-	add_library(emucorev_discord SHARED "${CMAKE_CURRENT_LIST_DIR}/../discord_bridge.cpp")
+	add_library(emucorev_discord SHARED "${CMAKE_CURRENT_LIST_DIR}/../../discord_bridge.cpp")
 	target_link_libraries(emucorev_discord PRIVATE discord_partner_sdk log)
 	set_target_properties(emucorev_discord PROPERTIES OUTPUT_NAME "emucorev_discord")
 	message(STATUS "Discord Social SDK enabled: ${DISCORD_SDK_SO}")

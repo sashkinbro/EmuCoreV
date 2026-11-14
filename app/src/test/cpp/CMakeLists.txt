@@ -3,7 +3,7 @@ project(EmuCoreVNativeTests LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-get_filename_component(VENDOR "${CMAKE_CURRENT_SOURCE_DIR}/../../main/cpp/vita3k" ABSOLUTE)
+get_filename_component(VENDOR "${CMAKE_CURRENT_SOURCE_DIR}/../../main/cpp/emucorev/ECV" ABSOLUTE)
 set(CORE "${VENDOR}/vita3k")
 set(EXTERNAL "${VENDOR}/external")
 set(ARCHITECTURE arm64)

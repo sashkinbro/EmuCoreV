@@ -54,8 +54,8 @@ tools/
 # Local documentation only. NEVER force-add docs/ (including plans and test reports).
 # Keep this directory out of commits and pushes unless the user explicitly asks otherwise.
 docs/
-app/src/main/cpp/vita3k/android/app/assets/*
-!app/src/main/cpp/vita3k/android/app/assets/.gitignore
+app/src/main/cpp/emucorev/ECV/android/app/assets/*
+!app/src/main/cpp/emucorev/ECV/android/app/assets/.gitignore
 app/src/main/jniLibs/
 
 # Nested repositories / local metadata
@@ -77,3 +77,10 @@ Thumbs.db
 *.tmp
 *.bak
 *.orig
+
+# Local Claude settings
+.claude/
+
+# Transient SQLite WAL coordination files
+*.db-shm
+*.db-wal

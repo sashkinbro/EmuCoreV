@@ -13,7 +13,7 @@ import subprocess
 root = Path(__file__).resolve().parents[4]
 out = root / 'app/build/gpu-depth-cleanup-probe'
 out.mkdir(parents=True, exist_ok=True)
-renderer = root / 'app/src/main/cpp/vita3k/vita3k/renderer'
+renderer = root / 'app/src/main/cpp/emucorev/ECV/vita3k/renderer'
 source = (renderer / 'src/vulkan/surface_cache.cpp').read_text()
 start = source.index('bool VKSurfaceCache::try_transfer_depth_gpu(')
 start = source.index('    dst_info->depth_content_stored = true;', start)
@@ -167,7 +167,7 @@ compiler = os.environ.get('CXX') or shutil.which('g++') or shutil.which('clang++
 assert compiler, 'A C++20 compiler is required'
 exe = out / 'probe.exe'
 subprocess.run([compiler, '-std=c++20', '-pthread', '-I' + str(renderer / 'include'),
-                '-I' + str(root / 'app/src/main/cpp/vita3k/vita3k/threads/include'),
+                '-I' + str(root / 'app/src/main/cpp/emucorev/ECV/vita3k/threads/include'),
                 str(out / 'probe.cpp'), '-o', str(exe)], check=True)
 result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=10)
 print(result.stdout + result.stderr)

@@ -8,14 +8,14 @@ from pathlib import Path
 import os, shutil, subprocess, sys
 
 root=Path(__file__).resolve().parents[4]
-core=root/'app/src/main/cpp/vita3k/vita3k'
+core=root/'app/src/main/cpp/emucorev/ECV/vita3k'
 out=root/'app/build/cheat-bridge-lifecycle-probe';out.mkdir(parents=True,exist_ok=True)
 bridge_path='app/src/main/cpp/emucorev/src/cheat_bridge.cpp'
 bridge=(root/bridge_path).read_text()
 interpreter=(core/'cheat/src/cheat.cpp').read_text()
 if '--baseline' in sys.argv:
     bridge=subprocess.check_output(['git','show','HEAD:'+bridge_path],cwd=root,text=True)
-    interpreter=subprocess.check_output(['git','show','HEAD:app/src/main/cpp/vita3k/vita3k/cheat/src/cheat.cpp'],cwd=root,text=True)
+    interpreter=subprocess.check_output(['git','show','HEAD:app/src/main/cpp/emucorev/ECV/vita3k/cheat/src/cheat.cpp'],cwd=root,text=True)
 def block(s,marker):
     assert s.count(marker)==1,marker
     a=s.index(marker);b=s.index('{',a);depth=0

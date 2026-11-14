@@ -1,9 +1,9 @@
 // EmuCoreV peripherals regression cases. These fixtures never claim a real camera capture.
-#include "../../main/cpp/vita3k/vita3k/camera/include/camera/camera.h"
-#include "../../main/cpp/vita3k/vita3k/camera/include/camera/frame_copy.h"
-#include "../../main/cpp/vita3k/vita3k/camera/include/camera/frame_convert.h"
-#include "../../main/cpp/vita3k/vita3k/camera/include/camera/read_abi.h"
-#include "../../main/cpp/vita3k/external/sdl/src/camera/android/SDL_camera_android_yuv.h"
+#include "../../main/cpp/emucorev/ECV/vita3k/camera/include/camera/camera.h"
+#include "../../main/cpp/emucorev/ECV/vita3k/camera/include/camera/frame_copy.h"
+#include "../../main/cpp/emucorev/ECV/vita3k/camera/include/camera/frame_convert.h"
+#include "../../main/cpp/emucorev/ECV/vita3k/camera/include/camera/read_abi.h"
+#include "../../main/cpp/emucorev/ECV/external/sdl/src/camera/android/SDL_camera_android_yuv.h"
 #include <SDL3/SDL_surface.h>
 #include <SDL3/SDL_error.h>
 

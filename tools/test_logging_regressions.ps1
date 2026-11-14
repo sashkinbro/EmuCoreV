@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$vendor = Join-Path $repoRoot 'app/src/main/cpp/vita3k'
+$vendor = Join-Path $repoRoot 'app/src/main/cpp/emucorev/ECV'
 $outputDir = Join-Path $repoRoot 'app/build/logging-regressions'
 New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 $includes = @('vita3k/util/include', 'external/boost', 'external/fmt/include', 'external/spdlog/include')

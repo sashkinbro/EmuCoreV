@@ -6,7 +6,7 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-source = (root / 'app/src/main/cpp/vita3k/vita3k/renderer/src/vulkan/context.cpp').read_text()
+source = (root / 'app/src/main/cpp/emucorev/ECV/vita3k/renderer/src/vulkan/context.cpp').read_text()
 start = source.index('    struct VisibilityRange {', source.index('void VKContext::stop_recording('))
 end = source.index('    // remember which part', start)
 body = source[start:end]

@@ -10,7 +10,7 @@ import sys
 import tempfile
 
 here = Path(__file__).resolve().parent
-core = here.parents[1] / "main/cpp/vita3k/vita3k"
+core = here.parents[1] / "main/cpp/emucorev/ECV/vita3k"
 vendor = core.parent
 gtest = vendor / "external/googletest/googletest"
 libraries = Path(sys.argv[1])

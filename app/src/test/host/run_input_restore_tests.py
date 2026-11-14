@@ -12,7 +12,7 @@ start = 'bool preflight_input(const std::vector<uint8_t> &data, std::string &err
 end = 'bool preflight_io(const std::vector<uint8_t> &data, std::string &error);'
 assert source.count(start) == source.count(end) == 1
 production = source[source.index(start):source.index(end)]
-motion = native / 'vita3k/vita3k/motion'
+motion = native / 'emucorev/ECV/vita3k/motion'
 motion_runtime = (motion / 'src/motion.cpp').read_text(encoding='utf-8')
 motion_runtime = motion_runtime[motion_runtime.index('static void detect_device_motion_support'):motion_runtime.index('SceFVector3 get_acceleration')]
 out = root / 'app/build/input-restore-probe'
@@ -96,9 +96,9 @@ if os.name == 'nt':
     os.environ['PATH'] = 'C:/msys64/ucrt64/bin;' + os.environ['PATH']
 compiler = os.environ.get('CXX') or shutil.which('g++')
 assert compiler, 'host C++ compiler required'
-includes = [native / 'emucorev/include', native / 'vita3k/vita3k/touch/include',
-            native / 'vita3k/vita3k/util/include', native / 'vita3k/external/sdl/include']
-includes += [motion / 'include', native / 'vita3k/external/fmt/include']
+includes = [native / 'emucorev/include', native / 'emucorev/ECV/vita3k/touch/include',
+            native / 'emucorev/ECV/vita3k/util/include', native / 'emucorev/ECV/external/sdl/include']
+includes += [motion / 'include', native / 'emucorev/ECV/external/fmt/include']
 subprocess.run([compiler, '-std=c++20', '-O0', *['-I'+str(p) for p in includes],
                 str(out/'probe.cpp'), str(motion / 'src/motion_input.cpp'), '-o', str(out/'probe.exe')], check=True)
 result = subprocess.run([str(out/'probe.exe')], capture_output=True, text=True)

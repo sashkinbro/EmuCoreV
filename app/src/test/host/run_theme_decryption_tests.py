@@ -14,10 +14,10 @@ import sys
 root = Path(__file__).resolve().parents[4]
 out = root / "app/build/theme-decryption-probe"
 out.mkdir(parents=True, exist_ok=True)
-relative = "app/src/main/cpp/vita3k/vita3k/packages/src/pkg.cpp"
+relative = "app/src/main/cpp/emucorev/ECV/vita3k/packages/src/pkg.cpp"
 source = (subprocess.check_output(["git", "show", "HEAD:" + relative], cwd=root, text=True)
           if "--baseline" in sys.argv else (root / relative).read_text())
-pfs = (root / "app/src/main/cpp/vita3k/external/psvpfstools/psvpfsparser/PsvPfsParserConfig.cpp").read_text()
+pfs = (root / "app/src/main/cpp/emucorev/ECV/external/psvpfstools/psvpfsparser/PsvPfsParserConfig.cpp").read_text()
 
 
 def body(text, marker):

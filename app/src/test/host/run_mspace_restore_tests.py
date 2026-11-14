@@ -5,7 +5,7 @@ import os
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-allocator = root / 'app/src/main/cpp/vita3k/external/dlmalloc'
+allocator = root / 'app/src/main/cpp/emucorev/ECV/external/dlmalloc'
 out = root / 'app/build/mspace-restore-probe'
 out.mkdir(parents=True, exist_ok=True)
 available = 'mspace_prepare_external' in (allocator / 'dlmalloc.h').read_text()

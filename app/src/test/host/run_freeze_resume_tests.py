@@ -11,7 +11,7 @@ import os, shutil, subprocess, sys
 root = Path(__file__).resolve().parents[4]
 out = root / 'app/build/freeze-resume-probe'
 out.mkdir(parents=True, exist_ok=True)
-source = Path(sys.argv[1]) if len(sys.argv) > 1 else root / 'app/src/main/cpp/vita3k/vita3k/kernel/src/thread_wait.cpp'
+source = Path(sys.argv[1]) if len(sys.argv) > 1 else root / 'app/src/main/cpp/emucorev/ECV/vita3k/kernel/src/thread_wait.cpp'
 text = source.read_text(encoding='utf-8-sig')
 
 def body(marker):

@@ -22,8 +22,8 @@ def function_body(source: str, signature: str) -> str:
     raise ValueError(f"unterminated function: {signature}")
 
 
-creation = (root / "app/src/main/cpp/vita3k/vita3k/renderer/src/creation.cpp").read_text(encoding="utf-8")
-screen = (root / "app/src/main/cpp/vita3k/vita3k/renderer/src/vulkan/screen_renderer.cpp").read_text(encoding="utf-8")
+creation = (root / "app/src/main/cpp/emucorev/ECV/vita3k/renderer/src/creation.cpp").read_text(encoding="utf-8")
+screen = (root / "app/src/main/cpp/emucorev/ECV/vita3k/renderer/src/vulkan/screen_renderer.cpp").read_text(encoding="utf-8")
 init_body = function_body(creation, "bool init(FrameHost &frame, std::unique_ptr<State> &state")
 cleanup_body = function_body(screen, "void ScreenRenderer::cleanup()")
 

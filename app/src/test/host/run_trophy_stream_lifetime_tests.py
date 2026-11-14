@@ -10,8 +10,8 @@ import os
 import shutil
 import subprocess
 
-root = next(p for p in Path(__file__).resolve().parents if (p / 'app/src/main/cpp/vita3k/vita3k').is_dir())
-base = root / 'app/src/main/cpp/vita3k/vita3k'
+root = next(p for p in Path(__file__).resolve().parents if (p / 'app/src/main/cpp/emucorev/ECV/vita3k').is_dir())
+base = root / 'app/src/main/cpp/emucorev/ECV/vita3k'
 out = root / 'tools/system-services/trophy-stream-lifetime-host'
 out.mkdir(parents=True, exist_ok=True)
 source = (base / 'np/src/trophy/context.cpp').read_text(encoding='utf-8')
@@ -105,7 +105,7 @@ int main() {
 compiler = os.environ.get('CXX') or shutil.which('g++') or 'C:/msys64/ucrt64/bin/g++.exe'
 env = os.environ.copy()
 env['PATH'] = str(Path(compiler).parent) + os.pathsep + env['PATH']
-includes = [base / 'np/include', base / 'mem/include', base / 'util/include', root / 'app/src/main/cpp/vita3k/external/boost', root / 'app/src/main/cpp/vita3k/external/fmt/include']
+includes = [base / 'np/include', base / 'mem/include', base / 'util/include', root / 'app/src/main/cpp/emucorev/ECV/external/boost', root / 'app/src/main/cpp/emucorev/ECV/external/fmt/include']
 subprocess.run([compiler, '-std=c++20', '-O0', '-D_GLIBCXX_DEBUG', *['-I' + str(i) for i in includes], str(out / 'probe.cpp'), '-o', str(out / 'probe.exe')], env=env, check=True)
 result = subprocess.run([str(out / 'probe.exe')], env=env, capture_output=True, text=True, timeout=10)
 print(result.stdout + result.stderr, end='')

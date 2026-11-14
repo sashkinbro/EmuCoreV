@@ -10,7 +10,7 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-source_path = root / 'app/src/main/cpp/vita3k/vita3k/shader/src/usse_utilities.cpp'
+source_path = root / 'app/src/main/cpp/emucorev/ECV/vita3k/shader/src/usse_utilities.cpp'
 out = root / 'app/build/shader-fpconstant-probe'
 out.mkdir(parents=True, exist_ok=True)
 parser = argparse.ArgumentParser()
@@ -100,7 +100,7 @@ if os.name == 'nt' and Path('C:/msys64/ucrt64/bin').is_dir():
     os.environ['PATH'] = 'C:/msys64/ucrt64/bin;' + os.environ['PATH']
 compiler = os.environ.get('CXX') or shutil.which('g++')
 assert compiler
-subprocess.run([compiler, '-std=c++20', '-O0', '-I', str(root / 'app/src/main/cpp/vita3k/vita3k/shader/include'), str(out / 'probe.cpp'), '-o', str(out / 'probe.exe')], check=True)
+subprocess.run([compiler, '-std=c++20', '-O0', '-I', str(root / 'app/src/main/cpp/emucorev/ECV/vita3k/shader/include'), str(out / 'probe.cpp'), '-o', str(out / 'probe.exe')], check=True)
 result = subprocess.run([str(out / 'probe.exe')], capture_output=True, text=True, timeout=10)
 print(result.stdout + result.stderr)
 (out / ('red.log' if result.returncode else 'green.log')).write_text(result.stdout + result.stderr)

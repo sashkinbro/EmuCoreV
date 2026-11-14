@@ -14,8 +14,8 @@ import subprocess
 parser = argparse.ArgumentParser()
 parser.add_argument('--source-root', type=Path)
 args = parser.parse_args()
-ROOT = next(p for p in Path(__file__).resolve().parents if (p / 'app/src/main/cpp/vita3k/vita3k').is_dir())
-BASE = args.source_root or ROOT / 'app/src/main/cpp/vita3k/vita3k'
+ROOT = next(p for p in Path(__file__).resolve().parents if (p / 'app/src/main/cpp/emucorev/ECV/vita3k').is_dir())
+BASE = args.source_root or ROOT / 'app/src/main/cpp/emucorev/ECV/vita3k'
 OUT = ROOT / 'tools/system-services/host-build'
 OUT.mkdir(parents=True, exist_ok=True)
 

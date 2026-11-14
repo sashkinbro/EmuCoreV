@@ -7,7 +7,7 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-source = (root / 'app/src/main/cpp/vita3k/vita3k/renderer/src/vulkan/pipeline_cache.cpp').read_text(encoding='utf-8')
+source = (root / 'app/src/main/cpp/emucorev/ECV/vita3k/renderer/src/vulkan/pipeline_cache.cpp').read_text(encoding='utf-8')
 start = source.index('void PipelineCache::cleanup() {')
 end = source.index('    {\n        std::lock_guard<std::mutex> guard(shaders_mutex);', start)
 body = source[start:end].replace('void PipelineCache::cleanup()', 'void cleanup()') + '}\n'

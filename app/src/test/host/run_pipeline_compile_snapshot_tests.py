@@ -16,10 +16,10 @@ import sys
 root = Path(__file__).resolve().parents[4]
 out = root / 'app/build/pipeline-compile-snapshot-probe'
 out.mkdir(parents=True, exist_ok=True)
-path = 'app/src/main/cpp/vita3k/vita3k/renderer/src/vulkan/pipeline_cache.cpp'
+path = 'app/src/main/cpp/emucorev/ECV/vita3k/renderer/src/vulkan/pipeline_cache.cpp'
 source = ((root / path).read_text() if '--baseline' not in sys.argv else
           subprocess.check_output(['git', 'show', 'HEAD:' + path], cwd=root, text=True))
-types = (root / 'app/src/main/cpp/vita3k/vita3k/renderer/include/renderer/types.h').read_text()
+types = (root / 'app/src/main/cpp/emucorev/ECV/vita3k/renderer/include/renderer/types.h').read_text()
 
 
 def block(text, marker):
@@ -111,8 +111,8 @@ if os.name == 'nt' and Path('C:/msys64/ucrt64/bin').is_dir():
 compiler = os.environ.get('CXX') or shutil.which('g++')
 assert compiler, 'A C++20 compiler is required'
 subprocess.run([compiler, '-std=c++20', '-O0',
-                '-I' + str(root / 'app/src/main/cpp/vita3k/vita3k/gxm/include'),
-                '-I' + str(root / 'app/src/main/cpp/vita3k/vita3k/util/include'),
+                '-I' + str(root / 'app/src/main/cpp/emucorev/ECV/vita3k/gxm/include'),
+                '-I' + str(root / 'app/src/main/cpp/emucorev/ECV/vita3k/util/include'),
                 str(out / 'probe.cpp'), '-o', str(out / 'probe.exe')], check=True)
 result = subprocess.run([str(out / 'probe.exe')], capture_output=True, text=True, timeout=10)
 print(result.stdout + result.stderr)

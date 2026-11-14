@@ -162,6 +162,7 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         @JvmField
         var mHasNativeShutdown = false
 
+        @Volatile
         private var nativeShutdownInFlight = false
 
         private var mFileDialogState: SDLFileDialogState? = null
@@ -194,6 +195,7 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
             mCursors = Hashtable()
             mLastCursorID = 0
             mSDLThread = null
+            mSDLMainFinished = false
             mIsResumedCalled = false
             mHasFocus = true
             mHasNativeShutdown = false
@@ -900,7 +902,10 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
             return
         }
 
-        if (mSDLMainFinished || mActivityCreated) {
+        // ECV starts a new game Activity after a fully joined and cleaned-up
+        // session. SDL's default guards assume one main() per Android process.
+        val restartingSession = mSingleton?.canReuseNativeSession() == true
+        if (!restartingSession && (mSDLMainFinished || mActivityCreated)) {
             val allowRecreate = nativeAllowRecreateActivity()
             if (mSDLMainFinished) {
                 Log.v(TAG, "SDL main() finished")
@@ -972,7 +977,7 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         }
 
         val runCount = nativeCheckSDLThreadCounter()
-        if (runCount != 0) {
+        if (runCount != 0 && !restartingSession) {
             val allowRecreate = nativeAllowRecreateActivity()
             if (allowRecreate) {
                 Log.v(TAG, "activity re-created // run_count: $runCount")
@@ -1134,12 +1139,16 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
 
     private var nativeShutdownStarted = false
     private var nativeShutdownCompleted = false
+    private var nativeShutdownSucceeded = false
     private val nativeShutdownCallbacks = mutableListOf<() -> Unit>()
     private val shutdownHandler = Handler(Looper.getMainLooper())
 
     protected open fun sendQuitForShutdown() = nativeSendQuit()
     protected open fun quitAfterShutdown() = nativeQuit()
     protected open fun nativeShutdownTimeoutMs(): Long = 10_000L
+
+    protected fun canReuseNativeSession(): Boolean =
+        nativeShutdownCompleted && nativeShutdownSucceeded && !nativeShutdownInFlight
 
     protected fun performNativeShutdown(onComplete: (() -> Unit)? = null) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -1170,6 +1179,7 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
         val brokenLibraries = mBrokenLibraries
         val timeoutMs = nativeShutdownTimeoutMs()
         Thread({
+            var shutdownSucceeded = false
             try {
                 if (!brokenLibraries) {
                     if (sdlThread != null) {
@@ -1180,6 +1190,7 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
                         Log.w(TAG, "SDLThread did not stop in time; skipping nativeQuit() to avoid destroying native state while game threads are still running")
                     } else {
                         quitAfterShutdown()
+                        shutdownSucceeded = true
                     }
                 }
             } catch (e: InterruptedException) {
@@ -1190,6 +1201,7 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
                     if (mSDLThread === sdlThread && sdlThread?.isAlive != true) mSDLThread = null
                     nativeShutdownInFlight = sdlThread?.isAlive == true
                     nativeShutdownCompleted = true
+                    nativeShutdownSucceeded = shutdownSucceeded
                     val callbacks = nativeShutdownCallbacks.toList()
                     nativeShutdownCallbacks.clear()
                     callbacks.forEach { it() }
@@ -1727,9 +1739,14 @@ open class SDLActivity : Activity(), View.OnSystemUiVisibilityChangeListener {
 
             val singleton = mSingleton
             if (singleton != null && !singleton.isFinishing) {
-                mSDLThread = null
                 mSDLMainFinished = true
-                singleton.finish()
+                // Coordinated exit owns navigation until nativeQuit and its
+                // callbacks complete. Finishing here can resume the library
+                // while nativeShutdownInFlight still rejects a new session.
+                if (!nativeShutdownInFlight) {
+                    mSDLThread = null
+                    singleton.finish()
+                }
             }
         }
     }

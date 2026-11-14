@@ -13,7 +13,7 @@ arguments.add_argument('--fixture', type=Path, help='Optional local GXP; never c
 options = arguments.parse_args()
 out = root / 'app/build/usse-control-flow-probe'
 out.mkdir(parents=True, exist_ok=True)
-vendor = root / 'app/src/main/cpp/vita3k'
+vendor = root / 'app/src/main/cpp/emucorev/ECV'
 core = vendor / 'vita3k'
 external = vendor / 'external'
 if os.name == 'nt' and Path('C:/msys64/ucrt64/bin').is_dir():

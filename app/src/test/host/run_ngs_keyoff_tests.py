@@ -5,7 +5,7 @@ Only guest callback execution and unused routing/kernel services are stubbed.
 from pathlib import Path
 import os, shutil, subprocess
 root=Path(__file__).resolve().parents[4]
-core=root/'app/src/main/cpp/vita3k/vita3k'; ext=core.parent/'external'
+core=root/'app/src/main/cpp/emucorev/ECV/vita3k'; ext=core.parent/'external'
 out=root/'app/build/ngs-keyoff-probe';out.mkdir(parents=True,exist_ok=True)
 if os.name=='nt':os.environ['PATH']='C:/msys64/ucrt64/bin;'+os.environ['PATH']
 def block(path,marker):

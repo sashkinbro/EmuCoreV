@@ -6,7 +6,7 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-source = (root / 'app/src/main/cpp/vita3k/vita3k/android/jni/main_android.cpp').read_text(encoding='utf-8')
+source = (root / 'app/src/main/cpp/emucorev/ECV/vita3k/android/jni/main_android.cpp').read_text(encoding='utf-8')
 marker = 'const auto cleanup_launch = [&](const app::AppSessionStopReason reason) {'
 assert source.count(marker) == 1, 'cleanup extraction marker must remain unique'
 begin = source.index(marker)

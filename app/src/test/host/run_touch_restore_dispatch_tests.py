@@ -7,8 +7,8 @@ import subprocess
 
 root = Path(__file__).resolve().parents[4]
 native = root / 'app/src/main/cpp'
-android = (native / 'vita3k/vita3k/android/jni/main_android.cpp').read_text(encoding='utf-8')
-touch = (native / 'vita3k/vita3k/touch/src/touch.cpp').read_text(encoding='utf-8')
+android = (native / 'emucorev/ECV/vita3k/android/jni/main_android.cpp').read_text(encoding='utf-8')
+touch = (native / 'emucorev/ECV/vita3k/touch/src/touch.cpp').read_text(encoding='utf-8')
 
 def block(source, marker):
     assert source.count(marker) == 1, 'production marker must be unique: ' + marker
@@ -115,7 +115,7 @@ if os.name == 'nt':
     os.environ['PATH'] = 'C:/msys64/ucrt64/bin;' + os.environ['PATH']
 compiler = os.environ.get('CXX') or shutil.which('g++')
 assert compiler
-includes = [native / 'emucorev/include', native / 'vita3k/vita3k/touch/include', native / 'vita3k/vita3k/util/include', native / 'vita3k/external/sdl/include']
+includes = [native / 'emucorev/include', native / 'emucorev/ECV/vita3k/touch/include', native / 'emucorev/ECV/vita3k/util/include', native / 'emucorev/ECV/external/sdl/include']
 subprocess.run([compiler, '-std=c++20', '-pthread', *['-I'+str(path) for path in includes], str(out / 'probe.cpp'), '-o', str(out / 'probe.exe')], check=True)
 result = subprocess.run([str(out / 'probe.exe')], capture_output=True, text=True, timeout=5)
 print(result.stdout + result.stderr)

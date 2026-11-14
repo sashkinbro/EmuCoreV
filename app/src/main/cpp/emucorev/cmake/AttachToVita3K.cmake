@@ -8,7 +8,7 @@ if(NOT TARGET vita3k)
 endif()
 
 get_filename_component(EMUCOREV_BRIDGE_DIR "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
-get_filename_component(VITA3K_VENDOR_DIR "${EMUCOREV_BRIDGE_DIR}/../vita3k" ABSOLUTE)
+get_filename_component(VITA3K_VENDOR_DIR "${EMUCOREV_BRIDGE_DIR}/ECV" ABSOLUTE)
 set(VITA3K_CORE_DIR "${VITA3K_VENDOR_DIR}/vita3k")
 
 include("${EMUCOREV_BRIDGE_DIR}/cmake/CoreTargetFilter.cmake")

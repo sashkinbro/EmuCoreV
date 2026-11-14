@@ -41,6 +41,6 @@ compiler = shutil.which("g++") or "C:/msys64/ucrt64/bin/g++.exe"
 env = os.environ.copy()
 env["PATH"] = str(Path(compiler).parent) + os.pathsep + env["PATH"]
 exe = out / "probe.exe"
-subprocess.run([compiler, "-std=c++20", "-O2", "-pthread", "-I" + str(root / "app/src/main/cpp/vita3k/vita3k/renderer/include"),
+subprocess.run([compiler, "-std=c++20", "-O2", "-pthread", "-I" + str(root / "app/src/main/cpp/emucorev/ECV/vita3k/renderer/include"),
                 str(source), "-o", str(exe)], check=True, env=env)
 subprocess.run([str(exe)], check=True, env=env)

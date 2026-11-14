@@ -58,7 +58,7 @@ int main() {
 (out/'probe.cpp').write_text(cpp,encoding='utf-8')
 if os.name=='nt': os.environ['PATH']='C:/msys64/ucrt64/bin;'+os.environ['PATH']
 compiler=os.environ.get('CXX') or shutil.which('g++'); assert compiler
-subprocess.run([compiler,'-std=c++20','-pthread','-I'+str(root/'app/src/main/cpp/vita3k/vita3k/renderer/include'),str(out/'probe.cpp'),'-o',str(out/'probe.exe')],check=True)
+subprocess.run([compiler,'-std=c++20','-pthread','-I'+str(root/'app/src/main/cpp/emucorev/ECV/vita3k/renderer/include'),str(out/'probe.cpp'),'-o',str(out/'probe.exe')],check=True)
 r=subprocess.run([str(out/'probe.exe')],capture_output=True,text=True,timeout=5)
 print(r.stdout+r.stderr);(out/('red.log' if r.returncode else 'green.log')).write_text(r.stdout+r.stderr)
 raise SystemExit(r.returncode)

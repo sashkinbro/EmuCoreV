@@ -20,7 +20,7 @@ def body(path, marker):
             return source[start:end + 1]
     raise AssertionError(marker)
 
-gxm_types = body('app/src/main/cpp/vita3k/vita3k/gxm/include/gxm/types.h', 'enum SceGxmTextureBaseFormat :') + ';\n'
+gxm_types = body('app/src/main/cpp/emucorev/ECV/vita3k/gxm/include/gxm/types.h', 'enum SceGxmTextureBaseFormat :') + ';\n'
 cpp = r'''
 #include <array>
 #include <cstdint>
@@ -41,7 +41,7 @@ struct SceGxmTexture {
  int texture_type()const{return type;}int true_lod_min()const{return (lod_min0<<2)|lod_min1;}
 };
 namespace gxm {
-'''+ body('app/src/main/cpp/vita3k/vita3k/gxm/src/textures.cpp', 'SceGxmTextureFormat get_format(') + body('app/src/main/cpp/vita3k/vita3k/gxm/src/textures.cpp', 'SceGxmTextureBaseFormat get_base_format(') + r'''
+'''+ body('app/src/main/cpp/emucorev/ECV/vita3k/gxm/src/textures.cpp', 'SceGxmTextureFormat get_format(') + body('app/src/main/cpp/emucorev/ECV/vita3k/gxm/src/textures.cpp', 'SceGxmTextureBaseFormat get_base_format(') + r'''
 }
 namespace vk {
 enum class Filter {eNearest,eLinear};enum class SamplerMipmapMode {eNearest,eLinear};enum class SamplerAddressMode {eRepeat};
@@ -77,8 +77,8 @@ struct VKTextureCache:TextureCache {
  vk::SamplerCreateInfo info(int index){return state.device.infos.at(samplers[index]);}
 };
 '''
-cpp += body('app/src/main/cpp/vita3k/vita3k/renderer/src/texture/cache.cpp', 'int TextureCache::cache_and_bind_sampler(')
-cpp += body('app/src/main/cpp/vita3k/vita3k/renderer/src/vulkan/texture.cpp', 'void VKTextureCache::configure_sampler(')
+cpp += body('app/src/main/cpp/emucorev/ECV/vita3k/renderer/src/texture/cache.cpp', 'int TextureCache::cache_and_bind_sampler(')
+cpp += body('app/src/main/cpp/emucorev/ECV/vita3k/renderer/src/vulkan/texture.cpp', 'void VKTextureCache::configure_sampler(')
 cpp += r'''
 int failures=0,checks=0;void check(bool b,const char*s){++checks;if(!b){++failures;printf("FAIL %s\n",s);}}
 int main(){

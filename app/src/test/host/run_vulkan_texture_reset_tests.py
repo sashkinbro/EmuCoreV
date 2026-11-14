@@ -15,7 +15,7 @@ import subprocess
 root = Path(__file__).resolve().parents[4]
 out = root / 'app/build/vulkan-texture-reset-probe'
 out.mkdir(parents=True, exist_ok=True)
-source = (root / 'app/src/main/cpp/vita3k/vita3k/renderer/src/vulkan/texture.cpp').read_text()
+source = (root / 'app/src/main/cpp/emucorev/ECV/vita3k/renderer/src/vulkan/texture.cpp').read_text()
 
 
 def body(marker):

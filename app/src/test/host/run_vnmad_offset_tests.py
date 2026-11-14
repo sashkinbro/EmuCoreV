@@ -6,7 +6,7 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-shader = root / 'app/src/main/cpp/vita3k/vita3k/shader'
+shader = root / 'app/src/main/cpp/emucorev/ECV/vita3k/shader'
 alu = (shader / 'src/translator/alu.cpp').read_text(encoding='utf-8')
 header = (shader / 'include/shader/usse_translator.h').read_text(encoding='utf-8')
 helpers = header[header.index('#define BEGIN_REPEAT'):header.index('    void reset_repeat_increase()')]

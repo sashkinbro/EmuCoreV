@@ -60,9 +60,9 @@ int main(int argc,char **argv){
 (out / 'probe.cpp').write_text(cpp)
 compiler = os.environ.get('CXX') or shutil.which('g++')
 assert compiler, 'A C++20 compiler is required'
-pugi = root / 'app/src/main/cpp/vita3k/external/pugixml/src'
+pugi = root / 'app/src/main/cpp/emucorev/ECV/external/pugixml/src'
 subprocess.run([compiler, '-std=c++20', '-O0',
-                '-I' + str(root / 'app/src/main/cpp/vita3k/vita3k/config/include'),
+                '-I' + str(root / 'app/src/main/cpp/emucorev/ECV/vita3k/config/include'),
                 '-I' + str(pugi), str(out / 'probe.cpp'), str(pugi / 'pugixml.cpp'),
                 '-o', str(out / 'probe.exe')], check=True)
 result = subprocess.run([str(out / 'probe.exe'),

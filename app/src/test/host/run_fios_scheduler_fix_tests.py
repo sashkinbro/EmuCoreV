@@ -6,7 +6,7 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[4]
-path = root / 'app/src/main/cpp/vita3k/vita3k/modules/guest_code_fixes.cpp'
+path = root / 'app/src/main/cpp/emucorev/ECV/vita3k/modules/guest_code_fixes.cpp'
 source = path.read_text(encoding='utf-8') if path.exists() else ''
 source = '\n'.join(line for line in source.splitlines() if not line.startswith('#include'))
 if not source:

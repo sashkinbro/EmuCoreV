@@ -43,7 +43,7 @@
 # once release shrinking/obfuscation is enabled.
 -keep,allowoptimization,includedescriptorclasses class com.getkeepsafe.relinker.** { *; }
 
-# Emulator restarts itself through ProcessPhoenix.
+# Explicit game restarts and failed native shutdown recovery use ProcessPhoenix.
 -keep,allowoptimization,includedescriptorclasses class com.jakewharton.processphoenix.** { *; }
 
 # The Discord bridge resolves JNI symbols by class name, and the SDK is used

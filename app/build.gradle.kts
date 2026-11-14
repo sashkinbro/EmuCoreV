@@ -5,9 +5,9 @@ import java.util.Properties
 
 val androidOpenSslRoot = rootProject.layout.projectDirectory.dir("tools/openssl-test/out").asFile
 val emuCoreVNativeHook = project.layout.projectDirectory.file("src/main/cpp/emucorev/cmake/Vita3KProjectHook.cmake").asFile
-val vita3kNewAssetsDir = project.layout.projectDirectory.dir("src/main/cpp/vita3k/android/app/assets").asFile
-val vita3kLegacyAssetsDir = project.layout.projectDirectory.dir("src/main/cpp/vita3k/android/assets").asFile
-val vita3kAssetsDir = if (vita3kNewAssetsDir.exists()) vita3kNewAssetsDir else vita3kLegacyAssetsDir
+val ecvNewAssetsDir = project.layout.projectDirectory.dir("src/main/cpp/emucorev/ECV/android/app/assets").asFile
+val ecvLegacyAssetsDir = project.layout.projectDirectory.dir("src/main/cpp/emucorev/ECV/android/assets").asFile
+val ecvAssetsDir = if (ecvNewAssetsDir.exists()) ecvNewAssetsDir else ecvLegacyAssetsDir
 val localBuildProperties = Properties().apply {
     rootProject.layout.projectDirectory.file("local.properties").asFile
         .takeIf(File::exists)
@@ -90,7 +90,7 @@ val bundledJniLibraries = tasks.register<Sync>("prepareBundledJniLibraries") {
     into(layout.buildDirectory.dir("generated/bundled-jni-libs"))
 }
 val bundledDebugNativeLibraries = tasks.register<Sync>("prepareBundledDebugNativeLibraries") {
-    from("src/main/cpp/vita3k/android/prebuilt") {
+    from("src/main/cpp/emucorev/ECV/android/prebuilt") {
         exclude("**/libECV.so")
         exclude("**/libVita3K.so")
     }
@@ -167,7 +167,7 @@ android {
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
-                "src/main/cpp/vita3k/android/proguard-rules.pro"
+                "src/main/cpp/emucorev/ECV/android/proguard-rules.pro"
             )
             externalNativeBuild {
                 cmake {
@@ -199,14 +199,14 @@ android {
             assets.setSrcDirs(
                 listOf(
                     "src/main/assets",
-                    vita3kAssetsDir
+                    ecvAssetsDir
                 )
             )
             jniLibs.setSrcDirs(listOf(bundledJniLibraries))
             discordSdkDirectory?.let(jniLibs::srcDir)
         }
         // The vendored Khronos validation layer (downloaded into
-        // src/main/cpp/vita3k/android/prebuilt for non-Release CMake builds)
+        // src/main/cpp/emucorev/ECV/android/prebuilt for non-Release CMake builds)
         // is a debug-only tool: the Vulkan loader auto-discovers
         // libVkLayer_*.so from the app library dir, so shipping it in release
         // routes every vkCreateInstance through stale validation code (Vitals
@@ -220,7 +220,7 @@ android {
 
     externalNativeBuild {
         cmake {
-            path = file("src/main/cpp/vita3k/CMakeLists.txt")
+            path = file("src/main/cpp/emucorev/ECV/CMakeLists.txt")
             version = "3.22.1+"
         }
     }
