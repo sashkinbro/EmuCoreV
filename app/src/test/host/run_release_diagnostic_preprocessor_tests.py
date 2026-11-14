@@ -26,6 +26,7 @@ cases = {
     'app/src/main/cpp/emucorev/src/savestate/savestate.cpp': ['const uint32_t sp = read_sp(*thread->cpu);'],
     core + 'mem/src/mem.cpp': ['Dl_info dl_pc{};', 'pc_offset = pc - reinterpret_cast<uintptr_t>(dl_pc.dli_fbase);'],
     core + 'cpu/src/dynarmic_cpu.cpp': ['bool no_execute_diagnostics_logged', 'get_last_import_call(last_import_nid, last_import_lr);', 'std::string register_memory;'],
+    core + 'camera/src/camera.cpp': ['ECV_FrontCameraProbe', 'ECV_FRONT_CAMERA_PROBE'],
     core + 'kernel/src/load_self.cpp': ['if (kernel.debugger.dump_elfs)', 'dump_elf.data()'],
     core + 'kernel/src/thread.cpp': ['is_probe(', 'probe_step_mutex', 'if (kernel.debugger.wait_for_debugger)'],
     core + 'android/jni/native_config.cpp': ['debugger.dump_elfs =', 'debugger.log_imports =', 'debugger.log_exports ='],

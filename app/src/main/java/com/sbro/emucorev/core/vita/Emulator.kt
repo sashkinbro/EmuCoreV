@@ -272,6 +272,12 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun getLibraries(): Array<String> = arrayOf("ECV")
 
+    private fun isFrontCameraProbe(): Boolean = BuildConfig.DEBUG &&
+        intent.getBooleanExtra("ECV_FRONT_CAMERA_PROBE", false)
+
+    override fun getMainFunction(): String =
+        if (isFrontCameraProbe()) "ECV_FrontCameraProbe" else super.getMainFunction()
+
     override fun shouldForceFullscreen(): Boolean = true
 
     override fun createSDLSurface(context: Context): SDLSurface {
@@ -283,6 +289,10 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun main() {
+        if (isFrontCameraProbe()) {
+            super.main()
+            return
+        }
         runBlocking { TrophySyncSessionGate.shared.gameStarting() }
         try {
             // SDL invokes this on SDLThread before nativeRunMain, including old pinned shortcuts.
@@ -304,6 +314,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun getArguments(): Array<String> {
+        if (isFrontCameraProbe()) return emptyArray()
         val baseArgs = intent.getStringArrayExtra(APP_RESTART_PARAMETERS) ?: gameIdFromIntent(intent).let {
             if (it.isBlank()) emptyArray() else arrayOf("-r", it)
         }
@@ -413,6 +424,10 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun quitAfterShutdown() {
+        if (isFrontCameraProbe()) {
+            super.quitAfterShutdown()
+            return
+        }
         try {
             super.quitAfterShutdown()
         } finally {

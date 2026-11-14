@@ -27,6 +27,7 @@
 #include <util/log.h>
 
 #include <SDL3/SDL_camera.h>
+#include <SDL3/SDL_init.h>
 #include <SDL3/SDL_timer.h>
 
 #if defined(__ANDROID__) && !defined(NDEBUG)
@@ -648,3 +649,90 @@ void init_default_cameras(Config &cfg) {
     }
 #endif
 }
+
+#if defined(__ANDROID__) && !defined(NDEBUG)
+// Explicit debug Activity entry; never runs a guest title or writes image files.
+extern "C" SDL_DECLSPEC int SDLCALL ECV_FrontCameraProbe(int, char **) {
+    if (!SDL_InitSubSystem(SDL_INIT_CAMERA)) {
+        SDL_Log("ECV_FRONT_CAMERA_PROBE FAIL init=%s", SDL_GetError());
+        return 1;
+    }
+    struct SubsystemGuard {
+        ~SubsystemGuard() { SDL_QuitSubSystem(SDL_INIT_CAMERA); }
+    } subsystem_guard;
+    int count = 0;
+    SDL_CameraListPtr devices(SDL_GetCameras(&count));
+    std::string selected;
+    SDL_CameraID selected_id = 0;
+    for (int i = 0; devices && i < count; ++i) {
+        if (SDL_GetCameraPosition(devices[i]) == SDL_CAMERA_POSITION_FRONT_FACING) {
+            const char *name = SDL_GetCameraName(devices[i]);
+            if (name) { selected = name; selected_id = devices[i]; }
+            break;
+        }
+    }
+    if (selected.empty()) {
+        SDL_Log("ECV_FRONT_CAMERA_PROBE FAIL no_front_sensor enumerated=%d", count);
+        return 1;
+    }
+    SDL_Log("ECV_FRONT_CAMERA_PROBE sensor sdl_id=%u facing=FRONT name=%s", selected_id, selected.c_str());
+    Camera camera;
+    camera.update_config(WebCamera, selected, "", 0);
+    struct CameraGuard {
+        Camera &camera;
+        ~CameraGuard() { camera.stop(); camera.close(); }
+    } camera_guard{camera};
+    SceCameraInfo info{};
+    info.size = sizeof(info);
+    info.format = SCE_CAMERA_FORMAT_ABGR;
+    info.width = 640; info.height = 480;
+    info.framerate = SCE_CAMERA_FRAMERATE_30_FPS;
+    info.sizeIBase = 640 * 480 * 4;
+    info.buffer = SCE_CAMERA_BUFFER_SETBYREAD;
+    const int opened = camera.open(&info, 0, 0);
+    const int started = opened == 0 ? camera.start() : opened;
+    if (opened != 0 || started != 0) {
+        SDL_Log("ECV_FRONT_CAMERA_PROBE FAIL open=0x%x start=0x%x", opened, started);
+        return 1;
+    }
+    auto buffer = std::make_unique<unsigned char[]>(info.sizeIBase + 32);
+    std::fill_n(buffer.get(), info.sizeIBase + 32, 0xCD);
+    const Uint64 deadline = SDL_GetTicksNS() + 5 * SDL_NS_PER_SECOND;
+    Uint64 last_timestamp = 0, last_frame = 0;
+    int received = 0, last_result = 0;
+    while (received < 2 && SDL_GetTicksNS() < deadline) {
+        SceCameraRead read{};
+        read.size = sizeof(read);
+        read.mode = SCE_CAMERA_READ_MODE_WAIT_NEXTFRAME_OFF;
+        last_result = camera.read(&read, buffer.get() + 16, nullptr, nullptr, info.sizeIBase, 0, 0);
+        if (last_result == 0 && read.status == SCE_CAMERA_STATUS_IS_ACTIVE && read.timestamp > last_timestamp && read.frame > last_frame) {
+            size_t nonblack = 0;
+            unsigned int hash = 2166136261u, lo = 255, hi = 0;
+            bool opaque = true, canaries = true;
+            for (size_t i = 16; i < 16 + info.sizeIBase; i += 4) {
+                nonblack += buffer[i] != 0 || buffer[i + 1] != 0 || buffer[i + 2] != 0;
+                opaque = opaque && buffer[i + 3] == 255;
+                for (int channel = 0; channel < 3; ++channel) {
+                    const unsigned int value = buffer[i + channel];
+                    lo = std::min(lo, value); hi = std::max(hi, value);
+                    hash = (hash ^ value) * 16777619u;
+                }
+            }
+            for (int i = 0; i < 16; ++i)
+                canaries = canaries && buffer[i] == 0xCD && buffer[16 + info.sizeIBase + i] == 0xCD;
+            SDL_Log("ECV_FRONT_CAMERA_PROBE frame=%llu timestamp_us=%llu size=640x480 capacity=%u nonblack=%zu rgb_min=%u rgb_max=%u checksum=%x opaque=%d canaries=%d", (unsigned long long)read.frame, (unsigned long long)read.timestamp, info.sizeIBase, nonblack, lo, hi, hash, opaque, canaries);
+            if (!nonblack || !opaque || !canaries) {
+                SDL_Log("ECV_FRONT_CAMERA_PROBE FAIL invalid_guest_frame");
+                return 1;
+            }
+            last_timestamp = read.timestamp; last_frame = read.frame;
+            ++received;
+        }
+        if (received < 2) SDL_Delay(10);
+    }
+    const int stopped = camera.stop(), closed = camera.close();
+    const bool passed = received == 2 && stopped == 0 && closed == 0;
+    SDL_Log("ECV_FRONT_CAMERA_PROBE %s frames=%d last_read=0x%x stop=0x%x close=0x%x", passed ? "PASS" : "FAIL", received, last_result, stopped, closed);
+    return passed ? 0 : 1;
+}
+#endif
