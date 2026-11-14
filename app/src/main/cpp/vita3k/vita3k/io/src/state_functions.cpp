@@ -27,6 +27,7 @@
 #endif
 
 #include <io/state.h>
+#include <io/io.h>
 #include <util/log.h>
 
 static const uint32_t page_size = []() -> uint32_t {
@@ -66,13 +67,15 @@ SceOff FileStats::read(void *input_data, const int element_size, const SceSize e
 }
 
 SceOff FileStats::write(const void *data, const SceSize size, const int count) const {
-    if (!can_write_file())
-        return -1;
+    if (!wrapped_file || !can_write_file())
+        return SCE_ERROR_ERRNO_EBADFD;
 
     return fwrite(data, size, count, get_file_pointer());
 }
 
 int FileStats::truncate(const SceSize size) const {
+    if (!wrapped_file || !can_write_file())
+        return SCE_ERROR_ERRNO_EBADFD;
 #ifdef _WIN32
     return _chsize_s(_fileno(get_file_pointer()), size);
 #else

@@ -13,16 +13,46 @@
 #include <kernel/sync_primitives.h>
 #include <renderer/gxm_types.h>
 #include <renderer/pause_overlay_policy.h>
+#include <io/functions.h>
+#include <io/io.h>
 
 #include <gtest/gtest.h>
 
 #include <array>
+#include <chrono>
 #include <cstring>
+#include <fstream>
 #include <future>
 #include <iterator>
 #include <thread>
 
 namespace {
+class IoTestRoot {
+public:
+    IoTestRoot() {
+        path = fs::temp_directory_path() /
+            ("emucorev-io-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        fs::create_directories(path);
+    }
+    ~IoTestRoot() {
+        boost::system::error_code error;
+        fs::remove_all(path, error);
+    }
+
+    fs::path path;
+};
+
+void init_test_io(IOState &io) {
+    io.user_id = "00";
+    io.savedata = "PCSE54321";
+    init_device_paths(io);
+}
+
+std::string read_text_file(const fs::path &path) {
+    std::ifstream input(path.generic_string(), std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+}
+
 template <typename Predicate>
 bool await_waiter(Predicate ready) {
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
@@ -33,6 +63,76 @@ bool await_waiter(Predicate ready) {
     } while (std::chrono::steady_clock::now() < deadline);
     return false;
 }
+}
+
+TEST(GuestIo, writable_truncate_replaces_existing_file_and_append_truncate_keeps_append_semantics) {
+    IoTestRoot root;
+    IOState io{};
+    init_test_io(io);
+    const auto savedata = root.path / "ux0/user/00/savedata/PCSE54321";
+    fs::create_directories(savedata);
+    const auto save = savedata / "slot.bin";
+
+    std::ofstream(save.generic_string(), std::ios::binary) << "long previous save";
+    auto fd = open_file(io, "savedata0:slot.bin", SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC,
+        root.path, "io_truncate_test");
+    ASSERT_GE(fd, 0);
+    constexpr char short_save[] = "short";
+    ASSERT_EQ(write_file(fd, short_save, sizeof(short_save) - 1, io, "io_truncate_test"), sizeof(short_save) - 1);
+    ASSERT_EQ(close_file(io, fd, "io_truncate_test"), 0);
+    EXPECT_EQ(read_text_file(save), "short");
+
+    std::ofstream(save.generic_string(), std::ios::binary | std::ios::trunc) << "old append target";
+    fd = open_file(io, "savedata0:slot.bin", SCE_O_WRONLY | SCE_O_APPEND | SCE_O_TRUNC,
+        root.path, "io_append_truncate_test");
+    ASSERT_GE(fd, 0);
+    constexpr char appended[] = "new";
+    ASSERT_EQ(write_file(fd, appended, sizeof(appended) - 1, io, "io_append_truncate_test"), sizeof(appended) - 1);
+    ASSERT_EQ(close_file(io, fd, "io_append_truncate_test"), 0);
+    EXPECT_EQ(read_text_file(save), "new");
+}
+
+TEST(GuestIo, create_without_truncate_preserves_unwritten_suffix) {
+    IoTestRoot root;
+    IOState io{};
+    init_test_io(io);
+    const auto savedata = root.path / "ux0/user/00/savedata/PCSE54321";
+    fs::create_directories(savedata);
+    const auto save = savedata / "slot.bin";
+    std::ofstream(save.generic_string(), std::ios::binary) << "old-save-data";
+
+    const auto fd = open_file(io, "savedata0:slot.bin", SCE_O_WRONLY | SCE_O_CREAT,
+        root.path, "io_create_test");
+    ASSERT_GE(fd, 0);
+    constexpr char prefix[] = "new";
+    ASSERT_EQ(write_file(fd, prefix, sizeof(prefix) - 1, io, "io_create_test"), sizeof(prefix) - 1);
+    ASSERT_EQ(close_file(io, fd, "io_create_test"), 0);
+    EXPECT_EQ(read_text_file(save), "new-save-data");
+
+    const auto exclusive_fd = open_file(io, "savedata0:slot.bin",
+        SCE_O_WRONLY | SCE_O_CREAT | SCE_O_EXCL | SCE_O_TRUNC, root.path, "io_exclusive_test");
+    EXPECT_EQ(exclusive_fd, SCE_ERROR_ERRNO_EEXIST);
+    EXPECT_EQ(read_text_file(save), "new-save-data");
+}
+
+TEST(GuestIo, failed_host_open_is_not_registered_and_null_stream_operations_return_bad_descriptor) {
+    IoTestRoot root;
+    IOState io{};
+    init_test_io(io);
+    const auto savedata = root.path / "ux0/user/00/savedata/PCSE54321";
+    fs::create_directories(savedata);
+    const auto broken_link = savedata / "unopenable.bin";
+    fs::create_symlink(root.path / "missing-parent" / "target.bin", broken_link);
+
+    const auto fd = open_file(io, "savedata0:unopenable.bin", SCE_O_WRONLY | SCE_O_CREAT,
+        root.path, "io_failed_open_test");
+    EXPECT_EQ(fd, SCE_ERROR_ERRNO_EBADFD);
+    EXPECT_TRUE(io.std_files.empty());
+
+    FileStats missing_stream("savedata0:missing.bin", "savedata0/missing.bin", savedata / "missing.bin", SCE_O_WRONLY);
+    constexpr char byte = 'x';
+    EXPECT_EQ(missing_stream.write(&byte, 1, 1), SCE_ERROR_ERRNO_EBADFD);
+    EXPECT_EQ(missing_stream.truncate(0), SCE_ERROR_ERRNO_EBADFD);
 }
 
 TEST(PauseOverlayPolicy, EditorSuppressesOnlyBannerAndNormalPauseRestoresIt) {

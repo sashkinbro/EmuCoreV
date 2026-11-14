@@ -26,10 +26,16 @@ const wchar_t *translate_open_mode(const int flags) {
             if (flags & SCE_O_APPEND) {
                 return L"ab+";
             }
+            if (flags & SCE_O_TRUNC) {
+                return L"wb+";
+            }
             return L"rb+";
         }
         if (flags & SCE_O_APPEND) {
             return L"ab";
+        }
+        if (flags & SCE_O_TRUNC) {
+            return L"wb";
         }
         return L"rb+";
     }
@@ -42,10 +48,16 @@ const char *translate_open_mode(const int flags) {
             if (flags & SCE_O_APPEND) {
                 return "ab+";
             }
+            if (flags & SCE_O_TRUNC) {
+                return "wb+";
+            }
             return "rb+";
         }
         if (flags & SCE_O_APPEND) {
             return "ab";
+        }
+        if (flags & SCE_O_TRUNC) {
+            return "wb";
         }
         return "rb+";
     }

@@ -363,6 +363,9 @@ SceUID open_file(IOState &io, const char *path, const int flags, const fs::path 
     }
 
     auto system_path = device::construct_emulated_path(device, translated_path, vita_fs_path, io.redirect_stdio);
+    if (fs::exists(system_path) && (flags & SCE_O_CREAT) && (flags & SCE_O_EXCL)) {
+        return IO_ERROR(SCE_ERROR_ERRNO_EEXIST);
+    }
     if (fs::is_directory(system_path)) {
         LOG_ERROR("Cannot open directory: {}", system_path);
         return IO_ERROR(SCE_ERROR_ERRNO_ENOENT);
@@ -403,6 +406,18 @@ SceUID open_file(IOState &io, const char *path, const int flags, const fs::path 
     const auto normalized_path = device::construct_normalized_path(device, translated_path);
 
     FileStats f{ path, normalized_path, system_path, flags };
+    if (!f.get_file_pointer()) {
+        LOG_ERROR("Cannot open host file: {}", system_path);
+        return IO_ERROR(SCE_ERROR_ERRNO_EBADFD);
+    }
+
+    // fopen modes handle non-append O_TRUNC. Append+truncate needs a post-open
+    // truncate so the stream retains append-on-write behavior.
+    if ((flags & SCE_O_WRONLY) && (flags & SCE_O_APPEND) && (flags & SCE_O_TRUNC) && f.truncate(0) != 0) {
+        LOG_ERROR("Cannot truncate host file: {}", system_path);
+        return IO_ERROR_UNK();
+    }
+
     const SceUID fd = insert_io_fd(io, io.std_files, std::move(f));
 
     LOG_TRACE_IF(log_file_op, "{}: Opening file {} ({}), fd: {}", export_name, path, normalized_path, log_hex(fd));
