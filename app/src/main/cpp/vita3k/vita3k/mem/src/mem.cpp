@@ -39,6 +39,9 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <unwind.h>
+#ifdef __linux__
+#include <sys/uio.h>
+#endif
 #endif
 
 constexpr uint32_t STANDARD_PAGE_SIZE = KiB(4);
@@ -168,7 +171,7 @@ bool is_valid_addr_range(const MemState &state, Address start, Address end) {
 }
 
 bool debug_safe_copy_guest(const MemState &state, Address addr, void *dst, uint32_t size) {
-    if (!addr || addr + size < addr)
+    if (!state.memory || !dst || !size || addr < state.host_page_size || addr + size < addr)
         return false;
 #ifdef _WIN32
     __try {
@@ -178,10 +181,23 @@ bool debug_safe_copy_guest(const MemState &state, Address addr, void *dst, uint3
         return false;
     }
 #else
-    if (!is_valid_addr_range(state, addr, addr + size))
+    // The reserved null page is allocated in the guest bitmap but PROT_NONE on
+    // the host. Allocation alone also does not prove a watched page is readable.
+    const uint64_t end = uint64_t{addr} + size;
+    const auto first_page = addr / STANDARD_PAGE_SIZE;
+    const auto end_page = static_cast<uint32_t>((end + STANDARD_PAGE_SIZE - 1) / STANDARD_PAGE_SIZE);
+    if (state.allocator.free_slot_count(first_page, end_page) != 0)
         return false;
+#ifdef __linux__
+    // Read our own process through the kernel so an inaccessible or concurrently
+    // protected page fails without re-entering the emulator's signal handler.
+    iovec local{dst, size};
+    iovec remote{&state.memory[addr], size};
+    return process_vm_readv(getpid(), &local, 1, &remote, 1, 0) == static_cast<ssize_t>(size);
+#else
     memcpy(dst, &state.memory[addr], size);
     return true;
+#endif
 #endif
 }
 

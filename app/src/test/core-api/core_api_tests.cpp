@@ -15,6 +15,7 @@
 #include <renderer/pause_overlay_policy.h>
 #include <io/functions.h>
 #include <io/io.h>
+#include <mem/state.h>
 
 #include <gtest/gtest.h>
 
@@ -133,6 +134,29 @@ TEST(GuestIo, failed_host_open_is_not_registered_and_null_stream_operations_retu
     constexpr char byte = 'x';
     EXPECT_EQ(missing_stream.write(&byte, 1, 1), SCE_ERROR_ERRNO_EBADFD);
     EXPECT_EQ(missing_stream.truncate(0), SCE_ERROR_ERRNO_EBADFD);
+}
+
+TEST(GuestDiagnosticMemory, null_page_and_protected_pages_fail_without_a_host_fault) {
+    MemState memory;
+    ASSERT_TRUE(init(memory, false));
+    uint32_t result = 0x12345678;
+    EXPECT_FALSE(debug_safe_copy_guest(memory, 0x180, &result, sizeof(result)));
+    EXPECT_EQ(result, 0x12345678u);
+
+    const auto address = alloc(memory, memory.host_page_size, "diagnostic-read-test");
+    ASSERT_NE(address, 0u);
+    const uint32_t expected = 0xaabbccdd;
+    std::memcpy(&memory.memory[address], &expected, sizeof(expected));
+    ASSERT_TRUE(debug_safe_copy_guest(memory, address, &result, sizeof(result)));
+    EXPECT_EQ(result, expected);
+
+    protect_inner(memory, address, memory.host_page_size, MemPerm::None);
+    EXPECT_FALSE(debug_safe_copy_guest(memory, address, &result, sizeof(result)));
+    protect_inner(memory, address, memory.host_page_size, MemPerm::ReadWrite);
+    EXPECT_TRUE(debug_safe_copy_guest(memory, address, &result, sizeof(result)));
+    EXPECT_FALSE(debug_safe_copy_guest(memory, 0xfffffffe, &result, sizeof(result)));
+    EXPECT_FALSE(debug_safe_copy_guest(memory, address, nullptr, sizeof(result)));
+    deinit_mem(memory);
 }
 
 TEST(PauseOverlayPolicy, EditorSuppressesOnlyBannerAndNormalPauseRestoresIt) {

@@ -233,7 +233,8 @@ public:
             "Last HLE import: nid=0x{:08X}, caller LR=0x{:08X}\n",
             pc, crash_ctx.description(), last_import_nid, last_import_lr);
 
-        // Decode only guest code bytes that the memory range checker confirms.
+        // Copy instruction words instead of disassembling live guest memory:
+        // another guest thread can unmap/protect it after the diagnostic read.
         const uint32_t lr_raw = crash_ctx.cpu_registers[14];
         const bool thumb_caller = (lr_raw & 1) != 0;
         const uint32_t lr = lr_raw & ~1u;
@@ -244,15 +245,14 @@ public:
                 if (address > std::numeric_limits<uint32_t>::max())
                     break;
                 uint32_t instruction_word = 0;
+                const uint16_t instruction_size = thumb_caller ? 2 : 4;
                 if (!debug_safe_copy_guest(*parent->mem, static_cast<Address>(address),
-                        &instruction_word, sizeof(instruction_word)))
+                        &instruction_word, instruction_size))
                     break;
-                uint16_t instruction_size = 2;
-                window += fmt::format("  0x{:08X}: {}\n", address,
-                    disassemble(*parent, address, thumb_caller, &instruction_size));
-                address += instruction_size ? instruction_size : 2;
+                window += fmt::format("  0x{:08X}: 0x{:08X}\n", address, instruction_word);
+                address += instruction_size;
             }
-            details += fmt::format("Caller code before LR (thumb={}):\n{}", thumb_caller, window);
+            details += fmt::format("Caller instruction words before LR (thumb={}):\n{}", thumb_caller, window);
         } else {
             details += fmt::format("Caller code unavailable for LR=0x{:08X}\n", lr_raw);
         }
