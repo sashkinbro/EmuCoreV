@@ -858,7 +858,11 @@ fun EmulationOverlayHost(
         }
 
         if (menuOpen) {
-            EmulationMenuWindow {
+            EmulationMenuWindow(
+                rendererBackend = config.backendRenderer,
+                snapshotSourceRoot = activity.window.decorView,
+                backdropHidden = saveStateBusy || autoSaving || waitingForStateFrame || launchStateLoading.active
+            ) {
                 Box(Modifier.fillMaxSize().graphicsLayer {
                     alpha = if (saveStateBusySaving || autoSaving) 0f else 1f
                 }) {
