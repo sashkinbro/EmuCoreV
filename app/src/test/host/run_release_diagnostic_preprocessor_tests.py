@@ -24,6 +24,8 @@ cases = {
     core + 'interface.cpp': ['server_open(emuenv)', 'wait_for_debugger = true'],
     core + 'app/src/app_init.cpp': ['server_close(emuenv)'],
     'app/src/main/cpp/emucorev/src/savestate/savestate.cpp': ['const uint32_t sp = read_sp(*thread->cpu);'],
+    core + 'mem/src/mem.cpp': ['Dl_info dl_pc{};', 'pc_offset = pc - reinterpret_cast<uintptr_t>(dl_pc.dli_fbase);'],
+    core + 'cpu/src/dynarmic_cpu.cpp': ['bool no_execute_diagnostics_logged', 'get_last_import_call(last_import_nid, last_import_lr);', 'std::string register_memory;'],
     core + 'kernel/src/load_self.cpp': ['if (kernel.debugger.dump_elfs)', 'dump_elf.data()'],
     core + 'kernel/src/thread.cpp': ['is_probe(', 'probe_step_mutex', 'if (kernel.debugger.wait_for_debugger)'],
     core + 'android/jni/native_config.cpp': ['debugger.dump_elfs =', 'debugger.log_imports =', 'debugger.log_exports ='],
@@ -43,6 +45,7 @@ for relative, diagnostics in cases.items():
     outputs = {}
     for mode in ('release', 'debug'):
         result = subprocess.run([compiler, '-E', '-P', '-x', 'c++', '-D__ANDROID__',
+                                 *(['-U_WIN32', '-U_WIN64', '-D__aarch64__'] if relative.endswith('mem/src/mem.cpp') else []),
                                  *(['-DNDEBUG'] if mode == 'release' else []), '-'],
                                 input=prelude + source, text=True, capture_output=True, check=True)
         outputs[mode] = result.stdout
@@ -57,6 +60,11 @@ for relative, diagnostics in cases.items():
                       'last_world_stop_epoch_ms.load', 'last_mem_transition_epoch_ms.load',
                       'renderer_idle_vblanks', 'guest_idle_vblanks', 'last_break_vblanks = vblanks'):
             assert token in outputs['release'], f'release lost recovery: {token}'
+            checks += 1
+    if relative.endswith('mem/src/mem.cpp'):
+        # Diagnostic removal must preserve memory fault recovery and routing.
+        for token in ('access_violation_handler(', 'signal(sig, SIG_DFL);', 'raise(sig);', 'sigaction(SIGBUS'):
+            assert token in outputs['release'], f'release lost signal handling: {token}'
             checks += 1
     if relative.endswith('renderer/src/vulkan/renderer.cpp'):
         assert 'constexpr bool use_validation_layer = false;' in outputs['release']

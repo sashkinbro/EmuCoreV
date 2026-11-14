@@ -33,6 +33,7 @@
 #include <atomic>
 #include <bit>
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -205,6 +206,9 @@ class ArmDynarmicCallback : public Dynarmic::A32::UserCallbacks {
 
     CPUState *parent;
     DynarmicCPU *cpu;
+#ifndef NDEBUG
+    bool no_execute_diagnostics_logged = false;
+#endif
 
 public:
     explicit ArmDynarmicCallback(CPUState &parent, DynarmicCPU &cpu)
@@ -213,6 +217,101 @@ public:
 
     ~ArmDynarmicCallback() override = default;
 
+    void log_no_execute_diagnostics(uint32_t pc) {
+#ifndef NDEBUG
+        if (no_execute_diagnostics_logged)
+            return;
+        no_execute_diagnostics_logged = true;
+
+        CPUContext crash_ctx = cpu->save_context();
+        uint32_t last_import_nid = 0;
+        uint32_t last_import_lr = 0;
+        get_last_import_call(last_import_nid, last_import_lr);
+
+        std::string details = fmt::format(
+            "NoExecute diagnostic: pc=0x{:08X}\n{}\n"
+            "Last HLE import: nid=0x{:08X}, caller LR=0x{:08X}\n",
+            pc, crash_ctx.description(), last_import_nid, last_import_lr);
+
+        // Decode only guest code bytes that the memory range checker confirms.
+        const uint32_t lr_raw = crash_ctx.cpu_registers[14];
+        const bool thumb_caller = (lr_raw & 1) != 0;
+        const uint32_t lr = lr_raw & ~1u;
+        if (lr >= parent->mem->host_page_size + 64) {
+            std::string window;
+            const uint64_t end = uint64_t{ lr } + 2;
+            for (uint64_t address = lr - 64; address <= end;) {
+                if (address > std::numeric_limits<uint32_t>::max())
+                    break;
+                uint32_t instruction_word = 0;
+                if (!debug_safe_copy_guest(*parent->mem, static_cast<Address>(address),
+                        &instruction_word, sizeof(instruction_word)))
+                    break;
+                uint16_t instruction_size = 2;
+                window += fmt::format("  0x{:08X}: {}\n", address,
+                    disassemble(*parent, address, thumb_caller, &instruction_size));
+                address += instruction_size ? instruction_size : 2;
+            }
+            details += fmt::format("Caller code before LR (thumb={}):\n{}", thumb_caller, window);
+        } else {
+            details += fmt::format("Caller code unavailable for LR=0x{:08X}\n", lr_raw);
+        }
+
+        // Copy bounded words at each register target without dereferencing an
+        // unchecked guest address. Keep underflow/overflow out of Ptr::get().
+        std::string register_memory;
+        for (int reg = 0; reg < 14; ++reg) {
+            const uint32_t value = crash_ctx.cpu_registers[reg];
+            const uint32_t base = value & ~3u;
+            register_memory += fmt::format("  [r{}=0x{:08X}]:", reg, value);
+            for (int word_offset = -2; word_offset < 6; ++word_offset) {
+                const int64_t address = int64_t{ base } + word_offset * int64_t{ 4 };
+                uint32_t word = 0;
+                if (address >= parent->mem->host_page_size
+                    && address <= std::numeric_limits<uint32_t>::max()
+                    && debug_safe_copy_guest(*parent->mem, static_cast<Address>(address), &word, sizeof(word))) {
+                    register_memory += fmt::format(" {:08X}", word);
+                } else {
+                    register_memory += " ????????";
+                }
+            }
+            register_memory += "\n";
+        }
+        details += fmt::format("Memory near register targets (words -2..+5):\n{}", register_memory);
+
+        // r0/r6 are useful `this` candidates for indirect calls. Safely read
+        // the object vtable-like pointer and its first four entries.
+        const auto append_table = [&](const char *reg_name, uint32_t object) {
+            uint32_t table = 0;
+            if (!debug_safe_copy_guest(*parent->mem, object, &table, sizeof(table))) {
+                details += fmt::format("{} object 0x{:08X}: first word unavailable\n", reg_name, object);
+                return;
+            }
+            details += fmt::format("{} object 0x{:08X}: table=0x{:08X} entries:", reg_name, object, table);
+            for (uint32_t slot = 0; slot < 4; ++slot) {
+                uint32_t entry = 0;
+                const uint64_t entry_address = uint64_t{ table } + slot * sizeof(uint32_t);
+                if (entry_address <= std::numeric_limits<uint32_t>::max()
+                    && debug_safe_copy_guest(*parent->mem, static_cast<Address>(entry_address), &entry, sizeof(entry))) {
+                    details += fmt::format(" [{}]=0x{:08X}", slot, entry);
+                } else {
+                    details += fmt::format(" [{}]=<unmapped>", slot);
+                }
+            }
+            details += "\n";
+        };
+        const uint32_t r0 = crash_ctx.cpu_registers[0];
+        const uint32_t r6 = crash_ctx.cpu_registers[6];
+        append_table("r0", r0);
+        if (r6 != r0)
+            append_table("r6", r6);
+
+        // NoExecuteFault is terminal, so critical logging guarantees this
+        // single diagnostic is retained without per-frame output.
+        LOG_CRITICAL("{}", details);
+#endif
+    }
+
     std::optional<std::uint32_t> MemoryReadCode(Dynarmic::A32::VAddr addr) override {
         if (cpu->log_mem)
             LOG_TRACE("Instruction fetch at address 0x{:X}", addr);
@@ -220,48 +319,6 @@ public:
         if (!ptr || !ptr.valid(*parent->mem) || ptr.address() < parent->mem->host_page_size) {
             if (!confirm_invalid_access(addr))
                 return MemoryRead32(addr);
-#ifndef NDEBUG
-            if (spdlog::default_logger_raw()->should_log(spdlog::level::err)) {
-                uint32_t bc_nid = 0, bc_lr = 0;
-                get_last_import_call(bc_nid, bc_lr);
-                LOG_CRITICAL("Invalid instruction fetch at address 0x{:X} (last HLE import on this thread: nid=0x{:X} called from LR=0x{:X})\n{}", addr, bc_nid, bc_lr, cpu->save_context().description());
-                // Disassemble the code before LR: it shows where the (bad) branch target was loaded from.
-                const uint32_t lr_raw = read_lr(*parent);
-                const bool thumb_caller = (lr_raw & 1) != 0;
-                const uint32_t lr = lr_raw & ~1u;
-                if (lr >= parent->mem->host_page_size) {
-                    std::string window;
-                    uint32_t a = lr - 64;
-                    while (a <= lr + 2 && Ptr<uint32_t>{ a }.valid(*parent->mem)) {
-                        uint16_t insn_size = 2;
-                        window += fmt::format("  0x{:X}: {}\n", a, disassemble(*parent, a, thumb_caller, &insn_size));
-                        a += insn_size ? insn_size : 2;
-                    }
-                    LOG_CRITICAL("Code before the call site (LR-64..LR, thumb={}):\n{}", thumb_caller, window);
-                }
-                // memory each register points at, captured at crash time
-                {
-                    const CPUContext crash_ctx = cpu->save_context();
-                    std::string reg_mem;
-                    for (int r = 0; r < 14; r++) {
-                        const uint32_t rv = crash_ctx.cpu_registers[r];
-                        const uint32_t base = rv & ~3u;
-                        if (base < parent->mem->host_page_size)
-                            continue;
-                        reg_mem += fmt::format("  [r{}=0x{:08X}]:", r, rv);
-                        for (int w = -2; w < 6; w++) {
-                            const Ptr<uint32_t> wp{ static_cast<Address>(base + w * 4) };
-                            if (wp.valid(*parent->mem))
-                                reg_mem += fmt::format(" {:08X}", *wp.get(*parent->mem));
-                            else
-                                reg_mem += " ????????";
-                        }
-                        reg_mem += "\n";
-                    }
-                    LOG_CRITICAL("Memory at register targets (words -2..+5):\n{}", reg_mem);
-                }
-            }
-#endif
             return std::nullopt;
         }
         return MemoryRead32(addr);
@@ -598,6 +655,7 @@ public:
         }
         case Dynarmic::A32::Exception::NoExecuteFault:
             LOG_CRITICAL("Halting thread: attempted to execute unmapped memory at pc = 0x{:X}\n{}", pc, cpu->save_context().description());
+            log_no_execute_diagnostics(pc);
             cpu->crashed = true;
             cpu->jit->HaltExecution();
             break;
