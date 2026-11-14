@@ -147,7 +147,7 @@ public class Emulator extends SDLActivity
      */
     @Override
     protected String[] getLibraries() {
-        return new String[] { "Vita3K" };
+        return new String[] { "ECV" };
     }
 
     @Override

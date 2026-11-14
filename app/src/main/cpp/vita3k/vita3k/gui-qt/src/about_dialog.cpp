@@ -46,31 +46,32 @@ AboutDialog::AboutDialog(EmuEnvState &emuenv, QWidget *parent)
     m_ui->credit_label->setTextInteractionFlags(Qt::TextBrowserInteraction);
     m_ui->credit_label->setOpenExternalLinks(true);
 
-    const QString version = QString::fromUtf8(app_version) + "-"
+    const QString version = QString::fromUtf8(core_version) + " (based on "
+        + QString::fromUtf8(upstream_version) + ")-"
         + QString::number(app_number) + "-" + QString::fromUtf8(app_hash);
     m_ui->version_label->setText(tr("Version: %1").arg(version));
 
     m_ui->description_label->setText(tr(
-        "Vita3K is the world's first functional PS Vita\u2122/PS TV\u2122 emulator, "
-        "open-source and written in C++ for Windows, Linux, macOS, and Android.\n"
-        "Visit our website at <a href=\"https://vita3k.org/quickstart.html\">vita3k.org</a> for more info. "
-        "If you're interested in contributing, check out our <a href=\"https://github.com/Vita3K/Vita3K\">GitHub</a>. "
-        "If you want to support us, you can donate via <a href=\"https://ko-fi.com/vita3k\">Ko-fi</a>."));
+        "EmuCoreV (ECV) is an open-source PS Vita\u2122/PS TV\u2122 emulator based on Vita3K.\n"
+        "Visit our website at <a href=\"https://emucorev.web.app\">emucorev.web.app</a> for more info. "
+        "If you're interested in contributing, check out our <a href=\"https://github.com/sashkinbro/EmuCoreV\">GitHub</a>. "
+        "Support EmuCore via <a href=\"https://www.patreon.com/c/emucore/membership\">Patreon</a>. "
+        "Upstream source: <a href=\"https://github.com/Vita3K/Vita3K\">Vita3K</a>."));
 
     m_ui->credit_label->setText(
         tr("Icon by %1").arg(QStringLiteral("<a href=\"https://gordonmackayillustration.blogspot.com\">Gordon Mackay</a>")));
 
     connect(m_ui->github_button, &QPushButton::clicked, [] {
-        QDesktopServices::openUrl(QUrl("https://github.com/Vita3K/Vita3K"));
+        QDesktopServices::openUrl(QUrl("https://github.com/sashkinbro/EmuCoreV"));
     });
     connect(m_ui->website_button, &QPushButton::clicked, [] {
-        QDesktopServices::openUrl(QUrl("https://vita3k.org"));
+        QDesktopServices::openUrl(QUrl("https://emucorev.web.app"));
     });
     connect(m_ui->kofi_button, &QPushButton::clicked, [] {
-        QDesktopServices::openUrl(QUrl("https://ko-fi.com/vita3k"));
+        QDesktopServices::openUrl(QUrl("https://www.patreon.com/c/emucore/membership"));
     });
     connect(m_ui->discord_button, &QPushButton::clicked, [] {
-        QDesktopServices::openUrl(QUrl("https://discord.com/invite/6aGwQzh"));
+        QDesktopServices::openUrl(QUrl("https://discord.gg/c5EBeNRpz2"));
     });
     connect(m_ui->close_button, &QPushButton::clicked, this, &QWidget::close);
 }

@@ -11,7 +11,7 @@
 			</rect>
 		</property>
 		<property name="windowTitle">
-			<string>About Vita3K</string>
+			<string>About EmuCoreV (ECV)</string>
 		</property>
 		<layout class="QVBoxLayout" name="main_layout" stretch="0,1,0">
 			<property name="spacing">
@@ -111,7 +111,7 @@
 											</font>
 										</property>
 										<property name="text">
-											<string>Vita3K PlayStation Vita Emulator</string>
+											<string>EmuCoreV (ECV) PlayStation Vita Emulator</string>
 										</property>
 										<property name="alignment">
 											<set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
@@ -232,7 +232,7 @@
 												</font>
 											</property>
 											<property name="text">
-												<string>Developers:</string>
+												<string>Vita3K upstream developers:</string>
 											</property>
 										</widget>
 									</item>
@@ -270,7 +270,7 @@
 												</font>
 											</property>
 											<property name="text">
-												<string>Contributors:</string>
+												<string>Vita3K upstream contributors:</string>
 											</property>
 										</widget>
 									</item>
@@ -308,7 +308,7 @@
 												</font>
 											</property>
 											<property name="text">
-												<string>Supporters:</string>
+												<string>Vita3K upstream supporters:</string>
 											</property>
 										</widget>
 									</item>
@@ -362,7 +362,7 @@
 					<item>
 						<widget class="QPushButton" name="kofi_button">
 							<property name="text">
-								<string>Ko-fi</string>
+								<string>Patreon</string>
 							</property>
 						</widget>
 					</item>

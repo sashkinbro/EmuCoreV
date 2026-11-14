@@ -78,20 +78,20 @@ struct VCRuntimeCheckObject {
         // fmt is self-contained, hopefully it'll be okay.
         char message[512];
         const auto fmt_result = fmt::format_to_n(message, sizeof(message),
-            "Your Microsoft Visual C++ Runtime appears to be too old for this build of Vita3K.\n\n"
+            "Your Microsoft Visual C++ Runtime appears to be too old for this build of EmuCoreV.\n\n"
             "Your version: {}.{}.{}.{}\n"
             "Required version: {}.{}.{}.{}\n\n"
             "You can download the latest version from {}.\n\n"
             "Do you want to exit and download this version now?\n"
-            "If you select No, Vita3K will likely crash.",
+            "If you select No, EmuCoreV will likely crash.",
             v0, v1, v2, v3, MIN_VERSION_V0, MIN_VERSION_V1, MIN_VERSION_V2, MIN_VERSION_V3, DOWNLOAD_URL);
         message[(fmt_result.size > (sizeof(message) - 1)) ? (sizeof(message) - 1) : fmt_result.size] = 0;
 
-        if (MessageBoxA(NULL, message, "Old Visual C++ Runtime Detected", MB_ICONERROR | MB_YESNO) == IDNO)
+        if (MessageBoxA(NULL, message, "EmuCoreV: Old Visual C++ Runtime Detected", MB_ICONERROR | MB_YESNO) == IDNO)
             return;
 
         if (!ShellExecuteA(NULL, "open", DOWNLOAD_URL, nullptr, nullptr, SW_SHOWNORMAL))
-            MessageBoxA(NULL, "ShellExecuteA() failed, you may need to manually open the URL.", "Error", MB_OK);
+            MessageBoxA(NULL, "ShellExecuteA() failed, you may need to manually open the URL.", "EmuCoreV Error", MB_OK);
 
         TerminateProcess(GetCurrentProcess(), 0xFFFFFFFF);
     }

@@ -83,13 +83,13 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "https://github.com/Vita3K/Vita3K"
-            VALUE "FileDescription", "Vita3K PSVita Emulator"
+            VALUE "CompanyName", "https://github.com/sashkinbro/EmuCoreV"
+            VALUE "FileDescription", "EmuCoreV ECV PS Vita Emulator"
             VALUE "FileVersion", FILE_VERSION_STR "\0"
             VALUE "InternalName", "Vita3K.exe"
             VALUE "LegalCopyright", "Copyright (C) 2018-2026"
             VALUE "OriginalFilename", "Vita3K.exe"
-            VALUE "ProductName", "Vita3K"
+            VALUE "ProductName", "EmuCoreV ECV"
             VALUE "ProductVersion", FILE_VERSION_STR "\0"
         END
     END

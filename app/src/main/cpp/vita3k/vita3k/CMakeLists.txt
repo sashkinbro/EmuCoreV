@@ -66,6 +66,9 @@ else()
 endif()
 
 file(WRITE ${CMAKE_BINARY_DIR}/vita3k/config/gitver.h
+	"#define ECV_VER_HI ${EMUCOREV_VERSION_MAJOR}\n"
+	"#define ECV_VER_MID ${EMUCOREV_VERSION_MINOR}\n"
+	"#define ECV_VER_LO ${EMUCOREV_VERSION_PATCH}\n"
 	"#define APP_VER_HI ${VITA3K_APP_VER_HI}\n"
 	"#define APP_VER_MID ${VITA3K_APP_VER_MID}\n"
 	"#define APP_VER_LO ${VITA3K_APP_VER_LO}\n"
