@@ -20,6 +20,8 @@ internal class RetroArchShaderPackStore(
 ) {
     companion object {
         private val installationLock = Mutex()
+        private data class CatalogCache(val signature: List<Any>, val presets: java.lang.ref.WeakReference<List<RetroArchShaderPreset>>)
+        @Volatile private var catalogCache: CatalogCache? = null
         private const val OFFICIAL_MARKER = ".official-pack"
         private const val REMOVED_MARKER = ".removed-presets"
         private const val MAX_ARCHIVE_BYTES = 256L * 1024 * 1024
@@ -34,27 +36,36 @@ internal class RetroArchShaderPackStore(
 
     suspend fun hasInstalledPack(): Boolean = lock.withLock {
         recoverInterruptedInstall()
-        root.resolve(OFFICIAL_MARKER).isFile && listPresetsUnlocked().isNotEmpty()
+        root.resolve(OFFICIAL_MARKER).isFile
     }
 
     suspend fun installArchive(
         archive: File,
         official: Boolean,
-        onExtractionChunk: () -> Unit = {}
+        onExtractionChunk: () -> Unit = {},
+        onProgress: (RetroArchShaderInstallProgress) -> Unit = {}
     ): Int {
         lock.lock()
         try {
             cache.mkdirs()
-            cache.listFiles().orEmpty()
+            (cache.listFiles().orEmpty().toList() + root.parentFile?.listFiles().orEmpty().toList())
                 .filter { it.isDirectory && it.name.startsWith("shader-stage-") }
                 .forEach { stale -> check(stale.deleteRecursively()) { "Unable to clear an abandoned shader install" } }
-            val staging = File(cache, "shader-stage-${UUID.randomUUID()}")
+            val staging = File(root.parentFile, "shader-stage-${UUID.randomUUID()}")
             val backup = File(root.parentFile, "${root.name}.backup")
             var staleBackup: File? = null
             check(staging.mkdirs()) { "Unable to stage shader pack" }
             try {
-                extract(archive, staging, onExtractionChunk)
-                val presets = RetroArchShaderPresetParser.inspectPresets(staging)
+                extract(archive, staging, onExtractionChunk, onProgress)
+                onProgress(RetroArchShaderInstallProgress(RetroArchShaderInstallStage.VALIDATING))
+                val installContext = currentCoroutineContext()
+                val inspected = RetroArchShaderPresetParser.inspectPresets(staging) { done, total ->
+                    installContext.ensureActive()
+                    onProgress(RetroArchShaderInstallProgress(RetroArchShaderInstallStage.VALIDATING,
+                        processedFiles = done, totalFiles = total))
+                }
+                val presets = toPresets(staging, inspected)
+                RetroArchShaderCatalog.write(staging, presets)
                 require(presets.isNotEmpty()) { "No structurally valid .slangp presets in archive" }
                 if (official) staging.resolve(OFFICIAL_MARKER).writeText("1\n")
                 currentCoroutineContext().ensureActive()
@@ -68,6 +79,7 @@ internal class RetroArchShaderPackStore(
                     if (backup.exists()) check(backup.renameTo(root)) { "Unable to restore current shader pack" }
                     error("Unable to install shader pack")
                 }
+                catalogCache = null
                 staleBackup?.deleteRecursively()
                 return presets.size
             } finally {
@@ -111,6 +123,7 @@ internal class RetroArchShaderPackStore(
             } finally {
                 temporary.delete()
             }
+            catalogCache = null
             paths.size
         })
     } catch (cancelled: CancellationException) {
@@ -119,28 +132,35 @@ internal class RetroArchShaderPackStore(
         Result.failure(error)
     }
 
-    private fun listPresetsUnlocked(): List<RetroArchShaderPreset> {
-        val removed = root.resolve(REMOVED_MARKER).takeIf(File::isFile)?.readLines()?.toSet().orEmpty()
+    private suspend fun listPresetsUnlocked(): List<RetroArchShaderPreset> {
         val base = root.canonicalFile
-        return RetroArchShaderPresetParser.inspectPresets(base).mapNotNull { (file, inspected) ->
-            val relative = file.relativeTo(base).invariantSeparatorsPath
-            if (relative in removed) return@mapNotNull null
-            RetroArchShaderPreset(
-                label = relative.substringBeforeLast('.'),
-                absolutePath = file.absolutePath,
-                passCount = inspected.passCount,
-                textureIds = inspected.textureIds,
-                parameters = inspected.parameters
-            )
-        }.sortedBy { it.label.lowercase() }
+        val index = File(base, ".preset-catalog-v3")
+        val marker = File(base, REMOVED_MARKER)
+        fun signature(): List<Any> = listOf(base.path, index.length(), index.lastModified(), marker.length(), marker.lastModified())
+        val current = signature()
+        catalogCache?.takeIf { it.signature == current }?.presets?.get()?.let { return it }
+        val removed = marker.takeIf(File::isFile)?.readLines()?.toSet().orEmpty()
+        val scanContext = currentCoroutineContext()
+        val catalog = RetroArchShaderCatalog.read(base) ?: toPresets(base,
+            RetroArchShaderPresetParser.inspectPresets(base) { _, _ -> scanContext.ensureActive() }).also {
+                if (base.isDirectory) RetroArchShaderCatalog.write(base, it)
+            }
+        return catalog.filter { File(it.absolutePath).relativeTo(base).invariantSeparatorsPath !in removed }.also {
+            catalogCache = CatalogCache(signature(), java.lang.ref.WeakReference(it))
+        }
     }
+
+    private fun toPresets(base: File, inspected: List<Pair<File, RetroArchShaderPresetInspection>>) = inspected.map { (file, data) ->
+        RetroArchShaderPreset(file.relativeTo(base).invariantSeparatorsPath.substringBeforeLast('.'),
+            file.absolutePath, data.passCount, data.textureIds, data.parameters)
+    }.sortedBy { it.label.lowercase() }
 
     private fun recoverInterruptedInstall() {
         val backup = File(root.parentFile, "${root.name}.backup")
         if (!root.exists() && backup.isDirectory) check(backup.renameTo(root)) { "Unable to restore shader backup" }
     }
 
-    private suspend fun extract(archive: File, destination: File, onExtractionChunk: () -> Unit) {
+    private suspend fun extract(archive: File, destination: File, onExtractionChunk: () -> Unit, onProgress: (RetroArchShaderInstallProgress) -> Unit) {
         ZipFile(archive).use { zip ->
             require(archive.isFile && archive.length() <= MAX_ARCHIVE_BYTES) { "Shader archive is too large" }
             val entries = mutableListOf<ZipEntry>()
@@ -158,6 +178,10 @@ internal class RetroArchShaderPackStore(
             val commonRoot = commonArchiveRoot(entries.map { it.name })
             val seen = mutableSetOf<String>()
             var expandedBytes = 0L
+            val totalBytes = entries.filterNot { it.isDirectory }.sumOf { it.size.coerceAtLeast(0) }
+            val totalFiles = entries.count { !it.isDirectory }
+            var done = 0
+            var lastReport = 0L
             for (entry in entries) {
                 currentCoroutineContext().ensureActive()
                 val relative = entry.name.removePrefix(commonRoot).trimEnd('/')
@@ -187,10 +211,17 @@ internal class RetroArchShaderPackStore(
                             checksum.update(buffer, 0, count)
                             sink.write(buffer, 0, count)
                             onExtractionChunk()
+                            val now = System.nanoTime()
+                            if (now - lastReport > 100_000_000L) {
+                                onProgress(RetroArchShaderInstallProgress(RetroArchShaderInstallStage.INSTALLING,
+                                    expandedBytes, totalBytes, processedFiles = done, totalFiles = totalFiles))
+                                lastReport = now
+                            }
                         }
                         sink.fd.sync()
                     }
                 }
+                done++
                 require((entry.size < 0 || fileBytes == entry.size) && (entry.crc < 0 || checksum.value == entry.crc)) {
                     "Shader archive is incomplete or corrupt"
                 }

@@ -1651,4 +1651,16 @@
     <string name="shader_installing">Gölgelendirici paketi yükleniyor…</string>
     <string name="shader_parameters">Gölgelendirici parametreleri</string>
     <string name="shader_reset_parameters">Parametreleri sıfırla</string>
+
+    <string name="shader_loading">Gölgelendirici ön ayarları yükleniyor…</string>
+    <string name="shader_pack_ready">Yüklü ön ayarlar: %1$d</string>
+    <string name="shader_redownload">Gölgelendirici paketini yeniden indir</string>
+    <string name="shader_downloading">Gölgelendirici paketi indiriliyor…</string>
+    <string name="shader_validating">Ön ayar kataloğu hazırlanıyor…</string>
+    <string name="shader_preparing">Hazırlanıyor…</string>
+    <string name="shader_transfer_progress">%1$s / %2$s · %3$s/sn</string>
+    <string name="shader_transfer_unknown">%1$s · %2$s/sn</string>
+
+    <string name="shader_search_parameters">Gölgelendirici parametrelerini ara</string>
+    <string name="shader_no_matching_parameters">Eşleşen parametre bulunamadı.</string>
 </resources>

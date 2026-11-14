@@ -1,5 +1,7 @@
 package com.sbro.emucorev.data
 
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.distinctUntilChanged
 import android.content.Context
 import java.io.File
 import java.security.MessageDigest
@@ -15,6 +17,18 @@ data class RetroArchShaderSelection(
 
 /** Stores user-facing shader selections without changing the native Vita config schema. */
 class RetroArchShaderSelectionRepository(context: Context) {
+    /** Emits selection edits without rescanning the shader pack. */
+    fun observeSelection(titleId: String? = null): kotlinx.coroutines.flow.Flow<RetroArchShaderSelection> =
+        kotlinx.coroutines.flow.callbackFlow {
+            fun current() = titleId?.takeIf(String::isNotBlank)?.let(::effectiveFor) ?: global()
+            val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key == null || key.endsWith(".preset") || key.endsWith(".enabled") || key.endsWith(".override")) trySend(current())
+            }
+            preferences.registerOnSharedPreferenceChangeListener(listener)
+            trySend(current())
+            awaitClose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+        }.distinctUntilChanged()
+
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val packRoot: File get() = File(appContext.filesDir, "retroarch-shaders")
@@ -93,6 +107,15 @@ class RetroArchShaderSelectionRepository(context: Context) {
             ?: return false
         preferences.edit().putFloat("${parameterKey(scope, titleId, preset)}.$parameterId", bounded).apply()
         return true
+    }
+
+    /** Writes inherited values together, including large Bezel parameter sets. */
+    fun setParameterOverrides(scope: RetroArchShaderSelectionScope, titleId: String?, preset: RetroArchShaderPreset, values: Map<String, Float>) {
+        val bounded = RetroArchShaderSelectionPolicy.validParameterOverrides(preset, values)
+        val key = parameterKey(scope, titleId, preset)
+        val editor = preferences.edit()
+        bounded.forEach { (id, value) -> editor.putFloat("$key.$id", value) }
+        editor.apply()
     }
 
     /** Clears values only for the specified scope, title and preset; preset defaults then apply. */
@@ -191,7 +214,7 @@ class RetroArchShaderSelectionRepository(context: Context) {
         preset: RetroArchShaderPreset
     ): String {
         val presetPath = encodePresetPath(preset.absolutePath)
-        require(preset.parameters.size <= MAX_PARAMETER_COUNT) { "Shader preset has too many parameters" }
+        require(preset.parameters.size <= RetroArchShaderPreset.MAX_PARAMETERS) { "Shader preset has too many parameters" }
         val base = when (scope) {
             RetroArchShaderSelectionScope.GLOBAL -> GLOBAL_KEY
             RetroArchShaderSelectionScope.GAME_OVERRIDE -> gameKey(requireNotNull(titleId) { "Game title ID is required" })
@@ -210,6 +233,5 @@ class RetroArchShaderSelectionRepository(context: Context) {
     private companion object {
         const val PREFERENCES_NAME = "retroarch_shader_selection"
         const val GLOBAL_KEY = "global"
-        const val MAX_PARAMETER_COUNT = 256
     }
 }

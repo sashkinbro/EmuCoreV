@@ -10,6 +10,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.key
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.BorderStroke
@@ -26,7 +31,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,12 +38,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import android.text.format.Formatter
+import com.sbro.emucorev.data.RetroArchShaderInstallStage
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorev.ui.common.AppDialog as Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.mutableStateMapOf
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -48,7 +57,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.sbro.emucorev.R
-import com.sbro.emucorev.data.NativeRetroArchShaderBridge
 import com.sbro.emucorev.data.RetroArchShaderParameter
 import com.sbro.emucorev.data.RetroArchShaderPreset
 import com.sbro.emucorev.data.RetroArchShaderInstallProgress
@@ -84,7 +92,7 @@ private fun shaderPresetGroups(presets: List<RetroArchShaderPreset>): List<Shade
     .sortedBy { it.title.lowercase() }
 
 @Composable
-private fun ShaderPresetPicker(
+internal fun ShaderPresetPicker(
     presets: List<RetroArchShaderPreset>,
     selectedPath: String,
     noneLabel: String,
@@ -96,7 +104,20 @@ private fun ShaderPresetPicker(
 ) {
     var query by remember { mutableStateOf("") }
     var expandedGroup by remember { mutableStateOf<String?>(null) }
+    val rootListState = rememberLazyListState()
+    val searchListState = rememberLazyListState()
+    val groupListStates = remember { mutableMapOf<String, LazyListState>() }
+    val listState = when {
+        query.isNotBlank() -> searchListState
+        expandedGroup == null -> rootListState
+        else -> groupListStates.getOrPut(expandedGroup.orEmpty()) { LazyListState() }
+    }
+    val searching = query.isNotBlank()
+    val showCategories = !searching && expandedGroup == null
+    val displayedGroup = expandedGroup
+    val listKey = if (searching) "search" else displayedGroup?.let { "group:$it" } ?: "root"
     val groups = remember(presets) { shaderPresetGroups(presets) }
+    val groupPresets = groups.firstOrNull { it.key == displayedGroup }?.presets.orEmpty()
     val rootPresets = remember(presets) { presets.filterNot { '/' in it.label }.sortedBy { it.label.lowercase() } }
     val matches = remember(presets, query) {
         val q = query.trim()
@@ -115,14 +136,22 @@ private fun ShaderPresetPicker(
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     placeholder = { Text(stringResource(R.string.shader_choose_preset)) }, shape = neonShape(14.dp)
                 )
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (query.isNotBlank()) {
+                if (query.isBlank() && expandedGroup != null) {
+                    TextButton(onClick = { expandedGroup = null }, modifier = Modifier.testTag("shader_group_back"), shape = neonButtonShape()) {
+                        Text("‹  ${shaderCategoryTitle(expandedGroup.orEmpty())}")
+                    }
+                }
+                key(listKey) {
+                LazyColumn(state = listState, modifier = Modifier.weight(1f, fill = false).testTag("shader_picker_list"), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Capture this page's immutable data: a disappearing lazy
+                    // list must not see the next page and clamp its saved offset.
+                    if (searching) {
                         if (onUseGlobal != null) item(key = "global") { ShaderPickerRow(useGlobalLabel, inheritsGlobal, onUseGlobal) }
                         item(key = "none") { ShaderPickerRow(noneLabel, selectedPath.isBlank() && !inheritsGlobal, { onSelect("") }) }
                         items(matches, key = { "match:${it.absolutePath}" }) { preset ->
                             ShaderPickerRow(preset.label, preset.absolutePath == selectedPath, { onSelect(preset.absolutePath) })
                         }
-                    } else if (expandedGroup == null) {
+                    } else if (showCategories) {
                         if (onUseGlobal != null) item(key = "global") { ShaderPickerRow(useGlobalLabel, inheritsGlobal, onUseGlobal) }
                         item(key = "none") { ShaderPickerRow(noneLabel, selectedPath.isBlank() && !inheritsGlobal, { onSelect("") }) }
                         items(rootPresets, key = { "root:${it.absolutePath}" }) { preset ->
@@ -132,11 +161,11 @@ private fun ShaderPresetPicker(
                             ShaderPickerRow("${group.title}  ·  ${group.presets.size}", group.presets.any { it.absolutePath == selectedPath }) { expandedGroup = group.key }
                         }
                     } else {
-                        item(key = "groupback") { ShaderPickerRow("‹  ${shaderCategoryTitle(expandedGroup.orEmpty())}", false) { expandedGroup = null } }
-                        items(groups.firstOrNull { it.key == expandedGroup }?.presets.orEmpty(), key = { "preset:${it.absolutePath}" }) { preset ->
+                        items(groupPresets, key = { "preset:${it.absolutePath}" }) { preset ->
                             ShaderPickerRow(shaderShortLabel(preset.label), preset.absolutePath == selectedPath, { onSelect(preset.absolutePath) })
                         }
                     }
+                }
                 }
                 TextButton(onClick = onDismiss, shape = neonButtonShape()) { Text(stringResource(R.string.common_cancel)) }
             }
@@ -168,7 +197,10 @@ data class RetroArchShaderUiState(
     val installing: Boolean = false,
     val installFraction: Float? = null,
     val error: String? = null,
-    val parameterValues: Map<String, Float> = emptyMap()
+    val parameterValues: Map<String, Float> = emptyMap(),
+    val loading: Boolean = false,
+    val officialPackInstalled: Boolean = false,
+    val installProgress: RetroArchShaderInstallProgress? = null
 )
 
 /** Labels are supplied from Android resources by the owning screen; no strings are embedded here. */
@@ -237,16 +269,20 @@ fun RetroArchShaderSettingsSection(
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary
             )
-            if (!state.supported) {
+            if (state.loading) {
+                Text(stringResource(R.string.shader_loading), style = MaterialTheme.typography.bodySmall)
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().testTag("shader_catalog_loading"))
+            } else if (!state.supported) {
                 Text(strings.unsupported, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-            } else {
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(strings.enabled, style = MaterialTheme.typography.bodyLarge)
-                    Switch(checked = state.enabled, onCheckedChange = onEnabledChange)
+                    Switch(checked = state.enabled, onCheckedChange = onEnabledChange, enabled = state.supported && !state.loading && !state.installing && state.selectedPresetPath.isNotBlank())
                 }
                 if (state.context != RetroArchShaderUiContext.GLOBAL && onUseGlobal != null) {
                     if (state.inheritsGlobal) {
@@ -257,7 +293,7 @@ fun RetroArchShaderSettingsSection(
 
                 var pickerOpen by remember { mutableStateOf(false) }
                 val selectedLabel = currentPreset?.label?.let(::shaderShortLabel) ?: strings.noPreset
-                OutlinedButton(onClick = { pickerOpen = true }, shape = neonButtonShape()) {
+                OutlinedButton(onClick = { pickerOpen = true }, enabled = !state.loading && !state.installing, modifier = Modifier.testTag("shader_preset_picker"), shape = neonButtonShape()) {
                     Text("${strings.choosePreset}: $selectedLabel")
                 }
                 if (pickerOpen) {
@@ -273,7 +309,11 @@ fun RetroArchShaderSettingsSection(
                     )
                 }
 
-                if (state.presets.isEmpty()) {
+                if (!state.loading && state.presets.isNotEmpty()) {
+                    Text(stringResource(R.string.shader_pack_ready, state.presets.size),
+                        modifier = Modifier.testTag("shader_pack_status"), style = MaterialTheme.typography.bodySmall)
+                }
+                if (!state.loading && state.presets.isEmpty()) {
                     Text(strings.noPresets, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (!state.selectedPresetPath.isBlank() && onRemovePreset != null) {
@@ -282,12 +322,37 @@ fun RetroArchShaderSettingsSection(
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = onDownloadPack, enabled = !state.installing, shape = neonButtonShape(), modifier = Modifier.fillMaxWidth()) { Text(strings.downloadPack) }
-                    OutlinedButton(onClick = onImportPack, enabled = !state.installing, shape = neonButtonShape(), modifier = Modifier.fillMaxWidth()) { Text(strings.importPack) }
+                    Button(onClick = onDownloadPack, enabled = !state.installing && !state.loading, shape = neonButtonShape(), modifier = Modifier.fillMaxWidth().testTag("shader_download")) {
+                        Text(if (state.officialPackInstalled) stringResource(R.string.shader_redownload) else strings.downloadPack)
+                    }
+                    OutlinedButton(onClick = onImportPack, enabled = !state.installing && !state.loading, shape = neonButtonShape(), modifier = Modifier.fillMaxWidth()) { Text(strings.importPack) }
                 }
                 if (state.installing) {
-                    Text(strings.installing, style = MaterialTheme.typography.bodySmall)
-                    state.installFraction?.let { LinearProgressIndicator(progress = { it.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth()) }
+                    val progress = state.installProgress
+                    val stage = when (progress?.stage) {
+                        RetroArchShaderInstallStage.DOWNLOADING -> stringResource(R.string.shader_downloading)
+                        RetroArchShaderInstallStage.VALIDATING -> stringResource(R.string.shader_validating)
+                        RetroArchShaderInstallStage.INSTALLING -> strings.installing
+                        null -> stringResource(R.string.shader_preparing)
+                    }
+                    Text(stage, modifier = Modifier.testTag("shader_install_stage"), style = MaterialTheme.typography.bodySmall)
+                    val fraction = progress?.fraction ?: state.installFraction
+                    if (fraction != null) {
+                        LinearProgressIndicator(progress = { fraction.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().testTag("shader_install_progress"))
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth().testTag("shader_install_progress"))
+                    }
+                    if (progress?.stage == RetroArchShaderInstallStage.DOWNLOADING) {
+                        val androidContext = LocalContext.current
+                        val bytes = Formatter.formatShortFileSize(androidContext, progress.transferredBytes)
+                        val speed = Formatter.formatShortFileSize(androidContext, progress.bytesPerSecond)
+                        Text(if (progress.totalBytes > 0) stringResource(R.string.shader_transfer_progress, bytes,
+                            Formatter.formatShortFileSize(androidContext, progress.totalBytes), speed)
+                        else stringResource(R.string.shader_transfer_unknown, bytes, speed),
+                            modifier = Modifier.testTag("shader_transfer_details"), style = MaterialTheme.typography.bodySmall)
+                    } else if (progress != null && progress.totalFiles > 0) {
+                        Text("${progress.processedFiles} / ${progress.totalFiles}", style = MaterialTheme.typography.bodySmall)
+                    }
                     onCancelInstall?.let { action ->
                         TextButton(onClick = action, shape = neonButtonShape()) { Text(stringResource(R.string.common_cancel)) }
                     }
@@ -297,14 +362,29 @@ fun RetroArchShaderSettingsSection(
                 }
                 if (state.enabled && currentPreset?.parameters.orEmpty().isNotEmpty()) {
                     Text(strings.parameters, style = MaterialTheme.typography.titleSmall)
-                    currentPreset?.parameters.orEmpty().forEach { parameter ->
-                        ShaderParameterControl(
-                            parameter = parameter,
-                            value = state.parameterValues[parameter.id] ?: parameter.initialValue,
-                            onValueChange = { onParameterChange(parameter.id, it) }
-                        )
+                    var parameterQuery by remember(currentPreset?.absolutePath) { mutableStateOf("") }
+                    val parameters = currentPreset?.parameters.orEmpty()
+                    val filteredParameters = remember(parameters, parameterQuery) {
+                        parameters.filter { it.description.contains(parameterQuery, ignoreCase = true) || it.id.contains(parameterQuery, ignoreCase = true) }
                     }
-                    OutlinedButton(onClick = onResetParameters, shape = neonButtonShape()) { Text(strings.resetParameters) }
+                    if (parameters.size > 16) {
+                        OutlinedTextField(value = parameterQuery, onValueChange = { parameterQuery = it },
+                            modifier = Modifier.fillMaxWidth().testTag("shader_parameter_search"), singleLine = true,
+                            placeholder = { Text(stringResource(R.string.shader_search_parameters)) }, shape = neonShape(14.dp))
+                    }
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).testTag("shader_parameter_list")) {
+                        if (filteredParameters.isEmpty()) item {
+                            Text(stringResource(R.string.shader_no_matching_parameters), style = MaterialTheme.typography.bodySmall)
+                        }
+                        items(filteredParameters, key = { it.id }) { parameter ->
+                            ShaderParameterControl(
+                                parameter = parameter,
+                                value = state.parameterValues[parameter.id] ?: parameter.initialValue,
+                                onValueChange = { onParameterChange(parameter.id, it) }
+                            )
+                        }
+                    }
+                    OutlinedButton(onClick = onResetParameters, modifier = Modifier.fillMaxWidth(), shape = neonButtonShape()) { Text(strings.resetParameters) }
                 }
             }
         }
@@ -363,13 +443,16 @@ private fun ShaderParameterControl(
     value: Float,
     onValueChange: (Float) -> Unit
 ) {
-    Column {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(parameter.description.ifBlank { parameter.id }, style = MaterialTheme.typography.bodyMedium)
-            Text("${parameter.id}: ${"%.2f".format(value)}", style = MaterialTheme.typography.labelMedium)
-        }
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(parameter.description.ifBlank { parameter.id }, modifier = Modifier.fillMaxWidth().testTag("shader_parameter_label:${parameter.id}"),
+            style = if (parameter.maximum > parameter.minimum) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
+            color = if (parameter.maximum > parameter.minimum) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
+            maxLines = 4, overflow = TextOverflow.Ellipsis)
         if (parameter.maximum > parameter.minimum) {
+            Text("%.2f".format(value), modifier = Modifier.fillMaxWidth().testTag("shader_parameter_value:${parameter.id}"),
+                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1)
             Slider(
+                modifier = Modifier.fillMaxWidth().testTag("shader_parameter_slider:${parameter.id}"),
                 value = value.coerceIn(parameter.minimum, parameter.maximum),
                 onValueChange = { raw ->
                     val stepIndex = ((raw - parameter.minimum) / parameter.step).roundToInt()
@@ -377,6 +460,7 @@ private fun ShaderParameterControl(
                 },
                 valueRange = parameter.minimum..parameter.maximum
             )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
         }
     }
 }
@@ -394,25 +478,31 @@ fun RetroArchShaderFeaturePanel(
     val repository = remember(appContext) { RetroArchShaderRepository(appContext) }
     val selections = remember(appContext) { RetroArchShaderSelectionRepository(appContext) }
     val sessionController = remember(appContext) { RetroArchShaderSessionController(appContext) }
-    val scope = rememberCoroutineScope()
-    var presets by remember { mutableStateOf(emptyList<RetroArchShaderPreset>()) }
-    var selection by remember(titleId, context) {
-        mutableStateOf(
-            runCatching {
-                if (context == RetroArchShaderUiContext.GLOBAL) selections.global()
-                else titleId?.takeIf(String::isNotBlank)?.let(selections::effectiveFor)
-                    ?: selections.global()
-            }.getOrElse {
-                RetroArchShaderSelection(false, "", RetroArchShaderSelectionScope.GLOBAL, false)
+    val panel: RetroArchShaderPanelState = viewModel(
+        key = "retroarch-shaders:${context.name}:${titleId.orEmpty()}",
+        factory = remember(appContext, titleId, context) {
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    val selection = if (context == RetroArchShaderUiContext.GLOBAL) selections.global()
+                        else titleId?.takeIf(String::isNotBlank)?.let(selections::effectiveFor) ?: selections.global()
+                    return RetroArchShaderPanelState(selection).also {
+                        it.observeSelection(selections.observeSelection(if (context == RetroArchShaderUiContext.GLOBAL) null else titleId))
+                    } as T
+                }
             }
-        )
-    }
-    var supported by remember(vulkanRenderer) { mutableStateOf(vulkanRenderer && runCatching { NativeRetroArchShaderBridge.isSupported() }.getOrDefault(false)) }
-    var loading by remember { mutableStateOf(true) }
+        }
+    )
+    val scope = panel.scope
+    var presets by panel::presets
+    var selection by panel::selection
+    var supported by panel::supported
+    var officialPackInstalled by panel::officialPackInstalled
+    var loading by panel::loading
+    var error by panel::error
+    val parameterValues = panel.parameterValues
+    val parameterWriteMutex = panel.parameterWriteMutex
     val packTask by RetroArchShaderPackTask.state.collectAsState()
-    var error by remember { mutableStateOf<String?>(null) }
-    val parameterValues = remember { mutableStateMapOf<String, Float>() }
-    val parameterWriteMutex = remember { Mutex() }
     val currentTitleId by rememberUpdatedState(titleId)
 
     suspend fun refreshParameterValues() {
@@ -420,14 +510,17 @@ fun RetroArchShaderFeaturePanel(
         val saved = if (preset != null) withContext(Dispatchers.IO) {
             selections.parameterOverrides(selection.scope, currentTitleId, preset)
         } else emptyMap()
-        parameterValues.clear()
-        preset?.parameters?.forEach { parameter ->
-            parameterValues[parameter.id] = saved[parameter.id] ?: parameter.initialValue
-        }
+        val values = preset?.parameters.orEmpty().associate { it.id to (saved[it.id] ?: it.initialValue) }
+        parameterValues.keys.toList().filterNot(values::containsKey).forEach(parameterValues::remove)
+        values.forEach { (id, value) -> if (parameterValues[id] != value) parameterValues[id] = value }
     }
 
     suspend fun refresh() {
-        supported = vulkanRenderer && runCatching { NativeRetroArchShaderBridge.isSupported() }.getOrDefault(false)
+        officialPackInstalled = repository.hasInstalledOfficialPack()
+        supported = vulkanRenderer && runCatching { repository.isSupported() }.getOrElse {
+            if (it is CancellationException) throw it
+            false
+        }
         presets = withContext(Dispatchers.IO) { repository.listPresets() }
         selection = withContext(Dispatchers.IO) {
             if (context == RetroArchShaderUiContext.GLOBAL) selections.global()
@@ -437,24 +530,12 @@ fun RetroArchShaderFeaturePanel(
         loading = false
     }
 
-    LaunchedEffect(titleId, context, vulkanRenderer) {
-        loading = true
-        try {
-            refresh()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (failure: Exception) {
-            error = failure.message
-        } finally {
-            loading = false
-        }
+    LaunchedEffect(panel, vulkanRenderer, packTask.completion) {
+        panel.loadIfNeeded(vulkanRenderer, packTask.completion) { refresh() }
     }
 
-    LaunchedEffect(packTask.completion) {
-        if (packTask.completion > 0L) {
-            try { refresh() } catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { error = failure.message }
-        }
+    LaunchedEffect(panel, selection, presets) {
+        if (!loading) refreshParameterValues()
     }
 
     LaunchedEffect(supported, selection.enabled) {
@@ -552,7 +633,10 @@ fun RetroArchShaderFeaturePanel(
         installing = packTask.busy,
         installFraction = packTask.progress?.fraction,
         error = error ?: packTask.error,
-        parameterValues = parameterValues.toMap()
+        parameterValues = parameterValues.toMap(),
+        loading = loading,
+        officialPackInstalled = officialPackInstalled,
+        installProgress = packTask.progress
     )
     val strings = RetroArchShaderUiStrings(
         title = stringResource(R.string.shader_title),
@@ -574,7 +658,7 @@ fun RetroArchShaderFeaturePanel(
         resetParameters = stringResource(R.string.shader_reset_parameters)
     )
 
-    if (!loading) {
+    run {
         RetroArchShaderSettingsSection(
             state = uiState,
             strings = strings,
@@ -597,9 +681,7 @@ fun RetroArchShaderFeaturePanel(
                                 withContext(Dispatchers.IO) {
                                     if (createOverride && !title.isNullOrBlank()) {
                                         selections.setGameOverride(title, selection.enabled, preset.absolutePath)
-                                        inheritedValues.forEach { (parameter, savedValue) ->
-                                            selections.setParameterOverride(targetScope, title, preset, parameter, savedValue)
-                                        }
+                                        selections.setParameterOverrides(targetScope, title, preset, inheritedValues)
                                     } else {
                                         selections.setParameterOverride(targetScope, title, preset, id, value)
                                     }

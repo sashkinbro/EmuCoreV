@@ -41,6 +41,22 @@ class RetroArchShaderSelectionRepositoryParametersTest {
     }
 
     @Test
+    fun bezelPresetsCanReadWriteAndResetMoreThan256Parameters() {
+        val large = preset.copy(parameters = List(2048) {
+            RetroArchShaderParameter("p$it", "Parameter $it", 0.5f, 0f, 1f, 0.1f)
+        })
+        val repository = RetroArchShaderSelectionRepository(context)
+        repository.setGlobal(true, large.absolutePath)
+        assertTrue(repository.parameterOverrides(RetroArchShaderSelectionScope.GLOBAL, null, large).isEmpty())
+        val values = large.parameters.associate { it.id to 0.7f }
+        repository.setParameterOverrides(RetroArchShaderSelectionScope.GLOBAL, null, large, values)
+        assertEquals(values, repository.parameterOverrides(RetroArchShaderSelectionScope.GLOBAL, null, large))
+        repository.clearParameterOverrides(RetroArchShaderSelectionScope.GLOBAL, null, large)
+        assertTrue(repository.parameterOverrides(RetroArchShaderSelectionScope.GLOBAL, null, large).isEmpty())
+        assertTrue(repository.global().enabled)
+    }
+
+    @Test
     fun valuesRoundTripByScopeResetIndependentlyAndClearWhenPresetIsRemoved() {
         val global = RetroArchShaderSelectionRepository(context)
         global.setGlobal(enabled = true, presetAbsolutePath = preset.absolutePath)

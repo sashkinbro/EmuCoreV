@@ -26,6 +26,11 @@ class RetroArchShaderRepository(private val context: Context) {
     private val root: File get() = File(context.filesDir, "retroarch-shaders")
     private val store: RetroArchShaderPackStore get() = RetroArchShaderPackStore(root, context.cacheDir)
 
+    suspend fun isSupported(): Boolean = withContext(Dispatchers.IO) {
+        com.sbro.emucorev.core.NativeLibraryLoader.ensureLoaded(context.applicationContext)
+        NativeRetroArchShaderBridge.isSupported()
+    }
+
     suspend fun listPresets(): List<RetroArchShaderPreset> = withContext(Dispatchers.IO) { store.listPresets() }
     suspend fun hasInstalledOfficialPack(): Boolean = withContext(Dispatchers.IO) { store.hasInstalledPack() }
     suspend fun removePresets(paths: Set<String>): Result<Int> = withContext(Dispatchers.IO) { store.removePresets(paths) }
@@ -67,7 +72,7 @@ class RetroArchShaderRepository(private val context: Context) {
                     download(archive, onProgress)
                     coroutineContext.ensureActive()
                     onProgress(RetroArchShaderInstallProgress(RetroArchShaderInstallStage.INSTALLING))
-                    store.installArchive(archive, official = true)
+                    store.installArchive(archive, official = true, onProgress = onProgress)
                 } finally {
                     archive.delete()
                 }
@@ -91,6 +96,7 @@ class RetroArchShaderRepository(private val context: Context) {
                         FileOutputStream(archive).use { output ->
                             val buffer = ByteArray(64 * 1024)
                             var bytes = 0L
+                            val startedAt = System.nanoTime()
                             var lastReportedAt = 0L
                             while (true) {
                                 coroutineContext.ensureActive()
@@ -101,7 +107,7 @@ class RetroArchShaderRepository(private val context: Context) {
                                 output.write(buffer, 0, read)
                                 val now = System.nanoTime()
                                 if (now - lastReportedAt >= PROGRESS_INTERVAL_NANOS) {
-                                    onProgress(RetroArchShaderInstallProgress(RetroArchShaderInstallStage.DOWNLOADING, bytes))
+                                    onProgress(RetroArchShaderInstallProgress(RetroArchShaderInstallStage.DOWNLOADING, bytes, bytesPerSecond = transferSpeed(bytes, startedAt)))
                                     lastReportedAt = now
                                 }
                             }
@@ -111,7 +117,7 @@ class RetroArchShaderRepository(private val context: Context) {
                     }
                     coroutineContext.ensureActive()
                     onProgress(RetroArchShaderInstallProgress(RetroArchShaderInstallStage.INSTALLING))
-                    store.installArchive(archive, official = false)
+                    store.installArchive(archive, official = false, onProgress = onProgress)
                 } finally {
                     archive.delete()
                 }
@@ -138,6 +144,9 @@ class RetroArchShaderRepository(private val context: Context) {
             }
             .forEach { file -> check(file.delete() || !file.exists()) { "Unable to clear an abandoned shader archive" } }
     }
+
+    private fun transferSpeed(bytes: Long, startedAt: Long): Long =
+        (bytes.toDouble() * 1_000_000_000.0 / (System.nanoTime() - startedAt).coerceAtLeast(1L)).toLong()
 
     private suspend fun download(
         archive: File,
@@ -174,6 +183,7 @@ class RetroArchShaderRepository(private val context: Context) {
                     FileOutputStream(archive).use { output ->
                         val buffer = ByteArray(64 * 1024)
                         var bytes = 0L
+                        val startedAt = System.nanoTime()
                         var lastReportedAt = 0L
                         while (true) {
                             coroutineContext.ensureActive()
@@ -184,7 +194,7 @@ class RetroArchShaderRepository(private val context: Context) {
                             output.write(buffer, 0, count)
                             val now = System.nanoTime()
                             if (now - lastReportedAt >= PROGRESS_INTERVAL_NANOS) {
-                                onProgress(RetroArchShaderInstallProgress(RetroArchShaderInstallStage.DOWNLOADING, bytes, expectedBytes.coerceAtLeast(0)))
+                                onProgress(RetroArchShaderInstallProgress(RetroArchShaderInstallStage.DOWNLOADING, bytes, expectedBytes.coerceAtLeast(0), bytesPerSecond = transferSpeed(bytes, startedAt)))
                                 lastReportedAt = now
                             }
                         }

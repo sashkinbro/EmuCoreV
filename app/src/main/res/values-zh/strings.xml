@@ -1650,4 +1650,16 @@
     <string name="shader_installing">正在安装着色器包…</string>
     <string name="shader_parameters">着色器参数</string>
     <string name="shader_reset_parameters">重置参数</string>
+
+    <string name="shader_loading">正在加载着色器预设…</string>
+    <string name="shader_pack_ready">已安装预设：%1$d</string>
+    <string name="shader_redownload">重新下载着色器包</string>
+    <string name="shader_downloading">正在下载着色器包…</string>
+    <string name="shader_validating">正在准备预设目录…</string>
+    <string name="shader_preparing">正在准备…</string>
+    <string name="shader_transfer_progress">%1$s / %2$s · %3$s/秒</string>
+    <string name="shader_transfer_unknown">%1$s · %2$s/秒</string>
+
+    <string name="shader_search_parameters">搜索着色器参数</string>
+    <string name="shader_no_matching_parameters">没有匹配的参数。</string>
 </resources>

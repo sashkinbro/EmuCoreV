@@ -1654,4 +1654,16 @@
     <string name="shader_installing">Instalowanie pakietu shaderów…</string>
     <string name="shader_parameters">Parametry shadera</string>
     <string name="shader_reset_parameters">Resetuj parametry</string>
+
+    <string name="shader_loading">Wczytywanie ustawień shaderów…</string>
+    <string name="shader_pack_ready">Zainstalowane ustawienia: %1$d</string>
+    <string name="shader_redownload">Pobierz pakiet ponownie</string>
+    <string name="shader_downloading">Pobieranie pakietu shaderów…</string>
+    <string name="shader_validating">Przygotowywanie katalogu ustawień…</string>
+    <string name="shader_preparing">Przygotowywanie…</string>
+    <string name="shader_transfer_progress">%1$s / %2$s · %3$s/s</string>
+    <string name="shader_transfer_unknown">%1$s · %2$s/s</string>
+
+    <string name="shader_search_parameters">Znajdź parametry shadera</string>
+    <string name="shader_no_matching_parameters">Brak pasujących parametrów.</string>
 </resources>

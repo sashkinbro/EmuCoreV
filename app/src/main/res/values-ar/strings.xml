@@ -1655,4 +1655,16 @@
     <string name="shader_installing">جارٍ تثبيت حزمة التظليل…</string>
     <string name="shader_parameters">معلمات التظليل</string>
     <string name="shader_reset_parameters">إعادة ضبط المعلمات</string>
+
+    <string name="shader_loading">جارٍ تحميل إعدادات التظليل المسبقة…</string>
+    <string name="shader_pack_ready">الإعدادات المسبقة المثبتة: %1$d</string>
+    <string name="shader_redownload">إعادة تنزيل حزمة التظليل</string>
+    <string name="shader_downloading">جارٍ تنزيل حزمة التظليل…</string>
+    <string name="shader_validating">جارٍ إعداد فهرس الإعدادات المسبقة…</string>
+    <string name="shader_preparing">جارٍ التحضير…</string>
+    <string name="shader_transfer_progress">%1$s / %2$s · %3$s/ث</string>
+    <string name="shader_transfer_unknown">%1$s · %2$s/ث</string>
+
+    <string name="shader_search_parameters">البحث في معلمات التظليل</string>
+    <string name="shader_no_matching_parameters">لا توجد معلمات مطابقة.</string>
 </resources>

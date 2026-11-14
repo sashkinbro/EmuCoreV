@@ -1655,4 +1655,16 @@
     <string name="shader_installing">در حال نصب بستهٔ سایه‌زن…</string>
     <string name="shader_parameters">پارامترهای سایه‌زن</string>
     <string name="shader_reset_parameters">بازنشانی پارامترها</string>
+
+    <string name="shader_loading">در حال بارگذاری پیش‌تنظیم‌های سایه‌زن…</string>
+    <string name="shader_pack_ready">پیش‌تنظیم‌های نصب‌شده: %1$d</string>
+    <string name="shader_redownload">دریافت دوبارهٔ بستهٔ سایه‌زن</string>
+    <string name="shader_downloading">در حال دریافت بستهٔ سایه‌زن…</string>
+    <string name="shader_validating">در حال آماده‌سازی فهرست پیش‌تنظیم‌ها…</string>
+    <string name="shader_preparing">در حال آماده‌سازی…</string>
+    <string name="shader_transfer_progress">%1$s / %2$s · %3$s/ثانیه</string>
+    <string name="shader_transfer_unknown">%1$s · %2$s/ثانیه</string>
+
+    <string name="shader_search_parameters">جست‌وجوی پارامترهای سایه‌زن</string>
+    <string name="shader_no_matching_parameters">پارامتر مطابقی یافت نشد.</string>
 </resources>

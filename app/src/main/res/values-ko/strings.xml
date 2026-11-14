@@ -1654,4 +1654,16 @@
     <string name="shader_installing">셰이더 팩 설치 중…</string>
     <string name="shader_parameters">셰이더 매개변수</string>
     <string name="shader_reset_parameters">매개변수 초기화</string>
+
+    <string name="shader_loading">셰이더 프리셋 불러오는 중…</string>
+    <string name="shader_pack_ready">설치된 프리셋: %1$d</string>
+    <string name="shader_redownload">셰이더 팩 다시 다운로드</string>
+    <string name="shader_downloading">셰이더 팩 다운로드 중…</string>
+    <string name="shader_validating">프리셋 목록 준비 중…</string>
+    <string name="shader_preparing">준비 중…</string>
+    <string name="shader_transfer_progress">%1$s / %2$s · %3$s/초</string>
+    <string name="shader_transfer_unknown">%1$s · %2$s/초</string>
+
+    <string name="shader_search_parameters">셰이더 매개변수 검색</string>
+    <string name="shader_no_matching_parameters">일치하는 매개변수가 없습니다.</string>
 </resources>

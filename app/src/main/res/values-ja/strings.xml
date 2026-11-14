@@ -1655,4 +1655,16 @@
     <string name="shader_installing">シェーダーパックをインストール中…</string>
     <string name="shader_parameters">シェーダーパラメーター</string>
     <string name="shader_reset_parameters">パラメーターをリセット</string>
+
+    <string name="shader_loading">シェーダープリセットを読み込み中…</string>
+    <string name="shader_pack_ready">インストール済みプリセット：%1$d</string>
+    <string name="shader_redownload">シェーダーパックを再ダウンロード</string>
+    <string name="shader_downloading">シェーダーパックをダウンロード中…</string>
+    <string name="shader_validating">プリセット一覧を準備中…</string>
+    <string name="shader_preparing">準備中…</string>
+    <string name="shader_transfer_progress">%1$s / %2$s · %3$s/秒</string>
+    <string name="shader_transfer_unknown">%1$s · %2$s/秒</string>
+
+    <string name="shader_search_parameters">シェーダーパラメーターを検索</string>
+    <string name="shader_no_matching_parameters">一致するパラメーターがありません。</string>
 </resources>

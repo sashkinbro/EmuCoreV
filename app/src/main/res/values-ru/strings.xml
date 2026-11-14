@@ -1654,4 +1654,16 @@
     <string name="shader_installing">Установка пакета шейдеров…</string>
     <string name="shader_parameters">Параметры шейдера</string>
     <string name="shader_reset_parameters">Сбросить параметры</string>
+
+    <string name="shader_loading">Загрузка списка шейдеров…</string>
+    <string name="shader_pack_ready">Установлено пресетов: %1$d</string>
+    <string name="shader_redownload">Загрузить пакет заново</string>
+    <string name="shader_downloading">Загрузка пакета шейдеров…</string>
+    <string name="shader_validating">Подготовка каталога пресетов…</string>
+    <string name="shader_preparing">Соединение…</string>
+    <string name="shader_transfer_progress">%1$s / %2$s · %3$s/с</string>
+    <string name="shader_transfer_unknown">%1$s · %2$s/с</string>
+
+    <string name="shader_search_parameters">Поиск параметров шейдера</string>
+    <string name="shader_no_matching_parameters">Параметры по этому запросу не найдены.</string>
 </resources>

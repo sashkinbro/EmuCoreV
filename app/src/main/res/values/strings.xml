@@ -1655,4 +1655,16 @@
     <string name="shader_installing">Installing shader pack…</string>
     <string name="shader_parameters">Shader parameters</string>
     <string name="shader_reset_parameters">Reset parameters</string>
+
+    <string name="shader_loading">Loading shader presets…</string>
+    <string name="shader_pack_ready">Installed presets: %1$d</string>
+    <string name="shader_redownload">Redownload shader pack</string>
+    <string name="shader_downloading">Downloading shader pack…</string>
+    <string name="shader_validating">Preparing preset catalog…</string>
+    <string name="shader_preparing">Connecting…</string>
+    <string name="shader_transfer_progress">%1$s / %2$s · %3$s/s</string>
+    <string name="shader_transfer_unknown">%1$s · %2$s/s</string>
+
+    <string name="shader_search_parameters">Search shader parameters</string>
+    <string name="shader_no_matching_parameters">No matching parameters.</string>
 </resources>

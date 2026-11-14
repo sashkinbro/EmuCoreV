@@ -1655,4 +1655,16 @@
     <string name="shader_installing">Memasang paket shader…</string>
     <string name="shader_parameters">Parameter shader</string>
     <string name="shader_reset_parameters">Atur ulang parameter</string>
+
+    <string name="shader_loading">Memuat preset shader…</string>
+    <string name="shader_pack_ready">Preset terpasang: %1$d</string>
+    <string name="shader_redownload">Unduh ulang paket shader</string>
+    <string name="shader_downloading">Mengunduh paket shader…</string>
+    <string name="shader_validating">Menyiapkan katalog preset…</string>
+    <string name="shader_preparing">Menyiapkan…</string>
+    <string name="shader_transfer_progress">%1$s / %2$s · %3$s/dtk</string>
+    <string name="shader_transfer_unknown">%1$s · %2$s/dtk</string>
+
+    <string name="shader_search_parameters">Cari parameter shader</string>
+    <string name="shader_no_matching_parameters">Tidak ada parameter yang cocok.</string>
 </resources>

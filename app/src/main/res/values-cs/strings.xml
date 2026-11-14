@@ -1655,4 +1655,16 @@
     <string name="shader_installing">Instaluje se balíček shaderů…</string>
     <string name="shader_parameters">Parametry shaderu</string>
     <string name="shader_reset_parameters">Obnovit parametry</string>
+
+    <string name="shader_loading">Načítání předvoleb shaderů…</string>
+    <string name="shader_pack_ready">Nainstalované předvolby: %1$d</string>
+    <string name="shader_redownload">Stáhnout balíček znovu</string>
+    <string name="shader_downloading">Stahování balíčku shaderů…</string>
+    <string name="shader_validating">Příprava katalogu předvoleb…</string>
+    <string name="shader_preparing">Příprava…</string>
+    <string name="shader_transfer_progress">%1$s / %2$s · %3$s/s</string>
+    <string name="shader_transfer_unknown">%1$s · %2$s/s</string>
+
+    <string name="shader_search_parameters">Vyhledat parametry shaderu</string>
+    <string name="shader_no_matching_parameters">Žádné odpovídající parametry.</string>
 </resources>

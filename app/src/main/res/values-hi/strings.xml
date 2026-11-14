@@ -1651,4 +1651,16 @@
     <string name="shader_installing">शेडर पैक इंस्टॉल हो रहा है…</string>
     <string name="shader_parameters">शेडर पैरामीटर</string>
     <string name="shader_reset_parameters">पैरामीटर रीसेट करें</string>
+
+    <string name="shader_loading">शेडर प्रीसेट लोड हो रहे हैं…</string>
+    <string name="shader_pack_ready">इंस्टॉल किए गए प्रीसेट: %1$d</string>
+    <string name="shader_redownload">शेडर पैक फिर से डाउनलोड करें</string>
+    <string name="shader_downloading">शेडर पैक डाउनलोड हो रहा है…</string>
+    <string name="shader_validating">प्रीसेट कैटलॉग तैयार हो रहा है…</string>
+    <string name="shader_preparing">तैयारी हो रही है…</string>
+    <string name="shader_transfer_progress">%1$s / %2$s · %3$s/सेकंड</string>
+    <string name="shader_transfer_unknown">%1$s · %2$s/सेकंड</string>
+
+    <string name="shader_search_parameters">शेडर पैरामीटर खोजें</string>
+    <string name="shader_no_matching_parameters">कोई मेल खाने वाला पैरामीटर नहीं मिला।</string>
 </resources>

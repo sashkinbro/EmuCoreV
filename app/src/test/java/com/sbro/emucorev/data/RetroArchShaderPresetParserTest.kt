@@ -7,6 +7,27 @@ import org.junit.Test
 import java.io.File
 
 class RetroArchShaderPresetParserTest {
+    @Test fun acceptsOfficialParameterReferencesDotPathsAndOptionalSteps() {
+        val root = kotlin.io.path.createTempDirectory("shader-official-syntax-").toFile()
+        try {
+            File(root, "source.slang").writeText("""
+                #pragma parameter BRIGHT "Brightness" 1.0 0.0 2.0
+                #pragma parameter HEADING "Heading" 0.0 0.0 0.0 0.0
+                #pragma parameter MACRO "Conditional metadata" DEFAULT MIN MAX
+            """.trimIndent())
+            File(root, "base.slangp").writeText("shaders = 1\nshader0 = ./source.slang\n")
+            File(root, "values.params").writeText("BRIGHT = 1.5\n")
+            val preset = File(root, "combined.slangp").apply {
+                writeText("#reference \"base.slangp\"\n#reference \"values.params\"\n")
+            }
+            val result = RetroArchShaderPresetParser.inspect(preset, root)
+            assertTrue(result.error, result.isValid)
+            assertEquals(listOf("BRIGHT", "HEADING"), result.parameterIds)
+            assertEquals(1.5f, result.parameters.first().initialValue)
+            assertTrue(result.parameters.all { it.step > 0f })
+        } finally { root.deleteRecursively() }
+    }
+
     @Test
     fun acceptsMultipassPresetWithTexturesIncludesAndParameters() {
         val root = kotlin.io.path.createTempDirectory("shader-valid-").toFile()

@@ -27,7 +27,7 @@ object RetroArchShaderPackTask {
     @Synchronized
     fun start(operation: suspend ((RetroArchShaderInstallProgress) -> Unit) -> Result<Int>) {
         if (job?.isActive == true) return
-        mutableState.value = RetroArchShaderPackTaskState(busy = true)
+        mutableState.value = RetroArchShaderPackTaskState(busy = true, completion = mutableState.value.completion)
         job = scope.launch {
             try {
                 val result = operation { progress ->
@@ -45,7 +45,7 @@ object RetroArchShaderPackTask {
                     }
                 )
             } catch (cancelled: CancellationException) {
-                mutableState.value = RetroArchShaderPackTaskState(completion = mutableState.value.completion)
+                mutableState.value = RetroArchShaderPackTaskState(completion = mutableState.value.completion + 1)
                 throw cancelled
             } catch (failure: Exception) {
                 mutableState.value = RetroArchShaderPackTaskState(
