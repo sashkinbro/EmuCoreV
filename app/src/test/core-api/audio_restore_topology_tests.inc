@@ -5,6 +5,9 @@
 #include <audio/impl/sdl_audio.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include "../../main/cpp/emucorev/ECV/external/sdl/src/audio/SDL_audio_state.h"
+#include <atomic>
+#include <thread>
 
 namespace {
 class AudioRestoreTopology : public testing::Test {
@@ -227,5 +230,34 @@ TEST_F(AudioRestoreTopology, RuntimeFormatFailureReleasesObsoleteAndReplacementS
     ASSERT_TRUE(SDL_GetAudioStreamFormat(probe_stream, &src, &dst));
     EXPECT_EQ(dst.format, SDL_AUDIO_S16LE);
     EXPECT_TRUE(SDL_AudioDevicePaused(SDL_GetAudioStreamDevice(probe_stream)));
+}
+
+TEST_F(AudioRestoreTopology, CapturesConsistentStreamWhilePlaybackConsumesAudio) {
+    SDL_AudioSpec spec{SDL_AUDIO_S16LE, 2, 48000};
+    AudioStreamPtr stream(SDL_CreateAudioStream(&spec, &spec), SDL_DestroyAudioStream);
+    ASSERT_TRUE(stream);
+    auto &adapter = static_cast<SDLAudioAdapter &>(*env->audio.adapter);
+    SDLAudioOutPort port(stream, adapter);
+    std::atomic<bool> stop{false};
+    std::atomic<unsigned> cycles{0};
+    std::thread playback([&] {
+        int16_t pcm[512]{};
+        while (!stop.load()) {
+            SDL_PutAudioStreamData(stream.get(), pcm, sizeof(pcm));
+            SDL_GetAudioStreamData(stream.get(), pcm, sizeof(pcm));
+            ++cycles;
+        }
+    });
+    while (cycles.load() == 0) std::this_thread::yield();
+    unsigned failures = 0;
+    for (unsigned i = 0; i < 3000; ++i) {
+        std::vector<uint8_t> snapshot;
+        if (!adapter.save_port_state(port, snapshot) ||
+            !SDL_ValidateAudioStreamState(snapshot.data(), snapshot.size())) ++failures;
+    }
+    stop = true;
+    playback.join();
+    EXPECT_EQ(failures, 0u);
+    EXPECT_GT(cycles.load(), 0u);
 }
 } // namespace

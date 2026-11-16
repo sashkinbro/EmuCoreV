@@ -140,11 +140,20 @@ void SDLAudioAdapter::wake_all_ports() {
 
 bool SDLAudioAdapter::save_port_state(AudioOutPort &out_port, std::vector<uint8_t> &state) {
     auto &port = static_cast<SDLAudioOutPort &>(out_port);
-    const size_t size = SDL_GetAudioStreamStateSize(port.stream.get());
+    auto *stream = port.stream.get();
+    if (!SDL_LockAudioStream(stream))
+        return false;
+    struct UnlockStream {
+        SDL_AudioStream *stream;
+        ~UnlockStream() { SDL_UnlockAudioStream(stream); }
+    } unlock{stream};
+    // Keep the size query and serialization on the same playback state. SDL's
+    // stream lock is recursive, so the snapshot APIs can take it internally.
+    const size_t size = SDL_GetAudioStreamStateSize(stream);
     if (size == 0 || size > 16u * 1024u * 1024u + 256u)
         return false;
     state.resize(size);
-    if (!SDL_SaveAudioStreamState(port.stream.get(), state.data(), state.size())) {
+    if (!SDL_SaveAudioStreamState(stream, state.data(), state.size())) {
         state.clear();
         return false;
     }
