@@ -18,6 +18,7 @@
 #include <ngs/modules/atrac9.h>
 #include <ngs/modules/envelope.h>
 #include <ngs/scheduler.h>
+#include <ngs/state.h>
 #include <ngs/system.h>
 
 #include <kernel/state.h>
@@ -362,10 +363,12 @@ void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID
         case PendingType::ReleaseRack:
             {
             const Address released_handle = Ptr<void>(op.release_data.rack, mem).address();
+            const Address release_callback = op.release_data.callback;
+            const Ptr<void> release_user_data = op.release_data.state->rack_user_data(released_handle);
             release_rack(*op.release_data.state, mem, op.system, op.release_data.rack);
             // run callback (we know it is defined)
             CallbackContextScope callback_context(*this, UpdateCallbackKind::RackReleaseCompletion);
-            kern.get_thread(thread_id)->run_callback(op.release_data.callback, { released_handle });
+            invoke_rack_release_callback(kern, mem, thread_id, release_callback, released_handle, release_user_data);
             break;
             }
         }

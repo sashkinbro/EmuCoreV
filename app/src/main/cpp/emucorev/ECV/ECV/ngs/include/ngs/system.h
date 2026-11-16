@@ -370,6 +370,8 @@ bool init_system(State &ngs, const MemState &mem, SceNgsSystemInitParams *parame
 void release_system(State &ngs, const MemState &mem, System *system);
 bool init_rack(State &ngs, const MemState &mem, System *system, SceNgsBufferInfo *init_info, const SceNgsRackDescription *description, bool *buffer_overlap = nullptr);
 void release_rack(State &ngs, const MemState &mem, System *system, Rack *rack);
+void invoke_rack_release_callback(KernelState &kernel, const MemState &mem, SceUID thread_id,
+    Address callback, Address rack_handle, Ptr<void> user_data);
 
 void voice_definition_init(State &ngs, MemState &mem);
 Ptr<VoiceDefinition> get_voice_definition(State &ngs, MemState &mem, ngs::BussType type);

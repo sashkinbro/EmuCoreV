@@ -403,6 +403,21 @@ bool Voice::invoke_callback(KernelState &kernel, const MemState &mem, const SceU
     return scheduler->abort_update_after_callback();
 }
 
+void invoke_rack_release_callback(KernelState &kernel, const MemState &mem, const SceUID thread_id,
+    Address callback, Address rack_handle, Ptr<void> user_data) {
+    if (!callback)
+        return;
+    const ThreadStatePtr thread = kernel.get_thread(thread_id);
+    if (!thread)
+        return;
+
+    const Address callback_info_addr = stack_alloc(*thread->cpu, sizeof(SceNgsCallbackInfo));
+    SceNgsCallbackInfo *info = Ptr<SceNgsCallbackInfo>(callback_info_addr).get(mem);
+    init_rack_release_callback_info(*info, rack_handle, user_data);
+    thread->run_callback(callback, { callback_info_addr });
+    stack_free(*thread->cpu, sizeof(SceNgsCallbackInfo));
+}
+
 uint32_t System::get_required_memspace_size(SceNgsSystemInitParams *parameters) {
     return sizeof(System);
 }

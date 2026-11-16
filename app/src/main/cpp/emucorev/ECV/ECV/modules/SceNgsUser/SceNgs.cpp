@@ -90,6 +90,24 @@ static ngs::Voice *find_patch_source_voice(ngs::State &ngs, const MemState &mem,
     return nullptr;
 }
 
+static ngs::Voice *find_live_voice(ngs::State &ngs, const MemState &mem, const Ptr<ngs::Voice> target) {
+    if (!target)
+        return nullptr;
+    for (ngs::System *system : ngs.systems) {
+        if (!system)
+            continue;
+        for (ngs::Rack *rack : system->racks) {
+            if (!rack)
+                continue;
+            for (const Ptr<ngs::Voice> voice_handle : rack->voices) {
+                if (voice_handle == target)
+                    return voice_handle.get(mem);
+            }
+        }
+    }
+    return nullptr;
+}
+
 enum SceNgsErrorCode : uint32_t {
     SCE_NGS_OK = 0,
     SCE_NGS_ERROR = 0x804A0001,
@@ -252,9 +270,14 @@ EXPORT(SceInt32, sceNgsPatchGetInfo, ngs::Patch *patch, SceNgsPatchAudioPropInfo
         return RET_ERROR(SCE_NGS_ERROR_INVALID_ARG);
     }
 
-    ngs::Voice *source = patch->source.get(emuenv.mem);
-    ngs::Voice *dest = patch->dest.get(emuenv.mem);
-    if (!source || !dest) {
+    const Ptr<ngs::Patch> patch_handle(patch, emuenv.mem);
+    ngs::Voice *source = find_patch_source_voice(emuenv.ngs, emuenv.mem, patch_handle);
+    if (!source || !patch->is_active() || patch->source != Ptr<ngs::Voice>(source, emuenv.mem)) {
+        return RET_ERROR(SCE_NGS_ERROR);
+    }
+
+    ngs::Voice *dest = find_live_voice(emuenv.ngs, emuenv.mem, patch->dest);
+    if (!dest) {
         return RET_ERROR(SCE_NGS_ERROR);
     }
 
@@ -379,12 +402,12 @@ EXPORT(SceInt32, sceNgsRackRelease, ngs::Rack *rack, Ptr<void> callback) {
     if (release_action == ngs::RackReleaseAction::Immediate) {
         const Address released_handle = rack_address;
         const Address release_cb = callback.address();
+        const Ptr<void> release_user_data = emuenv.ngs.rack_user_data(rack_address);
         ngs::release_rack(emuenv.ngs, emuenv.mem, rack_system, rack);
         if (release_cb) {
             lock.unlock();
-            const ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
-            if (thread)
-                thread->run_callback(release_cb, { released_handle });
+            ngs::invoke_rack_release_callback(emuenv.kernel, emuenv.mem, thread_id,
+                release_cb, released_handle, release_user_data);
         }
     } else if (release_action == ngs::RackReleaseAction::ReleaseFinishedCallback
         || release_action == ngs::RackReleaseAction::ReleaseModuleCallback) {

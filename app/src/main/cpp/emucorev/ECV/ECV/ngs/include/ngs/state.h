@@ -161,6 +161,14 @@ struct State {
         return info->instance_id;
     }
 
+    Ptr<void> rack_user_data(Address address) const {
+        const std::lock_guard lock(rack_infos_mutex);
+        const auto info = std::find_if(rack_infos.begin(), rack_infos.end(), [address](const RackInitInfo &entry) {
+            return entry.address == address;
+        });
+        return info == rack_infos.end() ? Ptr<void>() : info->description.unk14;
+    }
+
     bool rack_address_in_use(Address address) const {
         const std::lock_guard lock(rack_infos_mutex);
         return std::any_of(rack_infos.begin(), rack_infos.end(), [address](const RackInitInfo &info) {

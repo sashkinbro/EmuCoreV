@@ -331,7 +331,8 @@ TEST_F(NgsQueueRestore, CyclicPatchDependenciesPreserveExactSavedQueueOrder) {
     SceNgsSystemInitParams parameters{2, 4, 64, 48000, 0};
     ASSERT_TRUE(ngs::init_system(state, memory, &parameters, Ptr<void>(0x2000), 0x1000));
     auto *system = Ptr<ngs::System>(0x2000).get(memory);
-    SceNgsRackDescription description{state.definitions, 2, 2, 1, 1, Ptr<void>()};
+    constexpr Address release_user_data = 0x12345678;
+    SceNgsRackDescription description{state.definitions, 2, 2, 1, 1, Ptr<void>(release_user_data)};
     SceNgsBufferInfo buffer{Ptr<void>(0x4000), 0x10000};
     ASSERT_TRUE(ngs::init_rack(state, memory, system, &buffer, &description));
     auto *rack = buffer.data.cast<ngs::Rack>().get(memory);
@@ -344,16 +345,38 @@ TEST_F(NgsQueueRestore, CyclicPatchDependenciesPreserveExactSavedQueueOrder) {
     std::vector<ngs::SystemInitInfo> systems;
     std::vector<ngs::RackInitInfo> racks;
     ASSERT_TRUE(ngs::capture_state(state, memory, definitions, systems, racks));
+    ASSERT_EQ(racks.size(), 1u);
+    EXPECT_EQ(racks[0].description.unk14.address(), release_user_data);
     const std::vector<uint8_t> ram(memory.memory.get(), memory.memory.get() + 0x20000);
     ngs::deinit(state, memory);
     std::memcpy(memory.memory.get(), ram.data(), ram.size());
     ASSERT_TRUE(ngs::restore_state(state, memory, definitions, systems, racks));
+    EXPECT_EQ(state.rack_user_data(buffer.data.address()).address(), release_user_data);
     system = Ptr<ngs::System>(0x2000).get(memory);
     ASSERT_EQ(system->voice_scheduler.queue.size(), 2u);
     EXPECT_EQ(system->voice_scheduler.queue[0], a.get(memory));
     EXPECT_EQ(system->voice_scheduler.queue[1], b.get(memory));
     EXPECT_EQ(a.get(memory)->patches[0][0].get(memory)->dest, b);
     EXPECT_EQ(b.get(memory)->patches[0][0].get(memory)->dest, a);
+}
+
+TEST(NgsCallback, RackReleaseInfoMatchesNfsUserdataReadAtOffset18) {
+    static_assert(sizeof(SceNgsCallbackInfo) == 0x1C);
+    constexpr Address rack_handle = 0x76543210;
+    constexpr Address release_user_data = 0x12345678;
+    SceNgsCallbackInfo info;
+    ngs::init_rack_release_callback_info(info, rack_handle, Ptr<void>(release_user_data));
+
+    // NFS's completion callback reads SceNgsCallbackInfo::user_data at +0x18.
+    Address userdata_seen_by_guest = 0;
+    std::memcpy(&userdata_seen_by_guest, reinterpret_cast<const uint8_t *>(&info) + 0x18, sizeof(userdata_seen_by_guest));
+    EXPECT_EQ(userdata_seen_by_guest, release_user_data);
+    EXPECT_EQ(info.voice_handle.address(), 0u);
+    EXPECT_EQ(info.rack_handle.address(), rack_handle);
+    EXPECT_EQ(info.module_id, 0u);
+    EXPECT_EQ(info.callback_reason, 0u);
+    EXPECT_EQ(info.callback_reason_2, 0u);
+    EXPECT_EQ(info.callback_ptr.address(), 0u);
 }
 
 TEST_F(NgsQueueRestore, RackReleaseWaitPredicateIgnoresSpuriousNotifications) {

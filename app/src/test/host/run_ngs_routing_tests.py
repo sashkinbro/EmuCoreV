@@ -56,8 +56,9 @@ probe = r'''
 Address host_to_guest(const MemState &mem,const void *ptr){return static_cast<const uint8_t*>(ptr)-mem.memory.get();}
 namespace ngs {
 ''' + bodies + r'''
-void Voice::invoke_callback(KernelState &,const MemState &,SceUID,Ptr<void>,Ptr<void>,uint32_t,uint32_t,uint32_t,Address){std::abort();}
+bool Voice::invoke_callback(KernelState &,const MemState &,SceUID,Ptr<void>,Ptr<void>,uint32_t,uint32_t,uint32_t,Address){std::abort();}
 void release_rack(State &,const MemState &,System *,Rack *){std::abort();}
+void invoke_rack_release_callback(KernelState &,const MemState &,SceUID,Address,Address,Ptr<void>){std::abort();}
 Ptr<Patch> Voice::patch(const MemState &,int32_t,int32_t,int32_t,Ptr<Voice>,Ptr<Voice>){std::abort();}
 }
 // Known stereo PCM or passthrough of actual received input; routing stays real.

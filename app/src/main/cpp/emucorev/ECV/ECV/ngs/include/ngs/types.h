@@ -62,6 +62,14 @@ struct SceNgsCallbackInfo {
     Ptr<void> userdata;
 };
 
+namespace ngs {
+inline void init_rack_release_callback_info(SceNgsCallbackInfo &info, Address rack_handle, Ptr<void> user_data) {
+    info = {};
+    info.rack_handle = Ptr<void>(rack_handle);
+    info.userdata = user_data;
+}
+} // namespace ngs
+
 struct SceNgsVoicePreset {
     SceInt32 name_offset;
     SceUInt32 name_length;
