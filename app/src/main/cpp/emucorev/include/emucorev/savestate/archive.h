@@ -44,6 +44,7 @@ enum class SectionId : uint32_t {
     Gpu = 14,
     Audiodec = 15,
     GpuBufferPages = 16,
+    Np = 17,
 };
 
 enum SectionFlags : uint32_t {

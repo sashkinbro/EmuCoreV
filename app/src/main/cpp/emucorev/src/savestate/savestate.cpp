@@ -20,6 +20,7 @@
 #include <emucorev/savestate/gpu_state_io.h>
 #include <emucorev/savestate/kernel_import_io.h>
 #include <emucorev/savestate/motion_state_io.h>
+#include <emucorev/savestate/np_state_io.h>
 
 #include <cpu/functions.h>
 #include <config/state.h>
@@ -65,7 +66,7 @@ namespace emucorev::savestate {
 namespace {
 
 constexpr uint32_t kMemoryFormatVersion = 1;
-constexpr const char *kEngineRevision = "emucorev-savestate-16";
+constexpr const char *kEngineRevision = "emucorev-savestate-17";
 constexpr size_t kMemoryChunkSize = 1u << 20;
 
 class ScopedWorldStop {
@@ -2031,6 +2032,11 @@ Result save_state(EmuEnvState &emuenv, const fs::path &path, const std::string &
     if (!write_input(emuenv, writer, error))
         return fail(Status::IoError, error);
 
+    BufferWriter np_data;
+    if (!capture_np(emuenv.np, np_data, error)
+        || !writer.write_section(SectionId::Np, np_data.data().data(), np_data.size(), true, error))
+        return fail(Status::IoError, error);
+
     if (!write_io(emuenv, writer, error))
         return fail(Status::IoError, error);
 
@@ -2116,6 +2122,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     std::vector<uint8_t> audio_data;
     std::vector<uint8_t> audiodec_data;
     std::vector<uint8_t> input_data;
+    std::vector<uint8_t> np_data;
     std::vector<uint8_t> io_data;
 
     if (!reader.read_section(SectionId::Kernel, kernel_data, error)
@@ -2130,7 +2137,9 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         || !reader.read_section(SectionId::Input, input_data, error)
         || !reader.read_section(SectionId::Io, io_data, error)
         || (reader.has_section(SectionId::Audiodec)
-            && !reader.read_section(SectionId::Audiodec, audiodec_data, error))) {
+            && !reader.read_section(SectionId::Audiodec, audiodec_data, error))
+        || (reader.has_section(SectionId::Np)
+            && !reader.read_section(SectionId::Np, np_data, error))) {
         result.status = Status::InvalidFile;
         result.error = error;
         return result;
@@ -2160,6 +2169,15 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     ParsedKernelSync sync_snapshot;
     std::vector<ThreadState::Snapshot> thread_snapshots;
     const auto valid_range = [&](Address address, size_t size) { return memory_image->contains(address, size); };
+    NpSnapshot np_snapshot;
+    if ((result.meta.engine_version >= 17 && !reader.has_section(SectionId::Np))
+        || (reader.has_section(SectionId::Np)
+            && (!parse_np(np_data, np_snapshot, error)
+                || !validate_np_callbacks(np_snapshot, valid_range, error)))) {
+        result.status = Status::InvalidFile;
+        result.error = error.empty() ? "save state is missing NP callback state" : error;
+        return result;
+    }
     const auto external_tag = [&](uint32_t tag) { return emuenv.kernel.callback_resume_handlers.contains(tag); };
     if (!parse_kernel_base(kernel_data, kernel_snapshot, error)
         || !validate_kernel_base(kernel_snapshot, *memory_image, error)
@@ -2425,6 +2443,11 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         audiodec::clear_state(emuenv);
     }
     LOG_DEBUG("[savestate] load: guest audio decoders restored");
+
+    // Guest initialization is skipped by cold restore. Recreate its actual NP
+    // lifecycle and callback delivery history before any saved thread resumes.
+    if (reader.has_section(SectionId::Np))
+        apply_np(emuenv.np, std::move(np_snapshot));
 
     if (!input_data.empty() && !read_input(emuenv, input_data, error)) {
         result.status = Status::InvalidFile;
