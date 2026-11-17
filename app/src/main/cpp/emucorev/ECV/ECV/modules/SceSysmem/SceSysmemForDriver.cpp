@@ -463,8 +463,20 @@ EXPORT(int, ksceKernelMemRangeRetainWithPerm) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, ksceKernelMemcpyKernelToUser) {
-    return UNIMPLEMENTED();
+EXPORT(int, ksceKernelMemcpyKernelToUser, Ptr<void> dst, Ptr<const void> src, SceSize len) {
+    // Sysmodule returns its module-start status through this copy. Returning a
+    // success stub leaves the caller's output buffer uninitialized.
+    if (len == 0)
+        return 0;
+    const uint64_t dst_end = uint64_t{ dst.address() } + len;
+    const uint64_t src_end = uint64_t{ src.address() } + len;
+    if (dst.address() < emuenv.mem.host_page_size || src.address() < emuenv.mem.host_page_size
+        || dst_end > UINT32_MAX || src_end > UINT32_MAX
+        || !is_valid_addr_range(emuenv.mem, dst.address(), static_cast<Address>(dst_end))
+        || !is_valid_addr_range(emuenv.mem, src.address(), static_cast<Address>(src_end)))
+        return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_ADDR);
+    memcpy(dst.get(emuenv.mem), src.get(emuenv.mem), len);
+    return 0;
 }
 
 EXPORT(int, ksceKernelMemcpyKernelToUserForPid) {
