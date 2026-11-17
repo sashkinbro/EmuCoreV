@@ -2,6 +2,12 @@
 <!-- Recommendations only: global defaults -> Game DB -> explicit per-game settings.
      Shared by the Android settings UI and the native core. Never select a driver here. -->
 <game-db version="1">
+    <profile id="plants-vs-zombies-thread-order">
+        <!-- The loader races sound-manager initialization with unrestricted
+             host threads. Guest-priority scheduling preserves startup order. -->
+        <title-id>PCSE00064</title-id>
+        <gpu accurate-thread-scheduling="true" />
+    </profile>
     <profile id="injustice-high-accuracy">
         <!-- PCSB00356: tested on Lenovo on 2026-10-20 after intermittent HUD
              and texture flicker. Prefer GPU-completion synchronization for

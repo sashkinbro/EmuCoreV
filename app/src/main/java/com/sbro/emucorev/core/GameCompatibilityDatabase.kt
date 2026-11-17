@@ -9,13 +9,15 @@ data class GameGpuRecommendation(
     val backendRenderer: String? = null,
     val memoryMapping: String? = null,
     val useAngle: Boolean? = null,
-    val highAccuracy: Boolean? = null
+    val highAccuracy: Boolean? = null,
+    val accurateThreadScheduling: Boolean? = null
 ) {
     fun applyTo(base: VitaCoreConfig): VitaCoreConfig = base.copy(
         backendRenderer = backendRenderer ?: base.backendRenderer,
         memoryMapping = memoryMapping ?: base.memoryMapping,
         useAngle = useAngle ?: base.useAngle,
-        highAccuracy = highAccuracy ?: base.highAccuracy
+        highAccuracy = highAccuracy ?: base.highAccuracy,
+        accurateThreadScheduling = accurateThreadScheduling ?: base.accurateThreadScheduling
     )
 }
 
@@ -74,14 +76,16 @@ class GameCompatibilityDatabase private constructor(private val profiles: List<P
                 ) || angle == null)) continue
                 val accuracy = gpu.getAttribute("high-accuracy").toBooleanStrictOrNull()
                 if (gpu.hasAttribute("high-accuracy") && accuracy == null) continue
-                if (!hasLegacySettings && accuracy == null) continue
+                val scheduling = gpu.getAttribute("accurate-thread-scheduling").toBooleanStrictOrNull()
+                if (gpu.hasAttribute("accurate-thread-scheduling") && scheduling == null) continue
+                if (!hasLegacySettings && accuracy == null && scheduling == null) continue
                 val ids = entry.getElementsByTagName("title-id")
                 val titleIds = (0 until ids.length).mapNotNull {
                     ids.item(it).takeIf { node -> node.parentNode == entry }
                         ?.textContent?.trim()?.uppercase(Locale.ROOT)
                 }.filter(String::isNotEmpty).toSet()
                 profiles += Profile(titleIds, entry.getAttribute("title-word").trim().uppercase(Locale.ROOT),
-                    GameGpuRecommendation(renderer, mapping, angle, accuracy))
+                    GameGpuRecommendation(renderer, mapping, angle, accuracy, scheduling))
             }
             return GameCompatibilityDatabase(profiles)
         }

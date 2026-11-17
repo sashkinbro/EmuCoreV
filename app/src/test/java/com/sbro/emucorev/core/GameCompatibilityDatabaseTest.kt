@@ -12,6 +12,16 @@ class GameCompatibilityDatabaseTest {
     private val xml = app.resolve("src/main/assets/${GameCompatibilityDatabase.ASSET_PATH}").readText()
     private fun database(text: String = xml) = text.byteInputStream().use(GameCompatibilityDatabase::parse)
 
+    @Test fun plantsVsZombiesStartupSchedulingInheritsOtherSettingsAndCanBeOverridden() {
+        val base = VitaCoreConfig(highAccuracy = false, memoryMapping = "page-table")
+        val recommended = database().applyDefaults(base, "PCSE00064")
+        assertEquals(base.copy(accurateThreadScheduling = true), recommended)
+        val disabled = database("<game-db version=\"1\"><profile><title-id>EXACT</title-id><gpu accurate-thread-scheduling=\"false\"/></profile></game-db>")
+        assertFalse(disabled.applyDefaults(recommended, "EXACT").accurateThreadScheduling)
+        val invalid = database("<game-db version=\"1\"><profile><title-id>EXACT</title-id><gpu accurate-thread-scheduling=\"yes\"/></profile></game-db>")
+        assertNull(invalid.recommendationFor("EXACT"))
+    }
+
     @Test fun allFifaRegionsAndModsInheritGlobalSettings() {
         val ids = "PCSB00051 PCSB00052 PCSG00039 PCSB00082 PCSB00083 PCSB00084 PCSB00085 PCSB00086 PCSE00055 PCSE00059 PCSE00060 PCSG90012 PCSB00170 PCSB00171 PCSB00174 PCSE00093 PCSE00096 PCSG00107 PCSB00339 PCSB00340 PCSE00263 PCSG00201 PCSB00603 PCSB00604 PCSB00605 PCSB00606 PCSB00607 PCSE00481 PCSE00482 PCSE00483 PCSG00404".split(" ")
         assertEquals(31, ids.size)
