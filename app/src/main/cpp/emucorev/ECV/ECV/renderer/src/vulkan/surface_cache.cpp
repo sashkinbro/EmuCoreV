@@ -246,6 +246,10 @@ void VKSurfaceCache::destroy_framebuffers(vk::ImageView view) {
         if (it->first.first == view || it->first.second == view) {
             destroy_queue.add(it->second.standard);
             destroy_queue.add(it->second.shader_interlock);
+#ifndef NDEBUG
+            if (it->second.shell_fetch_snapshot)
+                destroy_queue.add_image(*it->second.shell_fetch_snapshot);
+#endif
             it = framebuffer_array.erase(it);
         } else {
             it = std::next(it);
@@ -2061,8 +2065,23 @@ Framebuffer &VKSurfaceCache::retrieve_framebuffer_handle(MemState &mem, SceGxmCo
         .layers = 1
     };
     vk::ImageView attachments[] = { color_result.view, color_result.raw_image ? color_result.raw_image->view : ds_result.view, ds_result.view };
+#ifndef NDEBUG
+    std::shared_ptr<vkutil::Image> shell_snapshot;
+    if (state.current_title_id == "SceShell" && color && !color_result.raw_image
+        && color_result.base_image->format == vk::Format::eR8G8B8A8Unorm) {
+        shell_snapshot = std::make_shared<vkutil::Image>(framebuffer_width, framebuffer_height, vk::Format::eR8G8B8A8Unorm);
+        shell_snapshot->init_image(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eColorAttachment);
+        auto &context = *static_cast<VKContext *>(state.context);
+        shell_snapshot->transition_to(context.prerender_cmd, vkutil::ImageLayout::StorageImage);
+        attachments[2] = shell_snapshot->view;
+    }
+#endif
     fb_info.setAttachments(attachments);
     fb_info.attachmentCount = color_result.raw_image ? 3 : 2;
+#ifndef NDEBUG
+    if (shell_snapshot)
+        fb_info.attachmentCount = 3;
+#endif
     vk::Framebuffer fb_standard = state.device.createFramebuffer(fb_info);
 
     vk::Framebuffer fb_interlock = nullptr;
@@ -2074,7 +2093,11 @@ Framebuffer &VKSurfaceCache::retrieve_framebuffer_handle(MemState &mem, SceGxmCo
         fb_interlock = state.device.createFramebuffer(fb_info);
     }
 
-    return (framebuffer_array[key] = { fb_standard, fb_interlock, color_result.base_image, framebuffer_width, framebuffer_height, color_result.raw_image });
+    auto &result = (framebuffer_array[key] = { fb_standard, fb_interlock, color_result.base_image, framebuffer_width, framebuffer_height, color_result.raw_image });
+#ifndef NDEBUG
+    result.shell_fetch_snapshot = std::move(shell_snapshot);
+#endif
+    return result;
 }
 
 std::map<Address, ColorSurfaceCacheInfo *>::iterator VKSurfaceCache::find_color_surface_containing(Address address, uint32_t size) {

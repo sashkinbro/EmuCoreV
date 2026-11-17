@@ -266,6 +266,9 @@ struct VKContext : public renderer::Context {
 
     vk::ImageView current_color_raw_view = nullptr;
     vkutil::Image *current_color_raw_image = nullptr;
+#ifndef NDEBUG
+    vkutil::Image *shell_fetch_snapshot = nullptr;
+#endif
 
     vkutil::HostRingBuffer vertex_stream_ring_buffer;
     vkutil::HostRingBuffer index_stream_ring_buffer;

@@ -20,7 +20,7 @@ import org.junit.runner.RunWith
 class ShellFirmwareResearchTest {
     private external fun decode(input: ByteArray): ByteArray
     private external fun link(inputs: Array<ByteArray>, trace: Boolean): String
-    private external fun prepareBoot(sandbox: String): Boolean
+    private external fun prepareBoot(sandbox: String, gpuProbe: String): Boolean
     private external fun verifyKernelCopy(): Boolean
     private external fun verifySystemThreads(): Boolean
     private external fun verifyPackageInfo(root: String): Boolean
@@ -79,14 +79,17 @@ class ShellFirmwareResearchTest {
         NativeLibraryLoader.ensureLoaded(context)
         val sandbox = File(context.cacheDir, "native-shell-runtime/vita")
         check(sandbox.isDirectory || sandbox.mkdirs())
-        assertTrue(prepareBoot(sandbox.absolutePath))
+        val gpuProbe = InstrumentationRegistry.getArguments().getString("shellGpuProbe", "")
+        assertTrue(prepareBoot(sandbox.absolutePath, gpuProbe))
         context.startActivity(Intent(context, Emulator::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             .putExtra("AppStartParameters", arrayOf("-r", "__VITA_SHELL_RESEARCH__"))
             .putExtra(SKIP_AUTOMATIC_STATE_LOAD_EXTRA, true))
         // Observational bootstrap only. A successful test is not proof of a
         // rendered shell: inspect native logs and the device frame separately.
-        Thread.sleep(30_000)
+        val seconds = InstrumentationRegistry.getArguments().getString("shellSeconds", "30")
+            .toLong().coerceIn(10, 180)
+        Thread.sleep(seconds * 1_000)
     }
 
     @Test

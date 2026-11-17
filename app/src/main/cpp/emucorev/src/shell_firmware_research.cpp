@@ -33,6 +33,7 @@
 
 namespace {
 fs::path shell_boot_sandbox;
+std::string shell_gpu_probe;
 
 std::vector<uint8_t> read_bytes(JNIEnv *env, jbyteArray input) {
     std::vector<uint8_t> bytes(env->GetArrayLength(input));
@@ -82,6 +83,26 @@ bool prepare_shell_firmware_research(EmuEnvState &emuenv) {
     // SceShell itself writes 1 to this key after its initialization checks.
     regmgr::set_int_value(emuenv.regmgr, "/CONFIG/SYSTEM/", "initialize", 1);
     app::set_current_config(emuenv, "");
+    // The library has its own presentation profile; never persist these values
+    // into the normal game's configuration.
+    emuenv.cfg.current_config.resolution_multiplier = 2.0f;
+    emuenv.cfg.current_config.high_accuracy = true;
+    // Opt-in A/B probes affect only this private debug session, never user config.
+    if (shell_gpu_probe == "no-mapping")
+        emuenv.cfg.current_config.memory_mapping = "disabled";
+    else if (shell_gpu_probe == "no-async-pipelines")
+        emuenv.cfg.current_config.async_pipeline_compilation = false;
+    else if (shell_gpu_probe == "accurate-sync")
+        emuenv.cfg.current_config.high_accuracy = true;
+    else if (shell_gpu_probe == "no-fetch") {
+        emuenv.cfg.current_config.high_accuracy = true;
+        emuenv.cfg.disable_programmable_blending = true;
+    }
+    else if (shell_gpu_probe == "dump-textures") {
+        emuenv.cfg.current_config.high_accuracy = true;
+        emuenv.cfg.current_config.export_textures = true;
+        emuenv.cfg.current_config.export_as_png = true;
+    }
     emuenv.cfg.current_config.modules_mode = ModulesMode::AUTO_MANUAL;
     emuenv.cfg.current_config.lle_modules.emplace_back("libpaf");
     emuenv.cfg.current_config.lle_modules.emplace_back("libnet");
@@ -100,13 +121,16 @@ bool prepare_shell_firmware_research(EmuEnvState &emuenv) {
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_sbro_emucorev_ShellFirmwareResearchTest_prepareBoot(JNIEnv *env, jobject, jstring sandbox) {
+Java_com_sbro_emucorev_ShellFirmwareResearchTest_prepareBoot(JNIEnv *env, jobject, jstring sandbox, jstring gpu_probe) {
     const auto *session = get_app_session_controller();
     if (!session || session->has_active_session())
         return JNI_FALSE;
     const char *path = env->GetStringUTFChars(sandbox, nullptr);
     shell_boot_sandbox = fs::path(path);
     env->ReleaseStringUTFChars(sandbox, path);
+    shell_gpu_probe = read_string(env, gpu_probe);
+    if (!shell_gpu_probe.empty() && shell_gpu_probe != "no-mapping" && shell_gpu_probe != "no-async-pipelines" && shell_gpu_probe != "accurate-sync" && shell_gpu_probe != "dump-textures" && shell_gpu_probe != "no-fetch")
+        return JNI_FALSE;
     if (auto *emuenv = get_emuenv()) {
         emuenv->cfg.log_level = spdlog::level::debug;
         emuenv->cfg.archive_log = false;

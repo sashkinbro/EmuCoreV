@@ -473,6 +473,33 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
 
     const SceGxmFragmentProgram &gxm_fragment_program = *context.record.fragment_program.get(mem);
     const SceGxmProgram &fragment_program_gxp = *renderer::get_program(gxm_fragment_program, mem);
+#ifndef NDEBUG
+    if (context.shell_fetch_snapshot && fragment_program_gxp.is_frag_color_used()) {
+        // PAF's glow must sample completed pixels, not a simultaneous write to
+        // the same attachment on a non-coherent mobile framebuffer-fetch path.
+        context.stop_render_pass();
+        auto &source = *context.current_color_base_image;
+        auto &snapshot = *context.shell_fetch_snapshot;
+        source.transition_to(context.render_cmd, vkutil::ImageLayout::TransferSrc);
+        snapshot.transition_to(context.render_cmd, vkutil::ImageLayout::TransferDst);
+        vk::ImageCopy region{
+            .srcSubresource = { vk::ImageAspectFlagBits::eColor, 0, 0, 1 },
+            .dstSubresource = { vk::ImageAspectFlagBits::eColor, 0, 0, 1 },
+            .extent = { snapshot.width, snapshot.height, 1 }
+        };
+        context.render_cmd.copyImage(source.image, vk::ImageLayout::eTransferSrcOptimal,
+            snapshot.image, vk::ImageLayout::eTransferDstOptimal, region);
+        source.transition_to(context.render_cmd, vkutil::ImageLayout::ColorAttachmentReadWrite);
+        snapshot.transition_to(context.render_cmd, vkutil::ImageLayout::StorageImage);
+        vk::MemoryBarrier ready{
+            .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+            .dstAccessMask = vk::AccessFlagBits::eInputAttachmentRead
+        };
+        context.render_cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+            vk::PipelineStageFlagBits::eFragmentShader, {}, ready, {}, {});
+        context.start_render_pass();
+    }
+#endif
 
     if (context.state.features.preserve_f16_nan_as_u16) {
         const VKFragmentProgram &vk_frag_program = *reinterpret_cast<VKFragmentProgram *>(gxm_fragment_program.renderer_data.get());

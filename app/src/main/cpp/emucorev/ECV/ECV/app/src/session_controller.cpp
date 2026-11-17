@@ -96,6 +96,12 @@ bool AppSessionController::initialize_renderer(renderer::FrameHost &frame) {
     }
 
     apply_renderer_config(emuenv);
+#ifndef NDEBUG
+    if (is_shell_firmware_research(active_launch_request))
+        // PAF can render from module_start, before load_and_run sets game
+        // metadata. Establish the isolated shell renderer profile beforehand.
+        emuenv.renderer->set_app("SceShell", "shell.self");
+#endif
     renderer_initialized = true;
     return true;
 }

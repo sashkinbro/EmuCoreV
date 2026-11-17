@@ -573,6 +573,11 @@ vk::PipelineShaderStageCreateInfo PipelineCache::retrieve_shader(const SceGxmPro
 
 vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth_load, bool stencil_load, bool force_store, bool is_color_transient, bool no_color, bool has_raw_attachment) {
     const bool with_raw_attachment = has_raw_attachment && !no_color && !is_color_transient && state.features.preserve_f16_nan_as_u16 && format == vk::Format::eR16G16B16A16Sfloat;
+    bool shell_snapshot = false;
+#ifndef NDEBUG
+    shell_snapshot = state.current_title_id == "SceShell" && !no_color && !is_color_transient
+        && !with_raw_attachment && format == vk::Format::eR8G8B8A8Unorm;
+#endif
 
     auto &render_passes_map = no_color
         ? shader_interlock_pass
@@ -595,6 +600,7 @@ vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth
         .attachment = no_color ? 0U : (with_raw_attachment ? 2U : 1U),
         .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal
     };
+    const vk::AttachmentReference shell_input{ .attachment = 2, .layout = vk::ImageLayout::eGeneral };
     vk::SubpassDescription subpass{
         .pipelineBindPoint = vk::PipelineBindPoint::eGraphics
     };
@@ -608,6 +614,8 @@ vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth
         subpass.pColorAttachments = color_refs;
         subpass.inputAttachmentCount = (with_raw_attachment && state.features.direct_fragcolor) ? 2 : 1;
         subpass.pInputAttachments = color_refs;
+        if (shell_snapshot)
+            subpass.pInputAttachments = &shell_input;
     }
 
     vk::AttachmentDescription color_attachment{
@@ -703,6 +711,10 @@ vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth
     vk::AttachmentDescription attachments[] = { color_attachment, with_raw_attachment ? raw_attachment : ds_attachment, ds_attachment };
     pass_info.setAttachments(attachments);
     pass_info.attachmentCount = with_raw_attachment ? 3 : 2;
+    if (shell_snapshot) {
+        attachments[2] = color_attachment;
+        pass_info.attachmentCount = 3;
+    }
     pass_info.setSubpasses(subpass);
     pass_info.setDependencies(dependencies);
     if (no_color) {
