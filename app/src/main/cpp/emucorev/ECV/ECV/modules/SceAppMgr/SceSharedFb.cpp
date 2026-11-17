@@ -23,6 +23,9 @@
 #include <kernel/state.h>
 
 #include <util/tracy.h>
+#ifndef NDEBUG
+#include <chrono>
+#endif
 
 TRACY_MODULE_NAME(SceSharedFB);
 
@@ -71,6 +74,12 @@ struct SharedFbState {
     std::mutex handoff_mutex;
     SceSharedFbRenderInfo pending{};
     bool pending_valid = false;
+#ifndef NDEBUG
+    std::chrono::steady_clock::time_point sample_start{};
+    std::chrono::steady_clock::time_point last_handoff{};
+    uint32_t sample_frames = 0;
+    double longest_interval_ms = 0;
+#endif
 };
 
 LIBRARY_INIT(SceSharedFb) {
@@ -175,6 +184,19 @@ EXPORT(int, sceSharedFbUpdateProcessBegin, SceUID id, const SceSharedFbRenderInf
     state->pending = *render_info;
     state->pending_valid = true;
 #ifndef NDEBUG
+    const auto now = std::chrono::steady_clock::now();
+    if (state->sample_frames == 0)
+        state->sample_start = now;
+    else
+        state->longest_interval_ms = std::max(state->longest_interval_ms,
+            std::chrono::duration<double, std::milli>(now - state->last_handoff).count());
+    state->last_handoff = now;
+    if (++state->sample_frames == 120) {
+        const double elapsed = std::chrono::duration<double>(now - state->sample_start).count();
+        LOG_DEBUG("SharedFb handoff preparations: {:.1f}/s, longest interval {:.1f} ms", 119 / elapsed, state->longest_interval_ms);
+        state->sample_frames = 0;
+        state->longest_interval_ms = 0;
+    }
     static std::atomic_uint trace_count{0};
     if (trace_count.fetch_add(1) < 6)
         LOG_DEBUG("SharedFb handoff buffer=0x{:X} index={} {}x{} stride={} format=0x{:X}",
@@ -193,20 +215,12 @@ EXPORT(int, sceSharedFbUpdateProcessBegin, SceUID id, const SceSharedFbRenderInf
 
 EXPORT(int, sceSharedFbUpdateProcessEnd) {
     auto *state = emuenv.kernel.obj_store.get<SharedFbState>();
-    SceSharedFbRenderInfo render_info{};
-    {
-        const std::lock_guard lock(state->handoff_mutex);
-        if (!state->pending_valid)
-            return RET_ERROR(SCE_KERNEL_ERROR_INVALID_ARGUMENT);
-        render_info = state->pending;
-        state->pending_valid = false;
-    }
-    SceDisplayFrameBuf frame_buf{
-        .size = sizeof(SceDisplayFrameBuf),
-        .base = render_info.frame_buffer_base,
-        .pitch = render_info.stride,
-        .width = render_info.width,
-        .height = render_info.height
-    };
-    return CALL_EXPORT(_sceDisplaySetFrameBuf, &frame_buf, SCE_DISPLAY_SETBUF_NEXTFRAME, nullptr);
+    const std::lock_guard lock(state->handoff_mutex);
+    if (!state->pending_valid)
+        return RET_ERROR(SCE_KERNEL_ERROR_INVALID_ARGUMENT);
+    state->pending_valid = false;
+    // This ends the inter-process handoff, not the shell's frame. PAF calls
+    // it before drawing its own UI. Its display-queue callback subsequently
+    // presents the completed composition through sceDisplaySetFrameBufInternal.
+    return 0;
 }
