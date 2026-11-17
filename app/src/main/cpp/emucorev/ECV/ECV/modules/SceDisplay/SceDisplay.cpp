@@ -19,6 +19,8 @@
 
 #include <display/functions.h>
 #include <display/state.h>
+#include <gxm/state.h>
+#include <gxm/functions.h>
 #include <io/state.h>
 #include <kernel/state.h>
 #include <packages/functions.h>
@@ -156,6 +158,14 @@ EXPORT(SceInt32, _sceDisplaySetFrameBuf, const SceDisplayFrameBuf *pFrameBuf, Sc
     info.image_size.x = pFrameBuf->width;
     info.image_size.y = pFrameBuf->height;
     update_prediction(emuenv, info);
+
+    // Games can present directly without using the GXM display queue. Those
+    // presentations still delimit Vulkan frames and release per-frame resources.
+    // Queue callbacks already have a NewFrame command from AddEntry.
+    if (emuenv.renderer->current_backend == renderer::Backend::Vulkan
+        && thread_id != emuenv.gxm.display_queue_thread) {
+        gxm::commit_direct_display_frame(emuenv);
+    }
 
     emuenv.display.last_setframe_vblank_count = emuenv.display.vblank_count.load();
     emuenv.frame_count++;

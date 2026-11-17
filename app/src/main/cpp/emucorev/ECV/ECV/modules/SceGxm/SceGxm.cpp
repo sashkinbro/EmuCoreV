@@ -3105,6 +3105,10 @@ struct DisplayQueueSubscription {
 };
 }
 
+void commit_direct_display_frame(EmuEnvState &env) {
+    commit_display_frame(env, PendingDisplaySubmission{});
+}
+
 SceInt32 wait_display_queue(KernelState &kernel, GxmState &gxm, MemState &mem, ThreadState &thread,
     bool finish, const DisplaySubmissionCommit &commit) {
     const auto self = kernel.get_thread(thread.id);

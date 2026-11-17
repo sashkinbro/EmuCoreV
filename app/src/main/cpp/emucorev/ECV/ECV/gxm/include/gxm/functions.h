@@ -27,6 +27,7 @@ struct EmuEnvState;
 struct GxmState;
 
 namespace gxm {
+void commit_direct_display_frame(EmuEnvState &env);
 // Color.
 SceGxmColorBaseFormat get_base_format(SceGxmColorFormat src);
 size_t bits_per_pixel(SceGxmColorBaseFormat base_format);

@@ -2,8 +2,44 @@
 #include <gxm/savestate.h>
 #include <emucorev/savestate/gxm_display_io.h>
 #include <cpu/functions.h>
+#include <modules/SceDisplay/SceDisplay.h>
 
 DECL_EXPORT(int, sceGxmDisplayQueueFinish);
+DECL_EXPORT(SceInt32, _sceDisplaySetFrameBuf, const SceDisplayFrameBuf *frame, SceDisplaySetBufSync sync, uint32_t *size);
+
+TEST(DirectDisplayFrame, VulkanPresentationQueuesFrameRetirementButQueueCallbackDoesNotDuplicateIt) {
+    EmuEnvState env;
+    env.renderer = std::make_unique<SnapshotBatchTestRenderer>();
+    env.renderer->current_backend = renderer::Backend::Vulkan;
+    env.gxm.display_queue_thread = 49;
+    SceDisplayFrameBuf frame{};
+    frame.size = sizeof(frame);
+    frame.base = Ptr<const void>(0x10000);
+    frame.pitch = frame.width = 960;
+    frame.height = 544;
+    frame.pixelformat = SCE_DISPLAY_PIXELFORMAT_A8B8G8R8;
+    for (int i = 0; i < 4; ++i) {
+        ASSERT_EQ(export__sceDisplaySetFrameBuf(env, 50, "test", &frame, SCE_DISPLAY_SETBUF_NEXTFRAME, nullptr), 0);
+        auto list = env.renderer->command_buffer_queue.pop(10);
+        ASSERT_TRUE(list);
+        ASSERT_NE(list->first, nullptr);
+        EXPECT_EQ(list->first->opcode, renderer::CommandOpcode::NewFrame);
+        renderer::CommandHelper helper(list->first);
+        EXPECT_EQ(helper.pop<DisplayFrameInfo *>(), nullptr);
+        EXPECT_EQ(helper.pop<DisplayState *>(), &env.display);
+        EXPECT_EQ(helper.pop<renderer::Context *>(), nullptr);
+        renderer::generic_command_free(list->first);
+    }
+    EXPECT_EQ(export__sceDisplaySetFrameBuf(env, 49, "test", &frame, SCE_DISPLAY_SETBUF_NEXTFRAME, nullptr), 0);
+    EXPECT_EQ(env.renderer->command_buffer_queue.size(), 0u);
+    env.renderer->current_backend = renderer::Backend::OpenGL;
+    EXPECT_EQ(export__sceDisplaySetFrameBuf(env, 50, "test", &frame, SCE_DISPLAY_SETBUF_NEXTFRAME, nullptr), 0);
+    EXPECT_EQ(env.renderer->command_buffer_queue.size(), 0u);
+    env.renderer->current_backend = renderer::Backend::Vulkan;
+    frame.pitch = 0;
+    EXPECT_NE(export__sceDisplaySetFrameBuf(env, 50, "test", &frame, SCE_DISPLAY_SETBUF_NEXTFRAME, nullptr), 0);
+    EXPECT_EQ(env.renderer->command_buffer_queue.size(), 0u);
+}
 
 namespace {
 struct DisplayQueueWaitEnv {
