@@ -858,14 +858,8 @@ fun EmulationOverlayHost(
         }
 
         if (menuOpen) {
-            EmulationMenuWindow(
-                rendererBackend = config.backendRenderer,
-                snapshotSourceRoot = activity.window.decorView,
-                backdropHidden = saveStateBusy || autoSaving || waitingForStateFrame || launchStateLoading.active
-            ) {
-                Box(Modifier.fillMaxSize().graphicsLayer {
-                    alpha = if (saveStateBusySaving || autoSaving) 0f else 1f
-                }) {
+            EmulationMenuWindow(hidden = saveStateBusySaving || autoSaving) {
+                Box(Modifier.fillMaxSize()) {
                     // Retain the selected menu tab and pause state while exposing only the game frame during Save.
                     Box(
                         modifier = Modifier

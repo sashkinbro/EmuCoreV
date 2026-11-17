@@ -3,11 +3,9 @@ package com.sbro.emucorev.ui.emulation
 import android.app.Dialog
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
-import android.view.View
-import android.view.ViewGroup
 import android.view.Window
+import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.FrameLayout
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
@@ -25,8 +23,6 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import com.sbro.emucorev.core.DeviceGpuInfoProvider
-import com.sbro.emucorev.core.GpuVendor
 import com.sbro.emucorev.ui.theme.WindowAwareRipple
 
 /**
@@ -36,21 +32,22 @@ import com.sbro.emucorev.ui.theme.WindowAwareRipple
  */
 @Composable
 internal fun EmulationMenuWindow(
-    rendererBackend: String = "",
-    snapshotSourceRoot: View? = null,
-    backdropHidden: Boolean = false,
+    hidden: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val anchor = LocalView.current
     val compositionContext = rememberCompositionContext()
     val currentContent by rememberUpdatedState(content)
-    val currentBackdropHidden by rememberUpdatedState(backdropHidden)
-    val backdrop = remember(anchor, compositionContext) { arrayOfNulls<PausedMenuBackdrop>(1) }
+    val dialogRef = remember(anchor, compositionContext) { arrayOfNulls<Dialog>(1) }
     DisposableEffect(anchor, compositionContext) {
         val dialog = Dialog(anchor.context)
+        dialogRef[0] = dialog
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         val window = requireNotNull(dialog.window)
-        window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        // This window covers the paused game. Keep its backing surface opaque so
+        // the renderer can never show through gaps between menu panels.
+        window.setBackgroundDrawable(ColorDrawable(Color.BLACK))
+        window.setFormat(android.graphics.PixelFormat.OPAQUE)
         window.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
@@ -62,19 +59,8 @@ internal fun EmulationMenuWindow(
             setViewTreeSavedStateRegistryOwner(anchor.findViewTreeSavedStateRegistryOwner())
             setContent { WindowAwareRipple { currentContent() } }
         }
-        val useSnapshot = rendererBackend.equals("Vulkan", ignoreCase = true) && usesPausedMenuBackdrop(
-            DeviceGpuInfoProvider.get(anchor.context).model?.vendor == GpuVendor.MALI,
-            rendererBackend
-        )
-        val dialogContent = if (useSnapshot) {
-            FrameLayout(anchor.context).apply {
-                addView(host, FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-                backdrop[0] = PausedMenuBackdrop(window, this, snapshotSourceRoot, currentBackdropHidden)
-            }
-        } else host
-        dialog.setContentView(dialogContent, ViewGroup.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        dialog.setContentView(host, WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT))
         dialog.setCancelable(false)
         dialog.show()
         window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
@@ -82,10 +68,8 @@ internal fun EmulationMenuWindow(
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
-        backdrop[0]?.capture()
         onDispose {
-            backdrop[0]?.dispose()
-            backdrop[0] = null
+            dialogRef[0] = null
             try {
                 // Cancel any platform ripple animators while their host RenderNodes are still
                 // attached. A released press can still be fading when this window is closed.
@@ -95,5 +79,13 @@ internal fun EmulationMenuWindow(
             }
         }
     }
-    SideEffect { backdrop[0]?.setHidden(backdropHidden) }
+    SideEffect {
+        dialogRef[0]?.let { dialog ->
+            if (hidden) {
+                dialog.hide()
+            } else {
+                dialog.show()
+            }
+        }
+    }
 }
