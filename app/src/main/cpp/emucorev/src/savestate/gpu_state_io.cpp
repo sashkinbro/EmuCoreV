@@ -657,28 +657,25 @@ bool validate_gpu_state(const GpuSnapshot &snapshot, const MemoryImage &memory, 
         const uint64_t samples = uint64_t(ds.stride_samples) * ds.memory_height;
         if (uint64_t(ds.total_bytes) != samples * depth_bytes)
             return fail("depth surface byte count does not match dimensions at " + address_text(ds.surface.depth_data.address()));
-        // memory_height is expanded to the physical sample-rate image when MSAA
-        // is active. Guest backing rows stay at the logical height; using the
-        // expanded image height here can run the reference into unrelated heap
-        // allocations and guard gaps.
-        uint32_t guest_height = static_cast<uint32_t>(ds.memory_height);
         if (ds.multisample_mode != SCE_GXM_MULTISAMPLE_NONE) {
-            if (guest_height % 2)
+            if (ds.memory_height % 2)
                 return fail("multisampled depth surface has an odd physical height at "
                     + address_text(ds.surface.depth_data.address()));
-            guest_height /= 2;
         }
-        const uint64_t guest_samples = uint64_t(ds.stride_samples) * guest_height;
+        // Depth cache contents are restored from the captured Vulkan image, not
+        // guest RAM. depth_content_stored means that image retains a scene's
+        // depth; it does not request a guest-memory writeback. An LRU entry can
+        // retain a larger image after the guest reuses its address for a smaller
+        // surface. Validate its lookup keys here; live GXM surface extents are
+        // validated separately against their current render targets.
         if (ds.surface.depth_data) {
             const Address address = ds.surface.depth_data.address();
-            if (!memory.contains(address, 4)
-                || (ds.depth_content_stored && !memory.contains(address, guest_samples * depth_bytes)))
+            if (!memory.contains(address, 4))
                 return fail("depth surface address is outside saved memory: " + address_text(address));
         }
         if (ds.surface.stencil_data) {
             const Address address = ds.surface.stencil_data.address();
-            if (!memory.contains(address, 4)
-                || (ds.depth_content_stored && !memory.contains(address, guest_samples)))
+            if (!memory.contains(address, 4))
                 return fail("stencil surface address is outside saved memory: " + address_text(address));
         }
     }

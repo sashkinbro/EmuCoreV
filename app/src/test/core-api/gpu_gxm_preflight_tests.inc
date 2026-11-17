@@ -599,7 +599,7 @@ TEST(GpuGxmPreflight, FourXDepthBackingUsesGuestHeightAndRetainsCapturedGpuImage
     fs::remove_all(root);
 }
 
-TEST(GpuGxmPreflight, UnstoredDepthNeedsMappedBaseAndCapturedImageButNotFullGuestBacking) {
+TEST(GpuGxmPreflight, CachedDepthRetainsGpuContentsWithoutRequiringOldGuestExtent) {
     using namespace emucorev::savestate;
     const auto root = fs::temp_directory_path() / fs::unique_path("gpu-depth-unbacked-%%%%-%%%%");
     ASSERT_TRUE(fs::create_directories(root));
@@ -611,13 +611,21 @@ TEST(GpuGxmPreflight, UnstoredDepthNeedsMappedBaseAndCapturedImageButNotFullGues
     ASSERT_TRUE(memory->contains(depth_address, 4));
     ASSERT_FALSE(memory->contains(depth_address, guest_bytes));
 
-    auto snapshot = make_gpu_depth_test_snapshot(false);
-    ASSERT_TRUE(snapshot.surfaces.depth_stencil[0].texture.present);
-    EXPECT_TRUE(validate_gpu_state(snapshot, *memory, error)) << error;
+    for (const bool stored : { false, true }) {
+        auto snapshot = make_gpu_depth_test_snapshot(stored);
+        ASSERT_TRUE(snapshot.surfaces.depth_stencil[0].texture.present);
+        EXPECT_TRUE(validate_gpu_state(snapshot, *memory, error)) << error;
+        EXPECT_EQ(snapshot.surfaces.depth_stencil[0].texture.image.bytes,
+            (std::vector<uint8_t>{ 0x34, 0x12 }));
 
-    snapshot.surfaces.depth_stencil[0].depth_content_stored = true;
-    EXPECT_FALSE(validate_gpu_state(snapshot, *memory, error));
-    EXPECT_NE(error.find("depth surface address is outside saved memory"), std::string::npos) << error;
+        snapshot.surfaces.depth_stencil[0].surface.depth_data = Ptr<void>(0x20000000);
+        EXPECT_FALSE(validate_gpu_state(snapshot, *memory, error));
+        EXPECT_NE(error.find("depth surface address is outside saved memory"), std::string::npos) << error;
+        snapshot.surfaces.depth_stencil[0].surface.depth_data = Ptr<void>(0x10000000);
+        snapshot.surfaces.depth_stencil[0].surface.stencil_data = Ptr<void>(0x20000000);
+        EXPECT_FALSE(validate_gpu_state(snapshot, *memory, error));
+        EXPECT_NE(error.find("stencil surface address is outside saved memory"), std::string::npos) << error;
+    }
     memory.reset();
     fs::remove_all(root);
 }

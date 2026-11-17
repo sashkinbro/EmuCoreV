@@ -210,6 +210,10 @@ TEST_F(GxmSysmemPreflight, DepthCacheUsesPhysicalStrideAndFormatByteFootprint) {
         EXPECT_FALSE(validate_gpu_state(gpu, *memory, error));
         ++depth.total_bytes;
         depth.surface.depth_data = Ptr<void>(depth.surface.depth_data.address() + 32);
+        // Cached depth is restored from its GPU image even if its old extent
+        // extends beyond a smaller guest allocation. Its lookup key must exist.
+        EXPECT_TRUE(validate_gpu_state(gpu, *memory, error)) << error;
+        depth.surface.depth_data = Ptr<void>(0x500000);
         EXPECT_FALSE(validate_gpu_state(gpu, *memory, error));
     }
 }
