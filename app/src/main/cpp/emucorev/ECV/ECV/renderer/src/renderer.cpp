@@ -66,7 +66,8 @@ void State::update_overlays() {
     {
         const bool is_paused = paused.load(std::memory_order_relaxed);
         overlay_manager->set_paused(is_paused);
-        const bool show_pause = show_pause_overlay.load(std::memory_order_relaxed);
+        const bool show_pause = show_pause_overlay.load(std::memory_order_relaxed)
+            && !android_menu_paused.load(std::memory_order_relaxed);
         if (should_display_pause_overlay(is_paused, show_pause)) {
             if (!overlay_manager->get<overlay::pause_overlay>())
                 overlay_manager->create<overlay::pause_overlay>();

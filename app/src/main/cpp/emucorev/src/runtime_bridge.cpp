@@ -11,6 +11,7 @@
 #include <android_state.h>
 #include <config/state.h>
 #include <emuenv/state.h>
+#include <renderer/state.h>
 #include <ime/keyboard.h>
 #include <ime/functions.h>
 #include <dialog/state.h>
@@ -85,9 +86,16 @@ Java_com_sbro_emucorev_core_vita_Emulator_setAppSessionMenuPaused(
         return JNI_FALSE;
     }
 
-    return controller->set_pause_reason(app::AppSessionPauseReason::Menu, paused == JNI_TRUE)
-        ? JNI_TRUE
-        : JNI_FALSE;
+    auto *emuenv = get_emuenv();
+    if (!emuenv || !emuenv->renderer)
+        return JNI_FALSE;
+    auto &menu_paused = emuenv->renderer->android_menu_paused;
+    const bool previous = menu_paused.exchange(paused == JNI_TRUE, std::memory_order_relaxed);
+    if (!controller->set_pause_reason(app::AppSessionPauseReason::Menu, paused == JNI_TRUE)) {
+        menu_paused.store(previous, std::memory_order_relaxed);
+        return JNI_FALSE;
+    }
+    return JNI_TRUE;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
