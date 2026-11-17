@@ -464,7 +464,7 @@ bool write_kernel_base(EmuEnvState &emuenv, BufferWriter &buffer) {
     buffer.u32(kernel.thread_event_start_arg);
     buffer.u32(kernel.thread_event_end.address());
     buffer.u32(kernel.thread_event_end_arg);
-    buffer.u64(kernel.start_tick);
+    buffer.u64(kernel.process_clock_pause.effective_start(kernel.start_tick, kernel.capture_clock().timer_us));
     buffer.u64(kernel.base_tick.tick);
     buffer.u32(kernel.process_param.address());
     buffer.u32(kernel.client_vtable.address());
@@ -2544,7 +2544,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         result.error = "unable to rebase restored process clock";
         return result;
     }
-    kernel.start_tick = restored_start_tick;
+    kernel.process_clock_pause.rebase(host_time_us(), restored_start_tick, kernel.start_tick);
 
     report(progress, 1.0f, "done");
     world.release();

@@ -1441,19 +1441,19 @@ EXPORT(int, sceKernelGetPMUSERENR) {
 EXPORT(int, sceKernelGetProcessTime, SceUInt64 *time) {
     TRACY_FUNC(sceKernelGetProcessTime, time);
     if (time) {
-        *time = rtc_get_ticks(emuenv.kernel.base_tick.tick) - emuenv.kernel.start_tick;
+        *time = emuenv.kernel.process_time_us();
     }
     return 0;
 }
 
 EXPORT(SceUInt32, sceKernelGetProcessTimeLow) {
     TRACY_FUNC(sceKernelGetProcessTimeLow);
-    return static_cast<SceUInt32>(rtc_get_ticks(emuenv.kernel.base_tick.tick) - emuenv.kernel.start_tick);
+    return static_cast<SceUInt32>(emuenv.kernel.process_time_us());
 }
 
 EXPORT(SceUInt64, sceKernelGetProcessTimeWide) {
     TRACY_FUNC(sceKernelGetProcessTimeWide);
-    return rtc_get_ticks(emuenv.kernel.base_tick.tick) - emuenv.kernel.start_tick;
+    return emuenv.kernel.process_time_us();
 }
 
 EXPORT(int, sceKernelGetRWLockInfo, SceUID rwlockId, SceKernelRWLockInfo *info) {

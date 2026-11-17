@@ -194,7 +194,7 @@ EXPORT(int, sceKernelIsGameBudget) {
 
 EXPORT(VitaTime, sceKernelLibcClock) {
     TRACY_FUNC(sceKernelLibcClock);
-    return static_cast<VitaTime>(rtc_get_ticks(emuenv.kernel.base_tick.tick) - emuenv.kernel.start_tick);
+    return static_cast<VitaTime>(emuenv.kernel.process_time_us());
 }
 
 EXPORT(int, sceKernelLibcGettimeofday, VitaTimeval *timeAddr, VitaTimezone *tzAddr) {

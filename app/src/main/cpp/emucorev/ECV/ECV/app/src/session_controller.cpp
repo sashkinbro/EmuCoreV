@@ -238,6 +238,7 @@ void AppSessionController::stop(const AppSessionStopReason reason) {
 void AppSessionController::apply_runtime_state_locked() {
     const uint32_t reasons = active_pause_reasons.load(std::memory_order_relaxed);
     const bool paused = reasons != 0 || save_state_draining;
+    emuenv.kernel.process_clock_pause.set_paused(paused, rtc_get_ticks(0), emuenv.kernel.start_tick);
     const uint32_t capture_pause = to_pause_mask(AppSessionPauseReason::SaveState);
     // Guest callbacks must be able to return before their host audio-update
     // stack can be captured. A background pause that arrives mid-drain must

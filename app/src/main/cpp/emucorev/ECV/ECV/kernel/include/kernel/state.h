@@ -22,6 +22,7 @@
 #include <kernel/debugger.h>
 #include <kernel/host_threads.h>
 #include <kernel/object_store.h>
+#include <kernel/process_clock_pause.h>
 #include <kernel/sync_primitives.h>
 #include <kernel/thread/thread_state.h>
 #include <kernel/types.h>
@@ -205,6 +206,11 @@ struct KernelState {
     ObjectStore obj_store;
 
     uint64_t start_tick;
+    ProcessClockPause process_clock_pause;
+    uint64_t process_time_us() {
+        const uint64_t now = rtc_get_ticks(0);
+        return base_tick.tick + now - process_clock_pause.effective_start(start_tick, now);
+    }
     SceRtcTick base_tick;
     Ptr<SceProcessParam> process_param;
     Ptr<void> client_vtable = Ptr<void>(0);
