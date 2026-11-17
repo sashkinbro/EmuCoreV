@@ -94,6 +94,7 @@ set(EMUCOREV_BRIDGE_SOURCES
 )
 
 target_sources(ECV PRIVATE ${EMUCOREV_BRIDGE_SOURCES})
+target_sources(ECV PRIVATE $<$<CONFIG:Debug>:${EMUCOREV_BRIDGE_DIR}/src/shell_firmware_research.cpp>)
 
 # These private diagnostic archives expose no JNI API. Hide their symbols so
 # section GC can discard unused logging/debug-server implementations in release.
