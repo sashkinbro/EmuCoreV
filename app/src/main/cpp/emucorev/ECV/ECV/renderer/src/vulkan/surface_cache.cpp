@@ -851,12 +851,16 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
 
     // we only support surface sync of linear surfaces for now
     if (!can_mprotect_mapped_memory) {
-        // perform surface sync on everything
-        // it is slow but well... we can't mprotect the buffer
+        // Without protection, write back every linear surface.
         *info_added.need_surface_sync = color->surfaceType == SCE_GXM_COLOR_SURFACE_LINEAR;
     } else {
         protect_surface(mem, info_added);
     }
+    // A first-read trap only requests future writeback. Games that CPU-copy a
+    // one-shot render target need its initial scene written before notification.
+    // Retain protection above so subsequent CPU writes still invalidate the cache.
+    if (state.eager_surface_sync && color->surfaceType == SCE_GXM_COLOR_SURFACE_LINEAR)
+        *info_added.need_surface_sync = true;
 
     // it's not impossible that this surface will be rendered once and only used after, so do not skip any shader on it
     state.pipeline_cache.can_use_deferred_compilation = false;

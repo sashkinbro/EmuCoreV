@@ -52,6 +52,7 @@ void copy_global_to_current(Config::CurrentConfig &current, const Config &cfg) {
     current.show_compile_shaders = cfg.show_compile_shaders;
     current.show_shader_cache_warn = cfg.show_shader_cache_warn;
     current.accurate_thread_scheduling = cfg.accurate_thread_scheduling;
+    current.eager_surface_sync = cfg.eager_surface_sync;
     current.guest_cores = cfg.guest_cores;
     current.import_textures = cfg.import_textures;
     current.export_textures = cfg.export_textures;
@@ -101,6 +102,7 @@ void copy_current_to_global(Config &cfg, const Config::CurrentConfig &current) {
     cfg.show_compile_shaders = current.show_compile_shaders;
     cfg.show_shader_cache_warn = current.show_shader_cache_warn;
     cfg.accurate_thread_scheduling = current.accurate_thread_scheduling;
+    cfg.eager_surface_sync = current.eager_surface_sync;
     cfg.guest_cores = current.guest_cores;
     cfg.import_textures = current.import_textures;
     cfg.export_textures = current.export_textures;
@@ -154,6 +156,7 @@ std::vector<RestartRequiredSetting> get_restart_required_settings(
     append_if_changed(before.audio_backend != after.audio_backend, RestartRequiredSetting::AudioBackend);
     append_if_changed(before.validation_layer != after.validation_layer, RestartRequiredSetting::ValidationLayer);
     append_if_changed(before.accurate_thread_scheduling != after.accurate_thread_scheduling, RestartRequiredSetting::AccurateThreadScheduling);
+    append_if_changed(before.eager_surface_sync != after.eager_surface_sync, RestartRequiredSetting::EagerSurfaceSync);
 
     return changed;
 }
@@ -207,6 +210,7 @@ bool load_custom_config(Config::CurrentConfig &out, const fs::path &config_path,
         out.show_compile_shaders = gpu.attribute("show-compile-shaders").as_bool(false);
         out.show_shader_cache_warn = gpu.attribute("show-shader-cache-warn").as_bool(true);
         out.accurate_thread_scheduling = gpu.attribute("accurate-thread-scheduling").as_bool();
+        out.eager_surface_sync = gpu.attribute("eager-surface-sync").as_bool(out.eager_surface_sync);
         out.guest_cores = gpu.attribute("guest-cores").as_int(1);
         out.import_textures = gpu.attribute("import-textures").as_bool();
         out.export_textures = gpu.attribute("export-textures").as_bool();
@@ -299,6 +303,7 @@ bool save_custom_config(const Config::CurrentConfig &cc, const fs::path &config_
     gpu_child.append_attribute("show-compile-shaders") = cc.show_compile_shaders;
     gpu_child.append_attribute("show-shader-cache-warn") = cc.show_shader_cache_warn;
     gpu_child.append_attribute("accurate-thread-scheduling") = cc.accurate_thread_scheduling;
+    gpu_child.append_attribute("eager-surface-sync") = cc.eager_surface_sync;
     gpu_child.append_attribute("guest-cores") = cc.guest_cores;
     gpu_child.append_attribute("import-textures") = cc.import_textures;
     gpu_child.append_attribute("export-textures") = cc.export_textures;

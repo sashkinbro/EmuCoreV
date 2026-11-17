@@ -53,6 +53,7 @@ struct EmulatorConfigFields {
     jfieldID anisotropicFiltering = nullptr;
     jfieldID asyncPipelineCompilation = nullptr;
     jfieldID accurateThreadScheduling = nullptr;
+    jfieldID eagerSurfaceSync = nullptr;
     jfieldID exportTextures = nullptr;
     jfieldID importTextures = nullptr;
     jfieldID exportAsPng = nullptr;
@@ -136,6 +137,7 @@ EmulatorConfigFields resolve_config_fields(JNIEnv *env) {
     fields.anisotropicFiltering = env->GetFieldID(fields.cls, "anisotropicFiltering", "I");
     fields.asyncPipelineCompilation = env->GetFieldID(fields.cls, "asyncPipelineCompilation", "Z");
     fields.accurateThreadScheduling = env->GetFieldID(fields.cls, "accurateThreadScheduling", "Z");
+    fields.eagerSurfaceSync = env->GetFieldID(fields.cls, "eagerSurfaceSync", "Z");
     fields.exportTextures = env->GetFieldID(fields.cls, "exportTextures", "Z");
     fields.importTextures = env->GetFieldID(fields.cls, "importTextures", "Z");
     fields.exportAsPng = env->GetFieldID(fields.cls, "exportAsPng", "Z");
@@ -314,6 +316,7 @@ void fill_config_object(JNIEnv *env, jobject obj, const EmulatorConfigFields &fi
     env->SetIntField(obj, fields.anisotropicFiltering, static_cast<jint>(current_config.anisotropic_filtering));
     env->SetBooleanField(obj, fields.asyncPipelineCompilation, current_config.async_pipeline_compilation);
     env->SetBooleanField(obj, fields.accurateThreadScheduling, current_config.accurate_thread_scheduling);
+    env->SetBooleanField(obj, fields.eagerSurfaceSync, current_config.eager_surface_sync);
     env->SetBooleanField(obj, fields.exportTextures, current_config.export_textures);
     env->SetBooleanField(obj, fields.importTextures, current_config.import_textures);
     env->SetBooleanField(obj, fields.exportAsPng, current_config.export_as_png);
@@ -454,6 +457,7 @@ void read_config_object(JNIEnv *env, jobject obj, const EmulatorConfigFields &fi
     current_config.anisotropic_filtering = static_cast<int>(env->GetIntField(obj, fields.anisotropicFiltering));
     current_config.async_pipeline_compilation = env->GetBooleanField(obj, fields.asyncPipelineCompilation) != JNI_FALSE;
     current_config.accurate_thread_scheduling = env->GetBooleanField(obj, fields.accurateThreadScheduling) != JNI_FALSE;
+    current_config.eager_surface_sync = env->GetBooleanField(obj, fields.eagerSurfaceSync) != JNI_FALSE;
     current_config.export_textures = env->GetBooleanField(obj, fields.exportTextures) != JNI_FALSE;
     current_config.import_textures = env->GetBooleanField(obj, fields.importTextures) != JNI_FALSE;
     current_config.export_as_png = env->GetBooleanField(obj, fields.exportAsPng) != JNI_FALSE;

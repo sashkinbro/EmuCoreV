@@ -37,6 +37,7 @@ enum class RestartRequiredSetting : uint8_t {
     AudioBackend = 7,
     ValidationLayer = 8,
     AccurateThreadScheduling = 9,
+    EagerSurfaceSync = 10,
 };
 
 std::vector<RestartRequiredSetting> get_restart_required_settings(

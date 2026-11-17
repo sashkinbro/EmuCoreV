@@ -6,7 +6,7 @@
         <!-- The loader races sound-manager initialization with unrestricted
              host threads. Guest-priority scheduling preserves startup order. -->
         <title-id>PCSE00064</title-id>
-        <gpu accurate-thread-scheduling="true" />
+        <gpu accurate-thread-scheduling="true" eager-surface-sync="true" />
     </profile>
     <profile id="injustice-high-accuracy">
         <!-- PCSB00356: tested on Lenovo on 2026-10-20 after intermittent HUD

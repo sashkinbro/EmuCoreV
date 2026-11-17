@@ -261,6 +261,9 @@ static Config::CurrentConfig get_runtime_current_config_after_save(
         case config::RestartRequiredSetting::AccurateThreadScheduling:
             runtime_current.accurate_thread_scheduling = previous_current.accurate_thread_scheduling;
             break;
+        case config::RestartRequiredSetting::EagerSurfaceSync:
+            runtime_current.eager_surface_sync = previous_current.eager_surface_sync;
+            break;
         }
     }
 

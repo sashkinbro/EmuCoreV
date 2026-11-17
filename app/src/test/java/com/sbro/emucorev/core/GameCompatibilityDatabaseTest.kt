@@ -15,10 +15,19 @@ class GameCompatibilityDatabaseTest {
     @Test fun plantsVsZombiesStartupSchedulingInheritsOtherSettingsAndCanBeOverridden() {
         val base = VitaCoreConfig(highAccuracy = false, memoryMapping = "page-table")
         val recommended = database().applyDefaults(base, "PCSE00064")
-        assertEquals(base.copy(accurateThreadScheduling = true), recommended)
+        assertEquals(base.copy(accurateThreadScheduling = true, eagerSurfaceSync = true), recommended)
         val disabled = database("<game-db version=\"1\"><profile><title-id>EXACT</title-id><gpu accurate-thread-scheduling=\"false\"/></profile></game-db>")
         assertFalse(disabled.applyDefaults(recommended, "EXACT").accurateThreadScheduling)
         val invalid = database("<game-db version=\"1\"><profile><title-id>EXACT</title-id><gpu accurate-thread-scheduling=\"yes\"/></profile></game-db>")
+        assertNull(invalid.recommendationFor("EXACT"))
+    }
+
+    @Test fun eagerSurfaceSyncIsOptionalStrictAndAllowsExplicitFalse() {
+        val base = VitaCoreConfig(eagerSurfaceSync = true)
+        val off = database("""<game-db version="1"><profile><title-id>EXACT</title-id><gpu eager-surface-sync="false"/></profile></game-db>""")
+        assertFalse(off.applyDefaults(base, "EXACT").eagerSurfaceSync)
+        assertTrue(off.applyDefaults(base, "OTHER").eagerSurfaceSync)
+        val invalid = database("""<game-db version="1"><profile><title-id>EXACT</title-id><gpu eager-surface-sync="yes"/></profile></game-db>""")
         assertNull(invalid.recommendationFor("EXACT"))
     }
 

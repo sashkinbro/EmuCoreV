@@ -144,6 +144,7 @@ using PhysicalKeyCode = input::PhysicalKeyCode;
     code(bool, "texture-cache", true, texture_cache)                                                    \
     code(bool, "async-pipeline-compilation", true, async_pipeline_compilation)                           \
     code(bool, "accurate-thread-scheduling", false, accurate_thread_scheduling)                         \
+    code(bool, "eager-surface-sync", false, eager_surface_sync)                                        \
     code(int, "guest-cores", 1, guest_cores)                                                            \
     code(bool, "show-compile-shaders", false, show_compile_shaders)                                     \
     code(bool, "show-shader-cache-warn", true, show_shader_cache_warn)                                  \

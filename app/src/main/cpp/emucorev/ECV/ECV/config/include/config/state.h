@@ -83,6 +83,7 @@ struct Config {
         bool show_compile_shaders = false;
         bool show_shader_cache_warn = true;
         bool accurate_thread_scheduling = false;
+        bool eager_surface_sync = false;
         int guest_cores = 1;
         bool import_textures = false;
         bool export_textures = false;

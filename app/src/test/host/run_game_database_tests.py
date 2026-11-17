@@ -16,7 +16,7 @@ cpp = r'''
 #include <iterator>
 struct Settings {
  std::string backend_renderer="OpenGL", memory_mapping="page-table", driver="working-driver";
- bool high_accuracy=false, accurate_thread_scheduling=false; int audio_volume=37;
+ bool high_accuracy=false, accurate_thread_scheduling=false, eager_surface_sync=false; int audio_volume=37;
 };
 int main(int argc,char **argv){
  int failed=0;auto check=[&](bool ok,const char *name){
@@ -41,11 +41,11 @@ int main(int argc,char **argv){
  pugi::xml_document bundled;check(argc==2&&bundled.load_file(argv[1]),"bundled database parses");
  Settings pvz=global;
  config::game_database::apply_gpu_settings(pvz,config::game_database::recommendation(bundled,"PCSE00064"));
- check(pvz.accurate_thread_scheduling&&!pvz.high_accuracy&&pvz.memory_mapping==global.memory_mapping,
-  "PvZ startup recommendation only enables guest scheduling");
- pugi::xml_document scheduling_user;scheduling_user.load_string(R"(<gpu accurate-thread-scheduling="false"/>)");
+ check(pvz.accurate_thread_scheduling&&pvz.eager_surface_sync&&!pvz.high_accuracy&&pvz.memory_mapping==global.memory_mapping,
+  "PvZ startup recommendation enables scheduling and eager surface writeback");
+ pugi::xml_document scheduling_user;scheduling_user.load_string(R"(<gpu accurate-thread-scheduling="false" eager-surface-sync="false"/>)");
  config::game_database::apply_gpu_settings(pvz,scheduling_user.child("gpu"));
- check(!pvz.accurate_thread_scheduling,"explicit user scheduling false overrides recommendation");
+ check(!pvz.accurate_thread_scheduling&&!pvz.eager_surface_sync,"explicit user scheduling false overrides recommendation");
  Settings recommended=global;
  config::game_database::apply_gpu_settings(recommended,config::game_database::recommendation(bundled," pcse00383 ","Renamed game"));
  check(recommended.high_accuracy&&recommended.backend_renderer==global.backend_renderer

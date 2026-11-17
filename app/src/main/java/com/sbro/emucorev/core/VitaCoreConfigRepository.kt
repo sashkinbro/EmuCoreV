@@ -22,6 +22,7 @@ data class VitaCoreConfig(
     val highAccuracy: Boolean = false,
     val resolutionMultiplier: Float = 1.0f,
     val disableSurfaceSync: Boolean = false,
+    val eagerSurfaceSync: Boolean = false,
     val screenFilter: String = "Bilinear",
     val anisotropicFiltering: Int = 1,
     val textureCache: Boolean = true,
@@ -155,6 +156,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         "gyro-invert-x",
         "gyro-invert-y",
         "disable-surface-sync",
+        "eager-surface-sync",
         "discord-rich-presence",
         "enable-cheats",
         "enable-gamepad-overlay",
@@ -255,6 +257,7 @@ class VitaCoreConfigRepository(private val context: Context) {
                 highAccuracy = values["high-accuracy"]?.toBooleanStrictOrNull() ?: defaults.highAccuracy,
                 resolutionMultiplier = values["resolution-multiplier"]?.toFloatOrNull() ?: defaults.resolutionMultiplier,
                 disableSurfaceSync = values["disable-surface-sync"]?.toBooleanStrictOrNull() ?: defaults.disableSurfaceSync,
+                eagerSurfaceSync = values["eager-surface-sync"]?.toBooleanStrictOrNull() ?: defaults.eagerSurfaceSync,
                 screenFilter = values["screen-filter"] ?: defaults.screenFilter,
                 anisotropicFiltering = values["anisotropic-filtering"]?.toIntOrNull() ?: defaults.anisotropicFiltering,
                 textureCache = values["texture-cache"]?.toBooleanStrictOrNull() ?: defaults.textureCache,
@@ -396,6 +399,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["high-accuracy"] = config.highAccuracy.toString()
         values["resolution-multiplier"] = formatFloat(config.resolutionMultiplier)
         values["disable-surface-sync"] = config.disableSurfaceSync.toString()
+        values["eager-surface-sync"] = config.eagerSurfaceSync.toString()
         values["screen-filter"] = config.screenFilter
         values["anisotropic-filtering"] = config.anisotropicFiltering.toString()
         values["texture-cache"] = config.textureCache.toString()

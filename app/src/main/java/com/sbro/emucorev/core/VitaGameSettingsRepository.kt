@@ -187,6 +187,7 @@ class VitaGameSettingsRepository(private val context: Context) {
                 highAccuracy = gpu.boolAttr("high-accuracy", config.highAccuracy),
                 resolutionMultiplier = gpu.floatAttr("resolution-multiplier", config.resolutionMultiplier),
                 disableSurfaceSync = gpu.boolAttr("disable-surface-sync", config.disableSurfaceSync),
+                eagerSurfaceSync = gpu.boolAttr("eager-surface-sync", config.eagerSurfaceSync),
                 screenFilter = gpu.stringAttr("screen-filter", config.screenFilter),
                 memoryMapping = gpu.stringAttr("memory-mapping", config.memoryMapping),
                 vSync = gpu.boolAttr("v-sync", config.vSync),
@@ -319,6 +320,7 @@ class VitaGameSettingsRepository(private val context: Context) {
             setAttribute("high-accuracy", config.highAccuracy.toString())
             setAttribute("resolution-multiplier", config.resolutionMultiplier.toString())
             setAttribute("disable-surface-sync", config.disableSurfaceSync.toString())
+            setAttribute("eager-surface-sync", config.eagerSurfaceSync.toString())
             setAttribute("screen-filter", config.screenFilter)
             setAttribute("memory-mapping", config.memoryMapping)
             setAttribute("v-sync", config.vSync.toString())

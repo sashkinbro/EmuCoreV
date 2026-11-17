@@ -162,9 +162,9 @@ namespace {
 std::mutex g_sched_mutex;
 std::condition_variable g_sched_cv;
 constexpr size_t GUEST_CORES_MAX = 4;
-constexpr auto SCHED_DEADLINE_WINDOW = std::chrono::milliseconds(2);
 constexpr auto SCHED_MIN_SLICE = std::chrono::microseconds(50);
 constexpr auto SCHED_TIMESLICE = std::chrono::microseconds(250);
+constexpr auto SCHED_RECHECK_INTERVAL = std::chrono::microseconds(50);
 
 thread_local bool tls_holds_token = false;
 thread_local int tls_token_priority = 0;
@@ -244,30 +244,11 @@ void sched_acquire(int priority, SceInt32 affinity_mask, bool enabled, CPUState 
     };
     preempt_lower(start);
 
-    const auto deadline = start + SCHED_DEADLINE_WINDOW;
     while (g_sched_running >= g_sched_cores || g_sched_best_waiter.load(std::memory_order_relaxed) < priority) {
-        if (g_sched_cv.wait_until(lock, deadline) == std::cv_status::timeout) {
-
-#ifndef NDEBUG
-            if (spdlog::default_logger_raw()->should_log(spdlog::level::warn)) {
-                static std::atomic<int64_t> last_logged_us{ 0 };
-                const int64_t now_forced_us = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::steady_clock::now().time_since_epoch())
-                                                  .count();
-                int64_t prev_logged = last_logged_us.load(std::memory_order_relaxed);
-                if (now_forced_us - prev_logged >= 10'000'000
-                    && last_logged_us.compare_exchange_strong(prev_logged, now_forced_us)) {
-                    int holder_prio = -1;
-                    for (const auto &h : g_sched_holders) {
-                        if (h.cpu)
-                            holder_prio = h.priority;
-                    }
-                    LOG_WARN("[GUEST-SCHED] \"{}\" (#{} prio {}) forced through after {}ms; holder prio {}", name, id, priority, std::chrono::duration_cast<std::chrono::milliseconds>(SCHED_DEADLINE_WINDOW).count(), holder_prio);
-                }
-            }
-#endif
-            break;
-        }
+        // Keep the gate closed while a higher-priority guest is waiting. Recheck
+        // periodically because an active holder may need stop() before it can
+        // reach sched_maybe_yield() and release its slot.
+        g_sched_cv.wait_for(lock, SCHED_RECHECK_INTERVAL);
         preempt_lower(std::chrono::steady_clock::now());
     }
     waiter_remove(priority);
@@ -312,9 +293,11 @@ void sched_maybe_yield(SceInt32 affinity_mask, bool enabled, CPUState *cpu) {
     if (affinity_mask != 0 || !enabled || !tls_holds_token)
         return;
 
+    const int best_waiter = g_sched_best_waiter.load(std::memory_order_relaxed);
+    const bool outranked = best_waiter < tls_token_priority;
+    const bool equal_priority_waiting = best_waiter == tls_token_priority;
     const bool slice_over = (std::chrono::steady_clock::now() - tls_slice_start) >= SCHED_TIMESLICE;
-    const bool outranked = !slice_over && g_sched_best_waiter.load(std::memory_order_relaxed) < tls_token_priority;
-    if (slice_over || outranked) {
+    if (outranked || (slice_over && equal_priority_waiting)) {
         sched_release_internal(cpu);
     }
 }

@@ -243,6 +243,7 @@ class SettingsBackupRepository(
         .put("textureCache", textureCache)
         .put("asyncPipelineCompilation", asyncPipelineCompilation)
         .put("accurateThreadScheduling", accurateThreadScheduling)
+        .put("eagerSurfaceSync", eagerSurfaceSync)
         .put("guestCores", guestCores)
         .put("showCompileShaders", showCompileShaders)
         .put("hashlessTextureCache", hashlessTextureCache)
@@ -334,6 +335,7 @@ class SettingsBackupRepository(
         textureCache = optBoolean("textureCache", defaults.textureCache),
         asyncPipelineCompilation = optBoolean("asyncPipelineCompilation", defaults.asyncPipelineCompilation),
         accurateThreadScheduling = optBoolean("accurateThreadScheduling", defaults.accurateThreadScheduling),
+        eagerSurfaceSync = optBoolean("eagerSurfaceSync", defaults.eagerSurfaceSync),
         guestCores = optInt("guestCores", defaults.guestCores).coerceIn(1, 4),
         showCompileShaders = optBoolean("showCompileShaders", defaults.showCompileShaders),
         hashlessTextureCache = optBoolean("hashlessTextureCache", defaults.hashlessTextureCache),

@@ -137,6 +137,7 @@ struct VKState : public renderer::State {
     bool support_rasterized_order_access = false;
     // bound guest write-backs to the render-target extent the surface was rendered with
     bool surface_sync_clamp_rt = true;
+    bool eager_surface_sync = false;
     LinuxSurfaceType linux_surface_type = LinuxSurfaceType::Unknown;
 
 #ifdef __ANDROID__

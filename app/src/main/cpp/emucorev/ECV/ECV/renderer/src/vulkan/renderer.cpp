@@ -1071,6 +1071,7 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
 
     bool use_high_accuracy = cfg.current_config.high_accuracy;
     surface_sync_clamp_rt = cfg.surface_sync_clamp_rt;
+    eager_surface_sync = cfg.current_config.eager_surface_sync;
 
     constexpr bool force_direct_fragcolor_variant = false;
     if (force_direct_fragcolor_variant && features.support_shader_interlock) {

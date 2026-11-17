@@ -10,14 +10,16 @@ data class GameGpuRecommendation(
     val memoryMapping: String? = null,
     val useAngle: Boolean? = null,
     val highAccuracy: Boolean? = null,
-    val accurateThreadScheduling: Boolean? = null
+    val accurateThreadScheduling: Boolean? = null,
+    val eagerSurfaceSync: Boolean? = null
 ) {
     fun applyTo(base: VitaCoreConfig): VitaCoreConfig = base.copy(
         backendRenderer = backendRenderer ?: base.backendRenderer,
         memoryMapping = memoryMapping ?: base.memoryMapping,
         useAngle = useAngle ?: base.useAngle,
         highAccuracy = highAccuracy ?: base.highAccuracy,
-        accurateThreadScheduling = accurateThreadScheduling ?: base.accurateThreadScheduling
+        accurateThreadScheduling = accurateThreadScheduling ?: base.accurateThreadScheduling,
+        eagerSurfaceSync = eagerSurfaceSync ?: base.eagerSurfaceSync
     )
 }
 
@@ -78,14 +80,16 @@ class GameCompatibilityDatabase private constructor(private val profiles: List<P
                 if (gpu.hasAttribute("high-accuracy") && accuracy == null) continue
                 val scheduling = gpu.getAttribute("accurate-thread-scheduling").toBooleanStrictOrNull()
                 if (gpu.hasAttribute("accurate-thread-scheduling") && scheduling == null) continue
-                if (!hasLegacySettings && accuracy == null && scheduling == null) continue
+                val eagerSurfaceSync = gpu.getAttribute("eager-surface-sync").toBooleanStrictOrNull()
+                if (gpu.hasAttribute("eager-surface-sync") && eagerSurfaceSync == null) continue
+                if (!hasLegacySettings && accuracy == null && scheduling == null && eagerSurfaceSync == null) continue
                 val ids = entry.getElementsByTagName("title-id")
                 val titleIds = (0 until ids.length).mapNotNull {
                     ids.item(it).takeIf { node -> node.parentNode == entry }
                         ?.textContent?.trim()?.uppercase(Locale.ROOT)
                 }.filter(String::isNotEmpty).toSet()
                 profiles += Profile(titleIds, entry.getAttribute("title-word").trim().uppercase(Locale.ROOT),
-                    GameGpuRecommendation(renderer, mapping, angle, accuracy, scheduling))
+                    GameGpuRecommendation(renderer, mapping, angle, accuracy, scheduling, eagerSurfaceSync))
             }
             return GameCompatibilityDatabase(profiles)
         }
