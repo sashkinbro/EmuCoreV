@@ -40,7 +40,9 @@ inline bool valid_gpu(pugi::xml_node gpu) {
     if (scheduling && std::string_view(scheduling.value()) != "true" && std::string_view(scheduling.value()) != "false") return false;
     const auto eager_surface_sync = gpu.attribute("eager-surface-sync");
     if (eager_surface_sync && std::string_view(eager_surface_sync.value()) != "true" && std::string_view(eager_surface_sync.value()) != "false") return false;
-    return has_legacy_settings || accuracy || scheduling || eager_surface_sync;
+    const auto depth_clamp = gpu.attribute("depth-clamp");
+    if (depth_clamp && std::string_view(depth_clamp.value()) != "true" && std::string_view(depth_clamp.value()) != "false") return false;
+    return has_legacy_settings || accuracy || scheduling || eager_surface_sync || depth_clamp;
 }
 
 inline pugi::xml_node recommendation(const pugi::xml_document &db, std::string_view title_id, std::string_view title = {}) {
@@ -68,6 +70,7 @@ inline void apply_gpu_settings(Config &out, pugi::xml_node gpu) {
     if (auto accuracy = gpu.attribute("high-accuracy")) out.high_accuracy = accuracy.as_bool();
     if (auto scheduling = gpu.attribute("accurate-thread-scheduling")) out.accurate_thread_scheduling = scheduling.as_bool();
     if (auto eager_surface_sync = gpu.attribute("eager-surface-sync")) out.eager_surface_sync = eager_surface_sync.as_bool();
+    if (auto depth_clamp = gpu.attribute("depth-clamp")) out.depth_clamp = depth_clamp.as_bool();
 }
 
 } // namespace config::game_database

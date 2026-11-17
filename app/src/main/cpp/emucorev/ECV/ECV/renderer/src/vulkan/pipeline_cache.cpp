@@ -906,7 +906,7 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
 
 
     const vk::PipelineRasterizationStateCreateInfo rasterizer{
-        .depthClampEnable = (enable_depth_clamp && state.physical_device_features.depthClamp) ? VK_TRUE : VK_FALSE,
+        .depthClampEnable = (enable_depth_clamp && state.depth_clamp_enabled && state.physical_device_features.depthClamp) ? VK_TRUE : VK_FALSE,
         .polygonMode = translate_polygon_mode(record.front_polygon_mode),
         .cullMode = translate_cull_mode(record.cull_mode),
         // front face is always counter clockwise

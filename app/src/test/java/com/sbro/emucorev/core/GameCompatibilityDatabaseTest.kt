@@ -124,6 +124,14 @@ class GameCompatibilityDatabaseTest {
         assertSame(global, db.applyDefaults(global, ""))
     }
 
+    @Test fun nativeDepthPolicyKeepsEditableGpuSettingsAndRejectsMalformedValues() {
+        val profile = """<game-db version="1"><profile><title-id>PCSE00280</title-id><gpu depth-clamp="false"/></profile></game-db>"""
+        val base = VitaCoreConfig()
+        assertNotNull(database(profile).recommendationFor("PCSE00280"))
+        assertEquals(base, database(profile).applyDefaults(base, "PCSE00280"))
+        assertNull(database(profile.replace("depth-clamp=\"false\"", "depth-clamp=\"invalid\"")).recommendationFor("PCSE00280"))
+    }
+
     @Test fun missingUnknownOrInvalidDatabaseCannotForceSettings() {
         assertNull(database("<game-db version=\"1\"/>").recommendationFor("PCSE00481"))
         assertNull(database(xml.replace("version=\"1\"", "version=\"99\"")).recommendationFor("PCSE00481"))

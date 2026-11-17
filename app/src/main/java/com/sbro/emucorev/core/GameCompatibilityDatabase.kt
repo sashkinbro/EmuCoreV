@@ -82,7 +82,11 @@ class GameCompatibilityDatabase private constructor(private val profiles: List<P
                 if (gpu.hasAttribute("accurate-thread-scheduling") && scheduling == null) continue
                 val eagerSurfaceSync = gpu.getAttribute("eager-surface-sync").toBooleanStrictOrNull()
                 if (gpu.hasAttribute("eager-surface-sync") && eagerSurfaceSync == null) continue
-                if (!hasLegacySettings && accuracy == null && scheduling == null && eagerSurfaceSync == null) continue
+                // Native-only rasterization policy; retain validation without
+                // changing the user's editable Android configuration.
+                val depthClamp = gpu.getAttribute("depth-clamp").toBooleanStrictOrNull()
+                if (gpu.hasAttribute("depth-clamp") && depthClamp == null) continue
+                if (!hasLegacySettings && accuracy == null && scheduling == null && eagerSurfaceSync == null && depthClamp == null) continue
                 val ids = entry.getElementsByTagName("title-id")
                 val titleIds = (0 until ids.length).mapNotNull {
                     ids.item(it).takeIf { node -> node.parentNode == entry }

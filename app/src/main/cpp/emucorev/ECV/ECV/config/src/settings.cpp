@@ -33,6 +33,7 @@ namespace config {
 namespace {
 
 void copy_global_to_current(Config::CurrentConfig &current, const Config &cfg) {
+    current.depth_clamp = true;
     current.cpu_opt = cfg.cpu_opt;
     current.modules_mode = cfg.modules_mode;
     current.lle_modules = cfg.lle_modules;

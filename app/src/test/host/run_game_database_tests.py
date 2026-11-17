@@ -16,7 +16,7 @@ cpp = r'''
 #include <iterator>
 struct Settings {
  std::string backend_renderer="OpenGL", memory_mapping="page-table", driver="working-driver";
- bool high_accuracy=false, accurate_thread_scheduling=false, eager_surface_sync=false; int audio_volume=37;
+ bool high_accuracy=false, accurate_thread_scheduling=false, eager_surface_sync=false, depth_clamp=true; int audio_volume=37;
 };
 int main(int argc,char **argv){
  int failed=0;auto check=[&](bool ok,const char *name){
@@ -40,6 +40,18 @@ int main(int argc,char **argv){
  }
  pugi::xml_document bundled;check(argc==2&&bundled.load_file(argv[1]),"bundled database parses");
  Settings pvz=global;
+ Settings stealth=global;
+ config::game_database::apply_gpu_settings(stealth,config::game_database::recommendation(bundled,"PCSE00280"));
+ check(!stealth.depth_clamp && stealth.high_accuracy==global.high_accuracy && stealth.memory_mapping==global.memory_mapping,
+  "Stealth disables depth clamp without changing unrelated GPU settings");
+ Settings unrelated=global;
+ config::game_database::apply_gpu_settings(unrelated,config::game_database::recommendation(bundled,"PCSE00089"));
+ check(unrelated.depth_clamp,"NFS and unprofiled games retain depth clamp");
+ pugi::xml_document depth_user;depth_user.load_string(R"(<gpu depth-clamp="true"/>)");
+ config::game_database::apply_gpu_settings(stealth,depth_user.child("gpu"));
+ check(stealth.depth_clamp,"explicit depth-clamp true overrides recommendation");
+ pugi::xml_document invalid_depth;invalid_depth.load_string(R"(<gpu depth-clamp="invalid"/>)");
+ check(!config::game_database::valid_gpu(invalid_depth.child("gpu")),"reject invalid depth-clamp policy");
  config::game_database::apply_gpu_settings(pvz,config::game_database::recommendation(bundled,"PCSE00064"));
  check(pvz.accurate_thread_scheduling&&pvz.eager_surface_sync&&!pvz.high_accuracy&&pvz.memory_mapping==global.memory_mapping,
   "PvZ startup recommendation enables scheduling and eager surface writeback");
