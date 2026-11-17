@@ -51,8 +51,26 @@ typedef struct SceSharedFbInfo { // size is 0x58
     int unk_54;
 } SceSharedFbInfo;
 
+// VitaSDK psp2/sharedfb.h: render information supplied by the native PAF handoff.
+struct SceSharedFbRenderInfo {
+    Ptr<void> frame_buffer_base;
+    uint32_t reserved04;
+    Ptr<void> depth_stencil_buffer;
+    uint32_t reserved0C[4];
+    uint32_t stride;
+    uint32_t width;
+    uint32_t height;
+    uint32_t pixel_format;
+    int32_t buffer_index;
+    uint32_t reserved30[4];
+};
+static_assert(sizeof(SceSharedFbRenderInfo) == 0x40);
+
 struct SharedFbState {
     SceSharedFbInfo info;
+    std::mutex handoff_mutex;
+    SceSharedFbRenderInfo pending{};
+    bool pending_valid = false;
 };
 
 LIBRARY_INIT(SceSharedFb) {
@@ -108,6 +126,11 @@ EXPORT(int, sceSharedFbEnd) {
     TRACY_FUNC(sceSharedFbEnd);
     SharedFbState *state = emuenv.kernel.obj_store.get<SharedFbState>();
     Ptr<void> data = (state->info.curbuf == 0) ? state->info.base2 : state->info.base1;
+#ifndef NDEBUG
+    static std::atomic_uint trace_count{0};
+    if (trace_count.fetch_add(1) < 6)
+        LOG_DEBUG("SharedFbEnd buffer=0x{:X} index={}", data.address(), state->info.curbuf);
+#endif
     // tell the display a new buffer is ready
     SceDisplayFrameBuf frame_buf{
         .size = sizeof(SceDisplayFrameBuf),
@@ -131,17 +154,59 @@ EXPORT(int, sceSharedFbGetRenderingInfo) {
 }
 
 EXPORT(int, sceSharedFbGetShellRenderPort) {
-    return UNIMPLEMENTED();
+    // One emulated display: the shell renders to port zero.
+    return 0;
 }
 
 EXPORT(int, sceSharedFbUpdateProcess) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceSharedFbUpdateProcessBegin) {
-    return UNIMPLEMENTED();
+EXPORT(int, sceSharedFbUpdateProcessBegin, SceUID id, const SceSharedFbRenderInfo *render_info, uint32_t *update_count) {
+    if (!render_info || !update_count)
+        return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_ADDR);
+    auto *state = emuenv.kernel.obj_store.get<SharedFbState>();
+    if (id != 1 || state->info.memsize == 0)
+        return RET_ERROR(SCE_KERNEL_ERROR_INVALID_UID);
+    if (!render_info->frame_buffer_base || render_info->width == 0 || render_info->height == 0
+        || render_info->stride < render_info->width)
+        return RET_ERROR(SCE_KERNEL_ERROR_INVALID_ARGUMENT);
+    const std::lock_guard lock(state->handoff_mutex);
+    state->pending = *render_info;
+    state->pending_valid = true;
+#ifndef NDEBUG
+    static std::atomic_uint trace_count{0};
+    if (trace_count.fetch_add(1) < 6)
+        LOG_DEBUG("SharedFb handoff buffer=0x{:X} index={} {}x{} stride={} format=0x{:X}",
+            render_info->frame_buffer_base.address(), render_info->buffer_index,
+            render_info->width, render_info->height, render_info->stride, render_info->pixel_format);
+#endif
+    state->info.pitch = render_info->stride;
+    state->info.width = render_info->width;
+    state->info.height = render_info->height;
+    state->info.color_format = static_cast<SceGxmColorFormat>(render_info->pixel_format);
+    state->info.curbuf = render_info->buffer_index;
+    // There is one guest process. No secondary process needs a handoff.
+    *update_count = 0;
+    return 0;
 }
 
 EXPORT(int, sceSharedFbUpdateProcessEnd) {
-    return UNIMPLEMENTED();
+    auto *state = emuenv.kernel.obj_store.get<SharedFbState>();
+    SceSharedFbRenderInfo render_info{};
+    {
+        const std::lock_guard lock(state->handoff_mutex);
+        if (!state->pending_valid)
+            return RET_ERROR(SCE_KERNEL_ERROR_INVALID_ARGUMENT);
+        render_info = state->pending;
+        state->pending_valid = false;
+    }
+    SceDisplayFrameBuf frame_buf{
+        .size = sizeof(SceDisplayFrameBuf),
+        .base = render_info.frame_buffer_base,
+        .pitch = render_info.stride,
+        .width = render_info.width,
+        .height = render_info.height
+    };
+    return CALL_EXPORT(_sceDisplaySetFrameBuf, &frame_buf, SCE_DISPLAY_SETBUF_NEXTFRAME, nullptr);
 }

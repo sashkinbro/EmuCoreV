@@ -438,8 +438,13 @@ EXPORT(int, sceAppMgrLaunchAppByNameForShell) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAppMgrLaunchAppByPath4) {
+EXPORT(int, sceAppMgrLaunchAppByPath4, const char *path, const char *args, uint32_t flags, uint32_t option) {
     TRACY_FUNC(sceAppMgrLaunchAppByPath4);
+#ifndef NDEBUG
+    if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
+        LOG_DEBUG("Native shell requested launch path={} args={} flags=0x{:X} option=0x{:X}",
+            path ? path : "<null>", args ? args : "<null>", flags, option);
+#endif
     return UNIMPLEMENTED();
 }
 

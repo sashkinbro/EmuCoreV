@@ -4,6 +4,18 @@
 
 #include <android_state.h>
 #include <app/session_controller.h>
+#include <app/functions.h>
+#include <config/state.h>
+#include <emuenv/state.h>
+#include <io/state.h>
+#include <packages/sfo.h>
+#include <regmgr/functions.h>
+#include <modules/SceSysmem/SceSysmemForDriver.h>
+#include <modules/SceKernelThreadMgr/SceThreadmgr.h>
+#include <modules/SceSblUpdateMgr/SceSblSsUpdateMgr.h>
+#include <packages/functions.h>
+#include <shell_firmware_research.h>
+#include <util/log.h>
 #include <cpu/functions.h>
 #include <cpu/state.h>
 #include <kernel/load_self.h>
@@ -14,16 +26,94 @@
 #include <packages/sce_types.h>
 
 #include <chrono>
+#include <cstring>
 #include <sstream>
 #include <string_view>
 #include <vector>
 
 namespace {
+fs::path shell_boot_sandbox;
+
 std::vector<uint8_t> read_bytes(JNIEnv *env, jbyteArray input) {
     std::vector<uint8_t> bytes(env->GetArrayLength(input));
     env->GetByteArrayRegion(input, 0, bytes.size(), reinterpret_cast<jbyte *>(bytes.data()));
     return bytes;
 }
+
+std::string read_string(JNIEnv *env, jstring input) {
+    const char *text = env->GetStringUTFChars(input, nullptr);
+    const std::string result(text);
+    env->ReleaseStringUTFChars(input, text);
+    return result;
+}
+}
+
+bool prepare_shell_firmware_research(EmuEnvState &emuenv) {
+    // Give VSH its own writable filesystem. Firmware is linked read-only by
+    // convention, while shell database/registry initialization stays isolated
+    // from game data and the normal user's Vita filesystem.
+    const auto firmware_root = emuenv.vita_fs_path;
+    if (shell_boot_sandbox.empty())
+        return false;
+    const auto sandbox = shell_boot_sandbox;
+    fs::create_directories(sandbox);
+    for (const auto *device : { "vs0", "os0", "sa0" }) {
+        const auto source = firmware_root / device;
+        const auto target = sandbox / device;
+        if (fs::is_directory(target) && !fs::is_symlink(target) && fs::is_empty(target))
+            fs::remove(target); // Only remove the empty mount placeholder created by IO initialization.
+        if (!fs::exists(target)) {
+            boost::system::error_code error;
+            fs::create_directory_symlink(source, target, error);
+            if (error)
+                return false;
+        }
+    }
+    emuenv.config_path = sandbox.parent_path() / "config";
+    emuenv.cache_path = sandbox.parent_path() / "cache";
+    fs::create_directories(emuenv.config_path);
+    fs::create_directories(emuenv.cache_path);
+    fs::create_directories(sandbox / "vd0/registry");
+    if (!app::switch_emulator_path(emuenv, sandbox))
+        return false;
+    regmgr::init_regmgr(emuenv.regmgr, sandbox);
+    // This host supplies the user's configuration. The private shell registry
+    // represents an initialized console and must not launch initialsetup.self.
+    // SceShell itself writes 1 to this key after its initialization checks.
+    regmgr::set_int_value(emuenv.regmgr, "/CONFIG/SYSTEM/", "initialize", 1);
+    app::set_current_config(emuenv, "");
+    emuenv.cfg.current_config.modules_mode = ModulesMode::AUTO_MANUAL;
+    emuenv.cfg.current_config.lle_modules.emplace_back("libpaf");
+    emuenv.cfg.current_config.lle_modules.emplace_back("libnet");
+    for (const auto *name : { "sqlite", "bXCe", "ini_file_processor", "common_gui_dialog", "dbutil", "activity_db" })
+        emuenv.cfg.current_config.lle_modules.emplace_back(name);
+    emuenv.io.app_path = "__VITA_SHELL_RESEARCH__";
+    emuenv.kernel.is_system_process = true;
+    emuenv.io.title_id = "SceShell";
+    emuenv.io.content_id.clear();
+    emuenv.io.addcont.clear();
+    emuenv.io.savedata.clear();
+    emuenv.current_app_title = "SceShell";
+    emuenv.app_info = {};
+    app::reset_perf_metrics(emuenv);
+    return fs::is_regular_file(sandbox / "vs0/vsh/shell/shell.self");
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorev_ShellFirmwareResearchTest_prepareBoot(JNIEnv *env, jobject, jstring sandbox) {
+    const auto *session = get_app_session_controller();
+    if (!session || session->has_active_session())
+        return JNI_FALSE;
+    const char *path = env->GetStringUTFChars(sandbox, nullptr);
+    shell_boot_sandbox = fs::path(path);
+    env->ReleaseStringUTFChars(sandbox, path);
+    if (auto *emuenv = get_emuenv()) {
+        emuenv->cfg.log_level = spdlog::level::debug;
+        emuenv->cfg.archive_log = false;
+        emuenv->kernel.debugger.watch_import_calls = false;
+        logging::set_level(spdlog::level::debug);
+    }
+    return shell_boot_sandbox.is_absolute() ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
@@ -35,6 +125,130 @@ Java_com_sbro_emucorev_ShellFirmwareResearchTest_decode(JNIEnv *env, jobject, jb
     if (!decoded.empty())
         env->SetByteArrayRegion(result, 0, decoded.size(), reinterpret_cast<const jbyte *>(decoded.data()));
     return result;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorev_ShellFirmwareResearchTest_verifyKernelCopy(JNIEnv *, jobject) {
+    if (const auto *session = get_app_session_controller(); session && session->has_active_session())
+        return JNI_FALSE;
+    bool valid = false;
+    {
+        EmuEnvState emuenv;
+        if (!init(emuenv.mem, false))
+            return JNI_FALSE;
+        const auto source = Ptr<uint8_t>(alloc(emuenv.mem, 4096, "copy-test-source"));
+        const auto target = Ptr<uint8_t>(alloc(emuenv.mem, 4096, "copy-test-target"));
+        std::memset(source.get(emuenv.mem), 0x35, 4096);
+        std::memset(target.get(emuenv.mem), 0xA7, 4096);
+        const auto copy = [&](Ptr<void> dst, Ptr<const void> src, SceSize size) {
+            return export_ksceKernelMemcpyKernelToUser(emuenv, 0, "ksceKernelMemcpyKernelToUser", dst, src, size);
+        };
+        valid = copy(target + 3, source + 1, 37) == 0
+            && target.get(emuenv.mem)[2] == 0xA7
+            && target.get(emuenv.mem)[40] == 0xA7
+            && std::memcmp((target + 3).get(emuenv.mem), (source + 1).get(emuenv.mem), 37) == 0
+            && copy({}, {}, 0) == 0
+            && copy({}, source, 1) == SCE_KERNEL_ERROR_ILLEGAL_ADDR
+            && copy(target, {}, 1) == SCE_KERNEL_ERROR_ILLEGAL_ADDR
+            && copy(Ptr<void>(0xFFFFFFF0), source, 32) == SCE_KERNEL_ERROR_ILLEGAL_ADDR
+            && copy(target, Ptr<const void>(0xFFFFFFF0), 32) == SCE_KERNEL_ERROR_ILLEGAL_ADDR
+            && copy(Ptr<void>(0xFFFFF000), source, 1) == SCE_KERNEL_ERROR_ILLEGAL_ADDR;
+        deinit_mem(emuenv.mem);
+    }
+    return valid ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorev_ShellFirmwareResearchTest_verifySystemThreads(JNIEnv *, jobject) {
+    if (const auto *session = get_app_session_controller(); session && session->has_active_session())
+        return JNI_FALSE;
+    EmuEnvState emuenv;
+    if (!init(emuenv.mem, false))
+        return JNI_FALSE;
+    emuenv.kernel.init(emuenv.mem, [](CPUState &, uint32_t, SceUID) {}, false);
+    SceKernelCreateThread_opt options{
+        .size = sizeof(SceKernelCreateThread_opt),
+        .stack_size = 64 * 1024,
+        .cpu_affinity_mask = 0xF0000,
+    };
+    int priority = 160;
+    const auto create = [&]() {
+        return export_sceKernelCreateThreadForUser(emuenv, 0, "sceKernelCreateThreadForUser", "system-affinity-probe",
+            SceKernelThreadEntry(emuenv.kernel.halt_instruction_pc), priority, &options);
+    };
+    bool valid = create() == SCE_KERNEL_ERROR_INVALID_CPU_AFFINITY;
+    emuenv.kernel.is_system_process = true;
+    const auto id = create();
+    valid = valid && id > 0 && emuenv.kernel.get_thread(id)->affinity_mask == 0xF0000;
+    priority = 229; // Native SceGameGcPromoteJobQueue's absolute system priority.
+    const auto background = create();
+    valid = valid && background > 0 && emuenv.kernel.get_thread(background)->priority == 229;
+    priority = SCE_KERNEL_DEFAULT_PRIORITY;
+    const auto system_default = create();
+    valid = valid && system_default > 0 && emuenv.kernel.get_thread(system_default)->priority == 96;
+    options.cpu_affinity_mask = 0x100000;
+    valid = valid && create() == SCE_KERNEL_ERROR_INVALID_CPU_AFFINITY;
+    emuenv.kernel.is_system_process = false;
+    options.cpu_affinity_mask = 0;
+    const auto game_default = create();
+    valid = valid && game_default > 0 && emuenv.kernel.get_thread(game_default)->priority == 160;
+    priority = 229;
+    valid = valid && create() == SCE_KERNEL_ERROR_ILLEGAL_PRIORITY;
+    emuenv.kernel.deinit(emuenv.mem);
+    valid = valid && !emuenv.kernel.is_system_process
+        && emuenv.kernel.process_cpu_affinity_mask() == SCE_KERNEL_CPU_MASK_USER_ALL;
+    deinit_mem(emuenv.mem);
+    return valid ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorev_ShellFirmwareResearchTest_verifyPackageInfo(JNIEnv *env, jobject, jstring root) {
+    if (const auto *session = get_app_session_controller(); session && session->has_active_session())
+        return JNI_FALSE;
+    EmuEnvState emuenv;
+    emuenv.vita_fs_path = read_string(env, root);
+    if (!init(emuenv.mem, false))
+        return JNI_FALSE;
+    const auto info = Ptr<SceSblUsSpkgInfo>(alloc(emuenv.mem, 64, "package-info-probe"));
+    std::memset(info.get(emuenv.mem), 0xA5, 64);
+    const auto path = firmware::package_version_path(emuenv.vita_fs_path, 23);
+    fs::create_directories(path.parent_path());
+    { fs::ofstream output(path); output << "1234567\n"; }
+    const auto query = [&](int type, Ptr<SceSblUsSpkgInfo> output) {
+        return export_sceSblUsGetSpkgInfo(emuenv, 0, "sceSblUsGetSpkgInfo", type, output);
+    };
+    bool valid = query(23, info) == 0 && info.get(emuenv.mem)->size == 16
+        && info.get(emuenv.mem)->version == 0x1234567 && info.get(emuenv.mem)->reserved == 0;
+    for (const auto byte : info.get(emuenv.mem)->status)
+        valid = valid && byte == 0;
+    valid = valid && info.cast<uint8_t>().get(emuenv.mem)[16] == 0xA5;
+    valid = valid && query(23, {}) == SCE_KERNEL_ERROR_ILLEGAL_ADDR
+        && query(23, Ptr<SceSblUsSpkgInfo>(1)) == SCE_KERNEL_ERROR_ILLEGAL_ADDR
+        && query(23, Ptr<SceSblUsSpkgInfo>(0xFFFFFFF8)) == SCE_KERNEL_ERROR_ILLEGAL_ADDR
+        && query(0, info) == SCE_KERNEL_ERROR_INVALID_ARGUMENT;
+    { fs::ofstream output(path); output << "not-a-version\n"; }
+    valid = valid && query(23, info) < 0;
+    { fs::ofstream output(path); output << "1234junk\n"; }
+    valid = valid && query(23, info) < 0;
+    fs::remove(path);
+    valid = valid && query(23, info) < 0;
+    deinit_mem(emuenv.mem);
+    return valid ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_sbro_emucorev_ShellFirmwareResearchTest_installPackageFixture(JNIEnv *env, jobject, jstring pup, jstring root) {
+    if (const auto *session = get_app_session_controller(); session && session->has_active_session())
+        return env->NewStringUTF("");
+    try {
+        const fs::path target(read_string(env, root));
+        fs::create_directories(target);
+        const auto version = install_pup(target, fs::path(read_string(env, pup)));
+        return env->NewStringUTF(version.c_str());
+    } catch (const std::exception &error) {
+        LOG_ERROR("Private firmware install probe failed: {}", error.what());
+        return env->NewStringUTF("");
+    }
 }
 
 extern "C" JNIEXPORT jstring JNICALL

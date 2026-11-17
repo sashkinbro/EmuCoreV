@@ -15,7 +15,11 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-#include <module/module.h>
+#include "SceSblSsUpdateMgr.h"
+#include <kernel/types.h>
+#include <io/io.h>
+#include <mem/functions.h>
+#include <packages/firmware_info.h>
 
 EXPORT(int, sceSblUsAllocateBuffer) {
     return UNIMPLEMENTED();
@@ -37,8 +41,23 @@ EXPORT(int, sceSblUsGetExtractSpackage) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceSblUsGetSpkgInfo) {
-    return UNIMPLEMENTED();
+EXPORT(int, sceSblUsGetSpkgInfo, int package_type, Ptr<SceSblUsSpkgInfo> info) {
+    if (!info || info.address() < emuenv.mem.host_page_size || uint64_t{ info.address() } + sizeof(SceSblUsSpkgInfo) > UINT32_MAX
+        || !is_valid_addr_range(emuenv.mem, info.address(), info.address() + sizeof(SceSblUsSpkgInfo)))
+        return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_ADDR);
+    if (package_type <= 0 || package_type > 28)
+        return RET_ERROR(SCE_KERNEL_ERROR_INVALID_ARGUMENT);
+    fs::ifstream input(firmware::package_version_path(emuenv.vita_fs_path, package_type));
+    uint64_t version = 0;
+    if (!(input >> std::hex >> version) || version > UINT32_MAX)
+        return RET_ERROR(SCE_ERROR_ERRNO_ENOENT);
+    input >> std::ws;
+    if (!input.eof())
+        return RET_ERROR(SCE_ERROR_ERRNO_ENOENT);
+    // Report the installed component's own version, not the overall firmware
+    // version. In particular, SA0/font packages have an independent version.
+    *info.get(emuenv.mem) = SceSblUsSpkgInfo{ sizeof(SceSblUsSpkgInfo), static_cast<uint32_t>(version), {}, 0 };
+    return 0;
 }
 
 EXPORT(int, sceSblUsGetStatus) {

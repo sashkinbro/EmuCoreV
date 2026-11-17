@@ -197,7 +197,7 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
             // deferred-unmap collapses remaps WITHOUT world-stops, blinding the veto above; transitions are stamped regardless
             const bool mem_transition_quiet = !emuenv.renderer
                 || (now_epoch_ms - emuenv.renderer->last_mem_transition_epoch_ms.load(std::memory_order_relaxed)) >= 5000;
-            if (!never_flipped && stall_vblanks > PROVABLE_BREAK_VBLANKS && unpaused && renderer_idle_vblanks > PROVABLE_BREAK_VBLANKS && world_stop_quiet && mem_transition_quiet && last_provable_break_setframe != setframe) {
+            if (!emuenv.kernel.is_system_process && !never_flipped && stall_vblanks > PROVABLE_BREAK_VBLANKS && unpaused && renderer_idle_vblanks > PROVABLE_BREAK_VBLANKS && world_stop_quiet && mem_transition_quiet && last_provable_break_setframe != setframe) {
 #ifdef _WIN32
                 if (!IsDebuggerPresent())
 #endif
@@ -213,7 +213,7 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
             // Deadlock breaker for stuck event flags
             constexpr uint64_t BREAK_STALL_VBLANKS = 300; // ~5s at 60Hz
             constexpr uint64_t BREAK_SLOW_VBLANKS = 900; // ~15s fallback when guest threads still wake
-            if (!never_flipped && stall_vblanks > BREAK_STALL_VBLANKS && unpaused
+            if (!emuenv.kernel.is_system_process && !never_flipped && stall_vblanks > BREAK_STALL_VBLANKS && unpaused
                 && (last_break_vblanks == 0 || vblanks - last_break_vblanks > BREAK_STALL_VBLANKS)) {
                 last_break_vblanks = vblanks;
                 const bool full_wedge = renderer_idle_vblanks > BREAK_STALL_VBLANKS && guest_idle_vblanks > BREAK_STALL_VBLANKS;

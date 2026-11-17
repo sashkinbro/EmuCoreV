@@ -25,6 +25,7 @@
 
 #include <openssl/evp.h>
 #include <packages/exfat.h>
+#include <packages/firmware_info.h>
 #include <packages/sce_types.h>
 #include <util/fs.h>
 
@@ -307,6 +308,41 @@ std::string install_pup(const fs::path &vita_fs_path, const fs::path &pup_path, 
         versionFile.close();
     } else
         LOG_WARN("Firmware Version file not found!");
+
+    // Preserve the installed filesystem packages' versions before discarding
+    // their original headers. VSH queries component versions during startup.
+    if (!fw_version.empty()) {
+        std::map<uint32_t, uint32_t> versions;
+        for (const auto &entry : fs::directory_iterator(pup_dest)) {
+            if (entry.path().extension() != ".pkg")
+                continue;
+            fs::ifstream package(entry.path(), std::ios::binary);
+            char header_bytes[SceHeader::Size];
+            if (!package.read(header_bytes, sizeof(header_bytes)))
+                continue;
+            const SceHeader header(header_bytes);
+            if (header.sce_type != SceType::SPKG)
+                continue;
+            package.seekg(header.header_length);
+            char component_bytes[SpkgHeader::Size];
+            if (!package.read(component_bytes, sizeof(component_bytes)))
+                continue;
+            const SpkgHeader component(component_bytes);
+            if (component.type != SpkgType::OS0 && component.type != SpkgType::VS0
+                && component.type != SpkgType::SA0 && component.type != SpkgType::PD0)
+                continue;
+            if (component.update_version <= UINT32_MAX)
+                versions.insert_or_assign(static_cast<uint32_t>(component.type), static_cast<uint32_t>(component.update_version));
+        }
+        for (const auto &[type, version] : versions) {
+            const auto path = firmware::package_version_path(vita_fs_path, type);
+            fs::create_directories(path.parent_path());
+            fs::ofstream output(path, std::ios::trunc);
+            output << std::hex << version << '\n';
+            if (!output)
+                LOG_WARN("Unable to record installed package version: {}", path);
+        }
+    }
 
     fs::remove_all(pup_dec_root);
 

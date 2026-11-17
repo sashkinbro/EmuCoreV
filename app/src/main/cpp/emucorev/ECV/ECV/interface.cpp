@@ -42,6 +42,9 @@
 #include <pugixml.hpp>
 
 #include <modules/module_parent.h>
+#ifndef NDEBUG
+#include <shell_firmware_research.h>
+#endif
 #include <string>
 #include <util/log.h>
 #include <util/string_utils.h>
@@ -854,7 +857,10 @@ static ExitCode load_app_impl(SceUID &main_module_id, EmuEnvState &emuenv, const
     LOG_INFO("Category: {}", emuenv.app_info.app_category);
 
     init_device_paths(emuenv.io);
-    init_savedata_app_path(emuenv.io, emuenv.vita_fs_path);
+#ifndef NDEBUG
+    if (!is_shell_firmware_research(launch_request))
+#endif
+        init_savedata_app_path(emuenv.io, emuenv.vita_fs_path);
 
     // Load param.sfo
     vfs::FileBuffer param_sfo;
@@ -870,7 +876,13 @@ static ExitCode load_app_impl(SceUID &main_module_id, EmuEnvState &emuenv, const
         emuenv.self_path = !emuenv.cfg.self_path.empty() ? emuenv.cfg.self_path : EBOOT_PATH;
     }
 
-    main_module_id = load_module(emuenv, "app0:" + emuenv.self_path);
+#ifndef NDEBUG
+    if (is_shell_firmware_research(launch_request)) {
+        emuenv.self_path = "vsh/shell/shell.self";
+        main_module_id = load_module(emuenv, "vs0:" + emuenv.self_path);
+    } else
+#endif
+        main_module_id = load_module(emuenv, "app0:" + emuenv.self_path);
 
     if (main_module_id >= 0) {
         const auto module = emuenv.kernel.loaded_modules[main_module_id];
@@ -896,6 +908,10 @@ static ExitCode load_app_impl(SceUID &main_module_id, EmuEnvState &emuenv, const
     const auto module_app_path{ emuenv.vita_fs_path / "ux0/app" / emuenv.io.app_path / "sce_module" };
 
     std::vector<std::string> lib_load_list = {};
+#ifndef NDEBUG
+    if (is_shell_firmware_research(launch_request))
+        lib_load_list.emplace_back("vs0:sys/external/libnet.suprx");
+#endif
     // todo: check if module is imported
     auto add_preload_module = [&](uint32_t code, SceSysmoduleModuleId module_id, const std::string &name, bool load_from_app) {
         if ((process_preload_disabled & code) == 0) {

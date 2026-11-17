@@ -30,6 +30,9 @@
 #include <motion/state.h>
 #include <renderer/functions.h>
 #include <util/log.h>
+#ifndef NDEBUG
+#include <shell_firmware_research.h>
+#endif
 
 namespace app {
 
@@ -58,6 +61,13 @@ bool AppSessionController::begin_launch(const AppLaunchRequest &launch_request, 
         return false;
     }
 
+    emuenv.kernel.is_system_process = false;
+#ifndef NDEBUG
+    if (is_shell_firmware_research(launch_request)) {
+        if (!prepare_shell_firmware_research(emuenv))
+            return false;
+    } else
+#endif
     if (!setup_game_launch(emuenv, launch_request.app_path, update_last_time_used))
         return false;
 

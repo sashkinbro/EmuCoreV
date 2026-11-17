@@ -47,18 +47,17 @@ int ThreadState::init(const char *name, Ptr<const void> entry_point, int init_pr
     this->name = name;
     this->entry_point = entry_point.address();
 
+    const auto resolved_priority = kernel.resolve_thread_priority(init_priority);
+    if (!resolved_priority)
+        return SCE_KERNEL_ERROR_ILLEGAL_PRIORITY;
+    priority = *resolved_priority;
+
     int core_num = kernel.corenum_allocator.new_corenum();
     if (core_num < 0) {
         LOG_ERROR("Out of core number to allocate, use 0");
         core_num = 0;
     }
 
-    if (init_priority > SCE_KERNEL_LOWEST_PRIORITY_USER) {
-        assert(SCE_KERNEL_HIGHEST_DEFAULT_PRIORITY <= init_priority && init_priority <= SCE_KERNEL_LOWEST_DEFAULT_PRIORITY);
-        priority = init_priority - SCE_KERNEL_DEFAULT_PRIORITY + SCE_KERNEL_GAME_DEFAULT_PRIORITY_ACTUAL;
-    } else {
-        priority = init_priority;
-    }
     this->affinity_mask = affinity_mask;
     this->stack_size = stack_size;
     start_tick = rtc_get_ticks(kernel.base_tick.tick);

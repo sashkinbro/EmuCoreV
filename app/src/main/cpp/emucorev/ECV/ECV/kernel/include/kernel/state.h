@@ -122,6 +122,17 @@ struct KernelState {
     std::set<Address> prepared_clib_mspaces;
 
     bool accurate_thread_scheduling = false;
+    bool is_system_process = false;
+    uint32_t process_cpu_affinity_mask() const {
+        return is_system_process ? 0xF0000u : SCE_KERNEL_CPU_MASK_USER_ALL;
+    }
+    std::optional<int> resolve_thread_priority(int value) const {
+        if (value >= SCE_KERNEL_HIGHEST_DEFAULT_PRIORITY && value <= SCE_KERNEL_LOWEST_DEFAULT_PRIORITY)
+            return value - SCE_KERNEL_DEFAULT_PRIORITY + (is_system_process ? 96 : SCE_KERNEL_GAME_DEFAULT_PRIORITY_ACTUAL);
+        if (value < 0 || value > (is_system_process ? 255 : SCE_KERNEL_LOWEST_PRIORITY_USER))
+            return std::nullopt;
+        return value;
+    }
 
     Ptr<const void> tls_address = Ptr<const void>(0);
     unsigned int tls_psize = 0;

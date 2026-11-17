@@ -524,8 +524,8 @@ EXPORT(SceInt32, _sceKernelGetThreadInfo, SceUID threadId, Ptr<SceKernelThreadIn
     info->currentPriority = thread->priority;
     info->initCpuAffinityMask = thread->affinity_mask; // Todo Give init affinity
     info->currentCpuAffinityMask = thread->affinity_mask;
-    const uint32_t user_cpus = (static_cast<uint32_t>(thread->affinity_mask) >> 16) & 0x7;
-    info->currentCpuId = (user_cpus & 1) ? 0 : (user_cpus & 2) ? 1 : (user_cpus & 4) ? 2 : 0;
+    const uint32_t user_cpus = (static_cast<uint32_t>(thread->affinity_mask) & emuenv.kernel.process_cpu_affinity_mask()) >> 16;
+    info->currentCpuId = (user_cpus & 1) ? 0 : (user_cpus & 2) ? 1 : (user_cpus & 4) ? 2 : (user_cpus & 8) ? 3 : 0;
     info->lastExecutedCpuId = info->currentCpuId;
     info->entry = SceKernelThreadEntry(thread->entry_point);
     info->status = std::to_underlying(thread->status);
@@ -899,7 +899,7 @@ EXPORT(SceInt32, sceKernelChangeThreadCpuAffinityMask, SceUID thid, SceInt32 aff
 
     const SceInt32 old_affinity = thread->affinity_mask;
 
-    if (affinity_mask & ~SCE_KERNEL_CPU_MASK_USER_ALL)
+    if (affinity_mask & ~emuenv.kernel.process_cpu_affinity_mask())
         return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_CPU_AFFINITY_MASK);
 
     thread->affinity_mask = affinity_mask;
@@ -919,13 +919,10 @@ EXPORT(SceInt32, sceKernelChangeThreadPriority2, SceUID thid, SceInt32 priority)
         priority = emuenv.kernel.get_thread(thread_id)->priority;
     }
 
-    if (priority >= SCE_KERNEL_HIGHEST_DEFAULT_PRIORITY
-        && priority <= SCE_KERNEL_LOWEST_DEFAULT_PRIORITY) {
-        priority = SCE_KERNEL_GAME_DEFAULT_PRIORITY_ACTUAL + (priority - SCE_KERNEL_DEFAULT_PRIORITY);
-    }
-
-    if (priority < SCE_KERNEL_HIGHEST_PRIORITY_USER || priority > SCE_KERNEL_LOWEST_PRIORITY_USER)
+    const auto resolved_priority = emuenv.kernel.resolve_thread_priority(priority);
+    if (!resolved_priority || (!emuenv.kernel.is_system_process && *resolved_priority < SCE_KERNEL_HIGHEST_PRIORITY_USER))
         return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_PRIORITY);
+    priority = *resolved_priority;
 
     thread->priority = priority;
     thread->tls.get_ptr<int>().get(emuenv.mem)[TLS_CURRENT_PRIORITY] = priority;
@@ -1032,7 +1029,12 @@ EXPORT(SceUID, sceKernelCreateCallback, char *name, SceUInt32 attr, Ptr<SceKerne
 
 EXPORT(int, sceKernelCreateThreadForUser, const char *name, SceKernelThreadEntry entry, int init_priority, SceKernelCreateThread_opt *options) {
     TRACY_FUNC(sceKernelCreateThreadForUser, name, entry, init_priority, options);
-    if (options->cpu_affinity_mask & ~SCE_KERNEL_CPU_MASK_USER_ALL) {
+    if (!emuenv.kernel.resolve_thread_priority(init_priority))
+        return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_PRIORITY);
+    if (options->cpu_affinity_mask & ~emuenv.kernel.process_cpu_affinity_mask()) {
+#ifndef NDEBUG
+        LOG_ERROR("Thread '{}' requested unsupported CPU affinity 0x{:08X}", name, options->cpu_affinity_mask);
+#endif
         return RET_ERROR(SCE_KERNEL_ERROR_INVALID_CPU_AFFINITY);
     }
 

@@ -16,6 +16,9 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include <module/module.h>
+#ifndef NDEBUG
+#include <io/state.h>
+#endif
 
 #include <regmgr/functions.h>
 #include <regmgr/types.h>
@@ -53,6 +56,10 @@ EXPORT(int, sceRegMgrGetKeyBin, const char *category, const char *name, void *bu
 EXPORT(int, sceRegMgrGetKeyInt, const char *category, const char *name, SceInt32 *buf) {
     TRACY_FUNC(sceRegMgrGetKeyInt, category, name, buf);
     *buf = regmgr::get_int_value(emuenv.regmgr, category, name);
+#ifndef NDEBUG
+    if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
+        LOG_DEBUG("Native shell registry {}/{} = {}", category, name, *buf);
+#endif
 
     return 0;
 }

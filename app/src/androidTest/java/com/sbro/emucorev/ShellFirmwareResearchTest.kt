@@ -1,10 +1,14 @@
 package com.sbro.emucorev
 
+import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.NativeLibraryLoader
+import com.sbro.emucorev.core.SKIP_AUTOMATIC_STATE_LOAD_EXTRA
+import com.sbro.emucorev.core.vita.Emulator
 import java.io.File
+import java.security.MessageDigest
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -16,6 +20,74 @@ import org.junit.runner.RunWith
 class ShellFirmwareResearchTest {
     private external fun decode(input: ByteArray): ByteArray
     private external fun link(inputs: Array<ByteArray>, trace: Boolean): String
+    private external fun prepareBoot(sandbox: String): Boolean
+    private external fun verifyKernelCopy(): Boolean
+    private external fun verifySystemThreads(): Boolean
+    private external fun verifyPackageInfo(root: String): Boolean
+    private external fun installPackageFixture(pup: String, root: String): String
+
+    @Test
+    fun systemAffinityDoesNotRelaxGameAffinity() {
+        assumeTrue("System affinity probe is opt-in", researchMode() == "affinity")
+        NativeLibraryLoader.ensureLoaded(InstrumentationRegistry.getInstrumentation().targetContext)
+        assertTrue("System CPU mask and game restriction must remain separate", verifySystemThreads())
+    }
+
+    @Test
+    fun packageInfoUsesInstalledMetadata() {
+        assumeTrue("Package info probe is opt-in", researchMode() == "packageInfo")
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        NativeLibraryLoader.ensureLoaded(context)
+        assertTrue(verifyPackageInfo(File(context.cacheDir, "package-info-probe/vita").absolutePath))
+    }
+
+    @Test
+    fun fontInstallationRecordsRealPackageVersion() {
+        assumeTrue("Real package fixture is opt-in", researchMode() == "packageInstall")
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        NativeLibraryLoader.ensureLoaded(context)
+        val source = File(context.externalCacheDir, "shell-research/PSP2UPDAT.PUP")
+        val target = File(context.cacheDir, "firmware-package-probe/vita")
+        assertTrue("Explicit official PUP fixture is required", source.isFile)
+        val md5 = MessageDigest.getInstance("MD5")
+        source.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                md5.update(buffer, 0, count)
+            }
+        }
+        assertTrue("Official font package identity", md5.digest().joinToString("") { "%02x".format(it) } ==
+            "59dcf059d3328fb67be7e51f8aa33418")
+        assertTrue("Installer must complete", installPackageFixture(source.absolutePath, target.absolutePath).isNotBlank())
+        assertTrue(File(target, "sa0/data/font/pvf/jpn0.pvf").isFile)
+        assertTrue(File(target, "system-packages/23.version").readText().trim().toLong(16) == 0x1000010L)
+    }
+
+    @Test
+    fun kernelCopyWritesOutputAndRejectsInvalidRanges() {
+        assumeTrue("Kernel copy probe is opt-in", researchMode() == "copy")
+        NativeLibraryLoader.ensureLoaded(InstrumentationRegistry.getInstrumentation().targetContext)
+        assertTrue("Kernel-to-user copy and invalid address handling", verifyKernelCopy())
+    }
+
+    @Test
+    fun bootOriginalShellInPrivateFilesystem() {
+        assumeTrue("Shell boot is opt-in", researchMode() == "boot")
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        NativeLibraryLoader.ensureLoaded(context)
+        val sandbox = File(context.cacheDir, "native-shell-runtime/vita")
+        check(sandbox.isDirectory || sandbox.mkdirs())
+        assertTrue(prepareBoot(sandbox.absolutePath))
+        context.startActivity(Intent(context, Emulator::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra("AppStartParameters", arrayOf("-r", "__VITA_SHELL_RESEARCH__"))
+            .putExtra(SKIP_AUTOMATIC_STATE_LOAD_EXTRA, true))
+        // Observational bootstrap only. A successful test is not proof of a
+        // rendered shell: inspect native logs and the device frame separately.
+        Thread.sleep(30_000)
+    }
 
     @Test
     fun inspect() {

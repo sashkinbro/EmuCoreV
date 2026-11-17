@@ -566,6 +566,7 @@ void KernelState::resume_world() {
 
 void KernelState::deinit(MemState &mem) {
     process_exit();
+    is_system_process = false;
     threads.clear();
 
     simple_events.clear();
