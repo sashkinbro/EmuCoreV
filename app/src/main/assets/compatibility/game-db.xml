@@ -2,6 +2,15 @@
 <!-- Recommendations only: global defaults -> Game DB -> explicit per-game settings.
      Shared by the Android settings UI and the native core. Never select a driver here. -->
 <game-db version="1">
+    <profile id="crazy-market-network-modules">
+        <!-- HLE network state stalls startup before savedata completion is polled.
+             Use the firmware network libraries for this verified title only. -->
+        <title-id>PCSE00291</title-id>
+        <modules mode="auto-manual">
+            <module>libnet</module>
+            <module>libnetctl</module>
+        </modules>
+    </profile>
     <profile id="stealth-inc-depth-clipping">
         <!-- Room covers are moved outside the depth frustum to reveal gameplay.
              Clamping them onto its boundary leaves only the starting capsule visible.

@@ -14,9 +14,11 @@ cpp = r'''
 #include <config/game_database.h>
 #include <cstdio>
 #include <iterator>
+#include <vector>
 struct Settings {
  std::string backend_renderer="OpenGL", memory_mapping="page-table", driver="working-driver";
  bool high_accuracy=false, accurate_thread_scheduling=false, eager_surface_sync=false, depth_clamp=true; int audio_volume=37;
+ int modules_mode=0; std::vector<std::string> lle_modules;
 };
 int main(int argc,char **argv){
  int failed=0;auto check=[&](bool ok,const char *name){
@@ -39,6 +41,22 @@ int main(int argc,char **argv){
   check(!config::game_database::recommendation(bad,"EXACT"),"empty, incomplete or malformed profile ignored");
  }
  pugi::xml_document bundled;check(argc==2&&bundled.load_file(argv[1]),"bundled database parses");
+ Settings crazy=global;crazy.lle_modules={"libngs"};
+ config::game_database::apply_module_settings(crazy,config::game_database::module_recommendation(bundled," pcse00291 "));
+ config::game_database::apply_module_settings(crazy,config::game_database::module_recommendation(bundled,"PCSE00291"));
+ check(crazy.modules_mode==1 && crazy.lle_modules==std::vector<std::string>({"libngs","libnet","libnetctl"})
+  &&crazy.high_accuracy==global.high_accuracy&&crazy.memory_mapping==global.memory_mapping,
+  "Crazy firmware modules preserve other choices and do not duplicate");
+ check(!config::game_database::module_recommendation(bundled,"PCSE00089")
+  &&!config::game_database::module_recommendation(bundled,"PCSB00374")
+  &&!config::game_database::module_recommendation(bundled,""),"module policy requires verified exact ID");
+ for(const auto &xml:{"<modules mode='auto-manual'/>","<modules mode='manual'><module>libnet</module></modules>",
+  "<modules mode='auto-manual'><module>../libnet</module></modules>","<modules mode='auto-manual'><module>libnet.suprx</module></modules>",
+  "<modules mode='auto-manual'><module/></modules>","<modules mode='auto-manual'><unknown>libnet</unknown></modules>"}){
+  pugi::xml_document bad;bad.load_string(xml);Settings unchanged=global;
+  config::game_database::apply_module_settings(unchanged,bad.child("modules"));
+  check(unchanged.modules_mode==global.modules_mode&&unchanged.lle_modules.empty(),"invalid module policies do not change config");
+ }
  Settings pvz=global;
  Settings stealth=global;
  config::game_database::apply_gpu_settings(stealth,config::game_database::recommendation(bundled,"PCSE00280"));

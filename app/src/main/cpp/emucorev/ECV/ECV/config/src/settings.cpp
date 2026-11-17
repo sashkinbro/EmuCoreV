@@ -407,6 +407,7 @@ void set_current_config(Config &cfg, const fs::path &config_path, const std::str
             return doc;
         }();
         game_database::apply_gpu_settings(cfg.current_config, game_database::recommendation(database, app_path, app_title));
+        game_database::apply_module_settings(cfg.current_config, game_database::module_recommendation(database, app_path));
     }
 #endif
     // Explicit per-game choices always take precedence over recommendations.

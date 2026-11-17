@@ -3,6 +3,7 @@
 #include <pugixml.hpp>
 #include <string>
 #include <string_view>
+#include <algorithm>
 
 namespace config::game_database {
 
@@ -59,6 +60,43 @@ inline pugi::xml_node recommendation(const pugi::xml_document &db, std::string_v
         if (valid_gpu(profile.child("gpu")) && contains_word(name, normalized(profile.attribute("title-word").value())))
             return profile.child("gpu");
     return {};
+}
+
+inline bool valid_modules(pugi::xml_node modules) {
+    if (std::string_view(modules.attribute("mode").value()) != "auto-manual") return false;
+    bool found = false;
+    for (auto module : modules.children()) {
+        if (std::string_view(module.name()) != "module") return false;
+        const std::string_view name = module.text().as_string();
+        if (name.empty() || name.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") != std::string_view::npos) return false;
+        found = true;
+    }
+    return found;
+}
+
+// Firmware-module policies require an exact verified ID; title names never match.
+inline pugi::xml_node module_recommendation(const pugi::xml_document &db, std::string_view title_id) {
+    const auto id = normalized(title_id);
+    const auto root = db.child("game-db");
+    if (id.empty() || std::string_view(root.attribute("version").value()) != "1") return {};
+    for (auto profile : root.children("profile")) {
+        const auto modules = profile.child("modules");
+        if (!valid_modules(modules)) continue;
+        for (auto candidate : profile.children("title-id"))
+            if (normalized(candidate.text().as_string()) == id) return modules;
+    }
+    return {};
+}
+
+template <typename Config>
+inline void apply_module_settings(Config &out, pugi::xml_node modules) {
+    if (!valid_modules(modules)) return;
+    out.modules_mode = 1; // ModulesMode::AUTO_MANUAL
+    for (auto module : modules.children("module")) {
+        const std::string name = module.text().as_string();
+        if (std::find(out.lle_modules.begin(), out.lle_modules.end(), name) == out.lle_modules.end())
+            out.lle_modules.push_back(name);
+    }
 }
 
 // Reused for user XML AFTER recommendations. Missing attributes inherit;
