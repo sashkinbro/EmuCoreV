@@ -195,7 +195,7 @@ private data class EmulationMenuPalette(
 private fun emulationMenuPalette(): EmulationMenuPalette {
     val scheme = MaterialTheme.colorScheme
     return EmulationMenuPalette(
-        panel = scheme.surface.copy(alpha = 0.96f),
+        panel = scheme.surface,
         panelSoft = scheme.surfaceVariant.copy(alpha = 0.60f),
         row = scheme.surfaceVariant.copy(alpha = 0.30f),
         border = scheme.onSurface.copy(alpha = 0.06f),
@@ -350,7 +350,7 @@ fun EmulationGameMenu(
         Row(modifier = modifier.fillMaxHeight(), horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.Top) {
             Surface(modifier = Modifier.fillMaxHeight().widthIn(min = 300.dp, max = 420.dp),
-                shape = neonShape(28.dp), color = scheme.surface.copy(alpha = 0.96f),
+                shape = neonShape(28.dp), color = scheme.surface,
                 border = runtimeMenuBorder(RuntimeMenuSurfaceRole.Outer, scheme, effectiveStyle)) {
                 Box(Modifier.fillMaxSize()) {
                     content(Modifier)
@@ -378,7 +378,7 @@ fun EmulationGameMenu(
                 GameMenuLayoutStyle.SIDEBAR -> Modifier.fillMaxHeight().widthIn(min = 470.dp, max = 506.dp)
             }),
         shape = shape,
-        color = scheme.surface.copy(alpha = if (compact) 0.95f else 0.98f),
+        color = scheme.surface,
         border = runtimeMenuBorder(RuntimeMenuSurfaceRole.Outer, scheme, effectiveStyle),
         tonalElevation = 0.dp,
         shadowElevation = when (effectiveStyle) {
@@ -1570,7 +1570,7 @@ private fun MenuVerticalTabs(
     }
     Surface(modifier = modifier,
         shape = if (iconOnly) neonShape(24.dp) else neonShapeCorners(topStart = 24.dp, bottomStart = 24.dp),
-        color = if (iconOnly) scheme.surface.copy(alpha = 0.72f) else scheme.surfaceContainerLow,
+        color = if (iconOnly) scheme.surface else scheme.surfaceContainerLow,
         border = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.48f))) {
         Box(Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())

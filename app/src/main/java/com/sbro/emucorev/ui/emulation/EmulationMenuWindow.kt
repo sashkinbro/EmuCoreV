@@ -44,10 +44,9 @@ internal fun EmulationMenuWindow(
         dialogRef[0] = dialog
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         val window = requireNotNull(dialog.window)
-        // This window covers the paused game. Keep its backing surface opaque so
-        // the renderer can never show through gaps between menu panels.
-        window.setBackgroundDrawable(ColorDrawable(Color.BLACK))
-        window.setFormat(android.graphics.PixelFormat.OPAQUE)
+        // Only the menu panels are opaque; uncovered space shows the paused game.
+        window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        window.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
         window.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)

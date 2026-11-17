@@ -864,7 +864,6 @@ fun EmulationOverlayHost(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f))
                             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                                 menuOpen = false
                             }
