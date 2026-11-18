@@ -15,6 +15,17 @@ object NativeLibraryMode {
     const val EXIT_NATIVE_LIBRARY = "exit_native_library"
     val available: Boolean get() = BuildConfig.DEBUG
 
+    fun needsCatalogBootstrap(context: Context): Boolean {
+        val database = File(context.cacheDir, "native-shell-runtime/vita/ur0/shell/db/app.db")
+        if (!database.isFile) return true
+        return runCatching {
+            android.database.sqlite.SQLiteDatabase.openDatabase(database.path, null,
+                android.database.sqlite.SQLiteDatabase.OPEN_READONLY).use { db ->
+                db.rawQuery("SELECT 1 FROM tbl_appinfo WHERE titleId='NPXS10008' LIMIT 1", null).use { !it.moveToFirst() }
+            }
+        }.getOrDefault(true)
+    }
+
     /** Runs on SDL's worker before starting the guest; never edits a live shell database. */
     fun prepare(context: Context): File {
         val root = File(context.cacheDir, "native-shell-runtime/vita")
@@ -26,7 +37,23 @@ object NativeLibraryMode {
                 check(target.parentFile!!.isDirectory || target.parentFile!!.mkdirs())
                 if (!target.isFile || !source.readBytes().contentEquals(target.readBytes())) source.copyTo(target, overwrite = true)
             }
-        if (File(root, "ur0/shell/db/app.db").isFile) {
+        // Older installers discarded SPKG versions. Recover only missing
+        // metadata from the actual cached packages; never invent a version.
+        val downloads = File(EmulatorStorage.runtimeRoot(context), "Download/firmware-downloads")
+        listOf("PSVUPDAT.PUP", "PSP2UPDAT.PUP").forEach { name ->
+            val source = File(downloads, name)
+            if (source.isFile && (name == "PSVUPDAT.PUP" && !File(root, "system-packages/1.version").isFile ||
+                    name == "PSP2UPDAT.PUP" && !File(root, "system-packages/23.version").isFile)) {
+                runCatching { FirmwarePackageVersions.read(source) }.getOrDefault(emptyMap()).forEach { (type, version) ->
+                    val target = File(root, "system-packages/$type.version")
+                    if (!target.isFile) {
+                        check(target.parentFile!!.isDirectory || target.parentFile!!.mkdirs())
+                        target.writeText(version.toString(16) + "\n")
+                    }
+                }
+            }
+        }
+        if (!needsCatalogBootstrap(context)) {
             NativeLibraryCatalog.synchronize(context, root, InstalledGameRepository().loadInstalledGames(context))
         }
         return root
