@@ -539,6 +539,13 @@ EXPORT(int, sceAppMgrReceiveEventNum, SceUInt32 *eventNum) {
 
 EXPORT(int, sceAppMgrReceiveNotificationRequestForShell) {
     TRACY_FUNC(sceAppMgrReceiveNotificationRequestForShell);
+#ifndef NDEBUG
+    // The isolated host has no application-manager notification service.
+    // Reporting success leaves the native request structure unwritten and
+    // causes VSH to process uninitialized stack contents as a real request.
+    if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
+        return static_cast<int>(SCE_APPMGR_ERROR_STATE);
+#endif
     return UNIMPLEMENTED();
 }
 
