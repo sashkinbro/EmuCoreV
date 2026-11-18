@@ -241,6 +241,54 @@ Measured on 2026-11-18 for the offline reference described above:
 Compilation alone proves neither stage linking nor original arithmetic, blending,
 input binding, image equivalence or performance. These gates remain pending.
 
+### Independent Vulkan pipeline compilation
+
+The same 113 original programs have also been translated offline to Vulkan
+SPIR-V with direct framebuffer input attachments and default RGBA hints. All 113
+pass the NDK's `spirv-val --target-env vulkan1.1`. The Android-only diagnostic
+`paf_shader_pipeline_test` links only the system Vulkan loader. It creates its
+own Vulkan instance/device and offscreen render-pass description; no emulator,
+application, guest runtime or shader translation library is linked into it.
+
+Unlike creating shader modules alone, this test calls
+`vkCreateGraphicsPipelines` for every original stage. For a fragment program it
+supplies a generated vertex stage with matching reflected inputs; for an original
+vertex program it supplies a fragment stage that consumes its reflected outputs.
+These diagnostic companions are explicitly not original UI stage pairs and must
+never be used to claim a reconstructed screen. Entry-point names come from the
+SPIR-V instructions, rather than assuming `main` (`main_vs`/`main_fs` occur in the
+reference). Reflected descriptor layouts are created for each stage.
+
+On RG556, Lenovo TB710FU and OnePlus CPH2747, **113/113 diagnostic graphics
+pipelines create successfully**, including the four PAF fragment programs that
+crash Lenovo's GLES compiler. This establishes a Vulkan compilation path for the
+reviewed programs. It does not repair the GLES compiler or establish a final
+renderer, original stage pairing, descriptor contents, ordered framebuffer
+feedback, correct pixels or 60 FPS. No draws or queue submissions occur in this
+gate. All reported device features are enabled for this diagnostic; production
+feature selection remains pending.
+
+```text
+paf_shader_pipeline_test LOCAL_SPIRV_REFERENCE_DIRECTORY EXPECTED_PROGRAM_COUNT
+```
+
+Each reference subdirectory contains `shader.spv` and `shader.meta`, generated
+by offline SPIRV-Cross reflection. The line-based metadata uses:
+
+```text
+STAGE <Vulkan stage bit: 1 vertex / 16 fragment>
+BIND <set> <binding> <Vulkan descriptor type> <array count>
+IN <location> <components> <bit width> <SPIRV-Cross base type> <array dimensions>
+OUT <location> <components> <bit width> <SPIRV-Cross base type> <array dimensions>
+INPUT_ATTACHMENT <index>
+```
+
+The reviewed interface consists of scalar-array-free float32 vec4 locations
+(SPIRV-Cross base type 13), input attachment index 0 and descriptor sets 0–3.
+Unreviewed interface variants are rejected explicitly. Original programs,
+reflection files and translated shaders remain ignored local research inputs.
+Neither diagnostic shader test is part of the application build or release.
+
 ## Build and validation
 
 Build independently using CMake 3.22+ and a C++20 compiler. For Android, supply
