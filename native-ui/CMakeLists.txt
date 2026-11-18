@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.22)
+project(EmuCoreVNativeUi LANGUAGES CXX)
+
+# Standalone reconstruction: no guest CPU, emulator, SDL or game dependencies.
+add_library(emucorev_paf STATIC paf/src/resource_document.cpp)
+target_include_directories(emucorev_paf PUBLIC paf/include)
+target_compile_features(emucorev_paf PUBLIC cxx_std_20)
+if(MSVC)
+    target_compile_options(emucorev_paf PRIVATE /W4 /WX)
+else()
+    target_compile_options(emucorev_paf PRIVATE -Wall -Wextra -Werror)
+endif()
+
+add_executable(paf_resource_inspect tools/resource_inspect.cpp)
+target_link_libraries(paf_resource_inspect PRIVATE emucorev_paf)
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(paf_resource_test tests/resource_document_test.cpp)
+    target_link_libraries(paf_resource_test PRIVATE emucorev_paf)
+    add_test(NAME paf_resource_document COMMAND paf_resource_test)
+endif()
