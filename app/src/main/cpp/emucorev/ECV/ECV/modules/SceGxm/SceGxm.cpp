@@ -31,6 +31,12 @@
 #include <stack>
 #include <system_error>
 #include <thread>
+#if defined(__ANDROID__) && !defined(NDEBUG)
+#include <bit>
+#include <sys/system_properties.h>
+#include <sys/uio.h>
+#include <unistd.h>
+#endif
 #if defined(__x86_64__) && !defined(__APPLE__)
 #include <xxh_x86dispatch.h>
 #else
@@ -3303,6 +3309,186 @@ static void gxmSetUniformBuffers(renderer::State &state, GxmState &gxm, SceGxmCo
     }
 }
 
+#if defined(__ANDROID__) && !defined(NDEBUG)
+// Read-only, explicitly requested research capture. This entire implementation
+// and its call site are absent from release builds. No guest state is changed.
+static void capture_native_ui_mesh(EmuEnvState &emuenv, const SceGxmContext &context,
+    const SceGxmVertexProgram &vertex, const SceGxmFragmentProgram &fragment,
+    const SceGxmProgram &vertex_gxp, const SceGxmProgram &fragment_gxp,
+    std::span<UniformBuffer> vertex_buffers, std::span<UniformBuffer> fragment_buffers,
+    const SceGxmTexture *vertex_textures, const SceGxmTexture *fragment_textures,
+    SceGxmPrimitiveType primitive, SceGxmIndexFormat index_format,
+    Ptr<const void> indices, uint32_t index_count, uint32_t instances) {
+    if (emuenv.io.app_path != "__VITA_NATIVE_LIBRARY__" || !index_count || !instances)
+        return;
+    // The reviewed original BubbleObj vertex programs, not arbitrary game data.
+    if (!((vertex_gxp.binary_guid == 0x82e017b4 && vertex_gxp.source_guid == 0x08543813)
+            || (vertex_gxp.binary_guid == 0xa103930c && vertex_gxp.source_guid == 0xb8e8f29b)))
+        return;
+    char property[PROP_VALUE_MAX]{};
+    const int length = __system_property_get("debug.emucorev.shell.mesh", property);
+    if (length <= 0 || length > 16 || std::any_of(property, property + length,
+            [](char c) { return c < '0' || c > '9'; }))
+        return;
+    const std::string request(property, length);
+    if (request == "0")
+        return;
+    static std::mutex capture_mutex;
+    static std::string last_request;
+    std::lock_guard lock(capture_mutex);
+    if (last_request == request)
+        return;
+    // Consume failed attempts too: a bad pointer or full disk must not cause
+    // repeated I/O on every frame. A different numeric token requests a retry.
+    last_request = request;
+    try {
+        const auto directory = emuenv.cache_path / "native-ui-mesh" / request;
+        if (fs::exists(directory))
+            return;
+        fs::create_directories(directory);
+        fs::ofstream manifest(directory / "mesh.txt");
+        if (!manifest)
+            throw std::runtime_error("Cannot create mesh manifest");
+        manifest << "PAF_MESH_CAPTURE 1\n";
+        manifest << "vertex_guid " << vertex_gxp.binary_guid << ' ' << vertex_gxp.source_guid << '\n';
+        manifest << "fragment_guid " << fragment_gxp.binary_guid << ' ' << fragment_gxp.source_guid << '\n';
+        manifest << "draw " << uint32_t(primitive) << ' ' << uint32_t(index_format) << ' ' << index_count << ' ' << instances << '\n';
+        const auto &viewport = context.state.viewport;
+        manifest << "viewport " << uint32_t(viewport.enable)
+                 << ' ' << std::bit_cast<uint32_t>(viewport.offset.x) << ' ' << std::bit_cast<uint32_t>(viewport.offset.y)
+                 << ' ' << std::bit_cast<uint32_t>(viewport.offset.z) << ' ' << std::bit_cast<uint32_t>(viewport.scale.x)
+                 << ' ' << std::bit_cast<uint32_t>(viewport.scale.y) << ' ' << std::bit_cast<uint32_t>(viewport.scale.z) << '\n';
+        manifest << "cull " << uint32_t(context.state.cull_mode) << '\n';
+        size_t copied = 0;
+        const auto copy = [&](const std::string &name, Address address, size_t bytes) {
+            if (!bytes || bytes > 2 * 1024 * 1024 || copied + bytes > 8 * 1024 * 1024)
+                throw std::runtime_error("Mesh capture exceeds research bounds");
+            std::vector<uint8_t> data(bytes);
+            bool readable = debug_safe_copy_guest(emuenv.mem, address, data.data(), static_cast<uint32_t>(bytes));
+            if (!readable && emuenv.mem.use_page_table && uint64_t(address) + bytes <= uint64_t(UINT32_MAX)) {
+                // GPU-backed external mappings can live outside the canonical
+                // memory reservation. Resolve each guest page as Ptr::get does;
+                // kernel-mediated reads still fail safely for inaccessible pages.
+                const std::shared_lock transition(emuenv.mem.external_transition_mutex);
+                readable = true;
+                for (size_t offset = 0; offset < bytes;) {
+                    const Address current = address + static_cast<Address>(offset);
+                    const size_t count = std::min<size_t>(bytes - offset, 4096 - current % 4096);
+                    iovec local{data.data() + offset, count};
+                    iovec remote{const_cast<void *>(Ptr<const void>(current).get(emuenv.mem)), count};
+                    if (process_vm_readv(getpid(), &local, 1, &remote, 1, 0) != static_cast<ssize_t>(count)) {
+                        readable = false;
+                        break;
+                    }
+                    offset += count;
+                }
+            }
+            if (!readable)
+                throw std::runtime_error("Unreadable mesh capture source");
+            fs::ofstream output(directory / name, std::ios::binary);
+            output.write(reinterpret_cast<const char *>(data.data()), data.size());
+            if (!output)
+                throw std::runtime_error("Cannot write mesh capture data");
+            copied += bytes;
+            return data;
+        };
+        const size_t index_size = index_format == SCE_GXM_INDEX_FORMAT_U16 ? 2 : 4;
+        const auto index_bytes = copy("indices.bin", indices.address(), uint64_t(index_count) * index_size);
+        uint32_t maximum_index = 0;
+        for (size_t i = 0; i < index_count; ++i) {
+            uint32_t value = 0;
+            std::memcpy(&value, index_bytes.data() + i * index_size, index_size);
+            maximum_index = std::max(maximum_index, value);
+        }
+        copy("vertex.gxp", vertex.program.address(), vertex_gxp.size);
+        copy("fragment.gxp", fragment.program.address(), fragment_gxp.size);
+        std::array<size_t, SCE_GXM_MAX_VERTEX_STREAMS> lengths{};
+        for (const auto &attribute : vertex.attributes) {
+            if (attribute.streamIndex >= vertex.streams.size() || attribute.streamIndex >= lengths.size())
+                throw std::runtime_error("Invalid captured vertex stream");
+            const auto &stream = vertex.streams[attribute.streamIndex];
+            const uint64_t last = gxm::is_stream_instancing(static_cast<SceGxmIndexSource>(stream.indexSource))
+                ? instances - 1 : maximum_index;
+            const uint64_t bytes = uint64_t(attribute.offset) + last * stream.stride
+                + gxm::attribute_format_size(attribute.format) * attribute.componentCount;
+            if (bytes > 2 * 1024 * 1024)
+                throw std::runtime_error("Captured vertex stream is too large");
+            lengths[attribute.streamIndex] = std::max(lengths[attribute.streamIndex], size_t(bytes));
+            manifest << "attribute " << attribute.streamIndex << ' ' << attribute.offset << ' '
+                     << uint32_t(attribute.format) << ' ' << unsigned(attribute.componentCount) << ' ' << attribute.regIndex << '\n';
+        }
+        for (size_t i = 0; i < lengths.size(); ++i) {
+            if (!lengths[i])
+                continue;
+            copy("stream-" + std::to_string(i) + ".bin", context.state.stream_data[i].address(), lengths[i]);
+            manifest << "stream " << i << ' ' << vertex.streams[i].stride << ' ' << vertex.streams[i].indexSource << ' ' << lengths[i] << '\n';
+        }
+        const auto uniforms = [&](const char *stage, std::span<UniformBuffer> buffers, const UniformBufferSizes &sizes) {
+            for (size_t i = 0; i < buffers.size(); ++i) {
+                if (!buffers[i] || !sizes.at(i))
+                    continue;
+                uint32_t bytes = sizes.at(i) * 4;
+                if (sizes.at(i) == SCE_GXM_MAX_UB_IN_FLOAT_UNIT) {
+                    auto region = emuenv.gxm.memory_mapped_regions.upper_bound(buffers[i].address());
+                    if (region != emuenv.gxm.memory_mapped_regions.begin()) {
+                        --region;
+                        const uint64_t end = uint64_t(region->first) + region->second.size;
+                        if (end > buffers[i].address())
+                            bytes = static_cast<uint32_t>(std::min<uint64_t>(end - buffers[i].address(), bytes));
+                    }
+                }
+                copy(std::string(stage) + "-ubo-" + std::to_string(i) + ".bin", buffers[i].address(), bytes);
+                manifest << "uniform " << stage << ' ' << i << ' ' << bytes << '\n';
+            }
+        };
+        uniforms("vertex", vertex_buffers, vertex.renderer_data->uniform_buffer_sizes);
+        uniforms("fragment", fragment_buffers, fragment.renderer_data->uniform_buffer_sizes);
+        const auto textures = [&](const char *stage, const SceGxmTexture *values, const gxp::TextureInfo &used) {
+            for (size_t i = 0; i < SCE_GXM_MAX_TEXTURE_UNITS; ++i) {
+                if (!used[i])
+                    continue;
+                const auto &texture = values[i];
+                const auto format = gxm::get_format(texture);
+                const auto base = gxm::get_base_format(format);
+                const auto bytes = gxm::texture_size(texture);
+                const auto prefix = std::string(stage) + "-texture-" + std::to_string(i);
+                std::array<uint32_t, 4> descriptor{};
+                std::memcpy(descriptor.data(), &texture, sizeof(texture));
+                manifest << "texture " << stage << ' ' << i << ' ' << gxm::get_width(texture) << ' '
+                         << gxm::get_height(texture) << ' ' << uint32_t(format) << ' ' << bytes;
+                for (const auto word : descriptor)
+                    manifest << ' ' << word;
+                manifest << '\n';
+                try {
+                    copy(prefix + ".bin", texture.data_addr << 2, bytes);
+                } catch (const std::exception &) {
+                    // Keep the descriptor and explicitly report an unavailable
+                    // source. In particular, never dereference an unbound or
+                    // protected GPU texture to force a nominally complete dump.
+                    manifest << "texture_unavailable " << stage << ' ' << i << '\n';
+                    continue;
+                }
+                if (gxm::is_paletted_format(base)) {
+                    const size_t palette_bytes = base == SCE_GXM_TEXTURE_BASE_FORMAT_P4 ? 64 : 1024;
+                    copy(prefix + "-palette.bin", texture.palette_addr << 6, palette_bytes);
+                    manifest << "palette " << stage << ' ' << i << ' ' << palette_bytes << '\n';
+                }
+            }
+        };
+        // Guest-side bytes only. A sampled GPU render target may need separate
+        // GPU readback; this capture must not be called a complete frame replay.
+        textures("vertex", vertex_textures, vertex.renderer_data->textures_used);
+        textures("fragment", fragment_textures, fragment.renderer_data->textures_used);
+        manifest << "DONE\n";
+        manifest.flush();
+        if (!manifest)
+            throw std::runtime_error("Cannot finish mesh capture manifest");
+    } catch (const std::exception &error) {
+        LOG_WARN("One-shot native UI mesh capture failed: {}", error.what());
+    }
+}
+#endif
+
 static int gxmDrawElementGeneral(EmuEnvState &emuenv, const char *export_name, const SceUID thread_id, SceGxmContext *context, SceGxmPrimitiveType primType, SceGxmIndexFormat indexType, Ptr<const void> indexData, uint32_t indexCount, uint32_t instanceCount) {
     if (!context || !indexData)
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
@@ -3427,6 +3613,12 @@ static int gxmDrawElementGeneral(EmuEnvState &emuenv, const char *export_name, c
         }
     }
 
+#if defined(__ANDROID__) && !defined(NDEBUG)
+    capture_native_ui_mesh(emuenv, *context, gxm_vertex_program, gxm_fragment_program,
+        vertex_program_gxp, fragment_program_gxp, vert_buffers, frag_buffers,
+        vert_textures, frag_textures,
+        primType, indexType, indexData, indexCount, instanceCount);
+#endif
     renderer::draw(*emuenv.renderer, context->renderer.get(), primType, indexType, indexData, indexCount, instanceCount);
 
     // increase the ringbuffer position if a default vertex or fragment buffer was reserved, we know the new position will fit in the ringbuffer

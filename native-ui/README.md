@@ -289,6 +289,54 @@ Unreviewed interface variants are rejected explicitly. Original programs,
 reflection files and translated shaders remain ignored local research inputs.
 Neither diagnostic shader test is part of the application build or release.
 
+## Original bubble draw capture
+
+The original `BubbleObj` draw path has been traced through its renderer queue to
+the `bubble_opaque.vp` / `bubble_opaque.fp` programs. The original shaders' program
+bytes match the extracted reference programs by SHA-256, rather than relying on
+their names alone. On the smartphone and RG556 the captured draw uses a 608-vertex
+stream (32-byte records), 1,220 uint16 indices and the same shader pair. Vertex and
+index buffers match byte for byte between these captures. Viewport and vertex/
+fragment uniform buffers are recorded as original bit patterns.
+
+The opt-in capture implementation lives in the emulated reference's SceGxm debug
+path, not in this independent module. Both its implementation and call site are
+guarded by `__ANDROID__ && !NDEBUG`; it refuses sessions other than the private
+native-library sentinel and the two reviewed BubbleObj vertex program GUIDs.
+It performs no writes to guest state. A numeric token in the Android property
+`debug.emucorev.shell.mesh` requests one capture per process/token; `0` disables
+capture. Reusing a token does not repeat or overwrite the output. Capture files
+are confined to the application's cache path, with fixed generated filenames and
+bounded allocation/I/O (2 MiB per buffer, 8 MiB total). Failures consume the token
+to prevent continuous per-frame I/O. Change the token for an explicit retry.
+
+The debug reader first tries canonical guest memory. For separately mapped GPU
+pages it can resolve individual pages through the guest page table and use
+kernel-mediated reads while holding the external-mapping transition read lock.
+Unreadable texture data is explicitly marked `texture_unavailable` while retaining
+the descriptor. It is not replaced with invented pixels. The completed reference
+captures still have an unavailable 64x64 environment-detail texture at fragment
+slot 1. GPU-cached texture contents and freshness need additional capture before
+these files can reproduce the full draw. The 128x128 indexed color texture at slot
+0 and its palette were captured; different installed titles can supply different
+icons, so cross-device icon bytes are not assumed identical.
+
+Debug/release builds, unit tests and lint passed for this capture addition. The
+APK's debug `libECV.so` contains its property, manifest and failure markers; the
+release library contains none of those markers. Smartphone and RG556 capture
+integrity checks pass; seven deliberately corrupted host captures are rejected.
+The independent UI still does not initialize or link the emulation core.
+
+```text
+python native-ui/tests/inspect_mesh_reference.py LOCAL_CAPTURE_DIRECTORY --original-programs LOCAL_EXTRACTED_GXP_DIRECTORY --output LOCAL_REPORT.json
+```
+
+This checks completed manifests, exact buffer sizes, index/attribute bounds,
+finite float vertices, uniform/texture files and shader identity. It explicitly
+reports missing texture sources and leaves `pixelReplayVerified` false. It does
+not establish original GPU readback, full frame capture, correct resource binding
+or rendered equivalence. Original buffers and reports remain ignored artifacts.
+
 ## Build and validation
 
 Build independently using CMake 3.22+ and a C++20 compiler. For Android, supply
