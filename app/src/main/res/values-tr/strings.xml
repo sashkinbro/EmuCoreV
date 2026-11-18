@@ -1663,4 +1663,5 @@
 
     <string name="shader_search_parameters">Gölgelendirici parametrelerini ara</string>
     <string name="shader_no_matching_parameters">Eşleşen parametre bulunamadı.</string>
+    <string name="native_library_exit_title">Vita kitaplığından çıkılsın mı?</string>
 </resources>

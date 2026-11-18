@@ -1663,4 +1663,5 @@
 
     <string name="shader_search_parameters">Buscar parâmetros do shader</string>
     <string name="shader_no_matching_parameters">Nenhum parâmetro correspondente.</string>
+    <string name="native_library_exit_title">Sair da biblioteca Vita?</string>
 </resources>

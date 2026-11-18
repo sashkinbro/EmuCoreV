@@ -1667,4 +1667,5 @@
 
     <string name="shader_search_parameters">シェーダーパラメーターを検索</string>
     <string name="shader_no_matching_parameters">一致するパラメーターがありません。</string>
+    <string name="native_library_exit_title">Vitaライブラリーを終了しますか？</string>
 </resources>

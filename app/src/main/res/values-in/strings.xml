@@ -1667,4 +1667,5 @@
 
     <string name="shader_search_parameters">Cari parameter shader</string>
     <string name="shader_no_matching_parameters">Tidak ada parameter yang cocok.</string>
+    <string name="native_library_exit_title">Keluar dari pustaka Vita?</string>
 </resources>

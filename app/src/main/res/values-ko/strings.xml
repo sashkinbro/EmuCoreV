@@ -1666,4 +1666,5 @@
 
     <string name="shader_search_parameters">셰이더 매개변수 검색</string>
     <string name="shader_no_matching_parameters">일치하는 매개변수가 없습니다.</string>
+    <string name="native_library_exit_title">Vita 라이브러리를 종료할까요?</string>
 </resources>

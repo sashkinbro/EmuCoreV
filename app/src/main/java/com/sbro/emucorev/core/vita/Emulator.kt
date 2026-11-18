@@ -102,6 +102,9 @@ import com.sbro.emucorev.ui.theme.EmuCoreVTheme
 import java.io.File
 
 class Emulator : SDLActivity(), InputManager.InputDeviceListener {
+    private val isNativeShellSession: Boolean
+        get() = BuildConfig.DEBUG && gameIdFromIntent(intent) == "__VITA_SHELL_RESEARCH__"
+    private var shellExitDialog: android.app.AlertDialog? = null
     val rearTouchInput = com.sbro.emucorev.core.input.RearTouchInput()
     // Private backing state so that Compose observes changes when the native
     // core calls setCurrentGameId(). Using a separate computed property avoids
@@ -259,12 +262,14 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     fun requestOverlayMenuButtonReveal() {
+        if (isNativeShellSession) return
         runOnUiThread {
             overlayMenuButtonRevealHandler?.invoke()
         }
     }
 
     fun openPauseMenuFromController() {
+        if (isNativeShellSession) return
         runOnUiThread {
             overlayPauseMenuOpenHandler?.invoke()
         }
@@ -289,7 +294,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun main() {
-        if (isFrontCameraProbe()) {
+        if (isFrontCameraProbe() || isNativeShellSession) {
             super.main()
             return
         }
@@ -319,6 +324,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             if (it.isBlank()) emptyArray() else arrayOf("-r", it)
         }
         val gameId = gameIdFromArgs(baseArgs)
+        if (isNativeShellSession) return baseArgs
         syncEffectiveDriverForLaunch(gameId)
         // SDL requests these arguments on SDLThread after loading the core.
         // External shortcuts therefore inspect their auto slot off the UI thread too.
@@ -355,6 +361,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
         super.onCreate(savedInstanceState)
         if (isFinishing) return
+        if (isNativeShellSession) inputOverlay.setTouchControlsActive(false)
         KeyboardMouseManager.ensureInitialized(this)
         KeyboardMouseManager.setPointerCaptureListener { enabled ->
             runOnUiThread { updatePointerCapture(enabled) }
@@ -424,7 +431,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun quitAfterShutdown() {
-        if (isFrontCameraProbe()) {
+        if (isFrontCameraProbe() || isNativeShellSession) {
             super.quitAfterShutdown()
             return
         }
@@ -440,6 +447,8 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onDestroy() {
+        shellExitDialog?.dismiss()
+        shellExitDialog = null
         KeyboardMouseManager.setEmulationInputEnabled(false)
         KeyboardMouseManager.setPointerCaptureListener(null)
         KeyboardMouseManager.releaseAll()
@@ -561,6 +570,19 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         } catch (_: Exception) {
             ""
         }
+    }
+
+    private fun showShellExitDialog() {
+        if (isFinishing || shellExitDialog?.isShowing == true) return
+        shellExitDialog = android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.native_library_exit_title)
+            .setMessage(R.string.emulation_exit_confirm_body)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.emulation_exit_confirm_action) { _, _ -> exitEmulation(autoSave = false) }
+            .create().also { dialog ->
+                dialog.setOnDismissListener { shellExitDialog = null }
+                dialog.show()
+            }
     }
 
     @Deprecated("Deprecated in Java")
@@ -820,6 +842,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     @Deprecated("Deprecated in Java")
     @SuppressLint("GestureBackNavigation")
     override fun onBackPressed() {
+        if (isNativeShellSession) { showShellExitDialog(); return }
         if (launchStateLoading.active || stateFrameWaiting) return
         if (nativeKeyboardRequested) { onScreenKeyboardFocusLost(); return }
         if (overlayBackHandler?.invoke() == true) return
@@ -827,6 +850,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun superOnBackPressed() {
+        if (isNativeShellSession) { showShellExitDialog(); return }
         if (launchStateLoading.active || stateFrameWaiting) return
         if (nativeKeyboardRequested) { onScreenKeyboardFocusLost(); return }
         if (overlayBackHandler?.invoke() == true) return
@@ -834,6 +858,10 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (isNativeShellSession && event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) showShellExitDialog()
+            return true
+        }
         if (rebirthRequested) return true
         if (launchStateLoading.active || stateFrameWaiting) {
             return when (event.keyCode) {
@@ -1021,6 +1049,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     private fun attachComposeOverlay() {
+        if (isNativeShellSession) return
         val layout = mLayout ?: return
         if (composeOverlayAttached) return
         composeOverlayAttached = true
@@ -1060,6 +1089,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     private fun startPlayTimeSessionIfNeeded() {
+        if (isNativeShellSession) return
         val gameId = currentGameIdOrIntent().trim()
         if (gameId.isBlank()) return
         if (playTimeSessionId != null && playTimeSessionTitleId.equals(gameId, ignoreCase = true)) return
@@ -1083,6 +1113,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     private fun requestRetroArchShaderReapply(titleId: String) {
+        if (isNativeShellSession) return
         runOnUiThread {
             if (rebirthRequested || isFinishing || isDestroyed) return@runOnUiThread
             val normalizedTitleId = titleId.trim()

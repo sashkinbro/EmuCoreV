@@ -1667,4 +1667,5 @@
 
     <string name="shader_search_parameters">البحث في معلمات التظليل</string>
     <string name="shader_no_matching_parameters">لا توجد معلمات مطابقة.</string>
+    <string name="native_library_exit_title">هل تريد مغادرة مكتبة Vita؟</string>
 </resources>
