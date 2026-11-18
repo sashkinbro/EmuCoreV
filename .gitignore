@@ -84,3 +84,6 @@ Thumbs.db
 # Transient SQLite WAL coordination files
 *.db-shm
 *.db-wal
+
+# Local test captures, dumps, fixtures and research outputs
+/artifacts/

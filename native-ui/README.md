@@ -68,6 +68,40 @@ Validation on 2026-11-18:
   documents parse. All 1,960 UTF-16 string values match independent raw decoding.
   This proves decoding, not translation completeness or rendered font parity.
 
+## Reconstructed animation functions
+
+`evaluate_curve` implements the original linear, slower (square root), faster,
+quadratic-in and quadratic-out functions, including input clamping and operation
+order. These are independent C++ functions, not calls to guest code. They are not
+the complete PAF timer or shell transitions. The API's enum values are local and
+must not be treated as firmware function IDs.
+
+The functions were reconstructed from the local reference's Thumb/VFP operations.
+`tests/generate_curve_reference.py` verifies SHA-256 fingerprints of each code
+region, executes the original instructions offline using Unicorn, and records
+input/output words. This oracle is a research dependency only. The delivered C++
+module has no Unicorn or guest-code dependency. It disables fast-math and fused
+contraction so a compiler cannot replace the recovered arithmetic order.
+
+On RG556, Lenovo TB710FU and OnePlus CPH2747, all **41,035** corpus comparisons
+match bit for bit: 8,207 input words per function, including 4,097 evenly spaced
+points, reproducible random bit patterns, signed zeros, subnormals, infinities,
+and quiet/signaling NaNs. The reference oracle uses FPSCR=0 (round-to-nearest,
+no flush-to-zero/default-NaN); the original shell's active floating-point settings
+still require runtime capture. These results prove only the tested function
+subset/settings, not complete animation or frame equivalence.
+
+```text
+python native-ui/tests/generate_curve_reference.py OWNED_DECRYPTED_LIBPAF.suprx LOCAL_CORPUS.bin
+```
+
+Build `paf_curve_test`, push it and the corpus to `/data/local/tmp`, and run
+`paf_curve_test LOCAL_CORPUS.bin` on Android. Running without a corpus performs
+only basic checks and explicitly reports that original-code comparison was not
+performed. The reference binary and generated research corpus stay outside the
+source tree. A different firmware code fingerprint requires independent review;
+the generator refuses to execute unverified offsets.
+
 ## Build and validation
 
 Build independently using CMake 3.22+ and a C++20 compiler. For Android, supply
