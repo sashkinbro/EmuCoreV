@@ -1218,7 +1218,7 @@
     <string name="profile_customize_pro_games">Wyróżnij do 3 gier</string>
     <string name="profile_customize_pro_games_help">Wybierz gry, które zostaną wyróżnione w Twoim profilu publicznym.</string>
     <string name="profile_customize_pro_title">Profil Pro</string>
-    <string name="profile_device_android">System</string>
+    <string name="profile_device_android">System operacyjny</string>
     <string name="profile_device_app_core">Aplikacja · rdzeń</string>
     <string name="profile_device_current">To urządzenie</string>
     <string name="profile_device_delete">Usuń urządzenie</string>
@@ -1667,4 +1667,77 @@
     <string name="shader_search_parameters">Znajdź parametry shadera</string>
     <string name="shader_no_matching_parameters">Brak pasujących parametrów.</string>
     <string name="native_library_exit_title">Wyjść z biblioteki Vita?</string>
+
+    <string name="emulation_auto_save_on_exit">Autozapis przy wyjściu</string>
+    <string name="emulation_auto_save_on_exit_desc">Zapisz tę grę w gnieździe autozapisu przed zamknięciem emulatora.</string>
+    <string name="emulation_auto_load_on_start">Autowczytywanie przy starcie</string>
+    <string name="emulation_auto_load_on_start_desc">Automatycznie wczytaj najnowszy autozapis tej gry po jej uruchomieniu.</string>
+
+    <string name="stats_title">Statystyki</string>
+    <string name="stats_help">CPU mierzy tę aplikację na wszystkich rdzeniach. GPU dotyczy całego urządzenia, jeśli dostępne. Temperatura pochodzi z baterii; brak danych oznacza —.</string>
+    <string name="stats_position">Pozycja</string>
+    <string name="stats_top_left">Góra lewo</string>
+    <string name="stats_top_right">Góra prawo</string>
+    <string name="stats_bottom_left">Dół lewo</string>
+    <string name="stats_bottom_right">Dół prawo</string>
+    <string name="stats_size">Rozmiar</string>
+    <string name="stats_metrics">Widoczne wskaźniki</string>
+    <string name="stats_reset">Resetuj statystyki</string>
+    <string name="stats_version">Wersja aplikacji i rdzenia</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Czas klatki</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">Model CPU</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">Obciążenie GPU</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Temperatura baterii</string>
+    <string name="stats_thermal">Stan termiczny</string>
+    <string name="stats_resolution">Rozdzielczość</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">Wstrzymano</string>
+    <string name="stats_thermal_none">Normalny</string>
+    <string name="stats_thermal_light">Lekki</string>
+    <string name="stats_thermal_moderate">Umiarkowany</string>
+    <string name="stats_thermal_severe">Poważny</string>
+    <string name="stats_thermal_critical">Krytyczny</string>
+    <string name="stats_thermal_emergency">Awaryjny</string>
+    <string name="stats_thermal_shutdown">Wyłączenie</string>
+    <string name="stats_mode">Tryb wyświetlania</string>
+    <string name="stats_mode_off">Wyłączone</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Szczegółowe</string>
+    <string name="stats_enabled">Pokaż FPS</string>
+
+    <string name="touch_layout_settings_title">Układ sterowania dotykowego</string>
+    <string name="touch_layout_settings_description">Ustaw domyślne położenie i rozmiar elementów sterujących na ekranie. Gry z własnym układem zachowują go.</string>
+    <string name="touch_layout_game_inherited">Używany jest układ globalny</string>
+    <string name="touch_layout_game_custom">Własny układ tej gry</string>
+    <string name="touch_layout_edit">Edytuj sterowanie dotykowe</string>
+    <string name="touch_layout_use_global">Użyj układu globalnego</string>
+
+    <plurals name="library_game_count">
+        <item quantity="one">Łącznie: %1$d gra</item>
+        <item quantity="few">Łącznie: %1$d gry</item>
+        <item quantity="many">Łącznie: %1$d gier</item>
+        <item quantity="other">Łącznie: %1$d gry</item>
+    </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="one">Pomyślnie zainstalowano %1$d grę.</item>
+        <item quantity="few">Pomyślnie zainstalowano %1$d gry.</item>
+        <item quantity="many">Pomyślnie zainstalowano %1$d gier.</item>
+        <item quantity="other">Pomyślnie zainstalowano %1$d gry.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="one">Ukończono %1$d z %2$d elementów</item>
+        <item quantity="few">Ukończono %1$d z %2$d elementów</item>
+        <item quantity="many">Ukończono %1$d z %2$d elementów</item>
+        <item quantity="other">Ukończono %1$d z %2$d elementów</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="one">Archiwum zawiera %1$d plik z metodą kompresji ZIP, której ten instalator nie może odczytać.</item>
+        <item quantity="few">Archiwum zawiera %1$d pliki z metodą kompresji ZIP, której ten instalator nie może odczytać.</item>
+        <item quantity="many">Archiwum zawiera %1$d plików z metodą kompresji ZIP, której ten instalator nie może odczytać.</item>
+        <item quantity="other">Archiwum zawiera %1$d pliku z metodą kompresji ZIP, której ten instalator nie może odczytać.</item>
+    </plurals>
 </resources>

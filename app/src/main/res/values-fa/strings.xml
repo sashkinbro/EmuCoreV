@@ -1668,4 +1668,69 @@
     <string name="shader_search_parameters">جست‌وجوی پارامترهای سایه‌زن</string>
     <string name="shader_no_matching_parameters">پارامتر مطابقی یافت نشد.</string>
     <string name="native_library_exit_title">از کتابخانهٔ Vita خارج می‌شوید؟</string>
+
+    <string name="emulation_auto_save_on_exit">ذخیره خودکار هنگام خروج</string>
+    <string name="emulation_auto_save_on_exit_desc">قبل از بستن شبیه‌ساز، این بازی را در شکاف ذخیره خودکار ذخیره کنید.</string>
+    <string name="emulation_auto_load_on_start">بارگذاری خودکار در شروع</string>
+    <string name="emulation_auto_load_on_start_desc">هنگام شروع، آخرین ذخیره خودکار این بازی را به طور خودکار بارگذاری کنید.</string>
+
+    <string name="stats_title">آمار</string>
+    <string name="stats_help">CPU مصرف این برنامه در همهٔ هسته‌هاست. GPU مصرف کل دستگاه در صورت دسترسی است. دما از حسگر باتری است؛ مقدار ناموجود با — نشان داده می‌شود.</string>
+    <string name="stats_position">موقعیت</string>
+    <string name="stats_top_left">بالا چپ</string>
+    <string name="stats_top_right">بالا راست</string>
+    <string name="stats_bottom_left">پایین چپ</string>
+    <string name="stats_bottom_right">پایین راست</string>
+    <string name="stats_size">اندازه</string>
+    <string name="stats_metrics">شاخص‌های نمایان</string>
+    <string name="stats_reset">بازنشانی آمار</string>
+    <string name="stats_version">نسخهٔ برنامه و هسته</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">زمان فریم</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">مدل CPU</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">بار GPU</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">دمای باتری</string>
+    <string name="stats_thermal">وضعیت حرارتی</string>
+    <string name="stats_resolution">وضوح</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">متوقف</string>
+    <string name="stats_thermal_none">عادی</string>
+    <string name="stats_thermal_light">کم</string>
+    <string name="stats_thermal_moderate">متوسط</string>
+    <string name="stats_thermal_severe">شدید</string>
+    <string name="stats_thermal_critical">بحرانی</string>
+    <string name="stats_thermal_emergency">اضطراری</string>
+    <string name="stats_thermal_shutdown">خاموشی</string>
+    <string name="stats_mode">حالت نمایش</string>
+    <string name="stats_mode_off">خاموش</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">جزئیات</string>
+    <string name="stats_enabled">نمایش FPS</string>
+
+    <string name="touch_layout_settings_title">چیدمان لمسی</string>
+    <string name="touch_layout_settings_description">مکان و اندازه پیش‌فرض کنترل‌های روی صفحه را تنظیم کنید. بازی‌هایی که چیدمان جداگانه دارند همان را نگه می‌دارند.</string>
+    <string name="touch_layout_game_inherited">استفاده از چیدمان سراسری</string>
+    <string name="touch_layout_game_custom">چیدمان سفارشی این بازی</string>
+    <string name="touch_layout_edit">ویرایش کنترل‌های لمسی</string>
+    <string name="touch_layout_use_global">استفاده از چیدمان سراسری</string>
+
+    <plurals name="library_game_count">
+        <item quantity="one">تعداد بازی‌ها: %1$d</item>
+        <item quantity="other">تعداد بازی‌ها: %1$d</item>
+    </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="one">%1$d بازی با موفقیت نصب شد.</item>
+        <item quantity="other">%1$d بازی با موفقیت نصب شد.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="one">تکمیل %1$d مورد از %2$d مورد</item>
+        <item quantity="other">تکمیل %1$d مورد از %2$d مورد</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="one">این بایگانی شامل %1$d فایل با روش فشرده‌سازی ZIP است که این نصب‌کننده نمی‌تواند آن را بخواند.</item>
+        <item quantity="other">این بایگانی شامل %1$d فایل با روش فشرده‌سازی ZIP است که این نصب‌کننده نمی‌تواند آن‌ها را بخواند.</item>
+    </plurals>
 </resources>

@@ -331,7 +331,7 @@
     <string name="settings_help_use_angle">Memperbaiki masalah grafis untuk game yang menggunakan renderer OpenGL. Aktifkan ini jika Anda mengalami grafis berkedip, layar hitam, atau crash saat bermain. Direkomendasikan untuk sebagian besar perangkat Android modern.</string>
     <string name="settings_core_screen_filter_label">Filter layar</string>
     <string name="settings_filter_bilinear">Bilinear</string>
-    <string name="settings_filter_nearest">Nearest</string>
+    <string name="settings_filter_nearest">Tetangga terdekat</string>
     <string name="settings_core_anisotropic_label">Pemfilteran anisotropik</string>
     <string name="settings_core_anisotropic_value">%1$dx</string>
     <string name="settings_core_texture_cache">Cache tekstur</string>
@@ -1488,7 +1488,7 @@
 
 
     <!-- Keyboard and mouse input -->
-    <string name="settings_keyboard_mouse_section">Keyboard &amp; Mouse</string>
+    <string name="settings_keyboard_mouse_section">Papan Ketik &amp; Tetikus</string>
     <string name="settings_keyboard_input">Input keyboard</string>
     <string name="settings_keyboard_input_desc">Petakan keyboard fisik ke controller yang diemulasi.</string>
     <string name="settings_keyboard_target_player">Pemain keyboard</string>
@@ -1519,8 +1519,8 @@
     <string name="settings_keyboard_mouse_mapping_reset_title">Reset pemetaan keyboard/mouse</string>
     <string name="settings_keyboard_mouse_mapping_reset_desc">Pulihkan pemetaan keyboard dan mouse default untuk pemain ini.</string>
     <string name="settings_keyboard_mouse_global_note">Pemetaan keyboard dan mouse bersifat global dan berlaku untuk semua game.</string>
-    <string name="settings_keyboard_mouse_source_keyboard">Keyboard</string>
-    <string name="settings_keyboard_mouse_source_mouse">Mouse</string>
+    <string name="settings_keyboard_mouse_source_keyboard">Papan ketik</string>
+    <string name="settings_keyboard_mouse_source_mouse">Tetikus</string>
     <string name="settings_keyboard_mouse_game_desc">Pengaturan ini hanya berlaku untuk game ini.</string>
     <string name="settings_keyboard_mouse_use_global">Gunakan pengaturan keyboard/mouse global</string>
     <string name="settings_keyboard_mouse_use_global_desc">Hapus penimpaan keyboard dan mouse khusus game ini.</string>
@@ -1668,4 +1668,65 @@
     <string name="shader_search_parameters">Cari parameter shader</string>
     <string name="shader_no_matching_parameters">Tidak ada parameter yang cocok.</string>
     <string name="native_library_exit_title">Keluar dari pustaka Vita?</string>
+
+    <string name="emulation_auto_save_on_exit">Simpan otomatis saat keluar</string>
+    <string name="emulation_auto_save_on_exit_desc">Simpan game ini ke slot simpan otomatis sebelum menutup emulator.</string>
+    <string name="emulation_auto_load_on_start">Muat otomatis saat mulai</string>
+    <string name="emulation_auto_load_on_start_desc">Muat otomatis simpanan terbaru game ini saat dimulai.</string>
+
+    <string name="stats_title">Statistik</string>
+    <string name="stats_help">CPU mengukur aplikasi ini di semua inti. GPU untuk seluruh perangkat jika tersedia. Suhu berasal dari baterai; data tak tersedia ditandai —.</string>
+    <string name="stats_position">Posisi</string>
+    <string name="stats_top_left">Kiri atas</string>
+    <string name="stats_top_right">Kanan atas</string>
+    <string name="stats_bottom_left">Kiri bawah</string>
+    <string name="stats_bottom_right">Kanan bawah</string>
+    <string name="stats_size">Ukuran</string>
+    <string name="stats_metrics">Metrik terlihat</string>
+    <string name="stats_reset">Reset statistik</string>
+    <string name="stats_version">Versi aplikasi dan inti</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Waktu bingkai</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">Model CPU</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">Beban GPU</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Suhu baterai</string>
+    <string name="stats_thermal">Status termal</string>
+    <string name="stats_resolution">Resolusi</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">Dijeda</string>
+    <string name="stats_thermal_none">Normal</string>
+    <string name="stats_thermal_light">Ringan</string>
+    <string name="stats_thermal_moderate">Sedang</string>
+    <string name="stats_thermal_severe">Berat</string>
+    <string name="stats_thermal_critical">Kritis</string>
+    <string name="stats_thermal_emergency">Darurat</string>
+    <string name="stats_thermal_shutdown">Matikan</string>
+    <string name="stats_mode">Mode tampilan</string>
+    <string name="stats_mode_off">Nonaktif</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Terperinci</string>
+    <string name="stats_enabled">Tampilkan FPS</string>
+
+    <string name="touch_layout_settings_title">Tata letak sentuh</string>
+    <string name="touch_layout_settings_description">Atur posisi dan ukuran awal kontrol di layar. Game dengan tata letak sendiri akan tetap menggunakannya.</string>
+    <string name="touch_layout_game_inherited">Menggunakan tata letak global</string>
+    <string name="touch_layout_game_custom">Tata letak khusus untuk game ini</string>
+    <string name="touch_layout_edit">Edit kontrol sentuh</string>
+    <string name="touch_layout_use_global">Gunakan tata letak global</string>
+
+    <plurals name="library_game_count">
+        <item quantity="other">Jumlah game: %1$d</item>
+    </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="other">%1$d game berhasil dipasang.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="other">Selesai %1$d dari %2$d item</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="other">Arsip berisi %1$d file dengan metode kompresi ZIP yang tidak dapat dibaca oleh pemasang ini.</item>
+    </plurals>
 </resources>

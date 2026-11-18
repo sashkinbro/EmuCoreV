@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name_emucorev">EmuCoreV</string>
     <string name="home_title">PlayStation Vita</string>
     <string name="home_shell_subtitle">Emulador de PS Vita</string>
@@ -62,8 +62,8 @@
     <string name="detail_delete_game_failed">Error al borrar el juego.</string>
     <string name="detail_title">Detalles del juego</string>
     <string name="detail_subtitle">Información del juego, multimedia y opciones de inicio.</string>
-    <string name="detail_title_id">Title ID</string>
-    <string name="detail_content_id">Content ID</string>
+    <string name="detail_title_id">ID del título</string>
+    <string name="detail_content_id">ID del contenido</string>
     <string name="detail_version">Versión</string>
     <string name="detail_category">Categoría</string>
     <string name="detail_summary_fallback">Aún no hay descripción disponible para este juego.</string>
@@ -1664,4 +1664,77 @@
     <string name="shader_search_parameters">Buscar parámetros del shader</string>
     <string name="shader_no_matching_parameters">No hay parámetros coincidentes.</string>
     <string name="native_library_exit_title">¿Salir de la biblioteca de Vita?</string>
+
+    <string name="emulation_auto_save_on_exit">Guardado automático al salir</string>
+    <string name="emulation_auto_save_on_exit_desc">Guarda este juego en el espacio de guardado automático antes de cerrar el emulador.</string>
+    <string name="emulation_auto_load_on_start">Carga automática al iniciar</string>
+    <string name="emulation_auto_load_on_start_desc">Carga automáticamente el último guardado automático de este juego cuando se inicie.</string>
+
+    <string name="stats_title">Estadísticas</string>
+    <string name="stats_help">CPU mide esta app en todos los núcleos. GPU mide todo el dispositivo si está disponible. La temperatura es de la batería; los datos ausentes muestran —.</string>
+    <string name="stats_position">Posición</string>
+    <string name="stats_top_left">Arriba izquierda</string>
+    <string name="stats_top_right">Arriba derecha</string>
+    <string name="stats_bottom_left">Abajo izquierda</string>
+    <string name="stats_bottom_right">Abajo derecha</string>
+    <string name="stats_size">Tamaño</string>
+    <string name="stats_metrics">Métricas visibles</string>
+    <string name="stats_reset">Restablecer estadísticas</string>
+    <string name="stats_version">Versión de app y núcleo</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Tiempo de fotograma</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">Modelo de CPU</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">Carga de GPU</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Temperatura de batería</string>
+    <string name="stats_thermal">Estado térmico</string>
+    <string name="stats_resolution">Resolución</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">En pausa</string>
+    <string name="stats_thermal_none">Normal</string>
+    <string name="stats_thermal_light">Leve</string>
+    <string name="stats_thermal_moderate">Moderado</string>
+    <string name="stats_thermal_severe">Grave</string>
+    <string name="stats_thermal_critical">Crítico</string>
+    <string name="stats_thermal_emergency">Emergencia</string>
+    <string name="stats_thermal_shutdown">Apagado</string>
+    <string name="stats_mode">Modo de visualización</string>
+    <string name="stats_mode_off">Desactivado</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Detallado</string>
+    <string name="stats_enabled">Mostrar FPS</string>
+
+    <string name="touch_layout_settings_title">Distribución táctil</string>
+    <string name="touch_layout_settings_description">Define las posiciones y tamaños predeterminados de los controles en pantalla. Los juegos con su propia distribución la conservan.</string>
+    <string name="touch_layout_game_inherited">Usando la distribución global</string>
+    <string name="touch_layout_game_custom">Distribución personalizada para este juego</string>
+    <string name="touch_layout_edit">Editar controles táctiles</string>
+    <string name="touch_layout_use_global">Usar distribución global</string>
+
+    <plurals name="library_game_count" tools:ignore="UnusedQuantity">
+        <item quantity="one">En total %1$d juego</item>
+        <item quantity="few">En total %1$d juegos</item>
+        <item quantity="many">En total %1$d juegos</item>
+        <item quantity="other">En total %1$d juegos</item>
+    </plurals>
+    <plurals name="install_dialog_content_done" tools:ignore="UnusedQuantity">
+        <item quantity="one">%1$d juego instalado correctamente.</item>
+        <item quantity="few">%1$d juegos instalados correctamente.</item>
+        <item quantity="many">%1$d juegos instalados correctamente.</item>
+        <item quantity="other">%1$d juegos instalados correctamente.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress" tools:ignore="UnusedQuantity">
+        <item quantity="one">%1$d de %2$d elemento completado</item>
+        <item quantity="few">%1$d de %2$d elementos completados</item>
+        <item quantity="many">%1$d de %2$d elementos completados</item>
+        <item quantity="other">%1$d de %2$d elementos completados</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression" tools:ignore="UnusedQuantity">
+        <item quantity="one">El archivo contiene %1$d archivo con un método de compresión ZIP que este instalador no puede leer.</item>
+        <item quantity="few">El archivo contiene %1$d archivos con un método de compresión ZIP que este instalador no puede leer.</item>
+        <item quantity="many">El archivo contiene %1$d archivos con un método de compresión ZIP que este instalador no puede leer.</item>
+        <item quantity="other">El archivo contiene %1$d archivos con un método de compresión ZIP que este instalador no puede leer.</item>
+    </plurals>
 </resources>

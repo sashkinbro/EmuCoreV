@@ -1668,4 +1668,77 @@
     <string name="shader_search_parameters">Vyhledat parametry shaderu</string>
     <string name="shader_no_matching_parameters">Žádné odpovídající parametry.</string>
     <string name="native_library_exit_title">Opustit knihovnu Vita?</string>
+
+    <string name="emulation_auto_save_on_exit">Automaticky uložit při ukončení</string>
+    <string name="emulation_auto_save_on_exit_desc">Před zavřením emulátoru uložit tuto hru do pozice pro automatické ukládání.</string>
+    <string name="emulation_auto_load_on_start">Automaticky načíst při spuštění</string>
+    <string name="emulation_auto_load_on_start_desc">Při startu automaticky načíst poslední automatické uložení této hry.</string>
+
+    <string name="stats_title">Statistiky</string>
+    <string name="stats_help">CPU měří tuto aplikaci na všech jádrech. GPU platí pro celé zařízení, pokud je dostupné. Teplota pochází z baterie; chybějící údaje značí —.</string>
+    <string name="stats_position">Pozice</string>
+    <string name="stats_top_left">Vlevo nahoře</string>
+    <string name="stats_top_right">Vpravo nahoře</string>
+    <string name="stats_bottom_left">Vlevo dole</string>
+    <string name="stats_bottom_right">Vpravo dole</string>
+    <string name="stats_size">Velikost</string>
+    <string name="stats_metrics">Viditelné metriky</string>
+    <string name="stats_reset">Obnovit statistiky</string>
+    <string name="stats_version">Verze aplikace a jádra</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Doba snímku</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">Model CPU</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">Vytížení GPU</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Teplota baterie</string>
+    <string name="stats_thermal">Tepelný stav</string>
+    <string name="stats_resolution">Rozlišení</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">Pozastaveno</string>
+    <string name="stats_thermal_none">Normální</string>
+    <string name="stats_thermal_light">Mírný</string>
+    <string name="stats_thermal_moderate">Střední</string>
+    <string name="stats_thermal_severe">Závažný</string>
+    <string name="stats_thermal_critical">Kritický</string>
+    <string name="stats_thermal_emergency">Nouzový</string>
+    <string name="stats_thermal_shutdown">Vypnutí</string>
+    <string name="stats_mode">Režim zobrazení</string>
+    <string name="stats_mode_off">Vypnuto</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Podrobné</string>
+    <string name="stats_enabled">Zobrazit FPS</string>
+
+    <string name="touch_layout_settings_title">Rozložení dotykového ovládání</string>
+    <string name="touch_layout_settings_description">Nastavte výchozí polohu a velikost ovládacích prvků na obrazovce. Hry s vlastním rozložením si ho zachovají.</string>
+    <string name="touch_layout_game_inherited">Používá globální rozložení</string>
+    <string name="touch_layout_game_custom">Vlastní rozložení pro tuto hru</string>
+    <string name="touch_layout_edit">Upravit dotykové ovládání</string>
+    <string name="touch_layout_use_global">Použít globální rozložení</string>
+
+    <plurals name="library_game_count">
+        <item quantity="one">Celkem %1$d hra</item>
+        <item quantity="few">Celkem %1$d hry</item>
+        <item quantity="many">Celkem %1$d her</item>
+        <item quantity="other">Celkem %1$d her</item>
+    </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="one">%1$d hra byla úspěšně nainstalována.</item>
+        <item quantity="few">%1$d hry byly úspěšně nainstalovány.</item>
+        <item quantity="many">%1$d her bylo úspěšně nainstalováno.</item>
+        <item quantity="other">%1$d her bylo úspěšně nainstalováno.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="one">Dokončeno položek: %1$d z %2$d</item>
+        <item quantity="few">Dokončeno položek: %1$d z %2$d</item>
+        <item quantity="many">Dokončeno položek: %1$d z %2$d</item>
+        <item quantity="other">Dokončeno položek: %1$d z %2$d</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="one">Archiv obsahuje %1$d soubor s metodou komprese ZIP, kterou tento instalátor neumí přečíst.</item>
+        <item quantity="few">Archiv obsahuje %1$d soubory s metodou komprese ZIP, kterou tento instalátor neumí přečíst.</item>
+        <item quantity="many">Archiv obsahuje %1$d souborů s metodou komprese ZIP, kterou tento instalátor neumí přečíst.</item>
+        <item quantity="other">Archiv obsahuje %1$d souborů s metodou komprese ZIP, kterou tento instalátor neumí přečíst.</item>
+    </plurals>
 </resources>

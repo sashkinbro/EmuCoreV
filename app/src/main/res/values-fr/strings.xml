@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name_emucorev">EmuCoreV</string>
     <string name="home_title">PlayStation Vita</string>
     <string name="home_shell_subtitle">Émulateur PS Vita</string>
@@ -1664,4 +1664,77 @@
     <string name="shader_search_parameters">Rechercher un paramètre</string>
     <string name="shader_no_matching_parameters">Aucun paramètre correspondant.</string>
     <string name="native_library_exit_title">Quitter la bibliothèque Vita ?</string>
+
+    <string name="emulation_auto_save_on_exit">Sauvegarde automatique en quittant</string>
+    <string name="emulation_auto_save_on_exit_desc">Sauvegardez ce jeu dans l\'emplacement de sauvegarde automatique avant de fermer l\'émulateur.</string>
+    <string name="emulation_auto_load_on_start">Chargement automatique au démarrage</string>
+    <string name="emulation_auto_load_on_start_desc">Charger automatiquement la dernière sauvegarde automatique de ce jeu lors de son lancement.</string>
+
+    <string name="stats_title">Statistiques</string>
+    <string name="stats_help">Le CPU mesure cette application sur tous les cœurs. Le GPU concerne tout le périphérique, si accessible. La température vient de la batterie ; les données absentes affichent —.</string>
+    <string name="stats_position">Position</string>
+    <string name="stats_top_left">En haut à gauche</string>
+    <string name="stats_top_right">En haut à droite</string>
+    <string name="stats_bottom_left">En bas à gauche</string>
+    <string name="stats_bottom_right">En bas à droite</string>
+    <string name="stats_size">Taille</string>
+    <string name="stats_metrics">Mesures visibles</string>
+    <string name="stats_reset">Réinitialiser les statistiques</string>
+    <string name="stats_version">Version application et cœur</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Durée d’image</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">Modèle du CPU</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">Charge du GPU</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Température batterie</string>
+    <string name="stats_thermal">État thermique</string>
+    <string name="stats_resolution">Résolution</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">En pause</string>
+    <string name="stats_thermal_none">Normal</string>
+    <string name="stats_thermal_light">Léger</string>
+    <string name="stats_thermal_moderate">Modéré</string>
+    <string name="stats_thermal_severe">Sévère</string>
+    <string name="stats_thermal_critical">Critique</string>
+    <string name="stats_thermal_emergency">Urgence</string>
+    <string name="stats_thermal_shutdown">Arrêt</string>
+    <string name="stats_mode">Mode d’affichage</string>
+    <string name="stats_mode_off">Désactivé</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Détaillé</string>
+    <string name="stats_enabled">Afficher les FPS</string>
+
+    <string name="touch_layout_settings_title">Disposition tactile</string>
+    <string name="touch_layout_settings_description">Définissez la position et la taille par défaut des commandes à l’écran. Les jeux ayant leur propre disposition la conservent.</string>
+    <string name="touch_layout_game_inherited">Utilise la disposition globale</string>
+    <string name="touch_layout_game_custom">Disposition personnalisée pour ce jeu</string>
+    <string name="touch_layout_edit">Modifier les commandes tactiles</string>
+    <string name="touch_layout_use_global">Utiliser la disposition globale</string>
+
+    <plurals name="library_game_count" tools:ignore="UnusedQuantity">
+        <item quantity="one">Au total %1$d jeu</item>
+        <item quantity="few">Au total %1$d jeux</item>
+        <item quantity="many">Au total %1$d jeux</item>
+        <item quantity="other">Au total %1$d jeux</item>
+    </plurals>
+    <plurals name="install_dialog_content_done" tools:ignore="UnusedQuantity">
+        <item quantity="one">%1$d jeu installé avec succès.</item>
+        <item quantity="few">%1$d jeux installés avec succès.</item>
+        <item quantity="many">%1$d jeux installés avec succès.</item>
+        <item quantity="other">%1$d jeux installés avec succès.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress" tools:ignore="UnusedQuantity">
+        <item quantity="one">%1$d élément sur %2$d terminé</item>
+        <item quantity="few">%1$d éléments sur %2$d terminés</item>
+        <item quantity="many">%1$d éléments sur %2$d terminés</item>
+        <item quantity="other">%1$d éléments sur %2$d terminés</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression" tools:ignore="UnusedQuantity">
+        <item quantity="one">L’archive contient %1$d fichier utilisant une méthode de compression ZIP que cet installateur ne peut pas lire.</item>
+        <item quantity="few">L’archive contient %1$d fichiers utilisant une méthode de compression ZIP que cet installateur ne peut pas lire.</item>
+        <item quantity="many">L’archive contient %1$d fichiers utilisant une méthode de compression ZIP que cet installateur ne peut pas lire.</item>
+        <item quantity="other">L’archive contient %1$d fichiers utilisant une méthode de compression ZIP que cet installateur ne peut pas lire.</item>
+    </plurals>
 </resources>

@@ -1273,7 +1273,7 @@
     <string name="profile_need_account">アカウントを作成</string>
     <string name="profile_player">プレイヤー</string>
     <string name="profile_player_blocked">プレイヤーをブロックしました。</string>
-    <string name="profile_player_card_brand">EmuCoreV PLAYER CARD</string>
+    <string name="profile_player_card_brand">EmuCoreV プレイヤーカード</string>
     <string name="profile_player_card_footer">PS Vitaの思い出をEmuCoreVで記録</string>
     <string name="profile_player_card_share">プレイヤーカードを共有</string>
     <string name="profile_player_card_share_text">EmuCoreVで私を探してください: %1$s</string>
@@ -1668,4 +1668,65 @@
     <string name="shader_search_parameters">シェーダーパラメーターを検索</string>
     <string name="shader_no_matching_parameters">一致するパラメーターがありません。</string>
     <string name="native_library_exit_title">Vitaライブラリーを終了しますか？</string>
+
+    <string name="emulation_auto_save_on_exit">終了時にオートセーブ</string>
+    <string name="emulation_auto_save_on_exit_desc">エミュレータを閉じる前に、このゲームをオートセーブスロットに保存します。</string>
+    <string name="emulation_auto_load_on_start">起動時にオートロード</string>
+    <string name="emulation_auto_load_on_start_desc">起動時に、このゲームの最新のオートセーブを自動的にロードします。</string>
+
+    <string name="stats_title">統計</string>
+    <string name="stats_help">CPU は全コアでのアプリ使用率です。GPU は取得可能な端末全体の使用率です。温度はバッテリーセンサー値です。未取得は — と表示します。</string>
+    <string name="stats_position">位置</string>
+    <string name="stats_top_left">左上</string>
+    <string name="stats_top_right">右上</string>
+    <string name="stats_bottom_left">左下</string>
+    <string name="stats_bottom_right">右下</string>
+    <string name="stats_size">サイズ</string>
+    <string name="stats_metrics">表示する項目</string>
+    <string name="stats_reset">統計をリセット</string>
+    <string name="stats_version">アプリとコアのバージョン</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">フレーム時間</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPUモデル</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU負荷</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">バッテリー温度</string>
+    <string name="stats_thermal">温度状態</string>
+    <string name="stats_resolution">解像度</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">一時停止</string>
+    <string name="stats_thermal_none">正常</string>
+    <string name="stats_thermal_light">軽度</string>
+    <string name="stats_thermal_moderate">中程度</string>
+    <string name="stats_thermal_severe">重度</string>
+    <string name="stats_thermal_critical">重大</string>
+    <string name="stats_thermal_emergency">緊急</string>
+    <string name="stats_thermal_shutdown">シャットダウン</string>
+    <string name="stats_mode">表示モード</string>
+    <string name="stats_mode_off">オフ</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">詳細</string>
+    <string name="stats_enabled">FPS を表示</string>
+
+    <string name="touch_layout_settings_title">タッチレイアウト</string>
+    <string name="touch_layout_settings_description">画面上の操作ボタンの標準位置とサイズを設定します。個別レイアウトがあるゲームには影響しません。</string>
+    <string name="touch_layout_game_inherited">共通レイアウトを使用中</string>
+    <string name="touch_layout_game_custom">このゲーム専用のレイアウト</string>
+    <string name="touch_layout_edit">タッチ操作を編集</string>
+    <string name="touch_layout_use_global">共通レイアウトを使用</string>
+
+    <plurals name="library_game_count">
+        <item quantity="other">ゲーム数: %1$d</item>
+    </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="other">ゲームを%1$d件インストールしました。</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="other">全%2$d件中%1$d件を完了</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="other">アーカイブには、このインストーラーで読み込めないZIP圧縮方式のファイルが%1$d件含まれています。</item>
+    </plurals>
 </resources>

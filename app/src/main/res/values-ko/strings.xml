@@ -1667,4 +1667,65 @@
     <string name="shader_search_parameters">셰이더 매개변수 검색</string>
     <string name="shader_no_matching_parameters">일치하는 매개변수가 없습니다.</string>
     <string name="native_library_exit_title">Vita 라이브러리를 종료할까요?</string>
+
+    <string name="emulation_auto_save_on_exit">종료 시 자동 저장</string>
+    <string name="emulation_auto_save_on_exit_desc">에뮬레이터를 닫기 전에 이 게임을 자동 저장 슬롯에 저장합니다.</string>
+    <string name="emulation_auto_load_on_start">시작 시 자동 로드</string>
+    <string name="emulation_auto_load_on_start_desc">게임이 시작될 때 이 게임의 최신 자동 저장을 자동으로 로드합니다.</string>
+
+    <string name="stats_title">통계</string>
+    <string name="stats_help">CPU는 모든 코어의 앱 사용량입니다. GPU는 접근 가능한 기기 전체 사용량입니다. 온도는 배터리 센서 값이며 없는 값은 —로 표시합니다.</string>
+    <string name="stats_position">위치</string>
+    <string name="stats_top_left">왼쪽 위</string>
+    <string name="stats_top_right">오른쪽 위</string>
+    <string name="stats_bottom_left">왼쪽 아래</string>
+    <string name="stats_bottom_right">오른쪽 아래</string>
+    <string name="stats_size">크기</string>
+    <string name="stats_metrics">표시 지표</string>
+    <string name="stats_reset">통계 초기화</string>
+    <string name="stats_version">앱 및 코어 버전</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">프레임 시간</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU 모델</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU 부하</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">배터리 온도</string>
+    <string name="stats_thermal">열 상태</string>
+    <string name="stats_resolution">해상도</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">일시 정지</string>
+    <string name="stats_thermal_none">정상</string>
+    <string name="stats_thermal_light">경미</string>
+    <string name="stats_thermal_moderate">보통</string>
+    <string name="stats_thermal_severe">심각</string>
+    <string name="stats_thermal_critical">위험</string>
+    <string name="stats_thermal_emergency">긴급</string>
+    <string name="stats_thermal_shutdown">종료</string>
+    <string name="stats_mode">표시 모드</string>
+    <string name="stats_mode_off">끄기</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">상세</string>
+    <string name="stats_enabled">FPS 표시</string>
+
+    <string name="touch_layout_settings_title">터치 레이아웃</string>
+    <string name="touch_layout_settings_description">화면 조작 버튼의 기본 위치와 크기를 설정합니다. 자체 레이아웃이 있는 게임에는 영향을 주지 않습니다.</string>
+    <string name="touch_layout_game_inherited">전역 레이아웃 사용 중</string>
+    <string name="touch_layout_game_custom">이 게임의 사용자 지정 레이아웃</string>
+    <string name="touch_layout_edit">터치 조작 편집</string>
+    <string name="touch_layout_use_global">전역 레이아웃 사용</string>
+
+    <plurals name="library_game_count">
+        <item quantity="other">전체 게임 수: %1$d</item>
+    </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="other">게임 %1$d개를 성공적으로 설치했습니다.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="other">전체 %2$d개 항목 중 %1$d개 완료</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="other">이 아카이브에는 이 설치 프로그램에서 읽을 수 없는 ZIP 압축 방식의 파일이 %1$d개 있습니다.</item>
+    </plurals>
 </resources>

@@ -1668,4 +1668,69 @@
     <string name="shader_search_parameters">Search shader parameters</string>
     <string name="shader_no_matching_parameters">No matching parameters.</string>
     <string name="native_library_exit_title">Exit Vita library?</string>
+
+    <string name="emulation_auto_save_on_exit">Auto save on exit</string>
+    <string name="emulation_auto_save_on_exit_desc">Save this game to the auto-save slot before closing the emulator.</string>
+    <string name="emulation_auto_load_on_start">Auto load on start</string>
+    <string name="emulation_auto_load_on_start_desc">Load this game\'s latest auto-save automatically when it starts.</string>
+
+    <string name="stats_title">Statistics</string>
+    <string name="stats_help">CPU usage covers this app across all cores. GPU usage is device-wide when accessible. Temperature is the battery sensor; unavailable readings show —.</string>
+    <string name="stats_position">Position</string>
+    <string name="stats_top_left">Top left</string>
+    <string name="stats_top_right">Top right</string>
+    <string name="stats_bottom_left">Bottom left</string>
+    <string name="stats_bottom_right">Bottom right</string>
+    <string name="stats_size">Size</string>
+    <string name="stats_metrics">Visible metrics</string>
+    <string name="stats_reset">Reset statistics</string>
+    <string name="stats_version">App and core version</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Frame time</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">CPU model</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">GPU load</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Battery temperature</string>
+    <string name="stats_thermal">Thermal status</string>
+    <string name="stats_resolution">Res</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">Paused</string>
+    <string name="stats_thermal_none">Normal</string>
+    <string name="stats_thermal_light">Light</string>
+    <string name="stats_thermal_moderate">Moderate</string>
+    <string name="stats_thermal_severe">Severe</string>
+    <string name="stats_thermal_critical">Critical</string>
+    <string name="stats_thermal_emergency">Emergency</string>
+    <string name="stats_thermal_shutdown">Shutdown</string>
+    <string name="stats_mode">Display mode</string>
+    <string name="stats_mode_off">Off</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Detailed</string>
+    <string name="stats_enabled">Show FPS</string>
+
+    <string name="touch_layout_settings_title">Touch layout</string>
+    <string name="touch_layout_settings_description">Set the default positions and sizes of on-screen controls. Games with their own layout keep it.</string>
+    <string name="touch_layout_game_inherited">Using the global layout</string>
+    <string name="touch_layout_game_custom">Custom layout for this game</string>
+    <string name="touch_layout_edit">Edit touch controls</string>
+    <string name="touch_layout_use_global">Use global layout</string>
+
+    <plurals name="library_game_count">
+        <item quantity="one">%1$d game total</item>
+        <item quantity="other">%1$d games total</item>
+    </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="one">%1$d game installed successfully.</item>
+        <item quantity="other">%1$d games installed successfully.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="one">Completed %1$d of %2$d item</item>
+        <item quantity="other">Completed %1$d of %2$d items</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="one">The archive contains %1$d file with a ZIP compression method that this installer cannot read.</item>
+        <item quantity="other">The archive contains %1$d files with ZIP compression methods that this installer cannot read.</item>
+    </plurals>
 </resources>

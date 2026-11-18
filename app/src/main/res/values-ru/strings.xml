@@ -62,8 +62,8 @@
     <string name="detail_delete_game_failed">Не удалось удалить игру.</string>
     <string name="detail_title">Сведения об игре</string>
     <string name="detail_subtitle">Информация об игре, медиа и параметры запуска.</string>
-    <string name="detail_title_id">Title ID</string>
-    <string name="detail_content_id">Content ID</string>
+    <string name="detail_title_id">ID игры</string>
+    <string name="detail_content_id">ID содержимого</string>
     <string name="detail_version">Версия</string>
     <string name="detail_category">Категория</string>
     <string name="detail_summary_fallback">Описание для этой игры пока недоступно.</string>
@@ -1206,8 +1206,8 @@
     <string name="profile_account_created">Аккаунт создан.</string>
     <string name="profile_auth_title">Ваш аккаунт EmuCoreV</string>
     <string name="profile_block_player">Заблокировать игрока</string>
-    <string name="profile_blocked_empty">No blocked players.</string>
-    <string name="profile_blocked_title">Blocked players</string>
+    <string name="profile_blocked_empty">Нет заблокированных игроков.</string>
+    <string name="profile_blocked_title">Заблокированные игроки</string>
     <string name="profile_catalog_game_not_found">%1$s еще недоступна в каталоге игр.</string>
     <string name="profile_cloud_confirm_restore">Подтвердить восстановление</string>
     <string name="profile_cloud_count">Облако · %1$d</string>
@@ -1256,15 +1256,15 @@
     <string name="profile_friend_added">Друг добавлен.</string>
     <string name="profile_friend_pending">Запрос отправлен</string>
     <string name="profile_friend_remove">В друзьях</string>
-    <string name="profile_friend_remove_action">Remove</string>
+    <string name="profile_friend_remove_action">Удалить</string>
     <string name="profile_friend_remove_confirm">Удалить %1$s из друзей?</string>
     <string name="profile_friend_remove_title">Удалить из друзей?</string>
     <string name="profile_friend_removed">Дружба прекращена.</string>
     <string name="profile_friend_request_sent">Запрос в друзья отправлен.</string>
-    <string name="profile_friend_requests">Friend requests</string>
-    <string name="profile_friend_requests_empty">No incoming requests.</string>
-    <string name="profile_friends_empty">No friends added yet.</string>
-    <string name="profile_friends_title">Friends</string>
+    <string name="profile_friend_requests">Запросы в друзья</string>
+    <string name="profile_friend_requests_empty">Нет входящих запросов.</string>
+    <string name="profile_friends_empty">Друзья пока не добавлены.</string>
+    <string name="profile_friends_title">Друзья</string>
     <string name="profile_game_last_played_format">Последний запуск %1$s</string>
     <string name="profile_game_sessions_format">Сеансов: %1$d</string>
     <string name="profile_games_empty">Пока нет игр</string>
@@ -1289,17 +1289,17 @@
     <string name="profile_player_card_share_text">Найдите меня в EmuCoreV: %1$s</string>
     <string name="profile_player_id_format">ID игрока: %1$s</string>
     <string name="profile_player_not_found">Игрок не найден</string>
-    <string name="profile_player_unblocked">Player unblocked.</string>
+    <string name="profile_player_unblocked">Игрок разблокирован.</string>
     <string name="profile_pro_updated">Профиль Pro обновлен.</string>
     <string name="profile_rank">Ранг</string>
-    <string name="profile_recent_events">Recent events</string>
+    <string name="profile_recent_events">Последние события</string>
     <string name="profile_recently_played">Недавно запущенные</string>
     <string name="profile_reset_password">Сбросить пароль</string>
     <string name="profile_showcase_count_format">Выбрано %1$d/3</string>
     <string name="profile_showcase_title">Витрина игр</string>
     <string name="profile_signed_in">Вход выполнен.</string>
     <string name="profile_signed_out">Выход выполнен.</string>
-    <string name="profile_social_center_title">Friends and notifications</string>
+    <string name="profile_social_center_title">Друзья и уведомления</string>
     <string name="profile_stats_activity">Активность</string>
     <string name="profile_stats_best_streak">Лучшая серия</string>
     <string name="profile_stats_current_streak">Текущая серия</string>
@@ -1323,7 +1323,7 @@
     <string name="profile_tab_stats">Статистика</string>
     <string name="profile_total_players">Игроков в рейтинге</string>
     <string name="profile_total_time">Общее время</string>
-    <string name="profile_unblock_player">Unblock</string>
+    <string name="profile_unblock_player">Разблокировать</string>
     <string name="save">Сохранить</string>
     <string name="settings_ra_points_label">Очки</string>
     <string name="drive_include_save_data">Включать сохранения и трофеи</string>
@@ -1667,4 +1667,77 @@
     <string name="shader_search_parameters">Поиск параметров шейдера</string>
     <string name="shader_no_matching_parameters">Параметры по этому запросу не найдены.</string>
     <string name="native_library_exit_title">Выйти из библиотеки Vita?</string>
+
+    <string name="emulation_auto_save_on_exit">Автосохранение при выходе</string>
+    <string name="emulation_auto_save_on_exit_desc">Сохранить эту игру в слот автосохранения перед закрытием эмулятора.</string>
+    <string name="emulation_auto_load_on_start">Автозагрузка при старте</string>
+    <string name="emulation_auto_load_on_start_desc">Автоматически загружать последнее автосохранение этой игры при ее запуске.</string>
+
+    <string name="stats_title">Статистика</string>
+    <string name="stats_help">CPU — нагрузка приложения на всех ядрах. GPU — всего устройства, если доступна. Температура — датчик батареи; недоступные данные отмечены —.</string>
+    <string name="stats_position">Позиция</string>
+    <string name="stats_top_left">Сверху слева</string>
+    <string name="stats_top_right">Сверху справа</string>
+    <string name="stats_bottom_left">Снизу слева</string>
+    <string name="stats_bottom_right">Снизу справа</string>
+    <string name="stats_size">Размер</string>
+    <string name="stats_metrics">Видимые показатели</string>
+    <string name="stats_reset">Сбросить статистику</string>
+    <string name="stats_version">Версия приложения и ядра</string>
+    <string name="stats_fps">FPS</string>
+    <string name="stats_frame_time">Время кадра</string>
+    <string name="stats_cpu">CPU</string>
+    <string name="stats_cpu_model">Модель CPU</string>
+    <string name="stats_gpu_model">GPU</string>
+    <string name="stats_gpu_usage">Нагрузка GPU</string>
+    <string name="stats_memory">RAM</string>
+    <string name="stats_temperature">Температура батареи</string>
+    <string name="stats_thermal">Тепловое состояние</string>
+    <string name="stats_resolution">Разрешение</string>
+    <string name="stats_unavailable">—</string>
+    <string name="stats_paused">Приостановлено</string>
+    <string name="stats_thermal_none">Нормальное</string>
+    <string name="stats_thermal_light">Лёгкое</string>
+    <string name="stats_thermal_moderate">Умеренное</string>
+    <string name="stats_thermal_severe">Сильное</string>
+    <string name="stats_thermal_critical">Критическое</string>
+    <string name="stats_thermal_emergency">Аварийное</string>
+    <string name="stats_thermal_shutdown">Выключение</string>
+    <string name="stats_mode">Режим отображения</string>
+    <string name="stats_mode_off">Выключено</string>
+    <string name="stats_mode_fps">FPS</string>
+    <string name="stats_mode_detailed">Подробно</string>
+    <string name="stats_enabled">Показывать FPS</string>
+
+    <string name="touch_layout_settings_title">Расположение сенсорных кнопок</string>
+    <string name="touch_layout_settings_description">Настройте расположение и размер экранных кнопок по умолчанию. Игры с собственным профилем сохранят его.</string>
+    <string name="touch_layout_game_inherited">Используется общий профиль</string>
+    <string name="touch_layout_game_custom">Профиль этой игры</string>
+    <string name="touch_layout_edit">Изменить сенсорные кнопки</string>
+    <string name="touch_layout_use_global">Использовать общий профиль</string>
+
+    <plurals name="library_game_count">
+        <item quantity="one">Всего %1$d игра</item>
+        <item quantity="few">Всего %1$d игры</item>
+        <item quantity="many">Всего %1$d игр</item>
+        <item quantity="other">Всего %1$d игры</item>
+    </plurals>
+    <plurals name="install_dialog_content_done">
+        <item quantity="one">%1$d игра установлена успешно.</item>
+        <item quantity="few">%1$d игры установлены успешно.</item>
+        <item quantity="many">%1$d игр установлено успешно.</item>
+        <item quantity="other">%1$d игры установлены успешно.</item>
+    </plurals>
+    <plurals name="install_dialog_items_progress">
+        <item quantity="one">Завершён %1$d из %2$d элемента</item>
+        <item quantity="few">Завершено %1$d из %2$d элементов</item>
+        <item quantity="many">Завершено %1$d из %2$d элементов</item>
+        <item quantity="other">Завершено %1$d из %2$d элементов</item>
+    </plurals>
+    <plurals name="install_dialog_archive_unsupported_compression">
+        <item quantity="one">В архиве содержится %1$d файл с методом сжатия ZIP, который эта программа установки не может прочитать.</item>
+        <item quantity="few">В архиве содержится %1$d файла с методом сжатия ZIP, который эта программа установки не может прочитать.</item>
+        <item quantity="many">В архиве содержится %1$d файлов с методом сжатия ZIP, который эта программа установки не может прочитать.</item>
+        <item quantity="other">В архиве содержится %1$d файла с методом сжатия ZIP, который эта программа установки не может прочитать.</item>
+    </plurals>
 </resources>
