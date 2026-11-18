@@ -864,7 +864,6 @@
     <string name="customization_preview_title">미리 보기</string>
     <string name="customization_preview_subtitle">나만을 위한 라이브러리</string>
     <plurals name="customization_games_per_row">
-        <item quantity="one">행당 게임 %1$d개</item>
         <item quantity="other">행당 게임 %1$d개</item>
     </plurals>
     <string name="customization_home_background">홈 화면 배경</string>

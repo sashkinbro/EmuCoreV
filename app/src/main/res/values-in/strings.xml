@@ -864,7 +864,6 @@
     <string name="customization_preview_title">Pratinjau</string>
     <string name="customization_preview_subtitle">Pustaka Anda, disesuaikan untuk Anda</string>
     <plurals name="customization_games_per_row">
-        <item quantity="one">%1$d game per baris</item>
         <item quantity="other">%1$d game per baris</item>
     </plurals>
     <string name="customization_home_background">Latar layar utama</string>

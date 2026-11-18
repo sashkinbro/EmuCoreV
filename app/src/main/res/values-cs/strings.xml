@@ -865,6 +865,8 @@
     <string name="customization_preview_subtitle">Vaše knihovna, přesně podle vás</string>
     <plurals name="customization_games_per_row">
         <item quantity="one">%1$d hra v řadě</item>
+        <item quantity="few">%1$d hry v řadě</item>
+        <item quantity="many">%1$d hry v řadě</item>
         <item quantity="other">%1$d her v řadě</item>
     </plurals>
     <string name="customization_home_background">Pozadí domovské obrazovky</string>

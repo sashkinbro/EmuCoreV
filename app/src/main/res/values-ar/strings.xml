@@ -874,9 +874,12 @@
     <string name="customization_preview_title">معاينة</string>
     <string name="customization_preview_subtitle">مكتبتك مضبوطة حسب تفضيلاتك</string>
     <plurals name="customization_games_per_row">
-        <item quantity="zero">لا ألعاب في الصف</item><item quantity="one">لعبة واحدة في الصف</item>
-        <item quantity="two">لعبتان في الصف</item><item quantity="few">%1$d ألعاب في الصف</item>
-        <item quantity="many">%1$d لعبة في الصف</item><item quantity="other">%1$d لعبة في الصف</item>
+        <item quantity="zero">لا ألعاب في الصف</item>
+        <item quantity="one">لعبة واحدة في الصف</item>
+        <item quantity="two">لعبتان في الصف</item>
+        <item quantity="few">%1$d ألعاب في الصف</item>
+        <item quantity="many">%1$d لعبة في الصف</item>
+        <item quantity="other">%1$d لعبة في الصف</item>
     </plurals>
     <string name="customization_home_background">خلفية الشاشة الرئيسية</string>
     <string name="customization_background_select">اختر صورة أو GIF أو فيديو</string>

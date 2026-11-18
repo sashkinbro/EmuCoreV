@@ -1,4 +1,4 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
     <string name="app_name_emucorev">EmuCoreV</string>
     <string name="home_title">PlayStation Vita</string>
     <string name="home_shell_subtitle">PS Vita 模擬器</string>
@@ -872,7 +872,9 @@
     <string name="settings_tab_customization">个性化</string>
     <string name="customization_preview_title">预览</string>
     <string name="customization_preview_subtitle">为你定制的游戏库</string>
-    <plurals name="customization_games_per_row"><item quantity="other">每行 %1$d 个游戏</item></plurals>
+    <plurals name="customization_games_per_row">
+        <item quantity="other">每行 %1$d 个游戏</item>
+    </plurals>
     <string name="customization_home_background">主屏幕背景</string>
     <string name="customization_background_select">选择图片、GIF 或视频</string>
     <string name="customization_background_default">默认背景</string>
@@ -1712,16 +1714,13 @@
     <string name="touch_layout_edit">编辑触控操作</string>
     <string name="touch_layout_use_global">使用全局布局</string>
 
-    <plurals name="library_game_count" tools:ignore="MissingTranslation,UnusedQuantity">
-        <item quantity="one">共 %1$d 款遊戲</item>
+    <plurals name="library_game_count">
         <item quantity="other">共 %1$d 款遊戲</item>
     </plurals>
-    <plurals name="install_dialog_content_done" tools:ignore="MissingTranslation,UnusedQuantity">
-        <item quantity="one">已成功安裝 %1$d 款遊戲。</item>
+    <plurals name="install_dialog_content_done">
         <item quantity="other">已成功安裝 %1$d 款遊戲。</item>
     </plurals>
-    <plurals name="install_dialog_items_progress" tools:ignore="MissingTranslation,UnusedQuantity">
-        <item quantity="one">已完成 %1$d / %2$d 個項目</item>
+    <plurals name="install_dialog_items_progress">
         <item quantity="other">已完成 %1$d / %2$d 個項目</item>
     </plurals>
     <plurals name="install_dialog_archive_unsupported_compression">

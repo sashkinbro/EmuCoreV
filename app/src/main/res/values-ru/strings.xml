@@ -874,8 +874,10 @@
     <string name="customization_preview_title">Предварительный просмотр</string>
     <string name="customization_preview_subtitle">Ваша библиотека, настроенная для вас</string>
     <plurals name="customization_games_per_row">
-        <item quantity="one">%1$d игра в ряду</item><item quantity="few">%1$d игры в ряду</item>
-        <item quantity="many">%1$d игр в ряду</item><item quantity="other">%1$d игры в ряду</item>
+        <item quantity="one">%1$d игра в ряду</item>
+        <item quantity="few">%1$d игры в ряду</item>
+        <item quantity="many">%1$d игр в ряду</item>
+        <item quantity="other">%1$d игры в ряду</item>
     </plurals>
     <string name="customization_home_background">Фон главного экрана</string>
     <string name="customization_background_select">Выбрать изображение, GIF или видео</string>

@@ -865,7 +865,9 @@
     <string name="customization_preview_subtitle">Twoja biblioteka, dopasowana do Ciebie</string>
     <plurals name="customization_games_per_row">
         <item quantity="one">%1$d gra w rzędzie</item>
-        <item quantity="other">%1$d gier w rzędzie</item>
+        <item quantity="few">%1$d gry w rzędzie</item>
+        <item quantity="many">%1$d gier w rzędzie</item>
+        <item quantity="other">%1$d gry w rzędzie</item>
     </plurals>
     <string name="customization_home_background">Tło ekranu głównego</string>
     <string name="customization_background_select">Wybierz obraz, GIF lub film</string>

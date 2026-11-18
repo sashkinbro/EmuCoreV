@@ -864,7 +864,6 @@
     <string name="customization_preview_title">プレビュー</string>
     <string name="customization_preview_subtitle">あなた好みにカスタマイズされたライブラリ</string>
     <plurals name="customization_games_per_row">
-        <item quantity="one">1行あたり%1$dゲーム</item>
         <item quantity="other">1行あたり%1$dゲーム</item>
     </plurals>
     <string name="customization_home_background">ホーム画面の背景</string>

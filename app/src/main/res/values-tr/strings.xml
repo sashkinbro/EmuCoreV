@@ -873,7 +873,10 @@
     <string name="settings_tab_customization">Özelleştirme</string>
     <string name="customization_preview_title">Ön izleme</string>
     <string name="customization_preview_subtitle">Size göre düzenlenmiş kitaplığınız</string>
-    <plurals name="customization_games_per_row"><item quantity="one">Satır başına %1$d oyun</item><item quantity="other">Satır başına %1$d oyun</item></plurals>
+    <plurals name="customization_games_per_row">
+        <item quantity="one">Satır başına %1$d oyun</item>
+        <item quantity="other">Satır başına %1$d oyun</item>
+    </plurals>
     <string name="customization_home_background">Ana ekran arka planı</string>
     <string name="customization_background_select">Resim, GIF veya video seç</string>
     <string name="customization_background_default">Varsayılan arka plan</string>

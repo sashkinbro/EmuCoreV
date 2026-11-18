@@ -1,4 +1,4 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
     <string name="app_name_emucorev">EmuCoreV</string>
     <string name="home_title">PlayStation Vita</string>
     <string name="home_shell_subtitle">Emulador de PS Vita</string>
@@ -873,7 +873,11 @@
     <string name="settings_tab_customization">Personalização</string>
     <string name="customization_preview_title">Pré-visualização</string>
     <string name="customization_preview_subtitle">A sua biblioteca, ajustada a si</string>
-    <plurals name="customization_games_per_row"><item quantity="one">%1$d jogo por linha</item><item quantity="other">%1$d jogos por linha</item></plurals>
+    <plurals name="customization_games_per_row">
+        <item quantity="one">%1$d jogo por linha</item>
+        <item quantity="many">%1$d jogos por linha</item>
+        <item quantity="other">%1$d jogos por linha</item>
+    </plurals>
     <string name="customization_home_background">Fundo do ecrã principal</string>
     <string name="customization_background_select">Escolher imagem, GIF ou vídeo</string>
     <string name="customization_background_default">Fundo predefinido</string>
@@ -1713,20 +1717,24 @@
     <string name="touch_layout_edit">Editar controles de toque</string>
     <string name="touch_layout_use_global">Usar layout global</string>
 
-    <plurals name="library_game_count" tools:ignore="MissingQuantity,MissingTranslation">
+    <plurals name="library_game_count">
         <item quantity="one">%1$d jogo no total</item>
+        <item quantity="many">%1$d jogos no total</item>
         <item quantity="other">%1$d jogos no total</item>
     </plurals>
-    <plurals name="install_dialog_content_done" tools:ignore="MissingQuantity,MissingTranslation">
+    <plurals name="install_dialog_content_done">
         <item quantity="one">%1$d jogo instalado com sucesso.</item>
+        <item quantity="many">%1$d jogos instalados com sucesso.</item>
         <item quantity="other">%1$d jogos instalados com sucesso.</item>
     </plurals>
-    <plurals name="install_dialog_items_progress" tools:ignore="MissingQuantity,MissingTranslation">
+    <plurals name="install_dialog_items_progress">
         <item quantity="one">Concluído %1$d de %2$d item</item>
+        <item quantity="many">Concluído %1$d de %2$d itens</item>
         <item quantity="other">Concluído %1$d de %2$d itens</item>
     </plurals>
     <plurals name="install_dialog_archive_unsupported_compression">
         <item quantity="one">O arquivo contém %1$d arquivo com um método de compressão ZIP que este instalador não consegue ler.</item>
+        <item quantity="many">O arquivo contém %1$d arquivos com um método de compressão ZIP que este instalador não consegue ler.</item>
         <item quantity="other">O arquivo contém %1$d arquivos com um método de compressão ZIP que este instalador não consegue ler.</item>
     </plurals>
 </resources>

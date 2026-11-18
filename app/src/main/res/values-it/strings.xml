@@ -1,4 +1,4 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
     <string name="app_name_emucorev">EmuCoreV</string>
     <string name="home_title">PlayStation Vita</string>
     <string name="home_shell_subtitle">Emulatore PS Vita</string>
@@ -873,7 +873,11 @@
     <string name="settings_tab_customization">Personalizzazione</string>
     <string name="customization_preview_title">Anteprima</string>
     <string name="customization_preview_subtitle">La tua raccolta, su misura per te</string>
-    <plurals name="customization_games_per_row"><item quantity="one">%1$d gioco per riga</item><item quantity="other">%1$d giochi per riga</item></plurals>
+    <plurals name="customization_games_per_row">
+        <item quantity="one">%1$d gioco per riga</item>
+        <item quantity="many">%1$d giochi per riga</item>
+        <item quantity="other">%1$d giochi per riga</item>
+    </plurals>
     <string name="customization_home_background">Sfondo della schermata principale</string>
     <string name="customization_background_select">Scegli un’immagine, una GIF o un video</string>
     <string name="customization_background_default">Sfondo predefinito</string>
@@ -1713,20 +1717,24 @@
     <string name="touch_layout_edit">Modifica i comandi touch</string>
     <string name="touch_layout_use_global">Usa layout globale</string>
 
-    <plurals name="library_game_count" tools:ignore="MissingQuantity,MissingTranslation">
+    <plurals name="library_game_count">
         <item quantity="one">%1$d gioco in totale</item>
+        <item quantity="many">%1$d giochi in totale</item>
         <item quantity="other">%1$d giochi in totale</item>
     </plurals>
-    <plurals name="install_dialog_content_done" tools:ignore="MissingQuantity,MissingTranslation">
+    <plurals name="install_dialog_content_done">
         <item quantity="one">%1$d gioco installato con successo.</item>
+        <item quantity="many">%1$d giochi installati con successo.</item>
         <item quantity="other">%1$d giochi installati con successo.</item>
     </plurals>
-    <plurals name="install_dialog_items_progress" tools:ignore="MissingQuantity,MissingTranslation">
+    <plurals name="install_dialog_items_progress">
         <item quantity="one">Completato %1$d di %2$d elemento</item>
+        <item quantity="many">Completato %1$d di %2$d elementi</item>
         <item quantity="other">Completato %1$d di %2$d elementi</item>
     </plurals>
     <plurals name="install_dialog_archive_unsupported_compression">
         <item quantity="one">L’archivio contiene %1$d file con un metodo di compressione ZIP che questo programma di installazione non può leggere.</item>
+        <item quantity="many">L’archivio contiene %1$d file con un metodo di compressione ZIP che questo programma di installazione non può leggere.</item>
         <item quantity="other">L’archivio contiene %1$d file con un metodo di compressione ZIP che questo programma di installazione non può leggere.</item>
     </plurals>
 </resources>

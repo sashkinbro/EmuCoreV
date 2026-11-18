@@ -1,4 +1,4 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
     <string name="app_name_emucorev">EmuCoreV</string>
     <string name="home_title">PlayStation Vita</string>
     <string name="home_shell_subtitle">Émulateur PS Vita</string>
@@ -873,7 +873,11 @@
     <string name="settings_tab_customization">Personnalisation</string>
     <string name="customization_preview_title">Aperçu</string>
     <string name="customization_preview_subtitle">Votre bibliothèque, adaptée à vos goûts</string>
-    <plurals name="customization_games_per_row"><item quantity="one">%1$d jeu par ligne</item><item quantity="other">%1$d jeux par ligne</item></plurals>
+    <plurals name="customization_games_per_row">
+        <item quantity="one">%1$d jeu par ligne</item>
+        <item quantity="many">%1$d jeux par ligne</item>
+        <item quantity="other">%1$d jeux par ligne</item>
+    </plurals>
     <string name="customization_home_background">Arrière-plan de l’écran d’accueil</string>
     <string name="customization_background_select">Choisir une image, un GIF ou une vidéo</string>
     <string name="customization_background_default">Arrière-plan par défaut</string>
@@ -1713,27 +1717,23 @@
     <string name="touch_layout_edit">Modifier les commandes tactiles</string>
     <string name="touch_layout_use_global">Utiliser la disposition globale</string>
 
-    <plurals name="library_game_count" tools:ignore="UnusedQuantity">
+    <plurals name="library_game_count">
         <item quantity="one">Au total %1$d jeu</item>
-        <item quantity="few">Au total %1$d jeux</item>
         <item quantity="many">Au total %1$d jeux</item>
         <item quantity="other">Au total %1$d jeux</item>
     </plurals>
-    <plurals name="install_dialog_content_done" tools:ignore="UnusedQuantity">
+    <plurals name="install_dialog_content_done">
         <item quantity="one">%1$d jeu installé avec succès.</item>
-        <item quantity="few">%1$d jeux installés avec succès.</item>
         <item quantity="many">%1$d jeux installés avec succès.</item>
         <item quantity="other">%1$d jeux installés avec succès.</item>
     </plurals>
-    <plurals name="install_dialog_items_progress" tools:ignore="UnusedQuantity">
+    <plurals name="install_dialog_items_progress">
         <item quantity="one">%1$d élément sur %2$d terminé</item>
-        <item quantity="few">%1$d éléments sur %2$d terminés</item>
         <item quantity="many">%1$d éléments sur %2$d terminés</item>
         <item quantity="other">%1$d éléments sur %2$d terminés</item>
     </plurals>
-    <plurals name="install_dialog_archive_unsupported_compression" tools:ignore="UnusedQuantity">
+    <plurals name="install_dialog_archive_unsupported_compression">
         <item quantity="one">L’archive contient %1$d fichier utilisant une méthode de compression ZIP que cet installateur ne peut pas lire.</item>
-        <item quantity="few">L’archive contient %1$d fichiers utilisant une méthode de compression ZIP que cet installateur ne peut pas lire.</item>
         <item quantity="many">L’archive contient %1$d fichiers utilisant une méthode de compression ZIP que cet installateur ne peut pas lire.</item>
         <item quantity="other">L’archive contient %1$d fichiers utilisant une méthode de compression ZIP que cet installateur ne peut pas lire.</item>
     </plurals>

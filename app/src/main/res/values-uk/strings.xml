@@ -860,8 +860,10 @@
     <string name="customization_preview_title">Попередній перегляд</string>
     <string name="customization_preview_subtitle">Ваша бібліотека, налаштована для вас</string>
     <plurals name="customization_games_per_row">
-        <item quantity="one">%1$d гра в ряд</item><item quantity="few">%1$d гри в ряд</item>
-        <item quantity="many">%1$d ігор у ряд</item><item quantity="other">%1$d гри в ряд</item>
+        <item quantity="one">%1$d гра в ряд</item>
+        <item quantity="few">%1$d гри в ряд</item>
+        <item quantity="many">%1$d ігор у ряд</item>
+        <item quantity="other">%1$d гри в ряд</item>
     </plurals>
     <string name="customization_home_background">Фон головного екрана</string>
     <string name="customization_background_select">Вибрати зображення, GIF або відео</string>

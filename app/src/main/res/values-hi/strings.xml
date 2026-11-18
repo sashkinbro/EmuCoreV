@@ -873,7 +873,10 @@
     <string name="settings_tab_customization">मनपसंद बनाना</string>
     <string name="customization_preview_title">पूर्वावलोकन</string>
     <string name="customization_preview_subtitle">आपके अनुसार बनाई गई आपकी लाइब्रेरी</string>
-    <plurals name="customization_games_per_row"><item quantity="one">हर पंक्ति में %1$d गेम</item><item quantity="other">हर पंक्ति में %1$d गेम</item></plurals>
+    <plurals name="customization_games_per_row">
+        <item quantity="one">हर पंक्ति में %1$d गेम</item>
+        <item quantity="other">हर पंक्ति में %1$d गेम</item>
+    </plurals>
     <string name="customization_home_background">होम स्क्रीन की पृष्ठभूमि</string>
     <string name="customization_background_select">चित्र, GIF या वीडियो चुनें</string>
     <string name="customization_background_default">डिफ़ॉल्ट पृष्ठभूमि</string>
