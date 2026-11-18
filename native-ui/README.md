@@ -103,6 +103,50 @@ performed. The reference binary and generated research corpus stay outside the
 source tree. A different firmware code fingerprint requires independent review;
 the generator refuses to execute unverified offsets.
 
+## Scalar animation timer
+
+`AnimationTimer` reconstructs scalar `InitTickUnit`, `InitTimer`, `ResetTimer`
+and `DoTick` behavior for the five recovered curves. The clock has no threads,
+guest memory, callbacks, system clock access or emulator dependency. Its owner
+supplies tick intervals explicitly. Stopping calls costs no background work;
+freezing the complete renderer and host callbacks is still a separate integration
+requirement.
+
+The original quantizes duration to tick units, applies the exact endpoint-bias
+constant `0x3f7fffef`, and stores its reciprocal. Those operations and their
+single-precision order are retained. `tick()` returns the original **unclamped
+normalized time**; `snapshot().mapped` is the interpolated value. They differ on
+overshoot and at finished/repeating states and must not be interchanged by the
+future widget scheduler.
+
+Logical state flags retain the original signed repeat-count behavior, first-tick
+bit and observed raw repeat transitions. The `round` / `reverse` enum names are
+reference labels, not a promise of conventional ping-pong behavior: direct
+original calls can advance reverse time below zero. This implementation preserves
+the observed comparisons; the surrounding original Animator/Widget scheduling
+must still be recovered before deciding how shell transitions use these modes.
+Snapshots requiring 2D/3D/custom-parameter curves or unknown states are rejected.
+
+On RG556, Lenovo TB710FU and OnePlus CPH2747, all **2,340 traces / 149,760 frame
+steps** match the original instructions bit for bit, including initial duration,
+reciprocal, current time, flags, mapped value and every returned normalized time.
+The corpus covers five curves; three time units; thirteen duration cases
+(including zero, negative, huge, infinity and NaN); four observed repeat modes;
+counts -1/0/2; changing intervals, resets, held states and forced finished states.
+Oracle FPSCR=0 remains explicit. This proves the tested scalar timing behavior,
+not all PAF curves, scheduling, full animations or rendered frame equivalence.
+
+```text
+python native-ui/tests/generate_timer_reference.py OWNED_DECRYPTED_LIBPAF.suprx LOCAL_TIMER_CORPUS.bin
+```
+
+Build `paf_timer_test`, upload it and the corpus to the device's research storage,
+then run `paf_timer_test LOCAL_TIMER_CORPUS.bin`. It requires a supplied corpus;
+an absent or empty reference cannot produce a pass. The generator executes the
+original functions offline with Unicorn and refuses a different firmware hash
+until that profile has been reviewed. No original instructions enter the C++
+runtime or source tree.
+
 ## Original GIM texture decoding
 
 `decode_gim` independently decodes the observed little-endian PSP GIM variants:
