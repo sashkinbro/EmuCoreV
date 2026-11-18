@@ -12,12 +12,33 @@ import java.nio.ByteOrder
 object NativeLibraryCatalog {
     private val utilities = setOf("NPXS10008") // Trophies only.
 
+    /** Read fresh filesystem metadata across processes; never poll during gameplay. */
+    fun fingerprint(context: Context): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        fun add(value: String) { digest.update(value.encodeToByteArray()); digest.update(0.toByte()) }
+        add(com.sbro.emucorev.core.EmulatorStorage.vitaRoot(context).canonicalPath)
+        catalogSources(context).forEach { add(it) }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    private fun catalogSources(context: Context): List<String> =
+        com.sbro.emucorev.data.InstalledGameRepository().loadInstalledGames(context).sortedBy { it.titleId }.flatMap { game ->
+            listOf(game.titleId, game.title, game.version.orEmpty(), game.installPath) +
+                File(game.installPath, "sce_sys").walkTopDown().filter { it.isFile &&
+                    (it.name in setOf("param.sfo", "icon0.png", "pic0.png") || it.invariantSeparatorsPath.contains("/livearea/"))
+                }.sortedBy { it.path }.map { "${it.relativeTo(File(game.installPath)).path}:${it.length()}:${it.lastModified()}" }.toList()
+        }
+
     fun synchronize(context: Context, sandbox: File, games: List<InstalledVitaGame>): Int {
         val privateRoot = File(context.cacheDir, "native-shell-runtime").canonicalFile
         require(sandbox.canonicalPath.startsWith(privateRoot.path + File.separator))
         val database = File(sandbox, "ur0/shell/db/app.db")
         check(database.isFile) { "The genuine shell must initialize its schema first" }
-        val validGames = games.filter { it.titleId.matches(Regex("[A-Za-z0-9_]{1,64}")) }
+        val validGames = games.filter { game ->
+            game.titleId.matches(Regex("[A-Za-z0-9_]{1,64}")) &&
+                File(game.installPath, "eboot.bin").isFile &&
+                runCatching { readSfo(File(game.installPath, "sce_sys/param.sfo")) }.isSuccess
+        }
         // Copy only shell presentation resources. Never expose executable,
         // license, save-data, or writable installed-game directories to VSH.
         validGames.forEach { game ->
@@ -32,13 +53,28 @@ object NativeLibraryCatalog {
                 require(file.canonicalPath.startsWith(source.path + File.separator))
                 copyChanged(file, File(target, file.relativeTo(source).path))
             }
+            target.walkTopDown().filter(File::isFile).forEach { old ->
+                if (!File(source, old.relativeTo(target).path).isFile) check(old.delete())
+            }
         }
+        val removedResources = mutableListOf<String>()
         SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
             val allowed = utilities + validGames.map { it.titleId }
             db.beginTransaction()
             try {
+                // Firmware SQLite registers add_rm_list(), unavailable in Android
+                // SQLite (including Android 10). Capture the same removal queue in
+                // a temporary trigger and restore the original schema atomically.
+                val removalTrigger = db.rawQuery("SELECT sql FROM sqlite_master WHERE type='trigger' AND name='tgr_livearea_file_delete'", null).use { c ->
+                    if (c.moveToFirst()) c.getString(0) else null
+                }
+                db.execSQL("CREATE TEMP TABLE host_livearea_removed(path TEXT)")
+                if (removalTrigger != null) {
+                    db.execSQL("DROP TRIGGER tgr_livearea_file_delete")
+                    db.execSQL("CREATE TEMP TRIGGER host_livearea_remove BEFORE DELETE ON main.tbl_livearea_file BEGIN INSERT INTO host_livearea_removed SELECT dir||'/'||' '||rowid||ext FROM tbl_livearea_file WHERE rowid=OLD.rowid; END")
+                }
                 val obsolete = mutableListOf<String>()
-                db.rawQuery("SELECT DISTINCT titleId FROM tbl_appinfo_icon", null).use { cursor ->
+                db.rawQuery("SELECT titleId FROM tbl_appinfo_icon UNION SELECT titleId FROM tbl_appinfo", null).use { cursor ->
                     while (cursor.moveToNext()) {
                         val id = cursor.getString(0)
                         if (id !in allowed) obsolete += id
@@ -66,12 +102,27 @@ object NativeLibraryCatalog {
                     }
                     db.update("tbl_appinfo_icon", values, "titleId=?", arrayOf(game.titleId))
                 }
+                db.execSQL("DELETE FROM tbl_appinfo_page WHERE pageNo>=0 AND pageId NOT IN (SELECT pageId FROM tbl_appinfo_icon)")
                 db.rawQuery("PRAGMA integrity_check", null).use { cursor ->
                     check(cursor.moveToFirst() && cursor.getString(0) == "ok")
+                }
+                db.rawQuery("SELECT path FROM host_livearea_removed", null).use { c ->
+                    while (c.moveToNext()) removedResources += c.getString(0)
+                }
+                if (removalTrigger != null) {
+                    db.execSQL("DROP TRIGGER host_livearea_remove")
+                    db.execSQL(removalTrigger)
                 }
                 db.setTransactionSuccessful()
             } finally {
                 db.endTransaction()
+            }
+        }
+        removedResources.forEach { path ->
+            val device = path.substringBefore(':')
+            if (device == "ux0" || device == "ur0") {
+                val target = File(sandbox, "$device/${path.substringAfter(':').trimStart('/')}").canonicalFile
+                if (target.path.startsWith(sandbox.canonicalPath + File.separator) && target.isFile) check(target.delete())
             }
         }
         val allowedIds = validGames.mapTo(mutableSetOf()) { it.titleId }
