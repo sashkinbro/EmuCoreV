@@ -236,6 +236,10 @@ EXPORT(int, _sceAppMgrGetFgAppInfo) {
 
 EXPORT(int, _sceAppMgrGetIdByName) {
     TRACY_FUNC(_sceAppMgrGetIdByName);
+#ifndef NDEBUG
+    if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
+        return static_cast<int>(SCE_APPMGR_ERROR_NOT_FOUND);
+#endif
     return UNIMPLEMENTED();
 }
 
@@ -316,6 +320,10 @@ EXPORT(int, _sceAppMgrGetStatusById) {
 
 EXPORT(int, _sceAppMgrGetStatusByName) {
     TRACY_FUNC(_sceAppMgrGetStatusByName);
+#ifndef NDEBUG
+    if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
+        return static_cast<int>(SCE_APPMGR_ERROR_NOT_FOUND);
+#endif
     return UNIMPLEMENTED();
 }
 

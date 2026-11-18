@@ -24,7 +24,7 @@
 
 #include <util/tracy.h>
 #ifndef NDEBUG
-#include <chrono>
+#include <shell_firmware_research.h>
 #endif
 
 TRACY_MODULE_NAME(SceSharedFB);
@@ -74,12 +74,6 @@ struct SharedFbState {
     std::mutex handoff_mutex;
     SceSharedFbRenderInfo pending{};
     bool pending_valid = false;
-#ifndef NDEBUG
-    std::chrono::steady_clock::time_point sample_start{};
-    std::chrono::steady_clock::time_point last_handoff{};
-    uint32_t sample_frames = 0;
-    double longest_interval_ms = 0;
-#endif
 };
 
 LIBRARY_INIT(SceSharedFb) {
@@ -172,6 +166,10 @@ EXPORT(int, sceSharedFbUpdateProcess) {
 }
 
 EXPORT(int, sceSharedFbUpdateProcessBegin, SceUID id, const SceSharedFbRenderInfo *render_info, uint32_t *update_count) {
+#ifndef NDEBUG
+    if (const auto thread = emuenv.kernel.get_thread(thread_id))
+        poll_shell_catalog_research(emuenv, *thread);
+#endif
     if (!render_info || !update_count)
         return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_ADDR);
     auto *state = emuenv.kernel.obj_store.get<SharedFbState>();
@@ -184,19 +182,6 @@ EXPORT(int, sceSharedFbUpdateProcessBegin, SceUID id, const SceSharedFbRenderInf
     state->pending = *render_info;
     state->pending_valid = true;
 #ifndef NDEBUG
-    const auto now = std::chrono::steady_clock::now();
-    if (state->sample_frames == 0)
-        state->sample_start = now;
-    else
-        state->longest_interval_ms = std::max(state->longest_interval_ms,
-            std::chrono::duration<double, std::milli>(now - state->last_handoff).count());
-    state->last_handoff = now;
-    if (++state->sample_frames == 120) {
-        const double elapsed = std::chrono::duration<double>(now - state->sample_start).count();
-        LOG_DEBUG("SharedFb handoff preparations: {:.1f}/s, longest interval {:.1f} ms", 119 / elapsed, state->longest_interval_ms);
-        state->sample_frames = 0;
-        state->longest_interval_ms = 0;
-    }
     static std::atomic_uint trace_count{0};
     if (trace_count.fetch_add(1) < 6)
         LOG_DEBUG("SharedFb handoff buffer=0x{:X} index={} {}x{} stride={} format=0x{:X}",

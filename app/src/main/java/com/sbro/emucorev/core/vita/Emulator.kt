@@ -102,8 +102,8 @@ import com.sbro.emucorev.ui.theme.EmuCoreVTheme
 import java.io.File
 
 class Emulator : SDLActivity(), InputManager.InputDeviceListener {
-    private val isNativeShellSession: Boolean
-        get() = BuildConfig.DEBUG && gameIdFromIntent(intent) == "__VITA_SHELL_RESEARCH__"
+    private var isNativeShellSession = false
+    private val shellLaunchPending = java.util.concurrent.atomic.AtomicBoolean(false)
     private var shellExitDialog: android.app.AlertDialog? = null
     val rearTouchInput = com.sbro.emucorev.core.input.RearTouchInput()
     // Private backing state so that Compose observes changes when the native
@@ -294,7 +294,12 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun main() {
-        if (isFrontCameraProbe() || isNativeShellSession) {
+        if (isNativeShellSession) {
+            check(prepareNativeLibraryRuntime(java.io.File(cacheDir, "native-shell-runtime/vita").absolutePath))
+            super.main()
+            return
+        }
+        if (isFrontCameraProbe()) {
             super.main()
             return
         }
@@ -347,12 +352,13 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         setIntent(intent)
         if (isLaunchIntent(intent)) {
             triggerRebirthAfterNativeShutdown(markRebirthHandled(intent), outgoingTitle,
-                allowAutoSave = !shouldSkipExitAutoSave(intent.getStringArrayExtra(APP_RESTART_PARAMETERS),
+                allowAutoSave = !isNativeShellSession && !shouldSkipExitAutoSave(intent.getStringArrayExtra(APP_RESTART_PARAMETERS),
                     intent.getBooleanExtra(AUTOMATIC_STATE_LOAD_EXTRA, false)))
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        isNativeShellSession = BuildConfig.DEBUG && gameIdFromIntent(intent) == "__VITA_SHELL_RESEARCH__"
         launchStateLoading = LaunchStateLoadingState.fromArguments(
             intent?.getStringArrayExtra(APP_RESTART_PARAMETERS)
         )
@@ -511,6 +517,37 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             putExtra(APP_RESTART_PARAMETERS, args.toTypedArray())
         }
         triggerRebirthAfterNativeShutdown(restartIntent)
+    }
+
+    /** Native library requests use the same driver/settings/automatic-state resolver as the library UI. */
+    private external fun prepareNativeLibraryRuntime(sandbox: String): Boolean
+
+    fun onNativeLibraryLaunchRequested(titleId: String): Boolean {
+        if (!isNativeShellSession || rebirthRequested || !titleId.matches(Regex("[A-Za-z0-9_]{1,64}"))) return false
+        if (!shellLaunchPending.compareAndSet(false, true)) return true
+        runOnUiThread {
+            exitScope.launch {
+                var launched = false
+                try {
+                    check(withContext(Dispatchers.IO) {
+                        InstalledGameRepository().findByTitleId(this@Emulator, titleId) != null &&
+                            setAppSessionMenuPaused(true)
+                    })
+                    launched = com.sbro.emucorev.core.VitaLaunchBridge.launchInstalledTitle(this@Emulator, titleId) ==
+                        com.sbro.emucorev.core.VitaLaunchBridge.LaunchResult.Success
+                    check(launched)
+                } catch (error: Exception) {
+                    Log.e(TAG, "Native library could not hand off installed title $titleId", error)
+                    Toast.makeText(this@Emulator, R.string.game_launch_failed, Toast.LENGTH_LONG).show()
+                } finally {
+                    if (!launched) {
+                        withContext(Dispatchers.IO) { setAppSessionMenuPaused(false) }
+                        shellLaunchPending.set(false)
+                    }
+                }
+            }
+        }
+        return true
     }
 
     fun setStoragePermission() {

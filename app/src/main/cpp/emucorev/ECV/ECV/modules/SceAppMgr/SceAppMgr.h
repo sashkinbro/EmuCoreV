@@ -23,6 +23,7 @@ enum SceAppMgrErrorCode : uint32_t {
     SCE_APPMGR_ERROR_INVALID_PARAMETER = 0x80800001, //!< Invalid parameter (NULL)
     SCE_APPMGR_ERROR_INVALID_PARAMETER2 = 0x80801000, //!< Invalid parameter (wrong value)
     SCE_APPMGR_ERROR_BUSY = 0x80802000, //!< Busy
+    SCE_APPMGR_ERROR_NOT_FOUND = 0x80802012, //!< Application or process not found
     SCE_APPMGR_ERROR_STATE = 0x80802013, //!< Invalid state
     SCE_APPMGR_ERROR_NULL_POINTER = 0x80802016, //!< NULL pointer
     SCE_APPMGR_ERROR_INVALID = 0x8080201A, //!< Invalid param

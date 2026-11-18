@@ -30,10 +30,14 @@
 #include <sstream>
 #include <string_view>
 #include <vector>
+#include <atomic>
+#include <renderer/state.h>
+#include <SDL3/SDL_system.h>
 
 namespace {
 fs::path shell_boot_sandbox;
 std::string shell_gpu_probe;
+std::atomic_bool shell_catalog_requested{false};
 
 std::vector<uint8_t> read_bytes(JNIEnv *env, jbyteArray input) {
     std::vector<uint8_t> bytes(env->GetArrayLength(input));
@@ -49,6 +53,98 @@ std::string read_string(JNIEnv *env, jstring input) {
 }
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_ShellFirmwareResearchTest_requestCatalogImport(JNIEnv *, jobject) {
+    shell_catalog_requested.store(true);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_ShellFirmwareResearchTest_installShellProbes(JNIEnv *env, jobject, jintArray addresses) {
+    auto *emuenv = get_emuenv();
+    if (!emuenv || emuenv->io.app_path != "__VITA_SHELL_RESEARCH__") return;
+    const auto count = env->GetArrayLength(addresses);
+    if (count < 1 || count > 256) return;
+    std::vector<jint> values(count);
+    env->GetIntArrayRegion(addresses, 0, count, values.data());
+    for (const auto value : values) {
+        const auto address = static_cast<Address>(value) & ~1u;
+        if (address >= 0x81000000 && address < 0x81542130 && Ptr<uint32_t>(address).valid(emuenv->mem))
+            emuenv->kernel.debugger.add_probe(emuenv->mem, address | 1u);
+    }
+}
+
+
+void poll_shell_catalog_research(EmuEnvState &emuenv, ThreadState &thread) {
+    if (emuenv.io.app_path != "__VITA_SHELL_RESEARCH__" || !shell_catalog_requested.exchange(false))
+        return;
+    Address callback = 0;
+    {
+        const std::lock_guard lock(emuenv.kernel.export_nids_mutex);
+        const auto entry = emuenv.kernel.export_nids.find(0xC875C57A);
+        if (entry != emuenv.kernel.export_nids.end())
+            callback = entry->second;
+    }
+    if (!callback) {
+        LOG_ERROR("Native LiveArea catalog parser is unavailable");
+        return;
+    }
+    // C875C57A: native SceLsdb LiveArea import, (PAF string titleId,
+    // contents directory). It reads metadata from its own DB and parses XML
+    // through native PAF, including frames and firmware fallback resources.
+    const Address scratch = alloc(emuenv.mem, 1024, "shell-catalog-import");
+    if (!scratch)
+        return;
+    for (const auto &entry : fs::directory_iterator(shell_boot_sandbox / "ux0/app")) {
+        if (!fs::is_directory(entry.path()))
+            continue;
+        const std::string id = entry.path().filename().string();
+        if (id.empty() || id.size() > 64 || id.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_") != std::string::npos)
+            continue;
+        const auto path = fmt::format("ux0:app/{}/sce_sys/livearea/contents", id);
+        auto *words = Ptr<uint32_t>(scratch).get(emuenv.mem);
+        words[0] = scratch + 16;
+        words[1] = static_cast<uint32_t>(id.size());
+        words[2] = 0; // Reserved word in the 12-byte PAF string ABI.
+        std::memcpy(Ptr<char>(scratch + 16).get(emuenv.mem), id.c_str(), id.size() + 1);
+        std::memcpy(Ptr<char>(scratch + 128).get(emuenv.mem), path.c_str(), path.size() + 1);
+        const auto result = thread.run_callback(callback, {scratch, scratch + 128});
+        LOG_DEBUG("Native LiveArea import {} returned 0x{:08X}", id, result);
+    }
+    free(emuenv.mem, scratch);
+}
+
+int dispatch_shell_game_launch_research(EmuEnvState &emuenv, const char *path) {
+    constexpr int not_found = static_cast<int>(0x80802012u);
+    if (!path || !emuenv.renderer) return not_found;
+    const std::string_view requested(path);
+    constexpr std::string_view prefix = "ux0:app/";
+    constexpr std::string_view suffix = "/eboot.bin";
+    if (!requested.starts_with(prefix) || !requested.ends_with(suffix) || requested.size() <= prefix.size() + suffix.size())
+        return not_found;
+    const auto id = requested.substr(prefix.size(), requested.size() - prefix.size() - suffix.size());
+    if (id.size() > 64 || id.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_") != std::string_view::npos)
+        return not_found;
+    auto *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity) return not_found;
+    const auto cls = env->GetObjectClass(activity);
+    const auto method = cls ? env->GetMethodID(cls, "onNativeLibraryLaunchRequested", "(Ljava/lang/String;)Z") : nullptr;
+    bool accepted = false;
+    if (method && !env->ExceptionCheck()) {
+        const auto title = env->NewStringUTF(std::string(id).c_str());
+        const bool previous = emuenv.renderer->android_menu_paused.exchange(true);
+        accepted = env->CallBooleanMethod(activity, method, title) == JNI_TRUE && !env->ExceptionCheck();
+        if (!accepted) emuenv.renderer->android_menu_paused.store(previous);
+        env->DeleteLocalRef(title);
+    }
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    if (cls) env->DeleteLocalRef(cls);
+    env->DeleteLocalRef(activity);
+    // Positive acknowledgement is consumed only until the host stops this
+    // session and starts the game through the ordinary Android launch path.
+    return accepted ? 1 : not_found;
+}
+
 bool prepare_shell_firmware_research(EmuEnvState &emuenv) {
     // Give VSH its own writable filesystem. Firmware is linked read-only by
     // convention, while shell database/registry initialization stays isolated
@@ -57,6 +153,7 @@ bool prepare_shell_firmware_research(EmuEnvState &emuenv) {
     if (shell_boot_sandbox.empty())
         return false;
     const auto sandbox = shell_boot_sandbox;
+    shell_catalog_requested.store(false);
     fs::create_directories(sandbox);
     for (const auto *device : { "vs0", "os0", "sa0" }) {
         const auto source = firmware_root / device;
@@ -121,6 +218,14 @@ bool prepare_shell_firmware_research(EmuEnvState &emuenv) {
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorev_core_vita_Emulator_prepareNativeLibraryRuntime(JNIEnv *env, jobject, jstring sandbox) {
+    const auto *session = get_app_session_controller();
+    if (!session || session->has_active_session()) return JNI_FALSE;
+    shell_boot_sandbox = fs::path(read_string(env, sandbox));
+    return shell_boot_sandbox.is_absolute() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorev_ShellFirmwareResearchTest_prepareBoot(JNIEnv *env, jobject, jstring sandbox, jstring gpu_probe) {
     const auto *session = get_app_session_controller();
     if (!session || session->has_active_session())
@@ -132,10 +237,10 @@ Java_com_sbro_emucorev_ShellFirmwareResearchTest_prepareBoot(JNIEnv *env, jobjec
     if (!shell_gpu_probe.empty() && shell_gpu_probe != "no-mapping" && shell_gpu_probe != "no-async-pipelines" && shell_gpu_probe != "accurate-sync" && shell_gpu_probe != "dump-textures" && shell_gpu_probe != "no-fetch")
         return JNI_FALSE;
     if (auto *emuenv = get_emuenv()) {
-        emuenv->cfg.log_level = spdlog::level::debug;
+        emuenv->cfg.log_level = spdlog::level::warn;
         emuenv->cfg.archive_log = false;
         emuenv->kernel.debugger.watch_import_calls = false;
-        logging::set_level(spdlog::level::debug);
+        logging::set_level(spdlog::level::warn);
     }
     return shell_boot_sandbox.is_absolute() ? JNI_TRUE : JNI_FALSE;
 }

@@ -95,6 +95,7 @@ set(EMUCOREV_BRIDGE_SOURCES
 
 target_sources(ECV PRIVATE ${EMUCOREV_BRIDGE_SOURCES})
 target_sources(ECV PRIVATE $<$<CONFIG:Debug>:${EMUCOREV_BRIDGE_DIR}/src/shell_firmware_research.cpp>)
+target_include_directories(modules PRIVATE "$<$<CONFIG:Debug>:${EMUCOREV_BRIDGE_DIR}/include>")
 target_link_libraries(ECV PRIVATE $<$<CONFIG:Debug>:regmgr>)
 
 # These private diagnostic archives expose no JNI API. Hide their symbols so

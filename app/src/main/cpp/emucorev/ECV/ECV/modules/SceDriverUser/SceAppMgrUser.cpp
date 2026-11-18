@@ -27,6 +27,9 @@
 #include <util/find.h>
 
 #include <util/tracy.h>
+#ifndef NDEBUG
+#include <shell_firmware_research.h>
+#endif
 TRACY_MODULE_NAME(SceAppMgrUser);
 
 struct SceAppMgrSaveDataDataDelete {
@@ -285,6 +288,12 @@ EXPORT(int, sceAppMgrGetFgAppInfo) {
 
 EXPORT(int, sceAppMgrGetIdByName) {
     TRACY_FUNC(sceAppMgrGetIdByName);
+#ifndef NDEBUG
+    // The isolated library has no resident application processes. A false
+    // success makes VSH try to activate process zero instead of launching.
+    if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
+        return static_cast<int>(SCE_APPMGR_ERROR_NOT_FOUND);
+#endif
     return UNIMPLEMENTED();
 }
 
@@ -367,6 +376,10 @@ EXPORT(int, sceAppMgrGetStatusById) {
 
 EXPORT(int, sceAppMgrGetStatusByName) {
     TRACY_FUNC(sceAppMgrGetStatusByName);
+#ifndef NDEBUG
+    if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
+        return static_cast<int>(SCE_APPMGR_ERROR_NOT_FOUND);
+#endif
     return UNIMPLEMENTED();
 }
 
@@ -442,8 +455,7 @@ EXPORT(int, sceAppMgrLaunchAppByPath4, const char *path, const char *args, uint3
     TRACY_FUNC(sceAppMgrLaunchAppByPath4);
 #ifndef NDEBUG
     if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
-        LOG_DEBUG("Native shell requested launch path={} args={} flags=0x{:X} option=0x{:X}",
-            path ? path : "<null>", args ? args : "<null>", flags, option);
+        return dispatch_shell_game_launch_research(emuenv, path);
 #endif
     return UNIMPLEMENTED();
 }

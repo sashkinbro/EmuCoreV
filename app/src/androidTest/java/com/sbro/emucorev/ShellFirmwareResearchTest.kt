@@ -7,6 +7,8 @@ import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.NativeLibraryLoader
 import com.sbro.emucorev.core.SKIP_AUTOMATIC_STATE_LOAD_EXTRA
 import com.sbro.emucorev.core.vita.Emulator
+import com.sbro.emucorev.core.vita.NativeShellCatalogProbe
+import com.sbro.emucorev.data.InstalledGameRepository
 import java.io.File
 import java.security.MessageDigest
 import org.junit.Assert.assertFalse
@@ -18,6 +20,8 @@ import org.junit.runner.RunWith
 /** Opt-in research; never boots a game or changes installed firmware. */
 @RunWith(AndroidJUnit4::class)
 class ShellFirmwareResearchTest {
+    private external fun requestCatalogImport()
+    private external fun installShellProbes(addresses: IntArray)
     private external fun decode(input: ByteArray): ByteArray
     private external fun link(inputs: Array<ByteArray>, trace: Boolean): String
     private external fun prepareBoot(sandbox: String, gpuProbe: String): Boolean
@@ -74,11 +78,20 @@ class ShellFirmwareResearchTest {
 
     @Test
     fun bootOriginalShellInPrivateFilesystem() {
-        assumeTrue("Shell boot is opt-in", researchMode() == "boot")
+        assumeTrue("Shell boot is opt-in", researchMode() in listOf("boot", "bootCatalog"))
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         NativeLibraryLoader.ensureLoaded(context)
         val sandbox = File(context.cacheDir, "native-shell-runtime/vita")
         check(sandbox.isDirectory || sandbox.mkdirs())
+        if (researchMode() == "bootCatalog") {
+            val games = InstalledGameRepository().loadInstalledGames(context)
+            assertTrue("Installed titles are required for the catalog probe", games.isNotEmpty())
+            val count = NativeShellCatalogProbe.synchronize(context, sandbox, games)
+            assertTrue(count == games.size)
+            assertFalse("The shell mirror must not contain game executables",
+                File(sandbox, "ux0/app").walkTopDown().any { it.isFile && it.name == "eboot.bin" })
+            println("Native shell catalog synchronized: $count installed games")
+        }
         val gpuProbe = InstrumentationRegistry.getArguments().getString("shellGpuProbe", "")
         assertTrue(prepareBoot(sandbox.absolutePath, gpuProbe))
         context.startActivity(Intent(context, Emulator::class.java)
@@ -88,8 +101,16 @@ class ShellFirmwareResearchTest {
         // Observational bootstrap only. A successful test is not proof of a
         // rendered shell: inspect native logs and the device frame separately.
         val seconds = InstrumentationRegistry.getArguments().getString("shellSeconds", "30")
-            .toLong().coerceIn(10, 180)
-        Thread.sleep(seconds * 1_000)
+            .toLong().coerceIn(10, 900)
+        val probes = InstrumentationRegistry.getArguments().getString("shellProbeAddresses", "")
+        if (researchMode() == "bootCatalog" || probes.isNotEmpty()) {
+            Thread.sleep(15_000)
+            if (researchMode() == "bootCatalog") requestCatalogImport()
+            if (probes.isNotEmpty()) installShellProbes(probes.split(',').map { java.lang.Long.decode(it).toInt() }.toIntArray())
+            Thread.sleep((seconds * 1_000 - 15_000).coerceAtLeast(0))
+        } else {
+            Thread.sleep(seconds * 1_000)
+        }
     }
 
     @Test
