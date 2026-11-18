@@ -23,9 +23,7 @@
 #include <kernel/state.h>
 
 #include <util/tracy.h>
-#ifndef NDEBUG
-#include <shell_firmware_research.h>
-#endif
+#include <native_library_runtime.h>
 
 TRACY_MODULE_NAME(SceSharedFB);
 
@@ -168,7 +166,7 @@ EXPORT(int, sceSharedFbUpdateProcess) {
 EXPORT(int, sceSharedFbUpdateProcessBegin, SceUID id, const SceSharedFbRenderInfo *render_info, uint32_t *update_count) {
 #ifndef NDEBUG
     if (const auto thread = emuenv.kernel.get_thread(thread_id))
-        poll_shell_catalog_research(emuenv, *thread);
+        poll_native_library_catalog(emuenv, *thread);
 #endif
     if (!render_info || !update_count)
         return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_ADDR);

@@ -122,6 +122,18 @@
         </activity>
 
         <activity
+            android:name=".core.vita.NativeLibraryActivity"
+            android:process=":native_library"
+            android:exported="false"
+            android:hardwareAccelerated="false"
+            android:configChanges="layoutDirection|locale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
+            android:enableOnBackInvokedCallback="false"
+            android:launchMode="singleInstance"
+            android:screenOrientation="sensorLandscape"
+            android:theme="@style/Theme.EmuCoreV.Emulator"
+            android:windowSoftInputMode="adjustNothing|stateAlwaysHidden" />
+
+        <activity
             android:name="com.jakewharton.processphoenix.PhoenixActivity"
             android:theme="@style/Theme.EmuCoreV.Phoenix"
             tools:replace="android:theme"

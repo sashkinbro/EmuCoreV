@@ -25,6 +25,9 @@ class EmuCoreVApp : Application() {
         // helper may build the emulator-side graph.
         val processName = Application.getProcessName()
         if (processName.endsWith(PHOENIX_PROCESS_SUFFIX) || processName.endsWith(DISCORD_PROCESS_SUFFIX)) return
+        // Firmware UI has its own guest/SDL runtime, with no game bookkeeping,
+        // cloud sync, Discord, backup worker, or maintenance work in its process.
+        if (processName.endsWith(":native_library")) return
         AppIconManager.applyProIcon(this, AppPreferences(this).proUnlocked)
         PlayTimeRepository(this).finishOpenSessions().forEach { session ->
             ProfilePlayTimeSyncer.recordAndSync(this, session.titleId, session.title, session.durationMs)

@@ -27,9 +27,7 @@
 #include <util/find.h>
 
 #include <util/tracy.h>
-#ifndef NDEBUG
-#include <shell_firmware_research.h>
-#endif
+#include <native_library_runtime.h>
 TRACY_MODULE_NAME(SceAppMgrUser);
 
 struct SceAppMgrSaveDataDataDelete {
@@ -286,14 +284,12 @@ EXPORT(int, sceAppMgrGetFgAppInfo) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAppMgrGetIdByName) {
+EXPORT(int, sceAppMgrGetIdByName, int *process_id, const char *name) {
     TRACY_FUNC(sceAppMgrGetIdByName);
-#ifndef NDEBUG
     // The isolated library has no resident application processes. A false
     // success makes VSH try to activate process zero instead of launching.
-    if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
         return static_cast<int>(SCE_APPMGR_ERROR_NOT_FOUND);
-#endif
     return UNIMPLEMENTED();
 }
 
@@ -312,8 +308,10 @@ EXPORT(int, sceAppMgrGetMountProcessNum) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAppMgrGetNameById) {
+EXPORT(int, sceAppMgrGetNameById, int process_id, char *name) {
     TRACY_FUNC(sceAppMgrGetNameById);
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
+        return native_library_app_name(process_id, name);
     return UNIMPLEMENTED();
 }
 
@@ -334,8 +332,10 @@ EXPORT(int, sceAppMgrGetRawPath, char *path, char *resolved_path, int resolved_p
     return 0;
 }
 
-EXPORT(int, sceAppMgrGetRawPathOfApp0ByAppIdForShell) {
+EXPORT(int, sceAppMgrGetRawPathOfApp0ByAppIdForShell, int app_id, char *path) {
     TRACY_FUNC(sceAppMgrGetRawPathOfApp0ByAppIdForShell);
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
+        return native_library_app_path(app_id, path);
     return UNIMPLEMENTED();
 }
 
@@ -364,22 +364,27 @@ EXPORT(int, sceAppMgrGetSaveDataInfoForSpecialExport) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAppMgrGetStatusByAppId) {
+EXPORT(int, sceAppMgrGetStatusByAppId, int app_id, void *status) {
     TRACY_FUNC(sceAppMgrGetStatusByAppId);
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
+        return native_library_app_status(app_id, status);
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAppMgrGetStatusById) {
+EXPORT(int, sceAppMgrGetStatusById, int app_id, void *status) {
     TRACY_FUNC(sceAppMgrGetStatusById);
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
+        return native_library_app_status(app_id, status);
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAppMgrGetStatusByName) {
+EXPORT(int, sceAppMgrGetStatusByName, const char *name, void *status) {
     TRACY_FUNC(sceAppMgrGetStatusByName);
-#ifndef NDEBUG
-    if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
-        return static_cast<int>(SCE_APPMGR_ERROR_NOT_FOUND);
-#endif
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__") {
+        int process_id = 0;
+        const auto result = native_library_app_id(name, &process_id);
+        return result < 0 ? result : native_library_app_status(process_id, status);
+    }
     return UNIMPLEMENTED();
 }
 
@@ -451,12 +456,26 @@ EXPORT(int, sceAppMgrLaunchAppByNameForShell) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAppMgrLaunchAppByPath4, const char *path, const char *args, uint32_t flags, uint32_t option) {
+EXPORT(int, sceAppMgrLaunchAppByPath4, const char *path, const char *args, uint32_t memory_size, uint32_t flags, uint32_t launch_flags, Ptr<uint32_t> options) {
     TRACY_FUNC(sceAppMgrLaunchAppByPath4);
-#ifndef NDEBUG
-    if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
-        return dispatch_shell_game_launch_research(emuenv, path);
-#endif
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__") {
+        // SceShell passes six arguments. The option block's +0x28 field
+        // points to a complete SceAppMgrAppStatus output; its app_id is
+        // copied into the LiveArea after this call, independently of r0/PID.
+        Ptr<uint8_t> status;
+        if (options) {
+            if (!options.valid(emuenv.mem) || !Ptr<uint32_t>(options.address() + 0x28).valid(emuenv.mem))
+                return static_cast<int>(0x80020005u);
+            const auto *option = options.get(emuenv.mem);
+            if (option[0] < 0x2c) return static_cast<int>(0x80020005u);
+            status = Ptr<uint8_t>(option[10]);
+            if (status && (!status.valid(emuenv.mem) || !Ptr<uint8_t>(status.address() + 0x7f).valid(emuenv.mem)))
+                return static_cast<int>(0x80020005u);
+        }
+        const int result = dispatch_native_library_game_launch(emuenv, path);
+        if (result >= 0 && status) native_library_app_status(result, status.get(emuenv.mem));
+        return result;
+    }
     return UNIMPLEMENTED();
 }
 
@@ -551,18 +570,18 @@ EXPORT(int, sceAppMgrReceiveEventNum, SceUInt32 *eventNum) {
 
 EXPORT(int, sceAppMgrReceiveNotificationRequestForShell) {
     TRACY_FUNC(sceAppMgrReceiveNotificationRequestForShell);
-#ifndef NDEBUG
     // The isolated host has no application-manager notification service.
     // Reporting success leaves the native request structure unwritten and
     // causes VSH to process uninitialized stack contents as a real request.
-    if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
         return static_cast<int>(SCE_APPMGR_ERROR_STATE);
-#endif
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAppMgrReceiveShellEvent) {
+EXPORT(int, sceAppMgrReceiveShellEvent, void *event) {
     TRACY_FUNC(sceAppMgrReceiveShellEvent);
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
+        return receive_native_library_shell_event(event);
     return UNIMPLEMENTED();
 }
 

@@ -101,8 +101,10 @@ import com.sbro.emucorev.ui.emulation.EmulationOverlayHost
 import com.sbro.emucorev.ui.theme.EmuCoreVTheme
 import java.io.File
 
-class Emulator : SDLActivity(), InputManager.InputDeviceListener {
+open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var isNativeShellSession = false
+    val returnsToNativeLibrary: Boolean get() = NativeLibraryMode.available &&
+        (isNativeShellSession || intent.getBooleanExtra(NativeLibraryMode.RETURN_TO_NATIVE_LIBRARY, false))
     private val shellLaunchPending = java.util.concurrent.atomic.AtomicBoolean(false)
     private var shellExitDialog: android.app.AlertDialog? = null
     val rearTouchInput = com.sbro.emucorev.core.input.RearTouchInput()
@@ -190,6 +192,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                     putExtra(APP_RESTART_PARAMETERS, autoLoadFallbackArguments(
                         intent.getStringArrayExtra(APP_RESTART_PARAMETERS).orEmpty()))
                     putExtra(SKIP_AUTOMATIC_STATE_LOAD_EXTRA, true)
+                    putExtra(NativeLibraryMode.RETURN_TO_NATIVE_LIBRARY, returnsToNativeLibrary)
                 }
                 triggerRebirthAfterNativeShutdown(fallback, allowAutoSave = false)
             }
@@ -295,7 +298,11 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun main() {
         if (isNativeShellSession) {
-            check(prepareNativeLibraryRuntime(java.io.File(cacheDir, "native-shell-runtime/vita").absolutePath))
+            com.sbro.emucorev.core.NativeLibraryLoader.ensureLoaded(this)
+            // Loader pre-initialization uses the application context. Native
+            // firmware callbacks must resolve this process's actual Activity.
+            org.libsdl.app.SDL.setContext(this)
+            check(prepareNativeLibraryRuntime(NativeLibraryMode.prepare(this).absolutePath))
             super.main()
             return
         }
@@ -348,6 +355,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (isNativeShellSession && gameIdFromIntent(intent) == NativeLibraryMode.TITLE_ID) return
         val outgoingTitle = currentGameIdOrIntent()
         setIntent(intent)
         if (isLaunchIntent(intent)) {
@@ -358,7 +366,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        isNativeShellSession = BuildConfig.DEBUG && gameIdFromIntent(intent) == "__VITA_SHELL_RESEARCH__"
+        isNativeShellSession = gameIdFromIntent(intent) == NativeLibraryMode.TITLE_ID
         launchStateLoading = LaunchStateLoadingState.fromArguments(
             intent?.getStringArrayExtra(APP_RESTART_PARAMETERS)
         )
@@ -398,6 +406,12 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun onResume() {
         super.onResume()
         if (rebirthRequested || isFinishing) return
+        if (isNativeShellSession && shellLaunchPending.getAndSet(false)) {
+            exitScope.launch { withContext(Dispatchers.IO) {
+                notifyNativeLibraryGameStopped()
+                setAppSessionMenuPaused(false)
+            } }
+        }
         requestRetroArchShaderReapply(currentGameIdOrIntent())
         com.sbro.emucorev.core.input.RearTouchNative.setCamerasSuspended(false)
         KeyboardMouseManager.refreshConnectionState()
@@ -521,6 +535,7 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     /** Native library requests use the same driver/settings/automatic-state resolver as the library UI. */
     private external fun prepareNativeLibraryRuntime(sandbox: String): Boolean
+    private external fun notifyNativeLibraryGameStopped()
 
     fun onNativeLibraryLaunchRequested(titleId: String): Boolean {
         if (!isNativeShellSession || rebirthRequested || !titleId.matches(Regex("[A-Za-z0-9_]{1,64}"))) return false
@@ -846,12 +861,15 @@ class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             overlayBackHandler = null
             overlayMenuButtonRevealHandler = null
             overlayPauseMenuOpenHandler = null
-            val homeIntent = Intent(this, MainActivity::class.java).apply {
+            val returnToNative = !isNativeShellSession && returnsToNativeLibrary
+            val homeIntent = if (returnToNative) NativeLibraryMode.intent(this) else Intent(this, MainActivity::class.java).apply {
                 action = Intent.ACTION_MAIN
                 addCategory(Intent.CATEGORY_LAUNCHER)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                if (isNativeShellSession) putExtra(NativeLibraryMode.EXIT_NATIVE_LIBRARY, true)
             }
-            triggerRebirthAfterNativeShutdown(homeIntent, allowAutoSave = autoSave, returnToLibrary = true)
+            triggerRebirthAfterNativeShutdown(homeIntent, allowAutoSave = autoSave && !isNativeShellSession,
+                returnToLibrary = true)
         }
     }
 

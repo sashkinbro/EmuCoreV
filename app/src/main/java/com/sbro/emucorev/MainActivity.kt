@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
         preferences.applyAppLanguage()
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        handleNativeLibraryExit(intent)
         KeyboardMouseManager.ensureInitialized(this)
         inAppReviewCoordinator = InAppReviewCoordinator(
             progressSource = PlayTimeReviewProgressSource(applicationContext),
@@ -76,8 +77,26 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNativeLibraryExit(intent)
+    }
+
+    private fun handleNativeLibraryExit(intent: android.content.Intent?) {
+        if (intent?.getBooleanExtra(com.sbro.emucorev.core.vita.NativeLibraryMode.EXIT_NATIVE_LIBRARY, false) == true) {
+            com.sbro.emucorev.core.vita.NativeLibraryMode.setSelected(this, false)
+            intent.removeExtra(com.sbro.emucorev.core.vita.NativeLibraryMode.EXIT_NATIVE_LIBRARY)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
+        if (com.sbro.emucorev.core.vita.NativeLibraryMode.available &&
+            getSharedPreferences("emucorev_library_ui", MODE_PRIVATE).getBoolean("shelf_mode", false)) {
+            startActivity(com.sbro.emucorev.core.vita.NativeLibraryMode.intent(this))
+            return
+        }
         enterImmersiveMode()
         reviewPromptJob?.cancel()
         reviewPromptJob = lifecycleScope.launch {

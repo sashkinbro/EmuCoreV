@@ -457,12 +457,19 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 val libraryUiPreferences = remember(context) {
                     context.getSharedPreferences("emucorev_library_ui", android.content.Context.MODE_PRIVATE)
                 }
-                var shelfMode by rememberSaveable {
+                var shelfMode by remember(libraryUiPreferences) {
                     mutableStateOf(libraryUiPreferences.getBoolean("shelf_mode", false))
+                }
+                androidx.compose.runtime.DisposableEffect(libraryUiPreferences) {
+                    val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+                        if (key == "shelf_mode") shelfMode = prefs.getBoolean(key, false)
+                    }
+                    libraryUiPreferences.registerOnSharedPreferenceChangeListener(listener)
+                    onDispose { libraryUiPreferences.unregisterOnSharedPreferenceChangeListener(listener) }
                 }
                 AdaptiveShell(
                     selected = PrimaryDestination.Library,
-                    immersiveContent = shelfMode,
+                    immersiveContent = shelfMode && !com.sbro.emucorev.core.vita.NativeLibraryMode.available,
                     onNavigateSetup = {
                         navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
                     },
@@ -489,10 +496,13 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onInstallContent = openInstallChoiceDialog
                 ) { openDrawer ->
                     LibraryScreen(
-                        shelfMode = shelfMode,
+                        shelfMode = shelfMode && !com.sbro.emucorev.core.vita.NativeLibraryMode.available,
                         onShelfModeChanged = {
                             shelfMode = it
-                            libraryUiPreferences.edit().putBoolean("shelf_mode", it).apply()
+                            libraryUiPreferences.edit().putBoolean("shelf_mode", it).commit()
+                            if (it && com.sbro.emucorev.core.vita.NativeLibraryMode.available) {
+                                context.startActivity(com.sbro.emucorev.core.vita.NativeLibraryMode.intent(context))
+                            }
                         },
                         onLaunchGame = launchInstalledGame,
                         onOpenSaveManager = { titleId ->

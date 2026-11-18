@@ -335,9 +335,7 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
     context.current_fb_height = framebuffer.height;
     context.current_color_raw_view = framebuffer.raw_image ? framebuffer.raw_image->view : state.default_raw_image.view;
     context.current_color_raw_image = framebuffer.raw_image;
-#ifndef NDEBUG
     context.shell_fetch_snapshot = framebuffer.shell_fetch_snapshot.get();
-#endif
 
     // make sure we are not keeping any texture from the previous pass
     // (textures can be still bound even though they are not used)
@@ -577,10 +575,8 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
         .imageView = current_color_view,
         .imageLayout = vk::ImageLayout::eGeneral,
     };
-#ifndef NDEBUG
     if (shell_fetch_snapshot)
         descr_color_info.imageView = shell_fetch_snapshot->view;
-#endif
 
     const vk::DescriptorType input_type = state.features.support_shader_interlock ? vk::DescriptorType::eStorageImage : vk::DescriptorType::eInputAttachment;
     vk::WriteDescriptorSet write_descr{

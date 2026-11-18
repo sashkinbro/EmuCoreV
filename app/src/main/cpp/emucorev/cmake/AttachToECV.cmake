@@ -68,6 +68,7 @@ if(TARGET host_dialog)
 endif()
 
 set(EMUCOREV_BRIDGE_SOURCES
+    "${EMUCOREV_BRIDGE_DIR}/src/native_library_runtime.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/layer_contract.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/vita_install_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/runtime_bridge.cpp"
@@ -95,8 +96,8 @@ set(EMUCOREV_BRIDGE_SOURCES
 
 target_sources(ECV PRIVATE ${EMUCOREV_BRIDGE_SOURCES})
 target_sources(ECV PRIVATE $<$<CONFIG:Debug>:${EMUCOREV_BRIDGE_DIR}/src/shell_firmware_research.cpp>)
-target_include_directories(modules PRIVATE "$<$<CONFIG:Debug>:${EMUCOREV_BRIDGE_DIR}/include>")
-target_link_libraries(ECV PRIVATE $<$<CONFIG:Debug>:regmgr>)
+target_include_directories(modules PRIVATE "${EMUCOREV_BRIDGE_DIR}/include")
+target_link_libraries(ECV PRIVATE regmgr)
 
 # These private diagnostic archives expose no JNI API. Hide their symbols so
 # section GC can discard unused logging/debug-server implementations in release.

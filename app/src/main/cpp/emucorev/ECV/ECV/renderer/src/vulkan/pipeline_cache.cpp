@@ -574,10 +574,8 @@ vk::PipelineShaderStageCreateInfo PipelineCache::retrieve_shader(const SceGxmPro
 vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth_load, bool stencil_load, bool force_store, bool is_color_transient, bool no_color, bool has_raw_attachment) {
     const bool with_raw_attachment = has_raw_attachment && !no_color && !is_color_transient && state.features.preserve_f16_nan_as_u16 && format == vk::Format::eR16G16B16A16Sfloat;
     bool shell_snapshot = false;
-#ifndef NDEBUG
     shell_snapshot = state.current_title_id == "SceShell" && !no_color && !is_color_transient
         && !with_raw_attachment && format == vk::Format::eR8G8B8A8Unorm;
-#endif
 
     auto &render_passes_map = no_color
         ? shader_interlock_pass

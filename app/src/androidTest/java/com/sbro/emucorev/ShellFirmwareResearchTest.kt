@@ -7,7 +7,7 @@ import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.NativeLibraryLoader
 import com.sbro.emucorev.core.SKIP_AUTOMATIC_STATE_LOAD_EXTRA
 import com.sbro.emucorev.core.vita.Emulator
-import com.sbro.emucorev.core.vita.NativeShellCatalogProbe
+import com.sbro.emucorev.core.vita.NativeLibraryCatalog
 import com.sbro.emucorev.data.InstalledGameRepository
 import java.io.File
 import java.security.MessageDigest
@@ -86,7 +86,7 @@ class ShellFirmwareResearchTest {
         if (researchMode() == "bootCatalog") {
             val games = InstalledGameRepository().loadInstalledGames(context)
             assertTrue("Installed titles are required for the catalog probe", games.isNotEmpty())
-            val count = NativeShellCatalogProbe.synchronize(context, sandbox, games)
+            val count = NativeLibraryCatalog.synchronize(context, sandbox, games)
             assertTrue(count == games.size)
             assertFalse("The shell mirror must not contain game executables",
                 File(sandbox, "ux0/app").walkTopDown().any { it.isFile && it.name == "eboot.bin" })
@@ -96,7 +96,7 @@ class ShellFirmwareResearchTest {
         assertTrue(prepareBoot(sandbox.absolutePath, gpuProbe))
         context.startActivity(Intent(context, Emulator::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            .putExtra("AppStartParameters", arrayOf("-r", "__VITA_SHELL_RESEARCH__"))
+            .putExtra("AppStartParameters", arrayOf("-r", "__VITA_NATIVE_LIBRARY__"))
             .putExtra(SKIP_AUTOMATIC_STATE_LOAD_EXTRA, true))
         // Observational bootstrap only. A successful test is not proof of a
         // rendered shell: inspect native logs and the device frame separately.

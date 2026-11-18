@@ -69,9 +69,7 @@ struct Framebuffer {
     uint32_t width;
     uint32_t height;
     vkutil::Image *raw_image = nullptr;
-#ifndef NDEBUG
     std::shared_ptr<vkutil::Image> shell_fetch_snapshot;
-#endif
 };
 
 struct CastedTexture {

@@ -8,8 +8,8 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/** Metadata bridge for the isolated firmware probe, never a game installation. */
-object NativeShellCatalogProbe {
+/** Presentation metadata for the isolated firmware library. Call only while its guest session is stopped. */
+object NativeLibraryCatalog {
     private val utilities = setOf("NPXS10008") // Trophies only.
 
     fun synchronize(context: Context, sandbox: File, games: List<InstalledVitaGame>): Int {
@@ -44,7 +44,17 @@ object NativeShellCatalogProbe {
                         if (id !in allowed) obsolete += id
                     }
                 }
-                obsolete.forEach { db.delete("tbl_appinfo_icon", "titleId=?", arrayOf(it)) }
+                obsolete.forEach { id ->
+                    db.delete("tbl_appinfo_icon", "titleId=?", arrayOf(id))
+                    // Firmware utilities retain their internal metadata even
+                    // when hidden; removed installed games must leave no live
+                    // area, URI registration, or stale SFO entries behind.
+                    if (!id.startsWith("NPXS")) {
+                        listOf("tbl_appinfo", "tbl_uri", "tbl_livearea", "tbl_livearea_frame").forEach { table ->
+                            db.delete(table, "titleId=?", arrayOf(id))
+                        }
+                    }
+                }
                 validGames.forEach { game ->
                     updateMetadata(db, game)
                     db.rawQuery("SELECT 1 FROM tbl_appinfo_icon WHERE titleId=?", arrayOf(game.titleId)).use { cursor ->
@@ -62,6 +72,13 @@ object NativeShellCatalogProbe {
                 db.setTransactionSuccessful()
             } finally {
                 db.endTransaction()
+            }
+        }
+        val allowedIds = validGames.mapTo(mutableSetOf()) { it.titleId }
+        File(sandbox, "ux0/app").listFiles().orEmpty().forEach { old ->
+            if (old.name !in allowedIds && old.name.matches(Regex("[A-Za-z0-9_]{1,64}"))) {
+                require(old.canonicalPath.startsWith(File(sandbox, "ux0/app").canonicalPath + File.separator))
+                check(old.deleteRecursively())
             }
         }
         return validGames.size

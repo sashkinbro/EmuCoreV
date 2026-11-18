@@ -473,7 +473,6 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
 
     const SceGxmFragmentProgram &gxm_fragment_program = *context.record.fragment_program.get(mem);
     const SceGxmProgram &fragment_program_gxp = *renderer::get_program(gxm_fragment_program, mem);
-#ifndef NDEBUG
     if (context.shell_fetch_snapshot && fragment_program_gxp.is_frag_color_used()) {
         // PAF's glow must sample completed pixels, not a simultaneous write to
         // the same attachment on a non-coherent mobile framebuffer-fetch path.
@@ -499,7 +498,6 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
             vk::PipelineStageFlagBits::eFragmentShader, {}, ready, {}, {});
         context.start_render_pass();
     }
-#endif
 
     if (context.state.features.preserve_f16_nan_as_u16) {
         const VKFragmentProgram &vk_frag_program = *reinterpret_cast<VKFragmentProgram *>(gxm_fragment_program.renderer_data.get());

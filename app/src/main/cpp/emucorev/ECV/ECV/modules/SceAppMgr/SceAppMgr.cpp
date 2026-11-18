@@ -19,6 +19,7 @@
 
 #include <io/state.h>
 #include <kernel/state.h>
+#include <native_library_runtime.h>
 #include <packages/sfo.h>
 #include <renderer/state.h>
 #include <util/tracy.h>
@@ -234,12 +235,10 @@ EXPORT(int, _sceAppMgrGetFgAppInfo) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, _sceAppMgrGetIdByName) {
+EXPORT(int, _sceAppMgrGetIdByName, int *process_id, const char *name) {
     TRACY_FUNC(_sceAppMgrGetIdByName);
-#ifndef NDEBUG
-    if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
-        return static_cast<int>(SCE_APPMGR_ERROR_NOT_FOUND);
-#endif
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
+        return native_library_app_id(name, process_id);
     return UNIMPLEMENTED();
 }
 
@@ -258,8 +257,10 @@ EXPORT(int, _sceAppMgrGetMountProcessNum) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, _sceAppMgrGetNameById) {
+EXPORT(int, _sceAppMgrGetNameById, int process_id, char *name) {
     TRACY_FUNC(_sceAppMgrGetNameById);
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
+        return native_library_app_name(process_id, name);
     return UNIMPLEMENTED();
 }
 
@@ -278,8 +279,10 @@ EXPORT(int, _sceAppMgrGetRawPath) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, _sceAppMgrGetRawPathOfApp0ByAppIdForShell) {
+EXPORT(int, _sceAppMgrGetRawPathOfApp0ByAppIdForShell, int app_id, char *path) {
     TRACY_FUNC(_sceAppMgrGetRawPathOfApp0ByAppIdForShell);
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
+        return native_library_app_path(app_id, path);
     return UNIMPLEMENTED();
 }
 
@@ -308,22 +311,27 @@ EXPORT(int, _sceAppMgrGetSaveDataInfoForSpecialExport) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, _sceAppMgrGetStatusByAppId) {
+EXPORT(int, _sceAppMgrGetStatusByAppId, int app_id, void *status) {
     TRACY_FUNC(_sceAppMgrGetStatusByAppId);
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
+        return native_library_app_status(app_id, status);
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, _sceAppMgrGetStatusById) {
+EXPORT(int, _sceAppMgrGetStatusById, int app_id, void *status) {
     TRACY_FUNC(_sceAppMgrGetStatusById);
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
+        return native_library_app_status(app_id, status);
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, _sceAppMgrGetStatusByName) {
+EXPORT(int, _sceAppMgrGetStatusByName, const char *name, void *status) {
     TRACY_FUNC(_sceAppMgrGetStatusByName);
-#ifndef NDEBUG
-    if (emuenv.io.app_path == "__VITA_SHELL_RESEARCH__")
-        return static_cast<int>(SCE_APPMGR_ERROR_NOT_FOUND);
-#endif
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__") {
+        int process_id = 0;
+        const auto result = native_library_app_id(name, &process_id);
+        return result < 0 ? result : native_library_app_status(process_id, status);
+    }
     return UNIMPLEMENTED();
 }
 
@@ -782,8 +790,10 @@ EXPORT(int, sceAppMgrAcquireSoundOutExclusive2) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAppMgrActivateApp) {
+EXPORT(int, sceAppMgrActivateApp, int app_id) {
     TRACY_FUNC(sceAppMgrActivateApp);
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
+        return activate_native_library_app(app_id);
     return UNIMPLEMENTED();
 }
 
@@ -847,8 +857,13 @@ EXPORT(int, sceAppMgrFinishCoredumpForShell) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAppMgrGetAppIdByAppId) {
+EXPORT(int, sceAppMgrGetAppIdByAppId, int app_id) {
     TRACY_FUNC(sceAppMgrGetAppIdByAppId);
+    // Negative selectors ask for a resident foreground/exclusive application.
+    // This isolated guest contains only Shell; games run in the Android host.
+    // The native caller specifically tests -1 for an empty application slot.
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
+        return -1;
     return UNIMPLEMENTED();
 }
 
@@ -939,6 +954,8 @@ EXPORT(int, sceAppMgrQuitForNonSuspendableApp) {
 
 EXPORT(int, sceAppMgrReceiveShellEventNum) {
     TRACY_FUNC(sceAppMgrReceiveShellEventNum);
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__")
+        return native_library_shell_event_count();
     return UNIMPLEMENTED();
 }
 
