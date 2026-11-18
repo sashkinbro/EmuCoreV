@@ -106,7 +106,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     val returnsToNativeLibrary: Boolean get() = NativeLibraryMode.available &&
         (isNativeShellSession || intent.getBooleanExtra(NativeLibraryMode.RETURN_TO_NATIVE_LIBRARY, false))
     private val shellLaunchPending = java.util.concurrent.atomic.AtomicBoolean(false)
-    private var shellExitDialog: android.app.AlertDialog? = null
+    private var shellExitDialog: android.app.Dialog? = null
     val rearTouchInput = com.sbro.emucorev.core.input.RearTouchInput()
     // Private backing state so that Compose observes changes when the native
     // core calls setCurrentGameId(). Using a separate computed property avoids
@@ -626,13 +626,9 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     private fun showShellExitDialog() {
         if (isFinishing || shellExitDialog?.isShowing == true) return
-        shellExitDialog = android.app.AlertDialog.Builder(this)
-            .setTitle(R.string.native_library_exit_title)
-            .setMessage(R.string.emulation_exit_confirm_body)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(R.string.emulation_exit_confirm_action) { _, _ -> exitEmulation(autoSave = false) }
-            .create().also { dialog ->
-                dialog.setOnDismissListener { shellExitDialog = null }
+        shellExitDialog = NativeLibraryExitDialog(this) { exitEmulation(autoSave = false) }
+            .also { dialog ->
+                dialog.setOnDismissListener { shellExitDialog = null; hideSystemBars() }
                 dialog.show()
             }
     }
