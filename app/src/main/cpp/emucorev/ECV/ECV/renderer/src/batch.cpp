@@ -163,6 +163,8 @@ void process_batches(renderer::State &state, const FeatureState &features, MemSt
     auto max_time = duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + max_wait_ms;
 
     while (!state.should_display) {
+        if (state.shell_suspended.load(std::memory_order_relaxed))
+            return;
         if (state.render_abort.load(std::memory_order_relaxed))
             return;
 
@@ -281,6 +283,13 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
     auto next_presentation = std::chrono::steady_clock::now();
     int previous_frame_limit = 0;
     while (!state.render_abort.load(std::memory_order_relaxed)) {
+        {
+            std::unique_lock lock(state.shell_suspend_mutex);
+            state.shell_suspend_changed.wait(lock, [&] {
+                return state.render_abort.load(std::memory_order_relaxed)
+                    || !state.shell_suspended.load(std::memory_order_relaxed);
+            });
+        }
         state.snapshot_gate.boundary(true);
         if (state.render_abort.load(std::memory_order_relaxed))
             break;
@@ -291,6 +300,9 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
             break;
 
         process_batches(state, state.features, mem, config, 500);
+
+        if (state.shell_suspended.load(std::memory_order_relaxed))
+            continue;
 
         if (state.render_abort.load(std::memory_order_relaxed))
             break;
@@ -370,6 +382,7 @@ void stop_render_thread(State &state) {
     state.restore_presentation.cancel();
     abort_finish_operations(state);
     state.render_abort = true;
+    state.set_shell_suspended(false);
     state.snapshot_gate.stop();
     state.command_buffer_queue.abort();
     if (state.render_thread && state.render_thread->joinable())

@@ -71,6 +71,9 @@ struct DisplayState {
     std::condition_variable producer_changed;
     unsigned producer_freeze_count = 0;
     bool producer_active = false;
+    bool shell_suspended = false; // Protected by producer_mutex; games never enable it.
+    int refresh_hz = 60;
+    void set_shell_suspended(bool suspended);
     bool begin_vblank_update();
     void end_vblank_update();
     bool freeze_vblank_producer(std::chrono::milliseconds budget);

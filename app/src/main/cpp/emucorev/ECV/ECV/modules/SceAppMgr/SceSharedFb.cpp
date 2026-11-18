@@ -164,10 +164,8 @@ EXPORT(int, sceSharedFbUpdateProcess) {
 }
 
 EXPORT(int, sceSharedFbUpdateProcessBegin, SceUID id, const SceSharedFbRenderInfo *render_info, uint32_t *update_count) {
-#ifndef NDEBUG
     if (const auto thread = emuenv.kernel.get_thread(thread_id))
         poll_native_library_catalog(emuenv, *thread);
-#endif
     if (!render_info || !update_count)
         return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_ADDR);
     auto *state = emuenv.kernel.obj_store.get<SharedFbState>();

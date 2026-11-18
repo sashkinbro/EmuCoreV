@@ -107,6 +107,14 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         (isNativeShellSession || intent.getBooleanExtra(NativeLibraryMode.RETURN_TO_NATIVE_LIBRARY, false))
     private val shellLaunchPending = java.util.concurrent.atomic.AtomicBoolean(false)
     private var shellExitDialog: android.app.Dialog? = null
+    private var shellRefreshHz = 60
+    private var shellCatalogBootstrap = false
+    private val shellBootstrapRestartPending = java.util.concurrent.atomic.AtomicBoolean(false)
+    private var shellBootstrapNextCheckAt = 0L
+    private var shellBootstrapStableSince = 0L
+    private var shellBootstrapDatabaseModified = 0L
+    @Volatile private var shellCatalogFingerprint: String? = null
+    private var shellCatalogCheckJob: Job? = null
     val rearTouchInput = com.sbro.emucorev.core.input.RearTouchInput()
     // Private backing state so that Compose observes changes when the native
     // core calls setCurrentGameId(). Using a separate computed property avoids
@@ -302,7 +310,10 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             // Loader pre-initialization uses the application context. Native
             // firmware callbacks must resolve this process's actual Activity.
             org.libsdl.app.SDL.setContext(this)
-            check(prepareNativeLibraryRuntime(NativeLibraryMode.prepare(this).absolutePath))
+            val fingerprint = NativeLibraryCatalog.fingerprint(this)
+            val sandbox = NativeLibraryMode.prepare(this)
+            shellCatalogFingerprint = fingerprint
+            check(prepareNativeLibraryRuntime(sandbox.absolutePath, shellRefreshHz))
             super.main()
             return
         }
@@ -367,6 +378,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         isNativeShellSession = gameIdFromIntent(intent) == NativeLibraryMode.TITLE_ID
+        shellCatalogBootstrap = isNativeShellSession && NativeLibraryMode.needsCatalogBootstrap(this)
         launchStateLoading = LaunchStateLoadingState.fromArguments(
             intent?.getStringArrayExtra(APP_RESTART_PARAMETERS)
         )
@@ -375,6 +387,27 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
         super.onCreate(savedInstanceState)
         if (isFinishing) return
+        if (shellCatalogBootstrap) {
+            surfaceView.alpha = 0f
+            mLayout?.addView(android.widget.TextView(this).apply {
+                text = "Vita\n${getString(R.string.common_loading)}"
+                textSize = 24f
+                gravity = android.view.Gravity.CENTER
+                setTextColor(android.graphics.Color.WHITE)
+                setBackgroundColor(0xff0b294d.toInt())
+            }, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+        if (isNativeShellSession) {
+            @Suppress("DEPRECATION")
+            val display = windowManager.defaultDisplay
+            val current = display.mode
+            val mode = display.supportedModes.filter {
+                it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight &&
+                    (kotlin.math.abs(it.refreshRate - 60f) < 1f || kotlin.math.abs(it.refreshRate - 120f) < 1f)
+            }.maxByOrNull { it.refreshRate }
+            shellRefreshHz = if ((mode?.refreshRate ?: current.refreshRate) >= 119f) 120 else 60
+            if (mode != null) window.attributes = window.attributes.apply { preferredDisplayModeId = mode.modeId }
+        }
         if (isNativeShellSession) inputOverlay.setTouchControlsActive(false)
         KeyboardMouseManager.ensureInitialized(this)
         KeyboardMouseManager.setPointerCaptureListener { enabled ->
@@ -412,6 +445,16 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 setAppSessionMenuPaused(false)
             } }
         }
+        if (isNativeShellSession && shellCatalogFingerprint != null) {
+            shellCatalogCheckJob?.cancel()
+            shellCatalogCheckJob = exitScope.launch {
+                val current = withContext(Dispatchers.IO) { NativeLibraryCatalog.fingerprint(this@Emulator) }
+                if (current != shellCatalogFingerprint && !rebirthRequested && !isFinishing) {
+                    triggerRebirthAfterNativeShutdown(NativeLibraryMode.intent(this@Emulator), allowAutoSave = false,
+                        returnToLibrary = true)
+                }
+            }
+        }
         requestRetroArchShaderReapply(currentGameIdOrIntent())
         com.sbro.emucorev.core.input.RearTouchNative.setCamerasSuspended(false)
         KeyboardMouseManager.refreshConnectionState()
@@ -429,6 +472,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onPause() {
+        shellCatalogCheckJob?.cancel()
         rearTouchInput.setActive(false)
         com.sbro.emucorev.core.input.RearTouchNative.setCamerasSuspended(true)
         KeyboardMouseManager.releaseAll()
@@ -534,12 +578,40 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     /** Native library requests use the same driver/settings/automatic-state resolver as the library UI. */
-    private external fun prepareNativeLibraryRuntime(sandbox: String): Boolean
+    private external fun prepareNativeLibraryRuntime(sandbox: String, refreshHz: Int): Boolean
     private external fun notifyNativeLibraryGameStopped()
+
+    /** The firmware creates its schema on first boot. Filter it only after shutdown. */
+    fun onNativeLibraryCatalogReady(): Boolean {
+        if (!shellCatalogBootstrap) return true
+        if (shellBootstrapRestartPending.get()) return false
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now < shellBootstrapNextCheckAt) return false
+        shellBootstrapNextCheckAt = now + 500
+        val database = File(cacheDir, "native-shell-runtime/vita/ur0/shell/db/app.db")
+        if (!database.isFile || File(database.path + "-journal").exists()) return false
+        val ready = runCatching {
+            android.database.sqlite.SQLiteDatabase.openDatabase(database.path, null,
+                android.database.sqlite.SQLiteDatabase.OPEN_READONLY).use { db ->
+                db.rawQuery("SELECT 1 FROM tbl_appinfo_icon WHERE titleId='NPXS10008' LIMIT 1", null).use { it.moveToFirst() }
+            }
+        }.getOrDefault(false)
+        val modified = database.lastModified()
+        if (!ready || modified != shellBootstrapDatabaseModified) {
+            shellBootstrapDatabaseModified = modified
+            shellBootstrapStableSince = now
+            return false
+        }
+        if (now - shellBootstrapStableSince >= 1_000 && shellBootstrapRestartPending.compareAndSet(false, true)) {
+            triggerRebirthAfterNativeShutdown(NativeLibraryMode.intent(this), allowAutoSave = false,
+                returnToLibrary = true)
+        }
+        return false
+    }
 
     fun onNativeLibraryLaunchRequested(titleId: String): Boolean {
         if (!isNativeShellSession || rebirthRequested || !titleId.matches(Regex("[A-Za-z0-9_]{1,64}"))) return false
-        if (!shellLaunchPending.compareAndSet(false, true)) return true
+        if (!shellLaunchPending.compareAndSet(false, true)) return false
         runOnUiThread {
             exitScope.launch {
                 var launched = false
@@ -556,7 +628,10 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                     Toast.makeText(this@Emulator, R.string.game_launch_failed, Toast.LENGTH_LONG).show()
                 } finally {
                     if (!launched) {
-                        withContext(Dispatchers.IO) { setAppSessionMenuPaused(false) }
+                        withContext(Dispatchers.IO) {
+                            notifyNativeLibraryGameStopped()
+                            setAppSessionMenuPaused(false)
+                        }
                         shellLaunchPending.set(false)
                     }
                 }

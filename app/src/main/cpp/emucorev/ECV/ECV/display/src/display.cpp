@@ -52,8 +52,6 @@
 
 // Code heavily influenced by PPSSSPP's SceDisplay.cpp
 
-static constexpr int TARGET_FPS = 60;
-static constexpr int64_t TARGET_MICRO_PER_FRAME = 1000000LL / TARGET_FPS;
 // how many cycles do we need to see before we start predicting the next frame
 static constexpr int predict_threshold = 3;
 static constexpr int max_expected_swapchain_size = 6;
@@ -247,7 +245,8 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
         }
 
         const auto time_ms = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        const auto time_left = TARGET_MICRO_PER_FRAME - (time_ms % TARGET_MICRO_PER_FRAME);
+        const int64_t interval = 1000000LL / display.refresh_hz;
+        const auto time_left = interval - (time_ms % interval);
         std::this_thread::sleep_for(std::chrono::microseconds(time_left));
     }
 }
@@ -322,7 +321,7 @@ void clear_display_waiters_for_restore(DisplayState &display) {
 
 bool DisplayState::begin_vblank_update() {
     std::unique_lock lock(producer_mutex);
-    producer_changed.wait(lock, [&] { return abort.load() || producer_freeze_count == 0; });
+    producer_changed.wait(lock, [&] { return abort.load() || (producer_freeze_count == 0 && !shell_suspended); });
     if (abort.load())
         return false;
     assert(!producer_active);
@@ -333,6 +332,11 @@ void DisplayState::end_vblank_update() {
     const std::lock_guard lock(producer_mutex);
     assert(producer_active);
     producer_active = false;
+    producer_changed.notify_all();
+}
+void DisplayState::set_shell_suspended(bool suspended) {
+    const std::lock_guard lock(producer_mutex);
+    shell_suspended = suspended;
     producer_changed.notify_all();
 }
 bool DisplayState::freeze_vblank_producer(std::chrono::milliseconds budget) {
@@ -492,6 +496,8 @@ void DisplayState::deinit() {
     last_setframe_vblank_count = 0;
 
     fps_hack = false;
+    shell_suspended = false;
+    refresh_hz = 60;
     // pretty sure we set this on game boot
     fullscreen = false;
 }

@@ -162,6 +162,14 @@ struct State {
     std::atomic<bool> show_pause_overlay{ true };
     // Android presents its own pause menu; keep the game frame unobscured.
     std::atomic<bool> android_menu_paused{ false };
+    std::atomic<bool> shell_suspended{ false };
+    std::mutex shell_suspend_mutex;
+    std::condition_variable shell_suspend_changed;
+    void set_shell_suspended(bool suspended) {
+        const std::lock_guard lock(shell_suspend_mutex);
+        shell_suspended.store(suspended, std::memory_order_relaxed);
+        shell_suspend_changed.notify_all();
+    }
     // Diagnostic: last phase reached by the render loop (0 idle, 1 batches, 2 frame, 3 swap).
 
     // Non-owning pointer to dialog state for native common dialog overlays.

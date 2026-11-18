@@ -4,6 +4,8 @@
 #include <app/session_controller.h>
 #include <app/functions.h>
 #include <config/state.h>
+#include <display/state.h>
+#include <cpu/functions.h>
 #include <emuenv/state.h>
 #include <io/state.h>
 #include <regmgr/functions.h>
@@ -24,12 +26,30 @@
 namespace {
 fs::path shell_boot_sandbox;
 std::string shell_gpu_probe;
+int shell_refresh_hz = 60;
 std::atomic_bool shell_catalog_requested{false};
+std::atomic_bool shell_pacing_requested{true};
 std::mutex shell_events_mutex;
 std::deque<std::array<uint32_t, 16>> shell_events;
 std::string launched_title;
 bool host_game_running = false;
 bool host_returned = false;
+bool host_app_activated = false;
+
+// Called with shell_events_mutex held. Either Android return or native
+// activation may happen first; emit one exit only after both are observed.
+void finish_returned_host_game() {
+    if (!host_returned || !host_app_activated || !host_game_running) return;
+    host_returned = false;
+    host_app_activated = false;
+    std::array<uint32_t, 16> event{};
+    event[0] = 4;
+    event[5] = 1; // app ID, independently of the process ID
+    event[6] = 0xffffffffu; // No replacement application after exit.
+    std::memcpy(reinterpret_cast<char *>(event.data()) + 0x20, launched_title.c_str(),
+        std::min<size_t>(launched_title.size(), 31));
+    shell_events.push_back(event);
+}
 std::string read_string(JNIEnv *env, jstring input) {
     const char *value = env->GetStringUTFChars(input, nullptr);
     if (!value) return {};
@@ -96,21 +116,13 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_vita_Emulator_notifyNativeLibraryGameStopped(JNIEnv *, jobject) {
     const std::lock_guard lock(shell_events_mutex);
     host_returned = true;
+    finish_returned_host_game();
 }
 int activate_native_library_app(int app_id) {
     const std::lock_guard lock(shell_events_mutex);
-    if (!host_returned) return 0;
-    host_returned = false;
-    if (launched_title.empty()) return 0;
-    // SceShell consumes the application-exit event with app ID at +0x14
-    // and the application name at +0x20, then restores its LiveArea.
-    std::array<uint32_t, 16> event{};
-    event[0] = 4;
-    event[5] = 1;
-    event[6] = 0xffffffffu; // No replacement application after exit.
-    std::memcpy(reinterpret_cast<char *>(event.data()) + 0x20, launched_title.c_str(),
-        std::min<size_t>(launched_title.size(), 31));
-    shell_events.push_back(event);
+    if (app_id != 1 || !host_game_running) return static_cast<int>(0x80802012u);
+    host_app_activated = true;
+    finish_returned_host_game();
     return 0;
 }
 void request_native_library_catalog_import() { shell_catalog_requested.store(true); }
@@ -122,14 +134,48 @@ bool configure_native_library(const std::string &path, const std::string &probe)
 #endif
     shell_boot_sandbox = fs::path(path);
     shell_gpu_probe = probe;
+    shell_pacing_requested.store(true);
+    {
+        const std::lock_guard lock(shell_events_mutex);
+        shell_events.clear();
+        launched_title.clear();
+        host_game_running = host_returned = host_app_activated = false;
+    }
     return shell_boot_sandbox.is_absolute();
 }
 
 void poll_native_library_catalog(EmuEnvState &emuenv, ThreadState &thread) {
     const auto *session = get_app_session_controller();
     if (!session || !session->is_running()) return;
-    if (emuenv.io.app_path != "__VITA_NATIVE_LIBRARY__" || !shell_catalog_requested.exchange(false))
+    if (emuenv.io.app_path != "__VITA_NATIVE_LIBRARY__")
         return;
+    if (shell_pacing_requested.load()) {
+        Address init_tick = 0;
+        {
+            const std::lock_guard lock(emuenv.kernel.export_nids_mutex);
+            const auto entry = emuenv.kernel.export_nids.find(0x25B066A8); // paf::Timer::InitTickUnit(float milliseconds)
+            if (entry != emuenv.kernel.export_nids.end()) init_tick = entry->second;
+        }
+        if (init_tick && thread.cpu) {
+            const float previous = read_float_reg(*thread.cpu, 0);
+            write_float_reg(*thread.cpu, 0, 1000.0f / shell_refresh_hz);
+            thread.run_callback(init_tick, {});
+            write_float_reg(*thread.cpu, 0, previous);
+            shell_pacing_requested.store(false);
+        }
+    }
+    if (!shell_catalog_requested.load()) return;
+    auto *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity) return;
+    const auto cls = env->GetObjectClass(activity);
+    const auto ready = cls ? env->GetMethodID(cls, "onNativeLibraryCatalogReady", "()Z") : nullptr;
+    const bool catalog_ready = ready && !env->ExceptionCheck()
+        && env->CallBooleanMethod(activity, ready) == JNI_TRUE && !env->ExceptionCheck();
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    if (cls) env->DeleteLocalRef(cls);
+    env->DeleteLocalRef(activity);
+    if (!catalog_ready) return;
     Address callback = 0;
     {
         const std::lock_guard lock(emuenv.kernel.export_nids_mutex);
@@ -141,6 +187,7 @@ void poll_native_library_catalog(EmuEnvState &emuenv, ThreadState &thread) {
         LOG_ERROR("Native LiveArea catalog parser is unavailable");
         return;
     }
+    shell_catalog_requested.store(false);
     // C875C57A: native SceLsdb LiveArea import, (PAF string titleId,
     // contents directory). It reads metadata from its own DB and parses XML
     // through native PAF, including frames and firmware fallback resources.
@@ -193,13 +240,14 @@ int dispatch_native_library_game_launch(EmuEnvState &emuenv, const char *path) {
     if (env->ExceptionCheck()) env->ExceptionClear();
     if (cls) env->DeleteLocalRef(cls);
     env->DeleteLocalRef(activity);
-    // Positive acknowledgement is consumed only until the host stops this
-    // session and starts the game through the ordinary Android launch path.
+    // Keep the guest resident; Android pauses it while the separate game
+    // process runs through the ordinary launch path.
     if (accepted) {
         const std::lock_guard lock(shell_events_mutex);
         launched_title = id;
         host_game_running = true;
         host_returned = false;
+        host_app_activated = false;
         std::array<uint32_t, 16> event{};
         event[0] = 2;
         event[2] = 1;
@@ -245,8 +293,19 @@ bool prepare_native_library(EmuEnvState &emuenv) {
     app::set_current_config(emuenv, "");
     // The library has its own presentation profile; never persist these values
     // into the normal game's configuration.
-    emuenv.cfg.current_config.resolution_multiplier = 2.0f;
+    emuenv.cfg.current_config.resolution_multiplier = 1.0f;
     emuenv.cfg.current_config.high_accuracy = true;
+    emuenv.cfg.current_config.fps_hack = true;
+    emuenv.cfg.current_config.v_sync = false;
+    emuenv.cfg.current_config.export_textures = false;
+    emuenv.cfg.current_config.import_textures = false;
+    emuenv.cfg.current_config.log_active_shaders = false;
+    emuenv.cfg.current_config.log_uniforms = false;
+    emuenv.cfg.current_config.color_surface_debug = false;
+    emuenv.cfg.current_config.validation_layer = false;
+    // PAF's shared-frame composition spans two display ticks. Keep its
+    // animation tick in wall time while presenting at the host's 60/120 Hz.
+    emuenv.display.refresh_hz = shell_refresh_hz * 2;
     emuenv.cfg.archive_log = false;
 #ifndef NDEBUG
     emuenv.cfg.log_level = spdlog::level::warn;
@@ -289,7 +348,8 @@ bool prepare_native_library(EmuEnvState &emuenv) {
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_sbro_emucorev_core_vita_Emulator_prepareNativeLibraryRuntime(JNIEnv *env, jobject, jstring sandbox) {
+Java_com_sbro_emucorev_core_vita_Emulator_prepareNativeLibraryRuntime(JNIEnv *env, jobject, jstring sandbox, jint refresh_hz) {
+    shell_refresh_hz = refresh_hz >= 120 ? 120 : 60;
     return configure_native_library(read_string(env, sandbox)) ? JNI_TRUE : JNI_FALSE;
 }
 

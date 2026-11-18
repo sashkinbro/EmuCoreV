@@ -23,7 +23,9 @@ object NativeLibraryLoader {
         if (!loaded) {
             synchronized(this) {
                 if (!loaded) {
-                    SDL.setContext(appContext)
+                    // SDL may already have a live surface. Keep its Activity
+                    // available while native initialization posts UI messages.
+                    SDL.setContext(if (context is org.libsdl.app.SDLActivity) context else appContext)
                     SDL.loadLibrary("ECV", appContext)
                     loaded = true
                     // Seed SDL's cached JNI globals (activity class, getContext,

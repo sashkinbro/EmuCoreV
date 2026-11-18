@@ -11,6 +11,7 @@
 #include <android_state.h>
 #include <config/state.h>
 #include <emuenv/state.h>
+#include <io/state.h>
 #include <renderer/state.h>
 #include <ime/keyboard.h>
 #include <ime/functions.h>
@@ -94,6 +95,11 @@ Java_com_sbro_emucorev_core_vita_Emulator_setAppSessionMenuPaused(
     if (!controller->set_pause_reason(app::AppSessionPauseReason::Menu, paused == JNI_TRUE)) {
         menu_paused.store(previous, std::memory_order_relaxed);
         return JNI_FALSE;
+    }
+    if (emuenv->io.app_path == "__VITA_NATIVE_LIBRARY__") {
+        SDL_Event wake{};
+        wake.type = SDL_EVENT_USER;
+        SDL_PushEvent(&wake);
     }
     return JNI_TRUE;
 }

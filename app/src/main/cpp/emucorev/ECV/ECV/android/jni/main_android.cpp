@@ -30,6 +30,7 @@
 #include <ime/functions.h>
 #include <ime/keyboard.h>
 #include <io/state.h>
+#include <native_library_runtime.h>
 #include <motion/event_handler.h>
 #include <motion/functions.h>
 #include <renderer/functions.h>
@@ -682,13 +683,19 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
                 }
             }
 
-            app::update_runtime_metrics(*emuenv, runtime_metrics);
+            if (!is_native_library(launch_request) || !session_controller->is_paused())
+                app::update_runtime_metrics(*emuenv, runtime_metrics);
 
             if (!session_controller->is_running())
                 running = false;
 
-            if (running)
-                SDL_Delay(16);
+            if (running) {
+                if (is_native_library(launch_request) && session_controller->is_paused()) {
+                    // Foreground/quit events wake the resident shell without a
+                    // 60 Hz host polling loop while the game is active.
+                    if (SDL_WaitEvent(&event)) SDL_PushEvent(&event);
+                } else SDL_Delay(16);
+            }
         }
 
         LOG_INFO("Shutting down game");

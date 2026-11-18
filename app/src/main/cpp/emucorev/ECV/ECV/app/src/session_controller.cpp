@@ -93,6 +93,8 @@ bool AppSessionController::initialize_renderer(renderer::FrameHost &frame) {
 
     apply_renderer_config(emuenv);
     if (is_native_library(active_launch_request))
+        emuenv.renderer->frame_limit.store(emuenv.display.refresh_hz / 2, std::memory_order_relaxed);
+    if (is_native_library(active_launch_request))
         // PAF can render from module_start, before load_and_run sets game
         // metadata. Establish the isolated shell renderer profile beforehand.
         emuenv.renderer->set_app("SceShell", "shell.self");
@@ -273,6 +275,12 @@ void AppSessionController::apply_runtime_state_locked() {
     emuenv.ctrl.overlay_input_intercepted.store(overlay_intercepted, std::memory_order_relaxed);
 
     emuenv.renderer->paused.store(paused, std::memory_order_relaxed);
+    if (is_native_library(active_launch_request)) {
+        // Sleeping producers keep the resident firmware UI from submitting
+        // frames, sampling input or waking callbacks while a game owns the GPU.
+        emuenv.display.set_shell_suspended(paused);
+        emuenv.renderer->set_shell_suspended(paused);
+    }
 }
 
 void AppSessionController::set_phase(const AppSessionPhase next_phase) {
