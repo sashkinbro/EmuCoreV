@@ -5,12 +5,14 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.view.Gravity
 import android.view.Window
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.WindowCompat
 import com.sbro.emucorev.R
 import com.sbro.emucorev.ui.common.ImmersiveMode
 
@@ -64,15 +66,29 @@ internal class NativeLibraryExitDialog(context: Context, onExit: () -> Unit) : D
         content.addView(actions)
         setContentView(content)
         setCanceledOnTouchOutside(false)
-        setOnShowListener {
-            window?.apply {
-                setBackgroundDrawableResource(android.R.color.transparent)
-                setLayout(minOf(dp(600), (context.resources.displayMetrics.widthPixels * 0.82f).toInt()), WindowManager.LayoutParams.WRAP_CONTENT)
-                addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                setDimAmount(0.45f)
-                ImmersiveMode.applyToDialog(this)
+        // Configure the window before Dialog.show() attaches its first frame.
+        // Applying immersive/cutout policy in OnShow caused a second layout on
+        // phones with an asymmetric camera inset, visibly moving the panel.
+        window?.apply {
+            setBackgroundDrawableResource(android.R.color.transparent)
+            WindowCompat.setDecorFitsSystemWindows(this, false)
+            addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND or WindowManager.LayoutParams.FLAG_FULLSCREEN)
+            attributes = attributes.apply {
+                gravity = Gravity.CENTER
+                x = 0
+                y = 0
+                width = minOf(dp(600), (context.resources.displayMetrics.widthPixels * 0.82f).toInt())
+                height = WindowManager.LayoutParams.WRAP_CONTENT
+                dimAmount = 0.45f
+                windowAnimations = 0
+                layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                } else {
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
             }
-            cancel.requestFocus()
+            ImmersiveMode.applyToDialog(this)
         }
+        cancel.requestFocus()
     }
 }
