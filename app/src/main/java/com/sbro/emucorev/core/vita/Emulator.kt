@@ -1368,7 +1368,15 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                         if (SDLActivity.mSDLThread?.isAlive == true) {
                             Log.w(TAG, "Proceeding with process rebirth while SDLThread is still alive; shader cache may not be fully flushed")
                         }
-                        if (returnToLibrary && canReuseNativeSession()) {
+                        if (returnToLibrary && returnsToNativeLibrary && !isNativeShellSession) {
+                            // The firmware library has its own process and task.
+                            // Bring that resident Activity forward without Phoenix's
+                            // CLEAR_TASK, then retire only this completed game process.
+                            targetIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                            startActivity(targetIntent)
+                            finish()
+                            android.os.Process.killProcess(android.os.Process.myPid())
+                        } else if (returnToLibrary && canReuseNativeSession()) {
                             // Preserve the library Activity, ViewModel and decoded covers.
                             targetIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
                             startActivity(targetIntent)
