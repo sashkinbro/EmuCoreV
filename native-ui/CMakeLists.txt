@@ -17,6 +17,16 @@ else()
     target_compile_options(emucorev_paf PRIVATE -Wall -Wextra -Werror -fno-fast-math -ffp-contract=off)
 endif()
 
+if(ANDROID)
+    add_library(emucorev_paf_gles STATIC paf/src/bubble_renderer.cpp)
+    target_include_directories(emucorev_paf_gles PUBLIC paf/include)
+    target_compile_features(emucorev_paf_gles PUBLIC cxx_std_20)
+    target_compile_options(emucorev_paf_gles PRIVATE -Wall -Wextra -Werror)
+    target_link_libraries(emucorev_paf_gles PUBLIC GLESv3)
+    add_executable(paf_bubble_preview tools/bubble_preview.cpp)
+    target_link_libraries(paf_bubble_preview PRIVATE emucorev_paf_gles EGL)
+endif()
+
 add_executable(paf_resource_inspect tools/resource_inspect.cpp)
 target_link_libraries(paf_resource_inspect PRIVATE emucorev_paf)
 

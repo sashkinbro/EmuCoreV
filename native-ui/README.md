@@ -25,8 +25,8 @@ for all supported locales. The host provides resolved text; this module must not
 introduce a second partial translation catalogue.
 
 Firmware binaries and extracted resources are local research inputs and are not
-distributed in this directory. Resource/theme packaging, font selection, shader
-reconstruction, layout, animation and the host bridge are still pending. No
+distributed in this directory. Resource/theme packaging, font selection, complete
+materials, layout, animation integration and the host bridge are still pending. No
 approximate implementation is marked as equivalent.
 
 ## Implemented foundation: resource document reader
@@ -41,8 +41,9 @@ using original compression metadata with a caller-supplied allocation limit.
 Zlib streams require a valid checksum, exact decompressed size and no trailing
 bytes. The optional `--extract NEW_DIRECTORY` writes decoded payloads using
 element offsets and attribute ordinals, never resource-supplied filenames.
-The observed linear GIM texture variants are decoded as described below. Shader
-reconstruction and the original draw pipeline are not implemented yet.
+The observed linear GIM texture variants are decoded as described below. An
+initial native bubble draw is implemented separately as described below; the
+complete original draw pipeline is not implemented yet.
 
 RCSF locale documents share the typed tree format. Their UTF-16 offsets are code
 unit indices but their lengths are **bytes**; this was verified against actual
@@ -336,6 +337,38 @@ finite float vertices, uniform/texture files and shader identity. It explicitly
 reports missing texture sources and leaves `pixelReplayVerified` false. It does
 not establish original GPU readback, full frame capture, correct resource binding
 or rendered equivalence. Original buffers and reports remain ignored artifacts.
+
+## Native bubble renderer: first actual draw
+
+`emucorev_paf_gles` is an independent C++ GLES renderer. Its host supplies shaders,
+32-byte profile vertices, 16-bit strip indices, RGBA icon/environment images and
+the reviewed material parameter blocks. It links GLES only: no firmware loader,
+guest execution, emulator runtime or shader translator is linked into this module.
+GPU buffers, images and the program are created once; a draw updates parameter
+buffers and submits the strip without allocating or loading resources. All
+calls, including destruction, require the owning current context and thread.
+The renderer owns its draw state; a host sharing the context must rebind its own
+state afterwards. The host owns the framebuffer, viewport, presentation, pacing
+and suspension while games run.
+
+`paf_bubble_preview` renders one 960x544 frame to a top-down RGBA file using local
+external reference inputs. It converts the captured indexed icon through its
+actual palette. Shaders, captures and images are not packaged or committed.
+
+```text
+paf_bubble_preview CAPTURE_DIR VERTEX_GLSL FRAGMENT_GLSL ENVIRONMENT_64_RGBA OUTPUT_RGBA
+```
+
+Actual draws and readback succeeded on the OnePlus CPH2747 (Adreno 840) and
+Lenovo TB710FU (Adreno 750). Direct presentation uses native GLES Y and the
+corresponding winding, avoiding the reference backend's second presentation
+flip. Both devices were run with the captured steady-state geometry/uniforms
+and an explicitly unresolved zero environment input. That input demonstrates
+rendering only and is **not** an equivalent material. Reflection generation,
+filter/address state equivalence, blending equivalence, paired pixel comparison,
+selection effects and full-screen composition remain unverified. The program
+does not display an interactive Android screen yet. No 60 FPS or performance
+claim follows from a single offscreen draw.
 
 ## Build and validation
 
