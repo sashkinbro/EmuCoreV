@@ -11,6 +11,7 @@ public final class PreviewActivity extends NativeActivity {
         super.onCreate(state);
         WindowManager.LayoutParams attributes = getWindow().getAttributes();
         attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER;
+        attributes.preferredRefreshRate = 60.0f;
         getWindow().setAttributes(attributes);
         getWindow().getDecorView().setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION

@@ -6,6 +6,6 @@ add_library(native_app_glue STATIC "${ANDROID_NDK}/sources/android/native_app_gl
 target_include_directories(native_app_glue PUBLIC "${ANDROID_NDK}/sources/android/native_app_glue")
 add_library(paf_preview SHARED src/main/cpp/preview.cpp)
 target_compile_features(paf_preview PRIVATE cxx_std_20)
-target_compile_options(paf_preview PRIVATE -Wall -Wextra -Werror)
+target_compile_options(paf_preview PRIVATE -Wall -Wextra -Werror -fno-fast-math -ffp-contract=off)
 target_link_options(paf_preview PRIVATE "-uANativeActivity_onCreate")
 target_link_libraries(paf_preview PRIVATE native_app_glue emucorev_paf emucorev_paf_gles android log EGL)

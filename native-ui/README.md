@@ -424,15 +424,52 @@ Local reference inputs must be supplied to that debug package's private
 `files/bubble` directory: `stream-0.bin`, `indices.bin`, `vertex-ubo-0.bin`,
 `fragment-ubo-0.bin`, `fragment-texture-0.bin`,
 `fragment-texture-0-palette.bin` and a 64x64 RGBA `environment.rgba`. No fixture is
-baked into the APK. The current surface is one static bubble on a flat clear
-color, not the reconstructed menu/background or an animation demonstration.
+baked into the APK. The current surface is one bubble on a flat clear color,
+with recovered cone-motion geometry applied relative to the supplied pose. It
+is not the reconstructed menu/background or complete widget animation system.
 
 Rendering uses a 960x544 offscreen target and aspect-preserving presentation.
-Window recreation releases and rebuilds all context-owned resources; there is
-no idle render loop. Actual Lenovo launch and Home/resume succeeded, with both
-EmuCoreV processes stopped. The idle sample accumulated zero additional process
-CPU ticks. These checks concern this static development surface only; animated
-60 FPS pacing, complete lifecycle and final adaptive layouts are still pending.
+Window recreation releases and rebuilds all context-owned resources. Native
+choreographer callbacks target 60 frames per second only while resumed and
+focused. Pausing clears timing history, preserves the phase and stops drawing;
+there is no background polling timer or catch-up after returning. Actual Lenovo
+launch and Home/resume succeeded with both EmuCoreV processes stopped. The
+initial static surface accumulated zero additional idle process CPU ticks.
+Complete lifecycle, sustained animation pacing and final adaptive layouts still
+require validation with the full scene.
+
+The current animated Lenovo sample contains 126 presented frames at 60.00 FPS,
+with a 16.666667 ms median interval and 16.667343 ms maximum interval. After
+Home/cleanup settled, the paused process accumulated zero additional user or
+system CPU ticks during the observation. This is evidence for this one-bubble
+surface, not a full-menu load or thermal benchmark.
+
+### Recovered shell cone-motion basis
+
+`bubble_wobble_basis()` and `advance_bubble_phase()` reconstruct the reviewed
+shell function at `0x810cf332`: phase advances by half the product of the two
+framework deltas and wraps at positive pi; the cone amplitude is 0.15 times its
+setting. Three axes are built by normalization and cross products. The ARM port
+retains the original estimate/refinement sequence, including AArch32's separate
+rounding in reciprocal and square-root steps. Simply substituting the similarly
+named AArch64 fused intrinsics changed reference output and was corrected.
+
+All 132 numeric cases (33 phase positions, four strengths) match the original
+function bit for bit on OnePlus, Lenovo and RG556. Their trigonometric samples
+are explicit inputs: this does **not** verify platform libm against the original
+cos/sin implementation. The preview uses platform libm and a provisional
+relative transform; exact per-widget integration, phase initialization,
+framework-clock mapping and all other motion/effect controllers remain pending.
+
+```text
+python native-ui/tests/generate_bubble_motion_reference.py OWNED_DECRYPTED_SHELL LOCAL_CORPUS.bin
+paf_bubble_motion_test LOCAL_CORPUS.bin
+```
+
+The generator executes the reviewed original function offline and supplies two
+explicit math-call results, leaving its vector helpers unchanged. The original
+binary's whole-file SHA256 is checked before execution. No original instructions
+or test interpreter are linked into the UI.
 
 ## Build and validation
 
