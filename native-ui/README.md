@@ -41,7 +41,8 @@ using original compression metadata with a caller-supplied allocation limit.
 Zlib streams require a valid checksum, exact decompressed size and no trailing
 bytes. The optional `--extract NEW_DIRECTORY` writes decoded payloads using
 element offsets and attribute ordinals, never resource-supplied filenames.
-Texture and shader decoding are not implemented here yet.
+The observed linear GIM texture variants are decoded as described below. Shader
+reconstruction and the original draw pipeline are not implemented yet.
 
 RCSF locale documents share the typed tree format. Their UTF-16 offsets are code
 unit indices but their lengths are **bytes**; this was verified against actual
@@ -101,6 +102,47 @@ only basic checks and explicitly reports that original-code comparison was not
 performed. The reference binary and generated research corpus stay outside the
 source tree. A different firmware code fingerprint requires independent review;
 the generator refuses to execute unverified offsets.
+
+## Original GIM texture decoding
+
+`decode_gim` independently decodes the observed little-endian PSP GIM variants:
+linear RGBA8888, INDEX8 and INDEX4 with RGBA8888 palettes. It handles per-row
+padding, odd indexed widths, palette-before-image order and multiple pictures.
+Output preserves the stored RGBA bytes without resizing, quantization, alpha or
+color-space conversion. The interpretation of alpha and color space in the
+original shader/blend pipeline still requires original draw-state evidence.
+
+Unsupported formats, swizzled order, mip levels and multiple frames fail
+explicitly. They must be reconstructed before use; the decoder never substitutes
+an approximate path. Output allocation is bounded across all pictures. Headers,
+block boundaries, plane offsets and palette indices are checked before access.
+
+The implementation follows inspected original resource bytes. The publicly
+documented binary fields can also be inspected in the
+[GIM format reference](https://github.com/jeffangelion/gimconv_v#GIM-image-structure).
+No implementation code or assets from that project are included.
+
+On RG556, Lenovo TB710FU and OnePlus CPH2747, the native decoder reproduces the
+independent Python decoder's output for all **841** local original shell GIM
+files: **2,984,296 RGBA pixels**. These cover 804 INDEX8, one INDEX4 and 36 RGBA8888
+images. The original ARM PAF decoder/rendered pixel comparison remains pending;
+agreement between two independent decoders does not prove full render parity.
+
+All three devices also pass synthetic exact-pixel checks for each supported
+format, row padding, odd widths, palette order and multiple pictures, plus 329
+malformed/over-limit rejection cases. Run `paf_gim_test` on the target device.
+
+```text
+python native-ui/tests/verify_gim_pixels.py --adb PATH_TO_ADB --serial DEVICE --executable PATH_TO_ANDROID_GIM_DECODER --inputs OWNED_GIM_DIRECTORY --output NEW_LOCAL_OUTPUT_DIRECTORY
+```
+
+The verifier uploads inputs to a unique device research directory, runs the
+standalone decoder and compares every RGBA byte with independent Python output.
+An optional `--png-map` checks paired original source PNGs using Pillow. No such
+PNG pair is currently claimed verified: the four sampled RCO source PNGs remain
+PNG payloads, so they cannot serve as GIM-to-PNG conversion reference pairs.
+The tool `paf_gim_decode INPUT.gim NEW_DIRECTORY` writes numbered raw RGBA files
+and prints their dimensions; it is not included in the application release.
 
 ## Build and validation
 
