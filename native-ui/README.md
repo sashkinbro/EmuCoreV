@@ -144,6 +144,59 @@ PNG payloads, so they cannot serve as GIM-to-PNG conversion reference pairs.
 The tool `paf_gim_decode INPUT.gim NEW_DIRECTORY` writes numbered raw RGBA files
 and prints their dimensions; it is not included in the application release.
 
+## Shader reconstruction research and device gate
+
+The owned local reference contains 97 embedded GXP programs in the first load
+segment of `libpaf.suprx` and 16 in `shell.self`. Their binary lengths, reflected
+parameter records/names and primary instruction ranges have been checked.
+Parameters expose lighting, environment maps, wave materials and page-fold
+controls, but their presence does not prove which programs a particular screen
+uses. Active program pairs, mesh data, uniform values, texture bindings and blend
+state still require original draw capture.
+
+```text
+python native-ui/tests/extract_shader_references.py --output NEW_RESEARCH_DIRECTORY OWNED_DECRYPTED_LIBPAF.suprx OWNED_DECRYPTED_SHELL.self
+```
+
+This inventories and extracts supplied decrypted data; it does not decrypt
+firmware, run guest code, translate shaders or scan unreviewed load segments.
+Original GXP programs and generated inventories stay in ignored research storage.
+
+An offline research helper linked only to existing shader translation archives
+generated GLSL ES 3.20 and USSE disassembly for all 113 programs, with default RGBA
+texture/surface hints. This helper is separate from the native UI and application;
+the translation archives are not dependencies of `emucorev_paf`. Generated shader
+sources are not committed. Runtime texture format hints and draw pairing remain
+unverified. This is a shader-analysis reference, not an approved shipping shader
+set or a completed renderer.
+
+The Android-only `paf_shader_compile_test` creates an isolated EGL pbuffer and
+compiles externally supplied `.vert` / `.frag` files on the actual GLES driver.
+It requires an exact expected file count and fails for missing inputs or compile
+errors. It prints each input before compilation, so a driver crash can be isolated
+without starting or modifying the emulator app. Run it through ADB:
+
+```text
+paf_shader_compile_test LOCAL_GLSL_DIRECTORY EXPECTED_SHADER_COUNT
+```
+
+Measured on 2026-11-18 for the offline reference described above:
+
+- The forced interlock translation fails to compile seven programs on RG556;
+  its Mali driver does not support that extension. The exposed coherent
+  `GL_EXT_shader_framebuffer_fetch` path compiles all 113 programs on RG556.
+- The same framebuffer-fetch variant compiles all 113 programs on OnePlus
+  CPH2747 (Adreno 840).
+- Lenovo TB710FU (Adreno 750, driver V@0762.37) compiles 109 programs in isolated
+  processes. Its driver compiler crashes for fragment programs at reference PAF
+  addresses `0x812e4f4c`, `0x812ed258`, `0x812fe500`, `0x812ff950`. Backtraces enter
+  the vendor `libllvm-qgl.so` from `glCompileShader`. These four cases are unresolved
+  and prevent declaring this GLES reference universally usable. Do not hide them
+  or skip their effects. A final renderer needs a verified compatible shader path.
+
+Compilation alone proves neither stage linking nor original arithmetic, blending,
+input binding, image equivalence or performance. These gates remain pending.
+
 ## Build and validation
 
 Build independently using CMake 3.22+ and a C++20 compiler. For Android, supply

@@ -34,4 +34,11 @@ if(BUILD_TESTING)
     add_executable(paf_gim_test tests/gim_image_test.cpp)
     target_link_libraries(paf_gim_test PRIVATE emucorev_paf)
     add_test(NAME paf_gim_image COMMAND paf_gim_test)
+    if(ANDROID)
+        # Research-only GPU compiler test. Requires externally supplied GLSL;
+        # never linked into emucorev_paf or the Android application.
+        add_executable(paf_shader_compile_test tests/shader_compile_device.cpp)
+        target_compile_features(paf_shader_compile_test PRIVATE cxx_std_20)
+        target_link_libraries(paf_shader_compile_test PRIVATE EGL GLESv3)
+    endif()
 endif()
