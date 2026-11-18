@@ -1,7 +1,7 @@
 # Standalone native Vita UI reconstruction
 
-This directory contains the independent C++ implementation. It has no emulator,
-guest CPU, SDL, Android application or game runtime dependency. It is not yet a
+This directory contains the independent C++ implementation. Its core libraries
+have no emulator, guest CPU, SDL, Android application or game runtime dependency. It is not yet a
 replacement for SceShell or the full PAF framework, and is not connected to the
 shipping application's UI.
 
@@ -344,6 +344,11 @@ or rendered equivalence. Original buffers and reports remain ignored artifacts.
 32-byte profile vertices, 16-bit strip indices, RGBA icon/environment images and
 the reviewed material parameter blocks. It links GLES only: no firmware loader,
 guest execution, emulator runtime or shader translator is linked into this module.
+Parameter blocks use small std140 uniform buffers: unlike vertex storage
+buffers, these also link successfully on the RG556's Mali-G57. The reference
+preview adapts only the reviewed read-only vec4 arrays from std430 storage to
+std140 uniform blocks; their array byte layouts are identical and shader math
+is unchanged.
 GPU buffers, images and the program are created once; a draw updates parameter
 buffers and submits the strip without allocating or loading resources. All
 calls, including destruction, require the owning current context and thread.
@@ -366,9 +371,68 @@ flip. Both devices were run with the captured steady-state geometry/uniforms
 and an explicitly unresolved zero environment input. That input demonstrates
 rendering only and is **not** an equivalent material. Reflection generation,
 filter/address state equivalence, blending equivalence, paired pixel comparison,
-selection effects and full-screen composition remain unverified. The program
-does not display an interactive Android screen yet. No 60 FPS or performance
+selection effects and full-screen composition remain unverified. The command
+does not display an interactive Android screen. No 60 FPS or performance
 claim follows from a single offscreen draw.
+
+### Reconstructed opaque-bubble shader pair
+
+`opaque_bubble_vertex_shader()` and `opaque_bubble_fragment_shader()` provide
+our compact semantic implementations. They contain no translated register
+arrays or instruction dispatch. The vertex stage reconstructs profile-based
+position/normal transforms, the original cubic angular approximation, light and
+view vectors, diffuse/specular factors, background-height blend, cubic facing
+blend, icon coordinates and projection. The fragment stage reconstructs the
+icon, reflection, back-color and specular composition, retaining individual
+half-rounding boundaries and explicit fused operations.
+
+The standalone preview accepts `--native-vertex` in place of the vertex file and
+`--native-material` in place of the fragment file. Neither stage requires an
+external shader translator or original shader binary at runtime.
+
+Actual 960x544 output of the complete own shader pair matches the translated
+reference pair byte for byte on Adreno 840 (OnePlus) and Adreno 750 (Lenovo), for
+one steady-state mesh/transform fixture, a synthetic gradient environment and
+three fragment parameter sets (captured, mixed RGB and translucent alpha).
+On Mali-G57 the program renders successfully, but **does not yet match**: the
+same three comparisons differ in 3863, 3654 and 1440 channels, respectively.
+This remains an explicit fidelity defect; the test fails rather than accepting
+a tolerance. The three fixtures do not establish general shader or original
+firmware pixel equivalence, and reflection-source generation is still pending.
+
+```text
+python native-ui/tests/compare_bubble_material.py --adb ADB --serial DEVICE --executable PREVIEW --capture CAPTURE_DIR --vertex-shader REFERENCE_VERTEX --fragment-shader REFERENCE_FRAGMENT --output LOCAL_REPORT.json
+```
+
+This compares real framebuffer bytes, rejects an empty bubble, leaves all
+reference inputs external and removes its temporary device directory. Its
+`--fragment-only` option keeps the reference vertex stage for fault isolation.
+
+### Isolated Android development surface
+
+The optional `preview` module displays the own shader pair in an actual Android
+window under the separate package `com.sbro.emucorev.nativeuipreview`. It does not
+replace or update EmuCoreV. Its APK contains only `libpaf_preview.so` and no
+external reference assets, emulator library, firmware or game runtime. Normal
+builds do not include this module, and its release variant is disabled.
+
+```text
+gradlew -PnativeUiPreview=true :native-ui-preview:assembleDebug
+```
+
+Local reference inputs must be supplied to that debug package's private
+`files/bubble` directory: `stream-0.bin`, `indices.bin`, `vertex-ubo-0.bin`,
+`fragment-ubo-0.bin`, `fragment-texture-0.bin`,
+`fragment-texture-0-palette.bin` and a 64x64 RGBA `environment.rgba`. No fixture is
+baked into the APK. The current surface is one static bubble on a flat clear
+color, not the reconstructed menu/background or an animation demonstration.
+
+Rendering uses a 960x544 offscreen target and aspect-preserving presentation.
+Window recreation releases and rebuilds all context-owned resources; there is
+no idle render loop. Actual Lenovo launch and Home/resume succeeded, with both
+EmuCoreV processes stopped. The idle sample accumulated zero additional process
+CPU ticks. These checks concern this static development surface only; animated
+60 FPS pacing, complete lifecycle and final adaptive layouts are still pending.
 
 ## Build and validation
 

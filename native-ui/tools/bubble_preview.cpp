@@ -1,4 +1,5 @@
 #include <emucorev/paf/bubble_renderer.h>
+#include <emucorev/paf/bubble_shaders.h>
 #include <EGL/egl.h>
 #include <GLES3/gl32.h>
 #include <algorithm>
@@ -8,6 +9,7 @@
 #include <iostream>
 #include <iterator>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace {
@@ -54,6 +56,25 @@ template<class T> std::vector<T> typed(const std::filesystem::path& path, std::s
     std::memcpy(output.data(), bytes.data(), bytes.size());
     return output;
 }
+
+std::string shader(const std::filesystem::path& path) {
+    const auto bytes = read(path);
+    std::string source(bytes.begin(), bytes.end());
+    // Only adapt reviewed read-only vec4 parameter arrays to uniform blocks.
+    // Their std140/std430 array layouts are identical. Vertex SSBOs are not
+    // supported on RG556, whereas these small UBOs are core GLES functionality.
+    for (const auto& stage : {std::string("vertex"), std::string("fragment")}) {
+        const std::string old = "layout(binding = " + std::string(stage == "vertex" ? "0" : "1")
+            + ", std430) restrict readonly buffer " + stage + "DataType";
+        const auto offset = source.find(old);
+        if (offset != std::string::npos) {
+            const std::string replacement = "layout(binding = " + std::string(stage == "vertex" ? "0" : "1")
+                + ", std140) uniform " + stage + "DataType";
+            source.replace(offset, old.size(), replacement);
+        }
+    }
+    return source;
+}
 }
 
 // External research inputs are not product assets. No guest code is executed.
@@ -74,12 +95,16 @@ int main(int argc, char** argv) {
         for (std::size_t i = 0; i < icon_indices.size(); ++i)
             std::copy_n(palette.data() + icon_indices[i] * 4, 4, icon.data() + i * 4);
         const auto environment = read(argv[4], 64 * 64 * 4);
-        const auto vertex_shader = read(argv[2]), fragment_shader = read(argv[3]);
+        const auto vertex_shader = std::string_view(argv[2]) == "--native-vertex"
+            ? std::string(emucorev::paf::opaque_bubble_vertex_shader()) : shader(argv[2]);
+        const bool native_material = std::string_view(argv[3]) == "--native-material";
+        const auto fragment_shader = native_material ? std::string{} : shader(argv[3]);
         Context context;
         context.initialize();
         emucorev::paf::BubbleRenderer renderer(
-            {reinterpret_cast<const char*>(vertex_shader.data()), vertex_shader.size()},
-            {reinterpret_cast<const char*>(fragment_shader.data()), fragment_shader.size()},
+            vertex_shader,
+            native_material ? emucorev::paf::opaque_bubble_fragment_shader()
+                : std::string_view(fragment_shader),
             vertices, indices, {128, 128, icon}, {64, 64, environment});
         glViewport(0, 0, 960, 544);
         glClearColor(0, 0, 0, 0);

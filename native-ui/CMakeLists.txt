@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 project(EmuCoreVNativeUi LANGUAGES CXX)
 
 # Standalone reconstruction: no guest CPU, emulator, SDL or game dependencies.
-add_library(emucorev_paf STATIC paf/src/resource_document.cpp paf/src/animation_curve.cpp paf/src/animation_timer.cpp paf/src/gim_image.cpp)
+add_library(emucorev_paf STATIC paf/src/resource_document.cpp paf/src/animation_curve.cpp paf/src/animation_timer.cpp paf/src/gim_image.cpp paf/src/bubble_shaders.cpp)
 target_include_directories(emucorev_paf PUBLIC paf/include)
 target_compile_features(emucorev_paf PUBLIC cxx_std_20)
 if(ANDROID)
@@ -24,7 +24,7 @@ if(ANDROID)
     target_compile_options(emucorev_paf_gles PRIVATE -Wall -Wextra -Werror)
     target_link_libraries(emucorev_paf_gles PUBLIC GLESv3)
     add_executable(paf_bubble_preview tools/bubble_preview.cpp)
-    target_link_libraries(paf_bubble_preview PRIVATE emucorev_paf_gles EGL)
+    target_link_libraries(paf_bubble_preview PRIVATE emucorev_paf_gles emucorev_paf EGL)
 endif()
 
 add_executable(paf_resource_inspect tools/resource_inspect.cpp)

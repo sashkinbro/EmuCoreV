@@ -93,8 +93,8 @@ BubbleRenderer::BubbleRenderer(std::string_view vertex_source, std::string_view 
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(indices.size_bytes()), indices.data(), GL_STATIC_DRAW);
     p.count = static_cast<GLsizei>(indices.size());
     for (unsigned i = 0; i < 2; ++i) {
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[2 + i]);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, i == 0 ? 384 : 48, nullptr, GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[2 + i]);
+        glBufferData(GL_UNIFORM_BUFFER, i == 0 ? 384 : 48, nullptr, GL_DYNAMIC_DRAW);
     }
     // Present directly to a conventional GLES target. The reference backend
     // reverses Y here and again at presentation; this renderer has no second
@@ -129,12 +129,12 @@ void BubbleRenderer::draw(std::span<const float, 96> vertex, std::span<const flo
     glBindVertexArray(p.vao);
     const std::array<float, 12> padded_fragment{fragment[0], fragment[1], fragment[2], fragment[3],
         fragment[4], fragment[5], fragment[6], fragment[7], fragment[8], fragment[9], 0, 0};
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[2]);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 384, vertex.data());
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[3]);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 48, padded_fragment.data());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, p.buffers[2]);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, p.buffers[3]);
+    glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[2]);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, 384, vertex.data());
+    glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[3]);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, 48, padded_fragment.data());
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, p.buffers[2]);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 1, p.buffers[3]);
     glBindBufferBase(GL_UNIFORM_BUFFER, 2, p.buffers[4]);
     glBindBufferBase(GL_UNIFORM_BUFFER, 3, p.buffers[5]);
     for (unsigned i = 0; i < 2; ++i) {

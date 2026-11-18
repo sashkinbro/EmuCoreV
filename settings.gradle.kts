@@ -24,3 +24,9 @@ dependencyResolutionManagement {
 
 rootProject.name = "EmuCoreV"
 include(":app")
+
+// Explicitly requested development preview; absent from normal/release builds.
+if (providers.gradleProperty("nativeUiPreview").orNull == "true") {
+    include(":native-ui-preview")
+    project(":native-ui-preview").projectDir = file("native-ui/preview")
+}

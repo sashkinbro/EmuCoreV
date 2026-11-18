@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-feature android:glEsVersion="0x00030002" android:required="true" />
+    <application android:label="Native UI preview" android:hasCode="true"
+        android:allowBackup="false" android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        <activity android:name=".PreviewActivity" android:exported="true"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|keyboardHidden|density">
+            <meta-data android:name="android.app.lib_name" android:value="paf_preview" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

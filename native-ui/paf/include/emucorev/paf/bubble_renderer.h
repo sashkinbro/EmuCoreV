@@ -11,6 +11,8 @@ namespace emucorev::paf {
 // GLES resources belong to the caller's current context and rendering thread.
 // Shaders and image data are supplied by the host, never loaded from firmware
 // or through an emulator by this renderer.
+// Shader parameter blocks use std140 UBO bindings 0 (vertex) and 1 (fragment);
+// bindings 2 and 3 are reserved for the reviewed viewport/material draw state.
 struct BubbleVertex {
     std::array<float, 4> profile;
     std::array<float, 4> texture;
