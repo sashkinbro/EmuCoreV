@@ -503,7 +503,14 @@ class VitaCoreConfigRepository(private val context: Context) {
 
     private fun readKeyValues(): Map<String, String> = synchronized(CONFIG_IO_LOCK) {
         if (!configFile.exists()) return emptyMap()
-        configFile.readLines()
+        // A restore or another process may replace/remove the file after the
+        // existence check. The preference mirror still supplies saved settings.
+        val lines = try {
+            configFile.readLines()
+        } catch (_: java.io.FileNotFoundException) {
+            return emptyMap()
+        }
+        lines
             .map(String::trim)
             .filter { it.isNotEmpty() && !it.startsWith("#") && ":" in it }
             .associate { line ->
