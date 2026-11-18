@@ -14,6 +14,14 @@ val localBuildProperties = Properties().apply {
         ?.inputStream()
         ?.use { input -> load(input) }
 }
+val releaseSigningKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+val releaseSigningValues = releaseSigningKeys.associateWith {
+    localBuildProperties.getProperty("emucorev.release.$it")?.takeIf(String::isNotBlank)
+}
+val hasReleaseSigning = releaseSigningValues.values.any { it != null }
+require(!hasReleaseSigning || releaseSigningValues.values.all { it != null }) {
+    "Configure all emucorev.release signing properties in local.properties"
+}
 val discordApplicationId = "1536775623287115786"
 val discordSdkDirectory = localBuildProperties.getProperty("emucorev.discord.sdkDir")
     ?.let(::File)
@@ -144,6 +152,17 @@ android {
         }
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(releaseSigningValues.getValue("storeFile")!!)
+                storePassword = releaseSigningValues.getValue("storePassword")
+                keyAlias = releaseSigningValues.getValue("keyAlias")
+                keyPassword = releaseSigningValues.getValue("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isJniDebuggable = true
@@ -160,6 +179,7 @@ android {
             }
         }
         release {
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
