@@ -5,6 +5,7 @@
 #include <limits>
 #include <stdexcept>
 #include <unordered_set>
+#include <zlib.h>
 
 namespace emucorev::paf {
 namespace {
@@ -38,7 +39,7 @@ ResourceDocument::ResourceDocument(std::vector<std::uint8_t> bytes) : bytes_(std
     const Bytes image(bytes_);
     range(image, 0, 80);
     magic_.assign(bytes_.begin(), bytes_.begin() + 4);
-    if (magic_ != "RCOF" && magic_ != "CXML") throw std::runtime_error("Unsupported CXML magic");
+    if (magic_ != "RCOF" && magic_ != "CXML" && magic_ != "RCSF") throw std::runtime_error("Unsupported CXML magic");
     version_ = word(image, 4);
     if (version_ != 0x110) throw std::runtime_error("Unsupported CXML version");
     for (std::size_t i = 0; i < 9; ++i) {
@@ -103,7 +104,8 @@ std::string ResourceDocument::string_value(const Attribute &a) const {
 
 std::u16string ResourceDocument::wide_string_value(const Attribute &a) const {
     require_type(a, AttributeType::wide_string);
-    const auto bytes = range(section(Section::wide_strings), std::uint64_t(a.first) * 2, std::uint64_t(a.second) * 2);
+    if (a.second % 2) throw std::runtime_error("Odd CXML UTF-16 byte length");
+    const auto bytes = range(section(Section::wide_strings), std::uint64_t(a.first) * 2, a.second);
     std::u16string result;
     for (std::size_t i = 0; i < bytes.size(); i += 2)
         result.push_back(char16_t(std::uint16_t(bytes[i]) | (std::uint16_t(bytes[i + 1]) << 8)));
@@ -129,6 +131,51 @@ std::vector<float> ResourceDocument::real_values(const Attribute &a) const {
 std::span<const std::uint8_t> ResourceDocument::file_value(const Attribute &a) const {
     require_type(a, AttributeType::file);
     return range(section(Section::files), a.first, a.second);
+}
+
+std::vector<std::uint8_t> ResourceDocument::decoded_file(const Element &owner,
+    const Attribute &attribute, std::size_t maximum_bytes) const {
+    // Reject accidentally mixing an element/attribute from a different document.
+    const auto &element = element_at(std::int32_t(owner.offset));
+    if (&element != &owner || std::none_of(element.attributes.begin(), element.attributes.end(),
+        [&](const Attribute &candidate) { return &candidate == &attribute; }))
+        throw std::runtime_error("CXML file owner does not belong to this document");
+    const auto input = file_value(attribute);
+    const Attribute *compression = nullptr, *original_size = nullptr;
+    for (const auto &a : element.attributes) {
+        if (a.name == "compress") {
+            if (compression) throw std::runtime_error("Duplicate CXML compression metadata");
+            compression = &a;
+        }
+        if (a.name == "origsize") {
+            if (original_size) throw std::runtime_error("Duplicate CXML original size");
+            original_size = &a;
+        }
+    }
+    const auto mode = compression ? string_value(*compression) : "off";
+    if (mode != "on" && mode != "off") throw std::runtime_error("Unknown CXML compression mode");
+    if (mode == "off") {
+        if (input.size() > maximum_bytes) throw std::runtime_error("CXML payload exceeds allocation limit");
+        return {input.begin(), input.end()};
+    }
+    if (!original_size || original_size->type != AttributeType::integer
+        || std::bit_cast<std::int32_t>(original_size->first) <= 0)
+        throw std::runtime_error("Missing or invalid CXML decompressed size");
+    const auto size = original_size->first;
+    if (size > maximum_bytes || input.size() > std::numeric_limits<uInt>::max())
+        throw std::runtime_error("CXML payload exceeds allocation limit");
+    std::vector<std::uint8_t> output(size);
+    z_stream stream{};
+    stream.next_in = const_cast<Bytef *>(input.data());
+    stream.avail_in = static_cast<uInt>(input.size());
+    stream.next_out = output.data();
+    stream.avail_out = size;
+    if (inflateInit(&stream) != Z_OK) throw std::runtime_error("Cannot initialize CXML decompressor");
+    const int result = inflate(&stream, Z_FINISH);
+    const bool complete = result == Z_STREAM_END && stream.total_out == size && stream.avail_in == 0;
+    inflateEnd(&stream);
+    if (!complete) throw std::runtime_error("Invalid CXML compressed payload or size");
+    return output;
 }
 
 std::uint32_t ResourceDocument::hash_value(const Attribute &a) const {

@@ -3,6 +3,7 @@
 #include <bit>
 #include <cmath>
 #include <fstream>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
@@ -64,11 +65,30 @@ void value(const ResourceDocument &document, const Attribute &a) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 2) { std::cerr << "Usage: paf_resource_inspect resource.rco\n"; return 2; }
+    if (argc != 2 && !(argc == 4 && std::string(argv[2]) == "--extract")) {
+        std::cerr << "Usage: paf_resource_inspect resource.rco [--extract NEW_DIRECTORY]\n"; return 2;
+    }
     try {
         std::ifstream input(argv[1], std::ios::binary);
         if (!input) throw std::runtime_error("Cannot open resource");
         ResourceDocument document({std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()});
+        if (argc == 4) {
+            const std::filesystem::path directory(argv[3]);
+            if (!std::filesystem::create_directory(directory))
+                throw std::runtime_error("Extraction requires a new directory");
+            for (const auto &element : document.elements()) {
+                for (std::size_t i = 0; i < element.attributes.size(); ++i) {
+                    const auto &a = element.attributes[i];
+                    if (a.type != AttributeType::file) continue;
+                    const auto bytes = document.decoded_file(element, a, 64 * 1024 * 1024);
+                    // Filenames use validated offsets/ordinals, never resource-provided paths.
+                    const auto path = directory / (std::to_string(element.offset) + "_" + std::to_string(i) + ".bin");
+                    std::ofstream output(path, std::ios::binary);
+                    output.write(reinterpret_cast<const char *>(bytes.data()), std::streamsize(bytes.size()));
+                    if (!output) throw std::runtime_error("Cannot write extracted resource");
+                }
+            }
+        }
         std::cout << "{\"magic\":"; quoted(document.magic());
         std::cout << ",\"version\":" << document.version() << ",\"elements\":[\n";
         bool first_element = true;

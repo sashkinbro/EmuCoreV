@@ -31,19 +31,29 @@ approximate implementation is marked as equivalent.
 
 ## Implemented foundation: resource document reader
 
-`emucorev_paf` currently reads version 0x110 RCOF/CXML documents. It preserves
+`emucorev_paf` currently reads version 0x110 RCOF/CXML/RCSF documents. It preserves
 attribute words, float bits, table contents and element offsets; decodes typed
 attributes and ID references; and validates table ranges, overlaps, links and
 root reachability. Numeric/hash table positions are element indices; file and ID
 positions are byte offsets. `paf_resource_inspect` exports the decoded tree as
-JSON for comparison. Embedded file bytes are exposed unchanged: compression,
-texture, shader and locale payload decoding are not implemented here yet.
+JSON for comparison. Embedded file bytes can be accessed unchanged or decoded
+using original compression metadata with a caller-supplied allocation limit.
+Zlib streams require a valid checksum, exact decompressed size and no trailing
+bytes. The optional `--extract NEW_DIRECTORY` writes decoded payloads using
+element offsets and attribute ordinals, never resource-supplied filenames.
+Texture and shader decoding are not implemented here yet.
+
+RCSF locale documents share the typed tree format. Their UTF-16 offsets are code
+unit indices but their lengths are **bytes**; this was verified against actual
+shell locales and corrects the initial synthetic-only assumption. Decoded text
+is preserved, without normalization or substitution.
 
 Validation on 2026-11-18:
 
 - Android arm64 C++ build succeeds with Clang 21 / NDK 29.
 - Standalone tests pass on RG556 and OnePlus CPH2747: all attribute types,
-  float/NaN bits, typed table offsets, reference links, and 430 malformed inputs.
+  float/NaN bits, typed table offsets, reference links, payload integrity/bounds
+  and 439 malformed inputs.
   Synthetic type coverage is not proof of original runtime behavior.
 - All 17 original shell RCO documents on RG556 parse with range/tree validation,
   including Top Menu (263 elements / 695 attributes) and LiveArea (221 / 659).
@@ -53,6 +63,10 @@ Validation on 2026-11-18:
   `box_bottom` ID disagreement; `paf_sample_feature_screen_orientation` contains
   different ID encoding. The strict comparison reports failure for these inputs.
   Do not silently exclude differences or adjust decoded values to match XML.
+- On both RG556 and OnePlus, all 71 extracted Top Menu/LiveArea payloads match
+  independent Python zlib output byte for byte (SHA-256), and all 40 nested locale
+  documents parse. All 1,960 UTF-16 string values match independent raw decoding.
+  This proves decoding, not translation completeness or rendered font parity.
 
 ## Build and validation
 
@@ -73,3 +87,12 @@ python native-ui/tests/compare_resource_samples.py --adb PATH_TO_ADB --serial DE
 The comparison exits nonzero for any disagreement. Original source/binary pairs
 must be verified before they become reference fixtures. Research tools and tests
 are separate from the app build and must not be added to release packaging.
+
+For embedded payload and locale decoding:
+
+```text
+python native-ui/tests/verify_resource_payloads.py --adb PATH_TO_ADB --serial DEVICE --executable PATH_TO_ANDROID_INSPECTOR OWNED_RESOURCE.rco [MORE_RESOURCES.rco ...]
+```
+
+This creates isolated research outputs in a fresh `/data/local/tmp` directory
+and checks extracted hashes and UTF-16 text against independently decoded input.

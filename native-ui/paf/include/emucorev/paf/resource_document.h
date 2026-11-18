@@ -23,6 +23,7 @@ struct Attribute {
     // converted through a text representation in the runtime document.
     // first is a table element index for hashes/numeric arrays/UTF-16,
     // but a byte offset for UTF-8, files and ID records.
+    // UTF-16 second is a byte length, not a count of code units.
     std::uint32_t first;
     std::uint32_t second;
 };
@@ -55,6 +56,10 @@ public:
     std::vector<std::int32_t> integer_values(const Attribute &attribute) const;
     std::vector<float> real_values(const Attribute &attribute) const;
     std::span<const std::uint8_t> file_value(const Attribute &attribute) const;
+    // Decode the original per-element compression metadata. The caller bounds
+    // allocations explicitly; no filename or filesystem access is inferred.
+    std::vector<std::uint8_t> decoded_file(const Element &owner, const Attribute &attribute,
+        std::size_t maximum_bytes) const;
     std::uint32_t hash_value(const Attribute &attribute) const;
     Reference reference_value(const Attribute &attribute) const;
 
