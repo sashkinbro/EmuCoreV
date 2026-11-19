@@ -89,6 +89,14 @@ not established. This stage is not yet connected to Home. The recovered source
 chain is `draw_pos` (`0x810a1a80`) through helper `0x810a25ba`, followed by
 lighting texture `0x810a26d0` and color `0x810a451e`, called from `0x810a6688`.
 
+The final surface component now embeds the named `wave.vp/wave.fp` pair, samples
+caller-owned position/lighting textures and draws the supplied indexed wave mesh.
+Its mesh uploads change only when source bytes change. Both the position and
+surface renderer constructors compiled and linked their actual shaders in a
+Lenovo EGL context without GL errors. No complete-wave draw or Home background
+parity is claimed: simulation surfaces and the intermediate lighting pass are
+still required before these components can produce the original animated scene.
+
 The application supplies library snapshots, changes to installed games, real
 trophy data, localized text for every supported application language, preferences
 and resource access. The standalone UI emits user intentions such as launching a
