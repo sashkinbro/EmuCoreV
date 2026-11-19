@@ -1,4 +1,5 @@
 #pragma once
+#include <emucorev/paf/page_turn.h>
 #include <array>
 #include <cstdint>
 
@@ -24,4 +25,15 @@ PageTurnUniformRange page_turn_top_uniform(PageTurnUniform uniform) noexcept;
 PageTurnUniformRange page_turn_bottom_uniform(PageTurnUniform uniform) noexcept;
 // Empty folded-back vertex material, 9 vec4s.
 PageTurnUniformRange page_turn_empty_back_uniform(PageTurnUniform uniform) noexcept;
+// Identity camera/projection used by the controlled reconstruction fixture.
+inline constexpr PageTurnMatrix page_turn_identity{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+// Assembled top surface (flat/rounded) vertex block, 28 vec4s. The currently
+// recovered fields are MVP, ModelMatrix, the shape pack and both point-light
+// packs; the remaining cells stay zero
+// until their assembly is reconstructed.
+PageTurnMaterialBlock page_turn_top_vertex_material(PagePoint size, PagePoint point,
+    const PageTurnShapeStyle& style = {}, const PageTurnPose& pose = {},
+    const PageTurnMatrix& projection = page_turn_identity,
+    const PageTurnMatrix& view = page_turn_identity,
+    const PageTurnPointLight& light = {});
 }

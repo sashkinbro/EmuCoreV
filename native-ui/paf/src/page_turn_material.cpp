@@ -1,4 +1,6 @@
 #include <emucorev/paf/page_turn_material.h>
+#include <algorithm>
+#include <cstring>
 
 namespace emucorev::paf {
 namespace {
@@ -51,5 +53,33 @@ PageTurnUniformRange page_turn_empty_back_uniform(PageTurnUniform uniform) noexc
     case PageTurnUniform::aspect: return {32, 4};
     default: return none;
     }
+}
+
+PageTurnMaterialBlock page_turn_top_vertex_material(PagePoint size, PagePoint point,
+    const PageTurnShapeStyle& style, const PageTurnPose& pose,
+    const PageTurnMatrix& projection, const PageTurnMatrix& view,
+    const PageTurnPointLight& light) {
+    PageTurnMaterialBlock block;
+    block.size = 112;
+    const auto transforms = page_turn_transforms(size, pose, projection, view);
+    const auto shape = page_turn_fold_shape(point, page_turn_normalized_aspect(size));
+    const auto material = page_turn_shape_material(point, shape, style);
+    const auto lights = page_turn_light_parameters(light);
+    auto put = [&](PageTurnUniform uniform, const float* source, std::uint32_t count) {
+        const auto range = page_turn_top_uniform(uniform);
+        const auto copied = std::min(range.count, count);
+        std::memcpy(block.values.data() + range.offset, source, copied * sizeof(float));
+    };
+    put(PageTurnUniform::mvp, transforms.model_view_projection.data(), 16);
+    put(PageTurnUniform::model_matrix, transforms.model.data(), 16);
+    put(PageTurnUniform::deepest, material.deepest.data(), 4);
+    put(PageTurnUniform::grep, &material.grep.x, 2);
+    put(PageTurnUniform::normal_scale_z, &material.normal_scale_z, 1);
+    put(PageTurnUniform::params, material.params.data(), 4);
+    put(PageTurnUniform::fold_plane, material.fold_plane.data(), 4);
+    put(PageTurnUniform::aspect, material.aspect.data(), 4);
+    put(PageTurnUniform::point_light_pack2, lights.color.data(), 16);
+    put(PageTurnUniform::point_light_pack1, lights.position.data(), 16);
+    return block;
 }
 }
