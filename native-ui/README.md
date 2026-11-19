@@ -1087,6 +1087,28 @@ unused status services. It is a component preview, not the completed cold-start
 controller: lock-screen, readiness transitions and original screen placement
 are still pending. Its input toggle is not part of the shipping UI.
 
+### Recovered PlaneObj div / 9-slice layout
+
+`emucorev::paf::plane_div` reconstructs `PlaneObj::UpdateLayout` (`0x810848e8`),
+`FUN_81083892` (`scale_mode=0`), `PlaneObj::UpdateDivVerticesPosition` (`0x81084b1a`),
+`PlaneObj::UpdateDivVerticesTexcoord` (`0x810852c4`), `Surface` div presets
+(`0x8108d0d8`), RCO texture margin mapping (`0x81057856`, where `margin_v` stores
+bottom at `+0x8e` and top at `+0x92`), and the ARMv7 `vrecpe.f32` + 2x `vrecps.f32`
+reciprocal refinement. All 10 div modes (`0`–`9`), border overflow clamping,
+`<= 1.0` collapse guard, `3x5`/`5x3` stretch gap/offset behavior, and index tables
+from `DAT_8129aaac`/`DAT_8129ab1c` are implemented in `emucorev_paf`.
+
+```text
+python native-ui/tests/generate_plane_div_reference.py
+paf_plane_div_test artifacts/plane-div-corpus.bin
+```
+
+All 15 Unicorn cases pass bit-for-bit (`layout_pos`, `layout_size`, and all vertex
+`(x, y, u, v)` words) on Lenovo TB710FU (`HA28QVYS`). The LiveArea gate chrome
+(`0xca6a6db1`, `74x82`, `div_mode=3x3`, `div_ratio=0.487800002`, `margin_h=5`,
+`margin_v=9` around the `292x170` RCO panel) renders with `build_plane_div_screen_quads`
+and `SpriteRenderer::draw_patch`.
+
 Build independently using CMake 3.22+ and a C++20 compiler. For Android, supply
 the NDK toolchain, `ANDROID_ABI=arm64-v8a`, `ANDROID_PLATFORM=android-29` and
 `ANDROID_STL=c++_static`. Build outputs belong outside this source directory.

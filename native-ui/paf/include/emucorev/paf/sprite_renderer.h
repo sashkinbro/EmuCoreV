@@ -19,6 +19,9 @@ public:
     void begin(float width, float height);
     bool draw(std::uint32_t id, float x, float y, float width, float height,
         std::array<float, 4> tint = {1, 1, 1, 1});
+    bool draw_patch(std::uint32_t id, float x, float y, float width, float height,
+        float u, float v, float uv_width, float uv_height,
+        std::array<float, 4> tint = {1, 1, 1, 1});
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

@@ -153,6 +153,7 @@ class BundledImages(
     )
 
     fun loadHomeImages(onLoaded: (List<HomeCatalogEntry>) -> Unit = {}): List<HomeCatalogEntry> {
+        loadHomeLiveAreaChromeImages()
         val catalog = File(resources, "preview/home/catalog.json").readText()
         val catalogObject = JSONObject(catalog)
         require(catalogObject.getInt("version") == 1) { "Unsupported Home catalog version" }
@@ -217,6 +218,17 @@ class BundledImages(
             }
         onLoaded(entries)
         return entries
+    }
+
+    private fun loadHomeLiveAreaChromeImages() {
+        listOf(
+            0xca6a6db1.toInt() to "images/livearea_plugin/ca6a6db1.png",
+        ).forEach { (imageId, path) ->
+            val bitmap = File(resources, path).inputStream().use {
+                requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled LiveArea chrome image: $path" }
+            }
+            try { send(imageId, bitmap) } finally { bitmap.recycle() }
+        }
     }
 
     fun loadHomeLiveAreas(

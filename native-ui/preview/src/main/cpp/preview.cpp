@@ -8,6 +8,7 @@
 #include <emucorev/paf/page_turn_renderer.h>
 #include <emucorev/paf/page_turn_material.h>
 #include <emucorev/paf/page_turn_shaders.h>
+#include <emucorev/paf/plane_div.h>
 #include <android/choreographer.h>
 #include <fstream>
 #include <android/input.h>
@@ -509,6 +510,27 @@ struct Window {
             draw_layer(text.image_id, text.rect, tint);
         }
         draw_layer(page.gate_id, page.gate_rect);
+
+        // LiveArea RCO template 0x1467f749 contains a 292x170 composite drawer
+        // with a 292x170 plane button whose image_obj resolves to 0xca6a6db1
+        // (74x82, div_mode=3x3, div_ratio=0.487800002, margin_h=5, margin_v=9).
+        emucorev::paf::PlaneDivSpec frame_spec{};
+        frame_spec.size_x = 292.f;
+        frame_spec.size_y = 170.f;
+        frame_spec.tex_width = 74;
+        frame_spec.tex_height = 82;
+        frame_spec.div_mode = emucorev::paf::PlaneDivMode::Grid3x3;
+        frame_spec.div_ratio_h = {0.487800002f, 0.487800002f};
+        frame_spec.div_ratio_v = {0.487800002f, 0.487800002f};
+        frame_spec.margin_left = 5;
+        frame_spec.margin_right = 5;
+        frame_spec.margin_top = 9;
+        frame_spec.margin_bottom = 9;
+        const float gate_cx = page.gate_rect[0] + page.gate_rect[2] * 0.5f;
+        const float gate_cy = page.gate_rect[1] + page.gate_rect[3] * 0.5f;
+        for (const auto& quad : emucorev::paf::build_plane_div_screen_quads(frame_spec, gate_cx, gate_cy))
+            sprites->draw_patch(0xca6a6db1u, quad.x, quad.y, quad.width, quad.height,
+                quad.u, quad.v, quad.uv_width, quad.uv_height);
     }
 
     void open_livearea(std::size_t index) {
