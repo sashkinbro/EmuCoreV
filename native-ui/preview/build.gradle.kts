@@ -12,6 +12,7 @@ val verifyLocalNativeUiAssets by tasks.registering {
             "effects/lookups/corner-distance.png",
             "images/paf-common-resource/ba195a37.png",
             "images/indicator_plugin/ca76be07.png", "images/indicator_plugin/56e72f16.png",
+            "preview/home/catalog.json",
             "preview/bubble/stream-0.bin", "preview/bubble/indices.bin",
             "preview/bubble/vertex-ubo-0.bin", "preview/bubble/fragment-ubo-0.bin",
             "preview/bubble/fragment-texture-0.bin", "preview/bubble/fragment-texture-0-palette.bin",
@@ -19,6 +20,38 @@ val verifyLocalNativeUiAssets by tasks.registering {
         check(required.all { root.resolve(it).isFile }) {
             "Local native UI resource pack is missing or incomplete. " +
                 "Prepare native-ui/resources using the offline tools documented in native-ui/README.md."
+        }
+        val homeRoot = root.resolve("preview/home").canonicalFile
+        val homePrefix = homeRoot.path + File.separator
+        val catalog = groovy.json.JsonSlurper().parse(homeRoot.resolve("catalog.json")) as? Map<*, *>
+            ?: error("Invalid Home preview catalog")
+        check((catalog["version"] as? Number)?.toInt() == 1) { "Unsupported Home preview catalog version" }
+        val games = catalog["games"] as? List<*> ?: error("Home preview catalog has no games list")
+        check(games.size <= 512) { "Home preview catalog contains too many games" }
+        games.forEach { entry ->
+            val game = entry as? Map<*, *> ?: error("Invalid Home preview catalog entry")
+            val iconRelativePath = game["icon"] as? String ?: error("Home preview game has no icon path")
+            val icon = homeRoot.resolve(iconRelativePath).canonicalFile
+            check(icon.path.startsWith(homePrefix) && icon.isFile) {
+                "Invalid Home preview catalog icon path: $iconRelativePath"
+            }
+            val liveArea = game["liveArea"] as? Map<*, *> ?: return@forEach
+            val templateRelativePath = liveArea["template"] as? String
+                ?: error("Home preview LiveArea has no template path")
+            val template = homeRoot.resolve(templateRelativePath).canonicalFile
+            check(template.path.startsWith(homePrefix) && template.isFile) {
+                "Invalid Home preview LiveArea template path: $templateRelativePath"
+            }
+            val images = liveArea["images"] as? List<*>
+                ?: error("Home preview LiveArea has no images list")
+            images.forEach { imageValue ->
+                val imageRelativePath = imageValue as? String
+                    ?: error("Home preview LiveArea image path must be a string")
+                val image = homeRoot.resolve(imageRelativePath).canonicalFile
+                check(image.path.startsWith(homePrefix) && image.isFile) {
+                    "Invalid Home preview LiveArea image path: $imageRelativePath"
+                }
+            }
         }
     }
 }

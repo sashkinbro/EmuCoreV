@@ -35,12 +35,34 @@ preserves the pre-existing rectangle constructor argument. Assemble and lint pas
 This scene remains incomplete: the offscreen preview flattens clip-space depth
 while retaining model depth for lighting, and orders the curled face after the
 overlapping surfaces. Original camera/depth and complete pass equivalence are
-not established. Peel currently reveals the wallpaper, not the unfinished Home
-screen; full startup, exit alpha/Z tracks, original text shadows/rasterization,
+not established. Peel now enters the development Home composition; full startup,
+exit alpha/Z tracks, original text shadows/rasterization,
 gamepad navigation and remaining shell transitions still need integration.
 The current visual result is **not** declared 1:1 or a replacement for the
 shipping emulated mode. This work was checked only on Lenovo; Anbernic is
 reserved for another agent at the user's request.
+
+Home consumes a title-keyed catalog snapshot and packaged game icons instead of
+opening the emulator. The current fixture contains two installed games copied
+read-only from Lenovo. Bubble renderers are retained for the visible page only.
+The 3-4-3 arrangement is provisional: exact shell grid transforms and paging
+motion are not yet recovered. The default animated wave background is missing;
+direct Home currently clears to black, while unlock still retains the lock
+wallpaper underneath Home. Neither is the original default Home background.
+
+The development LiveArea viewer consumes the game's actual template and listed
+images, selects localized/default backgrounds, and composes its gate, frame
+images and text natively. Only style A3 is supported currently; its placement
+table comes from the existing LiveArea implementation, not a proven original
+SceShell layout trace. Opening/closing animations, full template semantics,
+gate labels and the production launch bridge remain pending. Resource fixtures
+remain ignored; the preparation tool copies only template-referenced images.
+
+Assemble and lint passed for this integration. On Lenovo, both fixture LiveAreas
+were opened from Home and inspected. System Back now returns to Home without
+finishing the NativeActivity; modern Android back callbacks and the legacy key
+path queue the request for the native thread. The Android XML parser path was
+also exercised on-device after removing unsupported desktop parser flags.
 
 The application supplies library snapshots, changes to installed games, real
 trophy data, localized text for every supported application language, preferences

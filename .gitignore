@@ -90,3 +90,5 @@ Thumbs.db
 
 # Extracted native UI images, fonts and other local resource assets
 /native-ui/resources/
+!native-ui/tools/
+!native-ui/tools/prepare_home_catalog.py

@@ -22,6 +22,7 @@
 #include <cmath>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 #include <unordered_map>
@@ -35,6 +36,20 @@ struct HostImage {
     std::vector<std::uint8_t> rgba;
     std::uint64_t revision = 0;
 };
+struct HomeCatalogItem {
+    std::string id, title, content_id;
+    std::uint32_t icon_image_id = 0, label_image_id = 0;
+};
+using ScreenRect = std::array<float, 4>;
+struct LiveAreaLayer { std::uint32_t image_id = 0; ScreenRect rect{}; std::uint32_t color = 0xffffffffu; };
+struct LiveAreaTarget { std::string id; ScreenRect rect{}; };
+struct LiveAreaSnapshot {
+    std::string title_id;
+    std::uint32_t background_id = 0, gate_id = 0;
+    ScreenRect background_rect{}, gate_rect{};
+    std::vector<LiveAreaLayer> frames, texts;
+    std::vector<LiveAreaTarget> targets;
+};
 struct LockPageConfig {
     emucorev::paf::PagePoint size{960.f, 512.f};
     emucorev::paf::PagePoint position{0.f, -16.f}; // recovered centered, Y-up PageTurn SetPos
@@ -44,7 +59,26 @@ struct LockPageConfig {
 };
 constexpr LockPageConfig lock_page_config{};
 constexpr float preview_width = 960.f, preview_height = 544.f;
+constexpr std::uint32_t home_icon_image_min = 1000, home_icon_image_limit = 2000;
+constexpr std::uint32_t home_highlight_image_id = 0xa952ef1eu;
+struct HomeGridConfig {
+    float page_width = 960.f;
+    float page_height = 512.f;
+    float content_width = 840.f; // topmenu_plugin RCO content group (offset 976)
+    float screen_center_x = 480.f, screen_center_y = 272.f;
+    float row_spacing = 144.f; // observed 3-4-3 page capture; exact shell placement pending
+    std::array<unsigned, 3> row_counts{3, 4, 3};
+};
+constexpr HomeGridConfig home_grid_config{};
 std::unordered_map<std::uint32_t, HostImage> host_images;
+std::vector<HomeCatalogItem> home_catalog;
+std::uint64_t home_catalog_revision = 0;
+std::unordered_map<std::string, LiveAreaSnapshot> livearea_catalog;
+std::uint64_t livearea_catalog_revision = 0;
+std::atomic<bool> native_back_requested{false};
+JavaVM* preview_java_vm = nullptr;
+jobject preview_activity_ref = nullptr;
+jmethodID livearea_target_callback = nullptr;
 std::uint64_t image_revision = 0;
 std::atomic<int> preview_scene{0}; // 0 bubble, 1 busy indicator, 2 lock screen
 std::string resource_root;
@@ -74,6 +108,37 @@ template<class T> std::vector<T> read(const char* filename, std::size_t count) {
     return values;
 }
 
+void emit_livearea_target_request(const std::string& target) {
+    JavaVM* vm = nullptr;
+    { const std::lock_guard lock_guard(status_mutex); vm = preview_java_vm; }
+    if (!vm) return;
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    const jint state = vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (state == JNI_EDETACHED) {
+        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+        attached = true;
+    } else if (state != JNI_OK || !env) return;
+
+    jobject activity = nullptr;
+    jmethodID callback = nullptr;
+    {
+        const std::lock_guard lock_guard(status_mutex);
+        if (preview_activity_ref && livearea_target_callback)
+            activity = env->NewGlobalRef(preview_activity_ref);
+        callback = livearea_target_callback;
+    }
+    if (activity && callback) {
+        const auto value = env->NewStringUTF(target.c_str());
+        if (value) {
+            env->CallVoidMethod(activity, callback, value);
+            env->DeleteLocalRef(value);
+        }
+        env->DeleteGlobalRef(activity);
+    }
+    if (attached) vm->DetachCurrentThread();
+}
+
 struct Window {
     EGLDisplay display = EGL_NO_DISPLAY;
     EGLSurface surface = EGL_NO_SURFACE;
@@ -82,6 +147,27 @@ struct Window {
     std::unique_ptr<emucorev::paf::BubbleRenderer> bubble;
     std::unique_ptr<emucorev::paf::SpriteRenderer> sprites;
     std::unique_ptr<emucorev::paf::PageTurnRenderer> lock;
+    struct HomeBubble {
+        HomeCatalogItem item;
+        std::unique_ptr<emucorev::paf::BubbleRenderer> renderer;
+        std::array<float, 96> base_vertex{};
+        float x = 0.f, y = 0.f, radius = 0.f;
+    };
+    std::vector<HomeBubble> home_bubbles;
+    bool home_visible = false;
+    bool livearea_visible = false;
+    std::string livearea_title_id;
+    std::optional<LiveAreaSnapshot> livearea_snapshot;
+    std::uint64_t applied_livearea_catalog_revision = 0;
+    int home_page = 0, home_focus = 0, home_touch = -1;
+    std::size_t home_page_capacity = 0;
+    emucorev::paf::PagePoint home_touch_start{};
+    float home_motion_phase = 0.f;
+    std::uint64_t applied_home_catalog_revision = 0;
+    std::vector<emucorev::paf::BubbleVertex> bubble_vertices;
+    std::vector<std::uint16_t> bubble_indices;
+    std::vector<std::uint8_t> bubble_environment;
+    std::vector<std::uint8_t> reference_icon;
     GLuint lock_page = 0, lock_corner = 0, lock_exp = 0;
     std::array<std::uint64_t, 3> lock_texture_revisions{};
     std::array<unsigned, 3> lock_texture_widths{}, lock_texture_heights{};
@@ -151,10 +237,11 @@ struct Window {
         if (!eglMakeCurrent(display, surface, surface, context)) throw std::runtime_error("Cannot activate preview context");
         eglSwapInterval(display, 1);
 
-        // The isolated busy scene needs no bubble geometry/material resources.
-        if (preview_scene.load() == 0) {
-            const auto vertices = read<emucorev::paf::BubbleVertex>("stream-0.bin", 608);
-            const auto indices = read<std::uint16_t>("indices.bin", 1220);
+        // Busy preview is isolated; lock and Home scenes share this original
+        // bubble mesh, material, and environment resource set.
+        if (preview_scene.load() == 0 || preview_scene.load() == 2 || preview_scene.load() == 3) {
+            bubble_vertices = read<emucorev::paf::BubbleVertex>("stream-0.bin", 608);
+            bubble_indices = read<std::uint16_t>("indices.bin", 1220);
             const auto transform = read<float>("vertex-ubo-0.bin", 96);
             const auto parameters = read<float>("fragment-ubo-0.bin", 10);
             std::copy(transform.begin(), transform.end(), vertex.begin());
@@ -164,14 +251,18 @@ struct Window {
             std::copy(parameters.begin(), parameters.end(), material.begin());
             const auto palette = read<std::uint8_t>("fragment-texture-0-palette.bin", 1024);
             const auto indexed = read<std::uint8_t>("fragment-texture-0.bin", 128 * 128);
-            const auto environment = read<std::uint8_t>("environment.rgba", 64 * 64 * 4);
+            bubble_environment = read<std::uint8_t>("environment.rgba", 64 * 64 * 4);
             std::vector<std::uint8_t> icon(128 * 128 * 4);
             for (std::size_t i = 0; i < indexed.size(); ++i)
                 std::copy_n(palette.data() + indexed[i] * 4, 4, icon.data() + i * 4);
-            bubble = std::make_unique<emucorev::paf::BubbleRenderer>(
-                emucorev::paf::opaque_bubble_vertex_shader(), emucorev::paf::opaque_bubble_fragment_shader(),
-                vertices, indices, emucorev::paf::BubbleImage{128, 128, icon},
-                emucorev::paf::BubbleImage{64, 64, environment});
+            reference_icon = std::move(icon);
+            if (preview_scene.load() == 0) {
+                bubble = std::make_unique<emucorev::paf::BubbleRenderer>(
+                    emucorev::paf::opaque_bubble_vertex_shader(), emucorev::paf::opaque_bubble_fragment_shader(),
+                    bubble_vertices, bubble_indices,
+                    emucorev::paf::BubbleImage{128, 128, reference_icon},
+                    emucorev::paf::BubbleImage{64, 64, bubble_environment});
+            }
         }
         sprites = std::make_unique<emucorev::paf::SpriteRenderer>();
         if (preview_scene.load() == 2) {
@@ -188,6 +279,7 @@ struct Window {
                 lock_page_config.fold_fraction, lock_page_config.corner_aspect);
             update_lock_fold(lock_fold_point(lock_layout.rest));
         }
+        home_visible = preview_scene.load() == 3;
 
         // Fixed 1x rasterization, independently of the physical display size.
         glGenTextures(1, &color);
@@ -244,6 +336,313 @@ struct Window {
             0.f, 2.f / preview_height, 0.f, 0.f,
             0.f, 0.f, 0.f, 0.f,
             0.f, 0.f, 0.f, 1.f};
+    }
+
+    bool ensure_home_initialized() {
+        std::vector<HomeCatalogItem> catalog;
+        std::uint64_t revision = 0;
+        std::string focused_id;
+        if (home_focus >= 0 && static_cast<std::size_t>(home_focus) < home_bubbles.size())
+            focused_id = home_bubbles[static_cast<std::size_t>(home_focus)].item.id;
+        {
+            const std::lock_guard lock_guard(status_mutex);
+            revision = home_catalog_revision;
+            if (!revision || revision == applied_home_catalog_revision) return revision != 0;
+            catalog = home_catalog;
+        }
+        home_bubbles.clear();
+        home_bubbles.reserve(catalog.size());
+        const float column_spacing = home_grid_config.content_width / 4.f;
+        const float radius = 66.f; // projected radius of the captured AppIconSimple bubble
+        std::size_t slot = 0;
+        for (const auto& item : catalog) {
+            HomeBubble bubble_item{};
+            bubble_item.item = item;
+            bubble_item.base_vertex = base_vertex;
+            const std::size_t page_slot = slot % 10;
+            unsigned row = 0, column = 0;
+            if (page_slot < 3) { row = 0; column = static_cast<unsigned>(page_slot); }
+            else if (page_slot < 7) { row = 1; column = static_cast<unsigned>(page_slot - 3); }
+            else if (page_slot < 10) { row = 2; column = static_cast<unsigned>(page_slot - 7); }
+            else { row = 2; column = 2; }
+            const unsigned row_count = home_grid_config.row_counts[row];
+            bubble_item.x = home_grid_config.screen_center_x
+                + (static_cast<float>(column) - static_cast<float>(row_count - 1) * .5f) * column_spacing;
+            bubble_item.y = home_grid_config.screen_center_y
+                + (static_cast<float>(row) - 1.f) * home_grid_config.row_spacing;
+            bubble_item.radius = radius;
+            home_bubbles.push_back(std::move(bubble_item));
+            ++slot;
+        }
+        home_focus = 0;
+        for (std::size_t i = 0; i < home_bubbles.size(); ++i)
+            if (home_bubbles[i].item.id == focused_id) home_focus = static_cast<int>(i);
+        home_page = 0;
+        home_page_capacity = 10;
+        applied_home_catalog_revision = revision;
+        return true;
+    }
+
+    bool ensure_home_page_renderers(std::size_t first, std::size_t last) {
+        for (std::size_t i = 0; i < home_bubbles.size(); ++i)
+            if (i < first || i >= last) home_bubbles[i].renderer.reset();
+        for (std::size_t i = first; i < last; ++i) {
+            auto& item = home_bubbles[i];
+            if (item.renderer) continue;
+            HostImage icon;
+            {
+                const std::lock_guard lock_guard(status_mutex);
+                const auto image = host_images.find(item.item.icon_image_id);
+                if (image == host_images.end()) return false;
+                icon = image->second;
+            }
+            item.renderer = std::make_unique<emucorev::paf::BubbleRenderer>(
+                emucorev::paf::opaque_bubble_vertex_shader(), emucorev::paf::opaque_bubble_fragment_shader(),
+                bubble_vertices, bubble_indices,
+                emucorev::paf::BubbleImage{icon.width, icon.height, icon.rgba},
+                emucorev::paf::BubbleImage{64, 64, bubble_environment});
+            item.base_vertex = base_vertex;
+        }
+        return true;
+    }
+
+    std::array<float, 96> home_bubble_transform(const HomeBubble& item, float phase) const {
+        auto output = item.base_vertex;
+        const auto basis = emucorev::paf::bubble_wobble_basis(std::cos(phase), std::sin(phase), 1.f);
+        const auto initial = initial_basis;
+        std::array<std::array<float, 3>, 3> delta{};
+        for (unsigned row = 0; row < 3; ++row)
+            for (unsigned column = 0; column < 3; ++column)
+                for (unsigned axis = 0; axis < 3; ++axis)
+                    delta[row][column] += basis[axis][row] * initial[axis][column];
+        for (const unsigned first : {4u, 12u})
+            for (unsigned column = first; column < first + 3; ++column)
+                for (unsigned row = 0; row < 3; ++row) {
+                    float value = 0;
+                    for (unsigned axis = 0; axis < 3; ++axis)
+                        value += delta[row][axis] * item.base_vertex[column * 4 + axis];
+                    output[column * 4 + row] = value;
+                }
+
+        // The captured perspective matrix maps world positions to pixels.
+        // Keep the original depth and radius while placing this AppIconSimple
+        // at the Home grid position supplied by the recovered layout provider.
+        const float depth = output[7 * 4 + 2];
+        const float clip_w = output[2 * 4 + 3] * depth + output[3 * 4 + 3];
+        const float ndc_x = (item.x / 480.f) - 1.f;
+        const float ndc_y = 1.f - (item.y / 272.f);
+        output[7 * 4] = ndc_x * clip_w / output[0];
+        output[7 * 4 + 1] = ndc_y * clip_w / output[5];
+        return output;
+    }
+
+    void draw_home_bubbles() {
+        if (!ensure_home_initialized() || home_bubbles.empty()) return;
+        const std::size_t page_capacity = home_page_capacity;
+        const std::size_t first = static_cast<std::size_t>(std::max(home_page, 0)) * page_capacity;
+        const std::size_t last = std::min(first + page_capacity, home_bubbles.size());
+        if (!ensure_home_page_renderers(first, last)) return;
+        sprites->begin(preview_width, preview_height);
+        if (home_focus >= 0 && static_cast<std::size_t>(home_focus) >= first
+            && static_cast<std::size_t>(home_focus) < last) {
+            const auto& focused = home_bubbles[static_cast<std::size_t>(home_focus)];
+            sprites->draw(home_highlight_image_id, focused.x - focused.radius,
+                focused.y - focused.radius, focused.radius * 2.f, focused.radius * 2.f,
+                {1.f, 1.f, 1.f, 128.f / 255.f});
+        }
+        for (std::size_t i = first; i < last; ++i) {
+            auto& item = home_bubbles[i];
+            const auto parameters = home_bubble_transform(item, home_motion_phase);
+            if (item.renderer) item.renderer->draw(parameters, material);
+        }
+        sprites->begin(preview_width, preview_height);
+        const std::lock_guard lock_guard(status_mutex);
+        for (std::size_t i = first; i < last; ++i) {
+            const auto& item = home_bubbles[i];
+            const auto label = host_images.find(item.item.label_image_id);
+            if (item.item.label_image_id && label != host_images.end())
+                sprites->draw(item.item.label_image_id,
+                    item.x - label->second.width * .5f, item.y + item.radius + 8.f,
+                    float(label->second.width), float(label->second.height));
+        }
+    }
+
+    bool ensure_livearea_snapshot() {
+        if (!livearea_visible || livearea_title_id.empty()) return false;
+        std::uint64_t revision = 0;
+        {
+            const std::lock_guard lock_guard(status_mutex);
+            revision = livearea_catalog_revision;
+            if (livearea_snapshot && revision == applied_livearea_catalog_revision
+                && livearea_snapshot->title_id == livearea_title_id) return true;
+            const auto entry = livearea_catalog.find(livearea_title_id);
+            if (entry == livearea_catalog.end()) return false;
+            livearea_snapshot = entry->second;
+            applied_livearea_catalog_revision = revision;
+        }
+        return livearea_snapshot.has_value();
+    }
+
+    void draw_livearea() {
+        if (!ensure_livearea_snapshot()) return;
+        const auto& page = *livearea_snapshot;
+        sprites->begin(preview_width, preview_height);
+        // Layer bounds and images come from the per-title LiveArea template
+        // snapshot supplied by Home.  The A3 fallback geometry lives in the
+        // recovered Vita3K reference style table (live_area.cpp); this renderer
+        // does not invent a second layout.  The gate is drawn last as in the
+        // reference composition, but remains a preview-only visual surface.
+        auto draw_layer = [&](std::uint32_t id, const ScreenRect& rect,
+            std::array<float, 4> tint = {1.f, 1.f, 1.f, 1.f}) {
+            if (!id || rect[2] <= 0.f || rect[3] <= 0.f) return;
+            sprites->draw(id, rect[0], rect[1], rect[2], rect[3], tint);
+        };
+        draw_layer(page.background_id, page.background_rect);
+        for (const auto& frame : page.frames) draw_layer(frame.image_id, frame.rect);
+        for (const auto& text : page.texts) {
+            const float inv = 1.f / 255.f;
+            const std::array<float, 4> tint{
+                float((text.color >> 16) & 0xff) * inv,
+                float((text.color >> 8) & 0xff) * inv,
+                float(text.color & 0xff) * inv,
+                float((text.color >> 24) & 0xff) * inv};
+            draw_layer(text.image_id, text.rect, tint);
+        }
+        draw_layer(page.gate_id, page.gate_rect);
+    }
+
+    void open_livearea(std::size_t index) {
+        if (index >= home_bubbles.size()) return;
+        livearea_title_id = home_bubbles[index].item.id;
+        livearea_snapshot.reset();
+        applied_livearea_catalog_revision = 0;
+        livearea_visible = true;
+    }
+
+    void close_livearea() {
+        livearea_visible = false;
+        livearea_snapshot.reset();
+    }
+
+    bool livearea_target_at(float x, float y, std::string& target) {
+        if (!ensure_livearea_snapshot()) return false;
+        for (const auto& hit : livearea_snapshot->targets) {
+            const auto& r = hit.rect;
+            if (x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3]) {
+                target = hit.id;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void tick_home(float elapsed) {
+        home_motion_phase = emucorev::paf::advance_bubble_phase(home_motion_phase, elapsed, 1.f);
+    }
+
+    int32_t handle_home_input(AInputEvent* event) {
+        if (!ensure_home_initialized()) return 0;
+        if (home_bubbles.empty()) return 0;
+        if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
+            if (AKeyEvent_getAction(event) != AKEY_EVENT_ACTION_DOWN || AKeyEvent_getRepeatCount(event) != 0)
+                return 0;
+            const int key = AKeyEvent_getKeyCode(event);
+            if (key == AKEYCODE_DPAD_LEFT) {
+                home_focus = std::max(home_focus - 1, 0);
+                home_page = home_focus / static_cast<int>(home_page_capacity);
+            } else if (key == AKEYCODE_DPAD_RIGHT) {
+                home_focus = std::min(home_focus + 1, static_cast<int>(home_bubbles.size()) - 1);
+                home_page = home_focus / static_cast<int>(home_page_capacity);
+            } else if (key == AKEYCODE_BUTTON_A || key == AKEYCODE_ENTER) {
+                if (home_focus >= 0 && static_cast<std::size_t>(home_focus) < home_bubbles.size())
+                    open_livearea(static_cast<std::size_t>(home_focus));
+                return 1;
+            }
+            else return 0;
+            return 1;
+        }
+        if (AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION) return 0;
+        const int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
+        EGLint width = 0, height = 0;
+        eglQuerySurface(display, surface, EGL_WIDTH, &width);
+        eglQuerySurface(display, surface, EGL_HEIGHT, &height);
+        if (width <= 0 || height <= 0) return 0;
+        const float scale = std::min((width - 32.f) / preview_width, (height - 32.f) / preview_height);
+        const float ox = (width - preview_width * scale) * .5f;
+        const float oy = (height - preview_height * scale) * .5f;
+        const float px = (AMotionEvent_getX(event, 0) - ox) / scale;
+        const float py = (AMotionEvent_getY(event, 0) - oy) / scale;
+        const float max_distance = 1.5f * 140.f;
+        if (action == AMOTION_EVENT_ACTION_DOWN) {
+            float nearest = max_distance * max_distance;
+            home_touch = -1;
+            const std::size_t first = static_cast<std::size_t>(home_page)
+                * std::max<std::size_t>(home_page_capacity, 1);
+            const std::size_t last = std::min(first + home_page_capacity, home_bubbles.size());
+            for (std::size_t i = first; i < last; ++i) {
+                const float dx = px - home_bubbles[i].x, dy = py - home_bubbles[i].y;
+                const float distance = dx * dx + dy * dy;
+                if (distance <= home_bubbles[i].radius * home_bubbles[i].radius && distance < nearest) {
+                    nearest = distance;
+                    home_touch = static_cast<int>(i);
+                }
+            }
+            home_touch_start = {px, py};
+            if (home_touch >= 0) home_focus = home_touch;
+            return 1;
+        }
+        if (action == AMOTION_EVENT_ACTION_MOVE) return home_touch >= 0 || home_page_capacity < home_bubbles.size();
+        if (action == AMOTION_EVENT_ACTION_UP || action == AMOTION_EVENT_ACTION_CANCEL) {
+            const auto pages = (home_bubbles.size() + std::max<std::size_t>(home_page_capacity, 1) - 1)
+                / std::max<std::size_t>(home_page_capacity, 1);
+            if (action == AMOTION_EVENT_ACTION_UP && std::abs(px - home_touch_start.x) > 100.f) {
+                if (px < home_touch_start.x && static_cast<std::size_t>(home_page + 1) < pages) ++home_page;
+                else if (px > home_touch_start.x && home_page > 0) --home_page;
+            } else if (action == AMOTION_EVENT_ACTION_UP && home_touch >= 0
+                && std::hypot(px - home_touch_start.x, py - home_touch_start.y) < 30.f) {
+                open_livearea(static_cast<std::size_t>(home_touch));
+            }
+            home_touch = -1;
+            return 1;
+        }
+        return 0;
+    }
+
+    int32_t handle_livearea_input(AInputEvent* event) {
+        if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
+            if (AKeyEvent_getAction(event) != AKEY_EVENT_ACTION_DOWN || AKeyEvent_getRepeatCount(event) != 0)
+                return 0;
+            const int key = AKeyEvent_getKeyCode(event);
+            if (key == AKEYCODE_BACK || key == AKEYCODE_BUTTON_B || key == AKEYCODE_ESCAPE) {
+                close_livearea();
+                return 1;
+            }
+            if (key == AKEYCODE_BUTTON_A || key == AKEYCODE_ENTER) {
+                // The host records this preview intent for inspection; it
+                // does not dispatch to the emulator or an external handler.
+                if (ensure_livearea_snapshot() && !livearea_snapshot->targets.empty())
+                    emit_livearea_target_request(livearea_snapshot->targets.front().id);
+                return 1;
+            }
+            return 0;
+        }
+        if (AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION) return 0;
+        const int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
+        if (action != AMOTION_EVENT_ACTION_UP) return 1;
+        EGLint width = 0, height = 0;
+        eglQuerySurface(display, surface, EGL_WIDTH, &width);
+        eglQuerySurface(display, surface, EGL_HEIGHT, &height);
+        if (width <= 0 || height <= 0) return 0;
+        const float scale = std::min((width - 32.f) / preview_width, (height - 32.f) / preview_height);
+        const float ox = (width - preview_width * scale) * .5f;
+        const float oy = (height - preview_height * scale) * .5f;
+        const float px = (AMotionEvent_getX(event, 0) - ox) / scale;
+        const float py = (AMotionEvent_getY(event, 0) - oy) / scale;
+        // Taps on declared LiveArea target bounds are recorded by the host as
+        // preview intents; they are never dispatched to an emulator/browser.
+        std::string target;
+        if (livearea_target_at(px, py, target)) emit_livearea_target_request(target);
+        return 1;
     }
 
     void update_lock_fold(emucorev::paf::PagePoint point) {
@@ -333,7 +732,11 @@ struct Window {
     }
 
     void tick_lock(float elapsed) {
-        if (lock_anim_state == LockAnimState::idle || lock_anim_state == LockAnimState::unlocked)
+        if (lock_anim_state == LockAnimState::unlocked) {
+            tick_home(elapsed);
+            return;
+        }
+        if (lock_anim_state == LockAnimState::idle)
             return;
         anim_elapsed += elapsed;
         const float t = anim_duration > 0.f ? std::clamp(anim_elapsed / anim_duration, 0.f, 1.f) : 1.f;
@@ -350,6 +753,7 @@ struct Window {
         if (t >= 1.f) {
             if (lock_anim_state == LockAnimState::peeling) {
                 lock_anim_state = LockAnimState::unlocked;
+                home_visible = true;
             } else {
                 lock_anim_state = LockAnimState::idle;
             }
@@ -357,6 +761,8 @@ struct Window {
     }
 
     int32_t handle_input(AInputEvent* event) {
+        if (home_visible) return livearea_visible
+            ? handle_livearea_input(event) : handle_home_input(event);
         if (AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION) return 0;
         const int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
         EGLint width = 0, height = 0;
@@ -439,6 +845,9 @@ struct Window {
         const std::lock_guard lock(status_mutex);
         if (uploaded_revision != image_revision) {
             for (const auto& [id, image] : host_images) {
+                // BubbleRenderer owns icon textures on demand for the active
+                // 10-item page; never mirror the full catalog into sprites.
+                if (id >= home_icon_image_min && id < home_icon_image_limit) continue;
                 if (uploaded_images[id] == image.revision) continue;
                 sprites->upload(id, image.width, image.height, image.rgba);
                 uploaded_images[id] = image.revision;
@@ -607,10 +1016,23 @@ struct Window {
         upload_images();
         if (preview_scene.load() == 2) {
             sprites->begin(960, 544);
-            // The raw wallpaper is the underlying screen; the clock/date are
-            // part of texture 100 and move with the PageTurn surface.
-            sprites->draw(103, 0, 0, 960, 544);
-            draw_lock();
+            if (home_visible) {
+                if (livearea_visible) draw_livearea();
+                else {
+                    sprites->draw(103, 0, 0, 960, 544);
+                    draw_home_bubbles();
+                }
+            } else {
+                // The raw wallpaper is the underlying screen; the clock/date are
+                // part of texture 100 and move with the PageTurn surface.
+                sprites->draw(103, 0, 0, 960, 544);
+                draw_lock();
+            }
+            draw_status(charging_texture);
+        } else if (preview_scene.load() == 3) {
+            sprites->begin(960, 544);
+            if (livearea_visible) draw_livearea();
+            else draw_home_bubbles();
             draw_status(charging_texture);
         }
         else if (busy) {
@@ -664,11 +1086,16 @@ struct Preview {
             preview.callback_pending = false;
             if (!preview.active()) return;
             try {
+                    // JNI can run on Android's UI thread. It only sets this
+                    // atomic request; native scene state is changed here on
+                    // the render/looper thread.
+                    if (native_back_requested.exchange(false) && preview.window)
+                        preview.window->close_livearea();
                 // Vsync timestamps round fractional refresh periods to ns.
                 // Do not skip a 60 Hz frame merely because it is a few ns
                 // earlier than the accumulated 16,666,667 ns deadline.
                 if (time + 500000 >= preview.next_draw) {
-                    if (preview_scene.load() == 0 || preview_scene.load() == 2) {
+                    if (preview_scene.load() == 0 || preview_scene.load() == 2 || preview_scene.load() == 3) {
                         const std::lock_guard lock(status_mutex);
                         preview.charging.advance(device_status.charging, device_status.battery_percent);
                     }
@@ -680,6 +1107,8 @@ struct Preview {
                             preview.window->set_phase(preview.phase);
                         } else if (preview_scene.load() == 2 && preview.window) {
                             preview.window->tick_lock(elapsed);
+                        } else if (preview_scene.load() == 3 && preview.window) {
+                            preview.window->tick_home(elapsed);
                         }
                     }
                     preview.last_draw = time;
@@ -742,6 +1171,11 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeResourceRoot(JNIEnv
 extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewScene(JNIEnv*, jobject, jint scene) {
     preview_scene.store(scene);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeBackRequested(JNIEnv*, jobject) {
+    native_back_requested.store(true);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -810,7 +1244,7 @@ void android_main(android_app* app) {
             if (phase == emucorev::paf::BusyState::idle) preview.last_draw = preview.next_draw = 0;
             preview.schedule();
             return 1;
-        } else if (scene == 2 && preview.window) {
+        } else if ((scene == 2 || scene == 3) && preview.window) {
             const int handled = preview.window->handle_input(event);
             if (handled) {
                 preview.last_draw = preview.next_draw = 0;
@@ -827,4 +1261,179 @@ void android_main(android_app* app) {
         if (ALooper_pollOnce(-1, nullptr, nullptr, reinterpret_cast<void**>(&source)) >= 0 && source)
             source->process(app, source);
     }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeCatalog(JNIEnv* env, jobject activity,
+    jobjectArray ids, jobjectArray titles, jobjectArray content_ids,
+    jintArray icon_image_ids, jintArray label_image_ids) {
+    if (!ids || !titles || !content_ids || !icon_image_ids || !label_image_ids) {
+        env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), "Missing Home catalog array");
+        return;
+    }
+    const jsize count = env->GetArrayLength(ids);
+    if (count > 512 || env->GetArrayLength(titles) != count
+        || env->GetArrayLength(content_ids) != count || env->GetArrayLength(icon_image_ids) != count
+        || env->GetArrayLength(label_image_ids) != count) {
+        env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), "Invalid Home catalog lengths");
+        return;
+    }
+    std::vector<jint> icons(static_cast<std::size_t>(count)), labels(static_cast<std::size_t>(count));
+    if (count) {
+        env->GetIntArrayRegion(icon_image_ids, 0, count, icons.data());
+        env->GetIntArrayRegion(label_image_ids, 0, count, labels.data());
+    }
+    if (env->ExceptionCheck()) return;
+    auto read_string = [&](jobjectArray array, jsize index, bool required) {
+        auto value = static_cast<jstring>(env->GetObjectArrayElement(array, index));
+        if (!value) throw std::invalid_argument("Null Home catalog string");
+        const char* chars = env->GetStringUTFChars(value, nullptr);
+        if (!chars) { env->DeleteLocalRef(value); throw std::runtime_error("Cannot read Home catalog string"); }
+        std::string result(chars);
+        env->ReleaseStringUTFChars(value, chars);
+        env->DeleteLocalRef(value);
+        if ((required && result.empty()) || result.size() > 256)
+            throw std::invalid_argument("Invalid Home catalog string");
+        return result;
+    };
+    try {
+        std::vector<HomeCatalogItem> next;
+        next.reserve(static_cast<std::size_t>(count));
+        for (jsize i = 0; i < count; ++i) {
+            next.push_back({read_string(ids, i, true), read_string(titles, i, true), read_string(content_ids, i, false),
+                static_cast<std::uint32_t>(icons[static_cast<std::size_t>(i)]),
+                static_cast<std::uint32_t>(labels[static_cast<std::size_t>(i)])});
+        }
+        {
+            const std::lock_guard lock_guard(status_mutex);
+            home_catalog = std::move(next);
+            ++home_catalog_revision;
+        }
+        JavaVM* vm = nullptr;
+        env->GetJavaVM(&vm);
+        jclass activity_class = env->GetObjectClass(activity);
+        const auto callback = activity_class
+            ? env->GetMethodID(activity_class, "onNativeLiveAreaTarget", "(Ljava/lang/String;)V") : nullptr;
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        jobject activity_global = callback ? env->NewGlobalRef(activity) : nullptr;
+        if (activity_class) env->DeleteLocalRef(activity_class);
+        if (activity_global && vm) {
+            const std::lock_guard lock_guard(status_mutex);
+            if (preview_activity_ref) env->DeleteGlobalRef(preview_activity_ref);
+            preview_java_vm = vm;
+            preview_activity_ref = activity_global;
+            livearea_target_callback = callback;
+        } else if (activity_global) env->DeleteGlobalRef(activity_global);
+    } catch (const std::exception& error) {
+        env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), error.what());
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeLiveArea(JNIEnv* env, jobject,
+    jstring title_id, jint background_id, jfloatArray background_rect, jint gate_id, jfloatArray gate_rect,
+    jintArray frame_image_ids, jfloatArray frame_rects, jintArray text_image_ids, jfloatArray text_rects,
+    jintArray text_colors, jobjectArray target_ids, jfloatArray target_rects) {
+    if (!title_id || !background_rect || !gate_rect || !frame_image_ids || !frame_rects
+        || !text_image_ids || !text_rects || !text_colors || !target_ids || !target_rects) {
+        env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), "Missing LiveArea snapshot array");
+        return;
+    }
+    auto read_string = [&](jobjectArray array, jsize index) {
+        auto value = static_cast<jstring>(env->GetObjectArrayElement(array, index));
+        if (!value) throw std::invalid_argument("Null LiveArea string");
+        const char* chars = env->GetStringUTFChars(value, nullptr);
+        if (!chars) { env->DeleteLocalRef(value); throw std::runtime_error("Cannot read LiveArea string"); }
+        std::string result(chars);
+        env->ReleaseStringUTFChars(value, chars);
+        env->DeleteLocalRef(value);
+        if (result.size() > 1024) throw std::invalid_argument("Oversized LiveArea string");
+        return result;
+    };
+    auto read_rect = [&](jfloatArray values) {
+        if (env->GetArrayLength(values) != 4) throw std::invalid_argument("LiveArea rect must contain four values");
+        ScreenRect rect{};
+        env->GetFloatArrayRegion(values, 0, 4, rect.data());
+        if (env->ExceptionCheck()) throw std::runtime_error("Cannot read LiveArea rect");
+        for (const auto value : rect)
+            if (!std::isfinite(value)) throw std::invalid_argument("Non-finite LiveArea rect");
+        if (rect[2] < 0.f || rect[3] < 0.f) throw std::invalid_argument("Negative LiveArea rect size");
+        return rect;
+    };
+    try {
+        LiveAreaSnapshot page{};
+        const char* title_chars = env->GetStringUTFChars(title_id, nullptr);
+        if (!title_chars) throw std::runtime_error("Cannot read LiveArea title ID");
+        page.title_id = title_chars;
+        env->ReleaseStringUTFChars(title_id, title_chars);
+        if (page.title_id.empty() || page.title_id.size() > 256)
+            throw std::invalid_argument("Invalid LiveArea title ID");
+        page.background_id = static_cast<std::uint32_t>(background_id);
+        page.gate_id = static_cast<std::uint32_t>(gate_id);
+        page.background_rect = read_rect(background_rect);
+        page.gate_rect = read_rect(gate_rect);
+
+        const jsize frame_count = env->GetArrayLength(frame_image_ids);
+        const jsize text_count = env->GetArrayLength(text_image_ids);
+        const jsize target_count = env->GetArrayLength(target_ids);
+        if (frame_count > 64 || text_count > 128 || target_count > 64
+            || env->GetArrayLength(frame_rects) != frame_count * 4
+            || env->GetArrayLength(text_rects) != text_count * 4
+            || env->GetArrayLength(text_colors) != text_count
+            || env->GetArrayLength(target_rects) != target_count * 4)
+            throw std::invalid_argument("Invalid LiveArea layer counts");
+
+        std::vector<jint> frame_ids(static_cast<std::size_t>(frame_count));
+        std::vector<jint> text_ids(static_cast<std::size_t>(text_count));
+        std::vector<jint> colors(static_cast<std::size_t>(text_count));
+        std::vector<jfloat> frame_bounds(static_cast<std::size_t>(frame_count) * 4);
+        std::vector<jfloat> text_bounds(static_cast<std::size_t>(text_count) * 4);
+        std::vector<jfloat> target_bounds(static_cast<std::size_t>(target_count) * 4);
+        if (frame_count) {
+            env->GetIntArrayRegion(frame_image_ids, 0, frame_count, frame_ids.data());
+            env->GetFloatArrayRegion(frame_rects, 0, frame_count * 4, frame_bounds.data());
+        }
+        if (text_count) {
+            env->GetIntArrayRegion(text_image_ids, 0, text_count, text_ids.data());
+            env->GetFloatArrayRegion(text_rects, 0, text_count * 4, text_bounds.data());
+            env->GetIntArrayRegion(text_colors, 0, text_count, colors.data());
+        }
+        if (target_count) env->GetFloatArrayRegion(target_rects, 0, target_count * 4, target_bounds.data());
+        if (env->ExceptionCheck()) throw std::runtime_error("Cannot read LiveArea arrays");
+
+        auto rect_at = [](const std::vector<jfloat>& values, std::size_t index) {
+            ScreenRect rect{values[index * 4], values[index * 4 + 1],
+                values[index * 4 + 2], values[index * 4 + 3]};
+            for (const auto value : rect)
+                if (!std::isfinite(value)) throw std::invalid_argument("Non-finite LiveArea rect");
+            if (rect[2] < 0.f || rect[3] < 0.f) throw std::invalid_argument("Negative LiveArea rect size");
+            return rect;
+        };
+        for (jsize i = 0; i < frame_count; ++i)
+            page.frames.push_back({static_cast<std::uint32_t>(frame_ids[static_cast<std::size_t>(i)]),
+                rect_at(frame_bounds, static_cast<std::size_t>(i)), 0xffffffffu});
+        for (jsize i = 0; i < text_count; ++i)
+            page.texts.push_back({static_cast<std::uint32_t>(text_ids[static_cast<std::size_t>(i)]),
+                rect_at(text_bounds, static_cast<std::size_t>(i)),
+                static_cast<std::uint32_t>(colors[static_cast<std::size_t>(i)])});
+        for (jsize i = 0; i < target_count; ++i) {
+            auto target = read_string(target_ids, i);
+            if (target.empty()) throw std::invalid_argument("Empty LiveArea target");
+            page.targets.push_back({std::move(target), rect_at(target_bounds, static_cast<std::size_t>(i))});
+        }
+        const std::lock_guard lock_guard(status_mutex);
+        livearea_catalog[page.title_id] = std::move(page);
+        ++livearea_catalog_revision;
+    } catch (const std::exception& error) {
+        env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), error.what());
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeReleaseHomeCallback(JNIEnv* env, jobject) {
+    const std::lock_guard lock_guard(status_mutex);
+    if (preview_activity_ref) env->DeleteGlobalRef(preview_activity_ref);
+    preview_activity_ref = nullptr;
+    livearea_target_callback = nullptr;
+    preview_java_vm = nullptr;
 }
