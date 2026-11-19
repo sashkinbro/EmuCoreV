@@ -81,9 +81,23 @@ int main(int argc, char **argv) {
             expect(empty, PageTurnUniform::mvp, slot(matrices, 16), 4, "empty MVP", page_turn_empty_back_uniform);
             expect(empty, PageTurnUniform::fold_plane, slot(shape, 10), 4, "empty FoldPlane", page_turn_empty_back_uniform);
             expect(empty, PageTurnUniform::aspect, slot(shape, 14), 4, "empty Aspect", page_turn_empty_back_uniform);
+            std::array<PageTurnPass, 3> passes{};
+            if (page_turn_draw_passes(size, point, false, style, passes.data(), 2) != 2
+                || passes[0].role != PageTurnPassRole::top
+                || passes[1].role != PageTurnPassRole::bottom)
+                throw std::runtime_error("flat draw list is not top+bottom");
+            const auto default_top = page_turn_top_vertex_material(size, point, style);
+            if (std::memcmp(passes[0].material.values.data(), default_top.values.data(),
+                    sizeof(default_top.values)) != 0)
+                throw std::runtime_error("flat draw list top block differs from the assembled block");
+            if (page_turn_draw_passes(size, point, true, style, passes.data(), 2) != 0)
+                throw std::runtime_error("folded draw list accepted too small a capacity");
+            if (page_turn_draw_passes(size, point, true, style, passes.data(), 3) != 3
+                || passes[2].role != PageTurnPassRole::empty_back)
+                throw std::runtime_error("folded draw list is not top+bottom+empty_back");
         }
         std::cout << "PASS top vertex material: " << count
-            << " records match the original MVP/Model/shape/light uniforms\n";
+            << " records match the original MVP/Model/shape/light uniforms; flat/folded pass lists verified\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';
         return 1;

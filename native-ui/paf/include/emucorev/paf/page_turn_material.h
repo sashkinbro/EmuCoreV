@@ -50,4 +50,15 @@ PageTurnMaterialBlock page_turn_empty_back_vertex_material(PagePoint size, PageP
     const PageTurnShapeStyle& style = {}, const PageTurnPose& pose = {},
     const PageTurnMatrix& projection = page_turn_identity,
     const PageTurnMatrix& view = page_turn_identity);
+
+// Ordered surface draws for one PageTurn frame. The flat (unfolded) state
+// submits the top and bottom surfaces; a folded page also submits the empty
+// folded-back surface. Roles follow the reviewed draw protocol; the exact
+// order of the two folded-edge surfaces is not yet established.
+enum class PageTurnPassRole : std::uint32_t { top, bottom, empty_back };
+struct PageTurnPass { PageTurnPassRole role; PageTurnMaterialBlock material; };
+// Returns 2 (flat) or 3 (folded) passes; zero when the caller capacity is too
+// small. Material blocks carry only the currently recovered uniforms.
+std::uint32_t page_turn_draw_passes(PagePoint size, PagePoint point, bool folded,
+    const PageTurnShapeStyle& style, PageTurnPass* output, std::uint32_t capacity) noexcept;
 }

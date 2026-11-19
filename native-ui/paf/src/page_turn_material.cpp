@@ -123,4 +123,16 @@ PageTurnMaterialBlock page_turn_empty_back_vertex_material(PagePoint size, PageP
     put(PageTurnUniform::aspect, material.aspect.data(), 4);
     return block;
 }
+
+std::uint32_t page_turn_draw_passes(PagePoint size, PagePoint point, bool folded,
+    const PageTurnShapeStyle& style, PageTurnPass* output, std::uint32_t capacity) noexcept {
+    const std::uint32_t required = folded ? 3 : 2;
+    if (!output || capacity < required) return 0;
+    output[0] = {PageTurnPassRole::top, page_turn_top_vertex_material(size, point, style)};
+    output[1] = {PageTurnPassRole::bottom, page_turn_bottom_vertex_material(size, point, style)};
+    if (folded)
+        output[2] = {PageTurnPassRole::empty_back,
+            page_turn_empty_back_vertex_material(size, point, style)};
+    return required;
+}
 }
