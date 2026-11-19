@@ -665,10 +665,31 @@ differences but also introduced differences on Lenovo, so that experiment is
 not retained. This remains a shader precision issue to resolve, and these
 measurements are not proof of complete rendered-screen parity.
 
+`page_turn_bottom_vertex_shader()` and `page_turn_bottom_fragment_shader()`
+implement the lower surface: its shallow curl, vertex texture lookup, RGB shadow
+modulation, unchanged image alpha, UV and projection transforms. The vertex
+parameters retain the original 12-vec4 layout. The lookup is supplied on texture
+unit 4; the page image uses fragment unit 0. The fragment uses a high-precision
+sampler followed by explicit half-register boundaries; lowering the sampler
+itself introduced additional 8-bit output differences on Lenovo.
+
+The bottom vertex transform-feedback check compares **10,872 float words bit
+for bit on both Lenovo and RG556**, with no nonfinite results, across the same
+four folds and three projection/scale configurations. A deliberately nonuniform
+64-texel test lookup exercises filtering and binding; it is not presented as the
+original exponential lookup asset. The 16 bottom fragment cases vary shadow
+strength across filtered nonuniform image samples. On Lenovo all **524,288
+RGBA8 channels match** the original translation. On Mali, **12,855 channels still
+differ by at most 1/255**, with alpha matching exactly; the strict comparison
+returns nonzero. Complete material integration and original lookup preparation
+remain pending.
+
 ```text
 paf_page_shader_test
 paf_page_shader_test LOCAL_ORIGINAL_EMPTY_BACK_FRAGMENT.frag
 paf_page_shader_test --top-vertex LOCAL_ORIGINAL_TOP_VERTEX.vert
+paf_page_shader_test --bottom-vertex LOCAL_ORIGINAL_BOTTOM_VERTEX.vert
+paf_page_shader_test --bottom-fragment LOCAL_ORIGINAL_BOTTOM_FRAGMENT.frag
 ```
 
 ### Recovered busy indicator

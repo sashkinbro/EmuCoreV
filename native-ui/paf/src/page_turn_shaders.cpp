@@ -1,6 +1,81 @@
 #include <emucorev/paf/page_turn_shaders.h>
 
 namespace emucorev::paf {
+std::string_view page_turn_bottom_vertex_shader() noexcept {
+    return R"glsl(#version 320 es
+precision highp float;
+precision highp int;
+layout(binding=0, std140) uniform PageBottomVertex { vec4 p[12]; };
+layout(binding=2, std140) uniform PageViewport {
+    vec4 viewport_flip;
+    float viewport_flag, screen_width, screen_height, z_offset, z_scale;
+};
+layout(binding=4) uniform highp sampler2D vertTex_ExpMinusTexture;
+layout(location=0) in vec4 point;
+layout(location=4) out vec4 v_TexCoord0;
+void main() {
+    vec2 gap = vec2(0.0) - p[8].xy + p[8].zw;
+    float extent = 1.0 / inversesqrt(dot(vec3(gap,0.0),vec3(gap,1.0)));
+    extent = max(min(extent,1.0),0.0);
+    float scale = fma(extent,.8,.2);
+    float curl = fma(scale,p[9].x,0.0);
+    float range_start = curl * .5;
+    float shadow_scale = p[4].x * p[7].y;
+    vec2 relative = vec2(0.0) - p[10].xy + point.xy;
+    float distance = dot(vec3(p[10].zw,0.0),vec3(relative,1.0));
+    distance = min(distance,.5);
+    float argument = fma(1.0,.5,0.0-distance);
+    float curve = 1.0 / inversesqrt(max(fma(argument,0.0-argument,.25),0.0));
+    float height = fma(curve,0.0-curl,range_start);
+    vec4 position = vec4(p[6].xy*point.xy,fma(vec2(height,1.0),p[6].zw,vec2(0.0)));
+    float lookup = fma(height,shadow_scale,0.0);
+    float sampled = textureLod(vertTex_ExpMinusTexture,vec2(lookup,.5),0.0).x;
+    float shadow = fma(sampled,0.0-p[4].y,p[4].y);
+    vec2 uv = p[11].zw * point.xy;
+    uv.y = (0.0-uv.y)+1.0;
+    uv = fma(uv,p[5].xy,p[5].zw);
+    v_TexCoord0 = vec4(uv,shadow+sampled,0.0);
+    vec4 clip = p[0] * vec4(position.x);
+    clip = fma(vec4(position.y),p[1],clip);
+    clip = fma(vec4(position.z),p[2],clip);
+    clip = fma(vec4(position.w),p[3],clip);
+    if(viewport_flag<.5) {
+        gl_Position=((clip*(vec4(2.0,-2.0,2.0,2.0)/vec4(screen_width,screen_height,1.0,1.0)))
+            +vec4(-1.0,1.0,0.0,0.0))*viewport_flip;
+        gl_Position.z=gl_Position.w;
+    } else {
+        gl_Position=clip*viewport_flip;
+        gl_Position.z=(((((gl_Position.z/gl_Position.w)*z_scale)+z_offset)*2.0)-1.0)*gl_Position.w;
+    }
+}
+)glsl";
+}
+std::string_view page_turn_bottom_fragment_shader() noexcept {
+    return R"glsl(#version 320 es
+precision highp float;
+precision highp int;
+layout(binding=3, std140) uniform PageDrawState {
+    float back_disabled, front_disabled, writing_mask, use_raw_image;
+    float res_multiplier, cast_sampler_mask, cast_phase_mask;
+    float inv_frag_width, inv_frag_height, raw_cast_mask, iterator_written_mask;
+};
+layout(binding=0) uniform highp sampler2D page_texture;
+layout(location=4) in mediump vec4 v_TexCoord0;
+layout(location=0) out mediump vec4 out_color;
+vec2 half_pair(vec2 value) {
+    vec2 bounded=mix(clamp(value,vec2(-65504.0),vec2(65504.0)),value,isnan(value));
+    return unpackHalf2x16(packHalf2x16(bounded));
+}
+void main() {
+    if((front_disabled!=0.0 && gl_FrontFacing) || (back_disabled!=0.0 && !gl_FrontFacing)) discard;
+    float shadow=half_pair(vec2((uint(iterator_written_mask)&16u)!=0u?v_TexCoord0.z:0.0,0.0)).x;
+    highp vec4 sampled=texture(page_texture,v_TexCoord0.xy);
+    vec4 image=vec4(half_pair(sampled.xy),half_pair(sampled.zw));
+    vec4 color=vec4(shadow,shadow,shadow,1.0)*image;
+    out_color=vec4(half_pair(color.xy),half_pair(color.zw));
+}
+)glsl";
+}
 std::string_view page_turn_top_vertex_shader() noexcept {
     return R"glsl(#version 320 es
 precision highp float;
