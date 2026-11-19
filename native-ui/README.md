@@ -940,6 +940,19 @@ non-zero fold point selects the rounded-edge material set. Its output does not
 establish the shell's real lock-screen configuration, texture identity or
 rendered-frame parity, and no trace enters the application.
 
+The traced setter blocks are cross-checked against the already bit-exact
+material, pose and light oracles for the same fixture. Both the flat and folded
+paths match all 17 traced vertex slots: MVP, ModelMatrix, shape.Grep,
+shape.FoldPlane, shape.Params, shape.Deepest, shape.Aspect,
+shape.NormalScaleZ, the two MaterialPack Fresnel cells and both point-light
+packs. This proves the recovered setter-slot -> uniform mapping and the
+compatibility of the tracer fixture with the earlier corpora; it does not add
+renderer behaviour.
+
+```text
+python native-ui/tests/verify_page_material_slots.py OWNED_DECRYPTED_LIBPAF
+```
+
 ### Recovered busy indicator
 
 `BusyIndicator` reconstructs the PAF component's head and eight retained trail
