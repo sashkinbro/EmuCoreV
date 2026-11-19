@@ -87,3 +87,6 @@ Thumbs.db
 
 # Local test captures, dumps, fixtures and research outputs
 /artifacts/
+
+# Extracted native UI images, fonts and other local resource assets
+/native-ui/resources/
