@@ -871,6 +871,53 @@ python native-ui/tests/generate_page_light_reference.py OWNED_DECRYPTED_PAF LOCA
 paf_page_light_test LOCAL_LIGHT_CORPUS.bin
 ```
 
+### Recovered PageTurn GPU program interfaces
+
+The offline GXP inventory retains each program's reflected parameter names,
+component counts, float/half type and packed uniform-slot offset. The reviewed
+PageTurn programs are now identified by role. Addresses are local reference
+labels, not runtime constants; the delivered C++/GLSL keeps no firmware address.
+
+| Role | Uniform block in slot order (float-slot offset) |
+| --- | --- |
+| Top surface vertex (flat and rounded) | MVP 0, ModelMatrix 16, MaterialPack 32, UVTransform 48, SqueezeZ 52, Deepest 56, Grep 60, NormalScaleZ 62, Params 64, FoldPlane 68, Aspect 72, PointLightPack2 76, PointLightPack1 92, Eye 108 |
+| Bottom surface vertex (flat and rounded) | MVP 0, Shadow 16, UVTransform 20, SqueezeZ 24, ExpMinusRange 28, Deepest 30, Grep 34, Params 36, FoldPlane 40, Aspect 44 |
+| Empty folded-back vertex | MVP 0, Shadow 16, UVTransform 20, SqueezeZ 24, FoldPlane 28, Aspect 32 |
+| Rectangle (quad) vertex | MVP (half) 0, UVOffset (half2) 8, UVScale (half2) 10 |
+| Top fragment (flat) | BackSideOpacity 0, MaterialPack 2, PointLightPack2 18 |
+| Top fragment (rounded) | CornerSize 0, BackSideOpacity 4, MaterialPack 6, PointLightPack2 22 |
+| Bottom fragment (flat) | No own material block; samples the page texture through the shared draw state |
+| Bottom fragment (rounded) | CornerSize 0, CornerRefract 4 |
+| Empty-back fragment | CornerSize 0, EmptyShadow 4, EmptyColor 5, EmptyShadowColor 9, EmptyBackgroundUVFactor 13 |
+| Shadow fragment | Border (half4) 0, Level (half) 2, Color 4 |
+| Copy fragment | Texture only; its program is not uniquely separated from the other texture-only programs yet |
+
+These offsets agree with the native material array layouts already exercised by
+the device shader comparisons (28/12/9/5-vec4 and the small fragment blocks), so
+each native field now has a recovered original name. They do **not** complete the
+renderer: the `Shadow`, `UVTransform`, `SqueezeZ`, `CornerSize`, `CornerRefract`,
+`ExpMinusRange` and lighting-pack values still need a native material controller,
+and pass ordering, texture identity and blend states require the full draw
+protocol capture described below.
+
+An offline trace runs the original renderer entry in a hosted graphics
+environment and records the ordered protocol: surface activation and texture
+binds, per-pass matrix/shape/light setter blocks, cull/blend state changes and
+draw submissions. With a controlled flat fold it currently captures 85 events,
+resolving the two page-surface passes and their uniform order; the mesh draw-info
+structures are still stubbed, so program binds and draw ranges are not yet in the
+trace. This is a research generator only. The standalone busier scenes and
+existing device gates are unaffected.
+
+```text
+python native-ui/tests/trace_page_draw_protocol.py OWNED_DECRYPTED_LIBPAF OUTPUT_TRACE.json
+```
+
+The tracer validates the reviewed reference SHA-256 and refuses an unknown
+image. It supplies only the controlled renderer input state; the original
+renderer computes the recorded protocol itself. Its output does not establish
+program pairings or rendered-frame parity, and no trace enters the application.
+
 ### Recovered busy indicator
 
 `BusyIndicator` reconstructs the PAF component's head and eight retained trail
