@@ -647,9 +647,28 @@ uncovered pixels. These diagnostic materials prove geometry submission only;
 they are not used as substitutes for the original curl, lighting, edge or shadow
 materials. The complete lock-screen renderer/controller remains unfinished.
 
+`page_turn_top_vertex_shader()` now implements the top surface's semicircular
+curl, reflected planar coordinates, displaced normal, model/projection transforms,
+view-facing opacity, light response and UV transform. It uses the reviewed
+28-vec4 material layout and retains the original operation order and explicit
+fused operations. The C++ library supplies this GLSL directly; no original
+program container, guest instructions or runtime translator is involved.
+
+The `--top-vertex` device check captures position and both output varyings with
+transform feedback, before rasterization. It uses all recovered mesh vertices
+from four folds and three projection/scale configurations. On Lenovo, all
+**16,308 float words match the original translation bit for bit**, with no
+nonfinite outputs. On Mali-G57, the same strict comparison currently reports
+**2,187 differing words, maximum absolute difference 0.0000193417**; it exits
+nonzero rather than accepting a tolerance. Removing `precise` reduced Mali's
+differences but also introduced differences on Lenovo, so that experiment is
+not retained. This remains a shader precision issue to resolve, and these
+measurements are not proof of complete rendered-screen parity.
+
 ```text
 paf_page_shader_test
 paf_page_shader_test LOCAL_ORIGINAL_EMPTY_BACK_FRAGMENT.frag
+paf_page_shader_test --top-vertex LOCAL_ORIGINAL_TOP_VERTEX.vert
 ```
 
 ### Recovered busy indicator

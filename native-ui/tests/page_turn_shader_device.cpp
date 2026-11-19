@@ -4,6 +4,8 @@
 #include <GLES3/gl32.h>
 #include <algorithm>
 #include <array>
+#include <bit>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -109,12 +111,121 @@ void main() { color=vec4(0.0,0.0,1.0,1.0); }
     }
     std::cout << "PASS page surface fan submission: " << checked << " pixel centers / four folds\n";
 }
+void check_top_vertex(const char* reference_path) {
+    using namespace emucorev::paf;
+    auto build = [&](const std::string& source) {
+        const auto vs = compile(GL_VERTEX_SHADER,source);
+        const auto fs = compile(GL_FRAGMENT_SHADER,"#version 320 es\nprecision highp float; layout(location=0) out vec4 c; void main(){c=vec4(1.0);}");
+        const auto shader=glCreateProgram();
+        glAttachShader(shader,vs); glAttachShader(shader,fs);
+        const char* outputs[]{"gl_Position","v_TexCoord0","v_TexCoord2"};
+        glTransformFeedbackVaryings(shader,3,outputs,GL_INTERLEAVED_ATTRIBS);
+        glLinkProgram(shader); glDeleteShader(vs); glDeleteShader(fs);
+        GLint ok=0; glGetProgramiv(shader,GL_LINK_STATUS,&ok);
+        if(!ok) throw std::runtime_error("Top vertex transform-feedback link failed");
+        return shader;
+    };
+    const auto native=build(std::string(page_turn_top_vertex_shader()));
+    GLuint reference=0;
+    if(reference_path) {
+        std::ifstream file(reference_path,std::ios::binary);
+        if(!file) throw std::runtime_error("Missing top vertex reference");
+        std::string source{std::istreambuf_iterator<char>(file),{}};
+        const std::string old="layout(binding = 0, std430) restrict readonly buffer vertexDataType";
+        const auto at=source.find(old);
+        if(at==std::string::npos) throw std::runtime_error("Unexpected top vertex reference block");
+        source.replace(at,old.size(),"layout(binding = 0, std140) uniform vertexDataType");
+        reference=build(source);
+    }
+    GLuint vao, buffers[4], feedback;
+    glGenVertexArrays(1,&vao); glBindVertexArray(vao);
+    glGenBuffers(4,buffers); glGenTransformFeedbacks(1,&feedback);
+    glBindTransformFeedback(GL_TRANSFORM_FEEDBACK,feedback);
+    glBindBuffer(GL_ARRAY_BUFFER,buffers[0]);
+    glBufferData(GL_ARRAY_BUFFER,1024*sizeof(PagePoint),nullptr,GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0); glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,sizeof(PagePoint),nullptr);
+    glBindBuffer(GL_UNIFORM_BUFFER,buffers[1]);
+    glBufferData(GL_UNIFORM_BUFFER,112*sizeof(float),nullptr,GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_UNIFORM_BUFFER,0,buffers[1]);
+    glBindBuffer(GL_UNIFORM_BUFFER,buffers[2]);
+    glBufferData(GL_UNIFORM_BUFFER,48,nullptr,GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_UNIFORM_BUFFER,2,buffers[2]);
+    glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER,buffers[3]);
+    glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER,1024*48,nullptr,GL_DYNAMIC_READ);
+    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER,0,buffers[3]);
+    glEnable(GL_RASTERIZER_DISCARD);
+    PageTurnMesh mesh;
+    unsigned compared=0,differences=0,nonfinite=0;
+    std::array<unsigned,12> component_differences{};
+    std::array<float,12> component_maximum{};
+    float maximum=0;
+    for(auto deepest:std::array<PagePoint,4>{{{1.9f,.95f},{1.1f,.4f},{-.8f,-.3f},{-3.f,-2.f}}}) {
+        const auto shape=page_turn_fold_shape(deepest,{2,1});
+        page_turn_mesh(shape,mesh);
+        glBindBuffer(GL_ARRAY_BUFFER,buffers[0]);
+        glBufferSubData(GL_ARRAY_BUFFER,0,mesh.vertex_count*sizeof(PagePoint),mesh.vertices.data());
+        for(unsigned configuration=0;configuration<3;++configuration) {
+            std::array<float,112> p{};
+            p[0]=p[5]=p[10]=p[15]=1;
+            p[16]=p[21]=p[26]=p[31]=1;
+            p[36]=.9f; p[41]=.2f; p[42]=.8f;
+            p[48]=p[49]=1;
+            p[52]=p[53]=1; p[54]=1.f+configuration*.2f; p[55]=1;
+            p[56]=shape.minimum.distance; p[58]=deepest.x; p[59]=deepest.y;
+            p[60]=shape.minimum.on_fold.x; p[61]=shape.minimum.on_fold.y; p[62]=3.3f;
+            p[64]=.23f; p[65]=.6f; p[66]=.45f;
+            p[68]=shape.center.x; p[69]=shape.center.y; p[70]=shape.normal.x; p[71]=shape.normal.y;
+            p[72]=2; p[73]=1; p[74]=.5f; p[75]=1;
+            p[84]=.8f; p[85]=.6f; p[86]=.3f;
+            p[92]=2; p[93]=3; p[94]=4;
+            p[108]=1; p[109]=2; p[110]=5;
+            const std::array<float,12> viewport{1,configuration==2?-1.f:1.f,1,1,
+                configuration==1?0.f:1.f,128,64,.5f,.5f,0,0,0};
+            glBindBuffer(GL_UNIFORM_BUFFER,buffers[1]); glBufferSubData(GL_UNIFORM_BUFFER,0,sizeof(p),p.data());
+            glBindBuffer(GL_UNIFORM_BUFFER,buffers[2]); glBufferSubData(GL_UNIFORM_BUFFER,0,sizeof(viewport),viewport.data());
+            auto capture=[&](GLuint shader) {
+                glUseProgram(shader); glBeginTransformFeedback(GL_POINTS);
+                glDrawArrays(GL_POINTS,0,mesh.vertex_count); glEndTransformFeedback();
+                glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER,buffers[3]);
+                const auto size=mesh.vertex_count*48;
+                const auto* data=static_cast<const float*>(glMapBufferRange(GL_TRANSFORM_FEEDBACK_BUFFER,0,size,GL_MAP_READ_BIT));
+                if(!data) throw std::runtime_error("Cannot read top vertex feedback");
+                std::vector<float> result(data,data+mesh.vertex_count*12);
+                glUnmapBuffer(GL_TRANSFORM_FEEDBACK_BUFFER);
+                if(glGetError()!=GL_NO_ERROR) throw std::runtime_error("Top vertex feedback error");
+                return result;
+            };
+            const auto actual=capture(native);
+            for(float value:actual) nonfinite+=!std::isfinite(value);
+            if(reference) {
+                const auto original=capture(reference);
+                for(unsigned i=0;i<actual.size();++i) {
+                    differences+=std::bit_cast<unsigned>(actual[i])!=std::bit_cast<unsigned>(original[i]);
+                    component_differences[i%12]+=std::bit_cast<unsigned>(actual[i])!=std::bit_cast<unsigned>(original[i]);
+                    component_maximum[i%12]=std::max(component_maximum[i%12],std::abs(actual[i]-original[i]));
+                    maximum=std::max(maximum,std::abs(actual[i]-original[i])); ++compared;
+                }
+            }
+        }
+    }
+    glDisable(GL_RASTERIZER_DISCARD); glBindTransformFeedback(GL_TRANSFORM_FEEDBACK,0);
+    glDeleteTransformFeedbacks(1,&feedback); glDeleteBuffers(4,buffers); glDeleteVertexArrays(1,&vao);
+    glDeleteProgram(native); if(reference) glDeleteProgram(reference);
+    std::cout << "Top vertex: " << nonfinite << " nonfinite outputs, " << compared << " compared words, "
+        << differences << " differences, max " << maximum << '\n';
+    if(differences) for(unsigned i=0;i<12;++i)
+        std::cout << "component " << i << ": " << component_differences[i] << " max " << component_maximum[i] << '\n';
+    if(nonfinite || differences) throw std::runtime_error("Top vertex comparison failed");
+}
 }
 int main(int argc, char** argv) {
     try {
-        if (argc > 2) throw std::runtime_error("Usage: paf_page_shader_test [REFERENCE_FRAGMENT]");
+        const bool top_only=argc==3 && std::string(argv[1])=="--top-vertex";
+        if (argc > 2 && !top_only) throw std::runtime_error("Usage: paf_page_shader_test [REFERENCE_FRAGMENT] | --top-vertex REFERENCE_VERTEX");
         Context context;
         std::cout << std::unitbuf << "GPU " << glGetString(GL_RENDERER) << '\n';
+        if(top_only) { check_top_vertex(argv[2]); return 0; }
+        check_top_vertex(nullptr);
         const auto native = program(std::string(emucorev::paf::page_turn_empty_back_fragment_shader()));
         GLuint reference = 0;
         if (argc == 2) {
