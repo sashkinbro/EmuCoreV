@@ -603,6 +603,31 @@ The folded top/bottom surfaces, round edges, shadow passes and
 lighting parameters still need their native renderer and original-frame
 comparison. These controls are not presented as a completed unlock screen.
 
+`page_turn_empty_back_fragment_shader()` is the first native material for the
+rounded empty back surface (reference program `0x812ed258`, which crashes the
+Lenovo driver compiler in its generic translated form). It implements corner
+sampling, background tint, shadow subtraction/highlight and opacity with
+explicit half-register rounding. It accepts normalized native textures and
+retains the original four-vec4 material layout. Guest raw-format casts and
+guest framebuffer-resolution compensation are deliberately outside this
+native shader's contract.
+
+The standalone `paf_page_shader_test` draws 16 material cases into an RGBA8
+target, using spatially varying coordinates and two nonuniform filtered test
+textures. The native shader compiles, links and renders on Lenovo Adreno 750
+and RG556 Mali-G57. On RG556, comparing the generic original translation to
+this shader currently finds **10,510 differing channels out of 524,288, maximum
+absolute difference 1/255**. This is an unresolved precision discrepancy, not
+pixel parity; the shader is not yet connected to the preview lock screen.
+The original translation is not executed on Lenovo because of the documented
+vendor compiler crash. A native-only test explicitly reports that no reference
+comparison took place. This test executable is never linked into an app.
+
+```text
+paf_page_shader_test
+paf_page_shader_test LOCAL_ORIGINAL_EMPTY_BACK_FRAGMENT.frag
+```
+
 ### Recovered busy indicator
 
 `BusyIndicator` reconstructs the PAF component's head and eight retained trail
