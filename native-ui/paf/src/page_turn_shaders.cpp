@@ -1,6 +1,70 @@
 #include <emucorev/paf/page_turn_shaders.h>
+#include <array>
 
 namespace emucorev::paf {
+std::string_view page_turn_empty_back_vertex_shader() noexcept {
+    return R"glsl(#version 320 es
+precision highp float;
+precision highp int;
+layout(binding=0, std140) uniform PageEmptyVertex { vec4 p[9]; } vertex_material;
+layout(binding=2, std140) uniform PageViewport {
+    vec4 viewport_flip;
+    float viewport_flag, screen_width, screen_height, z_offset, z_scale;
+};
+layout(location=0) in vec4 point;
+layout(location=4) out vec4 v_TexCoord0;
+layout(location=5) out vec4 v_TexCoord1;
+void main() {
+    float exponent_scale=(0.0-vertex_material.p[4].z)*1.44269502162933349609375;
+    float shadow_level=-1.0+vertex_material.p[4].w;
+    vec3 position=vec3(vertex_material.p[6].xy,vertex_material.p[6].w)*vec3(point.xy,1.0);
+    vec2 base_uv=vertex_material.p[8].zw*point.xy;
+    vec4 clip=vertex_material.p[0]*vec4(position.x);
+    clip=fma(vec4(position.y),vertex_material.p[1],clip);
+    clip=fma(vec4(position.z),vertex_material.p[3],clip);
+    vec2 relative=vec2(0.0)-vertex_material.p[7].xy+point.xy;
+    float distance=dot(vec3(vertex_material.p[7].zw,0.0),vec3(relative,1.0));
+    float exponent=fma(abs(distance),exponent_scale,0.0);
+    float fade=isnan(exponent)?1.0:exp2(exponent);
+    vec2 uv=fma(vec2(base_uv.x,(0.0-base_uv.y)+1.0),vertex_material.p[5].xy,vertex_material.p[5].zw);
+    float shadow=fma(fade,shadow_level,1.0);
+    vec2 corner_uv=vec2(fma(base_uv.x,2.0,-1.0),fma(base_uv.y,2.0,-1.0));
+    v_TexCoord0=vec4(uv,shadow,corner_uv.x);
+    v_TexCoord1=vec4(corner_uv,0.0,0.0);
+    if(viewport_flag<.5) {
+        gl_Position=((clip*(vec4(2.0,-2.0,2.0,2.0)/vec4(screen_width,screen_height,1.0,1.0)))
+            +vec4(-1.0,1.0,0.0,0.0))*viewport_flip;
+        gl_Position.z=gl_Position.w;
+    } else {
+        gl_Position=clip*viewport_flip;
+        gl_Position.z=(((((gl_Position.z/gl_Position.w)*z_scale)+z_offset)*2.0)-1.0)*gl_Position.w;
+    }
+}
+)glsl";
+}
+std::string_view page_turn_copy_fragment_shader() noexcept {
+    return R"glsl(#version 320 es
+precision highp float;
+precision highp int;
+layout(binding=3, std140) uniform PageDrawState {
+    float back_disabled, front_disabled, writing_mask, use_raw_image;
+    float res_multiplier, cast_sampler_mask, cast_phase_mask;
+    float inv_frag_width, inv_frag_height, raw_cast_mask, iterator_written_mask;
+};
+layout(binding=0) uniform highp sampler2D source_texture;
+layout(location=4) in vec4 v_TexCoord0;
+layout(location=0) out mediump vec4 out_color;
+vec2 half_pair(vec2 value) {
+    precise vec2 bounded=mix(clamp(value,vec2(-65504.0),vec2(65504.0)),value,isnan(value));
+    return unpackHalf2x16(packHalf2x16(bounded));
+}
+void main() {
+    if((front_disabled!=0.0 && gl_FrontFacing) || (back_disabled!=0.0 && !gl_FrontFacing)) discard;
+    precise vec4 image=texture(source_texture,v_TexCoord0.xy);
+    out_color=vec4(half_pair(image.xy),half_pair(image.zw));
+}
+)glsl";
+}
 std::string_view page_turn_quad_vertex_shader() noexcept {
     return R"glsl(#version 320 es
 precision highp float;
@@ -102,9 +166,60 @@ void main() {
 }
 )glsl";
 }
-std::string_view page_turn_bottom_vertex_shader() noexcept {
+std::string_view page_turn_top_round_fragment_shader() noexcept {
     return R"glsl(#version 320 es
 precision highp float;
+precision highp int;
+layout(binding=1, std140) uniform PageTopRoundMaterial { vec4 p[10]; } fragment_material;
+layout(binding=3, std140) uniform PageDrawState {
+    float back_disabled, front_disabled, writing_mask, use_raw_image;
+    float res_multiplier, cast_sampler_mask, cast_phase_mask;
+    float inv_frag_width, inv_frag_height, raw_cast_mask, iterator_written_mask;
+};
+layout(binding=0) uniform highp sampler2D page_texture;
+layout(binding=1) uniform highp sampler2D corner_texture;
+layout(location=4) in vec4 v_TexCoord0;
+layout(location=6) in mediump vec4 v_TexCoord2;
+layout(location=5) in mediump vec4 v_TexCoord1;
+layout(location=0) out mediump vec4 out_color;
+vec2 half_pair(vec2 value) {
+    precise vec2 bounded=mix(clamp(value,vec2(-65504.0),vec2(65504.0)),value,isnan(value));
+    return unpackHalf2x16(packHalf2x16(bounded));
+}
+vec4 half_color(vec4 value) {
+    return vec4(half_pair(value.xy),half_pair(value.zw));
+}
+void main() {
+    if((front_disabled!=0.0 && gl_FrontFacing) || (back_disabled!=0.0 && !gl_FrontFacing)) discard;
+    precise vec4 lighting=half_color((uint(iterator_written_mask)&64u)!=0u
+        ?v_TexCoord2:vec4(0.0,0.0,0.0,1.0));
+    precise vec4 image=half_color(texture(page_texture,v_TexCoord0.xy));
+    precise vec2 corner_position=half_pair((uint(iterator_written_mask)&32u)!=0u?v_TexCoord1.xy:vec2(0.0));
+    precise vec2 corner_uv=max(vec2(0.0)-fragment_material.p[0].xy+abs(corner_position),vec2(0.0))*fragment_material.p[0].zw;
+    precise vec4 corner=half_color(texture(corner_texture,corner_uv));
+    precise vec4 tint=half_color(vec4(fragment_material.p[1].zw,fragment_material.p[2].xy));
+    precise float back_opacity=half_pair(vec2(fragment_material.p[1].x,0.0)).x;
+    precise vec4 light_color=half_color(vec4(fragment_material.p[5].zw,fragment_material.p[6].xy));
+    precise vec4 base=half_color(tint*image);
+    precise vec4 back=half_color(fma(base,vec4(0.0)-vec4(back_opacity),vec4(back_opacity)));
+    precise vec4 combined=half_color(fma(image,tint,back));
+    precise vec4 lit=half_color(light_color+lighting);
+    precise vec4 color=half_color(fma(combined,lit,vec4(lighting.w)));
+    color.rgb=half_color(vec4(vec3(corner.g)+color.rgb,0.0)).rgb;
+    color.a=half_pair(vec2(corner.r*color.a,0.0)).x;
+    out_color=color;
+}
+)glsl";
+}
+namespace {
+template<std::size_t A, std::size_t B>
+consteval auto shader_source(const char (&prefix)[A], const char (&body)[B]) {
+    std::array<char,A+B-1> result{};
+    for(std::size_t i=0;i<A-1;++i) result[i]=prefix[i];
+    for(std::size_t i=0;i<B;++i) result[A-1+i]=body[i];
+    return result;
+}
+constexpr char bottom_vertex_body[]=R"glsl(precision highp float;
 precision highp int;
 layout(binding=0, std140) uniform PageBottomVertex { vec4 p[12]; } vertex_material;
 layout(binding=2, std140) uniform PageViewport {
@@ -114,6 +229,9 @@ layout(binding=2, std140) uniform PageViewport {
 layout(binding=4) uniform highp sampler2D vertTex_ExpMinusTexture;
 layout(location=0) in vec4 point;
 layout(location=4) out vec4 v_TexCoord0;
+#ifdef ROUNDED_EDGE
+layout(location=5) out vec4 v_TexCoord1;
+#endif
 void main() {
     vec2 gap = vec2(0.0) - vertex_material.p[8].xy + vertex_material.p[8].zw;
     float extent = 1.0 / inversesqrt(dot(vec3(gap,0.0),vec3(gap,1.0)));
@@ -133,9 +251,17 @@ void main() {
     float sampled = textureLod(vertTex_ExpMinusTexture,vec2(lookup,.5),0.0).x;
     float shadow = fma(sampled,0.0-vertex_material.p[4].y,vertex_material.p[4].y);
     vec2 uv = vertex_material.p[11].zw * point.xy;
+#ifdef ROUNDED_EDGE
+    vec2 corner_uv=fma(uv,vec2(2.0),vec2(-1.0));
+#endif
     uv.y = (0.0-uv.y)+1.0;
     uv = fma(uv,vertex_material.p[5].xy,vertex_material.p[5].zw);
+#ifdef ROUNDED_EDGE
+    v_TexCoord0 = vec4(uv,shadow+sampled,corner_uv.x);
+    v_TexCoord1 = vec4(corner_uv,0.0,0.0);
+#else
     v_TexCoord0 = vec4(uv,shadow+sampled,0.0);
+#endif
     vec4 clip = vertex_material.p[0] * vec4(position.x);
     clip = fma(vec4(position.y),vertex_material.p[1],clip);
     clip = fma(vec4(position.z),vertex_material.p[2],clip);
@@ -150,6 +276,14 @@ void main() {
     }
 }
 )glsl";
+constexpr auto bottom_vertex=shader_source("#version 320 es\n",bottom_vertex_body);
+constexpr auto bottom_round_vertex=shader_source("#version 320 es\n#define ROUNDED_EDGE\n",bottom_vertex_body);
+}
+std::string_view page_turn_bottom_vertex_shader() noexcept {
+    return {bottom_vertex.data(),bottom_vertex.size()-1};
+}
+std::string_view page_turn_bottom_round_vertex_shader() noexcept {
+    return {bottom_round_vertex.data(),bottom_round_vertex.size()-1};
 }
 std::string_view page_turn_bottom_fragment_shader() noexcept {
     return R"glsl(#version 320 es
@@ -177,9 +311,44 @@ void main() {
 }
 )glsl";
 }
-std::string_view page_turn_top_vertex_shader() noexcept {
+std::string_view page_turn_bottom_round_fragment_shader() noexcept {
     return R"glsl(#version 320 es
 precision highp float;
+precision highp int;
+layout(binding=1, std140) uniform PageBottomRoundMaterial { vec4 p[2]; } fragment_material;
+layout(binding=3, std140) uniform PageDrawState {
+    float back_disabled, front_disabled, writing_mask, use_raw_image;
+    float res_multiplier, cast_sampler_mask, cast_phase_mask;
+    float inv_frag_width, inv_frag_height, raw_cast_mask, iterator_written_mask;
+};
+layout(binding=0) uniform highp sampler2D page_texture;
+layout(binding=1) uniform highp sampler2D corner_texture;
+layout(location=4) in mediump vec4 v_TexCoord0;
+layout(location=5) in mediump vec4 v_TexCoord1;
+layout(location=0) out mediump vec4 out_color;
+vec2 half_pair(vec2 value) {
+    precise vec2 bounded=mix(clamp(value,vec2(-65504.0),vec2(65504.0)),value,isnan(value));
+    return unpackHalf2x16(packHalf2x16(bounded));
+}
+vec4 half_color(vec4 value) { return vec4(half_pair(value.xy),half_pair(value.zw)); }
+void main() {
+    if((front_disabled!=0.0 && gl_FrontFacing) || (back_disabled!=0.0 && !gl_FrontFacing)) discard;
+    precise vec4 incoming=half_color((uint(iterator_written_mask)&16u)!=0u
+        ?v_TexCoord0:vec4(0.0,0.0,0.0,1.0));
+    precise vec2 corner_position=half_pair((uint(iterator_written_mask)&32u)!=0u?v_TexCoord1.xy:vec2(0.0));
+    precise vec2 corner_uv=max(vec2(0.0)-fragment_material.p[0].xy+abs(corner_position),vec2(0.0))
+        *fragment_material.p[0].zw;
+    precise vec4 corner=texture(corner_texture,corner_uv);
+    precise vec2 uv=fma(vec2(corner.g),fragment_material.p[1].xy,incoming.xy);
+    precise vec4 image=half_color(texture(page_texture,uv));
+    precise vec4 color=half_color(fma(image,vec4(incoming.z),vec4(corner.g)));
+    color.a=half_pair(vec2(corner.r*image.a,0.0)).x;
+    out_color=color;
+}
+)glsl";
+}
+namespace {
+constexpr char top_vertex_body[]=R"glsl(precision highp float;
 precision highp int;
 layout(binding=0, std140) uniform PageTopVertex { vec4 p[28]; } vertex_material;
 layout(binding=2, std140) uniform PageViewport {
@@ -189,6 +358,9 @@ layout(binding=2, std140) uniform PageViewport {
 layout(location=0) in vec4 point;
 layout(location=4) out vec4 v_TexCoord0;
 layout(location=6) out vec4 v_TexCoord2;
+#ifdef ROUNDED_EDGE
+layout(location=5) out vec4 v_TexCoord1;
+#endif
 void main() {
     precise vec2 relative = vec2(0.0) - vertex_material.p[17].xy + point.xy;
     precise vec2 tangent = vertex_material.p[17].wz * vec2(-1.0, 1.0);
@@ -222,9 +394,19 @@ void main() {
     }
     precise float slope = fma(next_curve, curl_scale, -height + middle);
     precise vec2 offset = vec2(0.0 - vertex_material.p[15].z) * vertex_material.p[17].zw;
+#ifdef ROUNDED_EDGE
+    precise vec3 normal = vec3(fma(vec2(slope),offset,vec2(0.0)),.01);
+    precise float normal_inverse = inversesqrt(dot(normal,normal));
+    normal = vec3(fma(vec2(normal_inverse),normal.xy,vec2(0.0)),normal.z*normal_inverse);
+#else
     precise vec3 normal = vec3(vec2(slope) * offset, .01);
     normal = normal * vec3(inversesqrt(dot(normal, normal)));
+#endif
+#ifdef ROUNDED_EDGE
+    precise vec4 position = vec4(fma(reflected,vertex_material.p[13].xy,vec2(0.0)),vec2(height,1.0)*vertex_material.p[13].zw);
+#else
     precise vec4 position = vec4(vertex_material.p[13].xy * reflected, vec2(height, 1.0) * vertex_material.p[13].zw);
+#endif
     precise vec3 world = fma(vec3(height), vertex_material.p[6].xyz, vertex_material.p[7].xyz);
     world = fma(vec3(reflected.y), vertex_material.p[5].xyz, world);
     world = fma(vec3(reflected.x), vertex_material.p[4].xyz, world);
@@ -232,7 +414,11 @@ void main() {
     world_normal = fma(vec4(normal.y), vertex_material.p[5], world_normal);
     world_normal = fma(vec4(normal.z), vertex_material.p[6], world_normal);
     precise float inverse_normal = inversesqrt(dot(world_normal, world_normal));
+#ifdef ROUNDED_EDGE
+    precise vec3 unit_normal = fma(world_normal.xyz,vec3(inverse_normal),vec3(0.0));
+#else
     precise vec3 unit_normal = vec3(fma(world_normal.xy, vec2(inverse_normal), vec2(0.0)), world_normal.z * inverse_normal);
+#endif
     precise vec3 eye = vertex_material.p[27].xyz + (vec3(0.0) - world);
     precise vec3 light = vertex_material.p[23].xyz + (vec3(0.0) - world);
     precise float inverse_ramp = 1.0 / (0.0 - vertex_material.p[10].y + 1.0);
@@ -241,10 +427,18 @@ void main() {
     ramp = fma(inverse_ramp, 0.0 - vertex_material.p[10].y, ramp);
     ramp = max(min(ramp, 1.0), 0.0);
     precise vec3 light_color = vertex_material.p[21].xyz * vec3(vertex_material.p[9].x);
+#ifdef ROUNDED_EDGE
+    precise vec3 light_direction = fma(light,vec3(inversesqrt(dot(light,light))),vec3(0.0));
+#else
     precise vec3 light_direction = light * vec3(inversesqrt(dot(light, light)));
+#endif
     precise float square_ramp = ramp * ramp;
     precise float diffuse = fma(dot(unit_normal, light_direction), .5, .5);
+#ifdef ROUNDED_EDGE
+    diffuse = fma(diffuse,diffuse,0.0);
+#else
     diffuse = diffuse * diffuse;
+#endif
     precise float cube_ramp = ramp * square_ramp;
     precise vec3 lighting = vec3(fma(vec2(diffuse), light_color.xy, vec2(0.0)), light_color.z * diffuse);
     precise float facing = fma(cube_ramp, -2.0, 3.0 * square_ramp);
@@ -262,12 +456,28 @@ void main() {
         gl_Position.z = (((((gl_Position.z / gl_Position.w) * z_scale) + z_offset) * 2.0) - 1.0) * gl_Position.w;
     }
     precise vec2 uv = vertex_material.p[18].zw * point.xy;
+#ifdef ROUNDED_EDGE
+    precise vec2 corner_uv=fma(uv,vec2(2.0),vec2(-1.0));
+#endif
     uv.y = (0.0 - uv.y) + 1.0;
     uv = fma(uv, vertex_material.p[12].xy, vertex_material.p[12].zw);
+#ifdef ROUNDED_EDGE
+    v_TexCoord0 = vec4(uv,corner_uv);
+    v_TexCoord1 = vec4(corner_uv,lighting.xy);
+#else
     v_TexCoord0 = vec4(uv, lighting.xy);
+#endif
     v_TexCoord2 = vec4(lighting, opacity);
 }
 )glsl";
+constexpr auto top_vertex=shader_source("#version 320 es\n",top_vertex_body);
+constexpr auto top_round_vertex=shader_source("#version 320 es\n#define ROUNDED_EDGE\n",top_vertex_body);
+}
+std::string_view page_turn_top_vertex_shader() noexcept {
+    return {top_vertex.data(),top_vertex.size()-1};
+}
+std::string_view page_turn_top_round_vertex_shader() noexcept {
+    return {top_round_vertex.data(),top_round_vertex.size()-1};
 }
 std::string_view page_turn_empty_back_fragment_shader() noexcept {
     return R"glsl(#version 320 es

@@ -712,6 +712,37 @@ constant material on Lenovo and RG556. These are component checks; rounded-edge
 passes, complete material parameters/lookup assets and lock-screen integration
 are still pending.
 
+All 13 reviewed PageTurn GPU programs now have native source implementations:
+six vertex stages and seven fragment stages, linked into the seven original
+stage pairings by the device component check. Flat and rounded vertex variants
+share compile-time source bodies; the variants are assembled as constant arrays,
+with no runtime string allocation or original-program translation. Rounded
+variants retain their additional signed corner coordinates and the original
+fused-operation differences. The rounded materials implement corner sampling,
+UV refraction, edge highlights and coverage alpha.
+
+Current additional component comparisons (each fragment set contains 524,288
+RGBA8 channels unless stated otherwise):
+
+| Component | Lenovo | RG556 |
+| --- | --- | --- |
+| Rounded bottom vertex, 16,308 words | Bit-exact | Bit-exact |
+| Rounded bottom fragment | 4,495 differing channels, max 1/255 | 7,375 differing channels, max 1/255 |
+| Rounded top vertex, 21,744 words | Bit-exact | 2,148 differing words, max 0.0000193417 |
+| Rounded top fragment | Exact RGBA8 | 3,393 differing channels, max 1/255 |
+| Empty-back vertex, 16,308 words | Bit-exact | Bit-exact |
+| Pure copy, 32,768 channels | Exact RGBA8 | Exact RGBA8 |
+
+The empty-back vertex preserves the original exponential shadow falloff and
+the explicit NaN-to-one exponential behavior. Pure copy preserves the image's
+half-register output boundaries. The new pairs also undergo joint compilation,
+in addition to separate transform-feedback and fragment comparisons. Tests of
+the shared flat top/bottom bodies still pass their existing exact checks on
+Lenovo/RG556 respectively. Remaining precision discrepancies are reported as
+failures by the strict comparator. Having all stage sources does not complete
+the screen: material assembly, original lookup images, pass ordering, the full
+gesture controller and original-frame comparison remain required.
+
 ```text
 paf_page_shader_test
 paf_page_shader_test LOCAL_ORIGINAL_EMPTY_BACK_FRAGMENT.frag
@@ -721,6 +752,12 @@ paf_page_shader_test --bottom-fragment LOCAL_ORIGINAL_BOTTOM_FRAGMENT.frag
 paf_page_shader_test --top-fragment LOCAL_ORIGINAL_TOP_FRAGMENT.frag
 paf_page_shader_test --quad-vertex LOCAL_ORIGINAL_QUAD_VERTEX.vert
 paf_page_shader_test --shadow-fragment LOCAL_ORIGINAL_SHADOW_FRAGMENT.frag
+paf_page_shader_test --bottom-round-vertex LOCAL_ORIGINAL_BOTTOM_ROUND_VERTEX.vert
+paf_page_shader_test --bottom-round-fragment LOCAL_ORIGINAL_BOTTOM_ROUND_FRAGMENT.frag
+paf_page_shader_test --top-round-vertex LOCAL_ORIGINAL_TOP_ROUND_VERTEX.vert
+paf_page_shader_test --top-round-fragment LOCAL_ORIGINAL_TOP_ROUND_FRAGMENT.frag
+paf_page_shader_test --empty-back-vertex LOCAL_ORIGINAL_EMPTY_BACK_VERTEX.vert
+paf_page_shader_test --copy-fragment LOCAL_ORIGINAL_COPY_FRAGMENT.frag
 ```
 
 ### Recovered busy indicator
