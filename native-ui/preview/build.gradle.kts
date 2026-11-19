@@ -10,7 +10,7 @@ val verifyLocalNativeUiAssets by tasks.registering {
         val required = listOf("images.json", "fonts.json", "fonts/ltn4.otf", "fonts/ltn0.otf", "audio/sounds.json",
             "effects/lookups/lookups.json", "effects/lookups/exp-minus.png",
             "effects/lookups/corner-distance.png",
-            "images/paf-common-resource/ba195a37.png",
+            "images/topmenu_plugin/754463d1.png",
             "images/livearea_plugin/ca6a6db1.png",
             "images/indicator_plugin/ca76be07.png", "images/indicator_plugin/56e72f16.png",
             "preview/home/catalog.json",
@@ -59,7 +59,7 @@ val verifyLocalNativeUiAssets by tasks.registering {
 val packedAssets = layout.buildDirectory.dir("generated/nativeUiAssets")
 val startupAssets = layout.buildDirectory.dir("generated/nativeUiStartupAssets")
 val copyStartupBusyImage by tasks.registering(Copy::class) {
-    from(file("../resources/images/paf-common-resource/ba195a37.png")) {
+    from(file("../resources/images/topmenu_plugin/754463d1.png")) {
         rename { "startup-busy.png" }
     }
     into(startupAssets)

@@ -62,6 +62,8 @@ constexpr LockPageConfig lock_page_config{};
 constexpr float preview_width = 960.f, preview_height = 544.f;
 constexpr std::uint32_t home_icon_image_min = 1000, home_icon_image_limit = 2000;
 constexpr std::uint32_t home_highlight_image_id = 0xa952ef1eu;
+constexpr std::uint32_t busy_ball_image_id = 0x754463d1u;
+constexpr std::array<float, 3> busy_ball_tint{0.66f, 0.9f, 1.f};
 struct HomeGridConfig {
     float page_width = 960.f;
     float page_height = 512.f;
@@ -196,6 +198,7 @@ struct Window {
     float anim_duration = 0.f;
     emucorev::paf::PagePoint anim_start_point{0.f, 0.f};
     emucorev::paf::PagePoint anim_target_point{0.f, 0.f};
+    float lock_page_alpha = 1.f;
 
     std::unordered_map<std::uint32_t, std::uint64_t> uploaded_images;
     std::uint64_t uploaded_revision = 0;
@@ -767,8 +770,14 @@ struct Window {
         }
         if (lock_anim_state == LockAnimState::idle)
             return;
+        if (lock_anim_state == LockAnimState::peeling) tick_home(elapsed);
         anim_elapsed += elapsed;
         const float t = anim_duration > 0.f ? std::clamp(anim_elapsed / anim_duration, 0.f, 1.f) : 1.f;
+        if (lock_anim_state == LockAnimState::peeling) {
+            const float alpha_t = std::clamp(anim_elapsed / 0.300f, 0.f, 1.f);
+            const float alpha_eased = 1.f - (1.f - alpha_t) * (1.f - alpha_t);
+            lock_page_alpha = 1.f - alpha_eased;
+        }
         // PAF curve 0x19 is sine-in for the exit peel. Curve 0x15 is
         // quadratic-out for a return to the resting fold point.
         const float factor = lock_anim_state == LockAnimState::peeling
@@ -792,6 +801,7 @@ struct Window {
     int32_t handle_input(AInputEvent* event) {
         if (home_visible) return livearea_visible
             ? handle_livearea_input(event) : handle_home_input(event);
+        if (lock_anim_state == LockAnimState::peeling) return 1;
         if (AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION) return 0;
         const int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
         EGLint width = 0, height = 0;
@@ -845,6 +855,7 @@ struct Window {
                     : emucorev::paf::page_turn_release({dx, dy}, 280.f, false, false);
                 if (release == emucorev::paf::PageTurnRelease::beyond_threshold) {
                     lock_anim_state = LockAnimState::peeling;
+                    lock_page_alpha = 1.f;
                     anim_elapsed = 0.f;
                     anim_duration = 0.500f;
                     anim_start_point = lock_point;
@@ -984,6 +995,7 @@ struct Window {
         folded_draw.blend = true;
         folded_draw.vertex_parameters = lock_top_material;
         folded_draw.fragment_parameters = top_round_fragment_material;
+        folded_draw.meta_alpha = lock_page_alpha;
 
         // 2. Front surface (Bottom round) - Event 132 in libpaf proto
         std::array<float, 8> bottom_round_fragment_material{};
@@ -999,6 +1011,7 @@ struct Window {
         front_draw.blend = true;
         front_draw.vertex_parameters = lock_bottom_material;
         front_draw.fragment_parameters = bottom_round_fragment_material;
+        front_draw.meta_alpha = lock_page_alpha;
 
         // 3. Empty back folded surface - Event 138 in libpaf proto
         std::array<float, 16> empty_back_fragment_material{};
@@ -1026,6 +1039,7 @@ struct Window {
         empty_draw.blend = true;
         empty_draw.vertex_parameters = lock_empty_material;
         empty_draw.fragment_parameters = empty_back_fragment_material;
+        empty_draw.meta_alpha = lock_page_alpha;
         // Painter order follows the original surface relationship: the page
         // body is laid down first, its underside next, and the curled page
         // face last so it remains visible where the meshes overlap.
@@ -1045,12 +1059,12 @@ struct Window {
         upload_images();
         if (preview_scene.load() == 2) {
             sprites->begin(960, 544);
-            if (home_visible) {
+            if (home_visible || lock_anim_state == LockAnimState::peeling) {
                 if (livearea_visible) draw_livearea();
                 else {
-                    sprites->draw(103, 0, 0, 960, 544);
                     draw_home_bubbles();
                 }
+                draw_lock();
             } else {
                 // The raw wallpaper is the underlying screen; the clock/date are
                 // part of texture 100 and move with the PageTurn surface.
@@ -1069,9 +1083,10 @@ struct Window {
             if (busy->state != emucorev::paf::BusyState::idle)
                 for (const auto& dot : busy->dots)
                     if (dot.size > 0 && dot.alpha)
-                        sprites->draw(0xba195a37, 480 + dot.x - dot.size * .5f,
+                        sprites->draw(busy_ball_image_id, 480 + dot.x - dot.size * .5f,
                             272 - dot.y - dot.size * .5f, dot.size, dot.size,
-                            {1, 1, 1, float(dot.alpha) * (1.f / 255.f)});
+                            {busy_ball_tint[0], busy_ball_tint[1], busy_ball_tint[2],
+                                float(dot.alpha) * (1.f / 255.f)});
         } else {
             bubble->draw(vertex, material);
             draw_status(charging_texture);
@@ -1091,7 +1106,7 @@ struct Window {
 };
 
 struct Preview {
-    emucorev::paf::BusyIndicator busy{80};
+    emucorev::paf::BusyIndicator busy{72, 16};
     emucorev::paf::ChargingIndicator charging;
     std::unique_ptr<Window> window;
     android_app* app = nullptr;

@@ -76,7 +76,7 @@ class PreviewActivity : NativeActivity() {
             sceneExtra == "home" || sceneInt == 3 -> 3
             else -> 2 // Cold launch settles on the Lock scene with Home ready behind it.
         }
-        // Show the original PAF busy animation while the pack is prepared.
+        // Show the original Shell topmenu busy animation while the pack is prepared.
         val startupRoot = File(noBackupFilesDir, "native-ui-startup").apply {
             check(isDirectory || mkdirs()) { "Cannot create startup resource directory" }
         }

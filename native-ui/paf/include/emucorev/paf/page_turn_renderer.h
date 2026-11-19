@@ -16,6 +16,9 @@ struct PageSurfaceDraw {
     // Borrowed GLES texture names: fragment units 0..3, vertex lookup unit 4.
     std::array<unsigned, 5> textures;
     bool blend;
+    // Native-preview composition extension. PAF meta-alpha is not part of the
+    // recovered GX fragment block; its reserved tail float carries opacity.
+    float meta_alpha = 1.f;
 };
 
 // Created/destroyed on the owning GLES context thread. No firmware, guest state,

@@ -81,8 +81,20 @@ Loading ignores the component preview's tap/A stop toggle; ready/failure request
 wake the native looper even if the busy component has become idle. The looper
 pointer is synchronized with native-thread shutdown. Lenovo loading-input checks
 reached the prepared shell without hanging; explicit component preview controls
-remain separate. The current 80-pixel busy extent is still a development value,
-and its dot thickness/placement must be recovered from the original shell widget.
+remain separate. The former 80-pixel/10-pixel busy fixture has been replaced by
+the topmenu template's 72-pixel extent, 16-pixel balls, cyan tint and texture
+`754463d1`. Shell function `81297df8` opens template `b6e09720` and resolves child
+`ae8fa25b`; these match the extracted RCO. This proves that Shell template path,
+not the complete power-on loading sequence or its final screen placement.
+
+Unlock now renders Home underneath the peeling page and applies the recovered
+300 ms quadratic-out meta-alpha track from `811016e2` to every PageTurn surface,
+alongside the existing 500 ms sine fold. A native shader state extension carries
+transparency in the previously unused tail float; zero retains the prior opaque
+shader result. The original 300 ms Z track/camera mapping remains unresolved.
+Lenovo recorded the transition with Home showing through the fading page. The
+focused native shader check passed surface submission, shadow pixels and 16
+material draws; this is not a full original-frame equivalence comparison.
 
 The wave reconstruction now includes the native `wave_pos.vp/fp` position pass
 and the standard `effects_default_0512_01` sky parameter snapshot. Preset floats

@@ -50,6 +50,7 @@ layout(binding=3, std140) uniform PageDrawState {
     float back_disabled, front_disabled, writing_mask, use_raw_image;
     float res_multiplier, cast_sampler_mask, cast_phase_mask;
     float inv_frag_width, inv_frag_height, raw_cast_mask, iterator_written_mask;
+    float native_transparency;
 };
 layout(binding=0) uniform highp sampler2D source_texture;
 layout(location=4) in vec4 v_TexCoord0;
@@ -62,6 +63,7 @@ void main() {
     if((front_disabled!=0.0 && gl_FrontFacing) || (back_disabled!=0.0 && !gl_FrontFacing)) discard;
     precise vec4 image=texture(source_texture,v_TexCoord0.xy);
     out_color=vec4(half_pair(image.xy),half_pair(image.zw));
+    out_color.a=half_pair(vec2(out_color.a*(1.0-native_transparency),0.0)).x;
 }
 )glsl";
 }
@@ -101,6 +103,7 @@ layout(binding=3, std140) uniform PageDrawState {
     float back_disabled, front_disabled, writing_mask, use_raw_image;
     float res_multiplier, cast_sampler_mask, cast_phase_mask;
     float inv_frag_width, inv_frag_height, raw_cast_mask, iterator_written_mask;
+    float native_transparency;
 };
 layout(binding=0) uniform highp sampler2D shadow_texture;
 layout(location=4) in mediump vec4 v_TexCoord0;
@@ -126,6 +129,7 @@ void main() {
     highp vec4 sampled=texture(shadow_texture,uv);
     precise float weight=half_pair(sampled.xy).x;
     out_color=half_color(fma(vec4(weight),inverse,shaded));
+    out_color.a=half_pair(vec2(out_color.a*(1.0-native_transparency),0.0)).x;
 }
 )glsl";
 }
@@ -138,6 +142,7 @@ layout(binding=3, std140) uniform PageDrawState {
     float back_disabled, front_disabled, writing_mask, use_raw_image;
     float res_multiplier, cast_sampler_mask, cast_phase_mask;
     float inv_frag_width, inv_frag_height, raw_cast_mask, iterator_written_mask;
+    float native_transparency;
 };
 layout(binding=0) uniform highp sampler2D page_texture;
 layout(location=4) in vec4 v_TexCoord0;
@@ -163,6 +168,7 @@ void main() {
     precise vec4 combined=half_color(fma(image,tint,back));
     precise vec4 lit=half_color(light_color+lighting);
     out_color=half_color(fma(combined,lit,vec4(lighting.w)));
+    out_color.a=half_pair(vec2(out_color.a*(1.0-native_transparency),0.0)).x;
 }
 )glsl";
 }
@@ -175,6 +181,7 @@ layout(binding=3, std140) uniform PageDrawState {
     float back_disabled, front_disabled, writing_mask, use_raw_image;
     float res_multiplier, cast_sampler_mask, cast_phase_mask;
     float inv_frag_width, inv_frag_height, raw_cast_mask, iterator_written_mask;
+    float native_transparency;
 };
 layout(binding=0) uniform highp sampler2D page_texture;
 layout(binding=1) uniform highp sampler2D corner_texture;
@@ -208,6 +215,7 @@ void main() {
     color.rgb=half_color(vec4(vec3(corner.g)+color.rgb,0.0)).rgb;
     color.a=half_pair(vec2(corner.r*color.a,0.0)).x;
     out_color=color;
+    out_color.a=half_pair(vec2(out_color.a*(1.0-native_transparency),0.0)).x;
 }
 )glsl";
 }
@@ -293,6 +301,7 @@ layout(binding=3, std140) uniform PageDrawState {
     float back_disabled, front_disabled, writing_mask, use_raw_image;
     float res_multiplier, cast_sampler_mask, cast_phase_mask;
     float inv_frag_width, inv_frag_height, raw_cast_mask, iterator_written_mask;
+    float native_transparency;
 };
 layout(binding=0) uniform highp sampler2D page_texture;
 layout(location=4) in mediump vec4 v_TexCoord0;
@@ -308,6 +317,7 @@ void main() {
     vec4 image=vec4(half_pair(sampled.xy),half_pair(sampled.zw));
     vec4 color=vec4(shadow,shadow,shadow,1.0)*image;
     out_color=vec4(half_pair(color.xy),half_pair(color.zw));
+    out_color.a=half_pair(vec2(out_color.a*(1.0-native_transparency),0.0)).x;
 }
 )glsl";
 }
@@ -320,6 +330,7 @@ layout(binding=3, std140) uniform PageDrawState {
     float back_disabled, front_disabled, writing_mask, use_raw_image;
     float res_multiplier, cast_sampler_mask, cast_phase_mask;
     float inv_frag_width, inv_frag_height, raw_cast_mask, iterator_written_mask;
+    float native_transparency;
 };
 layout(binding=0) uniform highp sampler2D page_texture;
 layout(binding=1) uniform highp sampler2D corner_texture;
@@ -344,6 +355,7 @@ void main() {
     precise vec4 color=half_color(fma(image,vec4(incoming.z),vec4(corner.g)));
     color.a=half_pair(vec2(corner.r*image.a,0.0)).x;
     out_color=color;
+    out_color.a=half_pair(vec2(out_color.a*(1.0-native_transparency),0.0)).x;
 }
 )glsl";
 }
@@ -488,6 +500,7 @@ layout(binding = 3, std140) uniform PageDrawState {
     float back_disabled, front_disabled, writing_mask, use_raw_image;
     float res_multiplier, cast_sampler_mask, cast_phase_mask;
     float inv_frag_width, inv_frag_height, raw_cast_mask, iterator_written_mask;
+    float native_transparency;
 };
 layout(binding = 0) uniform highp sampler2D corner_texture;
 layout(binding = 1) uniform highp sampler2D empty_background;
@@ -529,6 +542,7 @@ void main() {
     precise float opacity = half_pair(vec2(fragment_material.p[2].y, 0.0)).x;
     precise float alpha = half_pair(vec2(opacity * corner.r, 0.0)).x;
     out_color = vec4(shaded, alpha);
+    out_color.a = half_pair(vec2(out_color.a * (1.0 - native_transparency), 0.0)).x;
 }
 )glsl";
 }

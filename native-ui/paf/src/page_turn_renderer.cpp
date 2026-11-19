@@ -1,6 +1,7 @@
 #include <emucorev/paf/page_turn_renderer.h>
 #include <GLES3/gl32.h>
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 
@@ -138,12 +139,19 @@ void PageTurnRenderer::draw_quad(std::span<const PageQuadVertex, 4> vertices,
 void PageTurnRenderer::Impl::apply(GLuint program, const PageSurfaceDraw& material) {
     if (material.vertex_parameters.size() > 128 || material.fragment_parameters.size() > 128)
         throw std::invalid_argument("Page surface parameter block exceeds storage");
+    if (!std::isfinite(material.meta_alpha) || material.meta_alpha < 0.f || material.meta_alpha > 1.f)
+        throw std::invalid_argument("Invalid PageTurn meta-alpha");
     glUseProgram(program);
     // Zero padding prevents short blocks from inheriting another material's tail.
     std::array<float, 128> vertex{}, fragment{};
+    auto draw_state = material.fragment_state;
+    // Original PageDrawState has 11 values and one reserved tail float. Keep
+    // its default (zero) exactly opaque; meta_alpha=1 leaves recovered passes
+    // unchanged while preview composition can fade all PageTurn passes.
+    draw_state[11] = 1.f - material.meta_alpha;
     std::copy(material.vertex_parameters.begin(), material.vertex_parameters.end(), vertex.begin());
     std::copy(material.fragment_parameters.begin(), material.fragment_parameters.end(), fragment.begin());
-    const std::array<const float*, 4> data{vertex.data(), fragment.data(), material.viewport.data(), material.fragment_state.data()};
+    const std::array<const float*, 4> data{vertex.data(), fragment.data(), material.viewport.data(), draw_state.data()};
     for (unsigned i = 0; i < 4; ++i) {
         glBindBuffer(GL_UNIFORM_BUFFER, buffers[i + 1]);
         glBufferSubData(GL_UNIFORM_BUFFER, 0, i < 2 ? 512 : 48, data[i]);

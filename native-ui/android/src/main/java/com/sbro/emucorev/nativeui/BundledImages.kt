@@ -606,7 +606,7 @@ class BundledImages(
     }
 
     fun loadBusyImage() {
-        val busy = File(resources, "images/paf-common-resource/ba195a37.png").inputStream().use {
+        val busy = File(resources, "images/topmenu_plugin/754463d1.png").inputStream().use {
             requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled busy image" }
         }
         try { loadBusyImage(busy) } finally { busy.recycle() }
@@ -614,7 +614,7 @@ class BundledImages(
 
     /** Publish an early standalone busy image before the full offline pack is extracted. */
     fun loadBusyImage(busy: Bitmap) {
-        send(0xba195a37.toInt(), busy)
+        send(0x754463d1.toInt(), busy)
     }
 
     fun updateClock(status: DeviceStatusSource.Snapshot) {
