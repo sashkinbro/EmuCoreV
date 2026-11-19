@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-feature android:glEsVersion="0x00030002" android:required="true" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <application android:label="Native UI preview" android:hasCode="true"
         android:allowBackup="false" android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
         <activity android:name=".PreviewActivity" android:exported="true"

@@ -1,6 +1,7 @@
 #include <emucorev/paf/bubble_renderer.h>
 #include <emucorev/paf/bubble_shaders.h>
 #include <emucorev/paf/bubble_motion.h>
+#include <emucorev/paf/device_status.h>
 #include <android/choreographer.h>
 #include <android_native_app_glue.h>
 #include <android/log.h>
@@ -13,10 +14,13 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <vector>
 
 namespace {
+std::mutex status_mutex;
+emucorev::paf::DeviceStatus device_status;
 template<class T> std::vector<T> read(const std::filesystem::path& path, std::size_t count) {
     if (std::filesystem::file_size(path) != count * sizeof(T))
         throw std::runtime_error("Unexpected preview resource size: " + path.filename().string());
@@ -219,6 +223,28 @@ struct Preview {
         }
     }
 };
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeStatus(JNIEnv* env, jobject,
+    jint battery, jboolean charging, jint power, jint wifi, jboolean connected, jint rssi,
+    jint bluetooth, jlong minute, jstring zone, jboolean clock24) {
+    const char* text = zone ? env->GetStringUTFChars(zone, nullptr) : nullptr;
+    if (zone && !text) return;
+    {
+        const std::lock_guard lock(status_mutex);
+        device_status.battery_percent = battery;
+        device_status.charging = charging;
+        device_status.power_source = power;
+        device_status.wifi_enabled = static_cast<emucorev::paf::RadioState>(wifi);
+        device_status.wifi_connected = connected;
+        device_status.wifi_rssi = rssi;
+        device_status.bluetooth_enabled = static_cast<emucorev::paf::RadioState>(bluetooth);
+        device_status.epoch_minute = minute;
+        device_status.time_zone = text ? text : "";
+        device_status.use_24_hour_clock = clock24;
+    }
+    if (text) env->ReleaseStringUTFChars(zone, text);
 }
 
 void android_main(android_app* app) {

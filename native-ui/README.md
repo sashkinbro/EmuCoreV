@@ -24,10 +24,20 @@ All new translated product text belongs in the existing main `strings.xml` files
 for all supported locales. The host provides resolved text; this module must not
 introduce a second partial translation catalogue.
 
-Firmware binaries and extracted resources are local research inputs and are not
-distributed in this directory. Resource/theme packaging, font selection, complete
-materials, layout, animation integration and the host bridge are still pending. No
-approximate implementation is marked as equivalent.
+Firmware binaries remain local development inputs. Ready images and fonts live
+in the Git-ignored `native-ui/resources/` directory and are packaged as assets;
+they are never extracted from firmware when the UI starts. The resource pack is
+not uploaded to Git. Complete materials, layout, animation integration and the
+host bridge are still pending. No approximate implementation is marked as equivalent.
+
+The offline `tools/prepare_image_pack.py` uses our standalone C++ readers for
+RCO/GIM and Pillow for embedded PNG/DDS images. It writes 935 PNG images from the
+current 18 local references, verifies every PNG round trip, and records source,
+pixel and output hashes in `images.json`. `tools/prepare_font_pack.py` copies
+the supplied OpenType CFF fonts unchanged into the same ignored directory.
+Neither preparation tool is invoked at runtime or included in the application.
+Android device status and lifecycle adapters use Kotlin. The status source
+subscribes only while resumed; it does not poll or start the emulator.
 
 ## Implemented foundation: resource document reader
 

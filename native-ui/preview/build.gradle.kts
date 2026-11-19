@@ -6,6 +6,8 @@ android {
     namespace = "com.sbro.emucorev.nativeuipreview"
     compileSdk = 37
     ndkVersion = "29.0.14206865"
+    sourceSets.getByName("main").kotlin.srcDir("../android/src/main/java")
+    sourceSets.getByName("main").assets.srcDir("../resources")
     defaultConfig {
         applicationId = "com.sbro.emucorev.nativeuipreview"
         minSdk = 29
