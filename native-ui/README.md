@@ -959,6 +959,14 @@ style/empty-back constant, plus the corner texture location) are recorded in
 `tests/reference/page_turn_material_order.json` for the native material
 controller. It is a local research reference; no firmware data is packaged.
 
+```text
+python native-ui/tests/run_offline_checks.py OWNED_DECRYPTED_LIBPAF
+```
+
+This harness runs the reference consistency check and, when a decrypted
+reference is supplied, the five-fixture draw-trace slot cross-check. Without a
+reference it reports the device-free check only; it never touches a device.
+
 ### Recovered busy indicator
 
 `BusyIndicator` reconstructs the PAF component's head and eight retained trail
