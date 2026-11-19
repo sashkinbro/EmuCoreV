@@ -457,10 +457,26 @@ packaged Rodin bold font. Minute/time-zone/format changes, battery, Wi-Fi and
 Bluetooth events feed the preview without per-frame JNI calls or polling.
 The visible status panel was launched on Lenovo and RG556; Lenovo's clock matched
 device time and its battery selection used the real 78% reading. Exact panel
-anchors, original font rasterization, charging animation and complete radio
+anchors, original font rasterization, charging entry/exit opacity and complete radio
 presentation remain pending. The Wi-Fi strength conversion uses Android's RSSI
 scale rather than an emulated Vita radio service. The packaged debug APK contains
 935 PNGs, 20 fonts and only `libpaf_preview.so`; no emulator library is loaded.
+
+The charging overlay now selects the two original electric textures using the
+recovered `sce_paf_rand` LCG (`state * 0x41c64e6d + 0x3039`, bit 16 selects the
+image), with UI-owned state preserved across pause/resume and GL recreation.
+The shell's charging callback selects those same images with `rand() & 1`; the
+effect is disabled at full charge. Preview frame ticks currently drive this
+selection. Original handler-timer event ordering and repeated 200 ms show-alpha
+animation remain to be integrated; this is not a claim of complete charging
+transition equivalence. The private RNG does not reproduce unrelated consumers
+of the original shell's shared global random stream.
+
+On Lenovo, real charging at 77% produced both electric texture frames. A temporary
+BatteryService 100% override produced a stable full battery without that overlay.
+RG556's temporary 50%/charging override also produced both frames. Both devices'
+real BatteryService state was restored after the checks. These checks verify
+host-state binding and frame selection, not original rendered-pixel parity.
 
 Rendering uses a 960x544 offscreen target and aspect-preserving presentation.
 Window recreation releases and rebuilds all context-owned resources. Native

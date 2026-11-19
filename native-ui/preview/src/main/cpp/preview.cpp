@@ -4,6 +4,7 @@
 #include <emucorev/paf/device_status.h>
 #include <emucorev/paf/sprite_renderer.h>
 #include <emucorev/paf/busy_indicator.h>
+#include <emucorev/paf/charging_indicator.h>
 #include <android/choreographer.h>
 #include <android/asset_manager.h>
 #include <android/input.h>
@@ -170,7 +171,7 @@ struct Window {
         }
     }
 
-    void draw_status() {
+    void draw_status(std::uint32_t charging_texture) {
         const std::lock_guard lock(status_mutex);
         sprites->begin(960, 544);
         // Development composition; exact original anchors/clock metrics and
@@ -181,9 +182,9 @@ struct Window {
         const auto& status = device_status;
         auto battery_id = status.battery_percent < 0 ? 0xa5aafd9bu
             : battery[std::min(4, std::clamp(status.battery_percent, 0, 100) * 4 / 100)];
-        if (status.charging && status.battery_percent >= 0 && status.battery_percent < 100)
-            battery_id = 0x32465c57;
         sprites->draw(battery_id, 904, 2, 48, 28);
+        if (charging_texture && status.charging && status.battery_percent >= 0 && status.battery_percent < 100)
+            sprites->draw(charging_texture, 904, 2, 48, 28);
         if (const auto clock = host_images.find(1); clock != host_images.end())
             sprites->draw(1, 892.f - clock->second.width, 0, clock->second.width, clock->second.height);
         float left = 8;
@@ -200,7 +201,7 @@ struct Window {
             sprites->draw(0xca76be07, left, 4, 19, 24);
     }
 
-    void draw(const emucorev::paf::BusySnapshot* busy = nullptr) {
+    void draw(const emucorev::paf::BusySnapshot* busy, std::uint32_t charging_texture) {
         EGLint width, height;
         if (!eglQuerySurface(display, surface, EGL_WIDTH, &width)
             || !eglQuerySurface(display, surface, EGL_HEIGHT, &height) || width <= 0 || height <= 0) return;
@@ -220,7 +221,7 @@ struct Window {
                             {1, 1, 1, float(dot.alpha) * (1.f / 255.f)});
         } else {
             bubble->draw(vertex, material);
-            draw_status();
+            draw_status(charging_texture);
         }
 
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -238,6 +239,7 @@ struct Window {
 
 struct Preview {
     emucorev::paf::BusyIndicator busy{80};
+    emucorev::paf::ChargingIndicator charging;
     std::unique_ptr<Window> window;
     AChoreographer* choreographer = nullptr;
     bool resumed = false, focused = false, callback_pending = false;
@@ -246,7 +248,7 @@ struct Preview {
     int64_t last_draw = 0, next_draw = 0;
 
     Preview() { busy.start(); }
-    void render() { window->draw(busy_scene.load() ? &busy.snapshot() : nullptr); }
+    void render() { window->draw(busy_scene.load() ? &busy.snapshot() : nullptr, charging.texture()); }
 
     bool active() const { return window && resumed && focused; }
     void schedule() {
@@ -264,6 +266,10 @@ struct Preview {
                 // Do not skip a 60 Hz frame merely because it is a few ns
                 // earlier than the accumulated 16,666,667 ns deadline.
                 if (time + 500000 >= preview.next_draw) {
+                    if (!busy_scene.load()) {
+                        const std::lock_guard lock(status_mutex);
+                        preview.charging.advance(device_status.charging, device_status.battery_percent);
+                    }
                     const float elapsed = preview.last_draw ? float(time - preview.last_draw) * 1e-9f : 0;
                     if (elapsed > 0 && elapsed <= 1) {
                         if (busy_scene.load()) preview.busy.tick(elapsed);
