@@ -5,6 +5,8 @@
 #include <emucorev/paf/sprite_renderer.h>
 #include <emucorev/paf/busy_indicator.h>
 #include <emucorev/paf/charging_indicator.h>
+#include <emucorev/paf/page_turn_renderer.h>
+#include <emucorev/paf/page_turn_shaders.h>
 #include <android/choreographer.h>
 #include <fstream>
 #include <android/input.h>
@@ -33,8 +35,18 @@ struct HostImage {
 };
 std::unordered_map<std::uint32_t, HostImage> host_images;
 std::uint64_t image_revision = 0;
-std::atomic<bool> busy_scene{false};
+std::atomic<int> preview_scene{0}; // 0 bubble, 1 busy indicator, 2 lock screen
 std::string resource_root;
+template<class T> std::vector<T> read_path(const std::string& relative, std::size_t count) {
+    std::string path; { const std::lock_guard lock(status_mutex); path = resource_root + "/" + relative; }
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file || file.tellg() != static_cast<std::streamoff>(count * sizeof(T)))
+        throw std::runtime_error("Missing or invalid local preview asset: " + path);
+    std::vector<T> values(count); file.seekg(0);
+    file.read(reinterpret_cast<char*>(values.data()), count * sizeof(T));
+    if (!file) throw std::runtime_error("Incomplete preview asset: " + path);
+    return values;
+}
 template<class T> std::vector<T> read(const char* filename, std::size_t count) {
     std::string path;
     {
@@ -58,6 +70,14 @@ struct Window {
     GLuint target = 0, color = 0;
     std::unique_ptr<emucorev::paf::BubbleRenderer> bubble;
     std::unique_ptr<emucorev::paf::SpriteRenderer> sprites;
+    std::unique_ptr<emucorev::paf::PageTurnRenderer> lock;
+    GLuint lock_page = 0, lock_corner = 0, lock_exp = 0;
+    emucorev::paf::PageTurnMesh lock_mesh;
+    std::array<float, 112> lock_top_material{};
+    std::array<float, 48> lock_bottom_material{};
+    std::array<float, 16> lock_host_mvp{};
+    bool lock_host_transform = false;
+    bool lock_ready = false;
     std::unordered_map<std::uint32_t, std::uint64_t> uploaded_images;
     std::uint64_t uploaded_revision = 0;
     std::array<float, 96> vertex{};
@@ -101,7 +121,7 @@ struct Window {
         eglSwapInterval(display, 1);
 
         // The isolated busy scene needs no bubble geometry/material resources.
-        if (!busy_scene.load()) {
+        if (preview_scene.load() == 0) {
             const auto vertices = read<emucorev::paf::BubbleVertex>("stream-0.bin", 608);
             const auto indices = read<std::uint16_t>("indices.bin", 1220);
             const auto transform = read<float>("vertex-ubo-0.bin", 96);
@@ -123,6 +143,44 @@ struct Window {
                 emucorev::paf::BubbleImage{64, 64, environment});
         }
         sprites = std::make_unique<emucorev::paf::SpriteRenderer>();
+        if (preview_scene.load() == 2) {
+            lock = std::make_unique<emucorev::paf::PageTurnRenderer>(
+                emucorev::paf::PageSurfaceShaders{emucorev::paf::page_turn_bottom_vertex_shader(),
+                    emucorev::paf::page_turn_bottom_fragment_shader()},
+                emucorev::paf::PageSurfaceShaders{emucorev::paf::page_turn_top_vertex_shader(),
+                    emucorev::paf::page_turn_top_fragment_shader()},
+                emucorev::paf::PageSurfaceShaders{emucorev::paf::page_turn_quad_vertex_shader(),
+                    emucorev::paf::page_turn_shadow_fragment_shader()});
+            const auto material = read_path<float>("preview/lock/rest-material.bin", 160);
+            std::copy_n(material.begin(), 112, lock_top_material.begin());
+            std::copy_n(material.begin() + 112, 48, lock_bottom_material.begin());
+            const std::array<float, 8> bottom_uv_squeeze{1, 1, 0, 0, 1, 1, 1, 1};
+            std::copy_n(bottom_uv_squeeze.begin(), 8, lock_bottom_material.begin() + 20);
+            // Rest-state engine transforms for direct 960x544 submission:
+            // UVTransform (scale, offset) and SqueezeZ (xy scale, height/w scale).
+            const std::array<float, 8> uv_squeeze{1, 1, 0, 0, 1, 1, 1, 1};
+            std::copy_n(uv_squeeze.begin(), 8, lock_top_material.begin() + 48);
+            const auto aspect = emucorev::paf::page_turn_normalized_aspect({960, 544});
+            const auto shape = emucorev::paf::page_turn_fold_shape({1.7447f, .99f}, aspect);
+            emucorev::paf::page_turn_mesh(shape, lock_mesh);
+            lock->upload_mesh(lock_mesh);
+            // Host presentation transform: fit the recovered page mesh to the
+            // 960x544 target without using the shell's engine-side screen matrices.
+            // Fit the physical page rectangle (shape corners, not the folded
+            // curl) to the 95% safe area of the 960x544 target.
+            float min_x = shape.corners[0].x, max_x = shape.corners[0].x;
+            float min_y = shape.corners[0].y, max_y = shape.corners[0].y;
+            for (const auto& corner : shape.corners) {
+                min_x = std::min(min_x, corner.x); max_x = std::max(max_x, corner.x);
+                min_y = std::min(min_y, corner.y); max_y = std::max(max_y, corner.y);
+            }
+            const float center_x = (min_x + max_x) * .5f, center_y = (min_y + max_y) * .5f;
+            const float scale_x = (max_x - min_x) > 0 ? .97f * 2.f / (max_x - min_x) : 1.f;
+            const float scale_y = (max_y - min_y) > 0 ? .97f * 2.f / (max_y - min_y) : 1.f;
+            const std::array<float, 16> host_mvp{scale_x,0,0,0, 0,scale_y,0,0, 0,0,1,0,
+                -center_x * scale_x, -center_y * scale_y, 0, 1};
+            lock_host_mvp = host_mvp;
+        }
 
         // Fixed 1x rasterization, independently of the physical display size.
         glGenTextures(1, &color);
@@ -199,17 +257,68 @@ struct Window {
             sprites->draw(0xca76be07, left, 4, 19, 24);
     }
 
+    void ensure_lock_textures() {
+        const std::lock_guard lock_guard(status_mutex);
+        auto make = [&](std::uint32_t id, GLuint& texture) {
+            if (texture) return; const auto image = host_images.find(id);
+            if (image == host_images.end()) return;
+            glGenTextures(1, &texture); glBindTexture(GL_TEXTURE_2D, texture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image->second.width, image->second.height, 0,
+                GL_RGBA, GL_UNSIGNED_BYTE, image->second.rgba.data());
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        };
+        make(100, lock_page); make(101, lock_corner); make(102, lock_exp);
+        lock_ready = lock_page && lock_corner && lock_exp;
+    }
+
+    void draw_lock() {
+        ensure_lock_textures();
+        static int reported = 0;
+        if (reported < 5) {
+            const std::lock_guard lock_guard(status_mutex);
+            __android_log_print(ANDROID_LOG_WARN, "NativeUiPreview",
+                "lock ready=%d page=%u corner=%u exp=%u verts=%u images=%zu lock=%d", lock_ready,
+                lock_page, lock_corner, lock_exp, lock_mesh.vertex_count, host_images.size(),
+                lock ? 1 : 0);
+            ++reported;
+        }
+        if (!lock || !lock_ready || !lock_mesh.vertex_count) return;
+        emucorev::paf::PageSurfaceDraw material{};
+        material.vertex_parameters = lock_top_material;
+        std::copy(lock_host_mvp.begin(), lock_host_mvp.end(), lock_top_material.begin());
+        std::copy(lock_host_mvp.begin(), lock_host_mvp.end(), lock_bottom_material.begin());
+        std::array<float, 8> host_uv_squeeze{-1, 1, 1, 0, 1, 1, 1, 1};
+        std::copy(host_uv_squeeze.begin(), host_uv_squeeze.end(), lock_top_material.begin() + 48);
+        std::copy(host_uv_squeeze.begin(), host_uv_squeeze.end(), lock_bottom_material.begin() + 20);
+        // Rest-state page shading: flat page is fully visible; exponential
+        // lookup range comes from the prepared original table (5 / reciprocal .2).
+        const std::array<float, 4> shadow_one{1, 1, 1, 1};
+        std::copy(shadow_one.begin(), shadow_one.end(), lock_bottom_material.begin() + 16);
+        lock_bottom_material[28] = 5.f;
+        lock_bottom_material[29] = .2f;
+        material.viewport = {1,1,1,1, 1, 960, 544, 0, 1, 0, 0, 0};
+        material.fragment_state = {0,0,1,0, 1,0,0, 1.f/960, 1.f/544, 0, 16, 0};
+        material.textures = {lock_page, 0, 0, 0, lock_exp};
+        material.blend = false;
+        material.vertex_parameters = lock_bottom_material;
+        lock->draw(emucorev::paf::PageSurface::front, material);
+        // folded surface temporarily disabled while isolating the front page
+    }
+
     void draw(const emucorev::paf::BusySnapshot* busy, std::uint32_t charging_texture) {
         EGLint width, height;
         if (!eglQuerySurface(display, surface, EGL_WIDTH, &width)
             || !eglQuerySurface(display, surface, EGL_HEIGHT, &height) || width <= 0 || height <= 0) return;
         glBindFramebuffer(GL_FRAMEBUFFER, target);
         glViewport(0, 0, 960, 544);
-        if (busy) glClearColor(0, 0, 0, 1);
-        else glClearColor(12.f / 255, 40.f / 255, 150.f / 255, 1);
+        glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT);
         upload_images();
-        if (busy) {
+        if (preview_scene.load() == 2) { draw_lock(); }
+        else if (busy) {
             sprites->begin(960, 544);
             if (busy->state != emucorev::paf::BusyState::idle)
                 for (const auto& dot : busy->dots)
@@ -246,12 +355,12 @@ struct Preview {
     int64_t last_draw = 0, next_draw = 0;
 
     Preview() { busy.start(); }
-    void render() { window->draw(busy_scene.load() ? &busy.snapshot() : nullptr, charging.texture()); }
+    void render() { window->draw(preview_scene.load() == 1 ? &busy.snapshot() : nullptr, charging.texture()); }
 
     bool active() const { return window && resumed && focused; }
     void schedule() {
         if (!active() || callback_pending) return;
-        if (busy_scene.load() && busy.snapshot().state == emucorev::paf::BusyState::idle) return;
+        if (preview_scene.load() == 1 && busy.snapshot().state == emucorev::paf::BusyState::idle) return;
         if (!choreographer) choreographer = AChoreographer_getInstance();
         if (!choreographer) throw std::runtime_error("No native frame scheduler");
         callback_pending = true;
@@ -264,14 +373,14 @@ struct Preview {
                 // Do not skip a 60 Hz frame merely because it is a few ns
                 // earlier than the accumulated 16,666,667 ns deadline.
                 if (time + 500000 >= preview.next_draw) {
-                    if (!busy_scene.load()) {
+                    if (preview_scene.load() == 0) {
                         const std::lock_guard lock(status_mutex);
                         preview.charging.advance(device_status.charging, device_status.battery_percent);
                     }
                     const float elapsed = preview.last_draw ? float(time - preview.last_draw) * 1e-9f : 0;
                     if (elapsed > 0 && elapsed <= 1) {
-                        if (busy_scene.load()) preview.busy.tick(elapsed);
-                        else {
+                        if (preview_scene.load() == 1) preview.busy.tick(elapsed);
+                        else if (preview_scene.load() == 0) {
                             preview.phase = emucorev::paf::advance_bubble_phase(preview.phase, elapsed, 1);
                             preview.window->set_phase(preview.phase);
                         }
@@ -334,8 +443,8 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeResourceRoot(JNIEnv
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewScene(JNIEnv*, jobject, jboolean busy) {
-    busy_scene.store(busy);
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewScene(JNIEnv*, jobject, jint scene) {
+    preview_scene.store(scene);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -388,7 +497,7 @@ void android_main(android_app* app) {
     };
     app->onInputEvent = [](android_app* state, AInputEvent* event) -> int32_t {
         auto& preview = *static_cast<Preview*>(state->userData);
-        if (!busy_scene.load() || !preview.active()) return 0;
+        if (preview_scene.load() != 1 || !preview.active()) return 0;
         const bool tap = AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION
             && (AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK) == AMOTION_EVENT_ACTION_UP;
         const bool confirm = AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY

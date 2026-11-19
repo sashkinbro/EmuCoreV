@@ -13,9 +13,9 @@ import com.sbro.emucorev.nativeui.BundledResources
 class PreviewActivity : NativeActivity() {
     private lateinit var deviceStatus: DeviceStatusSource
     private lateinit var images: BundledImages
-    private var busyPreview = false
+    private var previewScene = 0
     private external fun nativeImage(id: Int, width: Int, height: Int, rgba: ByteArray)
-    private external fun nativePreviewScene(busy: Boolean)
+    private external fun nativePreviewScene(scene: Int)
     private external fun nativeResourceRoot(path: String)
 
     private external fun nativeStatus(
@@ -27,8 +27,8 @@ class PreviewActivity : NativeActivity() {
     override fun onCreate(state: Bundle?) {
         val resources = BundledResources.prepare(this)
         nativeResourceRoot(resources.absolutePath)
-        busyPreview = intent.getStringExtra("scene") == "busy"
-        nativePreviewScene(busyPreview)
+        previewScene = when (intent.getStringExtra("scene")) { "busy" -> 1; "lock" -> 2; else -> 0 }
+        nativePreviewScene(previewScene)
         super.onCreate(state)
         window.attributes = window.attributes.apply {
             layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER
@@ -39,12 +39,12 @@ class PreviewActivity : NativeActivity() {
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         deviceStatus = DeviceStatusSource(this)
         images = BundledImages(resources, ::nativeImage)
-        if (busyPreview) images.loadBusyImage() else images.loadShellImages()
+        when (previewScene) { 1 -> images.loadBusyImage(); 2 -> images.loadLockImages(); else -> images.loadShellImages() }
     }
 
     override fun onResume() {
         super.onResume()
-        if (busyPreview) return
+        if (previewScene != 0) return
         deviceStatus.start { status ->
             images.updateClock(status)
             nativeStatus(status.batteryPercent, status.charging, status.powerSource,

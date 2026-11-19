@@ -41,6 +41,18 @@ class BundledImages(
         upload(0, 1, 1, byteArrayOf(-1, -1, -1, -1))
     }
 
+    fun loadLockImages() {
+        // Lock wallpaper, original corner texture and the exponential lookup.
+        listOf(KEYLOCK_IMAGE to "effects/keylock.png",
+            CORNER_IMAGE to "effects/page_turn/textures/page_corner/mip-0.png",
+            EXP_MINUS_IMAGE to "effects/lookups/exp-minus.png").forEach { (id, path) ->
+            val bitmap = File(resources, path).inputStream().use {
+                requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled lock image: $path" }
+            }
+            try { send(id, bitmap) } finally { bitmap.recycle() }
+        }
+    }
+
     fun loadBusyImage() {
         val busy = File(resources, "images/paf-common-resource/ba195a37.png").inputStream().use {
             requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled busy image" }
@@ -81,5 +93,10 @@ class BundledImages(
         upload(id, bitmap.width, bitmap.height, rgba)
     }
 
-    companion object { const val CLOCK_IMAGE = 1 }
+    companion object {
+        const val CLOCK_IMAGE = 1
+        const val KEYLOCK_IMAGE = 100
+        const val CORNER_IMAGE = 101
+        const val EXP_MINUS_IMAGE = 102
+    }
 }
