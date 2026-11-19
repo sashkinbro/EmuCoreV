@@ -64,6 +64,17 @@ finishing the NativeActivity; modern Android back callbacks and the legacy key
 path queue the request for the native thread. The Android XML parser path was
 also exercised on-device after removing unsupported desktop parser flags.
 
+The wave reconstruction now includes the native `wave_pos.vp/fp` position pass
+and the standard `effects_default_0512_01` sky parameter snapshot. Preset floats
+are reconstructed from ARM/VFP writes before registration at `0x810b0fba`;
+they are not sampled from a theme chooser thumbnail. The position pass consumes
+a caller-owned height texture, four source vertices and explicit register blocks.
+Both embedded GLES shaders compile on Lenovo's Adreno 750; the module builds,
+but active simulation inputs, linked drawing and full background equivalence are
+not established. This stage is not yet connected to Home. The recovered source
+chain is `draw_pos` (`0x810a1a80`) through helper `0x810a25ba`, followed by
+lighting texture `0x810a26d0` and color `0x810a451e`, called from `0x810a6688`.
+
 The application supplies library snapshots, changes to installed games, real
 trophy data, localized text for every supported application language, preferences
 and resource access. The standalone UI emits user intentions such as launching a

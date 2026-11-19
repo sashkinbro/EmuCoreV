@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 project(EmuCoreVNativeUi LANGUAGES CXX)
 
 # Standalone reconstruction: no guest CPU, emulator, SDL or game dependencies.
-add_library(emucorev_paf STATIC paf/src/resource_document.cpp paf/src/animation_curve.cpp paf/src/animation_timer.cpp paf/src/gim_image.cpp paf/src/bubble_shaders.cpp paf/src/bubble_motion.cpp paf/src/busy_indicator.cpp paf/src/page_turn.cpp paf/src/page_turn_material.cpp paf/src/page_turn_shaders.cpp)
+add_library(emucorev_paf STATIC paf/src/resource_document.cpp paf/src/animation_curve.cpp paf/src/animation_timer.cpp paf/src/gim_image.cpp paf/src/bubble_shaders.cpp paf/src/bubble_motion.cpp paf/src/busy_indicator.cpp paf/src/page_turn.cpp paf/src/page_turn_material.cpp paf/src/page_turn_shaders.cpp paf/src/wave_preset.cpp)
 target_include_directories(emucorev_paf PUBLIC paf/include)
 target_compile_features(emucorev_paf PUBLIC cxx_std_20)
 if(ANDROID)
@@ -18,7 +18,7 @@ else()
 endif()
 
 if(ANDROID)
-    add_library(emucorev_paf_gles STATIC paf/src/bubble_renderer.cpp paf/src/sprite_renderer.cpp paf/src/page_turn_renderer.cpp)
+    add_library(emucorev_paf_gles STATIC paf/src/bubble_renderer.cpp paf/src/sprite_renderer.cpp paf/src/page_turn_renderer.cpp paf/src/wave_position_renderer.cpp)
     target_include_directories(emucorev_paf_gles PUBLIC paf/include)
     target_compile_features(emucorev_paf_gles PUBLIC cxx_std_20)
     target_compile_options(emucorev_paf_gles PRIVATE -Wall -Wextra -Werror)
