@@ -214,4 +214,27 @@ void page_turn_mesh(const PageFoldShape& shape, PageTurnMesh& output) {
         append_band(a, reverse, b, normal, true);
     }
 }
+PageTurnShapeMaterial page_turn_shape_material(PagePoint point, const PageFoldShape& shape,
+    const PageTurnShapeStyle& style) {
+    check_size(shape.aspect);
+    if (!std::isfinite(point.x) || !std::isfinite(point.y)
+        || !std::isfinite(style.top_scale) || !std::isfinite(style.top_curl)
+        || !std::isfinite(style.bottom_scale) || !std::isfinite(style.normal_scale_z))
+        throw std::invalid_argument("Invalid page material input");
+    // Original renderer clamps only the upper endpoint before the square.
+    const float progress = std::min((point.x / shape.aspect.x + point.y) * .5f, 1.f);
+    const float square = progress * progress;
+    const float fresnel = 1.f - (1.f - square) * .35f;
+    const float fade = std::min((1.f - progress) / .050000012f, 1.f);
+    return {{shape.minimum.distance, shape.maximum.distance, shape.far_corner.x, shape.far_corner.y},
+        point, {style.bottom_scale, fade * style.top_curl, fade * style.top_scale, 0},
+        {shape.center.x, shape.center.y, shape.normal.x, shape.normal.y},
+        {shape.aspect.x, shape.aspect.y, reciprocal(shape.aspect.x), reciprocal(shape.aspect.y)},
+        style.normal_scale_z, fresnel};
+}
+PagePoint page_turn_normalized_aspect(PagePoint size) {
+    check_size(size);
+    const float inverse_height = reciprocal(size.y);
+    return {size.x * inverse_height, size.y * inverse_height};
+}
 }

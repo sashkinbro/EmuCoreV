@@ -39,6 +39,8 @@ target_link_libraries(paf_export_sounds PRIVATE emucorev_paf)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(paf_page_material_test tests/page_turn_material_test.cpp)
+    target_link_libraries(paf_page_material_test PRIVATE emucorev_paf)
     add_executable(paf_page_turn_test tests/page_turn_test.cpp)
     target_link_libraries(paf_page_turn_test PRIVATE emucorev_paf)
     add_executable(paf_busy_test tests/busy_indicator_test.cpp)

@@ -788,6 +788,39 @@ paf_page_shader_test --copy-fragment LOCAL_ORIGINAL_COPY_FRAGMENT.frag
 paf_page_shader_test --bottom-vertex LOCAL_ORIGINAL_BOTTOM_VERTEX.vert --lookup-r8 LOCAL_EXP_MINUS.r8
 ```
 
+### Native shape-material assembly
+
+`page_turn_shape_material()` now assembles the common `Deepest`, `Grep`,
+`Params`, `FoldPlane`, `Aspect` and normal-scale uniforms from the native fold
+shape and style. `Deepest` contains the signed distance extrema and far corner;
+`Grep` retains the input fold point. The builder preserves the original small-fold
+curl fade and progress-dependent Fresnel multiplier, including negative progress
+and the original upper-only clamp. Default shape style values retain the original
+constructor's float bit patterns.
+
+`page_turn_normalized_aspect()` retains the original reciprocal-estimate,
+refinement and multiplication sequence. Both dimensions are multiplied by the
+inverse height: the resulting Y is not forcibly replaced with `1.0`. The original
+1234x567 case produces `0.9999998807907104`; preserving this matters to the plane
+and material parameters.
+
+The offline corpus executes the original renderer's parameter-assembly entry,
+retaining fold-plane, quaternion/matrix, lighting and material-adaptation math.
+Graphics/surface submission, uniform setters and mesh submission are hosted;
+mesh arithmetic is checked separately. Captured setter arguments are compared
+to the native builder for **80 records / 1,680 words, bit-exact on Lenovo and
+RG556**. Four page sizes, two controlled styles and ten fold points cover near
+rest, saturation, negative progress and out-of-page inputs. The comparison also
+checks the resulting two Fresnel coefficients after the multiplier is applied.
+This proves the shared shape-material block, not complete lighting/matrix/texture
+assembly, actual shell configuration or rendered-frame parity. The preview
+lock-screen integration remains pending.
+
+```text
+python native-ui/tests/generate_page_material_reference.py OWNED_DECRYPTED_PAF LOCAL_MATERIAL_CORPUS.bin
+paf_page_material_test LOCAL_MATERIAL_CORPUS.bin
+```
+
 ### Recovered busy indicator
 
 `BusyIndicator` reconstructs the PAF component's head and eight retained trail

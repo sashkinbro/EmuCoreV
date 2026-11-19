@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <bit>
 #include <cstdint>
 
 namespace emucorev::paf {
@@ -28,6 +29,19 @@ struct PageFoldShape {
     PagePoint aspect;
 };
 struct PageTurnFan { std::uint32_t first, count; };
+struct PageTurnShapeStyle {
+    float top_scale = std::bit_cast<float>(0x3e6de871u);
+    float top_curl = std::bit_cast<float>(0x3f1b6da8u);
+    float bottom_scale = std::bit_cast<float>(0x3c1246bfu);
+    float normal_scale_z = std::bit_cast<float>(0x40536db5u);
+};
+struct PageTurnShapeMaterial {
+    std::array<float, 4> deepest;
+    PagePoint grep;
+    std::array<float, 4> params, fold_plane, aspect;
+    float normal_scale_z;
+    float fresnel_multiplier;
+};
 struct PageTurnMesh {
     // Reused caller-owned storage. Only the counted prefixes are initialized.
     std::array<PagePoint, 1024> vertices;
@@ -51,5 +65,11 @@ PageTurnRelease page_turn_release(PagePoint displacement, float threshold,
     bool allow_outward, bool gamepad);
 // Geometry consumed by the original fold renderer, in height-normalized units.
 PageFoldShape page_turn_fold_shape(PagePoint deepest, PagePoint aspect);
+PagePoint page_turn_normalized_aspect(PagePoint size);
 void page_turn_mesh(const PageFoldShape& shape, PageTurnMesh& output);
+// Uniform values shared by flat/rounded passes. Shape and point must describe
+// the same fold, normalized by physical page height with the original
+// reciprocal/multiply rounding (aspect.y can differ from 1 by one float step).
+PageTurnShapeMaterial page_turn_shape_material(PagePoint point, const PageFoldShape& shape,
+    const PageTurnShapeStyle& style = {});
 }
