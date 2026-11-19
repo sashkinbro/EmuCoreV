@@ -16,8 +16,16 @@ import struct
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parents[1]
-FIXTURE = {"width": 960.0, "height": 544.0, "point": (960.0 / 544.0 - 0.02, 0.99),
-    "style": (0.21137017, 0.60689974, 0.008927729, 3.1533337)}
+FIXTURES = [
+    # width, height, fold point, style, folded
+    (960.0, 544.0, (960.0 / 544.0 - 0.02, 0.99),
+        (0.21137017, 0.60689974, 0.008927729, 3.1533337), False),
+    (896.0, 448.0, (1.9, 0.9), (0.18, 0.95, 0.012, 4.0), False),
+    (840.0, 512.0, (1.5, 0.8), (0.18, 0.95, 0.012, 4.0), False),
+    (960.0, 544.0, (960.0 / 544.0 - 0.02, 0.99),
+        (0.21137017, 0.60689974, 0.008927729, 3.1533337), True),
+    (896.0, 448.0, (1.9, 0.9), (0.18, 0.95, 0.012, 4.0), True),
+]
 
 
 def load_module(name, path):
@@ -51,15 +59,14 @@ def check(actual, offset, expected, label):
             label, got, expected))
 
 
-def verify(image, fold, material_object):
+def verify(image, width, height, point, style, fold):
+    tracer.WIDTH, tracer.HEIGHT = width, height
+    tracer.POINT, tracer.STYLE = point, style
     events = tracer.trace(image, fold)
-    blocks = slots(events, material_object)
-    shape = words_to_floats(oracle.record(image, FIXTURE["width"], FIXTURE["height"],
-        FIXTURE["point"], FIXTURE["style"], matrices=False))
-    matrices = words_to_floats(oracle.record(image, FIXTURE["width"], FIXTURE["height"],
-        FIXTURE["point"], FIXTURE["style"], matrices=True))
-    lights = words_to_floats(oracle.record(image, FIXTURE["width"], FIXTURE["height"],
-        FIXTURE["point"], FIXTURE["style"], lights=True))
+    blocks = slots(events, "0x14" if fold else "0xc9c")
+    shape = words_to_floats(oracle.record(image, width, height, point, style, matrices=False))
+    matrices = words_to_floats(oracle.record(image, width, height, point, style, matrices=True))
+    lights = words_to_floats(oracle.record(image, width, height, point, style, lights=True))
     # Recovered top-vertex setter order: MVP, ModelMatrix, Grep, FoldPlane,
     # Params, Deepest, Aspect, NormalScaleZ, ..., MaterialPack, PointLightPack2,
     # PointLightPack1. Matrix corpus is model+mvp; light corpus is position+color.
@@ -74,8 +81,8 @@ def verify(image, fold, material_object):
     check(blocks["0xb"], 9, shape[19:21], "slot MaterialPack fresnel pair")
     check(blocks["0xc"], 0, lights[16:32], "slot PointLightPack2")
     check(blocks["0xd"], 0, lights[0:16], "slot PointLightPack1")
-    print("PASS %s material setter-slot mapping: %d slots against verified oracles"
-        % ("folded" if fold else "flat", len(blocks)))
+    print("PASS %s %.0fx%.0f material setter-slot mapping: %d slots against verified oracles"
+        % ("folded" if fold else "flat", width, height, len(blocks)))
 
 
 def main():
@@ -83,8 +90,8 @@ def main():
     parser.add_argument("reference", type=Path)
     args = parser.parse_args()
     image = args.reference.read_bytes()
-    verify(image, False, "0xc9c")
-    verify(image, True, "0x14")
+    for width, height, point, style, fold in FIXTURES:
+        verify(image, width, height, point, style, fold)
 
 
 if __name__ == "__main__":
