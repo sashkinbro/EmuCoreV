@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 project(EmuCoreVNativeUi LANGUAGES CXX)
 
 # Standalone reconstruction: no guest CPU, emulator, SDL or game dependencies.
-add_library(emucorev_paf STATIC paf/src/resource_document.cpp paf/src/animation_curve.cpp paf/src/animation_timer.cpp paf/src/gim_image.cpp paf/src/bubble_shaders.cpp paf/src/bubble_motion.cpp paf/src/busy_indicator.cpp)
+add_library(emucorev_paf STATIC paf/src/resource_document.cpp paf/src/animation_curve.cpp paf/src/animation_timer.cpp paf/src/gim_image.cpp paf/src/bubble_shaders.cpp paf/src/bubble_motion.cpp paf/src/busy_indicator.cpp paf/src/page_turn.cpp)
 target_include_directories(emucorev_paf PUBLIC paf/include)
 target_compile_features(emucorev_paf PUBLIC cxx_std_20)
 if(ANDROID)
@@ -39,6 +39,8 @@ target_link_libraries(paf_export_sounds PRIVATE emucorev_paf)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(paf_page_turn_test tests/page_turn_test.cpp)
+    target_link_libraries(paf_page_turn_test PRIVATE emucorev_paf)
     add_executable(paf_busy_test tests/busy_indicator_test.cpp)
     target_link_libraries(paf_busy_test PRIVATE emucorev_paf)
     add_executable(paf_bubble_motion_test tests/bubble_motion_test.cpp)

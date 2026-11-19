@@ -542,6 +542,34 @@ or test interpreter are linked into the UI.
 
 ## Build and validation
 
+### Recovered PageTurn controls
+
+`page_turn.h` provides the original centered/Y-up fold layout, corner hit region,
+drag target, normalized draw controls/back-opacity mask, and pointer/gamepad
+release decisions. Fold fraction and aspect remain caller settings: no shell
+screen dimensions or guessed lock-screen settings are baked into the component.
+The drag calculation retains its original order and 0.7 overshoot factor.
+Hit testing includes the excluded diagonal at the corner as well as the two
+rectangle boundaries. Pointer and gamepad outward-release thresholds differ.
+
+The offline oracle executes the reviewed original PageTurn functions, retaining
+their math and branch decisions while supplying local pointer coordinates and
+suppressing widget notifications, capture and drawing. All **416 records / 6,240
+result words match bit for bit** on Lenovo and RG556. The corpus covers four
+page sizes, three fold configurations, hit-region boundaries, opacity, release
+thresholds, outward-release options and additional deterministic input samples.
+It does not prove Android input mapping, gesture capture/lifecycle, rendering,
+the shell's lock-screen configuration or spring/settling animation parity.
+
+```text
+python native-ui/tests/generate_page_turn_reference.py OWNED_DECRYPTED_PAF LOCAL_PAGE_TURN_CORPUS.bin
+paf_page_turn_test LOCAL_PAGE_TURN_CORPUS.bin
+```
+
+The folded top/bottom surfaces, round edges, shadow passes, original mesh and
+lighting parameters still need their native renderer and original-frame
+comparison. These controls are not presented as a completed unlock screen.
+
 ### Recovered busy indicator
 
 `BusyIndicator` reconstructs the PAF component's head and eight retained trail
