@@ -34,6 +34,8 @@ add_executable(paf_gim_decode tools/gim_decode.cpp)
 target_link_libraries(paf_gim_decode PRIVATE emucorev_paf)
 add_executable(paf_export_images tools/export_images.cpp)
 target_link_libraries(paf_export_images PRIVATE emucorev_paf)
+add_executable(paf_export_sounds tools/export_sounds.cpp)
+target_link_libraries(paf_export_sounds PRIVATE emucorev_paf)
 
 include(CTest)
 if(BUILD_TESTING)
