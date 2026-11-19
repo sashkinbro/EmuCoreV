@@ -13,6 +13,8 @@ object NativeLibraryMode {
     const val TITLE_ID = "__VITA_NATIVE_LIBRARY__"
     const val RETURN_TO_NATIVE_LIBRARY = "return_to_native_library"
     const val EXIT_NATIVE_LIBRARY = "exit_native_library"
+    // Presentation parity is still incomplete (trophies guest, layouts, settings);
+    // the emulated reference mode stays behind the debug gate until that is done.
     val available: Boolean get() = BuildConfig.DEBUG
 
     fun needsCatalogBootstrap(context: Context): Boolean {

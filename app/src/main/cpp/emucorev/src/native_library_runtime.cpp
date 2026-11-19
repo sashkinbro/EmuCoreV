@@ -87,7 +87,7 @@ int native_library_app_status(int app_id, void *output) {
     status[14] = host_game_running;
     status[15] = host_game_running;
     status[17] = 0xffffffffu; // no parent application
-    reinterpret_cast<uint8_t *>(status.data())[0x71] = 1; // game
+    reinterpret_cast<uint8_t *>(status.data())[0x71] = launched_title == "NPXS10008" ? 2 : 1;
     std::memcpy(output, status.data(), sizeof(status));
     return 0;
 }
@@ -99,7 +99,7 @@ int native_library_app_path(int app_id, char *path) {
     const std::lock_guard lock(shell_events_mutex);
     if (!path) return static_cast<int>(0x80802016u);
     if (app_id != 1 || launched_title.empty()) return static_cast<int>(0x80802012u);
-    const auto value = "ux0:app/" + launched_title;
+    const auto value = std::string(launched_title == "NPXS10008" ? "vs0:app/" : "ux0:app/") + launched_title;
     std::memcpy(path, value.c_str(), value.size() + 1);
     return 0;
 }
@@ -217,7 +217,7 @@ int dispatch_native_library_game_launch(EmuEnvState &emuenv, const char *path) {
     constexpr int not_found = static_cast<int>(0x80802012u);
     if (!path || !emuenv.renderer) return not_found;
     const std::string_view requested(path);
-    constexpr std::string_view prefix = "ux0:app/";
+    const std::string_view prefix = requested == "vs0:app/NPXS10008/eboot.bin" ? "vs0:app/" : "ux0:app/";
     constexpr std::string_view suffix = "/eboot.bin";
     if (!requested.starts_with(prefix) || !requested.ends_with(suffix) || requested.size() <= prefix.size() + suffix.size())
         return not_found;
@@ -347,9 +347,40 @@ bool prepare_native_library(EmuEnvState &emuenv) {
     return fs::is_regular_file(sandbox / "vs0/vsh/shell/shell.self");
 }
 
+bool prepare_native_trophies(EmuEnvState &emuenv) {
+#ifndef NDEBUG
+    logging::set_level(spdlog::level::warn);
+#endif
+    app::set_current_config(emuenv, "");
+    auto &config = emuenv.cfg.current_config;
+    config.modules_mode = ModulesMode::AUTO_MANUAL;
+    for (const auto *module : {"libpaf", "libnet", "sqlite", "bXCe", "ini_file_processor", "common_gui_dialog", "dbutil", "activity_db", "np_utility", "np_common", "np_activity", "np_trophy"})
+        config.lle_modules.emplace_back(module);
+    config.resolution_multiplier = 2.0f;
+    config.high_accuracy = true;
+    config.export_textures = config.import_textures = false;
+    emuenv.cfg.archive_log = false;
+    emuenv.io.app_path = "__VITA_NATIVE_TROPHIES__";
+    emuenv.io.title_id = "NPXS10008";
+    emuenv.io.content_id.clear();
+    emuenv.io.addcont.clear();
+    emuenv.io.savedata.clear();
+    emuenv.kernel.is_system_process = true;
+    emuenv.current_app_title = "Trophies";
+    fs::create_directories(emuenv.vita_fs_path / "ur0/user" / emuenv.io.user_id / "trophy/db");
+    {
+        const std::lock_guard lock(shell_events_mutex);
+        launched_title = "NPXS10008";
+        host_game_running = true;
+    }
+    emuenv.app_info = {};
+    app::reset_perf_metrics(emuenv);
+    return fs::is_regular_file(emuenv.vita_fs_path / "vs0/app/NPXS10008/eboot.bin");
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorev_core_vita_Emulator_prepareNativeLibraryRuntime(JNIEnv *env, jobject, jstring sandbox, jint refresh_hz) {
-    shell_refresh_hz = refresh_hz >= 120 ? 120 : 60;
+    shell_refresh_hz = refresh_hz >= 120 ? 120 : (refresh_hz >= 90 ? 90 : 60);
     return configure_native_library(read_string(env, sandbox)) ? JNI_TRUE : JNI_FALSE;
 }
 

@@ -380,7 +380,9 @@ EXPORT(int, sceAppMgrGetStatusById, int app_id, void *status) {
 
 EXPORT(int, sceAppMgrGetStatusByName, const char *name, void *status) {
     TRACY_FUNC(sceAppMgrGetStatusByName);
-    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__") {
+    if (emuenv.io.app_path == "__VITA_NATIVE_TROPHIES__" && !name)
+        return native_library_app_status(1, status);
+    if (emuenv.io.app_path == "__VITA_NATIVE_LIBRARY__" || emuenv.io.app_path == "__VITA_NATIVE_TROPHIES__") {
         int process_id = 0;
         const auto result = native_library_app_id(name, &process_id);
         return result < 0 ? result : native_library_app_status(process_id, status);

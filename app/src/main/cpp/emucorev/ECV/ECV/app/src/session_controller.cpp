@@ -63,6 +63,9 @@ bool AppSessionController::begin_launch(const AppLaunchRequest &launch_request, 
     if (is_native_library(launch_request)) {
         if (!prepare_native_library(emuenv))
             return false;
+    } else if (is_native_trophies(launch_request)) {
+        if (!prepare_native_trophies(emuenv))
+            return false;
     } else
     if (!setup_game_launch(emuenv, launch_request.app_path, update_last_time_used))
         return false;
@@ -94,10 +97,11 @@ bool AppSessionController::initialize_renderer(renderer::FrameHost &frame) {
     apply_renderer_config(emuenv);
     if (is_native_library(active_launch_request))
         emuenv.renderer->frame_limit.store(emuenv.display.refresh_hz / 2, std::memory_order_relaxed);
-    if (is_native_library(active_launch_request))
+    if (is_native_library(active_launch_request) || is_native_trophies(active_launch_request))
         // PAF can render from module_start, before load_and_run sets game
         // metadata. Establish the isolated shell renderer profile beforehand.
-        emuenv.renderer->set_app("SceShell", "shell.self");
+        emuenv.renderer->set_app(is_native_library(active_launch_request) ? "SceShell" : "NPXS10008",
+            is_native_library(active_launch_request) ? "shell.self" : "eboot.bin");
     renderer_initialized = true;
     return true;
 }

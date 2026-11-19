@@ -855,12 +855,15 @@ static ExitCode load_app_impl(SceUID &main_module_id, EmuEnvState &emuenv, const
     LOG_INFO("Category: {}", emuenv.app_info.app_category);
 
     init_device_paths(emuenv.io);
-    if (!is_native_library(launch_request))
+    if (!is_native_library(launch_request) && !is_native_trophies(launch_request))
         init_savedata_app_path(emuenv.io, emuenv.vita_fs_path);
 
     // Load param.sfo
     vfs::FileBuffer param_sfo;
-    if (vfs::read_app_file(param_sfo, emuenv.vita_fs_path, emuenv.io.app_path, "sce_sys/param.sfo"))
+    const bool has_param = is_native_trophies(launch_request)
+        ? vfs::read_file(VitaIoDevice::vs0, param_sfo, emuenv.vita_fs_path, "app/NPXS10008/sce_sys/param.sfo")
+        : vfs::read_app_file(param_sfo, emuenv.vita_fs_path, emuenv.io.app_path, "sce_sys/param.sfo");
+    if (has_param)
         sfo::load(emuenv.sfo_handle, param_sfo);
 
     init_exported_vars(emuenv);
@@ -874,6 +877,9 @@ static ExitCode load_app_impl(SceUID &main_module_id, EmuEnvState &emuenv, const
 
     if (is_native_library(launch_request)) {
         emuenv.self_path = "vsh/shell/shell.self";
+        main_module_id = load_module(emuenv, "vs0:" + emuenv.self_path);
+    } else if (is_native_trophies(launch_request)) {
+        emuenv.self_path = "app/NPXS10008/eboot.bin";
         main_module_id = load_module(emuenv, "vs0:" + emuenv.self_path);
     } else
         main_module_id = load_module(emuenv, "app0:" + emuenv.self_path);
@@ -902,7 +908,7 @@ static ExitCode load_app_impl(SceUID &main_module_id, EmuEnvState &emuenv, const
     const auto module_app_path{ emuenv.vita_fs_path / "ux0/app" / emuenv.io.app_path / "sce_module" };
 
     std::vector<std::string> lib_load_list = {};
-    if (is_native_library(launch_request))
+    if (is_native_library(launch_request) || is_native_trophies(launch_request))
         lib_load_list.emplace_back("vs0:sys/external/libnet.suprx");
     // todo: check if module is imported
     auto add_preload_module = [&](uint32_t code, SceSysmoduleModuleId module_id, const std::string &name, bool load_from_app) {

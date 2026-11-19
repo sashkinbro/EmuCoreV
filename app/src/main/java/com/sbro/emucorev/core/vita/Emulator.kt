@@ -103,6 +103,8 @@ import java.io.File
 
 open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var isNativeShellSession = false
+    private var isNativeTrophySession = false
+    private val isFirmwareSession get() = isNativeShellSession || isNativeTrophySession
     val returnsToNativeLibrary: Boolean get() = NativeLibraryMode.available &&
         (isNativeShellSession || intent.getBooleanExtra(NativeLibraryMode.RETURN_TO_NATIVE_LIBRARY, false))
     private val shellLaunchPending = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -273,14 +275,14 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     fun requestOverlayMenuButtonReveal() {
-        if (isNativeShellSession) return
+        if (isFirmwareSession) return
         runOnUiThread {
             overlayMenuButtonRevealHandler?.invoke()
         }
     }
 
     fun openPauseMenuFromController() {
-        if (isNativeShellSession) return
+        if (isFirmwareSession) return
         runOnUiThread {
             overlayPauseMenuOpenHandler?.invoke()
         }
@@ -305,15 +307,17 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun main() {
-        if (isNativeShellSession) {
+        if (isFirmwareSession) {
             com.sbro.emucorev.core.NativeLibraryLoader.ensureLoaded(this)
             // Loader pre-initialization uses the application context. Native
             // firmware callbacks must resolve this process's actual Activity.
             org.libsdl.app.SDL.setContext(this)
-            val fingerprint = NativeLibraryCatalog.fingerprint(this)
-            val sandbox = NativeLibraryMode.prepare(this)
-            shellCatalogFingerprint = fingerprint
-            check(prepareNativeLibraryRuntime(sandbox.absolutePath, shellRefreshHz))
+            if (isNativeShellSession) {
+                val fingerprint = NativeLibraryCatalog.fingerprint(this)
+                val sandbox = NativeLibraryMode.prepare(this)
+                shellCatalogFingerprint = fingerprint
+                check(prepareNativeLibraryRuntime(sandbox.absolutePath, shellRefreshHz))
+            }
             super.main()
             return
         }
@@ -347,7 +351,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             if (it.isBlank()) emptyArray() else arrayOf("-r", it)
         }
         val gameId = gameIdFromArgs(baseArgs)
-        if (isNativeShellSession) return baseArgs
+        if (isFirmwareSession) return baseArgs
         syncEffectiveDriverForLaunch(gameId)
         // SDL requests these arguments on SDLThread after loading the core.
         // External shortcuts therefore inspect their auto slot off the UI thread too.
@@ -378,6 +382,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         isNativeShellSession = gameIdFromIntent(intent) == NativeLibraryMode.TITLE_ID
+        isNativeTrophySession = gameIdFromIntent(intent) == "__VITA_NATIVE_TROPHIES__"
         shellCatalogBootstrap = isNativeShellSession && NativeLibraryMode.needsCatalogBootstrap(this)
         launchStateLoading = LaunchStateLoadingState.fromArguments(
             intent?.getStringArrayExtra(APP_RESTART_PARAMETERS)
@@ -403,12 +408,17 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             val current = display.mode
             val mode = display.supportedModes.filter {
                 it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight &&
-                    (kotlin.math.abs(it.refreshRate - 60f) < 1f || kotlin.math.abs(it.refreshRate - 120f) < 1f)
+                    (kotlin.math.abs(it.refreshRate - 60f) < 1f ||
+                        kotlin.math.abs(it.refreshRate - 90f) < 1f || kotlin.math.abs(it.refreshRate - 120f) < 1f)
             }.maxByOrNull { it.refreshRate }
-            shellRefreshHz = if ((mode?.refreshRate ?: current.refreshRate) >= 119f) 120 else 60
+            shellRefreshHz = when {
+                (mode?.refreshRate ?: current.refreshRate) >= 119f -> 120
+                (mode?.refreshRate ?: current.refreshRate) >= 89f -> 90
+                else -> 60
+            }
             if (mode != null) window.attributes = window.attributes.apply { preferredDisplayModeId = mode.modeId }
         }
-        if (isNativeShellSession) inputOverlay.setTouchControlsActive(false)
+        if (isFirmwareSession) inputOverlay.setTouchControlsActive(false)
         KeyboardMouseManager.ensureInitialized(this)
         KeyboardMouseManager.setPointerCaptureListener { enabled ->
             runOnUiThread { updatePointerCapture(enabled) }
@@ -495,7 +505,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun quitAfterShutdown() {
-        if (isFrontCameraProbe() || isNativeShellSession) {
+        if (isFrontCameraProbe() || isFirmwareSession) {
             super.quitAfterShutdown()
             return
         }
@@ -617,10 +627,16 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 var launched = false
                 try {
                     check(withContext(Dispatchers.IO) {
-                        InstalledGameRepository().findByTitleId(this@Emulator, titleId) != null &&
+                        (titleId == "NPXS10008" || InstalledGameRepository().findByTitleId(this@Emulator, titleId) != null) &&
                             setAppSessionMenuPaused(true)
                     })
-                    launched = com.sbro.emucorev.core.VitaLaunchBridge.launchInstalledTitle(this@Emulator, titleId) ==
+                    launched = if (titleId == "NPXS10008") {
+                        startActivity(Intent(this@Emulator, NativeLibraryTrophiesActivity::class.java).apply {
+                            putExtra(APP_RESTART_PARAMETERS, arrayOf("-r", "__VITA_NATIVE_TROPHIES__"))
+                            putExtra(NativeLibraryMode.RETURN_TO_NATIVE_LIBRARY, true)
+                        })
+                        true
+                    } else com.sbro.emucorev.core.VitaLaunchBridge.launchInstalledTitle(this@Emulator, titleId) ==
                         com.sbro.emucorev.core.VitaLaunchBridge.LaunchResult.Success
                     check(launched)
                 } catch (error: Exception) {
@@ -939,7 +955,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 if (isNativeShellSession) putExtra(NativeLibraryMode.EXIT_NATIVE_LIBRARY, true)
             }
-            triggerRebirthAfterNativeShutdown(homeIntent, allowAutoSave = autoSave && !isNativeShellSession,
+            triggerRebirthAfterNativeShutdown(homeIntent, allowAutoSave = autoSave && !isFirmwareSession,
                 returnToLibrary = true)
         }
     }
@@ -968,6 +984,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     @Deprecated("Deprecated in Java")
     @SuppressLint("GestureBackNavigation")
     override fun onBackPressed() {
+        if (isNativeTrophySession) { exitEmulation(autoSave = false); return }
         if (isNativeShellSession) { showShellExitDialog(); return }
         if (launchStateLoading.active || stateFrameWaiting) return
         if (nativeKeyboardRequested) { onScreenKeyboardFocusLost(); return }
@@ -976,6 +993,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun superOnBackPressed() {
+        if (isNativeTrophySession) { exitEmulation(autoSave = false); return }
         if (isNativeShellSession) { showShellExitDialog(); return }
         if (launchStateLoading.active || stateFrameWaiting) return
         if (nativeKeyboardRequested) { onScreenKeyboardFocusLost(); return }
@@ -984,6 +1002,10 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (isNativeTrophySession && event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) exitEmulation(autoSave = false)
+            return true
+        }
         if (isNativeShellSession && event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) showShellExitDialog()
             return true
@@ -1175,7 +1197,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     private fun attachComposeOverlay() {
-        if (isNativeShellSession) return
+        if (isFirmwareSession) return
         val layout = mLayout ?: return
         if (composeOverlayAttached) return
         composeOverlayAttached = true
@@ -1215,7 +1237,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     private fun startPlayTimeSessionIfNeeded() {
-        if (isNativeShellSession) return
+        if (isFirmwareSession) return
         val gameId = currentGameIdOrIntent().trim()
         if (gameId.isBlank()) return
         if (playTimeSessionId != null && playTimeSessionTitleId.equals(gameId, ignoreCase = true)) return
@@ -1239,7 +1261,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     private fun requestRetroArchShaderReapply(titleId: String) {
-        if (isNativeShellSession) return
+        if (isFirmwareSession) return
         runOnUiThread {
             if (rebirthRequested || isFinishing || isDestroyed) return@runOnUiThread
             val normalizedTitleId = titleId.trim()

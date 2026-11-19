@@ -248,7 +248,10 @@ std::string translate_path(const char *path, VitaIoDevice &device, const IOState
     }
     case VitaIoDevice::app0: { // Redirect app0: to ux0:app/<title_id>
         relative_path = device::remove_device_from_path(relative_path, device, device_paths.app0);
-        device = VitaIoDevice::ux0;
+        if (device_paths.app0 == "app/__VITA_NATIVE_TROPHIES__") {
+            string_utils::replace(relative_path, "app/__VITA_NATIVE_TROPHIES__", "app/NPXS10008");
+            device = VitaIoDevice::vs0;
+        } else device = VitaIoDevice::ux0;
         break;
     }
     case VitaIoDevice::addcont0: { // Redirect addcont0: to ux0:addcont/<title_id>

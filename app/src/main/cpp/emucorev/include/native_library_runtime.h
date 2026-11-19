@@ -11,6 +11,10 @@ inline bool is_native_library(const AppLaunchRequest &request) {
 }
 
 bool prepare_native_library(EmuEnvState &emuenv);
+inline bool is_native_trophies(const AppLaunchRequest &request) {
+    return request.app_path == "__VITA_NATIVE_TROPHIES__";
+}
+bool prepare_native_trophies(EmuEnvState &emuenv);
 void poll_native_library_catalog(EmuEnvState &emuenv, ThreadState &thread);
 int dispatch_native_library_game_launch(EmuEnvState &emuenv, const char *path);
 

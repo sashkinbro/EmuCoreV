@@ -27,7 +27,7 @@ class EmuCoreVApp : Application() {
         if (processName.endsWith(PHOENIX_PROCESS_SUFFIX) || processName.endsWith(DISCORD_PROCESS_SUFFIX)) return
         // Firmware UI has its own guest/SDL runtime, with no game bookkeeping,
         // cloud sync, Discord, backup worker, or maintenance work in its process.
-        if (processName.endsWith(":native_library")) return
+        if (processName.endsWith(":native_library") || processName.endsWith(":native_trophies")) return
         AppIconManager.applyProIcon(this, AppPreferences(this).proUnlocked)
         PlayTimeRepository(this).finishOpenSessions().forEach { session ->
             ProfilePlayTimeSyncer.recordAndSync(this, session.titleId, session.title, session.durationMs)
