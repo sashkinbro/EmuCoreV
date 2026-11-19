@@ -1,6 +1,6 @@
 package com.sbro.emucorev.nativeui
 
-import android.content.res.AssetManager
+import java.io.File
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -15,14 +15,14 @@ import kotlin.math.ceil
 
 /** Decode packaged images and rasterize changed text; the C++ scene owns layout. */
 class BundledImages(
-    private val assets: AssetManager,
+    private val resources: File,
     private val upload: (Int, Int, Int, ByteArray) -> Unit,
 ) {
     private val clockPaint by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textSize = 22f
-            typeface = Typeface.createFromAsset(assets, "fonts/ltn4.otf")
+            typeface = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
         }
     }
     private var previousClock: String? = null
@@ -32,7 +32,7 @@ class BundledImages(
         listOf("ca76be07", "78600544", "4a8ae255", "9e9cfcab", "f85f0b80",
             "56e72f16", "a5aafd9b", "32465c57", "00ea236e", "89dc8410",
             "2278fb2a", "ee958f99", "a13376bc").forEach { id ->
-            val bitmap = assets.open("images/indicator_plugin/$id.png").use {
+            val bitmap = File(resources, "images/indicator_plugin/$id.png").inputStream().use {
                 requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled image: $id" }
             }
             try { send(id.toLong(16).toInt(), bitmap) } finally { bitmap.recycle() }
@@ -42,7 +42,7 @@ class BundledImages(
     }
 
     fun loadBusyImage() {
-        val busy = assets.open("images/paf-common-resource/ba195a37.png").use {
+        val busy = File(resources, "images/paf-common-resource/ba195a37.png").inputStream().use {
             requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled busy image" }
         }
         try { send(0xba195a37.toInt(), busy) } finally { busy.recycle() }

@@ -1,3 +1,5 @@
+import java.security.MessageDigest
+
 plugins {
     alias(libs.plugins.android.application)
 }
@@ -5,7 +7,7 @@ plugins {
 val verifyLocalNativeUiAssets by tasks.registering {
     doLast {
         val root = file("../resources")
-        val required = listOf("images.json", "fonts.json", "fonts/ltn4.otf",
+        val required = listOf("images.json", "fonts.json", "fonts/ltn4.otf", "audio/sounds.json",
             "effects/lookups/lookups.json", "effects/lookups/exp-minus.png",
             "effects/lookups/corner-distance.png",
             "images/paf-common-resource/ba195a37.png",
@@ -20,15 +22,43 @@ val verifyLocalNativeUiAssets by tasks.registering {
         }
     }
 }
-tasks.named("preBuild") { dependsOn(verifyLocalNativeUiAssets) }
+val packedAssets = layout.buildDirectory.dir("generated/nativeUiAssets")
+val packNativeUiAssets by tasks.registering(Zip::class) {
+    dependsOn(verifyLocalNativeUiAssets)
+    from(file("../resources"))
+    destinationDirectory.set(packedAssets)
+    archiveFileName.set("native-ui.zip")
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+val indexNativeUiAssets by tasks.registering {
+    dependsOn(packNativeUiAssets)
+    val archive = packNativeUiAssets.flatMap { it.archiveFile }
+    inputs.file(archive)
+    outputs.file(packedAssets.map { it.file("native-ui.sha256") })
+    doLast {
+        val hash = MessageDigest.getInstance("SHA-256")
+        archive.get().asFile.inputStream().use { input ->
+            val buffer = ByteArray(65536)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                hash.update(buffer, 0, count)
+            }
+        }
+        packedAssets.get().file("native-ui.sha256").asFile.writeText(
+            hash.digest().joinToString("") { "%02x".format(it) })
+    }
+}
+tasks.named("preBuild") { dependsOn(indexNativeUiAssets) }
 
 android {
     namespace = "com.sbro.emucorev.nativeuipreview"
     compileSdk = 37
     ndkVersion = "29.0.14206865"
-    androidResources { noCompress += "wav" }
+    androidResources { noCompress += "zip" }
     sourceSets.getByName("main").kotlin.srcDir("../android/src/main/java")
-    sourceSets.getByName("main").assets.srcDir("../resources")
+    sourceSets.getByName("main").assets.srcDir(packedAssets.get().asFile)
     defaultConfig {
         applicationId = "com.sbro.emucorev.nativeuipreview"
         minSdk = 29

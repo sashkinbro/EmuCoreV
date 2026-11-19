@@ -25,10 +25,27 @@ for all supported locales. The host provides resolved text; this module must not
 introduce a second partial translation catalogue.
 
 Firmware binaries remain local development inputs. Ready images and fonts live
-in the Git-ignored `native-ui/resources/` directory and are packaged as assets;
+in the Git-ignored `native-ui/resources/` directory and are packaged in one ZIP;
 they are never extracted from firmware when the UI starts. The resource pack is
 not uploaded to Git. Complete materials, layout, animation integration and the
 host bridge are still pending. No approximate implementation is marked as equivalent.
+
+The preview build creates a reproducible `native-ui.zip` plus its SHA-256 version
+under its ignored build directory. Only those two assets enter the APK; the
+unpacked source directory is not duplicated. `BundledResources` verifies the
+archive and installs it once into a versioned app-private, non-backed-up directory.
+It stages the complete ZIP before an atomic directory rename, serializes installs
+with a process/file lock, rejects escaping paths and oversized packs, and retries
+partial installs on the next launch. Changed content selects a new version and
+removes obsolete ready packs after activation; unchanged content skips extraction.
+Kotlin images/fonts and C++ preview geometry read the installed files directly.
+
+Current pack: 1,033 files, 53,694,683 bytes unpacked, 30,799,432 bytes in ZIP.
+Extraction needs additional private storage; it reduces the bundled archive size,
+not the size of the decoded files. Both Lenovo and RG556 verified every installed
+file against the ZIP, first/repeated startup, unchanged completion timestamps,
+partial-install recovery and obsolete-directory cleanup. Preview assemble/lint
+pass. This installer is connected only to the independent preview at present.
 
 The offline `tools/prepare_image_pack.py` uses our standalone C++ readers for
 RCO/GIM and Pillow for embedded PNG/DDS images. It writes 935 PNG images from the
@@ -80,8 +97,8 @@ The ordinary PSX ADPCM decoder in the available FFmpeg build rejects these
 HE-VAG frames, so it is not used as a conversion fallback.
 
 `audio/sounds.json` records source/channel/PCM/WAV hashes, decoder metadata,
-looping metadata and all original sound-event bindings. WAVs are packaged
-uncompressed for direct asset access. Neither vgmstream, its DLLs, VAG data nor
+looping metadata and all original sound-event bindings. WAVs are compressed
+inside the shared ZIP and read directly after its first-start installation. Neither vgmstream, its DLLs, VAG data nor
 the firmware containers enter the APK. Runtime event routing/playback remains
 to be connected as the native UI interactions are implemented.
 

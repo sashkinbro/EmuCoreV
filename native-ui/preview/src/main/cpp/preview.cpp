@@ -6,7 +6,7 @@
 #include <emucorev/paf/busy_indicator.h>
 #include <emucorev/paf/charging_indicator.h>
 #include <android/choreographer.h>
-#include <android/asset_manager.h>
+#include <fstream>
 #include <android/input.h>
 #include <android_native_app_glue.h>
 #include <android/log.h>
@@ -34,21 +34,20 @@ struct HostImage {
 std::unordered_map<std::uint32_t, HostImage> host_images;
 std::uint64_t image_revision = 0;
 std::atomic<bool> busy_scene{false};
-template<class T> std::vector<T> read(AAssetManager* assets, const char* filename, std::size_t count) {
-    const auto path = std::string("preview/bubble/") + filename;
-    const std::unique_ptr<AAsset, decltype(&AAsset_close)> asset(
-        AAssetManager_open(assets, path.c_str(), AASSET_MODE_BUFFER), AAsset_close);
-    if (!asset || AAsset_getLength64(asset.get()) != static_cast<off64_t>(count * sizeof(T)))
+std::string resource_root;
+template<class T> std::vector<T> read(const char* filename, std::size_t count) {
+    std::string path;
+    {
+        const std::lock_guard lock(status_mutex);
+        path = resource_root + "/preview/bubble/" + filename;
+    }
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file || file.tellg() != static_cast<std::streamoff>(count * sizeof(T)))
         throw std::runtime_error("Missing or invalid local preview asset: " + path);
     std::vector<T> values(count);
-    auto* output = reinterpret_cast<std::uint8_t*>(values.data());
-    std::size_t remaining = count * sizeof(T);
-    while (remaining) {
-        const auto bytes = AAsset_read(asset.get(), output, remaining);
-        if (bytes <= 0) throw std::runtime_error("Incomplete preview asset: " + path);
-        output += bytes;
-        remaining -= bytes;
-    }
+    file.seekg(0);
+    file.read(reinterpret_cast<char*>(values.data()), count * sizeof(T));
+    if (!file) throw std::runtime_error("Incomplete preview asset: " + path);
     return values;
 }
 
@@ -103,19 +102,18 @@ struct Window {
 
         // The isolated busy scene needs no bubble geometry/material resources.
         if (!busy_scene.load()) {
-            auto* assets = app->activity->assetManager;
-            const auto vertices = read<emucorev::paf::BubbleVertex>(assets, "stream-0.bin", 608);
-            const auto indices = read<std::uint16_t>(assets, "indices.bin", 1220);
-            const auto transform = read<float>(assets, "vertex-ubo-0.bin", 96);
-            const auto parameters = read<float>(assets, "fragment-ubo-0.bin", 10);
+            const auto vertices = read<emucorev::paf::BubbleVertex>("stream-0.bin", 608);
+            const auto indices = read<std::uint16_t>("indices.bin", 1220);
+            const auto transform = read<float>("vertex-ubo-0.bin", 96);
+            const auto parameters = read<float>("fragment-ubo-0.bin", 10);
             std::copy(transform.begin(), transform.end(), vertex.begin());
             base_vertex = vertex;
             initial_phase = std::atan2(vertex[14 * 4 + 1], vertex[14 * 4]);
             initial_basis = emucorev::paf::bubble_wobble_basis(std::cos(initial_phase), std::sin(initial_phase), 1);
             std::copy(parameters.begin(), parameters.end(), material.begin());
-            const auto palette = read<std::uint8_t>(assets, "fragment-texture-0-palette.bin", 1024);
-            const auto indexed = read<std::uint8_t>(assets, "fragment-texture-0.bin", 128 * 128);
-            const auto environment = read<std::uint8_t>(assets, "environment.rgba", 64 * 64 * 4);
+            const auto palette = read<std::uint8_t>("fragment-texture-0-palette.bin", 1024);
+            const auto indexed = read<std::uint8_t>("fragment-texture-0.bin", 128 * 128);
+            const auto environment = read<std::uint8_t>("environment.rgba", 64 * 64 * 4);
             std::vector<std::uint8_t> icon(128 * 128 * 4);
             for (std::size_t i = 0; i < indexed.size(); ++i)
                 std::copy_n(palette.data() + indexed[i] * 4, 4, icon.data() + i * 4);
@@ -322,6 +320,17 @@ struct Preview {
         }
     }
 };
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeResourceRoot(JNIEnv* env, jobject, jstring path) {
+    const char* text = env->GetStringUTFChars(path, nullptr);
+    if (!text) return;
+    {
+        const std::lock_guard lock(status_mutex);
+        resource_root = text;
+    }
+    env->ReleaseStringUTFChars(path, text);
 }
 
 extern "C" JNIEXPORT void JNICALL
