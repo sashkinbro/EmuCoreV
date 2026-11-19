@@ -36,4 +36,18 @@ PageTurnMaterialBlock page_turn_top_vertex_material(PagePoint size, PagePoint po
     const PageTurnMatrix& projection = page_turn_identity,
     const PageTurnMatrix& view = page_turn_identity,
     const PageTurnPointLight& light = {});
+
+// Assembled bottom surface (flat/rounded) vertex block, 12 vec4s. Recovered
+// fields: MVP and the shape pack; Shadow/UVTransform/SqueezeZ/ExpMinusRange
+// stay zero until their assembly is reconstructed.
+PageTurnMaterialBlock page_turn_bottom_vertex_material(PagePoint size, PagePoint point,
+    const PageTurnShapeStyle& style = {}, const PageTurnPose& pose = {},
+    const PageTurnMatrix& projection = page_turn_identity,
+    const PageTurnMatrix& view = page_turn_identity);
+// Assembled empty folded-back vertex block, 9 vec4s. Recovered fields: MVP,
+// FoldPlane and Aspect; Shadow/UVTransform/SqueezeZ stay zero for now.
+PageTurnMaterialBlock page_turn_empty_back_vertex_material(PagePoint size, PagePoint point,
+    const PageTurnShapeStyle& style = {}, const PageTurnPose& pose = {},
+    const PageTurnMatrix& projection = page_turn_identity,
+    const PageTurnMatrix& view = page_turn_identity);
 }

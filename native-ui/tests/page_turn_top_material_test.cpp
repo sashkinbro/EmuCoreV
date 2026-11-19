@@ -9,8 +9,9 @@ using namespace emucorev::paf;
 
 namespace {
 void expect(const PageTurnMaterialBlock &block, PageTurnUniform uniform,
-    const std::array<float, 4> &expected, unsigned count, const char *label) {
-    const auto range = page_turn_top_uniform(uniform);
+    const std::array<float, 4> &expected, unsigned count, const char *label,
+    PageTurnUniformRange (*lookup)(PageTurnUniform) = page_turn_top_uniform) {
+    const auto range = lookup(uniform);
     if (range.count < count) throw std::runtime_error(std::string("range too small for ") + label);
     for (unsigned i = 0; i < count; ++i) {
         const auto bits = std::bit_cast<std::uint32_t>(block.values[range.offset + i]);
@@ -69,6 +70,17 @@ int main(int argc, char **argv) {
             expect(block, PageTurnUniform::aspect, slot(shape, 14), 4, "Aspect");
             expect(block, PageTurnUniform::point_light_pack2, slot(lights, 16), 4, "PointLightPack2");
             expect(block, PageTurnUniform::point_light_pack1, slot(lights, 0), 4, "PointLightPack1");
+            const auto bottom = page_turn_bottom_vertex_material(size, point, style);
+            expect(bottom, PageTurnUniform::mvp, slot(matrices, 16), 4, "bottom MVP", page_turn_bottom_uniform);
+            expect(bottom, PageTurnUniform::deepest, slot(shape, 0), 4, "bottom Deepest", page_turn_bottom_uniform);
+            expect(bottom, PageTurnUniform::grep, slot(shape, 4), 2, "bottom Grep", page_turn_bottom_uniform);
+            expect(bottom, PageTurnUniform::params, slot(shape, 6), 4, "bottom Params", page_turn_bottom_uniform);
+            expect(bottom, PageTurnUniform::fold_plane, slot(shape, 10), 4, "bottom FoldPlane", page_turn_bottom_uniform);
+            expect(bottom, PageTurnUniform::aspect, slot(shape, 14), 4, "bottom Aspect", page_turn_bottom_uniform);
+            const auto empty = page_turn_empty_back_vertex_material(size, point, style);
+            expect(empty, PageTurnUniform::mvp, slot(matrices, 16), 4, "empty MVP", page_turn_empty_back_uniform);
+            expect(empty, PageTurnUniform::fold_plane, slot(shape, 10), 4, "empty FoldPlane", page_turn_empty_back_uniform);
+            expect(empty, PageTurnUniform::aspect, slot(shape, 14), 4, "empty Aspect", page_turn_empty_back_uniform);
         }
         std::cout << "PASS top vertex material: " << count
             << " records match the original MVP/Model/shape/light uniforms\n";
