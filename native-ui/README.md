@@ -36,6 +36,20 @@ current 18 local references, verifies every PNG round trip, and records source,
 pixel and output hashes in `images.json`. `tools/prepare_font_pack.py` copies
 the supplied OpenType CFF/TrueType fonts unchanged into the same ignored directory.
 Neither preparation tool is invoked at runtime or included in the application.
+
+`tools/prepare_effect_pack.py` additionally prepares the five standalone effect
+DDS textures and the lock wallpaper under the ignored `resources/effects/`.
+All 19 supplied mip levels are retained as separate PNGs, without resizing or
+regenerated mipmaps. BGRA8 channels are reordered losslessly; the alpha-only
+earth texture retains its original byte plane in a grayscale PNG, explicitly
+marked `alpha8` for the renderer. The lock PNG is copied unchanged. The manifest
+records source/pixel/output hashes. These assets are ready for renderer
+integration; their presence does not establish effect or lock-screen parity.
+
+```text
+python native-ui/tools/prepare_effect_pack.py --effects LOCAL_EFFECTS_DIRECTORY --lock-image LOCAL_KEYLOCK.png --pack native-ui/resources
+```
+
 The same ignored pack now includes `audio/`: 44 PCM16 WAV sounds from the current
 18 RCO inputs (all sound payloads are in the common reference). Four sounds retain
 separate left/right channels as stereo; mono sounds remain mono. The offline
