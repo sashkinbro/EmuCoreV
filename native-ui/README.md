@@ -967,6 +967,17 @@ This harness runs the reference consistency check and, when a decrypted
 reference is supplied, the five-fixture draw-trace slot cross-check. Without a
 reference it reports the device-free check only; it never touches a device.
 
+The recovered uniform offsets live in the standalone `page_turn_material`
+module: `paf_page_material_layout_test` checks that the top (14 uniforms,
+112 floats), bottom (10/48) and empty-back (6/36) blocks have no overlapping
+ranges, that their counted prefix ends at the block size (including the
+one-float `NormalScaleZ` padding) and that undeclared uniforms report empty
+ranges. It passed on Anbernic RG556; it reads no firmware and starts no guest.
+
+```text
+paf_page_material_layout_test
+```
+
 ### Recovered busy indicator
 
 `BusyIndicator` reconstructs the PAF component's head and eight retained trail
