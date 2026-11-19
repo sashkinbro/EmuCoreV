@@ -900,6 +900,21 @@ renderer: the `Shadow`, `UVTransform`, `SqueezeZ`, `CornerSize`, `CornerRefract`
 and pass ordering, texture identity and blend states require the full draw
 protocol capture described below.
 
+The offline PageTurnRenderer constructor was also reviewed. It allocates the
+renderer bundle used by the traces, creates the program objects at the bundle
+offsets seen in the draw protocol, and registers every material, style and light
+default. Its defaults are the original bit patterns: diffuse/specular/fresnel/
+refraction coefficients, both point lights, top/bottom scale and curl, shadow and
+shadow level, normal scale, squeeze, empty-back colour and occluder shadow
+constants, plus the `page_turn/textures/page_corner.dds` corner texture. The
+same review recovered the registered material parameter order for every pass
+(e.g. top vertex: MVP, ModelMatrix, Grep, FoldPlane, Params, Deepest, Aspect,
+NormalScaleZ, Eye, MaterialPack, PointLightPack2, PointLightPack1, UVTransform,
+SqueezeZ). That order resolves the observed 17/20-call setter sequences to
+uniform semantics; the earlier verified builders already supply the matrix,
+shape, Fresnel and light values. Value assembly for the remaining slots and the
+shell's own page size/pose configuration are still pending.
+
 An offline trace runs the original renderer entry in a hosted graphics
 environment and records the ordered protocol: surface activation and texture
 binds, per-pass matrix/shape/light setter blocks, program binds, render-state
