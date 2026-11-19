@@ -623,6 +623,30 @@ The original translation is not executed on Lenovo because of the documented
 vendor compiler crash. A native-only test explicitly reports that no reference
 comparison took place. This test executable is never linked into an app.
 
+Float-target diagnostic probes additionally exposed eliminated half-rounding
+boundaries on Mali: the native pack/unpack expression can retain a full-float
+result, while other packed-register expressions in the generic reference retain
+different boundaries. For example, an alpha probe produced native `0.0931373`
+versus reference `0.0931396`. Forcing every native boundary changes the observed
+reference mismatch rather than resolving it. That experiment was not retained
+as a material correction. Original hardware arithmetic and observed emulated
+frames still need to be reconciled before declaring material parity.
+
+`PageTurnRenderer` now owns the GLES vertex storage, front/folded programs and
+four reusable UBOs. It uploads the recovered mesh and submits each counted fan
+in original order, with no per-draw allocations or resource reads. Host-supplied
+shaders/material blocks remain independent of the emulator. The vertex lookup
+texture is assigned unit 4 separately from fragment units 0..3. Shader programs
+are compiled only during renderer construction; short parameter blocks are
+zero-padded to prevent stale state from a previous material.
+
+The same standalone device test checks this submission path with diagnostic
+red/blue materials over four recovered folds. On both Lenovo and RG556, all
+32,768 pixel centers select the CPU half-plane's expected page side, with no
+uncovered pixels. These diagnostic materials prove geometry submission only;
+they are not used as substitutes for the original curl, lighting, edge or shadow
+materials. The complete lock-screen renderer/controller remains unfinished.
+
 ```text
 paf_page_shader_test
 paf_page_shader_test LOCAL_ORIGINAL_EMPTY_BACK_FRAGMENT.frag

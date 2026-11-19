@@ -1,4 +1,5 @@
 #include <emucorev/paf/page_turn_shaders.h>
+#include <emucorev/paf/page_turn_renderer.h>
 #include <EGL/egl.h>
 #include <GLES3/gl32.h>
 #include <algorithm>
@@ -65,6 +66,48 @@ void main() {
     GLint ok; glGetProgramiv(result, GL_LINK_STATUS, &ok);
     if (!ok) throw std::runtime_error("Page-turn shader link failed");
     return result;
+}
+void check_mesh_renderer() {
+    using namespace emucorev::paf;
+    constexpr auto vertex = R"(#version 320 es
+precision highp float;
+layout(location=0) in vec2 point;
+void main() { gl_Position=vec4(point.x-1.0, point.y*2.0-1.0, 0.0, 1.0); }
+)";
+    constexpr auto red = R"(#version 320 es
+precision highp float;
+layout(location=0) out vec4 color;
+void main() { color=vec4(1.0,0.0,0.0,1.0); }
+)";
+    constexpr auto blue = R"(#version 320 es
+precision highp float;
+layout(location=0) out vec4 color;
+void main() { color=vec4(0.0,0.0,1.0,1.0); }
+)";
+    PageTurnRenderer renderer({vertex,red},{vertex,blue});
+    PageSurfaceDraw material{};
+    PageTurnMesh mesh;
+    std::array<unsigned char,128*64*4> pixels;
+    unsigned checked = 0;
+    for (auto deepest : std::array<PagePoint,4>{{{1.9f,.95f},{1.1f,.4f},{-.8f,-.3f},{-3.f,-2.f}}}) {
+        const auto shape = page_turn_fold_shape(deepest,{2,1});
+        page_turn_mesh(shape,mesh); renderer.upload_mesh(mesh);
+        glClearColor(0,1,0,0); glClear(GL_COLOR_BUFFER_BIT);
+        renderer.draw(PageSurface::front,material); renderer.draw(PageSurface::folded,material);
+        glReadPixels(0,0,128,64,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
+        if(glGetError()!=GL_NO_ERROR) throw std::runtime_error("Mesh renderer GPU error");
+        for(unsigned y=0;y<64;++y) for(unsigned x=0;x<128;++x) {
+            const float distance = ((x+.5f)/64.f-shape.center.x)*shape.normal.x
+                + ((y+.5f)/64.f-shape.center.y)*shape.normal.y;
+            if(std::abs(distance)<.00001f) continue;
+            const auto i=(y*128+x)*4;
+            if(pixels[i]!=(distance>=0?255:0) || pixels[i+1]!=0
+                || pixels[i+2]!=(distance<0?255:0) || pixels[i+3]!=255)
+                throw std::runtime_error("Mesh renderer leaves a hole or draws the wrong page side");
+            ++checked;
+        }
+    }
+    std::cout << "PASS page surface fan submission: " << checked << " pixel centers / four folds\n";
 }
 }
 int main(int argc, char** argv) {
@@ -144,6 +187,8 @@ int main(int argc, char** argv) {
         glDeleteProgram(native); if(reference) glDeleteProgram(reference);
         glDeleteFramebuffers(1,&framebuffer); glDeleteTextures(1,&output);
         glDeleteTextures(2,textures); glDeleteBuffers(2,buffers); glDeleteVertexArrays(1,&vao);
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
+        check_mesh_renderer();
         std::cout << "16 material draws, " << nonzero << " nonzero channels\n";
         if(reference) {
             std::cout << differences << " differing channels\n";

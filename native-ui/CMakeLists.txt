@@ -18,7 +18,7 @@ else()
 endif()
 
 if(ANDROID)
-    add_library(emucorev_paf_gles STATIC paf/src/bubble_renderer.cpp paf/src/sprite_renderer.cpp)
+    add_library(emucorev_paf_gles STATIC paf/src/bubble_renderer.cpp paf/src/sprite_renderer.cpp paf/src/page_turn_renderer.cpp)
     target_include_directories(emucorev_paf_gles PUBLIC paf/include)
     target_compile_features(emucorev_paf_gles PUBLIC cxx_std_20)
     target_compile_options(emucorev_paf_gles PRIVATE -Wall -Wextra -Werror)
@@ -58,7 +58,7 @@ if(BUILD_TESTING)
     add_test(NAME paf_gim_image COMMAND paf_gim_test)
     if(ANDROID)
         add_executable(paf_page_shader_test tests/page_turn_shader_device.cpp)
-        target_link_libraries(paf_page_shader_test PRIVATE emucorev_paf EGL GLESv3)
+        target_link_libraries(paf_page_shader_test PRIVATE emucorev_paf emucorev_paf_gles EGL GLESv3)
         # Research-only GPU compiler test. Requires externally supplied GLSL;
         # never linked into emucorev_paf or the Android application.
         add_executable(paf_shader_compile_test tests/shader_compile_device.cpp)
