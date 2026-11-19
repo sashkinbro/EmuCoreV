@@ -34,7 +34,7 @@ The offline `tools/prepare_image_pack.py` uses our standalone C++ readers for
 RCO/GIM and Pillow for embedded PNG/DDS images. It writes 935 PNG images from the
 current 18 local references, verifies every PNG round trip, and records source,
 pixel and output hashes in `images.json`. `tools/prepare_font_pack.py` copies
-the supplied OpenType CFF fonts unchanged into the same ignored directory.
+the supplied OpenType CFF/TrueType fonts unchanged into the same ignored directory.
 Neither preparation tool is invoked at runtime or included in the application.
 Android device status and lifecycle adapters use Kotlin. The status source
 subscribes only while resumed; it does not poll or start the emulator.
@@ -430,13 +430,37 @@ builds do not include this module, and its release variant is disabled.
 gradlew -PnativeUiPreview=true :native-ui-preview:assembleDebug
 ```
 
-Local reference inputs must be supplied to that debug package's private
-`files/bubble` directory: `stream-0.bin`, `indices.bin`, `vertex-ubo-0.bin`,
-`fragment-ubo-0.bin`, `fragment-texture-0.bin`,
-`fragment-texture-0-palette.bin` and a 64x64 RGBA `environment.rgba`. No fixture is
-baked into the APK. The current surface is one bubble on a flat clear color,
-with recovered cone-motion geometry applied relative to the supplied pose. It
-is not the reconstructed menu/background or complete widget animation system.
+Local debug reference inputs are prepared in the ignored resource pack before
+building. The debug APK packages these as `preview/bubble` assets; a fresh
+installation no longer needs private-file injection, installed firmware or the
+emulator. The mesh, initial pose and icon sample still come from the local
+capture, rather than a complete reconstructed widget/geometry generator. The
+current surface is one bubble on a flat clear color, with recovered cone-motion
+geometry applied relative to the supplied pose. It is not the reconstructed
+menu/background or complete widget animation system.
+
+```text
+python native-ui/tools/prepare_image_pack.py --adb ADB --serial DEVICE --exporter ANDROID_EXPORTER --output native-ui/resources OWNED_RESOURCES.rco [MORE_RESOURCES.rco ...]
+python native-ui/tools/prepare_font_pack.py LOCAL_PVF_DIRECTORY native-ui/resources
+python native-ui/tools/prepare_preview_fixture.py LOCAL_BUBBLE_CAPTURE native-ui/resources
+```
+
+Image preparation expects a new output directory. Font and preview preparation
+then add their files to that pack. A missing pack fails the opt-in preview build
+with an explicit preparation message. The fixture helper defaults to a zero
+reflection texture, explicitly a placeholder until that source is reconstructed.
+
+`SpriteRenderer` composes straight-alpha RGBA images in C++, uploading only
+changed images and retaining them for the GL context lifetime. The Kotlin adapter
+decodes 13 packaged indicator textures and rasterizes changed clock text with the
+packaged Rodin bold font. Minute/time-zone/format changes, battery, Wi-Fi and
+Bluetooth events feed the preview without per-frame JNI calls or polling.
+The visible status panel was launched on Lenovo and RG556; Lenovo's clock matched
+device time and its battery selection used the real 78% reading. Exact panel
+anchors, original font rasterization, charging animation and complete radio
+presentation remain pending. The Wi-Fi strength conversion uses Android's RSSI
+scale rather than an emulated Vita radio service. The packaged debug APK contains
+935 PNGs, 20 fonts and only `libpaf_preview.so`; no emulator library is loaded.
 
 Rendering uses a 960x544 offscreen target and aspect-preserving presentation.
 Window recreation releases and rebuilds all context-owned resources. Native

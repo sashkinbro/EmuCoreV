@@ -2,7 +2,9 @@
 #include <emucorev/paf/bubble_shaders.h>
 #include <emucorev/paf/bubble_motion.h>
 #include <emucorev/paf/device_status.h>
+#include <emucorev/paf/sprite_renderer.h>
 #include <android/choreographer.h>
+#include <android/asset_manager.h>
 #include <android_native_app_glue.h>
 #include <android/log.h>
 #include <EGL/egl.h>
@@ -11,23 +13,37 @@
 #include <array>
 #include <cstring>
 #include <cmath>
-#include <filesystem>
-#include <fstream>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <vector>
+#include <unordered_map>
 
 namespace {
 std::mutex status_mutex;
 emucorev::paf::DeviceStatus device_status;
-template<class T> std::vector<T> read(const std::filesystem::path& path, std::size_t count) {
-    if (std::filesystem::file_size(path) != count * sizeof(T))
-        throw std::runtime_error("Unexpected preview resource size: " + path.filename().string());
+struct HostImage {
+    unsigned width = 0, height = 0;
+    std::vector<std::uint8_t> rgba;
+    std::uint64_t revision = 0;
+};
+std::unordered_map<std::uint32_t, HostImage> host_images;
+std::uint64_t image_revision = 0;
+template<class T> std::vector<T> read(AAssetManager* assets, const char* filename, std::size_t count) {
+    const auto path = std::string("preview/bubble/") + filename;
+    const std::unique_ptr<AAsset, decltype(&AAsset_close)> asset(
+        AAssetManager_open(assets, path.c_str(), AASSET_MODE_BUFFER), AAsset_close);
+    if (!asset || AAsset_getLength64(asset.get()) != static_cast<off64_t>(count * sizeof(T)))
+        throw std::runtime_error("Missing or invalid local preview asset: " + path);
     std::vector<T> values(count);
-    std::ifstream input(path, std::ios::binary);
-    input.read(reinterpret_cast<char*>(values.data()), static_cast<std::streamsize>(count * sizeof(T)));
-    if (!input) throw std::runtime_error("Cannot read preview resource");
+    auto* output = reinterpret_cast<std::uint8_t*>(values.data());
+    std::size_t remaining = count * sizeof(T);
+    while (remaining) {
+        const auto bytes = AAsset_read(asset.get(), output, remaining);
+        if (bytes <= 0) throw std::runtime_error("Incomplete preview asset: " + path);
+        output += bytes;
+        remaining -= bytes;
+    }
     return values;
 }
 
@@ -37,6 +53,9 @@ struct Window {
     EGLContext context = EGL_NO_CONTEXT;
     GLuint target = 0, color = 0;
     std::unique_ptr<emucorev::paf::BubbleRenderer> bubble;
+    std::unique_ptr<emucorev::paf::SpriteRenderer> sprites;
+    std::unordered_map<std::uint32_t, std::uint64_t> uploaded_images;
+    std::uint64_t uploaded_revision = 0;
     std::array<float, 96> vertex{};
     std::array<float, 96> base_vertex{};
     std::array<float, 10> material{};
@@ -48,6 +67,7 @@ struct Window {
         if (context != EGL_NO_CONTEXT && surface != EGL_NO_SURFACE)
             eglMakeCurrent(display, surface, surface, context);
         bubble.reset();
+        sprites.reset();
         if (target) glDeleteFramebuffers(1, &target);
         if (color) glDeleteTextures(1, &color);
         if (display != EGL_NO_DISPLAY) {
@@ -76,19 +96,19 @@ struct Window {
         if (!eglMakeCurrent(display, surface, surface, context)) throw std::runtime_error("Cannot activate preview context");
         eglSwapInterval(display, 1);
 
-        const auto root = std::filesystem::path(app->activity->internalDataPath) / "bubble";
-        const auto vertices = read<emucorev::paf::BubbleVertex>(root / "stream-0.bin", 608);
-        const auto indices = read<std::uint16_t>(root / "indices.bin", 1220);
-        const auto transform = read<float>(root / "vertex-ubo-0.bin", 96);
-        const auto parameters = read<float>(root / "fragment-ubo-0.bin", 10);
+        auto* assets = app->activity->assetManager;
+        const auto vertices = read<emucorev::paf::BubbleVertex>(assets, "stream-0.bin", 608);
+        const auto indices = read<std::uint16_t>(assets, "indices.bin", 1220);
+        const auto transform = read<float>(assets, "vertex-ubo-0.bin", 96);
+        const auto parameters = read<float>(assets, "fragment-ubo-0.bin", 10);
         std::copy(transform.begin(), transform.end(), vertex.begin());
         base_vertex = vertex;
         initial_phase = std::atan2(vertex[14 * 4 + 1], vertex[14 * 4]);
         initial_basis = emucorev::paf::bubble_wobble_basis(std::cos(initial_phase), std::sin(initial_phase), 1);
         std::copy(parameters.begin(), parameters.end(), material.begin());
-        const auto palette = read<std::uint8_t>(root / "fragment-texture-0-palette.bin", 1024);
-        const auto indexed = read<std::uint8_t>(root / "fragment-texture-0.bin", 128 * 128);
-        const auto environment = read<std::uint8_t>(root / "environment.rgba", 64 * 64 * 4);
+        const auto palette = read<std::uint8_t>(assets, "fragment-texture-0-palette.bin", 1024);
+        const auto indexed = read<std::uint8_t>(assets, "fragment-texture-0.bin", 128 * 128);
+        const auto environment = read<std::uint8_t>(assets, "environment.rgba", 64 * 64 * 4);
         std::vector<std::uint8_t> icon(128 * 128 * 4);
         for (std::size_t i = 0; i < indexed.size(); ++i)
             std::copy_n(palette.data() + indexed[i] * 4, 4, icon.data() + i * 4);
@@ -96,6 +116,7 @@ struct Window {
             emucorev::paf::opaque_bubble_vertex_shader(), emucorev::paf::opaque_bubble_fragment_shader(),
             vertices, indices, emucorev::paf::BubbleImage{128, 128, icon},
             emucorev::paf::BubbleImage{64, 64, environment});
+        sprites = std::make_unique<emucorev::paf::SpriteRenderer>();
 
         // Fixed 1x rasterization, independently of the physical display size.
         glGenTextures(1, &color);
@@ -128,6 +149,46 @@ struct Window {
                 }
     }
 
+    void draw_status() {
+        // Packaged textures are decoded once by Kotlin and uploaded only when
+        // changed. A recreated GL context gets its own complete texture cache.
+        const std::lock_guard lock(status_mutex);
+        if (uploaded_revision != image_revision) {
+            for (const auto& [id, image] : host_images) {
+                if (uploaded_images[id] == image.revision) continue;
+                sprites->upload(id, image.width, image.height, image.rgba);
+                uploaded_images[id] = image.revision;
+            }
+            uploaded_revision = image_revision;
+        }
+        sprites->begin(960, 544);
+        // Development composition; exact original anchors/clock metrics and
+        // charging animation are still being reconstructed, not parity claims.
+        sprites->draw(0, 0, 0, 960, 32, {0, 0, 0, 1});
+        constexpr std::array<std::uint32_t, 5> battery{
+            0x78600544, 0x4a8ae255, 0x9e9cfcab, 0xf85f0b80, 0x56e72f16};
+        const auto& status = device_status;
+        auto battery_id = status.battery_percent < 0 ? 0xa5aafd9bu
+            : battery[std::min(4, std::clamp(status.battery_percent, 0, 100) * 4 / 100)];
+        if (status.charging && status.battery_percent >= 0 && status.battery_percent < 100)
+            battery_id = 0x32465c57;
+        sprites->draw(battery_id, 904, 2, 48, 28);
+        if (const auto clock = host_images.find(1); clock != host_images.end())
+            sprites->draw(1, 892.f - clock->second.width, 0, clock->second.width, clock->second.height);
+        float left = 8;
+        if (status.wifi_enabled == emucorev::paf::RadioState::on && status.wifi_connected) {
+            constexpr std::array<std::uint32_t, 4> wifi{0x89dc8410, 0x2278fb2a, 0xee958f99, 0xa13376bc};
+            // Android's four-bin RSSI scale. Original Vita radio service is
+            // intentionally absent; unknown RSSI does not fabricate strength.
+            const int level = status.wifi_rssi == INT32_MIN ? 0
+                : std::clamp((std::clamp(status.wifi_rssi, -100, -55) + 100) * 3 / 45, 0, 3);
+            sprites->draw(wifi[level], left, 4, 23, 24);
+            left += 31;
+        }
+        if (status.bluetooth_enabled == emucorev::paf::RadioState::on)
+            sprites->draw(0xca76be07, left, 4, 19, 24);
+    }
+
     void draw() {
         EGLint width, height;
         if (!eglQuerySurface(display, surface, EGL_WIDTH, &width)
@@ -137,6 +198,7 @@ struct Window {
         glClearColor(12.f / 255, 40.f / 255, 150.f / 255, 1);
         glClear(GL_COLOR_BUFFER_BIT);
         bubble->draw(vertex, material);
+        draw_status();
 
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
         glClearColor(0, 0, 0, 1);
@@ -223,6 +285,26 @@ struct Preview {
         }
     }
 };
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeImage(JNIEnv* env, jobject,
+    jint id, jint width, jint height, jbyteArray rgba) {
+    if (!rgba || width <= 0 || height <= 0 || width > 4096 || height > 4096
+        || env->GetArrayLength(rgba) != static_cast<jlong>(width) * height * 4) {
+        env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), "Invalid native UI image");
+        return;
+    }
+    HostImage image;
+    image.width = width;
+    image.height = height;
+    image.rgba.resize(std::size_t(width) * height * 4);
+    env->GetByteArrayRegion(rgba, 0, static_cast<jsize>(image.rgba.size()),
+        reinterpret_cast<jbyte*>(image.rgba.data()));
+    if (env->ExceptionCheck()) return;
+    const std::lock_guard lock(status_mutex);
+    image.revision = ++image_revision;
+    host_images[static_cast<std::uint32_t>(id)] = std::move(image);
 }
 
 extern "C" JNIEXPORT void JNICALL

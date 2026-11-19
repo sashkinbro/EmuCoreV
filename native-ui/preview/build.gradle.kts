@@ -2,6 +2,23 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+val verifyLocalNativeUiAssets by tasks.registering {
+    doLast {
+        val root = file("../resources")
+        val required = listOf("images.json", "fonts.json", "fonts/ltn4.otf",
+            "images/indicator_plugin/ca76be07.png", "images/indicator_plugin/56e72f16.png",
+            "preview/bubble/stream-0.bin", "preview/bubble/indices.bin",
+            "preview/bubble/vertex-ubo-0.bin", "preview/bubble/fragment-ubo-0.bin",
+            "preview/bubble/fragment-texture-0.bin", "preview/bubble/fragment-texture-0-palette.bin",
+            "preview/bubble/environment.rgba")
+        check(required.all { root.resolve(it).isFile }) {
+            "Local native UI resource pack is missing or incomplete. " +
+                "Prepare native-ui/resources using the offline tools documented in native-ui/README.md."
+        }
+    }
+}
+tasks.named("preBuild") { dependsOn(verifyLocalNativeUiAssets) }
+
 android {
     namespace = "com.sbro.emucorev.nativeuipreview"
     compileSdk = 37

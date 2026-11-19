@@ -18,7 +18,7 @@ its animations, timing, inputs or lifecycle are equivalent.
 | Launch | Start action and complete launch animation; launch through the existing game path; real readiness/errors; no black frame treated as success | Host bridge pending; existing game launch path is separate |
 | Game running | Stop native UI callbacks, clocks, radio observers and GPU submissions; release appropriate GPU resources | Preview pauses rendering; complete game/host integration pending |
 | Return/close | Reference return animation; correct Home/LiveArea destination, selected game and page; cancellation and repeated launches | Pending |
-| Status bar | Matching textures/layout/typography; real Android battery/charging, Wi-Fi, Bluetooth and local time; event-driven updates | Android data source in progress; original indicator resources identified |
+| Status bar | Matching textures/layout/typography; real Android battery/charging, Wi-Fi, Bluetooth and local time; event-driven updates | Kotlin event source and C++ sprite composition visible on Lenovo/RG556 with bundled textures/font; exact anchors, rasterization and charging animation pending |
 | Trophies | Original presentation with real trophy data, locks, progress, lists, details and navigation | Deferred until shell composition/host bridge |
 | Library changes | Add/delete/update games; install/remove selected game; refresh icons/metadata; changes while UI is paused or a game is active | Existing emulated catalogue sync implemented; native host binding pending |
 | Themes/settings | Original theme/wallpaper behavior; host settings tab; native UI-only resolution; game graphics remain separate | Pending |

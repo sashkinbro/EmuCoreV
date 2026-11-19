@@ -5,11 +5,14 @@ import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
 import com.sbro.emucorev.nativeui.DeviceStatusSource
+import com.sbro.emucorev.nativeui.BundledImages
 
 /** Independent Android host; it loads only our native UI library. */
 @Suppress("DEPRECATION")
 class PreviewActivity : NativeActivity() {
     private lateinit var deviceStatus: DeviceStatusSource
+    private lateinit var images: BundledImages
+    private external fun nativeImage(id: Int, width: Int, height: Int, rgba: ByteArray)
 
     private external fun nativeStatus(
         battery: Int, charging: Boolean, powerSource: Int,
@@ -27,11 +30,14 @@ class PreviewActivity : NativeActivity() {
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         deviceStatus = DeviceStatusSource(this)
+        images = BundledImages(assets, ::nativeImage)
+        images.loadIndicatorImages()
     }
 
     override fun onResume() {
         super.onResume()
         deviceStatus.start { status ->
+            images.updateClock(status)
             nativeStatus(status.batteryPercent, status.charging, status.powerSource,
                 status.wifiEnabled, status.wifiConnected, status.wifiRssi, status.bluetoothEnabled,
                 status.epochMinute, status.timeZoneId, status.use24HourClock)
