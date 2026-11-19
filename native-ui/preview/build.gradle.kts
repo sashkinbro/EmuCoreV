@@ -57,6 +57,13 @@ val verifyLocalNativeUiAssets by tasks.registering {
     }
 }
 val packedAssets = layout.buildDirectory.dir("generated/nativeUiAssets")
+val startupAssets = layout.buildDirectory.dir("generated/nativeUiStartupAssets")
+val copyStartupBusyImage by tasks.registering(Copy::class) {
+    from(file("../resources/images/paf-common-resource/ba195a37.png")) {
+        rename { "startup-busy.png" }
+    }
+    into(startupAssets)
+}
 val packNativeUiAssets by tasks.registering(Zip::class) {
     dependsOn(verifyLocalNativeUiAssets)
     from(file("../resources"))
@@ -84,7 +91,7 @@ val indexNativeUiAssets by tasks.registering {
             hash.digest().joinToString("") { "%02x".format(it) })
     }
 }
-tasks.named("preBuild") { dependsOn(indexNativeUiAssets) }
+tasks.named("preBuild") { dependsOn(indexNativeUiAssets, copyStartupBusyImage) }
 
 android {
     namespace = "com.sbro.emucorev.nativeuipreview"
@@ -93,6 +100,7 @@ android {
     androidResources { noCompress += "zip" }
     sourceSets.getByName("main").kotlin.srcDir("../android/src/main/java")
     sourceSets.getByName("main").assets.srcDir(packedAssets.get().asFile)
+    sourceSets.getByName("main").assets.srcDir(startupAssets.get().asFile)
     defaultConfig {
         applicationId = "com.sbro.emucorev.nativeuipreview"
         minSdk = 29

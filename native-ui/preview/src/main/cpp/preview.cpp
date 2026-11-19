@@ -77,6 +77,8 @@ std::uint64_t home_catalog_revision = 0;
 std::unordered_map<std::string, LiveAreaSnapshot> livearea_catalog;
 std::uint64_t livearea_catalog_revision = 0;
 std::atomic<bool> native_back_requested{false};
+std::atomic<int> native_ready_scene{-1};
+std::atomic<bool> native_preview_failed{false};
 JavaVM* preview_java_vm = nullptr;
 jobject preview_activity_ref = nullptr;
 jmethodID livearea_target_callback = nullptr;
@@ -160,6 +162,7 @@ struct Window {
     std::string livearea_title_id;
     std::optional<LiveAreaSnapshot> livearea_snapshot;
     std::uint64_t applied_livearea_catalog_revision = 0;
+    std::vector<emucorev::paf::PlaneDivScreenQuad> livearea_gate_frame;
     int home_page = 0, home_focus = 0, home_touch = -1;
     std::size_t home_page_capacity = 0;
     emucorev::paf::PagePoint home_touch_start{};
@@ -204,6 +207,9 @@ struct Window {
         // GPU resources must die before their context, including partial init.
         if (context != EGL_NO_CONTEXT && surface != EGL_NO_SURFACE)
             eglMakeCurrent(display, surface, surface, context);
+        // Home bubble renderers own GL objects; destroy them while their
+        // originating context is current, before EGL teardown below.
+        home_bubbles.clear();
         bubble.reset();
         sprites.reset();
         lock.reset();
@@ -480,6 +486,21 @@ struct Window {
             if (entry == livearea_catalog.end()) return false;
             livearea_snapshot = entry->second;
             applied_livearea_catalog_revision = revision;
+            // Gate frame geometry is fixed per A3 RCO resource. Build its
+            // exact PlaneObj patches only when the title snapshot changes.
+            emucorev::paf::PlaneDivSpec frame_spec{};
+            frame_spec.size_x = 292.f;
+            frame_spec.size_y = 170.f;
+            frame_spec.tex_width = 74;
+            frame_spec.tex_height = 82;
+            frame_spec.div_mode = emucorev::paf::PlaneDivMode::Grid3x3;
+            frame_spec.div_ratio_h = {0.487800002f, 0.487800002f};
+            frame_spec.div_ratio_v = {0.487800002f, 0.487800002f};
+            frame_spec.margin_left = frame_spec.margin_right = 5;
+            frame_spec.margin_top = frame_spec.margin_bottom = 9;
+            const auto& gate = livearea_snapshot->gate_rect;
+            livearea_gate_frame = emucorev::paf::build_plane_div_screen_quads(
+                frame_spec, gate[0] + gate[2] * 0.5f, gate[1] + gate[3] * 0.5f);
         }
         return livearea_snapshot.has_value();
     }
@@ -511,24 +532,7 @@ struct Window {
         }
         draw_layer(page.gate_id, page.gate_rect);
 
-        // LiveArea RCO template 0x1467f749 contains a 292x170 composite drawer
-        // with a 292x170 plane button whose image_obj resolves to 0xca6a6db1
-        // (74x82, div_mode=3x3, div_ratio=0.487800002, margin_h=5, margin_v=9).
-        emucorev::paf::PlaneDivSpec frame_spec{};
-        frame_spec.size_x = 292.f;
-        frame_spec.size_y = 170.f;
-        frame_spec.tex_width = 74;
-        frame_spec.tex_height = 82;
-        frame_spec.div_mode = emucorev::paf::PlaneDivMode::Grid3x3;
-        frame_spec.div_ratio_h = {0.487800002f, 0.487800002f};
-        frame_spec.div_ratio_v = {0.487800002f, 0.487800002f};
-        frame_spec.margin_left = 5;
-        frame_spec.margin_right = 5;
-        frame_spec.margin_top = 9;
-        frame_spec.margin_bottom = 9;
-        const float gate_cx = page.gate_rect[0] + page.gate_rect[2] * 0.5f;
-        const float gate_cy = page.gate_rect[1] + page.gate_rect[3] * 0.5f;
-        for (const auto& quad : emucorev::paf::build_plane_div_screen_quads(frame_spec, gate_cx, gate_cy))
+        for (const auto& quad : livearea_gate_frame)
             sprites->draw_patch(0xca6a6db1u, quad.x, quad.y, quad.width, quad.height,
                 quad.u, quad.v, quad.uv_width, quad.uv_height);
     }
@@ -544,6 +548,7 @@ struct Window {
     void close_livearea() {
         livearea_visible = false;
         livearea_snapshot.reset();
+        livearea_gate_frame.clear();
     }
 
     bool livearea_target_at(float x, float y, std::string& target) {
@@ -1087,6 +1092,7 @@ struct Preview {
     emucorev::paf::BusyIndicator busy{80};
     emucorev::paf::ChargingIndicator charging;
     std::unique_ptr<Window> window;
+    android_app* app = nullptr;
     AChoreographer* choreographer = nullptr;
     bool resumed = false, focused = false, callback_pending = false;
     bool phase_initialized = false;
@@ -1113,6 +1119,25 @@ struct Preview {
                     // the render/looper thread.
                     if (native_back_requested.exchange(false) && preview.window)
                         preview.window->close_livearea();
+                    if (native_preview_failed.exchange(false)) {
+                        preview.busy.stop();
+                    }
+                    int ready_scene = native_ready_scene.load();
+                    if (ready_scene >= 0 && preview.app && preview.app->window
+                        && native_ready_scene.compare_exchange_strong(ready_scene, -1)) {
+                        preview_scene.store(ready_scene);
+                        preview.window.reset();
+                        auto next = std::make_unique<Window>();
+                        next->initialize(preview.app);
+                        preview.window = std::move(next);
+                        if (!preview.phase_initialized) {
+                            preview.phase = preview.window->initial_phase;
+                            preview.phase_initialized = true;
+                        } else if (ready_scene == 0) {
+                            preview.window->set_phase(preview.phase);
+                        }
+                        preview.last_draw = preview.next_draw = 0;
+                    }
                 // Vsync timestamps round fractional refresh periods to ns.
                 // Do not skip a 60 Hz frame merely because it is a few ns
                 // earlier than the accumulated 16,666,667 ns deadline.
@@ -1149,6 +1174,7 @@ struct Preview {
 
     void command(android_app* app, int32_t command) {
         try {
+            this->app = app;
             if (command == APP_CMD_TERM_WINDOW) {
                 window.reset();
                 last_draw = next_draw = 0;
@@ -1192,7 +1218,23 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeResourceRoot(JNIEnv
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewScene(JNIEnv*, jobject, jint scene) {
+    native_ready_scene.store(-1);
+    native_preview_failed.store(false);
+    native_back_requested.store(false);
     preview_scene.store(scene);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewReady(JNIEnv*, jobject, jint scene) {
+    if (scene < 0 || scene > 3) return;
+    native_preview_failed.store(false);
+    native_ready_scene.store(scene);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewFailed(JNIEnv*, jobject) {
+    native_ready_scene.store(-1);
+    native_preview_failed.store(true);
 }
 
 extern "C" JNIEXPORT void JNICALL

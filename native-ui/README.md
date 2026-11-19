@@ -64,6 +64,20 @@ finishing the NativeActivity; modern Android back callbacks and the legacy key
 path queue the request for the native thread. The Android XML parser path was
 also exercised on-device after removing unsupported desktop parser flags.
 
+Cold preview startup now renders BusyIndicator while a single worker prepares
+the ZIP, images, catalog and LiveArea snapshots. A separate 767-byte bundled
+busy image is available before ZIP extraction. The main thread publishes the
+ready scene only after preparation; native scene replacement happens on the
+render thread, destroying the previous EGL window before creating its successor.
+Cancellation serializes JNI publication with Activity destruction. Home bubble
+GPU resources are destroyed before their EGL context, and LiveArea gate meshes
+are cached per snapshot rather than allocated every frame.
+
+Lenovo verification covered a fresh preview-data extraction, reaching Lock,
+unlocking Home, opening LiveArea, Back, background/resume and repeated startup.
+Assemble/lint passed. This verifies readiness integration, not original cold-start
+duration, loading-circle placement or complete shell lifecycle equivalence.
+
 The wave reconstruction now includes the native `wave_pos.vp/fp` position pass
 and the standard `effects_default_0512_01` sky parameter snapshot. Preset floats
 are reconstructed from ARM/VFP writes before registration at `0x810b0fba`;
