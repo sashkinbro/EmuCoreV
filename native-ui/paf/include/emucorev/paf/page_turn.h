@@ -42,6 +42,20 @@ struct PageTurnShapeMaterial {
     float normal_scale_z;
     float fresnel_multiplier;
 };
+using PageTurnMatrix = std::array<float, 16>;
+struct PageTurnPose {
+    std::array<float, 3> scale{1, 1, 1};
+    std::array<float, 3> position{0, 0, 0};
+    std::array<float, 4> rotation{0, 0, 0, 1};
+};
+struct PageTurnTransforms { PageTurnMatrix model, model_view_projection; };
+struct PageTurnPointLight {
+    PagePoint angles{std::bit_cast<float>(0x3fa8bf90u), std::bit_cast<float>(0x3f0f9d91u)};
+    float distance = std::bit_cast<float>(0x450ba0a1u);
+    std::array<float, 3> attenuation{1, 0, 0}, ambient{.2f, .2f, .2f}, diffuse{1, 1, 1};
+    float fade = 1;
+};
+struct PageTurnLightParameters { PageTurnMatrix position, color; };
 struct PageTurnMesh {
     // Reused caller-owned storage. Only the counted prefixes are initialized.
     std::array<PagePoint, 1024> vertices;
@@ -72,4 +86,8 @@ void page_turn_mesh(const PageFoldShape& shape, PageTurnMesh& output);
 // reciprocal/multiply rounding (aspect.y can differ from 1 by one float step).
 PageTurnShapeMaterial page_turn_shape_material(PagePoint point, const PageFoldShape& shape,
     const PageTurnShapeStyle& style = {});
+// Column-major matrices; physical-pixel position refers to the page center.
+PageTurnTransforms page_turn_transforms(PagePoint size, const PageTurnPose& pose,
+    const PageTurnMatrix& projection, const PageTurnMatrix& view);
+PageTurnLightParameters page_turn_light_parameters(const PageTurnPointLight& light);
 }

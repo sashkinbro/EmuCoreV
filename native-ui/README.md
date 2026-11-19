@@ -829,13 +829,46 @@ to the native builder for **80 records / 1,680 words, bit-exact on Lenovo and
 RG556**. Four page sizes, two controlled styles and ten fold points cover near
 rest, saturation, negative progress and out-of-page inputs. The comparison also
 checks the resulting two Fresnel coefficients after the multiplier is applied.
-This proves the shared shape-material block, not complete lighting/matrix/texture
-assembly, actual shell configuration or rendered-frame parity. The preview
+This proves the shared shape-material block; pose/light assembly is checked
+separately below. Complete texture assembly, actual shell configuration and
+rendered-frame parity remain unproven. The preview
 lock-screen integration remains pending.
 
 ```text
 python native-ui/tests/generate_page_material_reference.py OWNED_DECRYPTED_PAF LOCAL_MATERIAL_CORPUS.bin
 paf_page_material_test LOCAL_MATERIAL_CORPUS.bin
+```
+
+### Native page pose and point light
+
+`page_turn_transforms()` assembles column-major model/MVP matrices from the
+physical page size, scale, center position, quaternion and view/projection.
+It retains the original quaternion normalization, zero-quaternion identity,
+origin placement, height-normalized axes and non-fused matrix operation order.
+**60 original CPU-renderer records / 1,920 matrix words match bit for bit on
+Lenovo and RG556**, across four sizes, five poses and three camera configurations.
+
+`page_turn_light_parameters()` builds the position/attenuation and
+ambient/diffuse/fade uniform blocks. The Y-up spherical conversion reproduces
+the original PAF sine/cosine polynomials, range reduction and quadrant handling;
+it does not substitute platform libm. The zero-attenuation fallback is retained.
+Constructor defaults preserve their original float bits. **105 original
+CPU-renderer records / 3,360 light words match bit for bit on both devices**,
+including default angles/distance, positive/negative/wrapped angles, signed zero,
+polynomial/quadrant boundaries, zero distance and varied attenuation/colors/fade.
+The shared material corpus remains byte-identical and still passes all 80 cases.
+
+All these builders use caller-owned values with no allocation, I/O, guest execution
+or graphics calls. Their offline reference runner hosts graphics submission only;
+the original pose and lighting math executes unchanged. These results establish
+CPU parameter equivalence for the recorded cases; full material binding, pass
+ordering, shell layout and screen transitions still need integration.
+
+```text
+python native-ui/tests/generate_page_transform_reference.py OWNED_DECRYPTED_PAF LOCAL_POSE_CORPUS.bin
+paf_page_transform_test LOCAL_POSE_CORPUS.bin
+python native-ui/tests/generate_page_light_reference.py OWNED_DECRYPTED_PAF LOCAL_LIGHT_CORPUS.bin
+paf_page_light_test LOCAL_LIGHT_CORPUS.bin
 ```
 
 ### Recovered busy indicator

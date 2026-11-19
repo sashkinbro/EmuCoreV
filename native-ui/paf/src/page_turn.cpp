@@ -54,6 +54,44 @@ float root(float value) {
     return std::sqrt(value);
 #endif
 }
+float light_reduce(float angle) {
+    constexpr float period = 6.2831855f;
+    if (angle > period) {
+        float turns = angle / period;
+        if ((std::bit_cast<std::uint32_t>(turns) << 1) < 0x98000000u)
+            turns = static_cast<float>(static_cast<int>(turns));
+        angle = angle - turns * period;
+    }
+    return angle;
+}
+float light_sine_polynomial(float angle) {
+    const float square = angle * angle;
+    return angle * (((square * -.00019418877f + .008331325f) * square - .16666639f) * square + 1.f);
+}
+float light_cosine_polynomial(float square) {
+    return ((square * -.0013719854f + .04166315f) * square - .4999998f) * square + 1.f;
+}
+float light_sine(float input) {
+    float angle = light_reduce(std::abs(input));
+    auto sign = std::bit_cast<std::uint32_t>(input) & 0x80000000u;
+    if (angle > 3.1415927f) { angle -= 3.1415927f; sign ^= 0x80000000u; }
+    if (angle > 1.5707964f) angle = 3.1415927f - angle;
+    float value;
+    if (angle > .91734505f) {
+        const float complement = 1.5707964f - angle;
+        value = light_cosine_polynomial(complement * complement);
+    } else value = light_sine_polynomial(angle);
+    return value == 0 ? 0.f : std::bit_cast<float>(std::bit_cast<std::uint32_t>(std::abs(value)) | sign);
+}
+float light_cosine(float input) {
+    float angle = light_reduce(std::abs(input));
+    std::uint32_t sign = 0;
+    if (angle > 3.1415927f) { angle -= 3.1415927f; sign = 0x80000000u; }
+    if (angle > 1.5707964f) { angle = 3.1415927f - angle; sign ^= 0x80000000u; }
+    const float value = angle > .65345126f ? light_sine_polynomial(1.5707964f - angle)
+        : light_cosine_polynomial(angle * angle);
+    return value == 0 ? 0.f : std::bit_cast<float>(std::bit_cast<std::uint32_t>(std::abs(value)) | sign);
+}
 PagePoint add(PagePoint a, PagePoint b) { return {a.x + b.x, a.y + b.y}; }
 PagePoint subtract(PagePoint a, PagePoint b) { return {a.x - b.x, a.y - b.y}; }
 PagePoint multiply(PagePoint a, float b) { return {a.x * b, a.y * b}; }
@@ -236,5 +274,70 @@ PagePoint page_turn_normalized_aspect(PagePoint size) {
     check_size(size);
     const float inverse_height = reciprocal(size.y);
     return {size.x * inverse_height, size.y * inverse_height};
+}
+PageTurnTransforms page_turn_transforms(PagePoint size, const PageTurnPose& pose,
+    const PageTurnMatrix& projection, const PageTurnMatrix& view) {
+    check_size(size);
+    auto finite = [](const auto& values) {
+        return std::all_of(values.begin(), values.end(), [](float value) { return std::isfinite(value); });
+    };
+    if (!finite(pose.scale) || !finite(pose.position) || !finite(pose.rotation)
+        || !finite(projection) || !finite(view)) throw std::invalid_argument("Invalid page transform input");
+    const auto [x, y, z, w] = pose.rotation;
+    const float squared = (x * x + y * y) + (z * z + w * w);
+    PageTurnMatrix rotation{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    if (squared != 0) {
+        const float inverse = 2.f / squared;
+        const float x2 = x * inverse, y2 = y * inverse, z2 = z * inverse;
+        const float wy = w * y2, base = 1.f - x * x2;
+        rotation = {(1.f - y * y2) - z * z2, w * z2 + x * y2, z * x2 - wy, 0,
+            x * y2 - w * z2, base - z * z2, w * x2 + y * z2, 0,
+            wy + z * x2, y * z2 - w * x2, base - y * y2, 0, 0,0,0,1};
+    }
+    const float half_width = (size.x * pose.scale[0]) * .5f;
+    const float half_height = (size.y * pose.scale[1]) * .5f;
+    auto model = rotation;
+    for (unsigned row = 0; row < 3; ++row) {
+        float origin = rotation[row] * -half_width;
+        origin += rotation[row + 4] * -half_height;
+        origin += rotation[row + 8] * 0.f;
+        origin += pose.position[row];
+        model[row + 12] = origin;
+    }
+    for (unsigned column = 0; column < 3; ++column) {
+        const float scale = size.y * pose.scale[column];
+        for (unsigned row = 0; row < 4; ++row) model[column * 4 + row] = rotation[column * 4 + row] * scale;
+    }
+    auto multiply = [](const PageTurnMatrix& a, const PageTurnMatrix& b) {
+        PageTurnMatrix result{};
+        for (unsigned column = 0; column < 4; ++column) for (unsigned row = 0; row < 4; ++row) {
+            float value = a[row] * b[column * 4];
+            value += a[row + 4] * b[column * 4 + 1];
+            value += a[row + 8] * b[column * 4 + 2];
+            value += a[row + 12] * b[column * 4 + 3];
+            result[column * 4 + row] = value;
+        }
+        return result;
+    };
+    return {model, multiply(multiply(projection, view), model)};
+}
+PageTurnLightParameters page_turn_light_parameters(const PageTurnPointLight& light) {
+    auto finite = [](const auto& values) {
+        return std::all_of(values.begin(), values.end(), [](float value) { return std::isfinite(value); });
+    };
+    if (!std::isfinite(light.angles.x) || !std::isfinite(light.angles.y) || !std::isfinite(light.distance)
+        || !std::isfinite(light.fade) || !finite(light.attenuation) || !finite(light.ambient)
+        || !finite(light.diffuse)) throw std::invalid_argument("Invalid page light input");
+    const float sine = light_sine(light.angles.x);
+    const float cosine_phi = light_cosine(light.angles.y), sine_phi = light_sine(light.angles.y);
+    const float x = sine * sine_phi, z = sine * cosine_phi;
+    const float y = light_cosine(light.angles.x);
+    auto attenuation = light.attenuation;
+    if (attenuation[0] == 0 && attenuation[1] == 0 && attenuation[2] == 0) attenuation = {1, 0, 0};
+    return {{x * light.distance, y * light.distance, z * light.distance, 1,
+                attenuation[0], attenuation[1], attenuation[2], 0, 0,0,0,0, 0,0,0,0},
+        {light.ambient[0], light.ambient[1], light.ambient[2], 1, 0,0,0,0,
+                light.diffuse[0], light.diffuse[1], light.diffuse[2], 1,
+                light.fade, light.fade, light.fade, light.fade}};
 }
 }

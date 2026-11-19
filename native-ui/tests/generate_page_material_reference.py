@@ -18,7 +18,7 @@ from unicorn.arm_const import (UC_ARM_REG_C1_C0_2, UC_ARM_REG_FPEXC,
     UC_ARM_REG_LR, UC_ARM_REG_PC, UC_ARM_REG_FPSCR)
 
 
-def record(b, width, height, point, style):
+def record(b, width, height, point, style, *, pose=None, projection=None, view=None, matrices=False, light_values=None, lights=False):
     u=Uc(UC_ARCH_ARM,UC_MODE_THUMB)
     ph=struct.unpack_from('<Q',b,72)[0]; sec=struct.unpack_from('<Q',b,88)[0]
     for i in range(2):
@@ -49,10 +49,16 @@ def record(b, width, height, point, style):
     for offset in (0x14,0x2bc,0x39c,0x604,0x74c,0xb14,0xc9c,0xf44,0xfbc,0x1384):word(bundle+offset,0x260000)
     for offset,stack in ((0,0x220000),(0x20,0x221000),(0x40,0x222000)):
      word(gl+offset,stack);word(gl+offset+0x10,1);matrix(stack);matrix(stack+64)
+    if projection is not None: fs(0x220000,*projection)
+    if view is not None: fs(0x222000,*view)
     u.mem_write(gl+0xc0,b'\x01\x01')
     word(data,surface);fs(data+8,width,height,0,0)
     fs(data+0x18,0,0);fs(data+0x20,1,1,1,1)
     fs(data+0x30,0,0,width,height);fs(data+0x40,width*.5,height*.5,0,1);fs(data+0x50,0,0,0,1)
+    if pose is not None:
+        fs(data+0x20,*pose[:3],1)
+        fs(data+0x40,*pose[3:6],1)
+        fs(data+0x50,*pose[6:10])
     fs(data+0x60,*point);u.mem_write(data+0x68,b'\x01')
     fs(surface+0x30,1/width,1/height)
     fs(renderer+0x70*4+8,1,1,1,1)
@@ -63,6 +69,11 @@ def record(b, width, height, point, style):
     fs(renderer+0x25a*4,1,1,1,1)
     light=renderer+0xee*4
     fs(light+8,1.3,.5);fs(light+0x1c,2200);fs(light+0x50,.2,.2,.2,1);fs(light+0x70,1,1,1,1);fs(light+0x8c,1)
+    if light_values is not None:
+        fs(light+8,*light_values[:2]);fs(light+0x1c,light_values[2])
+        fs(light+0x30,*light_values[3:6],0)
+        fs(light+0x50,*light_values[6:9],1)
+        fs(light+0x70,*light_values[9:12],1);fs(light+0x8c,light_values[12])
     fs(renderer+5*4,5)
     trace=[];seen=[]
     def hook(vm,a,n,_):
@@ -87,6 +98,10 @@ def record(b, width, height, point, style):
         if len(matches)!=1 or len(matches[0])!=16:
             raise ValueError('Unexpected original material setter sequence')
         return matches[0]
+    if lights:
+        return words(0x34)+words(0x30)
+    if matrices:
+        return words(0xc)[:16]+words(0x8)[:16]
     return (words(0x1c)[:4]+words(0x10)[:2]+words(0x18)[:4]+words(0x14)[:4]
         +words(0x20)[:4]+words(0x24)[:1]+words(0x2c)[9:11])
 
