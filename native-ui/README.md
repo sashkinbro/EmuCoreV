@@ -902,21 +902,28 @@ protocol capture described below.
 
 An offline trace runs the original renderer entry in a hosted graphics
 environment and records the ordered protocol: surface activation and texture
-binds, per-pass matrix/shape/light setter blocks, cull/blend state changes and
-draw submissions. With a controlled flat fold it currently captures 85 events,
-resolving the two page-surface passes and their uniform order; the mesh draw-info
-structures are still stubbed, so program binds and draw ranges are not yet in the
-trace. This is a research generator only. The standalone busier scenes and
-existing device gates are unaffected.
+binds, per-pass matrix/shape/light setter blocks, program binds, render-state
+changes and draw submissions. Supplying the draw-info structures makes the
+renderer submit its real draws: a flat page produces 74 material blocks, four
+program binds and two surface draws; a folded page produces 111 blocks, six
+program binds and five draws (three surfaces). The renderer prepares every
+surface first and then binds and submits them in order, so each recorded
+vertex/fragment program object can be attributed to one material set. The
+material setter API is fixed-slot (17 vertex / 20 fragment calls per surface),
+which means the next reconstruction pass must map those slots to the reflected
+uniform offsets above. This is a research generator only. The standalone preview
+scenes and existing device gates are unaffected.
 
 ```text
-python native-ui/tests/trace_page_draw_protocol.py OWNED_DECRYPTED_LIBPAF OUTPUT_TRACE.json
+python native-ui/tests/trace_page_draw_protocol.py OWNED_DECRYPTED_LIBPAF OUTPUT_TRACE.json [--fold]
 ```
 
 The tracer validates the reviewed reference SHA-256 and refuses an unknown
 image. It supplies only the controlled renderer input state; the original
-renderer computes the recorded protocol itself. Its output does not establish
-program pairings or rendered-frame parity, and no trace enters the application.
+renderer computes the recorded protocol itself. With `--fold` the fixture's
+non-zero fold point selects the rounded-edge material set. Its output does not
+establish the shell's real lock-screen configuration, texture identity or
+rendered-frame parity, and no trace enters the application.
 
 ### Recovered busy indicator
 
