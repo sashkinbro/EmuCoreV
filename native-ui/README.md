@@ -542,7 +542,7 @@ or test interpreter are linked into the UI.
 
 ## Build and validation
 
-### Recovered PageTurn controls
+### Recovered PageTurn controls and fold geometry
 
 `page_turn.h` provides the original centered/Y-up fold layout, corner hit region,
 drag target, normalized draw controls/back-opacity mask, and pointer/gamepad
@@ -552,12 +552,24 @@ The drag calculation retains its original order and 0.7 overshoot factor.
 Hit testing includes the excluded diagonal at the corner as well as the two
 rectangle boundaries. Pointer and gamepad outward-release thresholds differ.
 
+`page_turn_fold_shape()` additionally reconstructs the renderer's fold-plane
+geometry: clamp the deepest point, build the normalized plane, project/mirror
+the four corners, select signed-distance extremes and clip the fold line against
+the page's four half-planes. The ARM implementation retains the original
+reciprocal/root estimates and non-fused refinement steps. Its returned shape is
+UI-owned data; it reads no guest memory and performs no allocation or I/O.
+
 The offline oracle executes the reviewed original PageTurn functions, retaining
 their math and branch decisions while supplying local pointer coordinates and
-suppressing widget notifications, capture and drawing. All **416 records / 6,240
+suppressing widget notifications, capture and drawing. The fold-shape function
+and its projection/clipping helpers execute unchanged in the reference. All
+**422 records / 27,852
 result words match bit for bit** on Lenovo and RG556. The corpus covers four
 page sizes, three fold configurations, hit-region boundaries, opacity, release
-thresholds, outward-release options and additional deterministic input samples.
+thresholds, outward-release options and additional deterministic input samples,
+including fold saturation and large drags outside the page. The compared fields
+include all projected/mirrored corners, signed distances, extrema, clipped-line
+endpoints and the whole-line-outside flag.
 It does not prove Android input mapping, gesture capture/lifecycle, rendering,
 the shell's lock-screen configuration or spring/settling animation parity.
 

@@ -68,8 +68,8 @@ def callback(machine, address, size, data):
 
 uc.hook_add(UC_HOOK_CODE, callback)
 
-def call(address, r1=0):
-    uc.reg_write(UC_ARM_REG_R0, 0x200000)
+def call(address, r1=0, r0=0x200000):
+    uc.reg_write(UC_ARM_REG_R0, r0)
     uc.reg_write(UC_ARM_REG_R1, r1)
     uc.reg_write(UC_ARM_REG_SP, 0x10f000)
     uc.reg_write(UC_ARM_REG_LR, 0x10001)
@@ -99,6 +99,8 @@ for _ in range(128):
         rng.uniform(-20, 20), rng.uniform(-20, 20),
         rng.random(), rng.random(), rng.random(), rng.uniform(-400, 400), rng.uniform(-400, 400), rng.uniform(1, 400)]
     cases.append((values, rng.randrange(2)))
+for x, y in ((960, 544), (3840, 2176), (-3840, -2176), (-3840, 2176), (3840, -2176), (0, 0)):
+    cases.append(([960, 544, .15, .8, x, y, 420, 210, 0, 0, 1, 1, 1, 0, 0, 280], 0))
 
 records = []
 for values, outward in cases:
@@ -150,6 +152,18 @@ for values, outward in cases:
         expected += struct.pack("<I", events[0])
     if len(expected) != 60:
         raise ValueError("Invalid PageTurn reference record")
-    records.append(packed + expected)
-args.output.write_bytes(b"PAFPAG01" + struct.pack("<I", len(records)) + b"".join(records))
+    shape_inputs = struct.pack("<4f", values[4] / values[1], values[5] / values[1], values[0] / values[1], 1)
+    uc.mem_write(0x205060, shape_inputs[:8])
+    uc.mem_write(0x205068, b"\x01")
+    uc.mem_write(0x206000, shape_inputs[8:])
+    uc.reg_write(UC_ARM_REG_R2, 0x206000)
+    call(0x810c9f34, 0x205000, 0x204000)
+    shape = read(0x204000, 48)
+    for offset in (0x30, 0x48, 0x60, 0x78): shape += read(0x204000 + offset, 20)
+    shape += read(0x204090, 8) + read(0x204098, 20) + read(0x2040b0, 20)
+    shape += read(0x2040c8, 16) + read(0x2040e0, 8)
+    shape += struct.pack("<I", uc.mem_read(0x2040d8, 1)[0])
+    if len(shape) != 204: raise ValueError("Invalid fold-shape reference record")
+    records.append(packed + expected + shape_inputs + shape)
+args.output.write_bytes(b"PAFPAG02" + struct.pack("<I", len(records)) + b"".join(records))
 print("Generated", len(records), "original PageTurn records")

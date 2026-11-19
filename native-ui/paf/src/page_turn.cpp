@@ -1,5 +1,6 @@
 #include <emucorev/paf/page_turn.h>
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <stdexcept>
 #if defined(__aarch64__) || defined(__ARM_NEON)
@@ -27,6 +28,57 @@ PagePoint inverse_size(PagePoint size) {
 #else
     return {1.f / size.x, 1.f / size.y};
 #endif
+}
+float reciprocal(float value) {
+#if defined(__aarch64__) || defined(__ARM_NEON)
+    const auto source = vdup_n_f32(value);
+    auto result = vrecpe_f32(source);
+    result = vmul_f32(result, vsub_f32(vdup_n_f32(2), vmul_f32(result, source)));
+    result = vmul_f32(result, vsub_f32(vdup_n_f32(2), vmul_f32(result, source)));
+    return vget_lane_f32(result, 0);
+#else
+    return 1.f / value;
+#endif
+}
+float root(float value) {
+#if defined(__aarch64__) || defined(__ARM_NEON)
+    const auto source = vdup_n_f32(value);
+    auto inverse = vrsqrte_f32(source);
+    for (unsigned i = 0; i < 2; ++i) {
+        const auto square = vmul_f32(inverse, inverse);
+        const auto step = vmul_f32(vsub_f32(vdup_n_f32(3), vmul_f32(square, source)), vdup_n_f32(.5f));
+        inverse = vmul_f32(inverse, step);
+    }
+    return vget_lane_f32(vmul_f32(source, inverse), 0);
+#else
+    return std::sqrt(value);
+#endif
+}
+PagePoint add(PagePoint a, PagePoint b) { return {a.x + b.x, a.y + b.y}; }
+PagePoint subtract(PagePoint a, PagePoint b) { return {a.x - b.x, a.y - b.y}; }
+PagePoint multiply(PagePoint a, float b) { return {a.x * b, a.y * b}; }
+float dot(PagePoint a, PagePoint b) { return a.x * b.x + a.y * b.y; }
+PageFoldProjection project(PagePoint center, PagePoint normal, PagePoint point) {
+    const PagePoint tangent{-normal.y, normal.x};
+    const auto delta = subtract(point, center);
+    auto along = multiply(tangent, dot(tangent, delta));
+    along = multiply(along, reciprocal(dot(tangent, tangent)));
+    const auto projected = add(center, along);
+    const float distance = dot(normal, delta);
+    return {projected, distance < 0 ? add(projected, subtract(projected, point)) : point, distance};
+}
+bool clip(PagePoint& start, PagePoint& end, PagePoint origin, PagePoint normal) {
+    const float a = dot(normal, subtract(start, origin));
+    const float b = dot(normal, subtract(end, origin));
+    if (a >= 0 && b >= 0) return false;
+    if (a < 0 && b < 0) return true;
+    const auto projected = subtract(start, multiply(normal, a));
+    const float numerator = dot(normal, subtract(projected, start));
+    const float ratio = numerator * reciprocal(b - a);
+    const auto intersection = add(start, multiply(subtract(end, start), ratio));
+    if (a < 0) start = intersection;
+    else end = intersection;
+    return false;
 }
 }
 PageTurnLayout page_turn_layout(PagePoint size, float fold_fraction, float corner_aspect) {
@@ -64,5 +116,40 @@ PageTurnRelease page_turn_release(PagePoint displacement, float threshold, bool 
         return PageTurnRelease::outward;
     const float squared = displacement.x * displacement.x + displacement.y * displacement.y;
     return squared > threshold * threshold ? PageTurnRelease::beyond_threshold : PageTurnRelease::within_threshold;
+}
+PageFoldShape page_turn_fold_shape(PagePoint deepest, PagePoint aspect) {
+    check_size(aspect);
+    if (!std::isfinite(deepest.x) || !std::isfinite(deepest.y))
+        throw std::invalid_argument("Invalid page-turn fold point");
+    constexpr float upper = std::bit_cast<float>(0x3f7fff58u);
+    constexpr float lower = std::bit_cast<float>(0x3fffffacu);
+    const PagePoint bounded{std::max(-aspect.x * lower, std::min(aspect.x * upper, deepest.x)),
+        std::max(-aspect.y * lower, std::min(aspect.y * upper, deepest.y))};
+    const auto delta = subtract(bounded, aspect);
+    const float squared = dot(delta, delta);
+    if (!std::isfinite(squared) || squared < 1.1754943508222875e-38f)
+        throw std::invalid_argument("Degenerate page-turn fold extent");
+    PageFoldShape result{};
+    result.center = multiply(add(bounded, aspect), .5f);
+    result.normal = multiply(delta, reciprocal(root(squared)));
+    result.corners = {{{0, 0}, {aspect.x, 0}, aspect, {0, aspect.y}}};
+    for (unsigned i = 0; i < 4; ++i)
+        result.projected[i] = project(result.center, result.normal, result.corners[i]);
+    result.far_corner = aspect;
+    result.maximum = result.minimum = result.projected[0];
+    for (const auto& corner : result.projected) {
+        if (corner.distance < 0 && corner.distance < result.minimum.distance) result.minimum = corner;
+        if (corner.distance > 0 && corner.distance > result.maximum.distance) result.maximum = corner;
+    }
+    const PagePoint tangent{-result.normal.y, result.normal.x};
+    result.line_start = add(result.center, multiply(tangent, 1000));
+    result.line_end = subtract(result.center, multiply(tangent, 1000));
+    // Apply all four half-planes even after a rejection, as the original does.
+    result.outside = clip(result.line_start, result.line_end, {0, 0}, {1, 0});
+    result.outside = clip(result.line_start, result.line_end, {0, 0}, {0, 1}) || result.outside;
+    result.outside = clip(result.line_start, result.line_end, aspect, {-1, -0.f}) || result.outside;
+    result.outside = clip(result.line_start, result.line_end, aspect, {-0.f, -1}) || result.outside;
+    result.aspect = aspect;
+    return result;
 }
 }

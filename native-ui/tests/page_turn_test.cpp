@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
         if (argc != 2) throw std::runtime_error("Usage: paf_page_turn_test ORIGINAL_CORPUS");
         std::ifstream input(argv[1], std::ios::binary);
         char magic[8]; input.read(magic, 8);
-        if (!input || std::string(magic, 8) != "PAFPAG01") throw std::runtime_error("Invalid page-turn corpus");
+        if (!input || std::string(magic, 8) != "PAFPAG02") throw std::runtime_error("Invalid page-turn corpus");
         auto word = [&]() {
             std::array<std::uint8_t, 4> bytes;
             input.read(reinterpret_cast<char*>(bytes.data()), 4);
@@ -47,8 +47,34 @@ int main(int argc, char** argv) {
                     throw std::runtime_error("Original PageTurn result differs");
                 }
             }
+            std::array<float, 4> shape_args;
+            for (auto& value : shape_args) value = std::bit_cast<float>(word());
+            const auto shape = page_turn_fold_shape({shape_args[0], shape_args[1]}, {shape_args[2], shape_args[3]});
+            std::array<std::uint32_t, 51> shape_actual{};
+            unsigned next = 0;
+            auto append_point = [&](PagePoint p) {
+                shape_actual[next++] = bits(p.x); shape_actual[next++] = bits(p.y);
+            };
+            auto append_projection = [&](PageFoldProjection p) {
+                append_point(p.on_fold); append_point(p.mirrored); shape_actual[next++] = bits(p.distance);
+            };
+            append_point(shape.center); append_point(shape.normal);
+            for (auto corner : shape.corners) append_point(corner);
+            for (auto corner : shape.projected) append_projection(corner);
+            append_point(shape.far_corner); append_projection(shape.maximum); append_projection(shape.minimum);
+            append_point(shape.line_start); append_point(shape.line_end); append_point(shape.aspect);
+            shape_actual[next++] = shape.outside;
+            if (next != shape_actual.size()) throw std::runtime_error("Invalid native fold layout");
+            for (unsigned lane = 0; lane < next; ++lane) {
+                const auto expected = word();
+                if (shape_actual[lane] != expected) {
+                    std::cerr << "case=" << i << " shape lane=" << lane << std::hex
+                        << " expected=" << expected << " actual=" << shape_actual[lane] << '\n';
+                    throw std::runtime_error("Original fold shape differs");
+                }
+            }
         }
         if (input.peek() != std::char_traits<char>::eof()) throw std::runtime_error("Trailing page-turn corpus data");
-        std::cout << "PASS " << count << " bit-exact original PageTurn layout/draw/drag/hit/release records\n";
+        std::cout << "PASS " << count << " bit-exact original PageTurn controls and fold-shape records\n";
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }
