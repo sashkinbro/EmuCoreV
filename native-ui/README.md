@@ -953,6 +953,12 @@ renderer behaviour.
 python native-ui/tests/verify_page_material_slots.py OWNED_DECRYPTED_LIBPAF
 ```
 
+The reviewed material registration order and the renderer-constructor defaults
+(exact IEEE-754 bit patterns for the material pack, both point lights and every
+style/empty-back constant, plus the corner texture location) are recorded in
+`tests/reference/page_turn_material_order.json` for the native material
+controller. It is a local research reference; no firmware data is packaged.
+
 ### Recovered busy indicator
 
 `BusyIndicator` reconstructs the PAF component's head and eight retained trail

@@ -1,0 +1,28 @@
+{
+ "note": "Recovered PageTurn material parameter registration order and renderer-constructor defaults from libpaf, reviewed 2026-11-19. Local research reference; the application uses no firmware data or addresses. Float defaults are exact IEEE-754 bit patterns. The native material controller must fill each program's uniforms in the listed order; numeric destination offsets come from the GXP reflection layout.",
+ "vertex": {
+  "page_turn_top.vp": ["MVP", "ModelMatrix", "shape.Grep", "shape.FoldPlane", "shape.Params", "shape.Deepest", "shape.Aspect", "shape.NormalScaleZ", "lit_params.Eye", "MaterialPack", "PointLightPack2", "PointLightPack1", "UVTransform", "SqueezeZ"],
+  "page_turn_top_round.vp": ["MVP", "ModelMatrix", "shape.Grep", "shape.FoldPlane", "shape.Params", "shape.Deepest", "shape.Aspect", "shape.NormalScaleZ", "lit_params.Eye", "MaterialPack", "PointLightPack2", "PointLightPack1", "UVTransform", "SqueezeZ"],
+  "page_turn_bottom.vp": ["MVP", "shape.Grep", "shape.FoldPlane", "shape.Params", "shape.Deepest", "shape.Aspect", "shape.NormalScaleZ", "Shadow", "UVTransform", "SqueezeZ", "ExpMinusTexture", "ExpMinusRange"],
+  "page_turn_bottom_round.vp": ["MVP", "shape.Grep", "shape.FoldPlane", "shape.Params", "shape.Deepest", "shape.Aspect", "shape.NormalScaleZ", "Shadow", "UVTransform", "SqueezeZ", "ExpMinusTexture", "ExpMinusRange"],
+  "page_turn_bottom_round_empty.vp": ["MVP", "shape.Grep", "shape.FoldPlane", "shape.Params", "shape.Deepest", "shape.Aspect", "shape.NormalScaleZ", "Shadow", "UVTransform", "SqueezeZ"],
+  "quad.vp": ["MVP", "UVtransform"]
+ },
+ "fragment": {
+  "page_turn_top.fp": ["MaterialPack", "PointLightPack2", "Tex", "BackSideOpacity"],
+  "page_turn_top_round.fp": ["MaterialPack", "PointLightPack2", "Tex", "CornerSize", "CornerTex", "BackSideOpacity"],
+  "page_turn_bottom.fp": ["Tex"],
+  "page_turn_bottom_round.fp": ["Tex", "CornerSize", "CornerTex", "CornerRefract"],
+  "page_turn_bottom_round_empty.fp": ["CornerSize", "CornerTex", "EmptyShadow", "EmptyColor", "EmptyShadowColor", "EmptyBackground", "EmptyBackgroundUVFactor"],
+  "page_turn_shadow.fp": ["Tex", "Border", "Level", "Color"],
+  "pure_copy.fp": ["Source"]
+ },
+ "constructor_defaults_bits": {
+  "material_pack": {"color": ["0x3f800000", "0x3f800000", "0x3f800000", "0x3f800000"], "diffuse_coeff": "0x3f649247", "specular_coeff": "0x3f8879ee", "specular_power": "0x4185f15e", "fresnel_front": "0x3da491b0", "fresnel_control": "0x3f4d30ad", "fresnel_coeff": "0x3e9349e0", "refraction_coeff": "0x404321c9", "refraction_amount": "0x3ec49214", "second_reflection": "0x3dea454e"},
+  "style": {"top_scale": "0x3e6de871", "top_curl": "0x3f1b6da8", "back_opacity": "0x3da491b0", "bottom_scale": "0x3c1246bf", "shadow": "0x437a0000", "shadow_level": "0x3e9b6da8", "normal_scale_z": "0x40536db5", "squeeze_z": "0x3f800000", "empty_shadow": "0x4181b13b", "empty_shadow_level": "0x3ef6db51", "empty_corner_shadow": "0x3e9a6c1a", "empty_color": ["0x3f800000", "0x3f800000", "0x3f800000"], "empty_shadow_color": ["0x3ec00000", "0x3ecdb6c3", "0x3ed6db51"], "occluder_shadow_sharpness": "0x3d0a2db6", "occluder_shadow_level": "0x3f39248d", "occluder_shadow_color": ["0x3f800000", "0x3f800000", "0x3f800000", "0x3f800000"]},
+  "point_light_default": {"theta_phi": ["0x3fa8bf90", "0x3f0f9d91"], "distance": "0x450ba0a1", "attenuation": ["0x3f800000", "0x00000000", "0x00000000"], "ambient": ["0x3e4ccccd", "0x3e4ccccd", "0x3e4ccccd"], "diffuse": ["0x3f800000", "0x3f800000", "0x3f800000"], "fade": "0x3f800000"},
+  "point_light_second": {"theta_phi": ["0x3fc90fd8", "0x3e2c5693"], "distance": "0x44408524"},
+  "corner_texture": "/page_turn/textures/page_corner.dds",
+  "texture_root": "vs0:data/internal/effects"
+ }
+}
