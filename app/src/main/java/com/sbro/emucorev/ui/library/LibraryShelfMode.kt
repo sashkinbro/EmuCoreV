@@ -2,6 +2,7 @@ package com.sbro.emucorev.ui.library
 
 import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -38,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -70,6 +72,7 @@ import com.sbro.emucorev.ui.common.GameCoverArt
 import com.sbro.emucorev.ui.common.gamepadFocusableCard
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import com.sbro.emucorev.ui.theme.neon.neonShape
@@ -101,8 +104,14 @@ internal fun LibraryShelfMode(
     // reach the card handler while a card is focused. The focus border stays gamepad-only.
     val shouldRequestGamepadFocus = true
     val cardFocusRequesters = remember(games) { List(games.size) { FocusRequester() } }
+    // currentPage for pager interactions; settledPage drives backdrop/title to avoid
+    // mid-swipe flicker from rapidly switching the blurred background image.
     val currentPage = pagerState.currentPage.coerceIn(0, games.lastIndex)
+    val settledPage = pagerState.settledPage.coerceIn(0, games.lastIndex)
     val activeGame = games[currentPage]
+    // Backdrop uses the settled game so it only crossfades once per navigation, not on every
+    // interpolated page offset update.
+    val backdropGame = games[settledPage]
     val pagerFlingBehavior = PagerDefaults.flingBehavior(
         state = pagerState,
         pagerSnapDistance = PagerSnapDistance.atMost(4)
@@ -174,22 +183,34 @@ internal fun LibraryShelfMode(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(Color(0xFF0F1217))
         ) {
-            val activeShelfCoverPath = activeGame.iconPath
-            ShelfBackdrop(
-                titleId = activeGame.titleId,
-                title = activeGame.title,
-                coverPath = activeShelfCoverPath,
-                artworkVersion = artworkVersion,
+            // Backdrop crossfades only after the pager settles so there's no rapid flickering
+            // of the blurred art during a drag gesture — the image switches once, cleanly.
+            AnimatedContent(
+                targetState = backdropGame,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(380)) togetherWith
+                        fadeOut(animationSpec = tween(260))
+                },
+                label = "shelf-backdrop",
                 modifier = Modifier.fillMaxSize()
-            )
+            ) { bgGame ->
+                ShelfBackdrop(
+                    titleId = bgGame.titleId,
+                    title = bgGame.title,
+                    coverPath = bgGame.iconPath,
+                    artworkVersion = artworkVersion,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
+                // Top bar title also uses settled game to avoid flickering text mid-swipe
                 ShelfTopBar(
-                    title = activeGame.title,
+                    title = backdropGame.title,
                     topInset = topInset,
                     horizontalInset = horizontalInset,
                     onExitShelfMode = onExitShelfMode
@@ -390,61 +411,82 @@ private fun ShelfBackdrop(
     artworkVersion: Long,
     modifier: Modifier = Modifier
 ) {
+    // Dark cinematic base — always rendered so there's no flash on first composition.
     val baseGradient = listOf(
-        Color(0xFF11141A),
-        Color(0xFF18202A),
-        Color(0xFF101318)
+        Color(0xFF0D1016),
+        Color(0xFF161C26),
+        Color(0xFF0E1115)
     )
+    // Subtle warm vignette from the center to give depth without overwhelming the covers.
     val stageGlow = listOf(
-        Color(0xFF344153).copy(alpha = 0.42f),
-        Color(0xFF263240).copy(alpha = 0.22f),
+        Color(0xFF2E3A4A).copy(alpha = 0.38f),
+        Color(0xFF1E2C3A).copy(alpha = 0.18f),
         Color.Transparent
     )
-    val coverAlpha = 0.16f
-    val verticalVeil = listOf(
-        Color(0xFF0F1217).copy(alpha = 0.08f),
+    // Cover art is blurred/scaled to fill the backdrop at very low opacity.
+    // ContentScale.Crop fills the frame; alpha keeps it subtle.
+    val coverAlpha = 0.13f
+    // Gradient overlays prevent the blurred cover from bleeding into the UI chrome.
+    val topVeil = listOf(
+        Color(0xFF0D1016).copy(alpha = 0.72f),
+        Color.Transparent
+    )
+    val bottomVeil = listOf(
         Color.Transparent,
-        Color(0xFF0F1217).copy(alpha = 0.24f)
+        Color(0xFF0D1016).copy(alpha = 0.88f)
     )
     val sideVeil = listOf(
-        Color.Black.copy(alpha = 0.18f),
+        Color.Black.copy(alpha = 0.22f),
         Color.Transparent,
-        Color.Black.copy(alpha = 0.18f)
+        Color.Black.copy(alpha = 0.22f)
     )
 
     Box(
         modifier = modifier.background(Brush.verticalGradient(baseGradient))
     ) {
+        // Radial glow behind where the active cover card sits
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Brush.radialGradient(stageGlow))
         )
-
-            GameCoverArt(
-                titleId = titleId,
-                fallbackIconPath = coverPath,
-                artworkVersion = artworkVersion,
-                contentDescription = "",
-                fallbackTitle = title,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = coverAlpha }
-            )
-
-        Box(
+        // Blurred cover art backdrop — rendered at low alpha; GameCoverArt fills with Crop.
+        GameCoverArt(
+            titleId = titleId,
+            fallbackIconPath = coverPath,
+            artworkVersion = artworkVersion,
+            contentDescription = "",
+            fallbackTitle = title,
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(verticalVeil)
-                )
+                .graphicsLayer {
+                    alpha = coverAlpha
+                    // Slight scale-up to avoid any letterboxing edge artifacts from Crop
+                    scaleX = 1.08f
+                    scaleY = 1.08f
+                }
         )
+        // Top veil hides the cover bleeding into the top bar / status area
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxSize(0.38f)
+                .align(Alignment.TopCenter)
+                .background(Brush.verticalGradient(topVeil))
+        )
+        // Bottom veil hides bleed into the game title / counter row
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxSize(0.42f)
+                .align(Alignment.BottomCenter)
+                .background(Brush.verticalGradient(bottomVeil))
+        )
+        // Side veils to prevent hard-edged cover art showing at screen edges
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(sideVeil)
-                )
+                .background(Brush.horizontalGradient(sideVeil))
         )
     }
 }
@@ -465,12 +507,15 @@ private fun ShelfCoverCard(
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
     val showMenu = remember(game.titleId) { mutableStateOf(false) }
+    // is3dCover drives only the focus-border inset, NOT layout. Using derivedStateOf avoids
+    // recomposing the whole card when the cover type is detected after first render.
     var is3dCover by remember(game.titleId, artworkVersion) { mutableStateOf(false) }
     val coverAspectRatio = 2f / 3f
-    val horizontalCoverPadding = if (isActive) 6.dp else 8.dp
-    val verticalCoverPadding = if (isActive) 6.dp else 4.dp
-    val shelfCoverPath = game.iconPath
-    // Flat covers are plain rectangles so their corners are never clipped.
+    // Active card gets tighter padding so it appears slightly larger vs adjacent cards,
+    // reinforcing the scale effect applied by the pager graphicsLayer.
+    val horizontalCoverPadding = if (isActive) 4.dp else 8.dp
+    val verticalCoverPadding = if (isActive) 4.dp else 6.dp
+    // Flat covers are plain rectangles; 3D covers handle their own rounding.
     val shape = RectangleShape
 
     Surface(
@@ -524,6 +569,7 @@ private fun ShelfCoverCard(
                 shape = shape,
                 interactionSource = interactionSource,
                 addFocusTarget = false,
+                // For 3D covers the art already has depth padding; inset the focus ring to match.
                 focusBorderVerticalInsetFraction = if (is3dCover) 0.07f else 0f
             ),
         shape = shape,
@@ -531,17 +577,17 @@ private fun ShelfCoverCard(
         tonalElevation = 0.dp,
         shadowElevation = 0.dp
     ) {
-            GameCoverArt(
-                titleId = game.titleId,
-                fallbackIconPath = shelfCoverPath,
-                artworkVersion = artworkVersion,
-                contentDescription = game.title,
-                fallbackTitle = game.title,
-                onPresentationChanged = { is3dCover = it },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = horizontalCoverPadding, vertical = verticalCoverPadding)
-            )
+        GameCoverArt(
+            titleId = game.titleId,
+            fallbackIconPath = game.iconPath,
+            artworkVersion = artworkVersion,
+            contentDescription = game.title,
+            fallbackTitle = game.title,
+            onPresentationChanged = { is3dCover = it },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = horizontalCoverPadding, vertical = verticalCoverPadding)
+        )
     }
 
     contextMenu(game, showMenu.value) {
