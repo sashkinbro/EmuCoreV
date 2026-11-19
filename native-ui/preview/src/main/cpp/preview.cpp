@@ -79,6 +79,8 @@ std::uint64_t livearea_catalog_revision = 0;
 std::atomic<bool> native_back_requested{false};
 std::atomic<int> native_ready_scene{-1};
 std::atomic<bool> native_preview_failed{false};
+std::atomic<bool> native_preview_loading{false};
+ALooper* native_preview_looper = nullptr;
 JavaVM* preview_java_vm = nullptr;
 jobject preview_activity_ref = nullptr;
 jmethodID livearea_target_callback = nullptr;
@@ -1105,7 +1107,8 @@ struct Preview {
     bool active() const { return window && resumed && focused; }
     void schedule() {
         if (!active() || callback_pending) return;
-        if (preview_scene.load() == 1 && busy.snapshot().state == emucorev::paf::BusyState::idle) return;
+        if (preview_scene.load() == 1 && busy.snapshot().state == emucorev::paf::BusyState::idle
+            && native_ready_scene.load() < 0 && !native_preview_failed.load()) return;
         if (!choreographer) choreographer = AChoreographer_getInstance();
         if (!choreographer) throw std::runtime_error("No native frame scheduler");
         callback_pending = true;
@@ -1126,6 +1129,7 @@ struct Preview {
                     if (ready_scene >= 0 && preview.app && preview.app->window
                         && native_ready_scene.compare_exchange_strong(ready_scene, -1)) {
                         preview_scene.store(ready_scene);
+                        native_preview_loading.store(false);
                         preview.window.reset();
                         auto next = std::make_unique<Window>();
                         next->initialize(preview.app);
@@ -1229,12 +1233,26 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewReady(JNIEnv
     if (scene < 0 || scene > 3) return;
     native_preview_failed.store(false);
     native_ready_scene.store(scene);
+    {
+        const std::lock_guard lock(status_mutex);
+        if (native_preview_looper) ALooper_wake(native_preview_looper);
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewFailed(JNIEnv*, jobject) {
     native_ready_scene.store(-1);
+    native_preview_loading.store(false);
     native_preview_failed.store(true);
+    {
+        const std::lock_guard lock(status_mutex);
+        if (native_preview_looper) ALooper_wake(native_preview_looper);
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewLoading(JNIEnv*, jobject, jboolean loading) {
+    native_preview_loading.store(loading == JNI_TRUE);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -1286,6 +1304,10 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeStatus(JNIEnv* env,
 
 void android_main(android_app* app) {
     Preview preview;
+    {
+        const std::lock_guard lock(status_mutex);
+        native_preview_looper = app->looper;
+    }
     app->userData = &preview;
     app->onAppCmd = [](android_app* state, int32_t command) {
         static_cast<Preview*>(state->userData)->command(state, command);
@@ -1295,6 +1317,7 @@ void android_main(android_app* app) {
         if (!preview.active()) return 0;
         const int scene = preview_scene.load();
         if (scene == 1) {
+            if (native_preview_loading.load()) return 1;
             const bool tap = AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION
                 && (AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK) == AMOTION_EVENT_ACTION_UP;
             const bool confirm = AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY
@@ -1324,6 +1347,12 @@ void android_main(android_app* app) {
         android_poll_source* source = nullptr;
         if (ALooper_pollOnce(-1, nullptr, nullptr, reinterpret_cast<void**>(&source)) >= 0 && source)
             source->process(app, source);
+        if ((native_ready_scene.load() >= 0 || native_preview_failed.load()) && preview.active())
+            preview.schedule();
+    }
+    {
+        const std::lock_guard lock(status_mutex);
+        native_preview_looper = nullptr;
     }
 }
 

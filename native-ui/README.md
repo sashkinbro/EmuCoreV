@@ -77,6 +77,12 @@ Lenovo verification covered a fresh preview-data extraction, reaching Lock,
 unlocking Home, opening LiveArea, Back, background/resume and repeated startup.
 Assemble/lint passed. This verifies readiness integration, not original cold-start
 duration, loading-circle placement or complete shell lifecycle equivalence.
+Loading ignores the component preview's tap/A stop toggle; ready/failure requests
+wake the native looper even if the busy component has become idle. The looper
+pointer is synchronized with native-thread shutdown. Lenovo loading-input checks
+reached the prepared shell without hanging; explicit component preview controls
+remain separate. The current 80-pixel busy extent is still a development value,
+and its dot thickness/placement must be recovered from the original shell widget.
 
 The wave reconstruction now includes the native `wave_pos.vp/fp` position pass
 and the standard `effects_default_0512_01` sky parameter snapshot. Preset floats

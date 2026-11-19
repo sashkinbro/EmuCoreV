@@ -40,6 +40,7 @@ class PreviewActivity : NativeActivity() {
     private val nativeBridgeLock = Any()
     private external fun nativeImage(id: Int, width: Int, height: Int, rgba: ByteArray)
     private external fun nativePreviewScene(scene: Int)
+    private external fun nativePreviewLoading(loading: Boolean)
     private external fun nativePreviewReady(scene: Int)
     private external fun nativePreviewFailed()
     private external fun nativeResourceRoot(path: String)
@@ -84,6 +85,7 @@ class PreviewActivity : NativeActivity() {
         }
         nativeResourceRoot(startupRoot.absolutePath)
         nativePreviewScene(1)
+        nativePreviewLoading(requestedScene != 1)
         super.onCreate(state)
         window.attributes = window.attributes.apply {
             layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER
@@ -167,7 +169,10 @@ class PreviewActivity : NativeActivity() {
             mainHandler.post {
                 if (!closed.get() && !isFinishing && !isDestroyed) {
                     synchronized(nativeBridgeLock) {
-                        if (!closed.get()) nativePreviewFailed()
+                        if (!closed.get()) {
+                            nativePreviewLoading(false)
+                            nativePreviewFailed()
+                        }
                     }
                     // This Activity is a local preview/debug host; keep the
                     // failure diagnostic scoped to the development surface.
