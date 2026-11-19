@@ -149,7 +149,8 @@ void main() { color=vec4(0.0,0.0,1.0,1.0); }
     std::cout << "PASS native shadow rectangle: 8192 expected RGBA pixels\n";
 }
 enum class VertexKind { top, bottom, quad, bottom_round, top_round, empty_back };
-void check_vertex(const char* reference_path, VertexKind kind = VertexKind::top) {
+void check_vertex(const char* reference_path, VertexKind kind = VertexKind::top,
+    const char* lookup_path = nullptr) {
     using namespace emucorev::paf;
     const bool bottom=kind==VertexKind::bottom || kind==VertexKind::bottom_round;
     const bool quad=kind==VertexKind::quad;
@@ -202,13 +203,21 @@ void check_vertex(const char* reference_path, VertexKind kind = VertexKind::top)
     glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER,0,buffers[3]);
     GLuint lookup;
     glGenTextures(1,&lookup); glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D,lookup);
-    std::array<unsigned char,64> lookup_pixels;
-    for(unsigned i=0;i<64;++i) lookup_pixels[i]=static_cast<unsigned char>((i*71+17)%256);
+    std::vector<unsigned char> lookup_pixels;
+    if(lookup_path) {
+        std::ifstream file(lookup_path,std::ios::binary);
+        if(!file) throw std::runtime_error("Missing external lookup");
+        lookup_pixels.assign(std::istreambuf_iterator<char>(file),{});
+        if(lookup_pixels.size()!=128*8) throw std::runtime_error("Expected 128x8 scalar lookup bytes");
+    } else {
+        lookup_pixels.resize(64);
+        for(unsigned i=0;i<64;++i) lookup_pixels[i]=static_cast<unsigned char>((i*71+17)%256);
+    }
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_R8,64,1,0,GL_RED,GL_UNSIGNED_BYTE,lookup_pixels.data());
+    glTexImage2D(GL_TEXTURE_2D,0,GL_R8,lookup_path?128:64,lookup_path?8:1,0,GL_RED,GL_UNSIGNED_BYTE,lookup_pixels.data());
     glEnable(GL_RASTERIZER_DISCARD);
     PageTurnMesh mesh;
     unsigned compared=0,differences=0,nonfinite=0;
@@ -243,7 +252,7 @@ void check_vertex(const char* reference_path, VertexKind kind = VertexKind::top)
                 p[16]=250; p[17]=.3f;
                 p[20]=p[21]=1;
                 p[24]=p[25]=1; p[26]=1.f+configuration*.2f; p[27]=1;
-                p[29]=1;
+                p[28]=lookup_path?5.f:0.f; p[29]=lookup_path?.2f:1.f;
                 p[32]=deepest.x; p[33]=deepest.y;
                 p[34]=shape.minimum.on_fold.x; p[35]=shape.minimum.on_fold.y;
                 p[36]=.009f;
@@ -298,6 +307,7 @@ void check_vertex(const char* reference_path, VertexKind kind = VertexKind::top)
     const std::array labels{"Top","Bottom","Quad","Bottom rounded","Top rounded","Empty back"};
     std::cout << labels[static_cast<unsigned>(kind)] << " vertex: " << nonfinite << " nonfinite outputs, " << compared << " compared words, "
         << differences << " differences, max " << maximum << '\n';
+    if(lookup_path) std::cout << "Used external 128x8 scalar lookup, range 5\n";
     if(differences) for(unsigned i=0;i<stride;++i)
         std::cout << "component " << i << ": " << component_differences[i] << " max " << component_maximum[i] << '\n';
     if(nonfinite || differences) throw std::runtime_error("Page vertex comparison failed");
@@ -305,6 +315,8 @@ void check_vertex(const char* reference_path, VertexKind kind = VertexKind::top)
 }
 int main(int argc, char** argv) {
     try {
+        const char* lookup_path=nullptr;
+        if(argc==5 && std::string(argv[3])=="--lookup-r8") { lookup_path=argv[4]; argc=3; }
         const bool top_only=argc==3 && std::string(argv[1])=="--top-vertex";
         const bool bottom_only=argc==3 && std::string(argv[1])=="--bottom-vertex";
         const bool quad_only=argc==3 && std::string(argv[1])=="--quad-vertex";
@@ -317,12 +329,13 @@ int main(int argc, char** argv) {
         const bool round_fragment=argc==3 && std::string(argv[1])=="--bottom-round-fragment";
         const bool top_round_fragment=argc==3 && std::string(argv[1])=="--top-round-fragment";
         const bool copy_fragment=argc==3 && std::string(argv[1])=="--copy-fragment";
+        if(lookup_path && !bottom_only && !round_vertex) throw std::runtime_error("External lookup applies only to bottom vertex modes");
         if (argc > 2 && !top_only && !bottom_only && !quad_only && !round_vertex && !top_round_vertex && !empty_vertex && !bottom_fragment && !top_fragment && !shadow_fragment && !round_fragment && !top_round_fragment && !copy_fragment) throw std::runtime_error("Unknown page shader comparison mode");
         Context context;
         std::cout << std::unitbuf << "GPU " << glGetString(GL_RENDERER) << '\n';
         if(top_only || bottom_only || quad_only || round_vertex || top_round_vertex || empty_vertex) {
             check_vertex(argv[2],empty_vertex?VertexKind::empty_back:top_round_vertex?VertexKind::top_round:
-                round_vertex?VertexKind::bottom_round:quad_only?VertexKind::quad:bottom_only?VertexKind::bottom:VertexKind::top);
+                round_vertex?VertexKind::bottom_round:quad_only?VertexKind::quad:bottom_only?VertexKind::bottom:VertexKind::top,lookup_path);
             return 0;
         }
         check_vertex(nullptr);
