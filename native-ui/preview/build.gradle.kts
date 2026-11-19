@@ -6,6 +6,7 @@ val verifyLocalNativeUiAssets by tasks.registering {
     doLast {
         val root = file("../resources")
         val required = listOf("images.json", "fonts.json", "fonts/ltn4.otf",
+            "images/paf-common-resource/ba195a37.png",
             "images/indicator_plugin/ca76be07.png", "images/indicator_plugin/56e72f16.png",
             "preview/bubble/stream-0.bin", "preview/bubble/indices.bin",
             "preview/bubble/vertex-ubo-0.bin", "preview/bubble/fragment-ubo-0.bin",

@@ -507,6 +507,39 @@ or test interpreter are linked into the UI.
 
 ## Build and validation
 
+### Recovered busy indicator
+
+`BusyIndicator` reconstructs the PAF component's head and eight retained trail
+objects, including the 0.3-second entry, 0.5-second exit, interrupted start/stop,
+phase wrapping, emission spacing, size relaxation and packed-byte alpha decay.
+The trail positions are retained particles, not a uniformly rotated static ring.
+The owner advances active time explicitly; this class owns no clocks or resources.
+
+The offline oracle executes the reviewed original update/start/stop functions.
+Its minimal object host records position/size setters, leaves the original
+packed-color setter executable, and suppresses widget notifications. All 32
+traces (four dimensions/ball sizes, 30/60/90/120 Hz, uninterrupted and interrupted
+sequences) pass **18,560 operations bit for bit** on Lenovo and RG556, comparing
+state, phase, elapsed time, emission history and all nine objects' positions,
+sizes and alpha. Both implementations use double host-libm trig samples rounded
+to float here; this does not establish original PAF libm, widget scheduling,
+complete startup timing or rendered-pixel parity.
+
+```text
+python native-ui/tests/generate_busy_reference.py OWNED_DECRYPTED_PAF LOCAL_BUSY_CORPUS.bin
+paf_busy_test LOCAL_BUSY_CORPUS.bin
+adb shell am start -n com.sbro.emucorev.nativeuipreview/.PreviewActivity --es scene busy
+```
+
+Start the scene in a fresh preview activity/process. This debug-only component
+surface uses the packaged `_common_texture_busy` image (hash `ba195a37`), with an
+80-pixel test extent. Tap or gamepad A interrupts/stops/restarts it. The completed
+idle state stops frame callbacks; backgrounding preserves state and suspends
+time. This scene does not load the bubble geometry/material or subscribe to
+unused status services. It is a component preview, not the completed cold-start
+controller: lock-screen, readiness transitions and original screen placement
+are still pending. Its input toggle is not part of the shipping UI.
+
 Build independently using CMake 3.22+ and a C++20 compiler. For Android, supply
 the NDK toolchain, `ANDROID_ABI=arm64-v8a`, `ANDROID_PLATFORM=android-29` and
 `ANDROID_STL=c++_static`. Build outputs belong outside this source directory.

@@ -27,7 +27,7 @@ class BundledImages(
     }
     private var previousClock: String? = null
 
-    fun loadIndicatorImages() {
+    fun loadShellImages() {
         // Resource hashes from the reviewed indicator document, not guessed names.
         listOf("ca76be07", "78600544", "4a8ae255", "9e9cfcab", "f85f0b80",
             "56e72f16", "a5aafd9b", "32465c57", "00ea236e", "89dc8410",
@@ -37,7 +37,15 @@ class BundledImages(
             }
             try { send(id.toLong(16).toInt(), bitmap) } finally { bitmap.recycle() }
         }
+        loadBusyImage()
         upload(0, 1, 1, byteArrayOf(-1, -1, -1, -1))
+    }
+
+    fun loadBusyImage() {
+        val busy = assets.open("images/paf-common-resource/ba195a37.png").use {
+            requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled busy image" }
+        }
+        try { send(0xba195a37.toInt(), busy) } finally { busy.recycle() }
     }
 
     fun updateClock(status: DeviceStatusSource.Snapshot) {

@@ -3,8 +3,10 @@
 #include <emucorev/paf/bubble_motion.h>
 #include <emucorev/paf/device_status.h>
 #include <emucorev/paf/sprite_renderer.h>
+#include <emucorev/paf/busy_indicator.h>
 #include <android/choreographer.h>
 #include <android/asset_manager.h>
+#include <android/input.h>
 #include <android_native_app_glue.h>
 #include <android/log.h>
 #include <EGL/egl.h>
@@ -18,6 +20,7 @@
 #include <stdexcept>
 #include <vector>
 #include <unordered_map>
+#include <atomic>
 
 namespace {
 std::mutex status_mutex;
@@ -29,6 +32,7 @@ struct HostImage {
 };
 std::unordered_map<std::uint32_t, HostImage> host_images;
 std::uint64_t image_revision = 0;
+std::atomic<bool> busy_scene{false};
 template<class T> std::vector<T> read(AAssetManager* assets, const char* filename, std::size_t count) {
     const auto path = std::string("preview/bubble/") + filename;
     const std::unique_ptr<AAsset, decltype(&AAsset_close)> asset(
@@ -96,26 +100,29 @@ struct Window {
         if (!eglMakeCurrent(display, surface, surface, context)) throw std::runtime_error("Cannot activate preview context");
         eglSwapInterval(display, 1);
 
-        auto* assets = app->activity->assetManager;
-        const auto vertices = read<emucorev::paf::BubbleVertex>(assets, "stream-0.bin", 608);
-        const auto indices = read<std::uint16_t>(assets, "indices.bin", 1220);
-        const auto transform = read<float>(assets, "vertex-ubo-0.bin", 96);
-        const auto parameters = read<float>(assets, "fragment-ubo-0.bin", 10);
-        std::copy(transform.begin(), transform.end(), vertex.begin());
-        base_vertex = vertex;
-        initial_phase = std::atan2(vertex[14 * 4 + 1], vertex[14 * 4]);
-        initial_basis = emucorev::paf::bubble_wobble_basis(std::cos(initial_phase), std::sin(initial_phase), 1);
-        std::copy(parameters.begin(), parameters.end(), material.begin());
-        const auto palette = read<std::uint8_t>(assets, "fragment-texture-0-palette.bin", 1024);
-        const auto indexed = read<std::uint8_t>(assets, "fragment-texture-0.bin", 128 * 128);
-        const auto environment = read<std::uint8_t>(assets, "environment.rgba", 64 * 64 * 4);
-        std::vector<std::uint8_t> icon(128 * 128 * 4);
-        for (std::size_t i = 0; i < indexed.size(); ++i)
-            std::copy_n(palette.data() + indexed[i] * 4, 4, icon.data() + i * 4);
-        bubble = std::make_unique<emucorev::paf::BubbleRenderer>(
-            emucorev::paf::opaque_bubble_vertex_shader(), emucorev::paf::opaque_bubble_fragment_shader(),
-            vertices, indices, emucorev::paf::BubbleImage{128, 128, icon},
-            emucorev::paf::BubbleImage{64, 64, environment});
+        // The isolated busy scene needs no bubble geometry/material resources.
+        if (!busy_scene.load()) {
+            auto* assets = app->activity->assetManager;
+            const auto vertices = read<emucorev::paf::BubbleVertex>(assets, "stream-0.bin", 608);
+            const auto indices = read<std::uint16_t>(assets, "indices.bin", 1220);
+            const auto transform = read<float>(assets, "vertex-ubo-0.bin", 96);
+            const auto parameters = read<float>(assets, "fragment-ubo-0.bin", 10);
+            std::copy(transform.begin(), transform.end(), vertex.begin());
+            base_vertex = vertex;
+            initial_phase = std::atan2(vertex[14 * 4 + 1], vertex[14 * 4]);
+            initial_basis = emucorev::paf::bubble_wobble_basis(std::cos(initial_phase), std::sin(initial_phase), 1);
+            std::copy(parameters.begin(), parameters.end(), material.begin());
+            const auto palette = read<std::uint8_t>(assets, "fragment-texture-0-palette.bin", 1024);
+            const auto indexed = read<std::uint8_t>(assets, "fragment-texture-0.bin", 128 * 128);
+            const auto environment = read<std::uint8_t>(assets, "environment.rgba", 64 * 64 * 4);
+            std::vector<std::uint8_t> icon(128 * 128 * 4);
+            for (std::size_t i = 0; i < indexed.size(); ++i)
+                std::copy_n(palette.data() + indexed[i] * 4, 4, icon.data() + i * 4);
+            bubble = std::make_unique<emucorev::paf::BubbleRenderer>(
+                emucorev::paf::opaque_bubble_vertex_shader(), emucorev::paf::opaque_bubble_fragment_shader(),
+                vertices, indices, emucorev::paf::BubbleImage{128, 128, icon},
+                emucorev::paf::BubbleImage{64, 64, environment});
+        }
         sprites = std::make_unique<emucorev::paf::SpriteRenderer>();
 
         // Fixed 1x rasterization, independently of the physical display size.
@@ -149,7 +156,7 @@ struct Window {
                 }
     }
 
-    void draw_status() {
+    void upload_images() {
         // Packaged textures are decoded once by Kotlin and uploaded only when
         // changed. A recreated GL context gets its own complete texture cache.
         const std::lock_guard lock(status_mutex);
@@ -161,6 +168,10 @@ struct Window {
             }
             uploaded_revision = image_revision;
         }
+    }
+
+    void draw_status() {
+        const std::lock_guard lock(status_mutex);
         sprites->begin(960, 544);
         // Development composition; exact original anchors/clock metrics and
         // charging animation are still being reconstructed, not parity claims.
@@ -189,16 +200,28 @@ struct Window {
             sprites->draw(0xca76be07, left, 4, 19, 24);
     }
 
-    void draw() {
+    void draw(const emucorev::paf::BusySnapshot* busy = nullptr) {
         EGLint width, height;
         if (!eglQuerySurface(display, surface, EGL_WIDTH, &width)
             || !eglQuerySurface(display, surface, EGL_HEIGHT, &height) || width <= 0 || height <= 0) return;
         glBindFramebuffer(GL_FRAMEBUFFER, target);
         glViewport(0, 0, 960, 544);
-        glClearColor(12.f / 255, 40.f / 255, 150.f / 255, 1);
+        if (busy) glClearColor(0, 0, 0, 1);
+        else glClearColor(12.f / 255, 40.f / 255, 150.f / 255, 1);
         glClear(GL_COLOR_BUFFER_BIT);
-        bubble->draw(vertex, material);
-        draw_status();
+        upload_images();
+        if (busy) {
+            sprites->begin(960, 544);
+            if (busy->state != emucorev::paf::BusyState::idle)
+                for (const auto& dot : busy->dots)
+                    if (dot.size > 0 && dot.alpha)
+                        sprites->draw(0xba195a37, 480 + dot.x - dot.size * .5f,
+                            272 - dot.y - dot.size * .5f, dot.size, dot.size,
+                            {1, 1, 1, float(dot.alpha) * (1.f / 255.f)});
+        } else {
+            bubble->draw(vertex, material);
+            draw_status();
+        }
 
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
         glClearColor(0, 0, 0, 1);
@@ -214,6 +237,7 @@ struct Window {
 };
 
 struct Preview {
+    emucorev::paf::BusyIndicator busy{80};
     std::unique_ptr<Window> window;
     AChoreographer* choreographer = nullptr;
     bool resumed = false, focused = false, callback_pending = false;
@@ -221,9 +245,13 @@ struct Preview {
     float phase = 0;
     int64_t last_draw = 0, next_draw = 0;
 
+    Preview() { busy.start(); }
+    void render() { window->draw(busy_scene.load() ? &busy.snapshot() : nullptr); }
+
     bool active() const { return window && resumed && focused; }
     void schedule() {
         if (!active() || callback_pending) return;
+        if (busy_scene.load() && busy.snapshot().state == emucorev::paf::BusyState::idle) return;
         if (!choreographer) choreographer = AChoreographer_getInstance();
         if (!choreographer) throw std::runtime_error("No native frame scheduler");
         callback_pending = true;
@@ -238,14 +266,17 @@ struct Preview {
                 if (time + 500000 >= preview.next_draw) {
                     const float elapsed = preview.last_draw ? float(time - preview.last_draw) * 1e-9f : 0;
                     if (elapsed > 0 && elapsed <= 1) {
-                        preview.phase = emucorev::paf::advance_bubble_phase(preview.phase, elapsed, 1);
-                        preview.window->set_phase(preview.phase);
+                        if (busy_scene.load()) preview.busy.tick(elapsed);
+                        else {
+                            preview.phase = emucorev::paf::advance_bubble_phase(preview.phase, elapsed, 1);
+                            preview.window->set_phase(preview.phase);
+                        }
                     }
                     preview.last_draw = time;
                     if (!preview.next_draw) preview.next_draw = time;
                     constexpr int64_t interval = 16666667;
                     preview.next_draw += (std::max<int64_t>(time - preview.next_draw, 0) / interval + 1) * interval;
-                    preview.window->draw();
+                    preview.render();
                 }
                 preview.schedule();
             } catch (const std::exception& error) {
@@ -269,9 +300,9 @@ struct Preview {
                     phase = window->initial_phase;
                     phase_initialized = true;
                 } else window->set_phase(phase);
-                window->draw();
+                render();
             } else if ((command == APP_CMD_WINDOW_REDRAW_NEEDED || command == APP_CMD_WINDOW_RESIZED
-                        || command == APP_CMD_GAINED_FOCUS) && window) window->draw();
+                        || command == APP_CMD_GAINED_FOCUS) && window) render();
             if (command == APP_CMD_RESUME) resumed = true;
             if (command == APP_CMD_GAINED_FOCUS) focused = true;
             if (command == APP_CMD_LOST_FOCUS) focused = false;
@@ -285,6 +316,11 @@ struct Preview {
         }
     }
 };
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewScene(JNIEnv*, jobject, jboolean busy) {
+    busy_scene.store(busy);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -334,6 +370,23 @@ void android_main(android_app* app) {
     app->userData = &preview;
     app->onAppCmd = [](android_app* state, int32_t command) {
         static_cast<Preview*>(state->userData)->command(state, command);
+    };
+    app->onInputEvent = [](android_app* state, AInputEvent* event) -> int32_t {
+        auto& preview = *static_cast<Preview*>(state->userData);
+        if (!busy_scene.load() || !preview.active()) return 0;
+        const bool tap = AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION
+            && (AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK) == AMOTION_EVENT_ACTION_UP;
+        const bool confirm = AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY
+            && AKeyEvent_getAction(event) == AKEY_EVENT_ACTION_DOWN
+            && AKeyEvent_getKeyCode(event) == AKEYCODE_BUTTON_A && AKeyEvent_getRepeatCount(event) == 0;
+        if (!tap && !confirm) return 0;
+        const auto phase = preview.busy.snapshot().state;
+        if (phase == emucorev::paf::BusyState::idle || phase == emucorev::paf::BusyState::stopping)
+            preview.busy.start();
+        else preview.busy.stop();
+        if (phase == emucorev::paf::BusyState::idle) preview.last_draw = preview.next_draw = 0;
+        preview.schedule();
+        return 1;
     };
     // Native frame callbacks wake this looper only while visible/focused.
     // Background work blocks on events, with no render loop or polling timer.

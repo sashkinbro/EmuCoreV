@@ -12,7 +12,9 @@ import com.sbro.emucorev.nativeui.BundledImages
 class PreviewActivity : NativeActivity() {
     private lateinit var deviceStatus: DeviceStatusSource
     private lateinit var images: BundledImages
+    private var busyPreview = false
     private external fun nativeImage(id: Int, width: Int, height: Int, rgba: ByteArray)
+    private external fun nativePreviewScene(busy: Boolean)
 
     private external fun nativeStatus(
         battery: Int, charging: Boolean, powerSource: Int,
@@ -21,6 +23,8 @@ class PreviewActivity : NativeActivity() {
     )
 
     override fun onCreate(state: Bundle?) {
+        busyPreview = intent.getStringExtra("scene") == "busy"
+        nativePreviewScene(busyPreview)
         super.onCreate(state)
         window.attributes = window.attributes.apply {
             layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER
@@ -31,11 +35,12 @@ class PreviewActivity : NativeActivity() {
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         deviceStatus = DeviceStatusSource(this)
         images = BundledImages(assets, ::nativeImage)
-        images.loadIndicatorImages()
+        if (busyPreview) images.loadBusyImage() else images.loadShellImages()
     }
 
     override fun onResume() {
         super.onResume()
+        if (busyPreview) return
         deviceStatus.start { status ->
             images.updateClock(status)
             nativeStatus(status.batteryPercent, status.charging, status.powerSource,
