@@ -684,12 +684,43 @@ differ by at most 1/255**, with alpha matching exactly; the strict comparison
 returns nonzero. Complete material integration and original lookup preparation
 remain pending.
 
+`page_turn_top_fragment_shader()` now reconstructs the upper material's tint,
+back opacity, lighting addition and fused final blend, preserving the original
+nine-vec4 fragment layout and half-register write boundaries. The 16 filtered
+texture/light/opacity cases match all **524,288 RGBA8 channels on Lenovo**. On
+Mali the strict comparison still reports **1,343 differing channels, maximum
+1/255**. This known discrepancy is not accepted as material parity.
+
+`page_turn_quad_vertex_shader()` and `page_turn_shadow_fragment_shader()` cover
+the rectangle and outer shadow passes. The rectangle consumes position/UV pairs
+and the original five-vec4 transform layout. Its **10,872 transform-feedback
+words match bit for bit on Lenovo and RG556**. The shadow retains packed half
+border/level parameters in its first vec4 and ordinary RGBA in the second;
+callers must preserve these bit patterns. It reconstructs absolute-coordinate
+border mapping, clipping and the sampled shadow/color blend. All **524,288
+RGBA8 channels match the original shadow translation on both devices** for the
+16 varied-level/border cases.
+
+The GLES renderer now accepts an optional third shader pair and submits four
+explicit position/UV vertices through `draw_quad()`. Construction compiles all
+configured pairs; draw calls only update existing buffers. Material UBO members
+have separate vertex/fragment instance names: testing actual pairs exposed a
+link conflict that compiling each stage with a diagnostic counterpart missed.
+The device check now links all three real pairs together, submits an actual
+shadow rectangle, and verifies all **8,192 output pixels** against its expected
+constant material on Lenovo and RG556. These are component checks; rounded-edge
+passes, complete material parameters/lookup assets and lock-screen integration
+are still pending.
+
 ```text
 paf_page_shader_test
 paf_page_shader_test LOCAL_ORIGINAL_EMPTY_BACK_FRAGMENT.frag
 paf_page_shader_test --top-vertex LOCAL_ORIGINAL_TOP_VERTEX.vert
 paf_page_shader_test --bottom-vertex LOCAL_ORIGINAL_BOTTOM_VERTEX.vert
 paf_page_shader_test --bottom-fragment LOCAL_ORIGINAL_BOTTOM_FRAGMENT.frag
+paf_page_shader_test --top-fragment LOCAL_ORIGINAL_TOP_FRAGMENT.frag
+paf_page_shader_test --quad-vertex LOCAL_ORIGINAL_QUAD_VERTEX.vert
+paf_page_shader_test --shadow-fragment LOCAL_ORIGINAL_SHADOW_FRAGMENT.frag
 ```
 
 ### Recovered busy indicator

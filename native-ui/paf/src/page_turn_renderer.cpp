@@ -43,30 +43,39 @@ GLuint link(PageSurfaceShaders source) {
 }
 }
 struct PageTurnRenderer::Impl {
-    std::array<GLuint, 2> programs{};
-    std::array<GLuint, 5> buffers{};
-    GLuint vao = 0;
+    std::array<GLuint, 3> programs{};
+    std::array<GLuint, 6> buffers{};
+    GLuint vao = 0, quad_vao = 0;
     std::array<PageTurnFan, 128> front{}, folded{};
     unsigned front_count = 0, folded_count = 0;
     ~Impl() {
         for (auto program : programs) if (program) glDeleteProgram(program);
         glDeleteBuffers(buffers.size(), buffers.data());
         if (vao) glDeleteVertexArrays(1, &vao);
+        if (quad_vao) glDeleteVertexArrays(1, &quad_vao);
     }
+    void apply(GLuint program, const PageSurfaceDraw& material);
 };
-PageTurnRenderer::PageTurnRenderer(PageSurfaceShaders front, PageSurfaceShaders folded)
+PageTurnRenderer::PageTurnRenderer(PageSurfaceShaders front, PageSurfaceShaders folded,
+    PageSurfaceShaders rectangle)
     : impl_(std::make_unique<Impl>()) {
     auto& p = *impl_;
     p.programs[0] = link(front); p.programs[1] = link(folded);
+    if (!rectangle.vertex.empty() || !rectangle.fragment.empty()) p.programs[2] = link(rectangle);
     glGenVertexArrays(1, &p.vao); glBindVertexArray(p.vao);
     glGenBuffers(p.buffers.size(), p.buffers.data());
     glBindBuffer(GL_ARRAY_BUFFER, p.buffers[0]);
     glBufferData(GL_ARRAY_BUFFER, 1024 * sizeof(PagePoint), nullptr, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0); glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(PagePoint), nullptr);
-    for (unsigned i = 1; i < p.buffers.size(); ++i) {
+    for (unsigned i = 1; i <= 4; ++i) {
         glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[i]);
         glBufferData(GL_UNIFORM_BUFFER, i <= 2 ? 512 : 48, nullptr, GL_DYNAMIC_DRAW);
     }
+    glGenVertexArrays(1, &p.quad_vao); glBindVertexArray(p.quad_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, p.buffers[5]);
+    glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(PageQuadVertex), nullptr, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(PageQuadVertex), nullptr);
     if (glGetError() != GL_NO_ERROR) throw std::runtime_error("Page surface GPU allocation failed");
 }
 PageTurnRenderer::~PageTurnRenderer() = default;
@@ -89,22 +98,40 @@ void PageTurnRenderer::upload_mesh(const PageTurnMesh& mesh) {
     p.front_count = mesh.front_count; p.folded_count = mesh.folded_count;
 }
 void PageTurnRenderer::draw(PageSurface surface, const PageSurfaceDraw& material) {
-    if (material.vertex_parameters.size() > 128 || material.fragment_parameters.size() > 128)
-        throw std::invalid_argument("Page surface parameter block exceeds storage");
     if (surface != PageSurface::front && surface != PageSurface::folded)
         throw std::invalid_argument("Invalid page surface");
     auto& p = *impl_;
     const bool folded = surface == PageSurface::folded;
-    glUseProgram(p.programs[folded ? 1 : 0]); glBindVertexArray(p.vao);
+    glBindVertexArray(p.vao);
+    p.apply(p.programs[folded ? 1 : 0], material);
+    const auto& fans = folded ? p.folded : p.front;
+    const auto count = folded ? p.folded_count : p.front_count;
+    for (unsigned i = 0; i < count; ++i)
+        glDrawArrays(GL_TRIANGLE_FAN, fans[i].first, fans[i].count);
+}
+void PageTurnRenderer::draw_quad(std::span<const PageQuadVertex, 4> vertices,
+    const PageSurfaceDraw& material) {
+    auto& p = *impl_;
+    if (!p.programs[2]) throw std::logic_error("Page rectangle shaders were not configured");
+    glBindVertexArray(p.quad_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, p.buffers[5]);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size_bytes(), vertices.data());
+    p.apply(p.programs[2], material);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+void PageTurnRenderer::Impl::apply(GLuint program, const PageSurfaceDraw& material) {
+    if (material.vertex_parameters.size() > 128 || material.fragment_parameters.size() > 128)
+        throw std::invalid_argument("Page surface parameter block exceeds storage");
+    glUseProgram(program);
     // Zero padding prevents short blocks from inheriting another material's tail.
     std::array<float, 128> vertex{}, fragment{};
     std::copy(material.vertex_parameters.begin(), material.vertex_parameters.end(), vertex.begin());
     std::copy(material.fragment_parameters.begin(), material.fragment_parameters.end(), fragment.begin());
     const std::array<const float*, 4> data{vertex.data(), fragment.data(), material.viewport.data(), material.fragment_state.data()};
     for (unsigned i = 0; i < 4; ++i) {
-        glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[i + 1]);
+        glBindBuffer(GL_UNIFORM_BUFFER, buffers[i + 1]);
         glBufferSubData(GL_UNIFORM_BUFFER, 0, i < 2 ? 512 : 48, data[i]);
-        glBindBufferBase(GL_UNIFORM_BUFFER, i, p.buffers[i + 1]);
+        glBindBufferBase(GL_UNIFORM_BUFFER, i, buffers[i + 1]);
     }
     for (unsigned i = 0; i < material.textures.size(); ++i) {
         glActiveTexture(GL_TEXTURE0 + i); glBindTexture(GL_TEXTURE_2D, material.textures[i]);
@@ -114,9 +141,5 @@ void PageTurnRenderer::draw(PageSurface surface, const PageSurfaceDraw& material
         glEnable(GL_BLEND); glBlendEquation(GL_FUNC_ADD);
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     } else glDisable(GL_BLEND);
-    const auto& fans = folded ? p.folded : p.front;
-    const auto count = folded ? p.folded_count : p.front_count;
-    for (unsigned i = 0; i < count; ++i)
-        glDrawArrays(GL_TRIANGLE_FAN, fans[i].first, fans[i].count);
 }
 }

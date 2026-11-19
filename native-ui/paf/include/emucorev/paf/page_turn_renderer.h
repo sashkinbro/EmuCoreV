@@ -7,6 +7,7 @@
 
 namespace emucorev::paf {
 struct PageSurfaceShaders { std::string_view vertex, fragment; };
+struct PageQuadVertex { PagePoint position, uv; };
 enum class PageSurface { front, folded };
 struct PageSurfaceDraw {
     // Reviewed parameter layouts, supplied by the native material controller.
@@ -22,7 +23,8 @@ struct PageSurfaceDraw {
 // The host supplies the material shaders; this class does not approximate them.
 class PageTurnRenderer {
 public:
-    PageTurnRenderer(PageSurfaceShaders front, PageSurfaceShaders folded);
+    PageTurnRenderer(PageSurfaceShaders front, PageSurfaceShaders folded,
+        PageSurfaceShaders rectangle = {});
     ~PageTurnRenderer();
     PageTurnRenderer(const PageTurnRenderer&) = delete;
     PageTurnRenderer& operator=(const PageTurnRenderer&) = delete;
@@ -30,6 +32,9 @@ public:
     // Caller owns framebuffer, viewport and scissor. Both winding directions
     // are retained: the fold material distinguishes front/back faces itself.
     void draw(PageSurface surface, const PageSurfaceDraw& material);
+    // Four position/UV pairs in triangle-strip order. The optional rectangle
+    // shaders must be provided at construction; no lazy compilation occurs.
+    void draw_quad(std::span<const PageQuadVertex, 4> vertices, const PageSurfaceDraw& material);
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

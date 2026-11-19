@@ -55,12 +55,14 @@ GLuint program(const std::string& fragment) {
 precision highp float;
 layout(location=4) out vec4 v_TexCoord0;
 layout(location=5) out vec4 v_TexCoord1;
+layout(location=6) out vec4 v_TexCoord2;
 uniform float test_shift;
 void main() {
     vec2 uv=vec2(float(gl_VertexID & 1), float(gl_VertexID >> 1));
     gl_Position=vec4(uv*2.0-1.0,0.0,1.0);
     v_TexCoord0=vec4(uv,uv.x*1.7-0.25+test_shift,1.0);
     v_TexCoord1=vec4(uv*4.0-2.0,0.0,1.0);
+    v_TexCoord2=vec4(uv,uv.x*.6+.2,uv.y*.7+.1+test_shift);
 })");
     const auto fs = compile(GL_FRAGMENT_SHADER, fragment);
     const auto result = glCreateProgram();
@@ -72,6 +74,12 @@ void main() {
 }
 void check_mesh_renderer() {
     using namespace emucorev::paf;
+    // Compile actual pairs together, not only with diagnostic counterparts:
+    // stage-local material arrays must not collide during program linking.
+    PageTurnRenderer native_materials(
+        {page_turn_bottom_vertex_shader(),page_turn_bottom_fragment_shader()},
+        {page_turn_top_vertex_shader(),page_turn_top_fragment_shader()},
+        {page_turn_quad_vertex_shader(),page_turn_shadow_fragment_shader()});
     constexpr auto vertex = R"(#version 320 es
 precision highp float;
 layout(location=0) in vec2 point;
@@ -87,7 +95,8 @@ precision highp float;
 layout(location=0) out vec4 color;
 void main() { color=vec4(0.0,0.0,1.0,1.0); }
 )";
-    PageTurnRenderer renderer({vertex,red},{vertex,blue});
+    PageTurnRenderer renderer({vertex,red},{vertex,blue},
+        {page_turn_quad_vertex_shader(),page_turn_shadow_fragment_shader()});
     PageSurfaceDraw material{};
     PageTurnMesh mesh;
     std::array<unsigned char,128*64*4> pixels;
@@ -111,17 +120,38 @@ void main() { color=vec4(0.0,0.0,1.0,1.0); }
         }
     }
     std::cout << "PASS page surface fan submission: " << checked << " pixel centers / four folds\n";
+    const std::array<float,20> quad_parameters{1,0,0,0,0,2,0,0,0,0,1,0,-1,-1,0,1,0,0,1,1};
+    const std::array<float,8> shadow_parameters{0,0,std::bit_cast<float>(0x3c00u),0,.25f,.5f,.75f,1};
+    GLuint black;
+    glGenTextures(1,&black); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,black);
+    const std::array<unsigned char,4> texel{0,0,0,255};
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,1,1,0,GL_RGBA,GL_UNSIGNED_BYTE,texel.data());
+    material.vertex_parameters=quad_parameters; material.fragment_parameters=shadow_parameters;
+    material.viewport={1,1,1,1,1,128,64,.5f,.5f,0,0,0};
+    material.fragment_state={0,0,0,0,1,0,0,1.f/128,1.f/64,0,16,0};
+    material.textures[0]=black;
+    const std::array<PageQuadVertex,4> quad{{{{0,0},{0,0}},{{2,0},{1,0}},{{0,1},{0,1}},{{2,1},{1,1}}}};
+    renderer.draw_quad(quad,material);
+    glReadPixels(0,0,128,64,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
+    if(glGetError()!=GL_NO_ERROR) throw std::runtime_error("Shadow rectangle GPU error");
+    for(unsigned i=0;i<pixels.size();++i)
+        if(pixels[i]!=std::array<unsigned char,4>{64,128,191,255}[i%4])
+            throw std::runtime_error("Shadow rectangle does not cover the target with the expected material");
+    glDeleteTextures(1,&black);
+    std::cout << "PASS native shadow rectangle: 8192 expected RGBA pixels\n";
 }
-void check_vertex(const char* reference_path, bool bottom = false) {
+void check_vertex(const char* reference_path, bool bottom = false, bool quad = false) {
     using namespace emucorev::paf;
-    const unsigned stride=bottom?8:12;
+    const unsigned stride=(bottom || quad)?8:12;
     auto build = [&](const std::string& source) {
         const auto vs = compile(GL_VERTEX_SHADER,source);
         const auto fs = compile(GL_FRAGMENT_SHADER,"#version 320 es\nprecision highp float; layout(location=0) out vec4 c; void main(){c=vec4(1.0);}");
         const auto shader=glCreateProgram();
         glAttachShader(shader,vs); glAttachShader(shader,fs);
         const char* outputs[]{"gl_Position","v_TexCoord0","v_TexCoord2"};
-        glTransformFeedbackVaryings(shader,bottom?2:3,outputs,GL_INTERLEAVED_ATTRIBS);
+        glTransformFeedbackVaryings(shader,(bottom || quad)?2:3,outputs,GL_INTERLEAVED_ATTRIBS);
         glLinkProgram(shader); glDeleteShader(vs); glDeleteShader(fs);
         GLint ok=0; glGetProgramiv(shader,GL_LINK_STATUS,&ok);
         if(!ok) throw std::runtime_error("Top vertex transform-feedback link failed");
@@ -129,7 +159,7 @@ void check_vertex(const char* reference_path, bool bottom = false) {
         if(sampler>=0) { glUseProgram(shader); glUniform1i(sampler,4); }
         return shader;
     };
-    const auto native=build(std::string(bottom?page_turn_bottom_vertex_shader():page_turn_top_vertex_shader()));
+    const auto native=build(std::string(quad?page_turn_quad_vertex_shader():bottom?page_turn_bottom_vertex_shader():page_turn_top_vertex_shader()));
     GLuint reference=0;
     if(reference_path) {
         std::ifstream file(reference_path,std::ios::binary);
@@ -146,8 +176,8 @@ void check_vertex(const char* reference_path, bool bottom = false) {
     glGenBuffers(4,buffers); glGenTransformFeedbacks(1,&feedback);
     glBindTransformFeedback(GL_TRANSFORM_FEEDBACK,feedback);
     glBindBuffer(GL_ARRAY_BUFFER,buffers[0]);
-    glBufferData(GL_ARRAY_BUFFER,1024*sizeof(PagePoint),nullptr,GL_DYNAMIC_DRAW);
-    glEnableVertexAttribArray(0); glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,sizeof(PagePoint),nullptr);
+    glBufferData(GL_ARRAY_BUFFER,1024*4*sizeof(float),nullptr,GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0); glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,4*sizeof(float),nullptr);
     glBindBuffer(GL_UNIFORM_BUFFER,buffers[1]);
     glBufferData(GL_UNIFORM_BUFFER,112*sizeof(float),nullptr,GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_UNIFORM_BUFFER,0,buffers[1]);
@@ -175,8 +205,11 @@ void check_vertex(const char* reference_path, bool bottom = false) {
     for(auto deepest:std::array<PagePoint,4>{{{1.9f,.95f},{1.1f,.4f},{-.8f,-.3f},{-3.f,-2.f}}}) {
         const auto shape=page_turn_fold_shape(deepest,{2,1});
         page_turn_mesh(shape,mesh);
+        std::vector<std::array<float,4>> points(mesh.vertex_count);
+        for(unsigned i=0;i<mesh.vertex_count;++i)
+            points[i]={mesh.vertices[i].x,mesh.vertices[i].y,float(i%7)*.1f,float(i%11)*.13f};
         glBindBuffer(GL_ARRAY_BUFFER,buffers[0]);
-        glBufferSubData(GL_ARRAY_BUFFER,0,mesh.vertex_count*sizeof(PagePoint),mesh.vertices.data());
+        glBufferSubData(GL_ARRAY_BUFFER,0,points.size()*sizeof(points[0]),points.data());
         for(unsigned configuration=0;configuration<3;++configuration) {
             std::array<float,112> p{};
             p[0]=p[5]=p[10]=p[15]=1;
@@ -203,6 +236,10 @@ void check_vertex(const char* reference_path, bool bottom = false) {
                 p[36]=.009f;
                 p[40]=shape.center.x; p[41]=shape.center.y; p[42]=shape.normal.x; p[43]=shape.normal.y;
                 p[44]=2; p[45]=1; p[46]=.5f; p[47]=1;
+            }
+            if(quad) {
+                p[12]=-.1f*configuration; p[13]=.2f*configuration;
+                p[16]=.2f; p[17]=.3f; p[18]=1.1f; p[19]=.7f;
             }
             const std::array<float,12> viewport{1,configuration==2?-1.f:1.f,1,1,
                 configuration==1?0.f:1.f,128,64,.5f,.5f,0,0,0};
@@ -237,7 +274,7 @@ void check_vertex(const char* reference_path, bool bottom = false) {
     glDeleteTransformFeedbacks(1,&feedback); glDeleteBuffers(4,buffers); glDeleteVertexArrays(1,&vao);
     glDeleteTextures(1,&lookup);
     glDeleteProgram(native); if(reference) glDeleteProgram(reference);
-    std::cout << (bottom?"Bottom":"Top") << " vertex: " << nonfinite << " nonfinite outputs, " << compared << " compared words, "
+    std::cout << (quad?"Quad":bottom?"Bottom":"Top") << " vertex: " << nonfinite << " nonfinite outputs, " << compared << " compared words, "
         << differences << " differences, max " << maximum << '\n';
     if(differences) for(unsigned i=0;i<stride;++i)
         std::cout << "component " << i << ": " << component_differences[i] << " max " << component_maximum[i] << '\n';
@@ -248,17 +285,21 @@ int main(int argc, char** argv) {
     try {
         const bool top_only=argc==3 && std::string(argv[1])=="--top-vertex";
         const bool bottom_only=argc==3 && std::string(argv[1])=="--bottom-vertex";
+        const bool quad_only=argc==3 && std::string(argv[1])=="--quad-vertex";
         const bool bottom_fragment=argc==3 && std::string(argv[1])=="--bottom-fragment";
-        if (argc > 2 && !top_only && !bottom_only && !bottom_fragment) throw std::runtime_error("Usage: paf_page_shader_test [REFERENCE_FRAGMENT] | --top-vertex/--bottom-vertex REFERENCE_VERTEX | --bottom-fragment REFERENCE_FRAGMENT");
+        const bool top_fragment=argc==3 && std::string(argv[1])=="--top-fragment";
+        const bool shadow_fragment=argc==3 && std::string(argv[1])=="--shadow-fragment";
+        if (argc > 2 && !top_only && !bottom_only && !quad_only && !bottom_fragment && !top_fragment && !shadow_fragment) throw std::runtime_error("Usage: paf_page_shader_test [REFERENCE_FRAGMENT] | --top-vertex/--bottom-vertex/--quad-vertex REFERENCE_VERTEX | --top-fragment/--bottom-fragment/--shadow-fragment REFERENCE_FRAGMENT");
         Context context;
         std::cout << std::unitbuf << "GPU " << glGetString(GL_RENDERER) << '\n';
-        if(top_only || bottom_only) { check_vertex(argv[2],bottom_only); return 0; }
+        if(top_only || bottom_only || quad_only) { check_vertex(argv[2],bottom_only,quad_only); return 0; }
         check_vertex(nullptr);
         check_vertex(nullptr,true);
-        const auto native = program(std::string(bottom_fragment?emucorev::paf::page_turn_bottom_fragment_shader():emucorev::paf::page_turn_empty_back_fragment_shader()));
+        check_vertex(nullptr,false,true);
+        const auto native = program(std::string(shadow_fragment?emucorev::paf::page_turn_shadow_fragment_shader():top_fragment?emucorev::paf::page_turn_top_fragment_shader():bottom_fragment?emucorev::paf::page_turn_bottom_fragment_shader():emucorev::paf::page_turn_empty_back_fragment_shader()));
         GLuint reference = 0;
-        if (argc == 2 || bottom_fragment) {
-            std::ifstream file(argv[bottom_fragment?2:1], std::ios::binary);
+        if (argc == 2 || bottom_fragment || top_fragment || shadow_fragment) {
+            std::ifstream file(argv[argc==3?2:1], std::ios::binary);
             if (!file) throw std::runtime_error("Missing reference shader");
             std::string source{std::istreambuf_iterator<char>(file), {}};
             const std::string old = "layout(binding = 1, std430) restrict readonly buffer fragmentDataType";
@@ -271,9 +312,9 @@ int main(int argc, char** argv) {
         glGenVertexArrays(1, &vao); glBindVertexArray(vao);
         glGenBuffers(2, buffers);
         glBindBuffer(GL_UNIFORM_BUFFER, buffers[0]);
-        glBufferData(GL_UNIFORM_BUFFER, 64, nullptr, GL_DYNAMIC_DRAW);
+        glBufferData(GL_UNIFORM_BUFFER, 144, nullptr, GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_UNIFORM_BUFFER, 1, buffers[0]);
-        const std::array<float, 12> state{0,0,0,0,1,0,0,1.f/128,1.f/64,0,48,0};
+        const std::array<float, 12> state{0,0,0,0,1,0,0,1.f/128,1.f/64,0,112,0};
         glBindBuffer(GL_UNIFORM_BUFFER, buffers[1]);
         glBufferData(GL_UNIFORM_BUFFER, sizeof(state), state.data(), GL_STATIC_DRAW);
         glBindBufferBase(GL_UNIFORM_BUFFER, 3, buffers[1]);
@@ -298,23 +339,38 @@ int main(int argc, char** argv) {
         glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, textures[1]);
         glViewport(0,0,128,64); glDisable(GL_BLEND); glDisable(GL_DITHER);
         std::array<unsigned char, 128*64*4> original{}, actual{};
-        unsigned differences = 0, nonzero = 0, reported = 0;
+        unsigned differences = 0, nonzero = 0, saturated = 0, reported = 0;
         std::array<unsigned,4> channel_differences{}, maximum{};
         for (unsigned sample = 0; sample < 16; ++sample) {
             const float rate = static_cast<float>(sample)/15;
-            const std::array<float,16> material{.2f,.3f,.8f,1.2f,rate,0,.7f,.9f,
+            std::array<float,36> material{.2f,.3f,.8f,1.2f,rate,0,.7f,.9f,
                 1.1f,.25f+rate,.1f,.2f,.3f,0,1.f+rate,.7f};
+            if(top_fragment) {
+                material[0]=rate; material[2]=.6f; material[3]=.7f;
+                material[4]=.8f; material[5]=.9f;
+                material[18]=.4f; material[19]=.3f; material[20]=.2f; material[21]=.1f;
+            }
+            if(shadow_fragment) {
+                auto packed=[](float a,float b) {
+                    return std::bit_cast<float>(unsigned(std::bit_cast<std::uint16_t>(static_cast<_Float16>(a)))
+                        | (unsigned(std::bit_cast<std::uint16_t>(static_cast<_Float16>(b)))<<16));
+                };
+                material[0]=packed(.1f,.2f); material[1]=packed(2.f+rate,1.5f);
+                material[2]=packed(rate,0); material[3]=0;
+                material[4]=.3f; material[5]=.5f; material[6]=.7f; material[7]=.8f;
+            }
             glBindBuffer(GL_UNIFORM_BUFFER,buffers[0]);
             glBufferSubData(GL_UNIFORM_BUFFER,0,sizeof(material),material.data());
             auto render = [&](GLuint shader, auto& result) {
                 glUseProgram(shader);
-                if(bottom_fragment) glUniform1f(glGetUniformLocation(shader,"test_shift"),rate*.7f);
+                if(bottom_fragment || top_fragment) glUniform1f(glGetUniformLocation(shader,"test_shift"),rate*.7f);
                 glDrawArrays(GL_TRIANGLE_STRIP,0,4);
                 glReadPixels(0,0,128,64,GL_RGBA,GL_UNSIGNED_BYTE,result.data());
                 if (glGetError() != GL_NO_ERROR) throw std::runtime_error("GPU draw error");
             };
             render(native, actual);
             nonzero += std::count_if(actual.begin(),actual.end(),[](auto value){return value != 0;});
+            saturated += std::count(actual.begin(),actual.end(),255);
             if (reference) {
                 render(reference, original);
                 for (unsigned i=0;i<actual.size();++i) {
@@ -331,12 +387,12 @@ int main(int argc, char** argv) {
         glDeleteTextures(2,textures); glDeleteBuffers(2,buffers); glDeleteVertexArrays(1,&vao);
         glBindFramebuffer(GL_FRAMEBUFFER,0);
         check_mesh_renderer();
-        std::cout << "16 material draws, " << nonzero << " nonzero channels\n";
+        std::cout << "16 material draws, " << nonzero << " nonzero channels, " << saturated << " saturated channels\n";
         if(reference) {
             std::cout << differences << " differing channels\n";
             for(unsigned i=0;i<4;++i) std::cout << "channel " << i << ": " << channel_differences[i] << " max " << maximum[i] << '\n';
         } else std::cout << "Native draw only; no reference comparison\n";
-        if (!nonzero || differences) return 1;
+        if (!nonzero || saturated==16*actual.size() || differences) return 1;
         return 0;
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }
