@@ -841,6 +841,20 @@ paf_page_material_test LOCAL_MATERIAL_CORPUS.bin
 
 ### Native page pose and point light
 
+`page_turn_material_pack()` assembles the complete 16-float original material
+block from caller-supplied color and nine coefficients. Constructor defaults
+retain their exact float bits; the two Fresnel coefficients follow the recovered
+fold-progress multiplier. The top-vertex builder now includes this block instead
+of leaving it zero. An independent capture of the original renderer's setter
+matches **48 records / 768 words bit for bit on Lenovo and RG556**, covering four
+sizes, two fold styles, two material sets and three fold states. This establishes
+parameter assembly, not the unfinished lock-screen camera/composition or pixels.
+
+```text
+python native-ui/tests/generate_page_material_pack_reference.py OWNED_DECRYPTED_PAF LOCAL_PACK_CORPUS.bin
+paf_page_material_pack_test LOCAL_PACK_CORPUS.bin
+```
+
 `page_turn_transforms()` assembles column-major model/MVP matrices from the
 physical page size, scale, center position, quaternion and view/projection.
 It retains the original quaternion normalization, zero-quaternion identity,

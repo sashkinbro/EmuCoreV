@@ -18,7 +18,8 @@ from unicorn.arm_const import (UC_ARM_REG_C1_C0_2, UC_ARM_REG_FPEXC,
     UC_ARM_REG_LR, UC_ARM_REG_PC, UC_ARM_REG_FPSCR)
 
 
-def record(b, width, height, point, style, *, pose=None, projection=None, view=None, matrices=False, light_values=None, lights=False):
+def record(b, width, height, point, style, *, pose=None, projection=None, view=None,
+        matrices=False, light_values=None, lights=False, material_values=None, material_pack=False):
     u=Uc(UC_ARCH_ARM,UC_MODE_THUMB)
     ph=struct.unpack_from('<Q',b,72)[0]; sec=struct.unpack_from('<Q',b,88)[0]
     for i in range(2):
@@ -61,8 +62,13 @@ def record(b, width, height, point, style, *, pose=None, projection=None, view=N
         fs(data+0x50,*pose[6:10])
     fs(data+0x60,*point);u.mem_write(data+0x68,b'\x01')
     fs(surface+0x30,1/width,1/height)
-    fs(renderer+0x70*4+8,1,1,1,1)
-    material=(0x3f649247,0x3f8879ee,0x4185f15e,0x3da491b0,0x3f4d30ad,0x3e9349e0,0x404321c9,0x3ec49214,0x3dea454e)
+    if material_values is None:
+        material_values=(1.0,1.0,1.0,1.0,0x3f649247,0x3f8879ee,0x4185f15e,
+            0x3da491b0,0x3f4d30ad,0x3e9349e0,0x404321c9,0x3ec49214,0x3dea454e)
+    if len(material_values)!=13: raise ValueError('Material input must contain color4 plus nine scalars')
+    fs(renderer+0x70*4+8,*material_values[:4])
+    material=tuple(struct.unpack('<I',struct.pack('<f',value))[0] if isinstance(value,float) else value
+        for value in material_values[4:])
     for i,v in enumerate(material):word(renderer+0x70*4+0x24+i*12,v)
     style=(style[0],style[1],.08,style[2],250,.3,style[3],1,16.2,.48,.3)
     for i,v in enumerate(style):fs(renderer+(0x209+i*3)*4,v)
@@ -100,6 +106,8 @@ def record(b, width, height, point, style, *, pose=None, projection=None, view=N
         return matches[0]
     if lights:
         return words(0x34)+words(0x30)
+    if material_pack:
+        return words(0x2c)
     if matrices:
         return words(0xc)[:16]+words(0x8)[:16]
     return (words(0x1c)[:4]+words(0x10)[:2]+words(0x18)[:4]+words(0x14)[:4]

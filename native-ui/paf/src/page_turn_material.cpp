@@ -1,10 +1,28 @@
 #include <emucorev/paf/page_turn_material.h>
 #include <algorithm>
+#include <cmath>
 #include <cstring>
+#include <stdexcept>
 
 namespace emucorev::paf {
 namespace {
 constexpr PageTurnUniformRange none{};
+}
+
+std::array<float, 16> page_turn_material_pack(float fresnel_multiplier,
+    const PageTurnMaterialStyle& style) {
+    const std::array values{style.color[0], style.color[1], style.color[2], style.color[3],
+        style.diffuse_coefficient, style.specular_coefficient, style.specular_power,
+        style.fresnel_front, style.fresnel_control, style.fresnel_coefficient,
+        style.refraction_coefficient, style.refraction_amount, style.second_reflection};
+    if (!std::isfinite(fresnel_multiplier)
+        || !std::all_of(values.begin(), values.end(), [](float value) { return std::isfinite(value); }))
+        throw std::invalid_argument("Invalid PageTurn material style");
+    return {style.color[0], style.color[1], style.color[2], style.color[3],
+        style.diffuse_coefficient, style.specular_coefficient, style.specular_power, 0.f,
+        style.fresnel_front, style.fresnel_control * fresnel_multiplier,
+        style.fresnel_coefficient * fresnel_multiplier, 0.f,
+        style.refraction_coefficient, 0.f, style.refraction_amount, style.second_reflection};
 }
 
 PageTurnUniformRange page_turn_top_uniform(PageTurnUniform uniform) noexcept {
@@ -58,13 +76,14 @@ PageTurnUniformRange page_turn_empty_back_uniform(PageTurnUniform uniform) noexc
 PageTurnMaterialBlock page_turn_top_vertex_material(PagePoint size, PagePoint point,
     const PageTurnShapeStyle& style, const PageTurnPose& pose,
     const PageTurnMatrix& projection, const PageTurnMatrix& view,
-    const PageTurnPointLight& light) {
+    const PageTurnPointLight& light, const PageTurnMaterialStyle& material_style) {
     PageTurnMaterialBlock block;
     block.size = 112;
     const auto transforms = page_turn_transforms(size, pose, projection, view);
     const auto shape = page_turn_fold_shape(point, page_turn_normalized_aspect(size));
     const auto material = page_turn_shape_material(point, shape, style);
     const auto lights = page_turn_light_parameters(light);
+    const auto packed_material = page_turn_material_pack(material.fresnel_multiplier, material_style);
     auto put = [&](PageTurnUniform uniform, const float* source, std::uint32_t count) {
         const auto range = page_turn_top_uniform(uniform);
         const auto copied = std::min(range.count, count);
@@ -72,6 +91,7 @@ PageTurnMaterialBlock page_turn_top_vertex_material(PagePoint size, PagePoint po
     };
     put(PageTurnUniform::mvp, transforms.model_view_projection.data(), 16);
     put(PageTurnUniform::model_matrix, transforms.model.data(), 16);
+    put(PageTurnUniform::material_pack, packed_material.data(), 16);
     put(PageTurnUniform::deepest, material.deepest.data(), 4);
     put(PageTurnUniform::grep, &material.grep.x, 2);
     put(PageTurnUniform::normal_scale_z, &material.normal_scale_z, 1);
@@ -125,7 +145,7 @@ PageTurnMaterialBlock page_turn_empty_back_vertex_material(PagePoint size, PageP
 }
 
 std::uint32_t page_turn_draw_passes(PagePoint size, PagePoint point, bool folded,
-    const PageTurnShapeStyle& style, PageTurnPass* output, std::uint32_t capacity) noexcept {
+    const PageTurnShapeStyle& style, PageTurnPass* output, std::uint32_t capacity) {
     const std::uint32_t required = folded ? 3 : 2;
     if (!output || capacity < required) return 0;
     output[0] = {PageTurnPassRole::top, page_turn_top_vertex_material(size, point, style)};
