@@ -13,6 +13,35 @@ the renderer and paired scenario measurements exist.
 
 ## Application boundary
 
+The lock-screen preview now connects the recovered widget configuration and
+materials into one interactive development scene. The shell constructor
+`8123b85a` creates a 960x512 PageTurn at centered position (0,-16), applies
+fold ratios (.23,.85), Graphics margins (32,32), and corner extents (.08,.08).
+Graphics assembly `8108047c` yields the 896x448 inset surface; `810ca2f8`
+derives CornerSize (.96,.92,25,12.5). Native pose and model matrices remain
+separate. The page samples the corresponding rectangle of the bundled canvas.
+Date/hour/minute/separator/AM-PM positions, regular/bold fonts and sizes are
+derived from the `power_manage_plugin` template f5228777 rather than the former
+manually composed large labels. Ready assets remain in the ignored resource pack.
+
+On Lenovo, the visible page curl, dragging, short-drag return, complete peel,
+and minute changes were inspected in the running preview. Text-bearing page
+textures update by revision; the pristine wallpaper is a separate underlying
+image. Android gesture cancellation returns to rest; the source base threshold
+is 280. The exit fold follows the recovered 500 ms sine curve instead of the
+previous 300 ms quadratic placeholder. The optional empty-back renderer program
+preserves the pre-existing rectangle constructor argument. Assemble and lint pass.
+
+This scene remains incomplete: the offscreen preview flattens clip-space depth
+while retaining model depth for lighting, and orders the curled face after the
+overlapping surfaces. Original camera/depth and complete pass equivalence are
+not established. Peel currently reveals the wallpaper, not the unfinished Home
+screen; full startup, exit alpha/Z tracks, original text shadows/rasterization,
+gamepad navigation and remaining shell transitions still need integration.
+The current visual result is **not** declared 1:1 or a replacement for the
+shipping emulated mode. This work was checked only on Lenovo; Anbernic is
+reserved for another agent at the user's request.
+
 The application supplies library snapshots, changes to installed games, real
 trophy data, localized text for every supported application language, preferences
 and resource access. The standalone UI emits user intentions such as launching a

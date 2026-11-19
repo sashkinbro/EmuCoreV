@@ -18,6 +18,25 @@ class BundledImages(
     private val resources: File,
     private val upload: (Int, Int, Int, ByteArray) -> Unit,
 ) {
+    /** Text layout from power_manage_plugin RCO template f5228777 (group de1f6be8). */
+    private object LockRcoLayout {
+        const val canvasWidth = 960f
+        const val canvasHeight = 544f
+        const val groupX = -430f
+        const val groupY = -222f
+        const val dateX = 10f
+        const val dateY = 108f
+        const val hourX = 160f
+        const val minuteX = 380f
+        const val separatorX = -52f
+        const val amPmX = 390f
+        const val textY = 0f
+
+        // PAF text layout uses a centered widget origin and a Y-up coordinate system.
+        fun screenX(localX: Float) = canvasWidth * .5f + groupX + localX
+        fun screenBaseline(localY: Float) = canvasHeight * .5f - (groupY + localY)
+    }
+
     private val clockPaint by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
@@ -25,7 +44,43 @@ class BundledImages(
             typeface = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
         }
     }
+    private val lockClockPaint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xfff2f2f2.toInt()
+            textSize = 120f // power_manage_plugin RCO textobj 6232
+            // The reference lock text is SCE Rodin Cattleya LATIN Regular (ltn0),
+            // not its Bold sibling ltn4 used by the shell status clock.
+            typeface = Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
+            setShadowLayer(1f, 0f, 1f, Color.argb(128, 0, 0, 0))
+        }
+    }
+    private val lockAmPmPaint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xfff2f2f2.toInt()
+            textSize = 52f // RCO textobj 6552, bold=true
+            typeface = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
+            setShadowLayer(1f, 0f, 1f, Color.argb(128, 0, 0, 0))
+        }
+    }
+    private val lockDatePaint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xfff2f2f2.toInt()
+            textSize = 32f // RCO textobj 6064
+            typeface = Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
+            setShadowLayer(1f, 0f, 1f, Color.argb(128, 0, 0, 0))
+        }
+    }
+    private val lockSeparatorPaint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xfff2f2f2.toInt()
+            textSize = 120f // RCO textobj 6736
+            typeface = Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
+            setShadowLayer(1f, 0f, 1f, Color.argb(128, 0, 0, 0))
+        }
+    }
     private var previousClock: String? = null
+    private var rawKeylock: Bitmap? = null
+    private var previousLockText: String? = null
 
     fun loadShellImages() {
         // Resource hashes from the reviewed indicator document, not guessed names.
@@ -42,15 +97,82 @@ class BundledImages(
     }
 
     fun loadLockImages() {
+        loadShellImages()
         // Lock wallpaper, original corner texture and the exponential lookup.
-        listOf(KEYLOCK_IMAGE to "effects/keylock.png",
+        listOf(
             CORNER_IMAGE to "effects/page_turn/textures/page_corner/mip-0.png",
-            EXP_MINUS_IMAGE to "effects/lookups/exp-minus.png").forEach { (id, path) ->
+            EXP_MINUS_IMAGE to "effects/lookups/exp-minus.png"
+        ).forEach { (id, path) ->
             val bitmap = File(resources, path).inputStream().use {
                 requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled lock image: $path" }
             }
             try { send(id, bitmap) } finally { bitmap.recycle() }
         }
+        val keylockFile = File(resources, "effects/keylock.png")
+        val base = keylockFile.inputStream().use {
+            requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled keylock wallpaper" }
+        }
+        releaseLockWallpaper()
+        rawKeylock = base
+        send(RAW_KEYLOCK_IMAGE, base)
+    }
+
+    fun updateLockClock(status: DeviceStatusSource.Snapshot) {
+        val instant = Instant.ofEpochSecond(status.epochMinute * 60)
+        val zone = ZoneId.of(status.timeZoneId)
+        val locale = Locale.getDefault()
+        val hourText = DateTimeFormatter.ofPattern(if (status.use24HourClock) "HH" else "h", locale)
+            .withZone(zone).format(instant)
+        val minuteText = DateTimeFormatter.ofPattern("mm", locale).withZone(zone).format(instant)
+        val amPmText = if (!status.use24HourClock) {
+            DateTimeFormatter.ofPattern("a", locale).withZone(zone).format(instant)
+        } else ""
+        // The source lock date is a full month, day, and parenthesized weekday.
+        // Keep the device locale for the translated names while preserving that layout.
+        val dateText = DateTimeFormatter.ofPattern("MMMM d (EEEE)", locale)
+            .withZone(zone).format(instant)
+
+        val combinedKey = "$hourText|$minuteText|$amPmText|$dateText"
+        if (combinedKey == previousLockText) return
+        val base = rawKeylock ?: return
+        val composited = base.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(composited)
+        val dateX = LockRcoLayout.screenX(LockRcoLayout.dateX)
+        val dateBaseline = LockRcoLayout.screenBaseline(LockRcoLayout.dateY)
+        canvas.drawText(dateText, dateX, dateBaseline, lockDatePaint)
+
+        // These are the source widget anchors: hour at 160, minute at 380, with
+        // the minute field right-aligned. The nested separator sits 52 units left.
+        val clockBaseline = LockRcoLayout.screenBaseline(LockRcoLayout.textY)
+        val hourRight = LockRcoLayout.screenX(LockRcoLayout.hourX)
+        val minuteRight = LockRcoLayout.screenX(LockRcoLayout.minuteX)
+        val minuteLeftInGroup = LockRcoLayout.minuteX - lockClockPaint.measureText(minuteText)
+        canvas.drawText(hourText, hourRight - lockClockPaint.measureText(hourText),
+            clockBaseline, lockClockPaint)
+        canvas.drawText(":", LockRcoLayout.screenX(minuteLeftInGroup + LockRcoLayout.separatorX),
+            clockBaseline, lockSeparatorPaint)
+        canvas.drawText(minuteText, minuteRight - lockClockPaint.measureText(minuteText),
+            clockBaseline, lockClockPaint)
+        if (amPmText.isNotEmpty()) {
+            canvas.drawText(amPmText, LockRcoLayout.screenX(LockRcoLayout.amPmX),
+                clockBaseline, lockAmPmPaint)
+        }
+        try {
+            send(KEYLOCK_IMAGE, composited)
+            previousLockText = combinedKey
+        } finally {
+            composited.recycle()
+        }
+    }
+
+    fun release() {
+        releaseLockWallpaper()
+    }
+
+    private fun releaseLockWallpaper() {
+        rawKeylock?.let { if (!it.isRecycled) it.recycle() }
+        rawKeylock = null
+        previousLockText = null
     }
 
     fun loadBusyImage() {
@@ -98,5 +220,6 @@ class BundledImages(
         const val KEYLOCK_IMAGE = 100
         const val CORNER_IMAGE = 101
         const val EXP_MINUS_IMAGE = 102
+        const val RAW_KEYLOCK_IMAGE = 103
     }
 }

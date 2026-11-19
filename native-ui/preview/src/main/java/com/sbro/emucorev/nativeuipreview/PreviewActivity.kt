@@ -27,7 +27,15 @@ class PreviewActivity : NativeActivity() {
     override fun onCreate(state: Bundle?) {
         val resources = BundledResources.prepare(this)
         nativeResourceRoot(resources.absolutePath)
-        previewScene = when (intent.getStringExtra("scene")) { "busy" -> 1; "lock" -> 2; else -> 0 }
+        val sceneArgument = intent.extras?.get("scene")
+        val sceneExtra = sceneArgument as? String
+        val sceneInt = sceneArgument as? Int ?: -1
+        previewScene = when {
+            sceneExtra == "busy" || sceneInt == 1 -> 1
+            sceneExtra == "shell" || sceneInt == 0 -> 0
+            sceneExtra == "lock" || sceneInt == 2 -> 2
+            else -> 2
+        }
         nativePreviewScene(previewScene)
         super.onCreate(state)
         window.attributes = window.attributes.apply {
@@ -44,9 +52,12 @@ class PreviewActivity : NativeActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (previewScene != 0) return
+        if (previewScene != 0 && previewScene != 2) return
         deviceStatus.start { status ->
             images.updateClock(status)
+            if (previewScene == 2) {
+                images.updateLockClock(status)
+            }
             nativeStatus(status.batteryPercent, status.charging, status.powerSource,
                 status.wifiEnabled, status.wifiConnected, status.wifiRssi, status.bluetoothEnabled,
                 status.epochMinute, status.timeZoneId, status.use24HourClock)
@@ -56,6 +67,11 @@ class PreviewActivity : NativeActivity() {
     override fun onPause() {
         deviceStatus.stop()
         super.onPause()
+    }
+
+    override fun onDestroy() {
+        if (::images.isInitialized) images.release()
+        super.onDestroy()
     }
 
     companion object {

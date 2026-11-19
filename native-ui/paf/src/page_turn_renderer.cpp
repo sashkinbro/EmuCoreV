@@ -43,7 +43,7 @@ GLuint link(PageSurfaceShaders source) {
 }
 }
 struct PageTurnRenderer::Impl {
-    std::array<GLuint, 3> programs{};
+    std::array<GLuint, 4> programs{};
     std::array<GLuint, 6> buffers{};
     GLuint vao = 0, quad_vao = 0;
     std::array<PageTurnFan, 128> front{}, folded{};
@@ -57,11 +57,13 @@ struct PageTurnRenderer::Impl {
     void apply(GLuint program, const PageSurfaceDraw& material);
 };
 PageTurnRenderer::PageTurnRenderer(PageSurfaceShaders front, PageSurfaceShaders folded,
-    PageSurfaceShaders rectangle)
+    PageSurfaceShaders rectangle, PageSurfaceShaders empty_back)
     : impl_(std::make_unique<Impl>()) {
     auto& p = *impl_;
-    p.programs[0] = link(front); p.programs[1] = link(folded);
-    if (!rectangle.vertex.empty() || !rectangle.fragment.empty()) p.programs[2] = link(rectangle);
+    p.programs[0] = link(front);
+    p.programs[1] = link(folded);
+    if (!empty_back.vertex.empty() || !empty_back.fragment.empty()) p.programs[2] = link(empty_back);
+    if (!rectangle.vertex.empty() || !rectangle.fragment.empty()) p.programs[3] = link(rectangle);
     glGenVertexArrays(1, &p.vao); glBindVertexArray(p.vao);
     glGenBuffers(p.buffers.size(), p.buffers.data());
     glBindBuffer(GL_ARRAY_BUFFER, p.buffers[0]);
@@ -98,25 +100,39 @@ void PageTurnRenderer::upload_mesh(const PageTurnMesh& mesh) {
     p.front_count = mesh.front_count; p.folded_count = mesh.folded_count;
 }
 void PageTurnRenderer::draw(PageSurface surface, const PageSurfaceDraw& material) {
-    if (surface != PageSurface::front && surface != PageSurface::folded)
-        throw std::invalid_argument("Invalid page surface");
     auto& p = *impl_;
-    const bool folded = surface == PageSurface::folded;
+    GLuint program = 0;
+    const PageTurnFan* fans = nullptr;
+    unsigned count = 0;
+    if (surface == PageSurface::front) {
+        program = p.programs[0];
+        fans = p.front.data();
+        count = p.front_count;
+    } else if (surface == PageSurface::folded) {
+        program = p.programs[1];
+        fans = p.folded.data();
+        count = p.folded_count;
+    } else if (surface == PageSurface::empty_back) {
+        program = p.programs[2];
+        fans = p.folded.data();
+        count = p.folded_count;
+    } else {
+        throw std::invalid_argument("Invalid page surface");
+    }
+    if (!program || !fans || !count) return;
     glBindVertexArray(p.vao);
-    p.apply(p.programs[folded ? 1 : 0], material);
-    const auto& fans = folded ? p.folded : p.front;
-    const auto count = folded ? p.folded_count : p.front_count;
+    p.apply(program, material);
     for (unsigned i = 0; i < count; ++i)
         glDrawArrays(GL_TRIANGLE_FAN, fans[i].first, fans[i].count);
 }
 void PageTurnRenderer::draw_quad(std::span<const PageQuadVertex, 4> vertices,
     const PageSurfaceDraw& material) {
     auto& p = *impl_;
-    if (!p.programs[2]) throw std::logic_error("Page rectangle shaders were not configured");
+    if (!p.programs[3]) throw std::logic_error("Page rectangle shaders were not configured");
     glBindVertexArray(p.quad_vao);
     glBindBuffer(GL_ARRAY_BUFFER, p.buffers[5]);
     glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size_bytes(), vertices.data());
-    p.apply(p.programs[2], material);
+    p.apply(p.programs[3], material);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 void PageTurnRenderer::Impl::apply(GLuint program, const PageSurfaceDraw& material) {

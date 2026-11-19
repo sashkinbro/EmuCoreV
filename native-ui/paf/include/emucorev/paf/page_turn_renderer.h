@@ -8,7 +8,7 @@
 namespace emucorev::paf {
 struct PageSurfaceShaders { std::string_view vertex, fragment; };
 struct PageQuadVertex { PagePoint position, uv; };
-enum class PageSurface { front, folded };
+enum class PageSurface { front, folded, empty_back };
 struct PageSurfaceDraw {
     // Reviewed parameter layouts, supplied by the native material controller.
     std::span<const float> vertex_parameters, fragment_parameters;
@@ -24,7 +24,7 @@ struct PageSurfaceDraw {
 class PageTurnRenderer {
 public:
     PageTurnRenderer(PageSurfaceShaders front, PageSurfaceShaders folded,
-        PageSurfaceShaders rectangle = {});
+        PageSurfaceShaders rectangle = {}, PageSurfaceShaders empty_back = {});
     ~PageTurnRenderer();
     PageTurnRenderer(const PageTurnRenderer&) = delete;
     PageTurnRenderer& operator=(const PageTurnRenderer&) = delete;

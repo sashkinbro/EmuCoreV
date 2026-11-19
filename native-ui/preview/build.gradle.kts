@@ -7,7 +7,7 @@ plugins {
 val verifyLocalNativeUiAssets by tasks.registering {
     doLast {
         val root = file("../resources")
-        val required = listOf("images.json", "fonts.json", "fonts/ltn4.otf", "audio/sounds.json",
+        val required = listOf("images.json", "fonts.json", "fonts/ltn4.otf", "fonts/ltn0.otf", "audio/sounds.json",
             "effects/lookups/lookups.json", "effects/lookups/exp-minus.png",
             "effects/lookups/corner-distance.png",
             "images/paf-common-resource/ba195a37.png",
