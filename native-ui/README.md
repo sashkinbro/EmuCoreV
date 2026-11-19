@@ -559,12 +559,19 @@ the page's four half-planes. The ARM implementation retains the original
 reciprocal/root estimates and non-fused refinement steps. Its returned shape is
 UI-owned data; it reads no guest memory and performs no allocation or I/O.
 
+`page_turn_mesh()` constructs the original front and folded triangle fans in
+reusable caller-owned storage. Front bands grow with the original 0.01 step;
+the folded section uses 16 cubic-spaced bands. Half-plane clipping preserves
+the original vertex order, including entry/exit intersections.
+
 The offline oracle executes the reviewed original PageTurn functions, retaining
 their math and branch decisions while supplying local pointer coordinates and
 suppressing widget notifications, capture and drawing. The fold-shape function
-and its projection/clipping helpers execute unchanged in the reference. All
-**422 records / 27,852
-result words match bit for bit** on Lenovo and RG556. The corpus covers four
+and its projection/clipping helpers execute unchanged in the reference. The
+original mesh builder additionally receives preallocated buffers and a dummy
+graphics context; its tessellation and clipping execute unchanged. All
+**422 control/shape/mesh records match bit for bit** on Lenovo and RG556,
+including every vertex and front/folded fan range. The corpus covers four
 page sizes, three fold configurations, hit-region boundaries, opacity, release
 thresholds, outward-release options and additional deterministic input samples,
 including fold saturation and large drags outside the page. The compared fields
@@ -578,7 +585,7 @@ python native-ui/tests/generate_page_turn_reference.py OWNED_DECRYPTED_PAF LOCAL
 paf_page_turn_test LOCAL_PAGE_TURN_CORPUS.bin
 ```
 
-The folded top/bottom surfaces, round edges, shadow passes, original mesh and
+The folded top/bottom surfaces, round edges, shadow passes and
 lighting parameters still need their native renderer and original-frame
 comparison. These controls are not presented as a completed unlock screen.
 

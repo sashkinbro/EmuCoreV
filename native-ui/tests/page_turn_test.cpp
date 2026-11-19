@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
         if (argc != 2) throw std::runtime_error("Usage: paf_page_turn_test ORIGINAL_CORPUS");
         std::ifstream input(argv[1], std::ios::binary);
         char magic[8]; input.read(magic, 8);
-        if (!input || std::string(magic, 8) != "PAFPAG02") throw std::runtime_error("Invalid page-turn corpus");
+        if (!input || std::string(magic, 8) != "PAFPAG03") throw std::runtime_error("Invalid page-turn corpus");
         auto word = [&]() {
             std::array<std::uint8_t, 4> bytes;
             input.read(reinterpret_cast<char*>(bytes.data()), 4);
@@ -73,8 +73,31 @@ int main(int argc, char** argv) {
                     throw std::runtime_error("Original fold shape differs");
                 }
             }
+            PageTurnMesh mesh;
+            page_turn_mesh(shape, mesh);
+            const auto vertices = word(), front = word(), folded = word();
+            if (vertices != mesh.vertex_count || front != mesh.front_count || folded != mesh.folded_count) {
+                std::cerr << "case=" << i << " mesh expected=" << vertices << '/' << front << '/' << folded
+                    << " actual=" << mesh.vertex_count << '/' << mesh.front_count << '/' << mesh.folded_count << '\n';
+                throw std::runtime_error("Original mesh counts differ");
+            }
+            for (unsigned vertex = 0; vertex < vertices; ++vertex) {
+                const auto x = word(), y = word();
+                if (bits(mesh.vertices[vertex].x) != x || bits(mesh.vertices[vertex].y) != y) {
+                    std::cerr << "case=" << i << " vertex=" << vertex << std::hex
+                        << " expected=" << x << ',' << y << " actual=" << bits(mesh.vertices[vertex].x)
+                        << ',' << bits(mesh.vertices[vertex].y) << '\n';
+                    throw std::runtime_error("Original mesh vertex differs");
+                }
+            }
+            for (unsigned fan = 0; fan < front + folded; ++fan) {
+                const auto first = word(), count = word();
+                const auto actual = fan < front ? mesh.front[fan] : mesh.folded[fan - front];
+                if (first != actual.first || count != actual.count)
+                    throw std::runtime_error("Original triangle-fan topology differs");
+            }
         }
         if (input.peek() != std::char_traits<char>::eof()) throw std::runtime_error("Trailing page-turn corpus data");
-        std::cout << "PASS " << count << " bit-exact original PageTurn controls and fold-shape records\n";
+        std::cout << "PASS " << count << " bit-exact original PageTurn control/shape/mesh records\n";
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

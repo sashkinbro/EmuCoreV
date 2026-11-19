@@ -67,18 +67,39 @@ PageFoldProjection project(PagePoint center, PagePoint normal, PagePoint point) 
     const float distance = dot(normal, delta);
     return {projected, distance < 0 ? add(projected, subtract(projected, point)) : point, distance};
 }
-bool clip(PagePoint& start, PagePoint& end, PagePoint origin, PagePoint normal) {
+unsigned clip_segment(PagePoint& start, PagePoint& end, PagePoint origin, PagePoint normal) {
     const float a = dot(normal, subtract(start, origin));
     const float b = dot(normal, subtract(end, origin));
-    if (a >= 0 && b >= 0) return false;
-    if (a < 0 && b < 0) return true;
+    if (a >= 0 && b >= 0) return 0;
+    if (a < 0 && b < 0) return 3;
     const auto projected = subtract(start, multiply(normal, a));
     const float numerator = dot(normal, subtract(projected, start));
     const float ratio = numerator * reciprocal(b - a);
     const auto intersection = add(start, multiply(subtract(end, start), ratio));
-    if (a < 0) start = intersection;
-    else end = intersection;
-    return false;
+    if (a < 0) { start = intersection; return 1; }
+    end = intersection;
+    return 2;
+}
+bool clip(PagePoint& start, PagePoint& end, PagePoint origin, PagePoint normal) {
+    return clip_segment(start, end, origin, normal) == 3;
+}
+struct Polygon {
+    std::array<PagePoint, 12> points;
+    unsigned count = 0;
+};
+Polygon clip_polygon(const Polygon& input, PagePoint origin, PagePoint normal) {
+    Polygon output;
+    auto append = [&](PagePoint point) {
+        if (output.count == output.points.size()) throw std::runtime_error("Page-turn polygon exceeds bounds");
+        output.points[output.count++] = point;
+    };
+    for (unsigned i = 0; i < input.count; ++i) {
+        auto start = input.points[i], end = input.points[(i + 1) % input.count];
+        const auto result = clip_segment(start, end, origin, normal);
+        if (result == 0 || result == 2) append(end);
+        else if (result == 1) { append(start); append(end); }
+    }
+    return output;
 }
 }
 PageTurnLayout page_turn_layout(PagePoint size, float fold_fraction, float corner_aspect) {
@@ -151,5 +172,46 @@ PageFoldShape page_turn_fold_shape(PagePoint deepest, PagePoint aspect) {
     result.outside = clip(result.line_start, result.line_end, aspect, {-0.f, -1}) || result.outside;
     result.aspect = aspect;
     return result;
+}
+void page_turn_mesh(const PageFoldShape& shape, PageTurnMesh& output) {
+    output.vertex_count = output.front_count = output.folded_count = 0;
+    Polygon page;
+    page.count = 4;
+    std::copy(shape.corners.begin(), shape.corners.end(), page.points.begin());
+    auto append_band = [&](PagePoint start, PagePoint start_normal, PagePoint end,
+                           PagePoint end_normal, bool folded) {
+        const auto first = clip_polygon(page, start, start_normal);
+        const auto polygon = clip_polygon(first, end, end_normal);
+        if (polygon.count < 3) return;
+        auto& count = folded ? output.folded_count : output.front_count;
+        auto& fans = folded ? output.folded : output.front;
+        if (count == fans.size() || output.vertex_count + polygon.count > output.vertices.size())
+            throw std::runtime_error("Page-turn mesh exceeds native storage");
+        fans[count++] = {output.vertex_count, polygon.count};
+        for (unsigned i = 0; i < polygon.count; ++i)
+            output.vertices[output.vertex_count++] = polygon.points[i];
+    };
+    const auto normal = shape.normal;
+    const PagePoint reverse{-normal.x, -normal.y};
+    auto start = shape.center;
+    auto end = add(shape.center, multiply(normal, .01f));
+    float step = 0;
+    while (shape.maximum.distance > dot(normal, subtract(start, shape.center))) {
+        append_band(start, normal, end, reverse, false);
+        step += 1;
+        if (step > 16384) throw std::runtime_error("Page-turn mesh does not converge");
+        start = end;
+        end = add(end, multiply(normal, step * .01f));
+    }
+    const float extent = std::abs(shape.minimum.distance);
+    auto parameter = [&](unsigned index) {
+        const float rate = static_cast<float>(index) * .0625f;
+        return ((rate * rate) * (rate * -2.f + 3.f)) * extent;
+    };
+    for (unsigned i = 0; i < 16; ++i) {
+        const auto a = subtract(shape.center, multiply(normal, parameter(i)));
+        const auto b = subtract(shape.center, multiply(normal, parameter(i + 1)));
+        append_band(a, reverse, b, normal, true);
+    }
 }
 }

@@ -27,6 +27,13 @@ struct PageFoldShape {
     bool outside;
     PagePoint aspect;
 };
+struct PageTurnFan { std::uint32_t first, count; };
+struct PageTurnMesh {
+    // Reused caller-owned storage. Only the counted prefixes are initialized.
+    std::array<PagePoint, 1024> vertices;
+    std::array<PageTurnFan, 128> front, folded;
+    std::uint32_t vertex_count = 0, front_count = 0, folded_count = 0;
+};
 enum class PageTurnRelease : std::uint32_t {
     beyond_threshold = 0x10000003,
     outward = 0x10000004,
@@ -44,4 +51,5 @@ PageTurnRelease page_turn_release(PagePoint displacement, float threshold,
     bool allow_outward, bool gamepad);
 // Geometry consumed by the original fold renderer, in height-normalized units.
 PageFoldShape page_turn_fold_shape(PagePoint deepest, PagePoint aspect);
+void page_turn_mesh(const PageFoldShape& shape, PageTurnMesh& output);
 }

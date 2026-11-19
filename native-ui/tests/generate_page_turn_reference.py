@@ -48,7 +48,8 @@ def read(address, length): return bytes(uc.mem_read(address, length))
 events = []
 pointer = (0, 0)
 stubs = (0x100100, 0x100110, 0x81100680, 0x81154a4c, 0x81102d54,
-         0x8110226c, 0x8115c2cc, 0x8114daa4, 0x81144892, 0x811612e2, 0x8113c33c)
+         0x8110226c, 0x8115c2cc, 0x8114daa4, 0x81144892, 0x811612e2, 0x8113c33c,
+         0x810760c8, 0x81212be0, 0x811dbe78, 0x81053778)
 for address in stubs: uc.mem_write(address, bytes.fromhex("7047"))
 
 def callback(machine, address, size, data):
@@ -65,6 +66,17 @@ def callback(machine, address, size, data):
         events.append(machine.reg_read(UC_ARM_REG_R1))
     elif address == 0x100110:
         word(0x20027c, machine.reg_read(UC_ARM_REG_R1))
+    elif address == 0x810760c8:
+        machine.reg_write(UC_ARM_REG_R0, 0x217000)
+    elif address == 0x81212be0:
+        vector = machine.reg_read(UC_ARM_REG_R0)
+        if vector not in (0x207024, 0x207034):
+            raise RuntimeError("Unexpected mesh vector allocation")
+        word(vector, 0x214000 if vector == 0x207024 else 0x215000)
+        word(vector + 8, 128)
+        machine.reg_write(UC_ARM_REG_R0, 1)
+    elif address == 0x811dbe78:
+        machine.reg_write(UC_ARM_REG_R0, machine.reg_read(UC_ARM_REG_R1))
 
 uc.hook_add(UC_HOOK_CODE, callback)
 
@@ -164,6 +176,28 @@ for values, outward in cases:
     shape += read(0x2040c8, 16) + read(0x2040e0, 8)
     shape += struct.pack("<I", uc.mem_read(0x2040d8, 1)[0])
     if len(shape) != 204: raise ValueError("Invalid fold-shape reference record")
-    records.append(packed + expected + shape_inputs + shape)
-args.output.write_bytes(b"PAFPAG02" + struct.pack("<I", len(records)) + b"".join(records))
+    word(0x207000, 200)  # Skip GPU buffer allocation; use caller-supplied storage.
+    word(0x20700c, 0x208000)
+    word(0x208000, 0x208100)
+    word(0x208100, 0x209000)
+    word(0x207018, 0x7fc00000)  # Force the original dirty comparison.
+    word(0x20701c, 0x7fc00000)
+    uc.reg_write(UC_ARM_REG_R2, 0x205060)
+    call(0x810c71e0, 0x204000, 0x207000)
+    base, = struct.unpack("<I", read(0x207020, 4))
+    groups = []
+    for offset in (0x24, 0x34):
+        address, count = struct.unpack("<2I", read(0x207000 + offset, 8))
+        if count > 128: raise ValueError("Original mesh fan count exceeds test storage")
+        group = [struct.unpack("<2I", read(address + i * 8, 8)) for i in range(count)]
+        groups.append([(first - base, count) for first, count in group])
+    fans = groups[0] + groups[1]
+    vertex_count = max((first + count for first, count in fans), default=0)
+    if vertex_count > 1024 or sum(count for _, count in fans) != vertex_count:
+        raise ValueError("Original mesh is not a contiguous fan sequence")
+    mesh = struct.pack("<3I", vertex_count, len(groups[0]), len(groups[1]))
+    mesh += read(0x209000 + base * 8, vertex_count * 8)
+    mesh += b"".join(struct.pack("<2I", *fan) for fan in fans)
+    records.append(packed + expected + shape_inputs + shape + mesh)
+args.output.write_bytes(b"PAFPAG03" + struct.pack("<I", len(records)) + b"".join(records))
 print("Generated", len(records), "original PageTurn records")
