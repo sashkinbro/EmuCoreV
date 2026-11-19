@@ -24,6 +24,7 @@ android {
     namespace = "com.sbro.emucorev.nativeuipreview"
     compileSdk = 37
     ndkVersion = "29.0.14206865"
+    androidResources { noCompress += "wav" }
     sourceSets.getByName("main").kotlin.srcDir("../android/src/main/java")
     sourceSets.getByName("main").assets.srcDir("../resources")
     defaultConfig {

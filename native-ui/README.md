@@ -36,6 +36,25 @@ current 18 local references, verifies every PNG round trip, and records source,
 pixel and output hashes in `images.json`. `tools/prepare_font_pack.py` copies
 the supplied OpenType CFF/TrueType fonts unchanged into the same ignored directory.
 Neither preparation tool is invoked at runtime or included in the application.
+The same ignored pack now includes `audio/`: 44 PCM16 WAV sounds from the current
+18 RCO inputs (all sound payloads are in the common reference). Four sounds retain
+separate left/right channels as stereo; mono sounds remain mono. The offline
+`tools/prepare_sound_pack.py` uses `paf_export_sounds` plus a supplied vgmstream
+CLI with HE-VAG support. It preserves the 48 kHz source rate, verifies sample
+counts and stereo ordering, and applies no resampling, normalization or gain.
+The ordinary PSX ADPCM decoder in the available FFmpeg build rejects these
+HE-VAG frames, so it is not used as a conversion fallback.
+
+`audio/sounds.json` records source/channel/PCM/WAV hashes, decoder metadata,
+looping metadata and all original sound-event bindings. WAVs are packaged
+uncompressed for direct asset access. Neither vgmstream, its DLLs, VAG data nor
+the firmware containers enter the APK. Runtime event routing/playback remains
+to be connected as the native UI interactions are implemented.
+
+```text
+python native-ui/tools/prepare_sound_pack.py --adb ADB --serial DEVICE --exporter ANDROID_SOUND_EXPORTER --decoder VGMSTREAM_CLI --pack native-ui/resources OWNED_RESOURCES.rco [MORE_RESOURCES.rco ...]
+```
+
 Android device status and lifecycle adapters use Kotlin. The status source
 subscribes only while resumed; it does not poll or start the emulator.
 

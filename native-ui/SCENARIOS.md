@@ -13,6 +13,7 @@ its animations, timing, inputs or lifecycle are equivalent.
 | Home | Every visible element, labels, fonts, bubble geometry/materials, idle movement, focus glow, hints and page indicators | One bubble and shader pair; recovered cone-motion basis; full composition/effects pending |
 | Paging | Touch drag, linked movement of all elements, inertia, page settling, reversals, edge/overscroll response, indicators and background effects | Pending |
 | Input | Touch and gamepad focus/navigation; confirm/back; directional repeat; button prompts; rear-panel behavior where applicable | Pending |
+| Sound | Original UI sound assets; correct per-event routing, gain, stereo/loop behavior and lifecycle; no playback while suspended | 44 ready WAV assets and original event bindings prepared in the ignored pack; runtime routing/playback pending |
 | Editing | Hold on a bubble, entry/exit effects, selection, moving/reordering, deletion, folders and cancellation paths matching the reference | Pending |
 | LiveArea | Opening transition from bubble; intermediate game page, background, controls, prompts and reverse transition | Pending |
 | Launch | Start action and complete launch animation; launch through the existing game path; real readiness/errors; no black frame treated as success | Host bridge pending; existing game launch path is separate |
