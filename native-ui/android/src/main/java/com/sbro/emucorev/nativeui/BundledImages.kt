@@ -515,7 +515,7 @@ class BundledImages(
     private fun rasterHomeTitle(title: String): Bitmap {
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = 26f // topmenu RCO textobj 12600 uses font_size=26, line_pitch=40
+            textSize = 18f // AppIcon2d uses AppIconBase TextObj font_size 18 (PAF constructor 0x810d8906).
             typeface = Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
         }
         val words = title.split(Regex("\\s+")).filter { it.isNotEmpty() }
