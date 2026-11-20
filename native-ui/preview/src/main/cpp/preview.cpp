@@ -9,6 +9,8 @@
 #include <emucorev/paf/page_turn_material.h>
 #include <emucorev/paf/page_turn_shaders.h>
 #include <emucorev/paf/plane_div.h>
+#include <emucorev/paf/wave_preset.h>
+#include <emucorev/paf/wave_renderer.h>
 #include <android/choreographer.h>
 #include <fstream>
 #include <android/input.h>
@@ -88,8 +90,10 @@ JavaVM* preview_java_vm = nullptr;
 jobject preview_activity_ref = nullptr;
 jmethodID livearea_target_callback = nullptr;
 std::uint64_t image_revision = 0;
-std::atomic<int> preview_scene{0}; // 0 bubble, 1 busy indicator, 2 lock screen
+std::atomic<int> preview_scene{0}; // 0 bubble, 1 busy indicator, 2 lock screen, 3 home, 4 wave
 std::string resource_root;
+std::string requested_wave_theme = "effects_default_0512_01";
+std::uint64_t wave_theme_revision = 1;
 template<class T> std::vector<T> read_path(const std::string& relative, std::size_t count) {
     std::string path; { const std::lock_guard lock(status_mutex); path = resource_root + "/" + relative; }
     std::ifstream file(path, std::ios::binary | std::ios::ate);
@@ -151,10 +155,13 @@ struct Window {
     EGLDisplay display = EGL_NO_DISPLAY;
     EGLSurface surface = EGL_NO_SURFACE;
     EGLContext context = EGL_NO_CONTEXT;
-    GLuint target = 0, color = 0;
+    GLuint target = 0, color = 0, depth = 0;
     std::unique_ptr<emucorev::paf::BubbleRenderer> bubble;
     std::unique_ptr<emucorev::paf::SpriteRenderer> sprites;
     std::unique_ptr<emucorev::paf::PageTurnRenderer> lock;
+    std::unique_ptr<emucorev::paf::WaveRenderer> wave;
+    std::uint64_t applied_wave_theme_revision = 0;
+    std::size_t wave_theme_index = 0;
     struct HomeBubble {
         HomeCatalogItem item;
         std::unique_ptr<emucorev::paf::BubbleRenderer> renderer;
@@ -217,6 +224,7 @@ struct Window {
         // Home bubble renderers own GL objects; destroy them while their
         // originating context is current, before EGL teardown below.
         home_bubbles.clear();
+        wave.reset();
         bubble.reset();
         sprites.reset();
         lock.reset();
@@ -224,6 +232,7 @@ struct Window {
         if (lock_corner) glDeleteTextures(1, &lock_corner);
         if (lock_exp) glDeleteTextures(1, &lock_exp);
         if (target) glDeleteFramebuffers(1, &target);
+        if (depth) glDeleteRenderbuffers(1, &depth);
         if (color) glDeleteTextures(1, &color);
         if (display != EGL_NO_DISPLAY) {
             eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
@@ -299,9 +308,13 @@ struct Window {
         glGenTextures(1, &color);
         glBindTexture(GL_TEXTURE_2D, color);
         glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 960, 544);
+        glGenRenderbuffers(1, &depth);
+        glBindRenderbuffer(GL_RENDERBUFFER, depth);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 960, 544);
         glGenFramebuffers(1, &target);
         glBindFramebuffer(GL_FRAMEBUFFER, target);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth);
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
             throw std::runtime_error("Cannot create 1x preview framebuffer");
     }
@@ -829,7 +842,85 @@ struct Window {
         }
     }
 
+    bool is_livearea_visible() const noexcept { return livearea_visible; }
+
+    void ensure_wave() {
+        std::string theme_name;
+        std::uint64_t rev = 0;
+        {
+            const std::lock_guard lock_guard(status_mutex);
+            theme_name = requested_wave_theme;
+            rev = wave_theme_revision;
+        }
+        auto sync_index = [&](const emucorev::paf::WaveThemePreset& active) {
+            const auto presets = emucorev::paf::wave_theme_presets();
+            for (std::size_t i = 0; i < presets.size(); ++i) {
+                if (presets[i].name == active.name) {
+                    wave_theme_index = i;
+                    break;
+                }
+            }
+        };
+        if (!wave) {
+            wave = std::make_unique<emucorev::paf::WaveRenderer>(theme_name);
+            sync_index(wave->theme());
+            applied_wave_theme_revision = rev;
+        } else if (rev != applied_wave_theme_revision) {
+            wave->set_theme(theme_name);
+            sync_index(wave->theme());
+            applied_wave_theme_revision = rev;
+        }
+    }
+
+    void tick_wave(float elapsed) {
+        ensure_wave();
+        wave->step(elapsed);
+    }
+
+    void draw_wave() {
+        ensure_wave();
+        wave->draw(target, 960, 544);
+        // Clear wave depth so 2D sprites, Home bubbles, and Lock PageTurn compose cleanly on top.
+        glBindFramebuffer(GL_FRAMEBUFFER, target);
+        glViewport(0, 0, 960, 544);
+        glDepthMask(GL_TRUE);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glDepthMask(GL_FALSE);
+    }
+
+    int32_t handle_wave_input(AInputEvent* event) {
+        const auto presets = emucorev::paf::wave_theme_presets();
+        if (presets.empty()) return 0;
+        auto advance_theme = [&](int delta) {
+            ensure_wave();
+            const std::size_t n = presets.size();
+            wave_theme_index = (wave_theme_index + n + static_cast<std::size_t>(delta % static_cast<int>(n))) % n;
+            wave->set_theme(presets[wave_theme_index]);
+        };
+        if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
+            if (AKeyEvent_getAction(event) != AKEY_EVENT_ACTION_DOWN || AKeyEvent_getRepeatCount(event) != 0)
+                return 0;
+            const int key = AKeyEvent_getKeyCode(event);
+            if (key == AKEYCODE_DPAD_RIGHT || key == AKEYCODE_BUTTON_A || key == AKEYCODE_ENTER) {
+                advance_theme(1);
+                return 1;
+            }
+            if (key == AKEYCODE_DPAD_LEFT) {
+                advance_theme(-1);
+                return 1;
+            }
+            return 0;
+        }
+        if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
+            const int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
+            if (action == AMOTION_EVENT_ACTION_UP) advance_theme(1);
+            return 1;
+        }
+        return 0;
+    }
+
     int32_t handle_input(AInputEvent* event) {
+        if (preview_scene.load() == 4) return handle_wave_input(event);
         if (home_visible) return livearea_visible
             ? handle_livearea_input(event) : handle_home_input(event);
         if (lock_anim_state == LockAnimState::peeling) return 1;
@@ -1089,25 +1180,31 @@ struct Window {
         glClear(GL_COLOR_BUFFER_BIT);
         upload_images();
         if (preview_scene.load() == 2) {
-            sprites->begin(960, 544);
             if (home_visible || lock_anim_state == LockAnimState::peeling) {
-                if (livearea_visible) draw_livearea();
-                else {
+                if (livearea_visible) {
+                    sprites->begin(960, 544);
+                    draw_livearea();
+                } else {
+                    draw_wave();
                     draw_home_bubbles();
                 }
                 draw_lock();
             } else {
-                // The raw wallpaper is the underlying screen; the clock/date are
-                // part of texture 100 and move with the PageTurn surface.
-                sprites->draw(103, 0, 0, 960, 544);
+                draw_wave();
                 draw_lock();
             }
             draw_status(charging_texture);
         } else if (preview_scene.load() == 3) {
-            sprites->begin(960, 544);
-            if (livearea_visible) draw_livearea();
-            else draw_home_bubbles();
+            if (livearea_visible) {
+                sprites->begin(960, 544);
+                draw_livearea();
+            } else {
+                draw_wave();
+                draw_home_bubbles();
+            }
             draw_status(charging_texture);
+        } else if (preview_scene.load() == 4) {
+            draw_wave();
         }
         else if (busy) {
             sprites->begin(960, 544);
@@ -1204,8 +1301,12 @@ struct Preview {
                             preview.window->set_phase(preview.phase);
                         } else if (preview_scene.load() == 2 && preview.window) {
                             preview.window->tick_lock(elapsed);
+                            if (!preview.window->is_livearea_visible()) preview.window->tick_wave(elapsed);
                         } else if (preview_scene.load() == 3 && preview.window) {
                             preview.window->tick_home(elapsed);
+                            if (!preview.window->is_livearea_visible()) preview.window->tick_wave(elapsed);
+                        } else if (preview_scene.load() == 4 && preview.window) {
+                            preview.window->tick_wave(elapsed);
                         }
                     }
                     preview.last_draw = time;
@@ -1275,8 +1376,21 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewScene(JNIEnv
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeSetWaveTheme(JNIEnv* env, jobject, jstring theme) {
+    if (!theme) return;
+    const char* text = env->GetStringUTFChars(theme, nullptr);
+    if (!text) return;
+    {
+        const std::lock_guard lock(status_mutex);
+        if (*text != '\0') requested_wave_theme = text;
+        ++wave_theme_revision;
+    }
+    env->ReleaseStringUTFChars(theme, text);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewReady(JNIEnv*, jobject, jint scene) {
-    if (scene < 0 || scene > 3) return;
+    if (scene < 0 || scene > 4) return;
     native_preview_failed.store(false);
     native_ready_scene.store(scene);
     {
@@ -1377,7 +1491,7 @@ void android_main(android_app* app) {
             if (phase == emucorev::paf::BusyState::idle) preview.last_draw = preview.next_draw = 0;
             preview.schedule();
             return 1;
-        } else if ((scene == 2 || scene == 3) && preview.window) {
+        } else if ((scene == 2 || scene == 3 || scene == 4) && preview.window) {
             const int handled = preview.window->handle_input(event);
             if (handled) {
                 preview.last_draw = preview.next_draw = 0;

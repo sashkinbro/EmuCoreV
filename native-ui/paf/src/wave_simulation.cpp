@@ -1,8 +1,11 @@
 #include "emucorev/paf/wave_simulation.h"
 
+#include <emucorev/paf/plane_div.h>
+
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <stdexcept>
 
 namespace emucorev::paf {
 namespace {
@@ -138,6 +141,178 @@ std::uint16_t float_to_half(float value) noexcept {
 }
 
 } // namespace
+
+std::uint32_t wave_paf_rand(std::uint32_t& state) noexcept {
+    state = state * 1103515245u + 12345u;
+    return (state >> 16) & 0x7fffu;
+}
+
+bool wave_generate_noise32(
+    std::uint32_t& prng_state,
+    std::span<WaveComplex32> noise) noexcept {
+    if (noise.size() != kWaveFftCellCount) {
+        return false;
+    }
+    for (std::size_t i = 0; i < kWaveFftCellCount; ++i) {
+        const std::uint32_t r0 = wave_paf_rand(prng_state) % 2056u;
+        const std::uint32_t r1 = wave_paf_rand(prng_state) % 2056u;
+        noise[i] = {
+            (static_cast<float>(r0) * 2.0f) / 2056.0f - 1.0f,
+            (static_cast<float>(r1) * 2.0f) / 2056.0f - 1.0f,
+        };
+    }
+    return true;
+}
+
+bool wave_init_phillips_spectrum32(
+    const WaveSimPreset& sim,
+    std::span<const WaveComplex32> noise,
+    std::span<WaveComplex32> h0) noexcept {
+    if (noise.size() != kWaveFftCellCount || h0.size() != kWaveFftCellCount
+        || !std::isfinite(sim.patch_size) || sim.patch_size == 0.0f
+        || !std::isfinite(sim.gravity) || sim.gravity == 0.0f
+        || !std::isfinite(sim.wind_speed) || sim.wind_speed == 0.0f
+        || !std::isfinite(sim.wind_dir) || !std::isfinite(sim.logA)) {
+        return false;
+    }
+
+    const float inv_patch = arm_recip_estimate_2step(sim.patch_size);
+    const float kx_scale = std::bit_cast<float>(0x40490fdbu) * inv_patch;
+    const float ky_scale = std::bit_cast<float>(0x40c90fdbu) * inv_patch;
+    const float wind_x = std::cos(sim.wind_dir);
+    const float wind_y = std::sin(sim.wind_dir);
+    const float l_wind = (sim.wind_speed * sim.wind_speed) / sim.gravity;
+    const float l_wind_sq = l_wind * l_wind;
+    const float norm_factor = std::bit_cast<float>(0x3f3504f3u); // 1/sqrt(2)
+
+    for (std::size_t row = 0; row < kWaveFftSize; ++row) {
+        const float ky = static_cast<float>(row) * ky_scale;
+        for (std::size_t col = 0; col < kWaveFftSize; ++col) {
+            const float kx = static_cast<float>(col) * kx_scale;
+            const std::size_t idx = row * kWaveFftSize + col;
+            const float k_sq = kx * kx + ky * ky;
+            float amplitude = 0.0f;
+            if (k_sq != 0.0f) {
+                const float k_len = std::sqrt(k_sq);
+                const float dot_kw = (kx / k_len) * wind_x + (ky / k_len) * wind_y;
+                const float exponent = sim.logA - 1.0f / (k_sq * l_wind_sq);
+                const float p = (std::exp(exponent) / (k_sq * k_sq)) * (dot_kw * dot_kw);
+                amplitude = std::sqrt(p);
+            }
+            const float scale = amplitude * norm_factor;
+            h0[idx] = {
+                noise[idx].real * scale,
+                noise[idx].imag * scale,
+            };
+        }
+    }
+    return true;
+}
+
+bool wave_init_phase_steps32(
+    const WaveSimPreset& sim,
+    std::span<WavePhaseCell> phases) noexcept {
+    if (phases.size() != kWaveFftCellCount
+        || !std::isfinite(sim.patch_size) || sim.patch_size == 0.0f
+        || !std::isfinite(sim.gravity) || sim.gravity < 0.0f
+        || !std::isfinite(sim.time_step)) {
+        return false;
+    }
+
+    // Preserve the exact axis order of PAF FUN_8109f256: outer loop advances X
+    // (lane 0 * pi/L), inner loop advances Y (lane 1 * 2*pi/L).
+    const float inv_patch = arm_recip_estimate_2step(sim.patch_size);
+    const float kx_scale = std::bit_cast<float>(0x40490fdbu) * inv_patch;
+    const float ky_scale = std::bit_cast<float>(0x40c90fdbu) * inv_patch;
+    const float k_sq_min = std::bit_cast<float>(0x00800000u);
+    const float step_factor = std::bit_cast<float>(0x3e19999au); // 0.15f
+
+    for (std::size_t row = 0; row < kWaveFftSize; ++row) {
+        const float kx = static_cast<float>(row) * kx_scale;
+        for (std::size_t col = 0; col < kWaveFftSize; ++col) {
+            const float ky = static_cast<float>(col) * ky_scale;
+            const float k_sq = kx * kx + ky * ky;
+            const float k_len = (k_sq > k_sq_min) ? std::sqrt(k_sq) : 0.0f;
+            const float angle = std::sqrt(sim.gravity * k_len) * sim.time_step * step_factor;
+            phases[row * kWaveFftSize + col] = {
+                {1.0f, 0.0f},
+                {std::cos(angle), std::sin(angle)},
+            };
+        }
+    }
+    return true;
+}
+
+WaveSurfaceMesh make_wave_surface_mesh(std::uint16_t columns, std::uint16_t rows) {
+    if (columns < 2 || rows < 2
+        || static_cast<std::uint32_t>(columns) * rows > 65536u) {
+        throw std::invalid_argument("Invalid PAF wave surface grid dimensions");
+    }
+    const float inv_columns = arm_recip_estimate_2step(static_cast<float>(columns - 1));
+    const float inv_rows = arm_recip_estimate_2step(static_cast<float>(rows - 1));
+    WaveSurfaceMesh mesh;
+    mesh.vertices.reserve(static_cast<std::size_t>(columns) * rows);
+    for (std::uint32_t row = 0; row < rows; ++row) {
+        const float v = static_cast<float>(row) * inv_rows;
+        for (std::uint32_t col = 0; col < columns; ++col) {
+            const float u = static_cast<float>(col) * inv_columns;
+            mesh.vertices.push_back({{u, v, 0.0f, 1.0f}});
+        }
+    }
+
+    // Identical FUN_81201278 stitched strip index generator as make_wave_skydome_mesh.
+    mesh.triangle_strip_indices.reserve(
+        (static_cast<std::size_t>(rows) - 1) * columns * 2
+            + (static_cast<std::size_t>(rows) - 2) * 4);
+    for (std::uint32_t row = 0; row + 1 < rows; ++row) {
+        const auto old_start = static_cast<std::uint16_t>(row * columns);
+        const auto new_start = static_cast<std::uint16_t>((row + 1) * columns);
+        for (std::uint32_t col = 0; col < columns; ++col) {
+            mesh.triangle_strip_indices.push_back(static_cast<std::uint16_t>(new_start + col));
+            mesh.triangle_strip_indices.push_back(static_cast<std::uint16_t>(old_start + col));
+        }
+        if (row + 2 < rows) {
+            mesh.triangle_strip_indices.push_back(static_cast<std::uint16_t>(new_start - 1));
+            const auto first_next_strip = static_cast<std::uint16_t>((row + 2) * columns);
+            mesh.triangle_strip_indices.push_back(first_next_strip);
+            mesh.triangle_strip_indices.push_back(first_next_strip);
+            mesh.triangle_strip_indices.push_back(first_next_strip);
+        }
+    }
+    return mesh;
+}
+
+bool WaveHeightfield32::reset(const WaveSimPreset& sim, std::uint32_t seed) noexcept {
+    std::uint32_t prng = seed;
+    if (!wave_generate_noise32(prng, noise)) {
+        return false;
+    }
+    if (!wave_init_phillips_spectrum32(sim, noise, h0)) {
+        return false;
+    }
+    return wave_init_phase_steps32(sim, phases);
+}
+
+bool WaveHeightfield32::step(std::span<std::uint16_t> out_half, bool advance) noexcept {
+    if (out_half.size() != kWaveFftCellCount) {
+        return false;
+    }
+    if (advance) {
+        if (!wave_phased_spectrum32(h0, phases, spectrum)) {
+            return false;
+        }
+    } else {
+        auto snapshot = phases;
+        if (!wave_phased_spectrum32(h0, snapshot, spectrum)) {
+            return false;
+        }
+    }
+    fft_out = spectrum;
+    if (!wave_fft32(fft_out)) {
+        return false;
+    }
+    return wave_height32_to_half(fft_out, kWaveDefaultHeightScale, out_half);
+}
 
 bool wave_phased_spectrum32(
     std::span<const WaveComplex32> initial_spectrum,

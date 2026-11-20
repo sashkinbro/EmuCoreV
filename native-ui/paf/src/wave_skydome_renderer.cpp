@@ -143,8 +143,8 @@ WaveSkydomeRenderer::WaveSkydomeRenderer() : impl_(std::make_unique<Impl>()) {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
         static_cast<GLsizeiptr>(mesh.triangle_strip_indices.size() * sizeof(std::uint16_t)),
         mesh.triangle_strip_indices.data(), GL_STATIC_DRAW);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[2]);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * 88, nullptr, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[2]);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 88, nullptr, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[3]);
     glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 12, nullptr, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[4]);
@@ -162,14 +162,14 @@ void WaveSkydomeRenderer::draw(std::uint32_t wave_normal_texture,
         || height > static_cast<std::uint32_t>(std::numeric_limits<GLsizei>::max()))
         throw std::invalid_argument("Invalid wave skydome target or normal texture");
     auto& p = *impl_;
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[2]);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(parameters.vertex_data),
+    glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[2]);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(parameters.vertex_data),
         parameters.vertex_data.data());
     glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[3]);
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(parameters.viewport_state),
         parameters.viewport_state.data());
     // Binding points are context-global and must be restored for each draw.
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, p.buffers[2]);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, p.buffers[2]);
     glBindBufferBase(GL_UNIFORM_BUFFER, 2, p.buffers[3]);
     glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[4]);
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(parameters.fragment_state),

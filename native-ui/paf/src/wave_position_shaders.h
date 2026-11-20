@@ -1,8 +1,7 @@
 #pragma once
 #include <string_view>
 namespace emucorev::paf::detail {
-inline constexpr std::string_view wave_position_vertex_shader = R"WAVEPOSVERT(
-#version 320 es
+inline constexpr std::string_view wave_position_vertex_shader = R"WAVEPOSVERT(#version 320 es
 #ifdef GL_ARB_fragment_shader_interlock
 #extension GL_ARB_fragment_shader_interlock : enable
 #define SPIRV_Cross_beginInvocationInterlock() beginInvocationInterlockARB()
@@ -18,7 +17,7 @@ const vec4 _28[20] = vec4[](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0
 const bool _31[4] = bool[](false, false, false, false);
 const int _34[2] = int[](0, 0);
 
-layout(binding = 0, std430) restrict readonly buffer vertexDataType
+layout(binding = 0, std140) uniform vertexDataType
 {
     vec4 buffer0[4];
 } vertexData;
@@ -108,8 +107,7 @@ void main()
 
 
 )WAVEPOSVERT";
-inline constexpr std::string_view wave_position_fragment_shader = R"WAVEPOSFRAG(
-#version 320 es
+inline constexpr std::string_view wave_position_fragment_shader = R"WAVEPOSFRAG(#version 320 es
 #ifdef GL_ARB_fragment_shader_interlock
 #extension GL_ARB_fragment_shader_interlock : enable
 #define SPIRV_Cross_beginInvocationInterlock() beginInvocationInterlockARB()
@@ -127,7 +125,7 @@ const vec4 _28[20] = vec4[](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0
 const bool _31[4] = bool[](false, false, false, false);
 const int _34[2] = int[](0, 0);
 
-layout(binding = 1, std430) restrict readonly buffer fragmentDataType
+layout(binding = 1, std140) uniform fragmentDataType
 {
     vec4 buffer0[8];
 } fragmentData;

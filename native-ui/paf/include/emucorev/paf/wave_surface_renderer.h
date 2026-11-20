@@ -1,5 +1,7 @@
 #pragma once
 
+#include <emucorev/paf/wave_simulation.h>
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -7,10 +9,6 @@
 #include <span>
 
 namespace emucorev::paf {
-
-struct WaveSurfaceVertex {
-    std::array<float, 4> uv;
-};
 
 enum class WaveSurfacePrimitive : std::uint8_t { triangles, triangle_strip };
 

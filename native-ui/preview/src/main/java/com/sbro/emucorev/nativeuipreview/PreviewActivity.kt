@@ -40,6 +40,7 @@ class PreviewActivity : NativeActivity() {
     private val nativeBridgeLock = Any()
     private external fun nativeImage(id: Int, width: Int, height: Int, rgba: ByteArray)
     private external fun nativePreviewScene(scene: Int)
+    private external fun nativeSetWaveTheme(theme: String)
     private external fun nativePreviewLoading(loading: Boolean)
     private external fun nativePreviewReady(scene: Int)
     private external fun nativePreviewFailed()
@@ -75,8 +76,10 @@ class PreviewActivity : NativeActivity() {
             sceneExtra == "shell" || sceneInt == 0 -> 0
             sceneExtra == "lock" || sceneInt == 2 -> 2
             sceneExtra == "home" || sceneInt == 3 -> 3
+            sceneExtra == "wave" || sceneInt == 4 -> 4
             else -> 2 // Cold launch settles on the Lock scene with Home ready behind it.
         }
+        val waveTheme = intent.getStringExtra("wave_theme") ?: "effects_default_0512_01"
         // Show the original Shell topmenu busy animation while the pack is prepared.
         val startupRoot = File(noBackupFilesDir, "native-ui-startup").apply {
             check(isDirectory || mkdirs()) { "Cannot create startup resource directory" }
@@ -84,9 +87,10 @@ class PreviewActivity : NativeActivity() {
         assets.open("startup-busy.png").use { input ->
             File(startupRoot, "startup-busy.png").outputStream().use { output -> input.copyTo(output) }
         }
+        nativeSetWaveTheme(waveTheme)
         nativeResourceRoot(startupRoot.absolutePath)
-        nativePreviewScene(1)
-        nativePreviewLoading(requestedScene != 1)
+        nativePreviewScene(if (requestedScene == 4) 4 else 1)
+        nativePreviewLoading(requestedScene != 1 && requestedScene != 4)
         super.onCreate(state)
         window.attributes = window.attributes.apply {
             layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER
@@ -101,7 +105,7 @@ class PreviewActivity : NativeActivity() {
             requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid startup busy image" }
         }
         try { startupImages.loadBusyImage(busy) } finally { busy.recycle() }
-        if (requestedScene == 1) {
+        if (requestedScene == 1 || requestedScene == 4) {
             images = startupImages
             ready = true
         } else {

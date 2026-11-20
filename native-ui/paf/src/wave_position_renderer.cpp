@@ -91,19 +91,19 @@ WavePositionPassRenderer::WavePositionPassRenderer() : impl_(std::make_unique<Im
     glGenBuffers(static_cast<GLsizei>(p.buffers.size()), p.buffers.data());
 
     // Slot 0 is the four-position stream. Slots 1 and 2 are the shader's
-    // std430 vertex/fragment register blocks. Slots 3 and 4 are GXM viewport
+    // std140 uniform vertex/fragment register blocks. Slots 3 and 4 are GXM viewport
     // and fragment state (12 floats each, including std140 tail padding).
     glBindBuffer(GL_ARRAY_BUFFER, p.buffers[0]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(WavePositionVertex) * 4, nullptr, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(WavePositionVertex), nullptr);
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[1]);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * 16, nullptr, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, p.buffers[1]);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[2]);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * 32, nullptr, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, p.buffers[2]);
+    glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[1]);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 16, nullptr, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, p.buffers[1]);
+    glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[2]);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 32, nullptr, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 1, p.buffers[2]);
 
     for (GLuint slot = 0; slot < 2; ++slot) {
         glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[3 + slot]);
@@ -127,11 +127,11 @@ void WavePositionPassRenderer::draw(std::uint32_t height_map_texture,
     auto& p = *impl_;
     glBindBuffer(GL_ARRAY_BUFFER, p.buffers[0]);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(WavePositionVertex) * 4, vertices.data());
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[1]);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(parameters.vertex_data),
+    glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[1]);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(parameters.vertex_data),
         parameters.vertex_data.data());
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[2]);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(parameters.fragment_data),
+    glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[2]);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(parameters.fragment_data),
         parameters.fragment_data.data());
     glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[3]);
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(parameters.viewport_state),
@@ -142,8 +142,8 @@ void WavePositionPassRenderer::draw(std::uint32_t height_map_texture,
 
     // Indexed bindings are context-global, not VAO state. Reassert them on
     // every call so another renderer instance cannot leave stale blocks here.
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, p.buffers[1]);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, p.buffers[2]);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, p.buffers[1]);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 1, p.buffers[2]);
     glBindBufferBase(GL_UNIFORM_BUFFER, 2, p.buffers[3]);
     glBindBufferBase(GL_UNIFORM_BUFFER, 3, p.buffers[4]);
 

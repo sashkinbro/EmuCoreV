@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <vector>
 
+#include <emucorev/paf/wave_preset.h>
 
 namespace emucorev::paf {
 
@@ -49,6 +50,24 @@ struct WaveSkydomeVertexUniforms {
     std::array<float, 2> color_blend_range{};   // offset 80
     std::array<float, 3> distortion_scale{};    // offset 82
 };
+
+// Maps the recovered WaveRenderer sky-track-group fields to shader uniforms.
+// Source: sky-schema/811fabb4.c and 811a674e; WorldScaleHack and camera
+// matrices are populated separately from the live draw context.
+inline void apply_wave_sky_preset(WaveSkydomeVertexUniforms& u,
+    const WaveSkyPreset& p) noexcept {
+    u.horizon_angle = {p.horizon_angle, p.side_angle,
+        p.horizon_blend_range, p.horizon_curvature};
+    u.wave_fog_color[3] = p.wave_fog_alpha;
+    u.sun_color = p.sun_color;
+    u.sun_power = p.sun_power;
+    u.sun_control = p.sun_control;
+    u.zenith_color = p.zenith_color;
+    u.horizon_color = p.horizon_color;
+    u.color_blend_range = {p.sky_blend_start, p.sky_blend_range};
+    u.distortion_scale = {p.pos_distortion_scale, p.grad_distortion_scale,
+        p.horizon_distortion_scale};
+}
 
 inline std::array<float, 88> pack_wave_skydome_vertex_uniforms(
     const WaveSkydomeVertexUniforms& u) noexcept {

@@ -127,8 +127,8 @@ struct WaveSurfaceRenderer::Impl {
             index_cache.assign(index_begin, index_begin + index_bytes_size);
             cached_index_type = index_type;
         }
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffers[2]);
-        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(parameters.vertex_data),
+        glBindBuffer(GL_UNIFORM_BUFFER, buffers[2]);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(parameters.vertex_data),
             parameters.vertex_data.data());
         glBindBuffer(GL_UNIFORM_BUFFER, buffers[3]);
         glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(parameters.viewport_state),
@@ -136,7 +136,7 @@ struct WaveSurfaceRenderer::Impl {
         glBindBuffer(GL_UNIFORM_BUFFER, buffers[4]);
         glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(parameters.fragment_state),
             parameters.fragment_state.data());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffers[2]);
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, buffers[2]);
         glBindBufferBase(GL_UNIFORM_BUFFER, 2, buffers[3]);
         glBindBufferBase(GL_UNIFORM_BUFFER, 3, buffers[4]);
 
@@ -183,9 +183,9 @@ WaveSurfaceRenderer::WaveSurfaceRenderer() : impl_(std::make_unique<Impl>()) {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(WaveSurfaceVertex), nullptr);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, p.buffers[1]);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[2]);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * 36, nullptr, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, p.buffers[2]);
+    glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[2]);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 36, nullptr, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, p.buffers[2]);
     for (GLuint slot = 0; slot < 2; ++slot) {
         glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[3 + slot]);
         glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 12, nullptr, GL_DYNAMIC_DRAW);

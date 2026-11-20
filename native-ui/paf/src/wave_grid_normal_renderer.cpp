@@ -89,10 +89,10 @@ WaveGridNormalRenderer::WaveGridNormalRenderer() : impl_(std::make_unique<Impl>(
     glBufferData(GL_ARRAY_BUFFER, sizeof(WaveGridNormalVertex) * 4, nullptr, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(WaveGridNormalVertex), nullptr);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[1]);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * 20, nullptr, GL_DYNAMIC_DRAW);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[2]);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * 4, nullptr, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[1]);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 20, nullptr, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[2]);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 4, nullptr, GL_DYNAMIC_DRAW);
     for (GLuint i = 0; i < 2; ++i) {
         glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[3 + i]);
         glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 12, nullptr, GL_DYNAMIC_DRAW);
@@ -114,16 +114,16 @@ void WaveGridNormalRenderer::draw(std::uint32_t source_texture,
     glBindVertexArray(p.vao);
     glBindBuffer(GL_ARRAY_BUFFER, p.buffers[0]);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices.data());
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[1]);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(parameters.vertex_data), parameters.vertex_data.data());
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, p.buffers[2]);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(parameters.fragment_data), parameters.fragment_data.data());
+    glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[1]);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(parameters.vertex_data), parameters.vertex_data.data());
+    glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[2]);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(parameters.fragment_data), parameters.fragment_data.data());
     glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[3]);
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(parameters.viewport_state), parameters.viewport_state.data());
     glBindBuffer(GL_UNIFORM_BUFFER, p.buffers[4]);
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(parameters.fragment_state), parameters.fragment_state.data());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, p.buffers[1]);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, p.buffers[2]);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, p.buffers[1]);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 1, p.buffers[2]);
     glBindBufferBase(GL_UNIFORM_BUFFER, 2, p.buffers[3]);
     glBindBufferBase(GL_UNIFORM_BUFFER, 3, p.buffers[4]);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target_framebuffer);

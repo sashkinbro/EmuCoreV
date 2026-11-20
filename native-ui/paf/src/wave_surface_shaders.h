@@ -1,8 +1,7 @@
 #pragma once
 #include <string_view>
 namespace emucorev::paf::detail {
-inline constexpr std::string_view wave_surface_vertex_shader = R"WAVESURFACEVERT(
-#version 320 es
+inline constexpr std::string_view wave_surface_vertex_shader = R"WAVESURFACEVERT(#version 320 es
 #ifdef GL_ARB_fragment_shader_interlock
 #extension GL_ARB_fragment_shader_interlock : enable
 #define SPIRV_Cross_beginInvocationInterlock() beginInvocationInterlockARB()
@@ -17,7 +16,7 @@ inline constexpr std::string_view wave_surface_vertex_shader = R"WAVESURFACEVERT
 const bool _31[4] = bool[](false, false, false, false);
 const int _34[2] = int[](0, 0);
 
-layout(binding = 0, std430) restrict readonly buffer vertexDataType
+layout(binding = 0, std140) uniform vertexDataType
 {
     vec4 buffer0[9];
 } vertexData;
@@ -139,8 +138,7 @@ void main()
 
 
 )WAVESURFACEVERT";
-inline constexpr std::string_view wave_surface_fragment_shader = R"WAVESURFACEFRAG(
-#version 320 es
+inline constexpr std::string_view wave_surface_fragment_shader = R"WAVESURFACEFRAG(#version 320 es
 #ifdef GL_ARB_fragment_shader_interlock
 #extension GL_ARB_fragment_shader_interlock : enable
 #define SPIRV_Cross_beginInvocationInterlock() beginInvocationInterlockARB()

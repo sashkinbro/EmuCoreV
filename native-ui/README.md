@@ -49,8 +49,10 @@ The 3-4-3 arrangement and title wrapping metrics are provisional: exact shell gr
 transforms and paging motion are not yet recovered. Title font size now follows
 the AppIconBase constructor's 18-pixel value; its label box is 160x52 with at
 most two lines. Natural font metrics replace the former fabricated 40-pixel
-line pitch. The existing first baseline remains provisional. The default animated wave background
-is missing; Home currently clears to black beneath the fading lock page.
+line pitch. The existing first baseline remains provisional. Home now composites the
+reconstructed animated 5-pass PS Vita Wave + SkyDome background (`WaveRenderer`)
+behind bubbles instead of clearing to black; Lock still composes the Wave
+behind the entire canvas rather than restricting it to the peeled corner.
 
 The development LiveArea viewer consumes the game's actual template and listed
 images, selects localized/default backgrounds, and composes its gate, frame
@@ -1186,6 +1188,34 @@ All 15 Unicorn cases pass bit-for-bit (`layout_pos`, `layout_size`, and all vert
 (`0xca6a6db1`, `74x82`, `div_mode=3x3`, `div_ratio=0.487800002`, `margin_h=5`,
 `margin_v=9` around the `292x170` RCO panel) renders with `build_plane_div_screen_quads`
 and `SpriteRenderer::draw_patch`.
+
+### Recovered 5-pass Wave + SkyDome background
+
+`emucorev::paf` and `emucorev::paf::gles` now implement the complete 5-pass
+PS Vita animated wave and sky dome background (`wave_preset`, `wave_simulation`,
+`wave_scene`, `WavePositionPassRenderer`, `WaveGridNormalRenderer`,
+`WaveLightingRenderer`, `WaveFliptriFilter`, `WaveSurfaceRenderer`,
+`WaveSkydomeRenderer`, and `WaveRenderer`):
+
+- All 32 firmware wave presets and `WaveMasterPreset` (`paf_wave_preset_test`).
+- Full 32×32 CPU heightfield (`WaveHeightfield32`: `0x8109f552` PRNG noise,
+  `0x8109ee5c` Phillips spectrum, `0x8109f256` dispersion rotors, `0x8109f17e`
+  phase update, `0x81193e32` 2D FFT, `0x8109f8be` half-float conversion) and
+  64×64 stitched surface mesh (`make_wave_surface_mesh`), verified against
+  Unicorn `paf.elf` (`paf_wave_sim_test`).
+- Exact firmware camera/uniform assembler (`wave_scene.h/.cpp`), verified
+  against Unicorn `paf.elf` (`paf_wave_scene_test`).
+- Headless 5-pass GLES 3.20 RTT + scene pipeline (`paf_wave_lighting_test` and
+  `paf_wave_renderer_test` passing on Lenovo `HA28QVYS`, with lighting and
+  5-pass renderer tests also verified on Mali-G57 prior to switching exclusively
+  to Lenovo).
+- Preview scenes `wave` (`--es wave_theme NAME`), `home`, and `lock` verified on
+  Lenovo `HA28QVYS` via `assembleDebug`, `lintDebug`, screenshot captures, and
+  clean `logcat`.
+
+```text
+adb shell am start -n com.sbro.emucorev.nativeuipreview/.PreviewActivity --es scene wave --es wave_theme effects_default_0512_01
+```
 
 Build independently using CMake 3.22+ and a C++20 compiler. For Android, supply
 the NDK toolchain, `ANDROID_ABI=arm64-v8a`, `ANDROID_PLATFORM=android-29` and
