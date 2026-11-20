@@ -7,8 +7,9 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.text.TextPaint
+import android.text.Layout
+import android.text.StaticLayout
 import android.graphics.Typeface
-import android.text.TextUtils
 import org.json.JSONObject
 import javax.xml.parsers.DocumentBuilderFactory
 import org.xml.sax.InputSource
@@ -553,32 +554,22 @@ class BundledImages(
             textSize = 18f // AppIcon2d uses AppIconBase TextObj font_size 18 (PAF constructor 0x810d8906).
             typeface = Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
         }
-        val words = title.split(Regex("\\s+")).filter { it.isNotEmpty() }
-        val lines = ArrayList<String>(2)
-        var line = ""
-        for (word in words) {
-            val candidate = if (line.isEmpty()) word else "$line $word"
-            if (line.isNotEmpty() && paint.measureText(candidate) > HOME_LABEL_MAX_WIDTH) {
-                lines += line
-                line = word
-            } else {
-                line = candidate
-            }
-        }
-        if (line.isNotEmpty()) lines += line
-        if (lines.size > 2) lines[1] = lines.drop(1).joinToString(" ")
-        while (lines.size > 2) lines.removeAt(lines.lastIndex)
-        val renderedLines = lines.map {
-            TextUtils.ellipsize(it, paint, HOME_LABEL_MAX_WIDTH, TextUtils.TruncateAt.END).toString()
-        }
-        val width = (renderedLines.maxOfOrNull { paint.measureText(it) } ?: 1f)
-            .toInt().coerceIn(1, HOME_LABEL_MAX_WIDTH.toInt())
-        val bitmap = Bitmap.createBitmap(width, HOME_LABEL_HEIGHT, Bitmap.Config.ARGB_8888)
+        val layout = StaticLayout.Builder.obtain(title, 0, title.length, paint, HOME_LABEL_MAX_WIDTH.toInt())
+            .setAlignment(Layout.Alignment.ALIGN_CENTER)
+            .setMaxLines(2)
+            .setEllipsize(android.text.TextUtils.TruncateAt.END)
+            .setIncludePad(false)
+            .build()
+        val bitmap = Bitmap.createBitmap(
+            HOME_LABEL_MAX_WIDTH.toInt(), HOME_LABEL_HEIGHT, Bitmap.Config.ARGB_8888,
+        )
         val canvas = Canvas(bitmap)
-        renderedLines.forEachIndexed { index, text ->
-            val x = (width - paint.measureText(text)) * .5f
-            canvas.drawText(text, x, HOME_LABEL_FIRST_BASELINE + index * HOME_LABEL_LINE_PITCH, paint)
-        }
+        // The PAF TextLayout keeps line_pitch at its default (0) and applies a
+        // two-line limit; StaticLayout uses the font's natural line metrics.
+        // Keep the existing provisional first-line baseline until its Shell
+        // wrapper offset is recovered from source.
+        canvas.translate(0f, HOME_LABEL_FIRST_BASELINE - layout.getLineBaseline(0))
+        layout.draw(canvas)
         return bitmap
     }
 
@@ -700,9 +691,8 @@ class BundledImages(
         private const val HOME_CATALOG_MAX_GAMES = 512
         private const val MAX_LIVEAREA_TEMPLATE_BYTES = 1024L * 1024L
         private val DOCTYPE_PATTERN = Regex("<!\\s*DOCTYPE\\b", RegexOption.IGNORE_CASE)
-        private const val HOME_LABEL_MAX_WIDTH = 180f
-        private const val HOME_LABEL_HEIGHT = 64
+        private const val HOME_LABEL_MAX_WIDTH = 160f
+        private const val HOME_LABEL_HEIGHT = 52
         private const val HOME_LABEL_FIRST_BASELINE = 22f
-        private const val HOME_LABEL_LINE_PITCH = 40
     }
 }
