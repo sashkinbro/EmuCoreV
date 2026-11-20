@@ -1243,3 +1243,12 @@ python native-ui/tests/verify_resource_payloads.py --adb PATH_TO_ADB --serial DE
 
 This creates isolated research outputs in a fresh `/data/local/tmp` directory
 and checks extracted hashes and UTF-16 text against independently decoded input.
+
+
+### Phase B: 1:1 Lock, Home and status bar (development preview)
+
+- Lock: outer bezel is `keylock.png` (id 103) around the 896x448 PageTurn card; the peeled corner shows `power_manage_plugin/ca707736`; exit uses a 300 ms Z +200 zoom with the 500 ms sine fold. Wave runs only during the peel.
+- Home: 10-slot 3-4-3 grid (`home_layout`), 138 px bubbles, per-bubble sway/spring physics, vertical paging with page dots, 4-way DPAD, live 64x64 Wave reflection map (`BubbleEnvRenderer`) and the 3-layer cyan focus cursor (`FocusCursorRenderer`, `focus.fp`).
+- Status bar: `bef34d7f` gradient, Home icon `56aebd5f`, notification orb `6821404a`/`94de0b89`, 12h clock with small AM/PM, green charging battery.
+- Sound: `NativeUiSoundBank` plays the five recovered Vita UI WAVs via SoundPool.
+- Verified only on Lenovo HA28QVYS: paf_home_layout_test, paf_home_effects_test, paf_wave_renderer_test pass; assembleDebug and lintDebug pass. The bubble reflection map and focus shader are approximations, not bit-exact; not declared 1:1.

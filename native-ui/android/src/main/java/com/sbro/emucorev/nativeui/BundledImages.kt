@@ -54,6 +54,13 @@ class BundledImages(
             typeface = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
         }
     }
+    private val clockAmPmPaint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 15f
+            typeface = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
+        }
+    }
     private val lockClockPaint by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xfff2f2f2.toInt()
@@ -92,16 +99,22 @@ class BundledImages(
     private var rawKeylock: Bitmap? = null
     private var previousLockText: String? = null
 
+    private fun loadPngResource(id: Int, relativePath: String) {
+        val bitmap = File(resources, relativePath).inputStream().use {
+            requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled image: $relativePath" }
+        }
+        try { send(id, bitmap) } finally { bitmap.recycle() }
+    }
+
     fun loadShellImages() {
         // Resource hashes from the reviewed indicator document, not guessed names.
         listOf("ca76be07", "78600544", "4a8ae255", "9e9cfcab", "f85f0b80",
             "56e72f16", "a5aafd9b", "32465c57", "00ea236e", "89dc8410",
-            "2278fb2a", "ee958f99", "a13376bc").forEach { id ->
-            val bitmap = File(resources, "images/indicator_plugin/$id.png").inputStream().use {
-                requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled image: $id" }
-            }
-            try { send(id.toLong(16).toInt(), bitmap) } finally { bitmap.recycle() }
+            "2278fb2a", "ee958f99", "a13376bc",
+            "bef34d7f", "6821404a", "94de0b89", "fbc7297e").forEach { id ->
+            loadPngResource(id.toLong(16).toInt(), "images/indicator_plugin/$id.png")
         }
+        loadPngResource(STATUS_HOME_ICON, "images/applauncher_plugin/56aebd5f.png")
         loadBusyImage()
         upload(0, 1, 1, byteArrayOf(-1, -1, -1, -1))
     }
@@ -109,16 +122,12 @@ class BundledImages(
     fun loadLockImages(onHomeCatalogLoaded: (List<HomeCatalogEntry>) -> Unit = {}) {
         loadShellImages()
         loadHomeImages(onHomeCatalogLoaded)
-        // Lock wallpaper, original corner texture and the exponential lookup.
+        // Lock wallpaper, original corner texture, inner peel background, and exponential lookup.
         listOf(
             CORNER_IMAGE to "effects/page_turn/textures/page_corner/mip-0.png",
-            EXP_MINUS_IMAGE to "effects/lookups/exp-minus.png"
-        ).forEach { (id, path) ->
-            val bitmap = File(resources, path).inputStream().use {
-                requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled lock image: $path" }
-            }
-            try { send(id, bitmap) } finally { bitmap.recycle() }
-        }
+            EXP_MINUS_IMAGE to "effects/lookups/exp-minus.png",
+            LOCK_EMPTY_BG_IMAGE to "images/power_manage_plugin/ca707736.png",
+        ).forEach { (id, path) -> loadPngResource(id, path) }
         val keylockFile = File(resources, "effects/keylock.png")
         val base = keylockFile.inputStream().use {
             requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled keylock wallpaper" }
@@ -205,20 +214,16 @@ class BundledImages(
                 } ?: emptyList(),
             )
         }
-        // This is an optional extracted shell asset. When present, publish it
-        // under the original PAF image ID used by the native Home renderer.
-        File(resources, "images/applauncher_plugin/a952ef1e.png")
-            .takeIf { it.isFile }
-            ?.inputStream()?.use { stream ->
-                val focusGlow = requireNotNull(BitmapFactory.decodeStream(stream)) {
-                    "Invalid bundled Home focus image"
-                }
-                try {
-                    send(HOME_FOCUS_GLOW_IMAGE, focusGlow)
-                } finally {
-                    focusGlow.recycle()
-                }
-            }
+        // Original Home shell RCO chrome: focus halo quadrant, page dots, and Home house icon.
+        listOf(
+            HOME_FOCUS_GLOW_IMAGE to "images/applauncher_plugin/a952ef1e.png",
+            HOME_FOCUS_RING_IMAGE to "images/applauncher_plugin/cf115394.png",
+            HOME_PAGE_DOT_ACTIVE to "images/applauncher_plugin/21ad6d05.png",
+            HOME_PAGE_DOT_INACTIVE to "images/applauncher_plugin/266627f6.png",
+            STATUS_HOME_ICON to "images/applauncher_plugin/56aebd5f.png",
+        ).forEach { (id, relPath) ->
+            if (File(resources, relPath).isFile) loadPngResource(id, relPath)
+        }
         onLoaded(entries)
         return entries
     }
@@ -553,6 +558,7 @@ class BundledImages(
             color = Color.WHITE
             textSize = 18f // AppIcon2d uses AppIconBase TextObj font_size 18 (PAF constructor 0x810d8906).
             typeface = Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
+            setShadowLayer(2.2f, 0f, 1.5f, 0xD8000000.toInt())
         }
         val layout = StaticLayout.Builder.obtain(title, 0, title.length, paint, HOME_LABEL_MAX_WIDTH.toInt())
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
@@ -644,19 +650,32 @@ class BundledImages(
     }
 
     fun updateClock(status: DeviceStatusSource.Snapshot) {
-        val pattern = if (status.use24HourClock) "HH:mm" else "h:mm a"
-        val text = DateTimeFormatter.ofPattern(pattern, Locale.getDefault())
-            .withZone(ZoneId.of(status.timeZoneId))
-            .format(Instant.ofEpochSecond(status.epochMinute * 60))
-        if (text == previousClock) return
+        val instant = Instant.ofEpochSecond(status.epochMinute * 60)
+        val zone = ZoneId.of(status.timeZoneId)
+        val locale = Locale.getDefault()
+        val timePattern = if (status.use24HourClock) "HH:mm" else "h:mm"
+        val timeText = DateTimeFormatter.ofPattern(timePattern, locale).withZone(zone).format(instant)
+        val amPmText = if (status.use24HourClock) "" else {
+            DateTimeFormatter.ofPattern("a", locale).withZone(zone).format(instant)
+        }
+        val combinedKey = "$timeText|$amPmText"
+        if (combinedKey == previousClock) return
         val paint = clockPaint
-        val width = ceil(paint.measureText(text)).toInt() + 4
+        val amPmPaint = clockAmPmPaint
+        val timeWidth = paint.measureText(timeText)
+        val gap = if (amPmText.isNotEmpty()) 4f else 0f
+        val amPmWidth = if (amPmText.isNotEmpty()) amPmPaint.measureText(amPmText) else 0f
+        val width = ceil(timeWidth + gap + amPmWidth).toInt() + 6
         val bitmap = Bitmap.createBitmap(width, 32, Bitmap.Config.ARGB_8888)
         try {
             val baseline = (32f - paint.ascent() - paint.descent()) * .5f
-            Canvas(bitmap).drawText(text, 2f, baseline, paint)
+            val canvas = Canvas(bitmap)
+            canvas.drawText(timeText, 3f, baseline, paint)
+            if (amPmText.isNotEmpty()) {
+                canvas.drawText(amPmText, 3f + timeWidth + gap, baseline, amPmPaint)
+            }
             send(CLOCK_IMAGE, bitmap)
-            previousClock = text
+            previousClock = combinedKey
         } finally { bitmap.recycle() }
     }
 
@@ -685,13 +704,22 @@ class BundledImages(
         const val HOME_ICON_IMAGE_BASE = 1000
         const val HOME_LABEL_IMAGE_BASE = 2000
         const val HOME_FOCUS_GLOW_IMAGE = 0xa952ef1e.toInt()
+        const val HOME_FOCUS_RING_IMAGE = 0xcf115394.toInt()
+        const val HOME_PAGE_DOT_ACTIVE = 0x21ad6d05
+        const val HOME_PAGE_DOT_INACTIVE = 0x266627f6
+        const val LOCK_EMPTY_BG_IMAGE = 0xca707736.toInt()
+        const val STATUS_BAR_BG = 0xbef34d7f.toInt()
+        const val STATUS_HOME_ICON = 0x56aebd5f
+        const val STATUS_NOTIF_ORB_IDLE = 0x6821404a
+        const val STATUS_NOTIF_ORB_GLOW = 0x94de0b89.toInt()
+        const val STATUS_APP_CHIP_MASK = 0xfbc7297e.toInt()
         const val LIVEAREA_START_CONTROL_IMAGE = 0x1e6a33de
         private const val LIVEAREA_IMAGE_BASE = 3000
         private const val LIVEAREA_IMAGE_SLOTS_PER_GAME = 64
         private const val HOME_CATALOG_MAX_GAMES = 512
         private const val MAX_LIVEAREA_TEMPLATE_BYTES = 1024L * 1024L
         private val DOCTYPE_PATTERN = Regex("<!\\s*DOCTYPE\\b", RegexOption.IGNORE_CASE)
-        private const val HOME_LABEL_MAX_WIDTH = 160f
+        private const val HOME_LABEL_MAX_WIDTH = 140f
         private const val HOME_LABEL_HEIGHT = 52
         private const val HOME_LABEL_FIRST_BASELINE = 22f
     }

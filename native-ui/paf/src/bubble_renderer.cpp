@@ -123,7 +123,8 @@ BubbleRenderer::BubbleRenderer(std::string_view vertex_source, std::string_view 
 
 BubbleRenderer::~BubbleRenderer() = default;
 
-void BubbleRenderer::draw(std::span<const float, 96> vertex, std::span<const float, 10> fragment) {
+void BubbleRenderer::draw(std::span<const float, 96> vertex, std::span<const float, 10> fragment,
+    unsigned environment_override) {
     auto& p = *impl_;
     glUseProgram(p.program);
     glBindVertexArray(p.vao);
@@ -139,7 +140,10 @@ void BubbleRenderer::draw(std::span<const float, 96> vertex, std::span<const flo
     glBindBufferBase(GL_UNIFORM_BUFFER, 3, p.buffers[5]);
     for (unsigned i = 0; i < 2; ++i) {
         glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, p.textures[i]);
+        const GLuint tex = (i == 1 && environment_override != 0)
+            ? static_cast<GLuint>(environment_override)
+            : p.textures[i];
+        glBindTexture(GL_TEXTURE_2D, tex);
     }
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_STENCIL_TEST);

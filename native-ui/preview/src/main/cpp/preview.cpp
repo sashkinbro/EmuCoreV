@@ -1,7 +1,10 @@
 #include <emucorev/paf/bubble_renderer.h>
+#include <emucorev/paf/bubble_env_renderer.h>
 #include <emucorev/paf/bubble_shaders.h>
 #include <emucorev/paf/bubble_motion.h>
 #include <emucorev/paf/device_status.h>
+#include <emucorev/paf/focus_cursor_renderer.h>
+#include <emucorev/paf/home_layout.h>
 #include <emucorev/paf/sprite_renderer.h>
 #include <emucorev/paf/busy_indicator.h>
 #include <emucorev/paf/charging_indicator.h>
@@ -65,17 +68,22 @@ constexpr LockPageConfig lock_page_config{};
 constexpr float preview_width = 960.f, preview_height = 544.f;
 constexpr std::uint32_t home_icon_image_min = 1000, home_icon_image_limit = 2000;
 constexpr std::uint32_t home_highlight_image_id = 0xa952ef1eu;
+constexpr std::uint32_t home_focus_ring_image_id = 0xcf115394u;
+constexpr std::uint32_t home_page_dot_active_id = 0x21ad6d05u;
+constexpr std::uint32_t home_page_dot_inactive_id = 0x266627f6u;
+constexpr std::uint32_t lock_empty_bg_image_id = 0xca707736u;
+constexpr std::uint32_t raw_keylock_image_id = 103u;
+constexpr std::uint32_t status_bar_bg_id = 0xbef34d7fu;
+constexpr std::uint32_t status_home_icon_id = 0x56aebd5fu;
+constexpr std::uint32_t status_notif_orb_idle_id = 0x6821404au;
+constexpr std::uint32_t status_notif_orb_glow_id = 0x94de0b89u;
 constexpr std::uint32_t busy_ball_image_id = 0x754463d1u;
 constexpr std::array<float, 3> busy_ball_tint{0.66f, 0.9f, 1.f};
-struct HomeGridConfig {
-    float page_width = 960.f;
-    float page_height = 512.f;
-    float content_width = 840.f; // topmenu_plugin RCO content group (offset 976)
-    float screen_center_x = 480.f, screen_center_y = 272.f;
-    float row_spacing = 144.f; // observed 3-4-3 page capture; exact shell placement pending
-    std::array<unsigned, 3> row_counts{3, 4, 3};
-};
-constexpr HomeGridConfig home_grid_config{};
+constexpr int sound_decide = 1;
+constexpr int sound_cancel = 2;
+constexpr int sound_focus = 3;
+constexpr int sound_page_scroll = 4;
+constexpr int sound_page_turn = 5;
 std::unordered_map<std::uint32_t, HostImage> host_images;
 std::vector<HomeCatalogItem> home_catalog;
 std::uint64_t home_catalog_revision = 0;
@@ -89,6 +97,7 @@ ALooper* native_preview_looper = nullptr;
 JavaVM* preview_java_vm = nullptr;
 jobject preview_activity_ref = nullptr;
 jmethodID livearea_target_callback = nullptr;
+jmethodID ui_sound_callback = nullptr;
 std::uint64_t image_revision = 0;
 std::atomic<int> preview_scene{0}; // 0 bubble, 1 busy indicator, 2 lock screen, 3 home, 4 wave
 std::string resource_root;
@@ -151,12 +160,41 @@ void emit_livearea_target_request(const std::string& target) {
     if (attached) vm->DetachCurrentThread();
 }
 
+void emit_ui_sound(int sound_id) {
+    JavaVM* vm = nullptr;
+    { const std::lock_guard lock_guard(status_mutex); vm = preview_java_vm; }
+    if (!vm) return;
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    const jint state = vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (state == JNI_EDETACHED) {
+        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+        attached = true;
+    } else if (state != JNI_OK || !env) return;
+
+    jobject activity = nullptr;
+    jmethodID callback = nullptr;
+    {
+        const std::lock_guard lock_guard(status_mutex);
+        if (preview_activity_ref && ui_sound_callback)
+            activity = env->NewGlobalRef(preview_activity_ref);
+        callback = ui_sound_callback;
+    }
+    if (activity && callback) {
+        env->CallVoidMethod(activity, callback, static_cast<jint>(sound_id));
+        env->DeleteGlobalRef(activity);
+    }
+    if (attached) vm->DetachCurrentThread();
+}
+
 struct Window {
     EGLDisplay display = EGL_NO_DISPLAY;
     EGLSurface surface = EGL_NO_SURFACE;
     EGLContext context = EGL_NO_CONTEXT;
     GLuint target = 0, color = 0, depth = 0;
     std::unique_ptr<emucorev::paf::BubbleRenderer> bubble;
+    std::unique_ptr<emucorev::paf::BubbleEnvRenderer> bubble_env;
+    std::unique_ptr<emucorev::paf::FocusCursorRenderer> focus_cursor;
     std::unique_ptr<emucorev::paf::SpriteRenderer> sprites;
     std::unique_ptr<emucorev::paf::PageTurnRenderer> lock;
     std::unique_ptr<emucorev::paf::WaveRenderer> wave;
@@ -166,6 +204,10 @@ struct Window {
         HomeCatalogItem item;
         std::unique_ptr<emucorev::paf::BubbleRenderer> renderer;
         std::array<float, 96> base_vertex{};
+        emucorev::paf::HomeBubbleFloatState float_state{};
+        int page = 0;
+        int slot = 0;
+        float wobble_phase_offset = 0.f;
         float x = 0.f, y = 0.f, radius = 0.f;
     };
     std::vector<HomeBubble> home_bubbles;
@@ -179,15 +221,23 @@ struct Window {
     int home_page = 0, home_focus = 0, home_touch = -1;
     std::size_t home_page_capacity = 0;
     emucorev::paf::PagePoint home_touch_start{};
+    emucorev::paf::HomeVerticalScroll home_scroll;
     float home_motion_phase = 0.f;
+    float home_focus_pulse = 0.f;
+    float status_orb_phase = 0.f;
+    float home_drag_last_y = 0.f;
+    std::int64_t home_drag_last_event_ns = 0;
+    bool home_drag_moved = false;
+    GLuint focus_ring_tex = 0;
+    std::uint64_t focus_ring_rev = 0;
     std::uint64_t applied_home_catalog_revision = 0;
     std::vector<emucorev::paf::BubbleVertex> bubble_vertices;
     std::vector<std::uint16_t> bubble_indices;
     std::vector<std::uint8_t> bubble_environment;
     std::vector<std::uint8_t> reference_icon;
-    GLuint lock_page = 0, lock_corner = 0, lock_exp = 0;
-    std::array<std::uint64_t, 3> lock_texture_revisions{};
-    std::array<unsigned, 3> lock_texture_widths{}, lock_texture_heights{};
+    GLuint lock_page = 0, lock_corner = 0, lock_exp = 0, lock_empty_bg = 0;
+    std::array<std::uint64_t, 4> lock_texture_revisions{};
+    std::array<unsigned, 4> lock_texture_widths{}, lock_texture_heights{};
     emucorev::paf::PageTurnMesh lock_mesh;
     std::array<float, 112> lock_top_material{};
     std::array<float, 48> lock_bottom_material{};
@@ -208,6 +258,7 @@ struct Window {
     emucorev::paf::PagePoint anim_start_point{0.f, 0.f};
     emucorev::paf::PagePoint anim_target_point{0.f, 0.f};
     float lock_page_alpha = 1.f;
+    float lock_exit_z = 0.f;
 
     std::unordered_map<std::uint32_t, std::uint64_t> uploaded_images;
     std::uint64_t uploaded_revision = 0;
@@ -224,13 +275,17 @@ struct Window {
         // Home bubble renderers own GL objects; destroy them while their
         // originating context is current, before EGL teardown below.
         home_bubbles.clear();
+        bubble_env.reset();
+        focus_cursor.reset();
         wave.reset();
         bubble.reset();
         sprites.reset();
         lock.reset();
+        if (focus_ring_tex) glDeleteTextures(1, &focus_ring_tex);
         if (lock_page) glDeleteTextures(1, &lock_page);
         if (lock_corner) glDeleteTextures(1, &lock_corner);
         if (lock_exp) glDeleteTextures(1, &lock_exp);
+        if (lock_empty_bg) glDeleteTextures(1, &lock_empty_bg);
         if (target) glDeleteFramebuffers(1, &target);
         if (depth) glDeleteRenderbuffers(1, &depth);
         if (color) glDeleteTextures(1, &color);
@@ -288,6 +343,10 @@ struct Window {
             }
         }
         sprites = std::make_unique<emucorev::paf::SpriteRenderer>();
+        if (preview_scene.load() == 2 || preview_scene.load() == 3) {
+            bubble_env = std::make_unique<emucorev::paf::BubbleEnvRenderer>();
+            focus_cursor = std::make_unique<emucorev::paf::FocusCursorRenderer>();
+        }
         if (preview_scene.load() == 2) {
             lock = std::make_unique<emucorev::paf::PageTurnRenderer>(
                 emucorev::paf::PageSurfaceShaders{emucorev::paf::page_turn_bottom_round_vertex_shader(),
@@ -298,6 +357,9 @@ struct Window {
                 emucorev::paf::PageSurfaceShaders{emucorev::paf::page_turn_empty_back_vertex_shader(),
                     emucorev::paf::page_turn_empty_back_fragment_shader()});
 
+            lock_anim_state = LockAnimState::idle;
+            lock_page_alpha = 1.f;
+            lock_exit_z = 0.f;
             lock_layout = emucorev::paf::page_turn_layout(lock_page_config.size,
                 lock_page_config.fold_fraction, lock_page_config.corner_aspect);
             update_lock_fold(lock_fold_point(lock_layout.rest));
@@ -359,10 +421,46 @@ struct Window {
     }
 
     emucorev::paf::PageTurnMatrix lock_projection() const {
-        return {2.f / preview_width, 0.f, 0.f, 0.f,
-            0.f, 2.f / preview_height, 0.f, 0.f,
+        const float zoom = 1.f / std::max(0.25f, 1.f - lock_exit_z / 960.f);
+        return {(2.f / preview_width) * zoom, 0.f, 0.f, 0.f,
+            0.f, (2.f / preview_height) * zoom, 0.f, 0.f,
             0.f, 0.f, 0.f, 0.f,
             0.f, 0.f, 0.f, 1.f};
+    }
+
+    emucorev::paf::HomeScreenPoint bubble_screen_position(const HomeBubble& b) const {
+        const auto base = emucorev::paf::home_slot_screen_position(
+            b.page, b.slot, home_scroll.scroll_y());
+        const auto offset = emucorev::paf::bubble_float_offset(b.float_state);
+        return {base.x + offset.x, base.y + offset.y};
+    }
+
+    int home_page_count() const {
+        return std::max(1, static_cast<int>(
+            (home_bubbles.size() + emucorev::paf::kHomeSlotsPerPage - 1)
+            / emucorev::paf::kHomeSlotsPerPage));
+    }
+
+    void ensure_focus_ring_texture() {
+        const std::lock_guard lock_guard(status_mutex);
+        const auto it = host_images.find(home_focus_ring_image_id);
+        if (it == host_images.end()) return;
+        const auto& src = it->second;
+        if (focus_ring_tex && focus_ring_rev == src.revision) return;
+        if (!focus_ring_tex) glGenTextures(1, &focus_ring_tex);
+        glBindTexture(GL_TEXTURE_2D, focus_ring_tex);
+        if (focus_ring_rev != 0) {
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, src.width, src.height,
+                GL_RGBA, GL_UNSIGNED_BYTE, src.rgba.data());
+        } else {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, src.width, src.height, 0,
+                GL_RGBA, GL_UNSIGNED_BYTE, src.rgba.data());
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        }
+        focus_ring_rev = src.revision;
     }
 
     bool ensure_home_initialized() {
@@ -379,33 +477,33 @@ struct Window {
         }
         home_bubbles.clear();
         home_bubbles.reserve(catalog.size());
-        const float column_spacing = home_grid_config.content_width / 4.f;
-        const float radius = 66.f; // projected radius of the captured AppIconSimple bubble
-        std::size_t slot = 0;
+        constexpr float radius = emucorev::paf::kHomeBubbleSize * 0.5f;
+        std::size_t index = 0;
         for (const auto& item : catalog) {
             HomeBubble bubble_item{};
             bubble_item.item = item;
             bubble_item.base_vertex = base_vertex;
-            const std::size_t page_slot = slot % 10;
-            unsigned row = 0, column = 0;
-            if (page_slot < 3) { row = 0; column = static_cast<unsigned>(page_slot); }
-            else if (page_slot < 7) { row = 1; column = static_cast<unsigned>(page_slot - 3); }
-            else if (page_slot < 10) { row = 2; column = static_cast<unsigned>(page_slot - 7); }
-            else { row = 2; column = 2; }
-            const unsigned row_count = home_grid_config.row_counts[row];
-            bubble_item.x = home_grid_config.screen_center_x
-                + (static_cast<float>(column) - static_cast<float>(row_count - 1) * .5f) * column_spacing;
-            bubble_item.y = home_grid_config.screen_center_y
-                + (static_cast<float>(row) - 1.f) * home_grid_config.row_spacing;
+            bubble_item.page = static_cast<int>(index / emucorev::paf::kHomeSlotsPerPage);
+            bubble_item.slot = static_cast<int>(index % emucorev::paf::kHomeSlotsPerPage);
+            bubble_item.float_state = emucorev::paf::make_bubble_float_state(
+                bubble_item.page, bubble_item.slot, 0.f);
+            bubble_item.wobble_phase_offset = static_cast<float>(bubble_item.slot) * 0.73f
+                + static_cast<float>(bubble_item.page) * 1.41f;
+            const auto pos = emucorev::paf::home_slot_screen_position(
+                bubble_item.page, bubble_item.slot, 0.f);
+            bubble_item.x = pos.x;
+            bubble_item.y = pos.y;
             bubble_item.radius = radius;
             home_bubbles.push_back(std::move(bubble_item));
-            ++slot;
+            ++index;
         }
         home_focus = 0;
         for (std::size_t i = 0; i < home_bubbles.size(); ++i)
             if (home_bubbles[i].item.id == focused_id) home_focus = static_cast<int>(i);
-        home_page = 0;
-        home_page_capacity = 10;
+        home_page_capacity = emucorev::paf::kHomeSlotsPerPage;
+        home_page = home_focus / static_cast<int>(home_page_capacity);
+        home_scroll.set_page_count(home_page_count());
+        home_scroll.jump_to_page(home_page);
         applied_home_catalog_revision = revision;
         return true;
     }
@@ -433,9 +531,11 @@ struct Window {
         return true;
     }
 
-    std::array<float, 96> home_bubble_transform(const HomeBubble& item, float phase) const {
+    std::array<float, 96> home_bubble_transform(const HomeBubble& item, float phase,
+        float screen_x, float screen_y, float press_scale) const {
         auto output = item.base_vertex;
-        const auto basis = emucorev::paf::bubble_wobble_basis(std::cos(phase), std::sin(phase), 1.f);
+        const float item_phase = phase + item.wobble_phase_offset;
+        const auto basis = emucorev::paf::bubble_wobble_basis(std::cos(item_phase), std::sin(item_phase), 1.f);
         const auto initial = initial_basis;
         std::array<std::array<float, 3>, 3> delta{};
         for (unsigned row = 0; row < 3; ++row)
@@ -448,16 +548,14 @@ struct Window {
                     float value = 0;
                     for (unsigned axis = 0; axis < 3; ++axis)
                         value += delta[row][axis] * item.base_vertex[column * 4 + axis];
-                    output[column * 4 + row] = value;
+                    output[column * 4 + row] = (first == 4u) ? (value * press_scale) : value;
                 }
 
-        // The captured perspective matrix maps world positions to pixels.
-        // Keep the original depth and radius while placing this AppIconSimple
-        // at the Home grid position supplied by the recovered layout provider.
+        // Map centered spherical bubble onto the live floating screen slot.
         const float depth = output[7 * 4 + 2];
         const float clip_w = output[2 * 4 + 3] * depth + output[3 * 4 + 3];
-        const float ndc_x = (item.x / 480.f) - 1.f;
-        const float ndc_y = 1.f - (item.y / 272.f);
+        const float ndc_x = (screen_x / 480.f) - 1.f;
+        const float ndc_y = 1.f - (screen_y / 272.f);
         output[7 * 4] = ndc_x * clip_w / output[0];
         output[7 * 4 + 1] = ndc_y * clip_w / output[5];
         return output;
@@ -465,32 +563,66 @@ struct Window {
 
     void draw_home_bubbles() {
         if (!ensure_home_initialized() || home_bubbles.empty()) return;
-        const std::size_t page_capacity = home_page_capacity;
-        const std::size_t first = static_cast<std::size_t>(std::max(home_page, 0)) * page_capacity;
-        const std::size_t last = std::min(first + page_capacity, home_bubbles.size());
+        const int pages = home_page_count();
+        const float scroll_y = home_scroll.scroll_y();
+        const int p_min = std::clamp(
+            static_cast<int>(std::floor(scroll_y / emucorev::paf::kHomePageHeight)), 0, pages - 1);
+        const int p_max = std::clamp(
+            static_cast<int>(std::ceil(scroll_y / emucorev::paf::kHomePageHeight)), 0, pages - 1);
+        const std::size_t first = static_cast<std::size_t>(p_min) * emucorev::paf::kHomeSlotsPerPage;
+        const std::size_t last = std::min(
+            static_cast<std::size_t>(p_max + 1) * emucorev::paf::kHomeSlotsPerPage, home_bubbles.size());
         if (!ensure_home_page_renderers(first, last)) return;
-        sprites->begin(preview_width, preview_height);
+        ensure_focus_ring_texture();
+        if (bubble_env) bubble_env->capture(color);
+        const std::uint32_t env_tex = bubble_env ? bubble_env->texture() : 0u;
+
+        for (std::size_t i = first; i < last; ++i) {
+            auto& item = home_bubbles[i];
+            const auto pos = bubble_screen_position(item);
+            item.x = pos.x;
+            item.y = pos.y;
+            const auto parameters = home_bubble_transform(
+                item, home_motion_phase, pos.x, pos.y, item.float_state.press_scale);
+            if (item.renderer) item.renderer->draw(parameters, material, env_tex);
+        }
         if (home_focus >= 0 && static_cast<std::size_t>(home_focus) >= first
             && static_cast<std::size_t>(home_focus) < last) {
             const auto& focused = home_bubbles[static_cast<std::size_t>(home_focus)];
-            sprites->draw(home_highlight_image_id, focused.x - focused.radius,
-                focused.y - focused.radius, focused.radius * 2.f, focused.radius * 2.f,
-                {1.f, 1.f, 1.f, 128.f / 255.f});
-        }
-        for (std::size_t i = first; i < last; ++i) {
-            auto& item = home_bubbles[i];
-            const auto parameters = home_bubble_transform(item, home_motion_phase);
-            if (item.renderer) item.renderer->draw(parameters, material);
+            if (focus_cursor && focus_ring_tex) {
+                focus_cursor->draw(focus_ring_tex, focused.x, focused.y,
+                    emucorev::paf::kHomeFocusRingSize * focused.float_state.press_scale,
+                    home_focus_pulse, 960, 544);
+            } else {
+                sprites->begin(preview_width, preview_height);
+                sprites->draw(home_highlight_image_id, focused.x - focused.radius,
+                    focused.y - focused.radius, focused.radius * 2.f, focused.radius * 2.f,
+                    {1.f, 1.f, 1.f, 128.f / 255.f});
+            }
         }
         sprites->begin(preview_width, preview_height);
-        const std::lock_guard lock_guard(status_mutex);
-        for (std::size_t i = first; i < last; ++i) {
-            const auto& item = home_bubbles[i];
-            const auto label = host_images.find(item.item.label_image_id);
-            if (item.item.label_image_id && label != host_images.end())
-                sprites->draw(item.item.label_image_id,
-                    item.x - label->second.width * .5f, item.y + item.radius + 8.f,
-                    float(label->second.width), float(label->second.height));
+        {
+            const std::lock_guard lock_guard(status_mutex);
+            for (std::size_t i = first; i < last; ++i) {
+                const auto& item = home_bubbles[i];
+                const auto label = host_images.find(item.item.label_image_id);
+                if (item.item.label_image_id && label != host_images.end())
+                    sprites->draw(item.item.label_image_id,
+                        item.x - label->second.width * .5f, item.y + 57.f,
+                        float(label->second.width), float(label->second.height));
+            }
+        }
+        const int active_dot_page = std::clamp(
+            static_cast<int>(std::lround(scroll_y / emucorev::paf::kHomePageHeight)), 0, pages - 1);
+        constexpr float dot_size = 22.f;
+        constexpr float dot_spacing = 24.f;
+        const float dot_start_y = 272.f - static_cast<float>(pages - 1) * dot_spacing * 0.5f;
+        for (int p = 0; p < pages; ++p) {
+            const std::uint32_t dot_id = (p == active_dot_page)
+                ? home_page_dot_active_id : home_page_dot_inactive_id;
+            sprites->draw(dot_id, 19.5f - dot_size * 0.5f,
+                dot_start_y + static_cast<float>(p) * dot_spacing - dot_size * 0.5f,
+                dot_size, dot_size);
         }
     }
 
@@ -587,6 +719,8 @@ struct Window {
 
     void open_livearea(std::size_t index) {
         if (index >= home_bubbles.size()) return;
+        home_touch = -1;
+        home_drag_moved = false;
         livearea_title_id = home_bubbles[index].item.id;
         livearea_snapshot.reset();
         applied_livearea_catalog_revision = 0;
@@ -594,6 +728,7 @@ struct Window {
     }
 
     void close_livearea() {
+        if (livearea_visible) emit_ui_sound(sound_cancel);
         livearea_visible = false;
         livearea_snapshot.reset();
         livearea_gate_frame.clear();
@@ -613,29 +748,64 @@ struct Window {
     }
 
     void tick_home(float elapsed) {
+        constexpr float kTwoPi = 6.28318530717958647692f;
         home_motion_phase = emucorev::paf::advance_bubble_phase(home_motion_phase, elapsed, 1.f);
+        home_focus_pulse += elapsed * 4.71238898f;
+        if (home_focus_pulse > kTwoPi) home_focus_pulse -= kTwoPi;
+        status_orb_phase += elapsed * 2.2f;
+        if (status_orb_phase > kTwoPi) status_orb_phase -= kTwoPi;
+        home_scroll.step(elapsed);
+        home_page = home_scroll.current_page();
+        const float sy = home_scroll.scroll_y();
+        for (std::size_t i = 0; i < home_bubbles.size(); ++i) {
+            emucorev::paf::step_bubble_float(
+                home_bubbles[i].float_state, elapsed, sy, static_cast<int>(i) == home_touch);
+        }
     }
 
     int32_t handle_home_input(AInputEvent* event) {
         if (!ensure_home_initialized()) return 0;
         if (home_bubbles.empty()) return 0;
+        const int pages = home_page_count();
         if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
             if (AKeyEvent_getAction(event) != AKEY_EVENT_ACTION_DOWN || AKeyEvent_getRepeatCount(event) != 0)
                 return 0;
             const int key = AKeyEvent_getKeyCode(event);
-            if (key == AKEYCODE_DPAD_LEFT) {
-                home_focus = std::max(home_focus - 1, 0);
-                home_page = home_focus / static_cast<int>(home_page_capacity);
-            } else if (key == AKEYCODE_DPAD_RIGHT) {
-                home_focus = std::min(home_focus + 1, static_cast<int>(home_bubbles.size()) - 1);
-                home_page = home_focus / static_cast<int>(home_page_capacity);
-            } else if (key == AKEYCODE_BUTTON_A || key == AKEYCODE_ENTER) {
-                if (home_focus >= 0 && static_cast<std::size_t>(home_focus) < home_bubbles.size())
-                    open_livearea(static_cast<std::size_t>(home_focus));
+            emucorev::paf::HomeDpadDirection dir{};
+            bool is_dir = true;
+            if (key == AKEYCODE_DPAD_LEFT) dir = emucorev::paf::HomeDpadDirection::left;
+            else if (key == AKEYCODE_DPAD_RIGHT) dir = emucorev::paf::HomeDpadDirection::right;
+            else if (key == AKEYCODE_DPAD_UP) dir = emucorev::paf::HomeDpadDirection::up;
+            else if (key == AKEYCODE_DPAD_DOWN) dir = emucorev::paf::HomeDpadDirection::down;
+            else is_dir = false;
+
+            if (is_dir) {
+                const int cur = std::clamp(home_focus, 0, static_cast<int>(home_bubbles.size()) - 1);
+                const auto& cur_b = home_bubbles[static_cast<std::size_t>(cur)];
+                const auto [np, ns] = emucorev::paf::home_dpad_neighbor(
+                    cur_b.page, cur_b.slot, static_cast<int>(home_bubbles.size()), pages, dir);
+                const int next_idx = np * emucorev::paf::kHomeSlotsPerPage + ns;
+                if (next_idx != home_focus && next_idx < static_cast<int>(home_bubbles.size())) {
+                    const int prev_page = home_page;
+                    home_focus = next_idx;
+                    if (np != prev_page) {
+                        home_scroll.snap_to_page(np);
+                        home_page = np;
+                        emit_ui_sound(sound_page_scroll);
+                    } else {
+                        emit_ui_sound(sound_focus);
+                    }
+                }
                 return 1;
             }
-            else return 0;
-            return 1;
+            if (key == AKEYCODE_BUTTON_A || key == AKEYCODE_ENTER) {
+                if (home_focus >= 0 && static_cast<std::size_t>(home_focus) < home_bubbles.size()) {
+                    emit_ui_sound(sound_decide);
+                    open_livearea(static_cast<std::size_t>(home_focus));
+                }
+                return 1;
+            }
+            return 0;
         }
         if (AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION) return 0;
         const int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
@@ -648,37 +818,61 @@ struct Window {
         const float oy = (height - preview_height * scale) * .5f;
         const float px = (AMotionEvent_getX(event, 0) - ox) / scale;
         const float py = (AMotionEvent_getY(event, 0) - oy) / scale;
-        const float max_distance = 1.5f * 140.f;
+        const std::int64_t event_ns = AMotionEvent_getEventTime(event);
         if (action == AMOTION_EVENT_ACTION_DOWN) {
-            float nearest = max_distance * max_distance;
+            float nearest = 1.0e9f;
             home_touch = -1;
+            home_drag_moved = false;
+            home_touch_start = {px, py};
+            home_drag_last_y = py;
+            home_drag_last_event_ns = event_ns;
             const std::size_t first = static_cast<std::size_t>(home_page)
-                * std::max<std::size_t>(home_page_capacity, 1);
-            const std::size_t last = std::min(first + home_page_capacity, home_bubbles.size());
+                * emucorev::paf::kHomeSlotsPerPage;
+            const std::size_t last = std::min(first + emucorev::paf::kHomeSlotsPerPage, home_bubbles.size());
             for (std::size_t i = first; i < last; ++i) {
-                const float dx = px - home_bubbles[i].x, dy = py - home_bubbles[i].y;
+                const auto pos = bubble_screen_position(home_bubbles[i]);
+                const float dx = px - pos.x, dy = py - pos.y;
                 const float distance = dx * dx + dy * dy;
                 if (distance <= home_bubbles[i].radius * home_bubbles[i].radius && distance < nearest) {
                     nearest = distance;
                     home_touch = static_cast<int>(i);
                 }
             }
-            home_touch_start = {px, py};
-            if (home_touch >= 0) home_focus = home_touch;
             return 1;
         }
-        if (action == AMOTION_EVENT_ACTION_MOVE) return home_touch >= 0 || home_page_capacity < home_bubbles.size();
+        if (action == AMOTION_EVENT_ACTION_MOVE) {
+            if (!home_drag_moved && std::hypot(px - home_touch_start.x, py - home_touch_start.y) > 14.f) {
+                home_drag_moved = true;
+                home_touch = -1;
+                home_scroll.begin_drag();
+            }
+            if (home_drag_moved) {
+                const float dt = std::clamp(
+                    float(event_ns - home_drag_last_event_ns) * 1.0e-9f, 0.001f, 0.1f);
+                home_scroll.drag_by(py - home_drag_last_y, dt);
+                home_drag_last_y = py;
+                home_drag_last_event_ns = event_ns;
+            }
+            return 1;
+        }
         if (action == AMOTION_EVENT_ACTION_UP || action == AMOTION_EVENT_ACTION_CANCEL) {
-            const auto pages = (home_bubbles.size() + std::max<std::size_t>(home_page_capacity, 1) - 1)
-                / std::max<std::size_t>(home_page_capacity, 1);
-            if (action == AMOTION_EVENT_ACTION_UP && std::abs(px - home_touch_start.x) > 100.f) {
-                if (px < home_touch_start.x && static_cast<std::size_t>(home_page + 1) < pages) ++home_page;
-                else if (px > home_touch_start.x && home_page > 0) --home_page;
+            if (home_drag_moved) {
+                const int old_page = home_page;
+                const int next_page = home_scroll.end_drag();
+                home_page = next_page;
+                if (next_page != old_page) emit_ui_sound(sound_page_scroll);
+                const int p_first = next_page * emucorev::paf::kHomeSlotsPerPage;
+                const int p_last = std::min<int>(
+                    p_first + emucorev::paf::kHomeSlotsPerPage, static_cast<int>(home_bubbles.size()));
+                if (home_focus < p_first || home_focus >= p_last) home_focus = p_first;
             } else if (action == AMOTION_EVENT_ACTION_UP && home_touch >= 0
                 && std::hypot(px - home_touch_start.x, py - home_touch_start.y) < 30.f) {
+                home_focus = home_touch;
+                emit_ui_sound(sound_decide);
                 open_livearea(static_cast<std::size_t>(home_touch));
             }
             home_touch = -1;
+            home_drag_moved = false;
             return 1;
         }
         return 0;
@@ -791,14 +985,15 @@ struct Window {
         lock_top_material[110] = 0.f;
         lock_top_material[111] = 1.f;
 
-        // 3. Empty back material (36 floats):
+        // 3. Empty back material (36 floats): p[4].zw hold shadow & shadow_level (page_turn_empty_back_vertex_shader).
         std::copy(transforms.model_view_projection.begin(), transforms.model_view_projection.end(),
             lock_empty_material.begin());
-        lock_empty_material[16] = lock_effect_style.empty_shadow;
-        lock_empty_material[17] = lock_effect_style.empty_shadow_level;
-        lock_empty_material[18] = 0.f;
-        lock_empty_material[19] = 0.f;
-        std::copy(page_uv_rect.begin(), page_uv_rect.end(), lock_empty_material.begin() + 20);
+        lock_empty_material[16] = 0.f;
+        lock_empty_material[17] = 0.f;
+        lock_empty_material[18] = lock_effect_style.empty_shadow;
+        lock_empty_material[19] = lock_effect_style.empty_shadow_level;
+        constexpr std::array<float, 4> empty_uv_rect{1.f, 1.f, 0.f, 0.f};
+        std::copy(empty_uv_rect.begin(), empty_uv_rect.end(), lock_empty_material.begin() + 20);
         lock_empty_material[24] = 1.f;
         lock_empty_material[25] = 1.f;
         lock_empty_material[26] = 1.f;
@@ -821,6 +1016,9 @@ struct Window {
             const float alpha_t = std::clamp(anim_elapsed / 0.300f, 0.f, 1.f);
             const float alpha_eased = 1.f - (1.f - alpha_t) * (1.f - alpha_t);
             lock_page_alpha = 1.f - alpha_eased;
+            lock_exit_z = 200.f * alpha_eased;
+        } else {
+            lock_exit_z = 0.f;
         }
         // PAF curve 0x19 is sine-in for the exit peel. Curve 0x15 is
         // quadratic-out for a return to the resting fold point.
@@ -835,11 +1033,16 @@ struct Window {
         if (t >= 1.f) {
             if (lock_anim_state == LockAnimState::peeling) {
                 lock_anim_state = LockAnimState::unlocked;
+                lock_exit_z = 0.f;
                 home_visible = true;
             } else {
                 lock_anim_state = LockAnimState::idle;
             }
         }
+    }
+
+    bool lock_needs_background() const noexcept {
+        return home_visible || lock_anim_state == LockAnimState::peeling;
     }
 
     bool is_livearea_visible() const noexcept { return livearea_visible; }
@@ -978,11 +1181,13 @@ struct Window {
                 if (release == emucorev::paf::PageTurnRelease::beyond_threshold) {
                     lock_anim_state = LockAnimState::peeling;
                     lock_page_alpha = 1.f;
+                    lock_exit_z = 0.f;
                     anim_elapsed = 0.f;
                     anim_duration = 0.500f;
                     anim_start_point = lock_point;
                     anim_target_point = lock_fold_point({
                         -2.f * lock_page_config.size.y, -2.f * lock_page_config.size.x});
+                    emit_ui_sound(sound_page_turn);
                 } else {
                     const float d_corner_x = (rest_point.x - lock_point.x) * render_size.y;
                     const float d_corner_y = (rest_point.y - lock_point.y) * render_size.y;
@@ -1021,19 +1226,44 @@ struct Window {
     void draw_status(std::uint32_t charging_texture) {
         const std::lock_guard lock(status_mutex);
         sprites->begin(960, 544);
-        // Development composition; exact original anchors/clock metrics and
-        // charging animation are still being reconstructed, not parity claims.
-        sprites->draw(0, 0, 0, 960, 32, {0, 0, 0, 1});
+        if (!sprites->draw(status_bar_bg_id, 0, 0, 960, 32)) {
+            sprites->draw(0, 0, 0, 960, 32, {0, 0, 0, 0.5f});
+        }
+        const int scene = preview_scene.load();
+        const bool show_home_chrome = (scene == 3)
+            || (scene == 2 && (home_visible || lock_anim_state == LockAnimState::peeling));
+
+        if (show_home_chrome) {
+            if (livearea_visible) {
+                sprites->draw(status_home_icon_id, 454, 3, 28, 26);
+                if (livearea_snapshot && livearea_snapshot->gate_id) {
+                    sprites->draw(livearea_snapshot->gate_id, 486, 4, 24, 24);
+                }
+            } else {
+                sprites->draw(status_home_icon_id, 466, 3, 28, 26);
+            }
+            sprites->draw(status_notif_orb_idle_id, 888, 0, 72, 70);
+            const float glow_alpha = 0.03f + 0.08f * (0.5f + 0.5f * std::sin(status_orb_phase));
+            sprites->draw(status_notif_orb_glow_id, 888, 0, 72, 70, {1.f, 1.f, 1.f, glow_alpha});
+        }
+
         constexpr std::array<std::uint32_t, 5> battery{
             0x78600544, 0x4a8ae255, 0x9e9cfcab, 0xf85f0b80, 0x56e72f16};
         const auto& status = device_status;
         auto battery_id = status.battery_percent < 0 ? 0xa5aafd9bu
             : battery[std::min(4, std::clamp(status.battery_percent, 0, 100) * 4 / 100)];
-        sprites->draw(battery_id, 904, 2, 48, 28);
+        const float bat_x = show_home_chrome ? 826.f : 904.f;
+        const std::array<float, 4> bat_tint = status.charging
+            ? std::array<float, 4>{0.72f, 1.f, 0.72f, 1.f}
+            : std::array<float, 4>{1.f, 1.f, 1.f, 1.f};
+        sprites->draw(battery_id, bat_x, 2, 48, 28, bat_tint);
         if (charging_texture && status.charging && status.battery_percent >= 0 && status.battery_percent < 100)
-            sprites->draw(charging_texture, 904, 2, 48, 28);
-        if (const auto clock = host_images.find(1); clock != host_images.end())
-            sprites->draw(1, 892.f - clock->second.width, 0, clock->second.width, clock->second.height);
+            sprites->draw(charging_texture, bat_x, 2, 48, 28, bat_tint);
+        if (const auto clock = host_images.find(1); clock != host_images.end()) {
+            const float clock_right = show_home_chrome ? 824.f : 902.f;
+            sprites->draw(1, clock_right - float(clock->second.width), 0,
+                float(clock->second.width), float(clock->second.height));
+        }
         float left = 8;
         if (status.wifi_enabled == emucorev::paf::RadioState::on && status.wifi_connected) {
             constexpr std::array<std::uint32_t, 4> wifi{0x89dc8410, 0x2278fb2a, 0xee958f99, 0xa13376bc};
@@ -1074,14 +1304,40 @@ struct Window {
             lock_texture_heights[slot] = source.height;
             lock_texture_revisions[slot] = source.revision;
         };
-        make(100, 0, lock_page); make(101, 1, lock_corner); make(102, 2, lock_exp);
-        lock_ready = lock_page && lock_corner && lock_exp;
+        make(100, 0, lock_page);
+        make(101, 1, lock_corner);
+        make(102, 2, lock_exp);
+        make(lock_empty_bg_image_id, 3, lock_empty_bg);
+        lock_ready = lock_page && lock_corner && lock_exp && lock_empty_bg;
     }
 
     void draw_lock() {
         ensure_lock_textures();
         if (!lock || !lock_ready || !lock_mesh.vertex_count) return;
         if (lock_anim_state == LockAnimState::unlocked) return;
+
+        sprites->begin(preview_width, preview_height);
+        if (!lock_needs_background()) {
+            // Draw full pristine bezel wallpaper behind PageTurn at rest so rounded corners show cleanly.
+            sprites->draw(raw_keylock_image_id, 0.f, 0.f, preview_width, preview_height,
+                {1.f, 1.f, 1.f, lock_page_alpha});
+        } else {
+            // Draw the 4 non-overlapping outer border strips around [32..928, 64..512] during peel.
+            const float zoom = 1.f / std::max(0.25f, 1.f - lock_exit_z / 960.f);
+            auto sx = [&](float x) { return preview_width * .5f + (x - preview_width * .5f) * zoom; };
+            auto sy = [&](float y) { return preview_height * .5f + (y - preview_height * .5f) * zoom; };
+            auto draw_border = [&](float x0, float y0, float x1, float y1) {
+                const float dx0 = sx(x0), dy0 = sy(y0), dx1 = sx(x1), dy1 = sy(y1);
+                sprites->draw_patch(raw_keylock_image_id, dx0, dy0, dx1 - dx0, dy1 - dy0,
+                    x0 / preview_width, y0 / preview_height,
+                    (x1 - x0) / preview_width, (y1 - y0) / preview_height,
+                    {1.f, 1.f, 1.f, lock_page_alpha});
+            };
+            draw_border(0.f, 0.f, 960.f, 64.f);
+            draw_border(0.f, 512.f, 960.f, 544.f);
+            draw_border(0.f, 64.f, 32.f, 512.f);
+            draw_border(928.f, 64.f, 960.f, 512.f);
+        }
 
         // PAF's 0.08 corner inset is scaled by the inverse frame aspect before
         // the rounded-page shader receives {1-q, 1-q, 1/q}.
@@ -1157,7 +1413,7 @@ struct Window {
         emucorev::paf::PageSurfaceDraw empty_draw{};
         empty_draw.viewport = {1.f, 1.f, 1.f, 1.f,  1.f, 960.f, 544.f, .5f,  .5f, 0.f, 0.f, 0.f};
         empty_draw.fragment_state = round_frag_state;
-        empty_draw.textures = {lock_corner, lock_page, 0, 0, 0};
+        empty_draw.textures = {lock_corner, lock_empty_bg, 0, 0, 0};
         empty_draw.blend = true;
         empty_draw.vertex_parameters = lock_empty_material;
         empty_draw.fragment_parameters = empty_back_fragment_material;
@@ -1180,7 +1436,7 @@ struct Window {
         glClear(GL_COLOR_BUFFER_BIT);
         upload_images();
         if (preview_scene.load() == 2) {
-            if (home_visible || lock_anim_state == LockAnimState::peeling) {
+            if (lock_needs_background()) {
                 if (livearea_visible) {
                     sprites->begin(960, 544);
                     draw_livearea();
@@ -1188,11 +1444,8 @@ struct Window {
                     draw_wave();
                     draw_home_bubbles();
                 }
-                draw_lock();
-            } else {
-                draw_wave();
-                draw_lock();
             }
+            draw_lock();
             draw_status(charging_texture);
         } else if (preview_scene.load() == 3) {
             if (livearea_visible) {
@@ -1301,7 +1554,9 @@ struct Preview {
                             preview.window->set_phase(preview.phase);
                         } else if (preview_scene.load() == 2 && preview.window) {
                             preview.window->tick_lock(elapsed);
-                            if (!preview.window->is_livearea_visible()) preview.window->tick_wave(elapsed);
+                            if (preview.window->lock_needs_background()
+                                && !preview.window->is_livearea_visible())
+                                preview.window->tick_wave(elapsed);
                         } else if (preview_scene.load() == 3 && preview.window) {
                             preview.window->tick_home(elapsed);
                             if (!preview.window->is_livearea_visible()) preview.window->tick_wave(elapsed);
@@ -1568,7 +1823,10 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeCatalog(JNIEnv*
         const auto callback = activity_class
             ? env->GetMethodID(activity_class, "onNativeLiveAreaTarget", "(Ljava/lang/String;)V") : nullptr;
         if (env->ExceptionCheck()) env->ExceptionClear();
-        jobject activity_global = callback ? env->NewGlobalRef(activity) : nullptr;
+        const auto sound_cb = activity_class
+            ? env->GetMethodID(activity_class, "onNativeUiSound", "(I)V") : nullptr;
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        jobject activity_global = (callback || sound_cb) ? env->NewGlobalRef(activity) : nullptr;
         if (activity_class) env->DeleteLocalRef(activity_class);
         if (activity_global && vm) {
             const std::lock_guard lock_guard(status_mutex);
@@ -1576,6 +1834,7 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeCatalog(JNIEnv*
             preview_java_vm = vm;
             preview_activity_ref = activity_global;
             livearea_target_callback = callback;
+            ui_sound_callback = sound_cb;
         } else if (activity_global) env->DeleteGlobalRef(activity_global);
     } catch (const std::exception& error) {
         env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), error.what());
@@ -1691,5 +1950,6 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeReleaseHomeCallback
     if (preview_activity_ref) env->DeleteGlobalRef(preview_activity_ref);
     preview_activity_ref = nullptr;
     livearea_target_callback = nullptr;
+    ui_sound_callback = nullptr;
     preview_java_vm = nullptr;
 }

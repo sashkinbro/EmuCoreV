@@ -35,7 +35,8 @@ public:
     // Original material parameter layout: 24 vertex vec4s and 10 fragment floats.
     // No allocation, shader compilation, resource loading or guest work per draw.
     void draw(std::span<const float, 96> vertex_parameters,
-        std::span<const float, 10> fragment_parameters);
+        std::span<const float, 10> fragment_parameters,
+        unsigned environment_override = 0);
 
 private:
     struct Impl;

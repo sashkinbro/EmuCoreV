@@ -13,10 +13,13 @@ import android.window.OnBackInvokedDispatcher
 import com.sbro.emucorev.nativeui.DeviceStatusSource
 import com.sbro.emucorev.nativeui.BundledImages
 import com.sbro.emucorev.nativeui.BundledResources
+import com.sbro.emucorev.nativeui.NativeUiSoundBank
 import android.graphics.BitmapFactory
+import android.text.format.DateFormat
 import android.util.Log
 import android.widget.Toast
 import java.io.File
+import java.util.TimeZone
 import java.util.concurrent.CancellationException
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -28,6 +31,7 @@ class PreviewActivity : NativeActivity() {
     private lateinit var deviceStatus: DeviceStatusSource
     @Volatile private lateinit var images: BundledImages
     private lateinit var startupImages: BundledImages
+    @Volatile private var soundBank: NativeUiSoundBank? = null
     private var requestedScene = 2
     @Volatile private var ready = false
     private val closed = AtomicBoolean(false)
@@ -142,7 +146,25 @@ class PreviewActivity : NativeActivity() {
                 }
                 else -> localLoader.loadShellImages()
             }
+            val seedClock = DeviceStatusSource.Snapshot(
+                batteryPercent = 100,
+                charging = false,
+                powerSource = 0,
+                wifiEnabled = DeviceStatusSource.UNKNOWN,
+                wifiConnected = false,
+                wifiRssi = Int.MIN_VALUE,
+                bluetoothEnabled = DeviceStatusSource.UNKNOWN,
+                epochMinute = System.currentTimeMillis() / 60000L,
+                timeZoneId = TimeZone.getDefault().id,
+                use24HourClock = DateFormat.is24HourFormat(this),
+            )
+            localLoader.updateClock(seedClock)
+            if (requestedScene == 2) {
+                localLoader.updateLockClock(seedClock)
+            }
+            val readySounds = NativeUiSoundBank(resources)
             if (Thread.currentThread().isInterrupted || closed.get()) {
+                readySounds.release()
                 return
             }
             val readyLoader = localLoader
@@ -150,14 +172,18 @@ class PreviewActivity : NativeActivity() {
             val posted = mainHandler.post {
                 if (closed.get() || isFinishing || isDestroyed) {
                     readyLoader.release()
+                    readySounds.release()
                     return@post
                 }
                 val published = synchronized(nativeBridgeLock) {
                     if (closed.get()) {
                         readyLoader.release()
+                        readySounds.release()
                         false
                     } else {
                         images = readyLoader
+                        soundBank?.release()
+                        soundBank = readySounds
                         nativePreviewReady(requestedScene)
                         ready = true
                         true
@@ -166,7 +192,10 @@ class PreviewActivity : NativeActivity() {
                 if (!published) return@post
                 startStatusIfResumed()
             }
-            if (!posted) readyLoader.release()
+            if (!posted) {
+                readyLoader.release()
+                readySounds.release()
+            }
         } catch (_: CancellationException) {
             // Expected when the Activity is closed while decoding the pack.
         } catch (error: Exception) {
@@ -236,6 +265,11 @@ class PreviewActivity : NativeActivity() {
         lastLiveAreaTarget = target
     }
 
+    @Suppress("unused")
+    fun onNativeUiSound(soundId: Int) {
+        soundBank?.play(soundId)
+    }
+
     @SuppressLint("GestureBackNavigation")
     override fun onBackPressed() {
         // NativeActivity otherwise finishes the Activity after the native input
@@ -247,6 +281,7 @@ class PreviewActivity : NativeActivity() {
     override fun onResume() {
         super.onResume()
         resumed = true
+        soundBank?.onResume()
         startStatusIfResumed()
     }
 
@@ -265,6 +300,7 @@ class PreviewActivity : NativeActivity() {
 
     override fun onPause() {
         resumed = false
+        soundBank?.onPause()
         deviceStatus.stop()
         super.onPause()
     }
@@ -277,6 +313,8 @@ class PreviewActivity : NativeActivity() {
             backCallback?.let(onBackInvokedDispatcher::unregisterOnBackInvokedCallback)
             backCallback = null
         }
+        soundBank?.release()
+        soundBank = null
         if (::images.isInitialized) images.release()
         if (::startupImages.isInitialized && (!::images.isInitialized || images !== startupImages)) {
             startupImages.release()

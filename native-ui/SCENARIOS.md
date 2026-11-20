@@ -31,3 +31,5 @@ its animations, timing, inputs or lifecycle are equivalent.
 Before replacing the emulated mode, compare complete sequences, including
 interrupted/reversed gestures and failure/recovery paths. Current known shader
 fidelity differences on Mali are recorded in README.md and remain unresolved.
+
+| Phase B status | Lock bezel/peel, Home grid/physics/paging, status bar, UI sounds | Implemented in the development preview and checked on Lenovo; reflection map and focus shader are approximations; edit mode, folders, LiveArea transitions, settings and trophies pending. |
