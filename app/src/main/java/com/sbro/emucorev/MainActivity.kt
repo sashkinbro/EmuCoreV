@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.sbro.emucorev.core.KeyboardMouseManager
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.CustomizationPreferences
@@ -53,6 +54,17 @@ class MainActivity : ComponentActivity() {
         )
         enterImmersiveMode()
         window.setBackgroundDrawable(ColorDrawable(resolveWindowBackground(preferences.themeMode)))
+        lifecycleScope.launch {
+            com.sbro.emucorev.core.AgeSignalsController.publishStored(preferences)
+            // Once per process, after the first frames, only while resumed (Play may show a consent prompt).
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                delay(1500)
+                com.sbro.emucorev.core.AgeSignalsController.run(
+                    this@MainActivity, preferences, com.sbro.emucorev.BuildConfig.DEBUG
+                )
+            }
+        }
+
         setContent {
             val customization by customizationPreferences.settings.collectAsState()
             val themeMode by preferences.themeModeFlow.collectAsState(initial = preferences.themeMode)

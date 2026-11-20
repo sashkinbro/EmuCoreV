@@ -138,6 +138,37 @@ class AppPreferences(context: Context) {
             }
         }
 
+    // Separate file so it can be excluded from backup / device transfer (see backup_rules.xml).
+    private val agePrefs = context.getSharedPreferences(AGE_PREFS_NAME, Context.MODE_PRIVATE)
+
+    /** Last Play Age Signals result. Local only: excluded from backup and device transfer. */
+    suspend fun getAgeSignals(): com.sbro.emucorev.core.AgeSignalsSnapshot {
+        fun intOrNull(key: String): Int? = if (agePrefs.contains(key)) agePrefs.getInt(key, 0) else null
+        return com.sbro.emucorev.core.AgeSignalsSnapshot(
+            ageLower = intOrNull(KEY_AGE_LOWER),
+            ageUpper = intOrNull(KEY_AGE_UPPER),
+            significantChangeStatus = intOrNull(KEY_AGE_CHANGE_STATUS),
+            installId = agePrefs.getString(KEY_AGE_INSTALL_ID, null),
+            ageRangeSource = intOrNull(KEY_AGE_SOURCE),
+            timestampMs = agePrefs.getLong(KEY_AGE_TIMESTAMP, 0L)
+        )
+    }
+
+    suspend fun setAgeSignals(snapshot: com.sbro.emucorev.core.AgeSignalsSnapshot) {
+        agePrefs.edit {
+            fun putOrRemove(key: String, value: Int?) {
+                if (value != null) putInt(key, value) else remove(key)
+            }
+            putOrRemove(KEY_AGE_LOWER, snapshot.ageLower)
+            putOrRemove(KEY_AGE_UPPER, snapshot.ageUpper)
+            putOrRemove(KEY_AGE_CHANGE_STATUS, snapshot.significantChangeStatus)
+            putOrRemove(KEY_AGE_SOURCE, snapshot.ageRangeSource)
+            val installId = snapshot.installId
+            if (installId != null) putString(KEY_AGE_INSTALL_ID, installId) else remove(KEY_AGE_INSTALL_ID)
+            putLong(KEY_AGE_TIMESTAMP, snapshot.timestampMs)
+        }
+    }
+
     var welcomeDialogShown: Boolean
         get() = prefs.getBoolean(KEY_WELCOME_DIALOG_SHOWN, false)
         set(value) = prefs.edit { putBoolean(KEY_WELCOME_DIALOG_SHOWN, value) }
@@ -296,6 +327,13 @@ class AppPreferences(context: Context) {
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_PRO_UNLOCKED = "pro_unlocked"
         private const val KEY_WELCOME_DIALOG_SHOWN = "welcome_dialog_shown"
+        private const val AGE_PREFS_NAME = "age_signals"
+        private const val KEY_AGE_LOWER = "age_signals_lower"
+        private const val KEY_AGE_UPPER = "age_signals_upper"
+        private const val KEY_AGE_CHANGE_STATUS = "age_signals_change_status"
+        private const val KEY_AGE_SOURCE = "age_signals_source"
+        private const val KEY_AGE_INSTALL_ID = "age_signals_install_id"
+        private const val KEY_AGE_TIMESTAMP = "age_signals_timestamp"
         private const val KEY_LIBRARY_LAYOUT_MODE = "library_layout_mode"
         private const val KEY_CONFIRM_SAVE_STATE_ACTIONS = "confirm_save_state_actions"
         private const val KEY_SHOW_EMULATION_QUICK_BAR = "show_emulation_quick_bar"
