@@ -47,7 +47,9 @@ opening the emulator. The current fixture contains two installed games copied
 read-only from Lenovo. Bubble renderers are retained for the visible page only.
 The 3-4-3 arrangement and title wrapping metrics are provisional: exact shell grid
 transforms and paging motion are not yet recovered. Title font size now follows
-the AppIconBase constructor's 18-pixel value. The default animated wave background
+the AppIconBase constructor's 18-pixel value; its label box is 160x52 with at
+most two lines. Natural font metrics replace the former fabricated 40-pixel
+line pitch. The existing first baseline remains provisional. The default animated wave background
 is missing; Home currently clears to black beneath the fading lock page.
 
 The development LiveArea viewer consumes the game's actual template and listed
@@ -133,6 +135,23 @@ quad/register inputs and a caller-owned source texture and output framebuffer.
 Its shaders also compiled and linked on Lenovo without GL errors; the preview
 build and lint pass. Live simulation inputs and complete background drawing
 remain pending, so this check does not establish visual equivalence.
+
+The skydome component uses the verified `skydome.vp/fp` pair, the original
+32x64 row-major UV mesh and four-index strip stitches. Uniform packers preserve
+the shader inventory's register offsets. Blend, depth and culling follow the
+source draw path; camera, normal texture and material values remain caller
+inputs. Its shader constructor also compiled and linked on Lenovo without GL
+errors. It is not yet connected to Home.
+
+CPU wave kernels now reproduce the original per-cell phase update, 32x32 FFT
+and real-height-to-half conversion. Exact FFT coefficients came from executing
+the original table initializer, including its nonstandard rounded constants.
+On Lenovo, five standalone FFT cases matched every output bit; three combined
+phase/FFT/height cases also matched original firmware execution bit for bit.
+The focused checks used optimized native code with FP contraction disabled.
+Initial random/spectral state, source parameter initialization, texture uploads,
+lighting and full camera/material composition still need connection before an
+animated Home background can be displayed.
 
 The application supplies library snapshots, changes to installed games, real
 trophy data, localized text for every supported application language, preferences
