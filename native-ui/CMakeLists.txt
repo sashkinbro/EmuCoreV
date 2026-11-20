@@ -18,7 +18,7 @@ else()
 endif()
 
 if(ANDROID)
-    add_library(emucorev_paf_gles STATIC paf/src/bubble_renderer.cpp paf/src/sprite_renderer.cpp paf/src/page_turn_renderer.cpp paf/src/wave_position_renderer.cpp paf/src/wave_surface_renderer.cpp)
+    add_library(emucorev_paf_gles STATIC paf/src/bubble_renderer.cpp paf/src/sprite_renderer.cpp paf/src/page_turn_renderer.cpp paf/src/wave_position_renderer.cpp paf/src/wave_surface_renderer.cpp paf/src/wave_grid_normal_renderer.cpp)
     target_include_directories(emucorev_paf_gles PUBLIC paf/include)
     target_compile_features(emucorev_paf_gles PUBLIC cxx_std_20)
     target_compile_options(emucorev_paf_gles PRIVATE -Wall -Wextra -Werror)
