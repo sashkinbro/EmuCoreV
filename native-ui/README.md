@@ -36,7 +36,7 @@ This scene remains incomplete: the offscreen preview flattens clip-space depth
 while retaining model depth for lighting, and orders the curled face after the
 overlapping surfaces. Original camera/depth and complete pass equivalence are
 not established. Peel now enters the development Home composition; full startup,
-exit alpha/Z tracks, original text shadows/rasterization,
+exit Z motion, original text shadows/rasterization,
 gamepad navigation and remaining shell transitions still need integration.
 The current visual result is **not** declared 1:1 or a replacement for the
 shipping emulated mode. This work was checked only on Lenovo; Anbernic is
@@ -45,10 +45,10 @@ reserved for another agent at the user's request.
 Home consumes a title-keyed catalog snapshot and packaged game icons instead of
 opening the emulator. The current fixture contains two installed games copied
 read-only from Lenovo. Bubble renderers are retained for the visible page only.
-The 3-4-3 arrangement is provisional: exact shell grid transforms and paging
-motion are not yet recovered. The default animated wave background is missing;
-direct Home currently clears to black, while unlock still retains the lock
-wallpaper underneath Home. Neither is the original default Home background.
+The 3-4-3 arrangement and title wrapping metrics are provisional: exact shell grid
+transforms and paging motion are not yet recovered. Title font size now follows
+the AppIconBase constructor's 18-pixel value. The default animated wave background
+is missing; Home currently clears to black beneath the fading lock page.
 
 The development LiveArea viewer consumes the game's actual template and listed
 images, selects localized/default backgrounds, and composes its gate, frame
@@ -114,6 +114,14 @@ surface renderer constructors compiled and linked their actual shaders in a
 Lenovo EGL context without GL errors. No complete-wave draw or Home background
 parity is claimed: simulation surfaces and the intermediate lighting pass are
 still required before these components can produce the original animated scene.
+
+The intermediate normal-map component now uses the source-paired TextureOps
+`quad.vp` / `grid_normal_8.fp` programs (`0x812fc998` / `0x812ff4d8`), identified
+through constructor `0x811a0b3a` and draw routine `0x811a486a`. It accepts explicit
+quad/register inputs and a caller-owned source texture and output framebuffer.
+Its shaders also compiled and linked on Lenovo without GL errors; the preview
+build and lint pass. Live simulation inputs and complete background drawing
+remain pending, so this check does not establish visual equivalence.
 
 The application supplies library snapshots, changes to installed games, real
 trophy data, localized text for every supported application language, preferences

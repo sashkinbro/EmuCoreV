@@ -9,6 +9,16 @@ namespace emucorev::paf {
 // One of the four source TextureOps quad.vp input records.
 struct WaveGridNormalVertex { std::array<float, 4> data; };
 
+// FUN_81214804 builds this exact four-record stream for TextureOps' default
+// (flipX=0, flipY=0) quad, which gridNormal8 uses when no orientation override
+// applies.
+inline constexpr std::array<WaveGridNormalVertex, 4> kPafTextureOpsQuadVertices{{
+    {{{0.0f, 1.0f, 0.0f, 1.0f}}},
+    {{{0.0f, 0.0f, 0.0f, 0.0f}}},
+    {{{1.0f, 1.0f, 1.0f, 1.0f}}},
+    {{{1.0f, 0.0f, 1.0f, 0.0f}}},
+}};
+
 // Register blocks consumed by quad.vp / grid_normal_8.fp. fragment_data is the
 // four-float normal-pass block {1/sourceWidth, 0, 0,
 // orientationSign/sourceHeight}, computed by PAF from source dimensions and
