@@ -1,4 +1,5 @@
 import java.security.MessageDigest
+import javax.xml.parsers.DocumentBuilderFactory
 
 plugins {
     alias(libs.plugins.android.application)
@@ -12,6 +13,7 @@ val verifyLocalNativeUiAssets by tasks.registering {
             "effects/lookups/corner-distance.png",
             "images/topmenu_plugin/754463d1.png",
             "images/livearea_plugin/ca6a6db1.png",
+            "images/livearea_plugin/1e6a33de.png",
             "images/indicator_plugin/ca76be07.png", "images/indicator_plugin/56e72f16.png",
             "preview/home/catalog.json",
             "preview/bubble/stream-0.bin", "preview/bubble/indices.bin",
@@ -64,6 +66,44 @@ val copyStartupBusyImage by tasks.registering(Copy::class) {
     }
     into(startupAssets)
 }
+val generatedPreviewStrings = layout.buildDirectory.dir("generated/nativeUiPreviewStrings")
+val sourceAppResources = layout.projectDirectory.dir("../../app/src/main/res").asFile
+val generatePreviewStrings by tasks.registering {
+    inputs.dir(sourceAppResources)
+    outputs.dir(generatedPreviewStrings)
+    doLast {
+        val outputRoot = generatedPreviewStrings.get().asFile
+        outputRoot.deleteRecursively()
+        val localeDirs = sourceAppResources.listFiles().orEmpty()
+            .filter { it.isDirectory && (it.name == "values" || it.name.startsWith("values-")) }
+            .filter { it.resolve("strings.xml").isFile }
+        check(localeDirs.any { it.name == "values" }) { "App default strings.xml is missing" }
+        localeDirs.forEach { localeDir ->
+            val document = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                .parse(localeDir.resolve("strings.xml"))
+            fun translatedText(name: String): String {
+                val strings = document.getElementsByTagName("string")
+                for (index in 0 until strings.length) {
+                    val element = strings.item(index) as org.w3c.dom.Element
+                    if (element.getAttribute("name") == name) return element.textContent
+                }
+                error("Missing $name translation in ${localeDir.name}/strings.xml")
+            }
+            fun escapeXml(value: String): String = value
+                .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&apos;")
+            val localeOutput = outputRoot.resolve(localeDir.name).apply { mkdirs() }
+            localeOutput.resolve("strings.xml").writeText(
+                """<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="native_ui_start">${escapeXml(translatedText("native_ui_start"))}</string>
+    <string name="native_ui_continue">${escapeXml(translatedText("native_ui_continue"))}</string>
+</resources>
+""".trimIndent(),
+            )
+        }
+    }
+}
 val packNativeUiAssets by tasks.registering(Zip::class) {
     dependsOn(verifyLocalNativeUiAssets)
     from(file("../resources"))
@@ -92,6 +132,7 @@ val indexNativeUiAssets by tasks.registering {
     }
 }
 tasks.named("preBuild") { dependsOn(indexNativeUiAssets, copyStartupBusyImage) }
+tasks.named("preBuild") { dependsOn(generatePreviewStrings) }
 
 android {
     namespace = "com.sbro.emucorev.nativeuipreview"
@@ -101,6 +142,7 @@ android {
     sourceSets.getByName("main").kotlin.srcDir("../android/src/main/java")
     sourceSets.getByName("main").assets.srcDir(packedAssets.get().asFile)
     sourceSets.getByName("main").assets.srcDir(startupAssets.get().asFile)
+    sourceSets.getByName("main").res.srcDir(generatedPreviewStrings.get().asFile)
     defaultConfig {
         applicationId = "com.sbro.emucorev.nativeuipreview"
         minSdk = 29

@@ -47,6 +47,7 @@ struct LiveAreaTarget { std::string id; ScreenRect rect{}; };
 struct LiveAreaSnapshot {
     std::string title_id;
     std::uint32_t background_id = 0, gate_id = 0;
+    std::uint32_t gate_start_label_id = 0, gate_control_id = 0;
     ScreenRect background_rect{}, gate_rect{};
     std::vector<LiveAreaLayer> frames, texts;
     std::vector<LiveAreaTarget> targets;
@@ -167,6 +168,7 @@ struct Window {
     std::optional<LiveAreaSnapshot> livearea_snapshot;
     std::uint64_t applied_livearea_catalog_revision = 0;
     std::vector<emucorev::paf::PlaneDivScreenQuad> livearea_gate_frame;
+    std::vector<emucorev::paf::PlaneDivScreenQuad> livearea_gate_control;
     int home_page = 0, home_focus = 0, home_touch = -1;
     std::size_t home_page_capacity = 0;
     emucorev::paf::PagePoint home_touch_start{};
@@ -506,6 +508,22 @@ struct Window {
             const auto& gate = livearea_snapshot->gate_rect;
             livearea_gate_frame = emucorev::paf::build_plane_div_screen_quads(
                 frame_spec, gate[0] + gate[2] * 0.5f, gate[1] + gate[3] * 0.5f);
+            emucorev::paf::PlaneDivSpec control_spec{};
+            control_spec.size_x = 136.f;
+            control_spec.size_y = 36.f;
+            control_spec.tex_width = 40;
+            control_spec.tex_height = 36;
+            control_spec.div_mode = emucorev::paf::PlaneDivMode::Grid3x1;
+            control_spec.div_ratio_h = emucorev::paf::resolve_plane_div_ratio(
+                emucorev::paf::PlaneDivRatioPreset::Third);
+            control_spec.div_ratio_v = emucorev::paf::resolve_plane_div_ratio(
+                emucorev::paf::PlaneDivRatioPreset::Third);
+            // RCO texture 0x1e6a33de declares div_mode=3x1 and omits both
+            // ratio attributes; the firmware texture parser defaults each
+            // absent ratio to one third (Plugin parser 0x81057856).
+            livearea_gate_control = emucorev::paf::build_plane_div_screen_quads(
+                control_spec, gate[0] + gate[2] * 0.5f,
+                gate[1] + gate[3] * 0.5f + 54.f);
         }
         return livearea_snapshot.has_value();
     }
@@ -515,10 +533,10 @@ struct Window {
         const auto& page = *livearea_snapshot;
         sprites->begin(preview_width, preview_height);
         // Layer bounds and images come from the per-title LiveArea template
-        // snapshot supplied by Home.  The A3 fallback geometry lives in the
+        // snapshot supplied by Home. The A3 fallback geometry lives in the
         // recovered Vita3K reference style table (live_area.cpp); this renderer
-        // does not invent a second layout.  The gate is drawn last as in the
-        // reference composition, but remains a preview-only visual surface.
+        // does not invent a second layout. The gate's source RCO composite
+        // children are layered over its per-game startup image below.
         auto draw_layer = [&](std::uint32_t id, const ScreenRect& rect,
             std::array<float, 4> tint = {1.f, 1.f, 1.f, 1.f}) {
             if (!id || rect[2] <= 0.f || rect[3] <= 0.f) return;
@@ -540,6 +558,18 @@ struct Window {
         for (const auto& quad : livearea_gate_frame)
             sprites->draw_patch(0xca6a6db1u, quad.x, quad.y, quad.width, quad.height,
                 quad.u, quad.v, quad.uv_width, quad.uv_height);
+        // livearea_plugin template 0x1467f749, style 0x8292: composite
+        // child 2 is the 136x36 3x1 Start control at local (0,-54), followed
+        // by child 3, the centered 24px bold localized Start/Continue label.
+        for (const auto& quad : livearea_gate_control)
+            sprites->draw_patch(page.gate_control_id, quad.x, quad.y, quad.width, quad.height,
+                quad.u, quad.v, quad.uv_width, quad.uv_height);
+        if (page.gate_start_label_id) {
+            const auto& gate = page.gate_rect;
+            const float x = gate[0] + gate[2] * 0.5f - 68.f;
+            const float y = gate[1] + gate[3] * 0.5f + 54.f - 18.f;
+            sprites->draw(page.gate_start_label_id, x, y, 136.f, 36.f);
+        }
     }
 
     void open_livearea(std::size_t index) {
@@ -554,6 +584,7 @@ struct Window {
         livearea_visible = false;
         livearea_snapshot.reset();
         livearea_gate_frame.clear();
+        livearea_gate_control.clear();
     }
 
     bool livearea_target_at(float x, float y, std::string& target) {
@@ -1440,6 +1471,7 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeCatalog(JNIEnv*
 extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeLiveArea(JNIEnv* env, jobject,
     jstring title_id, jint background_id, jfloatArray background_rect, jint gate_id, jfloatArray gate_rect,
+    jint gate_start_label_id, jint gate_control_id,
     jintArray frame_image_ids, jfloatArray frame_rects, jintArray text_image_ids, jfloatArray text_rects,
     jintArray text_colors, jobjectArray target_ids, jfloatArray target_rects) {
     if (!title_id || !background_rect || !gate_rect || !frame_image_ids || !frame_rects
@@ -1478,6 +1510,8 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeLiveArea(JNIEnv
             throw std::invalid_argument("Invalid LiveArea title ID");
         page.background_id = static_cast<std::uint32_t>(background_id);
         page.gate_id = static_cast<std::uint32_t>(gate_id);
+        page.gate_start_label_id = static_cast<std::uint32_t>(gate_start_label_id);
+        page.gate_control_id = static_cast<std::uint32_t>(gate_control_id);
         page.background_rect = read_rect(background_rect);
         page.gate_rect = read_rect(gate_rect);
 

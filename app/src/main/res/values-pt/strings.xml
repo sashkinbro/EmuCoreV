@@ -1737,4 +1737,6 @@
         <item quantity="many">O arquivo contém %1$d arquivos com um método de compressão ZIP que este instalador não consegue ler.</item>
         <item quantity="other">O arquivo contém %1$d arquivos com um método de compressão ZIP que este instalador não consegue ler.</item>
     </plurals>
+    <string name="native_ui_start">Iniciar</string>
+    <string name="native_ui_continue">Continuar</string>
 </resources>

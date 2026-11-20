@@ -1742,4 +1742,6 @@
         <item quantity="many">Архів містить %1$d файлів із методом стиснення ZIP, який цей інсталятор не може прочитати.</item>
         <item quantity="other">Архів містить %1$d файлу з методом стиснення ZIP, який цей інсталятор не може прочитати.</item>
     </plurals>
+    <string name="native_ui_start">Запустити</string>
+    <string name="native_ui_continue">Продовжити</string>
 </resources>

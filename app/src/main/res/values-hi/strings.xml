@@ -1732,4 +1732,6 @@
         <item quantity="one">आर्काइव में %1$d फ़ाइल है, जिसका ZIP कम्प्रेशन तरीका इस इंस्टॉलर द्वारा पढ़ा नहीं जा सकता।</item>
         <item quantity="other">आर्काइव में %1$d फ़ाइलें हैं, जिनका ZIP कम्प्रेशन तरीका इस इंस्टॉलर द्वारा पढ़ा नहीं जा सकता।</item>
     </plurals>
+    <string name="native_ui_start">शुरू करें</string>
+    <string name="native_ui_continue">जारी रखें</string>
 </resources>

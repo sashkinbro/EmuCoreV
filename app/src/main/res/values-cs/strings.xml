@@ -1743,4 +1743,6 @@
         <item quantity="many">Archiv obsahuje %1$d souborů s metodou komprese ZIP, kterou tento instalátor neumí přečíst.</item>
         <item quantity="other">Archiv obsahuje %1$d souborů s metodou komprese ZIP, kterou tento instalátor neumí přečíst.</item>
     </plurals>
+    <string name="native_ui_start">Spustit</string>
+    <string name="native_ui_continue">Pokračovat</string>
 </resources>

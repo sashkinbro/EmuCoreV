@@ -55,8 +55,19 @@ images, selects localized/default backgrounds, and composes its gate, frame
 images and text natively. Only style A3 is supported currently; its placement
 table comes from the existing LiveArea implementation, not a proven original
 SceShell layout trace. Opening/closing animations, full template semantics,
-gate labels and the production launch bridge remain pending. Resource fixtures
+gate behavior and the production launch bridge remain pending. Resource fixtures
 remain ignored; the preparation tool copies only template-referenced images.
+
+LiveArea now overlays the original rounded Start control (`0x1e6a33de`) and
+host-resolved label from gate template `0x1467f749`. Its 136x36 child box is
+centered at local (0,-54); the texture's 3x1 slices use the RCO parser's default
+one-third ratios. The label uses the source 24-pixel bold style. All 18 app
+locales define Start/Continue in their main strings files; firmware-covered
+translations match the extracted locale resources. The preview generates its
+two string resources from those same files. Both game fixtures and Japanese
+text were inspected on Lenovo; assemble, lint and release resource merge pass.
+The preview currently supplies Start only, with no running-game state or launch
+bridge. Original text rasterization, embossing and full gate parity remain open.
 
 Assemble and lint passed for this integration. On Lenovo, both fixture LiveAreas
 were opened from Home and inspected. System Back now returns to Home without

@@ -1742,4 +1742,6 @@
         <item quantity="many">Archiwum zawiera %1$d plików z metodą kompresji ZIP, której ten instalator nie może odczytać.</item>
         <item quantity="other">Archiwum zawiera %1$d pliku z metodą kompresji ZIP, której ten instalator nie może odczytać.</item>
     </plurals>
+    <string name="native_ui_start">Rozpocznij</string>
+    <string name="native_ui_continue">Kontynuuj</string>
 </resources>

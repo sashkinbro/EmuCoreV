@@ -1728,4 +1728,6 @@
     <plurals name="install_dialog_archive_unsupported_compression">
         <item quantity="other">アーカイブには、このインストーラーで読み込めないZIP圧縮方式のファイルが%1$d件含まれています。</item>
     </plurals>
+    <string name="native_ui_start">はじめる</string>
+    <string name="native_ui_continue">つづける</string>
 </resources>

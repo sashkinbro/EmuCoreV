@@ -1742,4 +1742,6 @@
         <item quantity="many">В архиве содержится %1$d файлов с методом сжатия ZIP, который эта программа установки не может прочитать.</item>
         <item quantity="other">В архиве содержится %1$d файла с методом сжатия ZIP, который эта программа установки не может прочитать.</item>
     </plurals>
+    <string name="native_ui_start">Запуск</string>
+    <string name="native_ui_continue">Продолжить</string>
 </resources>

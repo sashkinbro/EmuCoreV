@@ -1733,4 +1733,6 @@
         <item quantity="one">این بایگانی شامل %1$d فایل با روش فشرده‌سازی ZIP است که این نصب‌کننده نمی‌تواند آن را بخواند.</item>
         <item quantity="other">این بایگانی شامل %1$d فایل با روش فشرده‌سازی ZIP است که این نصب‌کننده نمی‌تواند آن‌ها را بخواند.</item>
     </plurals>
+    <string name="native_ui_start">شروع</string>
+    <string name="native_ui_continue">ادامه</string>
 </resources>

@@ -1726,4 +1726,6 @@
     <plurals name="install_dialog_archive_unsupported_compression">
         <item quantity="other">壓縮檔中有 %1$d 個檔案使用此安裝程式無法讀取的 ZIP 壓縮方式。</item>
     </plurals>
+    <string name="native_ui_start">开始</string>
+    <string name="native_ui_continue">继续</string>
 </resources>

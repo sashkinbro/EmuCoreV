@@ -1732,4 +1732,6 @@
         <item quantity="one">Das Archiv enthält %1$d Datei mit einer ZIP-Komprimierungsmethode, die dieses Installationsprogramm nicht lesen kann.</item>
         <item quantity="other">Das Archiv enthält %1$d Dateien mit einer ZIP-Komprimierungsmethode, die dieses Installationsprogramm nicht lesen kann.</item>
     </plurals>
+    <string name="native_ui_start">Starten</string>
+    <string name="native_ui_continue">Fortfahren</string>
 </resources>

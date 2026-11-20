@@ -50,7 +50,8 @@ class PreviewActivity : NativeActivity() {
     )
     private external fun nativeHomeLiveArea(
         titleId: String, backgroundId: Int, backgroundRect: FloatArray,
-        gateId: Int, gateRect: FloatArray, frameImageIds: IntArray, frameRects: FloatArray,
+        gateId: Int, gateRect: FloatArray, gateStartLabelImageId: Int, gateControlImageId: Int,
+        frameImageIds: IntArray, frameRects: FloatArray,
         textImageIds: IntArray, textRects: FloatArray, textColors: IntArray,
         targetIds: Array<String>, targetRects: FloatArray,
     )
@@ -204,7 +205,7 @@ class PreviewActivity : NativeActivity() {
             if (closed.get()) throw CancellationException("Preview Activity was destroyed")
             nativeHomeCatalog(ids, titles, contentIds, iconIds, labelIds)
         }
-        loader.loadHomeLiveAreas(entries) { snapshot ->
+        loader.loadHomeLiveAreas(entries, getString(R.string.native_ui_start)) { snapshot ->
             synchronized(nativeBridgeLock) {
                 if (closed.get()) throw CancellationException("Preview Activity was destroyed")
                 nativeHomeLiveArea(
@@ -213,6 +214,8 @@ class PreviewActivity : NativeActivity() {
                     snapshot.backgroundRect,
                     snapshot.gateImageId,
                     snapshot.gateRect,
+                    snapshot.gateStartLabelImageId,
+                    snapshot.gateControlImageId,
                     snapshot.frameImageIds,
                     snapshot.frameRects,
                     snapshot.textImageIds,

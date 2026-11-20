@@ -1732,4 +1732,6 @@
         <item quantity="one">Arşivde, bu yükleyicinin okuyamadığı bir ZIP sıkıştırma yöntemi kullanan %1$d dosya var.</item>
         <item quantity="other">Arşivde, bu yükleyicinin okuyamadığı bir ZIP sıkıştırma yöntemi kullanan %1$d dosya var.</item>
     </plurals>
+    <string name="native_ui_start">Başlat</string>
+    <string name="native_ui_continue">Devam</string>
 </resources>

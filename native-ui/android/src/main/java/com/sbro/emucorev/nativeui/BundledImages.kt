@@ -143,6 +143,8 @@ class BundledImages(
         val backgroundRect: FloatArray,
         val gateImageId: Int,
         val gateRect: FloatArray,
+        val gateStartLabelImageId: Int,
+        val gateControlImageId: Int,
         val frameImageIds: IntArray,
         val frameRects: FloatArray,
         val textImageIds: IntArray,
@@ -223,6 +225,7 @@ class BundledImages(
     private fun loadHomeLiveAreaChromeImages() {
         listOf(
             0xca6a6db1.toInt() to "images/livearea_plugin/ca6a6db1.png",
+            0x1e6a33de to "images/livearea_plugin/1e6a33de.png",
         ).forEach { (imageId, path) ->
             val bitmap = File(resources, path).inputStream().use {
                 requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled LiveArea chrome image: $path" }
@@ -233,11 +236,12 @@ class BundledImages(
 
     fun loadHomeLiveAreas(
         entries: List<HomeCatalogEntry>,
+        gateStartLabel: String,
         onLoaded: (HomeLiveAreaSnapshot) -> Unit,
     ) {
         entries.forEachIndexed { gameIndex, entry ->
             val templateRelative = entry.liveAreaTemplate ?: return@forEachIndexed
-            onLoaded(loadHomeLiveArea(entry, gameIndex, templateRelative))
+            onLoaded(loadHomeLiveArea(entry, gameIndex, templateRelative, gateStartLabel))
         }
     }
 
@@ -245,6 +249,7 @@ class BundledImages(
         entry: HomeCatalogEntry,
         gameIndex: Int,
         templateRelative: String,
+        gateStartLabel: String,
     ): HomeLiveAreaSnapshot {
         val homeRoot = File(resources, "preview/home").canonicalFile
         val homePrefix = homeRoot.path + File.separator
@@ -327,6 +332,21 @@ class BundledImages(
         val gateId = gatePair?.first ?: 0
         gatePair?.second?.recycle()
 
+        var gateStartLabelImageId = 0
+        if (gateId != 0) {
+            require(gateStartLabel.isNotBlank()) { "Home gate label is empty for ${entry.id}" }
+            require(nextImageId < LIVEAREA_IMAGE_BASE + (gameIndex + 1) * LIVEAREA_IMAGE_SLOTS_PER_GAME) {
+                "Too many LiveArea images for ${entry.id}"
+            }
+            val label = rasterGateStartLabel(gateStartLabel)
+            try {
+                gateStartLabelImageId = nextImageId++
+                send(gateStartLabelImageId, label)
+            } finally {
+                label.recycle()
+            }
+        }
+
         val frameImageIds = ArrayList<Int>()
         val frameRects = ArrayList<Float>()
         val textImageIds = ArrayList<Int>()
@@ -404,6 +424,8 @@ class BundledImages(
             backgroundRect = if (backgroundId == 0) FloatArray(4) else backgroundRect,
             gateImageId = gateId,
             gateRect = if (gateId == 0) FloatArray(4) else A3Layout.gateRect,
+            gateStartLabelImageId = gateStartLabelImageId,
+            gateControlImageId = if (gateId == 0) 0 else LIVEAREA_START_CONTROL_IMAGE,
             frameImageIds = frameImageIds.toIntArray(),
             frameRects = frameRects.toFloatArray(),
             textImageIds = textImageIds.toIntArray(),
@@ -425,6 +447,19 @@ class BundledImages(
         val height = ceil(paint.descent() - paint.ascent()).toInt().coerceAtLeast(1)
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         Canvas(bitmap).drawText(text, 0f, -paint.ascent(), paint)
+        return bitmap
+    }
+
+    private fun rasterGateStartLabel(text: String): Bitmap {
+        val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 24f
+            typeface = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
+        }
+        val bitmap = Bitmap.createBitmap(136, 36, Bitmap.Config.ARGB_8888)
+        val baseline = (36f - (paint.descent() + paint.ascent())) * 0.5f
+        val x = (136f - paint.measureText(text)) * 0.5f
+        Canvas(bitmap).drawText(text, x, baseline, paint)
         return bitmap
     }
 
@@ -659,6 +694,7 @@ class BundledImages(
         const val HOME_ICON_IMAGE_BASE = 1000
         const val HOME_LABEL_IMAGE_BASE = 2000
         const val HOME_FOCUS_GLOW_IMAGE = 0xa952ef1e.toInt()
+        const val LIVEAREA_START_CONTROL_IMAGE = 0x1e6a33de
         private const val LIVEAREA_IMAGE_BASE = 3000
         private const val LIVEAREA_IMAGE_SLOTS_PER_GAME = 64
         private const val HOME_CATALOG_MAX_GAMES = 512
