@@ -1,5 +1,27 @@
 # Standalone native Vita UI reconstruction
 
+## Current integration (2026-11-21)
+
+- `shell/` is the `:native-ui-shell` Android library: the C++ shell
+  (`shell.cpp`, `app_screen.h`), `NativeShellActivity`, the resource pack and
+  every `native_ui_*` string of the app (all 18 locales). It is included only
+  when `native-ui/resources/` exists; otherwise the app keeps the Compose
+  carousel. `preview/` is a thin fixture host over it.
+- The app's library mode starts `NativeShellHostActivity` (process
+  `:native_shell`): installed games, launch through `VitaLaunchBridge`,
+  return to the game's LiveArea after the Emulator process retires.
+- Shell applications: Trophy Collection (reads `TrophyRepository`), Settings
+  of this mode (themes, sounds, display area, time format, system info), and
+  Quick Saves (EmuCoreV addition). Custom themes use the Vita theme.xml
+  layout (Home page backgrounds, Start screen, date/bar colours, m_waveType).
+- Adaptive canvas: 544 logical rows (960 columns on narrower panels), safe
+  area from cutouts and rounded corners.
+
+Open: exact timings of the notification fade, app open/close zoom and page
+slide are provisional (not traced from SceShell); m_waveType to effect
+mapping is provisional; theme BGM, theme deletion and the monthly Default
+wave colour are not implemented.
+
 This directory contains the independent C++ implementation. Its core libraries
 have no emulator, guest CPU, SDL, Android application or game runtime dependency. It is not yet a
 replacement for SceShell or the full PAF framework, and is not connected to the
