@@ -114,6 +114,13 @@ void SpriteRenderer::begin(float width, float height) {
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glActiveTexture(GL_TEXTURE0);
 }
+void SpriteRenderer::set_additive_blend(bool additive) {
+    if (additive) {
+        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE, GL_ZERO, GL_ONE);
+    } else {
+        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    }
+}
 bool SpriteRenderer::draw(std::uint32_t id, float x, float y, float width, float height,
     std::array<float, 4> tint) {
     return draw_patch(id, x, y, width, height, 0.f, 0.f, 1.f, 1.f, tint);

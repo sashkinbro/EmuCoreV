@@ -62,6 +62,7 @@ class PreviewActivity : NativeActivity() {
     )
     private external fun nativeReleaseHomeCallback()
     private external fun nativeBackRequested()
+    private external fun nativeLoadHomeLayout(layout: String)
     private var lastLiveAreaTarget: String? = null
     private var backCallback: OnBackInvokedCallback? = null
 
@@ -237,6 +238,10 @@ class PreviewActivity : NativeActivity() {
         synchronized(nativeBridgeLock) {
             if (closed.get()) throw CancellationException("Preview Activity was destroyed")
             nativeHomeCatalog(ids, titles, contentIds, iconIds, labelIds)
+            val layoutFile = File(noBackupFilesDir, "home-layout.txt")
+            if (layoutFile.isFile) {
+                nativeLoadHomeLayout(layoutFile.readText())
+            }
         }
         loader.loadHomeLiveAreas(entries, getString(R.string.native_ui_start)) { snapshot ->
             synchronized(nativeBridgeLock) {
@@ -268,6 +273,18 @@ class PreviewActivity : NativeActivity() {
     @Suppress("unused")
     fun onNativeUiSound(soundId: Int) {
         soundBank?.play(soundId)
+    }
+
+    @Suppress("unused")
+    fun onNativeSaveHomeLayout(layout: String) {
+        try {
+            val dest = File(noBackupFilesDir, "home-layout.txt")
+            val tmp = File(noBackupFilesDir, "home-layout.txt.tmp")
+            tmp.writeText(layout)
+            tmp.renameTo(dest)
+        } catch (error: Exception) {
+            Log.w("NativeUiPreview", "Could not persist home layout", error)
+        }
     }
 
     @SuppressLint("GestureBackNavigation")

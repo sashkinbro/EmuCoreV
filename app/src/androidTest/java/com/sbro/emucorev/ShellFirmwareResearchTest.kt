@@ -115,14 +115,17 @@ class ShellFirmwareResearchTest {
 
     @Test
     fun inspect() {
-        assumeTrue("Firmware research is opt-in", researchMode() in listOf("decode", "decodeTrophies"))
+        assumeTrue("Firmware research is opt-in", researchMode() in listOf("decode", "decodeTrophies", "decodeApps"))
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         NativeLibraryLoader.ensureLoaded(context)
         val root = File(EmulatorStorage.vitaRoot(context), "vs0")
         val output = File(context.externalCacheDir, "shell-research")
         val sources = root.walkTopDown().filter {
-            it.isFile && if (researchMode() == "decodeTrophies") it == File(root, "app/NPXS10008/eboot.bin")
-                else (it.extension == "suprx" || it.name == "shell.self")
+            it.isFile && when (researchMode()) {
+                "decodeTrophies" -> it == File(root, "app/NPXS10008/eboot.bin")
+                "decodeApps" -> it.name == "eboot.bin" && it.parentFile?.parentFile == File(root, "app")
+                else -> it.extension == "suprx" || it.name == "shell.self"
+            }
         }.toList()
         assertTrue("Installed firmware modules must exist", sources.isNotEmpty())
         for (source in sources) {

@@ -4,7 +4,9 @@
 #include <emucorev/paf/bubble_motion.h>
 #include <emucorev/paf/device_status.h>
 #include <emucorev/paf/focus_cursor_renderer.h>
+#include <emucorev/paf/home_edit.h>
 #include <emucorev/paf/home_layout.h>
+#include <emucorev/paf/livearea_sheet.h>
 #include <emucorev/paf/sprite_renderer.h>
 #include <emucorev/paf/busy_indicator.h>
 #include <emucorev/paf/charging_indicator.h>
@@ -56,6 +58,9 @@ struct LiveAreaSnapshot {
     ScreenRect background_rect{}, gate_rect{};
     std::vector<LiveAreaLayer> frames, texts;
     std::vector<LiveAreaTarget> targets;
+    std::vector<emucorev::paf::PlaneDivScreenQuad> gate_frame_quads;
+    std::vector<emucorev::paf::PlaneDivScreenQuad> gate_glow_quads;
+    std::vector<emucorev::paf::PlaneDivScreenQuad> gate_control_quads;
 };
 struct LockPageConfig {
     emucorev::paf::PagePoint size{960.f, 512.f};
@@ -77,6 +82,24 @@ constexpr std::uint32_t status_bar_bg_id = 0xbef34d7fu;
 constexpr std::uint32_t status_home_icon_id = 0x56aebd5fu;
 constexpr std::uint32_t status_notif_orb_idle_id = 0x6821404au;
 constexpr std::uint32_t status_notif_orb_glow_id = 0x94de0b89u;
+constexpr std::uint32_t status_app_chip_mask_id = 0xfbc7297eu;
+constexpr std::uint32_t topmenu_arrow_left_id = 0x8ca9d181u;
+constexpr std::uint32_t topmenu_arrow_right_id = 0x168e9e6bu;
+constexpr std::uint32_t livearea_gate_frame_id = 0xca6a6db1u;
+constexpr std::uint32_t livearea_gate_glow_id = 0xd5dd35e7u;
+constexpr std::uint32_t livearea_start_control_id = 0x1e6a33deu;
+constexpr std::uint32_t edit_new_page_icon_id = 0x23ab06c5u;
+constexpr std::uint32_t edit_wallpaper_icon_id = 0x02024c2cu;
+constexpr std::uint32_t edit_dots_badge_id = 0xfede49bfu;
+constexpr std::uint32_t edit_callout_bg_id = 0xd29cb815u;
+constexpr std::uint32_t edit_back_icon_id = 0x2cac72e8u;
+constexpr std::uint32_t folder_panel_bg_id = 0xd8cdfae1u;
+constexpr std::uint32_t folder_icon_id = 0xe35fe13au;
+constexpr std::uint32_t folder_title_pill_id = 0xf1455f7eu;
+constexpr std::uint32_t home_chip_image_base = 40000u;
+constexpr std::uint32_t folder_label_image_id = 45000u;
+constexpr std::uint32_t edit_create_folder_label_id = 45001u;
+constexpr std::uint32_t edit_ungroup_label_id = 45002u;
 constexpr std::uint32_t busy_ball_image_id = 0x754463d1u;
 constexpr std::array<float, 3> busy_ball_tint{0.66f, 0.9f, 1.f};
 constexpr int sound_decide = 1;
@@ -89,6 +112,8 @@ std::vector<HomeCatalogItem> home_catalog;
 std::uint64_t home_catalog_revision = 0;
 std::unordered_map<std::string, LiveAreaSnapshot> livearea_catalog;
 std::uint64_t livearea_catalog_revision = 0;
+std::string persisted_home_layout;
+std::uint64_t persisted_home_layout_revision = 0;
 std::atomic<bool> native_back_requested{false};
 std::atomic<int> native_ready_scene{-1};
 std::atomic<bool> native_preview_failed{false};
@@ -98,6 +123,7 @@ JavaVM* preview_java_vm = nullptr;
 jobject preview_activity_ref = nullptr;
 jmethodID livearea_target_callback = nullptr;
 jmethodID ui_sound_callback = nullptr;
+jmethodID save_home_layout_callback = nullptr;
 std::uint64_t image_revision = 0;
 std::atomic<int> preview_scene{0}; // 0 bubble, 1 busy indicator, 2 lock screen, 3 home, 4 wave
 std::string resource_root;
@@ -187,6 +213,37 @@ void emit_ui_sound(int sound_id) {
     if (attached) vm->DetachCurrentThread();
 }
 
+void emit_save_home_layout(const std::string& layout) {
+    JavaVM* vm = nullptr;
+    { const std::lock_guard lock_guard(status_mutex); vm = preview_java_vm; }
+    if (!vm) return;
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    const jint state = vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (state == JNI_EDETACHED) {
+        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+        attached = true;
+    } else if (state != JNI_OK || !env) return;
+
+    jobject activity = nullptr;
+    jmethodID callback = nullptr;
+    {
+        const std::lock_guard lock_guard(status_mutex);
+        if (preview_activity_ref && save_home_layout_callback)
+            activity = env->NewGlobalRef(preview_activity_ref);
+        callback = save_home_layout_callback;
+    }
+    if (activity && callback) {
+        const auto value = env->NewStringUTF(layout.c_str());
+        if (value) {
+            env->CallVoidMethod(activity, callback, value);
+            env->DeleteLocalRef(value);
+        }
+        env->DeleteGlobalRef(activity);
+    }
+    if (attached) vm->DetachCurrentThread();
+}
+
 struct Window {
     EGLDisplay display = EGL_NO_DISPLAY;
     EGLSurface surface = EGL_NO_SURFACE;
@@ -197,37 +254,57 @@ struct Window {
     std::unique_ptr<emucorev::paf::FocusCursorRenderer> focus_cursor;
     std::unique_ptr<emucorev::paf::SpriteRenderer> sprites;
     std::unique_ptr<emucorev::paf::PageTurnRenderer> lock;
+    std::unique_ptr<emucorev::paf::PageTurnRenderer> livearea_pageturn;
     std::unique_ptr<emucorev::paf::WaveRenderer> wave;
     std::uint64_t applied_wave_theme_revision = 0;
     std::size_t wave_theme_index = 0;
-    struct HomeBubble {
-        HomeCatalogItem item;
-        std::unique_ptr<emucorev::paf::BubbleRenderer> renderer;
-        std::array<float, 96> base_vertex{};
+    GLuint livearea_fbo = 0, livearea_tex = 0;
+
+    struct BubbleVisualSlot {
         emucorev::paf::HomeBubbleFloatState float_state{};
-        int page = 0;
-        int slot = 0;
         float wobble_phase_offset = 0.f;
-        float x = 0.f, y = 0.f, radius = 0.f;
     };
-    std::vector<HomeBubble> home_bubbles;
-    bool home_visible = false;
-    bool livearea_visible = false;
-    std::string livearea_title_id;
-    std::optional<LiveAreaSnapshot> livearea_snapshot;
+    std::vector<HomeCatalogItem> home_catalog_items;
+    std::vector<std::string> home_catalog_ids;
+    std::vector<std::unique_ptr<emucorev::paf::BubbleRenderer>> catalog_bubble_renderers;
+    std::unordered_map<std::string, BubbleVisualSlot> bubble_slots;
+    emucorev::paf::HomeDesktopState desktop;
+    emucorev::paf::HomeEditVisualState edit_visual;
+    std::uint64_t applied_home_layout_revision = 0;
+
+    emucorev::paf::LiveAreaDeck livearea_deck;
+    emucorev::paf::PageTurnMesh livearea_mesh;
+    std::unordered_map<std::string, LiveAreaSnapshot> cached_livearea_snapshots;
     std::uint64_t applied_livearea_catalog_revision = 0;
-    std::vector<emucorev::paf::PlaneDivScreenQuad> livearea_gate_frame;
-    std::vector<emucorev::paf::PlaneDivScreenQuad> livearea_gate_control;
-    int home_page = 0, home_focus = 0, home_touch = -1;
-    std::size_t home_page_capacity = 0;
+
+    bool home_visible = false;
+    int home_page = 0, home_focus_page = 0, home_focus_slot = 0;
+    int home_touch_page = -1, home_touch_slot = -1;
+    bool home_touch_down = false;
+    float home_hold_elapsed = 0.f;
+    float home_enter_elapsed = 1.f;
     emucorev::paf::PagePoint home_touch_start{};
     emucorev::paf::HomeVerticalScroll home_scroll;
     float home_motion_phase = 0.f;
     float home_focus_pulse = 0.f;
     float status_orb_phase = 0.f;
-    float home_drag_last_y = 0.f;
+    float home_drag_last_x = 0.f, home_drag_last_y = 0.f;
     std::int64_t home_drag_last_event_ns = 0;
     bool home_drag_moved = false;
+    bool home_horiz_drag = false;
+    bool topbar_drag = false;
+
+    // Edit Mode & Folder interaction state
+    bool edit_drag_active = false;
+    int edit_drag_src_page = -1, edit_drag_src_slot = -1;
+    float edit_drag_x = 0.f, edit_drag_y = 0.f;
+    float edit_edge_scroll_cooldown = 0.f;
+    bool callout_open = false;
+    int callout_page = -1, callout_slot = -1;
+    float callout_x = 0.f, callout_y = 0.f;
+    int folder_focus_idx = 0, folder_touch_idx = -1;
+    bool peeker_peel_drag = false;
+
     GLuint focus_ring_tex = 0;
     std::uint64_t focus_ring_rev = 0;
     std::uint64_t applied_home_catalog_revision = 0;
@@ -272,15 +349,18 @@ struct Window {
         // GPU resources must die before their context, including partial init.
         if (context != EGL_NO_CONTEXT && surface != EGL_NO_SURFACE)
             eglMakeCurrent(display, surface, surface, context);
-        // Home bubble renderers own GL objects; destroy them while their
+        // Catalog bubble renderers own GL objects; destroy them while their
         // originating context is current, before EGL teardown below.
-        home_bubbles.clear();
+        catalog_bubble_renderers.clear();
         bubble_env.reset();
         focus_cursor.reset();
         wave.reset();
         bubble.reset();
         sprites.reset();
+        livearea_pageturn.reset();
         lock.reset();
+        if (livearea_fbo) glDeleteFramebuffers(1, &livearea_fbo);
+        if (livearea_tex) glDeleteTextures(1, &livearea_tex);
         if (focus_ring_tex) glDeleteTextures(1, &focus_ring_tex);
         if (lock_page) glDeleteTextures(1, &lock_page);
         if (lock_corner) glDeleteTextures(1, &lock_corner);
@@ -346,6 +426,24 @@ struct Window {
         if (preview_scene.load() == 2 || preview_scene.load() == 3) {
             bubble_env = std::make_unique<emucorev::paf::BubbleEnvRenderer>();
             focus_cursor = std::make_unique<emucorev::paf::FocusCursorRenderer>();
+            livearea_pageturn = std::make_unique<emucorev::paf::PageTurnRenderer>(
+                emucorev::paf::PageSurfaceShaders{emucorev::paf::page_turn_bottom_vertex_shader(),
+                    emucorev::paf::page_turn_bottom_fragment_shader()},
+                emucorev::paf::PageSurfaceShaders{emucorev::paf::page_turn_top_vertex_shader(),
+                    emucorev::paf::page_turn_top_fragment_shader()});
+            glGenTextures(1, &livearea_tex);
+            glBindTexture(GL_TEXTURE_2D, livearea_tex);
+            glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 840, 500);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glGenFramebuffers(1, &livearea_fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, livearea_fbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, livearea_tex, 0);
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+                throw std::runtime_error("Cannot create 840x500 LiveArea sheet framebuffer");
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
         if (preview_scene.load() == 2) {
             lock = std::make_unique<emucorev::paf::PageTurnRenderer>(
@@ -428,17 +526,22 @@ struct Window {
             0.f, 0.f, 0.f, 1.f};
     }
 
-    emucorev::paf::HomeScreenPoint bubble_screen_position(const HomeBubble& b) const {
-        const auto base = emucorev::paf::home_slot_screen_position(
-            b.page, b.slot, home_scroll.scroll_y());
-        const auto offset = emucorev::paf::bubble_float_offset(b.float_state);
-        return {base.x + offset.x, base.y + offset.y};
+    void persist_home_layout() const {
+        if (home_catalog_ids.empty()) return;
+        emit_save_home_layout(desktop.serialize_layout(home_catalog_ids));
     }
 
-    int home_page_count() const {
-        return std::max(1, static_cast<int>(
-            (home_bubbles.size() + emucorev::paf::kHomeSlotsPerPage - 1)
-            / emucorev::paf::kHomeSlotsPerPage));
+    emucorev::paf::HomeScreenPoint entry_screen_position(
+        int page, int slot, const std::string& entry_id, float offset_x = 0.f) const {
+        const auto base = emucorev::paf::home_slot_screen_position(
+            page, slot, home_scroll.scroll_y());
+        const auto it = bubble_slots.find(entry_id);
+        emucorev::paf::HomeScreenPoint float_off{};
+        if (it != bubble_slots.end()) {
+            float_off = emucorev::paf::bubble_float_offset(it->second.float_state);
+        }
+        const float lift_y = edit_visual.edit_wiggle_lift_y(page, slot);
+        return {base.x + float_off.x + offset_x, base.y + float_off.y + lift_y};
     }
 
     void ensure_focus_ring_texture() {
@@ -463,95 +566,133 @@ struct Window {
         focus_ring_rev = src.revision;
     }
 
+    void sync_visual_slots_with_desktop() {
+        std::unordered_map<std::string, BubbleVisualSlot> next;
+        for (int p = 0; p < desktop.page_count(); ++p) {
+            for (int s = 0; s < emucorev::paf::kHomeSlotsPerPage; ++s) {
+                const auto* entry = desktop.entry_at(p, s);
+                if (!entry) continue;
+                const auto existing = bubble_slots.find(entry->id);
+                if (existing != bubble_slots.end()) {
+                    next.emplace(entry->id, existing->second);
+                } else {
+                    BubbleVisualSlot slot_vis{};
+                    slot_vis.float_state = emucorev::paf::make_bubble_float_state(
+                        p, s, home_scroll.scroll_y());
+                    slot_vis.wobble_phase_offset = static_cast<float>(s) * 0.73f
+                        + static_cast<float>(p) * 1.41f;
+                    next.emplace(entry->id, slot_vis);
+                }
+            }
+        }
+        bubble_slots = std::move(next);
+    }
+
     bool ensure_home_initialized() {
         std::vector<HomeCatalogItem> catalog;
-        std::uint64_t revision = 0;
-        std::string focused_id;
-        if (home_focus >= 0 && static_cast<std::size_t>(home_focus) < home_bubbles.size())
-            focused_id = home_bubbles[static_cast<std::size_t>(home_focus)].item.id;
+        std::uint64_t cat_rev = 0;
+        std::uint64_t layout_rev = 0;
+        std::string layout_str;
         {
             const std::lock_guard lock_guard(status_mutex);
-            revision = home_catalog_revision;
-            if (!revision || revision == applied_home_catalog_revision) return revision != 0;
-            catalog = home_catalog;
-        }
-        home_bubbles.clear();
-        home_bubbles.reserve(catalog.size());
-        constexpr float radius = emucorev::paf::kHomeBubbleSize * 0.5f;
-        std::size_t index = 0;
-        for (const auto& item : catalog) {
-            HomeBubble bubble_item{};
-            bubble_item.item = item;
-            bubble_item.base_vertex = base_vertex;
-            bubble_item.page = static_cast<int>(index / emucorev::paf::kHomeSlotsPerPage);
-            bubble_item.slot = static_cast<int>(index % emucorev::paf::kHomeSlotsPerPage);
-            bubble_item.float_state = emucorev::paf::make_bubble_float_state(
-                bubble_item.page, bubble_item.slot, 0.f);
-            bubble_item.wobble_phase_offset = static_cast<float>(bubble_item.slot) * 0.73f
-                + static_cast<float>(bubble_item.page) * 1.41f;
-            const auto pos = emucorev::paf::home_slot_screen_position(
-                bubble_item.page, bubble_item.slot, 0.f);
-            bubble_item.x = pos.x;
-            bubble_item.y = pos.y;
-            bubble_item.radius = radius;
-            home_bubbles.push_back(std::move(bubble_item));
-            ++index;
-        }
-        home_focus = 0;
-        for (std::size_t i = 0; i < home_bubbles.size(); ++i)
-            if (home_bubbles[i].item.id == focused_id) home_focus = static_cast<int>(i);
-        home_page_capacity = emucorev::paf::kHomeSlotsPerPage;
-        home_page = home_focus / static_cast<int>(home_page_capacity);
-        home_scroll.set_page_count(home_page_count());
-        home_scroll.jump_to_page(home_page);
-        applied_home_catalog_revision = revision;
-        return true;
-    }
-
-    bool ensure_home_page_renderers(std::size_t first, std::size_t last) {
-        for (std::size_t i = 0; i < home_bubbles.size(); ++i)
-            if (i < first || i >= last) home_bubbles[i].renderer.reset();
-        for (std::size_t i = first; i < last; ++i) {
-            auto& item = home_bubbles[i];
-            if (item.renderer) continue;
-            HostImage icon;
-            {
-                const std::lock_guard lock_guard(status_mutex);
-                const auto image = host_images.find(item.item.icon_image_id);
-                if (image == host_images.end()) return false;
-                icon = image->second;
+            cat_rev = home_catalog_revision;
+            layout_rev = persisted_home_layout_revision;
+            if (!cat_rev) return false;
+            if (cat_rev == applied_home_catalog_revision
+                && layout_rev == applied_home_layout_revision) {
+                return true;
             }
-            item.renderer = std::make_unique<emucorev::paf::BubbleRenderer>(
-                emucorev::paf::opaque_bubble_vertex_shader(), emucorev::paf::opaque_bubble_fragment_shader(),
-                bubble_vertices, bubble_indices,
-                emucorev::paf::BubbleImage{icon.width, icon.height, icon.rgba},
-                emucorev::paf::BubbleImage{64, 64, bubble_environment});
-            item.base_vertex = base_vertex;
+            if (cat_rev != applied_home_catalog_revision) catalog = home_catalog;
+            if (layout_rev != applied_home_layout_revision) layout_str = persisted_home_layout;
         }
+        if (cat_rev != applied_home_catalog_revision) {
+            home_catalog_items = std::move(catalog);
+            home_catalog_ids.clear();
+            home_catalog_ids.reserve(home_catalog_items.size());
+            for (const auto& item : home_catalog_items) home_catalog_ids.push_back(item.id);
+            catalog_bubble_renderers.clear();
+            catalog_bubble_renderers.resize(home_catalog_items.size());
+            desktop.sync_with_catalog(home_catalog_ids);
+            applied_home_catalog_revision = cat_rev;
+        }
+        if (layout_rev != applied_home_layout_revision) {
+            if (!layout_str.empty()) {
+                desktop.apply_serialized_layout(layout_str, home_catalog_ids);
+            }
+            applied_home_layout_revision = layout_rev;
+        }
+        sync_visual_slots_with_desktop();
+        const auto* focused = desktop.entry_at(home_focus_page, home_focus_slot);
+        if (!focused) {
+            const auto first_occ = desktop.find_first_occupied(0);
+            home_focus_page = first_occ.first;
+            home_focus_slot = first_occ.second;
+        }
+        home_scroll.set_page_count(desktop.page_count());
+        home_page = std::clamp(home_focus_page, 0, desktop.page_count() - 1);
+        home_scroll.jump_to_page(home_page);
         return true;
     }
 
-    std::array<float, 96> home_bubble_transform(const HomeBubble& item, float phase,
-        float screen_x, float screen_y, float press_scale) const {
-        auto output = item.base_vertex;
-        const float item_phase = phase + item.wobble_phase_offset;
+    emucorev::paf::BubbleRenderer* ensure_catalog_bubble_renderer(int catalog_index) {
+        if (catalog_index < 0 || static_cast<std::size_t>(catalog_index) >= home_catalog_items.size())
+            return nullptr;
+        auto& slot_ptr = catalog_bubble_renderers[static_cast<std::size_t>(catalog_index)];
+        if (slot_ptr) return slot_ptr.get();
+        HostImage icon;
+        {
+            const std::lock_guard lock_guard(status_mutex);
+            const auto image = host_images.find(
+                home_catalog_items[static_cast<std::size_t>(catalog_index)].icon_image_id);
+            if (image == host_images.end()) return nullptr;
+            icon = image->second;
+        }
+        slot_ptr = std::make_unique<emucorev::paf::BubbleRenderer>(
+            emucorev::paf::opaque_bubble_vertex_shader(), emucorev::paf::opaque_bubble_fragment_shader(),
+            bubble_vertices, bubble_indices,
+            emucorev::paf::BubbleImage{icon.width, icon.height, icon.rgba},
+            emucorev::paf::BubbleImage{64, 64, bubble_environment});
+        return slot_ptr.get();
+    }
+
+    std::array<float, 96> home_bubble_transform(float phase, float phase_offset,
+        float screen_x, float screen_y, float scale,
+        float spin_y_rad = 0.f, float roll_z_rad = 0.f) const {
+        auto output = base_vertex;
+        const float item_phase = phase + phase_offset;
         const auto basis = emucorev::paf::bubble_wobble_basis(std::cos(item_phase), std::sin(item_phase), 1.f);
-        const auto initial = initial_basis;
-        std::array<std::array<float, 3>, 3> delta{};
+        std::array<std::array<float, 3>, 3> rot{};
         for (unsigned row = 0; row < 3; ++row)
             for (unsigned column = 0; column < 3; ++column)
                 for (unsigned axis = 0; axis < 3; ++axis)
-                    delta[row][column] += basis[axis][row] * initial[axis][column];
+                    rot[row][column] += basis[axis][row] * initial_basis[axis][column];
+
+        auto mul_left = [&](const std::array<std::array<float, 3>, 3>& lhs) {
+            std::array<std::array<float, 3>, 3> out{};
+            for (unsigned r = 0; r < 3; ++r)
+                for (unsigned c = 0; c < 3; ++c)
+                    for (unsigned k = 0; k < 3; ++k)
+                        out[r][c] += lhs[r][k] * rot[k][c];
+            rot = out;
+        };
+        if (std::abs(spin_y_rad) > 1.0e-4f) {
+            const float cy = std::cos(spin_y_rad), sy = std::sin(spin_y_rad);
+            mul_left({{{cy, 0.f, sy}, {0.f, 1.f, 0.f}, {-sy, 0.f, cy}}});
+        }
+        if (std::abs(roll_z_rad) > 1.0e-4f) {
+            const float cz = std::cos(roll_z_rad), sz = std::sin(roll_z_rad);
+            mul_left({{{cz, -sz, 0.f}, {sz, cz, 0.f}, {0.f, 0.f, 1.f}}});
+        }
+
         for (const unsigned first : {4u, 12u})
             for (unsigned column = first; column < first + 3; ++column)
                 for (unsigned row = 0; row < 3; ++row) {
                     float value = 0;
                     for (unsigned axis = 0; axis < 3; ++axis)
-                        value += delta[row][axis] * item.base_vertex[column * 4 + axis];
-                    output[column * 4 + row] = (first == 4u) ? (value * press_scale) : value;
+                        value += rot[row][axis] * base_vertex[column * 4 + axis];
+                    output[column * 4 + row] = (first == 4u) ? (value * scale) : value;
                 }
 
-        // Map centered spherical bubble onto the live floating screen slot.
         const float depth = output[7 * 4 + 2];
         const float clip_w = output[2 * 4 + 3] * depth + output[3 * 4 + 3];
         const float ndc_x = (screen_x / 480.f) - 1.f;
@@ -561,57 +702,203 @@ struct Window {
         return output;
     }
 
-    void draw_home_bubbles() {
-        if (!ensure_home_initialized() || home_bubbles.empty()) return;
-        const int pages = home_page_count();
+    void draw_nine_slice(std::uint32_t tex_id, float cx, float cy, float w, float h,
+        std::uint16_t tex_w, std::uint16_t tex_h, std::uint16_t mh, std::uint16_t mv,
+        std::array<float, 2> div_h, std::array<float, 2> div_v,
+        std::array<float, 4> tint = {1.f, 1.f, 1.f, 1.f}) {
+        emucorev::paf::PlaneDivSpec spec{};
+        spec.size_x = w;
+        spec.size_y = h;
+        spec.tex_width = static_cast<std::int16_t>(tex_w);
+        spec.tex_height = static_cast<std::int16_t>(tex_h);
+        spec.div_mode = emucorev::paf::PlaneDivMode::Grid3x3;
+        spec.div_ratio_h = div_h;
+        spec.div_ratio_v = div_v;
+        spec.margin_left = spec.margin_right = mh;
+        spec.margin_top = spec.margin_bottom = mv;
+        const auto quads = emucorev::paf::build_plane_div_screen_quads(spec, cx, cy);
+        for (const auto& q : quads) {
+            sprites->draw_patch(tex_id, q.x, q.y, q.width, q.height,
+                q.u, q.v, q.uv_width, q.uv_height, tint);
+        }
+    }
+
+    void draw_folder_bubble_badge(const emucorev::paf::HomeSlotEntry& entry,
+        float bx, float by, float scale, float alpha) {
+        const float d = emucorev::paf::kHomeBubbleSize * scale;
+        sprites->draw(status_app_chip_mask_id, bx - d * 0.5f, by - d * 0.5f, d, d,
+            {0.12f, 0.24f, 0.44f, 0.72f * alpha});
+        sprites->draw(folder_icon_id, bx - 38.f * scale, by - 28.f * scale,
+            76.f * scale, 57.f * scale, {0.88f, 0.94f, 1.f, 0.52f * alpha});
+        const int show_count = std::min(4, static_cast<int>(entry.members.size()));
+        for (int m = 0; m < show_count; ++m) {
+            const float mx = (m % 2 == 0) ? -19.f * scale : 19.f * scale;
+            const float my = (m < 2) ? -18.f * scale : 18.f * scale;
+            const std::uint32_t chip_id = home_chip_image_base
+                + static_cast<std::uint32_t>(entry.members[static_cast<std::size_t>(m)]);
+            const float chip_s = 34.f * scale;
+            sprites->draw(chip_id, bx + mx - chip_s * 0.5f, by + my - chip_s * 0.5f,
+                chip_s, chip_s, {1.f, 1.f, 1.f, alpha});
+        }
+    }
+
+    void draw_home_bubbles(float home_offset_x = 0.f, float home_alpha = 1.f,
+        int exclude_catalog_idx = -1) {
+        if (!ensure_home_initialized() || home_alpha <= 0.005f) return;
+        const int pages = desktop.page_count();
         const float scroll_y = home_scroll.scroll_y();
         const int p_min = std::clamp(
             static_cast<int>(std::floor(scroll_y / emucorev::paf::kHomePageHeight)), 0, pages - 1);
         const int p_max = std::clamp(
             static_cast<int>(std::ceil(scroll_y / emucorev::paf::kHomePageHeight)), 0, pages - 1);
-        const std::size_t first = static_cast<std::size_t>(p_min) * emucorev::paf::kHomeSlotsPerPage;
-        const std::size_t last = std::min(
-            static_cast<std::size_t>(p_max + 1) * emucorev::paf::kHomeSlotsPerPage, home_bubbles.size());
-        if (!ensure_home_page_renderers(first, last)) return;
+
         ensure_focus_ring_texture();
         if (bubble_env) bubble_env->capture(color);
         const std::uint32_t env_tex = bubble_env ? bubble_env->texture() : 0u;
 
-        for (std::size_t i = first; i < last; ++i) {
-            auto& item = home_bubbles[i];
-            const auto pos = bubble_screen_position(item);
-            item.x = pos.x;
-            item.y = pos.y;
-            const auto parameters = home_bubble_transform(
-                item, home_motion_phase, pos.x, pos.y, item.float_state.press_scale);
-            if (item.renderer) item.renderer->draw(parameters, material, env_tex);
-        }
-        if (home_focus >= 0 && static_cast<std::size_t>(home_focus) >= first
-            && static_cast<std::size_t>(home_focus) < last) {
-            const auto& focused = home_bubbles[static_cast<std::size_t>(home_focus)];
-            if (focus_cursor && focus_ring_tex) {
-                focus_cursor->draw(focus_ring_tex, focused.x, focused.y,
-                    emucorev::paf::kHomeFocusRingSize * focused.float_state.press_scale,
-                    home_focus_pulse, 960, 544);
-            } else {
-                sprites->begin(preview_width, preview_height);
-                sprites->draw(home_highlight_image_id, focused.x - focused.radius,
-                    focused.y - focused.radius, focused.radius * 2.f, focused.radius * 2.f,
-                    {1.f, 1.f, 1.f, 128.f / 255.f});
+        // 1. Edit mode frosted page frames and empty slot indicator dots.
+        if (edit_visual.edit_blend > 0.01f) {
+            sprites->begin(preview_width, preview_height);
+            const float eb = edit_visual.edit_blend * home_alpha;
+            for (int p = p_min; p <= p_max; ++p) {
+                const auto center = emucorev::paf::home_slot_screen_position(p, 5, scroll_y);
+                const float page_cy = center.y - 4.f;
+                draw_nine_slice(folder_panel_bg_id, 480.f + home_offset_x, page_cy, 888.f, 466.f,
+                    64, 64, 16, 16, {0.5f, 0.5f}, {0.5f, 0.5f},
+                    {0.85f, 0.92f, 1.f, 0.34f * eb});
+                for (int s = 0; s < emucorev::paf::kHomeSlotsPerPage; ++s) {
+                    if (desktop.entry_at(p, s)) continue;
+                    const auto sp = emucorev::paf::home_slot_screen_position(p, s, scroll_y);
+                    sprites->draw(home_page_dot_active_id, sp.x + home_offset_x - 6.f, sp.y - 6.f,
+                        12.f, 12.f, {1.f, 1.f, 1.f, 0.72f * eb});
+                }
             }
         }
+
+        // Helper computes entrance stagger slide/scale after lock unlock peel.
+        auto enter_params = [&](int slot, float& dx_out, float& s_out, float& a_out) {
+            dx_out = 0.f;
+            s_out = 1.f;
+            a_out = home_alpha;
+            if (home_enter_elapsed < 0.36f) {
+                const float t = std::clamp(
+                    (home_enter_elapsed - 0.12f - static_cast<float>(slot) * 0.016f) / 0.19f,
+                    0.f, 1.f);
+                const float e = 1.f - (1.f - t) * (1.f - t);
+                dx_out = -95.f * (1.f - e);
+                s_out = 0.72f + 0.28f * e;
+                a_out *= e;
+            }
+        };
+
+        // 2. Render opaque 3D app bubbles (excluding actively dragged or transitioning bubble).
+        auto mat_copy = material;
+        for (int p = p_min; p <= p_max; ++p) {
+            for (int s = 0; s < emucorev::paf::kHomeSlotsPerPage; ++s) {
+                const auto* entry = desktop.entry_at(p, s);
+                if (!entry || entry->kind != emucorev::paf::HomeEntryKind::app) continue;
+                if (entry->catalog_index == exclude_catalog_idx) continue;
+                if (edit_drag_active && p == edit_drag_src_page && s == edit_drag_src_slot) continue;
+                auto* renderer = ensure_catalog_bubble_renderer(entry->catalog_index);
+                if (!renderer) continue;
+                const auto pos = entry_screen_position(p, s, entry->id, home_offset_x);
+                float enter_dx = 0.f, enter_s = 1.f, enter_a = 1.f;
+                enter_params(s, enter_dx, enter_s, enter_a);
+                if (enter_a <= 0.01f) continue;
+                const auto& slot_vis = bubble_slots[entry->id];
+                const float roll = edit_visual.edit_wiggle_roll_rad(p, s);
+                const auto params = home_bubble_transform(home_motion_phase,
+                    slot_vis.wobble_phase_offset, pos.x + enter_dx, pos.y,
+                    slot_vis.float_state.press_scale * enter_s, 0.f, roll);
+                mat_copy[0] = enter_a;
+                renderer->draw(params, mat_copy, env_tex);
+            }
+        }
+
+        // 3a. Focus halo: the genuine shell draws title text above the cursor ring.
+        if (!edit_visual.edit_mode && !edit_visual.folder_open && home_alpha > 0.85f) {
+            const auto* focused = desktop.entry_at(home_focus_page, home_focus_slot);
+            if (focused && focused->catalog_index != exclude_catalog_idx
+                && home_focus_page >= p_min && home_focus_page <= p_max) {
+                const auto fpos = entry_screen_position(
+                    home_focus_page, home_focus_slot, focused->id, home_offset_x);
+                const float fscale = bubble_slots[focused->id].float_state.press_scale;
+                if (focus_cursor && focus_ring_tex) {
+                    focus_cursor->draw(focus_ring_tex, fpos.x, fpos.y,
+                        emucorev::paf::kHomeFocusRingSize * fscale,
+                        home_focus_pulse, 960, 544);
+                } else {
+                    sprites->begin(preview_width, preview_height);
+                    const float r = emucorev::paf::kHomeBubbleSize * 0.5f;
+                    sprites->draw(home_highlight_image_id, fpos.x - r, fpos.y - r, r * 2.f, r * 2.f,
+                        {1.f, 1.f, 1.f, 128.f / 255.f});
+                }
+            }
+        }
+
+        // 3. Render folder icons, labels, Edit '...' badges, focus cursor, and page dots.
         sprites->begin(preview_width, preview_height);
-        {
-            const std::lock_guard lock_guard(status_mutex);
-            for (std::size_t i = first; i < last; ++i) {
-                const auto& item = home_bubbles[i];
-                const auto label = host_images.find(item.item.label_image_id);
-                if (item.item.label_image_id && label != host_images.end())
-                    sprites->draw(item.item.label_image_id,
-                        item.x - label->second.width * .5f, item.y + 57.f,
-                        float(label->second.width), float(label->second.height));
+        for (int p = p_min; p <= p_max; ++p) {
+            for (int s = 0; s < emucorev::paf::kHomeSlotsPerPage; ++s) {
+                const auto* entry = desktop.entry_at(p, s);
+                if (!entry) continue;
+                if (entry->kind == emucorev::paf::HomeEntryKind::app
+                    && entry->catalog_index == exclude_catalog_idx) continue;
+                if (edit_drag_active && p == edit_drag_src_page && s == edit_drag_src_slot) continue;
+                const auto pos = entry_screen_position(p, s, entry->id, home_offset_x);
+                float enter_dx = 0.f, enter_s = 1.f, enter_a = 1.f;
+                enter_params(s, enter_dx, enter_s, enter_a);
+                if (enter_a <= 0.01f) continue;
+                const float bx = pos.x + enter_dx;
+                const float by = pos.y;
+                if (entry->kind == emucorev::paf::HomeEntryKind::folder) {
+                    draw_folder_bubble_badge(*entry, bx, by,
+                        bubble_slots[entry->id].float_state.press_scale * enter_s, enter_a);
+                }
+                const std::uint32_t label_id = (entry->kind == emucorev::paf::HomeEntryKind::folder)
+                    ? folder_label_image_id
+                    : home_catalog_items[static_cast<std::size_t>(entry->catalog_index)].label_image_id;
+                {
+                    const std::lock_guard lock_guard(status_mutex);
+                    const auto label = host_images.find(label_id);
+                    if (label_id && label != host_images.end()) {
+                        sprites->draw(label_id, bx - float(label->second.width) * .5f,
+                            by + 40.f, float(label->second.width), float(label->second.height),
+                            {1.f, 1.f, 1.f, enter_a});
+                    }
+                }
+                if (edit_visual.edit_blend > 0.05f) {
+                    const float ba = edit_visual.edit_blend * home_alpha;
+                    const float badge_cx = bx + 46.f, badge_cy = by - 36.f;
+                    sprites->draw(status_app_chip_mask_id, badge_cx - 17.f, badge_cy - 17.f,
+                        34.f, 34.f, {0.95f, 0.96f, 0.98f, 0.94f * ba});
+                    sprites->draw(edit_dots_badge_id, badge_cx - 19.f, badge_cy - 19.f,
+                        38.f, 38.f, {0.2f, 0.2f, 0.25f, ba});
+                }
             }
         }
+
+        // 5. Render dragged entry on top of other bubbles at cursor position.
+        if (edit_drag_active) {
+            const auto* dragged = desktop.entry_at(edit_drag_src_page, edit_drag_src_slot);
+            if (dragged) {
+                if (dragged->kind == emucorev::paf::HomeEntryKind::app) {
+                    if (auto* r = ensure_catalog_bubble_renderer(dragged->catalog_index)) {
+                        const auto& slot_vis = bubble_slots[dragged->id];
+                        const auto params = home_bubble_transform(home_motion_phase,
+                            slot_vis.wobble_phase_offset, edit_drag_x, edit_drag_y, 1.12f, 0.f, 0.f);
+                        mat_copy[0] = 0.92f;
+                        r->draw(params, mat_copy, env_tex);
+                    }
+                } else {
+                    sprites->begin(preview_width, preview_height);
+                    draw_folder_bubble_badge(*dragged, edit_drag_x, edit_drag_y, 1.12f, 0.92f);
+                }
+            }
+        }
+
+        // 6. Left-rail page indicator dots + Edit Mode corner tools + Callout.
+        sprites->begin(preview_width, preview_height);
         const int active_dot_page = std::clamp(
             static_cast<int>(std::lround(scroll_y / emucorev::paf::kHomePageHeight)), 0, pages - 1);
         constexpr float dot_size = 22.f;
@@ -620,26 +907,137 @@ struct Window {
         for (int p = 0; p < pages; ++p) {
             const std::uint32_t dot_id = (p == active_dot_page)
                 ? home_page_dot_active_id : home_page_dot_inactive_id;
-            sprites->draw(dot_id, 19.5f - dot_size * 0.5f,
+            sprites->draw(dot_id, 19.5f + home_offset_x - dot_size * 0.5f,
                 dot_start_y + static_cast<float>(p) * dot_spacing - dot_size * 0.5f,
-                dot_size, dot_size);
+                dot_size, dot_size, {1.f, 1.f, 1.f, home_alpha});
+        }
+
+        if (edit_visual.edit_blend > 0.01f) {
+            const float eb = edit_visual.edit_blend * home_alpha;
+            sprites->draw(status_app_chip_mask_id, -16.f + home_offset_x, 476.f, 84.f, 84.f,
+                {0.08f, 0.14f, 0.24f, 0.68f * eb});
+            sprites->draw(edit_back_icon_id, 6.f + home_offset_x, 488.f, 48.f, 48.f,
+                {1.f, 1.f, 1.f, eb});
+            sprites->draw(edit_wallpaper_icon_id, 808.f + home_offset_x, 484.f, 64.f, 48.f,
+                {1.f, 1.f, 1.f, eb});
+            sprites->draw(edit_new_page_icon_id, 880.f + home_offset_x, 480.f, 70.f, 56.f,
+                {1.f, 1.f, 1.f, eb});
+
+            if (callout_open) {
+                const auto* target = desktop.entry_at(callout_page, callout_slot);
+                if (target) {
+                    const float cx = std::clamp(callout_x + home_offset_x + 42.f, 118.f, 840.f);
+                    const float cy = std::clamp(callout_y - 68.f, 56.f, 430.f);
+                    sprites->draw(edit_callout_bg_id, cx - 104.f, cy - 46.f, 208.f, 92.f,
+                        {1.f, 1.f, 1.f, eb});
+                    const std::uint32_t lbl = (target->kind == emucorev::paf::HomeEntryKind::folder)
+                        ? edit_ungroup_label_id : edit_create_folder_label_id;
+                    sprites->draw(lbl, cx - 104.f, cy - 26.f, 208.f, 42.f,
+                        {0.10f, 0.14f, 0.20f, eb});
+                }
+            }
         }
     }
 
-    bool ensure_livearea_snapshot() {
-        if (!livearea_visible || livearea_title_id.empty()) return false;
+    void draw_folder_overlay() {
+        if (!edit_visual.is_folder_visible()) return;
+        const auto* folder = desktop.entry_at(
+            edit_visual.open_folder_page, edit_visual.open_folder_slot);
+        if (!folder || folder->kind != emucorev::paf::HomeEntryKind::folder) return;
+
+        const float t = edit_visual.folder_blend;
+        const float cx = edit_visual.folder_origin_x + (480.f - edit_visual.folder_origin_x) * t;
+        const float cy = edit_visual.folder_origin_y + (284.f - edit_visual.folder_origin_y) * t;
+        const float pw = 133.f + (836.f - 133.f) * t;
+        const float ph = 133.f + (454.f - 133.f) * t;
+
+        sprites->begin(preview_width, preview_height);
+        sprites->draw(0, 0.f, 0.f, preview_width, preview_height, {0.f, 0.f, 0.f, 0.38f * t});
+        draw_nine_slice(folder_panel_bg_id, cx, cy, pw, ph, 64, 64, 16, 16,
+            {0.5f, 0.5f}, {0.5f, 0.5f}, {0.82f, 0.90f, 1.f, 0.92f * t});
+
+        if (t > 0.25f) {
+            const float inner_a = std::clamp((t - 0.25f) / 0.75f, 0.f, 1.f);
+            const float top_y = cy - ph * 0.5f + 16.f;
+            sprites->draw(folder_title_pill_id, cx - 110.f, top_y, 220.f, 40.f,
+                {1.f, 1.f, 1.f, inner_a});
+            sprites->draw(folder_label_image_id, cx - 84.f, top_y - 34.f, 168.f, 60.f,
+                {1.f, 1.f, 1.f, inner_a});
+        }
+
+        if (t > 0.18f && !folder->members.empty()) {
+            const std::uint32_t env_tex = bubble_env ? bubble_env->texture() : 0u;
+            const float member_a = std::clamp((t - 0.18f) / 0.82f, 0.f, 1.f);
+            auto mat_copy = material;
+            mat_copy[0] = member_a;
+            const int n = std::min(static_cast<int>(folder->members.size()),
+                emucorev::paf::kHomeSlotsPerPage);
+            for (int m = 0; m < n; ++m) {
+                const int cat_idx = folder->members[static_cast<std::size_t>(m)];
+                auto* renderer = ensure_catalog_bubble_renderer(cat_idx);
+                if (!renderer) continue;
+                const auto sp = emucorev::paf::home_slot_screen_position(
+                    0, m, 0.f, emucorev::paf::HomeGridLayout::folder);
+                const float mx = edit_visual.folder_origin_x
+                    + (sp.x - edit_visual.folder_origin_x) * t;
+                const float my = edit_visual.folder_origin_y
+                    + ((sp.y + 18.f) - edit_visual.folder_origin_y) * t;
+                const float press = (m == folder_touch_idx) ? 0.93f : 1.0f;
+                const auto params = home_bubble_transform(home_motion_phase,
+                    static_cast<float>(m) * 0.73f, mx, my, (0.4f + 0.52f * t) * press);
+                renderer->draw(params, mat_copy, env_tex);
+            }
+            if (t > 0.55f && folder_focus_idx >= 0 && folder_focus_idx < n) {
+                const auto sp = emucorev::paf::home_slot_screen_position(
+                    0, folder_focus_idx, 0.f, emucorev::paf::HomeGridLayout::folder);
+                if (focus_cursor && focus_ring_tex) {
+                    focus_cursor->draw(focus_ring_tex, sp.x, sp.y + 18.f,
+                        emucorev::paf::kHomeFocusRingSize * 0.92f, home_focus_pulse, 960, 544);
+                }
+            }
+            sprites->begin(preview_width, preview_height);
+            for (int m = 0; m < n; ++m) {
+                const int cat_idx = folder->members[static_cast<std::size_t>(m)];
+                const std::uint32_t lid =
+                    home_catalog_items[static_cast<std::size_t>(cat_idx)].label_image_id;
+                const auto sp = emucorev::paf::home_slot_screen_position(
+                    0, m, 0.f, emucorev::paf::HomeGridLayout::folder);
+                const float mx = edit_visual.folder_origin_x
+                    + (sp.x - edit_visual.folder_origin_x) * t;
+                const float my = edit_visual.folder_origin_y
+                    + ((sp.y + 18.f) - edit_visual.folder_origin_y) * t;
+                const std::lock_guard lock_guard(status_mutex);
+                const auto label = host_images.find(lid);
+                if (lid && label != host_images.end()) {
+                    sprites->draw(lid, mx - float(label->second.width) * .5f,
+                        my + 35.f, float(label->second.width), float(label->second.height),
+                        {1.f, 1.f, 1.f, member_a});
+                }
+            }
+        }
+    }
+
+    const LiveAreaSnapshot* ensure_livearea_snapshot(const std::string& title_id) {
+        if (title_id.empty()) return nullptr;
         std::uint64_t revision = 0;
         {
             const std::lock_guard lock_guard(status_mutex);
             revision = livearea_catalog_revision;
-            if (livearea_snapshot && revision == applied_livearea_catalog_revision
-                && livearea_snapshot->title_id == livearea_title_id) return true;
-            const auto entry = livearea_catalog.find(livearea_title_id);
-            if (entry == livearea_catalog.end()) return false;
-            livearea_snapshot = entry->second;
-            applied_livearea_catalog_revision = revision;
-            // Gate frame geometry is fixed per A3 RCO resource. Build its
-            // exact PlaneObj patches only when the title snapshot changes.
+            if (revision != applied_livearea_catalog_revision) {
+                cached_livearea_snapshots.clear();
+                applied_livearea_catalog_revision = revision;
+            }
+            if (const auto cached = cached_livearea_snapshots.find(title_id);
+                cached != cached_livearea_snapshots.end()) {
+                return &cached->second;
+            }
+            const auto entry = livearea_catalog.find(title_id);
+            if (entry == livearea_catalog.end()) return nullptr;
+            LiveAreaSnapshot copy = entry->second;
+            const auto& gate = copy.gate_rect;
+            const float gcx = gate[0] + gate[2] * 0.5f - emucorev::paf::kLiveAreaSheetLeft;
+            const float gcy = gate[1] + gate[3] * 0.5f - emucorev::paf::kLiveAreaSheetTop;
+
             emucorev::paf::PlaneDivSpec frame_spec{};
             frame_spec.size_x = 292.f;
             frame_spec.size_y = 170.f;
@@ -650,9 +1048,18 @@ struct Window {
             frame_spec.div_ratio_v = {0.487800002f, 0.487800002f};
             frame_spec.margin_left = frame_spec.margin_right = 5;
             frame_spec.margin_top = frame_spec.margin_bottom = 9;
-            const auto& gate = livearea_snapshot->gate_rect;
-            livearea_gate_frame = emucorev::paf::build_plane_div_screen_quads(
-                frame_spec, gate[0] + gate[2] * 0.5f, gate[1] + gate[3] * 0.5f);
+            copy.gate_frame_quads = emucorev::paf::build_plane_div_screen_quads(frame_spec, gcx, gcy);
+
+            emucorev::paf::PlaneDivSpec glow_spec{};
+            glow_spec.size_x = 292.f;
+            glow_spec.size_y = 170.f;
+            glow_spec.tex_width = 82;
+            glow_spec.tex_height = 82;
+            glow_spec.div_mode = emucorev::paf::PlaneDivMode::Grid3x3;
+            glow_spec.div_ratio_h = {0.49000001f, 0.49000001f};
+            glow_spec.div_ratio_v = {0.49000001f, 0.49000001f};
+            copy.gate_glow_quads = emucorev::paf::build_plane_div_screen_quads(glow_spec, gcx, gcy);
+
             emucorev::paf::PlaneDivSpec control_spec{};
             control_spec.size_x = 136.f;
             control_spec.size_y = 36.f;
@@ -663,88 +1070,311 @@ struct Window {
                 emucorev::paf::PlaneDivRatioPreset::Third);
             control_spec.div_ratio_v = emucorev::paf::resolve_plane_div_ratio(
                 emucorev::paf::PlaneDivRatioPreset::Third);
-            // RCO texture 0x1e6a33de declares div_mode=3x1 and omits both
-            // ratio attributes; the firmware texture parser defaults each
-            // absent ratio to one third (Plugin parser 0x81057856).
-            livearea_gate_control = emucorev::paf::build_plane_div_screen_quads(
-                control_spec, gate[0] + gate[2] * 0.5f,
-                gate[1] + gate[3] * 0.5f + 54.f);
+            copy.gate_control_quads = emucorev::paf::build_plane_div_screen_quads(
+                control_spec, gcx, gcy + 54.f);
+
+            const auto [it, _] = cached_livearea_snapshots.emplace(title_id, std::move(copy));
+            return &it->second;
         }
-        return livearea_snapshot.has_value();
     }
 
-    void draw_livearea() {
-        if (!ensure_livearea_snapshot()) return;
-        const auto& page = *livearea_snapshot;
-        sprites->begin(preview_width, preview_height);
-        // Layer bounds and images come from the per-title LiveArea template
-        // snapshot supplied by Home. The A3 fallback geometry lives in the
-        // recovered Vita3K reference style table (live_area.cpp); this renderer
-        // does not invent a second layout. The gate's source RCO composite
-        // children are layered over its per-game startup image below.
+    void render_livearea_sheet_to_fbo(const emucorev::paf::LiveAreaTab& tab,
+        float gate_alpha, float glow_intro, float frames_alpha) {
+        if (!livearea_fbo || !livearea_tex) return;
+        const auto* page = ensure_livearea_snapshot(tab.title_id);
+        glBindFramebuffer(GL_FRAMEBUFFER, livearea_fbo);
+        glViewport(0, 0, 840, 500);
+        glClearColor(0.05f, 0.18f, 0.46f, 1.f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        sprites->begin(840.f, 500.f);
+
+        auto shift_x = [](float sx) { return sx - emucorev::paf::kLiveAreaSheetLeft; };
+        auto shift_y = [](float sy) { return sy - emucorev::paf::kLiveAreaSheetTop; };
         auto draw_layer = [&](std::uint32_t id, const ScreenRect& rect,
             std::array<float, 4> tint = {1.f, 1.f, 1.f, 1.f}) {
-            if (!id || rect[2] <= 0.f || rect[3] <= 0.f) return;
-            sprites->draw(id, rect[0], rect[1], rect[2], rect[3], tint);
+            if (!id || rect[2] <= 0.f || rect[3] <= 0.f || tint[3] <= 0.005f) return;
+            sprites->draw(id, shift_x(rect[0]), shift_y(rect[1]), rect[2], rect[3], tint);
         };
-        draw_layer(page.background_id, page.background_rect);
-        for (const auto& frame : page.frames) draw_layer(frame.image_id, frame.rect);
-        for (const auto& text : page.texts) {
-            const float inv = 1.f / 255.f;
-            const std::array<float, 4> tint{
-                float((text.color >> 16) & 0xff) * inv,
-                float((text.color >> 8) & 0xff) * inv,
-                float(text.color & 0xff) * inv,
-                float((text.color >> 24) & 0xff) * inv};
-            draw_layer(text.image_id, text.rect, tint);
-        }
-        draw_layer(page.gate_id, page.gate_rect);
 
-        for (const auto& quad : livearea_gate_frame)
-            sprites->draw_patch(0xca6a6db1u, quad.x, quad.y, quad.width, quad.height,
-                quad.u, quad.v, quad.uv_width, quad.uv_height);
-        // livearea_plugin template 0x1467f749, style 0x8292: composite
-        // child 2 is the 136x36 3x1 Start control at local (0,-54), followed
-        // by child 3, the centered 24px bold localized Start/Continue label.
-        for (const auto& quad : livearea_gate_control)
-            sprites->draw_patch(page.gate_control_id, quad.x, quad.y, quad.width, quad.height,
-                quad.u, quad.v, quad.uv_width, quad.uv_height);
-        if (page.gate_start_label_id) {
-            const auto& gate = page.gate_rect;
-            const float x = gate[0] + gate[2] * 0.5f - 68.f;
-            const float y = gate[1] + gate[3] * 0.5f + 54.f - 18.f;
-            sprites->draw(page.gate_start_label_id, x, y, 136.f, 36.f);
+        if (page) {
+            draw_layer(page->background_id, page->background_rect);
+            if (frames_alpha > 0.005f) {
+                for (const auto& frame : page->frames) {
+                    draw_layer(frame.image_id, frame.rect, {1.f, 1.f, 1.f, frames_alpha});
+                }
+                for (const auto& text : page->texts) {
+                    const float inv = 1.f / 255.f;
+                    const std::array<float, 4> tint{
+                        float((text.color >> 16) & 0xff) * inv,
+                        float((text.color >> 8) & 0xff) * inv,
+                        float(text.color & 0xff) * inv,
+                        float((text.color >> 24) & 0xff) * inv * frames_alpha};
+                    draw_layer(text.image_id, text.rect, tint);
+                }
+            }
+            if (gate_alpha > 0.005f) {
+                if (page->gate_id) {
+                    draw_layer(page->gate_id, page->gate_rect, {1.f, 1.f, 1.f, gate_alpha});
+                } else if (tab.catalog_index >= 0
+                    && static_cast<std::size_t>(tab.catalog_index) < home_catalog_items.size()) {
+                    const auto& g = page->gate_rect;
+                    const float icon_x = shift_x(g[0] + g[2] * 0.5f) - 48.f;
+                    const float icon_y = shift_y(g[1] + g[3] * 0.5f) - 17.f - 48.f;
+                    sprites->draw(home_catalog_items[static_cast<std::size_t>(tab.catalog_index)]
+                        .icon_image_id, icon_x, icon_y, 96.f, 96.f, {1.f, 1.f, 1.f, gate_alpha});
+                }
+                for (const auto& quad : page->gate_frame_quads) {
+                    sprites->draw_patch(livearea_gate_frame_id, quad.x, quad.y, quad.width, quad.height,
+                        quad.u, quad.v, quad.uv_width, quad.uv_height, {1.f, 1.f, 1.f, gate_alpha});
+                }
+                const std::uint32_t ctrl_id = page->gate_control_id
+                    ? page->gate_control_id : livearea_start_control_id;
+                for (const auto& quad : page->gate_control_quads) {
+                    sprites->draw_patch(ctrl_id, quad.x, quad.y, quad.width, quad.height,
+                        quad.u, quad.v, quad.uv_width, quad.uv_height, {1.f, 1.f, 1.f, gate_alpha});
+                }
+                if (page->gate_start_label_id) {
+                    const auto& g = page->gate_rect;
+                    const float lx = shift_x(g[0] + g[2] * 0.5f) - 68.f;
+                    const float ly = shift_y(g[1] + g[3] * 0.5f) + 54.f - 18.f;
+                    sprites->draw(page->gate_start_label_id, lx, ly, 136.f, 36.f,
+                        {1.f, 1.f, 1.f, gate_alpha});
+                }
+                if (glow_intro > 0.005f) {
+                    const float pulse = 0.5f + 0.5f * std::sin(livearea_deck.gate_focus_pulse());
+                    const float glow_alpha = (0.20f + 0.72f * pulse) * glow_intro * gate_alpha;
+                    sprites->set_additive_blend(true);
+                    for (const auto& quad : page->gate_glow_quads) {
+                        sprites->draw_patch(livearea_gate_glow_id, quad.x, quad.y,
+                            quad.width, quad.height, quad.u, quad.v, quad.uv_width, quad.uv_height,
+                            {0.05f, 0.96f, 1.f, glow_alpha});
+                    }
+                    sprites->set_additive_blend(false);
+                }
+            }
         }
+        glBindFramebuffer(GL_FRAMEBUFFER, target);
+        glViewport(0, 0, 960, 544);
     }
 
-    void open_livearea(std::size_t index) {
-        if (index >= home_bubbles.size()) return;
-        home_touch = -1;
-        home_drag_moved = false;
-        livearea_title_id = home_bubbles[index].item.id;
-        livearea_snapshot.reset();
-        applied_livearea_catalog_revision = 0;
-        livearea_visible = true;
+    void draw_livearea_tab(int tab_index) {
+        if (!livearea_pageturn || !livearea_deck.is_tab_visible(tab_index)) return;
+        const bool is_opening_tab = (tab_index == 0) && livearea_deck.is_open_anim_active();
+        if (is_opening_tab && !livearea_deck.is_opening_sheet_visible()) return;
+        ensure_exp_texture();
+        if (!lock_exp) return;
+
+        const auto& tab = livearea_deck.tabs()[static_cast<std::size_t>(tab_index)];
+        const float gate_a = is_opening_tab ? livearea_deck.sheet_gate_alpha() : 1.f;
+        const float glow_a = is_opening_tab ? livearea_deck.sheet_gate_glow_intro() : 1.f;
+        const float frames_a = is_opening_tab ? livearea_deck.sheet_frames_alpha() : 1.f;
+        render_livearea_sheet_to_fbo(tab, gate_a, glow_a, frames_a);
+
+        const auto fold_pt = (tab.peel_state == emucorev::paf::LiveAreaPeelState::rest && !tab.is_dragging)
+            ? livearea_deck.effective_fold_point(tab_index) : tab.fold_point;
+        const auto aspect = emucorev::paf::page_turn_normalized_aspect(emucorev::paf::kLiveAreaSheetSize);
+        const auto shape = emucorev::paf::page_turn_fold_shape(fold_pt, aspect);
+        emucorev::paf::page_turn_mesh(shape, livearea_mesh);
+        livearea_pageturn->upload_mesh(livearea_mesh);
+
+        const float offset_x = livearea_deck.tab_offset_x(tab_index);
+        const float yaw = livearea_deck.tab_yaw_rad(tab_index);
+        const float slide_frac = std::min(std::abs(offset_x) / preview_width, 1.f);
+        const float depth_arc = -85.f * std::sin(slide_frac * 1.5707963f);
+
+        emucorev::paf::PageTurnPose pose{};
+        pose.position = {
+            emucorev::paf::kLiveAreaSheetPosition.x + offset_x,
+            emucorev::paf::kLiveAreaSheetPosition.y,
+            tab.exit_z + depth_arc,
+        };
+        const float s = is_opening_tab ? livearea_deck.sheet_open_scale() : 1.f;
+        pose.scale = {s, s, s};
+        pose.rotation = {0.f, std::sin(yaw * 0.5f), 0.f, std::cos(yaw * 0.5f)};
+
+        constexpr emucorev::paf::PageTurnMatrix persp{
+            2.f / preview_width, 0.f, 0.f, 0.f,
+            0.f, 2.f / preview_height, 0.f, 0.f,
+            0.f, 0.f, 0.f, -1.f / preview_width,
+            0.f, 0.f, 0.f, 1.f,
+        };
+
+        const emucorev::paf::PageTurnShapeStyle shape_style{};
+        const auto shape_mat = emucorev::paf::page_turn_shape_material(fold_pt, shape, shape_style);
+        const auto lights = emucorev::paf::page_turn_light_parameters({});
+        const auto transforms = emucorev::paf::page_turn_transforms(
+            emucorev::paf::kLiveAreaSheetSize, pose, persp, emucorev::paf::page_turn_identity);
+        const auto page_material = emucorev::paf::page_turn_material_pack(
+            shape_mat.fresnel_multiplier, lock_material_style);
+        constexpr std::array<float, 4> fbo_uv_rect{1.f, -1.f, 0.f, 1.f};
+
+        std::array<float, 48> bottom_mat{};
+        std::copy(transforms.model_view_projection.begin(), transforms.model_view_projection.end(),
+            bottom_mat.begin());
+        bottom_mat[16] = lock_effect_style.shadow;
+        bottom_mat[17] = lock_effect_style.shadow_level;
+        bottom_mat[18] = 1.f;
+        bottom_mat[19] = 1.f;
+        std::copy(fbo_uv_rect.begin(), fbo_uv_rect.end(), bottom_mat.begin() + 20);
+        bottom_mat[24] = 1.f; bottom_mat[25] = 1.f; bottom_mat[26] = 1.f; bottom_mat[27] = 1.f;
+        bottom_mat[28] = 5.f;
+        bottom_mat[29] = 0.2f;
+        std::copy_n(shape_mat.deepest.begin(), 4, bottom_mat.begin() + 30);
+        bottom_mat[34] = shape_mat.grep.x;
+        bottom_mat[35] = shape_mat.grep.y;
+        std::copy(shape_mat.params.begin(), shape_mat.params.end(), bottom_mat.begin() + 36);
+        std::copy(shape_mat.fold_plane.begin(), shape_mat.fold_plane.end(), bottom_mat.begin() + 40);
+        std::copy(shape_mat.aspect.begin(), shape_mat.aspect.end(), bottom_mat.begin() + 44);
+
+        std::array<float, 112> top_mat{};
+        std::copy(transforms.model_view_projection.begin(), transforms.model_view_projection.end(),
+            top_mat.begin());
+        std::copy(transforms.model.begin(), transforms.model.end(), top_mat.begin() + 16);
+        std::copy(page_material.begin(), page_material.end(), top_mat.begin() + 32);
+        std::copy(fbo_uv_rect.begin(), fbo_uv_rect.end(), top_mat.begin() + 48);
+        top_mat[52] = 1.f; top_mat[53] = 1.f; top_mat[54] = 1.f; top_mat[55] = 1.f;
+        std::copy(shape_mat.deepest.begin(), shape_mat.deepest.end(), top_mat.begin() + 56);
+        top_mat[60] = shape_mat.grep.x;
+        top_mat[61] = shape_mat.grep.y;
+        top_mat[62] = shape_mat.normal_scale_z;
+        top_mat[63] = 0.f;
+        std::copy(shape_mat.params.begin(), shape_mat.params.end(), top_mat.begin() + 64);
+        std::copy(shape_mat.fold_plane.begin(), shape_mat.fold_plane.end(), top_mat.begin() + 68);
+        std::copy(shape_mat.aspect.begin(), shape_mat.aspect.end(), top_mat.begin() + 72);
+        std::copy(lights.color.begin(), lights.color.end(), top_mat.begin() + 76);
+        std::copy(lights.position.begin(), lights.position.end(), top_mat.begin() + 92);
+        top_mat[108] = 0.f; top_mat[109] = 0.f; top_mat[110] = 0.f; top_mat[111] = 1.f;
+
+        const std::array<float, 12> flat_frag_state{
+            0.f, 0.f, 1.f, 0.f,
+            1.f, 0.f, 0.f,
+            1.f / preview_width, 1.f / preview_height,
+            0.f, 80.f, 0.f
+        };
+
+        std::array<float, 8> flat_bottom_frag{};
+        std::array<float, 36> flat_top_frag{};
+        flat_top_frag[0] = lock_material_style.back_side_opacity;
+        std::copy_n(page_material.begin(), 4, flat_top_frag.begin() + 2);
+        std::copy_n(lights.color.begin(), 16, flat_top_frag.begin() + 18);
+
+        emucorev::paf::PageSurfaceDraw front_draw{};
+        front_draw.viewport = {1.f, 1.f, 1.f, 1.f,  1.f, preview_width, preview_height, .5f, .5f, 0.f, 0.f, 0.f};
+        front_draw.fragment_state = flat_frag_state;
+        front_draw.textures = {livearea_tex, 0, 0, 0, lock_exp};
+        front_draw.blend = true;
+        front_draw.vertex_parameters = bottom_mat;
+        front_draw.fragment_parameters = flat_bottom_frag;
+        front_draw.meta_alpha = tab.sheet_alpha;
+
+        emucorev::paf::PageSurfaceDraw folded_draw{};
+        folded_draw.viewport = front_draw.viewport;
+        folded_draw.fragment_state = flat_frag_state;
+        folded_draw.textures = {livearea_tex, 0, 0, 0, lock_exp};
+        folded_draw.blend = true;
+        folded_draw.vertex_parameters = top_mat;
+        folded_draw.fragment_parameters = flat_top_frag;
+        folded_draw.meta_alpha = tab.sheet_alpha;
+
+        livearea_pageturn->draw(emucorev::paf::PageSurface::front, front_draw);
+        livearea_pageturn->draw(emucorev::paf::PageSurface::folded, folded_draw);
+    }
+
+    void draw_livearea_and_home_composition() {
+        const bool opening_bubble = livearea_deck.is_open_anim_active();
+        const int exclude_cat = opening_bubble ? livearea_deck.open_bubble_catalog_index() : -1;
+        if (livearea_deck.is_home_visible()) {
+            const float hx = livearea_deck.home_offset_x();
+            const float ha = opening_bubble ? livearea_deck.open_other_home_alpha() : 1.f;
+            draw_home_bubbles(hx, ha, exclude_cat);
+        }
+        for (int i = livearea_deck.tab_count() - 1; i >= 0; --i) {
+            if (i != livearea_deck.active_tab_index()) draw_livearea_tab(i);
+        }
+        if (livearea_deck.active_tab_index() >= 0) {
+            draw_livearea_tab(livearea_deck.active_tab_index());
+        }
+        // Swelling/spinning bubble renders on top of emerging LiveArea sheet during 0..430ms!
+        if (livearea_deck.is_open_bubble_visible()) {
+            const int cat_idx = livearea_deck.open_bubble_catalog_index();
+            if (auto* renderer = ensure_catalog_bubble_renderer(cat_idx)) {
+                if (bubble_env) bubble_env->capture(color);
+                const std::uint32_t env_tex = bubble_env ? bubble_env->texture() : 0u;
+                const auto bpos = livearea_deck.open_bubble_pos();
+                const auto params = home_bubble_transform(home_motion_phase, 0.f, bpos.x, bpos.y,
+                    livearea_deck.open_bubble_scale(), livearea_deck.open_bubble_spin_y_rad(), 0.f);
+                auto mat_copy = material;
+                mat_copy[0] = livearea_deck.open_bubble_alpha();
+                renderer->draw(params, mat_copy, env_tex);
+            }
+        }
+        draw_folder_overlay();
+        if (!edit_visual.edit_mode && !edit_visual.is_folder_visible()) {
+            sprites->begin(preview_width, preview_height);
+            if (livearea_deck.pager_position() > 0.25f) {
+                sprites->draw(topmenu_arrow_left_id, 0.f, 258.f, 60.f, 60.f);
+            }
+            if (livearea_deck.tab_count() > 0
+                && livearea_deck.pager_position() < static_cast<float>(livearea_deck.tab_count()) - 0.25f) {
+                sprites->draw(topmenu_arrow_right_id, 900.f, 258.f, 60.f, 60.f);
+            }
+        }
     }
 
     void close_livearea() {
-        if (livearea_visible) emit_ui_sound(sound_cancel);
-        livearea_visible = false;
-        livearea_snapshot.reset();
-        livearea_gate_frame.clear();
-        livearea_gate_control.clear();
+        if (!livearea_deck.is_home_active()) {
+            if (livearea_deck.trigger_peel_close()) {
+                emit_ui_sound(sound_page_turn);
+            }
+        } else if (edit_visual.folder_open) {
+            edit_visual.close_folder();
+            emit_ui_sound(sound_cancel);
+        } else if (edit_visual.edit_mode) {
+            edit_visual.set_edit_mode(false);
+            callout_open = false;
+            desktop.prune_trailing_empty_pages();
+            home_scroll.set_page_count(desktop.page_count());
+            persist_home_layout();
+            emit_ui_sound(sound_cancel);
+        }
     }
 
     bool livearea_target_at(float x, float y, std::string& target) {
-        if (!ensure_livearea_snapshot()) return false;
-        for (const auto& hit : livearea_snapshot->targets) {
+        const int active_tab = livearea_deck.active_tab_index();
+        if (active_tab < 0 || active_tab >= livearea_deck.tab_count()) return false;
+        const auto* snap = ensure_livearea_snapshot(
+            livearea_deck.tabs()[static_cast<std::size_t>(active_tab)].title_id);
+        if (!snap) return false;
+        const float ox = livearea_deck.tab_offset_x(active_tab);
+        const float lx = x - ox;
+        for (const auto& hit : snap->targets) {
             const auto& r = hit.rect;
-            if (x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3]) {
+            if (lx >= r[0] && y >= r[1] && lx < r[0] + r[2] && y < r[1] + r[3]) {
                 target = hit.id;
                 return true;
             }
         }
         return false;
+    }
+
+    void open_entry_at(int page, int slot, float screen_x, float screen_y) {
+        const auto* entry = desktop.entry_at(page, slot);
+        if (!entry) return;
+        home_touch_page = -1;
+        home_touch_slot = -1;
+        home_touch_down = false;
+        home_drag_moved = false;
+        if (entry->kind == emucorev::paf::HomeEntryKind::folder) {
+            folder_focus_idx = 0;
+            folder_touch_idx = -1;
+            edit_visual.open_folder(page, slot, screen_x, screen_y);
+            emit_ui_sound(sound_decide);
+            return;
+        }
+        if (entry->catalog_index < 0
+            || static_cast<std::size_t>(entry->catalog_index) >= home_catalog_items.size()) return;
+        emit_ui_sound(sound_decide);
+        livearea_deck.open_or_focus(entry->id, entry->catalog_index, screen_x, screen_y);
     }
 
     void tick_home(float elapsed) {
@@ -754,23 +1384,117 @@ struct Window {
         if (home_focus_pulse > kTwoPi) home_focus_pulse -= kTwoPi;
         status_orb_phase += elapsed * 2.2f;
         if (status_orb_phase > kTwoPi) status_orb_phase -= kTwoPi;
+        if (home_enter_elapsed < 1.f) home_enter_elapsed += elapsed;
+        if (edit_edge_scroll_cooldown > 0.f) edit_edge_scroll_cooldown = std::max(0.f, edit_edge_scroll_cooldown - elapsed);
+
+        livearea_deck.step(elapsed);
+        edit_visual.step(elapsed);
+
+        if (home_touch_down && !home_drag_moved && !edit_visual.edit_mode
+            && !edit_visual.folder_open && livearea_deck.is_home_active()) {
+            home_hold_elapsed += elapsed;
+            if (home_hold_elapsed >= 0.55f) {
+                edit_visual.set_edit_mode(true);
+                home_touch_down = false;
+                home_touch_page = -1;
+                home_touch_slot = -1;
+                emit_ui_sound(sound_decide);
+            }
+        }
+
         home_scroll.step(elapsed);
         home_page = home_scroll.current_page();
         const float sy = home_scroll.scroll_y();
-        for (std::size_t i = 0; i < home_bubbles.size(); ++i) {
-            emucorev::paf::step_bubble_float(
-                home_bubbles[i].float_state, elapsed, sy, static_cast<int>(i) == home_touch);
+        for (auto& [id, vis] : bubble_slots) {
+            const auto* cur_touch = (home_touch_page >= 0 && home_touch_slot >= 0)
+                ? desktop.entry_at(home_touch_page, home_touch_slot) : nullptr;
+            const bool pressed = cur_touch && cur_touch->id == id;
+            emucorev::paf::step_bubble_float(vis.float_state, elapsed, sy, pressed);
         }
     }
 
-    int32_t handle_home_input(AInputEvent* event) {
+    std::pair<int, int> hit_test_home_slot(float px, float py, float max_dist) const {
+        const float scroll_y = home_scroll.scroll_y();
+        const int pages = desktop.page_count();
+        const int p_min = std::clamp(
+            static_cast<int>(std::floor(scroll_y / emucorev::paf::kHomePageHeight)), 0, pages - 1);
+        const int p_max = std::clamp(
+            static_cast<int>(std::ceil(scroll_y / emucorev::paf::kHomePageHeight)), 0, pages - 1);
+        float best = max_dist * max_dist;
+        int bp = -1, bs = -1;
+        for (int p = p_min; p <= p_max; ++p) {
+            for (int s = 0; s < emucorev::paf::kHomeSlotsPerPage; ++s) {
+                const auto sp = emucorev::paf::home_slot_screen_position(p, s, scroll_y);
+                const float dx = px - sp.x, dy = py - sp.y;
+                const float d2 = dx * dx + dy * dy;
+                if (d2 <= best) {
+                    best = d2;
+                    bp = p;
+                    bs = s;
+                }
+            }
+        }
+        return {bp, bs};
+    }
+
+    int32_t handle_shell_input(AInputEvent* event) {
         if (!ensure_home_initialized()) return 0;
-        if (home_bubbles.empty()) return 0;
-        const int pages = home_page_count();
+
         if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
             if (AKeyEvent_getAction(event) != AKEY_EVENT_ACTION_DOWN || AKeyEvent_getRepeatCount(event) != 0)
                 return 0;
             const int key = AKeyEvent_getKeyCode(event);
+            if (key == AKEYCODE_BACK || key == AKEYCODE_BUTTON_B || key == AKEYCODE_ESCAPE) {
+                if (!livearea_deck.is_home_active() || edit_visual.folder_open || edit_visual.edit_mode) {
+                    close_livearea();
+                    return 1;
+                }
+                return 0;
+            }
+            if (edit_visual.folder_open) {
+                const auto* f = desktop.entry_at(edit_visual.open_folder_page, edit_visual.open_folder_slot);
+                const int n = f ? static_cast<int>(f->members.size()) : 0;
+                if (n > 0) {
+                    if (key == AKEYCODE_DPAD_RIGHT && folder_focus_idx + 1 < n) {
+                        ++folder_focus_idx; emit_ui_sound(sound_focus); return 1;
+                    }
+                    if (key == AKEYCODE_DPAD_LEFT && folder_focus_idx > 0) {
+                        --folder_focus_idx; emit_ui_sound(sound_focus); return 1;
+                    }
+                    if ((key == AKEYCODE_BUTTON_A || key == AKEYCODE_ENTER)
+                        && folder_focus_idx >= 0 && folder_focus_idx < n) {
+                        const int cat_idx = f->members[static_cast<std::size_t>(folder_focus_idx)];
+                        const auto sp = emucorev::paf::home_slot_screen_position(
+                            0, folder_focus_idx, 0.f, emucorev::paf::HomeGridLayout::folder);
+                        edit_visual.close_folder();
+                        emit_ui_sound(sound_decide);
+                        livearea_deck.open_or_focus(
+                            home_catalog_items[static_cast<std::size_t>(cat_idx)].id, cat_idx, sp.x, sp.y + 18.f);
+                        return 1;
+                    }
+                }
+                return 1;
+            }
+            if (!livearea_deck.is_home_active()) {
+                if (key == AKEYCODE_BUTTON_L1 || key == AKEYCODE_DPAD_LEFT) {
+                    if (livearea_deck.slide_left()) { emit_ui_sound(sound_page_scroll); return 1; }
+                } else if (key == AKEYCODE_BUTTON_R1 || key == AKEYCODE_DPAD_RIGHT) {
+                    if (livearea_deck.slide_right()) { emit_ui_sound(sound_page_scroll); return 1; }
+                } else if (key == AKEYCODE_BUTTON_A || key == AKEYCODE_ENTER) {
+                    const int idx = livearea_deck.active_tab_index();
+                    if (idx >= 0 && idx < livearea_deck.tab_count()) {
+                        const auto* snap = ensure_livearea_snapshot(
+                            livearea_deck.tabs()[static_cast<std::size_t>(idx)].title_id);
+                        if (snap && !snap->targets.empty()) {
+                            emit_ui_sound(sound_decide);
+                            emit_livearea_target_request(snap->targets.front().id);
+                        }
+                    }
+                    return 1;
+                }
+                return 0;
+            }
+            // Home DPAD navigation
             emucorev::paf::HomeDpadDirection dir{};
             bool is_dir = true;
             if (key == AKEYCODE_DPAD_LEFT) dir = emucorev::paf::HomeDpadDirection::left;
@@ -778,16 +1502,12 @@ struct Window {
             else if (key == AKEYCODE_DPAD_UP) dir = emucorev::paf::HomeDpadDirection::up;
             else if (key == AKEYCODE_DPAD_DOWN) dir = emucorev::paf::HomeDpadDirection::down;
             else is_dir = false;
-
             if (is_dir) {
-                const int cur = std::clamp(home_focus, 0, static_cast<int>(home_bubbles.size()) - 1);
-                const auto& cur_b = home_bubbles[static_cast<std::size_t>(cur)];
-                const auto [np, ns] = emucorev::paf::home_dpad_neighbor(
-                    cur_b.page, cur_b.slot, static_cast<int>(home_bubbles.size()), pages, dir);
-                const int next_idx = np * emucorev::paf::kHomeSlotsPerPage + ns;
-                if (next_idx != home_focus && next_idx < static_cast<int>(home_bubbles.size())) {
+                const auto [np, ns] = desktop.dpad_neighbor(home_focus_page, home_focus_slot, dir);
+                if (np != home_focus_page || ns != home_focus_slot) {
                     const int prev_page = home_page;
-                    home_focus = next_idx;
+                    home_focus_page = np;
+                    home_focus_slot = ns;
                     if (np != prev_page) {
                         home_scroll.snap_to_page(np);
                         home_page = np;
@@ -798,15 +1518,18 @@ struct Window {
                 }
                 return 1;
             }
+            if (key == AKEYCODE_BUTTON_R1 && livearea_deck.tab_count() > 0) {
+                if (livearea_deck.slide_right()) { emit_ui_sound(sound_page_scroll); return 1; }
+            }
             if (key == AKEYCODE_BUTTON_A || key == AKEYCODE_ENTER) {
-                if (home_focus >= 0 && static_cast<std::size_t>(home_focus) < home_bubbles.size()) {
-                    emit_ui_sound(sound_decide);
-                    open_livearea(static_cast<std::size_t>(home_focus));
-                }
+                const auto sp = emucorev::paf::home_slot_screen_position(
+                    home_focus_page, home_focus_slot, home_scroll.scroll_y());
+                open_entry_at(home_focus_page, home_focus_slot, sp.x, sp.y);
                 return 1;
             }
             return 0;
         }
+
         if (AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION) return 0;
         const int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
         EGLint width = 0, height = 0;
@@ -819,100 +1542,322 @@ struct Window {
         const float px = (AMotionEvent_getX(event, 0) - ox) / scale;
         const float py = (AMotionEvent_getY(event, 0) - oy) / scale;
         const std::int64_t event_ns = AMotionEvent_getEventTime(event);
-        if (action == AMOTION_EVENT_ACTION_DOWN) {
-            float nearest = 1.0e9f;
-            home_touch = -1;
-            home_drag_moved = false;
-            home_touch_start = {px, py};
-            home_drag_last_y = py;
-            home_drag_last_event_ns = event_ns;
-            const std::size_t first = static_cast<std::size_t>(home_page)
-                * emucorev::paf::kHomeSlotsPerPage;
-            const std::size_t last = std::min(first + emucorev::paf::kHomeSlotsPerPage, home_bubbles.size());
-            for (std::size_t i = first; i < last; ++i) {
-                const auto pos = bubble_screen_position(home_bubbles[i]);
-                const float dx = px - pos.x, dy = py - pos.y;
-                const float distance = dx * dx + dy * dy;
-                if (distance <= home_bubbles[i].radius * home_bubbles[i].radius && distance < nearest) {
-                    nearest = distance;
-                    home_touch = static_cast<int>(i);
+
+        // Folder overlay modal input
+        if (edit_visual.folder_open) {
+            const auto* folder = desktop.entry_at(
+                edit_visual.open_folder_page, edit_visual.open_folder_slot);
+            if (action == AMOTION_EVENT_ACTION_DOWN) {
+                home_touch_start = {px, py};
+                folder_touch_idx = -1;
+                if (folder) {
+                    const int n = std::min(static_cast<int>(folder->members.size()),
+                        emucorev::paf::kHomeSlotsPerPage);
+                    for (int m = 0; m < n; ++m) {
+                        const auto sp = emucorev::paf::home_slot_screen_position(
+                            0, m, 0.f, emucorev::paf::HomeGridLayout::folder);
+                        if (std::hypot(px - sp.x, py - (sp.y + 18.f)) <= 66.f) {
+                            folder_touch_idx = m;
+                            break;
+                        }
+                    }
+                }
+                return 1;
+            }
+            if (action == AMOTION_EVENT_ACTION_UP) {
+                if (folder && folder_touch_idx >= 0
+                    && folder_touch_idx < static_cast<int>(folder->members.size())
+                    && std::hypot(px - home_touch_start.x, py - home_touch_start.y) < 30.f) {
+                    const int cat_idx = folder->members[static_cast<std::size_t>(folder_touch_idx)];
+                    const auto sp = emucorev::paf::home_slot_screen_position(
+                        0, folder_touch_idx, 0.f, emucorev::paf::HomeGridLayout::folder);
+                    edit_visual.close_folder();
+                    folder_touch_idx = -1;
+                    emit_ui_sound(sound_decide);
+                    livearea_deck.open_or_focus(
+                        home_catalog_items[static_cast<std::size_t>(cat_idx)].id, cat_idx,
+                        sp.x, sp.y + 18.f);
+                    return 1;
+                }
+                folder_touch_idx = -1;
+                if (px < 62.f || px > 898.f || py < 56.f || py > 512.f) {
+                    edit_visual.close_folder();
+                    emit_ui_sound(sound_cancel);
                 }
             }
             return 1;
         }
-        if (action == AMOTION_EVENT_ACTION_MOVE) {
-            if (!home_drag_moved && std::hypot(px - home_touch_start.x, py - home_touch_start.y) > 14.f) {
-                home_drag_moved = true;
-                home_touch = -1;
-                home_scroll.begin_drag();
+
+        if (action == AMOTION_EVENT_ACTION_DOWN) {
+            home_touch_start = {px, py};
+            home_drag_last_x = px;
+            home_drag_last_y = py;
+            home_drag_last_event_ns = event_ns;
+            home_drag_moved = false;
+            home_horiz_drag = false;
+            topbar_drag = false;
+            peeker_peel_drag = false;
+            home_touch_down = false;
+            home_hold_elapsed = 0.f;
+            home_touch_page = -1;
+            home_touch_slot = -1;
+
+            // Top bar Home/App chip strip tap (only when Edit Mode inactive).
+            if (py < 36.f && !edit_visual.edit_mode && livearea_deck.tab_count() > 0) {
+                topbar_drag = true;
+                return 1;
             }
-            if (home_drag_moved) {
-                const float dt = std::clamp(
-                    float(event_ns - home_drag_last_event_ns) * 1.0e-9f, 0.001f, 0.1f);
-                home_scroll.drag_by(py - home_drag_last_y, dt);
-                home_drag_last_y = py;
-                home_drag_last_event_ns = event_ns;
+            // Active LiveArea top-right peel corner hit-test.
+            if (!livearea_deck.is_home_active() && livearea_deck.begin_peel_drag(px, py)) {
+                peeker_peel_drag = true;
+                return 1;
+            }
+            // Edit mode pointer down: callout, '...', corners, or bubble pick-up.
+            if (livearea_deck.is_home_active() && edit_visual.edit_mode) {
+                if (callout_open) {
+                    const auto* c_target = desktop.entry_at(callout_page, callout_slot);
+                    const float cx = std::clamp(callout_x + 42.f, 118.f, 840.f);
+                    const float cy = std::clamp(callout_y - 68.f, 56.f, 430.f);
+                    if (c_target && std::abs(px - cx) <= 104.f && std::abs(py - cy) <= 46.f) {
+                        if (c_target->kind == emucorev::paf::HomeEntryKind::folder) {
+                            desktop.ungroup_folder(callout_page, callout_slot);
+                        } else {
+                            desktop.create_folder_at(callout_page, callout_slot, "New Folder");
+                        }
+                        callout_open = false;
+                        home_scroll.set_page_count(desktop.page_count());
+                        sync_visual_slots_with_desktop();
+                        persist_home_layout();
+                        emit_ui_sound(sound_decide);
+                        return 1;
+                    }
+                    callout_open = false;
+                }
+                // Bottom-left Done/Back button or bottom-right Wallpaper / '+' New Page.
+                if (px < 72.f && py > 474.f) {
+                    edit_visual.set_edit_mode(false);
+                    desktop.prune_trailing_empty_pages();
+                    home_scroll.set_page_count(desktop.page_count());
+                    home_page = home_scroll.current_page();
+                    persist_home_layout();
+                    emit_ui_sound(sound_cancel);
+                    return 1;
+                }
+                if (px >= 804.f && px <= 876.f && py > 476.f) {
+                    ensure_wave();
+                    const auto presets = emucorev::paf::wave_theme_presets();
+                    if (!presets.empty()) {
+                        wave_theme_index = (wave_theme_index + 1) % presets.size();
+                        wave->set_theme(presets[wave_theme_index]);
+                        emit_ui_sound(sound_decide);
+                    }
+                    return 1;
+                }
+                if (px > 876.f && py > 476.f) {
+                    const int new_p = desktop.add_page();
+                    home_scroll.set_page_count(desktop.page_count());
+                    home_scroll.snap_to_page(new_p);
+                    home_page = new_p;
+                    persist_home_layout();
+                    emit_ui_sound(sound_page_scroll);
+                    return 1;
+                }
+                // Hit-test '...' badge first, then occupied bubble to drag-reorder.
+                const float sy = home_scroll.scroll_y();
+                const int p_min = std::clamp(
+                    static_cast<int>(std::floor(sy / emucorev::paf::kHomePageHeight)),
+                    0, desktop.page_count() - 1);
+                const int p_max = std::clamp(
+                    static_cast<int>(std::ceil(sy / emucorev::paf::kHomePageHeight)),
+                    0, desktop.page_count() - 1);
+                for (int p = p_min; p <= p_max; ++p) {
+                    for (int s = 0; s < emucorev::paf::kHomeSlotsPerPage; ++s) {
+                        const auto* entry = desktop.entry_at(p, s);
+                        if (!entry) continue;
+                        const auto pos = entry_screen_position(p, s, entry->id);
+                        if (std::hypot(px - (pos.x + 46.f), py - (pos.y - 36.f)) <= 24.f) {
+                            callout_open = true;
+                            callout_page = p;
+                            callout_slot = s;
+                            callout_x = pos.x;
+                            callout_y = pos.y;
+                            emit_ui_sound(sound_focus);
+                            return 1;
+                        }
+                        if (std::hypot(px - pos.x, py - pos.y) <= emucorev::paf::kHomeBubbleSize * 0.5f) {
+                            edit_drag_active = true;
+                            edit_drag_src_page = p;
+                            edit_drag_src_slot = s;
+                            edit_drag_x = px;
+                            edit_drag_y = py;
+                            return 1;
+                        }
+                    }
+                }
+                return 1;
+            }
+            // Normal Home hit test
+            if (livearea_deck.is_home_active()) {
+                home_touch_down = true;
+                const auto [hp, hs] = hit_test_home_slot(px, py, emucorev::paf::kHomeBubbleSize * 0.5f);
+                if (hp >= 0 && desktop.entry_at(hp, hs)) {
+                    home_touch_page = hp;
+                    home_touch_slot = hs;
+                }
             }
             return 1;
         }
+
+        if (action == AMOTION_EVENT_ACTION_MOVE) {
+            if (peeker_peel_drag) {
+                livearea_deck.update_peel_drag(px, py);
+                return 1;
+            }
+            if (edit_drag_active) {
+                edit_drag_x = px;
+                edit_drag_y = py;
+                if (edit_edge_scroll_cooldown <= 0.f) {
+                    if (py > 482.f && home_page + 1 < desktop.page_count()) {
+                        home_scroll.snap_to_page(home_page + 1);
+                        home_page = home_page + 1;
+                        edit_edge_scroll_cooldown = 0.55f;
+                        emit_ui_sound(sound_page_scroll);
+                    } else if (py < 68.f && home_page > 0) {
+                        home_scroll.snap_to_page(home_page - 1);
+                        home_page = home_page - 1;
+                        edit_edge_scroll_cooldown = 0.55f;
+                        emit_ui_sound(sound_page_scroll);
+                    }
+                }
+                return 1;
+            }
+            if (topbar_drag) return 1;
+
+            const float dx_total = px - home_touch_start.x;
+            const float dy_total = py - home_touch_start.y;
+            const float dt = std::clamp(
+                float(event_ns - home_drag_last_event_ns) * 1.0e-9f, 0.001f, 0.1f);
+            if (!home_drag_moved && !home_horiz_drag && std::hypot(dx_total, dy_total) > 14.f) {
+                home_touch_down = false;
+                home_touch_page = -1;
+                home_touch_slot = -1;
+                if (livearea_deck.tab_count() > 0 && !edit_visual.edit_mode
+                    && std::abs(dx_total) > std::abs(dy_total) * 1.15f) {
+                    home_horiz_drag = true;
+                    livearea_deck.begin_horizontal_drag(px);
+                } else if (livearea_deck.is_home_active()) {
+                    home_drag_moved = true;
+                    home_scroll.begin_drag();
+                }
+            }
+            if (home_horiz_drag) {
+                livearea_deck.update_horizontal_drag(px, dt);
+            } else if (home_drag_moved) {
+                home_scroll.drag_by(py - home_drag_last_y, dt);
+            }
+            home_drag_last_x = px;
+            home_drag_last_y = py;
+            home_drag_last_event_ns = event_ns;
+            return 1;
+        }
+
         if (action == AMOTION_EVENT_ACTION_UP || action == AMOTION_EVENT_ACTION_CANCEL) {
+            if (peeker_peel_drag) {
+                peeker_peel_drag = false;
+                const auto res = livearea_deck.end_peel_drag(action == AMOTION_EVENT_ACTION_CANCEL);
+                if (res == emucorev::paf::LiveAreaPeelEndResult::started_close) {
+                    emit_ui_sound(sound_page_turn);
+                }
+                return 1;
+            }
+            if (edit_drag_active) {
+                edit_drag_active = false;
+                if (action == AMOTION_EVENT_ACTION_UP) {
+                    const auto [dp, ds] = hit_test_home_slot(px, py, 76.f);
+                    if (dp >= 0 && (dp != edit_drag_src_page || ds != edit_drag_src_slot)) {
+                        const auto* src_e = desktop.entry_at(edit_drag_src_page, edit_drag_src_slot);
+                        const bool allow_folder = src_e && src_e->kind == emucorev::paf::HomeEntryKind::app;
+                        if (desktop.drop_onto_slot(edit_drag_src_page, edit_drag_src_slot,
+                                dp, ds, allow_folder, "New Folder")) {
+                            sync_visual_slots_with_desktop();
+                            home_scroll.set_page_count(desktop.page_count());
+                            persist_home_layout();
+                            emit_ui_sound(sound_decide);
+                        }
+                    }
+                }
+                edit_drag_src_page = -1;
+                edit_drag_src_slot = -1;
+                return 1;
+            }
+            if (topbar_drag) {
+                topbar_drag = false;
+                if (action == AMOTION_EVENT_ACTION_UP
+                    && std::hypot(px - home_touch_start.x, py - home_touch_start.y) < 28.f) {
+                    const int count = 1 + livearea_deck.tab_count();
+                    const float pitch = 32.f;
+                    const float start_x = 480.f - static_cast<float>(count) * pitch * 0.5f;
+                    const int idx = static_cast<int>(std::floor((px - start_x) / pitch));
+                    if (idx == 0) {
+                        if (livearea_deck.slide_to_home()) emit_ui_sound(sound_page_scroll);
+                    } else if (idx > 0 && idx - 1 < livearea_deck.tab_count()) {
+                        if (livearea_deck.slide_to_tab(idx - 1)) emit_ui_sound(sound_page_scroll);
+                    }
+                }
+                return 1;
+            }
+            if (home_horiz_drag) {
+                home_horiz_drag = false;
+                const int prev = livearea_deck.active_tab_index();
+                const int next_page = livearea_deck.end_horizontal_drag();
+                if (next_page - 1 != prev) emit_ui_sound(sound_page_scroll);
+                return 1;
+            }
             if (home_drag_moved) {
                 const int old_page = home_page;
                 const int next_page = home_scroll.end_drag();
                 home_page = next_page;
                 if (next_page != old_page) emit_ui_sound(sound_page_scroll);
-                const int p_first = next_page * emucorev::paf::kHomeSlotsPerPage;
-                const int p_last = std::min<int>(
-                    p_first + emucorev::paf::kHomeSlotsPerPage, static_cast<int>(home_bubbles.size()));
-                if (home_focus < p_first || home_focus >= p_last) home_focus = p_first;
-            } else if (action == AMOTION_EVENT_ACTION_UP && home_touch >= 0
+                const auto first_occ = desktop.find_first_occupied(next_page);
+                if (home_focus_page != next_page) {
+                    home_focus_page = first_occ.first;
+                    home_focus_slot = first_occ.second;
+                }
+            } else if (action == AMOTION_EVENT_ACTION_UP
                 && std::hypot(px - home_touch_start.x, py - home_touch_start.y) < 30.f) {
-                home_focus = home_touch;
-                emit_ui_sound(sound_decide);
-                open_livearea(static_cast<std::size_t>(home_touch));
+                if (!edit_visual.edit_mode) {
+                    if (livearea_deck.pager_position() > 0.25f && px < 64.f && py >= 220.f && py <= 356.f) {
+                        if (livearea_deck.slide_left()) emit_ui_sound(sound_page_scroll);
+                        home_touch_down = false;
+                        return 1;
+                    }
+                    if (livearea_deck.tab_count() > 0
+                        && livearea_deck.pager_position() < static_cast<float>(livearea_deck.tab_count()) - 0.25f
+                        && px > 896.f && py >= 220.f && py <= 356.f) {
+                        if (livearea_deck.slide_right()) emit_ui_sound(sound_page_scroll);
+                        home_touch_down = false;
+                        return 1;
+                    }
+                }
+                if (!livearea_deck.is_home_active()) {
+                    std::string target;
+                    if (livearea_target_at(px, py, target)) {
+                        emit_ui_sound(sound_decide);
+                        emit_livearea_target_request(target);
+                    }
+                } else if (home_touch_page >= 0 && home_touch_slot >= 0) {
+                    home_focus_page = home_touch_page;
+                    home_focus_slot = home_touch_slot;
+                    open_entry_at(home_touch_page, home_touch_slot, px, py);
+                }
             }
-            home_touch = -1;
+            home_touch_down = false;
+            home_touch_page = -1;
+            home_touch_slot = -1;
             home_drag_moved = false;
             return 1;
         }
         return 0;
-    }
-
-    int32_t handle_livearea_input(AInputEvent* event) {
-        if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
-            if (AKeyEvent_getAction(event) != AKEY_EVENT_ACTION_DOWN || AKeyEvent_getRepeatCount(event) != 0)
-                return 0;
-            const int key = AKeyEvent_getKeyCode(event);
-            if (key == AKEYCODE_BACK || key == AKEYCODE_BUTTON_B || key == AKEYCODE_ESCAPE) {
-                close_livearea();
-                return 1;
-            }
-            if (key == AKEYCODE_BUTTON_A || key == AKEYCODE_ENTER) {
-                // The host records this preview intent for inspection; it
-                // does not dispatch to the emulator or an external handler.
-                if (ensure_livearea_snapshot() && !livearea_snapshot->targets.empty())
-                    emit_livearea_target_request(livearea_snapshot->targets.front().id);
-                return 1;
-            }
-            return 0;
-        }
-        if (AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION) return 0;
-        const int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
-        if (action != AMOTION_EVENT_ACTION_UP) return 1;
-        EGLint width = 0, height = 0;
-        eglQuerySurface(display, surface, EGL_WIDTH, &width);
-        eglQuerySurface(display, surface, EGL_HEIGHT, &height);
-        if (width <= 0 || height <= 0) return 0;
-        const float scale = std::min((width - 32.f) / preview_width, (height - 32.f) / preview_height);
-        const float ox = (width - preview_width * scale) * .5f;
-        const float oy = (height - preview_height * scale) * .5f;
-        const float px = (AMotionEvent_getX(event, 0) - ox) / scale;
-        const float py = (AMotionEvent_getY(event, 0) - oy) / scale;
-        // Taps on declared LiveArea target bounds are recorded by the host as
-        // preview intents; they are never dispatched to an emulator/browser.
-        std::string target;
-        if (livearea_target_at(px, py, target)) emit_livearea_target_request(target);
-        return 1;
     }
 
     void update_lock_fold(emucorev::paf::PagePoint point) {
@@ -1045,7 +1990,7 @@ struct Window {
         return home_visible || lock_anim_state == LockAnimState::peeling;
     }
 
-    bool is_livearea_visible() const noexcept { return livearea_visible; }
+    bool is_livearea_visible() const noexcept { return livearea_deck.is_livearea_visible(); }
 
     void ensure_wave() {
         std::string theme_name;
@@ -1124,8 +2069,7 @@ struct Window {
 
     int32_t handle_input(AInputEvent* event) {
         if (preview_scene.load() == 4) return handle_wave_input(event);
-        if (home_visible) return livearea_visible
-            ? handle_livearea_input(event) : handle_home_input(event);
+        if (home_visible) return handle_shell_input(event);
         if (lock_anim_state == LockAnimState::peeling) return 1;
         if (AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION) return 0;
         const int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
@@ -1180,6 +2124,7 @@ struct Window {
                     : emucorev::paf::page_turn_release({dx, dy}, 280.f, false, false);
                 if (release == emucorev::paf::PageTurnRelease::beyond_threshold) {
                     lock_anim_state = LockAnimState::peeling;
+                    home_enter_elapsed = 0.f;
                     lock_page_alpha = 1.f;
                     lock_exit_z = 0.f;
                     anim_elapsed = 0.f;
@@ -1225,26 +2170,47 @@ struct Window {
 
     void draw_status(std::uint32_t charging_texture) {
         const std::lock_guard lock(status_mutex);
-        sprites->begin(960, 544);
-        if (!sprites->draw(status_bar_bg_id, 0, 0, 960, 32)) {
-            sprites->draw(0, 0, 0, 960, 32, {0, 0, 0, 0.5f});
-        }
         const int scene = preview_scene.load();
+        const float bar_y = (scene == 3 || home_visible)
+            ? (-32.f * edit_visual.edit_blend) : 0.f;
+        if (bar_y <= -31.5f) return;
+
+        sprites->begin(960, 544);
+        if (!sprites->draw(status_bar_bg_id, 0, bar_y, 960, 32)) {
+            sprites->draw(0, 0, bar_y, 960, 32, {0, 0, 0, 0.5f});
+        }
         const bool show_home_chrome = (scene == 3)
             || (scene == 2 && (home_visible || lock_anim_state == LockAnimState::peeling));
 
         if (show_home_chrome) {
-            if (livearea_visible) {
-                sprites->draw(status_home_icon_id, 454, 3, 28, 26);
-                if (livearea_snapshot && livearea_snapshot->gate_id) {
-                    sprites->draw(livearea_snapshot->gate_id, 486, 4, 24, 24);
+            const int open_tabs = livearea_deck.tab_count();
+            const int total_items = 1 + open_tabs;
+            constexpr float strip_pitch = 32.f;
+            const float strip_start = 480.f - static_cast<float>(total_items) * strip_pitch * 0.5f;
+            const float home_alpha = livearea_deck.is_home_active() ? 1.f : 0.45f;
+            sprites->draw(status_home_icon_id, strip_start + 2.f, bar_y + 3.f, 28.f, 26.f,
+                {1.f, 1.f, 1.f, home_alpha});
+            for (int i = 0; i < open_tabs; ++i) {
+                const auto& tab = livearea_deck.tabs()[static_cast<std::size_t>(i)];
+                if (tab.catalog_index < 0) continue;
+                const float chip_alpha = (livearea_deck.active_tab_index() == i) ? 1.f : 0.55f;
+                const float cx = strip_start + static_cast<float>(1 + i) * strip_pitch + 3.f;
+                const std::uint32_t chip_id = home_chip_image_base
+                    + static_cast<std::uint32_t>(tab.catalog_index);
+                if (!sprites->draw(chip_id, cx, bar_y + 3.f, 26.f, 26.f,
+                        {1.f, 1.f, 1.f, chip_alpha})) {
+                    const auto snap_it = livearea_catalog.find(tab.title_id);
+                    if (snap_it != livearea_catalog.end() && snap_it->second.gate_id) {
+                        sprites->draw(snap_it->second.gate_id, cx, bar_y + 4.f, 24.f, 24.f,
+                            {1.f, 1.f, 1.f, chip_alpha});
+                    }
                 }
-            } else {
-                sprites->draw(status_home_icon_id, 466, 3, 28, 26);
             }
-            sprites->draw(status_notif_orb_idle_id, 888, 0, 72, 70);
+            sprites->draw(status_notif_orb_idle_id, 888, bar_y, 72, 70);
             const float glow_alpha = 0.03f + 0.08f * (0.5f + 0.5f * std::sin(status_orb_phase));
-            sprites->draw(status_notif_orb_glow_id, 888, 0, 72, 70, {1.f, 1.f, 1.f, glow_alpha});
+            sprites->set_additive_blend(true);
+            sprites->draw(status_notif_orb_glow_id, 888, bar_y, 72, 70, {1.f, 1.f, 1.f, glow_alpha});
+            sprites->set_additive_blend(false);
         }
 
         constexpr std::array<std::uint32_t, 5> battery{
@@ -1256,58 +2222,62 @@ struct Window {
         const std::array<float, 4> bat_tint = status.charging
             ? std::array<float, 4>{0.72f, 1.f, 0.72f, 1.f}
             : std::array<float, 4>{1.f, 1.f, 1.f, 1.f};
-        sprites->draw(battery_id, bat_x, 2, 48, 28, bat_tint);
+        sprites->draw(battery_id, bat_x, bar_y + 2.f, 48, 28, bat_tint);
         if (charging_texture && status.charging && status.battery_percent >= 0 && status.battery_percent < 100)
-            sprites->draw(charging_texture, bat_x, 2, 48, 28, bat_tint);
+            sprites->draw(charging_texture, bat_x, bar_y + 2.f, 48, 28, bat_tint);
         if (const auto clock = host_images.find(1); clock != host_images.end()) {
             const float clock_right = show_home_chrome ? 824.f : 902.f;
-            sprites->draw(1, clock_right - float(clock->second.width), 0,
+            sprites->draw(1, clock_right - float(clock->second.width), bar_y,
                 float(clock->second.width), float(clock->second.height));
         }
         float left = 8;
         if (status.wifi_enabled == emucorev::paf::RadioState::on && status.wifi_connected) {
             constexpr std::array<std::uint32_t, 4> wifi{0x89dc8410, 0x2278fb2a, 0xee958f99, 0xa13376bc};
-            // Android's four-bin RSSI scale. Original Vita radio service is
-            // intentionally absent; unknown RSSI does not fabricate strength.
             const int level = status.wifi_rssi == INT32_MIN ? 0
                 : std::clamp((std::clamp(status.wifi_rssi, -100, -55) + 100) * 3 / 45, 0, 3);
-            sprites->draw(wifi[level], left, 4, 23, 24);
+            sprites->draw(wifi[level], left, bar_y + 4.f, 23, 24);
             left += 31;
         }
         if (status.bluetooth_enabled == emucorev::paf::RadioState::on)
-            sprites->draw(0xca76be07, left, 4, 19, 24);
+            sprites->draw(0xca76be07, left, bar_y + 4.f, 19, 24);
+    }
+
+    void upload_lock_texture_slot(std::uint32_t id, std::size_t slot, GLuint& texture) {
+        const auto image = host_images.find(id);
+        if (image == host_images.end()) return;
+        const auto& source = image->second;
+        if (texture && lock_texture_revisions[slot] == source.revision) return;
+        if (!texture) glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        const bool same_size = lock_texture_widths[slot] == source.width
+            && lock_texture_heights[slot] == source.height;
+        if (same_size && lock_texture_revisions[slot] != 0) {
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, source.width, source.height,
+                GL_RGBA, GL_UNSIGNED_BYTE, source.rgba.data());
+        } else {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, source.width, source.height, 0,
+                GL_RGBA, GL_UNSIGNED_BYTE, source.rgba.data());
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        }
+        lock_texture_widths[slot] = source.width;
+        lock_texture_heights[slot] = source.height;
+        lock_texture_revisions[slot] = source.revision;
+    }
+
+    void ensure_exp_texture() {
+        const std::lock_guard lock_guard(status_mutex);
+        upload_lock_texture_slot(102, 2, lock_exp);
     }
 
     void ensure_lock_textures() {
         const std::lock_guard lock_guard(status_mutex);
-        auto make = [&](std::uint32_t id, std::size_t slot, GLuint& texture) {
-            const auto image = host_images.find(id);
-            if (image == host_images.end()) return;
-            const auto& source = image->second;
-            if (texture && lock_texture_revisions[slot] == source.revision) return;
-            if (!texture) glGenTextures(1, &texture);
-            glBindTexture(GL_TEXTURE_2D, texture);
-            const bool same_size = lock_texture_widths[slot] == source.width
-                && lock_texture_heights[slot] == source.height;
-            if (same_size && lock_texture_revisions[slot] != 0) {
-                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, source.width, source.height,
-                    GL_RGBA, GL_UNSIGNED_BYTE, source.rgba.data());
-            } else {
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, source.width, source.height, 0,
-                    GL_RGBA, GL_UNSIGNED_BYTE, source.rgba.data());
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            }
-            lock_texture_widths[slot] = source.width;
-            lock_texture_heights[slot] = source.height;
-            lock_texture_revisions[slot] = source.revision;
-        };
-        make(100, 0, lock_page);
-        make(101, 1, lock_corner);
-        make(102, 2, lock_exp);
-        make(lock_empty_bg_image_id, 3, lock_empty_bg);
+        upload_lock_texture_slot(100, 0, lock_page);
+        upload_lock_texture_slot(101, 1, lock_corner);
+        upload_lock_texture_slot(102, 2, lock_exp);
+        upload_lock_texture_slot(lock_empty_bg_image_id, 3, lock_empty_bg);
         lock_ready = lock_page && lock_corner && lock_exp && lock_empty_bg;
     }
 
@@ -1437,24 +2407,14 @@ struct Window {
         upload_images();
         if (preview_scene.load() == 2) {
             if (lock_needs_background()) {
-                if (livearea_visible) {
-                    sprites->begin(960, 544);
-                    draw_livearea();
-                } else {
-                    draw_wave();
-                    draw_home_bubbles();
-                }
+                draw_wave();
+                draw_livearea_and_home_composition();
             }
             draw_lock();
             draw_status(charging_texture);
         } else if (preview_scene.load() == 3) {
-            if (livearea_visible) {
-                sprites->begin(960, 544);
-                draw_livearea();
-            } else {
-                draw_wave();
-                draw_home_bubbles();
-            }
+            draw_wave();
+            draw_livearea_and_home_composition();
             draw_status(charging_texture);
         } else if (preview_scene.load() == 4) {
             draw_wave();
@@ -1554,12 +2514,11 @@ struct Preview {
                             preview.window->set_phase(preview.phase);
                         } else if (preview_scene.load() == 2 && preview.window) {
                             preview.window->tick_lock(elapsed);
-                            if (preview.window->lock_needs_background()
-                                && !preview.window->is_livearea_visible())
+                            if (preview.window->lock_needs_background())
                                 preview.window->tick_wave(elapsed);
                         } else if (preview_scene.load() == 3 && preview.window) {
                             preview.window->tick_home(elapsed);
-                            if (!preview.window->is_livearea_visible()) preview.window->tick_wave(elapsed);
+                            preview.window->tick_wave(elapsed);
                         } else if (preview_scene.load() == 4 && preview.window) {
                             preview.window->tick_wave(elapsed);
                         }
@@ -1826,7 +2785,10 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeCatalog(JNIEnv*
         const auto sound_cb = activity_class
             ? env->GetMethodID(activity_class, "onNativeUiSound", "(I)V") : nullptr;
         if (env->ExceptionCheck()) env->ExceptionClear();
-        jobject activity_global = (callback || sound_cb) ? env->NewGlobalRef(activity) : nullptr;
+        const auto save_cb = activity_class
+            ? env->GetMethodID(activity_class, "onNativeSaveHomeLayout", "(Ljava/lang/String;)V") : nullptr;
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        jobject activity_global = (callback || sound_cb || save_cb) ? env->NewGlobalRef(activity) : nullptr;
         if (activity_class) env->DeleteLocalRef(activity_class);
         if (activity_global && vm) {
             const std::lock_guard lock_guard(status_mutex);
@@ -1835,6 +2797,7 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeCatalog(JNIEnv*
             preview_activity_ref = activity_global;
             livearea_target_callback = callback;
             ui_sound_callback = sound_cb;
+            save_home_layout_callback = save_cb;
         } else if (activity_global) env->DeleteGlobalRef(activity_global);
     } catch (const std::exception& error) {
         env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), error.what());
@@ -1945,11 +2908,25 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeLiveArea(JNIEnv
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeLoadHomeLayout(JNIEnv* env, jobject, jstring layout) {
+    if (!layout) return;
+    const char* text = env->GetStringUTFChars(layout, nullptr);
+    if (!text) return;
+    {
+        const std::lock_guard lock_guard(status_mutex);
+        persisted_home_layout = text;
+        ++persisted_home_layout_revision;
+    }
+    env->ReleaseStringUTFChars(layout, text);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeReleaseHomeCallback(JNIEnv* env, jobject) {
     const std::lock_guard lock_guard(status_mutex);
     if (preview_activity_ref) env->DeleteGlobalRef(preview_activity_ref);
     preview_activity_ref = nullptr;
     livearea_target_callback = nullptr;
     ui_sound_callback = nullptr;
+    save_home_layout_callback = nullptr;
     preview_java_vm = nullptr;
 }

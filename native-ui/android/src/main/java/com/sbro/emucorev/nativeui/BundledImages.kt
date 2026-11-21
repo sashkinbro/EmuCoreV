@@ -6,6 +6,9 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
 import android.text.TextPaint
 import android.text.Layout
 import android.text.StaticLayout
@@ -111,10 +114,17 @@ class BundledImages(
         listOf("ca76be07", "78600544", "4a8ae255", "9e9cfcab", "f85f0b80",
             "56e72f16", "a5aafd9b", "32465c57", "00ea236e", "89dc8410",
             "2278fb2a", "ee958f99", "a13376bc",
-            "bef34d7f", "6821404a", "94de0b89", "fbc7297e").forEach { id ->
+            "bef34d7f", "6821404a", "94de0b89", "fbc7297e",
+            "e062c41f", "fede49bf", "d29cb815").forEach { id ->
             loadPngResource(id.toLong(16).toInt(), "images/indicator_plugin/$id.png")
         }
         loadPngResource(STATUS_HOME_ICON, "images/applauncher_plugin/56aebd5f.png")
+        listOf(
+            TOPMENU_ARROW_LEFT to "images/topmenu_plugin/8ca9d181.png",
+            TOPMENU_ARROW_RIGHT to "images/topmenu_plugin/168e9e6b.png",
+        ).forEach { (id, rel) ->
+            if (File(resources, rel).isFile) loadPngResource(id, rel)
+        }
         loadBusyImage()
         upload(0, 1, 1, byteArrayOf(-1, -1, -1, -1))
     }
@@ -175,55 +185,74 @@ class BundledImages(
         val seenIds = HashSet<String>(games.length())
         val homeRoot = File(resources, "preview/home").canonicalFile
         val homePrefix = homeRoot.path + File.separator
-        for (index in 0 until games.length()) {
-            val game = games.getJSONObject(index)
-            val id = game.getString("id")
-            val title = game.getString("title")
-            val contentId = game.getString("contentId")
-            require(id.isNotBlank() && title.isNotBlank()) {
-                "Home catalog contains an empty game field"
+        val chipMask = File(resources, "images/indicator_plugin/fbc7297e.png")
+            .takeIf { it.isFile }
+            ?.inputStream()?.use { BitmapFactory.decodeStream(it) }
+        try {
+            for (index in 0 until games.length()) {
+                val game = games.getJSONObject(index)
+                val id = game.getString("id")
+                val title = game.getString("title")
+                val contentId = game.getString("contentId")
+                require(id.isNotBlank() && title.isNotBlank()) {
+                    "Home catalog contains an empty game field"
+                }
+                require(seenIds.add(id)) { "Home catalog contains duplicate id: $id" }
+                val iconPath = File(homeRoot, game.getString("icon")).canonicalFile
+                require(iconPath.path.startsWith(homePrefix) && iconPath.isFile) {
+                    "Invalid Home catalog icon path"
+                }
+                val iconImageId = HOME_ICON_IMAGE_BASE + index
+                val labelImageId = HOME_LABEL_IMAGE_BASE + index
+                val icon = iconPath.inputStream().use { requireNotNull(BitmapFactory.decodeStream(it)) }
+                try {
+                    send(iconImageId, icon)
+                    val chip = rasterCircularChip(icon, chipMask)
+                    try {
+                        send(HOME_CHIP_IMAGE_BASE + index, chip)
+                    } finally {
+                        chip.recycle()
+                    }
+                } finally {
+                    icon.recycle()
+                }
+                val label = rasterHomeTitle(title)
+                try {
+                    send(labelImageId, label)
+                } finally {
+                    label.recycle()
+                }
+                entries += HomeCatalogEntry(
+                    id = id,
+                    title = title,
+                    contentId = contentId,
+                    iconImageId = iconImageId,
+                    labelImageId = labelImageId,
+                    liveAreaTemplate = game.optJSONObject("liveArea")?.optString("template")?.takeIf { it.isNotBlank() },
+                    liveAreaImages = game.optJSONObject("liveArea")?.optJSONArray("images")?.let { array ->
+                        (0 until array.length()).map { array.getString(it) }
+                    } ?: emptyList(),
+                )
             }
-            require(seenIds.add(id)) { "Home catalog contains duplicate id: $id" }
-            val iconPath = File(homeRoot, game.getString("icon")).canonicalFile
-            require(iconPath.path.startsWith(homePrefix) && iconPath.isFile) {
-                "Invalid Home catalog icon path"
-            }
-            val iconImageId = HOME_ICON_IMAGE_BASE + index
-            val labelImageId = HOME_LABEL_IMAGE_BASE + index
-            val icon = iconPath.inputStream().use { requireNotNull(BitmapFactory.decodeStream(it)) }
-            try {
-                send(iconImageId, icon)
-            } finally {
-                icon.recycle()
-            }
-            val label = rasterHomeTitle(title)
-            try {
-                send(labelImageId, label)
-            } finally {
-                label.recycle()
-            }
-            entries += HomeCatalogEntry(
-                id = id,
-                title = title,
-                contentId = contentId,
-                iconImageId = iconImageId,
-                labelImageId = labelImageId,
-                liveAreaTemplate = game.optJSONObject("liveArea")?.optString("template")?.takeIf { it.isNotBlank() },
-                liveAreaImages = game.optJSONObject("liveArea")?.optJSONArray("images")?.let { array ->
-                    (0 until array.length()).map { array.getString(it) }
-                } ?: emptyList(),
-            )
+        } finally {
+            chipMask?.recycle()
         }
-        // Original Home shell RCO chrome: focus halo quadrant, page dots, and Home house icon.
+        // Original Home shell RCO chrome: focus halo quadrant, page dots, edit/folder chrome, Home house.
         listOf(
             HOME_FOCUS_GLOW_IMAGE to "images/applauncher_plugin/a952ef1e.png",
             HOME_FOCUS_RING_IMAGE to "images/applauncher_plugin/cf115394.png",
             HOME_PAGE_DOT_ACTIVE to "images/applauncher_plugin/21ad6d05.png",
             HOME_PAGE_DOT_INACTIVE to "images/applauncher_plugin/266627f6.png",
             STATUS_HOME_ICON to "images/applauncher_plugin/56aebd5f.png",
+            EDIT_NEW_PAGE_ICON to "images/applauncher_plugin/23ab06c5.png",
+            EDIT_WALLPAPER_ICON to "images/applauncher_plugin/02024c2c.png",
+            FOLDER_PANEL_BG to "images/applauncher_plugin/d8cdfae1.png",
+            FOLDER_ICON to "images/applauncher_plugin/e35fe13a.png",
+            FOLDER_TITLE_PILL to "images/applauncher_plugin/f1455f7e.png",
         ).forEach { (id, relPath) ->
             if (File(resources, relPath).isFile) loadPngResource(id, relPath)
         }
+        loadHomeEditLabels()
         onLoaded(entries)
         return entries
     }
@@ -232,11 +261,11 @@ class BundledImages(
         listOf(
             0xca6a6db1.toInt() to "images/livearea_plugin/ca6a6db1.png",
             0x1e6a33de to "images/livearea_plugin/1e6a33de.png",
+            LIVEAREA_GATE_GLOW_IMAGE to "images/livearea_plugin/d5dd35e7.png",
+            EDIT_BACK_ICON to "images/livearea_plugin/2cac72e8.png",
+            EXP_MINUS_IMAGE to "effects/lookups/exp-minus.png",
         ).forEach { (imageId, path) ->
-            val bitmap = File(resources, path).inputStream().use {
-                requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled LiveArea chrome image: $path" }
-            }
-            try { send(imageId, bitmap) } finally { bitmap.recycle() }
+            if (File(resources, path).isFile) loadPngResource(imageId, path)
         }
     }
 
@@ -289,9 +318,10 @@ class BundledImages(
         }
         val document = builder.parse(InputSource(ByteArrayInputStream(templateBytes)))
         val root = document.documentElement
-        require(root.tagName == "livearea" && root.getAttribute("style") == "a3") {
-            "Unsupported LiveArea template style for ${entry.id}"
+        require(root.tagName == "livearea") {
+            "Unsupported LiveArea root tag for ${entry.id}"
         }
+        val styleSpec = LiveAreaStyles.resolve(root.getAttribute("style"))
         var nextImageId = LIVEAREA_IMAGE_BASE + gameIndex * LIVEAREA_IMAGE_SLOTS_PER_GAME
         fun uploadAsset(relative: String): Pair<Int, Bitmap> {
             require(relative in allowedImages) { "LiveArea asset is not listed by the catalog: $relative" }
@@ -311,7 +341,7 @@ class BundledImages(
             return imageId to bitmap
         }
 
-        val backgroundRect = A3Layout.backgroundRect
+        val backgroundRect = styleSpec.backgroundRect
         val backgroundOptions = root.children("livearea-background").firstOrNull()
             ?.children("image").orEmpty().map { element ->
                 LiveAreaBackground(
@@ -339,8 +369,7 @@ class BundledImages(
         gatePair?.second?.recycle()
 
         var gateStartLabelImageId = 0
-        if (gateId != 0) {
-            require(gateStartLabel.isNotBlank()) { "Home gate label is empty for ${entry.id}" }
+        if (gateStartLabel.isNotBlank()) {
             require(nextImageId < LIVEAREA_IMAGE_BASE + (gameIndex + 1) * LIVEAREA_IMAGE_SLOTS_PER_GAME) {
                 "Too many LiveArea images for ${entry.id}"
             }
@@ -360,16 +389,12 @@ class BundledImages(
         val textColors = ArrayList<Int>()
         val targetIds = ArrayList<String>()
         val targetRects = ArrayList<Float>()
-        if (gateId != 0) {
-            targetIds += entry.id
-            targetRects += A3Layout.gateRect.toList()
-        }
+        targetIds += entry.id
+        targetRects += styleSpec.gateRect.toList()
 
         for (frame in root.children("frame")) {
             val frameId = frame.getAttribute("id")
-            val frameRect = A3Layout.frameRects[frameId] ?: continue
-            val frameWidth = frameRect[2]
-            val frameHeight = frameRect[3]
+            val frameRect = styleSpec.frameRects[frameId] ?: continue
             for (liveItem in frame.children("liveitem")) {
                 val imageElement = liveItem.children("image").firstOrNull()
                 if (imageElement != null) {
@@ -377,7 +402,7 @@ class BundledImages(
                     if (relative.isNotBlank()) {
                         val pair = uploadAsset("livearea/${entry.id}/$relative")
                         val bitmap = pair.second
-                        val rect = A3Layout.imageRect(frameId, imageElement, bitmap.width, bitmap.height)
+                        val rect = styleSpec.imageRect(frameId, imageElement, bitmap.width, bitmap.height)
                         bitmap.recycle()
                         frameImageIds += pair.first
                         frameRects += rect.toList()
@@ -398,7 +423,7 @@ class BundledImages(
                         }
                         val textBitmap = rasterLiveAreaText(content, size)
                         try {
-                            val rect = A3Layout.textRect(
+                            val rect = styleSpec.textRect(
                                 frameRect, textBitmap.width.toFloat(), textBitmap.height.toFloat(),
                                 align, valign, yOffset,
                             )
@@ -429,7 +454,7 @@ class BundledImages(
             backgroundImageId = backgroundId,
             backgroundRect = if (backgroundId == 0) FloatArray(4) else backgroundRect,
             gateImageId = gateId,
-            gateRect = if (gateId == 0) FloatArray(4) else A3Layout.gateRect,
+            gateRect = if (gateId == 0) FloatArray(4) else styleSpec.gateRect,
             gateStartLabelImageId = gateStartLabelImageId,
             gateControlImageId = if (gateId == 0) 0 else LIVEAREA_START_CONTROL_IMAGE,
             frameImageIds = frameImageIds.toIntArray(),
@@ -471,20 +496,59 @@ class BundledImages(
 
     private data class LiveAreaBackground(val file: String, val language: String, val isDefault: Boolean)
 
-    /** A3 geometry corroborated by ECV/gui/live_area.cpp (960x544 top-left space). */
-    private object A3Layout {
+    private fun rasterCircularChip(icon: Bitmap, mask: Bitmap?): Bitmap {
+        val size = 48
+        val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        canvas.drawBitmap(icon, null, Rect(0, 0, size, size), paint)
+        if (mask != null) {
+            paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+            canvas.drawBitmap(mask, null, Rect(0, 0, size, size), paint)
+        }
+        return out
+    }
+
+    private fun rasterSingleLineLabel(text: String, textSizePx: Float, widthPx: Int, heightPx: Int): Bitmap {
+        val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = textSizePx
+            typeface = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
+            setShadowLayer(2.0f, 0f, 1.2f, 0xCC000000.toInt())
+        }
+        val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+        val baseline = (heightPx.toFloat() - (paint.descent() + paint.ascent())) * 0.5f
+        val x = ((widthPx.toFloat() - paint.measureText(text)) * 0.5f).coerceAtLeast(2f)
+        Canvas(bitmap).drawText(text, x, baseline, paint)
+        return bitmap
+    }
+
+    private fun loadHomeEditLabels() {
+        val isUk = Locale.getDefault().language.lowercase(Locale.ROOT) == "uk"
+        val folderTitle = rasterHomeTitle(if (isUk) "Папка" else "Folder")
+        try { send(FOLDER_LABEL_IMAGE, folderTitle) } finally { folderTitle.recycle() }
+
+        val createFolder = rasterSingleLineLabel(
+            if (isUk) "Створити папку" else "Create Folder", 18f, 188, 42)
+        try { send(EDIT_CREATE_FOLDER_LABEL, createFolder) } finally { createFolder.recycle() }
+
+        val ungroup = rasterSingleLineLabel(
+            if (isUk) "Розгрупувати" else "Ungroup", 18f, 188, 42)
+        try { send(EDIT_UNGROUP_LABEL, ungroup) } finally { ungroup.recycle() }
+
+        val done = rasterSingleLineLabel(
+            if (isUk) "Готово" else "Done", 18f, 128, 36)
+        try { send(EDIT_DONE_LABEL, done) } finally { done.recycle() }
+    }
+
+    private class LiveAreaStyleSpec(
+        val gateRect: FloatArray,
+        val frameRects: Map<String, FloatArray>,
+    ) {
         val backgroundRect = floatArrayOf(60f, 44f, 840f, 500f)
-        val gateRect = floatArrayOf(340f, 149f, 280f, 158f)
-        val frameRects = mapOf(
-            "frame1" to floatArrayOf(60f, 130f, 260f, 200f),
-            "frame2" to floatArrayOf(640f, 130f, 260f, 200f),
-            "frame3" to floatArrayOf(60f, 330f, 260f, 210f),
-            "frame4" to floatArrayOf(320f, 330f, 320f, 210f),
-            "frame5" to floatArrayOf(640f, 330f, 260f, 210f),
-        )
 
         fun imageRect(frameId: String, element: Element, sourceWidth: Int, sourceHeight: Int): FloatArray {
-            val frame = requireNotNull(frameRects[frameId]) { "Unsupported a3 frame: $frameId" }
+            val frame = requireNotNull(frameRects[frameId]) { "Unsupported frame: $frameId" }
             val width = minOf(sourceWidth.toFloat(), frame[2])
             val height = minOf(sourceHeight.toFloat(), frame[3])
             val xOffset = element.getAttribute("x").toFloatOrNull() ?: 0f
@@ -528,6 +592,94 @@ class BundledImages(
         }
     }
 
+    /** Reconstructed LiveArea A1..A5 / Browser / CM / PSMobile coordinate specs from live_area.cpp. */
+    private object LiveAreaStyles {
+        private fun rect(posX: Float, posY: Float, w: Float, h: Float) =
+            floatArrayOf(960f - posX, 544f - posY, w, h)
+
+        private val specs = mapOf(
+            "a1" to LiveAreaStyleSpec(
+                gateRect = rect(620f, 361f, 280f, 158f),
+                frameRects = mapOf(
+                    "frame1" to rect(900f, 414f, 260f, 260f),
+                    "frame2" to rect(320f, 414f, 260f, 260f),
+                    "frame3" to rect(900f, 154f, 840f, 150f),
+                ),
+            ),
+            "a2" to LiveAreaStyleSpec(
+                gateRect = rect(620f, 395f, 280f, 158f),
+                frameRects = mapOf(
+                    "frame1" to rect(900f, 404f, 260f, 400f),
+                    "frame2" to rect(320f, 404f, 260f, 400f),
+                    "frame3" to rect(640f, 204f, 320f, 200f),
+                ),
+            ),
+            "a3" to LiveAreaStyleSpec(
+                gateRect = rect(620f, 395f, 280f, 158f),
+                frameRects = mapOf(
+                    "frame1" to rect(900f, 414f, 260f, 200f),
+                    "frame2" to rect(320f, 414f, 260f, 200f),
+                    "frame3" to rect(900f, 214f, 260f, 210f),
+                    "frame4" to rect(640f, 214f, 320f, 210f),
+                    "frame5" to rect(320f, 214f, 260f, 210f),
+                ),
+            ),
+            "a4" to LiveAreaStyleSpec(
+                gateRect = rect(620f, 395f, 280f, 158f),
+                frameRects = mapOf(
+                    "frame1" to rect(900f, 414f, 260f, 200f),
+                    "frame2" to rect(320f, 414f, 260f, 200f),
+                    "frame3" to rect(900f, 214f, 840f, 70f),
+                    "frame4" to rect(900f, 144f, 840f, 70f),
+                    "frame5" to rect(900f, 74f, 840f, 70f),
+                ),
+            ),
+            "a5" to LiveAreaStyleSpec(
+                gateRect = rect(380f, 395f, 280f, 158f),
+                frameRects = mapOf(
+                    "frame1" to rect(900f, 412f, 480f, 68f),
+                    "frame2" to rect(900f, 344f, 480f, 68f),
+                    "frame3" to rect(900f, 276f, 480f, 68f),
+                    "frame4" to rect(900f, 208f, 480f, 68f),
+                    "frame5" to rect(900f, 140f, 480f, 68f),
+                    "frame6" to rect(900f, 72f, 480f, 68f),
+                    "frame7" to rect(420f, 214f, 360f, 210f),
+                ),
+            ),
+            "browser" to LiveAreaStyleSpec(
+                gateRect = rect(381f, 395f, 280f, 158f),
+                frameRects = mapOf(
+                    "frame1" to rect(890f, 405f, 472f, 50f),
+                    "frame2" to rect(890f, 355f, 472f, 50f),
+                    "frame3" to rect(890f, 305f, 472f, 50f),
+                    "frame4" to rect(890f, 255f, 472f, 50f),
+                    "frame5" to rect(890f, 205f, 472f, 50f),
+                    "frame6" to rect(890f, 155f, 472f, 50f),
+                    "frame7" to rect(890f, 105f, 472f, 50f),
+                    "frame8" to rect(890f, 55f, 472f, 50f),
+                    "frame9" to rect(381f, 223f, 282f, 108f),
+                    "frame10" to rect(381f, 115f, 282f, 108f),
+                ),
+            ),
+            "content_manager" to LiveAreaStyleSpec(
+                gateRect = rect(620f, 361f, 280f, 158f),
+                frameRects = emptyMap(),
+            ),
+            "psmobile" to LiveAreaStyleSpec(
+                gateRect = rect(380f, 345f, 280f, 158f),
+                frameRects = mapOf(
+                    "frame1" to rect(866f, 414f, 446f, 154f),
+                    "frame2" to rect(866f, 249.5f, 446f, 109f),
+                    "frame3" to rect(866f, 119f, 196f, 58f),
+                    "frame4" to rect(866f, 34f, 772f, 30f),
+                ),
+            ),
+        )
+
+        fun resolve(style: String): LiveAreaStyleSpec =
+            specs[style.lowercase(Locale.ROOT)] ?: specs.getValue("a3")
+    }
+
     private fun Element.children(tag: String): List<Element> {
         val result = ArrayList<Element>()
         var child = firstChild
@@ -554,29 +706,56 @@ class BundledImages(
     }
 
     private fun rasterHomeTitle(title: String): Bitmap {
+        // Metrics matched against genuine SceShell Home frames rendered by the
+        // emulated firmware on the same panel (tools/shell-research/completion-fix-home.png):
+        // Rodin LATIN Regular (ltn0) at an effective 19 px em with ~0.5 px glyph
+        // emboldening (IoU 0.70 vs 0.35 for the former plain 18 px), 23 px line
+        // pitch, wrap width between 148 and 159 px, and the LAST line's baseline
+        // anchored 92 px below the bubble centre (two-line titles grow upward).
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = 18f // AppIcon2d uses AppIconBase TextObj font_size 18 (PAF constructor 0x810d8906).
-            typeface = Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
-            setShadowLayer(2.2f, 0f, 1.5f, 0xD8000000.toInt())
+            textSize = HOME_LABEL_TEXT_SIZE
+            typeface = homeTitleTypeface
+            style = Paint.Style.FILL_AND_STROKE
+            strokeWidth = HOME_LABEL_EMBOLDEN
+            strokeJoin = Paint.Join.ROUND
+            setShadowLayer(2.2f, 0.8f, 1.5f, 0xD8000000.toInt())
         }
-        val layout = StaticLayout.Builder.obtain(title, 0, title.length, paint, HOME_LABEL_MAX_WIDTH.toInt())
+        // Wrap greedily into at most two lines; an overflowing second line is
+        // cut at a character boundary with trailing spaces removed before the
+        // ellipsis, as the original shell shows "Speed™ Most…".
+        val width = HOME_LABEL_MAX_WIDTH
+        val wrapped = StaticLayout.Builder.obtain(title, 0, title.length, paint, width.toInt())
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
-            .setMaxLines(2)
-            .setEllipsize(android.text.TextUtils.TruncateAt.END)
             .setIncludePad(false)
             .build()
+        val lines = ArrayList<String>(2)
+        for (line in 0 until minOf(2, wrapped.lineCount)) {
+            val end = if (line == 1) title.length else wrapped.getLineEnd(line)
+            lines += title.substring(wrapped.getLineStart(line), end).trim()
+        }
+        if (lines.size == 2 && (wrapped.lineCount > 2 || paint.measureText(lines[1]) > width)) {
+            var cut = lines[1]
+            while (cut.isNotEmpty() && paint.measureText(cut.trimEnd() + ELLIPSIS) > width) cut = cut.dropLast(1)
+            lines[1] = cut.trimEnd() + ELLIPSIS
+        } else if (lines.size == 1 && paint.measureText(lines[0]) > width) {
+            var cut = lines[0]
+            while (cut.isNotEmpty() && paint.measureText(cut.trimEnd() + ELLIPSIS) > width) cut = cut.dropLast(1)
+            lines[0] = cut.trimEnd() + ELLIPSIS
+        }
         val bitmap = Bitmap.createBitmap(
-            HOME_LABEL_MAX_WIDTH.toInt(), HOME_LABEL_HEIGHT, Bitmap.Config.ARGB_8888,
+            HOME_LABEL_BITMAP_WIDTH, HOME_LABEL_HEIGHT, Bitmap.Config.ARGB_8888,
         )
         val canvas = Canvas(bitmap)
-        // The PAF TextLayout keeps line_pitch at its default (0) and applies a
-        // two-line limit; StaticLayout uses the font's natural line metrics.
-        // Keep the existing provisional first-line baseline until its Shell
-        // wrapper offset is recovered from source.
-        canvas.translate(0f, HOME_LABEL_FIRST_BASELINE - layout.getLineBaseline(0))
-        layout.draw(canvas)
+        lines.forEachIndexed { index, text ->
+            val baseline = HOME_LABEL_LAST_BASELINE - (lines.size - 1 - index) * HOME_LABEL_LINE_PITCH
+            canvas.drawText(text, (HOME_LABEL_BITMAP_WIDTH - paint.measureText(text)) * .5f, baseline, paint)
+        }
         return bitmap
+    }
+
+    private val homeTitleTypeface: Typeface by lazy {
+        Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
     }
 
     fun updateLockClock(status: DeviceStatusSource.Snapshot) {
@@ -712,15 +891,39 @@ class BundledImages(
         const val STATUS_HOME_ICON = 0x56aebd5f
         const val STATUS_NOTIF_ORB_IDLE = 0x6821404a
         const val STATUS_NOTIF_ORB_GLOW = 0x94de0b89.toInt()
+        const val STATUS_NOTIF_ORB_ACTIVE = 0xe062c41f.toInt()
         const val STATUS_APP_CHIP_MASK = 0xfbc7297e.toInt()
+        const val TOPMENU_ARROW_LEFT = 0x8ca9d181.toInt()
+        const val TOPMENU_ARROW_RIGHT = 0x168e9e6b
+        const val EDIT_NEW_PAGE_ICON = 0x23ab06c5
+        const val EDIT_WALLPAPER_ICON = 0x02024c2c
+        const val EDIT_DOTS_BADGE = 0xfede49bf.toInt()
+        const val EDIT_CALLOUT_BG = 0xd29cb815.toInt()
+        const val EDIT_BACK_ICON = 0x2cac72e8
+        const val FOLDER_PANEL_BG = 0xd8cdfae1.toInt()
+        const val FOLDER_ICON = 0xe35fe13a.toInt()
+        const val FOLDER_TITLE_PILL = 0xf1455f7e.toInt()
+        const val LIVEAREA_GATE_GLOW_IMAGE = 0xd5dd35e7.toInt()
         const val LIVEAREA_START_CONTROL_IMAGE = 0x1e6a33de
+        const val HOME_CHIP_IMAGE_BASE = 40000
+        const val FOLDER_LABEL_IMAGE = 45000
+        const val EDIT_CREATE_FOLDER_LABEL = 45001
+        const val EDIT_UNGROUP_LABEL = 45002
+        const val EDIT_DONE_LABEL = 45003
         private const val LIVEAREA_IMAGE_BASE = 3000
         private const val LIVEAREA_IMAGE_SLOTS_PER_GAME = 64
         private const val HOME_CATALOG_MAX_GAMES = 512
         private const val MAX_LIVEAREA_TEMPLATE_BYTES = 1024L * 1024L
         private val DOCTYPE_PATTERN = Regex("<!\\s*DOCTYPE\\b", RegexOption.IGNORE_CASE)
-        private const val HOME_LABEL_MAX_WIDTH = 140f
-        private const val HOME_LABEL_HEIGHT = 52
-        private const val HOME_LABEL_FIRST_BASELINE = 22f
+        private const val HOME_LABEL_MAX_WIDTH = 152f
+        private const val HOME_LABEL_BITMAP_WIDTH = 168
+        private const val HOME_LABEL_HEIGHT = 60
+        // The native renderer places the label bitmap top 40 px below the
+        // bubble centre; the last baseline lands 92 px below it.
+        private const val HOME_LABEL_LAST_BASELINE = 52f
+        private const val HOME_LABEL_TEXT_SIZE = 19f
+        private const val HOME_LABEL_EMBOLDEN = 1.0f
+        private const val HOME_LABEL_LINE_PITCH = 23f
+        private const val ELLIPSIS = "…"
     }
 }

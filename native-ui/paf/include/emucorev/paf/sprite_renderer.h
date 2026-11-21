@@ -17,6 +17,7 @@ public:
     void upload(std::uint32_t id, unsigned width, unsigned height,
         std::span<const std::uint8_t> rgba);
     void begin(float width, float height);
+    void set_additive_blend(bool additive);
     bool draw(std::uint32_t id, float x, float y, float width, float height,
         std::array<float, 4> tint = {1, 1, 1, 1});
     bool draw_patch(std::uint32_t id, float x, float y, float width, float height,
