@@ -1757,4 +1757,17 @@
     <string name="native_ui_no_notifications">لا توجد إشعارات.</string>
     <string name="native_ui_trophies">الجوائز</string>
     <string name="native_ui_settings">الإعدادات</string>
+    <string name="native_ui_trophy_earned">تم الحصول عليها</string>
+    <string name="native_ui_trophy_not_earned">لم يتم الحصول عليها</string>
+    <string name="native_ui_trophy_grade">الدرجة</string>
+    <string name="native_ui_trophy_progress">التقدم</string>
+    <string name="native_ui_trophy_details">التفاصيل</string>
+    <string name="native_ui_trophy_updated">آخر تحديث</string>
+    <string name="native_ui_trophy_system">نظام PS Vita</string>
+    <string name="native_ui_trophy_psn">PlayStation™Network</string>
+    <string name="native_ui_trophy_hidden">جائزة مخفية</string>
+    <string name="native_ui_trophy_platinum">بلاتيني</string>
+    <string name="native_ui_trophy_gold">ذهبي</string>
+    <string name="native_ui_trophy_silver">فضي</string>
+    <string name="native_ui_trophy_bronze">برونزي</string>
 </resources>

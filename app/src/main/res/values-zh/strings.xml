@@ -1731,4 +1731,17 @@
     <string name="native_ui_no_notifications">没有最新资讯。</string>
     <string name="native_ui_trophies">奖杯</string>
     <string name="native_ui_settings">设定</string>
+    <string name="native_ui_trophy_earned">获得日期</string>
+    <string name="native_ui_trophy_not_earned">未获得</string>
+    <string name="native_ui_trophy_grade">Grade（等级）</string>
+    <string name="native_ui_trophy_progress">达成率</string>
+    <string name="native_ui_trophy_details">详细信息</string>
+    <string name="native_ui_trophy_updated">升级日期</string>
+    <string name="native_ui_trophy_system">PS Vita主机</string>
+    <string name="native_ui_trophy_psn">PlayStation™Network</string>
+    <string name="native_ui_trophy_hidden">隐藏奖杯</string>
+    <string name="native_ui_trophy_platinum">白金</string>
+    <string name="native_ui_trophy_gold">金</string>
+    <string name="native_ui_trophy_silver">银</string>
+    <string name="native_ui_trophy_bronze">铜</string>
 </resources>

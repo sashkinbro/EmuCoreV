@@ -1737,4 +1737,17 @@
     <string name="native_ui_no_notifications">कोई सूचना नहीं है।</string>
     <string name="native_ui_trophies">ट्रॉफ़ियाँ</string>
     <string name="native_ui_settings">सेटिंग्स</string>
+    <string name="native_ui_trophy_earned">प्राप्त</string>
+    <string name="native_ui_trophy_not_earned">प्राप्त नहीं</string>
+    <string name="native_ui_trophy_grade">ग्रेड</string>
+    <string name="native_ui_trophy_progress">प्रगति</string>
+    <string name="native_ui_trophy_details">विवरण</string>
+    <string name="native_ui_trophy_updated">अपडेट किया गया</string>
+    <string name="native_ui_trophy_system">PS Vita सिस्टम</string>
+    <string name="native_ui_trophy_psn">PlayStation™Network</string>
+    <string name="native_ui_trophy_hidden">छिपी ट्रॉफ़ी</string>
+    <string name="native_ui_trophy_platinum">प्लैटिनम</string>
+    <string name="native_ui_trophy_gold">गोल्ड</string>
+    <string name="native_ui_trophy_silver">सिल्वर</string>
+    <string name="native_ui_trophy_bronze">ब्रॉन्ज़</string>
 </resources>

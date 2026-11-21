@@ -1748,4 +1748,17 @@
     <string name="native_ui_no_notifications">Nejsou k dispozici žádná oznámení.</string>
     <string name="native_ui_trophies">Trofeje</string>
     <string name="native_ui_settings">Nastavení</string>
+    <string name="native_ui_trophy_earned">Získáno</string>
+    <string name="native_ui_trophy_not_earned">Nezískáno</string>
+    <string name="native_ui_trophy_grade">Stupeň</string>
+    <string name="native_ui_trophy_progress">Postup</string>
+    <string name="native_ui_trophy_details">Podrobnosti</string>
+    <string name="native_ui_trophy_updated">Aktualizováno</string>
+    <string name="native_ui_trophy_system">Systém PS Vita</string>
+    <string name="native_ui_trophy_psn">PlayStation™Network</string>
+    <string name="native_ui_trophy_hidden">Skrytá trofej</string>
+    <string name="native_ui_trophy_platinum">Platinová</string>
+    <string name="native_ui_trophy_gold">Zlatá</string>
+    <string name="native_ui_trophy_silver">Stříbrná</string>
+    <string name="native_ui_trophy_bronze">Bronzová</string>
 </resources>

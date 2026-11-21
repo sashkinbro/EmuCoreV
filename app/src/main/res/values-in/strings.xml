@@ -1733,4 +1733,17 @@
     <string name="native_ui_no_notifications">Tidak ada notifikasi.</string>
     <string name="native_ui_trophies">Trofi</string>
     <string name="native_ui_settings">Pengaturan</string>
+    <string name="native_ui_trophy_earned">Diperoleh</string>
+    <string name="native_ui_trophy_not_earned">Belum diperoleh</string>
+    <string name="native_ui_trophy_grade">Tingkat</string>
+    <string name="native_ui_trophy_progress">Kemajuan</string>
+    <string name="native_ui_trophy_details">Detail</string>
+    <string name="native_ui_trophy_updated">Diperbarui</string>
+    <string name="native_ui_trophy_system">Sistem PS Vita</string>
+    <string name="native_ui_trophy_psn">PlayStation™Network</string>
+    <string name="native_ui_trophy_hidden">Trofi tersembunyi</string>
+    <string name="native_ui_trophy_platinum">Platinum</string>
+    <string name="native_ui_trophy_gold">Emas</string>
+    <string name="native_ui_trophy_silver">Perak</string>
+    <string name="native_ui_trophy_bronze">Perunggu</string>
 </resources>

@@ -6,6 +6,11 @@ import com.sbro.emucorev.MainActivity
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.VitaLaunchBridge
 import com.sbro.emucorev.data.InstalledGameRepository
+import com.sbro.emucorev.data.TrophyRepository
+import com.sbro.emucorev.data.VitaTrophyGrade
+import com.sbro.emucorev.nativeui.shell.ShellTrophy
+import com.sbro.emucorev.nativeui.shell.ShellTrophyGame
+import com.sbro.emucorev.nativeui.shell.ShellTrophySource
 import com.sbro.emucorev.nativeui.BundledImages
 import com.sbro.emucorev.nativeui.shell.NativeShellActivity
 import java.io.File
@@ -36,6 +41,33 @@ class NativeShellHostActivity : NativeShellActivity(), NativeLibraryMode.ReturnT
                 liveAreaRoot = File(game.installPath, "sce_sys/livearea/contents").takeIf(File::isDirectory),
             )
         }
+
+    // Same data the app's achievements screen shows; the shell only reads it.
+    override fun trophySource() = ShellTrophySource {
+        TrophyRepository().list(this).map { set ->
+            ShellTrophyGame(
+                id = set.communicationId,
+                title = set.gameTitle.ifBlank { set.setName },
+                icon = set.gameIconPath?.let(::File),
+                trophies = set.trophies.map { trophy ->
+                    ShellTrophy(
+                        name = trophy.name,
+                        detail = trophy.detail,
+                        grade = when (trophy.grade) {
+                            VitaTrophyGrade.Platinum -> 0
+                            VitaTrophyGrade.Gold -> 1
+                            VitaTrophyGrade.Silver -> 2
+                            else -> 3
+                        },
+                        hidden = trophy.hidden,
+                        unlocked = trophy.unlocked,
+                        unlockedAtEpochSeconds = trophy.unlockedAtEpochSeconds,
+                        icon = trophy.iconPath?.let(::File),
+                    )
+                },
+            )
+        }
+    }
 
     override fun onLiveAreaTarget(titleId: String, target: String) {
         // The gate (Start) target carries the title id; other live items are

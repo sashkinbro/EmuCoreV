@@ -1732,4 +1732,17 @@
     <string name="native_ui_no_notifications">알림이 없습니다.</string>
     <string name="native_ui_trophies">트로피</string>
     <string name="native_ui_settings">설정</string>
+    <string name="native_ui_trophy_earned">획득일</string>
+    <string name="native_ui_trophy_not_earned">미획득</string>
+    <string name="native_ui_trophy_grade">그레이드</string>
+    <string name="native_ui_trophy_progress">달성률</string>
+    <string name="native_ui_trophy_details">상세</string>
+    <string name="native_ui_trophy_updated">갱신일</string>
+    <string name="native_ui_trophy_system">PS Vita 본체</string>
+    <string name="native_ui_trophy_psn">PlayStation™Network</string>
+    <string name="native_ui_trophy_hidden">숨겨진 트로피</string>
+    <string name="native_ui_trophy_platinum">플래티넘</string>
+    <string name="native_ui_trophy_gold">골드</string>
+    <string name="native_ui_trophy_silver">실버</string>
+    <string name="native_ui_trophy_bronze">브론즈</string>
 </resources>

@@ -102,6 +102,14 @@ class BundledImages(
     private var rawKeylock: Bitmap? = null
     private var previousLockText: String? = null
 
+    /** Uploads one pack texture under its resource id (shell applications). */
+    fun loadTexture(id: Int, relativePath: String) {
+        if (File(resources, relativePath).isFile) loadPngResource(id, relativePath)
+    }
+
+    /** Uploads a host raster (shell application rows and headers). */
+    fun uploadBitmap(id: Int, bitmap: Bitmap) = send(id, bitmap)
+
     private fun loadPngResource(id: Int, relativePath: String) {
         val bitmap = File(resources, relativePath).inputStream().use {
             requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled image: $relativePath" }

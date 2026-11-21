@@ -1747,4 +1747,17 @@
     <string name="native_ui_no_notifications">Сповіщення відсутні.</string>
     <string name="native_ui_trophies">Трофеї</string>
     <string name="native_ui_settings">Налаштування</string>
+    <string name="native_ui_trophy_earned">Отримано</string>
+    <string name="native_ui_trophy_not_earned">Не отримано</string>
+    <string name="native_ui_trophy_grade">Категорія</string>
+    <string name="native_ui_trophy_progress">Виконано</string>
+    <string name="native_ui_trophy_details">Подробиці</string>
+    <string name="native_ui_trophy_updated">Оновлено</string>
+    <string name="native_ui_trophy_system">Система PS Vita</string>
+    <string name="native_ui_trophy_psn">PlayStation™Network</string>
+    <string name="native_ui_trophy_hidden">Прихований трофей</string>
+    <string name="native_ui_trophy_platinum">Платиновий</string>
+    <string name="native_ui_trophy_gold">Золотий</string>
+    <string name="native_ui_trophy_silver">Срібний</string>
+    <string name="native_ui_trophy_bronze">Бронзовий</string>
 </resources>

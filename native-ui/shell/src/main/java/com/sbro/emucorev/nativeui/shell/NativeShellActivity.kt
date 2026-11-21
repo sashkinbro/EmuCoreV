@@ -16,6 +16,7 @@ import com.sbro.emucorev.nativeui.DeviceStatusSource
 import com.sbro.emucorev.nativeui.BundledImages
 import com.sbro.emucorev.nativeui.BundledResources
 import com.sbro.emucorev.nativeui.NativeUiSoundBank
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.text.format.DateFormat
 import android.util.Log
@@ -71,6 +72,12 @@ open class NativeShellActivity : NativeActivity() {
     private external fun nativeBackRequested()
     private external fun nativeSafeArea(area: FloatArray)
     private external fun nativeLoadHomeLayout(layout: String)
+    private external fun nativeAppPage(
+        app: String, key: Int, transition: Int, background: Int, header: Int, headerRect: FloatArray,
+        listRect: FloatArray, rowImages: IntArray, rowPlates: IntArray, rowGlows: IntArray,
+        rowGeometry: FloatArray, rowSelectable: BooleanArray, focus: Int,
+    )
+    private external fun nativeAppClose()
     private var lastLiveAreaTarget: String? = null
     @Volatile private var catalogEntries: List<BundledImages.HomeCatalogEntry> = emptyList()
     private val requestedLiveAreas = java.util.Collections.synchronizedSet(HashSet<String>())
@@ -99,6 +106,81 @@ open class NativeShellActivity : NativeActivity() {
     @Suppress("unused")
     fun onNativeExitRequested(reason: String) {
         mainHandler.post { if (!closed.get() && !isFinishing) onExitRequested() }
+    }
+
+    /** Real trophy data for the Trophy Collection application (read only). */
+    protected open fun trophySource(): ShellTrophySource = ShellTrophySource { emptyList() }
+
+    /** Full-screen applications reachable from their LiveArea gate. */
+    protected open fun shellApps(): List<ShellApp> = listOf(TrophyCollectionApp(trophySource()))
+
+    private val apps by lazy { shellApps().associateBy { it.titleId } }
+    @Volatile private var resourceRoot: File? = null
+    private val textureCache = HashMap<Int, Bitmap>()
+    private val uploadedAppTextures = HashSet<Int>()
+    private var pageSerial = 0
+
+    private val appHost = object : ShellAppHost {
+        override val resources: File get() = requireNotNull(resourceRoot) { "Shell resources are not ready" }
+        override fun string(id: Int): String = getString(id)
+        override fun playSound(id: Int) { soundBank?.play(id) }
+        override fun texture(id: Int): Bitmap? = synchronized(textureCache) {
+            textureCache[id] ?: appTexturePath(id)?.let { File(resources, it) }?.let(::decodeFile)
+                ?.also { textureCache[id] = it }
+        }
+        override fun close() {
+            synchronized(nativeBridgeLock) { if (!closed.get()) nativeAppClose() }
+        }
+        override fun show(page: ShellPage, transition: ShellTransition) = publishAppPage(page, transition)
+    }
+
+    private fun appTexturePath(id: Int): String? = TrophyCollectionApp.TEXTURES[id]
+
+    /** Uploads a page's rasters into a rotating id bank and hands it to native. */
+    private fun publishAppPage(page: ShellPage, transition: ShellTransition) {
+        val loader = if (::images.isInitialized) images else return
+        // Three banks: the outgoing page keeps its images during the slide.
+        val base = APP_IMAGE_BASE + (pageSerial++ % 3) * APP_IMAGE_BANK
+        val textures = listOf(page.background) + page.rows.flatMap { listOf(it.plate, it.glow) }
+        textures.forEach { id ->
+            if (id != 0 && uploadedAppTextures.add(id)) appTexturePath(id)?.let { loader.loadTexture(id, it) }
+        }
+        val headerId = page.header?.let { loader.uploadBitmap(base, it); base } ?: 0
+        val n = page.rows.size.coerceAtMost(APP_IMAGE_BANK - 1)
+        val imageIds = IntArray(n)
+        val geometry = FloatArray(n * 5)
+        page.rows.take(n).forEachIndexed { i, row ->
+            row.bitmap?.let { loader.uploadBitmap(base + 1 + i, it); imageIds[i] = base + 1 + i }
+            geometry[i * 5] = row.x; geometry[i * 5 + 1] = row.width; geometry[i * 5 + 2] = row.height
+            geometry[i * 5 + 3] = row.bitmap?.width?.toFloat() ?: 0f
+            geometry[i * 5 + 4] = row.bitmap?.height?.toFloat() ?: 0f
+        }
+        page.header?.recycle()
+        page.rows.forEach { it.bitmap?.recycle() }
+        synchronized(nativeBridgeLock) {
+            if (closed.get()) return
+            nativeAppPage(page.app, page.key, transition.code, page.background, headerId, page.headerRect,
+                page.listRect, imageIds, IntArray(n) { page.rows[it].plate }, IntArray(n) { page.rows[it].glow },
+                geometry, BooleanArray(n) { page.rows[it].selectable }, page.focus)
+        }
+    }
+
+    private fun runApp(block: () -> Unit) {
+        startupExecutor.execute {
+            runCatching(block).onFailure { Log.w(TAG, "Shell application failed", it) }
+        }
+    }
+
+    @Suppress("unused")
+    fun onNativeAppRow(app: String, key: Int, row: Int) {
+        val target = apps[app] ?: return
+        runApp { target.onRow(appHost, key, row) }
+    }
+
+    @Suppress("unused")
+    fun onNativeAppBack(app: String, key: Int) {
+        val target = apps[app] ?: return
+        runApp { target.onBack(appHost, key) }
     }
 
     /** Scene to settle on when the Activity starts without an explicit request. */
@@ -184,6 +266,7 @@ open class NativeShellActivity : NativeActivity() {
                 if (closed.get()) return
                 nativeResourceRoot(resources.absolutePath)
             }
+            resourceRoot = resources
             val localLoader = BundledImages(resources, ::uploadImage)
             loader = localLoader
             when (requestedScene) {
@@ -338,6 +421,11 @@ open class NativeShellActivity : NativeActivity() {
     @Suppress("unused")
     fun onNativeLiveAreaTarget(titleId: String, target: String) {
         lastLiveAreaTarget = target
+        val app = apps[titleId]
+        if (app != null && target == titleId) {
+            runApp { app.open(appHost) }
+            return
+        }
         mainHandler.post { if (!closed.get() && !isFinishing) onLiveAreaTarget(titleId, target) }
     }
 
@@ -422,6 +510,7 @@ open class NativeShellActivity : NativeActivity() {
         soundBank?.release()
         soundBank = null
         if (::images.isInitialized) images.release()
+        synchronized(textureCache) { textureCache.values.forEach(Bitmap::recycle); textureCache.clear() }
         if (::startupImages.isInitialized && (!::images.isInitialized || images !== startupImages)) {
             startupImages.release()
         }
@@ -431,6 +520,8 @@ open class NativeShellActivity : NativeActivity() {
 
     companion object {
         private const val TAG = "NativeShell"
+        private const val APP_IMAGE_BASE = 60000
+        private const val APP_IMAGE_BANK = 3000
         const val TROPHIES_TITLE_ID = "NPXS10008"
         const val SETTINGS_TITLE_ID = "NPXS10015"
         private val SYSTEM_APPS = listOf(

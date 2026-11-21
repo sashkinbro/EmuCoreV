@@ -1737,4 +1737,17 @@
     <string name="native_ui_no_notifications">Bildirim yok.</string>
     <string name="native_ui_trophies">Kupalar</string>
     <string name="native_ui_settings">Ayarlar</string>
+    <string name="native_ui_trophy_earned">Kazanıldığı Tarih</string>
+    <string name="native_ui_trophy_not_earned">Kazanılmadı</string>
+    <string name="native_ui_trophy_grade">Derece</string>
+    <string name="native_ui_trophy_progress">İlerleme</string>
+    <string name="native_ui_trophy_details">Ayrıntılı Bilgi</string>
+    <string name="native_ui_trophy_updated">Güncelleme Tarihi</string>
+    <string name="native_ui_trophy_system">PS Vita Sistemi</string>
+    <string name="native_ui_trophy_psn">PlayStation™Network</string>
+    <string name="native_ui_trophy_hidden">Gizli Kupa</string>
+    <string name="native_ui_trophy_platinum">Platin</string>
+    <string name="native_ui_trophy_gold">Altın</string>
+    <string name="native_ui_trophy_silver">Gümüş</string>
+    <string name="native_ui_trophy_bronze">Bronz</string>
 </resources>

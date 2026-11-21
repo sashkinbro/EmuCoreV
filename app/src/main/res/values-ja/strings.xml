@@ -1733,4 +1733,17 @@
     <string name="native_ui_no_notifications">お知らせはありません。</string>
     <string name="native_ui_trophies">トロフィー</string>
     <string name="native_ui_settings">設定</string>
+    <string name="native_ui_trophy_earned">獲得日</string>
+    <string name="native_ui_trophy_not_earned">未獲得</string>
+    <string name="native_ui_trophy_grade">グレード</string>
+    <string name="native_ui_trophy_progress">達成率</string>
+    <string name="native_ui_trophy_details">詳細</string>
+    <string name="native_ui_trophy_updated">更新日</string>
+    <string name="native_ui_trophy_system">PS Vita本体</string>
+    <string name="native_ui_trophy_psn">PlayStation™Network</string>
+    <string name="native_ui_trophy_hidden">隠しトロフィー</string>
+    <string name="native_ui_trophy_platinum">プラチナ</string>
+    <string name="native_ui_trophy_gold">ゴールド</string>
+    <string name="native_ui_trophy_silver">シルバー</string>
+    <string name="native_ui_trophy_bronze">ブロンズ</string>
 </resources>

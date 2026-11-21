@@ -16,6 +16,7 @@
 #include <emucorev/paf/plane_div.h>
 #include <emucorev/paf/wave_preset.h>
 #include <emucorev/paf/wave_renderer.h>
+#include "app_screen.h"
 #include <android/choreographer.h>
 #include <fstream>
 #include <android/input.h>
@@ -127,6 +128,12 @@ jobject preview_activity_ref = nullptr;
 jmethodID livearea_target_callback = nullptr;
 jmethodID request_livearea_callback = nullptr;
 jmethodID exit_request_callback = nullptr;
+jmethodID app_row_callback = nullptr;
+jmethodID app_back_callback = nullptr;
+// Host-built application pages waiting for the render thread.
+struct PendingAppPage { shell_app::Page page; int transition = 0; };
+std::vector<PendingAppPage> pending_app_pages;
+bool pending_app_close = false;
 jmethodID ui_sound_callback = nullptr;
 jmethodID save_home_layout_callback = nullptr;
 std::uint64_t image_revision = 0;
@@ -200,6 +207,37 @@ void emit_activity_strings(jmethodID* slot, const std::string& first, const std:
 
 void emit_livearea_target_request(const std::string& title_id, const std::string& target) {
     emit_activity_strings(&livearea_target_callback, title_id, &target);
+}
+
+// Calls onNativeAppRow(String, int, int) / onNativeAppBack(String, int).
+void emit_app_event(jmethodID* slot, const std::string& app, int key, int row, bool with_row) {
+    JavaVM* vm = nullptr;
+    { const std::lock_guard lock_guard(status_mutex); vm = preview_java_vm; }
+    if (!vm) return;
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    const jint state = vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (state == JNI_EDETACHED) {
+        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+        attached = true;
+    } else if (state != JNI_OK || !env) return;
+    jobject activity = nullptr;
+    jmethodID callback = nullptr;
+    {
+        const std::lock_guard lock_guard(status_mutex);
+        callback = *slot;
+        if (preview_activity_ref && callback) activity = env->NewGlobalRef(preview_activity_ref);
+    }
+    if (activity && callback) {
+        if (const auto name = env->NewStringUTF(app.c_str())) {
+            if (with_row) env->CallVoidMethod(activity, callback, name, jint(key), jint(row));
+            else env->CallVoidMethod(activity, callback, name, jint(key));
+            if (env->ExceptionCheck()) env->ExceptionClear();
+            env->DeleteLocalRef(name);
+        }
+        env->DeleteGlobalRef(activity);
+    }
+    if (attached) vm->DetachCurrentThread();
 }
 
 // Back on an otherwise idle Home: the host decides whether to leave the shell.
@@ -362,6 +400,34 @@ struct Window {
     float callout_x = 0.f, callout_y = 0.f;
     int folder_focus_idx = 0, folder_touch_idx = -1;
     bool peeker_peel_drag = false;
+
+    shell_app::AppScreen app_screen;
+    shell_app::Canvas app_canvas() const noexcept {
+        return {cw, ch, cx0, cy0, edge_left(), edge_bottom()};
+    }
+    void wire_app_screen() {
+        app_screen.on_row = [](const std::string& app, int key, int row) {
+            emit_app_event(&app_row_callback, app, key, row, true);
+        };
+        app_screen.on_back = [](const std::string& app, int key) {
+            emit_app_event(&app_back_callback, app, key, 0, false);
+        };
+        app_screen.on_sound = [](int id) { emit_ui_sound(id); };
+        app_screen.back_icon = edit_back_icon_id;
+    }
+    void apply_pending_app_pages() {
+        std::vector<PendingAppPage> pages;
+        bool close = false;
+        {
+            const std::lock_guard lock_guard(status_mutex);
+            pages.swap(pending_app_pages);
+            close = pending_app_close;
+            pending_app_close = false;
+        }
+        for (auto& p : pages)
+            app_screen.show(std::move(p.page), static_cast<shell_app::Transition>(p.transition));
+        if (close) app_screen.close();
+    }
 
     // Notification indicator balloon (top-right orb).
     bool notif_open = false;
@@ -540,6 +606,7 @@ struct Window {
         eglQuerySurface(display, surface, EGL_HEIGHT, &sh);
         ensure_canvas(sw, sh);
 
+        wire_app_screen();
         if ((preview_scene.load() == 2 || preview_scene.load() == 3) && shell_session) {
             livearea_deck = shell_session->deck;
             home_focus_page = shell_session->focus_page;
@@ -1526,6 +1593,10 @@ struct Window {
 
     // Returns whether Back was consumed by an open shell surface.
     bool close_livearea() {
+        if (app_screen.active()) {
+            app_screen.key(0, 0, 0, AKEYCODE_BACK, AKEYCODE_BACK);
+            return true;
+        }
         if (notif_open) {
             notif_open = false;
             emit_ui_sound(sound_cancel);
@@ -1601,6 +1672,8 @@ struct Window {
 
         livearea_deck.step(elapsed);
         edit_visual.step(elapsed);
+        apply_pending_app_pages();
+        app_screen.step(elapsed);
         // Provisional 200 ms linear fade: the emulated reference confirms the
         // end states (dimmed Home, opaque balloon) but not the exact curve.
         notif_blend = std::clamp(notif_blend + (notif_open ? elapsed : -elapsed) / 0.2f, 0.f, 1.f);
@@ -1652,8 +1725,33 @@ struct Window {
         return {bp, bs};
     }
 
+    int32_t handle_app_input(AInputEvent* event) {
+        if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
+            if (AKeyEvent_getAction(event) != AKEY_EVENT_ACTION_DOWN) return 1;
+            int key = AKeyEvent_getKeyCode(event);
+            if (key == AKEYCODE_ENTER || key == AKEYCODE_DPAD_CENTER) key = AKEYCODE_BUTTON_A;
+            if (key == AKEYCODE_ESCAPE || key == AKEYCODE_BACK) key = AKEYCODE_BUTTON_B;
+            app_screen.key(AKEYCODE_DPAD_UP, AKEYCODE_DPAD_DOWN, AKEYCODE_BUTTON_A, AKEYCODE_BUTTON_B, key);
+            return 1;
+        }
+        if (AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION || surface_w <= 0) return 0;
+        const int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
+        const auto [px, py] = to_content(AMotionEvent_getX(event, 0), AMotionEvent_getY(event, 0));
+        const std::int64_t t = AMotionEvent_getEventTime(event);
+        if (action == AMOTION_EVENT_ACTION_DOWN) { app_last_event_ns = t; app_screen.touch_down(px, py); }
+        else if (action == AMOTION_EVENT_ACTION_MOVE) {
+            const float dt = std::clamp(float(t - app_last_event_ns) * 1e-9f, 0.001f, 0.1f);
+            app_last_event_ns = t;
+            app_screen.touch_move(px, py, dt);
+        } else if (action == AMOTION_EVENT_ACTION_UP || action == AMOTION_EVENT_ACTION_CANCEL)
+            app_screen.touch_up(px, py, action == AMOTION_EVENT_ACTION_CANCEL);
+        return 1;
+    }
+    std::int64_t app_last_event_ns = 0;
+
     int32_t handle_shell_input(AInputEvent* event) {
         if (!ensure_home_initialized()) return 0;
+        if (app_screen.active()) return handle_app_input(event);
 
         if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
             if (AKeyEvent_getAction(event) != AKEY_EVENT_ACTION_DOWN || AKeyEvent_getRepeatCount(event) != 0)
@@ -2663,6 +2761,7 @@ struct Window {
             if (lock_needs_background()) {
                 draw_wave();
                 draw_livearea_and_home_composition();
+                app_screen.draw(*sprites, app_canvas());
                 draw_notification_overlay();
             }
             draw_lock();
@@ -2670,6 +2769,7 @@ struct Window {
         } else if (preview_scene.load() == 3) {
             draw_wave();
             draw_livearea_and_home_composition();
+            app_screen.draw(*sprites, app_canvas());
             draw_notification_overlay();
             draw_status(charging_texture);
         } else if (preview_scene.load() == 4) {
@@ -2887,6 +2987,62 @@ Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativePreviewLoading(J
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeAppPage(JNIEnv* env, jobject,
+    jstring app, jint key, jint transition, jint background, jint header, jfloatArray header_rect,
+    jfloatArray list_rect, jintArray row_images, jintArray row_plates, jintArray row_glows,
+    jfloatArray row_geometry, jbooleanArray row_selectable, jint focus) {
+    if (!app || !header_rect || !list_rect || !row_images || !row_plates || !row_glows || !row_geometry
+        || !row_selectable || env->GetArrayLength(header_rect) != 4 || env->GetArrayLength(list_rect) != 4) return;
+    const jsize n = env->GetArrayLength(row_images);
+    if (n > 4096 || env->GetArrayLength(row_plates) != n || env->GetArrayLength(row_glows) != n
+        || env->GetArrayLength(row_selectable) != n || env->GetArrayLength(row_geometry) != n * 5) return;
+    shell_app::Page page;
+    const char* app_text = env->GetStringUTFChars(app, nullptr);
+    if (!app_text) return;
+    page.app = app_text;
+    env->ReleaseStringUTFChars(app, app_text);
+    page.key = key;
+    page.background = std::uint32_t(background);
+    page.header = std::uint32_t(header);
+    env->GetFloatArrayRegion(header_rect, 0, 4, page.header_rect.data());
+    env->GetFloatArrayRegion(list_rect, 0, 4, page.list_rect.data());
+    const auto count = static_cast<std::size_t>(n);
+    std::vector<jint> images(count), plates(count), glows(count);
+    std::vector<jfloat> geometry(count * 5);
+    std::vector<jboolean> selectable(count);
+    if (n) {
+        env->GetIntArrayRegion(row_images, 0, n, images.data());
+        env->GetIntArrayRegion(row_plates, 0, n, plates.data());
+        env->GetIntArrayRegion(row_glows, 0, n, glows.data());
+        env->GetFloatArrayRegion(row_geometry, 0, n * 5, geometry.data());
+        env->GetBooleanArrayRegion(row_selectable, 0, n, selectable.data());
+    }
+    page.rows.reserve(std::size_t(n));
+    for (jsize i = 0; i < n; ++i) {
+        const auto g = geometry.data() + std::size_t(i) * 5;
+        shell_app::Row row;
+        row.image = std::uint32_t(images[std::size_t(i)]);
+        row.plate = std::uint32_t(plates[std::size_t(i)]);
+        row.glow = std::uint32_t(glows[std::size_t(i)]);
+        row.x = g[0]; row.width = g[1]; row.height = std::max(1.f, g[2]);
+        row.image_width = g[3]; row.image_height = g[4];
+        row.selectable = selectable[std::size_t(i)] == JNI_TRUE;
+        page.rows.push_back(row);
+    }
+    page.focus = (focus >= 0 && focus < n) ? focus : -1;
+    const std::lock_guard lock(status_mutex);
+    pending_app_pages.push_back({std::move(page), transition});
+    if (native_preview_looper) ALooper_wake(native_preview_looper);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeAppClose(JNIEnv*, jobject) {
+    const std::lock_guard lock(status_mutex);
+    pending_app_close = true;
+    if (native_preview_looper) ALooper_wake(native_preview_looper);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeSafeArea(JNIEnv* env, jobject, jfloatArray area) {
     if (!area || env->GetArrayLength(area) != 8) return;
     std::array<float, 8> values{};
@@ -3055,6 +3211,12 @@ Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeHomeCatalog(JNIE
         const auto exit_cb = activity_class
             ? env->GetMethodID(activity_class, "onNativeExitRequested", "(Ljava/lang/String;)V") : nullptr;
         if (env->ExceptionCheck()) env->ExceptionClear();
+        const auto app_row_cb = activity_class
+            ? env->GetMethodID(activity_class, "onNativeAppRow", "(Ljava/lang/String;II)V") : nullptr;
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        const auto app_back_cb = activity_class
+            ? env->GetMethodID(activity_class, "onNativeAppBack", "(Ljava/lang/String;I)V") : nullptr;
+        if (env->ExceptionCheck()) env->ExceptionClear();
         const auto sound_cb = activity_class
             ? env->GetMethodID(activity_class, "onNativeUiSound", "(I)V") : nullptr;
         if (env->ExceptionCheck()) env->ExceptionClear();
@@ -3071,6 +3233,8 @@ Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeHomeCatalog(JNIE
             livearea_target_callback = callback;
             request_livearea_callback = request_cb;
             exit_request_callback = exit_cb;
+            app_row_callback = app_row_cb;
+            app_back_callback = app_back_cb;
             ui_sound_callback = sound_cb;
             save_home_layout_callback = save_cb;
         } else if (activity_global) env->DeleteGlobalRef(activity_global);
@@ -3203,6 +3367,8 @@ Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeReleaseHomeCallb
     livearea_target_callback = nullptr;
     request_livearea_callback = nullptr;
     exit_request_callback = nullptr;
+    app_row_callback = nullptr;
+    app_back_callback = nullptr;
     ui_sound_callback = nullptr;
     save_home_layout_callback = nullptr;
     preview_java_vm = nullptr;

@@ -1738,4 +1738,17 @@
     <string name="native_ui_no_notifications">هیچ اعلانی وجود ندارد.</string>
     <string name="native_ui_trophies">جوایز</string>
     <string name="native_ui_settings">تنظیمات</string>
+    <string name="native_ui_trophy_earned">کسب شده</string>
+    <string name="native_ui_trophy_not_earned">کسب نشده</string>
+    <string name="native_ui_trophy_grade">درجه</string>
+    <string name="native_ui_trophy_progress">پیشرفت</string>
+    <string name="native_ui_trophy_details">جزئیات</string>
+    <string name="native_ui_trophy_updated">به‌روزرسانی</string>
+    <string name="native_ui_trophy_system">سیستم PS Vita</string>
+    <string name="native_ui_trophy_psn">PlayStation™Network</string>
+    <string name="native_ui_trophy_hidden">جایزه پنهان</string>
+    <string name="native_ui_trophy_platinum">پلاتینیوم</string>
+    <string name="native_ui_trophy_gold">طلا</string>
+    <string name="native_ui_trophy_silver">نقره</string>
+    <string name="native_ui_trophy_bronze">برنز</string>
 </resources>

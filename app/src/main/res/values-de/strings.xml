@@ -1737,4 +1737,17 @@
     <string name="native_ui_no_notifications">Es gibt keine Mitteilungen.</string>
     <string name="native_ui_trophies">Trophäen</string>
     <string name="native_ui_settings">Einstellungen</string>
+    <string name="native_ui_trophy_earned">Verdient</string>
+    <string name="native_ui_trophy_not_earned">Nicht verdient</string>
+    <string name="native_ui_trophy_grade">Rang</string>
+    <string name="native_ui_trophy_progress">Fortschritt</string>
+    <string name="native_ui_trophy_details">Einzelheiten</string>
+    <string name="native_ui_trophy_updated">Aktualisiert</string>
+    <string name="native_ui_trophy_system">PS Vita-System</string>
+    <string name="native_ui_trophy_psn">PlayStation™Network</string>
+    <string name="native_ui_trophy_hidden">Versteckte Trophäe</string>
+    <string name="native_ui_trophy_platinum">Platin</string>
+    <string name="native_ui_trophy_gold">Gold</string>
+    <string name="native_ui_trophy_silver">Silber</string>
+    <string name="native_ui_trophy_bronze">Bronze</string>
 </resources>
