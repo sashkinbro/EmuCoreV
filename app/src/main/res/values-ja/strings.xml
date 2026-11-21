@@ -1730,4 +1730,5 @@
     </plurals>
     <string name="native_ui_start">はじめる</string>
     <string name="native_ui_continue">つづける</string>
+    <string name="native_ui_no_notifications">お知らせはありません。</string>
 </resources>

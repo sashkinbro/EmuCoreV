@@ -1730,4 +1730,5 @@
     </plurals>
     <string name="native_ui_start">Mulai</string>
     <string name="native_ui_continue">Lanjutkan</string>
+    <string name="native_ui_no_notifications">Tidak ada notifikasi.</string>
 </resources>

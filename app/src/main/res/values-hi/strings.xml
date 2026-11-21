@@ -1734,4 +1734,5 @@
     </plurals>
     <string name="native_ui_start">शुरू करें</string>
     <string name="native_ui_continue">जारी रखें</string>
+    <string name="native_ui_no_notifications">कोई सूचना नहीं है।</string>
 </resources>

@@ -78,28 +78,35 @@ val generatePreviewStrings by tasks.registering {
             .filter { it.isDirectory && (it.name == "values" || it.name.startsWith("values-")) }
             .filter { it.resolve("strings.xml").isFile }
         check(localeDirs.any { it.name == "values" }) { "App default strings.xml is missing" }
-        localeDirs.forEach { localeDir ->
-            val document = DocumentBuilderFactory.newInstance().newDocumentBuilder()
-                .parse(localeDir.resolve("strings.xml"))
-            fun translatedText(name: String): String {
-                val strings = document.getElementsByTagName("string")
-                for (index in 0 until strings.length) {
-                    val element = strings.item(index) as org.w3c.dom.Element
-                    if (element.getAttribute("name") == name) return element.textContent
-                }
-                error("Missing $name translation in ${localeDir.name}/strings.xml")
+        fun parse(dir: java.io.File) = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+            .parse(dir.resolve("strings.xml"))
+        fun nativeUiStrings(document: org.w3c.dom.Document): Map<String, String> {
+            val strings = document.getElementsByTagName("string")
+            val result = LinkedHashMap<String, String>()
+            for (index in 0 until strings.length) {
+                val element = strings.item(index) as org.w3c.dom.Element
+                val name = element.getAttribute("name")
+                if (name.startsWith("native_ui_")) result[name] = element.textContent
             }
-            fun escapeXml(value: String): String = value
-                .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                .replace("\"", "&quot;").replace("'", "&apos;")
+            return result
+        }
+        // Every native_ui_* product string of the app is mirrored, and each
+        // locale must translate all of them.
+        val required = nativeUiStrings(parse(localeDirs.first { it.name == "values" })).keys
+        fun escapeXml(value: String): String = value
+            .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace("\"", "&quot;")
+        localeDirs.forEach { localeDir ->
+            val strings = nativeUiStrings(parse(localeDir))
+            val missing = required - strings.keys
+            check(missing.isEmpty()) { "Missing $missing translation in ${localeDir.name}/strings.xml" }
             val localeOutput = outputRoot.resolve(localeDir.name).apply { mkdirs() }
+            val body = required.joinToString(separator = System.lineSeparator()) { name ->
+                "    <string name=\"$name\">${escapeXml(strings.getValue(name))}</string>"
+            }
             localeOutput.resolve("strings.xml").writeText(
-                """<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="native_ui_start">${escapeXml(translatedText("native_ui_start"))}</string>
-    <string name="native_ui_continue">${escapeXml(translatedText("native_ui_continue"))}</string>
-</resources>
-""".trimIndent(),
+                listOf("<?xml version=\"1.0\" encoding=\"utf-8\"?>", "<resources>", body, "</resources>", "")
+                    .joinToString(System.lineSeparator()),
             )
         }
     }

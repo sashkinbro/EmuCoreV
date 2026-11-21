@@ -1744,4 +1744,5 @@
     </plurals>
     <string name="native_ui_start">Rozpocznij</string>
     <string name="native_ui_continue">Kontynuuj</string>
+    <string name="native_ui_no_notifications">Brak powiadomień.</string>
 </resources>

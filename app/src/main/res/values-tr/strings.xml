@@ -1734,4 +1734,5 @@
     </plurals>
     <string name="native_ui_start">Başlat</string>
     <string name="native_ui_continue">Devam</string>
+    <string name="native_ui_no_notifications">Bildirim yok.</string>
 </resources>

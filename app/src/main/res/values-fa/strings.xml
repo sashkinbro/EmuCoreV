@@ -1735,4 +1735,5 @@
     </plurals>
     <string name="native_ui_start">شروع</string>
     <string name="native_ui_continue">ادامه</string>
+    <string name="native_ui_no_notifications">هیچ اعلانی وجود ندارد.</string>
 </resources>

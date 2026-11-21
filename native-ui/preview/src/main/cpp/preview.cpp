@@ -101,6 +101,8 @@ constexpr std::uint32_t folder_label_image_id = 45000u;
 constexpr std::uint32_t edit_create_folder_label_id = 45001u;
 constexpr std::uint32_t edit_ungroup_label_id = 45002u;
 constexpr std::uint32_t busy_ball_image_id = 0x754463d1u;
+constexpr std::uint32_t notification_balloon_id = 0xfec9dfd8u; // indicator_plugin balloon with tail
+constexpr std::uint32_t notification_text_image_id = 45010u;
 constexpr std::array<float, 3> busy_ball_tint{0.66f, 0.9f, 1.f};
 constexpr int sound_decide = 1;
 constexpr int sound_cancel = 2;
@@ -127,6 +129,9 @@ jmethodID save_home_layout_callback = nullptr;
 std::uint64_t image_revision = 0;
 std::atomic<int> preview_scene{0}; // 0 bubble, 1 busy indicator, 2 lock screen, 3 home, 4 wave
 std::string resource_root;
+// Physical safe area from the host window, in surface pixels:
+// cutout insets (left, top, right, bottom) and rounded corner radii (TL, TR, BR, BL).
+std::array<float, 8> safe_area_px{};
 std::string requested_wave_theme = "effects_default_0512_01";
 std::uint64_t wave_theme_revision = 1;
 template<class T> std::vector<T> read_path(const std::string& relative, std::size_t count) {
@@ -260,6 +265,27 @@ struct Window {
     std::size_t wave_theme_index = 0;
     GLuint livearea_fbo = 0, livearea_tex = 0;
 
+    // Adaptive canvas. The original 960x544 layout stays intact and centred
+    // (content origin cx0/cy0); the canvas grows along the longer axis so the
+    // background, status bar and edge-anchored chrome fill the whole display
+    // instead of letterboxing. safe_* keep edge chrome clear of rounded
+    // corners and cutouts (logical units).
+    float cw = 960.f, ch = 544.f, cx0 = 0.f, cy0 = 0.f, surf_scale = 1.f;
+    float safe_l = 0.f, safe_r = 0.f, safe_t = 0.f, safe_b = 0.f;
+    int target_w = 0, target_h = 0;
+    EGLint surface_w = 0, surface_h = 0;
+    // Content-space coordinates of the visible canvas edges (safe area applied).
+    float edge_left() const noexcept { return -cx0 + safe_l; }
+    float edge_right() const noexcept { return 960.f + cx0 - safe_r; }
+    float edge_bottom() const noexcept { return 544.f + cy0 - safe_b; }
+    float canvas_top() const noexcept { return -cy0; }
+    // Horizontal pager distance between Home and LiveArea pages on this canvas.
+    float pager_scale() const noexcept { return cw / 960.f; }
+    void sprites_begin() {
+        sprites->begin(cw, ch);
+        sprites->set_origin(cx0, cy0);
+    }
+
     struct BubbleVisualSlot {
         emucorev::paf::HomeBubbleFloatState float_state{};
         float wobble_phase_offset = 0.f;
@@ -304,6 +330,10 @@ struct Window {
     float callout_x = 0.f, callout_y = 0.f;
     int folder_focus_idx = 0, folder_touch_idx = -1;
     bool peeker_peel_drag = false;
+
+    // Notification indicator balloon (top-right orb).
+    bool notif_open = false;
+    float notif_blend = 0.f;
 
     GLuint focus_ring_tex = 0;
     std::uint64_t focus_ring_rev = 0;
@@ -464,19 +494,79 @@ struct Window {
         }
         home_visible = preview_scene.load() == 3;
 
-        // Fixed 1x rasterization, independently of the physical display size.
+        EGLint sw = 0, sh = 0;
+        eglQuerySurface(display, surface, EGL_WIDTH, &sw);
+        eglQuerySurface(display, surface, EGL_HEIGHT, &sh);
+        ensure_canvas(sw, sh);
+    }
+
+    // 1x rasterization at the original UI density: the logical canvas keeps
+    // 544 rows (or 960 columns on narrower panels) and extends the other axis
+    // to the display aspect.
+    void ensure_canvas(EGLint width, EGLint height) {
+        float w = 960.f, h = 544.f;
+        if (width > 0 && height > 0) {
+            const float aspect = float(width) / float(height);
+            if (aspect >= 960.f / 544.f) w = std::min(std::round(544.f * aspect), 1600.f);
+            else h = std::min(std::round(960.f / aspect), 900.f);
+        }
+        float l = 0, t = 0, r = 0, b = 0;
+        if (width > 0 && height > 0) {
+            std::array<float, 8> area{};
+            { const std::lock_guard lock_guard(status_mutex); area = safe_area_px; }
+            const float scale = std::min(float(width) / w, float(height) / h);
+            // A rounded corner of radius R clips content at distance d from an
+            // edge by R - sqrt(R^2 - (R - d)^2); probe the status bar centre line.
+            auto corner = [&](float radius_px) {
+                const float d = 16.f * scale;
+                if (radius_px <= d) return 0.f;
+                const float k = radius_px - d;
+                return (radius_px - std::sqrt(radius_px * radius_px - k * k)) / scale;
+            };
+            l = std::max(area[0] / scale, std::max(corner(area[4]), corner(area[7])));
+            r = std::max(area[2] / scale, std::max(corner(area[5]), corner(area[6])));
+            t = area[1] / scale;
+            b = area[3] / scale;
+            surf_scale = scale;
+            surface_w = width;
+            surface_h = height;
+        }
+        safe_l = l; safe_r = r; safe_t = t; safe_b = b;
+        const bool resized = cw != w || ch != h;
+        cw = w; ch = h;
+        cx0 = (w - 960.f) * .5f;
+        cy0 = (h - 544.f) * .5f;
+        const int tw = int(w), th = int(h);
+        // Lock PageTurn transforms bake the canvas projection; rebuild them.
+        if (resized && lock && lock_mesh.vertex_count) update_lock_fold(lock_point);
+        if (tw == target_w && th == target_h && target) return;
+        if (target) glDeleteFramebuffers(1, &target);
+        if (depth) glDeleteRenderbuffers(1, &depth);
+        if (color) glDeleteTextures(1, &color);
+        target = depth = color = 0;
         glGenTextures(1, &color);
         glBindTexture(GL_TEXTURE_2D, color);
-        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 960, 544);
+        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, tw, th);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glGenRenderbuffers(1, &depth);
         glBindRenderbuffer(GL_RENDERBUFFER, depth);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 960, 544);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, tw, th);
         glGenFramebuffers(1, &target);
         glBindFramebuffer(GL_FRAMEBUFFER, target);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth);
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
             throw std::runtime_error("Cannot create 1x preview framebuffer");
+        target_w = tw;
+        target_h = th;
+    }
+
+    // Maps a physical touch point to the original 960x544 content space.
+    std::pair<float, float> to_content(float raw_x, float raw_y) const {
+        const float ox = (float(surface_w) - cw * surf_scale) * .5f;
+        const float oy = (float(surface_h) - ch * surf_scale) * .5f;
+        return {(raw_x - ox) / surf_scale - cx0, (raw_y - oy) / surf_scale - cy0};
     }
 
     void set_phase(float phase) {
@@ -520,8 +610,8 @@ struct Window {
 
     emucorev::paf::PageTurnMatrix lock_projection() const {
         const float zoom = 1.f / std::max(0.25f, 1.f - lock_exit_z / 960.f);
-        return {(2.f / preview_width) * zoom, 0.f, 0.f, 0.f,
-            0.f, (2.f / preview_height) * zoom, 0.f, 0.f,
+        return {(2.f / cw) * zoom, 0.f, 0.f, 0.f,
+            0.f, (2.f / ch) * zoom, 0.f, 0.f,
             0.f, 0.f, 0.f, 0.f,
             0.f, 0.f, 0.f, 1.f};
     }
@@ -693,10 +783,13 @@ struct Window {
                     output[column * 4 + row] = (first == 4u) ? (value * scale) : value;
                 }
 
+        // Keep the bubble's original pixel size on the adaptive canvas.
+        output[0] *= 960.f / cw;
+        output[5] *= 544.f / ch;
         const float depth = output[7 * 4 + 2];
         const float clip_w = output[2 * 4 + 3] * depth + output[3 * 4 + 3];
-        const float ndc_x = (screen_x / 480.f) - 1.f;
-        const float ndc_y = 1.f - (screen_y / 272.f);
+        const float ndc_x = ((screen_x + cx0) / (cw * .5f)) - 1.f;
+        const float ndc_y = 1.f - ((screen_y + cy0) / (ch * .5f));
         output[7 * 4] = ndc_x * clip_w / output[0];
         output[7 * 4 + 1] = ndc_y * clip_w / output[5];
         return output;
@@ -758,7 +851,7 @@ struct Window {
 
         // 1. Edit mode frosted page frames and empty slot indicator dots.
         if (edit_visual.edit_blend > 0.01f) {
-            sprites->begin(preview_width, preview_height);
+            sprites_begin();
             const float eb = edit_visual.edit_blend * home_alpha;
             for (int p = p_min; p <= p_max; ++p) {
                 const auto center = emucorev::paf::home_slot_screen_position(p, 5, scroll_y);
@@ -824,11 +917,11 @@ struct Window {
                     home_focus_page, home_focus_slot, focused->id, home_offset_x);
                 const float fscale = bubble_slots[focused->id].float_state.press_scale;
                 if (focus_cursor && focus_ring_tex) {
-                    focus_cursor->draw(focus_ring_tex, fpos.x, fpos.y,
+                    focus_cursor->draw(focus_ring_tex, fpos.x + cx0, fpos.y + cy0,
                         emucorev::paf::kHomeFocusRingSize * fscale,
-                        home_focus_pulse, 960, 544);
+                        home_focus_pulse, std::uint32_t(cw), std::uint32_t(ch));
                 } else {
-                    sprites->begin(preview_width, preview_height);
+                    sprites_begin();
                     const float r = emucorev::paf::kHomeBubbleSize * 0.5f;
                     sprites->draw(home_highlight_image_id, fpos.x - r, fpos.y - r, r * 2.f, r * 2.f,
                         {1.f, 1.f, 1.f, 128.f / 255.f});
@@ -837,7 +930,7 @@ struct Window {
         }
 
         // 3. Render folder icons, labels, Edit '...' badges, focus cursor, and page dots.
-        sprites->begin(preview_width, preview_height);
+        sprites_begin();
         for (int p = p_min; p <= p_max; ++p) {
             for (int s = 0; s < emucorev::paf::kHomeSlotsPerPage; ++s) {
                 const auto* entry = desktop.entry_at(p, s);
@@ -891,14 +984,14 @@ struct Window {
                         r->draw(params, mat_copy, env_tex);
                     }
                 } else {
-                    sprites->begin(preview_width, preview_height);
+                    sprites_begin();
                     draw_folder_bubble_badge(*dragged, edit_drag_x, edit_drag_y, 1.12f, 0.92f);
                 }
             }
         }
 
         // 6. Left-rail page indicator dots + Edit Mode corner tools + Callout.
-        sprites->begin(preview_width, preview_height);
+        sprites_begin();
         const int active_dot_page = std::clamp(
             static_cast<int>(std::lround(scroll_y / emucorev::paf::kHomePageHeight)), 0, pages - 1);
         constexpr float dot_size = 22.f;
@@ -907,20 +1000,22 @@ struct Window {
         for (int p = 0; p < pages; ++p) {
             const std::uint32_t dot_id = (p == active_dot_page)
                 ? home_page_dot_active_id : home_page_dot_inactive_id;
-            sprites->draw(dot_id, 19.5f + home_offset_x - dot_size * 0.5f,
+            sprites->draw(dot_id, edge_left() + 19.5f + home_offset_x - dot_size * 0.5f,
                 dot_start_y + static_cast<float>(p) * dot_spacing - dot_size * 0.5f,
                 dot_size, dot_size, {1.f, 1.f, 1.f, home_alpha});
         }
 
         if (edit_visual.edit_blend > 0.01f) {
             const float eb = edit_visual.edit_blend * home_alpha;
-            sprites->draw(status_app_chip_mask_id, -16.f + home_offset_x, 476.f, 84.f, 84.f,
+            const float el = edge_left() + home_offset_x, er = edge_right() + home_offset_x;
+            const float eb_y = edge_bottom();
+            sprites->draw(status_app_chip_mask_id, el - 16.f, eb_y - 68.f, 84.f, 84.f,
                 {0.08f, 0.14f, 0.24f, 0.68f * eb});
-            sprites->draw(edit_back_icon_id, 6.f + home_offset_x, 488.f, 48.f, 48.f,
+            sprites->draw(edit_back_icon_id, el + 6.f, eb_y - 56.f, 48.f, 48.f,
                 {1.f, 1.f, 1.f, eb});
-            sprites->draw(edit_wallpaper_icon_id, 808.f + home_offset_x, 484.f, 64.f, 48.f,
+            sprites->draw(edit_wallpaper_icon_id, er - 152.f, eb_y - 60.f, 64.f, 48.f,
                 {1.f, 1.f, 1.f, eb});
-            sprites->draw(edit_new_page_icon_id, 880.f + home_offset_x, 480.f, 70.f, 56.f,
+            sprites->draw(edit_new_page_icon_id, er - 80.f, eb_y - 64.f, 70.f, 56.f,
                 {1.f, 1.f, 1.f, eb});
 
             if (callout_open) {
@@ -951,8 +1046,8 @@ struct Window {
         const float pw = 133.f + (836.f - 133.f) * t;
         const float ph = 133.f + (454.f - 133.f) * t;
 
-        sprites->begin(preview_width, preview_height);
-        sprites->draw(0, 0.f, 0.f, preview_width, preview_height, {0.f, 0.f, 0.f, 0.38f * t});
+        sprites_begin();
+        sprites->draw(0, -cx0, -cy0, cw, ch, {0.f, 0.f, 0.f, 0.38f * t});
         draw_nine_slice(folder_panel_bg_id, cx, cy, pw, ph, 64, 64, 16, 16,
             {0.5f, 0.5f}, {0.5f, 0.5f}, {0.82f, 0.90f, 1.f, 0.92f * t});
 
@@ -991,11 +1086,12 @@ struct Window {
                 const auto sp = emucorev::paf::home_slot_screen_position(
                     0, folder_focus_idx, 0.f, emucorev::paf::HomeGridLayout::folder);
                 if (focus_cursor && focus_ring_tex) {
-                    focus_cursor->draw(focus_ring_tex, sp.x, sp.y + 18.f,
-                        emucorev::paf::kHomeFocusRingSize * 0.92f, home_focus_pulse, 960, 544);
+                    focus_cursor->draw(focus_ring_tex, sp.x + cx0, sp.y + 18.f + cy0,
+                        emucorev::paf::kHomeFocusRingSize * 0.92f, home_focus_pulse,
+                        std::uint32_t(cw), std::uint32_t(ch));
                 }
             }
-            sprites->begin(preview_width, preview_height);
+            sprites_begin();
             for (int m = 0; m < n; ++m) {
                 const int cat_idx = folder->members[static_cast<std::size_t>(m)];
                 const std::uint32_t lid =
@@ -1154,7 +1250,7 @@ struct Window {
             }
         }
         glBindFramebuffer(GL_FRAMEBUFFER, target);
-        glViewport(0, 0, 960, 544);
+        glViewport(0, 0, target_w, target_h);
     }
 
     void draw_livearea_tab(int tab_index) {
@@ -1177,7 +1273,7 @@ struct Window {
         emucorev::paf::page_turn_mesh(shape, livearea_mesh);
         livearea_pageturn->upload_mesh(livearea_mesh);
 
-        const float offset_x = livearea_deck.tab_offset_x(tab_index);
+        const float offset_x = livearea_deck.tab_offset_x(tab_index) * pager_scale();
         const float yaw = livearea_deck.tab_yaw_rad(tab_index);
         const float slide_frac = std::min(std::abs(offset_x) / preview_width, 1.f);
         const float depth_arc = -85.f * std::sin(slide_frac * 1.5707963f);
@@ -1192,9 +1288,9 @@ struct Window {
         pose.scale = {s, s, s};
         pose.rotation = {0.f, std::sin(yaw * 0.5f), 0.f, std::cos(yaw * 0.5f)};
 
-        constexpr emucorev::paf::PageTurnMatrix persp{
-            2.f / preview_width, 0.f, 0.f, 0.f,
-            0.f, 2.f / preview_height, 0.f, 0.f,
+        const emucorev::paf::PageTurnMatrix persp{
+            2.f / cw, 0.f, 0.f, 0.f,
+            0.f, 2.f / ch, 0.f, 0.f,
             0.f, 0.f, 0.f, -1.f / preview_width,
             0.f, 0.f, 0.f, 1.f,
         };
@@ -1248,7 +1344,7 @@ struct Window {
         const std::array<float, 12> flat_frag_state{
             0.f, 0.f, 1.f, 0.f,
             1.f, 0.f, 0.f,
-            1.f / preview_width, 1.f / preview_height,
+            1.f / cw, 1.f / ch,
             0.f, 80.f, 0.f
         };
 
@@ -1259,7 +1355,7 @@ struct Window {
         std::copy_n(lights.color.begin(), 16, flat_top_frag.begin() + 18);
 
         emucorev::paf::PageSurfaceDraw front_draw{};
-        front_draw.viewport = {1.f, 1.f, 1.f, 1.f,  1.f, preview_width, preview_height, .5f, .5f, 0.f, 0.f, 0.f};
+        front_draw.viewport = {1.f, 1.f, 1.f, 1.f,  1.f, cw, ch, .5f, .5f, 0.f, 0.f, 0.f};
         front_draw.fragment_state = flat_frag_state;
         front_draw.textures = {livearea_tex, 0, 0, 0, lock_exp};
         front_draw.blend = true;
@@ -1284,7 +1380,7 @@ struct Window {
         const bool opening_bubble = livearea_deck.is_open_anim_active();
         const int exclude_cat = opening_bubble ? livearea_deck.open_bubble_catalog_index() : -1;
         if (livearea_deck.is_home_visible()) {
-            const float hx = livearea_deck.home_offset_x();
+            const float hx = livearea_deck.home_offset_x() * pager_scale();
             const float ha = opening_bubble ? livearea_deck.open_other_home_alpha() : 1.f;
             draw_home_bubbles(hx, ha, exclude_cat);
         }
@@ -1310,14 +1406,58 @@ struct Window {
         }
         draw_folder_overlay();
         if (!edit_visual.edit_mode && !edit_visual.is_folder_visible()) {
-            sprites->begin(preview_width, preview_height);
+            sprites_begin();
             if (livearea_deck.pager_position() > 0.25f) {
-                sprites->draw(topmenu_arrow_left_id, 0.f, 258.f, 60.f, 60.f);
+                sprites->draw(topmenu_arrow_left_id, edge_left(), 258.f, 60.f, 60.f);
             }
             if (livearea_deck.tab_count() > 0
                 && livearea_deck.pager_position() < static_cast<float>(livearea_deck.tab_count()) - 0.25f) {
-                sprites->draw(topmenu_arrow_right_id, 900.f, 258.f, 60.f, 60.f);
+                sprites->draw(topmenu_arrow_right_id, edge_right() - 60.f, 258.f, 60.f, 60.f);
             }
+        }
+    }
+
+    bool notification_orb_hit(float px, float py) const {
+        if (edit_visual.edit_mode || edit_visual.is_folder_visible()) return false;
+        return py - canvas_top() < 64.f && px > edge_right() - 84.f;
+    }
+
+    // Geometry measured on the emulated SceShell frame (Lenovo, 3.333x):
+    // balloon body 85.5 px tall from y=57, text centred with 29 px padding,
+    // tail tip at (orb right edge - 59.4, 60). Texture fec9dfd8 is 90x94:
+    // body columns 7..49, tail in columns 30..90 / rows 0..58.
+    void draw_notification_overlay() {
+        if (notif_blend <= 0.003f) return;
+        const float b = notif_blend;
+        sprites_begin();
+        // Home below the status bar dims while the balloon is shown.
+        sprites->draw(0, -cx0, -cy0, cw, ch, {0.f, 0.f, 0.f, 0.32f * b});
+        float text_w = 0.f, text_h = 0.f;
+        {
+            const std::lock_guard lock_guard(status_mutex);
+            if (const auto it = host_images.find(notification_text_image_id); it != host_images.end()) {
+                text_w = float(it->second.width);
+                text_h = float(it->second.height);
+            }
+        }
+        const float body_w = std::max(text_w - 8.f + 58.f, 120.f);
+        const float tex_w = body_w + 48.f, tex_h = 99.5f;
+        const float tip_x = edge_right() - 59.4f;
+        const float right = tip_x + 6.f, left = right - tex_w, top = canvas_top() + 53.f;
+        constexpr float tw = 90.f, th = 94.f;
+        const std::array<float, 4> xs{0.f, 20.f, 30.f, 90.f};
+        const std::array<float, 4> ys{0.f, 58.f, 68.f, 94.f};
+        const std::array<float, 4> dx{left, left + 20.f, right - 60.f, right};
+        const std::array<float, 4> dy{top, top + 58.f, top + tex_h - 26.f, top + tex_h};
+        const std::array<float, 4> tint{1.f, 1.f, 1.f, b};
+        for (int r = 0; r < 3; ++r)
+            for (int c = 0; c < 3; ++c)
+                sprites->draw_patch(notification_balloon_id, dx[c], dy[r], dx[c + 1] - dx[c], dy[r + 1] - dy[r],
+                    xs[c] / tw, ys[r] / th, (xs[c + 1] - xs[c]) / tw, (ys[r + 1] - ys[r]) / th, tint);
+        if (text_w > 0.f) {
+            const float body_left = left + 7.f;
+            sprites->draw(notification_text_image_id, body_left + (body_w - (text_w - 8.f)) * .5f - 4.f,
+                canvas_top() + 110.f - 32.f, text_w, text_h, tint);
         }
     }
 
@@ -1345,7 +1485,7 @@ struct Window {
         const auto* snap = ensure_livearea_snapshot(
             livearea_deck.tabs()[static_cast<std::size_t>(active_tab)].title_id);
         if (!snap) return false;
-        const float ox = livearea_deck.tab_offset_x(active_tab);
+        const float ox = livearea_deck.tab_offset_x(active_tab) * pager_scale();
         const float lx = x - ox;
         for (const auto& hit : snap->targets) {
             const auto& r = hit.rect;
@@ -1389,6 +1529,9 @@ struct Window {
 
         livearea_deck.step(elapsed);
         edit_visual.step(elapsed);
+        // Provisional 200 ms linear fade: the emulated reference confirms the
+        // end states (dimmed Home, opaque balloon) but not the exact curve.
+        notif_blend = std::clamp(notif_blend + (notif_open ? elapsed : -elapsed) / 0.2f, 0.f, 1.f);
 
         if (home_touch_down && !home_drag_moved && !edit_visual.edit_mode
             && !edit_visual.folder_open && livearea_deck.is_home_active()) {
@@ -1444,6 +1587,14 @@ struct Window {
             if (AKeyEvent_getAction(event) != AKEY_EVENT_ACTION_DOWN || AKeyEvent_getRepeatCount(event) != 0)
                 return 0;
             const int key = AKeyEvent_getKeyCode(event);
+            if (notif_open) {
+                if (key == AKEYCODE_BACK || key == AKEYCODE_BUTTON_B || key == AKEYCODE_ESCAPE
+                    || key == AKEYCODE_BUTTON_A || key == AKEYCODE_ENTER) {
+                    notif_open = false;
+                    emit_ui_sound(sound_cancel);
+                }
+                return 1;
+            }
             if (key == AKEYCODE_BACK || key == AKEYCODE_BUTTON_B || key == AKEYCODE_ESCAPE) {
                 if (!livearea_deck.is_home_active() || edit_visual.folder_open || edit_visual.edit_mode) {
                     close_livearea();
@@ -1532,15 +1683,8 @@ struct Window {
 
         if (AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION) return 0;
         const int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
-        EGLint width = 0, height = 0;
-        eglQuerySurface(display, surface, EGL_WIDTH, &width);
-        eglQuerySurface(display, surface, EGL_HEIGHT, &height);
-        if (width <= 0 || height <= 0) return 0;
-        const float scale = std::min((width - 32.f) / preview_width, (height - 32.f) / preview_height);
-        const float ox = (width - preview_width * scale) * .5f;
-        const float oy = (height - preview_height * scale) * .5f;
-        const float px = (AMotionEvent_getX(event, 0) - ox) / scale;
-        const float py = (AMotionEvent_getY(event, 0) - oy) / scale;
+        if (surface_w <= 0 || surface_h <= 0) return 0;
+        const auto [px, py] = to_content(AMotionEvent_getX(event, 0), AMotionEvent_getY(event, 0));
         const std::int64_t event_ns = AMotionEvent_getEventTime(event);
 
         // Folder overlay modal input
@@ -1588,6 +1732,20 @@ struct Window {
             return 1;
         }
 
+        // Notification balloon: modal while open, any touch dismisses it.
+        if (notif_open) {
+            if (action == AMOTION_EVENT_ACTION_DOWN) {
+                notif_open = false;
+                emit_ui_sound(sound_cancel);
+            }
+            return 1;
+        }
+        if (action == AMOTION_EVENT_ACTION_DOWN && notification_orb_hit(px, py)) {
+            notif_open = true;
+            emit_ui_sound(sound_decide);
+            return 1;
+        }
+
         if (action == AMOTION_EVENT_ACTION_DOWN) {
             home_touch_start = {px, py};
             home_drag_last_x = px;
@@ -1603,7 +1761,7 @@ struct Window {
             home_touch_slot = -1;
 
             // Top bar Home/App chip strip tap (only when Edit Mode inactive).
-            if (py < 36.f && !edit_visual.edit_mode && livearea_deck.tab_count() > 0) {
+            if (py - canvas_top() < 36.f && !edit_visual.edit_mode && livearea_deck.tab_count() > 0) {
                 topbar_drag = true;
                 return 1;
             }
@@ -1634,7 +1792,7 @@ struct Window {
                     callout_open = false;
                 }
                 // Bottom-left Done/Back button or bottom-right Wallpaper / '+' New Page.
-                if (px < 72.f && py > 474.f) {
+                if (px < edge_left() + 72.f && py > edge_bottom() - 70.f) {
                     edit_visual.set_edit_mode(false);
                     desktop.prune_trailing_empty_pages();
                     home_scroll.set_page_count(desktop.page_count());
@@ -1643,7 +1801,7 @@ struct Window {
                     emit_ui_sound(sound_cancel);
                     return 1;
                 }
-                if (px >= 804.f && px <= 876.f && py > 476.f) {
+                if (px >= edge_right() - 156.f && px <= edge_right() - 84.f && py > edge_bottom() - 68.f) {
                     ensure_wave();
                     const auto presets = emucorev::paf::wave_theme_presets();
                     if (!presets.empty()) {
@@ -1653,7 +1811,7 @@ struct Window {
                     }
                     return 1;
                 }
-                if (px > 876.f && py > 476.f) {
+                if (px > edge_right() - 84.f && py > edge_bottom() - 68.f) {
                     const int new_p = desktop.add_page();
                     home_scroll.set_page_count(desktop.page_count());
                     home_scroll.snap_to_page(new_p);
@@ -1744,14 +1902,14 @@ struct Window {
                 if (livearea_deck.tab_count() > 0 && !edit_visual.edit_mode
                     && std::abs(dx_total) > std::abs(dy_total) * 1.15f) {
                     home_horiz_drag = true;
-                    livearea_deck.begin_horizontal_drag(px);
+                    livearea_deck.begin_horizontal_drag(px / pager_scale());
                 } else if (livearea_deck.is_home_active()) {
                     home_drag_moved = true;
                     home_scroll.begin_drag();
                 }
             }
             if (home_horiz_drag) {
-                livearea_deck.update_horizontal_drag(px, dt);
+                livearea_deck.update_horizontal_drag(px / pager_scale(), dt);
             } else if (home_drag_moved) {
                 home_scroll.drag_by(py - home_drag_last_y, dt);
             }
@@ -1826,14 +1984,15 @@ struct Window {
             } else if (action == AMOTION_EVENT_ACTION_UP
                 && std::hypot(px - home_touch_start.x, py - home_touch_start.y) < 30.f) {
                 if (!edit_visual.edit_mode) {
-                    if (livearea_deck.pager_position() > 0.25f && px < 64.f && py >= 220.f && py <= 356.f) {
+                    if (livearea_deck.pager_position() > 0.25f && px < edge_left() + 64.f
+                        && py >= 220.f && py <= 356.f) {
                         if (livearea_deck.slide_left()) emit_ui_sound(sound_page_scroll);
                         home_touch_down = false;
                         return 1;
                     }
                     if (livearea_deck.tab_count() > 0
                         && livearea_deck.pager_position() < static_cast<float>(livearea_deck.tab_count()) - 0.25f
-                        && px > 896.f && py >= 220.f && py <= 356.f) {
+                        && px > edge_right() - 64.f && py >= 220.f && py <= 356.f) {
                         if (livearea_deck.slide_right()) emit_ui_sound(sound_page_scroll);
                         home_touch_down = false;
                         return 1;
@@ -2027,10 +2186,10 @@ struct Window {
 
     void draw_wave() {
         ensure_wave();
-        wave->draw(target, 960, 544);
+        wave->draw(target, std::uint32_t(target_w), std::uint32_t(target_h));
         // Clear wave depth so 2D sprites, Home bubbles, and Lock PageTurn compose cleanly on top.
         glBindFramebuffer(GL_FRAMEBUFFER, target);
-        glViewport(0, 0, 960, 544);
+        glViewport(0, 0, target_w, target_h);
         glDepthMask(GL_TRUE);
         glClear(GL_DEPTH_BUFFER_BIT);
         glDepthMask(GL_FALSE);
@@ -2073,20 +2232,8 @@ struct Window {
         if (lock_anim_state == LockAnimState::peeling) return 1;
         if (AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION) return 0;
         const int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
-        EGLint width = 0, height = 0;
-        eglQuerySurface(display, surface, EGL_WIDTH, &width);
-        eglQuerySurface(display, surface, EGL_HEIGHT, &height);
-        if (width <= 0 || height <= 0) return 0;
-
-        const float scale = std::min((width - 32.f) / 960.f, (height - 32.f) / 544.f);
-        const int w = static_cast<int>(960 * scale), h = static_cast<int>(544 * scale);
-        const int ox = (width - w) / 2, oy = (height - h) / 2;
-
-        const float raw_x = AMotionEvent_getX(event, 0);
-        const float raw_y = AMotionEvent_getY(event, 0);
-
-        const float px = (raw_x - ox) / scale;
-        const float py = (raw_y - oy) / scale;
+        if (surface_w <= 0 || surface_h <= 0) return 0;
+        const auto [px, py] = to_content(AMotionEvent_getX(event, 0), AMotionEvent_getY(event, 0));
 
         // Convert to the PageTurn widget's centered, Y-up local coordinates.
         const emucorev::paf::PagePoint widget_point{
@@ -2175,10 +2322,12 @@ struct Window {
             ? (-32.f * edit_visual.edit_blend) : 0.f;
         if (bar_y <= -31.5f) return;
 
-        sprites->begin(960, 544);
-        if (!sprites->draw(status_bar_bg_id, 0, bar_y, 960, 32)) {
-            sprites->draw(0, 0, bar_y, 960, 32, {0, 0, 0, 0.5f});
+        // Canvas coordinates: the bar spans the whole display width.
+        sprites->begin(cw, ch);
+        if (!sprites->draw(status_bar_bg_id, 0, bar_y, cw, 32)) {
+            sprites->draw(0, 0, bar_y, cw, 32, {0, 0, 0, 0.5f});
         }
+        const float right_edge = cw - safe_r;
         const bool show_home_chrome = (scene == 3)
             || (scene == 2 && (home_visible || lock_anim_state == LockAnimState::peeling));
 
@@ -2186,7 +2335,7 @@ struct Window {
             const int open_tabs = livearea_deck.tab_count();
             const int total_items = 1 + open_tabs;
             constexpr float strip_pitch = 32.f;
-            const float strip_start = 480.f - static_cast<float>(total_items) * strip_pitch * 0.5f;
+            const float strip_start = cw * .5f - static_cast<float>(total_items) * strip_pitch * 0.5f;
             const float home_alpha = livearea_deck.is_home_active() ? 1.f : 0.45f;
             sprites->draw(status_home_icon_id, strip_start + 2.f, bar_y + 3.f, 28.f, 26.f,
                 {1.f, 1.f, 1.f, home_alpha});
@@ -2206,10 +2355,10 @@ struct Window {
                     }
                 }
             }
-            sprites->draw(status_notif_orb_idle_id, 888, bar_y, 72, 70);
+            sprites->draw(status_notif_orb_idle_id, right_edge - 72.f, bar_y, 72, 70);
             const float glow_alpha = 0.03f + 0.08f * (0.5f + 0.5f * std::sin(status_orb_phase));
             sprites->set_additive_blend(true);
-            sprites->draw(status_notif_orb_glow_id, 888, bar_y, 72, 70, {1.f, 1.f, 1.f, glow_alpha});
+            sprites->draw(status_notif_orb_glow_id, right_edge - 72.f, bar_y, 72, 70, {1.f, 1.f, 1.f, glow_alpha});
             sprites->set_additive_blend(false);
         }
 
@@ -2218,7 +2367,7 @@ struct Window {
         const auto& status = device_status;
         auto battery_id = status.battery_percent < 0 ? 0xa5aafd9bu
             : battery[std::min(4, std::clamp(status.battery_percent, 0, 100) * 4 / 100)];
-        const float bat_x = show_home_chrome ? 826.f : 904.f;
+        const float bat_x = right_edge - (show_home_chrome ? 134.f : 56.f);
         const std::array<float, 4> bat_tint = status.charging
             ? std::array<float, 4>{0.72f, 1.f, 0.72f, 1.f}
             : std::array<float, 4>{1.f, 1.f, 1.f, 1.f};
@@ -2226,11 +2375,11 @@ struct Window {
         if (charging_texture && status.charging && status.battery_percent >= 0 && status.battery_percent < 100)
             sprites->draw(charging_texture, bat_x, bar_y + 2.f, 48, 28, bat_tint);
         if (const auto clock = host_images.find(1); clock != host_images.end()) {
-            const float clock_right = show_home_chrome ? 824.f : 902.f;
+            const float clock_right = right_edge - (show_home_chrome ? 136.f : 58.f);
             sprites->draw(1, clock_right - float(clock->second.width), bar_y,
                 float(clock->second.width), float(clock->second.height));
         }
-        float left = 8;
+        float left = 8 + safe_l;
         if (status.wifi_enabled == emucorev::paf::RadioState::on && status.wifi_connected) {
             constexpr std::array<std::uint32_t, 4> wifi{0x89dc8410, 0x2278fb2a, 0xee958f99, 0xa13376bc};
             const int level = status.wifi_rssi == INT32_MIN ? 0
@@ -2281,16 +2430,38 @@ struct Window {
         lock_ready = lock_page && lock_corner && lock_exp && lock_empty_bg;
     }
 
+    // Extends the lock bezel image to the adaptive canvas edges by repeating
+    // its outermost texel row/column (a uniform dark bezel), never scaling it.
+    void draw_keylock_bleed(float alpha) {
+        const std::array<float, 4> tint{1.f, 1.f, 1.f, alpha};
+        const float eu = 0.5f / preview_width, ev = 0.5f / preview_height;
+        if (cx0 > 0.f) {
+            sprites->draw_patch(raw_keylock_image_id, -cx0, 0.f, cx0, preview_height, 0.f, 0.f, eu, 1.f, tint);
+            // The right bezel edge carries the PS symbol watermark near the
+            // bottom; continue that band with the plain left-edge column.
+            constexpr float split = 440.f;
+            sprites->draw_patch(raw_keylock_image_id, preview_width, 0.f, cx0, split,
+                1.f - eu, 0.f, eu, split / preview_height, tint);
+            sprites->draw_patch(raw_keylock_image_id, preview_width, split, cx0, preview_height - split,
+                0.f, split / preview_height, eu, 1.f - split / preview_height, tint);
+        }
+        if (cy0 > 0.f) {
+            sprites->draw_patch(raw_keylock_image_id, -cx0, -cy0, cw, cy0, 0.f, 0.f, 1.f, ev, tint);
+            sprites->draw_patch(raw_keylock_image_id, -cx0, preview_height, cw, cy0, 0.f, 1.f - ev, 1.f, ev, tint);
+        }
+    }
+
     void draw_lock() {
         ensure_lock_textures();
         if (!lock || !lock_ready || !lock_mesh.vertex_count) return;
         if (lock_anim_state == LockAnimState::unlocked) return;
 
-        sprites->begin(preview_width, preview_height);
+        sprites_begin();
         if (!lock_needs_background()) {
             // Draw full pristine bezel wallpaper behind PageTurn at rest so rounded corners show cleanly.
             sprites->draw(raw_keylock_image_id, 0.f, 0.f, preview_width, preview_height,
                 {1.f, 1.f, 1.f, lock_page_alpha});
+            draw_keylock_bleed(lock_page_alpha);
         } else {
             // Draw the 4 non-overlapping outer border strips around [32..928, 64..512] during peel.
             const float zoom = 1.f / std::max(0.25f, 1.f - lock_exit_z / 960.f);
@@ -2307,6 +2478,7 @@ struct Window {
             draw_border(0.f, 512.f, 960.f, 544.f);
             draw_border(0.f, 64.f, 32.f, 512.f);
             draw_border(928.f, 64.f, 960.f, 512.f);
+            draw_keylock_bleed(lock_page_alpha);
         }
 
         // PAF's 0.08 corner inset is scaled by the inverse frame aspect before
@@ -2321,7 +2493,7 @@ struct Window {
         const std::array<float, 12> round_frag_state{
             0.f, 0.f, 1.f, 0.f,
             1.f, 0.f, 0.f,
-            1.f / 960.f, 1.f / 544.f,
+            1.f / cw, 1.f / ch,
             0.f, 112.f, 0.f
         };
 
@@ -2337,7 +2509,7 @@ struct Window {
         std::copy_n(lock_top_material.begin() + 76, 16, top_round_fragment_material.begin() + 22);
 
         emucorev::paf::PageSurfaceDraw folded_draw{};
-        folded_draw.viewport = {1.f, 1.f, 1.f, 1.f,  1.f, 960.f, 544.f, .5f,  .5f, 0.f, 0.f, 0.f};
+        folded_draw.viewport = {1.f, 1.f, 1.f, 1.f,  1.f, cw, ch, .5f,  .5f, 0.f, 0.f, 0.f};
         folded_draw.fragment_state = round_frag_state;
         folded_draw.textures = {lock_page, lock_corner, 0, 0, lock_exp};
         folded_draw.blend = true;
@@ -2353,7 +2525,7 @@ struct Window {
         bottom_round_fragment_material[3] = corner_inv_y;
 
         emucorev::paf::PageSurfaceDraw front_draw{};
-        front_draw.viewport = {1.f, 1.f, 1.f, 1.f,  1.f, 960.f, 544.f, .5f,  .5f, 0.f, 0.f, 0.f};
+        front_draw.viewport = {1.f, 1.f, 1.f, 1.f,  1.f, cw, ch, .5f,  .5f, 0.f, 0.f, 0.f};
         front_draw.fragment_state = round_frag_state;
         front_draw.textures = {lock_page, lock_corner, 0, 0, lock_exp};
         front_draw.blend = true;
@@ -2381,7 +2553,7 @@ struct Window {
         empty_back_fragment_material[15] = 1.0f;
 
         emucorev::paf::PageSurfaceDraw empty_draw{};
-        empty_draw.viewport = {1.f, 1.f, 1.f, 1.f,  1.f, 960.f, 544.f, .5f,  .5f, 0.f, 0.f, 0.f};
+        empty_draw.viewport = {1.f, 1.f, 1.f, 1.f,  1.f, cw, ch, .5f,  .5f, 0.f, 0.f, 0.f};
         empty_draw.fragment_state = round_frag_state;
         empty_draw.textures = {lock_corner, lock_empty_bg, 0, 0, 0};
         empty_draw.blend = true;
@@ -2400,8 +2572,9 @@ struct Window {
         EGLint width, height;
         if (!eglQuerySurface(display, surface, EGL_WIDTH, &width)
             || !eglQuerySurface(display, surface, EGL_HEIGHT, &height) || width <= 0 || height <= 0) return;
+        ensure_canvas(width, height);
         glBindFramebuffer(GL_FRAMEBUFFER, target);
-        glViewport(0, 0, 960, 544);
+        glViewport(0, 0, target_w, target_h);
         glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT);
         upload_images();
@@ -2409,18 +2582,20 @@ struct Window {
             if (lock_needs_background()) {
                 draw_wave();
                 draw_livearea_and_home_composition();
+                draw_notification_overlay();
             }
             draw_lock();
             draw_status(charging_texture);
         } else if (preview_scene.load() == 3) {
             draw_wave();
             draw_livearea_and_home_composition();
+            draw_notification_overlay();
             draw_status(charging_texture);
         } else if (preview_scene.load() == 4) {
             draw_wave();
         }
         else if (busy) {
-            sprites->begin(960, 544);
+            sprites_begin();
             if (busy->state != emucorev::paf::BusyState::idle)
                 for (const auto& dot : busy->dots)
                     if (dot.size > 0 && dot.alpha)
@@ -2436,12 +2611,12 @@ struct Window {
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
         glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT);
-        // Preserve the reference aspect without stretching or corner clipping.
-        const float scale = std::min((width - 32.f) / 960, (height - 32.f) / 544);
-        const int w = static_cast<int>(960 * scale), h = static_cast<int>(544 * scale);
+        // The canvas already matches the display aspect: fill the surface.
+        const int w = static_cast<int>(std::lround(cw * surf_scale));
+        const int h = static_cast<int>(std::lround(ch * surf_scale));
         const int x = (width - w) / 2, y = (height - h) / 2;
         glBindFramebuffer(GL_READ_FRAMEBUFFER, target);
-        glBlitFramebuffer(0, 0, 960, 544, x, y, x + w, y + h, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+        glBlitFramebuffer(0, 0, target_w, target_h, x, y, x + w, y + h, GL_COLOR_BUFFER_BIT, GL_LINEAR);
         if (!eglSwapBuffers(display, surface)) throw std::runtime_error("Preview presentation failed");
     }
 };
@@ -2627,6 +2802,16 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewFailed(JNIEn
 extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewLoading(JNIEnv*, jobject, jboolean loading) {
     native_preview_loading.store(loading == JNI_TRUE);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeSafeArea(JNIEnv* env, jobject, jfloatArray area) {
+    if (!area || env->GetArrayLength(area) != 8) return;
+    std::array<float, 8> values{};
+    env->GetFloatArrayRegion(area, 0, 8, values.data());
+    for (auto& v : values) v = std::clamp(std::isfinite(v) ? v : 0.f, 0.f, 4096.f);
+    const std::lock_guard lock(status_mutex);
+    safe_area_px = values;
 }
 
 extern "C" JNIEXPORT void JNICALL

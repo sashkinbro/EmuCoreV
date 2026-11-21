@@ -115,7 +115,7 @@ class BundledImages(
             "56e72f16", "a5aafd9b", "32465c57", "00ea236e", "89dc8410",
             "2278fb2a", "ee958f99", "a13376bc",
             "bef34d7f", "6821404a", "94de0b89", "fbc7297e",
-            "e062c41f", "fede49bf", "d29cb815").forEach { id ->
+            "e062c41f", "fede49bf", "d29cb815", "fec9dfd8").forEach { id ->
             loadPngResource(id.toLong(16).toInt(), "images/indicator_plugin/$id.png")
         }
         loadPngResource(STATUS_HOME_ICON, "images/applauncher_plugin/56aebd5f.png")
@@ -523,6 +523,26 @@ class BundledImages(
         return bitmap
     }
 
+    /**
+     * Notification balloon message (indicator_plugin string 187da0f4), matched
+     * against the emulated SceShell frame: ltn0 29 px, grey 0x50 on the 0xE3
+     * balloon, baseline 32 px into a 44 px tall image.
+     */
+    fun loadNotificationText(text: String) {
+        val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFF505050.toInt()
+            textSize = 29f
+            typeface = homeTitleTypeface
+            setShadowLayer(1.2f, 0f, 1f, 0x40000000)
+        }
+        val width = ceil(paint.measureText(text)).toInt() + 8
+        val bitmap = Bitmap.createBitmap(width.coerceIn(8, 900), 44, Bitmap.Config.ARGB_8888)
+        try {
+            Canvas(bitmap).drawText(text, 4f, 32f, paint)
+            send(NOTIFICATION_TEXT_IMAGE, bitmap)
+        } finally { bitmap.recycle() }
+    }
+
     private fun loadHomeEditLabels() {
         val isUk = Locale.getDefault().language.lowercase(Locale.ROOT) == "uk"
         val folderTitle = rasterHomeTitle(if (isUk) "Папка" else "Folder")
@@ -910,6 +930,7 @@ class BundledImages(
         const val EDIT_CREATE_FOLDER_LABEL = 45001
         const val EDIT_UNGROUP_LABEL = 45002
         const val EDIT_DONE_LABEL = 45003
+        const val NOTIFICATION_TEXT_IMAGE = 45010
         private const val LIVEAREA_IMAGE_BASE = 3000
         private const val LIVEAREA_IMAGE_SLOTS_PER_GAME = 64
         private const val HOME_CATALOG_MAX_GAMES = 512

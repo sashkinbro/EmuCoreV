@@ -1739,4 +1739,5 @@
     </plurals>
     <string name="native_ui_start">Démarrer</string>
     <string name="native_ui_continue">Continuer</string>
+    <string name="native_ui_no_notifications">Aucune notification.</string>
 </resources>

@@ -6,7 +6,9 @@ import android.os.Bundle
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.view.RoundedCorner
 import android.view.View
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
@@ -62,6 +64,7 @@ class PreviewActivity : NativeActivity() {
     )
     private external fun nativeReleaseHomeCallback()
     private external fun nativeBackRequested()
+    private external fun nativeSafeArea(area: FloatArray)
     private external fun nativeLoadHomeLayout(layout: String)
     private var lastLiveAreaTarget: String? = null
     private var backCallback: OnBackInvokedCallback? = null
@@ -98,12 +101,20 @@ class PreviewActivity : NativeActivity() {
         nativePreviewLoading(requestedScene != 1 && requestedScene != 4)
         super.onCreate(state)
         window.attributes = window.attributes.apply {
-            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER
+            // Draw edge to edge; the native canvas keeps chrome inside the
+            // reported cutout/rounded-corner safe area itself.
+            layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            else WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             preferredRefreshRate = 60f
         }
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        window.decorView.setOnApplyWindowInsetsListener { view, insets ->
+            publishSafeArea(insets)
+            view.onApplyWindowInsets(insets)
+        }
         deviceStatus = DeviceStatusSource(this)
         startupImages = BundledImages(startupRoot, ::uploadImage)
         val busy = File(startupRoot, "startup-busy.png").inputStream().use {
@@ -243,6 +254,7 @@ class PreviewActivity : NativeActivity() {
                 nativeLoadHomeLayout(layoutFile.readText())
             }
         }
+        loader.loadNotificationText(getString(R.string.native_ui_no_notifications))
         loader.loadHomeLiveAreas(entries, getString(R.string.native_ui_start)) { snapshot ->
             synchronized(nativeBridgeLock) {
                 if (closed.get()) throw CancellationException("Preview Activity was destroyed")
@@ -285,6 +297,24 @@ class PreviewActivity : NativeActivity() {
         } catch (error: Exception) {
             Log.w("NativeUiPreview", "Could not persist home layout", error)
         }
+    }
+
+    private fun publishSafeArea(insets: WindowInsets) {
+        val area = FloatArray(8)
+        insets.displayCutout?.let {
+            area[0] = it.safeInsetLeft.toFloat(); area[1] = it.safeInsetTop.toFloat()
+            area[2] = it.safeInsetRight.toFloat(); area[3] = it.safeInsetBottom.toFloat()
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val corners = intArrayOf(
+                RoundedCorner.POSITION_TOP_LEFT, RoundedCorner.POSITION_TOP_RIGHT,
+                RoundedCorner.POSITION_BOTTOM_RIGHT, RoundedCorner.POSITION_BOTTOM_LEFT,
+            )
+            corners.forEachIndexed { index, position ->
+                area[4 + index] = insets.getRoundedCorner(position)?.radius?.toFloat() ?: 0f
+            }
+        }
+        nativeSafeArea(area)
     }
 
     @SuppressLint("GestureBackNavigation")

@@ -27,6 +27,7 @@ GLuint shader(GLenum kind, const char* source) {
 struct SpriteRenderer::Impl {
     GLuint program = 0, vao = 0;
     GLint canvas = -1, rectangle = -1, uv_rectangle = -1, tint = -1;
+    float origin_x = 0.f, origin_y = 0.f;
     std::unordered_map<std::uint32_t, GLuint> textures;
     ~Impl() {
         for (const auto& [id, texture] : textures) glDeleteTextures(1, &texture);
@@ -113,6 +114,12 @@ void SpriteRenderer::begin(float width, float height) {
     glBlendEquation(GL_FUNC_ADD);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glActiveTexture(GL_TEXTURE0);
+    impl_->origin_x = 0.f;
+    impl_->origin_y = 0.f;
+}
+void SpriteRenderer::set_origin(float x, float y) noexcept {
+    impl_->origin_x = x;
+    impl_->origin_y = y;
 }
 void SpriteRenderer::set_additive_blend(bool additive) {
     if (additive) {
@@ -132,7 +139,7 @@ bool SpriteRenderer::draw_patch(std::uint32_t id, float x, float y, float width,
     const auto image = p.textures.find(id);
     if (image == p.textures.end()) return false;
     glBindTexture(GL_TEXTURE_2D, image->second);
-    glUniform4f(p.rectangle, x, y, width, height);
+    glUniform4f(p.rectangle, x + p.origin_x, y + p.origin_y, width, height);
     glUniform4f(p.uv_rectangle, u, v, uv_width, uv_height);
     glUniform4fv(p.tint, 1, tint.data());
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);

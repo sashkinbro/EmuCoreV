@@ -1754,4 +1754,5 @@
     </plurals>
     <string name="native_ui_start">ابدأ</string>
     <string name="native_ui_continue">متابعة</string>
+    <string name="native_ui_no_notifications">لا توجد إشعارات.</string>
 </resources>
