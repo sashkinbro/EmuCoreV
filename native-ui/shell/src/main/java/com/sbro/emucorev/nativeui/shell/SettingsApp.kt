@@ -39,6 +39,18 @@ interface SettingsActions {
     fun applyDisplayArea(mode: Int)
     fun applyClock()
     fun exitMode()
+    /** Installed custom themes (id to title) and the active one. */
+    val customThemes: List<Pair<String, String>>
+    val activeCustomTheme: String?
+    fun selectWaveTheme(name: String)
+    fun selectCustomTheme(id: String)
+    fun installTheme()
+    val hasHomePhoto: Boolean
+    val hasStartPhoto: Boolean
+    fun pickHomePhoto()
+    fun pickStartPhoto()
+    fun clearHomePhoto()
+    fun clearStartPhoto()
 }
 
 /**
@@ -50,6 +62,14 @@ interface SettingsActions {
  */
 class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
     private var easterTaps = 0
+    @Volatile private var currentKey = -1
+    @Volatile private var currentHost: ShellAppHost? = null
+
+    /** Rebuilds the visible page after an asynchronous change (theme install, photo pick). */
+    fun refresh() {
+        val host = currentHost ?: return
+        if (currentKey >= 0) host.show(page(host, currentKey), ShellTransition.REPLACE)
+    }
 
     private data class Item(val label: String, val icon: Int = 0, val value: String? = null,
         val check: Boolean? = null, val arrow: Boolean = false, val selectable: Boolean = true)
@@ -63,17 +83,31 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
         val s = actions.settings
         when (key) {
             ROOT -> when (row) {
-                0 -> push(host, THEME)
+                0 -> push(host, THEME_BACKGROUND)
                 1 -> push(host, SOUND_DISPLAY)
                 2 -> push(host, DATE_TIME)
                 3 -> push(host, SYSTEM)
                 4 -> actions.exitMode()
             }
-            THEME -> actions.waveThemes.getOrNull(row)?.let {
-                s.waveTheme = it
-                actions.applyWaveTheme(it)
+            THEME_BACKGROUND -> when (row) {
+                0 -> push(host, THEME)
+                1 -> push(host, HOME_BACKGROUNDS)
+                2 -> push(host, START_SCREEN)
+            }
+            THEME -> {
+                val waves = actions.waveThemes
+                val custom = actions.customThemes
+                when {
+                    row < waves.size -> actions.selectWaveTheme(waves[row])
+                    row < waves.size + custom.size -> actions.selectCustomTheme(custom[row - waves.size].first)
+                    else -> { actions.installTheme(); return }
+                }
                 host.show(page(host, THEME), ShellTransition.REPLACE)
             }
+            HOME_BACKGROUNDS -> if (row == 0) { actions.clearHomePhoto(); host.show(page(host, key), ShellTransition.REPLACE) }
+                else actions.pickHomePhoto()
+            START_SCREEN -> if (row == 0) { actions.clearStartPhoto(); host.show(page(host, key), ShellTransition.REPLACE) }
+                else actions.pickStartPhoto()
             SOUND_DISPLAY -> {
                 when (row) {
                     0 -> s.systemSounds = !s.systemSounds
@@ -96,6 +130,7 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
         when (key) {
             ROOT -> host.close()
             SYSTEM_INFO -> host.show(page(host, SYSTEM), ShellTransition.POP)
+            THEME, HOME_BACKGROUNDS, START_SCREEN -> host.show(page(host, THEME_BACKGROUND), ShellTransition.POP)
             else -> host.show(page(host, ROOT), ShellTransition.POP)
         }
     }
@@ -103,6 +138,8 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
     private fun push(host: ShellAppHost, key: Int) = host.show(page(host, key), ShellTransition.PUSH)
 
     private fun page(host: ShellAppHost, key: Int): ShellPage {
+        currentKey = key
+        currentHost = host
         val s = actions.settings
         val (title, items) = when (key) {
             ROOT -> host.string(R.string.native_ui_settings) to listOf(
@@ -112,11 +149,29 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
                 Item(host.string(R.string.native_ui_set_system), ICON_SYSTEM, arrow = true),
                 Item(host.string(R.string.native_ui_set_exit_mode), ICON_EXIT),
             )
-            THEME -> host.string(R.string.native_ui_set_theme) to actions.waveThemes.mapIndexed { i, name ->
-                Item(if (i == 0) host.string(R.string.native_ui_set_default)
-                    else "${host.string(R.string.native_ui_set_theme)} ${i + 1}",
-                    check = name == s.waveTheme)
+            THEME_BACKGROUND -> host.string(R.string.native_ui_set_theme_background) to listOf(
+                Item(host.string(R.string.native_ui_set_theme), arrow = true),
+                Item(host.string(R.string.native_ui_set_home_backgrounds), arrow = true),
+                Item(host.string(R.string.native_ui_set_start_screen), arrow = true),
+            )
+            THEME -> host.string(R.string.native_ui_set_theme) to buildList {
+                val custom = actions.activeCustomTheme
+                actions.waveThemes.forEachIndexed { i, name ->
+                    add(Item(if (i == 0) host.string(R.string.native_ui_set_default)
+                        else "${host.string(R.string.native_ui_set_theme)} ${i + 1}",
+                        check = custom == null && name == s.waveTheme))
+                }
+                actions.customThemes.forEach { (id, title) -> add(Item(title, check = id == custom)) }
+                add(Item(host.string(R.string.native_ui_set_install_theme), arrow = true))
             }
+            HOME_BACKGROUNDS -> host.string(R.string.native_ui_set_home_backgrounds) to listOf(
+                Item(host.string(R.string.native_ui_set_default), check = !actions.hasHomePhoto),
+                Item(host.string(R.string.native_ui_set_choose_image), check = actions.hasHomePhoto),
+            )
+            START_SCREEN -> host.string(R.string.native_ui_set_start_screen) to listOf(
+                Item(host.string(R.string.native_ui_set_default), check = !actions.hasStartPhoto),
+                Item(host.string(R.string.native_ui_set_choose_image), check = actions.hasStartPhoto),
+            )
             SOUND_DISPLAY -> host.string(R.string.native_ui_set_sound_display) to listOf(
                 Item(host.string(R.string.native_ui_set_system_sounds), check = s.systemSounds),
                 Item("${host.string(R.string.native_ui_set_display_area)}: ${host.string(R.string.native_ui_set_full)}",
@@ -201,6 +256,9 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
         private const val DATE_TIME = 3
         private const val SYSTEM = 4
         private const val SYSTEM_INFO = 5
+        private const val THEME_BACKGROUND = 6
+        private const val HOME_BACKGROUNDS = 7
+        private const val START_SCREEN = 8
 
         const val BACKGROUND = 0xa67cb5df.toInt()
         const val ROW_PLATE = 0x29b91f26

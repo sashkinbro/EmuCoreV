@@ -144,6 +144,10 @@ std::string resource_root;
 std::array<float, 8> safe_area_px{};
 // Settings > Sound & Display > Display Area: 0 full screen, 1 original 960x544.
 std::atomic<int> display_area_mode{0};
+// Theme: Home page backgrounds (host image ids, page order) replacing the
+// wave, and the information bar colour (ARGB, 0 = default).
+std::vector<std::uint32_t> home_wallpaper_ids;
+std::uint32_t theme_bar_color = 0;
 std::string requested_wave_theme = "effects_default_0512_01";
 std::uint64_t wave_theme_revision = 1;
 template<class T> std::vector<T> read_path(const std::string& relative, std::size_t count) {
@@ -2365,7 +2369,44 @@ struct Window {
         wave->step(elapsed);
     }
 
+    // Home background: theme/photo page images when set (cover-scaled,
+    // cross-faded while scrolling between pages), otherwise the wave.
     void draw_wave() {
+        std::vector<std::uint32_t> wallpapers;
+        {
+            const std::lock_guard lock_guard(status_mutex);
+            wallpapers = home_wallpaper_ids;
+        }
+        if (!wallpapers.empty()) {
+            glBindFramebuffer(GL_FRAMEBUFFER, target);
+            glViewport(0, 0, target_w, target_h);
+            glDepthMask(GL_TRUE);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            glDepthMask(GL_FALSE);
+            sprites_begin();
+            const float page_f = std::max(0.f, home_scroll.scroll_y() / emucorev::paf::kHomePageHeight);
+            const int p0 = int(std::floor(page_f));
+            const float t = page_f - float(p0);
+            auto image_for = [&](int page) {
+                return wallpapers[std::size_t(std::clamp(page, 0, int(wallpapers.size()) - 1))];
+            };
+            auto draw_cover = [&](std::uint32_t id, float alpha) {
+                float iw = 960.f, ih = 544.f;
+                {
+                    const std::lock_guard lock_guard(status_mutex);
+                    if (const auto it = host_images.find(id); it != host_images.end()) {
+                        iw = float(it->second.width);
+                        ih = float(it->second.height);
+                    }
+                }
+                const float scale = std::max(cw / iw, ch / ih);
+                const float w = iw * scale, h = ih * scale;
+                sprites->draw(id, 480.f - w * .5f, 272.f - h * .5f, w, h, {1.f, 1.f, 1.f, alpha});
+            };
+            draw_cover(image_for(p0), 1.f);
+            if (t > 0.001f && image_for(p0 + 1) != image_for(p0)) draw_cover(image_for(p0 + 1), t);
+            return;
+        }
         ensure_wave();
         wave->draw(target, std::uint32_t(target_w), std::uint32_t(target_h));
         // Clear wave depth so 2D sprites, Home bubbles, and Lock PageTurn compose cleanly on top.
@@ -2505,7 +2546,11 @@ struct Window {
 
         // Canvas coordinates: the bar spans the whole display width.
         sprites->begin(cw, ch);
-        if (!sprites->draw(status_bar_bg_id, 0, bar_y, cw, 32)) {
+        if (theme_bar_color) {
+            const auto c = theme_bar_color;
+            sprites->draw(0, 0, bar_y, cw, 32, {float((c >> 16) & 0xff) / 255.f, float((c >> 8) & 0xff) / 255.f,
+                float(c & 0xff) / 255.f, float(c >> 24) / 255.f});
+        } else if (!sprites->draw(status_bar_bg_id, 0, bar_y, cw, 32)) {
             sprites->draw(0, 0, bar_y, cw, 32, {0, 0, 0, 0.5f});
         }
         const float right_edge = cw - safe_r;
@@ -3055,6 +3100,21 @@ Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeWaveThemes(JNIEn
         env->DeleteLocalRef(value);
     }
     return result;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeSetHomeTheme(JNIEnv* env, jobject,
+    jintArray wallpapers, jint bar_color) {
+    std::vector<std::uint32_t> ids;
+    if (wallpapers) {
+        const jsize n = std::min<jsize>(env->GetArrayLength(wallpapers), 10);
+        std::vector<jint> values(static_cast<std::size_t>(n));
+        if (n) env->GetIntArrayRegion(wallpapers, 0, n, values.data());
+        for (const auto v : values) if (v) ids.push_back(std::uint32_t(v));
+    }
+    const std::lock_guard lock(status_mutex);
+    home_wallpaper_ids = std::move(ids);
+    theme_bar_color = std::uint32_t(bar_color);
 }
 
 extern "C" JNIEXPORT void JNICALL

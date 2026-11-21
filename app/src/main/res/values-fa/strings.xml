@@ -1736,6 +1736,7 @@
     <string name="native_ui_start">شروع</string>
     <string name="native_ui_continue">ادامه</string>
     <string name="native_ui_no_notifications">هیچ اعلانی وجود ندارد.</string>
+    <string name="native_ui_users_guide">راهنمای کاربر</string>
     <string name="native_ui_trophies">جوایز</string>
     <string name="native_ui_settings">تنظیمات</string>
     <string name="native_ui_trophy_earned">کسب شده</string>
@@ -1772,4 +1773,8 @@
     <string name="native_ui_set_exit_mode">بازگشت به کتابخانه</string>
     <string name="native_ui_set_edition">3.74 نسخه EmuCore</string>
     <string name="native_ui_set_easter_egg">شما از نسخه EmuCore استفاده می‌کنید. از بازی شما سپاسگزاریم!</string>
+    <string name="native_ui_set_home_backgrounds">پس‌زمینه‌های صفحه اصلی</string>
+    <string name="native_ui_set_start_screen">صفحه شروع</string>
+    <string name="native_ui_set_install_theme">نصب زمینه…</string>
+    <string name="native_ui_set_choose_image">انتخاب تصویر…</string>
 </resources>

@@ -1755,6 +1755,7 @@
     <string name="native_ui_start">ابدأ</string>
     <string name="native_ui_continue">متابعة</string>
     <string name="native_ui_no_notifications">لا توجد إشعارات.</string>
+    <string name="native_ui_users_guide">دليل المستخدم</string>
     <string name="native_ui_trophies">الجوائز</string>
     <string name="native_ui_settings">الإعدادات</string>
     <string name="native_ui_trophy_earned">تم الحصول عليها</string>
@@ -1791,4 +1792,8 @@
     <string name="native_ui_set_exit_mode">العودة إلى المكتبة</string>
     <string name="native_ui_set_edition">3.74 إصدار EmuCore</string>
     <string name="native_ui_set_easter_egg">أنت تستخدم إصدار EmuCore. شكرًا لك على اللعب!</string>
+    <string name="native_ui_set_home_backgrounds">خلفيات الشاشة الرئيسية</string>
+    <string name="native_ui_set_start_screen">شاشة البدء</string>
+    <string name="native_ui_set_install_theme">تثبيت سمة…</string>
+    <string name="native_ui_set_choose_image">اختيار صورة…</string>
 </resources>

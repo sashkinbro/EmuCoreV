@@ -1729,6 +1729,7 @@
     <string name="native_ui_start">开始</string>
     <string name="native_ui_continue">继续</string>
     <string name="native_ui_no_notifications">没有最新资讯。</string>
+    <string name="native_ui_users_guide">用户指南</string>
     <string name="native_ui_trophies">奖杯</string>
     <string name="native_ui_settings">设定</string>
     <string name="native_ui_trophy_earned">获得日期</string>
@@ -1765,4 +1766,8 @@
     <string name="native_ui_set_exit_mode">返回游戏库</string>
     <string name="native_ui_set_edition">3.74 EmuCore Edition</string>
     <string name="native_ui_set_easter_egg">您正在使用 EmuCore Edition。感谢游玩！</string>
+    <string name="native_ui_set_home_backgrounds">主画面的背景</string>
+    <string name="native_ui_set_start_screen">开始画面</string>
+    <string name="native_ui_set_install_theme">安装主题…</string>
+    <string name="native_ui_set_choose_image">选择图片…</string>
 </resources>

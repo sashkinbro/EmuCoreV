@@ -1740,6 +1740,7 @@
     <string name="native_ui_start">Avvia</string>
     <string name="native_ui_continue">Continua</string>
     <string name="native_ui_no_notifications">Non ci sono notifiche.</string>
+    <string name="native_ui_users_guide">Guida per l\'utente</string>
     <string name="native_ui_trophies">Trofei</string>
     <string name="native_ui_settings">Impostazioni</string>
     <string name="native_ui_trophy_earned">Guadagnato</string>
@@ -1776,4 +1777,8 @@
     <string name="native_ui_set_exit_mode">Torna alla libreria</string>
     <string name="native_ui_set_edition">3.74 EmuCore Edition</string>
     <string name="native_ui_set_easter_egg">Stai usando la EmuCore Edition. Grazie per giocare!</string>
+    <string name="native_ui_set_home_backgrounds">Sfondi schermata principale</string>
+    <string name="native_ui_set_start_screen">Schermata iniziale</string>
+    <string name="native_ui_set_install_theme">Installa tema…</string>
+    <string name="native_ui_set_choose_image">Scegli immagine…</string>
 </resources>

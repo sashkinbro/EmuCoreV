@@ -100,6 +100,29 @@ class BundledImages(
     }
     private var previousClock: String? = null
     private var rawKeylock: Bitmap? = null
+    private var lockWallpaper: Bitmap? = null
+
+    /**
+     * Translations for firmware LiveArea texts (system applications) used when
+     * a template has no live item for the system language and falls back to
+     * English, keyed by the English text.
+     */
+    var liveAreaFallbackTexts: Map<String, String> = emptyMap()
+    private var liveItemsFellBack = false
+    private var lockTextColor: Int? = null
+    private var lockDefaultColors: IntArray? = null
+
+    /**
+     * Theme Start Screen (StartScreenProperty): the image fills the page
+     * surface (896x448 at 32,64 of the 960x544 lock canvas, cover-scaled) and
+     * m_dateColor tints the date and clock. Null restores the default page.
+     */
+    fun setLockTheme(wallpaper: Bitmap?, textColor: Int?) {
+        lockWallpaper?.let { if (!it.isRecycled) it.recycle() }
+        lockWallpaper = wallpaper
+        lockTextColor = textColor
+        previousLockText = null
+    }
     private var previousLockText: String? = null
 
     /** Uploads one pack texture under its resource id (shell applications). */
@@ -447,7 +470,9 @@ class BundledImages(
                     val valign = textElement.getAttribute("valign").ifBlank { "center" }
                     val yOffset = textElement.getAttribute("y").toFloatOrNull() ?: 0f
                     for (str in textElement.children("str")) {
-                        val content = str.textContent.orEmpty()
+                        val content = str.textContent.orEmpty().let { text ->
+                            if (liveItemsFellBack) liveAreaFallbackTexts[text.trim()] ?: text else text
+                        }
                         if (content.isBlank()) continue
                         val size = str.getAttribute("size").toFloatOrNull() ?: 19.2f
                         val color = str.getAttribute("color").let {
@@ -527,6 +552,7 @@ class BundledImages(
      */
     private fun localizedLiveItems(items: List<Element>): List<Element> {
         val tagged = items.filter { it.children("lang").isNotEmpty() }
+        liveItemsFellBack = false
         if (tagged.isEmpty()) return items
         val locale = Locale.getDefault()
         val code = when (val language = locale.language.lowercase(Locale.ROOT)) {
@@ -537,8 +563,10 @@ class BundledImages(
             else -> language
         }
         fun lang(item: Element) = item.children("lang").first().textContent.trim().lowercase(Locale.ROOT)
-        val chosen = tagged.firstOrNull { lang(it) == code }
+        val exact = tagged.firstOrNull { lang(it) == code }
             ?: tagged.firstOrNull { lang(it) == code.substringBefore('-') }
+        liveItemsFellBack = exact == null
+        val chosen = exact
             ?: tagged.firstOrNull { lang(it) == "en" }
             ?: tagged.first()
         return items.filter { it.children("lang").isEmpty() } + chosen
@@ -880,6 +908,18 @@ class BundledImages(
         val base = rawKeylock ?: return
         val composited = base.copy(Bitmap.Config.ARGB_8888, true)
         val canvas = Canvas(composited)
+        lockWallpaper?.takeIf { !it.isRecycled }?.let { image ->
+            val page = android.graphics.RectF(32f, 64f, 928f, 512f)
+            val scale = maxOf(page.width() / image.width, page.height() / image.height)
+            val w = page.width() / scale
+            val h = page.height() / scale
+            val src = android.graphics.Rect(((image.width - w) / 2).toInt(), ((image.height - h) / 2).toInt(),
+                ((image.width + w) / 2).toInt(), ((image.height + h) / 2).toInt())
+            canvas.drawBitmap(image, src, page, Paint(Paint.FILTER_BITMAP_FLAG))
+        }
+        val textPaints = listOf(lockDatePaint, lockClockPaint, lockSeparatorPaint, lockAmPmPaint)
+        if (lockDefaultColors == null) lockDefaultColors = textPaints.map { it.color }.toIntArray()
+        textPaints.forEachIndexed { i, paint -> paint.color = lockTextColor ?: lockDefaultColors!![i] }
         val dateX = LockRcoLayout.screenX(LockRcoLayout.dateX)
         val dateBaseline = LockRcoLayout.screenBaseline(LockRcoLayout.dateY)
         canvas.drawText(dateText, dateX, dateBaseline, lockDatePaint)
@@ -915,6 +955,8 @@ class BundledImages(
     private fun releaseLockWallpaper() {
         rawKeylock?.let { if (!it.isRecycled) it.recycle() }
         rawKeylock = null
+        lockWallpaper?.let { if (!it.isRecycled) it.recycle() }
+        lockWallpaper = null
         previousLockText = null
     }
 

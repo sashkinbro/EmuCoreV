@@ -1730,6 +1730,7 @@
     <string name="native_ui_start">시작</string>
     <string name="native_ui_continue">계속</string>
     <string name="native_ui_no_notifications">알림이 없습니다.</string>
+    <string name="native_ui_users_guide">사용자 가이드</string>
     <string name="native_ui_trophies">트로피</string>
     <string name="native_ui_settings">설정</string>
     <string name="native_ui_trophy_earned">획득일</string>
@@ -1766,4 +1767,8 @@
     <string name="native_ui_set_exit_mode">라이브러리로 돌아가기</string>
     <string name="native_ui_set_edition">3.74 EmuCore Edition</string>
     <string name="native_ui_set_easter_egg">EmuCore Edition을 사용 중입니다. 플레이해 주셔서 감사합니다!</string>
+    <string name="native_ui_set_home_backgrounds">홈 화면의 배경</string>
+    <string name="native_ui_set_start_screen">시작 화면</string>
+    <string name="native_ui_set_install_theme">테마 설치…</string>
+    <string name="native_ui_set_choose_image">이미지 선택…</string>
 </resources>

@@ -1745,6 +1745,7 @@
     <string name="native_ui_start">Запуск</string>
     <string name="native_ui_continue">Продолжить</string>
     <string name="native_ui_no_notifications">Уведомления отсутствуют.</string>
+    <string name="native_ui_users_guide">Руководство пользователя</string>
     <string name="native_ui_trophies">Призы</string>
     <string name="native_ui_settings">Настройки</string>
     <string name="native_ui_trophy_earned">Получены</string>
@@ -1781,4 +1782,8 @@
     <string name="native_ui_set_exit_mode">Вернуться в библиотеку</string>
     <string name="native_ui_set_edition">3.74 EmuCore Edition</string>
     <string name="native_ui_set_easter_egg">У вас EmuCore Edition. Спасибо, что играете!</string>
+    <string name="native_ui_set_home_backgrounds">Фон начального экрана</string>
+    <string name="native_ui_set_start_screen">Экран запуска</string>
+    <string name="native_ui_set_install_theme">Установить тему…</string>
+    <string name="native_ui_set_choose_image">Выбрать изображение…</string>
 </resources>

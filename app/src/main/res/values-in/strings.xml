@@ -1731,6 +1731,7 @@
     <string name="native_ui_start">Mulai</string>
     <string name="native_ui_continue">Lanjutkan</string>
     <string name="native_ui_no_notifications">Tidak ada notifikasi.</string>
+    <string name="native_ui_users_guide">Panduan Pengguna</string>
     <string name="native_ui_trophies">Trofi</string>
     <string name="native_ui_settings">Pengaturan</string>
     <string name="native_ui_trophy_earned">Diperoleh</string>
@@ -1767,4 +1768,8 @@
     <string name="native_ui_set_exit_mode">Kembali ke Pustaka</string>
     <string name="native_ui_set_edition">3.74 EmuCore Edition</string>
     <string name="native_ui_set_easter_egg">Anda menggunakan EmuCore Edition. Terima kasih telah bermain!</string>
+    <string name="native_ui_set_home_backgrounds">Latar Layar Beranda</string>
+    <string name="native_ui_set_start_screen">Layar Mulai</string>
+    <string name="native_ui_set_install_theme">Pasang Tema…</string>
+    <string name="native_ui_set_choose_image">Pilih Gambar…</string>
 </resources>

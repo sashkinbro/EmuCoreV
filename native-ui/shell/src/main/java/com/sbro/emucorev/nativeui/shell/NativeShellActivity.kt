@@ -80,6 +80,7 @@ open class NativeShellActivity : NativeActivity() {
     private external fun nativeAppClose()
     private external fun nativeWaveThemes(): Array<String>
     private external fun nativeSetDisplayArea(mode: Int)
+    private external fun nativeSetHomeTheme(wallpapers: IntArray, barColor: Int)
     private var lastLiveAreaTarget: String? = null
     @Volatile private var catalogEntries: List<BundledImages.HomeCatalogEntry> = emptyList()
     private val requestedLiveAreas = java.util.Collections.synchronizedSet(HashSet<String>())
@@ -114,8 +115,63 @@ open class NativeShellActivity : NativeActivity() {
     protected open fun trophySource(): ShellTrophySource = ShellTrophySource { emptyList() }
 
     /** Full-screen applications reachable from their LiveArea gate. */
+    private val settingsApp by lazy { SettingsApp(settingsActions) }
+
     protected open fun shellApps(): List<ShellApp> =
-        listOf(TrophyCollectionApp(trophySource()), SettingsApp(settingsActions))
+        listOf(TrophyCollectionApp(trophySource()), settingsApp)
+
+    protected val shellThemes by lazy { ShellThemes(this) }
+    @Volatile private var lastStatus: DeviceStatusSource.Snapshot? = null
+
+    /**
+     * Applies the active theme / chosen photos: Home page backgrounds (or the
+     * wave), Start screen image and date colour, information bar colour.
+     * Runs on the shell worker.
+     */
+    private fun applyTheme() {
+        val loader = if (::images.isInitialized) images else return
+        val theme = shellThemes.active()
+        val home = if (shellThemes.homePhoto.isFile) listOf(shellThemes.homePhoto)
+            else theme?.homeBackgrounds.orEmpty()
+        val ids = home.mapIndexedNotNull { i, file ->
+            ShellThemes.decode(file)?.let { bitmap ->
+                try { loader.uploadBitmap(THEME_IMAGE_BASE + i, bitmap) } finally { bitmap.recycle() }
+                THEME_IMAGE_BASE + i
+            }
+        }
+        val start = if (shellThemes.startPhoto.isFile) shellThemes.startPhoto else theme?.startScreen
+        loader.setLockTheme(start?.let { ShellThemes.decode(it) }, theme?.dateColor)
+        lastStatus?.let(loader::updateLockClock)
+        synchronized(nativeBridgeLock) {
+            if (!closed.get()) nativeSetHomeTheme(ids.toIntArray(), theme?.barColor ?: 0)
+        }
+    }
+
+    private fun pick(request: Int, mime: String) { mainHandler.post {
+        if (closed.get() || isFinishing) return@post
+        runCatching {
+            startActivityForResult(android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                type = mime
+            }, request)
+        }.onFailure { Log.w(TAG, "No document picker", it) }
+    } }
+
+    @Deprecated("NativeActivity has no activity result registry")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data ?: return
+        if (resultCode != RESULT_OK) return
+        runApp {
+            when (requestCode) {
+                REQUEST_THEME -> shellThemes.import(uri).also { shellThemes.activeTheme = it.id }
+                REQUEST_HOME_PHOTO -> shellThemes.savePhoto(uri, shellThemes.homePhoto)
+                REQUEST_START_PHOTO -> shellThemes.savePhoto(uri, shellThemes.startPhoto)
+            }
+            applyTheme()
+            settingsApp.refresh()
+        }
+    }
 
     /** Version shown in Settings > System > System Information. */
     protected open val applicationVersion: String
@@ -131,6 +187,25 @@ open class NativeShellActivity : NativeActivity() {
         override fun applyDisplayArea(mode: Int) = nativeSetDisplayArea(mode)
         override fun applyClock() { mainHandler.post { deviceStatus.stop(); startStatusIfResumed() } }
         override fun exitMode() { mainHandler.post { if (!closed.get() && !isFinishing) onExitRequested() } }
+        override val customThemes get() = shellThemes.installed().map { it.id to it.title }
+        override val activeCustomTheme get() = shellThemes.activeTheme
+        override fun selectWaveTheme(name: String) {
+            shellSettings.waveTheme = name
+            shellThemes.activeTheme = null
+            nativeSetWaveTheme(name)
+            applyTheme()
+        }
+        override fun selectCustomTheme(id: String) {
+            shellThemes.activeTheme = id
+            applyTheme()
+        }
+        override fun installTheme() = pick(REQUEST_THEME, "application/zip")
+        override val hasHomePhoto get() = shellThemes.homePhoto.isFile
+        override val hasStartPhoto get() = shellThemes.startPhoto.isFile
+        override fun pickHomePhoto() = pick(REQUEST_HOME_PHOTO, "image/*")
+        override fun pickStartPhoto() = pick(REQUEST_START_PHOTO, "image/*")
+        override fun clearHomePhoto() { shellThemes.homePhoto.delete(); applyTheme() }
+        override fun clearStartPhoto() { shellThemes.startPhoto.delete(); applyTheme() }
     }
 
     private val apps by lazy { shellApps().associateBy { it.titleId } }
@@ -288,6 +363,7 @@ open class NativeShellActivity : NativeActivity() {
             }
             resourceRoot = resources
             val localLoader = BundledImages(resources, ::uploadImage)
+            localLoader.liveAreaFallbackTexts = mapOf("User's Guide" to getString(R.string.native_ui_users_guide))
             loader = localLoader
             when (requestedScene) {
                 2 -> localLoader.loadLockImages(loadCatalog() + systemCatalog(resources)) {
@@ -346,6 +422,7 @@ open class NativeShellActivity : NativeActivity() {
                 }
                 if (!published) return@post
                 startStatusIfResumed()
+                runApp { applyTheme() }
             }
             if (!posted) {
                 readyLoader.release()
@@ -507,6 +584,7 @@ open class NativeShellActivity : NativeActivity() {
                 2 -> raw.copy(use24HourClock = true)
                 else -> raw
             }
+            lastStatus = status
             images.updateClock(status)
             if (requestedScene == 2) {
                 images.updateLockClock(status)
@@ -546,6 +624,10 @@ open class NativeShellActivity : NativeActivity() {
     companion object {
         private const val TAG = "NativeShell"
         private const val APP_IMAGE_BASE = 60000
+        private const val THEME_IMAGE_BASE = 70000
+        private const val REQUEST_THEME = 7101
+        private const val REQUEST_HOME_PHOTO = 7102
+        private const val REQUEST_START_PHOTO = 7103
         private const val APP_IMAGE_BANK = 3000
         const val TROPHIES_TITLE_ID = "NPXS10008"
         const val SETTINGS_TITLE_ID = "NPXS10015"
