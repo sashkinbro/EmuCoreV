@@ -1746,4 +1746,25 @@
     <string name="native_ui_trophy_gold">Emas</string>
     <string name="native_ui_trophy_silver">Perak</string>
     <string name="native_ui_trophy_bronze">Perunggu</string>
+    <string name="native_ui_set_theme_background">Tema &amp; Latar</string>
+    <string name="native_ui_set_sound_display">Suara &amp; Tampilan</string>
+    <string name="native_ui_set_date_time">Tanggal &amp; Waktu</string>
+    <string name="native_ui_set_system">Sistem</string>
+    <string name="native_ui_set_time_format">Format Waktu</string>
+    <string name="native_ui_set_clock12">Jam 12 Jam</string>
+    <string name="native_ui_set_clock24">Jam 24 Jam</string>
+    <string name="native_ui_set_automatic">Otomatis</string>
+    <string name="native_ui_set_display_area">Pengaturan Area Tampilan</string>
+    <string name="native_ui_set_full">Penuh</string>
+    <string name="native_ui_set_system_information">Informasi Sistem</string>
+    <string name="native_ui_set_system_software">Perangkat Lunak Sistem</string>
+    <string name="native_ui_set_application">Aplikasi</string>
+    <string name="native_ui_set_theme">Tema</string>
+    <string name="native_ui_set_default">Bawaan</string>
+    <string name="native_ui_set_original">Asli</string>
+    <string name="native_ui_set_system_sounds">Suara Sistem</string>
+    <string name="native_ui_set_device">Perangkat</string>
+    <string name="native_ui_set_exit_mode">Kembali ke Pustaka</string>
+    <string name="native_ui_set_edition">3.74 EmuCore Edition</string>
+    <string name="native_ui_set_easter_egg">Anda menggunakan EmuCore Edition. Terima kasih telah bermain!</string>
 </resources>

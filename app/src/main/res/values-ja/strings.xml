@@ -1746,4 +1746,25 @@
     <string name="native_ui_trophy_gold">ゴールド</string>
     <string name="native_ui_trophy_silver">シルバー</string>
     <string name="native_ui_trophy_bronze">ブロンズ</string>
+    <string name="native_ui_set_theme_background">テーマ&amp;背景</string>
+    <string name="native_ui_set_sound_display">サウンド&amp;ディスプレイ</string>
+    <string name="native_ui_set_date_time">日付&amp;時刻</string>
+    <string name="native_ui_set_system">システム</string>
+    <string name="native_ui_set_time_format">時間表示</string>
+    <string name="native_ui_set_clock12">12時間</string>
+    <string name="native_ui_set_clock24">24時間</string>
+    <string name="native_ui_set_automatic">自動</string>
+    <string name="native_ui_set_display_area">表示エリア設定</string>
+    <string name="native_ui_set_full">フル</string>
+    <string name="native_ui_set_system_information">システム情報</string>
+    <string name="native_ui_set_system_software">システムソフトウェア</string>
+    <string name="native_ui_set_application">アプリケーション</string>
+    <string name="native_ui_set_theme">テーマ</string>
+    <string name="native_ui_set_default">オリジナル</string>
+    <string name="native_ui_set_original">オリジナル</string>
+    <string name="native_ui_set_system_sounds">システムサウンド</string>
+    <string name="native_ui_set_device">デバイス</string>
+    <string name="native_ui_set_exit_mode">ライブラリーに戻る</string>
+    <string name="native_ui_set_edition">3.74 EmuCore Edition</string>
+    <string name="native_ui_set_easter_egg">EmuCore Edition をお使いです。遊んでくれてありがとう！</string>
 </resources>

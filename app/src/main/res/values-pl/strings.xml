@@ -1760,4 +1760,25 @@
     <string name="native_ui_trophy_gold">Złoto</string>
     <string name="native_ui_trophy_silver">Srebro</string>
     <string name="native_ui_trophy_bronze">Brąz</string>
+    <string name="native_ui_set_theme_background">Motyw i tło</string>
+    <string name="native_ui_set_sound_display">Dźwięk i ekran</string>
+    <string name="native_ui_set_date_time">Data i godzina</string>
+    <string name="native_ui_set_system">System</string>
+    <string name="native_ui_set_time_format">Format godziny</string>
+    <string name="native_ui_set_clock12">Zegar 12-godz</string>
+    <string name="native_ui_set_clock24">Zegar 24-godz</string>
+    <string name="native_ui_set_automatic">Automatyczne</string>
+    <string name="native_ui_set_display_area">Ustawienia obszaru wyświetlania</string>
+    <string name="native_ui_set_full">Pełny</string>
+    <string name="native_ui_set_system_information">Informacje o systemie</string>
+    <string name="native_ui_set_system_software">Oprogramowanie systemu</string>
+    <string name="native_ui_set_application">Aplikacja</string>
+    <string name="native_ui_set_theme">Motyw</string>
+    <string name="native_ui_set_default">Domyślnie</string>
+    <string name="native_ui_set_original">Oryginalne</string>
+    <string name="native_ui_set_system_sounds">Dźwięki systemowe</string>
+    <string name="native_ui_set_device">Urządzenie</string>
+    <string name="native_ui_set_exit_mode">Powrót do biblioteki</string>
+    <string name="native_ui_set_edition">3.74 EmuCore Edition</string>
+    <string name="native_ui_set_easter_egg">Używasz EmuCore Edition. Dziękujemy za grę!</string>
 </resources>

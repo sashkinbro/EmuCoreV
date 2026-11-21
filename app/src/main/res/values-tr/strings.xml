@@ -1750,4 +1750,25 @@
     <string name="native_ui_trophy_gold">Altın</string>
     <string name="native_ui_trophy_silver">Gümüş</string>
     <string name="native_ui_trophy_bronze">Bronz</string>
+    <string name="native_ui_set_theme_background">Tema &amp; Arkaplan</string>
+    <string name="native_ui_set_sound_display">Ses &amp; Görüntü</string>
+    <string name="native_ui_set_date_time">Tarih &amp; Saat</string>
+    <string name="native_ui_set_system">Sistem</string>
+    <string name="native_ui_set_time_format">Saat Formatı</string>
+    <string name="native_ui_set_clock12">12 Saatlik Zaman Formatı</string>
+    <string name="native_ui_set_clock24">24 Saatlik Zaman Formatı</string>
+    <string name="native_ui_set_automatic">Otomatik</string>
+    <string name="native_ui_set_display_area">Alan Ayarlarını Görüntüle</string>
+    <string name="native_ui_set_full">Tam</string>
+    <string name="native_ui_set_system_information">Sistem Bilgileri</string>
+    <string name="native_ui_set_system_software">Sistem Yazılımı</string>
+    <string name="native_ui_set_application">Uygulama</string>
+    <string name="native_ui_set_theme">Tema</string>
+    <string name="native_ui_set_default">Varsayılan</string>
+    <string name="native_ui_set_original">Orijinal</string>
+    <string name="native_ui_set_system_sounds">Sistem Sesleri</string>
+    <string name="native_ui_set_device">Cihaz</string>
+    <string name="native_ui_set_exit_mode">Kütüphaneye Dön</string>
+    <string name="native_ui_set_edition">3.74 EmuCore Edition</string>
+    <string name="native_ui_set_easter_egg">EmuCore Edition kullanıyorsunuz. Oynadığınız için teşekkürler!</string>
 </resources>

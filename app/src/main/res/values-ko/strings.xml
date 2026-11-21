@@ -1745,4 +1745,25 @@
     <string name="native_ui_trophy_gold">골드</string>
     <string name="native_ui_trophy_silver">실버</string>
     <string name="native_ui_trophy_bronze">브론즈</string>
+    <string name="native_ui_set_theme_background">테마 &amp; 배경</string>
+    <string name="native_ui_set_sound_display">사운드 &amp; 디스플레이</string>
+    <string name="native_ui_set_date_time">날짜 &amp; 시각</string>
+    <string name="native_ui_set_system">시스템</string>
+    <string name="native_ui_set_time_format">시간 표시 형식</string>
+    <string name="native_ui_set_clock12">12 시간</string>
+    <string name="native_ui_set_clock24">24 시간</string>
+    <string name="native_ui_set_automatic">자동</string>
+    <string name="native_ui_set_display_area">표시 영역 설정</string>
+    <string name="native_ui_set_full">전체</string>
+    <string name="native_ui_set_system_information">시스템 정보</string>
+    <string name="native_ui_set_system_software">시스템 소프트웨어</string>
+    <string name="native_ui_set_application">애플리케이션</string>
+    <string name="native_ui_set_theme">테마</string>
+    <string name="native_ui_set_default">오리지널</string>
+    <string name="native_ui_set_original">오리지널</string>
+    <string name="native_ui_set_system_sounds">시스템 사운드</string>
+    <string name="native_ui_set_device">기기</string>
+    <string name="native_ui_set_exit_mode">라이브러리로 돌아가기</string>
+    <string name="native_ui_set_edition">3.74 EmuCore Edition</string>
+    <string name="native_ui_set_easter_egg">EmuCore Edition을 사용 중입니다. 플레이해 주셔서 감사합니다!</string>
 </resources>

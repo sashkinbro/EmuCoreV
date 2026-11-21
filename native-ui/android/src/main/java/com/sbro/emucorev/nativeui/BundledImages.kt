@@ -127,6 +127,10 @@ class BundledImages(
             loadPngResource(id.toLong(16).toInt(), "images/indicator_plugin/$id.png")
         }
         loadPngResource(STATUS_HOME_ICON, "images/applauncher_plugin/56aebd5f.png")
+        // Application corner button (paf-common corner_button style 35ca8ee7).
+        listOf("fb2979d5", "352ffde1", "c903feec").forEach { id ->
+            loadTexture(id.toLong(16).toInt(), "images/paf-common-resource/$id.png")
+        }
         listOf(
             TOPMENU_ARROW_LEFT to "images/topmenu_plugin/8ca9d181.png",
             TOPMENU_ARROW_RIGHT to "images/topmenu_plugin/168e9e6b.png",
@@ -421,7 +425,8 @@ class BundledImages(
         for (frame in root.children("frame")) {
             val frameId = frame.getAttribute("id")
             val frameRect = styleSpec.frameRects[frameId] ?: continue
-            for (liveItem in frame.children("liveitem")) {
+            for (liveItem in localizedLiveItems(frame.children("liveitem"))) {
+                var itemImageRect: FloatArray? = null
                 val imageElement = liveItem.children("image").firstOrNull()
                 if (imageElement != null) {
                     val relative = imageElement.directText()
@@ -429,6 +434,7 @@ class BundledImages(
                         val pair = uploadAsset(relative)
                         val bitmap = pair.second
                         val rect = styleSpec.imageRect(frameId, imageElement, bitmap.width, bitmap.height)
+                        itemImageRect = rect
                         bitmap.recycle()
                         frameImageIds += pair.first
                         frameRects += rect.toList()
@@ -449,7 +455,27 @@ class BundledImages(
                         }
                         val textBitmap = rasterLiveAreaText(content, size)
                         try {
-                            val rect = styleSpec.textRect(
+                            val image = itemImageRect
+                            val rect = if (textElement.getAttribute("origin") == "image" && image != null) {
+                                // Text placed against its item's image (e.g. outside-right).
+                                val w = textBitmap.width.toFloat()
+                                val h = textBitmap.height.toFloat()
+                                val x = when (align) {
+                                    "outside-right" -> image[0] + image[2]
+                                    "outside-left" -> image[0] - w
+                                    "left" -> image[0]
+                                    "right" -> image[0] + image[2] - w
+                                    else -> image[0] + (image[2] - w) * .5f
+                                }
+                                val y = when (valign) {
+                                    "outside-top" -> image[1] - h
+                                    "outside-bottom" -> image[1] + image[3]
+                                    "top" -> image[1]
+                                    "bottom" -> image[1] + image[3] - h
+                                    else -> image[1] + (image[3] - h) * .5f
+                                } - yOffset
+                                floatArrayOf(x, y, w, h)
+                            } else styleSpec.textRect(
                                 frameRect, textBitmap.width.toFloat(), textBitmap.height.toFloat(),
                                 align, valign, yOffset,
                             )
@@ -492,6 +518,30 @@ class BundledImages(
             targetRects = targetRects.toFloatArray(),
         )
         return snapshot
+    }
+
+    /**
+     * Live items may be duplicated per <lang>: keep the one for the system
+     * language (LiveArea codes; zh = simplified, ch = traditional, pt-br),
+     * else English, else the first; items without <lang> always stay.
+     */
+    private fun localizedLiveItems(items: List<Element>): List<Element> {
+        val tagged = items.filter { it.children("lang").isNotEmpty() }
+        if (tagged.isEmpty()) return items
+        val locale = Locale.getDefault()
+        val code = when (val language = locale.language.lowercase(Locale.ROOT)) {
+            "zh" -> if (locale.country in setOf("TW", "HK", "MO") || locale.script == "Hant") "ch" else "zh"
+            "pt" -> if (locale.country == "BR") "pt-br" else "pt"
+            "nb", "nn" -> "no"
+            "in" -> "id"
+            else -> language
+        }
+        fun lang(item: Element) = item.children("lang").first().textContent.trim().lowercase(Locale.ROOT)
+        val chosen = tagged.firstOrNull { lang(it) == code }
+            ?: tagged.firstOrNull { lang(it) == code.substringBefore('-') }
+            ?: tagged.firstOrNull { lang(it) == "en" }
+            ?: tagged.first()
+        return items.filter { it.children("lang").isEmpty() } + chosen
     }
 
     private fun rasterLiveAreaText(text: String, size: Float): Bitmap {

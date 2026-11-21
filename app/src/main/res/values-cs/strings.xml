@@ -1761,4 +1761,25 @@
     <string name="native_ui_trophy_gold">Zlatá</string>
     <string name="native_ui_trophy_silver">Stříbrná</string>
     <string name="native_ui_trophy_bronze">Bronzová</string>
+    <string name="native_ui_set_theme_background">Motiv a pozadí</string>
+    <string name="native_ui_set_sound_display">Zvuk a obraz</string>
+    <string name="native_ui_set_date_time">Datum a čas</string>
+    <string name="native_ui_set_system">Systém</string>
+    <string name="native_ui_set_time_format">Formát času</string>
+    <string name="native_ui_set_clock12">12hodinový formát</string>
+    <string name="native_ui_set_clock24">24hodinový formát</string>
+    <string name="native_ui_set_automatic">Automaticky</string>
+    <string name="native_ui_set_display_area">Nastavení oblasti zobrazení</string>
+    <string name="native_ui_set_full">Celá</string>
+    <string name="native_ui_set_system_information">Informace o systému</string>
+    <string name="native_ui_set_system_software">Systémový software</string>
+    <string name="native_ui_set_application">Aplikace</string>
+    <string name="native_ui_set_theme">Motiv</string>
+    <string name="native_ui_set_default">Výchozí</string>
+    <string name="native_ui_set_original">Původní</string>
+    <string name="native_ui_set_system_sounds">Systémové zvuky</string>
+    <string name="native_ui_set_device">Zařízení</string>
+    <string name="native_ui_set_exit_mode">Zpět do knihovny</string>
+    <string name="native_ui_set_edition">3.74 EmuCore Edition</string>
+    <string name="native_ui_set_easter_egg">Používáte edici EmuCore. Děkujeme, že hrajete!</string>
 </resources>

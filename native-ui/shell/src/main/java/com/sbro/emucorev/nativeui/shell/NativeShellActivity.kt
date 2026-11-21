@@ -78,6 +78,8 @@ open class NativeShellActivity : NativeActivity() {
         rowGeometry: FloatArray, rowSelectable: BooleanArray, focus: Int,
     )
     private external fun nativeAppClose()
+    private external fun nativeWaveThemes(): Array<String>
+    private external fun nativeSetDisplayArea(mode: Int)
     private var lastLiveAreaTarget: String? = null
     @Volatile private var catalogEntries: List<BundledImages.HomeCatalogEntry> = emptyList()
     private val requestedLiveAreas = java.util.Collections.synchronizedSet(HashSet<String>())
@@ -112,7 +114,24 @@ open class NativeShellActivity : NativeActivity() {
     protected open fun trophySource(): ShellTrophySource = ShellTrophySource { emptyList() }
 
     /** Full-screen applications reachable from their LiveArea gate. */
-    protected open fun shellApps(): List<ShellApp> = listOf(TrophyCollectionApp(trophySource()))
+    protected open fun shellApps(): List<ShellApp> =
+        listOf(TrophyCollectionApp(trophySource()), SettingsApp(settingsActions))
+
+    /** Version shown in Settings > System > System Information. */
+    protected open val applicationVersion: String
+        get() = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty()
+
+    protected val shellSettings by lazy { ShellSettings(this) }
+
+    private val settingsActions = object : SettingsActions {
+        override val settings get() = shellSettings
+        override val waveThemes: List<String> get() = nativeWaveThemes().toList()
+        override val applicationVersion get() = this@NativeShellActivity.applicationVersion
+        override fun applyWaveTheme(name: String) = nativeSetWaveTheme(name)
+        override fun applyDisplayArea(mode: Int) = nativeSetDisplayArea(mode)
+        override fun applyClock() { mainHandler.post { deviceStatus.stop(); startStatusIfResumed() } }
+        override fun exitMode() { mainHandler.post { if (!closed.get() && !isFinishing) onExitRequested() } }
+    }
 
     private val apps by lazy { shellApps().associateBy { it.titleId } }
     @Volatile private var resourceRoot: File? = null
@@ -134,7 +153,7 @@ open class NativeShellActivity : NativeActivity() {
         override fun show(page: ShellPage, transition: ShellTransition) = publishAppPage(page, transition)
     }
 
-    private fun appTexturePath(id: Int): String? = TrophyCollectionApp.TEXTURES[id]
+    private fun appTexturePath(id: Int): String? = TrophyCollectionApp.TEXTURES[id] ?: SettingsApp.TEXTURES[id]
 
     /** Uploads a page's rasters into a rotating id bank and hands it to native. */
     private fun publishAppPage(page: ShellPage, transition: ShellTransition) {
@@ -213,7 +232,8 @@ open class NativeShellActivity : NativeActivity() {
         assets.open("startup-busy.png").use { input ->
             File(startupRoot, "startup-busy.png").outputStream().use { output -> input.copyTo(output) }
         }
-        nativeSetWaveTheme(waveTheme)
+        nativeSetWaveTheme(intent.getStringExtra("wave_theme") ?: shellSettings.waveTheme)
+        nativeSetDisplayArea(shellSettings.displayArea)
         nativeResourceRoot(startupRoot.absolutePath)
         nativePreviewScene(if (requestedScene == 4) 4 else 1)
         nativePreviewLoading(requestedScene != 1 && requestedScene != 4)
@@ -431,7 +451,7 @@ open class NativeShellActivity : NativeActivity() {
 
     @Suppress("unused")
     fun onNativeUiSound(soundId: Int) {
-        soundBank?.play(soundId)
+        if (shellSettings.systemSounds) soundBank?.play(soundId)
     }
 
     @Suppress("unused")
@@ -481,7 +501,12 @@ open class NativeShellActivity : NativeActivity() {
 
     private fun startStatusIfResumed() {
         if (!resumed || !ready || (requestedScene != 0 && requestedScene != 2 && requestedScene != 3)) return
-        deviceStatus.start { status ->
+        deviceStatus.start { raw ->
+            val status = when (shellSettings.clock) {
+                1 -> raw.copy(use24HourClock = false)
+                2 -> raw.copy(use24HourClock = true)
+                else -> raw
+            }
             images.updateClock(status)
             if (requestedScene == 2) {
                 images.updateLockClock(status)

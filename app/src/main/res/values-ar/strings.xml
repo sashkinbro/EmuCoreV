@@ -1770,4 +1770,25 @@
     <string name="native_ui_trophy_gold">ذهبي</string>
     <string name="native_ui_trophy_silver">فضي</string>
     <string name="native_ui_trophy_bronze">برونزي</string>
+    <string name="native_ui_set_theme_background">السمة والخلفية</string>
+    <string name="native_ui_set_sound_display">الصوت والعرض</string>
+    <string name="native_ui_set_date_time">التاريخ والوقت</string>
+    <string name="native_ui_set_system">النظام</string>
+    <string name="native_ui_set_time_format">تنسيق الوقت</string>
+    <string name="native_ui_set_clock12">ساعة 12 ساعة</string>
+    <string name="native_ui_set_clock24">ساعة 24 ساعة</string>
+    <string name="native_ui_set_automatic">تلقائي</string>
+    <string name="native_ui_set_display_area">إعدادات منطقة العرض</string>
+    <string name="native_ui_set_full">كامل</string>
+    <string name="native_ui_set_system_information">معلومات النظام</string>
+    <string name="native_ui_set_system_software">برنامج النظام</string>
+    <string name="native_ui_set_application">التطبيق</string>
+    <string name="native_ui_set_theme">السمة</string>
+    <string name="native_ui_set_default">افتراضي</string>
+    <string name="native_ui_set_original">أصلي</string>
+    <string name="native_ui_set_system_sounds">أصوات النظام</string>
+    <string name="native_ui_set_device">الجهاز</string>
+    <string name="native_ui_set_exit_mode">العودة إلى المكتبة</string>
+    <string name="native_ui_set_edition">3.74 إصدار EmuCore</string>
+    <string name="native_ui_set_easter_egg">أنت تستخدم إصدار EmuCore. شكرًا لك على اللعب!</string>
 </resources>

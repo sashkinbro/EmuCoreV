@@ -142,6 +142,8 @@ std::string resource_root;
 // Physical safe area from the host window, in surface pixels:
 // cutout insets (left, top, right, bottom) and rounded corner radii (TL, TR, BR, BL).
 std::array<float, 8> safe_area_px{};
+// Settings > Sound & Display > Display Area: 0 full screen, 1 original 960x544.
+std::atomic<int> display_area_mode{0};
 std::string requested_wave_theme = "effects_default_0512_01";
 std::uint64_t wave_theme_revision = 1;
 template<class T> std::vector<T> read_path(const std::string& relative, std::size_t count) {
@@ -413,7 +415,9 @@ struct Window {
             emit_app_event(&app_back_callback, app, key, 0, false);
         };
         app_screen.on_sound = [](int id) { emit_ui_sound(id); };
-        app_screen.back_icon = edit_back_icon_id;
+        app_screen.back_icon = 0x352ffde1u;
+        app_screen.back_bg = 0xfb2979d5u;
+        app_screen.back_highlight = 0xc903feecu;
     }
     void apply_pending_app_pages() {
         std::vector<PendingAppPage> pages;
@@ -624,7 +628,8 @@ struct Window {
     // to the display aspect.
     void ensure_canvas(EGLint width, EGLint height) {
         float w = 960.f, h = 544.f;
-        if (width > 0 && height > 0) {
+        const bool original_area = display_area_mode.load() == 1;
+        if (width > 0 && height > 0 && !original_area) {
             const float aspect = float(width) / float(height);
             if (aspect >= 960.f / 544.f) w = std::min(std::round(544.f * aspect), 1600.f);
             else h = std::min(std::round(960.f / aspect), 900.f);
@@ -642,12 +647,14 @@ struct Window {
                 const float k = radius_px - d;
                 return (radius_px - std::sqrt(radius_px * radius_px - k * k)) / scale;
             };
-            l = std::max(area[0] / scale, std::max(corner(area[4]), corner(area[7])));
-            r = std::max(area[2] / scale, std::max(corner(area[5]), corner(area[6])));
-            t = area[1] / scale;
-            b = area[3] / scale;
+            if (!original_area) {
+                l = std::max(area[0] / scale, std::max(corner(area[4]), corner(area[7])));
+                r = std::max(area[2] / scale, std::max(corner(area[5]), corner(area[6])));
+                t = area[1] / scale;
+                b = area[3] / scale;
+            }
             surf_scale = scale;
-            orb_scale = 1.f + std::clamp(area[5] / scale / 72.f, 0.f, 0.45f);
+            orb_scale = original_area ? 1.f : 1.f + std::clamp(area[5] / scale / 72.f, 0.f, 0.45f);
             surface_w = width;
             surface_h = height;
         }
@@ -3033,6 +3040,26 @@ Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeAppPage(JNIEnv* 
     const std::lock_guard lock(status_mutex);
     pending_app_pages.push_back({std::move(page), transition});
     if (native_preview_looper) ALooper_wake(native_preview_looper);
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeWaveThemes(JNIEnv* env, jobject) {
+    const auto presets = emucorev::paf::wave_theme_presets();
+    jclass string_class = env->FindClass("java/lang/String");
+    if (!string_class) return nullptr;
+    jobjectArray result = env->NewObjectArray(jsize(presets.size()), string_class, nullptr);
+    for (std::size_t i = 0; result && i < presets.size(); ++i) {
+        const std::string name(presets[i].name);
+        jstring value = env->NewStringUTF(name.c_str());
+        env->SetObjectArrayElement(result, jsize(i), value);
+        env->DeleteLocalRef(value);
+    }
+    return result;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeSetDisplayArea(JNIEnv*, jobject, jint mode) {
+    display_area_mode.store(mode == 1 ? 1 : 0);
 }
 
 extern "C" JNIEXPORT void JNICALL

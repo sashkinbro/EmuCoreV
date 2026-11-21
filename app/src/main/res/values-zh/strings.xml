@@ -1744,4 +1744,25 @@
     <string name="native_ui_trophy_gold">金</string>
     <string name="native_ui_trophy_silver">银</string>
     <string name="native_ui_trophy_bronze">铜</string>
+    <string name="native_ui_set_theme_background">主题&amp;背景</string>
+    <string name="native_ui_set_sound_display">声音&amp; 显示器</string>
+    <string name="native_ui_set_date_time">日期&amp;时间</string>
+    <string name="native_ui_set_system">系统</string>
+    <string name="native_ui_set_time_format">时间格式</string>
+    <string name="native_ui_set_clock12">12小时制</string>
+    <string name="native_ui_set_clock24">24小时制</string>
+    <string name="native_ui_set_automatic">自动</string>
+    <string name="native_ui_set_display_area">显示区域设定</string>
+    <string name="native_ui_set_full">全部</string>
+    <string name="native_ui_set_system_information">系统信息</string>
+    <string name="native_ui_set_system_software">系统软件</string>
+    <string name="native_ui_set_application">应用程序</string>
+    <string name="native_ui_set_theme">主题</string>
+    <string name="native_ui_set_default">原始</string>
+    <string name="native_ui_set_original">原始</string>
+    <string name="native_ui_set_system_sounds">系统音效</string>
+    <string name="native_ui_set_device">设备</string>
+    <string name="native_ui_set_exit_mode">返回游戏库</string>
+    <string name="native_ui_set_edition">3.74 EmuCore Edition</string>
+    <string name="native_ui_set_easter_egg">您正在使用 EmuCore Edition。感谢游玩！</string>
 </resources>

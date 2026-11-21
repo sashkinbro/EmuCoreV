@@ -63,7 +63,9 @@ public:
     std::function<void(const std::string&, int, int)> on_row;   // app, page key, row
     std::function<void(const std::string&, int)> on_back;       // app, page key
     std::function<void(int)> on_sound;
-    std::uint32_t back_icon = 0;
+    std::uint32_t back_icon = 0;       // corner_button corner_obj (352ffde1)
+    std::uint32_t back_bg = 0;         // corner_button bg_obj (fb2979d5)
+    std::uint32_t back_highlight = 0;  // corner_button highlight_obj (c903feec)
 
     bool active() const noexcept { return !pages_.empty() || closing_ > 0.f; }
     bool visible() const noexcept { return active(); }
@@ -134,6 +136,7 @@ public:
             if (p.scroll > max) { p.scroll += (max - p.scroll) * std::min(1.f, dt * 14.f); p.velocity *= 0.5f; }
         }
         if (press_row_ >= 0) press_time_ += dt;
+        if (release_glow_ > 0.f) release_glow_ = std::max(0.f, release_glow_ - dt);
     }
 
     void draw(emucorev::paf::SpriteRenderer& sprites, const Canvas& c) {
@@ -198,7 +201,10 @@ public:
                 if (on_sound) on_sound(2);
                 if (on_back) on_back(p.app, p.key);
             } else if (press_row_ >= 0 && row_at(x, y) == press_row_) {
-                p.focus = press_row_;
+                // Touch hides the key focus cursor; it only lights while pressed.
+                p.focus = -1;
+                release_row_ = press_row_;
+                release_glow_ = 0.18f;
                 if (on_sound) on_sound(1);
                 if (on_row) on_row(p.app, p.key, press_row_);
             }
@@ -248,7 +254,7 @@ private:
     }
 
     bool in_back(float x, float y) const noexcept {
-        return x < back_x_ + 72.f && y > back_y_ - 16.f;
+        return x < back_x_ + 90.f && y > back_y_;
     }
 
     int row_at(float x, float y) const noexcept {
@@ -296,7 +302,8 @@ private:
             if (y0 + r.height < l[1] - 2.f || y0 > l[1] + l[3] + 2.f) continue;
             const float x = sx(l[0] + r.x), y = sy(y0), w = r.width * scale, h = r.height * scale;
             if (r.plate) sprites.draw(r.plate, x, y, w, h, ltint);
-            const bool pressed = i == press_row_ && press_time_ > 0.03f && &p == &pages_.back();
+            const bool pressed = &p == &pages_.back()
+                && ((i == press_row_ && press_time_ > 0.03f) || (i == release_row_ && release_glow_ > 0.f));
             const bool focused = i == p.focus && &p == &pages_.back();
             if (r.glow && (pressed || focused)) {
                 sprites.set_additive_blend(true);
@@ -316,13 +323,16 @@ private:
             sprites.draw(0, sx(l[0] + l[2] - 8.f), sy(l[1] + (l[3] - bar_h) * t), 4.f, bar_h * scale,
                 {1.f, 1.f, 1.f, 0.45f * la});
         }
-        // Corner back button (bottom-left), as in Vita applications.
-        back_x_ = c.edge_left;
-        back_y_ = c.edge_bottom - 64.f;
-        if (back_icon) {
-            const float a = alpha * (back_pressed_ && &p == &pages_.back() ? 0.6f : 1.f);
-            sprites.draw(back_icon, back_x_ + 8.f, back_y_ + 4.f, 56.f, 56.f, {1.f, 1.f, 1.f, a});
-        }
+        // Corner back button (paf-common style 35ca8ee7, layout_type 2): a
+        // 90x90 quarter plane flush with the bottom-left corner, tinted
+        // (0.16, 0.15, 0.22, 0.8), with the 64x64 arrow offset (-13, -11).
+        back_x_ = -c.cx0;
+        back_y_ = 544.f + c.cy0 - 90.f;
+        if (back_bg) sprites.draw(back_bg, back_x_, back_y_, 90.f, 90.f, {0.16f, 0.15f, 0.22f, 0.8f * alpha});
+        if (back_pressed_ && back_highlight && &p == &pages_.back())
+            sprites.draw(back_highlight, back_x_, back_y_, 90.f, 90.f, {1.f, 1.f, 1.f, alpha});
+        if (back_icon) sprites.draw(back_icon, back_x_ + 45.f - 13.f - 32.f, back_y_ + 45.f + 11.f - 32.f,
+            64.f, 64.f, {1.f, 1.f, 1.f, alpha});
     }
 
     std::vector<Page> pages_;
@@ -332,6 +342,8 @@ private:
     bool dragging_ = false, moved_ = false, back_pressed_ = false;
     float down_x_ = 0.f, down_y_ = 0.f, last_y_ = 0.f, press_time_ = 0.f;
     int press_row_ = -1;
+    int release_row_ = -1;
+    float release_glow_ = 0.f;
     mutable float back_x_ = 0.f, back_y_ = 480.f;
 };
 
