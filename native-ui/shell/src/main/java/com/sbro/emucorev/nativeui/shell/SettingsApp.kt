@@ -104,12 +104,14 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
                 2 -> push(host, START_SCREEN)
             }
             THEME -> {
-                // As on the Vita: the Default theme, then installed themes.
+                // Default, the standard wave colour themes, installed themes, install.
                 val custom = actions.customThemes
+                val first = 1 + STANDARD_THEMES.size
                 when {
                     row == 0 -> actions.selectWaveTheme(ShellSettings.DEFAULT_THEME)
-                    row - 1 < custom.size -> {
-                        val id = custom[row - 1].first
+                    row < first -> actions.selectWaveTheme(STANDARD_THEMES[row - 1].first)
+                    row - first < custom.size -> {
+                        val id = custom[row - first].first
                         if (id == actions.activeCustomTheme) {
                             // Tapping the theme in use opens its page (information, delete).
                             detailTheme = id
@@ -142,10 +144,14 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
                 when (row) {
                     0 -> { s.systemMusic = !s.systemMusic; actions.applyMusic() }
                     1 -> s.systemSounds = !s.systemSounds
-                    2 -> { s.displayArea = 0; actions.applyDisplayArea(0) }
-                    3 -> { s.displayArea = 1; actions.applyDisplayArea(1) }
+                    2 -> { push(host, DISPLAY_AREA); return }
                 }
                 host.show(page(host, SOUND_DISPLAY), ShellTransition.REPLACE)
+            }
+            DISPLAY_AREA -> if (row in 0..1) {
+                s.displayArea = row
+                actions.applyDisplayArea(row)
+                host.show(page(host, DISPLAY_AREA), ShellTransition.REPLACE)
             }
             DATE_TIME -> if (row in 0..2) {
                 s.clock = row
@@ -162,6 +168,7 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
             ROOT -> host.close()
             SYSTEM_INFO -> host.show(page(host, SYSTEM), ShellTransition.POP)
             THEME_DETAIL -> host.show(page(host, THEME), ShellTransition.POP)
+            DISPLAY_AREA -> host.show(page(host, SOUND_DISPLAY), ShellTransition.POP)
             THEME, HOME_BACKGROUNDS, START_SCREEN -> host.show(page(host, THEME_BACKGROUND), ShellTransition.POP)
             else -> host.show(page(host, ROOT), ShellTransition.POP)
         }
@@ -188,7 +195,11 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
             )
             THEME -> host.string(R.string.native_ui_set_theme) to buildList {
                 val custom = actions.activeCustomTheme
-                add(Item(host.string(R.string.native_ui_set_default), check = custom == null))
+                add(Item(host.string(R.string.native_ui_set_default),
+                    check = custom == null && s.waveTheme == ShellSettings.DEFAULT_THEME))
+                STANDARD_THEMES.forEach { (effect, name) ->
+                    add(Item(host.string(name), check = custom == null && s.waveTheme == effect))
+                }
                 actions.customThemes.forEach { (id, title) -> add(Item(title, check = id == custom)) }
                 add(Item(host.string(R.string.native_ui_set_install_theme), arrow = true))
             }
@@ -212,10 +223,12 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
             SOUND_DISPLAY -> host.string(R.string.native_ui_set_sound_display) to listOf(
                 Item(host.string(R.string.native_ui_set_system_music), check = s.systemMusic),
                 Item(host.string(R.string.native_ui_set_system_sounds), check = s.systemSounds),
-                Item("${host.string(R.string.native_ui_set_display_area)}: ${host.string(R.string.native_ui_set_full)}",
-                    check = s.displayArea == 0),
-                Item("${host.string(R.string.native_ui_set_display_area)}: ${host.string(R.string.native_ui_set_original)}",
-                    check = s.displayArea == 1),
+                Item(host.string(R.string.native_ui_set_display_area), arrow = true,
+                    value = host.string(if (s.displayArea == 0) R.string.native_ui_set_full else R.string.native_ui_set_original)),
+            )
+            DISPLAY_AREA -> host.string(R.string.native_ui_set_display_area) to listOf(
+                Item(host.string(R.string.native_ui_set_full), check = s.displayArea == 0),
+                Item(host.string(R.string.native_ui_set_original), check = s.displayArea == 1),
             )
             DATE_TIME -> host.string(R.string.native_ui_set_time_format) to listOf(
                 Item(host.string(R.string.native_ui_set_automatic), check = s.clock == 0),
@@ -257,7 +270,8 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
             labelX = 96f
         }
         val trailing = if (item.arrow || item.check != null) 70f else 24f
-        val valueWidth = if (item.value != null) 300f else 0f
+        val valuePaint = text.paint(20f, bold = true)
+        val valueWidth = item.value?.let { minOf(300f, valuePaint.measureText(it) + 8f) } ?: 0f
         val label = text.paint(28f, bold = true)
         if (!item.selectable && item.value == null) {
             // Free text row (easter egg): wrap over the full width.
@@ -266,7 +280,7 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
             text.line(c, item.label, labelX, 40f, 840f - labelX - trailing - valueWidth - 16f, label)
         }
         item.value?.let {
-            text.line(c, it, 840f - trailing, 40f, valueWidth, text.paint(20f, bold = true), Paint.Align.RIGHT)
+            text.line(c, it, 840f - trailing, 40f, valueWidth, valuePaint, Paint.Align.RIGHT)
         }
         if (item.arrow) c.drawTexture(host.texture(ARROW), RectF(774f, 17f, 820f, 63f))
         item.check?.let { checked ->
@@ -298,6 +312,27 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
         private const val HOME_BACKGROUNDS = 7
         private const val START_SCREEN = 8
         private const val THEME_DETAIL = 9
+        private const val DISPLAY_AREA = 10
+
+        /** Standard wave colour themes: libpaf effect and localized colour name. */
+        val STANDARD_THEMES = listOf(
+            "effects_black" to R.string.native_ui_color_black,
+            "effects_blueTB_0513_01" to R.string.native_ui_color_blue,
+            "effects_bluewhite_05" to R.string.native_ui_color_light_blue,
+            "effects_turquoise_0513_01" to R.string.native_ui_color_turquoise,
+            "effects_green_0512_01" to R.string.native_ui_color_green,
+            "effects_limegreen_0513_02" to R.string.native_ui_color_lime,
+            "effects_yellow_0512_01" to R.string.native_ui_color_yellow,
+            "effects_marrygold" to R.string.native_ui_color_marigold,
+            "effects_0408_01_orange" to R.string.native_ui_color_orange,
+            "effects_redTB_0513_01" to R.string.native_ui_color_red,
+            "effects_0406_ruby" to R.string.native_ui_color_ruby,
+            "effects_peach_0512_001" to R.string.native_ui_color_peach,
+            "effects_purplered" to R.string.native_ui_color_magenta,
+            "effects_purple_01" to R.string.native_ui_color_purple,
+            "effects_0407_purple_01" to R.string.native_ui_color_violet,
+            "effects_0518_gray_FLAT" to R.string.native_ui_color_gray,
+        )
 
         const val BACKGROUND = 0xa67cb5df.toInt()
         const val ROW_PLATE = 0x29b91f26

@@ -147,7 +147,8 @@ open class NativeShellActivity : NativeActivity() {
             }
         }
         // The wave follows the theme's m_waveType, otherwise the Default theme's.
-        val wave = theme?.waveType?.let { ShellThemes.WAVE_TYPES.getOrNull(it) } ?: ShellSettings.DEFAULT_THEME
+        val wave = if (theme != null) theme.waveType?.let { ShellThemes.WAVE_TYPES.getOrNull(it) }
+            ?: ShellSettings.DEFAULT_THEME else shellSettings.waveTheme
         synchronized(nativeBridgeLock) { if (!closed.get()) nativeSetWaveTheme(wave) }
         val start = if (shellThemes.startPhoto.isFile) shellThemes.startPhoto else theme?.startScreen
         loader.setLockTheme(start?.let { ShellThemes.decode(it) }, theme?.dateColor)
@@ -364,7 +365,7 @@ open class NativeShellActivity : NativeActivity() {
         assets.open("startup-busy.png").use { input ->
             File(startupRoot, "startup-busy.png").outputStream().use { output -> input.copyTo(output) }
         }
-        nativeSetWaveTheme(intent.getStringExtra("wave_theme") ?: ShellSettings.DEFAULT_THEME)
+        nativeSetWaveTheme(intent.getStringExtra("wave_theme") ?: shellSettings.waveTheme)
         nativeSetDisplayArea(shellSettings.displayArea)
         nativeResourceRoot(startupRoot.absolutePath)
         nativePreviewScene(if (requestedScene == 4) 4 else 1)
