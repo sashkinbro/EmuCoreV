@@ -1729,4 +1729,6 @@
     <string name="native_ui_start">开始</string>
     <string name="native_ui_continue">继续</string>
     <string name="native_ui_no_notifications">没有最新资讯。</string>
+    <string name="native_ui_trophies">奖杯</string>
+    <string name="native_ui_settings">设定</string>
 </resources>

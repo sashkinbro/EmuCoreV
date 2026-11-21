@@ -73,6 +73,10 @@ run {
     if (vcpkgRoot.exists()) setEnv("VCPKG_ROOT", vcpkgRoot.absolutePath.replace('\\', '/'))
 }
 
+// The native PS Vita shell module exists only when its local resource pack does
+// (see settings.gradle.kts); otherwise library mode keeps the Compose carousel.
+val nativeShellAvailable = rootProject.findProject(":native-ui-shell") != null
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -124,6 +128,7 @@ android {
         buildConfigField("String", "FEEDBACK_API_KEY", buildConfigString(feedbackApiKey))
         buildConfigField("long", "DISCORD_APPLICATION_ID", "${discordApplicationId}L")
         buildConfigField("boolean", "DISCORD_SDK_AVAILABLE", (discordSdkDirectory != null).toString())
+        buildConfigField("boolean", "NATIVE_SHELL", nativeShellAvailable.toString())
         manifestPlaceholders["discordSdkAvailable"] = (discordSdkDirectory != null).toString()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -214,7 +219,9 @@ android {
 
     sourceSets {
         getByName("main") {
-            java.setSrcDirs(listOf("src/main/java"))
+            val shellSources = if (nativeShellAvailable) "src/nativeShell/java" else "src/nativeShellStub/java"
+            java.setSrcDirs(listOf("src/main/java", shellSources))
+            kotlin.srcDir(shellSources)
             res.setSrcDirs(listOf("src/main/res"))
             assets.setSrcDirs(
                 listOf(
@@ -271,6 +278,7 @@ tasks.configureEach {
 }
 
 dependencies {
+    if (nativeShellAvailable) implementation(project(":native-ui-shell"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)

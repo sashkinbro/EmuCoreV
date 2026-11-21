@@ -13,9 +13,12 @@ object NativeLibraryMode {
     const val TITLE_ID = "__VITA_NATIVE_LIBRARY__"
     const val RETURN_TO_NATIVE_LIBRARY = "return_to_native_library"
     const val EXIT_NATIVE_LIBRARY = "exit_native_library"
-    // Presentation parity is still incomplete (trophies guest, layouts, settings);
-    // the emulated reference mode stays behind the debug gate until that is done.
-    val available: Boolean get() = BuildConfig.DEBUG
+    /** Activities whose launches return to the native shell after the game. */
+    interface ReturnTarget
+
+    // The standalone native shell (native-ui) replaces the former emulated
+    // firmware library; it is present whenever the build bundles its pack.
+    val available: Boolean get() = BuildConfig.NATIVE_SHELL
 
     fun needsCatalogBootstrap(context: Context): Boolean {
         val database = File(context.cacheDir, "native-shell-runtime/vita/ur0/shell/db/app.db")
@@ -61,7 +64,13 @@ object NativeLibraryMode {
         return root
     }
 
-    fun intent(context: Context): Intent = Intent(context, NativeLibraryActivity::class.java).apply {
+    fun intent(context: Context): Intent = Intent(context, NativeShellHostActivity::class.java).apply {
+        action = "LAUNCH_NATIVE_LIBRARY"
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+    }
+
+    /** The former emulated firmware library (debug research only). */
+    fun emulatedIntent(context: Context): Intent = Intent(context, NativeLibraryActivity::class.java).apply {
         action = "LAUNCH_NATIVE_LIBRARY"
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
         putExtra("AppStartParameters", arrayOf("-r", TITLE_ID))

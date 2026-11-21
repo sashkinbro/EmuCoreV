@@ -108,7 +108,8 @@ object VitaLaunchBridge {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra(APP_RESTART_PARAMETERS, args)
             putExtra(AUTOMATIC_STATE_LOAD_EXTRA, automaticLoad)
-            if (context is Emulator && context.returnsToNativeLibrary) {
+            if ((context is Emulator && context.returnsToNativeLibrary) ||
+                context is com.sbro.emucorev.core.vita.NativeLibraryMode.ReturnTarget) {
                 putExtra(com.sbro.emucorev.core.vita.NativeLibraryMode.RETURN_TO_NATIVE_LIBRARY, true)
             }
             this.action = "${action}_${System.currentTimeMillis()}"

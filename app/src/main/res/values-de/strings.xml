@@ -1735,4 +1735,6 @@
     <string name="native_ui_start">Starten</string>
     <string name="native_ui_continue">Fortfahren</string>
     <string name="native_ui_no_notifications">Es gibt keine Mitteilungen.</string>
+    <string name="native_ui_trophies">Trophäen</string>
+    <string name="native_ui_settings">Einstellungen</string>
 </resources>

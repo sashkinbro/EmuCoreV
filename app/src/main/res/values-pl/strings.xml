@@ -1745,4 +1745,6 @@
     <string name="native_ui_start">Rozpocznij</string>
     <string name="native_ui_continue">Kontynuuj</string>
     <string name="native_ui_no_notifications">Brak powiadomień.</string>
+    <string name="native_ui_trophies">Trofea</string>
+    <string name="native_ui_settings">Ustawienia</string>
 </resources>

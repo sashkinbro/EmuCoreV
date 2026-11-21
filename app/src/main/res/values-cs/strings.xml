@@ -1746,4 +1746,6 @@
     <string name="native_ui_start">Spustit</string>
     <string name="native_ui_continue">Pokračovat</string>
     <string name="native_ui_no_notifications">Nejsou k dispozici žádná oznámení.</string>
+    <string name="native_ui_trophies">Trofeje</string>
+    <string name="native_ui_settings">Nastavení</string>
 </resources>

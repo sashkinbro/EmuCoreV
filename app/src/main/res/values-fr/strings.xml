@@ -1740,4 +1740,6 @@
     <string name="native_ui_start">Démarrer</string>
     <string name="native_ui_continue">Continuer</string>
     <string name="native_ui_no_notifications">Aucune notification.</string>
+    <string name="native_ui_trophies">Trophées</string>
+    <string name="native_ui_settings">Paramètres</string>
 </resources>

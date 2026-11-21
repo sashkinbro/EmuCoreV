@@ -1745,4 +1745,6 @@
     <string name="native_ui_start">Запустити</string>
     <string name="native_ui_continue">Продовжити</string>
     <string name="native_ui_no_notifications">Сповіщення відсутні.</string>
+    <string name="native_ui_trophies">Трофеї</string>
+    <string name="native_ui_settings">Налаштування</string>
 </resources>

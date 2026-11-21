@@ -61,6 +61,7 @@ struct LiveAreaSnapshot {
     std::vector<emucorev::paf::PlaneDivScreenQuad> gate_frame_quads;
     std::vector<emucorev::paf::PlaneDivScreenQuad> gate_glow_quads;
     std::vector<emucorev::paf::PlaneDivScreenQuad> gate_control_quads;
+    float gate_label_width = 136.f;
 };
 struct LockPageConfig {
     emucorev::paf::PagePoint size{960.f, 512.f};
@@ -124,6 +125,8 @@ ALooper* native_preview_looper = nullptr;
 JavaVM* preview_java_vm = nullptr;
 jobject preview_activity_ref = nullptr;
 jmethodID livearea_target_callback = nullptr;
+jmethodID request_livearea_callback = nullptr;
+jmethodID exit_request_callback = nullptr;
 jmethodID ui_sound_callback = nullptr;
 jmethodID save_home_layout_callback = nullptr;
 std::uint64_t image_revision = 0;
@@ -160,7 +163,8 @@ template<class T> std::vector<T> read(const char* filename, std::size_t count) {
     return values;
 }
 
-void emit_livearea_target_request(const std::string& target) {
+// Calls a void (String) or (String, String) method on the host Activity from any thread.
+void emit_activity_strings(jmethodID* slot, const std::string& first, const std::string* second) {
     JavaVM* vm = nullptr;
     { const std::lock_guard lock_guard(status_mutex); vm = preview_java_vm; }
     if (!vm) return;
@@ -176,19 +180,35 @@ void emit_livearea_target_request(const std::string& target) {
     jmethodID callback = nullptr;
     {
         const std::lock_guard lock_guard(status_mutex);
-        if (preview_activity_ref && livearea_target_callback)
-            activity = env->NewGlobalRef(preview_activity_ref);
-        callback = livearea_target_callback;
+        callback = *slot;
+        if (preview_activity_ref && callback) activity = env->NewGlobalRef(preview_activity_ref);
     }
     if (activity && callback) {
-        const auto value = env->NewStringUTF(target.c_str());
-        if (value) {
-            env->CallVoidMethod(activity, callback, value);
-            env->DeleteLocalRef(value);
+        const auto a = env->NewStringUTF(first.c_str());
+        const auto b = second ? env->NewStringUTF(second->c_str()) : nullptr;
+        if (a && (!second || b)) {
+            if (second) env->CallVoidMethod(activity, callback, a, b);
+            else env->CallVoidMethod(activity, callback, a);
+            if (env->ExceptionCheck()) env->ExceptionClear();
         }
+        if (a) env->DeleteLocalRef(a);
+        if (b) env->DeleteLocalRef(b);
         env->DeleteGlobalRef(activity);
     }
     if (attached) vm->DetachCurrentThread();
+}
+
+void emit_livearea_target_request(const std::string& title_id, const std::string& target) {
+    emit_activity_strings(&livearea_target_callback, title_id, &target);
+}
+
+// Back on an otherwise idle Home: the host decides whether to leave the shell.
+void emit_exit_request() {
+    emit_activity_strings(&exit_request_callback, "back", nullptr);
+}
+
+void emit_request_livearea(const std::string& title_id) {
+    emit_activity_strings(&request_livearea_callback, title_id, nullptr);
 }
 
 void emit_ui_sound(int sound_id) {
@@ -249,6 +269,15 @@ void emit_save_home_layout(const std::string& layout) {
     if (attached) vm->DetachCurrentThread();
 }
 
+// Shell state that must outlive a surface: Android destroys the native window
+// while a game runs, but the Vita returns to the game's LiveArea, unlocked.
+struct ShellSession {
+    bool unlocked = false;
+    emucorev::paf::LiveAreaDeck deck;
+    int focus_page = 0, focus_slot = 0;
+};
+std::optional<ShellSession> shell_session;
+
 struct Window {
     EGLDisplay display = EGL_NO_DISPLAY;
     EGLSurface surface = EGL_NO_SURFACE;
@@ -272,6 +301,9 @@ struct Window {
     // corners and cutouts (logical units).
     float cw = 960.f, ch = 544.f, cx0 = 0.f, cy0 = 0.f, surf_scale = 1.f;
     float safe_l = 0.f, safe_r = 0.f, safe_t = 0.f, safe_b = 0.f;
+    // Notification orb enlargement on panels whose top-right corner is rounded,
+    // so the part left visible stays comfortably tappable (1 = original size).
+    float orb_scale = 1.f;
     int target_w = 0, target_h = 0;
     EGLint surface_w = 0, surface_h = 0;
     // Content-space coordinates of the visible canvas edges (safe area applied).
@@ -376,6 +408,15 @@ struct Window {
     float initial_phase = 0;
 
     ~Window() {
+        const int scene = preview_scene.load();
+        if ((scene == 2 || scene == 3) && (home_visible || lock_anim_state == LockAnimState::unlocked)) {
+            ShellSession session;
+            session.unlocked = true;
+            session.deck = livearea_deck;
+            session.focus_page = home_focus_page;
+            session.focus_slot = home_focus_slot;
+            shell_session = std::move(session);
+        }
         // GPU resources must die before their context, including partial init.
         if (context != EGL_NO_CONTEXT && surface != EGL_NO_SURFACE)
             eglMakeCurrent(display, surface, surface, context);
@@ -498,6 +539,17 @@ struct Window {
         eglQuerySurface(display, surface, EGL_WIDTH, &sw);
         eglQuerySurface(display, surface, EGL_HEIGHT, &sh);
         ensure_canvas(sw, sh);
+
+        if ((preview_scene.load() == 2 || preview_scene.load() == 3) && shell_session) {
+            livearea_deck = shell_session->deck;
+            home_focus_page = shell_session->focus_page;
+            home_focus_slot = shell_session->focus_slot;
+            if (shell_session->unlocked) {
+                lock_anim_state = LockAnimState::unlocked;
+                home_visible = true;
+                home_enter_elapsed = 1.f;
+            }
+        }
     }
 
     // 1x rasterization at the original UI density: the logical canvas keeps
@@ -528,6 +580,7 @@ struct Window {
             t = area[1] / scale;
             b = area[3] / scale;
             surf_scale = scale;
+            orb_scale = 1.f + std::clamp(area[5] / scale / 72.f, 0.f, 0.45f);
             surface_w = width;
             surface_h = height;
         }
@@ -1157,7 +1210,11 @@ struct Window {
             copy.gate_glow_quads = emucorev::paf::build_plane_div_screen_quads(glow_spec, gcx, gcy);
 
             emucorev::paf::PlaneDivSpec control_spec{};
+            // Widened with the localized label (host raster is 136..260 px wide).
             control_spec.size_x = 136.f;
+            if (const auto label = host_images.find(copy.gate_start_label_id); label != host_images.end())
+                control_spec.size_x = std::clamp(float(label->second.width), 136.f, 260.f);
+            copy.gate_label_width = control_spec.size_x;
             control_spec.size_y = 36.f;
             control_spec.tex_width = 40;
             control_spec.tex_height = 36;
@@ -1231,9 +1288,10 @@ struct Window {
                 }
                 if (page->gate_start_label_id) {
                     const auto& g = page->gate_rect;
-                    const float lx = shift_x(g[0] + g[2] * 0.5f) - 68.f;
+                    const float lw = page->gate_label_width;
+                    const float lx = shift_x(g[0] + g[2] * 0.5f) - lw * .5f;
                     const float ly = shift_y(g[1] + g[3] * 0.5f) + 54.f - 18.f;
-                    sprites->draw(page->gate_start_label_id, lx, ly, 136.f, 36.f,
+                    sprites->draw(page->gate_start_label_id, lx, ly, lw, 36.f,
                         {1.f, 1.f, 1.f, gate_alpha});
                 }
                 if (glow_intro > 0.005f) {
@@ -1419,7 +1477,7 @@ struct Window {
 
     bool notification_orb_hit(float px, float py) const {
         if (edit_visual.edit_mode || edit_visual.is_folder_visible()) return false;
-        return py - canvas_top() < 64.f && px > 960.f + cx0 - 84.f;
+        return py - canvas_top() < 64.f * orb_scale && px > 960.f + cx0 - 84.f * orb_scale;
     }
 
     // Geometry measured on the emulated SceShell frame (Lenovo, 3.333x):
@@ -1442,7 +1500,7 @@ struct Window {
         }
         const float body_w = std::max(text_w - 8.f + 58.f, 120.f);
         const float tex_w = body_w + 48.f, tex_h = 99.5f;
-        const float tip_x = 960.f + cx0 - 59.4f;
+        const float tip_x = 960.f + cx0 - 59.4f * orb_scale;
         const float right = tip_x + 6.f, left = right - tex_w, top = canvas_top() + 53.f;
         constexpr float tw = 90.f, th = 94.f;
         const std::array<float, 4> xs{0.f, 20.f, 30.f, 90.f};
@@ -1461,7 +1519,18 @@ struct Window {
         }
     }
 
-    void close_livearea() {
+    void open_livearea_tab(const std::string& title_id, int catalog_index, float x, float y) {
+        emit_request_livearea(title_id);
+        livearea_deck.open_or_focus(title_id, catalog_index, x, y);
+    }
+
+    // Returns whether Back was consumed by an open shell surface.
+    bool close_livearea() {
+        if (notif_open) {
+            notif_open = false;
+            emit_ui_sound(sound_cancel);
+            return true;
+        }
         if (!livearea_deck.is_home_active()) {
             if (livearea_deck.trigger_peel_close()) {
                 emit_ui_sound(sound_page_turn);
@@ -1476,7 +1545,10 @@ struct Window {
             home_scroll.set_page_count(desktop.page_count());
             persist_home_layout();
             emit_ui_sound(sound_cancel);
+        } else {
+            return false;
         }
+        return true;
     }
 
     bool livearea_target_at(float x, float y, std::string& target) {
@@ -1514,7 +1586,7 @@ struct Window {
         if (entry->catalog_index < 0
             || static_cast<std::size_t>(entry->catalog_index) >= home_catalog_items.size()) return;
         emit_ui_sound(sound_decide);
-        livearea_deck.open_or_focus(entry->id, entry->catalog_index, screen_x, screen_y);
+        open_livearea_tab(entry->id, entry->catalog_index, screen_x, screen_y);
     }
 
     void tick_home(float elapsed) {
@@ -1619,7 +1691,7 @@ struct Window {
                             0, folder_focus_idx, 0.f, emucorev::paf::HomeGridLayout::folder);
                         edit_visual.close_folder();
                         emit_ui_sound(sound_decide);
-                        livearea_deck.open_or_focus(
+                        open_livearea_tab(
                             home_catalog_items[static_cast<std::size_t>(cat_idx)].id, cat_idx, sp.x, sp.y + 18.f);
                         return 1;
                     }
@@ -1638,7 +1710,9 @@ struct Window {
                             livearea_deck.tabs()[static_cast<std::size_t>(idx)].title_id);
                         if (snap && !snap->targets.empty()) {
                             emit_ui_sound(sound_decide);
-                            emit_livearea_target_request(snap->targets.front().id);
+                            emit_livearea_target_request(
+                                livearea_deck.tabs()[static_cast<std::size_t>(idx)].title_id,
+                                snap->targets.front().id);
                         }
                     }
                     return 1;
@@ -1718,7 +1792,7 @@ struct Window {
                     edit_visual.close_folder();
                     folder_touch_idx = -1;
                     emit_ui_sound(sound_decide);
-                    livearea_deck.open_or_focus(
+                    open_livearea_tab(
                         home_catalog_items[static_cast<std::size_t>(cat_idx)].id, cat_idx,
                         sp.x, sp.y + 18.f);
                     return 1;
@@ -2002,7 +2076,9 @@ struct Window {
                     std::string target;
                     if (livearea_target_at(px, py, target)) {
                         emit_ui_sound(sound_decide);
-                        emit_livearea_target_request(target);
+                        emit_livearea_target_request(
+                            livearea_deck.tabs()[static_cast<std::size_t>(livearea_deck.active_tab_index())].title_id,
+                            target);
                     }
                 } else if (home_touch_page >= 0 && home_touch_slot >= 0) {
                     home_focus_page = home_touch_page;
@@ -2357,10 +2433,11 @@ struct Window {
             }
             // The orb is a corner element: it stays flush with the physical
             // corner (a rounded panel corner trims it like the Vita bezel).
-            sprites->draw(status_notif_orb_idle_id, cw - 72.f, bar_y, 72, 70);
+            sprites->draw(status_notif_orb_idle_id, cw - 72.f * orb_scale, bar_y, 72.f * orb_scale, 70.f * orb_scale);
             const float glow_alpha = 0.03f + 0.08f * (0.5f + 0.5f * std::sin(status_orb_phase));
             sprites->set_additive_blend(true);
-            sprites->draw(status_notif_orb_glow_id, cw - 72.f, bar_y, 72, 70, {1.f, 1.f, 1.f, glow_alpha});
+            sprites->draw(status_notif_orb_glow_id, cw - 72.f * orb_scale, bar_y, 72.f * orb_scale, 70.f * orb_scale,
+                {1.f, 1.f, 1.f, glow_alpha});
             sprites->set_additive_blend(false);
         }
 
@@ -2369,7 +2446,7 @@ struct Window {
         const auto& status = device_status;
         auto battery_id = status.battery_percent < 0 ? 0xa5aafd9bu
             : battery[std::min(4, std::clamp(status.battery_percent, 0, 100) * 4 / 100)];
-        const float bat_x = show_home_chrome ? cw - 134.f : right_edge - 56.f;
+        const float bat_x = show_home_chrome ? cw - 62.f - 72.f * orb_scale : right_edge - 56.f;
         const std::array<float, 4> bat_tint = status.charging
             ? std::array<float, 4>{0.72f, 1.f, 0.72f, 1.f}
             : std::array<float, 4>{1.f, 1.f, 1.f, 1.f};
@@ -2377,7 +2454,7 @@ struct Window {
         if (charging_texture && status.charging && status.battery_percent >= 0 && status.battery_percent < 100)
             sprites->draw(charging_texture, bat_x, bar_y + 2.f, 48, 28, bat_tint);
         if (const auto clock = host_images.find(1); clock != host_images.end()) {
-            const float clock_right = show_home_chrome ? cw - 136.f : right_edge - 58.f;
+            const float clock_right = show_home_chrome ? cw - 64.f - 72.f * orb_scale : right_edge - 58.f;
             sprites->draw(1, clock_right - float(clock->second.width), bar_y,
                 float(clock->second.width), float(clock->second.height));
         }
@@ -2449,7 +2526,9 @@ struct Window {
         }
         if (cy0 > 0.f) {
             sprites->draw_patch(raw_keylock_image_id, -cx0, -cy0, cw, cy0, 0.f, 0.f, 1.f, ev, tint);
-            sprites->draw_patch(raw_keylock_image_id, -cx0, preview_height, cw, cy0, 0.f, 1.f - ev, 1.f, ev, tint);
+            // The bottom bezel row carries the PS symbol watermark: continue it
+            // with the plain dark bottom-left texel instead of streaking it.
+            sprites->draw_patch(raw_keylock_image_id, -cx0, preview_height, cw, cy0, 0.f, 1.f - ev, eu, ev, tint);
         }
     }
 
@@ -2653,8 +2732,9 @@ struct Preview {
                     // JNI can run on Android's UI thread. It only sets this
                     // atomic request; native scene state is changed here on
                     // the render/looper thread.
-                    if (native_back_requested.exchange(false) && preview.window)
-                        preview.window->close_livearea();
+                    if (native_back_requested.exchange(false) && preview.window
+                        && !preview.window->close_livearea())
+                        emit_exit_request();
                     if (native_preview_failed.exchange(false)) {
                         preview.busy.stop();
                     }
@@ -2748,7 +2828,7 @@ struct Preview {
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeResourceRoot(JNIEnv* env, jobject, jstring path) {
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeResourceRoot(JNIEnv* env, jobject, jstring path) {
     const char* text = env->GetStringUTFChars(path, nullptr);
     if (!text) return;
     {
@@ -2759,7 +2839,7 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeResourceRoot(JNIEnv
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewScene(JNIEnv*, jobject, jint scene) {
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativePreviewScene(JNIEnv*, jobject, jint scene) {
     native_ready_scene.store(-1);
     native_preview_failed.store(false);
     native_back_requested.store(false);
@@ -2767,7 +2847,7 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewScene(JNIEnv
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeSetWaveTheme(JNIEnv* env, jobject, jstring theme) {
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeSetWaveTheme(JNIEnv* env, jobject, jstring theme) {
     if (!theme) return;
     const char* text = env->GetStringUTFChars(theme, nullptr);
     if (!text) return;
@@ -2780,7 +2860,7 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeSetWaveTheme(JNIEnv
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewReady(JNIEnv*, jobject, jint scene) {
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativePreviewReady(JNIEnv*, jobject, jint scene) {
     if (scene < 0 || scene > 4) return;
     native_preview_failed.store(false);
     native_ready_scene.store(scene);
@@ -2791,7 +2871,7 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewReady(JNIEnv
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewFailed(JNIEnv*, jobject) {
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativePreviewFailed(JNIEnv*, jobject) {
     native_ready_scene.store(-1);
     native_preview_loading.store(false);
     native_preview_failed.store(true);
@@ -2802,12 +2882,12 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewFailed(JNIEn
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativePreviewLoading(JNIEnv*, jobject, jboolean loading) {
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativePreviewLoading(JNIEnv*, jobject, jboolean loading) {
     native_preview_loading.store(loading == JNI_TRUE);
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeSafeArea(JNIEnv* env, jobject, jfloatArray area) {
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeSafeArea(JNIEnv* env, jobject, jfloatArray area) {
     if (!area || env->GetArrayLength(area) != 8) return;
     std::array<float, 8> values{};
     env->GetFloatArrayRegion(area, 0, 8, values.data());
@@ -2817,12 +2897,12 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeSafeArea(JNIEnv* en
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeBackRequested(JNIEnv*, jobject) {
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeBackRequested(JNIEnv*, jobject) {
     native_back_requested.store(true);
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeImage(JNIEnv* env, jobject,
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeImage(JNIEnv* env, jobject,
     jint id, jint width, jint height, jbyteArray rgba) {
     if (!rgba || width <= 0 || height <= 0 || width > 4096 || height > 4096
         || env->GetArrayLength(rgba) != static_cast<jlong>(width) * height * 4) {
@@ -2842,7 +2922,7 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeImage(JNIEnv* env, 
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeStatus(JNIEnv* env, jobject,
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeStatus(JNIEnv* env, jobject,
     jint battery, jboolean charging, jint power, jint wifi, jboolean connected, jint rssi,
     jint bluetooth, jlong minute, jstring zone, jboolean clock24) {
     const char* text = zone ? env->GetStringUTFChars(zone, nullptr) : nullptr;
@@ -2918,7 +2998,7 @@ void android_main(android_app* app) {
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeCatalog(JNIEnv* env, jobject activity,
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeHomeCatalog(JNIEnv* env, jobject activity,
     jobjectArray ids, jobjectArray titles, jobjectArray content_ids,
     jintArray icon_image_ids, jintArray label_image_ids) {
     if (!ids || !titles || !content_ids || !icon_image_ids || !label_image_ids) {
@@ -2967,7 +3047,13 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeCatalog(JNIEnv*
         env->GetJavaVM(&vm);
         jclass activity_class = env->GetObjectClass(activity);
         const auto callback = activity_class
-            ? env->GetMethodID(activity_class, "onNativeLiveAreaTarget", "(Ljava/lang/String;)V") : nullptr;
+            ? env->GetMethodID(activity_class, "onNativeLiveAreaTarget", "(Ljava/lang/String;Ljava/lang/String;)V") : nullptr;
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        const auto request_cb = activity_class
+            ? env->GetMethodID(activity_class, "onNativeRequestLiveArea", "(Ljava/lang/String;)V") : nullptr;
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        const auto exit_cb = activity_class
+            ? env->GetMethodID(activity_class, "onNativeExitRequested", "(Ljava/lang/String;)V") : nullptr;
         if (env->ExceptionCheck()) env->ExceptionClear();
         const auto sound_cb = activity_class
             ? env->GetMethodID(activity_class, "onNativeUiSound", "(I)V") : nullptr;
@@ -2983,6 +3069,8 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeCatalog(JNIEnv*
             preview_java_vm = vm;
             preview_activity_ref = activity_global;
             livearea_target_callback = callback;
+            request_livearea_callback = request_cb;
+            exit_request_callback = exit_cb;
             ui_sound_callback = sound_cb;
             save_home_layout_callback = save_cb;
         } else if (activity_global) env->DeleteGlobalRef(activity_global);
@@ -2992,7 +3080,7 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeCatalog(JNIEnv*
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeLiveArea(JNIEnv* env, jobject,
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeHomeLiveArea(JNIEnv* env, jobject,
     jstring title_id, jint background_id, jfloatArray background_rect, jint gate_id, jfloatArray gate_rect,
     jint gate_start_label_id, jint gate_control_id,
     jintArray frame_image_ids, jfloatArray frame_rects, jintArray text_image_ids, jfloatArray text_rects,
@@ -3095,7 +3183,7 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeHomeLiveArea(JNIEnv
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeLoadHomeLayout(JNIEnv* env, jobject, jstring layout) {
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeLoadHomeLayout(JNIEnv* env, jobject, jstring layout) {
     if (!layout) return;
     const char* text = env->GetStringUTFChars(layout, nullptr);
     if (!text) return;
@@ -3108,11 +3196,13 @@ Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeLoadHomeLayout(JNIE
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeuipreview_PreviewActivity_nativeReleaseHomeCallback(JNIEnv* env, jobject) {
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeReleaseHomeCallback(JNIEnv* env, jobject) {
     const std::lock_guard lock_guard(status_mutex);
     if (preview_activity_ref) env->DeleteGlobalRef(preview_activity_ref);
     preview_activity_ref = nullptr;
     livearea_target_callback = nullptr;
+    request_livearea_callback = nullptr;
+    exit_request_callback = nullptr;
     ui_sound_callback = nullptr;
     save_home_layout_callback = nullptr;
     preview_java_vm = nullptr;

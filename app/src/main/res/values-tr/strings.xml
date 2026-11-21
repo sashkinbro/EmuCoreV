@@ -1735,4 +1735,6 @@
     <string name="native_ui_start">Başlat</string>
     <string name="native_ui_continue">Devam</string>
     <string name="native_ui_no_notifications">Bildirim yok.</string>
+    <string name="native_ui_trophies">Kupalar</string>
+    <string name="native_ui_settings">Ayarlar</string>
 </resources>

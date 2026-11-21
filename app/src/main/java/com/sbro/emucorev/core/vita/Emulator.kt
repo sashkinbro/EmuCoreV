@@ -460,7 +460,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             shellCatalogCheckJob = exitScope.launch {
                 val current = withContext(Dispatchers.IO) { NativeLibraryCatalog.fingerprint(this@Emulator) }
                 if (current != shellCatalogFingerprint && !rebirthRequested && !isFinishing) {
-                    triggerRebirthAfterNativeShutdown(NativeLibraryMode.intent(this@Emulator), allowAutoSave = false,
+                    triggerRebirthAfterNativeShutdown(NativeLibraryMode.emulatedIntent(this@Emulator), allowAutoSave = false,
                         returnToLibrary = true)
                 }
             }
@@ -613,7 +613,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             return false
         }
         if (now - shellBootstrapStableSince >= 1_000 && shellBootstrapRestartPending.compareAndSet(false, true)) {
-            triggerRebirthAfterNativeShutdown(NativeLibraryMode.intent(this), allowAutoSave = false,
+            triggerRebirthAfterNativeShutdown(NativeLibraryMode.emulatedIntent(this), allowAutoSave = false,
                 returnToLibrary = true)
         }
         return false

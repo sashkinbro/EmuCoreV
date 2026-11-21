@@ -9,7 +9,7 @@
         <activity android:name=".PreviewActivity" android:exported="true"
             android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|keyboardHidden|density">
-            <meta-data android:name="android.app.lib_name" android:value="paf_preview" />
+            <meta-data android:name="android.app.lib_name" android:value="emucorev_shell" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

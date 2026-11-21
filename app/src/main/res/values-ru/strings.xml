@@ -1745,4 +1745,6 @@
     <string name="native_ui_start">Запуск</string>
     <string name="native_ui_continue">Продолжить</string>
     <string name="native_ui_no_notifications">Уведомления отсутствуют.</string>
+    <string name="native_ui_trophies">Призы</string>
+    <string name="native_ui_settings">Настройки</string>
 </resources>

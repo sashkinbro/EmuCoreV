@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.22)
+project(EmuCoreVNativeShell LANGUAGES C CXX)
+
+add_subdirectory(.. native-ui)
+add_library(native_app_glue STATIC "${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c")
+target_include_directories(native_app_glue PUBLIC "${ANDROID_NDK}/sources/android/native_app_glue")
+add_library(emucorev_shell SHARED src/main/cpp/shell.cpp)
+target_compile_features(emucorev_shell PRIVATE cxx_std_20)
+target_compile_options(emucorev_shell PRIVATE -Wall -Wextra -Werror -fno-fast-math -ffp-contract=off)
+target_link_options(emucorev_shell PRIVATE "-uANativeActivity_onCreate")
+target_link_libraries(emucorev_shell PRIVATE native_app_glue emucorev_paf emucorev_paf_gles android log EGL)

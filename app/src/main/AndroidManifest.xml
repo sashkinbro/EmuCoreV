@@ -121,6 +121,18 @@
             </intent-filter>
         </activity>
 
+        <!-- Native PS Vita shell library mode; its own process stays resident
+             while a game runs and the retired Emulator process returns here. -->
+        <activity
+            android:name=".core.vita.NativeShellHostActivity"
+            android:process=":native_shell"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|locale|layoutDirection"
+            android:launchMode="singleInstance"
+            android:screenOrientation="sensorLandscape"
+            android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
+            <meta-data android:name="android.app.lib_name" android:value="emucorev_shell" />
+        </activity>
         <activity
             android:name=".core.vita.NativeLibraryTrophiesActivity"
             android:process=":native_trophies"

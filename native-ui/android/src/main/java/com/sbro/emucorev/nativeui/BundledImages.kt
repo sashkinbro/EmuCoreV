@@ -129,9 +129,12 @@ class BundledImages(
         upload(0, 1, 1, byteArrayOf(-1, -1, -1, -1))
     }
 
-    fun loadLockImages(onHomeCatalogLoaded: (List<HomeCatalogEntry>) -> Unit = {}) {
+    fun loadLockImages(
+        catalog: List<HomeCatalogSource>,
+        onHomeCatalogLoaded: (List<HomeCatalogEntry>) -> Unit = {},
+    ) {
         loadShellImages()
-        loadHomeImages(onHomeCatalogLoaded)
+        loadHomeImages(catalog, onHomeCatalogLoaded)
         // Lock wallpaper, original corner texture, inner peel background, and exponential lookup.
         listOf(
             CORNER_IMAGE to "effects/page_turn/textures/page_corner/mip-0.png",
@@ -147,14 +150,26 @@ class BundledImages(
         send(RAW_KEYLOCK_IMAGE, base)
     }
 
+    /**
+     * One Home bubble supplied by the host: an installed game (its sce_sys
+     * icon and LiveArea directory) or a system application.
+     */
+    data class HomeCatalogSource(
+        val id: String,
+        val title: String,
+        val contentId: String,
+        val icon: File,
+        /** Directory holding template.xml and the images it references. */
+        val liveAreaRoot: File?,
+    )
+
     data class HomeCatalogEntry(
         val id: String,
         val title: String,
         val contentId: String,
         val iconImageId: Int,
         val labelImageId: Int,
-        val liveAreaTemplate: String?,
-        val liveAreaImages: List<String>,
+        val liveAreaRoot: File?,
     )
 
     data class HomeLiveAreaSnapshot(
@@ -174,37 +189,28 @@ class BundledImages(
         val targetRects: FloatArray,
     )
 
-    fun loadHomeImages(onLoaded: (List<HomeCatalogEntry>) -> Unit = {}): List<HomeCatalogEntry> {
+    fun loadHomeImages(
+        catalog: List<HomeCatalogSource>,
+        onLoaded: (List<HomeCatalogEntry>) -> Unit = {},
+    ): List<HomeCatalogEntry> {
         loadHomeLiveAreaChromeImages()
-        val catalog = File(resources, "preview/home/catalog.json").readText()
-        val catalogObject = JSONObject(catalog)
-        require(catalogObject.getInt("version") == 1) { "Unsupported Home catalog version" }
-        val games = catalogObject.getJSONArray("games")
-        require(games.length() <= HOME_CATALOG_MAX_GAMES) { "Home catalog contains too many games" }
-        val entries = ArrayList<HomeCatalogEntry>(games.length())
-        val seenIds = HashSet<String>(games.length())
-        val homeRoot = File(resources, "preview/home").canonicalFile
-        val homePrefix = homeRoot.path + File.separator
+        require(catalog.size <= HOME_CATALOG_MAX_GAMES) { "Home catalog contains too many games" }
+        val entries = ArrayList<HomeCatalogEntry>(catalog.size)
+        val seenIds = HashSet<String>(catalog.size)
         val chipMask = File(resources, "images/indicator_plugin/fbc7297e.png")
             .takeIf { it.isFile }
             ?.inputStream()?.use { BitmapFactory.decodeStream(it) }
         try {
-            for (index in 0 until games.length()) {
-                val game = games.getJSONObject(index)
-                val id = game.getString("id")
-                val title = game.getString("title")
-                val contentId = game.getString("contentId")
-                require(id.isNotBlank() && title.isNotBlank()) {
+            for ((index, game) in catalog.withIndex()) {
+                require(game.id.isNotBlank() && game.title.isNotBlank()) {
                     "Home catalog contains an empty game field"
                 }
-                require(seenIds.add(id)) { "Home catalog contains duplicate id: $id" }
-                val iconPath = File(homeRoot, game.getString("icon")).canonicalFile
-                require(iconPath.path.startsWith(homePrefix) && iconPath.isFile) {
-                    "Invalid Home catalog icon path"
-                }
+                if (!seenIds.add(game.id)) continue
                 val iconImageId = HOME_ICON_IMAGE_BASE + index
                 val labelImageId = HOME_LABEL_IMAGE_BASE + index
-                val icon = iconPath.inputStream().use { requireNotNull(BitmapFactory.decodeStream(it)) }
+                val icon = runCatching {
+                    game.icon.inputStream().use { BitmapFactory.decodeStream(it) }
+                }.getOrNull() ?: continue
                 try {
                     send(iconImageId, icon)
                     val chip = rasterCircularChip(icon, chipMask)
@@ -216,22 +222,19 @@ class BundledImages(
                 } finally {
                     icon.recycle()
                 }
-                val label = rasterHomeTitle(title)
+                val label = rasterHomeTitle(game.title)
                 try {
                     send(labelImageId, label)
                 } finally {
                     label.recycle()
                 }
                 entries += HomeCatalogEntry(
-                    id = id,
-                    title = title,
-                    contentId = contentId,
+                    id = game.id,
+                    title = game.title,
+                    contentId = game.contentId,
                     iconImageId = iconImageId,
                     labelImageId = labelImageId,
-                    liveAreaTemplate = game.optJSONObject("liveArea")?.optString("template")?.takeIf { it.isNotBlank() },
-                    liveAreaImages = game.optJSONObject("liveArea")?.optJSONArray("images")?.let { array ->
-                        (0 until array.length()).map { array.getString(it) }
-                    } ?: emptyList(),
+                    liveAreaRoot = game.liveAreaRoot,
                 )
             }
         } finally {
@@ -257,6 +260,31 @@ class BundledImages(
         return entries
     }
 
+    object Fixture {
+        /** Parses a development catalog (preview fixture) into host sources. */
+        fun fixtureCatalog(homeRoot: File): List<HomeCatalogSource> {
+            val root = homeRoot.canonicalFile
+            val prefix = root.path + File.separator
+            fun inside(relative: String): File = File(root, relative).canonicalFile.also {
+                require(it.path.startsWith(prefix)) { "Invalid fixture path: $relative" }
+            }
+            val catalog = JSONObject(File(root, "catalog.json").readText())
+            require(catalog.getInt("version") == 1) { "Unsupported Home catalog version" }
+            val games = catalog.getJSONArray("games")
+            return (0 until games.length()).map { index ->
+                val game = games.getJSONObject(index)
+                HomeCatalogSource(
+                    id = game.getString("id"),
+                    title = game.getString("title"),
+                    contentId = game.optString("contentId"),
+                    icon = inside(game.getString("icon")),
+                    liveAreaRoot = game.optJSONObject("liveArea")?.optString("template")
+                        ?.takeIf { it.isNotBlank() }?.let { inside(it).parentFile },
+                )
+            }
+        }
+    }
+
     private fun loadHomeLiveAreaChromeImages() {
         listOf(
             0xca6a6db1.toInt() to "images/livearea_plugin/ca6a6db1.png",
@@ -269,34 +297,25 @@ class BundledImages(
         }
     }
 
-    fun loadHomeLiveAreas(
-        entries: List<HomeCatalogEntry>,
-        gateStartLabel: String,
-        onLoaded: (HomeLiveAreaSnapshot) -> Unit,
-    ) {
-        entries.forEachIndexed { gameIndex, entry ->
-            val templateRelative = entry.liveAreaTemplate ?: return@forEachIndexed
-            onLoaded(loadHomeLiveArea(entry, gameIndex, templateRelative, gateStartLabel))
-        }
-    }
-
-    private fun loadHomeLiveArea(
+    /**
+     * Decodes one LiveArea on demand (opening a bubble), so a large library
+     * never keeps every background image resident.
+     */
+    fun loadHomeLiveArea(
         entry: HomeCatalogEntry,
         gameIndex: Int,
-        templateRelative: String,
         gateStartLabel: String,
-    ): HomeLiveAreaSnapshot {
-        val homeRoot = File(resources, "preview/home").canonicalFile
-        val homePrefix = homeRoot.path + File.separator
+    ): HomeLiveAreaSnapshot? {
+        val liveAreaRoot = entry.liveAreaRoot?.canonicalFile ?: return null
+        val rootPrefix = liveAreaRoot.path + File.separator
         fun asset(relative: String): File {
-            val file = File(homeRoot, relative).canonicalFile
-            require(file.path.startsWith(homePrefix) && file.isFile) {
+            val file = File(liveAreaRoot, relative).canonicalFile
+            require(file.path.startsWith(rootPrefix) && file.isFile) {
                 "Invalid LiveArea asset path: $relative"
             }
             return file
         }
-        val template = asset(templateRelative)
-        val allowedImages = entry.liveAreaImages.toHashSet()
+        val template = File(liveAreaRoot, "template.xml").takeIf { it.isFile } ?: return null
         require(template.length() <= MAX_LIVEAREA_TEMPLATE_BYTES) {
             "LiveArea template is too large for ${entry.id}"
         }
@@ -324,7 +343,6 @@ class BundledImages(
         val styleSpec = LiveAreaStyles.resolve(root.getAttribute("style"))
         var nextImageId = LIVEAREA_IMAGE_BASE + gameIndex * LIVEAREA_IMAGE_SLOTS_PER_GAME
         fun uploadAsset(relative: String): Pair<Int, Bitmap> {
-            require(relative in allowedImages) { "LiveArea asset is not listed by the catalog: $relative" }
             require(nextImageId < LIVEAREA_IMAGE_BASE + (gameIndex + 1) * LIVEAREA_IMAGE_SLOTS_PER_GAME) {
                 "Too many LiveArea images for ${entry.id}"
             }
@@ -357,14 +375,14 @@ class BundledImages(
         val selectedBackground = backgroundOptions.firstOrNull { it.language == language }
             ?: backgroundOptions.firstOrNull { it.isDefault }
             ?: backgroundOptions.firstOrNull()
-        val backgroundPair = selectedBackground?.let { uploadAsset("livearea/${entry.id}/${it.file}") }
+        val backgroundPair = selectedBackground?.let { uploadAsset(it.file) }
         val backgroundId = backgroundPair?.first ?: 0
         backgroundPair?.second?.recycle()
 
         val startupImage = root.children("gate").firstOrNull()
             ?.children("startup-image")?.firstOrNull()?.directText().orEmpty()
         val gatePair = startupImage.takeIf { it.isNotBlank() }
-            ?.let { uploadAsset("livearea/${entry.id}/$it") }
+            ?.let { uploadAsset(it) }
         val gateId = gatePair?.first ?: 0
         gatePair?.second?.recycle()
 
@@ -400,7 +418,7 @@ class BundledImages(
                 if (imageElement != null) {
                     val relative = imageElement.directText()
                     if (relative.isNotBlank()) {
-                        val pair = uploadAsset("livearea/${entry.id}/$relative")
+                        val pair = uploadAsset(relative)
                         val bitmap = pair.second
                         val rect = styleSpec.imageRect(frameId, imageElement, bitmap.width, bitmap.height)
                         bitmap.recycle()
@@ -487,9 +505,15 @@ class BundledImages(
             textSize = 24f
             typeface = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
         }
-        val bitmap = Bitmap.createBitmap(136, 36, Bitmap.Config.ARGB_8888)
+        // The original control is 136 px wide; longer translations widen it
+        // (16 px side padding inside the 3x1 slices) up to 260 px, beyond which
+        // the label is condensed to fit rather than overflowing the capsule.
+        val textWidth = paint.measureText(text)
+        val width = ceil(textWidth + 32f).toInt().coerceIn(136, 260)
+        if (textWidth > width - 32f) paint.textScaleX = (width - 32f) / textWidth
+        val bitmap = Bitmap.createBitmap(width, 36, Bitmap.Config.ARGB_8888)
         val baseline = (36f - (paint.descent() + paint.ascent())) * 0.5f
-        val x = (136f - paint.measureText(text)) * 0.5f
+        val x = (width - paint.measureText(text)) * 0.5f
         Canvas(bitmap).drawText(text, x, baseline, paint)
         return bitmap
     }
