@@ -1419,7 +1419,7 @@ struct Window {
 
     bool notification_orb_hit(float px, float py) const {
         if (edit_visual.edit_mode || edit_visual.is_folder_visible()) return false;
-        return py - canvas_top() < 64.f && px > edge_right() - 84.f;
+        return py - canvas_top() < 64.f && px > 960.f + cx0 - 84.f;
     }
 
     // Geometry measured on the emulated SceShell frame (Lenovo, 3.333x):
@@ -1442,7 +1442,7 @@ struct Window {
         }
         const float body_w = std::max(text_w - 8.f + 58.f, 120.f);
         const float tex_w = body_w + 48.f, tex_h = 99.5f;
-        const float tip_x = edge_right() - 59.4f;
+        const float tip_x = 960.f + cx0 - 59.4f;
         const float right = tip_x + 6.f, left = right - tex_w, top = canvas_top() + 53.f;
         constexpr float tw = 90.f, th = 94.f;
         const std::array<float, 4> xs{0.f, 20.f, 30.f, 90.f};
@@ -2355,10 +2355,12 @@ struct Window {
                     }
                 }
             }
-            sprites->draw(status_notif_orb_idle_id, right_edge - 72.f, bar_y, 72, 70);
+            // The orb is a corner element: it stays flush with the physical
+            // corner (a rounded panel corner trims it like the Vita bezel).
+            sprites->draw(status_notif_orb_idle_id, cw - 72.f, bar_y, 72, 70);
             const float glow_alpha = 0.03f + 0.08f * (0.5f + 0.5f * std::sin(status_orb_phase));
             sprites->set_additive_blend(true);
-            sprites->draw(status_notif_orb_glow_id, right_edge - 72.f, bar_y, 72, 70, {1.f, 1.f, 1.f, glow_alpha});
+            sprites->draw(status_notif_orb_glow_id, cw - 72.f, bar_y, 72, 70, {1.f, 1.f, 1.f, glow_alpha});
             sprites->set_additive_blend(false);
         }
 
@@ -2367,7 +2369,7 @@ struct Window {
         const auto& status = device_status;
         auto battery_id = status.battery_percent < 0 ? 0xa5aafd9bu
             : battery[std::min(4, std::clamp(status.battery_percent, 0, 100) * 4 / 100)];
-        const float bat_x = right_edge - (show_home_chrome ? 134.f : 56.f);
+        const float bat_x = show_home_chrome ? cw - 134.f : right_edge - 56.f;
         const std::array<float, 4> bat_tint = status.charging
             ? std::array<float, 4>{0.72f, 1.f, 0.72f, 1.f}
             : std::array<float, 4>{1.f, 1.f, 1.f, 1.f};
@@ -2375,7 +2377,7 @@ struct Window {
         if (charging_texture && status.charging && status.battery_percent >= 0 && status.battery_percent < 100)
             sprites->draw(charging_texture, bat_x, bar_y + 2.f, 48, 28, bat_tint);
         if (const auto clock = host_images.find(1); clock != host_images.end()) {
-            const float clock_right = right_edge - (show_home_chrome ? 136.f : 58.f);
+            const float clock_right = show_home_chrome ? cw - 136.f : right_edge - 58.f;
             sprites->draw(1, clock_right - float(clock->second.width), bar_y,
                 float(clock->second.width), float(clock->second.height));
         }
