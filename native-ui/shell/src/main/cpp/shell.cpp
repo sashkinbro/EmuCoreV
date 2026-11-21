@@ -1083,11 +1083,18 @@ struct Window {
                     ? folder_label_image_id
                     : home_catalog_items[static_cast<std::size_t>(entry->catalog_index)].label_image_id;
                 {
+                    // Titles stay on the slot while only the bubble sways: two
+                    // SceShell frames show the label bbox pixel-identical with
+                    // the bubble displaced. Following the sub-pixel sway made
+                    // the upscaled 1x text shimmer.
+                    const auto slot = emucorev::paf::home_slot_screen_position(p, s, scroll_y);
+                    const float lx = std::round(slot.x + home_offset_x + enter_dx);
+                    const float ly = slot.y;
                     const std::lock_guard lock_guard(status_mutex);
                     const auto label = host_images.find(label_id);
                     if (label_id && label != host_images.end()) {
-                        sprites->draw(label_id, bx - float(label->second.width) * .5f,
-                            by + 40.f, float(label->second.width), float(label->second.height),
+                        sprites->draw(label_id, lx - float(label->second.width) * .5f,
+                            ly + 40.f, float(label->second.width), float(label->second.height),
                             {1.f, 1.f, 1.f, enter_a});
                     }
                 }
