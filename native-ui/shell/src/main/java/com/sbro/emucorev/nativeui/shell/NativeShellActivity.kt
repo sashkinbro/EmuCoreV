@@ -108,6 +108,7 @@ open class NativeShellActivity : NativeActivity() {
 
     @Suppress("unused")
     fun onNativeExitRequested(reason: String) {
+        if (reason == "wallpaper") { settingsActions.pickHomePhoto(); return }
         mainHandler.post { if (!closed.get() && !isFinishing) onExitRequested() }
     }
 
@@ -178,7 +179,7 @@ open class NativeShellActivity : NativeActivity() {
                 REQUEST_START_PHOTO -> shellThemes.savePhoto(uri, shellThemes.startPhoto)
             }
             applyTheme()
-            settingsApp.refresh()
+            if (activeApp == SettingsApp.TITLE_ID) settingsApp.refresh()
         }
     }
 
@@ -222,6 +223,8 @@ open class NativeShellActivity : NativeActivity() {
     private val textureCache = HashMap<Int, Bitmap>()
     private val uploadedAppTextures = HashSet<Int>()
     private var pageSerial = 0
+    /** Application currently shown full screen, if any. */
+    @Volatile private var activeApp: String? = null
 
     private val appHost = object : ShellAppHost {
         override val resources: File get() = requireNotNull(resourceRoot) { "Shell resources are not ready" }
@@ -232,9 +235,13 @@ open class NativeShellActivity : NativeActivity() {
                 ?.also { textureCache[id] = it }
         }
         override fun close() {
+            activeApp = null
             synchronized(nativeBridgeLock) { if (!closed.get()) nativeAppClose() }
         }
-        override fun show(page: ShellPage, transition: ShellTransition) = publishAppPage(page, transition)
+        override fun show(page: ShellPage, transition: ShellTransition) {
+            activeApp = page.app
+            publishAppPage(page, transition)
+        }
     }
 
     private fun appTexturePath(id: Int): String? =

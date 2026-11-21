@@ -1985,13 +1985,9 @@ struct Window {
                     return 1;
                 }
                 if (px >= edge_right() - 156.f && px <= edge_right() - 84.f && py > edge_bottom() - 68.f) {
-                    ensure_wave();
-                    const auto presets = emucorev::paf::wave_theme_presets();
-                    if (!presets.empty()) {
-                        wave_theme_index = (wave_theme_index + 1) % presets.size();
-                        wave->set_theme(presets[wave_theme_index]);
-                        emit_ui_sound(sound_decide);
-                    }
+                    // As on the Vita: the wallpaper tool picks a background image.
+                    emit_ui_sound(sound_decide);
+                    emit_activity_strings(&exit_request_callback, "wallpaper", nullptr);
                     return 1;
                 }
                 if (px > edge_right() - 84.f && py > edge_bottom() - 68.f) {
@@ -3218,7 +3214,10 @@ void android_main(android_app* app) {
         } else if ((scene == 2 || scene == 3 || scene == 4) && preview.window) {
             const int handled = preview.window->handle_input(event);
             if (handled) {
-                preview.last_draw = preview.next_draw = 0;
+                // Draw the response on the next vsync, but keep the clock:
+                // resetting last_draw made every frame during a touch tick
+                // with elapsed = 0, freezing animations while a finger moved.
+                preview.next_draw = 0;
                 preview.schedule();
             }
             return handled;
