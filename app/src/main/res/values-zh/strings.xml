@@ -1776,4 +1776,7 @@
     <string name="native_ui_set_start_screen">开始画面</string>
     <string name="native_ui_set_install_theme">安装主题…</string>
     <string name="native_ui_set_choose_image">选择图片…</string>
+    <string name="native_ui_set_system_music">系统音乐</string>
+    <string name="native_ui_set_delete">删除</string>
+    <string name="native_ui_set_delete_theme_confirm">删除此主题。</string>
 </resources>

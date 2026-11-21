@@ -152,9 +152,46 @@ open class NativeShellActivity : NativeActivity() {
         val start = if (shellThemes.startPhoto.isFile) shellThemes.startPhoto else theme?.startScreen
         loader.setLockTheme(start?.let { ShellThemes.decode(it) }, theme?.dateColor)
         lastStatus?.let(loader::updateLockClock)
+        prepareMusic(theme?.bgm?.takeIf { shellSettings.systemMusic })
         synchronized(nativeBridgeLock) {
             if (!closed.get()) nativeSetHomeTheme(ids.toIntArray(), theme?.barColor ?: 0)
         }
+    }
+
+    // ---- Theme BGM (HomeProperty m_bgmFilePath), looping while the shell is shown.
+    private var music: android.media.MediaPlayer? = null
+    @Volatile private var musicSource: File? = null
+
+    private fun prepareMusic(bgm: File?) {
+        val playable = bgm?.let { source ->
+            if (source.extension.equals("at9", true)) {
+                val decoded = File(source.parentFile, source.nameWithoutExtension + ".decoded.wav")
+                if (decoded.isFile || nativeDecodeAt9(source.path, decoded.path)) decoded else null
+            } else source
+        }
+        mainHandler.post {
+            if (playable?.path == musicSource?.path && music != null) return@post
+            stopMusic()
+            musicSource = playable
+            playable ?: return@post
+            music = runCatching {
+                android.media.MediaPlayer().apply {
+                    setAudioAttributes(android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_GAME)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC).build())
+                    setDataSource(playable.path)
+                    isLooping = true
+                    prepare()
+                    if (resumed) start()
+                }
+            }.onFailure { Log.w(TAG, "Cannot play theme music", it) }.getOrNull()
+        }
+    }
+
+    private fun stopMusic() {
+        music?.runCatching { stop(); release() }
+        music = null
+        musicSource = null
     }
 
     private fun pick(request: Int, mime: String) { mainHandler.post {
@@ -215,6 +252,9 @@ open class NativeShellActivity : NativeActivity() {
         override fun pickHomePhoto() = pick(REQUEST_HOME_PHOTO, "image/*")
         override fun pickStartPhoto() = pick(REQUEST_START_PHOTO, "image/*")
         override fun clearHomePhoto() { shellThemes.homePhoto.delete(); applyTheme() }
+        override fun deleteTheme(id: String) { stopMusic(); shellThemes.delete(id); applyTheme() }
+        override fun applyMusic() = applyTheme()
+        override fun themeProvider(id: String?) = shellThemes.installed().firstOrNull { it.id == id }?.provider
         override fun clearStartPhoto() { shellThemes.startPhoto.delete(); applyTheme() }
     }
 
@@ -589,6 +629,7 @@ open class NativeShellActivity : NativeActivity() {
     override fun onResume() {
         super.onResume()
         resumed = true
+        music?.runCatching { start() }
         soundBank?.onResume()
         startStatusIfResumed()
     }
@@ -613,6 +654,7 @@ open class NativeShellActivity : NativeActivity() {
     }
 
     override fun onPause() {
+        music?.runCatching { if (isPlaying) pause() }
         resumed = false
         soundBank?.onPause()
         deviceStatus.stop()
@@ -629,6 +671,7 @@ open class NativeShellActivity : NativeActivity() {
         }
         soundBank?.release()
         soundBank = null
+        stopMusic()
         if (::images.isInitialized) images.release()
         synchronized(textureCache) { textureCache.values.forEach(Bitmap::recycle); textureCache.clear() }
         if (::startupImages.isInitialized && (!::images.isInitialized || images !== startupImages)) {
@@ -640,6 +683,7 @@ open class NativeShellActivity : NativeActivity() {
 
     companion object {
         private const val TAG = "NativeShell"
+        @JvmStatic private external fun nativeDecodeAt9(input: String, output: String): Boolean
         private const val APP_IMAGE_BASE = 60000
         private const val THEME_IMAGE_BASE = 70000
         private const val REQUEST_THEME = 7101

@@ -1787,4 +1787,7 @@
     <string name="native_ui_set_start_screen">Pantalla inicial</string>
     <string name="native_ui_set_install_theme">Instalar tema…</string>
     <string name="native_ui_set_choose_image">Elegir imagen…</string>
+    <string name="native_ui_set_system_music">Música del sistema</string>
+    <string name="native_ui_set_delete">Eliminar</string>
+    <string name="native_ui_set_delete_theme_confirm">Este tema se eliminará.</string>
 </resources>

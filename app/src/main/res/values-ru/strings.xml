@@ -1792,4 +1792,7 @@
     <string name="native_ui_set_start_screen">Экран запуска</string>
     <string name="native_ui_set_install_theme">Установить тему…</string>
     <string name="native_ui_set_choose_image">Выбрать изображение…</string>
+    <string name="native_ui_set_system_music">Фоновая музыка системы</string>
+    <string name="native_ui_set_delete">Удалить</string>
+    <string name="native_ui_set_delete_theme_confirm">Эта тема будет удалена.</string>
 </resources>

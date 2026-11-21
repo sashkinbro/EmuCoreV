@@ -1783,4 +1783,7 @@
     <string name="native_ui_set_start_screen">Start Screen</string>
     <string name="native_ui_set_install_theme">Install Theme…</string>
     <string name="native_ui_set_choose_image">Choose Image…</string>
+    <string name="native_ui_set_system_music">System Music</string>
+    <string name="native_ui_set_delete">Delete</string>
+    <string name="native_ui_set_delete_theme_confirm">This theme will be deleted.</string>
 </resources>

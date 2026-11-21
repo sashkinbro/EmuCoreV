@@ -1792,4 +1792,7 @@
     <string name="native_ui_set_start_screen">Ekran początkowy</string>
     <string name="native_ui_set_install_theme">Zainstaluj motyw…</string>
     <string name="native_ui_set_choose_image">Wybierz obraz…</string>
+    <string name="native_ui_set_system_music">Muzyka w systemie</string>
+    <string name="native_ui_set_delete">Usuń</string>
+    <string name="native_ui_set_delete_theme_confirm">Ten motyw zostanie usunięty.</string>
 </resources>

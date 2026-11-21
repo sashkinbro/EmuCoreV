@@ -1782,4 +1782,7 @@
     <string name="native_ui_set_start_screen">Startbildschirm</string>
     <string name="native_ui_set_install_theme">Design installieren…</string>
     <string name="native_ui_set_choose_image">Bild auswählen…</string>
+    <string name="native_ui_set_system_music">Systemmusik</string>
+    <string name="native_ui_set_delete">Löschen</string>
+    <string name="native_ui_set_delete_theme_confirm">Dieses Design wird gelöscht.</string>
 </resources>

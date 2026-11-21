@@ -1802,4 +1802,7 @@
     <string name="native_ui_set_start_screen">شاشة البدء</string>
     <string name="native_ui_set_install_theme">تثبيت سمة…</string>
     <string name="native_ui_set_choose_image">اختيار صورة…</string>
+    <string name="native_ui_set_system_music">موسيقى النظام</string>
+    <string name="native_ui_set_delete">حذف</string>
+    <string name="native_ui_set_delete_theme_confirm">سيتم حذف هذه السمة.</string>
 </resources>

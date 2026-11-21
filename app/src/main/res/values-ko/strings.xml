@@ -1777,4 +1777,7 @@
     <string name="native_ui_set_start_screen">시작 화면</string>
     <string name="native_ui_set_install_theme">테마 설치…</string>
     <string name="native_ui_set_choose_image">이미지 선택…</string>
+    <string name="native_ui_set_system_music">시스템 음악</string>
+    <string name="native_ui_set_delete">삭제</string>
+    <string name="native_ui_set_delete_theme_confirm">이 테마를 삭제합니다.</string>
 </resources>

@@ -1783,4 +1783,7 @@
     <string name="native_ui_set_start_screen">صفحه شروع</string>
     <string name="native_ui_set_install_theme">نصب زمینه…</string>
     <string name="native_ui_set_choose_image">انتخاب تصویر…</string>
+    <string name="native_ui_set_system_music">موسیقی سیستم</string>
+    <string name="native_ui_set_delete">حذف</string>
+    <string name="native_ui_set_delete_theme_confirm">این زمینه حذف خواهد شد.</string>
 </resources>

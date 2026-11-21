@@ -28,6 +28,9 @@ class ShellThemes(private val context: Context) {
         val barColor: Int?,
         /** HomeProperty m_waveType: wave effect used when the theme has no backgrounds. */
         val waveType: Int?,
+        /** HomeProperty m_bgmFilePath (usually ATRAC9 .at9). */
+        val bgm: File?,
+        val provider: String?,
     )
 
     private val root = File(context.noBackupFilesDir, "native-themes").apply { mkdirs() }
@@ -108,6 +111,8 @@ class ShellThemes(private val context: Context) {
         var dateColor: Int? = null
         var barColor: Int? = null
         var waveType: Int? = null
+        var bgm: File? = null
+        var provider: String? = null
         val stack = ArrayList<String>()
         val parser = XmlPullParserFactory.newInstance().newPullParser()
         File(dir, "theme.xml").inputStream().use { input ->
@@ -129,12 +134,14 @@ class ShellThemes(private val context: Context) {
                             tag == "m_dateColor" -> dateColor = color(value)
                             tag == "m_barColor" -> barColor = color(value)
                             tag == "m_waveType" -> waveType = value.toIntOrNull()
+                            tag == "m_bgmFilePath" -> bgm = file()
+                            tag == "m_provider" -> provider = value
                         }
                     }
                 }
             }
         }
-        return Theme(dir.name, title, homeBackgrounds.take(10), startScreen, dateColor, barColor, waveType)
+        return Theme(dir.name, title, homeBackgrounds.take(10), startScreen, dateColor, barColor, waveType, bgm, provider)
     }
 
     /** Vita theme colours are written as AARRGGBB hex. */

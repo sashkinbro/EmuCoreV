@@ -1782,4 +1782,7 @@
     <string name="native_ui_set_start_screen">Başlangıç Ekranı</string>
     <string name="native_ui_set_install_theme">Tema Yükle…</string>
     <string name="native_ui_set_choose_image">Görüntü Seç…</string>
+    <string name="native_ui_set_system_music">Sistem Müziği</string>
+    <string name="native_ui_set_delete">Sil</string>
+    <string name="native_ui_set_delete_theme_confirm">Bu tema silinecek.</string>
 </resources>

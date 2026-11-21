@@ -1778,4 +1778,7 @@
     <string name="native_ui_set_start_screen">Layar Mulai</string>
     <string name="native_ui_set_install_theme">Pasang Tema…</string>
     <string name="native_ui_set_choose_image">Pilih Gambar…</string>
+    <string name="native_ui_set_system_music">Musik Sistem</string>
+    <string name="native_ui_set_delete">Hapus</string>
+    <string name="native_ui_set_delete_theme_confirm">Tema ini akan dihapus.</string>
 </resources>

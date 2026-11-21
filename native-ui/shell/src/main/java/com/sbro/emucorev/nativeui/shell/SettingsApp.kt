@@ -18,6 +18,10 @@ class ShellSettings(context: Context) {
     var systemSounds: Boolean
         get() = prefs.getBoolean("system_sounds", true)
         set(value) = prefs.edit().putBoolean("system_sounds", value).apply()
+    /** Sound & Display > System Music: the theme's Home BGM. */
+    var systemMusic: Boolean
+        get() = prefs.getBoolean("system_music", true)
+        set(value) = prefs.edit().putBoolean("system_music", value).apply()
     /** 0 automatic (device), 1 12-hour, 2 24-hour. */
     var clock: Int
         get() = prefs.getInt("clock", 0)
@@ -51,6 +55,9 @@ interface SettingsActions {
     fun pickStartPhoto()
     fun clearHomePhoto()
     fun clearStartPhoto()
+    fun deleteTheme(id: String)
+    fun applyMusic()
+    fun themeProvider(id: String?): String?
 }
 
 /**
@@ -62,6 +69,8 @@ interface SettingsActions {
  */
 class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
     private var easterTaps = 0
+    private var detailTheme: String? = null
+    private var confirmDelete = false
     @Volatile private var currentKey = -1
     @Volatile private var currentHost: ShellAppHost? = null
 
@@ -99,7 +108,17 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
                 val custom = actions.customThemes
                 when {
                     row == 0 -> actions.selectWaveTheme(ShellSettings.DEFAULT_THEME)
-                    row - 1 < custom.size -> actions.selectCustomTheme(custom[row - 1].first)
+                    row - 1 < custom.size -> {
+                        val id = custom[row - 1].first
+                        if (id == actions.activeCustomTheme) {
+                            // Tapping the theme in use opens its page (information, delete).
+                            detailTheme = id
+                            confirmDelete = false
+                            push(host, THEME_DETAIL)
+                            return
+                        }
+                        actions.selectCustomTheme(id)
+                    }
                     else -> { actions.installTheme(); return }
                 }
                 host.show(page(host, THEME), ShellTransition.REPLACE)
@@ -108,11 +127,23 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
                 else actions.pickHomePhoto()
             START_SCREEN -> if (row == 0) { actions.clearStartPhoto(); host.show(page(host, key), ShellTransition.REPLACE) }
                 else actions.pickStartPhoto()
+            THEME_DETAIL -> if (row == 1) {
+                val id = detailTheme ?: return
+                if (!confirmDelete) {
+                    confirmDelete = true
+                    host.show(page(host, THEME_DETAIL), ShellTransition.REPLACE)
+                } else {
+                    actions.deleteTheme(id)
+                    detailTheme = null
+                    host.show(page(host, THEME), ShellTransition.POP)
+                }
+            }
             SOUND_DISPLAY -> {
                 when (row) {
-                    0 -> s.systemSounds = !s.systemSounds
-                    1 -> { s.displayArea = 0; actions.applyDisplayArea(0) }
-                    2 -> { s.displayArea = 1; actions.applyDisplayArea(1) }
+                    0 -> { s.systemMusic = !s.systemMusic; actions.applyMusic() }
+                    1 -> s.systemSounds = !s.systemSounds
+                    2 -> { s.displayArea = 0; actions.applyDisplayArea(0) }
+                    3 -> { s.displayArea = 1; actions.applyDisplayArea(1) }
                 }
                 host.show(page(host, SOUND_DISPLAY), ShellTransition.REPLACE)
             }
@@ -130,6 +161,7 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
         when (key) {
             ROOT -> host.close()
             SYSTEM_INFO -> host.show(page(host, SYSTEM), ShellTransition.POP)
+            THEME_DETAIL -> host.show(page(host, THEME), ShellTransition.POP)
             THEME, HOME_BACKGROUNDS, START_SCREEN -> host.show(page(host, THEME_BACKGROUND), ShellTransition.POP)
             else -> host.show(page(host, ROOT), ShellTransition.POP)
         }
@@ -168,7 +200,17 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
                 Item(host.string(R.string.native_ui_set_default), check = !actions.hasStartPhoto),
                 Item(host.string(R.string.native_ui_set_choose_image), check = actions.hasStartPhoto),
             )
+            THEME_DETAIL -> {
+                val id = detailTheme
+                val title = actions.customThemes.firstOrNull { it.first == id }?.second.orEmpty()
+                title to buildList {
+                    add(Item(if (confirmDelete) host.string(R.string.native_ui_set_delete_theme_confirm)
+                        else actions.themeProvider(id).orEmpty().ifBlank { title }, selectable = false))
+                    add(Item(host.string(R.string.native_ui_set_delete)))
+                }
+            }
             SOUND_DISPLAY -> host.string(R.string.native_ui_set_sound_display) to listOf(
+                Item(host.string(R.string.native_ui_set_system_music), check = s.systemMusic),
                 Item(host.string(R.string.native_ui_set_system_sounds), check = s.systemSounds),
                 Item("${host.string(R.string.native_ui_set_display_area)}: ${host.string(R.string.native_ui_set_full)}",
                     check = s.displayArea == 0),
@@ -255,6 +297,7 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
         private const val THEME_BACKGROUND = 6
         private const val HOME_BACKGROUNDS = 7
         private const val START_SCREEN = 8
+        private const val THEME_DETAIL = 9
 
         const val BACKGROUND = 0xa67cb5df.toInt()
         const val ROW_PLATE = 0x29b91f26
