@@ -1748,6 +1748,12 @@
     <string name="native_ui_users_guide">Руководство пользователя</string>
     <string name="native_ui_trophies">Призы</string>
     <string name="native_ui_settings">Настройки</string>
+    <string name="native_ui_saves">Быстрые сохранения</string>
+    <string name="native_ui_saves_quick">Быстрое сохранение</string>
+    <string name="native_ui_saves_slot">Слот %1$d</string>
+    <string name="native_ui_saves_count">Сохранений: %1$d</string>
+    <string name="native_ui_saves_none">Сохранения отсутствуют.</string>
+    <string name="native_ui_saves_empty">Пусто</string>
     <string name="native_ui_trophy_earned">Получены</string>
     <string name="native_ui_trophy_not_earned">Не получен</string>
     <string name="native_ui_trophy_grade">Категория</string>

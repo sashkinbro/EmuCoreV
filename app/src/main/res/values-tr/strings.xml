@@ -1738,6 +1738,12 @@
     <string name="native_ui_users_guide">Kullanım Kılavuzu</string>
     <string name="native_ui_trophies">Kupalar</string>
     <string name="native_ui_settings">Ayarlar</string>
+    <string name="native_ui_saves">Hızlı Kayıtlar</string>
+    <string name="native_ui_saves_quick">Hızlı Kayıt</string>
+    <string name="native_ui_saves_slot">Yuva %1$d</string>
+    <string name="native_ui_saves_count">Kayıtlar: %1$d</string>
+    <string name="native_ui_saves_none">Kayıt yok.</string>
+    <string name="native_ui_saves_empty">Boş</string>
     <string name="native_ui_trophy_earned">Kazanıldığı Tarih</string>
     <string name="native_ui_trophy_not_earned">Kazanılmadı</string>
     <string name="native_ui_trophy_grade">Derece</string>

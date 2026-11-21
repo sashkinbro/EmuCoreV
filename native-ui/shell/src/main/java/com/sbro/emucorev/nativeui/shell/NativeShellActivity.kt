@@ -117,8 +117,14 @@ open class NativeShellActivity : NativeActivity() {
     /** Full-screen applications reachable from their LiveArea gate. */
     private val settingsApp by lazy { SettingsApp(settingsActions) }
 
+    /** Save states for the Quick Saves application (EmuCoreV addition). */
+    protected open fun saveSource(): ShellSaveSource = object : ShellSaveSource {
+        override fun load(): List<ShellSaveGame> = emptyList()
+        override fun resume(titleId: String, slot: Int) = Unit
+    }
+
     protected open fun shellApps(): List<ShellApp> =
-        listOf(TrophyCollectionApp(trophySource()), settingsApp)
+        listOf(TrophyCollectionApp(trophySource()), settingsApp, QuickSavesApp(saveSource()))
 
     protected val shellThemes by lazy { ShellThemes(this) }
     @Volatile private var lastStatus: DeviceStatusSource.Snapshot? = null
@@ -139,6 +145,9 @@ open class NativeShellActivity : NativeActivity() {
                 THEME_IMAGE_BASE + i
             }
         }
+        // The wave follows the theme's m_waveType, otherwise the Default theme's.
+        val wave = theme?.waveType?.let { ShellThemes.WAVE_TYPES.getOrNull(it) } ?: ShellSettings.DEFAULT_THEME
+        synchronized(nativeBridgeLock) { if (!closed.get()) nativeSetWaveTheme(wave) }
         val start = if (shellThemes.startPhoto.isFile) shellThemes.startPhoto else theme?.startScreen
         loader.setLockTheme(start?.let { ShellThemes.decode(it) }, theme?.dateColor)
         lastStatus?.let(loader::updateLockClock)
@@ -228,7 +237,8 @@ open class NativeShellActivity : NativeActivity() {
         override fun show(page: ShellPage, transition: ShellTransition) = publishAppPage(page, transition)
     }
 
-    private fun appTexturePath(id: Int): String? = TrophyCollectionApp.TEXTURES[id] ?: SettingsApp.TEXTURES[id]
+    private fun appTexturePath(id: Int): String? =
+        TrophyCollectionApp.TEXTURES[id] ?: SettingsApp.TEXTURES[id] ?: QuickSavesApp.TEXTURES[id]
 
     /** Uploads a page's rasters into a rotating id bank and hands it to native. */
     private fun publishAppPage(page: ShellPage, transition: ShellTransition) {
@@ -307,7 +317,7 @@ open class NativeShellActivity : NativeActivity() {
         assets.open("startup-busy.png").use { input ->
             File(startupRoot, "startup-busy.png").outputStream().use { output -> input.copyTo(output) }
         }
-        nativeSetWaveTheme(intent.getStringExtra("wave_theme") ?: shellSettings.waveTheme)
+        nativeSetWaveTheme(intent.getStringExtra("wave_theme") ?: ShellSettings.DEFAULT_THEME)
         nativeSetDisplayArea(shellSettings.displayArea)
         nativeResourceRoot(startupRoot.absolutePath)
         nativePreviewScene(if (requestedScene == 4) 4 else 1)
@@ -634,6 +644,7 @@ open class NativeShellActivity : NativeActivity() {
         private val SYSTEM_APPS = listOf(
             TROPHIES_TITLE_ID to R.string.native_ui_trophies,
             SETTINGS_TITLE_ID to R.string.native_ui_settings,
+            QuickSavesApp.TITLE_ID to R.string.native_ui_saves,
         )
         init { System.loadLibrary("emucorev_shell") }
     }

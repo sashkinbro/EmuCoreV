@@ -1734,6 +1734,12 @@
     <string name="native_ui_users_guide">ユーザーズガイド</string>
     <string name="native_ui_trophies">トロフィー</string>
     <string name="native_ui_settings">設定</string>
+    <string name="native_ui_saves">クイックセーブ</string>
+    <string name="native_ui_saves_quick">クイックセーブ</string>
+    <string name="native_ui_saves_slot">スロット %1$d</string>
+    <string name="native_ui_saves_count">セーブ数: %1$d</string>
+    <string name="native_ui_saves_none">セーブはありません。</string>
+    <string name="native_ui_saves_empty">空き</string>
     <string name="native_ui_trophy_earned">獲得日</string>
     <string name="native_ui_trophy_not_earned">未獲得</string>
     <string name="native_ui_trophy_grade">グレード</string>

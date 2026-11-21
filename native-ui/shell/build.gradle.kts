@@ -120,7 +120,9 @@ tasks.named("preBuild") {
 
 android {
     namespace = "com.sbro.emucorev.nativeui.shell"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) { minorApiLevel = 1 }
+    }
     ndkVersion = "29.0.14206865"
     androidResources { noCompress += "zip" }
     sourceSets.getByName("main").kotlin.srcDir("../android/src/main/java")

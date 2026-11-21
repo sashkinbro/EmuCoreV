@@ -1758,6 +1758,12 @@
     <string name="native_ui_users_guide">دليل المستخدم</string>
     <string name="native_ui_trophies">الجوائز</string>
     <string name="native_ui_settings">الإعدادات</string>
+    <string name="native_ui_saves">الحفظ السريع</string>
+    <string name="native_ui_saves_quick">حفظ سريع</string>
+    <string name="native_ui_saves_slot">الخانة %1$d</string>
+    <string name="native_ui_saves_count">المحفوظات: %1$d</string>
+    <string name="native_ui_saves_none">لا توجد محفوظات.</string>
+    <string name="native_ui_saves_empty">فارغ</string>
     <string name="native_ui_trophy_earned">تم الحصول عليها</string>
     <string name="native_ui_trophy_not_earned">لم يتم الحصول عليها</string>
     <string name="native_ui_trophy_grade">الدرجة</string>

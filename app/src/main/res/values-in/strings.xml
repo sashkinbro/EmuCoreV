@@ -1734,6 +1734,12 @@
     <string name="native_ui_users_guide">Panduan Pengguna</string>
     <string name="native_ui_trophies">Trofi</string>
     <string name="native_ui_settings">Pengaturan</string>
+    <string name="native_ui_saves">Simpan Cepat</string>
+    <string name="native_ui_saves_quick">Simpan Cepat</string>
+    <string name="native_ui_saves_slot">Slot %1$d</string>
+    <string name="native_ui_saves_count">Simpanan: %1$d</string>
+    <string name="native_ui_saves_none">Tidak ada simpanan.</string>
+    <string name="native_ui_saves_empty">Kosong</string>
     <string name="native_ui_trophy_earned">Diperoleh</string>
     <string name="native_ui_trophy_not_earned">Belum diperoleh</string>
     <string name="native_ui_trophy_grade">Tingkat</string>

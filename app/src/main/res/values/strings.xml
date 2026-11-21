@@ -1739,6 +1739,12 @@
     <string name="native_ui_users_guide">User\'s Guide</string>
     <string name="native_ui_trophies">Trophies</string>
     <string name="native_ui_settings">Settings</string>
+    <string name="native_ui_saves">Quick Saves</string>
+    <string name="native_ui_saves_quick">Quick Save</string>
+    <string name="native_ui_saves_slot">Slot %1$d</string>
+    <string name="native_ui_saves_count">Saves: %1$d</string>
+    <string name="native_ui_saves_none">There are no saves.</string>
+    <string name="native_ui_saves_empty">Empty</string>
     <string name="native_ui_trophy_earned">Earned</string>
     <string name="native_ui_trophy_not_earned">Not Earned</string>
     <string name="native_ui_trophy_grade">Grade</string>

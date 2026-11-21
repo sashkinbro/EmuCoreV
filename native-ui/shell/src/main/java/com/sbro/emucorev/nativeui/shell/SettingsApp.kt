@@ -95,11 +95,11 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
                 2 -> push(host, START_SCREEN)
             }
             THEME -> {
-                val waves = actions.waveThemes
+                // As on the Vita: the Default theme, then installed themes.
                 val custom = actions.customThemes
                 when {
-                    row < waves.size -> actions.selectWaveTheme(waves[row])
-                    row < waves.size + custom.size -> actions.selectCustomTheme(custom[row - waves.size].first)
+                    row == 0 -> actions.selectWaveTheme(ShellSettings.DEFAULT_THEME)
+                    row - 1 < custom.size -> actions.selectCustomTheme(custom[row - 1].first)
                     else -> { actions.installTheme(); return }
                 }
                 host.show(page(host, THEME), ShellTransition.REPLACE)
@@ -156,11 +156,7 @@ class SettingsApp(private val actions: SettingsActions) : ShellApp(TITLE_ID) {
             )
             THEME -> host.string(R.string.native_ui_set_theme) to buildList {
                 val custom = actions.activeCustomTheme
-                actions.waveThemes.forEachIndexed { i, name ->
-                    add(Item(if (i == 0) host.string(R.string.native_ui_set_default)
-                        else "${host.string(R.string.native_ui_set_theme)} ${i + 1}",
-                        check = custom == null && name == s.waveTheme))
-                }
+                add(Item(host.string(R.string.native_ui_set_default), check = custom == null))
                 actions.customThemes.forEach { (id, title) -> add(Item(title, check = id == custom)) }
                 add(Item(host.string(R.string.native_ui_set_install_theme), arrow = true))
             }

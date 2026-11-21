@@ -1738,6 +1738,12 @@
     <string name="native_ui_users_guide">Benutzerhandbuch</string>
     <string name="native_ui_trophies">Trophäen</string>
     <string name="native_ui_settings">Einstellungen</string>
+    <string name="native_ui_saves">Schnellspeicher</string>
+    <string name="native_ui_saves_quick">Schnellspeicherung</string>
+    <string name="native_ui_saves_slot">Platz %1$d</string>
+    <string name="native_ui_saves_count">Speicherstände: %1$d</string>
+    <string name="native_ui_saves_none">Keine Speicherstände vorhanden.</string>
+    <string name="native_ui_saves_empty">Leer</string>
     <string name="native_ui_trophy_earned">Verdient</string>
     <string name="native_ui_trophy_not_earned">Nicht verdient</string>
     <string name="native_ui_trophy_grade">Rang</string>

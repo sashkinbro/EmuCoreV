@@ -4,7 +4,11 @@ import android.content.Intent
 import android.widget.Toast
 import com.sbro.emucorev.MainActivity
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.SaveStateRepository
 import com.sbro.emucorev.core.VitaLaunchBridge
+import com.sbro.emucorev.nativeui.shell.ShellSaveGame
+import com.sbro.emucorev.nativeui.shell.ShellSaveSlot
+import com.sbro.emucorev.nativeui.shell.ShellSaveSource
 import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.TrophyRepository
 import com.sbro.emucorev.data.VitaTrophyGrade
@@ -69,13 +73,42 @@ class NativeShellHostActivity : NativeShellActivity(), NativeLibraryMode.ReturnT
         }
     }
 
+    // Reads save-state files directly: the shell process never loads the core.
+    override fun saveSource() = object : ShellSaveSource {
+        override fun load(): List<ShellSaveGame> {
+            val repository = SaveStateRepository(this@NativeShellHostActivity)
+            val games = InstalledGameRepository().loadInstalledGames(this@NativeShellHostActivity)
+                .associateBy { it.titleId }
+            return repository.gamesWithSlots().mapNotNull { titleId ->
+                val game = games[titleId] ?: return@mapNotNull null
+                val slots = SaveStateRepository.SLOT_ORDER.mapNotNull { slot ->
+                    val state = repository.stateFile(titleId, slot)
+                    if (!state.isFile || state.length() == 0L) return@mapNotNull null
+                    ShellSaveSlot(slot, repository.thumbnailFile(titleId, slot).takeIf(File::isFile),
+                        state.lastModified(), state.length())
+                }
+                ShellSaveGame(titleId, game.title, game.iconPath?.let(::File), slots)
+            }
+        }
+
+        override fun resume(titleId: String, slot: Int) {
+            val path = SaveStateRepository(this@NativeShellHostActivity).stateFile(titleId, slot).absolutePath
+            launch { VitaLaunchBridge.launchInstalledTitleWithSaveState(this@NativeShellHostActivity, titleId, path) }
+        }
+    }
+
     override fun onLiveAreaTarget(titleId: String, target: String) {
         // The gate (Start) target carries the title id; other live items are
         // web/store links the shell does not open.
-        if (target != titleId || !launching.compareAndSet(false, true)) return
+        if (target != titleId) return
+        launch { VitaLaunchBridge.launchInstalledTitle(this@NativeShellHostActivity, titleId) }
+    }
+
+    private fun launch(start: suspend () -> VitaLaunchBridge.LaunchResult) {
+        if (!launching.compareAndSet(false, true)) return
         scope.launch {
             try {
-                when (VitaLaunchBridge.launchInstalledTitle(this@NativeShellHostActivity, titleId)) {
+                when (start()) {
                     VitaLaunchBridge.LaunchResult.Success -> Unit
                     VitaLaunchBridge.LaunchResult.MissingFirmware ->
                         toast(R.string.game_launch_requires_firmware)

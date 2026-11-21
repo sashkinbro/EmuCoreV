@@ -1748,6 +1748,12 @@
     <string name="native_ui_users_guide">Посібник користувача</string>
     <string name="native_ui_trophies">Трофеї</string>
     <string name="native_ui_settings">Налаштування</string>
+    <string name="native_ui_saves">Швидкі збереження</string>
+    <string name="native_ui_saves_quick">Швидке збереження</string>
+    <string name="native_ui_saves_slot">Слот %1$d</string>
+    <string name="native_ui_saves_count">Збережень: %1$d</string>
+    <string name="native_ui_saves_none">Збереження відсутні.</string>
+    <string name="native_ui_saves_empty">Порожньо</string>
     <string name="native_ui_trophy_earned">Отримано</string>
     <string name="native_ui_trophy_not_earned">Не отримано</string>
     <string name="native_ui_trophy_grade">Категорія</string>

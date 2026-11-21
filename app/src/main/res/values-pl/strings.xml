@@ -1748,6 +1748,12 @@
     <string name="native_ui_users_guide">Podręcznik użytkownika</string>
     <string name="native_ui_trophies">Trofea</string>
     <string name="native_ui_settings">Ustawienia</string>
+    <string name="native_ui_saves">Szybkie zapisy</string>
+    <string name="native_ui_saves_quick">Szybki zapis</string>
+    <string name="native_ui_saves_slot">Slot %1$d</string>
+    <string name="native_ui_saves_count">Zapisy: %1$d</string>
+    <string name="native_ui_saves_none">Brak zapisów.</string>
+    <string name="native_ui_saves_empty">Pusty</string>
     <string name="native_ui_trophy_earned">Zdobyto</string>
     <string name="native_ui_trophy_not_earned">Nie zdobyto</string>
     <string name="native_ui_trophy_grade">Stopień</string>

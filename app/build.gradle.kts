@@ -114,7 +114,7 @@ android {
     namespace = "com.sbro.emucorev"
     ndkVersion = "29.0.14206865"
     compileSdk {
-        version = release(37)
+        version = release(37) { minorApiLevel = 1 }
     }
 
     defaultConfig {

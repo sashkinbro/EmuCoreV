@@ -1749,6 +1749,12 @@
     <string name="native_ui_users_guide">Uživatelská příručka</string>
     <string name="native_ui_trophies">Trofeje</string>
     <string name="native_ui_settings">Nastavení</string>
+    <string name="native_ui_saves">Rychlé uložení</string>
+    <string name="native_ui_saves_quick">Rychlé uložení</string>
+    <string name="native_ui_saves_slot">Pozice %1$d</string>
+    <string name="native_ui_saves_count">Uložení: %1$d</string>
+    <string name="native_ui_saves_none">Nejsou žádná uložení.</string>
+    <string name="native_ui_saves_empty">Prázdné</string>
     <string name="native_ui_trophy_earned">Získáno</string>
     <string name="native_ui_trophy_not_earned">Nezískáno</string>
     <string name="native_ui_trophy_grade">Stupeň</string>

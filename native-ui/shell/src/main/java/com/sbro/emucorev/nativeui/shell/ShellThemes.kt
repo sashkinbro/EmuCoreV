@@ -26,6 +26,8 @@ class ShellThemes(private val context: Context) {
         /** ARGB, or null for the default. */
         val dateColor: Int?,
         val barColor: Int?,
+        /** HomeProperty m_waveType: wave effect used when the theme has no backgrounds. */
+        val waveType: Int?,
     )
 
     private val root = File(context.noBackupFilesDir, "native-themes").apply { mkdirs() }
@@ -105,6 +107,7 @@ class ShellThemes(private val context: Context) {
         var startScreen: File? = null
         var dateColor: Int? = null
         var barColor: Int? = null
+        var waveType: Int? = null
         val stack = ArrayList<String>()
         val parser = XmlPullParserFactory.newInstance().newPullParser()
         File(dir, "theme.xml").inputStream().use { input ->
@@ -125,12 +128,13 @@ class ShellThemes(private val context: Context) {
                             tag == "m_filePath" && "StartScreenProperty" in stack -> startScreen = file()
                             tag == "m_dateColor" -> dateColor = color(value)
                             tag == "m_barColor" -> barColor = color(value)
+                            tag == "m_waveType" -> waveType = value.toIntOrNull()
                         }
                     }
                 }
             }
         }
-        return Theme(dir.name, title, homeBackgrounds.take(10), startScreen, dateColor, barColor)
+        return Theme(dir.name, title, homeBackgrounds.take(10), startScreen, dateColor, barColor, waveType)
     }
 
     /** Vita theme colours are written as AARRGGBB hex. */
@@ -139,6 +143,22 @@ class ShellThemes(private val context: Context) {
 
     companion object {
         private const val MAX_THEME_BYTES = 64L * 1024 * 1024
+
+        /**
+         * Wave effects in the order of libpaf's effect name table (0x29c890).
+         * Mapping m_waveType through this order is provisional: the shell's
+         * own index-to-effect lookup has not been traced yet.
+         */
+        val WAVE_TYPES = listOf(
+            "effects_0406_ruby", "effects_0407_purple_01", "effects_0408_01_orange", "effects_0411_purple_02",
+            "effects_0415_A5", "effects_0518_dalia", "effects_0518_gray_FLAT", "effects_0518_ruby", "effects_A1",
+            "effects_black", "effects_blueTB_0513_01", "effects_blue_FLAT", "effects_bluewhite_05", "effects_casis",
+            "effects_default_0512_01", "effects_green_0512_01", "effects_koiao_0512_01", "effects_limegreen_0513_02",
+            "effects_maintosh", "effects_marrygold", "effects_peach_0512_001", "effects_purple_01",
+            "effects_purplered", "effects_redTB_0513_01", "effects_turquoise_0513_01", "effects_yellow_0512_01",
+            "effects_color_vari_2g_01", "effects_color_vari_2g_02", "effects_color_vari_2g_03",
+            "effects_color_vari_2g_04", "iboot", "effects_original_01",
+        )
 
         fun decode(file: File, maxSide: Int = 1920): Bitmap? {
             if (!file.isFile) return null

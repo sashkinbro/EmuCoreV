@@ -1743,6 +1743,12 @@
     <string name="native_ui_users_guide">Guida per l\'utente</string>
     <string name="native_ui_trophies">Trofei</string>
     <string name="native_ui_settings">Impostazioni</string>
+    <string name="native_ui_saves">Salvataggi rapidi</string>
+    <string name="native_ui_saves_quick">Salvataggio rapido</string>
+    <string name="native_ui_saves_slot">Slot %1$d</string>
+    <string name="native_ui_saves_count">Salvataggi: %1$d</string>
+    <string name="native_ui_saves_none">Non ci sono salvataggi.</string>
+    <string name="native_ui_saves_empty">Vuoto</string>
     <string name="native_ui_trophy_earned">Guadagnato</string>
     <string name="native_ui_trophy_not_earned">Non guadagnato</string>
     <string name="native_ui_trophy_grade">Grado</string>

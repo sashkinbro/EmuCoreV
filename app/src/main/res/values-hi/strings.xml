@@ -1738,6 +1738,12 @@
     <string name="native_ui_users_guide">उपयोगकर्ता मार्गदर्शिका</string>
     <string name="native_ui_trophies">ट्रॉफ़ियाँ</string>
     <string name="native_ui_settings">सेटिंग्स</string>
+    <string name="native_ui_saves">त्वरित सेव</string>
+    <string name="native_ui_saves_quick">त्वरित सेव</string>
+    <string name="native_ui_saves_slot">स्लॉट %1$d</string>
+    <string name="native_ui_saves_count">सेव: %1$d</string>
+    <string name="native_ui_saves_none">कोई सेव नहीं है।</string>
+    <string name="native_ui_saves_empty">खाली</string>
     <string name="native_ui_trophy_earned">प्राप्त</string>
     <string name="native_ui_trophy_not_earned">प्राप्त नहीं</string>
     <string name="native_ui_trophy_grade">ग्रेड</string>

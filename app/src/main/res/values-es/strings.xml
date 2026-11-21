@@ -1743,6 +1743,12 @@
     <string name="native_ui_users_guide">Guía del usuario</string>
     <string name="native_ui_trophies">Trofeos</string>
     <string name="native_ui_settings">Ajustes</string>
+    <string name="native_ui_saves">Guardados rápidos</string>
+    <string name="native_ui_saves_quick">Guardado rápido</string>
+    <string name="native_ui_saves_slot">Ranura %1$d</string>
+    <string name="native_ui_saves_count">Guardados: %1$d</string>
+    <string name="native_ui_saves_none">No hay guardados.</string>
+    <string name="native_ui_saves_empty">Vacío</string>
     <string name="native_ui_trophy_earned">Ganado</string>
     <string name="native_ui_trophy_not_earned">No ganado</string>
     <string name="native_ui_trophy_grade">Grado</string>

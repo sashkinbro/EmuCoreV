@@ -14,7 +14,9 @@ tasks.named("preBuild") { dependsOn(copyHomeFixture) }
 
 android {
     namespace = "com.sbro.emucorev.nativeuipreview"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) { minorApiLevel = 1 }
+    }
     ndkVersion = "29.0.14206865"
     sourceSets.getByName("main").assets.srcDir(fixtureAssets.get().asFile)
     defaultConfig {

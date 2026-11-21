@@ -1733,6 +1733,12 @@
     <string name="native_ui_users_guide">사용자 가이드</string>
     <string name="native_ui_trophies">트로피</string>
     <string name="native_ui_settings">설정</string>
+    <string name="native_ui_saves">빠른 저장</string>
+    <string name="native_ui_saves_quick">빠른 저장</string>
+    <string name="native_ui_saves_slot">슬롯 %1$d</string>
+    <string name="native_ui_saves_count">저장: %1$d</string>
+    <string name="native_ui_saves_none">저장된 데이터가 없습니다.</string>
+    <string name="native_ui_saves_empty">비어 있음</string>
     <string name="native_ui_trophy_earned">획득일</string>
     <string name="native_ui_trophy_not_earned">미획득</string>
     <string name="native_ui_trophy_grade">그레이드</string>

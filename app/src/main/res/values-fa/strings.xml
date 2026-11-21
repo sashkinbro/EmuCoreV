@@ -1739,6 +1739,12 @@
     <string name="native_ui_users_guide">راهنمای کاربر</string>
     <string name="native_ui_trophies">جوایز</string>
     <string name="native_ui_settings">تنظیمات</string>
+    <string name="native_ui_saves">ذخیره‌های سریع</string>
+    <string name="native_ui_saves_quick">ذخیره سریع</string>
+    <string name="native_ui_saves_slot">جایگاه %1$d</string>
+    <string name="native_ui_saves_count">ذخیره‌ها: %1$d</string>
+    <string name="native_ui_saves_none">هیچ ذخیره‌ای وجود ندارد.</string>
+    <string name="native_ui_saves_empty">خالی</string>
     <string name="native_ui_trophy_earned">کسب شده</string>
     <string name="native_ui_trophy_not_earned">کسب نشده</string>
     <string name="native_ui_trophy_grade">درجه</string>
