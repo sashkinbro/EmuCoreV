@@ -599,6 +599,16 @@
     <string name="settings_camera_source_solid">Сплошной цвет</string>
     <string name="settings_camera_source_image">Статичное изображение</string>
     <string name="settings_camera_source_real">Реальная камера</string>
+    <string name="settings_camera_device">Устройство камеры</string>
+    <string name="settings_help_camera_device">Выберите, какая камера этого устройства передаёт изображение в эмулируемую камеру Vita. Автоматически выбирается камера, направленная в ту же сторону.</string>
+    <string name="settings_camera_device_auto">Автоматически</string>
+    <string name="settings_camera_device_front">Фронтальная камера (%1$s)</string>
+    <string name="settings_camera_device_back">Основная камера (%1$s)</string>
+    <string name="settings_camera_device_external">Внешняя камера (%1$s)</string>
+    <string name="settings_camera_image_title">Изображение камеры</string>
+    <string name="settings_camera_image_none">Нажмите, чтобы выбрать изображение</string>
+    <string name="settings_camera_image_selected">Изображение выбрано. Нажмите, чтобы изменить</string>
+    <string name="settings_camera_image_failed">Не удалось использовать это изображение</string>
     <string name="settings_show_welcome">Показывать экран приветствия</string>
     <string name="settings_help_show_welcome">Показывать вступительный экран при запуске, пока вы его не закроете.</string>
     <string name="settings_warn_missing_firmware">Предупреждать об отсутствии прошивки</string>
@@ -611,14 +621,12 @@
     <string name="emulation_quickbar_screenshot">Скриншот</string>
     <string name="emulation_quickbar_open_menu">Открыть меню</string>
     <string name="emulation_menu_paused_badge">Пауза</string>
-    <string name="emulation_menu_badge_live">В реальном времени</string>
-    <string name="emulation_menu_badge_restart">Требуется перезапуск</string>
+    <string name="emulation_menu_resolution_failed">Не удалось изменить разрешение. Игра продолжит с текущим.</string>
     <string name="emulation_menu_section_now">Сейчас</string>
     <string name="emulation_menu_section_now_desc">Изменения мгновенно применяются к запущенной игре.</string>
     <string name="emulation_menu_section_touch">Сенсорное управление</string>
     <string name="emulation_menu_section_touch_desc">Экранный геймпад. Изменения применяются сразу.</string>
     <string name="emulation_menu_section_display">Дисплей</string>
-    <string name="emulation_menu_section_display_desc">Разрешение и отображение кадров. Вступают в силу при следующем запуске.</string>
     <string name="emulation_menu_section_performance">Производительность</string>
     <string name="emulation_menu_section_performance_desc">Компромиссы между скоростью и точностью. Вступают в силу при следующем запуске.</string>
     <string name="emulation_menu_section_system">Система</string>
@@ -1430,6 +1438,10 @@
     <string name="emulation_savestate_loaded_toast">Загружено</string>
     <string name="emulation_savestate_deleted_toast">Удалено</string>
     <string name="emulation_savestate_failed_toast">Не удалось выполнить действие</string>
+    <string name="emulation_savestate_refused_no_game">Игра не запущена, состояние сохранить нельзя</string>
+    <string name="emulation_savestate_refused_exiting">Игра закрывается, повторите позже</string>
+    <string name="emulation_savestate_refused_loading">Игра ещё загружается, повторите через мгновение</string>
+    <string name="emulation_savestate_refused_busy">Выполняется другое сохранение или загрузка, подождите</string>
     <string name="emulation_savestate_session_mismatch_toast">Это сохранение относится к предыдущему сеансу игры, поэтому пока его нельзя загрузить</string>
     <string name="emulation_savestate_title_mismatch_toast">Это сохранение относится к другой игре</string>
     <string name="emulation_savestate_confirm_save_title">Перезаписать сохранение?</string>
@@ -1444,7 +1456,6 @@
     <string name="savestate_manager_title">Сохранения</string>
     <string name="savestate_manager_subtitle">Снимки эмулятора, отдельно от внутриигровых сохранений</string>
     <string name="savestate_manager_refresh">Обновить</string>
-    <string name="savestate_manager_open_for_game">Сохранения</string>
     <string name="savestate_manager_empty_title">Пока нет сохранений</string>
     <string name="savestate_manager_empty_body">Создайте его в игровом меню или кнопкой быстрого сохранения.</string>
     <string name="nav_save_states">Быстрые сохранения</string>
@@ -1599,6 +1610,7 @@
     <string name="rear_touch_game">Эта игра</string>
     <string name="rear_touch_inherit">Использовать глобальный профиль</string>
     <string name="rear_touch_clear">Убрать назначение</string>
+    <string name="rear_touch_reset_confirm">Сбросить все точки заднего тачпада к значениям по умолчанию?</string>
     <string name="rear_touch_hint">Удерживайте для касания задней панели; отпустите, чтобы поднять палец. Назначенные кнопки заменяют обычное действие. Передний сенсор остаётся доступным.</string>
     <string name="rear_touch_screen_position">Позиция экранной кнопки</string>
     <string name="settings_gpu_driver_status_missing_selection">Выбранный драйвер недоступен: %1$s</string>
@@ -1809,4 +1821,8 @@
     <string name="native_ui_set_system_music">Фоновая музыка системы</string>
     <string name="native_ui_set_delete">Удалить</string>
     <string name="native_ui_set_delete_theme_confirm">Эта тема будет удалена.</string>
+    <string name="storage_unavailable_message">Выбранное хранилище недоступно. Вставьте SD-карту или выберите другое хранилище в настройках.</string>
+    <string name="emulation_screenshot_saved">Скриншот сохранён в Pictures/EmuCoreV</string>
+    <string name="emulation_screenshot_failed">Не удалось сохранить скриншот</string>
+    <string name="native_ui_new_folder">Новая папка</string>
 </resources>

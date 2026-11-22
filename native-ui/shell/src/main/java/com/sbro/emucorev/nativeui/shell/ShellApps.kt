@@ -42,6 +42,8 @@ interface ShellAppHost {
     fun show(page: ShellPage, transition: ShellTransition)
     fun close()
     fun string(id: Int): String
+    /** Locale-aware, localized file size ("1.5 MB"). */
+    fun formatSize(bytes: Long): String
     fun texture(id: Int): Bitmap?
     fun playSound(id: Int)
 }

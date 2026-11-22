@@ -40,12 +40,51 @@ object EmulatorStorage {
         return (context.getExternalFilesDir(null) ?: context.filesDir).apply { mkdirs() }
     }
 
-    fun storageRoot(context: Context): File {
+    /**
+     * Outcome of resolving the user's selected storage root. [selectedUnavailable] is true when a
+     * root was selected but is currently missing (for example an ejected SD card): [rootPath] is
+     * then only a read-only fallback and no Vita tree may be created there.
+     */
+    internal data class StorageRootDecision(val rootPath: String?, val selectedUnavailable: Boolean)
+
+    internal fun decideStorageRoot(
+        selectedPath: String?,
+        availableRoots: List<String>,
+        selectedMediaUsable: Boolean = true
+    ): StorageRootDecision {
+        val selected = selectedPath?.takeIf { it.isNotBlank() }
+            ?: return StorageRootDecision(availableRoots.firstOrNull(), false)
+        return if (selected in availableRoots && selectedMediaUsable) {
+            StorageRootDecision(selected, false)
+        } else {
+            StorageRootDecision(availableRoots.firstOrNull(), true)
+        }
+    }
+
+    /** Mounted or unknown (internal/app-private paths report unknown) media can be written to. */
+    internal fun isMediaStateUsable(state: String?): Boolean =
+        state == null || state == Environment.MEDIA_MOUNTED || state == Environment.MEDIA_UNKNOWN
+
+    private fun resolveStorage(context: Context): StorageRootDecision {
         val roots = availableStorageRoots(context)
-        val selected = AppPreferences(context).vitaStorageRootPath
-            ?.let(::File)
-            ?.takeIf { configured -> roots.any { it.absolutePath == configured.absolutePath } }
-        return selected ?: roots.firstOrNull() ?: context.filesDir
+        val selectedPath = AppPreferences(context).vitaStorageRootPath?.let { File(it).absolutePath }
+        val usable = selectedPath == null || runCatching {
+            isMediaStateUsable(Environment.getExternalStorageState(File(selectedPath)))
+        }.getOrDefault(true)
+        return decideStorageRoot(selectedPath, roots.map { it.absolutePath }, usable)
+    }
+
+    fun storageRoot(context: Context): File {
+        val path = resolveStorage(context).rootPath
+        return path?.let(::File) ?: context.filesDir
+    }
+
+    /** True when a storage root was selected but is missing, so nothing may be created on a fallback. */
+    fun isStorageUnavailable(context: Context): Boolean = resolveStorage(context).selectedUnavailable
+
+    private fun ensureDirectory(context: Context, directory: File): File {
+        if (!isStorageUnavailable(context)) directory.mkdirs()
+        return directory
     }
 
     private fun availableStorageRoots(context: Context): List<File> {
@@ -102,8 +141,7 @@ object EmulatorStorage {
     }
 
     fun vitaRoot(context: Context): File {
-        val base = storageRoot(context)
-        return File(base, "vita").apply { mkdirs() }
+        return ensureDirectory(context, File(storageRoot(context), "vita"))
     }
 
     fun cacheRoot(context: Context): File {
@@ -119,35 +157,38 @@ object EmulatorStorage {
      * stays on stable internal storage while bulk transfers go to the SD card.
      */
     fun installStagingRoot(context: Context): File {
-        return File(storageRoot(context), "cache/install_cache").apply { mkdirs() }
+        return ensureDirectory(context, File(storageRoot(context), "cache/install_cache"))
     }
 
     fun prepareRuntime(context: Context) {
         val runtimeRoot = runtimeRoot(context)
+        val storageUnavailable = isStorageUnavailable(context)
         migrateLegacyRuntimeData(context, storageRoot(context))
         val vitaRoot = vitaRoot(context)
         val cacheRoot = cacheRoot(context)
-        listOf(
+        val vitaTree = if (storageUnavailable) emptyList() else listOf(
             vitaRoot,
-            cacheRoot,
             File(vitaRoot, "ux0"),
             File(vitaRoot, "ux0/app"),
             File(vitaRoot, "ux0/data"),
             File(vitaRoot, "ux0/user"),
-            File(vitaRoot, "vs0"),
+            File(vitaRoot, "vs0")
+        )
+        (vitaTree + listOf(
+            cacheRoot,
             File(runtimeRoot, "shaderlog"),
             File(runtimeRoot, "texturelog"),
             File(runtimeRoot, "patch"),
             File(runtimeRoot, "config"),
             File(cacheRoot, "shaders"),
             File(cacheRoot, "logs")
-        ).forEach { directory ->
+        )).forEach { directory ->
             if (!directory.exists()) {
                 directory.mkdirs()
             }
         }
 
-        purgeOrphanedInstallStaging(context)
+        if (!storageUnavailable) purgeOrphanedInstallStaging(context)
     }
 
     /**
@@ -159,6 +200,9 @@ object EmulatorStorage {
      * ever needs to outlive the install that created it.
      */
     private fun purgeOrphanedInstallStaging(context: Context) {
+        // An install in another process (or an earlier prepareRuntime caller) may be using the
+        // staging directories right now; only a stale or absent marker means they are orphaned.
+        if (isInstallMarkerActive(installMarker(context).lastModified(), System.currentTimeMillis())) return
         val stagingDirs = buildSet {
             add(File(runtimeRoot(context), "cache/install_cache"))
             add(File(storageRoot(context), "cache/install_cache"))
@@ -174,7 +218,25 @@ object EmulatorStorage {
         }
     }
 
-    fun ux0AppRoot(context: Context): File = File(vitaRoot(context), "ux0/app").apply { mkdirs() }
+    private const val INSTALL_MARKER_NAME = "install_in_progress"
+    internal const val INSTALL_MARKER_STALE_MS = 30 * 60 * 1000L
+
+    private fun installMarker(context: Context) = File(runtimeRoot(context), INSTALL_MARKER_NAME)
+
+    /** An install heartbeat is live while it was refreshed within [INSTALL_MARKER_STALE_MS]. */
+    internal fun isInstallMarkerActive(lastModifiedMs: Long, nowMs: Long): Boolean =
+        lastModifiedMs > 0L && nowMs - lastModifiedMs < INSTALL_MARKER_STALE_MS
+
+    /** Marks an install as running (and refreshes the heartbeat); staging purges skip meanwhile. */
+    fun touchInstallInProgress(context: Context) {
+        runCatching { installMarker(context).writeText(System.currentTimeMillis().toString()) }
+    }
+
+    fun clearInstallInProgress(context: Context) {
+        runCatching { installMarker(context).delete() }
+    }
+
+    fun ux0AppRoot(context: Context): File = ensureDirectory(context, File(vitaRoot(context), "ux0/app"))
 
     /** Summary of a cache clear, in bytes freed and files removed. */
     data class CacheClearResult(
@@ -252,7 +314,7 @@ object EmulatorStorage {
         }.toList()
     }
 
-    fun ux0UserRoot(context: Context): File = File(vitaRoot(context), "ux0/user").apply { mkdirs() }
+    fun ux0UserRoot(context: Context): File = ensureDirectory(context, File(vitaRoot(context), "ux0/user"))
 
     /**
      * The emulator mounts savedata0: at ux0:user/<active user>/savedata and only
@@ -281,7 +343,7 @@ object EmulatorStorage {
 
     fun ux0SaveDataRoot(context: Context, userId: String? = null): File {
         val userSegment = userId?.takeIf(String::isNotBlank) ?: activeUserId(context)
-        return File(ux0UserRoot(context), "$userSegment/savedata").apply { mkdirs() }
+        return ensureDirectory(context, File(ux0UserRoot(context), "$userSegment/savedata"))
     }
 
     private fun readConfiguredUserId(context: Context): String? {

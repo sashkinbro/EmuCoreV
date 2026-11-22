@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Looper
 import android.os.Handler
+import android.os.SystemClock
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.ActivityResultRegistryOwner
@@ -76,6 +77,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -91,7 +93,12 @@ import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.InstalledGameRepository
 import com.sbro.emucorev.data.ProfilePlayTimeSyncer
 import com.sbro.emucorev.data.RetroArchShaderSessionController
-import com.sbro.emucorev.data.TrophyCloudRepository
+import com.sbro.emucorev.data.TrophySyncScheduler
+import com.sbro.emucorev.core.GameLaunchPreparation
+import com.sbro.emucorev.core.GameSessionMarker
+import com.sbro.emucorev.core.InputGateWatchdog
+import com.sbro.emucorev.core.LaunchGate
+import com.sbro.emucorev.core.LaunchIntents
 import com.sbro.emucorev.data.TrophySoundRepository
 import com.sbro.emucorev.data.TrophySyncSessionGate
 import com.sbro.emucorev.data.drive.DriveBackupWork
@@ -169,6 +176,11 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var trophySoundPlayer: TrophySoundPlayer? = null
     var launchStateLoading by mutableStateOf(LaunchStateLoadingState())
         private set
+    // Input is swallowed while a launch state loads; a load that never reports back must not
+    // leave the session permanently unresponsive.
+    private val inputGateWatchdog = InputGateWatchdog(clock = SystemClock::elapsedRealtime)
+    private var inputGateJob: Job? = null
+    private val inputGateBlocking: Boolean get() = launchStateLoading.active || stateFrameWaiting
     var stateFramePendingGeneration by mutableStateOf(0L)
         private set
     var stateFrameReadyGeneration by mutableStateOf(0L)
@@ -193,6 +205,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         runOnUiThread {
             sessionUsable = false
             launchStateLoading = launchStateLoading.onFailure()
+            clearLoadMarker()
             Toast.makeText(this, R.string.emulation_savestate_failed_toast, Toast.LENGTH_LONG).show()
             if (intent.getBooleanExtra(AUTOMATIC_STATE_LOAD_EXTRA, false)) {
                 // Header inspection cannot detect every corrupt payload. A failed
@@ -213,6 +226,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         runOnUiThread {
             if (!active && stateFrameWaiting) return@runOnUiThread
             launchStateLoading = launchStateLoading.onNativeProgress(progress, active)
+            clearLoadMarkerIfSettled()
         }
     }
 
@@ -220,6 +234,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         runOnUiThread {
             if (generation > stateFrameReadyGeneration)
                 stateFramePendingGeneration = maxOf(stateFramePendingGeneration, generation)
+            startInputGateWatchdog()
         }
     }
 
@@ -228,7 +243,41 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             if (generation < stateFramePendingGeneration) return@runOnUiThread
             stateFrameReadyGeneration = maxOf(stateFrameReadyGeneration, generation)
             launchStateLoading = launchStateLoading.onNativeProgress(1f, false)
+            clearLoadMarkerIfSettled()
         }
+    }
+
+    private fun clearLoadMarkerIfSettled() {
+        if (!inputGateBlocking) clearLoadMarker()
+    }
+
+    /** The boot-time state load is over (done or failed): it no longer counts as a possible crash cause. */
+    private fun clearLoadMarker() {
+        if (isFirmwareSession) return
+        val title = currentGameIdOrIntent()
+        if (title.isBlank()) return
+        exitScope.launch(Dispatchers.IO) { SaveStateRepository(this@Emulator).finishLoad(title) }
+    }
+
+    private fun startInputGateWatchdog() {
+        if (isFirmwareSession || inputGateJob?.isActive == true) return
+        inputGateJob = exitScope.launch {
+            while (inputGateBlocking) {
+                if (inputGateWatchdog.check(true)) {
+                    onInputGateTimeout()
+                    break
+                }
+                delay(INPUT_GATE_POLL_MS)
+            }
+            inputGateWatchdog.check(false)
+        }
+    }
+
+    private fun onInputGateTimeout() {
+        Log.e(TAG, "Input gate stayed closed for ${InputGateWatchdog.TIMEOUT_MS} ms " +
+            "(loading=${launchStateLoading.active} frameWaiting=$stateFrameWaiting); clearing it")
+        stateFrameReadyGeneration = maxOf(stateFrameReadyGeneration, stateFramePendingGeneration)
+        showSaveStateLoadError("input gate timed out")
     }
 
     fun setCurrentGameId(gameId: String) {
@@ -328,41 +377,117 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         runBlocking { TrophySyncSessionGate.shared.gameStarting() }
         try {
             // SDL invokes this on SDLThread before nativeRunMain, including old pinned shortcuts.
-            // Failed maintenance must abort the native entry point rather than boot with stale state.
-            try {
-                CoreMaintenanceRepository(this).ensureCoreUpdated()
-            } catch (error: Exception) {
-                Log.e(TAG, "Core maintenance failed before external launch", error)
-                runOnUiThread {
-                    Toast.makeText(this, R.string.settings_clear_cache_failed, Toast.LENGTH_LONG).show()
-                    finish()
-                }
-                return
-            }
+            // Every launch, whichever process requested it, is prepared here: failed preparation
+            // must abort the native entry point rather than boot with stale state.
+            if (!prepareLaunch()) return
             super.main()
         } finally {
             TrophySyncSessionGate.shared.gameStopped()
         }
     }
 
+    /**
+     * Runs on SDLThread in the Emulator process. Returns false after reporting the error and
+     * closing this Activity (back to the caller); the launch gate is always released.
+     */
+    private fun prepareLaunch(): Boolean {
+        val gate = LaunchGate.forContext(this)
+        try {
+            if (launchRequestMalformed(intent)) {
+                Log.w(TAG, "Rejected launch with a malformed title id")
+                return abortLaunch(R.string.game_launch_failed)
+            }
+            val args = intent.getStringArrayExtra(APP_RESTART_PARAMETERS) ?: gameIdFromIntent(intent).let {
+                if (it.isBlank()) emptyArray() else arrayOf("-r", it)
+            }
+            val gameId = gameIdFromArgs(args)
+            val repository = SaveStateRepository(this)
+            // Before any save or load of this process: drop temp files of interrupted ones.
+            runCatching { repository.sweepOrphans() }
+                .onFailure { Log.w(TAG, "Orphan sweep failed", it) }
+            if (gameId.isBlank()) {
+                // Installer restarts carry no title; they only need the core maintenance.
+                try {
+                    CoreMaintenanceRepository(this).ensureCoreUpdated()
+                } catch (error: Exception) {
+                    Log.e(TAG, "Core maintenance failed before external launch", error)
+                    return abortLaunch(R.string.settings_clear_cache_failed)
+                }
+                return true
+            }
+            when (GameLaunchPreparation.prepare(this, gameId)) {
+                is GameLaunchPreparation.Outcome.Ready -> Unit
+                GameLaunchPreparation.Outcome.MissingFirmware ->
+                    return abortLaunch(R.string.game_launch_requires_firmware)
+                GameLaunchPreparation.Outcome.MissingFirmwareUpdate ->
+                    return abortLaunch(R.string.game_launch_requires_firmware_update)
+                GameLaunchPreparation.Outcome.Failed -> return abortLaunch(R.string.settings_clear_cache_failed)
+            }
+            val explicitState = loadStatePath(args)
+            if (explicitState != null) {
+                // An explicit resume (for example from the native shell) names a raw path.
+                // Validate it here, where the engine that will load it lives.
+                if (repository.interruptedLoad(gameId) == explicitState) {
+                    Log.e(TAG, "Previous load of $explicitState never finished; not retrying it")
+                    repository.finishLoad(gameId)
+                    return abortLaunch(R.string.emulation_savestate_failed_toast)
+                }
+                if (!repository.validStatePath(gameId, explicitState)) {
+                    Log.e(TAG, "Rejected save state for $gameId: $explicitState")
+                    return abortLaunch(R.string.emulation_savestate_failed_toast)
+                }
+            }
+            return true
+        } finally {
+            gate.release()
+        }
+    }
+
+    private fun abortLaunch(message: Int): Boolean {
+        runOnUiThread {
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            finishAndRemoveTask()
+        }
+        return false
+    }
+
+    private fun loadStatePath(args: Array<String>): String? {
+        val index = args.indexOf("-loadstate")
+        return args.getOrNull(index + 1)?.takeIf { index >= 0 && it.isNotBlank() }
+    }
+
     override fun getArguments(): Array<String> {
         if (isFrontCameraProbe()) return emptyArray()
+        if (launchRequestMalformed(intent)) return emptyArray()
         val baseArgs = intent.getStringArrayExtra(APP_RESTART_PARAMETERS) ?: gameIdFromIntent(intent).let {
             if (it.isBlank()) emptyArray() else arrayOf("-r", it)
         }
         val gameId = gameIdFromArgs(baseArgs)
         if (isFirmwareSession) return baseArgs
-        syncEffectiveDriverForLaunch(gameId)
-        // SDL requests these arguments on SDLThread after loading the core.
-        // External shortcuts therefore inspect their auto slot off the UI thread too.
+        // SDL requests these arguments on SDLThread after loading the core (prepareLaunch has
+        // already synced the driver). Auto-load is decided here, from this process's fresh
+        // preferences, whichever process asked for the launch.
+        val repository = SaveStateRepository(this)
         val enabled = SaveStateAutomationPreferences(this, gameId).use { it.current.autoLoadOnStart }
+        val interrupted = repository.interruptedLoad(gameId)
         val args = resolveAutoLoadArguments(baseArgs, enabled,
             skipAutomatic = intent.getBooleanExtra(SKIP_AUTOMATIC_STATE_LOAD_EXTRA, false)) {
-            SaveStateRepository(this).validQuickStatePath(gameId)
+            val quick = repository.validQuickStatePath(gameId)
+            if (quick != null && quick == interrupted) {
+                // The last automatic load of this file killed the process: boot normally once.
+                Log.e(TAG, "Previous automatic load of $quick never finished; skipping it")
+                repository.finishLoad(gameId)
+                runOnUiThread { Toast.makeText(this, R.string.emulation_savestate_failed_toast, Toast.LENGTH_LONG).show() }
+                null
+            } else quick
         }
         if (args !== baseArgs) {
             intent.putExtra(APP_RESTART_PARAMETERS, args).putExtra(AUTOMATIC_STATE_LOAD_EXTRA, true)
             runOnUiThread { launchStateLoading = LaunchStateLoadingState.fromArguments(args) }
+        }
+        loadStatePath(args)?.let { path ->
+            repository.beginLoad(gameId, path)
+            runOnUiThread { startInputGateWatchdog() }
         }
         Log.i(TAG, "Starting emulator with args=${args.joinToString(" ")} gameId=$gameId")
         return args
@@ -381,12 +506,18 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        Log.i(TAG, "onCreate action=${intent?.action} flags=0x${Integer.toHexString(intent?.flags ?: 0)} " +
+            "restored=${savedInstanceState != null}")
+        // A task the system brings back from recents or after process death carries the original
+        // launch Intent; it must not replay an old explicit state load.
+        intent?.let { LaunchIntents.sanitizeRestoredLaunch(it, restoredByFramework = savedInstanceState != null) }
         isNativeShellSession = gameIdFromIntent(intent) == NativeLibraryMode.TITLE_ID
         isNativeTrophySession = gameIdFromIntent(intent) == "__VITA_NATIVE_TROPHIES__"
         shellCatalogBootstrap = isNativeShellSession && NativeLibraryMode.needsCatalogBootstrap(this)
         launchStateLoading = LaunchStateLoadingState.fromArguments(
             intent?.getStringArrayExtra(APP_RESTART_PARAMETERS)
         )
+        if (launchStateLoading.active) startInputGateWatchdog()
         if (!::inputOverlay.isInitialized) {
             inputOverlay = InputOverlay(this)
         }
@@ -419,6 +550,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             if (mode != null) window.attributes = window.attributes.apply { preferredDisplayModeId = mode.modeId }
         }
         if (isFirmwareSession) inputOverlay.setTouchControlsActive(false)
+        else GameSessionMarker.forContext(this).markLive(android.os.Process.myPid(), android.app.Application.getProcessName())
         KeyboardMouseManager.ensureInitialized(this)
         KeyboardMouseManager.setPointerCaptureListener { enabled ->
             runOnUiThread { updatePointerCapture(enabled) }
@@ -433,6 +565,9 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             }
         }
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        // Application startup recovers stale play-time sessions off the main thread; a new session
+        // must not start before that finished or it would be closed as stale.
+        com.sbro.emucorev.core.AppStartup.awaitReady()
         EmulatorStorage.prepareRuntime(this)
         VitaCoreConfigRepository(this).ensureDefaultsPersisted()
         refreshGamepadRuntimeInputSettings()
@@ -514,9 +649,9 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         } finally {
             stopRetroArchShaderSession()
             TrophySyncSessionGate.shared.gameStopped()
-            runCatching {
-                runBlocking { TrophyCloudRepository(applicationContext).sync() }
-            }
+            // The exit path (rebirth or process kill) must not wait on the network: WorkManager
+            // runs the sync with its own network constraint and survives this process.
+            runCatching { TrophySyncScheduler.schedule(applicationContext) }
         }
     }
 
@@ -531,6 +666,8 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         keyboardRequestGeneration++
         finishPlayTimeSessionIfNeeded()
         stopRetroArchShaderSession()
+        inputGateJob?.cancel()
+        if (!isFirmwareSession) GameSessionMarker.forContext(this).clear(android.os.Process.myPid())
         inputManager?.unregisterInputDeviceListener(this)
         inputManager = null
         if (::inputOverlay.isInitialized) {
@@ -884,6 +1021,49 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     /** Push UI-driven audio volume (0..100) into the running emulator state. */
     external fun setAudioVolume(volume: Int)
 
+    private val recordAudioGate = RecordAudioPermissionGate()
+
+    /** Called from the guest thread (sceAudioInOpenPort): cheap, never blocks. */
+    @Suppress("unused") // JNI
+    fun hasRecordAudioPermission(): Boolean =
+        androidx.core.content.ContextCompat.checkSelfPermission(
+            this, android.Manifest.permission.RECORD_AUDIO
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Called from the guest thread. Shows the runtime prompt once per session; the prompt is
+     * issued on the UI thread and the call returns immediately. The result arrives in
+     * [onRequestPermissionsResult].
+     */
+    @Suppress("unused") // JNI
+    fun requestRecordAudioPermission() {
+        if (!recordAudioGate.shouldRequest(hasRecordAudioPermission())) return
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            androidx.core.app.ActivityCompat.requestPermissions(
+                this,
+                arrayOf(android.Manifest.permission.RECORD_AUDIO),
+                RecordAudioPermissionGate.REQUEST_CODE
+            )
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        // SDLActivity forwards every result to SDL's own pending-permission callbacks.
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        val granted = grantResults.isNotEmpty() &&
+            grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (recordAudioGate.shouldReopenCapture(requestCode, granted)) {
+            notifyRecordAudioGranted()
+        }
+    }
+
+    private external fun notifyRecordAudioGranted()
+
     /** Apply runtime-safe menu settings to the active Vita3K session. */
     external fun applyRuntimeCoreSettings(
         vSync: Boolean,
@@ -896,11 +1076,28 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         pstvMode: Boolean
     )
 
+    /** Largest internal resolution multiplier the running session can switch to live; 0 if it cannot. */
+    external fun getLiveResolutionLimit(): Float
+
+    /** Internal resolution multiplier the running session renders at right now; 0 if none is running. */
+    external fun getLiveResolutionMultiplier(): Float
+
     /**
-     * Ask the core to capture and save a screenshot using its configured format.
-     * Returns false if no emulator session is currently active.
+     * Switch the internal resolution of the running, menu-paused session. Blocks until the render
+     * thread has applied it (or refused); true only if it is in effect afterwards.
      */
-    external fun requestScreenshot(): Boolean
+    external fun setLiveResolutionMultiplier(multiplier: Float): Boolean
+
+    /** Apply a screen filter name (as stored in the profile) to the running session. */
+    external fun setLiveScreenFilter(filter: String)
+
+    /**
+     * Ask the core to capture and save a screenshot using its configured format. Blocking
+     * (frame readback and encode): never call it on the UI thread, use [ScreenshotPublisher].
+     * Returns the written file path, or null when nothing was saved (no session, screenshots
+     * disabled, readback or encode failure).
+     */
+    external fun requestScreenshot(): String?
 
     /** Pause/resume the active Vita3K app session through the upstream session controller. */
     external fun setAppSessionMenuPaused(paused: Boolean): Boolean
@@ -1396,7 +1593,8 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                             // CLEAR_TASK, then retire only this completed game process.
                             targetIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
                             startActivity(targetIntent)
-                            finish()
+                            // Remove the retained task so it cannot re-deliver this launch Intent.
+                            finishAndRemoveTask()
                             android.os.Process.killProcess(android.os.Process.myPid())
                         } else if (returnToLibrary && canReuseNativeSession()) {
                             // Preserve the library Activity, ViewModel and decoded covers.
@@ -1420,7 +1618,22 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         return action == ACTION_EXTERNAL_LAUNCH || action.startsWith("LAUNCH_")
     }
 
-    private fun gameIdFromIntent(intent: Intent?): String {
+    /** Validated title id of a launch intent; "" when absent or malformed (the activity is exported). */
+    private fun gameIdFromIntent(intent: Intent?): String =
+        com.sbro.emucorev.core.TitleIds.sanitizeOrNull(rawGameIdFromIntent(intent)).orEmpty()
+
+    /** True when the intent names a title id that is not a safe id; such a launch is rejected. */
+    private fun launchRequestMalformed(intent: Intent?): Boolean {
+        if (intent == null) return false
+        val args = intent.getStringArrayExtra(APP_RESTART_PARAMETERS)
+        val restartIndex = args?.indexOf("-r") ?: -1
+        val argId = if (args != null && restartIndex >= 0) args.getOrNull(restartIndex + 1).orEmpty() else ""
+        return listOf(rawGameIdFromIntent(intent), argId).any {
+            it.isNotBlank() && !com.sbro.emucorev.core.TitleIds.isValid(it.trim())
+        }
+    }
+
+    private fun rawGameIdFromIntent(intent: Intent?): String {
         if (intent == null) return ""
         intent.getStringExtra(EXTRA_TITLE_ID)?.takeIf { it.isNotBlank() }?.let { return it }
         intent.getStringExtra(EXTRA_GAME_ID)?.takeIf { it.isNotBlank() }?.let { return it }
@@ -1439,12 +1652,8 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     private fun gameIdFromArgs(args: Array<String>): String {
         val restartIndex = args.indexOf("-r")
-        return if (restartIndex >= 0 && restartIndex + 1 < args.size) args[restartIndex + 1] else ""
-    }
-
-    private fun syncEffectiveDriverForLaunch(gameId: String) {
-        if (gameId.isBlank()) return
-        runCatching { VitaGameSettingsRepository(this).syncEffectiveDriverForLaunch(gameId) }
+        val raw = if (restartIndex >= 0 && restartIndex + 1 < args.size) args[restartIndex + 1] else ""
+        return com.sbro.emucorev.core.TitleIds.sanitizeOrNull(raw).orEmpty()
     }
 
     private fun isSpecialLaunchAction(action: String): Boolean {
@@ -1467,6 +1676,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         const val EXTRA_REBIRTH_HANDLED = "emu_rebirth_handled"
         const val EMULATION_OVERLAY_ELEVATION = 64f
         const val PLAY_TIME_HEARTBEAT_INTERVAL_MS = 60_000L
+        const val INPUT_GATE_POLL_MS = 1_000L
     }
 }
 

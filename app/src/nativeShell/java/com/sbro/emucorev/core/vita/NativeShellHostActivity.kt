@@ -109,11 +109,13 @@ class NativeShellHostActivity : NativeShellActivity(), NativeLibraryMode.ReturnT
         scope.launch {
             try {
                 when (start()) {
-                    VitaLaunchBridge.LaunchResult.Success -> Unit
+                    // Busy: an earlier launch has not reported ready (or timed out) yet; do not start another.
+                    VitaLaunchBridge.LaunchResult.Success, VitaLaunchBridge.LaunchResult.Busy -> Unit
                     VitaLaunchBridge.LaunchResult.MissingFirmware ->
                         toast(R.string.game_launch_requires_firmware)
                     VitaLaunchBridge.LaunchResult.MissingFirmwareUpdate ->
                         toast(R.string.game_launch_requires_firmware_update)
+                    VitaLaunchBridge.LaunchResult.StorageUnavailable -> toast(R.string.storage_unavailable_message)
                     VitaLaunchBridge.LaunchResult.Failure -> toast(R.string.game_launch_failed)
                 }
             } finally {

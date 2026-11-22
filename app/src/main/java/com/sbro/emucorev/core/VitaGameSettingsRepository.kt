@@ -38,10 +38,16 @@ class VitaGameSettingsRepository(private val context: Context) {
             return File(base, "config")
         }
 
-    fun customConfigFile(titleId: String): File = File(configDirectory, "config_${titleId.trim()}.xml")
+    /** Blank or malformed ids (path separators, dots) never reach a file name. */
+    private fun isUsableTitleId(titleId: String): Boolean = TitleIds.isValid(titleId.trim())
+
+    fun customConfigFile(titleId: String): File {
+        val safeId = requireNotNull(TitleIds.sanitizeOrNull(titleId)) { "Invalid title id" }
+        return File(configDirectory, "config_$safeId.xml")
+    }
 
     fun hasCustomConfig(titleId: String): Boolean {
-        if (titleId.isBlank()) return false
+        if (!isUsableTitleId(titleId)) return false
         val file = customConfigFile(titleId)
         return file.isFile && !isLaunchOnlyConfig(file)
     }
@@ -52,7 +58,7 @@ class VitaGameSettingsRepository(private val context: Context) {
 
     fun loadProfile(titleId: String): VitaGameSettingsProfile {
         val global = globalRepository.ensureDefaultsPersisted()
-        if (titleId.isBlank()) return VitaGameSettingsProfile(global, null)
+        if (!isUsableTitleId(titleId)) return VitaGameSettingsProfile(global, null)
         val title = runCatching { VitaSfoParser.parse(EmulatorStorage.paramSfoPath(context, titleId)).title.orEmpty() }
             .getOrDefault("")
         val base = gameDatabase.applyDefaults(global, titleId, title)
@@ -62,7 +68,7 @@ class VitaGameSettingsRepository(private val context: Context) {
         } else {
             VitaGameSettingsProfile(base, null)
         }
-        return profile
+        return profile.copy(config = profile.config.clampedToUiRanges())
     }
 
     fun save(titleId: String, config: VitaCoreConfig) {
@@ -70,7 +76,7 @@ class VitaGameSettingsRepository(private val context: Context) {
     }
 
     fun savePreservingDriverOverride(titleId: String, config: VitaCoreConfig) {
-        if (titleId.isBlank()) return
+        if (!isUsableTitleId(titleId)) return
         val override = loadProfile(titleId).customDriverOverride
         saveProfile(titleId, config, override)
     }
@@ -85,10 +91,10 @@ class VitaGameSettingsRepository(private val context: Context) {
         customDriverOverride: String?,
         keyboardMouse: KeyboardMouseSettings?
     ) {
-        if (titleId.isBlank()) return
+        if (!isUsableTitleId(titleId)) return
         synchronized(CONFIG_IO_LOCK) {
             val base = globalRepository.ensureDefaultsPersisted()
-            val effectiveConfig = config.copy(customDriverName = customDriverOverride ?: base.customDriverName)
+            val effectiveConfig = config.copy(customDriverName = customDriverOverride ?: base.customDriverName).clampedToUiRanges()
             configDirectory.mkdirs()
             writeCustomConfig(
                 customConfigFile(titleId),
@@ -101,7 +107,7 @@ class VitaGameSettingsRepository(private val context: Context) {
 
     /** Persists or clears a game-specific keyboard/mouse override without touching other settings. */
     fun updateKeyboardMouse(titleId: String, keyboardMouse: KeyboardMouseSettings?) {
-        if (titleId.isBlank()) return
+        if (!isUsableTitleId(titleId)) return
         val profile = loadProfile(titleId)
         if (keyboardMouse == null) {
             if (profile.keyboardMouse == null || !customConfigFile(titleId).exists()) return
@@ -119,7 +125,7 @@ class VitaGameSettingsRepository(private val context: Context) {
         customDriverOverride: String?,
         keyboardMouse: KeyboardMouseSettings?
     ) {
-        if (titleId.isBlank()) return
+        if (!isUsableTitleId(titleId)) return
         if (keyboardMouse == null && !hasCustomConfig(titleId)) return
         saveProfile(titleId, config, customDriverOverride, keyboardMouse)
     }
@@ -131,7 +137,7 @@ class VitaGameSettingsRepository(private val context: Context) {
             profile.config.backendRenderer, DeviceGpuInfoProvider.get(context),
             if (profile.config.customDriverName.isBlank()) emptyList() else GpuDriverManager(context).listInstalledDrivers())
         val effective = profile.config.copy(customDriverName = effectiveName)
-        if (titleId.isBlank()) return@synchronized effective
+        if (!isUsableTitleId(titleId)) return@synchronized effective
         val file = customConfigFile(titleId)
         val realProfile = file.isFile && !isLaunchOnlyConfig(file)
         if (!realProfile && effectiveName == profile.config.customDriverName) {
@@ -154,7 +160,7 @@ class VitaGameSettingsRepository(private val context: Context) {
     }
 
     fun reset(titleId: String) {
-        if (titleId.isBlank()) return
+        if (!isUsableTitleId(titleId)) return
         synchronized(CONFIG_IO_LOCK) {
             customConfigFile(titleId).delete()
         }

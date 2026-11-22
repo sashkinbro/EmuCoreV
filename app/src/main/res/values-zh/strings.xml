@@ -598,6 +598,16 @@
     <string name="settings_camera_source_solid">纯色</string>
     <string name="settings_camera_source_image">静态图像</string>
     <string name="settings_camera_source_real">真实相机</string>
+    <string name="settings_camera_device">相机设备</string>
+    <string name="settings_help_camera_device">选择本设备上的哪个相机为模拟的 Vita 相机提供画面。自动会选择朝向相同的相机。</string>
+    <string name="settings_camera_device_auto">自动</string>
+    <string name="settings_camera_device_front">前置相机 (%1$s)</string>
+    <string name="settings_camera_device_back">后置相机 (%1$s)</string>
+    <string name="settings_camera_device_external">外接相机 (%1$s)</string>
+    <string name="settings_camera_image_title">相机图片</string>
+    <string name="settings_camera_image_none">点按以选择图片</string>
+    <string name="settings_camera_image_selected">已选择图片。点按可更换</string>
+    <string name="settings_camera_image_failed">无法使用此图片</string>
     <string name="settings_show_welcome">显示欢迎屏幕</string>
     <string name="settings_help_show_welcome">在启动时显示介绍性的欢迎屏幕，直到您将其关闭。</string>
     <string name="settings_warn_missing_firmware">缺少固件时警告</string>
@@ -610,14 +620,12 @@
     <string name="emulation_quickbar_screenshot">截图</string>
     <string name="emulation_quickbar_open_menu">打开菜单</string>
     <string name="emulation_menu_paused_badge">已暂停</string>
-    <string name="emulation_menu_badge_live">实时</string>
-    <string name="emulation_menu_badge_restart">需要重启</string>
+    <string name="emulation_menu_resolution_failed">无法更改分辨率。游戏将保持当前分辨率。</string>
     <string name="emulation_menu_section_now">立即</string>
     <string name="emulation_menu_section_now_desc">更改会立即应用到运行中的游戏。</string>
     <string name="emulation_menu_section_touch">触摸控制</string>
     <string name="emulation_menu_section_touch_desc">屏幕虚拟手柄。更改会立即应用。</string>
     <string name="emulation_menu_section_display">显示</string>
-    <string name="emulation_menu_section_display_desc">分辨率和帧呈现。在下次启动时生效。</string>
     <string name="emulation_menu_section_performance">性能</string>
     <string name="emulation_menu_section_performance_desc">速度与准确性的权衡。在下次启动时生效。</string>
     <string name="emulation_menu_section_system">系统</string>
@@ -1426,6 +1434,10 @@
     <string name="emulation_savestate_loaded_toast">已读取</string>
     <string name="emulation_savestate_deleted_toast">已删除</string>
     <string name="emulation_savestate_failed_toast">操作失败</string>
+    <string name="emulation_savestate_refused_no_game">当前没有运行的游戏，无法保存状态</string>
+    <string name="emulation_savestate_refused_exiting">游戏正在关闭，请稍后再试</string>
+    <string name="emulation_savestate_refused_loading">游戏仍在加载，请稍后再试</string>
+    <string name="emulation_savestate_refused_busy">另一个存档或读档操作正在进行，请稍候</string>
     <string name="emulation_savestate_session_mismatch_toast">此存档属于之前的游戏会话，暂时无法读取</string>
     <string name="emulation_savestate_title_mismatch_toast">此存档属于其他游戏</string>
     <string name="emulation_savestate_confirm_save_title">覆盖存档？</string>
@@ -1440,7 +1452,6 @@
     <string name="savestate_manager_title">存档</string>
     <string name="savestate_manager_subtitle">模拟器快照，与游戏内存档分开</string>
     <string name="savestate_manager_refresh">刷新</string>
-    <string name="savestate_manager_open_for_game">存档</string>
     <string name="savestate_manager_empty_title">尚无即时存档</string>
     <string name="savestate_manager_empty_body">可在游戏内菜单或使用快速保存按钮创建。</string>
     <string name="nav_save_states">快速存档</string>
@@ -1595,6 +1606,7 @@
     <string name="rear_touch_game">此游戏</string>
     <string name="rear_touch_inherit">使用全局配置</string>
     <string name="rear_touch_clear">清除绑定</string>
+    <string name="rear_touch_reset_confirm">要将所有背面触控点重置为默认值吗?</string>
     <string name="rear_touch_hint">按住即可触摸背面触摸板，松开即可抬起触点。已分配的输入将替代原有操作。正面触摸仍可使用。</string>
     <string name="rear_touch_screen_position">屏幕按钮位置</string>
     <string name="settings_gpu_driver_status_missing_selection">所选驱动不可用：%1$s</string>
@@ -1793,4 +1805,8 @@
     <string name="native_ui_set_system_music">系统音乐</string>
     <string name="native_ui_set_delete">删除</string>
     <string name="native_ui_set_delete_theme_confirm">删除此主题。</string>
+    <string name="storage_unavailable_message">所选存储空间不可用。请插入 SD 卡，或在设置中选择其他存储空间。</string>
+    <string name="emulation_screenshot_saved">截图已保存到 Pictures/EmuCoreV</string>
+    <string name="emulation_screenshot_failed">无法保存截图</string>
+    <string name="native_ui_new_folder">新建文件夹</string>
 </resources>

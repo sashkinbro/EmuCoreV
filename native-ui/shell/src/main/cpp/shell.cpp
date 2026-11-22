@@ -149,6 +149,13 @@ std::atomic<int> display_area_mode{0};
 std::vector<std::uint32_t> home_wallpaper_ids;
 std::uint32_t theme_bar_color = 0;
 std::string requested_wave_theme = "effects_default_0512_01";
+// Localized default name of a new Home folder, set by the host (native_ui_new_folder); guarded by
+// status_mutex. The English fallback only applies until the host has provided the string.
+std::string default_folder_title = "New Folder";
+std::string current_default_folder_title() {
+    const std::lock_guard lock(status_mutex);
+    return default_folder_title;
+}
 std::uint64_t wave_theme_revision = 1;
 template<class T> std::vector<T> read_path(const std::string& relative, std::size_t count) {
     std::string path; { const std::lock_guard lock(status_mutex); path = resource_root + "/" + relative; }
@@ -355,6 +362,14 @@ struct Window {
     float edge_right() const noexcept { return 960.f + cx0 - safe_r; }
     float edge_bottom() const noexcept { return 544.f + cy0 - safe_b; }
     float canvas_top() const noexcept { return -cy0; }
+    // The Vita LiveArea sheet is flush with the panel bottom (content y 44..544);
+    // on taller canvases it is shifted down by cy0 so it stays anchored to the
+    // bottom edge. Zero for the original 960x544 layout.
+    float livearea_shift_y() const noexcept { return cy0; }
+    // Side arrows follow the sheet only while it is on screen (Home keeps them put).
+    float livearea_arrow_shift_y() const noexcept {
+        return cy0 * std::clamp(livearea_deck.pager_position(), 0.f, 1.f);
+    }
     // Horizontal pager distance between Home and LiveArea pages on this canvas.
     float pager_scale() const noexcept { return cw / 960.f; }
     void sprites_begin() {
@@ -1424,7 +1439,7 @@ struct Window {
         emucorev::paf::PageTurnPose pose{};
         pose.position = {
             emucorev::paf::kLiveAreaSheetPosition.x + offset_x,
-            emucorev::paf::kLiveAreaSheetPosition.y,
+            emucorev::paf::kLiveAreaSheetPosition.y - livearea_shift_y(),
             tab.exit_z + depth_arc,
         };
         const float s = is_opening_tab ? livearea_deck.sheet_open_scale() : 1.f;
@@ -1551,11 +1566,11 @@ struct Window {
         if (!edit_visual.edit_mode && !edit_visual.is_folder_visible()) {
             sprites_begin();
             if (livearea_deck.pager_position() > 0.25f) {
-                sprites->draw(topmenu_arrow_left_id, edge_left(), 258.f, 60.f, 60.f);
+                sprites->draw(topmenu_arrow_left_id, edge_left(), 258.f + livearea_arrow_shift_y(), 60.f, 60.f);
             }
             if (livearea_deck.tab_count() > 0
                 && livearea_deck.pager_position() < static_cast<float>(livearea_deck.tab_count()) - 0.25f) {
-                sprites->draw(topmenu_arrow_right_id, edge_right() - 60.f, 258.f, 60.f, 60.f);
+                sprites->draw(topmenu_arrow_right_id, edge_right() - 60.f, 258.f + livearea_arrow_shift_y(), 60.f, 60.f);
             }
         }
     }
@@ -1648,6 +1663,7 @@ struct Window {
         if (!snap) return false;
         const float ox = livearea_deck.tab_offset_x(active_tab) * pager_scale();
         const float lx = x - ox;
+        y -= livearea_shift_y();
         for (const auto& hit : snap->targets) {
             const auto& r = hit.rect;
             if (lx >= r[0] && y >= r[1] && lx < r[0] + r[2] && y < r[1] + r[3]) {
@@ -1956,7 +1972,7 @@ struct Window {
                 return 1;
             }
             // Active LiveArea top-right peel corner hit-test.
-            if (!livearea_deck.is_home_active() && livearea_deck.begin_peel_drag(px, py)) {
+            if (!livearea_deck.is_home_active() && livearea_deck.begin_peel_drag(px, py - livearea_shift_y())) {
                 peeker_peel_drag = true;
                 return 1;
             }
@@ -1970,7 +1986,7 @@ struct Window {
                         if (c_target->kind == emucorev::paf::HomeEntryKind::folder) {
                             desktop.ungroup_folder(callout_page, callout_slot);
                         } else {
-                            desktop.create_folder_at(callout_page, callout_slot, "New Folder");
+                            desktop.create_folder_at(callout_page, callout_slot, current_default_folder_title());
                         }
                         callout_open = false;
                         home_scroll.set_page_count(desktop.page_count());
@@ -2054,7 +2070,7 @@ struct Window {
 
         if (action == AMOTION_EVENT_ACTION_MOVE) {
             if (peeker_peel_drag) {
-                livearea_deck.update_peel_drag(px, py);
+                livearea_deck.update_peel_drag(px, py - livearea_shift_y());
                 return 1;
             }
             if (edit_drag_active) {
@@ -2122,7 +2138,7 @@ struct Window {
                         const auto* src_e = desktop.entry_at(edit_drag_src_page, edit_drag_src_slot);
                         const bool allow_folder = src_e && src_e->kind == emucorev::paf::HomeEntryKind::app;
                         if (desktop.drop_onto_slot(edit_drag_src_page, edit_drag_src_slot,
-                                dp, ds, allow_folder, "New Folder")) {
+                                dp, ds, allow_folder, current_default_folder_title())) {
                             sync_visual_slots_with_desktop();
                             home_scroll.set_page_count(desktop.page_count());
                             persist_home_layout();
@@ -2171,14 +2187,15 @@ struct Window {
                 && std::hypot(px - home_touch_start.x, py - home_touch_start.y) < 30.f) {
                 if (!edit_visual.edit_mode) {
                     if (livearea_deck.pager_position() > 0.25f && px < edge_left() + 64.f
-                        && py >= 220.f && py <= 356.f) {
+                        && py >= 220.f + livearea_arrow_shift_y() && py <= 356.f + livearea_arrow_shift_y()) {
                         if (livearea_deck.slide_left()) emit_ui_sound(sound_page_scroll);
                         home_touch_down = false;
                         return 1;
                     }
                     if (livearea_deck.tab_count() > 0
                         && livearea_deck.pager_position() < static_cast<float>(livearea_deck.tab_count()) - 0.25f
-                        && px > edge_right() - 64.f && py >= 220.f && py <= 356.f) {
+                        && px > edge_right() - 64.f
+                        && py >= 220.f + livearea_arrow_shift_y() && py <= 356.f + livearea_arrow_shift_y()) {
                         if (livearea_deck.slide_right()) emit_ui_sound(sound_page_scroll);
                         home_touch_down = false;
                         return 1;
@@ -2896,17 +2913,45 @@ struct Preview {
                     int ready_scene = native_ready_scene.load();
                     if (ready_scene >= 0 && preview.app && preview.app->window
                         && native_ready_scene.compare_exchange_strong(ready_scene, -1)) {
-                        preview_scene.store(ready_scene);
-                        native_preview_loading.store(false);
+                        // The old Window owns the EGL surface of the one ANativeWindow, so it
+                        // must be released before the new one can connect: the swap cannot be
+                        // built beside it. If the new scene fails to initialize, rebuild the
+                        // previous scene's Window; only when that fails too, finish the
+                        // activity instead of leaving a black screen without Back.
+                        const int previous_scene = preview_scene.load();
                         preview.window.reset();
-                        auto next = std::make_unique<Window>();
-                        next->initialize(preview.app);
-                        preview.window = std::move(next);
-                        if (!preview.phase_initialized) {
-                            preview.phase = preview.window->initial_phase;
-                            preview.phase_initialized = true;
-                        } else if (ready_scene == 0) {
-                            preview.window->set_phase(preview.phase);
+                        bool swapped = false;
+                        try {
+                            preview_scene.store(ready_scene);
+                            auto next = std::make_unique<Window>();
+                            next->initialize(preview.app);
+                            preview.window = std::move(next);
+                            swapped = true;
+                        } catch (const std::exception& error) {
+                            __android_log_print(ANDROID_LOG_ERROR, "NativeUiPreview",
+                                "Scene %d failed to initialize: %s", ready_scene, error.what());
+                            preview_scene.store(previous_scene);
+                            try {
+                                auto previous = std::make_unique<Window>();
+                                previous->initialize(preview.app);
+                                preview.window = std::move(previous);
+                            } catch (const std::exception& restore_error) {
+                                __android_log_print(ANDROID_LOG_ERROR, "NativeUiPreview",
+                                    "Previous scene %d could not be restored: %s", previous_scene, restore_error.what());
+                            }
+                        }
+                        native_preview_loading.store(false);
+                        if (!preview.window) {
+                            ANativeActivity_finish(preview.app->activity);
+                            return;
+                        }
+                        if (swapped) {
+                            if (!preview.phase_initialized) {
+                                preview.phase = preview.window->initial_phase;
+                                preview.phase_initialized = true;
+                            } else if (ready_scene == 0) {
+                                preview.window->set_phase(preview.phase);
+                            }
                         }
                         preview.last_draw = preview.next_draw = 0;
                     }
@@ -3012,6 +3057,18 @@ Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeSetWaveTheme(JNI
         ++wave_theme_revision;
     }
     env->ReleaseStringUTFChars(theme, text);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeSetDefaultFolderTitle(JNIEnv* env, jobject, jstring title) {
+    if (!title) return;
+    const char* text = env->GetStringUTFChars(title, nullptr);
+    if (!text) return;
+    {
+        const std::lock_guard lock(status_mutex);
+        if (*text != '\0') default_folder_title = text;
+    }
+    env->ReleaseStringUTFChars(title, text);
 }
 
 extern "C" JNIEXPORT void JNICALL

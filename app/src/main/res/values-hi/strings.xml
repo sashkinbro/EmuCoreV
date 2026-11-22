@@ -599,6 +599,16 @@
     <string name="settings_camera_source_solid">ठोस रंग</string>
     <string name="settings_camera_source_image">स्थिर छवि</string>
     <string name="settings_camera_source_real">असली कैमरा</string>
+    <string name="settings_camera_device">कैमरा डिवाइस</string>
+    <string name="settings_help_camera_device">चुनें कि इस डिवाइस का कौन-सा कैमरा एमुलेटेड Vita कैमरे को फीड करे। ऑटोमैटिक उसी दिशा वाला कैमरा चुनता है।</string>
+    <string name="settings_camera_device_auto">ऑटोमैटिक</string>
+    <string name="settings_camera_device_front">फ्रंट कैमरा (%1$s)</string>
+    <string name="settings_camera_device_back">बैक कैमरा (%1$s)</string>
+    <string name="settings_camera_device_external">बाहरी कैमरा (%1$s)</string>
+    <string name="settings_camera_image_title">कैमरा इमेज</string>
+    <string name="settings_camera_image_none">इमेज चुनने के लिए टैप करें</string>
+    <string name="settings_camera_image_selected">इमेज चुनी गई। बदलने के लिए टैप करें</string>
+    <string name="settings_camera_image_failed">इस इमेज का उपयोग नहीं किया जा सका</string>
     <string name="settings_show_welcome">स्वागत स्क्रीन दिखाएं</string>
     <string name="settings_help_show_welcome">लॉन्च पर परिचयात्मक स्वागत स्क्रीन दिखाएं जब तक आप इसे हटा नहीं देते।</string>
     <string name="settings_warn_missing_firmware">फर्मवेयर गायब होने पर चेतावनी दें</string>
@@ -611,14 +621,12 @@
     <string name="emulation_quickbar_screenshot">स्क्रीनशॉट</string>
     <string name="emulation_quickbar_open_menu">मेनू खोलें</string>
     <string name="emulation_menu_paused_badge">रोका गया</string>
-    <string name="emulation_menu_badge_live">लाइव</string>
-    <string name="emulation_menu_badge_restart">पुनरारंभ आवश्यक है</string>
+    <string name="emulation_menu_resolution_failed">रिज़ॉल्यूशन बदला नहीं जा सका। गेम मौजूदा रिज़ॉल्यूशन पर ही चलेगा।</string>
     <string name="emulation_menu_section_now">अभी</string>
     <string name="emulation_menu_section_now_desc">परिवर्तन चल रहे गेम पर तुरंत लागू होते हैं।</string>
     <string name="emulation_menu_section_touch">टच नियंत्रण</string>
     <string name="emulation_menu_section_touch_desc">ऑन-स्क्रीन गेमपैड। परिवर्तन तुरंत लागू होते हैं।</string>
     <string name="emulation_menu_section_display">प्रदर्शन</string>
-    <string name="emulation_menu_section_display_desc">रिज़ॉल्यूशन और फ्रेम प्रस्तुति। अगले लॉन्च पर प्रभावी होंगे।</string>
     <string name="emulation_menu_section_performance">कार्यक्षमता</string>
     <string name="emulation_menu_section_performance_desc">गति और सटीकता के बीच समझौता। अगले लॉन्च पर प्रभावी होंगे।</string>
     <string name="emulation_menu_section_system">सिस्टम</string>
@@ -1428,6 +1436,10 @@
     <string name="emulation_savestate_loaded_toast">लोड हो गया</string>
     <string name="emulation_savestate_deleted_toast">हटा दिया गया</string>
     <string name="emulation_savestate_failed_toast">कार्रवाई पूरी नहीं हो सकी</string>
+    <string name="emulation_savestate_refused_no_game">कोई गेम नहीं चल रहा है, इसलिए स्टेट सेव नहीं हो सकता</string>
+    <string name="emulation_savestate_refused_exiting">गेम बंद हो रहा है, बाद में पुनः प्रयास करें</string>
+    <string name="emulation_savestate_refused_loading">गेम अभी लोड हो रहा है, कुछ देर बाद पुनः प्रयास करें</string>
+    <string name="emulation_savestate_refused_busy">दूसरा सेव या लोड चल रहा है, कृपया प्रतीक्षा करें</string>
     <string name="emulation_savestate_session_mismatch_toast">यह सेव पिछले गेम सत्र की है और अभी लोड नहीं की जा सकती</string>
     <string name="emulation_savestate_title_mismatch_toast">यह सेव किसी दूसरे गेम की है</string>
     <string name="emulation_savestate_confirm_save_title">सेव को बदलें?</string>
@@ -1442,7 +1454,6 @@
     <string name="savestate_manager_title">सेव</string>
     <string name="savestate_manager_subtitle">एमुलेटर स्नैपशॉट, गेम सेव से अलग</string>
     <string name="savestate_manager_refresh">रीफ़्रेश करें</string>
-    <string name="savestate_manager_open_for_game">सेव</string>
     <string name="savestate_manager_empty_title">अभी कोई सेव नहीं</string>
     <string name="savestate_manager_empty_body">इन-गेम मेनू या क्विक सेव बटन से एक बनाएँ।</string>
     <string name="nav_save_states">क्विक सेव</string>
@@ -1597,6 +1608,7 @@
     <string name="rear_touch_game">यह गेम</string>
     <string name="rear_touch_inherit">वैश्विक प्रोफ़ाइल इस्तेमाल करें</string>
     <string name="rear_touch_clear">असाइनमेंट हटाएँ</string>
+    <string name="rear_touch_reset_confirm">सभी रियर टच पॉइंट को डिफ़ॉल्ट पर रीसेट करें?</string>
     <string name="rear_touch_hint">पिछले पैनल को छूने के लिए दबाकर रखें; स्पर्श हटाने के लिए छोड़ें। जोड़े गए इनपुट अपनी सामान्य क्रिया की जगह लेते हैं। सामने का टच उपलब्ध रहता है।</string>
     <string name="rear_touch_screen_position">स्क्रीन बटन की स्थिति</string>
     <string name="settings_gpu_driver_status_missing_selection">चुना गया ड्राइवर उपलब्ध नहीं है: %1$s</string>
@@ -1799,4 +1811,8 @@
     <string name="native_ui_set_system_music">सिस्टम संगीत</string>
     <string name="native_ui_set_delete">हटाएँ</string>
     <string name="native_ui_set_delete_theme_confirm">यह थीम हटा दी जाएगी।</string>
+    <string name="storage_unavailable_message">चुना गया स्टोरेज उपलब्ध नहीं है। SD कार्ड डालें या सेटिंग में कोई दूसरा स्टोरेज चुनें।</string>
+    <string name="emulation_screenshot_saved">स्क्रीनशॉट Pictures/EmuCoreV में सहेजा गया</string>
+    <string name="emulation_screenshot_failed">स्क्रीनशॉट सहेजा नहीं जा सका</string>
+    <string name="native_ui_new_folder">नया फ़ोल्डर</string>
 </resources>

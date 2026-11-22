@@ -68,7 +68,9 @@ fun RearTouchControls(profile: RearTouchProfile, input: RearTouchInput, modifier
                         when (event.actionMasked) {
                             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> if (finger < 0) {
                                 finger = event.getPointerId(index)
-                                startX = event.rawX; startY = event.rawY
+                                // raw position of the pressing pointer (rawX/rawY alone is pointer 0)
+                                startX = event.getX(index) + event.rawX - event.x
+                                startY = event.getY(index) + event.rawY - event.y
                                 input.dispatcher.movePoint(point.slot, point.x, point.y)
                                 input.dispatcher.setSource(point.slot, source, true)
                             }
@@ -109,6 +111,7 @@ fun RearTouchSettingsDialog(
     var inherit by remember(titleId) { mutableStateOf(repository.override(titleId) == null) }
     var slot by remember { mutableIntStateOf(0) }
     var capturing by remember { mutableStateOf(false) }
+    var confirmReset by remember { mutableStateOf(false) }
     val point = profile.normalized().points[slot]
     fun changed(next: RearTouchProfile) {
         profile = next.normalized()
@@ -200,12 +203,17 @@ fun RearTouchSettingsDialog(
                     }
                 }, enabled = point.bindings.size < 8) { Text(stringResource(R.string.rear_touch_bind)) }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { changed(RearTouchProfile()) }) { Text(stringResource(R.string.emulation_controls_editor_reset)) }
+                    TextButton(onClick = { confirmReset = true }) { Text(stringResource(R.string.emulation_controls_editor_reset)) }
                     TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
                 }
             }
         }
     }
+    if (confirmReset) AlertDialog(onDismissRequest = { confirmReset = false },
+        title = { Text(stringResource(R.string.emulation_controls_editor_reset)) },
+        text = { Text(stringResource(R.string.rear_touch_reset_confirm)) },
+        confirmButton = { TextButton(onClick = { confirmReset = false; changed(RearTouchProfile()) }) { Text(stringResource(R.string.emulation_controls_editor_reset)) } },
+        dismissButton = { TextButton(onClick = { confirmReset = false }) { Text(stringResource(R.string.common_cancel)) } })
     if (capturing) AlertDialog(onDismissRequest = { capturing = false; input.capture = null },
         title = { Text(stringResource(R.string.rear_touch_bind)) }, text = { RearBindingCaptureWindow(input); Text(stringResource(R.string.rear_touch_capture)) },
         confirmButton = { TextButton(onClick = { capturing = false; input.capture = null }) { Text(stringResource(R.string.common_cancel)) } })

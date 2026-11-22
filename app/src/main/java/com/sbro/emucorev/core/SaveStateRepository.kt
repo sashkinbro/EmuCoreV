@@ -55,6 +55,8 @@ class SaveStateRepository internal constructor(
         private const val DIRECTORY = "savestates"
         private const val STATE_EXTENSION = ".ecvs"
         private const val THUMBNAIL_EXTENSION = ".jpg"
+        private const val LOADING_MARKER = ".loading"
+        private const val STAGING_DIRECTORY = "savestate-staging"
         private val operationLock = ReentrantLock()
     }
 
@@ -84,6 +86,61 @@ class SaveStateRepository internal constructor(
 
     fun thumbnailFile(titleId: String, slot: Int): File =
         File(slotsDirectory(titleId), baseName(slot) + THUMBNAIL_EXTENSION)
+
+    /**
+     * Validates an explicit resume request in the process that will load it: the file must be a
+     * readable state of [titleId] that the engine can still interpret.
+     */
+    fun validStatePath(titleId: String, path: String): Boolean = operationLock.withLock {
+        if (titleId.isBlank() || path.isBlank()) return@withLock false
+        val file = File(path)
+        if (!file.isFile || file.length() == 0L) return@withLock false
+        val inspection = backend.inspect(file.absolutePath)
+        inspection.isOk && inspection.titleId == titleId && inspection.engineVersion > 0
+    }
+
+    private fun loadingMarker(titleId: String): File = File(slotsDirectory(titleId), LOADING_MARKER)
+
+    /** Written before a state is loaded at boot; a marker that is still there next launch means the load killed the process. */
+    fun beginLoad(titleId: String, path: String) {
+        if (titleId.isBlank()) return
+        runCatching { loadingMarker(titleId).writeText(path) }
+    }
+
+    fun finishLoad(titleId: String) {
+        if (titleId.isBlank()) return
+        runCatching { loadingMarker(titleId).delete() }
+    }
+
+    /** The state path whose load never completed, or null. Does not clear the marker. */
+    fun interruptedLoad(titleId: String): String? {
+        if (titleId.isBlank()) return null
+        val marker = loadingMarker(titleId)
+        if (!marker.isFile) return null
+        return runCatching { marker.readText() }.getOrDefault("")
+    }
+
+    /**
+     * Removes leftovers of saves and loads the process never finished: archive temp files
+     * (`<state>.xxxx-xxxx-xxxx.tmp`), staged previews (`.preview-*.jpg`) and the native
+     * staging area. Only safe before this process starts any save or load.
+     */
+    fun sweepOrphans(): Int = operationLock.withLock {
+        var removed = 0
+        val root = File(EmulatorStorage.runtimeRoot(context), DIRECTORY)
+        root.listFiles().orEmpty().filter { it.isDirectory }.forEach { directory ->
+            directory.listFiles().orEmpty().filter { it.isFile && isOrphanName(it.name) }.forEach {
+                if (runCatching { it.delete() }.getOrDefault(false)) removed++
+            }
+        }
+        File(EmulatorStorage.cacheRoot(context), STAGING_DIRECTORY).listFiles().orEmpty().forEach {
+            if (runCatching { it.deleteRecursively() }.getOrDefault(false)) removed++
+        }
+        removed
+    }
+
+    private fun isOrphanName(name: String): Boolean =
+        name.endsWith(".tmp") || (name.startsWith(".preview-") && name.endsWith(THUMBNAIL_EXTENSION))
 
     fun listSlots(titleId: String): List<SaveStateSlot> = operationLock.withLock {
         if (titleId.isBlank()) return@withLock emptyList()

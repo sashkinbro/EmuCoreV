@@ -165,7 +165,7 @@ fun LibraryScreen(
         uiState.items.size
     )
     val deleteGameLabel = stringResource(R.string.detail_delete_game)
-    val manageSaveStatesLabel = stringResource(R.string.savestate_manager_open_for_game)
+    val manageSaveStatesLabel = stringResource(R.string.nav_save_states)
     val manageGameSettingsLabel = stringResource(R.string.game_manager_open_for_game)
     val playTimeLabel = stringResource(R.string.play_time_open_for_game)
     val achievementsLabel = stringResource(R.string.achievements_open_for_game)
@@ -427,7 +427,10 @@ fun LibraryScreen(
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            text = stringResource(R.string.library_empty_body),
+                            text = stringResource(
+                                if (uiState.storageUnavailable) R.string.storage_unavailable_message
+                                else R.string.library_empty_body
+                            ),
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f),
                             textAlign = TextAlign.Center
                         )

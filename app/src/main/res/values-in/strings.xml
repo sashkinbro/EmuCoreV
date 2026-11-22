@@ -296,6 +296,16 @@
     <string name="settings_camera_source_solid">Warna solid</string>
     <string name="settings_camera_source_image">Gambar statis</string>
     <string name="settings_camera_source_real">Kamera asli</string>
+    <string name="settings_camera_device">Perangkat kamera</string>
+    <string name="settings_help_camera_device">Pilih kamera perangkat ini yang menjadi sumber kamera Vita yang diemulasikan. Otomatis memilih kamera yang menghadap ke arah yang sama.</string>
+    <string name="settings_camera_device_auto">Otomatis</string>
+    <string name="settings_camera_device_front">Kamera depan (%1$s)</string>
+    <string name="settings_camera_device_back">Kamera belakang (%1$s)</string>
+    <string name="settings_camera_device_external">Kamera eksternal (%1$s)</string>
+    <string name="settings_camera_image_title">Gambar kamera</string>
+    <string name="settings_camera_image_none">Ketuk untuk memilih gambar</string>
+    <string name="settings_camera_image_selected">Gambar dipilih. Ketuk untuk mengubah</string>
+    <string name="settings_camera_image_failed">Gambar ini tidak dapat digunakan</string>
     <string name="settings_show_welcome">Tampilkan layar sambutan</string>
     <string name="settings_help_show_welcome">Tampilkan layar sambutan perkenalan saat peluncuran hingga Anda menutupnya.</string>
     <string name="settings_warn_missing_firmware">Peringatkan saat firmware tidak ada</string>
@@ -809,14 +819,12 @@
     <string name="emulation_quickbar_screenshot">Tangkapan layar</string>
     <string name="emulation_quickbar_open_menu">Buka menu</string>
     <string name="emulation_menu_paused_badge">Dijeda</string>
-    <string name="emulation_menu_badge_live">Langsung</string>
-    <string name="emulation_menu_badge_restart">Perlu mulai ulang</string>
+    <string name="emulation_menu_resolution_failed">Tidak dapat mengubah resolusi. Game tetap memakai resolusi saat ini.</string>
     <string name="emulation_menu_section_now">Sekarang</string>
     <string name="emulation_menu_section_now_desc">Perubahan langsung berlaku pada game yang berjalan.</string>
     <string name="emulation_menu_section_touch">Kontrol sentuh</string>
     <string name="emulation_menu_section_touch_desc">Gamepad di layar. Perubahan langsung berlaku.</string>
     <string name="emulation_menu_section_display">Tampilan</string>
-    <string name="emulation_menu_section_display_desc">Resolusi dan penyajian frame. Berlaku saat peluncuran berikutnya.</string>
     <string name="emulation_menu_section_performance">Performa</string>
     <string name="emulation_menu_section_performance_desc">Kompromi kecepatan dan akurasi. Berlaku saat peluncuran berikutnya.</string>
     <string name="emulation_menu_section_system">Sistem</string>
@@ -1428,6 +1436,10 @@
     <string name="emulation_savestate_loaded_toast">Dimuat</string>
     <string name="emulation_savestate_deleted_toast">Dihapus</string>
     <string name="emulation_savestate_failed_toast">Operasi tidak dapat diselesaikan</string>
+    <string name="emulation_savestate_refused_no_game">Tidak ada game yang berjalan, status tidak dapat disimpan</string>
+    <string name="emulation_savestate_refused_exiting">Game sedang ditutup, coba lagi nanti</string>
+    <string name="emulation_savestate_refused_loading">Game masih dimuat, coba lagi sebentar lagi</string>
+    <string name="emulation_savestate_refused_busy">Penyimpanan atau pemuatan lain sedang berlangsung, harap tunggu</string>
     <string name="emulation_savestate_session_mismatch_toast">Simpanan ini berasal dari sesi game sebelumnya dan belum dapat dimuat</string>
     <string name="emulation_savestate_title_mismatch_toast">Simpanan ini berasal dari game lain</string>
     <string name="emulation_savestate_confirm_save_title">Timpa simpanan?</string>
@@ -1442,7 +1454,6 @@
     <string name="savestate_manager_title">Simpanan</string>
     <string name="savestate_manager_subtitle">Snapshot emulator, terpisah dari simpanan dalam game</string>
     <string name="savestate_manager_refresh">Segarkan</string>
-    <string name="savestate_manager_open_for_game">Simpanan</string>
     <string name="savestate_manager_empty_title">Belum ada simpanan</string>
     <string name="savestate_manager_empty_body">Buat satu dari menu dalam game atau dengan tombol simpan cepat.</string>
     <string name="nav_save_states">Simpan cepat</string>
@@ -1597,6 +1608,7 @@
     <string name="rear_touch_game">Game ini</string>
     <string name="rear_touch_inherit">Gunakan profil global</string>
     <string name="rear_touch_clear">Hapus penetapan</string>
+    <string name="rear_touch_reset_confirm">Setel ulang semua titik sentuh belakang ke bawaan?</string>
     <string name="rear_touch_hint">Tahan untuk menyentuh panel belakang; lepaskan untuk mengangkat sentuhan. Input yang ditetapkan menggantikan aksi biasanya. Sentuhan depan tetap tersedia.</string>
     <string name="rear_touch_screen_position">Posisi tombol layar</string>
     <string name="settings_gpu_driver_status_missing_selection">Driver terpilih tidak tersedia: %1$s</string>
@@ -1795,4 +1807,8 @@
     <string name="native_ui_set_system_music">Musik Sistem</string>
     <string name="native_ui_set_delete">Hapus</string>
     <string name="native_ui_set_delete_theme_confirm">Tema ini akan dihapus.</string>
+    <string name="storage_unavailable_message">Penyimpanan yang dipilih tidak tersedia. Pasang kartu SD atau pilih penyimpanan lain di Pengaturan.</string>
+    <string name="emulation_screenshot_saved">Tangkapan layar disimpan di Pictures/EmuCoreV</string>
+    <string name="emulation_screenshot_failed">Tidak dapat menyimpan tangkapan layar</string>
+    <string name="native_ui_new_folder">Folder Baru</string>
 </resources>

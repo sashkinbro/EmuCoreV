@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.sbro.emucorev.core.EmulatorStorage
 import com.sbro.emucorev.core.PlayTimeRepository
 import com.sbro.emucorev.core.InstallStateBus
 import com.sbro.emucorev.data.InstalledGameRepository
@@ -25,7 +26,9 @@ data class LibraryUiState(
     val artworkVersion: Long = 0L,
     val recentTitleId: String? = null,
     val sortOption: LibrarySortOption = LibrarySortOption.TITLE_ASC,
-    val isSorting: Boolean = false
+    val isSorting: Boolean = false,
+    /** The selected storage (for example an SD card) is missing, so an empty library is not real. */
+    val storageUnavailable: Boolean = false
 )
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
@@ -59,7 +62,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         refreshJob?.cancel()
         sizeJob?.cancel()
         refreshJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, isSorting = false)
+            val storageUnavailable = withContext(Dispatchers.IO) { EmulatorStorage.isStorageUnavailable(context) }
+            _uiState.value = _uiState.value.copy(isLoading = true, isSorting = false, storageUnavailable = storageUnavailable)
             val snapshot = withContext(Dispatchers.IO) {
                 val games = repository.loadInstalledGames(context)
                 val metadata = games.associate { it.titleId to readInstalledGameSortMetadata(it, includeSize = false) }

@@ -36,6 +36,10 @@ import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.Image
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Link
@@ -77,6 +81,8 @@ import android.widget.Toast
 import com.sbro.emucorev.R
 import com.sbro.emucorev.BuildConfig
 import com.sbro.emucorev.core.AndroidGyroscopeInput
+import com.sbro.emucorev.core.CameraSourceSupport
+import com.sbro.emucorev.core.DeviceCamera
 import com.sbro.emucorev.core.CHEATS_ENABLED
 import com.sbro.emucorev.core.GpuDriverCompatibility
 import com.sbro.emucorev.core.DeviceGpuInfoProvider
@@ -413,9 +419,6 @@ private fun AudioTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMod
         SliderRow(stringResource(R.string.settings_core_audio_volume_label), stringResource(R.string.settings_help_audio_volume), stringResource(R.string.settings_core_audio_volume_value, uiState.coreConfig.audioVolume), { viewModel.updateCoreSettings { it.copy(audioVolume = defaults.audioVolume) } }) {
             Slider(value = uiState.coreConfig.audioVolume.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(audioVolume = value.roundToInt()) } }, valueRange = 0f..100f)
         }
-        SliderRow(stringResource(R.string.settings_bgm_volume), stringResource(R.string.settings_help_bgm_volume), stringResource(R.string.settings_bgm_volume_value, uiState.coreConfig.bgmVolume), { viewModel.updateCoreSettings { it.copy(bgmVolume = defaults.bgmVolume) } }) {
-            Slider(value = uiState.coreConfig.bgmVolume.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(bgmVolume = value.roundToInt()) } }, valueRange = 0f..100f)
-        }
         Toggle(stringResource(R.string.settings_core_ngs_enable), stringResource(R.string.settings_help_ngs_enable), uiState.coreConfig.ngsEnable, { enabled -> viewModel.updateCoreSettings { it.copy(ngsEnable = enabled) } }, { viewModel.updateCoreSettings { it.copy(ngsEnable = defaults.ngsEnable) } })
         TrophySoundSettingsSection(
             settings = uiState.trophySound,
@@ -642,6 +645,14 @@ private fun CameraTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMo
             IntChip(VitaCoreConfig.CAMERA_SOURCE_IMAGE, stringResource(R.string.settings_camera_source_image), uiState.coreConfig.frontCameraType, viewModel) { c, v -> c.copy(frontCameraType = v) }
             IntChip(VitaCoreConfig.CAMERA_SOURCE_REAL, stringResource(R.string.settings_camera_source_real), uiState.coreConfig.frontCameraType, viewModel) { c, v -> c.copy(frontCameraType = v) }
         }
+        CameraSourceExtras(
+            slot = "front",
+            type = uiState.coreConfig.frontCameraType,
+            cameraId = uiState.coreConfig.frontCameraId,
+            imagePath = uiState.coreConfig.frontCameraImage,
+            onCameraId = { id -> viewModel.updateCoreSettings { it.copy(frontCameraId = id) } },
+            onImagePath = { path -> viewModel.updateCoreSettings { it.copy(frontCameraImage = path) } }
+        )
     }
     SectionCard(title = stringResource(R.string.settings_camera_back), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
         Chips(
@@ -654,6 +665,88 @@ private fun CameraTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMo
             IntChip(VitaCoreConfig.CAMERA_SOURCE_SOLID, stringResource(R.string.settings_camera_source_solid), uiState.coreConfig.backCameraType, viewModel) { c, v -> c.copy(backCameraType = v) }
             IntChip(VitaCoreConfig.CAMERA_SOURCE_IMAGE, stringResource(R.string.settings_camera_source_image), uiState.coreConfig.backCameraType, viewModel) { c, v -> c.copy(backCameraType = v) }
             IntChip(VitaCoreConfig.CAMERA_SOURCE_REAL, stringResource(R.string.settings_camera_source_real), uiState.coreConfig.backCameraType, viewModel) { c, v -> c.copy(backCameraType = v) }
+        }
+        CameraSourceExtras(
+            slot = "back",
+            type = uiState.coreConfig.backCameraType,
+            cameraId = uiState.coreConfig.backCameraId,
+            imagePath = uiState.coreConfig.backCameraImage,
+            onCameraId = { id -> viewModel.updateCoreSettings { it.copy(backCameraId = id) } },
+            onImagePath = { path -> viewModel.updateCoreSettings { it.copy(backCameraImage = path) } }
+        )
+    }
+}
+
+/** Image picker (static image source) or device camera chooser (real camera source). */
+@Composable
+private fun CameraSourceExtras(
+    slot: String,
+    type: Int,
+    cameraId: String,
+    imagePath: String,
+    onCameraId: (String) -> Unit,
+    onImagePath: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val failedMessage = stringResource(R.string.settings_camera_image_failed)
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri: android.net.Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val path = withContext(Dispatchers.IO) { CameraSourceSupport.importImage(context, uri, slot) }
+            if (path != null) onImagePath(path)
+            else Toast.makeText(context, failedMessage, Toast.LENGTH_SHORT).show()
+        }
+    }
+    when (type) {
+        VitaCoreConfig.CAMERA_SOURCE_IMAGE -> SettingsActionRow(
+            icon = Icons.Rounded.Image,
+            title = stringResource(R.string.settings_camera_image_title),
+            subtitle = stringResource(
+                if (imagePath.isBlank()) R.string.settings_camera_image_none else R.string.settings_camera_image_selected
+            ),
+            onClick = { picker.launch(arrayOf("image/*")) }
+        )
+        VitaCoreConfig.CAMERA_SOURCE_REAL -> {
+            val cameras = remember { CameraSourceSupport.listCameras(context) }
+            if (cameras.isNotEmpty()) {
+                Chips(
+                    title = stringResource(R.string.settings_camera_device),
+                    description = stringResource(R.string.settings_help_camera_device),
+                    onResetDefault = { onCameraId("") }
+                ) {
+                    FilterChip(
+                        shape = neonChipShape(),
+                        selected = cameraId.isBlank(),
+                        onClick = { onCameraId("") },
+                        colors = appFilterChipColors(),
+                        label = { Text(stringResource(R.string.settings_camera_device_auto)) }
+                    )
+                    cameras.forEach { camera ->
+                        FilterChip(
+                            shape = neonChipShape(),
+                            // Older configs hold SDL's full device name, which ends in " [<camera2 id>]".
+                            selected = cameraId == camera.id || cameraId.endsWith(" [${camera.id}]"),
+                            onClick = { onCameraId(camera.id) },
+                            colors = appFilterChipColors(),
+                            label = {
+                                Text(
+                                    stringResource(
+                                        when (camera.facing) {
+                                            DeviceCamera.FACING_FRONT -> R.string.settings_camera_device_front
+                                            DeviceCamera.FACING_BACK -> R.string.settings_camera_device_back
+                                            else -> R.string.settings_camera_device_external
+                                        },
+                                        camera.id
+                                    )
+                                )
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 }

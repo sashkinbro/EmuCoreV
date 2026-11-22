@@ -44,6 +44,13 @@ object NativeLibraryLoader {
         if (!initialized) {
             synchronized(this) {
                 if (!initialized) {
+                    AppStartup.awaitReady()
+                    if (EmulatorStorage.isStorageUnavailable(appContext)) {
+                        // Do not let the core create a Vita tree on a fallback root; a later call
+                        // retries once the selected storage is back.
+                        Log.w(TAG, "Selected storage is unavailable; native init deferred")
+                        return@synchronized
+                    }
                     EmulatorStorage.prepareRuntime(appContext)
                     VitaCoreConfigRepository(appContext).ensureDefaultsPersisted()
                     if (!NativeLib.prepareFrontend()) {

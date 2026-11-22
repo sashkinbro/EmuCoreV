@@ -215,6 +215,16 @@
     <string name="settings_camera_source_solid">لون صلب</string>
     <string name="settings_camera_source_image">صورة ثابتة</string>
     <string name="settings_camera_source_real">كاميرا حقيقية</string>
+    <string name="settings_camera_device">جهاز الكاميرا</string>
+    <string name="settings_help_camera_device">اختر أي كاميرا في هذا الجهاز تغذي كاميرا Vita المحاكاة. الوضع التلقائي يختار الكاميرا المواجهة للاتجاه نفسه.</string>
+    <string name="settings_camera_device_auto">تلقائي</string>
+    <string name="settings_camera_device_front">الكاميرا الأمامية (%1$s)</string>
+    <string name="settings_camera_device_back">الكاميرا الخلفية (%1$s)</string>
+    <string name="settings_camera_device_external">كاميرا خارجية (%1$s)</string>
+    <string name="settings_camera_image_title">صورة الكاميرا</string>
+    <string name="settings_camera_image_none">اضغط لاختيار صورة</string>
+    <string name="settings_camera_image_selected">تم اختيار الصورة. اضغط للتغيير</string>
+    <string name="settings_camera_image_failed">تعذر استخدام هذه الصورة</string>
     <string name="settings_show_welcome">إظهار شاشة الترحيب</string>
     <string name="settings_help_show_welcome">إظهار شاشة الترحيب التمهيدية عند التشغيل حتى تقوم برفضها.</string>
     <string name="settings_warn_missing_firmware">التحذير عند فقدان البرامج الثابتة</string>
@@ -633,14 +643,12 @@
     <string name="emulation_quickbar_screenshot">لقطة شاشة</string>
     <string name="emulation_quickbar_open_menu">فتح القائمة</string>
     <string name="emulation_menu_paused_badge">متوقف مؤقتاً</string>
-    <string name="emulation_menu_badge_live">مباشر</string>
-    <string name="emulation_menu_badge_restart">يتطلب إعادة التشغيل</string>
+    <string name="emulation_menu_resolution_failed">تعذّر تغيير الدقة. ستبقى اللعبة بالدقة الحالية.</string>
     <string name="emulation_menu_section_now">الآن</string>
     <string name="emulation_menu_section_now_desc">تنطبق التغييرات على اللعبة قيد التشغيل فوراً.</string>
     <string name="emulation_menu_section_touch">التحكم باللمس</string>
     <string name="emulation_menu_section_touch_desc">لوحة اللعب على الشاشة. التغييرات تنطبق فوراً.</string>
     <string name="emulation_menu_section_display">العرض</string>
-    <string name="emulation_menu_section_display_desc">الدقة وعرض الإطارات. تدخل حيز التنفيذ في التشغيل القادم.</string>
     <string name="emulation_menu_section_performance">الأداء</string>
     <string name="emulation_menu_section_performance_desc">موازنات السرعة والدقة. تدخل حيز التنفيذ في التشغيل القادم.</string>
     <string name="emulation_menu_section_system">النظام</string>
@@ -1432,6 +1440,10 @@
     <string name="emulation_savestate_loaded_toast">تم التحميل</string>
     <string name="emulation_savestate_deleted_toast">تم الحذف</string>
     <string name="emulation_savestate_failed_toast">تعذر إكمال العملية</string>
+    <string name="emulation_savestate_refused_no_game">لا توجد لعبة قيد التشغيل، لذا لا يمكن حفظ الحالة</string>
+    <string name="emulation_savestate_refused_exiting">اللعبة قيد الإغلاق، حاول لاحقًا</string>
+    <string name="emulation_savestate_refused_loading">اللعبة لا تزال قيد التحميل، حاول بعد قليل</string>
+    <string name="emulation_savestate_refused_busy">عملية حفظ أو تحميل أخرى قيد التنفيذ، يرجى الانتظار</string>
     <string name="emulation_savestate_session_mismatch_toast">هذا الحفظ من جلسة لعب سابقة ولا يمكن تحميله بعد</string>
     <string name="emulation_savestate_title_mismatch_toast">هذا الحفظ يخص لعبة أخرى</string>
     <string name="emulation_savestate_confirm_save_title">استبدال الحفظ؟</string>
@@ -1446,7 +1458,6 @@
     <string name="savestate_manager_title">ملفات الحفظ</string>
     <string name="savestate_manager_subtitle">لقطات المحاكي، منفصلة عن حفظ اللعبة</string>
     <string name="savestate_manager_refresh">تحديث</string>
-    <string name="savestate_manager_open_for_game">ملفات الحفظ</string>
     <string name="savestate_manager_empty_title">لا توجد ملفات حفظ بعد</string>
     <string name="savestate_manager_empty_body">أنشئ ملف حفظ من قائمة اللعبة أو باستخدام زر الحفظ السريع.</string>
     <string name="nav_save_states">الحفظ السريع</string>
@@ -1601,6 +1612,7 @@
     <string name="rear_touch_game">هذه اللعبة</string>
     <string name="rear_touch_inherit">استخدام الملف العام</string>
     <string name="rear_touch_clear">مسح التعيين</string>
+    <string name="rear_touch_reset_confirm">إعادة جميع نقاط اللمس الخلفي إلى الإعدادات الافتراضية؟</string>
     <string name="rear_touch_hint">اضغط باستمرار للمس اللوحة الخلفية، ثم اترك الزر لرفع اللمس. تحل المدخلات المعيّنة محل وظيفتها المعتادة. يبقى اللمس الأمامي متاحًا.</string>
     <string name="rear_touch_screen_position">موضع الزر على الشاشة</string>
     <string name="settings_gpu_driver_status_missing_selection">برنامج التشغيل المحدد غير متاح: %1$s</string>
@@ -1819,4 +1831,8 @@
     <string name="native_ui_set_system_music">موسيقى النظام</string>
     <string name="native_ui_set_delete">حذف</string>
     <string name="native_ui_set_delete_theme_confirm">سيتم حذف هذه السمة.</string>
+    <string name="storage_unavailable_message">وحدة التخزين المحددة غير متاحة. أدخل بطاقة SD أو اختر وحدة تخزين أخرى من الإعدادات.</string>
+    <string name="emulation_screenshot_saved">تم حفظ لقطة الشاشة في Pictures/EmuCoreV</string>
+    <string name="emulation_screenshot_failed">تعذّر حفظ لقطة الشاشة</string>
+    <string name="native_ui_new_folder">مجلد جديد</string>
 </resources>

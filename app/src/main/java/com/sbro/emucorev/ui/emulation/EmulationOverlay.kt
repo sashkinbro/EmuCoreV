@@ -51,12 +51,10 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
-import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -64,6 +62,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -99,6 +98,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sbro.emucorev.R
 import com.sbro.emucorev.BuildConfig
+import com.sbro.emucorev.core.LiveResolutionSwitch
 import com.sbro.emucorev.core.AndroidGyroscopeInput
 import com.sbro.emucorev.core.AndroidTouchHaptics
 import com.sbro.emucorev.core.AndroidTouchHaptics.ButtonPhase
@@ -108,6 +108,7 @@ import com.sbro.emucorev.core.CheatOperationQueue
 import com.sbro.emucorev.ui.cheats.cheatPackFingerprint
 import com.sbro.emucorev.core.KeyboardMouseManager
 import com.sbro.emucorev.core.SaveStateResult
+import com.sbro.emucorev.core.ScreenshotPublisher
 import com.sbro.emucorev.core.VitaLaunchBridge
 import com.sbro.emucorev.core.SaveStateRepository
 import com.sbro.emucorev.core.SaveStateSlot
@@ -196,6 +197,9 @@ fun EmulationOverlayHost(
     var controlsEditMode by remember { mutableStateOf(false) }
     var editorProfileRevision by remember { mutableIntStateOf(0) }
     var menuOpen by remember { mutableStateOf(false) }
+    // Largest internal resolution the running session can switch to (0 = not switchable live).
+    var liveResolutionLimit by remember { mutableFloatStateOf(0f) }
+    var resolutionApplying by remember { mutableStateOf(false) }
     val showQuickBar by appPreferences.showEmulationQuickBarFlow.collectAsState(
         initial = appPreferences.showEmulationQuickBar
     )
@@ -289,7 +293,18 @@ fun EmulationOverlayHost(
     val overlayScope = rememberCoroutineScope()
 
     fun performSaveStateAction(action: SaveStateAction) {
-        if (saveStateBusy || activity.exitInProgress || waitingForStateFrame || gameId.isBlank()) return
+        val refusal = saveStateRefusalReason(
+            gameIdBlank = gameId.isBlank(),
+            exitInProgress = activity.exitInProgress,
+            launchStateLoading = launchStateLoading.active,
+            waitingForStateFrame = waitingForStateFrame,
+            saveStateBusy = saveStateBusy
+        )
+        if (refusal != null) {
+            Log.w("SaveStateOverlay", "${action.javaClass.simpleName} refused: $refusal")
+            Toast.makeText(activity, refusal.messageRes, Toast.LENGTH_SHORT).show()
+            return
+        }
         overlayScope.launch {
             val restoreMenuOnFailure = menuOpen
             saveStateBusy = true
@@ -371,6 +386,13 @@ fun EmulationOverlayHost(
                     return@withSaveStateMenuPause
                 }
                 if (result.isOk && action is SaveStateAction.Load) {
+                    // A load switches the session to the save's internal resolution; keep the
+                    // menu and the per-game profile in step with what is rendering now.
+                    val liveResolution = withContext(Dispatchers.Default) { activity.getLiveResolutionMultiplier() }
+                    if (liveResolution > 0f && abs(liveResolution - config.resolutionMultiplier) > 1e-3f) {
+                        config = config.copy(resolutionMultiplier = liveResolution)
+                        repository.savePreservingDriverOverride(gameId, config)
+                    }
                     menuOpen = false
                     userPaused = false
                 } else if (action is SaveStateAction.Load) {
@@ -496,6 +518,10 @@ fun EmulationOverlayHost(
         )
     }
 
+    LaunchedEffect(menuOpen) {
+        if (menuOpen) liveResolutionLimit = withContext(Dispatchers.Default) { activity.getLiveResolutionLimit() }
+    }
+
     DisposableEffect(config) {
         activity.rearTouchInput.stretchDisplay = config.stretchDisplayArea
         overlayBridge.synchronizeConfig(config)
@@ -604,6 +630,9 @@ fun EmulationOverlayHost(
             } else if (exitDialogVisible) {
                 exitDialogVisible = false
                 true
+            } else if (pendingSaveStateAction != null) {
+                pendingSaveStateAction = null
+                true
             } else if (controlsEditMode) {
                 controlsEditMode = false
                 overlayBridge.setIsInEditMode(false)
@@ -628,6 +657,54 @@ fun EmulationOverlayHost(
             activity.setOverlayMenuButtonRevealHandler(null)
             activity.setOverlayPauseMenuOpenHandler(null)
             customizationPreferences.close()
+        }
+    }
+
+    // Confirmation dialogs are drawn in the same window as whatever opened them: the pause menu
+    // is its own window, so its dialogs must live inside it (as the top layer) to be visible.
+    @Composable
+    fun ConfirmDialogs() {
+        pendingSaveStateAction?.let { action ->
+            val titleRes = when (action) {
+                is SaveStateAction.Save -> R.string.emulation_savestate_confirm_save_title
+                is SaveStateAction.Load -> R.string.emulation_savestate_confirm_load_title
+                is SaveStateAction.Delete -> R.string.emulation_savestate_confirm_delete_title
+            }
+            val bodyRes = when (action) {
+                is SaveStateAction.Save -> R.string.emulation_savestate_confirm_save_body
+                is SaveStateAction.Load -> R.string.emulation_savestate_confirm_load_body
+                is SaveStateAction.Delete -> R.string.emulation_savestate_confirm_delete_body
+            }
+            val confirmRes = when (action) {
+                is SaveStateAction.Save -> R.string.emulation_savestate_save_action
+                is SaveStateAction.Load -> R.string.emulation_savestate_load_action
+                is SaveStateAction.Delete -> R.string.emulation_savestate_delete_action
+            }
+            OverlayConfirmDialog(
+                title = stringResource(titleRes),
+                body = stringResource(bodyRes, saveStateSlotName(action.slot)),
+                confirmText = stringResource(confirmRes),
+                dismissText = stringResource(R.string.common_cancel),
+                onConfirm = {
+                    pendingSaveStateAction = null
+                    performSaveStateAction(action)
+                },
+                onDismiss = { pendingSaveStateAction = null }
+            )
+        }
+
+        if (exitDialogVisible) {
+            OverlayConfirmDialog(
+                title = stringResource(R.string.emulation_exit_confirm_title),
+                body = stringResource(R.string.emulation_exit_confirm_body),
+                confirmText = stringResource(R.string.emulation_exit_confirm_action),
+                dismissText = stringResource(R.string.emulation_exit_cancel_action),
+                onConfirm = {
+                    exitDialogVisible = false
+                    activity.exitEmulation()
+                },
+                onDismiss = { exitDialogVisible = false }
+            )
         }
     }
 
@@ -753,10 +830,35 @@ fun EmulationOverlayHost(
                 persistConfig { it.copy(audioVolume = volume) }
                 activity.setAudioVolume(volume)
             },
-            onBgmVolume = { volume -> persistConfig { it.copy(bgmVolume = volume) } },
             onInfoBar = { enabled -> persistConfig { it.copy(showInfoBar = enabled) } },
             onTouchpadCursor = { enabled -> persistConfig { it.copy(showTouchpadCursor = enabled) } },
             onVsync = { enabled -> persistConfig { it.copy(vSync = enabled) } },
+            liveResolutionLimit = liveResolutionLimit,
+            resolutionApplying = resolutionApplying,
+            onResolutionMultiplier = { value ->
+                if (!resolutionApplying) {
+                    resolutionApplying = true
+                    overlayScope.launch {
+                        try {
+                            val outcome = LiveResolutionSwitch(
+                                ensurePaused = { activity.setMenuPausedAndAwait(true) },
+                                applyToCore = { target ->
+                                    withContext(Dispatchers.Default) { activity.setLiveResolutionMultiplier(target) }
+                                },
+                                persist = { target -> persistConfig { it.copy(resolutionMultiplier = target) } }
+                            ).switchTo(config.resolutionMultiplier, value, liveResolutionLimit)
+                            if (outcome == LiveResolutionSwitch.Outcome.FAILED)
+                                Toast.makeText(activity, R.string.emulation_menu_resolution_failed, Toast.LENGTH_SHORT).show()
+                        } finally {
+                            resolutionApplying = false
+                        }
+                    }
+                }
+            },
+            onScreenFilter = { filter ->
+                persistConfig { it.copy(screenFilter = filter) }
+                activity.setLiveScreenFilter(filter)
+            },
             onStretchDisplay = { enabled -> persistConfig { it.copy(stretchDisplayArea = enabled) } },
             onFpsHack = { enabled -> persistConfig { it.copy(fpsHack = enabled) } },
             onFrameLimit = { limit -> persistConfig { it.copy(frameLimit = limit) } },
@@ -849,7 +951,16 @@ fun EmulationOverlayHost(
                 onPauseToggle = menuCallbacks.onPauseToggle,
                 onQuickSave = menuCallbacks.onQuickSaveState,
                 onQuickLoad = menuCallbacks.onQuickLoadState,
-                onScreenshot = { activity.requestScreenshot() },
+                onScreenshot = {
+                    overlayScope.launch {
+                        val saved = withContext(Dispatchers.IO) { ScreenshotPublisher.capture(activity, activity) }
+                        Toast.makeText(
+                            activity,
+                            if (saved) R.string.emulation_screenshot_saved else R.string.emulation_screenshot_failed,
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                },
                 onOpenMenu = {
                     menuOpen = !menuOpen
                     menuButtonVisible = true
@@ -897,76 +1008,14 @@ fun EmulationOverlayHost(
                             callbacks = menuCallbacks
                         )
                     }
+                    ConfirmDialogs()
                 }
             }
         }
 
         NativeImeOverlay(activity)
 
-        pendingSaveStateAction?.let { action ->
-            val titleRes = when (action) {
-                is SaveStateAction.Save -> R.string.emulation_savestate_confirm_save_title
-                is SaveStateAction.Load -> R.string.emulation_savestate_confirm_load_title
-                is SaveStateAction.Delete -> R.string.emulation_savestate_confirm_delete_title
-            }
-            val bodyRes = when (action) {
-                is SaveStateAction.Save -> R.string.emulation_savestate_confirm_save_body
-                is SaveStateAction.Load -> R.string.emulation_savestate_confirm_load_body
-                is SaveStateAction.Delete -> R.string.emulation_savestate_confirm_delete_body
-            }
-            val confirmRes = when (action) {
-                is SaveStateAction.Save -> R.string.emulation_savestate_save_action
-                is SaveStateAction.Load -> R.string.emulation_savestate_load_action
-                is SaveStateAction.Delete -> R.string.emulation_savestate_delete_action
-            }
-            AlertDialog(
-                onDismissRequest = { pendingSaveStateAction = null },
-                title = { Text(text = stringResource(titleRes)) },
-                text = { Text(text = stringResource(bodyRes, saveStateSlotName(action.slot))) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            pendingSaveStateAction = null
-                            performSaveStateAction(action)
-                        }
-                    ) {
-                        Text(text = stringResource(confirmRes))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { pendingSaveStateAction = null }) {
-                        Text(text = stringResource(R.string.common_cancel))
-                    }
-                }
-            )
-        }
-
-        if (exitDialogVisible) {
-            AlertDialog(
-                onDismissRequest = { exitDialogVisible = false },
-                title = {
-                    Text(text = stringResource(R.string.emulation_exit_confirm_title))
-                },
-                text = {
-                    Text(text = stringResource(R.string.emulation_exit_confirm_body))
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            exitDialogVisible = false
-                            activity.exitEmulation()
-                        }
-                    ) {
-                        Text(text = stringResource(R.string.emulation_exit_confirm_action))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { exitDialogVisible = false }) {
-                        Text(text = stringResource(R.string.emulation_exit_cancel_action))
-                    }
-                }
-            )
-        }
+        if (!menuOpen) ConfirmDialogs()
 
         if (showKeyboardMouseSettings) {
             KeyboardMouseSettingsDialog(

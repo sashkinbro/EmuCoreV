@@ -69,8 +69,15 @@ class InputOverlay(context: Context) {
     }
 
     /** Input wrappers used by the on-screen controls so a dropped native controller self-heals. */
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val buttonHoldGuard = ButtonHoldGuard(
+        clock = android.os.SystemClock::uptimeMillis,
+        schedule = { delayMs, action -> mainHandler.postDelayed(action, delayMs) },
+        apply = { button, pressed -> if (ensureControllerAttached()) setButton(button, pressed) }
+    )
+
     fun sendButton(button: Int, pressed: Boolean) {
-        if (ensureControllerAttached()) setButton(button, pressed)
+        buttonHoldGuard.send(button, pressed)
     }
 
     fun sendAxis(axis: Int, value: Short) {

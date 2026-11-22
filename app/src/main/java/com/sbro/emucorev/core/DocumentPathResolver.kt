@@ -74,7 +74,20 @@ object DocumentPathResolver {
             val inputStream = context.contentResolver.openInputStream(uri) ?: return null
             inputStream.use { input ->
                 destFile.outputStream().use { output ->
-                    input.copyTo(output)
+                    val buffer = ByteArray(1 shl 16)
+                    var lastBeat = android.os.SystemClock.elapsedRealtime()
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        // Keep the install heartbeat fresh during long staging copies so a
+                        // concurrent prepareRuntime does not purge this payload.
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        if (now - lastBeat >= 5_000L) {
+                            EmulatorStorage.touchInstallInProgress(context)
+                            lastBeat = now
+                        }
+                    }
                 }
             }
             destFile.takeIf { it.isFile }?.absolutePath

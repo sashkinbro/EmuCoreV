@@ -504,6 +504,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun installGpuDriver(uri: Uri, applyGlobally: Boolean = true, onComplete: (Result<String>) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val result = runCatching {
+                // The install-time compatibility refusal needs the measured GPU, not the SoC guess.
+                DeviceGpuInfoProvider.ensureLoaded(getApplication<Application>())
                 val driverName = gpuDriverManager.installFromArchive(uri)
                 val installedDrivers = gpuDriverManager.listInstalledDrivers()
                 val device = DeviceGpuInfoProvider.ensureLoaded(getApplication<Application>())
@@ -563,6 +565,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         gpuDriverDownloads = _uiState.value.gpuDriverDownloads + (driver.id to progress)
                     )
                 }
+                DeviceGpuInfoProvider.ensureLoaded(getApplication<Application>())
                 val driverName = gpuDriverManager.installFromArchive(archive, driver.vendor, catalogDriver = driver)
                 val installedDrivers = gpuDriverManager.listInstalledDrivers()
                 val device = DeviceGpuInfoProvider.ensureLoaded(getApplication<Application>())
@@ -594,11 +597,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun selectGpuDriver(driverName: String) {
-        val selection = GpuDriverCompatibility.resolveSelection(
-            driverName, null, DeviceGpuInfoProvider.get(getApplication<Application>()), _uiState.value.installedGpuDrivers
-        )
-        if (!selection.requestable) return
-        updateCoreSettings { it.copy(customDriverName = driverName) }
+        viewModelScope.launch(Dispatchers.IO) {
+            // Await the measured GPU: before the probe finishes an SX2 package is only UNVERIFIED.
+            val device = DeviceGpuInfoProvider.ensureLoaded(getApplication<Application>())
+            val selection = GpuDriverCompatibility.resolveSelection(
+                driverName, null, device, _uiState.value.installedGpuDrivers
+            )
+            if (!selection.requestable) return@launch
+            updateCoreSettings { it.copy(customDriverName = driverName) }
+        }
     }
 
     fun removeGpuDriver(driverName: String) {

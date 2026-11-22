@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Build
-import android.os.Debug
 import android.os.PowerManager
 import android.os.SystemClock
 import androidx.annotation.Keep
@@ -82,11 +81,15 @@ class PerformanceStatsSampler(context: Context) {
     private val context = context.applicationContext
     private val cpu = ProcessCpuMeter(Runtime.getRuntime().availableProcessors())
     private val gpuBusy = File("/sys/class/kgsl/kgsl-3d0/gpubusy")
+    private val statusFile = File("/proc/self/status")
 
     suspend fun sample(): PerformanceStatsSample = withContext(Dispatchers.IO) {
         DeviceGpuInfoProvider.ensureLoaded(context)
         val native = PerformanceStatsBridge.snapshot()
-        val memory = runCatching { Debug.MemoryInfo().also(Debug::getMemoryInfo).totalPss.takeIf { it > 0 }?.div(1024.0) }.getOrNull()
+        // VmRSS from /proc/self/status is O(1). Debug.getMemoryInfo walks /proc/self/smaps, which
+        // takes the kernel mmap lock for ~10-15 ms and stalled the renderer (mprotect) once per
+        // second while the overlay was visible.
+        val memory = runCatching { statusFile.readText().let(::parseVmRssMib) }.getOrNull()
         val battery = runCatching { context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) }
             .getOrNull()?.takeIf { it.hasExtra(BatteryManager.EXTRA_TEMPERATURE) }
             ?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)?.div(10.0)?.takeIf { it in -40.0..120.0 }
@@ -98,4 +101,11 @@ class PerformanceStatsSampler(context: Context) {
         PerformanceStatsSample(native, cpu.sample(SystemClock.elapsedRealtime(), android.os.Process.getElapsedCpuTime()),
             DeviceGpuInfoProvider.cpuName(), gpu, memory, battery, thermal)
     }
+}
+
+/** Resident set size in MiB from a /proc/<pid>/status text, or null when absent. */
+internal fun parseVmRssMib(status: String): Double? {
+    val line = status.lineSequence().firstOrNull { it.startsWith("VmRSS:") } ?: return null
+    val kib = line.removePrefix("VmRSS:").trim().substringBefore(' ').toLongOrNull() ?: return null
+    return if (kib > 0) kib / 1024.0 else null
 }

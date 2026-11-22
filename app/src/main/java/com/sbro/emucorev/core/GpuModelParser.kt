@@ -16,6 +16,9 @@ object GpuModelParser {
     private val ADRENO = Regex("""adreno[\s\-]*(?:\(tm\)\s*)?(\d{3})(?!\d)""", RegexOption.IGNORE_CASE)
     private val IMMORTALIS =
         Regex("""immortalis[\s\-]*g\s*(\d{3})(?:\s*((?:mc|mp)\s*\d{1,2}))?""", RegexOption.IGNORE_CASE)
+    // Some drivers report the marketing suffix last: "Mali-G715-Immortalis MC11".
+    private val MALI_IMMORTALIS_SUFFIX =
+        Regex("""mali[\s\-]*g\s*(\d{3})[\s\-]*immortalis(?:\s*((?:mc|mp)\s*\d{1,2}))?""", RegexOption.IGNORE_CASE)
     private val MALI_NEXT_GEN =
         Regex(
             """mali[\s\-]*g\s*([12])(?!\d)(?:[\s\-]+(ultra(?:[\s\-]+nx)?))?(?:[\s\-]*((?:mc|mp)\s*\d{1,2})(?!\d))?""",
@@ -57,6 +60,10 @@ object GpuModelParser {
 
     private fun parseMali(text: String): GpuModelInfo? {
         IMMORTALIS.find(text)?.let { match ->
+            val name = "Immortalis-G${match.groupValues[1]}" + coreSuffix(match.groupValues[2])
+            return GpuModelInfo(GpuVendor.MALI, name)
+        }
+        MALI_IMMORTALIS_SUFFIX.find(text)?.let { match ->
             val name = "Immortalis-G${match.groupValues[1]}" + coreSuffix(match.groupValues[2])
             return GpuModelInfo(GpuVendor.MALI, name)
         }

@@ -599,6 +599,16 @@
     <string name="settings_camera_source_solid">Couleur unie</string>
     <string name="settings_camera_source_image">Image statique</string>
     <string name="settings_camera_source_real">Caméra réelle</string>
+    <string name="settings_camera_device">Appareil photo</string>
+    <string name="settings_help_camera_device">Choisissez quelle caméra de cet appareil alimente la caméra Vita émulée. Automatique choisit la caméra orientée dans le même sens.</string>
+    <string name="settings_camera_device_auto">Automatique</string>
+    <string name="settings_camera_device_front">Caméra avant (%1$s)</string>
+    <string name="settings_camera_device_back">Caméra arrière (%1$s)</string>
+    <string name="settings_camera_device_external">Caméra externe (%1$s)</string>
+    <string name="settings_camera_image_title">Image de la caméra</string>
+    <string name="settings_camera_image_none">Touchez pour choisir une image</string>
+    <string name="settings_camera_image_selected">Image sélectionnée. Touchez pour changer</string>
+    <string name="settings_camera_image_failed">Impossible d’utiliser cette image</string>
     <string name="settings_show_welcome">Afficher l\'écran d\'accueil</string>
     <string name="settings_help_show_welcome">Affiche l\'écran d\'accueil d\'introduction au lancement jusqu\'à ce que vous le fermiez.</string>
     <string name="settings_warn_missing_firmware">Avertir lorsque le firmware est manquant</string>
@@ -611,14 +621,12 @@
     <string name="emulation_quickbar_screenshot">Capture d\'écran</string>
     <string name="emulation_quickbar_open_menu">Ouvrir le menu</string>
     <string name="emulation_menu_paused_badge">En pause</string>
-    <string name="emulation_menu_badge_live">En direct</string>
-    <string name="emulation_menu_badge_restart">Redémarrage requis</string>
+    <string name="emulation_menu_resolution_failed">Impossible de modifier la résolution. Le jeu garde la résolution actuelle.</string>
     <string name="emulation_menu_section_now">Maintenant</string>
     <string name="emulation_menu_section_now_desc">Les modifications s\'appliquent instantanément au jeu en cours d\'exécution.</string>
     <string name="emulation_menu_section_touch">Commandes tactiles</string>
     <string name="emulation_menu_section_touch_desc">Manette à l\'écran. Les modifications s\'appliquent immédiatement.</string>
     <string name="emulation_menu_section_display">Affichage</string>
-    <string name="emulation_menu_section_display_desc">Résolution et présentation des images. Prendront effet au prochain lancement.</string>
     <string name="emulation_menu_section_performance">Performances</string>
     <string name="emulation_menu_section_performance_desc">Compromis entre vitesse et précision. Prendront effet au prochain lancement.</string>
     <string name="emulation_menu_section_system">Système</string>
@@ -1429,6 +1437,10 @@
     <string name="emulation_savestate_loaded_toast">Chargé</string>
     <string name="emulation_savestate_deleted_toast">Supprimé</string>
     <string name="emulation_savestate_failed_toast">Échec de l’opération</string>
+    <string name="emulation_savestate_refused_no_game">Aucun jeu n\'est en cours, l\'état ne peut pas être enregistré</string>
+    <string name="emulation_savestate_refused_exiting">Le jeu est en train de se fermer, réessayez plus tard</string>
+    <string name="emulation_savestate_refused_loading">Le jeu est encore en cours de chargement, réessayez dans un instant</string>
+    <string name="emulation_savestate_refused_busy">Une autre sauvegarde ou un autre chargement est en cours, patientez</string>
     <string name="emulation_savestate_session_mismatch_toast">Cette sauvegarde appartient à une session de jeu précédente et ne peut pas encore être chargée</string>
     <string name="emulation_savestate_title_mismatch_toast">Cette sauvegarde appartient à un autre jeu</string>
     <string name="emulation_savestate_confirm_save_title">Écraser la sauvegarde ?</string>
@@ -1443,7 +1455,6 @@
     <string name="savestate_manager_title">Sauvegardes</string>
     <string name="savestate_manager_subtitle">Instantanés de l\'émulateur, séparés des sauvegardes du jeu</string>
     <string name="savestate_manager_refresh">Actualiser</string>
-    <string name="savestate_manager_open_for_game">Sauvegardes</string>
     <string name="savestate_manager_empty_title">Aucune sauvegarde pour le moment</string>
     <string name="savestate_manager_empty_body">Créez-en une depuis le menu en jeu ou avec le bouton de sauvegarde rapide.</string>
     <string name="nav_save_states">Sauvegardes rapides</string>
@@ -1598,6 +1609,7 @@
     <string name="rear_touch_game">Ce jeu</string>
     <string name="rear_touch_inherit">Utiliser le profil global</string>
     <string name="rear_touch_clear">Effacer l’association</string>
+    <string name="rear_touch_reset_confirm">Réinitialiser tous les points tactiles arrière aux valeurs par défaut ?</string>
     <string name="rear_touch_hint">Maintenez pour toucher le pavé arrière ; relâchez pour lever le contact. Les entrées associées remplacent leur action habituelle. Le tactile avant reste disponible.</string>
     <string name="rear_touch_screen_position">Position du bouton tactile</string>
     <string name="settings_gpu_driver_status_missing_selection">Pilote sélectionné indisponible : %1$s</string>
@@ -1804,4 +1816,8 @@
     <string name="native_ui_set_system_music">Musique système</string>
     <string name="native_ui_set_delete">Supprimer</string>
     <string name="native_ui_set_delete_theme_confirm">Ce thème va être supprimé.</string>
+    <string name="storage_unavailable_message">Le stockage sélectionné n\'est pas disponible. Insérez la carte SD ou choisissez un autre stockage dans les Paramètres.</string>
+    <string name="emulation_screenshot_saved">Capture d\'écran enregistrée dans Pictures/EmuCoreV</string>
+    <string name="emulation_screenshot_failed">Impossible d\'enregistrer la capture d\'écran</string>
+    <string name="native_ui_new_folder">Nouveau dossier</string>
 </resources>

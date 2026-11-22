@@ -3,12 +3,9 @@ package com.sbro.emucorev.core
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import android.system.Os
 import android.os.SystemClock
 import com.jakewharton.processphoenix.ProcessPhoenix
 import com.sbro.emucorev.core.vita.Emulator
-import com.sbro.emucorev.data.SaveDataRepository
-import com.sbro.emucorev.data.SaveStateAutomationPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +27,11 @@ object VitaLaunchBridge {
         Success,
         MissingFirmware,
         MissingFirmwareUpdate,
-        Failure
+        /** The selected storage root (for example an SD card) is not present. */
+        StorageUnavailable,
+        Failure,
+        /** A previous launch has not reported ready yet; nothing was started. */
+        Busy
     }
 
     suspend fun launchInstalledTitle(context: Context, titleId: String): LaunchResult {
@@ -41,45 +42,43 @@ object VitaLaunchBridge {
         return launchInstalledTitle(context, titleId, statePath)
     }
 
+    /**
+     * Callable from any process: it only sends the Intent. Core update, save-data migration,
+     * driver sync, ANGLE environment, auto-load resolution and state validation all run in the
+     * Emulator process (Emulator.main/getArguments), which owns the files and the SDL environment.
+     * The cheap read-only firmware check stays here so the caller can report it immediately;
+     * the Emulator repeats it for launches that do not come through this bridge.
+     */
     private suspend fun launchInstalledTitle(context: Context, titleId: String, statePath: String?): LaunchResult {
-        if (!launchInFlight.compareAndSet(false, true)) return LaunchResult.Success
+        if (!launchInFlight.compareAndSet(false, true)) return LaunchResult.Busy
         preparingLaunch.value = true
         val startedAt = SystemClock.elapsedRealtime()
+        val gate = LaunchGate.forContext(context)
+        var gateHeld = false
         try {
             return withContext(Dispatchers.IO) {
-                CoreMaintenanceRepository(context).ensureCoreUpdated()
+                if (!gate.tryAcquire()) return@withContext LaunchResult.Busy
+                gateHeld = true
+                if (EmulatorStorage.isStorageUnavailable(context)) return@withContext LaunchResult.StorageUnavailable
                 if (!EmulatorStorage.hasInstalledFirmware(context)) return@withContext LaunchResult.MissingFirmware
                 if (!EmulatorStorage.hasInstalledFirmwareUpdate(context)) return@withContext LaunchResult.MissingFirmwareUpdate
-                // Saves imported by older builds sit in ux0:user/savedata, which
-                // the mounted savedata0: never reads. Relocate them before the
-                // game starts so transferred saves are actually picked up.
-                runCatching { SaveDataRepository().migrateLegacySaveData(context) }
-                    .onFailure { error -> Log.w(TAG, "Save data migration failed", error) }
-                val config = VitaGameSettingsRepository(context).syncEffectiveDriverForLaunch(titleId)
-                val shouldAngle = config.useAngle && config.backendRenderer == "OpenGL"
-                val baseArgs = if (statePath.isNullOrBlank()) {
-                    arrayOf("-r", titleId)
-                } else {
-                    arrayOf("-r", titleId, "-loadstate", statePath)
-                }
-                val autoLoad = SaveStateAutomationPreferences(context, titleId).use { it.current.autoLoadOnStart }
-                val args = resolveAutoLoadArguments(baseArgs, autoLoad) {
-                    val repository = SaveStateRepository(context)
-                    if (!repository.stateFile(titleId, SaveStateRepository.QUICK_SLOT).isFile) null else {
-                        NativeLibraryLoader.ensureLoaded(context)
-                        repository.validQuickStatePath(titleId)
-                    }
-                }
-                launchWithArgs(context, "LAUNCH_$titleId", args, shouldAngle, automaticLoad = args !== baseArgs)
+                val returnToNative = (context is Emulator && context.returnsToNativeLibrary) ||
+                    context is com.sbro.emucorev.core.vita.NativeLibraryMode.ReturnTarget
+                val intent = LaunchIntents.buildGameLaunch(context, titleId, statePath, returnToNative,
+                    gameSessionLive = GameSessionMarker.forContext(context).isLive())
+                Log.i(TAG, "Launching emulator action=${intent.action} title=$titleId state=${statePath != null}")
+                withContext(Dispatchers.Main.immediate) { context.startActivity(intent) }
+                gateHeld = false // The Emulator process releases the gate once it is ready.
                 LaunchResult.Success
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            Log.e(TAG, "Failed to prepare game $titleId", error)
+            Log.e(TAG, "Failed to launch game $titleId", error)
             return LaunchResult.Failure
         } finally {
-            Log.i(TAG, "Launch preparation for $titleId took ${SystemClock.elapsedRealtime() - startedAt} ms")
+            if (gateHeld) gate.release()
+            Log.i(TAG, "Launch dispatch for $titleId took ${SystemClock.elapsedRealtime() - startedAt} ms")
             preparingLaunch.value = false
             launchInFlight.set(false)
         }
@@ -97,31 +96,11 @@ object VitaLaunchBridge {
         return runWithArgs(context, ACTION_INSTALL_PKG, arrayOf("--pkg", pkgPath, "--zrif", zrif))
     }
 
-    private suspend fun launchWithArgs(context: Context, action: String, args: Array<String>, useAngle: Boolean = false,
-                                      automaticLoad: Boolean = false) {
-        Log.i(TAG, "Launching emulator action=$action args=${args.joinToString(" ")}")
-        applyAngleEnvironment(context, useAngle)
-        NativeLibraryLoader.ensureLoaded(context)
-        // Native init and installers maintain the app list; setup_game_launch
-        // refreshes on a cache miss (e.g. a manually copied game).
-        val intent = Intent(context, Emulator::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            putExtra(APP_RESTART_PARAMETERS, args)
-            putExtra(AUTOMATIC_STATE_LOAD_EXTRA, automaticLoad)
-            if ((context is Emulator && context.returnsToNativeLibrary) ||
-                context is com.sbro.emucorev.core.vita.NativeLibraryMode.ReturnTarget) {
-                putExtra(com.sbro.emucorev.core.vita.NativeLibraryMode.RETURN_TO_NATIVE_LIBRARY, true)
-            }
-            this.action = "${action}_${System.currentTimeMillis()}"
-        }
-        withContext(Dispatchers.Main.immediate) { context.startActivity(intent) }
-    }
-
     private fun runWithArgs(context: Context, action: String, args: Array<String>): Boolean {
         return runCatching {
             Log.i(TAG, "Restarting emulator action=$action args=${args.joinToString(" ")}")
             CoreMaintenanceRepository(context).ensureCoreUpdated()
-            applyAngleEnvironment(context, false)
+            AngleEnvironment.apply(context, false)
             EmulatorStorage.prepareRuntime(context)
             VitaCoreConfigRepository(context).ensureDefaultsPersisted()
             NativeLibraryLoader.ensureLoaded(context)
@@ -135,33 +114,5 @@ object VitaLaunchBridge {
         }.onFailure { error ->
             Log.e(TAG, "Failed to restart emulator action=$action args=${args.joinToString(" ")}", error)
         }.isSuccess
-    }
-
-    private fun applyAngleEnvironment(context: Context, useAngle: Boolean) {
-        try {
-            if (useAngle) {
-                val libDir = context.applicationInfo.nativeLibraryDir
-                val eglPath = "$libDir/libEGL_angle.so"
-                val glPath = "$libDir/libGLESv2_angle.so"
-                Log.i(TAG, "Enabling ANGLE. EGL: $eglPath, GL: $glPath")
-                
-                try {
-                    System.load(glPath)
-                    System.load(eglPath)
-                    Log.i(TAG, "Successfully pre-loaded ANGLE libraries into memory.")
-                } catch (e: Throwable) {
-                    Log.e(TAG, "Failed to pre-load ANGLE libraries: ${e.message}", e)
-                }
-
-                Os.setenv("SDL_VIDEO_EGL_DRIVER", eglPath, true)
-                Os.setenv("SDL_VIDEO_GL_DRIVER", glPath, true)
-            } else {
-                Log.i(TAG, "Disabling ANGLE.")
-                Os.unsetenv("SDL_VIDEO_EGL_DRIVER")
-                Os.unsetenv("SDL_VIDEO_GL_DRIVER")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to update ANGLE environment variables", e)
-        }
     }
 }

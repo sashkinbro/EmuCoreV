@@ -296,6 +296,16 @@
     <string name="settings_camera_source_solid">Jednolitá barva</string>
     <string name="settings_camera_source_image">Statický obrázek</string>
     <string name="settings_camera_source_real">Skutečná kamera</string>
+    <string name="settings_camera_device">Zařízení kamery</string>
+    <string name="settings_help_camera_device">Vyberte, která kamera tohoto zařízení bude napájet emulovanou kameru Vity. Automaticky vybere kameru směřující stejným směrem.</string>
+    <string name="settings_camera_device_auto">Automaticky</string>
+    <string name="settings_camera_device_front">Přední kamera (%1$s)</string>
+    <string name="settings_camera_device_back">Zadní kamera (%1$s)</string>
+    <string name="settings_camera_device_external">Externí kamera (%1$s)</string>
+    <string name="settings_camera_image_title">Obrázek kamery</string>
+    <string name="settings_camera_image_none">Klepnutím vyberte obrázek</string>
+    <string name="settings_camera_image_selected">Obrázek vybrán. Klepnutím změníte</string>
+    <string name="settings_camera_image_failed">Tento obrázek nelze použít</string>
     <string name="settings_show_welcome">Zobrazit uvítací obrazovku</string>
     <string name="settings_help_show_welcome">Zobrazovat při spuštění úvodní uvítací obrazovku, dokud ji nezavřete.</string>
     <string name="settings_warn_missing_firmware">Upozornit na chybějící firmware</string>
@@ -809,14 +819,12 @@
     <string name="emulation_quickbar_screenshot">Snímek obrazovky</string>
     <string name="emulation_quickbar_open_menu">Otevřít nabídku</string>
     <string name="emulation_menu_paused_badge">Pozastaveno</string>
-    <string name="emulation_menu_badge_live">Živě</string>
-    <string name="emulation_menu_badge_restart">Vyžaduje restart</string>
+    <string name="emulation_menu_resolution_failed">Rozlišení se nepodařilo změnit. Hra zůstává u současného.</string>
     <string name="emulation_menu_section_now">Nyní</string>
     <string name="emulation_menu_section_now_desc">Změny se projeví ve spuštěné hře okamžitě.</string>
     <string name="emulation_menu_section_touch">Dotykové ovládání</string>
     <string name="emulation_menu_section_touch_desc">Gamepad na obrazovce. Změny se projeví okamžitě.</string>
     <string name="emulation_menu_section_display">Zobrazení</string>
-    <string name="emulation_menu_section_display_desc">Rozlišení a zobrazení snímků. Projeví se při příštím spuštění.</string>
     <string name="emulation_menu_section_performance">Výkon</string>
     <string name="emulation_menu_section_performance_desc">Kompromisy mezi rychlostí a přesností. Projeví se při příštím spuštění.</string>
     <string name="emulation_menu_section_system">Systém</string>
@@ -1431,6 +1439,10 @@
     <string name="emulation_savestate_loaded_toast">Načteno</string>
     <string name="emulation_savestate_deleted_toast">Smazáno</string>
     <string name="emulation_savestate_failed_toast">Operace se nezdařila</string>
+    <string name="emulation_savestate_refused_no_game">Neběží žádná hra, stav nelze uložit</string>
+    <string name="emulation_savestate_refused_exiting">Hra se zavírá, zkuste to později</string>
+    <string name="emulation_savestate_refused_loading">Hra se ještě načítá, zkuste to za chvíli</string>
+    <string name="emulation_savestate_refused_busy">Probíhá jiné ukládání nebo načítání, vyčkejte</string>
     <string name="emulation_savestate_session_mismatch_toast">Toto uložení patří k předchozí herní relaci a zatím ho nelze načíst</string>
     <string name="emulation_savestate_title_mismatch_toast">Toto uložení patří k jiné hře</string>
     <string name="emulation_savestate_confirm_save_title">Přepsat uloženou hru?</string>
@@ -1445,7 +1457,6 @@
     <string name="savestate_manager_title">Uložené hry</string>
     <string name="savestate_manager_subtitle">Snímky emulátoru, oddělené od uložení ve hře</string>
     <string name="savestate_manager_refresh">Aktualizovat</string>
-    <string name="savestate_manager_open_for_game">Uložené hry</string>
     <string name="savestate_manager_empty_title">Zatím žádná uložená pozice</string>
     <string name="savestate_manager_empty_body">Vytvořte ji v nabídce ve hře nebo tlačítkem rychlého uložení.</string>
     <string name="nav_save_states">Rychlá uložení</string>
@@ -1600,6 +1611,7 @@
     <string name="rear_touch_game">Tato hra</string>
     <string name="rear_touch_inherit">Použít globální profil</string>
     <string name="rear_touch_clear">Zrušit přiřazení</string>
+    <string name="rear_touch_reset_confirm">Obnovit všechny body zadního dotyku na výchozí hodnoty?</string>
     <string name="rear_touch_hint">Podržte pro dotyk zadního panelu; uvolněte pro ukončení dotyku. Přiřazené vstupy nahrazují běžnou akci. Přední dotyk zůstává dostupný.</string>
     <string name="rear_touch_screen_position">Poloha tlačítka na obrazovce</string>
     <string name="settings_gpu_driver_status_missing_selection">Vybraný ovladač není dostupný: %1$s</string>
@@ -1810,4 +1822,8 @@
     <string name="native_ui_set_system_music">Systémová hudba</string>
     <string name="native_ui_set_delete">Odstranit</string>
     <string name="native_ui_set_delete_theme_confirm">Tento motiv bude odstraněn.</string>
+    <string name="storage_unavailable_message">Vybrané úložiště není dostupné. Vložte kartu SD nebo vyberte jiné úložiště v Nastavení.</string>
+    <string name="emulation_screenshot_saved">Snímek obrazovky byl uložen do Pictures/EmuCoreV</string>
+    <string name="emulation_screenshot_failed">Snímek obrazovky se nepodařilo uložit</string>
+    <string name="native_ui_new_folder">Nová složka</string>
 </resources>

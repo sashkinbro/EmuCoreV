@@ -391,6 +391,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
         )
 
         runningInstallJob = viewModelScope.launch(Dispatchers.IO) {
+            EmulatorStorage.touchInstallInProgress(appContext)
             VitaInstallBridge.setListener { progress -> handleProgress(progress) }
             try {
                 block()
@@ -407,6 +408,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                     DocumentPathResolver.cleanupStagedFile(appContext, staged)
                 }
                 stagedFilesToCleanup.clear()
+                EmulatorStorage.clearInstallInProgress(appContext)
                 _archivePackageSelection.value = null
                 pendingPackageChoice = null
                 pendingPackageChoices = emptyMap()
@@ -493,6 +495,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
     }
 
     private fun handleProgress(progress: NativeInstallProgress) {
+        EmulatorStorage.touchInstallInProgress(appContext)
         val current = progress.current.takeIf { it > 0f }?.roundToInt()
         val total = progress.total.takeIf { it > 0f }?.roundToInt()
         val scaledProgress = nativeProgressOffset + progress.progress.coerceIn(0f, 100f) * nativeProgressScale

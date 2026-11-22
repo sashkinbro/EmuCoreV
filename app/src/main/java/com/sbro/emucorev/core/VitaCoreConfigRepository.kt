@@ -595,7 +595,7 @@ class VitaCoreConfigRepository(private val context: Context) {
             guestCores = config.guestCores.coerceIn(1, 4),
             frameLimit = FrameLimit.normalize(config.frameLimit),
             logLevel = normalizedLogLevel
-        )
+        ).clampedToUiRanges()
     }
 
     private fun normalizeGamepadProfile(profile: String): String {
@@ -670,3 +670,25 @@ class VitaCoreConfigRepository(private val context: Context) {
         )
     }
 }
+
+// Ranges mirror the settings sliders (SettingsTabContent). Values outside them can arrive from a
+// hand-edited config.yml or a restored backup and must never reach the core unclamped.
+internal const val AUDIO_VOLUME_MIN = 0
+internal const val AUDIO_VOLUME_MAX = 100
+internal const val OVERLAY_SCALE_MIN = 0.5f
+internal const val OVERLAY_SCALE_MAX = 2f
+internal const val OVERLAY_OPACITY_MIN = 10
+internal const val OVERLAY_OPACITY_MAX = 100
+internal const val RESOLUTION_MULTIPLIER_MIN = 0.5f
+internal const val RESOLUTION_MULTIPLIER_MAX = 8f
+
+private fun Float.clampedOr(min: Float, max: Float, fallback: Float): Float =
+    if (isNaN()) fallback else coerceIn(min, max)
+
+internal fun VitaCoreConfig.clampedToUiRanges(): VitaCoreConfig = copy(
+    audioVolume = audioVolume.coerceIn(AUDIO_VOLUME_MIN, AUDIO_VOLUME_MAX),
+    bgmVolume = bgmVolume.coerceIn(AUDIO_VOLUME_MIN, AUDIO_VOLUME_MAX),
+    overlayScale = overlayScale.clampedOr(OVERLAY_SCALE_MIN, OVERLAY_SCALE_MAX, 0.9f),
+    overlayOpacity = overlayOpacity.coerceIn(OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX),
+    resolutionMultiplier = resolutionMultiplier.clampedOr(RESOLUTION_MULTIPLIER_MIN, RESOLUTION_MULTIPLIER_MAX, 1f)
+)

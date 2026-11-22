@@ -53,6 +53,7 @@ open class NativeShellActivity : NativeActivity() {
     private external fun nativeImage(id: Int, width: Int, height: Int, rgba: ByteArray)
     private external fun nativePreviewScene(scene: Int)
     private external fun nativeSetWaveTheme(theme: String)
+    private external fun nativeSetDefaultFolderTitle(title: String)
     private external fun nativePreviewLoading(loading: Boolean)
     private external fun nativePreviewReady(scene: Int)
     private external fun nativePreviewFailed()
@@ -270,6 +271,7 @@ open class NativeShellActivity : NativeActivity() {
     private val appHost = object : ShellAppHost {
         override val resources: File get() = requireNotNull(resourceRoot) { "Shell resources are not ready" }
         override fun string(id: Int): String = getString(id)
+        override fun formatSize(bytes: Long): String = android.text.format.Formatter.formatShortFileSize(this@NativeShellActivity, bytes)
         override fun playSound(id: Int) { soundBank?.play(id) }
         override fun texture(id: Int): Bitmap? = synchronized(textureCache) {
             textureCache[id] ?: appTexturePath(id)?.let { File(resources, it) }?.let(::decodeFile)
@@ -367,6 +369,7 @@ open class NativeShellActivity : NativeActivity() {
         }
         nativeSetWaveTheme(intent.getStringExtra("wave_theme") ?: shellSettings.waveTheme)
         nativeSetDisplayArea(shellSettings.displayArea)
+        nativeSetDefaultFolderTitle(getString(R.string.native_ui_new_folder))
         nativeResourceRoot(startupRoot.absolutePath)
         nativePreviewScene(if (requestedScene == 4) 4 else 1)
         nativePreviewLoading(requestedScene != 1 && requestedScene != 4)

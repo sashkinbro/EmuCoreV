@@ -93,6 +93,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -104,6 +106,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sbro.emucorev.R
+import com.sbro.emucorev.core.LiveGraphicsSettings
 import com.sbro.emucorev.core.CHEATS_ENABLED
 import com.sbro.emucorev.core.SaveStateRepository
 import com.sbro.emucorev.core.SaveStateSlot
@@ -426,9 +429,14 @@ private fun MenuScrollableContent(
     modifier: Modifier = Modifier,
     compact: Boolean = false
 ) {
+    val saveActionFocus = remember { FocusRequester() }
+    Column(modifier = modifier.fillMaxSize()) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
+        modifier = Modifier
+            .fillMaxWidth()
+            // fill = false: the footer sits right under short content and is pinned to the
+            // bottom only once the content needs to scroll.
+            .weight(1f, fill = false)
             .verticalScroll(rememberScrollState())
             .padding(
                 start = horizontalPadding,
@@ -455,9 +463,20 @@ private fun MenuScrollableContent(
             saveStates = saveStates,
             physicalGamepadConnected = physicalGamepadConnected,
             controlsVisible = controlsVisible,
-            callbacks = callbacks
+            callbacks = callbacks,
+            saveActionFocus = saveActionFocus
         )
         }
+    }
+    if (selectedTab == EmulationMenuTab.SaveStates) {
+        // Fixed footer outside the scrolling column so Save/Load/Delete never need a scroll to be reached.
+        SaveStateActionBar(
+            saveStates = saveStates,
+            callbacks = callbacks,
+            saveActionFocus = saveActionFocus,
+            horizontalPadding = horizontalPadding
+        )
+    }
     }
 }
 
@@ -471,7 +490,8 @@ private fun MenuSelectedContent(
     saveStates: SaveStateMenuState,
     physicalGamepadConnected: Boolean,
     controlsVisible: Boolean,
-    callbacks: EmulationMenuCallbacks
+    callbacks: EmulationMenuCallbacks,
+    saveActionFocus: FocusRequester
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -486,7 +506,8 @@ private fun MenuSelectedContent(
             EmulationMenuTab.SaveStates -> SaveStatesTab(
                 gameId = gameId,
                 saveStates = saveStates,
-                callbacks = callbacks
+                callbacks = callbacks,
+                saveActionFocus = saveActionFocus
             )
             EmulationMenuTab.Controls -> ControlsTab(config = config, controlsVisible = controlsVisible, callbacks = callbacks)
             EmulationMenuTab.Display -> DisplayTab(config = config, callbacks = callbacks)
@@ -544,14 +565,6 @@ private fun GameTab(
             valueRange = 0f..100f,
             steps = 19,
             onValueChange = { callbacks.onAudioVolume(it.roundToInt()) }
-        )
-        MenuSliderRow(
-            label = stringResource(R.string.settings_bgm_volume),
-            value = config.bgmVolume.toFloat(),
-            valueText = "${config.bgmVolume}%",
-            valueRange = 0f..100f,
-            steps = 19,
-            onValueChange = { callbacks.onBgmVolume(it.roundToInt()) }
         )
         MenuToggleRow(
             label = stringResource(R.string.settings_show_info_bar),
@@ -714,16 +727,45 @@ private fun ControlsTab(config: VitaCoreConfig, controlsVisible: Boolean, callba
 
 @Composable
 private fun DisplayTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks) {
+    // Only options the running session can apply immediately are offered (see LiveGraphicsSettings).
+    val live = remember(config.backendRenderer, config.customDriverName, callbacks.liveResolutionLimit) {
+        LiveGraphicsSettings.liveOptions(LiveGraphicsSettings.capabilities(config, callbacks.liveResolutionLimit))
+    }
     MenuSection(
         title = stringResource(R.string.emulation_menu_section_display),
         subtitle = "",
         badge = null
     ) {
-        MenuToggleRow(
-            label = stringResource(R.string.settings_vsync),
-            checked = config.vSync,
-            onCheckedChange = callbacks.onVsync
-        )
+        if (LiveGraphicsSettings.Option.RESOLUTION in live) {
+            // Chip values are half-steps (2 = 1x, 3 = 1.5x) because the chip row is Int based.
+            MenuChipRow(
+                label = stringResource(R.string.settings_core_resolution_label),
+                selected = (config.resolutionMultiplier * 2f).roundToInt(),
+                options = LiveGraphicsSettings.resolutionChoices(callbacks.liveResolutionLimit).map {
+                    (it * 2f).roundToInt() to LiveGraphicsSettings.formatResolution(it)
+                },
+                enabled = !callbacks.resolutionApplying,
+                onSelected = { callbacks.onResolutionMultiplier(it / 2f) }
+            )
+        }
+        if (LiveGraphicsSettings.Option.SCREEN_FILTER in live) {
+            MenuChipRow(
+                label = stringResource(R.string.settings_core_screen_filter_label),
+                selected = if (config.screenFilter.equals("Nearest", ignoreCase = true)) 1 else 0,
+                options = listOf(
+                    0 to stringResource(R.string.settings_filter_bilinear),
+                    1 to stringResource(R.string.settings_filter_nearest)
+                ),
+                onSelected = { callbacks.onScreenFilter(if (it == 1) "Nearest" else "Bilinear") }
+            )
+        }
+        if (LiveGraphicsSettings.Option.V_SYNC in live) {
+            MenuToggleRow(
+                label = stringResource(R.string.settings_vsync),
+                checked = config.vSync,
+                onCheckedChange = callbacks.onVsync
+            )
+        }
         MenuToggleRow(
             label = stringResource(R.string.settings_stretch_display_area),
             checked = config.stretchDisplayArea,
@@ -751,11 +793,13 @@ private fun DisplayTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks
             checked = config.fpsHack,
             onCheckedChange = callbacks.onFpsHack
         )
-        MenuToggleRow(
-            label = stringResource(R.string.settings_turbo_mode),
-            checked = config.turboMode,
-            onCheckedChange = callbacks.onTurboMode
-        )
+        if (LiveGraphicsSettings.Option.TURBO_MODE in live) {
+            MenuToggleRow(
+                label = stringResource(R.string.settings_turbo_mode),
+                checked = config.turboMode,
+                onCheckedChange = callbacks.onTurboMode
+            )
+        }
         MenuToggleRow(
             label = stringResource(R.string.settings_core_disable_surface_sync),
             checked = config.disableSurfaceSync,
@@ -795,7 +839,12 @@ private fun SystemTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks)
 }
 
 @Composable
-private fun SaveStatesTab(gameId: String, saveStates: SaveStateMenuState, callbacks: EmulationMenuCallbacks) {
+private fun SaveStatesTab(
+    gameId: String,
+    saveStates: SaveStateMenuState,
+    callbacks: EmulationMenuCallbacks,
+    saveActionFocus: FocusRequester
+) {
     val palette = emulationMenuPalette()
     val slotOrder = SaveStateRepository.SLOT_ORDER
     val selectedIndex = slotOrder.indexOf(saveStates.selectedSlot).coerceAtLeast(0)
@@ -811,7 +860,12 @@ private fun SaveStatesTab(gameId: String, saveStates: SaveStateMenuState, callba
 
     Column(modifier = Modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Surface(modifier = Modifier.fillMaxWidth(), shape = neonShape(16.dp), color = palette.panelSoft,
+        Surface(modifier = Modifier.fillMaxWidth().clip(neonShape(16.dp)).clickable {
+                // Empty slot: save right away (same path as the Save button). Filled slot: never overwrite or
+                // load implicitly, just move focus to the always-visible action bar.
+                if (!hasState) callbacks.onSaveStateSave(selected)
+                else runCatching { saveActionFocus.requestFocus() }
+            }, shape = neonShape(16.dp), color = palette.panelSoft,
             border = runtimeMenuBorder(RuntimeMenuSurfaceRole.SaveSummary, MaterialTheme.colorScheme)) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -835,31 +889,50 @@ private fun SaveStatesTab(gameId: String, saveStates: SaveStateMenuState, callba
                 color = palette.textSecondary, modifier = Modifier.fillMaxWidth())
             }
         }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SaveStateActionButton(
-                    icon = Icons.Rounded.Save,
-                    contentDescription = stringResource(R.string.emulation_savestate_save_action),
-                    enabled = !busy,
-                    showProgress = saveStates.busy && saveStates.busySaving,
-                    onClick = { callbacks.onSaveStateSave(selected) },
-                    modifier = Modifier.weight(1f)
-                )
-                SaveStateActionButton(
-                    icon = Icons.Rounded.Restore,
-                    contentDescription = stringResource(R.string.emulation_savestate_load_action),
-                    enabled = hasState && !busy,
-                    showProgress = saveStates.busy && !saveStates.busySaving,
-                    onClick = { callbacks.onSaveStateLoad(selected) },
-                    modifier = Modifier.weight(1f)
-                )
-                if (hasState) {
-                    SaveStateDeleteButton(
-                        enabled = !busy,
-                        onClick = { callbacks.onSaveStateDelete(selected) }
-                    )
-                }
-            }
         SaveStateAutomationSection(gameId, enabled = !busy)
+    }
+}
+
+/** Save / Load / Delete footer of the save-state panel; lives outside the scrolling content. */
+@Composable
+private fun SaveStateActionBar(
+    saveStates: SaveStateMenuState,
+    callbacks: EmulationMenuCallbacks,
+    saveActionFocus: FocusRequester,
+    horizontalPadding: Dp
+) {
+    val slotOrder = SaveStateRepository.SLOT_ORDER
+    val selected = slotOrder[slotOrder.indexOf(saveStates.selectedSlot).coerceAtLeast(0)]
+    val hasState = saveStates.slots.firstOrNull { it.slot == selected }?.exists == true
+    val busy = saveStates.busy || !saveStates.canInteract
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = horizontalPadding, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        SaveStateActionButton(
+            icon = Icons.Rounded.Save,
+            contentDescription = stringResource(R.string.emulation_savestate_save_action),
+            enabled = !busy,
+            showProgress = saveStates.busy && saveStates.busySaving,
+            onClick = { callbacks.onSaveStateSave(selected) },
+            modifier = Modifier.weight(1f).focusRequester(saveActionFocus)
+        )
+        SaveStateActionButton(
+            icon = Icons.Rounded.Restore,
+            contentDescription = stringResource(R.string.emulation_savestate_load_action),
+            enabled = hasState && !busy,
+            showProgress = saveStates.busy && !saveStates.busySaving,
+            onClick = { callbacks.onSaveStateLoad(selected) },
+            modifier = Modifier.weight(1f)
+        )
+        if (hasState) {
+            SaveStateDeleteButton(
+                enabled = !busy,
+                onClick = { callbacks.onSaveStateDelete(selected) }
+            )
+        }
     }
 }
 
@@ -1675,10 +1748,14 @@ data class EmulationMenuCallbacks(
     val onOverlayScale: (Float) -> Unit,
     val onOverlayOpacity: (Int) -> Unit,
     val onAudioVolume: (Int) -> Unit,
-    val onBgmVolume: (Int) -> Unit,
     val onInfoBar: (Boolean) -> Unit,
     val onTouchpadCursor: (Boolean) -> Unit,
     val onVsync: (Boolean) -> Unit,
+    val onResolutionMultiplier: (Float) -> Unit = {},
+    val onScreenFilter: (String) -> Unit = {},
+    /** Largest resolution multiplier the running session can switch to; 0 hides the resolution row. */
+    val liveResolutionLimit: Float = 0f,
+    val resolutionApplying: Boolean = false,
     val onStretchDisplay: (Boolean) -> Unit,
     val onFpsHack: (Boolean) -> Unit,
     val onFrameLimit: (Int) -> Unit,

@@ -5,6 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.hardware.display.DisplayManager
 import android.view.Surface
 import android.view.WindowManager
 import kotlin.math.PI
@@ -39,6 +40,18 @@ class AndroidGyroscopeInput(
         appContext.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val windowManager =
         appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    private val displayManager =
+        appContext.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+    // Cached: querying the display for every sensor sample is wasted work on the sensor thread.
+    @Volatile
+    private var displayRotation = Surface.ROTATION_0
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) = Unit
+        override fun onDisplayRemoved(displayId: Int) = Unit
+        override fun onDisplayChanged(displayId: Int) {
+            refreshDisplayRotation()
+        }
+    }
     private var activeSensor: Sensor? = null
     private var mode = VitaCoreConfig.GYRO_MODE_OFF
     private var sensitivity = 1f
@@ -85,10 +98,19 @@ class AndroidGyroscopeInput(
             else -> null
         }
         val sensor = activeSensor ?: return false
-        return sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)
+        refreshDisplayRotation()
+        displayManager.registerDisplayListener(displayListener, null)
+        val registered = sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)
+        if (!registered) displayManager.unregisterDisplayListener(displayListener)
+        return registered
+    }
+
+    private fun refreshDisplayRotation() {
+        displayRotation = @Suppress("DEPRECATION") windowManager.defaultDisplay.rotation
     }
 
     fun stop() {
+        displayManager.unregisterDisplayListener(displayListener)
         activeSensor?.let { sensorManager.unregisterListener(this, it) }
         activeSensor = null
         hasSteeringCenter = false
@@ -131,7 +153,7 @@ class AndroidGyroscopeInput(
 
     private fun readAimValues(event: SensorEvent): Boolean {
         if (event.sensor.type != Sensor.TYPE_GYROSCOPE) return false
-        val rotation = @Suppress("DEPRECATION") windowManager.defaultDisplay.rotation
+        val rotation = displayRotation
         val gx = event.values[0]
         val gy = event.values[1]
         when (rotation) {
@@ -160,7 +182,7 @@ class AndroidGyroscopeInput(
     private fun readSteeringValues(event: SensorEvent): Boolean {
         if (event.sensor.type != Sensor.TYPE_GAME_ROTATION_VECTOR) return false
         SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-        val rotation = @Suppress("DEPRECATION") windowManager.defaultDisplay.rotation
+        val rotation = displayRotation
         val axisX: Int
         val axisY: Int
         when (rotation) {

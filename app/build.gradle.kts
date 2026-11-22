@@ -274,6 +274,9 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        // Robolectric recreates the Application per test: run its startup work inline so tests
+        // never race the startup worker over config files (production keeps the worker thread).
+        unitTests.all { it.systemProperty("emucorev.startup.sync", "true") }
     }
 }
 
@@ -289,13 +292,54 @@ tasks.configureEach {
 // (git-ignored tools/oracles) is present, every release APK is scanned after assembly.
 val releaseCleanChecker = rootProject.file("tools/oracles/check_release_clean.py")
 if (releaseCleanChecker.isFile) {
-    val checkReleaseClean = tasks.register<Exec>("checkReleaseClean") {
-        val apkDir = layout.buildDirectory.dir("outputs/apk/release")
-        commandLine("python", "-I", releaseCleanChecker.absolutePath,
-            apkDir.get().file("app-release.apk").asFile.absolutePath)
+    // Scans the newest existing artifact among the candidates: an unsigned build produces
+    // app-release-unsigned.apk instead of app-release.apk.
+    fun registerReleaseCleanCheck(taskName: String, outputsDir: String, candidates: List<String>) =
+        tasks.register<Exec>(taskName) {
+            val directory = layout.buildDirectory.dir(outputsDir)
+            val checker = releaseCleanChecker.absolutePath
+            fun existing() = candidates.map { directory.get().file(it).asFile }.filter(File::isFile)
+            onlyIf { existing().isNotEmpty() }
+            doFirst {
+                commandLine("python", "-I", checker, existing().maxByOrNull(File::lastModified)!!.absolutePath)
+            }
+        }
+    val checkReleaseApkClean = registerReleaseCleanCheck(
+        "checkReleaseClean", "outputs/apk/release", listOf("app-release.apk", "app-release-unsigned.apk"))
+    val checkReleaseBundleClean = registerReleaseCleanCheck(
+        "checkReleaseBundleClean", "outputs/bundle/release", listOf("app-release.aab"))
+    tasks.configureEach {
+        if (name == "assembleRelease") finalizedBy(checkReleaseApkClean)
+        if (name == "bundleRelease") finalizedBy(checkReleaseBundleClean)
+    }
+} else {
+    // The tools directory is private and absent in public checkouts: warn, never fail.
+    tasks.configureEach {
+        if (name == "assembleRelease" || name == "bundleRelease") {
+            doLast {
+                logger.warn("WARNING: tools/oracles/check_release_clean.py is missing; the release " +
+                    "artifact was NOT scanned for research/oracle tooling.")
+            }
+        }
+    }
+}
+
+// A release build without signing keys would silently produce an unsigned APK/AAB that cannot be
+// installed or published. Fail the release artifact tasks with a clear message (debug builds and
+// the opt-in debugWithReleaseSigning are unaffected).
+if (!hasReleaseSigning) {
+    val requireReleaseSigning = tasks.register("requireReleaseSigning") {
+        doFirst {
+            throw GradleException(
+                "Release signing is not configured. Set emucorev.release.storeFile, storePassword, " +
+                    "keyAlias and keyPassword in local.properties to build a release artifact."
+            )
+        }
     }
     tasks.configureEach {
-        if (name == "assembleRelease") finalizedBy(checkReleaseClean)
+        if (name in setOf("assembleRelease", "bundleRelease", "packageRelease", "packageReleaseBundle")) {
+            dependsOn(requireReleaseSigning)
+        }
     }
 }
 

@@ -16,7 +16,7 @@ internal object GpuRendererQuery {
     fun query(): String? = runBoundedGpuProbe(1500) { queryGpuRendererSession(AndroidGpuRendererProbe()) }
 }
 
-/** A broken vendor call may outlive the deadline; there is only one probe attempt per process. */
+/** A broken vendor call may outlive the deadline; a null result means "not measured" and the caller may retry later. */
 internal fun runBoundedGpuProbe(timeoutMillis: Long, query: () -> String?): String? {
     val executor = Executors.newSingleThreadExecutor { task ->
         Thread(task, "emucorev-gpu-probe").apply { isDaemon = true }

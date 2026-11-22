@@ -296,6 +296,16 @@
     <string name="settings_camera_source_solid">Solid color</string>
     <string name="settings_camera_source_image">Static image</string>
     <string name="settings_camera_source_real">Real camera</string>
+    <string name="settings_camera_device">Camera device</string>
+    <string name="settings_help_camera_device">Choose which camera of this device feeds the emulated Vita camera. Automatic picks the camera facing the same way.</string>
+    <string name="settings_camera_device_auto">Automatic</string>
+    <string name="settings_camera_device_front">Front camera (%1$s)</string>
+    <string name="settings_camera_device_back">Back camera (%1$s)</string>
+    <string name="settings_camera_device_external">External camera (%1$s)</string>
+    <string name="settings_camera_image_title">Camera image</string>
+    <string name="settings_camera_image_none">Tap to choose an image</string>
+    <string name="settings_camera_image_selected">Image selected. Tap to change</string>
+    <string name="settings_camera_image_failed">Could not use this image</string>
     <string name="settings_show_welcome">Show welcome screen</string>
     <string name="settings_help_show_welcome">Show the introductory welcome screen on launch until you dismiss it.</string>
     <string name="settings_warn_missing_firmware">Warn when firmware is missing</string>
@@ -809,14 +819,12 @@
     <string name="emulation_quickbar_screenshot">Screenshot</string>
     <string name="emulation_quickbar_open_menu">Open menu</string>
     <string name="emulation_menu_paused_badge">Paused</string>
-    <string name="emulation_menu_badge_live">Live</string>
-    <string name="emulation_menu_badge_restart">Restart required</string>
+    <string name="emulation_menu_resolution_failed">The resolution could not be changed. The game keeps the current one.</string>
     <string name="emulation_menu_section_now">Now</string>
     <string name="emulation_menu_section_now_desc">Changes apply to the running game instantly.</string>
     <string name="emulation_menu_section_touch">Touch controls</string>
     <string name="emulation_menu_section_touch_desc">On-screen gamepad. Changes apply immediately.</string>
     <string name="emulation_menu_section_display">Display</string>
-    <string name="emulation_menu_section_display_desc">Resolution and frame presentation. Take effect on next launch.</string>
     <string name="emulation_menu_section_performance">Performance</string>
     <string name="emulation_menu_section_performance_desc">Speed and accuracy trade-offs. Take effect on next launch.</string>
     <string name="emulation_menu_section_system">System</string>
@@ -1429,6 +1437,10 @@
     <string name="emulation_savestate_loaded_toast">Loaded</string>
     <string name="emulation_savestate_deleted_toast">Deleted</string>
     <string name="emulation_savestate_failed_toast">Could not complete the operation</string>
+    <string name="emulation_savestate_refused_no_game">No game is running, so the state cannot be saved</string>
+    <string name="emulation_savestate_refused_exiting">The game is closing, try again later</string>
+    <string name="emulation_savestate_refused_loading">The game is still loading, try again in a moment</string>
+    <string name="emulation_savestate_refused_busy">Another save or load is in progress, please wait</string>
     <string name="emulation_savestate_session_mismatch_toast">This save belongs to a previous game session and cannot be loaded yet</string>
     <string name="emulation_savestate_title_mismatch_toast">This save belongs to another game</string>
     <string name="emulation_savestate_confirm_save_title">Overwrite save?</string>
@@ -1443,7 +1455,6 @@
     <string name="savestate_manager_title">Saves</string>
     <string name="savestate_manager_subtitle">Emulator snapshots, separate from in-game saves</string>
     <string name="savestate_manager_refresh">Refresh</string>
-    <string name="savestate_manager_open_for_game">Saves</string>
     <string name="savestate_manager_empty_title">No saves yet</string>
     <string name="savestate_manager_empty_body">Create one from the in-game menu or with the quick save button.</string>
     <string name="nav_save_states">Quick saves</string>
@@ -1598,6 +1609,7 @@
     <string name="rear_touch_game">This game</string>
     <string name="rear_touch_inherit">Use global profile</string>
     <string name="rear_touch_clear">Clear binding</string>
+    <string name="rear_touch_reset_confirm">Reset all rear touch points to their defaults?</string>
     <string name="rear_touch_hint">Hold to touch the rear panel; release to lift. Assigned inputs replace their usual action. Front touch stays available.</string>
     <string name="rear_touch_screen_position">On-screen button position</string>
     <string name="settings_gpu_driver_status_missing_selection">Selected driver is unavailable: %1$s</string>
@@ -1802,4 +1814,8 @@
     <string name="native_ui_set_system_music">System Music</string>
     <string name="native_ui_set_delete">Delete</string>
     <string name="native_ui_set_delete_theme_confirm">This theme will be deleted.</string>
+    <string name="storage_unavailable_message">The selected storage is not available. Insert the SD card or choose another storage in Settings.</string>
+    <string name="emulation_screenshot_saved">Screenshot saved to Pictures/EmuCoreV</string>
+    <string name="emulation_screenshot_failed">Could not save the screenshot</string>
+    <string name="native_ui_new_folder">New Folder</string>
 </resources>

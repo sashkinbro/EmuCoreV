@@ -683,15 +683,6 @@ private fun AudioProfileSection(
             onReset = { onUpdate { it.copy(audioVolume = defaults.audioVolume) } },
             onChange = { value -> onUpdate { it.copy(audioVolume = value.toInt()) } }
         )
-        SliderRow(
-            title = stringResource(R.string.settings_bgm_volume),
-            description = stringResource(R.string.settings_help_bgm_volume),
-            valueText = stringResource(R.string.settings_bgm_volume_value, config.bgmVolume),
-            value = config.bgmVolume.toFloat(),
-            valueRange = 0f..100f,
-            onReset = { onUpdate { it.copy(bgmVolume = defaults.bgmVolume) } },
-            onChange = { value -> onUpdate { it.copy(bgmVolume = value.toInt()) } }
-        )
         ToggleRow(stringResource(R.string.settings_core_ngs_enable), config.ngsEnable, stringResource(R.string.settings_help_ngs_enable), { onUpdate { it.copy(ngsEnable = defaults.ngsEnable) } }) { onUpdate { cfg -> cfg.copy(ngsEnable = it) } }
     }
 }

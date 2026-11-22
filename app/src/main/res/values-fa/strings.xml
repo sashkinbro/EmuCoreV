@@ -296,6 +296,16 @@
     <string name="settings_camera_source_solid">رنگ ثابت</string>
     <string name="settings_camera_source_image">تصویر ساکن</string>
     <string name="settings_camera_source_real">دوربین واقعی</string>
+    <string name="settings_camera_device">دستگاه دوربین</string>
+    <string name="settings_help_camera_device">انتخاب کنید کدام دوربین این دستگاه، دوربین شبیه‌سازی‌شده Vita را تغذیه کند. حالت خودکار دوربینی را که به همان سمت رو دارد انتخاب می‌کند.</string>
+    <string name="settings_camera_device_auto">خودکار</string>
+    <string name="settings_camera_device_front">دوربین جلو (%1$s)</string>
+    <string name="settings_camera_device_back">دوربین عقب (%1$s)</string>
+    <string name="settings_camera_device_external">دوربین خارجی (%1$s)</string>
+    <string name="settings_camera_image_title">تصویر دوربین</string>
+    <string name="settings_camera_image_none">برای انتخاب تصویر ضربه بزنید</string>
+    <string name="settings_camera_image_selected">تصویر انتخاب شد. برای تغییر ضربه بزنید</string>
+    <string name="settings_camera_image_failed">استفاده از این تصویر ممکن نیست</string>
     <string name="settings_show_welcome">نمایش صفحه خوش‌آمدگویی</string>
     <string name="settings_help_show_welcome">صفحه خوش‌آمدگویی معرفی را هنگام اجرا نشان بده تا زمانی که آن را ببندید.</string>
     <string name="settings_warn_missing_firmware">هشدار در صورت نبود فریمور</string>
@@ -809,14 +819,12 @@
     <string name="emulation_quickbar_screenshot">تصویر صفحه</string>
     <string name="emulation_quickbar_open_menu">باز کردن منو</string>
     <string name="emulation_menu_paused_badge">در مکث</string>
-    <string name="emulation_menu_badge_live">زنده</string>
-    <string name="emulation_menu_badge_restart">نیاز به راه‌اندازی مجدد</string>
+    <string name="emulation_menu_resolution_failed">تغییر وضوح تصویر ممکن نشد. بازی با همان مقدار فعلی ادامه می‌دهد.</string>
     <string name="emulation_menu_section_now">فوری</string>
     <string name="emulation_menu_section_now_desc">تغییرات فوراً روی بازی در حال اجرا اعمال می‌شوند.</string>
     <string name="emulation_menu_section_touch">کنترل‌های لمسی</string>
     <string name="emulation_menu_section_touch_desc">دسته‌بازی روی صفحه. تغییرات فوراً اعمال می‌شوند.</string>
     <string name="emulation_menu_section_display">نمایش</string>
-    <string name="emulation_menu_section_display_desc">تفکیک‌پذیری و ارائه فریم. در اجرای بعدی اعمال می‌شود.</string>
     <string name="emulation_menu_section_performance">عملکرد</string>
     <string name="emulation_menu_section_performance_desc">توازن سرعت و دقت. در اجرای بعدی اعمال می‌شود.</string>
     <string name="emulation_menu_section_system">سیستم</string>
@@ -1429,6 +1437,10 @@
     <string name="emulation_savestate_loaded_toast">بارگذاری شد</string>
     <string name="emulation_savestate_deleted_toast">حذف شد</string>
     <string name="emulation_savestate_failed_toast">انجام عملیات ممکن نبود</string>
+    <string name="emulation_savestate_refused_no_game">بازی‌ای در حال اجرا نیست، بنابراین وضعیت ذخیره نمی‌شود</string>
+    <string name="emulation_savestate_refused_exiting">بازی در حال بسته شدن است، بعداً دوباره امتحان کنید</string>
+    <string name="emulation_savestate_refused_loading">بازی هنوز در حال بارگذاری است، کمی بعد دوباره امتحان کنید</string>
+    <string name="emulation_savestate_refused_busy">ذخیره یا بارگذاری دیگری در حال انجام است، لطفاً صبر کنید</string>
     <string name="emulation_savestate_session_mismatch_toast">این ذخیره مربوط به جلسه قبلی بازی است و هنوز نمی‌توان آن را بارگذاری کرد</string>
     <string name="emulation_savestate_title_mismatch_toast">این ذخیره متعلق به بازی دیگری است</string>
     <string name="emulation_savestate_confirm_save_title">ذخیره بازنویسی شود؟</string>
@@ -1443,7 +1455,6 @@
     <string name="savestate_manager_title">ذخیره‌ها</string>
     <string name="savestate_manager_subtitle">عکس‌های لحظه‌ای شبیه‌ساز، جدا از ذخیره‌های درون‌بازی</string>
     <string name="savestate_manager_refresh">بازخوانی</string>
-    <string name="savestate_manager_open_for_game">ذخیره‌ها</string>
     <string name="savestate_manager_empty_title">هنوز ذخیره‌ای وجود ندارد</string>
     <string name="savestate_manager_empty_body">یکی از منوی درون‌بازی یا با دکمه ذخیره سریع ایجاد کنید.</string>
     <string name="nav_save_states">ذخیره‌های سریع</string>
@@ -1598,6 +1609,7 @@
     <string name="rear_touch_game">این بازی</string>
     <string name="rear_touch_inherit">استفاده از پروفایل عمومی</string>
     <string name="rear_touch_clear">پاک کردن تخصیص</string>
+    <string name="rear_touch_reset_confirm">همه نقاط لمس پشتی به حالت پیش‌فرض بازنشانی شوند؟</string>
     <string name="rear_touch_hint">برای لمس صفحهٔ پشتی نگه دارید و برای پایان لمس رها کنید. ورودی‌های اختصاص‌یافته جایگزین عملکرد معمول می‌شوند. لمس جلو همچنان در دسترس است.</string>
     <string name="rear_touch_screen_position">موقعیت دکمه روی صفحه</string>
     <string name="settings_gpu_driver_status_missing_selection">درایور انتخاب‌شده در دسترس نیست: %1$s</string>
@@ -1800,4 +1812,8 @@
     <string name="native_ui_set_system_music">موسیقی سیستم</string>
     <string name="native_ui_set_delete">حذف</string>
     <string name="native_ui_set_delete_theme_confirm">این زمینه حذف خواهد شد.</string>
+    <string name="storage_unavailable_message">حافظه انتخاب‌شده در دسترس نیست. کارت SD را وارد کنید یا در تنظیمات حافظه دیگری انتخاب کنید.</string>
+    <string name="emulation_screenshot_saved">اسکرین‌شات در Pictures/EmuCoreV ذخیره شد</string>
+    <string name="emulation_screenshot_failed">ذخیره اسکرین‌شات ممکن نبود</string>
+    <string name="native_ui_new_folder">پوشه جدید</string>
 </resources>

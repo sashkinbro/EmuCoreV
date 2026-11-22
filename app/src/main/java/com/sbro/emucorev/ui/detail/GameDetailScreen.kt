@@ -164,12 +164,13 @@ fun GameDetailScreen(
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val backClick = rememberDebouncedClick(onClick = onBack)
     val launchFailedMessage = stringResource(R.string.game_launch_failed)
+    val storageUnavailableMessage = stringResource(R.string.storage_unavailable_message)
     val launchRequiresFirmwareMessage = stringResource(R.string.game_launch_requires_firmware)
     val launchRequiresFirmwareUpdateMessage = stringResource(R.string.game_launch_requires_firmware_update)
     val deleteGameLabel = stringResource(R.string.detail_delete_game)
     val installDlcLabel = stringResource(R.string.detail_install_dlc)
     val manageSaveDataLabel = stringResource(R.string.save_manager_open_for_game)
-    val manageSaveStatesLabel = stringResource(R.string.savestate_manager_open_for_game)
+    val manageSaveStatesLabel = stringResource(R.string.nav_save_states)
     val deleteGameConfirmTitle = stringResource(R.string.detail_delete_game_confirm_title)
     val deleteGameConfirmBody = stringResource(R.string.detail_delete_game_confirm_body)
     val deleteGameFailedMessage = stringResource(R.string.detail_delete_game_failed)
@@ -303,9 +304,10 @@ fun GameDetailScreen(
                         rememberDebouncedClick {
                             launchScope.launch {
                                 when (VitaLaunchBridge.launchInstalledTitle(context, it.titleId)) {
-                                    LaunchResult.Success -> Unit
+                                    LaunchResult.Success, LaunchResult.Busy -> Unit
                                     LaunchResult.MissingFirmware -> Toast.makeText(context, launchRequiresFirmwareMessage, Toast.LENGTH_SHORT).show()
                                     LaunchResult.MissingFirmwareUpdate -> Toast.makeText(context, launchRequiresFirmwareUpdateMessage, Toast.LENGTH_SHORT).show()
+                                    LaunchResult.StorageUnavailable -> Toast.makeText(context, storageUnavailableMessage, Toast.LENGTH_LONG).show()
                                     LaunchResult.Failure -> Toast.makeText(context, launchFailedMessage, Toast.LENGTH_SHORT).show()
                                 }
                             }

@@ -97,11 +97,19 @@ class ShellThemes(private val context: Context) {
 
     /** Copies a picked image (Home / Start screen background). */
     fun savePhoto(uri: Uri, target: File) {
-        context.contentResolver.openInputStream(uri).use { input ->
-            requireNotNull(input) { "Cannot open image" }
-            target.outputStream().use { input.copyTo(it) }
+        // Write to a sibling temp file and validate it before replacing the current photo: a bad
+        // or truncated pick must never destroy the existing background.
+        val temp = File(target.parentFile, "${target.name}.tmp")
+        try {
+            context.contentResolver.openInputStream(uri).use { input ->
+                requireNotNull(input) { "Cannot open image" }
+                temp.outputStream().use { input.copyTo(it) }
+            }
+            requireNotNull(decode(temp, 64)) { "Unsupported image" }
+            check(temp.renameTo(target) || (target.delete() && temp.renameTo(target))) { "Cannot replace image" }
+        } finally {
+            if (temp.exists()) temp.delete()
         }
-        requireNotNull(decode(target, 64)) { "Unsupported image" }
     }
 
     private fun parse(dir: File): Theme {

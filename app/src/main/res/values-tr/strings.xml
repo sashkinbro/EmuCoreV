@@ -599,6 +599,16 @@
     <string name="settings_camera_source_solid">Düz renk</string>
     <string name="settings_camera_source_image">Statik görüntü</string>
     <string name="settings_camera_source_real">Gerçek kamera</string>
+    <string name="settings_camera_device">Kamera aygıtı</string>
+    <string name="settings_help_camera_device">Bu cihazın hangi kamerasının öykünülen Vita kamerasını beslediğini seçin. Otomatik, aynı yöne bakan kamerayı seçer.</string>
+    <string name="settings_camera_device_auto">Otomatik</string>
+    <string name="settings_camera_device_front">Ön kamera (%1$s)</string>
+    <string name="settings_camera_device_back">Arka kamera (%1$s)</string>
+    <string name="settings_camera_device_external">Harici kamera (%1$s)</string>
+    <string name="settings_camera_image_title">Kamera görüntüsü</string>
+    <string name="settings_camera_image_none">Görüntü seçmek için dokunun</string>
+    <string name="settings_camera_image_selected">Görüntü seçildi. Değiştirmek için dokunun</string>
+    <string name="settings_camera_image_failed">Bu görüntü kullanılamadı</string>
     <string name="settings_show_welcome">Karşılama ekranını göster</string>
     <string name="settings_help_show_welcome">Siz kapatana kadar başlangıçtaki karşılama ekranını gösterir.</string>
     <string name="settings_warn_missing_firmware">Ürün yazılımı eksik olduğunda uyar</string>
@@ -611,14 +621,12 @@
     <string name="emulation_quickbar_screenshot">Ekran görüntüsü</string>
     <string name="emulation_quickbar_open_menu">Menüyü aç</string>
     <string name="emulation_menu_paused_badge">Duraklatıldı</string>
-    <string name="emulation_menu_badge_live">Canlı</string>
-    <string name="emulation_menu_badge_restart">Yeniden başlatma gerekiyor</string>
+    <string name="emulation_menu_resolution_failed">Çözünürlük değiştirilemedi. Oyun mevcut çözünürlükle devam ediyor.</string>
     <string name="emulation_menu_section_now">Şimdi</string>
     <string name="emulation_menu_section_now_desc">Değişiklikler çalışan oyuna anında uygulanır.</string>
     <string name="emulation_menu_section_touch">Dokunmatik kontroller</string>
     <string name="emulation_menu_section_touch_desc">Ekran üstü gamepad. Değişiklikler hemen uygulanır.</string>
     <string name="emulation_menu_section_display">Ekran</string>
-    <string name="emulation_menu_section_display_desc">Çözünürlük ve kare sunumu. Sonraki başlatmada etkili olur.</string>
     <string name="emulation_menu_section_performance">Performans</string>
     <string name="emulation_menu_section_performance_desc">Hız ve doğruluk ödünleşimleri. Sonraki başlatmada etkili olur.</string>
     <string name="emulation_menu_section_system">Sistem</string>
@@ -1428,6 +1436,10 @@
     <string name="emulation_savestate_loaded_toast">Yüklendi</string>
     <string name="emulation_savestate_deleted_toast">Silindi</string>
     <string name="emulation_savestate_failed_toast">İşlem tamamlanamadı</string>
+    <string name="emulation_savestate_refused_no_game">Çalışan bir oyun yok, durum kaydedilemez</string>
+    <string name="emulation_savestate_refused_exiting">Oyun kapanıyor, daha sonra tekrar deneyin</string>
+    <string name="emulation_savestate_refused_loading">Oyun hâlâ yükleniyor, birazdan tekrar deneyin</string>
+    <string name="emulation_savestate_refused_busy">Başka bir kaydetme veya yükleme sürüyor, lütfen bekleyin</string>
     <string name="emulation_savestate_session_mismatch_toast">Bu kayıt önceki bir oyun oturumuna ait ve henüz yüklenemiyor</string>
     <string name="emulation_savestate_title_mismatch_toast">Bu kayıt başka bir oyuna ait</string>
     <string name="emulation_savestate_confirm_save_title">Kaydın üzerine yazılsın mı?</string>
@@ -1442,7 +1454,6 @@
     <string name="savestate_manager_title">Kayıtlar</string>
     <string name="savestate_manager_subtitle">Emülatör anlık görüntüleri, oyun içi kayıtlardan ayrı</string>
     <string name="savestate_manager_refresh">Yenile</string>
-    <string name="savestate_manager_open_for_game">Kayıtlar</string>
     <string name="savestate_manager_empty_title">Henüz kayıt yok</string>
     <string name="savestate_manager_empty_body">Oyun içi menüden veya hızlı kaydet düğmesiyle bir tane oluşturun.</string>
     <string name="nav_save_states">Hızlı kayıtlar</string>
@@ -1597,6 +1608,7 @@
     <string name="rear_touch_game">Bu oyun</string>
     <string name="rear_touch_inherit">Genel profili kullan</string>
     <string name="rear_touch_clear">Atamayı temizle</string>
+    <string name="rear_touch_reset_confirm">Tüm arka dokunma noktaları varsayılana sıfırlansın mı?</string>
     <string name="rear_touch_hint">Arka panele dokunmak için basılı tutun, dokunmayı bitirmek için bırakın. Atanan girişler normal eylemlerinin yerine geçer. Ön dokunmatik kullanılabilir kalır.</string>
     <string name="rear_touch_screen_position">Ekran düğmesinin konumu</string>
     <string name="settings_gpu_driver_status_missing_selection">Seçilen sürücü kullanılamıyor: %1$s</string>
@@ -1799,4 +1811,8 @@
     <string name="native_ui_set_system_music">Sistem Müziği</string>
     <string name="native_ui_set_delete">Sil</string>
     <string name="native_ui_set_delete_theme_confirm">Bu tema silinecek.</string>
+    <string name="storage_unavailable_message">Seçilen depolama alanı kullanılamıyor. SD kartı takın veya Ayarlar\'dan başka bir depolama alanı seçin.</string>
+    <string name="emulation_screenshot_saved">Ekran görüntüsü Pictures/EmuCoreV klasörüne kaydedildi</string>
+    <string name="emulation_screenshot_failed">Ekran görüntüsü kaydedilemedi</string>
+    <string name="native_ui_new_folder">Yeni Klasör</string>
 </resources>

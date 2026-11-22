@@ -1,6 +1,7 @@
 package com.sbro.emucorev
 
 import android.app.Application
+import com.sbro.emucorev.core.AppStartup
 import com.sbro.emucorev.core.BackupSessionGate
 import com.sbro.emucorev.core.NativeLib
 import com.sbro.emucorev.core.AppIconManager
@@ -23,35 +24,39 @@ class EmuCoreVApp : Application() {
         // ProcessPhoenix restarts the app through a helper process where Firebase providers
         // are not initialized, and the Discord SDK runs in its own isolated process; neither
         // helper may build the emulator-side graph.
-        val processName = Application.getProcessName()
-        if (processName.endsWith(PHOENIX_PROCESS_SUFFIX) || processName.endsWith(DISCORD_PROCESS_SUFFIX)) return
-        // Firmware UI has its own guest/SDL runtime, with no game bookkeeping,
-        // cloud sync, Discord, backup worker, or maintenance work in its process.
-        if (processName.endsWith(":native_library") || processName.endsWith(":native_trophies")) return
-        AppIconManager.applyProIcon(this, AppPreferences(this).proUnlocked)
-        PlayTimeRepository(this).finishOpenSessions().forEach { session ->
-            ProfilePlayTimeSyncer.recordAndSync(this, session.titleId, session.title, session.durationMs)
-        }
-        ProfilePlayTimeSyncer.syncPendingAsync(this)
+        if (skipsAppStartup(Application.getProcessName())) return
         TrophyCloudRepository.resumePending(this)
         recoverPendingDriveRestore()
         DriveBackupWork.resumePending(this)
         DiscordIntegration.initialize(this)
-        runCatching {
-            EmulatorStorage.prepareRuntime(this)
-            VitaCoreConfigRepository(this).ensureDefaultsPersisted()
-        }
-        if (AppPreferences(this).onboardingCompleted) {
-            // Native init (Vulkan enumeration, app-list scan, compat DB) blocks for
-            // seconds on low-end devices. Running it on the UI thread stalls
-            // Choreographer/HWUI (syncAndDrawFrame) and trips the Vitals ANR
-            // grouped under condition_variable::wait. Pre-warm off-thread;
-            // ensureLoaded() is synchronized/idempotent so IO-thread callers
-            // (launch/install) safely join the same init.
-            val app = this
-            Thread({
-                runCatching { NativeLibraryLoader.ensureLoaded(app) }
-            }, "EmuCoreV-Init").apply { isDaemon = true; start() }
+        // Disk-heavy work (icon toggle, play-time recovery, storage skeleton and orphan purge,
+        // defaults persistence) stays off the main thread. Consumers that depend on it (native
+        // init, the Emulator activity starting a play-time session) call AppStartup.awaitReady().
+        val app = this
+        val prewarmNative = AppPreferences(this).onboardingCompleted
+        AppStartup.begin {
+            runCatching { AppIconManager.applyProIcon(app, AppPreferences(app).proUnlocked) }
+            runCatching {
+                PlayTimeRepository(app).finishOpenSessions().forEach { session ->
+                    ProfilePlayTimeSyncer.recordAndSync(app, session.titleId, session.title, session.durationMs)
+                }
+            }
+            runCatching { ProfilePlayTimeSyncer.syncPendingAsync(app) }
+            runCatching {
+                EmulatorStorage.prepareRuntime(app)
+                VitaCoreConfigRepository(app).ensureDefaultsPersisted()
+            }
+            if (prewarmNative) {
+                // Native init (Vulkan enumeration, app-list scan, compat DB) blocks for
+                // seconds on low-end devices. Running it on the UI thread stalls
+                // Choreographer/HWUI (syncAndDrawFrame) and trips the Vitals ANR
+                // grouped under condition_variable::wait. Pre-warm off-thread;
+                // ensureLoaded() is synchronized/idempotent so IO-thread callers
+                // (launch/install) safely join the same init.
+                Thread({
+                    runCatching { NativeLibraryLoader.ensureLoaded(app) }
+                }, "EmuCoreV-Init").apply { isDaemon = true; start() }
+            }
         }
     }
 
@@ -84,8 +89,28 @@ class EmuCoreVApp : Application() {
         }
     }
 
-    private companion object {
+    internal companion object {
         const val PHOENIX_PROCESS_SUFFIX = ":phoenix"
         const val DISCORD_PROCESS_SUFFIX = ":discord"
+        const val NATIVE_SHELL_PROCESS_SUFFIX = ":native_shell"
+        const val NATIVE_LIBRARY_PROCESS_SUFFIX = ":native_library"
+        const val NATIVE_TROPHIES_PROCESS_SUFFIX = ":native_trophies"
+
+        /**
+         * Helper processes never build the emulator-side graph. ProcessPhoenix restarts the app
+         * through a process where Firebase providers are not initialized, and the Discord SDK
+         * runs in its own isolated process. The firmware UI processes have their own guest/SDL
+         * runtime, and the resident native shell only browses files: none of them may close the
+         * running game's play session, sync cloud data, start Discord, run backup or maintenance
+         * work, or load the emulation core.
+         */
+        fun skipsAppStartup(processName: String?): Boolean {
+            if (processName == null) return false
+            return processName.endsWith(PHOENIX_PROCESS_SUFFIX) ||
+                processName.endsWith(DISCORD_PROCESS_SUFFIX) ||
+                processName.endsWith(NATIVE_SHELL_PROCESS_SUFFIX) ||
+                processName.endsWith(NATIVE_LIBRARY_PROCESS_SUFFIX) ||
+                processName.endsWith(NATIVE_TROPHIES_PROCESS_SUFFIX)
+        }
     }
 }

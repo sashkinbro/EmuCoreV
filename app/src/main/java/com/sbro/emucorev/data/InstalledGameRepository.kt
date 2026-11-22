@@ -7,6 +7,8 @@ import java.io.File
 
 class InstalledGameRepository {
     fun loadInstalledGames(context: Context): List<InstalledVitaGame> {
+        // The selected storage is missing: its library is unknown, not empty or the fallback's.
+        if (EmulatorStorage.isStorageUnavailable(context)) return emptyList()
         val root = EmulatorStorage.ux0AppRoot(context)
         return root.listFiles().orEmpty()
             .filter(File::isDirectory)

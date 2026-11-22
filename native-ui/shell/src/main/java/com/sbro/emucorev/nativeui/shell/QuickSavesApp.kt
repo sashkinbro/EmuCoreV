@@ -119,7 +119,7 @@ class QuickSavesApp(private val source: ShellSaveSource) : ShellApp(TITLE_ID) {
         val name = if (slot.slot == 0) host.string(R.string.native_ui_saves_quick)
             else host.string(R.string.native_ui_saves_slot).format(slot.slot)
         text.line(c, name, 270f, 34f, 590f, text.paint(24f, bold = true))
-        text.line(c, "${date(slot.timestampMillis)}  ·  ${size(slot.sizeBytes)}", 270f, 66f, 590f, text.paint(20f))
+        text.line(c, "${date(slot.timestampMillis)}  ·  ${host.formatSize(slot.sizeBytes)}", 270f, 66f, 590f, text.paint(20f))
         return ShellRow(bitmap, TrophyCollectionApp.ROW_PLATE, TrophyCollectionApp.ROW_GLOW, 0f, 960f, 90f)
     }
 
@@ -132,10 +132,6 @@ class QuickSavesApp(private val source: ShellSaveSource) : ShellApp(TITLE_ID) {
     private fun date(millis: Long) =
         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(millis))
 
-    private fun size(bytes: Long) = when {
-        bytes >= 1L shl 20 -> "%.1f MB".format(bytes / 1048576.0)
-        else -> "%d KB".format(bytes / 1024)
-    }
 
     companion object {
         const val TITLE_ID = "ECVS00001"

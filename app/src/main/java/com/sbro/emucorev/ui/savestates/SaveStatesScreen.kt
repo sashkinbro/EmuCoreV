@@ -88,6 +88,7 @@ fun SaveStatesScreen(
     val loadedMessage = stringResource(R.string.emulation_savestate_loaded_toast)
     val failedMessage = stringResource(R.string.emulation_savestate_failed_toast)
     val launchFailedMessage = stringResource(R.string.game_launch_failed)
+    val storageUnavailableMessage = stringResource(R.string.storage_unavailable_message)
     val launchFirmwareMessage = stringResource(R.string.game_launch_requires_firmware)
     val launchFirmwareUpdateMessage = stringResource(R.string.game_launch_requires_firmware_update)
     val launchUnavailableMessage = stringResource(R.string.emulation_savestate_load_starts_game)
@@ -103,9 +104,10 @@ fun SaveStatesScreen(
     }
 
     fun launchResultMessage(result: VitaLaunchBridge.LaunchResult): String = when (result) {
-        VitaLaunchBridge.LaunchResult.Success -> launchUnavailableMessage
+        VitaLaunchBridge.LaunchResult.Success, VitaLaunchBridge.LaunchResult.Busy -> launchUnavailableMessage
         VitaLaunchBridge.LaunchResult.MissingFirmware -> launchFirmwareMessage
         VitaLaunchBridge.LaunchResult.MissingFirmwareUpdate -> launchFirmwareUpdateMessage
+        VitaLaunchBridge.LaunchResult.StorageUnavailable -> storageUnavailableMessage
         VitaLaunchBridge.LaunchResult.Failure -> launchFailedMessage
     }
 
@@ -117,7 +119,8 @@ fun SaveStatesScreen(
                         Toast.makeText(context, describe(result.result, loadedMessage), Toast.LENGTH_LONG).show()
                     }
                     is SaveStateLoadOutcome.Relaunched -> {
-                        if (result.result != VitaLaunchBridge.LaunchResult.Success) {
+                        if (result.result != VitaLaunchBridge.LaunchResult.Success &&
+                            result.result != VitaLaunchBridge.LaunchResult.Busy) {
                             Toast.makeText(context, launchResultMessage(result.result), Toast.LENGTH_LONG).show()
                         }
                     }
@@ -125,7 +128,8 @@ fun SaveStatesScreen(
             }
         } else {
             viewModel.launchWithState(game.titleId, slot.slot) { result ->
-                if (result != VitaLaunchBridge.LaunchResult.Success) {
+                if (result != VitaLaunchBridge.LaunchResult.Success &&
+                    result != VitaLaunchBridge.LaunchResult.Busy) {
                     Toast.makeText(context, launchResultMessage(result), Toast.LENGTH_LONG).show()
                 }
             }

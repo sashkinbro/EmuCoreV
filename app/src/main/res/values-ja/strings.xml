@@ -296,6 +296,16 @@
     <string name="settings_camera_source_solid">単色</string>
     <string name="settings_camera_source_image">静止画</string>
     <string name="settings_camera_source_real">リアルカメラ</string>
+    <string name="settings_camera_device">カメラデバイス</string>
+    <string name="settings_help_camera_device">エミュレートされた Vita カメラに映像を送る、この端末のカメラを選択します。自動は同じ向きのカメラを選びます。</string>
+    <string name="settings_camera_device_auto">自動</string>
+    <string name="settings_camera_device_front">フロントカメラ (%1$s)</string>
+    <string name="settings_camera_device_back">バックカメラ (%1$s)</string>
+    <string name="settings_camera_device_external">外部カメラ (%1$s)</string>
+    <string name="settings_camera_image_title">カメラ画像</string>
+    <string name="settings_camera_image_none">タップして画像を選択</string>
+    <string name="settings_camera_image_selected">画像を選択しました。タップして変更</string>
+    <string name="settings_camera_image_failed">この画像は使用できません</string>
     <string name="settings_show_welcome">ようこそ画面を表示</string>
     <string name="settings_help_show_welcome">閉じるまで、起動時に導入のようこそ画面を表示します。</string>
     <string name="settings_warn_missing_firmware">ファームウェアがない場合に警告</string>
@@ -809,14 +819,12 @@
     <string name="emulation_quickbar_screenshot">スクリーンショット</string>
     <string name="emulation_quickbar_open_menu">メニューを開く</string>
     <string name="emulation_menu_paused_badge">一時停止中</string>
-    <string name="emulation_menu_badge_live">ライブ</string>
-    <string name="emulation_menu_badge_restart">再起動が必要</string>
+    <string name="emulation_menu_resolution_failed">解像度を変更できませんでした。ゲームは現在の解像度のままです。</string>
     <string name="emulation_menu_section_now">即時</string>
     <string name="emulation_menu_section_now_desc">変更は実行中のゲームに即座に適用されます。</string>
     <string name="emulation_menu_section_touch">タッチコントロール</string>
     <string name="emulation_menu_section_touch_desc">画面上のゲームパッド。変更はすぐに適用されます。</string>
     <string name="emulation_menu_section_display">表示</string>
-    <string name="emulation_menu_section_display_desc">解像度とフレーム表示。次回起動時に反映されます。</string>
     <string name="emulation_menu_section_performance">パフォーマンス</string>
     <string name="emulation_menu_section_performance_desc">速度と精度のトレードオフ。次回起動時に反映されます。</string>
     <string name="emulation_menu_section_system">システム</string>
@@ -1428,6 +1436,10 @@
     <string name="emulation_savestate_loaded_toast">読み込みました</string>
     <string name="emulation_savestate_deleted_toast">削除しました</string>
     <string name="emulation_savestate_failed_toast">操作に失敗しました</string>
+    <string name="emulation_savestate_refused_no_game">ゲームが実行されていないため、状態を保存できません</string>
+    <string name="emulation_savestate_refused_exiting">ゲームを終了中です。しばらくしてからお試しください</string>
+    <string name="emulation_savestate_refused_loading">ゲームを読み込み中です。少し待ってからお試しください</string>
+    <string name="emulation_savestate_refused_busy">別の保存または読み込みを実行中です。しばらくお待ちください</string>
     <string name="emulation_savestate_session_mismatch_toast">このセーブデータは以前のゲームセッションのもので、まだ読み込めません</string>
     <string name="emulation_savestate_title_mismatch_toast">このセーブデータは別のゲームのものです</string>
     <string name="emulation_savestate_confirm_save_title">セーブデータを上書きしますか？</string>
@@ -1442,7 +1454,6 @@
     <string name="savestate_manager_title">セーブ</string>
     <string name="savestate_manager_subtitle">ゲーム内セーブとは別のエミュレータースナップショット</string>
     <string name="savestate_manager_refresh">更新</string>
-    <string name="savestate_manager_open_for_game">セーブ</string>
     <string name="savestate_manager_empty_title">セーブデータはまだありません</string>
     <string name="savestate_manager_empty_body">ゲーム内メニューまたはクイックセーブボタンから作成できます。</string>
     <string name="nav_save_states">クイックセーブ</string>
@@ -1597,6 +1608,7 @@
     <string name="rear_touch_game">このゲーム</string>
     <string name="rear_touch_inherit">共通プロファイルを使用</string>
     <string name="rear_touch_clear">割り当てを解除</string>
+    <string name="rear_touch_reset_confirm">すべての背面タッチポイントを初期設定に戻しますか?</string>
     <string name="rear_touch_hint">押している間は背面をタッチし、離すとタッチを解除します。割り当てた入力は通常の操作に代わります。前面タッチも引き続き使えます。</string>
     <string name="rear_touch_screen_position">画面ボタンの位置</string>
     <string name="settings_gpu_driver_status_missing_selection">選択したドライバーを利用できません: %1$s</string>
@@ -1795,4 +1807,8 @@
     <string name="native_ui_set_system_music">システムのミュージック</string>
     <string name="native_ui_set_delete">削除</string>
     <string name="native_ui_set_delete_theme_confirm">このテーマを削除します。</string>
+    <string name="storage_unavailable_message">選択したストレージを利用できません。SDカードを挿入するか、設定で別のストレージを選択してください。</string>
+    <string name="emulation_screenshot_saved">スクリーンショットを Pictures/EmuCoreV に保存しました</string>
+    <string name="emulation_screenshot_failed">スクリーンショットを保存できませんでした</string>
+    <string name="native_ui_new_folder">新規フォルダ</string>
 </resources>

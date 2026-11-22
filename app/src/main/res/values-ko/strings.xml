@@ -296,6 +296,16 @@
     <string name="settings_camera_source_solid">단색</string>
     <string name="settings_camera_source_image">정적 이미지</string>
     <string name="settings_camera_source_real">실제 카메라</string>
+    <string name="settings_camera_device">카메라 장치</string>
+    <string name="settings_help_camera_device">에뮬레이트된 Vita 카메라에 영상을 공급할 이 기기의 카메라를 선택합니다. 자동은 같은 방향을 향한 카메라를 선택합니다.</string>
+    <string name="settings_camera_device_auto">자동</string>
+    <string name="settings_camera_device_front">전면 카메라 (%1$s)</string>
+    <string name="settings_camera_device_back">후면 카메라 (%1$s)</string>
+    <string name="settings_camera_device_external">외부 카메라 (%1$s)</string>
+    <string name="settings_camera_image_title">카메라 이미지</string>
+    <string name="settings_camera_image_none">탭하여 이미지 선택</string>
+    <string name="settings_camera_image_selected">이미지를 선택했습니다. 탭하여 변경</string>
+    <string name="settings_camera_image_failed">이 이미지를 사용할 수 없습니다</string>
     <string name="settings_show_welcome">환영 화면 표시</string>
     <string name="settings_help_show_welcome">닫을 때까지 실행 시 소개 환영 화면을 표시합니다.</string>
     <string name="settings_warn_missing_firmware">펌웨어가 없으면 경고</string>
@@ -809,14 +819,12 @@
     <string name="emulation_quickbar_screenshot">스크린샷</string>
     <string name="emulation_quickbar_open_menu">메뉴 열기</string>
     <string name="emulation_menu_paused_badge">일시 정지됨</string>
-    <string name="emulation_menu_badge_live">실시간</string>
-    <string name="emulation_menu_badge_restart">재시작 필요</string>
+    <string name="emulation_menu_resolution_failed">해상도를 변경할 수 없습니다. 게임은 현재 해상도를 유지합니다.</string>
     <string name="emulation_menu_section_now">지금</string>
     <string name="emulation_menu_section_now_desc">변경 사항이 실행 중인 게임에 즉시 적용됩니다.</string>
     <string name="emulation_menu_section_touch">터치 컨트롤</string>
     <string name="emulation_menu_section_touch_desc">화면 게임패드입니다. 변경 사항이 즉시 적용됩니다.</string>
     <string name="emulation_menu_section_display">디스플레이</string>
-    <string name="emulation_menu_section_display_desc">해상도와 프레임 표시입니다. 다음 실행 시 적용됩니다.</string>
     <string name="emulation_menu_section_performance">성능</string>
     <string name="emulation_menu_section_performance_desc">속도와 정확성 사이의 절충입니다. 다음 실행 시 적용됩니다.</string>
     <string name="emulation_menu_section_system">시스템</string>
@@ -1428,6 +1436,10 @@
     <string name="emulation_savestate_loaded_toast">불러옴</string>
     <string name="emulation_savestate_deleted_toast">삭제됨</string>
     <string name="emulation_savestate_failed_toast">작업을 완료하지 못했습니다</string>
+    <string name="emulation_savestate_refused_no_game">실행 중인 게임이 없어 상태를 저장할 수 없습니다</string>
+    <string name="emulation_savestate_refused_exiting">게임이 종료되는 중입니다. 나중에 다시 시도하세요</string>
+    <string name="emulation_savestate_refused_loading">게임을 아직 불러오는 중입니다. 잠시 후 다시 시도하세요</string>
+    <string name="emulation_savestate_refused_busy">다른 저장 또는 불러오기가 진행 중입니다. 잠시만 기다려 주세요</string>
     <string name="emulation_savestate_session_mismatch_toast">이 저장 데이터는 이전 게임 세션에 속해 있어 아직 불러올 수 없습니다</string>
     <string name="emulation_savestate_title_mismatch_toast">이 저장 데이터는 다른 게임에 속해 있습니다</string>
     <string name="emulation_savestate_confirm_save_title">저장 데이터를 덮어쓸까요?</string>
@@ -1442,7 +1454,6 @@
     <string name="savestate_manager_title">저장</string>
     <string name="savestate_manager_subtitle">게임 내 저장과 별개인 에뮬레이터 스냅샷</string>
     <string name="savestate_manager_refresh">새로 고침</string>
-    <string name="savestate_manager_open_for_game">저장</string>
     <string name="savestate_manager_empty_title">저장 데이터가 없습니다</string>
     <string name="savestate_manager_empty_body">게임 내 메뉴나 빠른 저장 버튼으로 생성하세요.</string>
     <string name="nav_save_states">빠른 저장</string>
@@ -1596,6 +1607,7 @@
     <string name="rear_touch_game">이 게임</string>
     <string name="rear_touch_inherit">공통 프로필 사용</string>
     <string name="rear_touch_clear">할당 지우기</string>
+    <string name="rear_touch_reset_confirm">모든 후면 터치 지점을 기본값으로 초기화할까요?</string>
     <string name="rear_touch_hint">누르고 있는 동안 후면 패널을 터치하며 놓으면 터치가 해제됩니다. 할당한 입력은 기존 동작을 대체합니다. 전면 터치도 계속 사용할 수 있습니다.</string>
     <string name="rear_touch_screen_position">화면 버튼 위치</string>
     <string name="settings_gpu_driver_status_missing_selection">선택한 드라이버를 사용할 수 없습니다: %1$s</string>
@@ -1794,4 +1806,8 @@
     <string name="native_ui_set_system_music">시스템 음악</string>
     <string name="native_ui_set_delete">삭제</string>
     <string name="native_ui_set_delete_theme_confirm">이 테마를 삭제합니다.</string>
+    <string name="storage_unavailable_message">선택한 저장소를 사용할 수 없습니다. SD 카드를 삽입하거나 설정에서 다른 저장소를 선택하세요.</string>
+    <string name="emulation_screenshot_saved">스크린샷을 Pictures/EmuCoreV에 저장했습니다</string>
+    <string name="emulation_screenshot_failed">스크린샷을 저장할 수 없습니다</string>
+    <string name="native_ui_new_folder">새 폴더</string>
 </resources>

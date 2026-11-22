@@ -151,6 +151,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     stringResource(R.string.core_install_pkg_failed)
     val unsupportedPkg = stringResource(R.string.core_install_pkg_unsupported)
     val gameLaunchFailed = stringResource(R.string.game_launch_failed)
+    val storageUnavailableMessage = stringResource(R.string.storage_unavailable_message)
     val launchRequiresFirmwareMessage = stringResource(R.string.game_launch_requires_firmware)
     val launchRequiresFirmwareUpdateMessage = stringResource(R.string.game_launch_requires_firmware_update)
     var pendingPkgZrif by rememberSaveable { mutableStateOf("") }
@@ -281,9 +282,10 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             // Cache/config migration must finish before the core can read or recreate them.
             if (!coreMaintenanceReady.await()) return@launch
             when (VitaLaunchBridge.launchInstalledTitle(context, titleId)) {
-                VitaLaunchBridge.LaunchResult.Success -> Unit
+                VitaLaunchBridge.LaunchResult.Success, VitaLaunchBridge.LaunchResult.Busy -> Unit
                 VitaLaunchBridge.LaunchResult.MissingFirmware -> Toast.makeText(context, launchRequiresFirmwareMessage, Toast.LENGTH_SHORT).show()
                 VitaLaunchBridge.LaunchResult.MissingFirmwareUpdate -> Toast.makeText(context, launchRequiresFirmwareUpdateMessage, Toast.LENGTH_SHORT).show()
+                VitaLaunchBridge.LaunchResult.StorageUnavailable -> Toast.makeText(context, storageUnavailableMessage, Toast.LENGTH_LONG).show()
                 VitaLaunchBridge.LaunchResult.Failure -> Toast.makeText(context, gameLaunchFailed, Toast.LENGTH_SHORT).show()
             }
         }

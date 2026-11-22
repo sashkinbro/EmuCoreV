@@ -296,6 +296,16 @@
     <string name="settings_camera_source_solid">Jednolity kolor</string>
     <string name="settings_camera_source_image">Obraz statyczny</string>
     <string name="settings_camera_source_real">Prawdziwa kamera</string>
+    <string name="settings_camera_device">Urządzenie kamery</string>
+    <string name="settings_help_camera_device">Wybierz, która kamera tego urządzenia zasila emulowaną kamerę Vity. Automatycznie wybiera kamerę skierowaną w tę samą stronę.</string>
+    <string name="settings_camera_device_auto">Automatycznie</string>
+    <string name="settings_camera_device_front">Kamera przednia (%1$s)</string>
+    <string name="settings_camera_device_back">Kamera tylna (%1$s)</string>
+    <string name="settings_camera_device_external">Kamera zewnętrzna (%1$s)</string>
+    <string name="settings_camera_image_title">Obraz kamery</string>
+    <string name="settings_camera_image_none">Dotknij, aby wybrać obraz</string>
+    <string name="settings_camera_image_selected">Wybrano obraz. Dotknij, aby zmienić</string>
+    <string name="settings_camera_image_failed">Nie można użyć tego obrazu</string>
     <string name="settings_show_welcome">Pokaż ekran powitalny</string>
     <string name="settings_help_show_welcome">Pokazuj ekran powitalny przy uruchomieniu, dopóki go nie zamkniesz.</string>
     <string name="settings_warn_missing_firmware">Ostrzegaj o braku firmware</string>
@@ -809,14 +819,12 @@
     <string name="emulation_quickbar_screenshot">Zrzut ekranu</string>
     <string name="emulation_quickbar_open_menu">Otwórz menu</string>
     <string name="emulation_menu_paused_badge">Wstrzymano</string>
-    <string name="emulation_menu_badge_live">Na żywo</string>
-    <string name="emulation_menu_badge_restart">Wymagany restart</string>
+    <string name="emulation_menu_resolution_failed">Nie udało się zmienić rozdzielczości. Gra zostaje przy obecnej.</string>
     <string name="emulation_menu_section_now">Teraz</string>
     <string name="emulation_menu_section_now_desc">Zmiany są natychmiast stosowane do uruchomionej gry.</string>
     <string name="emulation_menu_section_touch">Sterowanie dotykowe</string>
     <string name="emulation_menu_section_touch_desc">Gamepad na ekranie. Zmiany są stosowane natychmiast.</string>
     <string name="emulation_menu_section_display">Wyświetlanie</string>
-    <string name="emulation_menu_section_display_desc">Rozdzielczość i prezentacja klatek. Zaczną obowiązywać przy następnym uruchomieniu.</string>
     <string name="emulation_menu_section_performance">Wydajność</string>
     <string name="emulation_menu_section_performance_desc">Kompromis między szybkością a dokładnością. Zaczną obowiązywać przy następnym uruchomieniu.</string>
     <string name="emulation_menu_section_system">System</string>
@@ -1431,6 +1439,10 @@
     <string name="emulation_savestate_loaded_toast">Wczytano</string>
     <string name="emulation_savestate_deleted_toast">Usunięto</string>
     <string name="emulation_savestate_failed_toast">Nie udało się wykonać operacji</string>
+    <string name="emulation_savestate_refused_no_game">Żadna gra nie jest uruchomiona, nie można zapisać stanu</string>
+    <string name="emulation_savestate_refused_exiting">Gra się zamyka, spróbuj ponownie później</string>
+    <string name="emulation_savestate_refused_loading">Gra jeszcze się wczytuje, spróbuj za chwilę</string>
+    <string name="emulation_savestate_refused_busy">Trwa inny zapis lub odczyt, poczekaj</string>
     <string name="emulation_savestate_session_mismatch_toast">Ten zapis pochodzi z poprzedniej sesji gry i nie można go jeszcze wczytać</string>
     <string name="emulation_savestate_title_mismatch_toast">Ten zapis pochodzi z innej gry</string>
     <string name="emulation_savestate_confirm_save_title">Nadpisać zapis?</string>
@@ -1445,7 +1457,6 @@
     <string name="savestate_manager_title">Zapisy</string>
     <string name="savestate_manager_subtitle">Migawki emulatora, oddzielne od zapisów w grze</string>
     <string name="savestate_manager_refresh">Odśwież</string>
-    <string name="savestate_manager_open_for_game">Zapisy</string>
     <string name="savestate_manager_empty_title">Brak zapisów</string>
     <string name="savestate_manager_empty_body">Utwórz go z menu w grze lub za pomocą przycisku szybkiego zapisu.</string>
     <string name="nav_save_states">Szybkie zapisy</string>
@@ -1599,6 +1610,7 @@
     <string name="rear_touch_game">Ta gra</string>
     <string name="rear_touch_inherit">Użyj profilu globalnego</string>
     <string name="rear_touch_clear">Usuń przypisanie</string>
+    <string name="rear_touch_reset_confirm">Przywrócić wszystkie punkty tylnego panelu dotykowego do ustawień domyślnych?</string>
     <string name="rear_touch_hint">Przytrzymaj, aby dotknąć tylnego panelu; puść, aby zakończyć dotyk. Przypisane wejścia zastępują zwykłą akcję. Przedni dotyk pozostaje dostępny.</string>
     <string name="rear_touch_screen_position">Pozycja przycisku ekranowego</string>
     <string name="settings_gpu_driver_status_missing_selection">Wybrany sterownik jest niedostępny: %1$s</string>
@@ -1809,4 +1821,8 @@
     <string name="native_ui_set_system_music">Muzyka w systemie</string>
     <string name="native_ui_set_delete">Usuń</string>
     <string name="native_ui_set_delete_theme_confirm">Ten motyw zostanie usunięty.</string>
+    <string name="storage_unavailable_message">Wybrana pamięć jest niedostępna. Włóż kartę SD lub wybierz inną pamięć w Ustawieniach.</string>
+    <string name="emulation_screenshot_saved">Zrzut ekranu zapisano w Pictures/EmuCoreV</string>
+    <string name="emulation_screenshot_failed">Nie udało się zapisać zrzutu ekranu</string>
+    <string name="native_ui_new_folder">Nowy folder</string>
 </resources>
