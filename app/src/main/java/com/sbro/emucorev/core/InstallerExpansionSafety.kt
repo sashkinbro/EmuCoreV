@@ -312,6 +312,8 @@ internal class InstallerExpansionSession private constructor(
     }
 
     companion object {
+        private const val SESSION_PREFIX = "installer-expansion-"
+
         fun create(cacheRoot: File): InstallerExpansionSession {
             if (!cacheRoot.exists() && !cacheRoot.mkdirs()) {
                 throw InstallerExpansionException(InstallerExpansionFailure.STAGING_IO, "Could not create staging root")
@@ -319,7 +321,11 @@ internal class InstallerExpansionSession private constructor(
             if (!cacheRoot.isDirectory || Files.isSymbolicLink(cacheRoot.toPath())) {
                 throw InstallerExpansionException(InstallerExpansionFailure.STAGING_IO, "Staging root is not a safe directory")
             }
-            val root = File(cacheRoot, "installer-expansion-${UUID.randomUUID()}")
+            // Installs run one at a time; a session left behind is from a killed or crashed
+            // process and can hold a whole expanded game (GBs), so sweep it first.
+            cacheRoot.listFiles { file -> file.isDirectory && file.name.startsWith(SESSION_PREFIX) }
+                ?.forEach { stale -> runCatching { stale.deleteRecursively() } }
+            val root = File(cacheRoot, "$SESSION_PREFIX${UUID.randomUUID()}")
             if (!root.mkdir()) {
                 throw InstallerExpansionException(InstallerExpansionFailure.STAGING_IO, "Could not create isolated staging session")
             }

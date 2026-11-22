@@ -162,4 +162,17 @@ class InstallerExpansionSafetyTest {
         assertEquals(listOf("keep.bin"), cache.list()?.toList())
         cache.deleteRecursively()
     }
+    @Test fun creatingASessionSweepsSessionsLeftByACrashedInstall() {
+        val cache = Files.createTempDirectory("expansion-sweep-").toFile()
+        val stale = File(cache, "installer-expansion-crashed").apply { mkdirs() }
+        File(stale, "game.bin").writeBytes(ByteArray(16))
+        val keep = File(cache, "keep.bin").apply { writeBytes(ByteArray(1)) }
+        InstallerExpansionSession.create(cache).use { session ->
+            assertFalse(stale.exists())
+            assertTrue(keep.isFile)
+            assertTrue(session.root.isDirectory)
+        }
+        cache.deleteRecursively()
+    }
+
 }
