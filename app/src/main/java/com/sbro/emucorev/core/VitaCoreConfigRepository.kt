@@ -566,7 +566,8 @@ class VitaCoreConfigRepository(private val context: Context) {
         val normalizedLogLevel = when {
             !BuildConfig.DEBUG -> RELEASE_LOG_LEVEL
             diagnosticsEnabled -> normalizeLogLevel(config.logLevel).coerceAtMost(DIAGNOSTIC_LOG_LEVEL)
-            else -> maxOf(normalizeLogLevel(config.logLevel), DEFAULT_DEBUG_LOG_LEVEL)
+            // Debug builds always log at least warnings (unimplemented calls, GPU errors).
+            else -> normalizeLogLevel(config.logLevel).coerceAtMost(DEFAULT_DEBUG_LOG_LEVEL)
         }
         return config.copy(
             validationLayer = BuildConfig.DEBUG && config.validationLayer,
@@ -652,7 +653,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         // CRITICAL so logcat/file flushing does not make debug builds untestable;
         // the Settings diagnostics toggles opt into DEBUG when needed.
         private const val DIAGNOSTIC_LOG_LEVEL = 1
-        private const val DEFAULT_DEBUG_LOG_LEVEL = 5
+        private const val DEFAULT_DEBUG_LOG_LEVEL = 3
         private const val RELEASE_LOG_LEVEL = 6
         // Bump whenever an old non-upstream default needs to be snapped to vanilla
         // for users who already wrote a stale config.yml. applyMigrations() rewrites
