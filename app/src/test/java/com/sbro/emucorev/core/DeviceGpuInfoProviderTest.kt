@@ -1,5 +1,6 @@
 package com.sbro.emucorev.core
 
+import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -117,6 +118,107 @@ class DeviceGpuInfoProviderTest {
             assertNull(result.model)
             assertEquals("SwiftShader", result.renderer)
             assertEquals(GpuInfoSource.UNKNOWN, result.source)
+        } finally { scope.cancel() }
+    }
+
+    private class FakePersistence(var stored: DeviceGpuSnapshot? = null) : DeviceGpuPersistence {
+        var saves = 0
+        override fun load() = stored
+        override fun save(snapshot: DeviceGpuSnapshot) { saves++; stored = snapshot }
+    }
+
+    @Test fun persistedMeasurementSeedsColdGetAsGlRendererAndSx2IsSelectable() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val persisted = DeviceGpuInfoResolver.resolve("Mali-G715-Immortalis MC11", null)
+            var queried = 0
+            val loader = DeviceGpuInfoLoader({ "Unknown SoC" }, { "Unknown SoC" }, { queried++; null }, scope,
+                FakePersistence(persisted))
+            val device = loader.get()
+            assertEquals(GpuInfoSource.GL_RENDERER, device.source)
+            assertTrue(loader.hasMeasuredSnapshot())
+            assertEquals(0, queried)
+            val sx2 = InstalledGpuDriver("sx2", "libvulkan_malisx2.so", "/unused", false, GpuDriverVendor.MALI,
+                GpuDriverFamily.MALI_SX2, listOf("G715"), GpuDriverFileState.VALID)
+            assertEquals("sx2", resolveGpuDriverForLaunch("sx2", "Vulkan", device, listOf(sx2)))
+        } finally { scope.cancel() }
+    }
+
+    @Test fun missingPersistenceKeepsSocFallbackAndSx2StaysSystem() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val loader = DeviceGpuInfoLoader({ "Allwinner A523" }, { "x" }, { null }, scope, FakePersistence(null))
+            assertEquals(GpuInfoSource.SOC_CATALOG, loader.get().source)
+            assertFalse(loader.hasMeasuredSnapshot())
+        } finally { scope.cancel() }
+    }
+
+    @Test fun successfulProbeIsPersistedButFallbackAndSoftwareAreNot() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val store = FakePersistence()
+            DeviceGpuInfoLoader({ "Unknown SoC" }, { "Unknown SoC" }, { "Mali-G720-Immortalis MC12" }, scope, store)
+                .ensureLoaded()
+            assertEquals(1, store.saves)
+            assertEquals("Immortalis-G720 MC12", store.stored?.model?.displayName)
+            val none = FakePersistence()
+            DeviceGpuInfoLoader({ "Allwinner A523" }, { "x" }, { null }, scope, none).ensureLoaded()
+            DeviceGpuInfoLoader({ "Unknown SoC" }, { "Unknown SoC" }, { "SwiftShader" }, scope, none).ensureLoaded()
+            assertEquals(0, none.saves)
+        } finally { scope.cancel() }
+    }
+
+    @Test fun snapshotFileInvalidatesWhenBuildKeyChanges() {
+        val dir = java.nio.file.Files.createTempDirectory("gpu-snap").toFile()
+        try {
+            var key: String? = "fp-1|vk=1"
+            val file = File(dir, "gpu_probe.txt")
+            val store = DeviceGpuSnapshotFile({ file }, { key })
+            assertNull(store.load())
+            store.save(DeviceGpuInfoResolver.resolve("Mali-G715 MC7", null))
+            val loaded = store.load()
+            assertEquals(GpuInfoSource.GL_RENDERER, loaded?.source)
+            assertEquals("Mali-G715 MC7", loaded?.model?.displayName)
+            assertEquals(GpuVendor.MALI, loaded?.model?.vendor)
+            key = "fp-2|vk=1"
+            assertNull(store.load())
+            key = null
+            assertNull(store.load())
+            key = "fp-1|vk=1"
+            store.save(DeviceGpuSnapshot(null, null, GpuInfoSource.SOC_CATALOG))
+            assertEquals("Mali-G715 MC7", store.load()?.model?.displayName)
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test fun failedProbeIsNotCachedForeverAndRetriesAfterBackoff() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            var now = 0L
+            val queries = AtomicInteger()
+            val loader = DeviceGpuInfoLoader({ "Allwinner A523" }, { "Allwinner A523" }, {
+                if (queries.incrementAndGet() == 1) null else "Mali-G715 MC7"
+            }, scope, null, retryBackoffMillis = 1_000, clockMillis = { now })
+            assertEquals(GpuInfoSource.SOC_CATALOG, loader.ensureLoaded().source)
+            now = 500
+            assertEquals(GpuInfoSource.SOC_CATALOG, loader.ensureLoaded().source)
+            assertEquals(1, queries.get())
+            now = 1_500
+            assertEquals(GpuInfoSource.GL_RENDERER, loader.ensureLoaded().source)
+            assertEquals(2, queries.get())
+            now = 10_000
+            loader.ensureLoaded()
+            assertEquals(2, queries.get())
+        } finally { scope.cancel() }
+    }
+
+    @Test fun failedReprobeNeverDowngradesPersistedMeasurement() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val persisted = DeviceGpuInfoResolver.resolve("Mali-G715 MC7", null)
+            val loader = DeviceGpuInfoLoader({ "Allwinner A523" }, { "x" }, { null }, scope, FakePersistence(persisted))
+            loader.get()
+            assertEquals(GpuInfoSource.GL_RENDERER, loader.ensureLoaded().source)
+            assertEquals(GpuInfoSource.GL_RENDERER, loader.get().source)
         } finally { scope.cancel() }
     }
 }

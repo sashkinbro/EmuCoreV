@@ -20,8 +20,35 @@ class LaunchAndTouchRegressionContractTest {
         assertTrue(launch.contains("launchInFlight.compareAndSet(false, true)"))
         assertTrue(launch.contains("catch (cancelled: CancellationException)"))
         assertTrue(launch.substringAfter("finally {").contains("launchInFlight.set(false)"))
-        val launchOnly = launch.substringAfter("private suspend fun launchWithArgs").substringBefore("private fun runWithArgs")
+        val launchOnly = launch.substringAfter("private suspend fun launchInstalledTitle").substringBefore("fun installFirmware")
         assertFalse(launchOnly.contains("refreshAppsList()"))
+    }
+
+    @Test fun launchPreparationRunsInTheEmulatorProcessNotTheCaller() {
+        val bridge = kotlin("core/VitaLaunchBridge.kt")
+        val callerSide = bridge.substringAfter("private suspend fun launchInstalledTitle").substringBefore("fun installFirmware")
+        for (preparation in listOf("ensureCoreUpdated", "migrateLegacySaveData", "syncEffectiveDriverForLaunch",
+            "applyAngleEnvironment", "AngleEnvironment", "NativeLibraryLoader", "SaveStateAutomationPreferences", "validQuickStatePath")) {
+            assertFalse("$preparation must not run in the caller process", callerSide.contains(preparation))
+        }
+        val emulator = kotlin("core/vita/Emulator.kt")
+        val prepare = emulator.substringAfter("private fun prepareLaunch()").substringBefore("private fun abortLaunch")
+        assertTrue(prepare.contains("GameLaunchPreparation.prepare(this, gameId)"))
+        assertTrue(prepare.contains("validStatePath(gameId, explicitState)"))
+        assertTrue(prepare.contains("sweepOrphans()"))
+        assertTrue(prepare.contains("gate.release()"))
+        val preparation = kotlin("core/GameLaunchPreparation.kt")
+        for (step in listOf("ensureCoreUpdated()", "migrateLegacySaveData(context)", "syncEffectiveDriverForLaunch(titleId)",
+            "AngleEnvironment.apply(context, useAngle)")) {
+            assertTrue(step, preparation.contains(step))
+        }
+        // Auto-load is decided from the Emulator process's own preferences.
+        assertTrue(emulator.substringAfter("override fun getArguments()").contains("SaveStateAutomationPreferences(this, gameId)"))
+        // Exit retires the retained task before the process is killed, and no longer blocks on the network.
+        val exit = emulator.substringAfter("The firmware library has its own process").substringBefore("killProcess")
+        assertTrue(exit.contains("finishAndRemoveTask()"))
+        assertFalse(emulator.substringAfter("override fun quitAfterShutdown()").substringBefore("override fun onDestroy()")
+            .contains("runBlocking { TrophyCloudRepository"))
     }
 
     @Test fun missingNativeAppStillRefreshesTheListOnDemand() {

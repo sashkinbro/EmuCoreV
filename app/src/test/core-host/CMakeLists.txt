@@ -21,16 +21,40 @@ target_link_libraries(gtest_host PUBLIC Threads::Threads)
 add_executable(core_host_tests
     object_store_tests.cpp
     video_snapshot_tests.cpp
+    avc_picture_tests.cpp
     guest_atomics_tests.cpp
     clib_chk_tests.cpp
     rwlock_policy_tests.cpp
     async_io_tests.cpp
-    stub_dialog_tests.cpp)
+    stub_dialog_tests.cpp
+    shader_variant_key_tests.cpp
+    compile_gate_tests.cpp
+    transfer_fill_tests.cpp
+    rtc_text_tests.cpp
+    ngs_dsp_tests.cpp
+    ngs_effects_tests.cpp
+    hle_stub_batch3_tests.cpp
+    hle_stub_batch4_tests.cpp
+    rear_touch_tests.cpp
+    save_data_write_tests.cpp)
 target_include_directories(core_host_tests PRIVATE
     "${CORE_ROOT}/kernel/include"
+    "${CORE_ROOT}/ngs/include"
     "${CORE_ROOT}/io/include"
     "${CORE_ROOT}/dialog/include"
+    "${CORE_ROOT}/renderer/include"
+    "${CORE_ROOT}/shader/include"
+    "${CORE_ROOT}/gxm/include"
+    "${CORE_ROOT}/util/include"
+    "${CORE_ROOT}/mem/include"
+    "${CORE_ROOT}/rtc/include"
+    "${CORE_ROOT}/audio/include"
+    "${CORE_ROOT}/touch/include"
+    "${CORE_ROOT}/modules/SceAppUtil"
+    "${CORE_ROOT}/modules/SceKernelModulemgr"
+    "${CORE_ROOT}/modules/ScePower"
     "${CORE_ROOT}/modules/SceVideodec"
+    "${CORE_ROOT}/codec/include"
     "${CORE_ROOT}/modules/SceLibKernel")
 target_link_libraries(core_host_tests PRIVATE gtest_host)
 target_compile_options(core_host_tests PRIVATE -Wall -Wextra)

@@ -241,4 +241,19 @@ class GpuDriverEvidenceIntegrationTest {
         assertEquals(GpuDriverSelectionDecision.NATIVE_UNSUPPORTED, result.decision)
         assertEquals(GpuDriverNativeCapability.UNSUPPORTED, result.nativeCapability)
     }
+
+    @Test fun realSx2PackageLayoutInstallsBindsAndKeepsMetaJson() = store { store, _ ->
+        val meta = """{"libraryName":"libvulkan_malisx2.so","minApi":29,"schemaVersion":1}"""
+        val name = store.installFromArchive(ByteArrayInputStream(zip(
+            "libvulkan_malisx2.so" to elf("mali_kbase"), "meta.json" to meta.toByteArray())),
+            "SX2 real.zip", catalogDriver = driver("mali-sx2-real", GpuDriverFamily.MALI_SX2, models = listOf("G715")))
+        val installed = store.listInstalledDrivers().single()
+        assertEquals(GpuDriverVendor.MALI, installed.vendor)
+        assertEquals(GpuDriverFamily.MALI_SX2, installed.family)
+        assertEquals(GpuDriverFileState.VALID, installed.fileState)
+        assertTrue(installed.isUsable)
+        assertEquals(installed.mainLibraryPath, store.readMainLibraryPath(name))
+        assertTrue(installed.mainLibraryPath.endsWith("libvulkan_malisx2.so"))
+        assertEquals(meta, File(File(installed.mainLibraryPath).parentFile, "meta.json").readText())
+    }
 }

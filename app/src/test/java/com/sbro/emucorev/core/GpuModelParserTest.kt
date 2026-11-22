@@ -55,6 +55,24 @@ class GpuModelParserTest {
     }
 
     @Test
+    fun `parses real Immortalis strings to catalog model tokens`() {
+        assertEquals("Immortalis-G715 MC11", GpuModelParser.parse("Mali-G715-Immortalis MC11")?.displayName)
+        assertEquals("Immortalis-G720 MC12", GpuModelParser.parse("Mali-G720-Immortalis MC12")?.displayName)
+        assertEquals(GpuVendor.MALI, GpuModelParser.parse("Mali-G720-Immortalis MC12")?.vendor)
+        val catalog = GpuDriverPackageEvidence("sx2", GpuVendor.MALI, GpuDriverFamily.MALI_SX2,
+            setOf("G715", "G720"), GpuDriverFileState.VALID)
+        for (renderer in listOf("Mali-G715-Immortalis MC11", "Mali-G720-Immortalis MC12")) {
+            val device = DeviceGpuInfoResolver.resolve(renderer, null)
+            assertEquals(GpuInfoSource.GL_RENDERER, device.source)
+            assertEquals(GpuDriverCompatibilityState.COMPATIBLE,
+                GpuDriverSelectionPolicy.compatibility(device, catalog).state)
+        }
+        val g78 = DeviceGpuInfoResolver.resolve("Mali-G78 MP14", null)
+        assertEquals(GpuDriverCompatibilityState.INCOMPATIBLE,
+            GpuDriverSelectionPolicy.compatibility(g78, catalog).state)
+    }
+
+    @Test
     fun `parses Xclipse and PowerVR renderer strings`() {
         assertEquals("Xclipse 920", GpuModelParser.parse("Xclipse 920")?.displayName)
         assertEquals(GpuVendor.XCLIPSE, GpuModelParser.parse("Xclipse 940")?.vendor)

@@ -122,7 +122,7 @@ class SaveStateContractTest {
             "emulation_quickbar_quick_save",
             "emulation_quickbar_quick_load",
             "savestate_manager_title",
-            "savestate_manager_open_for_game"
+            "nav_save_states"
         )
         val localizedDirectories = Files.list(resourceRoot).use { paths ->
             paths.filter {

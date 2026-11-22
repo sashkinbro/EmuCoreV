@@ -147,9 +147,38 @@ TEST(GuestRearTouch, unplugging_one_controller_preserves_other_live_contacts_and
     ASSERT_EQ(env.touch.touchpad_finger_count,1);
     EXPECT_EQ(env.touch.touchpad_devices[0],200u);
     EXPECT_EQ(env.touch.finger_count,1);
-    EXPECT_TRUE(env.touch.rear_contact_down[0]);
+    EXPECT_TRUE(env.touch.rear.down[0]);
     EXPECT_EQ(env.touch.touch_buffers[env.touch.touch_buffer_idx][0].reportNum,2u);
     EXPECT_EQ(env.touch.touch_buffers[env.touch.touch_buffer_idx][1].reportNum,1u);
+}
+
+TEST(GuestRearTouch, quick_tap_between_vsyncs_is_reported_once) {
+    EmuEnvState env;
+    peripheral_touch_fixture(env);
+    set_rear_touch_contact(env.touch, 0, true, .5f, .5f);
+    set_rear_touch_contact(env.touch, 0, false, 0, 0);
+    touch_vsync_update(env);
+    ASSERT_EQ(env.touch.touch_buffers[env.touch.touch_buffer_idx][1].reportNum, 1u);
+    touch_vsync_update(env);
+    EXPECT_EQ(env.touch.touch_buffers[env.touch.touch_buffer_idx][1].reportNum, 0u);
+}
+
+TEST(GuestRearTouch, mode_switch_keeps_rear_contacts_and_ids_are_unique_per_press) {
+    EmuEnvState env;
+    peripheral_touch_fixture(env);
+    set_rear_touch_contact(env.touch, 0, true, .5f, .5f);
+    const auto first = env.touch.rear.report[0].id;
+    auto finger = peripheral_finger(1, .5f, .5f);
+    handle_touch_event(env.touch, finger);
+    EXPECT_NE(env.touch.finger_buffer[0].touchID, first);
+    set_touch_mode(env.touch, 1);
+    EXPECT_EQ(env.touch.finger_count, 0);
+    EXPECT_TRUE(env.touch.rear.down[0]);
+    EXPECT_EQ(env.touch.rear.report[0].id, first);
+    set_rear_touch_contact(env.touch, 0, false, 0, 0);
+    touch_vsync_update(env);
+    set_rear_touch_contact(env.touch, 0, true, .5f, .5f);
+    EXPECT_NE(env.touch.rear.report[0].id, first);
 }
 
 TEST(GuestCameraBuffers, flexible_android_chroma_is_repacked_in_uv_order) {

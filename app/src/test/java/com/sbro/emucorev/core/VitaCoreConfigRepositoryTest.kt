@@ -24,6 +24,8 @@ class VitaCoreConfigRepositoryTest {
     @Before
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
+        // Application.onCreate persists defaults on a worker thread; let it finish first.
+        AppStartup.awaitReady()
         configFile = File(EmulatorStorage.runtimeRoot(context), "config.yml")
         configFile.delete()
         context.getSharedPreferences("emucorev_ui_config", Context.MODE_PRIVATE).edit().clear().commit()
