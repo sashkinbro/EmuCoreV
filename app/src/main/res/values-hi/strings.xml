@@ -1685,7 +1685,6 @@
     <string name="stats_reset">आँकड़े रीसेट करें</string>
     <string name="stats_version">ऐप और कोर संस्करण</string>
     <string name="stats_fps">FPS</string>
-    <string name="stats_frame_time">फ़्रेम समय</string>
     <string name="stats_cpu">CPU</string>
     <string name="stats_cpu_model">CPU मॉडल</string>
     <string name="stats_gpu_model">GPU</string>
@@ -1693,7 +1692,6 @@
     <string name="stats_memory">RAM</string>
     <string name="stats_temperature">बैटरी तापमान</string>
     <string name="stats_thermal">तापीय स्थिति</string>
-    <string name="stats_resolution">रिज़ॉल्यूशन</string>
     <string name="stats_unavailable">—</string>
     <string name="stats_paused">रुका हुआ</string>
     <string name="stats_thermal_none">सामान्य</string>

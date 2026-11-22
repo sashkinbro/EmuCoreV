@@ -1687,7 +1687,6 @@
     <string name="stats_reset">Сбросить статистику</string>
     <string name="stats_version">Версия приложения и ядра</string>
     <string name="stats_fps">FPS</string>
-    <string name="stats_frame_time">Время кадра</string>
     <string name="stats_cpu">CPU</string>
     <string name="stats_cpu_model">Модель CPU</string>
     <string name="stats_gpu_model">GPU</string>
@@ -1695,7 +1694,6 @@
     <string name="stats_memory">RAM</string>
     <string name="stats_temperature">Температура батареи</string>
     <string name="stats_thermal">Тепловое состояние</string>
-    <string name="stats_resolution">Разрешение</string>
     <string name="stats_unavailable">—</string>
     <string name="stats_paused">Приостановлено</string>
     <string name="stats_thermal_none">Нормальное</string>

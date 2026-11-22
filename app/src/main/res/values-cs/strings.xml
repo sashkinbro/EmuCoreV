@@ -1688,7 +1688,6 @@
     <string name="stats_reset">Obnovit statistiky</string>
     <string name="stats_version">Verze aplikace a jádra</string>
     <string name="stats_fps">FPS</string>
-    <string name="stats_frame_time">Doba snímku</string>
     <string name="stats_cpu">CPU</string>
     <string name="stats_cpu_model">Model CPU</string>
     <string name="stats_gpu_model">GPU</string>
@@ -1696,7 +1695,6 @@
     <string name="stats_memory">RAM</string>
     <string name="stats_temperature">Teplota baterie</string>
     <string name="stats_thermal">Tepelný stav</string>
-    <string name="stats_resolution">Rozlišení</string>
     <string name="stats_unavailable">—</string>
     <string name="stats_paused">Pozastaveno</string>
     <string name="stats_thermal_none">Normální</string>

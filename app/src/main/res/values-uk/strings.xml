@@ -1687,7 +1687,6 @@
     <string name="stats_reset">Скинути статистику</string>
     <string name="stats_version">Версія застосунку та ядра</string>
     <string name="stats_fps">FPS</string>
-    <string name="stats_frame_time">Час кадру</string>
     <string name="stats_cpu">CPU</string>
     <string name="stats_cpu_model">Модель CPU</string>
     <string name="stats_gpu_model">GPU</string>
@@ -1695,7 +1694,6 @@
     <string name="stats_memory">RAM</string>
     <string name="stats_temperature">Температура батареї</string>
     <string name="stats_thermal">Тепловий стан</string>
-    <string name="stats_resolution">Розд.</string>
     <string name="stats_unavailable">—</string>
     <string name="stats_paused">Призупинено</string>
     <string name="stats_thermal_none">Нормальний</string>

@@ -1686,7 +1686,6 @@
     <string name="stats_reset">Réinitialiser les statistiques</string>
     <string name="stats_version">Version application et cœur</string>
     <string name="stats_fps">FPS</string>
-    <string name="stats_frame_time">Durée d’image</string>
     <string name="stats_cpu">CPU</string>
     <string name="stats_cpu_model">Modèle du CPU</string>
     <string name="stats_gpu_model">GPU</string>
@@ -1694,7 +1693,6 @@
     <string name="stats_memory">RAM</string>
     <string name="stats_temperature">Température batterie</string>
     <string name="stats_thermal">État thermique</string>
-    <string name="stats_resolution">Résolution</string>
     <string name="stats_unavailable">—</string>
     <string name="stats_paused">En pause</string>
     <string name="stats_thermal_none">Normal</string>

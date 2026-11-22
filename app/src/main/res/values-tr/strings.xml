@@ -1685,7 +1685,6 @@
     <string name="stats_reset">İstatistikleri sıfırla</string>
     <string name="stats_version">Uygulama ve çekirdek sürümü</string>
     <string name="stats_fps">FPS</string>
-    <string name="stats_frame_time">Kare süresi</string>
     <string name="stats_cpu">CPU</string>
     <string name="stats_cpu_model">CPU modeli</string>
     <string name="stats_gpu_model">GPU</string>
@@ -1693,7 +1692,6 @@
     <string name="stats_memory">RAM</string>
     <string name="stats_temperature">Pil sıcaklığı</string>
     <string name="stats_thermal">Termal durum</string>
-    <string name="stats_resolution">Çözünürlük</string>
     <string name="stats_unavailable">—</string>
     <string name="stats_paused">Duraklatıldı</string>
     <string name="stats_thermal_none">Normal</string>

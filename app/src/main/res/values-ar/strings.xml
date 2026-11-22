@@ -1689,7 +1689,6 @@
     <string name="stats_reset">إعادة ضبط الإحصاءات</string>
     <string name="stats_version">إصدار التطبيق والنواة</string>
     <string name="stats_fps">FPS</string>
-    <string name="stats_frame_time">زمن الإطار</string>
     <string name="stats_cpu">CPU</string>
     <string name="stats_cpu_model">طراز CPU</string>
     <string name="stats_gpu_model">GPU</string>
@@ -1697,7 +1696,6 @@
     <string name="stats_memory">RAM</string>
     <string name="stats_temperature">درجة حرارة البطارية</string>
     <string name="stats_thermal">الحالة الحرارية</string>
-    <string name="stats_resolution">الدقة</string>
     <string name="stats_unavailable">—</string>
     <string name="stats_paused">متوقف مؤقتًا</string>
     <string name="stats_thermal_none">طبيعية</string>

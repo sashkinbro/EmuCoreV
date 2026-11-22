@@ -1683,7 +1683,6 @@
     <string name="stats_reset">重置统计</string>
     <string name="stats_version">应用与核心版本</string>
     <string name="stats_fps">FPS</string>
-    <string name="stats_frame_time">帧时间</string>
     <string name="stats_cpu">CPU</string>
     <string name="stats_cpu_model">CPU 型号</string>
     <string name="stats_gpu_model">GPU</string>
@@ -1691,7 +1690,6 @@
     <string name="stats_memory">RAM</string>
     <string name="stats_temperature">电池温度</string>
     <string name="stats_thermal">温控状态</string>
-    <string name="stats_resolution">分辨率</string>
     <string name="stats_unavailable">—</string>
     <string name="stats_paused">已暂停</string>
     <string name="stats_thermal_none">正常</string>

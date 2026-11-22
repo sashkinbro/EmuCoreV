@@ -1685,7 +1685,6 @@
     <string name="stats_reset">統計をリセット</string>
     <string name="stats_version">アプリとコアのバージョン</string>
     <string name="stats_fps">FPS</string>
-    <string name="stats_frame_time">フレーム時間</string>
     <string name="stats_cpu">CPU</string>
     <string name="stats_cpu_model">CPUモデル</string>
     <string name="stats_gpu_model">GPU</string>
@@ -1693,7 +1692,6 @@
     <string name="stats_memory">RAM</string>
     <string name="stats_temperature">バッテリー温度</string>
     <string name="stats_thermal">温度状態</string>
-    <string name="stats_resolution">解像度</string>
     <string name="stats_unavailable">—</string>
     <string name="stats_paused">一時停止</string>
     <string name="stats_thermal_none">正常</string>
