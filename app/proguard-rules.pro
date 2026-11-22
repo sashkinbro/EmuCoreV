@@ -24,6 +24,18 @@
 # cheat manager ViewModel is created reflectively by the ViewModel factory.
 -keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.core.CheatBridge { *; }
 -keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.ui.cheats.CheatManagerViewModel { *; }
+# The archive expander calls these callback methods from native code by name
+# (GetMethodID "isCancelled" / "onProgress"). includedescriptorclasses above keeps
+# only the parameter class names, so keep the methods on the interfaces and on every
+# implementation (Kotlin fun-interface lambdas compile to synthetic classes).
+-keep,allowoptimization interface com.sbro.emucorev.core.NativeArchiveCancellation { *; }
+-keep,allowoptimization interface com.sbro.emucorev.core.NativeArchiveProgressListener { *; }
+-keepclassmembers,allowoptimization class * implements com.sbro.emucorev.core.NativeArchiveCancellation {
+    boolean isCancelled();
+}
+-keepclassmembers,allowoptimization class * implements com.sbro.emucorev.core.NativeArchiveProgressListener {
+    void onProgress(java.lang.String, long, long);
+}
 # Save-state JNI bridge resolves its entry points by symbol name.
 -keep,allowoptimization,includedescriptorclasses class com.sbro.emucorev.core.SaveStateBridge { *; }
 # These explicitly retained JNI classes intentionally use no @Keep annotation:
