@@ -15,6 +15,8 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include "../SceVideodec/state_snapshot.h"
+
 #include <module/module.h>
 
 #include <codec/state.h>
@@ -213,9 +215,15 @@ EXPORT(int, sceJpegDecodeMJpeg, const unsigned char *pJpeg, SceSize isize, uint8
     int decodeMode, void *pTempBuffer, SceSize tempBufferSize, void *pCoefBuffer, SceSize coefBufferSize) {
     TRACY_FUNC(sceJpegDecodeMJpeg, pJpeg, isize, pRGBA, osize, decodeMode, pTempBuffer, tempBufferSize, pCoefBuffer, coefBufferSize);
 
-    const auto state = emuenv.kernel.obj_store.get<MJpegState>();
+    // Absent when sceJpegInitMJpeg was not called in this process (e.g. cold restore of an older
+    // save state) or after sceJpegFinishMJpeg.
+    const auto state = emuenv.kernel.obj_store.get_shared<MJpegState>();
+    if (!state)
+        return RET_ERROR(SCE_JPEG_ERROR_INVALID_STATE);
     std::lock_guard<std::mutex> guard(state->decoderMutex);
-    configure_decoder(state, decodeMode);
+    if (!state->decoder)
+        return RET_ERROR(SCE_JPEG_ERROR_INVALID_STATE);
+    configure_decoder(state.get(), decodeMode);
 
     // the yuv data will always be smaller than the rgba data, so osize is an upper bound
     std::vector<uint8_t> temporary(osize);
@@ -241,9 +249,15 @@ EXPORT(int, sceJpegDecodeMJpegYCbCr, const uint8_t *pJpeg, SceSize isize,
     uint8_t *pYCbCr, SceSize osize, int decodeMode, void *pCoefBuffer, SceSize coefBufferSize) {
     TRACY_FUNC(sceJpegDecodeMJpegYCbCr, pJpeg, isize, pYCbCr, osize, decodeMode, pCoefBuffer, coefBufferSize);
 
-    const auto state = emuenv.kernel.obj_store.get<MJpegState>();
+    // Absent when sceJpegInitMJpeg was not called in this process (e.g. cold restore of an older
+    // save state) or after sceJpegFinishMJpeg.
+    const auto state = emuenv.kernel.obj_store.get_shared<MJpegState>();
+    if (!state)
+        return RET_ERROR(SCE_JPEG_ERROR_INVALID_STATE);
     std::lock_guard<std::mutex> guard(state->decoderMutex);
-    configure_decoder(state, decodeMode);
+    if (!state->decoder)
+        return RET_ERROR(SCE_JPEG_ERROR_INVALID_STATE);
+    configure_decoder(state.get(), decodeMode);
 
     DecoderSize size = {};
 
@@ -287,9 +301,15 @@ EXPORT(int, sceJpegGetOutputInfo, const uint8_t *pJpeg, SceSize isize,
     if (format != SCE_JPEG_NO_CSC_OUTPUT && format != SCE_JPEG_PIXEL_RGBA8888 && format != SCE_JPEG_PIXEL_BGRA8888)
         return RET_ERROR(SCE_JPEG_ERROR_INVALID_COLOR_FORMAT);
 
-    const auto state = emuenv.kernel.obj_store.get<MJpegState>();
+    // Absent when sceJpegInitMJpeg was not called in this process (e.g. cold restore of an older
+    // save state) or after sceJpegFinishMJpeg.
+    const auto state = emuenv.kernel.obj_store.get_shared<MJpegState>();
+    if (!state)
+        return RET_ERROR(SCE_JPEG_ERROR_INVALID_STATE);
     std::lock_guard<std::mutex> guard(state->decoderMutex);
-    configure_decoder(state, decodeMode);
+    if (!state->decoder)
+        return RET_ERROR(SCE_JPEG_ERROR_INVALID_STATE);
+    configure_decoder(state.get(), decodeMode);
 
     DecoderSize size = {};
 
@@ -354,8 +374,12 @@ EXPORT(int, sceJpegInitMJpeg, int maxSplitDecoder) {
         STUBBED("Ignoring non-zero maxSplitDecoder parameter");
 
     emuenv.kernel.obj_store.create<MJpegState>();
-    const auto state = emuenv.kernel.obj_store.get<MJpegState>();
+    const auto state = emuenv.kernel.obj_store.get_shared<MJpegState>();
+    if (!state)
+        return RET_ERROR(SCE_JPEG_ERROR_CANNOT_INIT);
+    std::lock_guard<std::mutex> guard(state->decoderMutex);
     state->decoder = std::make_shared<MjpegDecoderState>();
+    state->initialized = true;
 
     return 0;
 }
@@ -397,3 +421,27 @@ EXPORT(int, sceJpegSplitDecodeMJpeg) {
     TRACY_FUNC(sceJpegSplitDecodeMJpeg);
     return UNIMPLEMENTED();
 }
+
+namespace mjpegstate {
+bool is_initialized(EmuEnvState &emuenv) {
+    const auto state = emuenv.kernel.obj_store.get_shared<MJpegState>();
+    if (!state)
+        return false;
+    std::lock_guard<std::mutex> guard(state->decoderMutex);
+    return state->decoder != nullptr;
+}
+
+void set_initialized(EmuEnvState &emuenv, bool initialized) {
+    if (!initialized) {
+        emuenv.kernel.obj_store.erase<MJpegState>();
+        return;
+    }
+    emuenv.kernel.obj_store.create<MJpegState>();
+    const auto state = emuenv.kernel.obj_store.get_shared<MJpegState>();
+    std::lock_guard<std::mutex> guard(state->decoderMutex);
+    // The decoder is reconfigured on every call, so a fresh one is equivalent to the saved one.
+    if (!state->decoder)
+        state->decoder = std::make_shared<MjpegDecoderState>();
+    state->initialized = true;
+}
+} // namespace mjpegstate

@@ -18,7 +18,9 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <map>
+#include <memory>
 #include <mutex>
 
 // Brought form rpcs3
@@ -58,11 +60,26 @@ public:
     ~ObjectStore() = default;
 
     template <typename T>
+    // Returns nullptr when the type was never created (or was erased). State that is only
+    // created by guest-called exports is absent after a cold save-state restore, so callers
+    // must handle null. The raw pointer is not lifetime-protected against a concurrent erase;
+    // use get_shared() when the object may be erased while in use.
     T *get() {
         std::lock_guard<std::mutex> lock(mutex);
         auto it = objs.find(TypeInfo::registered<T>::index);
-        assert(it != objs.end());
-        return reinterpret_cast<T *>(it->second.get());
+        if (it == objs.end())
+            return nullptr;
+        return static_cast<T *>(it->second.get());
+    }
+
+    // Like get(), but keeps the object alive for as long as the returned pointer is held.
+    template <typename T>
+    std::shared_ptr<T> get_shared() {
+        std::lock_guard<std::mutex> lock(mutex);
+        auto it = objs.find(TypeInfo::registered<T>::index);
+        if (it == objs.end())
+            return nullptr;
+        return std::static_pointer_cast<T>(it->second);
     }
 
     template <typename T, typename... Args>
@@ -75,6 +92,7 @@ public:
 
     template <typename T>
     void erase() {
+        std::lock_guard<std::mutex> lock(mutex);
         auto it = objs.find(TypeInfo::registered<T>::index);
         if (it == objs.end())
             return;

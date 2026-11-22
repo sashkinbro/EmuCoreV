@@ -43,6 +43,8 @@
 #include <mem/state.h>
 #include <modules/sysmem_state.h>
 #include <modules/SceAudiodec/state_snapshot.h>
+#include <modules/SceVideodec/state_snapshot.h>
+#include <modules/SceVideodec/state_snapshot.h>
 #include <ngs/state.h>
 #include <renderer/functions.h>
 #include <renderer/state.h>
@@ -1089,6 +1091,8 @@ bool read_gxm(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::string
 
 bool write_sysmem(EmuEnvState &emuenv, BufferWriter &buffer) {
     auto *sysmem = emuenv.kernel.obj_store.get<SysmemState>();
+    if (!sysmem)
+        return false;
     const std::lock_guard<std::mutex> lock(sysmem->mutex);
     buffer.i32(sysmem->next_uid);
     buffer.u32(sysmem->allocated_user);
@@ -1116,6 +1120,10 @@ bool read_obj_store(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::
     SysmemSnapshot snapshot;
     if (!parse_sysmem_state(data, snapshot, error)) return false;
     auto *sysmem = emuenv.kernel.obj_store.get<SysmemState>();
+    if (!sysmem) {
+        error = "sysmem state is missing";
+        return false;
+    }
     const std::lock_guard lock(sysmem->mutex);
     Blocks blocks, vm_blocks;
     for (const auto &[uid, block] : snapshot.blocks)
@@ -2029,6 +2037,11 @@ Result save_state(EmuEnvState &emuenv, const fs::path &path, const std::string &
         || !writer.write_section(SectionId::Audiodec, audiodec_data.data(), audiodec_data.size(), true, error))
         return fail(Status::IoError, error);
 
+    std::vector<uint8_t> videocodec_data;
+    if (!videocodec::capture_state(emuenv, videocodec_data, error)
+        || !writer.write_section(SectionId::VideoCodecs, videocodec_data.data(), videocodec_data.size(), true, error))
+        return fail(Status::IoError, error);
+
     if (!write_input(emuenv, writer, error))
         return fail(Status::IoError, error);
 
@@ -2121,6 +2134,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     std::vector<uint8_t> objstore_data;
     std::vector<uint8_t> audio_data;
     std::vector<uint8_t> audiodec_data;
+    std::vector<uint8_t> videocodec_data;
     std::vector<uint8_t> input_data;
     std::vector<uint8_t> np_data;
     std::vector<uint8_t> io_data;
@@ -2138,6 +2152,8 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         || !reader.read_section(SectionId::Io, io_data, error)
         || (reader.has_section(SectionId::Audiodec)
             && !reader.read_section(SectionId::Audiodec, audiodec_data, error))
+        || (reader.has_section(SectionId::VideoCodecs)
+            && !reader.read_section(SectionId::VideoCodecs, videocodec_data, error))
         || (reader.has_section(SectionId::Np)
             && !reader.read_section(SectionId::Np, np_data, error))) {
         result.status = Status::InvalidFile;
@@ -2155,6 +2171,20 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     std::shared_ptr<audiodec::PreparedState> prepared_audiodec;
     if (reader.has_section(SectionId::Audiodec)
         && !audiodec::prepare_state(audiodec_data, prepared_audiodec, error)) {
+        result.status = Status::InvalidFile;
+        result.error = error;
+        return result;
+    }
+
+    if (result.meta.engine_version >= 18 && !reader.has_section(SectionId::VideoCodecs)) {
+        result.status = Status::InvalidFile;
+        result.error = "save state is missing video codec state";
+        return result;
+    }
+    // Fresh FFmpeg decoders are built here too (reference frames are not serialised).
+    std::shared_ptr<videocodec::PreparedState> prepared_videocodec;
+    if (reader.has_section(SectionId::VideoCodecs)
+        && !videocodec::prepare_state(videocodec_data, prepared_videocodec, error)) {
         result.status = Status::InvalidFile;
         result.error = error;
         return result;
@@ -2263,6 +2293,8 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     for (const auto &object : sync_snapshot.objects) valid_ids &= unique_uid(object.header.uid);
     if (prepared_audiodec)
         for (const auto uid : audiodec::decoder_handles(*prepared_audiodec)) valid_ids &= unique_uid(uid);
+    if (prepared_videocodec)
+        for (const auto uid : videocodec::decoder_handles(*prepared_videocodec)) valid_ids &= unique_uid(uid);
     for (const auto uid : display_snapshot.callbacks) valid_ids &= callback_ids.contains(uid);
     if (!valid_ids || !main_thread_found) {
         result.status = Status::InvalidFile;
@@ -2443,6 +2475,15 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         audiodec::clear_state(emuenv);
     }
     LOG_DEBUG("[savestate] load: guest audio decoders restored");
+
+    if (reader.has_section(SectionId::VideoCodecs)) {
+        videocodec::apply_state(emuenv, std::move(prepared_videocodec));
+    } else {
+        // Older files cannot say whether the game initialised these libraries. Leave them absent:
+        // the exports then report a clean "invalid state" error instead of crashing.
+        videocodec::clear_state(emuenv);
+    }
+    LOG_DEBUG("[savestate] load: video codecs restored");
 
     // Guest initialization is skipped by cold restore. Recreate its actual NP
     // lifecycle and callback delivery history before any saved thread resumes.

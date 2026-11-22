@@ -104,7 +104,7 @@ struct H264DecoderState : public DecoderState {
     uint64_t pts_out = ~0ull;
 
     // true means the output format is yuv420p3, false means it is yuv420p2
-    bool output_yuvp3;
+    bool output_yuvp3 = false;
 
     bool is_stopped = true;
 

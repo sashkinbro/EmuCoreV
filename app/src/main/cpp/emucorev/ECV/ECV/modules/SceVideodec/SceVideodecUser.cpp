@@ -15,6 +15,9 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include "state_snapshot.h"
+#include "video_snapshot.h"
+
 #include <module/module.h>
 
 #include <codec/state.h>
@@ -30,6 +33,8 @@ typedef std::map<SceUID, H264DecoderPtr> H264DecoderStates;
 struct VideodecState {
     std::mutex mutex;
     H264DecoderStates decoders;
+    // Creation size of every decoder, kept for save states (the live decoder overwrites its own).
+    std::map<SceUID, std::pair<uint32_t, uint32_t>> sizes;
 };
 
 enum {
@@ -162,13 +167,18 @@ EXPORT(int, sceAvcdecCreateDecoder, uint32_t codec_type, SceAvcdecCtrl *decoder,
     if (query->horizontal > 1920 || query->vertical > 1088 || query->horizontal * query->vertical > 1280 * 720 || query->numOfRefFrames > 16)
         return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
 
-    const auto state = emuenv.kernel.obj_store.get<VideodecState>();
+    // Absent when the guest never called sceVideodecInitLibrary* in this process (e.g. after a
+    // cold save-state restore of an older file) or after sceVideodecTermLibrary.
+    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
+    if (!state)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
     std::lock_guard<std::mutex> lock(state->mutex);
 
     SceUID handle = emuenv.kernel.get_next_uid();
     decoder->handle = handle;
 
     state->decoders[handle] = std::make_shared<H264DecoderState>(query->horizontal, query->vertical);
+    state->sizes[handle] = { query->horizontal, query->vertical };
 
     return 0;
 }
@@ -202,10 +212,15 @@ EXPORT(int, sceAvcdecDecode, SceAvcdecCtrl *decoder, const SceAvcdecAu *au, SceA
     if (decoder->handle == 0)
         return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
 
-    const auto state = emuenv.kernel.obj_store.get<VideodecState>();
-    const H264DecoderPtr &decoder_info = lock_and_find(decoder->handle, state->decoders, state->mutex);
+    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
+    if (!state)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+    const H264DecoderPtr decoder_info = lock_and_find(decoder->handle, state->decoders, state->mutex);
     if (!decoder_info)
         return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+
+    if (!au || !picture)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
 
     H264DecoderOptions options = {};
     options.pts_upper = au->pts.upper;
@@ -214,7 +229,12 @@ EXPORT(int, sceAvcdecDecode, SceAvcdecCtrl *decoder, const SceAvcdecAu *au, SceA
     options.dts_lower = au->dts.lower;
 
     // This is quite long...
-    SceAvcdecPicture *pPicture = picture->pPicture.get(emuenv.mem)[0].get(emuenv.mem);
+    Ptr<SceAvcdecPicture> *picture_list = picture->pPicture.get(emuenv.mem);
+    if (!picture_list)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+    SceAvcdecPicture *pPicture = picture_list[0].get(emuenv.mem);
+    if (!pPicture)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
     uint8_t *output = pPicture->frame.pPicture[0].cast<uint8_t>().get(emuenv.mem);
 
     if ((pPicture->frame.pixelType & (SCE_AVCDEC_PIXEL_YUV420_RASTER | SCE_AVCDEC_PIXEL_YUV420_PACKED_RASTER)) == 0) {
@@ -226,7 +246,10 @@ EXPORT(int, sceAvcdecDecode, SceAvcdecCtrl *decoder, const SceAvcdecAu *au, SceA
     decoder_info->set_output_format(is_yuvp3);
 
     decoder_info->configure(&options);
-    const auto send = decoder_info->send(au->es.pBuf.cast<uint8_t>().get(emuenv.mem), au->es.size);
+    const uint8_t *es_data = au->es.pBuf.cast<uint8_t>().get(emuenv.mem);
+    if (!es_data || !output)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+    const auto send = decoder_info->send(es_data, au->es.size);
     decoder_info->set_res(pPicture->frame.frameWidth, pPicture->frame.frameHeight);
     const bool got_frame = send && decoder_info->receive(output);
     if (got_frame) {
@@ -269,8 +292,10 @@ EXPORT(int, sceAvcdecDecodeAvailableSize, SceAvcdecCtrl *decoder) {
     if (decoder->handle == 0)
         return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
 
-    const auto state = emuenv.kernel.obj_store.get<VideodecState>();
-    const H264DecoderPtr &decoder_info = lock_and_find(decoder->handle, state->decoders, state->mutex);
+    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
+    if (!state)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+    const H264DecoderPtr decoder_info = lock_and_find(decoder->handle, state->decoders, state->mutex);
     if (!decoder_info)
         return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
 
@@ -287,8 +312,10 @@ EXPORT(int, sceAvcdecDecodeFlush, SceAvcdecCtrl *decoder) {
     if (decoder->handle == 0)
         return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
 
-    const auto state = emuenv.kernel.obj_store.get<VideodecState>();
-    const H264DecoderPtr &decoder_info = lock_and_find(decoder->handle, state->decoders, state->mutex);
+    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
+    if (!state)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+    const H264DecoderPtr decoder_info = lock_and_find(decoder->handle, state->decoders, state->mutex);
     if (!decoder_info)
         return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
 
@@ -342,13 +369,20 @@ EXPORT(int, sceAvcdecDecodeStop, SceAvcdecCtrl *decoder, SceAvcdecArrayPicture *
     if (decoder->handle == 0)
         return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
 
-    const auto state = emuenv.kernel.obj_store.get<VideodecState>();
-    const H264DecoderPtr &decoder_info = lock_and_find(decoder->handle, state->decoders, state->mutex);
+    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
+    if (!state)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+    const H264DecoderPtr decoder_info = lock_and_find(decoder->handle, state->decoders, state->mutex);
     if (!decoder_info)
         return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
 
     if (!decoder_info->is_stopped) {
-        SceAvcdecPicture *pPicture = picture->pPicture.get(emuenv.mem)[0].get(emuenv.mem);
+        if (!picture)
+            return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+        Ptr<SceAvcdecPicture> *picture_list = picture->pPicture.get(emuenv.mem);
+        SceAvcdecPicture *pPicture = picture_list ? picture_list[0].get(emuenv.mem) : nullptr;
+        if (!pPicture)
+            return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
 
         // we get the values from the last frame, maybe we should slightly increase the pts value?
         decoder_info->get_res(pPicture->frame.horizontalSize, pPicture->frame.verticalSize);
@@ -382,9 +416,12 @@ EXPORT(int, sceAvcdecDeleteDecoder, SceAvcdecCtrl *decoder) {
     if (decoder->handle == 0)
         return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
 
-    const auto state = emuenv.kernel.obj_store.get<VideodecState>();
+    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
+    if (!state)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
     std::lock_guard<std::mutex> lock(state->mutex);
     state->decoders.erase(decoder->handle);
+    state->sizes.erase(decoder->handle);
 
     return 0;
 }
@@ -618,3 +655,85 @@ EXPORT(int, sceVideodecTermLibrary) {
     emuenv.kernel.obj_store.erase<VideodecState>();
     return 0;
 }
+
+namespace videocodec {
+struct PreparedState {
+    video_snapshot::Snapshot snapshot;
+    H264DecoderStates decoders;
+};
+
+void clear_state(EmuEnvState &emuenv) {
+    emuenv.kernel.obj_store.erase<VideodecState>();
+    mjpegstate::set_initialized(emuenv, false);
+}
+
+bool capture_state(EmuEnvState &emuenv, std::vector<uint8_t> &blob, std::string &error) {
+    video_snapshot::Snapshot snapshot;
+    if (const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>()) {
+        const std::lock_guard<std::mutex> lock(state->mutex);
+        snapshot.videodec_initialized = true;
+        for (const auto &[handle, decoder] : state->decoders) {
+            const auto size = state->sizes.find(handle);
+            if (!decoder || size == state->sizes.end()) {
+                error = "video decoder has no creation parameters";
+                return false;
+            }
+            video_snapshot::AvcDecoderRecord record;
+            record.handle = handle;
+            record.width = size->second.first;
+            record.height = size->second.second;
+            record.output_yuvp3 = decoder->output_yuvp3;
+            record.stopped = decoder->is_stopped;
+            snapshot.decoders.push_back(record);
+        }
+    }
+    snapshot.mjpeg_initialized = mjpegstate::is_initialized(emuenv);
+    return video_snapshot::serialize(snapshot, blob, error);
+}
+
+bool prepare_state(const std::vector<uint8_t> &blob, std::shared_ptr<PreparedState> &prepared, std::string &error) {
+    prepared.reset();
+    auto candidate = std::make_shared<PreparedState>();
+    if (!video_snapshot::parse(blob, candidate->snapshot, error))
+        return false;
+    // Fresh FFmpeg contexts: reference frames cannot be serialised, the game resyncs at the next IDR.
+    for (const auto &record : candidate->snapshot.decoders) {
+        auto decoder = std::make_shared<H264DecoderState>(record.width, record.height);
+        if (!decoder->context || !decoder->parser) {
+            error = "cannot create video decoder";
+            return false;
+        }
+        decoder->set_output_format(record.output_yuvp3);
+        decoder->is_stopped = record.stopped;
+        candidate->decoders.emplace(record.handle, std::move(decoder));
+    }
+    prepared = std::move(candidate);
+    return true;
+}
+
+std::vector<int32_t> decoder_handles(const PreparedState &prepared) {
+    std::vector<int32_t> handles;
+    handles.reserve(prepared.snapshot.decoders.size());
+    for (const auto &record : prepared.snapshot.decoders)
+        handles.push_back(record.handle);
+    return handles;
+}
+
+void apply_state(EmuEnvState &emuenv, std::shared_ptr<PreparedState> prepared) {
+    if (!prepared)
+        return;
+    mjpegstate::set_initialized(emuenv, prepared->snapshot.mjpeg_initialized);
+    if (!prepared->snapshot.videodec_initialized) {
+        emuenv.kernel.obj_store.erase<VideodecState>();
+        return;
+    }
+    emuenv.kernel.obj_store.create<VideodecState>();
+    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
+    const std::lock_guard<std::mutex> lock(state->mutex);
+    state->decoders = std::move(prepared->decoders);
+    state->sizes.clear();
+    for (const auto &record : prepared->snapshot.decoders)
+        state->sizes[record.handle] = { record.width, record.height };
+}
+
+} // namespace videocodec
