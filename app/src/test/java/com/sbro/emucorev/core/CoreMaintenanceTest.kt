@@ -13,8 +13,8 @@ class CoreMaintenanceTest {
     fun `reset clears regenerable entries and keeps user data`() {
         val root = Files.createTempDirectory("core-maintenance").toFile()
         try {
-            val config = File(root, "config").apply { mkdirs() }
-            File(config, "config.yml").writeText("native config")
+            val perGame = File(root, "config").apply { mkdirs() }
+            val gameConfig = File(perGame, "config_PCSA00011.xml").apply { writeText("<config/>") }
             File(root, "config.yml").writeText("core settings")
             val cache = File(root, "cache").apply { mkdirs() }
             File(cache, "shaders.bin").writeText("shaders")
@@ -27,8 +27,10 @@ class CoreMaintenanceTest {
 
             val deletedFiles = clearRegenerableCoreState(root)
 
-            assertEquals(5, deletedFiles)
-            assertFalse(File(root, "config").exists())
+            assertEquals(4, deletedFiles)
+            // per-game settings are user data and must survive a core update
+            assertTrue(gameConfig.isFile)
+            assertEquals("<config/>", gameConfig.readText())
             assertFalse(File(root, "config.yml").exists())
             assertFalse(File(root, "cache").exists())
             assertFalse(File(root, "shaderlog").exists())

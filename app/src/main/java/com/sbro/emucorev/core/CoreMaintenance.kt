@@ -8,9 +8,14 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.data.AppPreferences
 import java.io.File
 
-/** Core-owned runtime entries that are rebuilt on demand and never contain user data. */
+/**
+ * Core-owned runtime entries that are rebuilt on demand and never contain user data.
+ * `config/` is NOT one of them: it holds the per-game settings (config_<TITLE>.xml), which exist
+ * nowhere else; wiping it on every core update silently reset every game's settings.
+ * `config.yml` is safe to drop because the app restores it from its preference mirror.
+ */
 internal val REGENERABLE_CORE_ENTRIES =
-    listOf("config.yml", "config", "cache", "shaderlog", "texturelog")
+    listOf("config.yml", "cache", "shaderlog", "texturelog")
 
 /** Deletes regenerable core entries; user files such as patches, play time and saves stay. */
 internal fun clearRegenerableCoreState(runtimeRoot: File): Int {
