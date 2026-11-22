@@ -279,6 +279,20 @@ tasks.configureEach {
     }
 }
 
+// Release must never contain research/oracle tooling. When the private checker
+// (git-ignored tools/oracles) is present, every release APK is scanned after assembly.
+val releaseCleanChecker = rootProject.file("tools/oracles/check_release_clean.py")
+if (releaseCleanChecker.isFile) {
+    val checkReleaseClean = tasks.register<Exec>("checkReleaseClean") {
+        val apkDir = layout.buildDirectory.dir("outputs/apk/release")
+        commandLine("python", "-I", releaseCleanChecker.absolutePath,
+            apkDir.get().file("app-release.apk").asFile.absolutePath)
+    }
+    tasks.configureEach {
+        if (name == "assembleRelease") finalizedBy(checkReleaseClean)
+    }
+}
+
 dependencies {
     if (nativeShellAvailable) implementation(project(":native-ui-shell"))
     implementation(libs.androidx.core.ktx)
