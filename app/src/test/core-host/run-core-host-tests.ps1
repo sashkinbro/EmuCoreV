@@ -3,7 +3,8 @@
 param(
     [string]$Mingw = "C:\Users\SBRO\tools\llvm-mingw\bin",
     [string]$CMakeBin = "C:\Users\SBRO\AppData\Local\Android\Sdk\cmake\3.30.5\bin",
-    [string]$BuildDir = (Join-Path $env:TEMP "emucorev-core-host-build")
+    [string]$BuildDir = (Join-Path $env:TEMP "emucorev-core-host-build"),
+    [string]$Filter = "*"   # gtest filter, e.g. "GuestAtomic*:ClibChk*:RWLock*"
 )
 # Native tools write warnings to stderr; exit codes are checked explicitly below.
 $ErrorActionPreference = "Continue"
@@ -17,5 +18,5 @@ $env:PATH = "$Mingw;$CMakeBin;$env:PATH"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & "$CMakeBin\cmake.exe" --build $BuildDir
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-& "$BuildDir\core_host_tests.exe"
+& "$BuildDir\core_host_tests.exe" "--gtest_filter=$Filter"
 exit $LASTEXITCODE

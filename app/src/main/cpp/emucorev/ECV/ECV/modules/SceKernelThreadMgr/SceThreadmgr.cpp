@@ -1399,14 +1399,14 @@ EXPORT(int, sceKernelTryLockMutex, SceUID mutexid, int lock_count) {
     return mutex_try_lock(emuenv.kernel, emuenv.mem, export_name, thread_id, mutexid, lock_count, SyncWeight::Heavy);
 }
 
-EXPORT(int, sceKernelTryLockReadRWLock) {
-    TRACY_FUNC(sceKernelTryLockReadRWLock);
-    return UNIMPLEMENTED();
+EXPORT(int, sceKernelTryLockReadRWLock, SceUID lock_id) {
+    TRACY_FUNC(sceKernelTryLockReadRWLock, lock_id);
+    return rwlock_try_lock(emuenv.kernel, export_name, thread_id, lock_id, false);
 }
 
-EXPORT(int, sceKernelTryLockWriteRWLock) {
-    TRACY_FUNC(sceKernelTryLockWriteRWLock);
-    return UNIMPLEMENTED();
+EXPORT(int, sceKernelTryLockWriteRWLock, SceUID lock_id) {
+    TRACY_FUNC(sceKernelTryLockWriteRWLock, lock_id);
+    return rwlock_try_lock(emuenv.kernel, export_name, thread_id, lock_id, true);
 }
 
 EXPORT(int, sceKernelUnlockMutex, SceUID mutexid, int unlock_count) {

@@ -19,6 +19,7 @@
 
 #include <atomic>
 #include <kernel/thread/thread_state.h>
+#include <kernel/rwlock_policy.h>
 #include <kernel/thread/wait_queue.h>
 #include <kernel/types.h>
 #include <util/byte_ring_buffer.h>
@@ -156,12 +157,6 @@ protected:
 typedef std::shared_ptr<Mutex> MutexPtr;
 typedef std::map<SceUID, MutexPtr> MutexPtrs;
 
-enum class RWLockState {
-    Unlocked,
-    ReadLocked,
-    WriteLocked,
-};
-
 // the int value is the lock count for recursive locks
 typedef std::map<ThreadStatePtr, int> RWLockOwners;
 
@@ -294,6 +289,7 @@ MutexPtr mutex_get(KernelState &kernel, const char *export_name, SceUID thread_i
 // RWLock
 SceUID rwlock_create(KernelState &kernel, MemState &mem, const char *export_name, const char *name, SceUID thread_id, SceUInt32 attr);
 SceInt32 rwlock_lock(KernelState &kernel, MemState &mem, const char *export_name, SceUID thread_id, SceUID lock_id, uint32_t *timeout, bool is_write, bool callbacks);
+SceInt32 rwlock_try_lock(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID lock_id, bool is_write);
 SceInt32 rwlock_unlock(KernelState &kernel, MemState &mem, const char *export_name, SceUID thread_id, SceUID lock_id, bool is_write);
 SceInt32 rwlock_delete(KernelState &kernel, MemState &mem, const char *export_name, SceUID thread_id, SceUID lock_id);
 

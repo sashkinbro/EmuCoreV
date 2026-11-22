@@ -16,6 +16,8 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include "SceLibKernel.h"
+#include "clib_chk.h"
+#include "guest_atomics.h"
 #include <modules/module_parent.h>
 #include <v3kprintf.h>
 
@@ -43,6 +45,8 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <mutex>
+#include <string>
 
 enum class TimerFlags : uint32_t {
     FIFO_THREAD = 0x00000000,
@@ -110,6 +114,22 @@ EXPORT(int, _sceKernelCreateLwMutex, Ptr<SceKernelLwMutexWork> workarea, const c
     return res;
 }
 
+// Fortify (sceClib*Chk) overflow. Real firmware aborts; here (PROVISIONAL policy) the copy is
+// not performed, the error is logged once per export and the caller returns its failure value
+// (nullptr / error code). The guest thread is deliberately not halted. Returns nullptr.
+static void *clib_chk_overflow(EmuEnvState &, SceUID thread_id, const char *export_name, SceSize len, SceSize dst_size) {
+    static std::mutex mutex;
+    static std::set<std::string> reported;
+    bool first;
+    {
+        std::lock_guard lock(mutex);
+        first = reported.insert(export_name).second;
+    }
+    if (first)
+        LOG_ERROR("{}: buffer overflow detected (len {} / dst size {}) in thread {}, operation skipped", export_name, len, dst_size, thread_id);
+    return nullptr;
+}
+
 EXPORT(int, sceClibAbort) {
     TRACY_FUNC(sceClibAbort);
     return UNIMPLEMENTED();
@@ -139,9 +159,10 @@ EXPORT(int, sceClibLookCtypeTable, uint32_t param1) {
     }
 }
 
-EXPORT(int, sceClibMemchr) {
-    TRACY_FUNC(sceClibMemchr);
-    return UNIMPLEMENTED();
+EXPORT(Ptr<void>, sceClibMemchr, const void *src, int ch, SceSize len) {
+    TRACY_FUNC(sceClibMemchr, src, ch, len);
+    void *res = const_cast<void *>(memchr(src, ch, len));
+    return Ptr<void>(res, emuenv.mem);
 }
 
 EXPORT(int, sceClibMemcmp, const void *s1, const void *s2, SceSize len) {
@@ -160,9 +181,14 @@ EXPORT(Ptr<void>, sceClibMemcpy, Ptr<void> dst, const void *src, SceSize len) {
     return dst;
 }
 
-EXPORT(int, sceClibMemcpyChk) {
-    TRACY_FUNC(sceClibMemcpyChk);
-    return UNIMPLEMENTED();
+EXPORT(Ptr<void>, sceClibMemcpyChk, Ptr<void> dst, const void *src, SceSize len, SceSize dst_size) {
+    TRACY_FUNC(sceClibMemcpyChk, dst, src, len, dst_size);
+    if (!clib_chk::fits_bytes(dst_size, len)) {
+        clib_chk_overflow(emuenv, thread_id, export_name, len, dst_size);
+        return Ptr<void>();
+    }
+    memcpy(dst.get(emuenv.mem), src, len);
+    return dst;
 }
 
 EXPORT(Ptr<void>, sceClibMemcpy_safe, Ptr<void> dst, const Ptr<void> src, SceSize len) {
@@ -198,9 +224,14 @@ EXPORT(Ptr<void>, sceClibMemmove, Ptr<void> dst, const void *src, SceSize len) {
     return dst;
 }
 
-EXPORT(int, sceClibMemmoveChk) {
-    TRACY_FUNC(sceClibMemmoveChk);
-    return UNIMPLEMENTED();
+EXPORT(Ptr<void>, sceClibMemmoveChk, Ptr<void> dst, const void *src, SceSize len, SceSize dst_size) {
+    TRACY_FUNC(sceClibMemmoveChk, dst, src, len, dst_size);
+    if (!clib_chk::fits_bytes(dst_size, len)) {
+        clib_chk_overflow(emuenv, thread_id, export_name, len, dst_size);
+        return Ptr<void>();
+    }
+    memmove(dst.get(emuenv.mem), src, len);
+    return dst;
 }
 
 EXPORT(Ptr<void>, sceClibMemset, Ptr<void> dst, int ch, SceSize len) {
@@ -209,9 +240,14 @@ EXPORT(Ptr<void>, sceClibMemset, Ptr<void> dst, int ch, SceSize len) {
     return dst;
 }
 
-EXPORT(int, sceClibMemsetChk) {
-    TRACY_FUNC(sceClibMemsetChk);
-    return UNIMPLEMENTED();
+EXPORT(Ptr<void>, sceClibMemsetChk, Ptr<void> dst, int ch, SceSize len, SceSize dst_size) {
+    TRACY_FUNC(sceClibMemsetChk, dst, ch, len, dst_size);
+    if (!clib_chk::fits_bytes(dst_size, len)) {
+        clib_chk_overflow(emuenv, thread_id, export_name, len, dst_size);
+        return Ptr<void>();
+    }
+    memset(dst.get(emuenv.mem), ch, len);
+    return dst;
 }
 
 // Guest RAM snapshots also contain dlmalloc's host-addressed bookkeeping.
@@ -367,14 +403,27 @@ EXPORT(int, sceClibSnprintf, char *dst, SceSize dst_max_size, const char *fmt, m
     return result;
 }
 
-EXPORT(int, sceClibSnprintfChk) {
-    TRACY_FUNC(sceClibSnprintfChk);
-    return UNIMPLEMENTED();
+EXPORT(int, sceClibSnprintfChk, char *dst, SceSize dst_max_size, int flag, SceSize dst_size, const char *fmt, module::vargs args) {
+    TRACY_FUNC(sceClibSnprintfChk, dst, dst_max_size, flag, dst_size, fmt);
+    if (!clib_chk::fits_size(dst_size, dst_max_size)) {
+        clib_chk_overflow(emuenv, thread_id, export_name, dst_max_size, dst_size);
+        return SCE_KERNEL_ERROR_INVALID_ARGUMENT;
+    }
+    const ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
+    if (!thread) {
+        return SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID;
+    }
+    return utils::snprintf(dst, dst_max_size, fmt, *(thread->cpu), emuenv.mem, args);
 }
 
-EXPORT(int, sceClibStrcatChk) {
-    TRACY_FUNC(sceClibStrcatChk);
-    return UNIMPLEMENTED();
+EXPORT(Ptr<char>, sceClibStrcatChk, char *dst, const char *src, SceSize dst_size) {
+    TRACY_FUNC(sceClibStrcatChk, dst, src, dst_size);
+    if (!clib_chk::fits_strcat(dst, src, dst_size)) {
+        clib_chk_overflow(emuenv, thread_id, export_name, 0, dst_size);
+        return Ptr<char>();
+    }
+    strcat(dst, src);
+    return Ptr<char>(dst, emuenv.mem);
 }
 
 EXPORT(Ptr<char>, sceClibStrchr, const char *str, int c) {
@@ -388,9 +437,14 @@ EXPORT(int, sceClibStrcmp, const char *s1, const char *s2) {
     return strcmp(s1, s2);
 }
 
-EXPORT(int, sceClibStrcpyChk) {
-    TRACY_FUNC(sceClibStrcpyChk);
-    return UNIMPLEMENTED();
+EXPORT(Ptr<char>, sceClibStrcpyChk, char *dst, const char *src, SceSize dst_size) {
+    TRACY_FUNC(sceClibStrcpyChk, dst, src, dst_size);
+    if (!clib_chk::fits_strcpy(src, dst_size)) {
+        clib_chk_overflow(emuenv, thread_id, export_name, 0, dst_size);
+        return Ptr<char>();
+    }
+    strcpy(dst, src);
+    return Ptr<char>(dst, emuenv.mem);
 }
 
 EXPORT(Ptr<char>, sceClibStrlcat, char *dst, const char *src, SceSize len) {
@@ -399,9 +453,13 @@ EXPORT(Ptr<char>, sceClibStrlcat, char *dst, const char *src, SceSize len) {
     return Ptr<char>(res, emuenv.mem);
 }
 
-EXPORT(int, sceClibStrlcatChk) {
-    TRACY_FUNC(sceClibStrlcatChk);
-    return UNIMPLEMENTED();
+EXPORT(SceSize, sceClibStrlcatChk, char *dst, const char *src, SceSize len, SceSize dst_size) {
+    TRACY_FUNC(sceClibStrlcatChk, dst, src, len, dst_size);
+    if (!clib_chk::fits_size(dst_size, len)) {
+        clib_chk_overflow(emuenv, thread_id, export_name, len, dst_size);
+        return 0;
+    }
+    return clib_chk::strlcat_impl(dst, src, len);
 }
 
 EXPORT(Ptr<char>, sceClibStrlcpy, char *dst, const char *src, SceSize len) {
@@ -410,9 +468,13 @@ EXPORT(Ptr<char>, sceClibStrlcpy, char *dst, const char *src, SceSize len) {
     return Ptr<char>(res, emuenv.mem);
 }
 
-EXPORT(int, sceClibStrlcpyChk) {
-    TRACY_FUNC(sceClibStrlcpyChk);
-    return UNIMPLEMENTED();
+EXPORT(SceSize, sceClibStrlcpyChk, char *dst, const char *src, SceSize len, SceSize dst_size) {
+    TRACY_FUNC(sceClibStrlcpyChk, dst, src, len, dst_size);
+    if (!clib_chk::fits_size(dst_size, len)) {
+        clib_chk_overflow(emuenv, thread_id, export_name, len, dst_size);
+        return 0;
+    }
+    return clib_chk::strlcpy_impl(dst, src, len);
 }
 
 EXPORT(int, sceClibStrncasecmp, const char *s1, const char *s2, SceSize len) {
@@ -430,9 +492,14 @@ EXPORT(Ptr<char>, sceClibStrncat, char *dst, const char *src, SceSize len) {
     return Ptr<char>(res, emuenv.mem);
 }
 
-EXPORT(int, sceClibStrncatChk) {
-    TRACY_FUNC(sceClibStrncatChk);
-    return UNIMPLEMENTED();
+EXPORT(Ptr<char>, sceClibStrncatChk, char *dst, const char *src, SceSize len, SceSize dst_size) {
+    TRACY_FUNC(sceClibStrncatChk, dst, src, len, dst_size);
+    if (!clib_chk::fits_strncat(dst, src, len, dst_size)) {
+        clib_chk_overflow(emuenv, thread_id, export_name, len, dst_size);
+        return Ptr<char>();
+    }
+    strncat(dst, src, len);
+    return Ptr<char>(dst, emuenv.mem);
 }
 
 EXPORT(int, sceClibStrncmp, const char *s1, const char *s2, SceSize len) {
@@ -446,9 +513,14 @@ EXPORT(Ptr<char>, sceClibStrncpy, char *dst, const char *src, SceSize len) {
     return Ptr<char>(res, emuenv.mem);
 }
 
-EXPORT(int, sceClibStrncpyChk) {
-    TRACY_FUNC(sceClibStrncpyChk);
-    return UNIMPLEMENTED();
+EXPORT(Ptr<char>, sceClibStrncpyChk, char *dst, const char *src, SceSize len, SceSize dst_size) {
+    TRACY_FUNC(sceClibStrncpyChk, dst, src, len, dst_size);
+    if (!clib_chk::fits_bytes(dst_size, len)) {
+        clib_chk_overflow(emuenv, thread_id, export_name, len, dst_size);
+        return Ptr<char>();
+    }
+    strncpy(dst, src, len);
+    return Ptr<char>(dst, emuenv.mem);
 }
 
 EXPORT(uint32_t, sceClibStrnlen, const char *s1, SceSize maxlen) {
@@ -525,9 +597,18 @@ EXPORT(int, sceClibVsnprintf, char *dst, SceSize dst_max_size, const char *fmt, 
     return SCE_KERNEL_OK;
 }
 
-EXPORT(int, sceClibVsnprintfChk) {
-    TRACY_FUNC(sceClibVsnprintfChk);
-    return UNIMPLEMENTED();
+EXPORT(int, sceClibVsnprintfChk, char *dst, SceSize dst_max_size, int flag, SceSize dst_size, const char *fmt, Address list) {
+    TRACY_FUNC(sceClibVsnprintfChk, dst, dst_max_size, flag, dst_size, fmt, list);
+    if (!clib_chk::fits_size(dst_size, dst_max_size)) {
+        clib_chk_overflow(emuenv, thread_id, export_name, dst_max_size, dst_size);
+        return SCE_KERNEL_ERROR_INVALID_ARGUMENT;
+    }
+    const ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
+    if (!thread) {
+        return SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID;
+    }
+    module::vargs args(list);
+    return utils::snprintf(dst, dst_max_size, fmt, *(thread->cpu), emuenv.mem, args);
 }
 
 EXPORT(int, sceIoChstat) {
@@ -764,364 +845,364 @@ EXPORT(int, sceIoWrite2) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceKernelAtomicAddAndGet16) {
-    TRACY_FUNC(sceKernelAtomicAddAndGet16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicAddAndGet16, uint16_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicAddAndGet16, ptr, value);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::add_and_get(ptr, static_cast<uint16_t>(value))));
 }
 
-EXPORT(int, sceKernelAtomicAddAndGet32) {
-    TRACY_FUNC(sceKernelAtomicAddAndGet32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicAddAndGet32, uint32_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicAddAndGet32, ptr, value);
+    return static_cast<int32_t>(guest_atomic::add_and_get(ptr, static_cast<uint32_t>(value)));
 }
 
-EXPORT(int, sceKernelAtomicAddAndGet64) {
-    TRACY_FUNC(sceKernelAtomicAddAndGet64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicAddAndGet64, uint64_t *ptr, uint64_t value) {
+    TRACY_FUNC(sceKernelAtomicAddAndGet64, ptr, value);
+    return static_cast<int64_t>(guest_atomic::add_and_get(ptr, static_cast<uint64_t>(value)));
 }
 
-EXPORT(int, sceKernelAtomicAddAndGet8) {
-    TRACY_FUNC(sceKernelAtomicAddAndGet8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicAddAndGet8, uint8_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicAddAndGet8, ptr, value);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::add_and_get(ptr, static_cast<uint8_t>(value))));
 }
 
-EXPORT(int, sceKernelAtomicAddUnless16) {
-    TRACY_FUNC(sceKernelAtomicAddUnless16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicAddUnless16, uint16_t *ptr, uint32_t value, uint32_t cmp) {
+    TRACY_FUNC(sceKernelAtomicAddUnless16, ptr, value, cmp);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::add_unless(ptr, static_cast<uint16_t>(value), static_cast<uint16_t>(cmp))));
 }
 
-EXPORT(int, sceKernelAtomicAddUnless32) {
-    TRACY_FUNC(sceKernelAtomicAddUnless32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicAddUnless32, uint32_t *ptr, uint32_t value, uint32_t cmp) {
+    TRACY_FUNC(sceKernelAtomicAddUnless32, ptr, value, cmp);
+    return static_cast<int32_t>(guest_atomic::add_unless(ptr, static_cast<uint32_t>(value), static_cast<uint32_t>(cmp)));
 }
 
-EXPORT(int, sceKernelAtomicAddUnless64) {
-    TRACY_FUNC(sceKernelAtomicAddUnless64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicAddUnless64, uint64_t *ptr, uint64_t value, uint64_t cmp) {
+    TRACY_FUNC(sceKernelAtomicAddUnless64, ptr, value, cmp);
+    return static_cast<int64_t>(guest_atomic::add_unless(ptr, static_cast<uint64_t>(value), static_cast<uint64_t>(cmp)));
 }
 
-EXPORT(int, sceKernelAtomicAddUnless8) {
-    TRACY_FUNC(sceKernelAtomicAddUnless8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicAddUnless8, uint8_t *ptr, uint32_t value, uint32_t cmp) {
+    TRACY_FUNC(sceKernelAtomicAddUnless8, ptr, value, cmp);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::add_unless(ptr, static_cast<uint8_t>(value), static_cast<uint8_t>(cmp))));
 }
 
-EXPORT(int, sceKernelAtomicAndAndGet16) {
-    TRACY_FUNC(sceKernelAtomicAndAndGet16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicAndAndGet16, uint16_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicAndAndGet16, ptr, mask);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::and_and_get(ptr, static_cast<uint16_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicAndAndGet32) {
-    TRACY_FUNC(sceKernelAtomicAndAndGet32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicAndAndGet32, uint32_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicAndAndGet32, ptr, mask);
+    return static_cast<int32_t>(guest_atomic::and_and_get(ptr, static_cast<uint32_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicAndAndGet64) {
-    TRACY_FUNC(sceKernelAtomicAndAndGet64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicAndAndGet64, uint64_t *ptr, uint64_t mask) {
+    TRACY_FUNC(sceKernelAtomicAndAndGet64, ptr, mask);
+    return static_cast<int64_t>(guest_atomic::and_and_get(ptr, static_cast<uint64_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicAndAndGet8) {
-    TRACY_FUNC(sceKernelAtomicAndAndGet8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicAndAndGet8, uint8_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicAndAndGet8, ptr, mask);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::and_and_get(ptr, static_cast<uint8_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicClearAndGet16) {
-    TRACY_FUNC(sceKernelAtomicClearAndGet16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicClearAndGet16, uint16_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicClearAndGet16, ptr, mask);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::clear_and_get(ptr, static_cast<uint16_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicClearAndGet32) {
-    TRACY_FUNC(sceKernelAtomicClearAndGet32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicClearAndGet32, uint32_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicClearAndGet32, ptr, mask);
+    return static_cast<int32_t>(guest_atomic::clear_and_get(ptr, static_cast<uint32_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicClearAndGet64) {
-    TRACY_FUNC(sceKernelAtomicClearAndGet64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicClearAndGet64, uint64_t *ptr, uint64_t mask) {
+    TRACY_FUNC(sceKernelAtomicClearAndGet64, ptr, mask);
+    return static_cast<int64_t>(guest_atomic::clear_and_get(ptr, static_cast<uint64_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicClearAndGet8) {
-    TRACY_FUNC(sceKernelAtomicClearAndGet8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicClearAndGet8, uint8_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicClearAndGet8, ptr, mask);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::clear_and_get(ptr, static_cast<uint8_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicClearMask16) {
-    TRACY_FUNC(sceKernelAtomicClearMask16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicClearMask16, uint16_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicClearMask16, ptr, mask);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::clear_mask(ptr, static_cast<uint16_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicClearMask32) {
-    TRACY_FUNC(sceKernelAtomicClearMask32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicClearMask32, uint32_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicClearMask32, ptr, mask);
+    return static_cast<int32_t>(guest_atomic::clear_mask(ptr, static_cast<uint32_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicClearMask64) {
-    TRACY_FUNC(sceKernelAtomicClearMask64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicClearMask64, uint64_t *ptr, uint64_t mask) {
+    TRACY_FUNC(sceKernelAtomicClearMask64, ptr, mask);
+    return static_cast<int64_t>(guest_atomic::clear_mask(ptr, static_cast<uint64_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicClearMask8) {
-    TRACY_FUNC(sceKernelAtomicClearMask8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicClearMask8, uint8_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicClearMask8, ptr, mask);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::clear_mask(ptr, static_cast<uint8_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicCompareAndSet16) {
-    TRACY_FUNC(sceKernelAtomicCompareAndSet16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicCompareAndSet16, uint16_t *ptr, uint32_t cmp, uint32_t set_to) {
+    TRACY_FUNC(sceKernelAtomicCompareAndSet16, ptr, cmp, set_to);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::compare_and_set(ptr, static_cast<uint16_t>(cmp), static_cast<uint16_t>(set_to))));
 }
 
-EXPORT(int, sceKernelAtomicCompareAndSet32) {
-    TRACY_FUNC(sceKernelAtomicCompareAndSet32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicCompareAndSet32, uint32_t *ptr, uint32_t cmp, uint32_t set_to) {
+    TRACY_FUNC(sceKernelAtomicCompareAndSet32, ptr, cmp, set_to);
+    return static_cast<int32_t>(guest_atomic::compare_and_set(ptr, static_cast<uint32_t>(cmp), static_cast<uint32_t>(set_to)));
 }
 
-EXPORT(int, sceKernelAtomicCompareAndSet64) {
-    TRACY_FUNC(sceKernelAtomicCompareAndSet64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicCompareAndSet64, uint64_t *ptr, uint64_t cmp, uint64_t set_to) {
+    TRACY_FUNC(sceKernelAtomicCompareAndSet64, ptr, cmp, set_to);
+    return static_cast<int64_t>(guest_atomic::compare_and_set(ptr, static_cast<uint64_t>(cmp), static_cast<uint64_t>(set_to)));
 }
 
-EXPORT(int, sceKernelAtomicCompareAndSet8) {
-    TRACY_FUNC(sceKernelAtomicCompareAndSet8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicCompareAndSet8, uint8_t *ptr, uint32_t cmp, uint32_t set_to) {
+    TRACY_FUNC(sceKernelAtomicCompareAndSet8, ptr, cmp, set_to);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::compare_and_set(ptr, static_cast<uint8_t>(cmp), static_cast<uint8_t>(set_to))));
 }
 
-EXPORT(int, sceKernelAtomicDecIfPositive16) {
-    TRACY_FUNC(sceKernelAtomicDecIfPositive16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicDecIfPositive16, uint16_t *ptr) {
+    TRACY_FUNC(sceKernelAtomicDecIfPositive16, ptr);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::dec_if_positive(ptr)));
 }
 
-EXPORT(int, sceKernelAtomicDecIfPositive32) {
-    TRACY_FUNC(sceKernelAtomicDecIfPositive32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicDecIfPositive32, uint32_t *ptr) {
+    TRACY_FUNC(sceKernelAtomicDecIfPositive32, ptr);
+    return static_cast<int32_t>(guest_atomic::dec_if_positive(ptr));
 }
 
-EXPORT(int, sceKernelAtomicDecIfPositive64) {
-    TRACY_FUNC(sceKernelAtomicDecIfPositive64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicDecIfPositive64, uint64_t *ptr) {
+    TRACY_FUNC(sceKernelAtomicDecIfPositive64, ptr);
+    return static_cast<int64_t>(guest_atomic::dec_if_positive(ptr));
 }
 
-EXPORT(int, sceKernelAtomicDecIfPositive8) {
-    TRACY_FUNC(sceKernelAtomicDecIfPositive8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicDecIfPositive8, uint8_t *ptr) {
+    TRACY_FUNC(sceKernelAtomicDecIfPositive8, ptr);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::dec_if_positive(ptr)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndAdd16) {
-    TRACY_FUNC(sceKernelAtomicGetAndAdd16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndAdd16, uint16_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicGetAndAdd16, ptr, value);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::get_and_add(ptr, static_cast<uint16_t>(value))));
 }
 
-EXPORT(int, sceKernelAtomicGetAndAdd32) {
-    TRACY_FUNC(sceKernelAtomicGetAndAdd32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndAdd32, uint32_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicGetAndAdd32, ptr, value);
+    return static_cast<int32_t>(guest_atomic::get_and_add(ptr, static_cast<uint32_t>(value)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndAdd64) {
-    TRACY_FUNC(sceKernelAtomicGetAndAdd64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicGetAndAdd64, uint64_t *ptr, uint64_t value) {
+    TRACY_FUNC(sceKernelAtomicGetAndAdd64, ptr, value);
+    return static_cast<int64_t>(guest_atomic::get_and_add(ptr, static_cast<uint64_t>(value)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndAdd8) {
-    TRACY_FUNC(sceKernelAtomicGetAndAdd8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndAdd8, uint8_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicGetAndAdd8, ptr, value);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::get_and_add(ptr, static_cast<uint8_t>(value))));
 }
 
-EXPORT(int, sceKernelAtomicGetAndAnd16) {
-    TRACY_FUNC(sceKernelAtomicGetAndAnd16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndAnd16, uint16_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndAnd16, ptr, mask);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::get_and_and(ptr, static_cast<uint16_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicGetAndAnd32) {
-    TRACY_FUNC(sceKernelAtomicGetAndAnd32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndAnd32, uint32_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndAnd32, ptr, mask);
+    return static_cast<int32_t>(guest_atomic::get_and_and(ptr, static_cast<uint32_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndAnd64) {
-    TRACY_FUNC(sceKernelAtomicGetAndAnd64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicGetAndAnd64, uint64_t *ptr, uint64_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndAnd64, ptr, mask);
+    return static_cast<int64_t>(guest_atomic::get_and_and(ptr, static_cast<uint64_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndAnd8) {
-    TRACY_FUNC(sceKernelAtomicGetAndAnd8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndAnd8, uint8_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndAnd8, ptr, mask);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::get_and_and(ptr, static_cast<uint8_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicGetAndClear16) {
-    TRACY_FUNC(sceKernelAtomicGetAndClear16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndClear16, uint16_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndClear16, ptr, mask);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::get_and_clear(ptr, static_cast<uint16_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicGetAndClear32) {
-    TRACY_FUNC(sceKernelAtomicGetAndClear32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndClear32, uint32_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndClear32, ptr, mask);
+    return static_cast<int32_t>(guest_atomic::get_and_clear(ptr, static_cast<uint32_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndClear64) {
-    TRACY_FUNC(sceKernelAtomicGetAndClear64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicGetAndClear64, uint64_t *ptr, uint64_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndClear64, ptr, mask);
+    return static_cast<int64_t>(guest_atomic::get_and_clear(ptr, static_cast<uint64_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndClear8) {
-    TRACY_FUNC(sceKernelAtomicGetAndClear8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndClear8, uint8_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndClear8, ptr, mask);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::get_and_clear(ptr, static_cast<uint8_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicGetAndOr16) {
-    TRACY_FUNC(sceKernelAtomicGetAndOr16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndOr16, uint16_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndOr16, ptr, mask);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::get_and_or(ptr, static_cast<uint16_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicGetAndOr32) {
-    TRACY_FUNC(sceKernelAtomicGetAndOr32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndOr32, uint32_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndOr32, ptr, mask);
+    return static_cast<int32_t>(guest_atomic::get_and_or(ptr, static_cast<uint32_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndOr64) {
-    TRACY_FUNC(sceKernelAtomicGetAndOr64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicGetAndOr64, uint64_t *ptr, uint64_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndOr64, ptr, mask);
+    return static_cast<int64_t>(guest_atomic::get_and_or(ptr, static_cast<uint64_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndOr8) {
-    TRACY_FUNC(sceKernelAtomicGetAndOr8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndOr8, uint8_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndOr8, ptr, mask);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::get_and_or(ptr, static_cast<uint8_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicGetAndSet16) {
-    TRACY_FUNC(sceKernelAtomicGetAndSet16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndSet16, uint16_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicGetAndSet16, ptr, value);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::get_and_set(ptr, static_cast<uint16_t>(value))));
 }
 
-EXPORT(int, sceKernelAtomicGetAndSet32) {
-    TRACY_FUNC(sceKernelAtomicGetAndSet32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndSet32, uint32_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicGetAndSet32, ptr, value);
+    return static_cast<int32_t>(guest_atomic::get_and_set(ptr, static_cast<uint32_t>(value)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndSet64) {
-    TRACY_FUNC(sceKernelAtomicGetAndSet64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicGetAndSet64, uint64_t *ptr, uint64_t value) {
+    TRACY_FUNC(sceKernelAtomicGetAndSet64, ptr, value);
+    return static_cast<int64_t>(guest_atomic::get_and_set(ptr, static_cast<uint64_t>(value)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndSet8) {
-    TRACY_FUNC(sceKernelAtomicGetAndSet8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndSet8, uint8_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicGetAndSet8, ptr, value);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::get_and_set(ptr, static_cast<uint8_t>(value))));
 }
 
-EXPORT(int, sceKernelAtomicGetAndSub16) {
-    TRACY_FUNC(sceKernelAtomicGetAndSub16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndSub16, uint16_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicGetAndSub16, ptr, value);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::get_and_sub(ptr, static_cast<uint16_t>(value))));
 }
 
-EXPORT(int, sceKernelAtomicGetAndSub32) {
-    TRACY_FUNC(sceKernelAtomicGetAndSub32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndSub32, uint32_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicGetAndSub32, ptr, value);
+    return static_cast<int32_t>(guest_atomic::get_and_sub(ptr, static_cast<uint32_t>(value)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndSub64) {
-    TRACY_FUNC(sceKernelAtomicGetAndSub64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicGetAndSub64, uint64_t *ptr, uint64_t value) {
+    TRACY_FUNC(sceKernelAtomicGetAndSub64, ptr, value);
+    return static_cast<int64_t>(guest_atomic::get_and_sub(ptr, static_cast<uint64_t>(value)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndSub8) {
-    TRACY_FUNC(sceKernelAtomicGetAndSub8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndSub8, uint8_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicGetAndSub8, ptr, value);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::get_and_sub(ptr, static_cast<uint8_t>(value))));
 }
 
-EXPORT(int, sceKernelAtomicGetAndXor16) {
-    TRACY_FUNC(sceKernelAtomicGetAndXor16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndXor16, uint16_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndXor16, ptr, mask);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::get_and_xor(ptr, static_cast<uint16_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicGetAndXor32) {
-    TRACY_FUNC(sceKernelAtomicGetAndXor32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndXor32, uint32_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndXor32, ptr, mask);
+    return static_cast<int32_t>(guest_atomic::get_and_xor(ptr, static_cast<uint32_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndXor64) {
-    TRACY_FUNC(sceKernelAtomicGetAndXor64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicGetAndXor64, uint64_t *ptr, uint64_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndXor64, ptr, mask);
+    return static_cast<int64_t>(guest_atomic::get_and_xor(ptr, static_cast<uint64_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicGetAndXor8) {
-    TRACY_FUNC(sceKernelAtomicGetAndXor8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicGetAndXor8, uint8_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicGetAndXor8, ptr, mask);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::get_and_xor(ptr, static_cast<uint8_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicOrAndGet16) {
-    TRACY_FUNC(sceKernelAtomicOrAndGet16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicOrAndGet16, uint16_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicOrAndGet16, ptr, mask);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::or_and_get(ptr, static_cast<uint16_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicOrAndGet32) {
-    TRACY_FUNC(sceKernelAtomicOrAndGet32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicOrAndGet32, uint32_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicOrAndGet32, ptr, mask);
+    return static_cast<int32_t>(guest_atomic::or_and_get(ptr, static_cast<uint32_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicOrAndGet64) {
-    TRACY_FUNC(sceKernelAtomicOrAndGet64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicOrAndGet64, uint64_t *ptr, uint64_t mask) {
+    TRACY_FUNC(sceKernelAtomicOrAndGet64, ptr, mask);
+    return static_cast<int64_t>(guest_atomic::or_and_get(ptr, static_cast<uint64_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicOrAndGet8) {
-    TRACY_FUNC(sceKernelAtomicOrAndGet8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicOrAndGet8, uint8_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicOrAndGet8, ptr, mask);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::or_and_get(ptr, static_cast<uint8_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicSet16) {
-    TRACY_FUNC(sceKernelAtomicSet16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicSet16, uint16_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicSet16, ptr, value);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::set(ptr, static_cast<uint16_t>(value))));
 }
 
-EXPORT(int, sceKernelAtomicSet32) {
-    TRACY_FUNC(sceKernelAtomicSet32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicSet32, uint32_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicSet32, ptr, value);
+    return static_cast<int32_t>(guest_atomic::set(ptr, static_cast<uint32_t>(value)));
 }
 
-EXPORT(int, sceKernelAtomicSet64) {
-    TRACY_FUNC(sceKernelAtomicSet64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicSet64, uint64_t *ptr, uint64_t value) {
+    TRACY_FUNC(sceKernelAtomicSet64, ptr, value);
+    return static_cast<int64_t>(guest_atomic::set(ptr, static_cast<uint64_t>(value)));
 }
 
-EXPORT(int, sceKernelAtomicSet8) {
-    TRACY_FUNC(sceKernelAtomicSet8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicSet8, uint8_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicSet8, ptr, value);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::set(ptr, static_cast<uint8_t>(value))));
 }
 
-EXPORT(int, sceKernelAtomicSubAndGet16) {
-    TRACY_FUNC(sceKernelAtomicSubAndGet16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicSubAndGet16, uint16_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicSubAndGet16, ptr, value);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::sub_and_get(ptr, static_cast<uint16_t>(value))));
 }
 
-EXPORT(int, sceKernelAtomicSubAndGet32) {
-    TRACY_FUNC(sceKernelAtomicSubAndGet32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicSubAndGet32, uint32_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicSubAndGet32, ptr, value);
+    return static_cast<int32_t>(guest_atomic::sub_and_get(ptr, static_cast<uint32_t>(value)));
 }
 
-EXPORT(int, sceKernelAtomicSubAndGet64) {
-    TRACY_FUNC(sceKernelAtomicSubAndGet64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicSubAndGet64, uint64_t *ptr, uint64_t value) {
+    TRACY_FUNC(sceKernelAtomicSubAndGet64, ptr, value);
+    return static_cast<int64_t>(guest_atomic::sub_and_get(ptr, static_cast<uint64_t>(value)));
 }
 
-EXPORT(int, sceKernelAtomicSubAndGet8) {
-    TRACY_FUNC(sceKernelAtomicSubAndGet8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicSubAndGet8, uint8_t *ptr, uint32_t value) {
+    TRACY_FUNC(sceKernelAtomicSubAndGet8, ptr, value);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::sub_and_get(ptr, static_cast<uint8_t>(value))));
 }
 
-EXPORT(int, sceKernelAtomicXorAndGet16) {
-    TRACY_FUNC(sceKernelAtomicXorAndGet16);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicXorAndGet16, uint16_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicXorAndGet16, ptr, mask);
+    return static_cast<int32_t>(static_cast<int16_t>(guest_atomic::xor_and_get(ptr, static_cast<uint16_t>(mask))));
 }
 
-EXPORT(int, sceKernelAtomicXorAndGet32) {
-    TRACY_FUNC(sceKernelAtomicXorAndGet32);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicXorAndGet32, uint32_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicXorAndGet32, ptr, mask);
+    return static_cast<int32_t>(guest_atomic::xor_and_get(ptr, static_cast<uint32_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicXorAndGet64) {
-    TRACY_FUNC(sceKernelAtomicXorAndGet64);
-    return UNIMPLEMENTED();
+EXPORT(int64_t, sceKernelAtomicXorAndGet64, uint64_t *ptr, uint64_t mask) {
+    TRACY_FUNC(sceKernelAtomicXorAndGet64, ptr, mask);
+    return static_cast<int64_t>(guest_atomic::xor_and_get(ptr, static_cast<uint64_t>(mask)));
 }
 
-EXPORT(int, sceKernelAtomicXorAndGet8) {
-    TRACY_FUNC(sceKernelAtomicXorAndGet8);
-    return UNIMPLEMENTED();
+EXPORT(int32_t, sceKernelAtomicXorAndGet8, uint8_t *ptr, uint32_t mask) {
+    TRACY_FUNC(sceKernelAtomicXorAndGet8, ptr, mask);
+    return static_cast<int32_t>(static_cast<int8_t>(guest_atomic::xor_and_get(ptr, static_cast<uint8_t>(mask))));
 }
 
 EXPORT(int, sceKernelBacktrace) {

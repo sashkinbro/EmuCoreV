@@ -895,10 +895,10 @@ SceInt32 rwlock_lock(KernelState &kernel, MemState &mem, const char *export_name
     // if it is a read lock, it is always recursive
     bool is_recursive = !is_write || (rwlock->attr & SCE_KERNEL_MUTEX_ATTR_RECURSIVE);
 
+    const RWLockAcquire decision = rwlock_acquire_decision(rwlock->state, is_write, is_recursive, rwlock->owners.contains(thread));
+
     // cases where we don't need to wait :
-    if (!continuation.resuming && (rwlock->state == RWLockState::Unlocked // the lock is unlocked
-        || (!is_write && rwlock->state == RWLockState::ReadLocked) // we want a read lock when the lock is readlocked
-        || (is_recursive && rwlock->owners.contains(thread)))) { // the thread asking has already locked this lock
+    if (!continuation.resuming && decision == RWLockAcquire::Acquire) {
 
         auto it = rwlock->owners.find(thread);
         if (it != rwlock->owners.end()) {
@@ -911,7 +911,7 @@ SceInt32 rwlock_lock(KernelState &kernel, MemState &mem, const char *export_name
         rwlock->state = is_write ? RWLockState::WriteLocked : RWLockState::ReadLocked;
 
         return SCE_KERNEL_OK;
-    } else if (!continuation.resuming && !is_recursive && rwlock->owners.contains(thread)) {
+    } else if (!continuation.resuming && decision == RWLockAcquire::Recursive) {
         return RET_ERROR(SCE_KERNEL_ERROR_RW_LOCK_RECURSIVE);
     } else {
         // we need to wait
@@ -920,6 +920,42 @@ SceInt32 rwlock_lock(KernelState &kernel, MemState &mem, const char *export_name
         writeback_timeout(timeout, deadline);
         return guest_result(r);
     }
+}
+
+// Non-blocking variant of rwlock_lock: same acquisition rules (owner / recursion), but when the
+// caller would have to wait it fails with SCE_KERNEL_ERROR_RW_LOCK_FAILED_TO_LOCK instead.
+SceInt32 rwlock_try_lock(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID lock_id, bool is_write) {
+    const ThreadStatePtr thread = kernel.get_thread(thread_id);
+    if (!thread) // the thread is being torn down so fail its last import instead of crashing the process
+        return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID);
+    const RWLockPtr rwlock = find_wait_object(kernel, lock_id, kernel.rwlocks);
+
+    if (!rwlock)
+        return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_RW_LOCK_ID);
+
+    auto rwlock_lock = rwlock->lock();
+    if (!rwlock_lock)
+        return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_RW_LOCK_ID);
+
+    // if it is a read lock, it is always recursive
+    const bool is_recursive = !is_write || (rwlock->attr & SCE_KERNEL_MUTEX_ATTR_RECURSIVE);
+
+    switch (rwlock_acquire_decision(rwlock->state, is_write, is_recursive, rwlock->owners.contains(thread))) {
+    case RWLockAcquire::Acquire: {
+        auto it = rwlock->owners.find(thread);
+        if (it != rwlock->owners.end())
+            it->second++;
+        else
+            rwlock->owners.emplace(thread, 1);
+        rwlock->state = is_write ? RWLockState::WriteLocked : RWLockState::ReadLocked;
+        return SCE_KERNEL_OK;
+    }
+    case RWLockAcquire::Recursive:
+        return RET_ERROR(SCE_KERNEL_ERROR_RW_LOCK_RECURSIVE);
+    case RWLockAcquire::Busy:
+        break;
+    }
+    return RET_ERROR(SCE_KERNEL_ERROR_RW_LOCK_FAILED_TO_LOCK);
 }
 
 SceInt32 rwlock_unlock(KernelState &kernel, MemState &mem, const char *export_name, SceUID thread_id, SceUID lock_id, bool is_write) {

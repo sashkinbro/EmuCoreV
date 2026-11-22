@@ -18,10 +18,16 @@ target_include_directories(gtest_host PUBLIC "${GTEST_ROOT}/include" PRIVATE "${
 find_package(Threads REQUIRED)
 target_link_libraries(gtest_host PUBLIC Threads::Threads)
 
-add_executable(core_host_tests object_store_tests.cpp video_snapshot_tests.cpp)
+add_executable(core_host_tests
+    object_store_tests.cpp
+    video_snapshot_tests.cpp
+    guest_atomics_tests.cpp
+    clib_chk_tests.cpp
+    rwlock_policy_tests.cpp)
 target_include_directories(core_host_tests PRIVATE
     "${CORE_ROOT}/kernel/include"
-    "${CORE_ROOT}/modules/SceVideodec")
+    "${CORE_ROOT}/modules/SceVideodec"
+    "${CORE_ROOT}/modules/SceLibKernel")
 target_link_libraries(core_host_tests PRIVATE gtest_host)
 target_compile_options(core_host_tests PRIVATE -Wall -Wextra)
 
