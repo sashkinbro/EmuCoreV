@@ -16,6 +16,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include "SceModulemgr.h"
+#include "sw_version.h"
 #include <io/functions.h>
 #include <kernel/load_self.h>
 #include <kernel/state.h>
@@ -168,9 +169,17 @@ EXPORT(int, sceKernelGetModuleList, int flags, SceUID *modids, int *num) {
     return SCE_KERNEL_OK;
 }
 
-EXPORT(int, sceKernelGetSystemSwVersion) {
-    TRACY_FUNC(sceKernelGetSystemSwVersion);
-    return UNIMPLEMENTED();
+EXPORT(int, sceKernelGetSystemSwVersion, Ptr<sw_version::FwInfo> fwInfo) {
+    TRACY_FUNC(sceKernelGetSystemSwVersion, fwInfo);
+    if (!fwInfo || !fwInfo.valid(emuenv.mem))
+        return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_ADDR);
+
+    sw_version::FwInfo *const info = fwInfo.get(emuenv.mem);
+    if (info->size != sizeof(sw_version::FwInfo))
+        return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_SIZE);
+
+    sw_version::fill(*info);
+    return SCE_KERNEL_OK;
 }
 
 EXPORT(int, sceKernelInhibitLoadingModule) {

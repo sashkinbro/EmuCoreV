@@ -69,9 +69,45 @@ struct AppsListState {
     mutable std::mutex mutex;
 };
 
+// Session state of small HLE services that only keep a few values (no emulated hardware behind them).
+struct ServiceState {
+    std::mutex mutex;
+
+    // sceAppUtilInit / sceAppUtilShutdown
+    bool apputil_inited = false;
+
+    // sceAppMgrAcquireBgmPort / sceAppMgrReleaseBgmPort: the application owns the BGM port.
+    bool bgm_port_acquired = false;
+
+    // sceScreenShot*: the emulator has no system screenshot UI, the values are only kept for queries.
+    bool screenshot_enabled = true;
+    bool screenshot_param_set = false;
+    std::string screenshot_photo_title;
+    std::string screenshot_game_title;
+    std::string screenshot_game_comment;
+    std::string screenshot_overlay_path;
+    int screenshot_overlay_x = 0;
+    int screenshot_overlay_y = 0;
+
+    void reset() {
+        const std::lock_guard<std::mutex> lock(mutex);
+        apputil_inited = false;
+        bgm_port_acquired = false;
+        screenshot_enabled = true;
+        screenshot_param_set = false;
+        screenshot_photo_title.clear();
+        screenshot_game_title.clear();
+        screenshot_game_comment.clear();
+        screenshot_overlay_path.clear();
+        screenshot_overlay_x = 0;
+        screenshot_overlay_y = 0;
+    }
+};
+
 } // namespace app
 
 struct AppState {
     app::AppsListState apps_list;
     app::UserListState user_list;
+    app::ServiceState services;
 };

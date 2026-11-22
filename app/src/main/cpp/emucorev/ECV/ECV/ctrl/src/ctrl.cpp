@@ -50,6 +50,15 @@ SceCtrlExternalInputMode get_type_of_controller(CtrlState &state, int port) {
     return SCE_CTRL_TYPE_DS3;
 }
 
+void latch_gamepad_button(CtrlState &state, SDL_JoystickID gamepad, uint8_t button) {
+    if (button >= 64)
+        return;
+    const std::lock_guard<std::mutex> guard(state.mutex);
+    const auto it = state.controllers.find(gamepad);
+    if (it != state.controllers.end())
+        it->second.latched_buttons |= uint64_t{ 1 } << button;
+}
+
 void refresh_controllers(CtrlState &state, EmuEnvState &emuenv) {
     // Remove disconnected controllers
     bool found_gyro = false;
@@ -84,13 +93,8 @@ void refresh_controllers(CtrlState &state, EmuEnvState &emuenv) {
             continue;
 #endif
 
-        const SDL_GUID guid = SDL_GetJoystickGUIDForID(gamepad_id);
-        if (!state.controllers.contains(guid)) {
-            Controller new_controller;
-            new_controller.port = reserve_port(state);
-            if (new_controller.port == -1) { // Port not available
-                break;
-            }
+        // Keyed by instance id: two identical pads share the same GUID.
+        if (!state.controllers.contains(gamepad_id)) {
             const GamepadPtr controller(SDL_OpenGamepad(gamepad_id), SDL_CloseGamepad);
             if (controller == nullptr) {
                 continue;
@@ -98,6 +102,12 @@ void refresh_controllers(CtrlState &state, EmuEnvState &emuenv) {
             auto controller_name = SDL_GetGamepadName(controller.get());
             if (controller_name == nullptr) {
                 continue;
+            }
+            // Reserve the port only once opening succeeded, so no failure path leaks it.
+            Controller new_controller;
+            new_controller.port = reserve_port(state);
+            if (new_controller.port == -1) { // Port not available
+                break;
             }
             new_controller.controller = controller;
             SDL_SetGamepadPlayerIndex(controller.get(), new_controller.port);
@@ -122,7 +132,7 @@ void refresh_controllers(CtrlState &state, EmuEnvState &emuenv) {
             found_gyro |= new_controller.has_gyro;
             found_accel |= new_controller.has_accel;
 
-            state.controllers.emplace(guid, new_controller);
+            state.controllers.emplace(gamepad_id, new_controller);
             state.controllers_num++;
         }
     }
@@ -198,12 +208,20 @@ static uint8_t float_to_byte(float f) {
     return static_cast<uint8_t>(mapped * 255);
 }
 
-static void apply_controller(EmuEnvState &emuenv, uint32_t *buttons, float axes[4], SDL_Gamepad *controller, bool ext) {
+static bool gamepad_button_down(SDL_Gamepad *controller, SDL_GamepadButton button, uint64_t latched) {
+    return SDL_GetGamepadButton(controller, button)
+        || (button >= 0 && button < 64 && (latched & (uint64_t{ 1 } << button)) != 0);
+}
+
+static void apply_controller(EmuEnvState &emuenv, uint32_t *buttons, float axes[4], Controller &pad, bool ext) {
+    SDL_Gamepad *controller = pad.controller.get();
+    const uint64_t latched = pad.latched_buttons;
+    pad.latched_buttons = 0;
     const auto &axis_binds = emuenv.cfg.controller_axis_binds;
 
     if (ext) {
         for (const auto &binding : get_controller_bindings_ext(emuenv)) {
-            if (SDL_GetGamepadButton(controller, binding.controller)) {
+            if (gamepad_button_down(controller, binding.controller, latched)) {
                 *buttons |= binding.button;
             }
         }
@@ -216,7 +234,7 @@ static void apply_controller(EmuEnvState &emuenv, uint32_t *buttons, float axes[
         }
     } else {
         for (const auto &binding : get_controller_bindings(emuenv)) {
-            if (SDL_GetGamepadButton(controller, binding.controller)) {
+            if (gamepad_button_down(controller, binding.controller, latched)) {
                 *buttons |= binding.button;
             }
         }
@@ -269,18 +287,18 @@ static void retrieve_ctrl_data(EmuEnvState &emuenv, int port, bool is_v2, bool n
             apply_keyboard(&buttons, axes.data(), is_v2, emuenv);
         }
         emucorev::input_state::apply_pad_state(port - 1, buttons, axes.data());
-        for (const auto &[_, controller] : state.controllers) {
+        for (auto &[_, controller] : state.controllers) {
             if (controller.port + 1 == port) {
                 // sceCtrl ports are 1-based and SDL_GameController index is 0-based. Need to convert.
-                apply_controller(emuenv, &buttons, axes.data(), controller.controller.get(), is_v2);
+                apply_controller(emuenv, &buttons, axes.data(), controller, is_v2);
             }
         }
     } else if (port == 1) {
         // If not in PSTV mode, every controller input is considered as a port 1 input
         apply_keyboard(&buttons, axes.data(), is_v2, emuenv);
         emucorev::input_state::apply_all_pad_states(buttons, axes.data());
-        for (const auto &[_, controller] : state.controllers) {
-            apply_controller(emuenv, &buttons, axes.data(), controller.controller.get(), is_v2);
+        for (auto &[_, controller] : state.controllers) {
+            apply_controller(emuenv, &buttons, axes.data(), controller, is_v2);
         }
     }
 

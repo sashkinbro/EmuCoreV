@@ -31,6 +31,7 @@
 #include <packages/functions.h>
 #include <util/log.h>
 #include <util/string_utils.h>
+#include <util/system.h>
 
 #include <SDL3/SDL_timer.h>
 
@@ -193,9 +194,33 @@ EXPORT(int, sceCommonDialogIsRunning) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceCommonDialogSetConfigParam) {
-    TRACY_FUNC(sceCommonDialogSetConfigParam);
-    return UNIMPLEMENTED();
+// Out-of-range language/enter-button values (0xFFFFFFFF = "use the system setting") are kept as "not set".
+// Layout as in the SDK (psp2/common_dialog.h): sceCommonDialogConfigParamInit sets sdkVersion and
+// language/enterButtonAssign = 0xFFFFFFFF ("use the system setting").
+struct SceCommonDialogConfigParam {
+    SceUInt32 sdkVersion;
+    SceInt32 language;
+    SceInt32 enterButtonAssign;
+    uint8_t reserved[32];
+};
+static_assert(sizeof(SceCommonDialogConfigParam) == 44);
+
+EXPORT(int, sceCommonDialogSetConfigParam, Ptr<const SceCommonDialogConfigParam> param) {
+    TRACY_FUNC(sceCommonDialogSetConfigParam, param);
+    if (!param || !param.valid(emuenv.mem))
+        return RET_ERROR(SCE_COMMON_DIALOG_ERROR_NULL);
+
+    const SceCommonDialogConfigParam *const config = param.get(emuenv.mem);
+    CommonDialogConfig value;
+    value.set = true;
+    if (config->language >= SCE_SYSTEM_PARAM_LANG_JAPANESE && config->language <= SCE_SYSTEM_PARAM_LANG_TURKISH)
+        value.language = config->language;
+    if (config->enterButtonAssign == SCE_SYSTEM_PARAM_ENTER_BUTTON_CIRCLE || config->enterButtonAssign == SCE_SYSTEM_PARAM_ENTER_BUTTON_CROSS)
+        value.enter_button_assign = config->enterButtonAssign;
+
+    const std::lock_guard<std::recursive_mutex> lock(emuenv.common_dialog.mutex);
+    emuenv.common_dialog.config = value;
+    return 0;
 }
 
 EXPORT(int, sceCommonDialogUpdate) {

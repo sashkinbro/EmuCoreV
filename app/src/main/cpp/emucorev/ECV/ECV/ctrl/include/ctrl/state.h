@@ -39,6 +39,9 @@ struct Controller {
     bool has_gyro;
     bool has_led;
     const char *name;
+    // SDL gamepad buttons pressed since the last sceCtrl read (bit = SDL_GamepadButton). A press
+    // released before the game samples the pad would otherwise never be seen.
+    uint64_t latched_buttons = 0;
 };
 
 struct ControllerBinding {
@@ -52,7 +55,8 @@ struct SDL_GUIDComparator {
     }
 };
 
-typedef std::map<SDL_GUID, Controller, SDL_GUIDComparator> ControllerList;
+// Keyed by SDL joystick instance id (the GUID is identical for two pads of the same model).
+typedef std::map<SDL_JoystickID, Controller> ControllerList;
 
 struct VirtualKeyboardState {
     uint32_t buttons = 0;

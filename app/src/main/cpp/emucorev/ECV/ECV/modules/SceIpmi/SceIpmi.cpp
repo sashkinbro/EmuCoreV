@@ -69,7 +69,9 @@ EXPORT(int, _ZN4IPMI6Client13waitEventFlagEjjjPjS1_) {
 EXPORT(int, _ZN4IPMI6Client16invokeSyncMethodEjPKNS_8DataInfoEjPiPNS_10BufferInfoEj, Ptr<void> client, uint32_t method, Ptr<uint32_t> input, uint32_t count, Ptr<int> result, Ptr<BufferInfo> output, uint32_t output_count) {
 #ifndef NDEBUG
     if (emuenv.io.app_path == "__VITA_NATIVE_TROPHIES__") {
-        auto *state = emuenv.kernel.obj_store.get<LocalIpmiState>();
+        const auto state = emuenv.kernel.obj_store.get_shared<LocalIpmiState>();
+        if (!state)
+            return UNIMPLEMENTED();
         const std::lock_guard lock(state->mutex);
         LOG_WARN("Trophy service {} method {:x} inputs {} outputs {}", state->services[client.address()], method, count, output_count);
         if (count == 1 && input && input.valid(emuenv.mem)) {
@@ -87,7 +89,9 @@ EXPORT(int, _ZN4IPMI6Client16invokeSyncMethodEjPKNS_8DataInfoEjPiPNS_10BufferInf
 
 EXPORT(int, _ZN4IPMI6Client16invokeSyncMethodEjPKvjPiPvPjj, Ptr<void> client, uint32_t method, Ptr<void> input, uint32_t size, Ptr<int> result, Ptr<void> output, Ptr<uint32_t> written, uint32_t output_size) {
     if (emuenv.io.app_path == "__VITA_NATIVE_TROPHIES__" && output_size == 0 && method <= 1 && result && result.valid(emuenv.mem)) {
-        auto *state = emuenv.kernel.obj_store.get<LocalIpmiState>();
+        const auto state = emuenv.kernel.obj_store.get_shared<LocalIpmiState>();
+        if (!state)
+            return UNIMPLEMENTED();
         const std::lock_guard lock(state->mutex);
         const auto service = state->services.find(client.address());
         if (service != state->services.end() && (service->second == "SceDbUtilDcn" || service->second == "SceNpTrophy")) {
@@ -135,9 +139,10 @@ EXPORT(int, _ZN4IPMI6Client6createEPPS0_PKNS0_6ConfigEPvS6_, Ptr<void> *client, 
     *client = client_memory;
     if (config && emuenv.io.app_path == "__VITA_NATIVE_TROPHIES__") {
         const char *name = static_cast<const char *>(config);
-        auto *state = emuenv.kernel.obj_store.get<LocalIpmiState>();
-        const std::lock_guard lock(state->mutex);
-        state->services[client_memory.address()] = std::string(name, strnlen(name, 16));
+        if (const auto state = emuenv.kernel.obj_store.get_shared<LocalIpmiState>()) {
+            const std::lock_guard lock(state->mutex);
+            state->services[client_memory.address()] = std::string(name, strnlen(name, 16));
+        }
     }
     STUBBED("Stubed");
     return 0;

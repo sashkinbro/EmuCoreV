@@ -353,6 +353,8 @@ struct System : public MempoolObject {
     int32_t max_voices;
     int32_t granularity;
     int32_t sample_rate;
+    // sceNgsSystemSetFlags: stored, no flag changes the emulated mixing.
+    uint32_t flags = 0;
 
     VoiceScheduler voice_scheduler;
 

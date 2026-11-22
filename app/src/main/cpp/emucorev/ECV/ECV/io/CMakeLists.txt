@@ -4,6 +4,7 @@ add_library(
 	include/io/device.h
 	include/io/filesystem.h
 	include/io/functions.h
+	include/io/guest_path.h
 	include/io/io.h
 	include/io/state.h
 	include/io/types.h

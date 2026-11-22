@@ -20,8 +20,10 @@
 
 #include <module/module.h>
 
+#include <codec/avc_picture.h>
 #include <codec/state.h>
 #include <kernel/state.h>
+#include <mem/functions.h>
 #include <util/lock_and_find.h>
 
 #include <util/tracy.h>
@@ -37,13 +39,18 @@ struct VideodecState {
     std::map<SceUID, std::pair<uint32_t, uint32_t>> sizes;
 };
 
+// SceAvcdecErrorCode (vitasdk vita-headers psp2/videodec.h)
 enum {
+    SCE_AVCDEC_ERROR_INVALID_TYPE = 0x80620001,
     SCE_AVCDEC_ERROR_INVALID_PARAM = 0x80620002,
+    SCE_AVCDEC_ERROR_OUT_OF_MEMORY = 0x80620003,
+    SCE_AVCDEC_ERROR_INVALID_COLOR_FORMAT = 0x80620006,
     SCE_AVCDEC_ERROR_INVALID_POINTER = 0x80620009,
 };
 
 enum SceVideodecType {
-    SCE_VIDEODEC_TYPE_HW_AVCDEC = 0x1001
+    SCE_VIDEODEC_TYPE_HW_AVCDEC = 0x1001,
+    SCE_VIDEODEC_TYPE_HW_M4VDEC = 0x1002,
 };
 
 struct SceVideodecTimeStamp {
@@ -119,6 +126,8 @@ struct SceAvcdecAu {
 
 enum ScePixelType : uint32_t {
     SCE_AVCDEC_PIXEL_RGBA8888 = 0x0U, // A:B:G:R=8:8:8:8    32bit   U8U8U8U8_ABGR
+    SCE_AVCDEC_PIXEL_RGBA565 = 0x1U, // vita-headers SceAvcdecPixelFormat
+    SCE_AVCDEC_PIXEL_RGBA5551 = 0x2U, // vita-headers SceAvcdecPixelFormat
     SCE_AVCDEC_PIXEL_BGRA8888 = 0x8U, // A:R:G:B=8:8:8:8    32bit   U8U8U8U8_ARGB
     SCE_AVCDEC_PIXEL_YUV420_RASTER = 0x10U, // YUV420P3
     SCE_AVCDEC_PIXEL_YUV420_PACKED_RASTER = 0x20U, // YVU420P2
@@ -155,16 +164,52 @@ struct SceAvcdecArrayPicture {
     Ptr<Ptr<SceAvcdecPicture>> pPicture;
 };
 
-EXPORT(int, sceAvcdecCreateDecoder, uint32_t codec_type, SceAvcdecCtrl *decoder, const SceAvcdecQueryDecoderInfo *query) {
-    TRACY_FUNC(sceAvcdecCreateDecoder, codec_type, decoder, query);
+static_assert(SCE_AVCDEC_PIXEL_RGBA8888 == avc_picture::kPixelRgba8888 && SCE_AVCDEC_PIXEL_RGBA565 == avc_picture::kPixelRgba565
+    && SCE_AVCDEC_PIXEL_RGBA5551 == avc_picture::kPixelRgba5551 && SCE_AVCDEC_PIXEL_BGRA8888 == avc_picture::kPixelBgra8888
+    && SCE_AVCDEC_PIXEL_YUV420_RASTER == avc_picture::kPixelYuv420Raster
+    && SCE_AVCDEC_PIXEL_YUV420_PACKED_RASTER == avc_picture::kPixelYuv420PackedRaster);
 
-    if (codec_type != SCE_VIDEODEC_TYPE_HW_AVCDEC)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+static uint32_t codec_type_of(VideoCodecKind kind) {
+    return kind == VideoCodecKind::MPEG4 ? SCE_VIDEODEC_TYPE_HW_M4VDEC : SCE_VIDEODEC_TYPE_HW_AVCDEC;
+}
+
+static bool query_in_range(const SceAvcdecQueryDecoderInfo *query) {
+    return query->horizontal <= 1920 && query->vertical <= 1088 && query->horizontal * query->vertical <= 1280 * 720 && query->numOfRefFrames <= 16;
+}
+
+// Looks a handle up and checks that it belongs to the right codec family (AVC handles are not
+// valid for the M4v exports and the other way round).
+static H264DecoderPtr find_decoder(EmuEnvState &emuenv, const char *export_name, const SceAvcdecCtrl *decoder, VideoCodecKind kind, int &error) {
+    error = 0;
+    if (!decoder) {
+        error = RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+        return nullptr;
+    }
+    if (decoder->handle == 0) {
+        error = RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+        return nullptr;
+    }
+    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
+    if (!state) {
+        error = RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+        return nullptr;
+    }
+    H264DecoderPtr decoder_info = lock_and_find(decoder->handle, state->decoders, state->mutex);
+    if (!decoder_info || decoder_info->kind != kind) {
+        error = RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+        return nullptr;
+    }
+    return decoder_info;
+}
+
+static int create_decoder_impl(EmuEnvState &emuenv, const char *export_name, VideoCodecKind kind, uint32_t codec_type, SceAvcdecCtrl *decoder, const SceAvcdecQueryDecoderInfo *query) {
+    if (codec_type != codec_type_of(kind))
+        return RET_ERROR(kind == VideoCodecKind::MPEG4 ? SCE_AVCDEC_ERROR_INVALID_TYPE : SCE_AVCDEC_ERROR_INVALID_PARAM);
 
     if (!decoder || !query)
         return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
 
-    if (query->horizontal > 1920 || query->vertical > 1088 || query->horizontal * query->vertical > 1280 * 720 || query->numOfRefFrames > 16)
+    if (!query_in_range(query))
         return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
 
     // Absent when the guest never called sceVideodecInitLibrary* in this process (e.g. after a
@@ -174,13 +219,263 @@ EXPORT(int, sceAvcdecCreateDecoder, uint32_t codec_type, SceAvcdecCtrl *decoder,
         return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
     std::lock_guard<std::mutex> lock(state->mutex);
 
+    auto new_decoder = std::make_shared<H264DecoderState>(query->horizontal, query->vertical, kind);
+    if (!new_decoder->context || !new_decoder->parser)
+        return RET_ERROR(SCE_AVCDEC_ERROR_OUT_OF_MEMORY);
+
     SceUID handle = emuenv.kernel.get_next_uid();
     decoder->handle = handle;
 
-    state->decoders[handle] = std::make_shared<H264DecoderState>(query->horizontal, query->vertical);
+    state->decoders[handle] = std::move(new_decoder);
     state->sizes[handle] = { query->horizontal, query->vertical };
 
     return 0;
+}
+
+static int query_mem_size_impl(const char *export_name, VideoCodecKind kind, uint32_t codec_type, const SceAvcdecQueryDecoderInfo *query_info, SceAvcdecDecoderInfo *decoder_info) {
+    if (codec_type != codec_type_of(kind))
+        return RET_ERROR(kind == VideoCodecKind::MPEG4 ? SCE_AVCDEC_ERROR_INVALID_TYPE : SCE_AVCDEC_ERROR_INVALID_PARAM);
+
+    if (!query_info || !decoder_info)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+
+    if (!query_in_range(query_info))
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+
+    std::uint32_t numOfRefFrames = query_info->numOfRefFrames;
+    if (numOfRefFrames == 0) {
+        numOfRefFrames = 1;
+    }
+
+    decoder_info->frameMemSize = H264DecoderState::buffer_size({ { query_info->horizontal, query_info->vertical } }) * numOfRefFrames;
+    decoder_info->frameMemSize = decoder_info->frameMemSize + 0x3ffffU & 0xfffc0000; // alignment to the next multiple of 0x40000 (256-KiB)
+
+    return 0;
+}
+
+// Shared by sceAvcdecDecode, sceAvcdecDecodeNalAu, the WithWorkPicture variants and sceM4vdecDecode.
+// nal_units: the access unit holds NAL units that may lack Annex-B start codes (they are added).
+static int decode_impl(EmuEnvState &emuenv, const char *export_name, VideoCodecKind kind, SceAvcdecCtrl *decoder, const SceAvcdecAu *au, SceAvcdecArrayPicture *picture, bool nal_units) {
+    int error = 0;
+    const H264DecoderPtr decoder_info = find_decoder(emuenv, export_name, decoder, kind, error);
+    if (!decoder_info)
+        return error;
+
+    if (!au || !picture)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+
+    H264DecoderOptions options = {};
+    options.pts_upper = au->pts.upper;
+    options.pts_lower = au->pts.lower;
+    options.dts_upper = au->dts.upper;
+    options.dts_lower = au->dts.lower;
+
+    Ptr<SceAvcdecPicture> *picture_list = picture->pPicture.get(emuenv.mem);
+    if (!picture_list)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+    SceAvcdecPicture *pPicture = picture_list[0].get(emuenv.mem);
+    if (!pPicture)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+    SceAvcdecFrame &frame = pPicture->frame;
+
+    if (!avc_picture::is_valid_pixel_type(frame.pixelType))
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_COLOR_FORMAT);
+    const uint32_t pitch = avc_picture::effective_pitch(frame.framePitch, frame.frameWidth);
+    const uint64_t needed = avc_picture::picture_buffer_size(frame.pixelType, pitch, frame.frameHeight);
+    if (frame.frameWidth == 0 || needed == 0)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+    if (avc_picture::is_rgb(frame.pixelType) && !avc_picture::is_valid_csc(frame.opt.rgba.cscCoefficient))
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+
+    uint8_t *output = frame.pPicture[0].cast<uint8_t>().get(emuenv.mem);
+    const uint8_t *es_data = au->es.pBuf.cast<uint8_t>().get(emuenv.mem);
+    if (!es_data || !output)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+    const uint64_t output_end = static_cast<uint64_t>(frame.pPicture[0].address()) + needed;
+    if (output_end > 0xffffffffull || !is_valid_addr_range(emuenv.mem, frame.pPicture[0].address(), static_cast<Address>(output_end)))
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+
+    decoder_info->set_pixel_type(frame.pixelType);
+
+    std::vector<uint8_t> annexb;
+    uint32_t es_size = au->es.size;
+    if (nal_units) {
+        avc_picture::append_annexb(annexb, es_data, es_size);
+        if (annexb.empty())
+            return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+        es_data = annexb.data();
+        es_size = static_cast<uint32_t>(annexb.size());
+    }
+
+    decoder_info->configure(&options);
+    const auto send = decoder_info->send(es_data, es_size);
+    decoder_info->set_res(frame.frameWidth, frame.frameHeight);
+    H264PictureRequest request = {};
+    request.pixel_type = frame.pixelType;
+    request.pitch = pitch;
+    request.width = frame.frameWidth;
+    request.height = frame.frameHeight;
+    request.alpha = frame.opt.rgba.alpha;
+    request.csc_coefficient = static_cast<uint8_t>(frame.opt.rgba.cscCoefficient);
+    const bool got_frame = send && decoder_info->receive_picture(output, request);
+    if (got_frame) {
+        decoder_info->get_res(frame.horizontalSize, frame.verticalSize);
+        // FFmpeg already removed the cropped area: the whole picture is visible.
+        frame.frameCropLeftOffset = 0;
+        frame.frameCropRightOffset = 0;
+        frame.frameCropTopOffset = 0;
+        frame.frameCropBottomOffset = 0;
+        decoder_info->get_pts(pPicture->info.pts.upper, pPicture->info.pts.lower);
+        picture->numOfOutput++;
+    }
+
+    decoder_info->is_stopped = false;
+
+    return 0;
+}
+
+static int decode_stop_impl(EmuEnvState &emuenv, const char *export_name, VideoCodecKind kind, SceAvcdecCtrl *decoder, SceAvcdecArrayPicture *picture) {
+    int error = 0;
+    const H264DecoderPtr decoder_info = find_decoder(emuenv, export_name, decoder, kind, error);
+    if (!decoder_info)
+        return error;
+
+    if (!decoder_info->is_stopped) {
+        if (!picture)
+            return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+        Ptr<SceAvcdecPicture> *picture_list = picture->pPicture.get(emuenv.mem);
+        SceAvcdecPicture *pPicture = picture_list ? picture_list[0].get(emuenv.mem) : nullptr;
+        if (!pPicture)
+            return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+
+        // we get the values from the last frame, maybe we should slightly increase the pts value?
+        decoder_info->get_res(pPicture->frame.horizontalSize, pPicture->frame.verticalSize);
+        decoder_info->get_pts(pPicture->info.pts.upper, pPicture->info.pts.lower);
+
+        picture->numOfOutput = 1;
+    } else if (picture) {
+        picture->numOfOutput = 0;
+    }
+    decoder_info->is_stopped = true;
+
+    return 0;
+}
+
+static int decode_flush_impl(EmuEnvState &emuenv, const char *export_name, VideoCodecKind kind, SceAvcdecCtrl *decoder) {
+    int error = 0;
+    const H264DecoderPtr decoder_info = find_decoder(emuenv, export_name, decoder, kind, error);
+    if (!decoder_info)
+        return error;
+
+    decoder_info->flush();
+    decoder_info->is_stopped = true;
+
+    return 0;
+}
+
+static int decode_available_size_impl(EmuEnvState &emuenv, const char *export_name, VideoCodecKind kind, SceAvcdecCtrl *decoder) {
+    int error = 0;
+    const H264DecoderPtr decoder_info = find_decoder(emuenv, export_name, decoder, kind, error);
+    if (!decoder_info)
+        return error;
+
+    return H264DecoderState::buffer_size(
+        { { decoder_info->get(DecoderQuery::WIDTH), decoder_info->get(DecoderQuery::HEIGHT) } });
+}
+
+static int delete_decoder_impl(EmuEnvState &emuenv, const char *export_name, VideoCodecKind kind, SceAvcdecCtrl *decoder) {
+    int error = 0;
+    if (!find_decoder(emuenv, export_name, decoder, kind, error))
+        return error;
+    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
+    std::lock_guard<std::mutex> lock(state->mutex);
+    state->decoders.erase(decoder->handle);
+    state->sizes.erase(decoder->handle);
+
+    return 0;
+}
+
+// Mode setters: the value is stored (and saved with the state) but FFmpeg has no equivalent
+// switch, so it does not change decoding. PROVISIONAL: the (decoder, mode) signature and the
+// mode range are undocumented (not in vita-headers), the value is not validated.
+static int set_mode_impl(EmuEnvState &emuenv, const char *export_name, SceAvcdecCtrl *decoder, uint32_t mode, uint32_t H264DecoderState::*field) {
+    int error = 0;
+    const H264DecoderPtr decoder_info = find_decoder(emuenv, export_name, decoder, VideoCodecKind::H264, error);
+    if (!decoder_info)
+        return error;
+    decoder_info.get()->*field = mode;
+    return 0;
+}
+
+// YUV 4:2:0 picture -> RGB picture. PROVISIONAL signature: neither vita-headers nor the
+// firmware exports were available, (src, dst) is assumed; the source is a decoded SceAvcdecPicture
+// (YUV pixel type, optional frame crop offsets), the destination describes the RGB buffer
+// (pixelType, framePitch/Width/Height, opt.rgba alpha and csc coefficient).
+static int csc_impl(EmuEnvState &emuenv, const char *export_name, const SceAvcdecPicture *src, SceAvcdecPicture *dst) {
+    if (!src || !dst)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+    const SceAvcdecFrame &sf = src->frame;
+    const SceAvcdecFrame &df = dst->frame;
+    if (!avc_picture::is_yuv(sf.pixelType) || !avc_picture::is_rgb(df.pixelType))
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_COLOR_FORMAT);
+    if (!avc_picture::is_valid_csc(df.opt.rgba.cscCoefficient))
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+
+    const uint32_t coded_w = sf.horizontalSize ? sf.horizontalSize : sf.frameWidth;
+    const uint32_t coded_h = sf.verticalSize ? sf.verticalSize : sf.frameHeight;
+    const uint32_t src_pitch = avc_picture::effective_pitch(sf.framePitch, sf.frameWidth ? sf.frameWidth : coded_w);
+    const uint32_t src_rows = sf.frameHeight ? sf.frameHeight : coded_h;
+    avc_picture::Rect visible;
+    if (coded_w == 0 || coded_h == 0 || coded_w > src_pitch || coded_h > src_rows
+        || !avc_picture::visible_rect(coded_w, coded_h, sf.frameCropLeftOffset, sf.frameCropRightOffset, sf.frameCropTopOffset, sf.frameCropBottomOffset, visible))
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+
+    avc_picture::YuvLayout layout;
+    if (!avc_picture::yuv420_layout(sf.pixelType, src_pitch, src_rows, layout))
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+    const uint32_t dst_pitch = avc_picture::effective_pitch(df.framePitch, df.frameWidth);
+    const uint64_t dst_size = avc_picture::picture_buffer_size(df.pixelType, dst_pitch, df.frameHeight);
+    if (dst_size == 0 || df.frameWidth == 0)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
+
+    const uint8_t *src_base = sf.pPicture[0].cast<uint8_t>().get(emuenv.mem);
+    uint8_t *dst_base = df.pPicture[0].cast<uint8_t>().get(emuenv.mem);
+    if (!src_base || !dst_base)
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+    const uint64_t src_end = static_cast<uint64_t>(sf.pPicture[0].address()) + layout.total_size;
+    const uint64_t dst_end = static_cast<uint64_t>(df.pPicture[0].address()) + dst_size;
+    if (src_end > 0xffffffffull || dst_end > 0xffffffffull
+        || !is_valid_addr_range(emuenv.mem, sf.pPicture[0].address(), static_cast<Address>(src_end))
+        || !is_valid_addr_range(emuenv.mem, df.pPicture[0].address(), static_cast<Address>(dst_end)))
+        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
+
+    avc_picture::Yuv420Planes planes;
+    planes.y_pitch = layout.luma_pitch;
+    planes.y = src_base + static_cast<size_t>(visible.y) * layout.luma_pitch + visible.x;
+    planes.chroma_pitch = layout.chroma_pitch;
+    const size_t chroma_row = static_cast<size_t>(visible.y / 2) * layout.chroma_pitch;
+    if (sf.pixelType == avc_picture::kPixelYuv420Raster) {
+        planes.u = src_base + layout.chroma_offset + chroma_row + visible.x / 2;
+        planes.v = src_base + layout.v_offset + chroma_row + visible.x / 2;
+        planes.chroma_step = 1;
+    } else {
+        planes.u = src_base + layout.chroma_offset + chroma_row + visible.x;
+        planes.v = planes.u + 1;
+        planes.chroma_step = 2;
+    }
+
+    const bool bt709 = src->info.matrixCoefficients == 1;
+    const bool full_range = src->info.videoFullRangeFlag != 0;
+    const auto csc = avc_picture::resolve_csc(static_cast<avc_picture::Csc>(df.opt.rgba.cscCoefficient), bt709, full_range);
+    const auto extent = avc_picture::copy_extent(visible.width, visible.height, df.frameWidth, df.frameHeight);
+    avc_picture::convert_yuv420(planes, extent.width, extent.height, df.pixelType, csc, df.opt.rgba.alpha, dst_base,
+        static_cast<size_t>(dst_pitch) * avc_picture::bytes_per_pixel(df.pixelType));
+    return 0;
+}
+
+EXPORT(int, sceAvcdecCreateDecoder, uint32_t codec_type, SceAvcdecCtrl *decoder, const SceAvcdecQueryDecoderInfo *query) {
+    TRACY_FUNC(sceAvcdecCreateDecoder, codec_type, decoder, query);
+    return create_decoder_impl(emuenv, export_name, VideoCodecKind::H264, codec_type, decoder, query);
 }
 
 EXPORT(int, sceAvcdecCreateDecoderInternal) {
@@ -193,9 +488,9 @@ EXPORT(int, sceAvcdecCreateDecoderNongameapp) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAvcdecCsc) {
-    TRACY_FUNC(sceAvcdecCsc);
-    return UNIMPLEMENTED();
+EXPORT(int, sceAvcdecCsc, const SceAvcdecPicture *src, SceAvcdecPicture *dst) {
+    TRACY_FUNC(sceAvcdecCsc, src, dst);
+    return csc_impl(emuenv, export_name, src, dst);
 }
 
 EXPORT(int, sceAvcdecCscInternal) {
@@ -205,62 +500,7 @@ EXPORT(int, sceAvcdecCscInternal) {
 
 EXPORT(int, sceAvcdecDecode, SceAvcdecCtrl *decoder, const SceAvcdecAu *au, SceAvcdecArrayPicture *picture) {
     TRACY_FUNC(sceAvcdecDecode, decoder, au, picture);
-
-    if (!decoder)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
-
-    if (decoder->handle == 0)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-
-    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
-    if (!state)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-    const H264DecoderPtr decoder_info = lock_and_find(decoder->handle, state->decoders, state->mutex);
-    if (!decoder_info)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-
-    if (!au || !picture)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
-
-    H264DecoderOptions options = {};
-    options.pts_upper = au->pts.upper;
-    options.pts_lower = au->pts.lower;
-    options.dts_upper = au->dts.upper;
-    options.dts_lower = au->dts.lower;
-
-    // This is quite long...
-    Ptr<SceAvcdecPicture> *picture_list = picture->pPicture.get(emuenv.mem);
-    if (!picture_list)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
-    SceAvcdecPicture *pPicture = picture_list[0].get(emuenv.mem);
-    if (!pPicture)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
-    uint8_t *output = pPicture->frame.pPicture[0].cast<uint8_t>().get(emuenv.mem);
-
-    if ((pPicture->frame.pixelType & (SCE_AVCDEC_PIXEL_YUV420_RASTER | SCE_AVCDEC_PIXEL_YUV420_PACKED_RASTER)) == 0) {
-        LOG_ERROR_ONCE("Avcdec rgba output is not implemented");
-        picture->numOfOutput++;
-        return 0;
-    }
-    bool is_yuvp3 = static_cast<bool>(pPicture->frame.pixelType & SCE_AVCDEC_PIXEL_YUV420_RASTER);
-    decoder_info->set_output_format(is_yuvp3);
-
-    decoder_info->configure(&options);
-    const uint8_t *es_data = au->es.pBuf.cast<uint8_t>().get(emuenv.mem);
-    if (!es_data || !output)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
-    const auto send = decoder_info->send(es_data, au->es.size);
-    decoder_info->set_res(pPicture->frame.frameWidth, pPicture->frame.frameHeight);
-    const bool got_frame = send && decoder_info->receive(output);
-    if (got_frame) {
-        decoder_info->get_res(pPicture->frame.horizontalSize, pPicture->frame.verticalSize);
-        decoder_info->get_pts(pPicture->info.pts.upper, pPicture->info.pts.lower);
-        picture->numOfOutput++;
-    }
-
-    decoder_info->is_stopped = false;
-
-    return 0;
+    return decode_impl(emuenv, export_name, VideoCodecKind::H264, decoder, au, picture, false);
 }
 
 EXPORT(int, sceAvcdecDecodeAuInternal) {
@@ -285,44 +525,12 @@ EXPORT(int, sceAvcdecDecodeAuNongameapp) {
 
 EXPORT(int, sceAvcdecDecodeAvailableSize, SceAvcdecCtrl *decoder) {
     TRACY_FUNC(sceAvcdecDecodeAvailableSize, decoder);
-
-    if (!decoder)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
-
-    if (decoder->handle == 0)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-
-    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
-    if (!state)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-    const H264DecoderPtr decoder_info = lock_and_find(decoder->handle, state->decoders, state->mutex);
-    if (!decoder_info)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-
-    return H264DecoderState::buffer_size(
-        { { decoder_info->get(DecoderQuery::WIDTH), decoder_info->get(DecoderQuery::HEIGHT) } });
+    return decode_available_size_impl(emuenv, export_name, VideoCodecKind::H264, decoder);
 }
 
 EXPORT(int, sceAvcdecDecodeFlush, SceAvcdecCtrl *decoder) {
     TRACY_FUNC(sceAvcdecDecodeFlush, decoder);
-
-    if (!decoder)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
-
-    if (decoder->handle == 0)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-
-    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
-    if (!state)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-    const H264DecoderPtr decoder_info = lock_and_find(decoder->handle, state->decoders, state->mutex);
-    if (!decoder_info)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-
-    decoder_info->flush();
-    decoder_info->is_stopped = true;
-
-    return 0;
+    return decode_flush_impl(emuenv, export_name, VideoCodecKind::H264, decoder);
 }
 
 EXPORT(int, sceAvcdecDecodeGetPictureInternal) {
@@ -340,14 +548,14 @@ EXPORT(int, sceAvcdecDecodeGetPictureWithWorkPictureInternal) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAvcdecDecodeNalAu) {
-    TRACY_FUNC(sceAvcdecDecodeNalAu);
-    return UNIMPLEMENTED();
+EXPORT(int, sceAvcdecDecodeNalAu, SceAvcdecCtrl *decoder, const SceAvcdecAu *au, SceAvcdecArrayPicture *picture) {
+    TRACY_FUNC(sceAvcdecDecodeNalAu, decoder, au, picture);
+    return decode_impl(emuenv, export_name, VideoCodecKind::H264, decoder, au, picture, true);
 }
 
-EXPORT(int, sceAvcdecDecodeNalAuWithWorkPicture) {
-    TRACY_FUNC(sceAvcdecDecodeNalAuWithWorkPicture);
-    return UNIMPLEMENTED();
+EXPORT(int, sceAvcdecDecodeNalAuWithWorkPicture, SceAvcdecCtrl *decoder, const SceAvcdecAu *au, SceAvcdecArrayPicture *picture, SceAvcdecArrayPicture *work_picture) {
+    TRACY_FUNC(sceAvcdecDecodeNalAuWithWorkPicture, decoder, au, picture, work_picture);
+    return decode_impl(emuenv, export_name, VideoCodecKind::H264, decoder, au, picture, true);
 }
 
 EXPORT(int, sceAvcdecDecodeSetTrickModeNongameapp) {
@@ -362,68 +570,22 @@ EXPORT(int, sceAvcdecDecodeSetUserDataSei1FieldMemSizeNongameapp) {
 
 EXPORT(int, sceAvcdecDecodeStop, SceAvcdecCtrl *decoder, SceAvcdecArrayPicture *picture) {
     TRACY_FUNC(sceAvcdecDecodeStop, decoder, picture);
-
-    if (!decoder)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
-
-    if (decoder->handle == 0)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-
-    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
-    if (!state)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-    const H264DecoderPtr decoder_info = lock_and_find(decoder->handle, state->decoders, state->mutex);
-    if (!decoder_info)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-
-    if (!decoder_info->is_stopped) {
-        if (!picture)
-            return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
-        Ptr<SceAvcdecPicture> *picture_list = picture->pPicture.get(emuenv.mem);
-        SceAvcdecPicture *pPicture = picture_list ? picture_list[0].get(emuenv.mem) : nullptr;
-        if (!pPicture)
-            return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
-
-        // we get the values from the last frame, maybe we should slightly increase the pts value?
-        decoder_info->get_res(pPicture->frame.horizontalSize, pPicture->frame.verticalSize);
-        decoder_info->get_pts(pPicture->info.pts.upper, pPicture->info.pts.lower);
-
-        picture->numOfOutput = 1;
-    } else {
-        picture->numOfOutput = 0;
-    }
-    decoder_info->is_stopped = true;
-
-    return 0;
+    return decode_stop_impl(emuenv, export_name, VideoCodecKind::H264, decoder, picture);
 }
 
-EXPORT(int, sceAvcdecDecodeStopWithWorkPicture) {
-    TRACY_FUNC(sceAvcdecDecodeStopWithWorkPicture);
-    return UNIMPLEMENTED();
+EXPORT(int, sceAvcdecDecodeStopWithWorkPicture, SceAvcdecCtrl *decoder, SceAvcdecArrayPicture *picture) {
+    TRACY_FUNC(sceAvcdecDecodeStopWithWorkPicture, decoder, picture);
+    return decode_stop_impl(emuenv, export_name, VideoCodecKind::H264, decoder, picture);
 }
 
-EXPORT(int, sceAvcdecDecodeWithWorkPicture) {
-    TRACY_FUNC(sceAvcdecDecodeWithWorkPicture);
-    return UNIMPLEMENTED();
+EXPORT(int, sceAvcdecDecodeWithWorkPicture, SceAvcdecCtrl *decoder, const SceAvcdecAu *au, SceAvcdecArrayPicture *picture, SceAvcdecArrayPicture *work_picture) {
+    TRACY_FUNC(sceAvcdecDecodeWithWorkPicture, decoder, au, picture, work_picture);
+    return decode_impl(emuenv, export_name, VideoCodecKind::H264, decoder, au, picture, false);
 }
 
 EXPORT(int, sceAvcdecDeleteDecoder, SceAvcdecCtrl *decoder) {
     TRACY_FUNC(sceAvcdecDeleteDecoder, decoder);
-
-    if (!decoder)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
-
-    if (decoder->handle == 0)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-
-    const auto state = emuenv.kernel.obj_store.get_shared<VideodecState>();
-    if (!state)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-    std::lock_guard<std::mutex> lock(state->mutex);
-    state->decoders.erase(decoder->handle);
-    state->sizes.erase(decoder->handle);
-
-    return 0;
+    return delete_decoder_impl(emuenv, export_name, VideoCodecKind::H264, decoder);
 }
 
 EXPORT(int, sceAvcdecGetSeiPictureTimingInternal) {
@@ -438,25 +600,7 @@ EXPORT(int, sceAvcdecGetSeiUserDataNongameapp) {
 
 EXPORT(int, sceAvcdecQueryDecoderMemSize, uint32_t codec_type, const SceAvcdecQueryDecoderInfo *query_info, SceAvcdecDecoderInfo *decoder_info) {
     TRACY_FUNC(sceAvcdecQueryDecoderMemSize, codec_type, query_info, decoder_info);
-
-    if (codec_type != SCE_VIDEODEC_TYPE_HW_AVCDEC)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-
-    if (!query_info || !decoder_info)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_POINTER);
-
-    if (query_info->horizontal > 1920 || query_info->vertical > 1088 || query_info->horizontal * query_info->vertical > 1280 * 720 || query_info->numOfRefFrames > 16)
-        return RET_ERROR(SCE_AVCDEC_ERROR_INVALID_PARAM);
-
-    std::uint32_t numOfRefFrames = query_info->numOfRefFrames;
-    if (numOfRefFrames == 0) {
-        numOfRefFrames = 1;
-    }
-
-    decoder_info->frameMemSize = H264DecoderState::buffer_size({ { query_info->horizontal, query_info->vertical } }) * numOfRefFrames;
-    decoder_info->frameMemSize = decoder_info->frameMemSize + 0x3ffffU & 0xfffc0000; // alignment to the next multiple of 0x40000 (256-KiB)
-
-    return 0;
+    return query_mem_size_impl(export_name, VideoCodecKind::H264, codec_type, query_info, decoder_info);
 }
 
 EXPORT(int, sceAvcdecQueryDecoderMemSizeInternal) {
@@ -479,9 +623,9 @@ EXPORT(int, sceAvcdecRegisterCallbackNongameapp) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAvcdecSetDecodeMode) {
-    TRACY_FUNC(sceAvcdecSetDecodeMode);
-    return UNIMPLEMENTED();
+EXPORT(int, sceAvcdecSetDecodeMode, SceAvcdecCtrl *decoder, uint32_t mode) {
+    TRACY_FUNC(sceAvcdecSetDecodeMode, decoder, mode);
+    return set_mode_impl(emuenv, export_name, decoder, mode, &H264DecoderState::decode_mode);
 }
 
 EXPORT(int, sceAvcdecSetDecodeModeInternal) {
@@ -489,9 +633,9 @@ EXPORT(int, sceAvcdecSetDecodeModeInternal) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAvcdecSetInterlacedStreamMode) {
-    TRACY_FUNC(sceAvcdecSetInterlacedStreamMode);
-    return UNIMPLEMENTED();
+EXPORT(int, sceAvcdecSetInterlacedStreamMode, SceAvcdecCtrl *decoder, uint32_t mode) {
+    TRACY_FUNC(sceAvcdecSetInterlacedStreamMode, decoder, mode);
+    return set_mode_impl(emuenv, export_name, decoder, mode, &H264DecoderState::interlaced_stream_mode);
 }
 
 EXPORT(int, sceAvcdecSetLowDelayModeNongameapp) {
@@ -499,9 +643,9 @@ EXPORT(int, sceAvcdecSetLowDelayModeNongameapp) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceAvcdecSetRecoveryPointSEIMode) {
-    TRACY_FUNC(sceAvcdecSetRecoveryPointSEIMode);
-    return UNIMPLEMENTED();
+EXPORT(int, sceAvcdecSetRecoveryPointSEIMode, SceAvcdecCtrl *decoder, uint32_t mode) {
+    TRACY_FUNC(sceAvcdecSetRecoveryPointSEIMode, decoder, mode);
+    return set_mode_impl(emuenv, export_name, decoder, mode, &H264DecoderState::recovery_point_sei_mode);
 }
 
 EXPORT(int, sceAvcdecUnregisterCallbackInternal) {
@@ -524,65 +668,64 @@ EXPORT(int, sceAvcdecUnregisterCallbackWithCbidNongameapp) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceM4vdecCreateDecoder) {
-    TRACY_FUNC(sceM4vdecCreateDecoder);
-    return UNIMPLEMENTED();
+EXPORT(int, sceM4vdecCreateDecoder, uint32_t codec_type, SceAvcdecCtrl *decoder, const SceAvcdecQueryDecoderInfo *query) {
+    TRACY_FUNC(sceM4vdecCreateDecoder, codec_type, decoder, query);
+    return create_decoder_impl(emuenv, export_name, VideoCodecKind::MPEG4, codec_type, decoder, query);
 }
 
-EXPORT(int, sceM4vdecCreateDecoderInternal) {
-    TRACY_FUNC(sceM4vdecCreateDecoderInternal);
-    return UNIMPLEMENTED();
+EXPORT(int, sceM4vdecCreateDecoderInternal, uint32_t codec_type, SceAvcdecCtrl *decoder, const SceAvcdecQueryDecoderInfo *query) {
+    TRACY_FUNC(sceM4vdecCreateDecoderInternal, codec_type, decoder, query);
+    return create_decoder_impl(emuenv, export_name, VideoCodecKind::MPEG4, codec_type, decoder, query);
 }
 
-EXPORT(int, sceM4vdecCsc) {
-    TRACY_FUNC(sceM4vdecCsc);
-    return UNIMPLEMENTED();
+EXPORT(int, sceM4vdecCsc, const SceAvcdecPicture *src, SceAvcdecPicture *dst) {
+    TRACY_FUNC(sceM4vdecCsc, src, dst);
+    return csc_impl(emuenv, export_name, src, dst);
 }
 
-EXPORT(int, sceM4vdecDecode) {
-    TRACY_FUNC(sceM4vdecDecode);
-    return UNIMPLEMENTED();
+EXPORT(int, sceM4vdecDecode, SceAvcdecCtrl *decoder, const SceAvcdecAu *au, SceAvcdecArrayPicture *picture) {
+    TRACY_FUNC(sceM4vdecDecode, decoder, au, picture);
+    return decode_impl(emuenv, export_name, VideoCodecKind::MPEG4, decoder, au, picture, false);
 }
 
-EXPORT(int, sceM4vdecDecodeAvailableSize) {
-    TRACY_FUNC(sceM4vdecDecodeAvailableSize);
-    return UNIMPLEMENTED();
+EXPORT(int, sceM4vdecDecodeAvailableSize, SceAvcdecCtrl *decoder) {
+    TRACY_FUNC(sceM4vdecDecodeAvailableSize, decoder);
+    return decode_available_size_impl(emuenv, export_name, VideoCodecKind::MPEG4, decoder);
 }
 
-EXPORT(int, sceM4vdecDecodeFlush) {
-    TRACY_FUNC(sceM4vdecDecodeFlush);
-    return UNIMPLEMENTED();
+EXPORT(int, sceM4vdecDecodeFlush, SceAvcdecCtrl *decoder) {
+    TRACY_FUNC(sceM4vdecDecodeFlush, decoder);
+    return decode_flush_impl(emuenv, export_name, VideoCodecKind::MPEG4, decoder);
 }
 
-EXPORT(int, sceM4vdecDecodeStop) {
-    TRACY_FUNC(sceM4vdecDecodeStop);
-    return UNIMPLEMENTED();
+EXPORT(int, sceM4vdecDecodeStop, SceAvcdecCtrl *decoder, SceAvcdecArrayPicture *picture) {
+    TRACY_FUNC(sceM4vdecDecodeStop, decoder, picture);
+    return decode_stop_impl(emuenv, export_name, VideoCodecKind::MPEG4, decoder, picture);
 }
 
-EXPORT(int, sceM4vdecDecodeStopWithWorkPicture) {
-    TRACY_FUNC(sceM4vdecDecodeStopWithWorkPicture);
-    return UNIMPLEMENTED();
+EXPORT(int, sceM4vdecDecodeStopWithWorkPicture, SceAvcdecCtrl *decoder, SceAvcdecArrayPicture *picture) {
+    TRACY_FUNC(sceM4vdecDecodeStopWithWorkPicture, decoder, picture);
+    return decode_stop_impl(emuenv, export_name, VideoCodecKind::MPEG4, decoder, picture);
 }
 
-EXPORT(int, sceM4vdecDecodeWithWorkPicture) {
-    TRACY_FUNC(sceM4vdecDecodeWithWorkPicture);
-    return UNIMPLEMENTED();
+EXPORT(int, sceM4vdecDecodeWithWorkPicture, SceAvcdecCtrl *decoder, const SceAvcdecAu *au, SceAvcdecArrayPicture *picture, SceAvcdecArrayPicture *work_picture) {
+    TRACY_FUNC(sceM4vdecDecodeWithWorkPicture, decoder, au, picture, work_picture);
+    return decode_impl(emuenv, export_name, VideoCodecKind::MPEG4, decoder, au, picture, false);
 }
 
-EXPORT(int, sceM4vdecDeleteDecoder) {
-    TRACY_FUNC(sceM4vdecDeleteDecoder);
-    return UNIMPLEMENTED();
+EXPORT(int, sceM4vdecDeleteDecoder, SceAvcdecCtrl *decoder) {
+    TRACY_FUNC(sceM4vdecDeleteDecoder, decoder);
+    return delete_decoder_impl(emuenv, export_name, VideoCodecKind::MPEG4, decoder);
 }
 
-EXPORT(int, sceM4vdecQueryDecoderMemSize) {
-    TRACY_FUNC(sceM4vdecQueryDecoderMemSize);
-    STUBBED("fake size");
-    return 53;
+EXPORT(int, sceM4vdecQueryDecoderMemSize, uint32_t codec_type, const SceAvcdecQueryDecoderInfo *query_info, SceAvcdecDecoderInfo *decoder_info) {
+    TRACY_FUNC(sceM4vdecQueryDecoderMemSize, codec_type, query_info, decoder_info);
+    return query_mem_size_impl(export_name, VideoCodecKind::MPEG4, codec_type, query_info, decoder_info);
 }
 
-EXPORT(int, sceM4vdecQueryDecoderMemSizeInternal) {
-    TRACY_FUNC(sceM4vdecQueryDecoderMemSizeInternal);
-    return UNIMPLEMENTED();
+EXPORT(int, sceM4vdecQueryDecoderMemSizeInternal, uint32_t codec_type, const SceAvcdecQueryDecoderInfo *query_info, SceAvcdecDecoderInfo *decoder_info) {
+    TRACY_FUNC(sceM4vdecQueryDecoderMemSizeInternal, codec_type, query_info, decoder_info);
+    return query_mem_size_impl(export_name, VideoCodecKind::MPEG4, codec_type, query_info, decoder_info);
 }
 
 EXPORT(int, sceVideodecInitLibrary) {
@@ -684,6 +827,11 @@ bool capture_state(EmuEnvState &emuenv, std::vector<uint8_t> &blob, std::string 
             record.height = size->second.second;
             record.output_yuvp3 = decoder->output_yuvp3;
             record.stopped = decoder->is_stopped;
+            record.pixel_type = decoder->pixel_type;
+            record.decode_mode = decoder->decode_mode;
+            record.recovery_point_sei_mode = decoder->recovery_point_sei_mode;
+            record.interlaced_stream_mode = decoder->interlaced_stream_mode;
+            record.codec = decoder->kind == VideoCodecKind::MPEG4 ? 1 : 0;
             snapshot.decoders.push_back(record);
         }
     }
@@ -698,12 +846,17 @@ bool prepare_state(const std::vector<uint8_t> &blob, std::shared_ptr<PreparedSta
         return false;
     // Fresh FFmpeg contexts: reference frames cannot be serialised, the game resyncs at the next IDR.
     for (const auto &record : candidate->snapshot.decoders) {
-        auto decoder = std::make_shared<H264DecoderState>(record.width, record.height);
+        auto decoder = std::make_shared<H264DecoderState>(record.width, record.height,
+            record.codec == 1 ? VideoCodecKind::MPEG4 : VideoCodecKind::H264);
         if (!decoder->context || !decoder->parser) {
             error = "cannot create video decoder";
             return false;
         }
         decoder->set_output_format(record.output_yuvp3);
+        decoder->set_pixel_type(record.pixel_type);
+        decoder->decode_mode = record.decode_mode;
+        decoder->recovery_point_sei_mode = record.recovery_point_sei_mode;
+        decoder->interlaced_stream_mode = record.interlaced_stream_mode;
         decoder->is_stopped = record.stopped;
         candidate->decoders.emplace(record.handle, std::move(decoder));
     }

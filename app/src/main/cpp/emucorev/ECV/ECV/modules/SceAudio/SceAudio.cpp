@@ -19,6 +19,7 @@
 
 #include <audio/state.h>
 #include <audio/continuation.h>
+#include <audio/out_config.h>
 #include <kernel/state.h>
 #include <kernel/thread/thread_state.h>
 #include <util/lock_and_find.h>
@@ -146,8 +147,14 @@ EXPORT(int, sceAudioOutGetAdopt, SceAudioOutPortType type) {
 }
 
 EXPORT(int, sceAudioOutGetConfig, int port, SceAudioOutConfigType type) {
-    TRACY_FUNC(sceAudioOutGetConfig, type);
-    return UNIMPLEMENTED();
+    TRACY_FUNC(sceAudioOutGetConfig, port, type);
+    const AudioOutPortPtr prt = lock_and_find(port, emuenv.audio.out_ports, emuenv.audio.mutex);
+    if (!prt)
+        return RET_ERROR(SCE_AUDIO_OUT_ERROR_INVALID_PORT);
+    const int value = audio_out_config::get_config(type, prt->len, prt->freq, prt->mode);
+    if (value < 0)
+        return RET_ERROR(value);
+    return value;
 }
 
 EXPORT(int, sceAudioOutGetPortVolume_forUser) {
@@ -251,12 +258,22 @@ EXPORT(int, sceAudioOutSetAdopt_forUser) {
 
 EXPORT(int, sceAudioOutSetAlcMode, SceAudioOutAlcMode mode) {
     TRACY_FUNC(sceAudioOutSetAlcMode, mode);
-    return UNIMPLEMENTED();
+    if (const int err = audio_out_config::check_alc_mode(mode))
+        return RET_ERROR(err);
+    const std::lock_guard<std::mutex> lock(emuenv.audio.mutex);
+    emuenv.audio.alc_mode = mode;
+    return 0;
 }
 
-EXPORT(int, sceAudioOutSetCompress) {
-    TRACY_FUNC(sceAudioOutSetCompress);
-    return UNIMPLEMENTED();
+EXPORT(int, sceAudioOutSetCompress, int port, int enable) {
+    TRACY_FUNC(sceAudioOutSetCompress, port, enable);
+    const AudioOutPortPtr prt = lock_and_find(port, emuenv.audio.out_ports, emuenv.audio.mutex);
+    if (!prt)
+        return RET_ERROR(SCE_AUDIO_OUT_ERROR_INVALID_PORT);
+    if (const int err = audio_out_config::check_compress_port_type(prt->type))
+        return RET_ERROR(err);
+    prt->compressed = enable != 0;
+    return 0;
 }
 
 EXPORT(int, sceAudioOutSetConfig, int port, int len, int freq, int mode) {
@@ -301,9 +318,13 @@ EXPORT(int, sceAudioOutSetConfig, int port, int len, int freq, int mode) {
     return 0;
 }
 
-EXPORT(int, sceAudioOutSetEffectType) {
-    TRACY_FUNC(sceAudioOutSetEffectType);
-    return UNIMPLEMENTED();
+EXPORT(int, sceAudioOutSetEffectType, int effect_type) {
+    TRACY_FUNC(sceAudioOutSetEffectType, effect_type);
+    if (const int err = audio_out_config::check_effect_type(effect_type))
+        return RET_ERROR(err);
+    const std::lock_guard<std::mutex> lock(emuenv.audio.mutex);
+    emuenv.audio.effect_type = effect_type;
+    return 0;
 }
 
 EXPORT(int, sceAudioOutSetPortVolume_forUser) {

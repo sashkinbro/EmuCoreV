@@ -650,6 +650,7 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
                 case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
                     if (event.gbutton.button == SDL_GAMEPAD_BUTTON_GUIDE)
                         open_pause_menu();
+                    latch_gamepad_button(emuenv->ctrl, event.gbutton.which, event.gbutton.button);
                     break;
 
                 case SDL_EVENT_GAMEPAD_TOUCHPAD_DOWN:

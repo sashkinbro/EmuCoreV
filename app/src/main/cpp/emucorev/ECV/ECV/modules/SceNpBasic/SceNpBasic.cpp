@@ -17,12 +17,23 @@
 
 #include <module/module.h>
 
+#include <np/state.h>
+
+#include <mutex>
+
 enum SceNpBasicError : uint32_t {
     SCE_NP_BASIC_ERROR_INVALID_ARGUMENT = 0x80551d02,
+    // PROVISIONAL: the generic NP codes stand in for the Basic-specific ones (not recovered).
+    SCE_NP_BASIC_ERROR_ALREADY_INITIALIZED = 0x80550001,
+    SCE_NP_BASIC_ERROR_NOT_INITIALIZED = 0x80550002,
 };
 
+// Offline: there is never an event to dispatch to the registered handler.
 EXPORT(int, sceNpBasicCheckCallback) {
-    return UNIMPLEMENTED();
+    const std::lock_guard<std::mutex> lock(emuenv.np.mutex);
+    if (!emuenv.np.offline.basic_inited)
+        return RET_ERROR(SCE_NP_BASIC_ERROR_NOT_INITIALIZED);
+    return 0;
 }
 
 EXPORT(int, sceNpBasicCheckIfPlayerIsBlocked) {
@@ -90,8 +101,15 @@ EXPORT(int, sceNpBasicGetRequestedFriendRequestEntryCount) {
     return UNIMPLEMENTED();
 }
 
+// The emulator is an offline console: the NP Basic service initialises and keeps its handler, but no
+// event (friends, presence, messages) is ever produced.
+// PROVISIONAL: double-init / not-initialised reuse the generic SCE_NP_ERROR_* codes (Basic-specific values unrecovered).
 EXPORT(int, sceNpBasicInit) {
-    return UNIMPLEMENTED();
+    const std::lock_guard<std::mutex> lock(emuenv.np.mutex);
+    if (emuenv.np.offline.basic_inited)
+        return RET_ERROR(SCE_NP_BASIC_ERROR_ALREADY_INITIALIZED);
+    emuenv.np.offline.basic_inited = true;
+    return 0;
 }
 
 EXPORT(int, sceNpBasicJoinGameAckResponseSend) {
@@ -102,8 +120,16 @@ EXPORT(int, sceNpBasicRecordPlaySessionLog) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceNpBasicRegisterHandler) {
-    return UNIMPLEMENTED();
+// PROVISIONAL signature: (communication config, handler, handler argument).
+EXPORT(int, sceNpBasicRegisterHandler, const void *commConfig, uint32_t handler, uint32_t arg) {
+    if (!commConfig || !handler)
+        return RET_ERROR(SCE_NP_BASIC_ERROR_INVALID_ARGUMENT);
+    const std::lock_guard<std::mutex> lock(emuenv.np.mutex);
+    if (!emuenv.np.offline.basic_inited)
+        return RET_ERROR(SCE_NP_BASIC_ERROR_NOT_INITIALIZED);
+    emuenv.np.offline.basic_handler_pc = handler;
+    emuenv.np.offline.basic_handler_arg = arg;
+    return 0;
 }
 
 EXPORT(int, sceNpBasicRegisterInGameDataMessageHandler) {
@@ -123,11 +149,22 @@ EXPORT(int, sceNpBasicSetInGamePresence) {
 }
 
 EXPORT(int, sceNpBasicTerm) {
-    return UNIMPLEMENTED();
+    const std::lock_guard<std::mutex> lock(emuenv.np.mutex);
+    if (!emuenv.np.offline.basic_inited)
+        return RET_ERROR(SCE_NP_BASIC_ERROR_NOT_INITIALIZED);
+    emuenv.np.offline.basic_inited = false;
+    emuenv.np.offline.basic_handler_pc = 0;
+    emuenv.np.offline.basic_handler_arg = 0;
+    return 0;
 }
 
 EXPORT(int, sceNpBasicUnregisterHandler) {
-    return UNIMPLEMENTED();
+    const std::lock_guard<std::mutex> lock(emuenv.np.mutex);
+    if (!emuenv.np.offline.basic_inited)
+        return RET_ERROR(SCE_NP_BASIC_ERROR_NOT_INITIALIZED);
+    emuenv.np.offline.basic_handler_pc = 0;
+    emuenv.np.offline.basic_handler_arg = 0;
+    return 0;
 }
 
 EXPORT(int, sceNpBasicUnregisterInGameDataMessageHandler) {

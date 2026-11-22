@@ -21,6 +21,16 @@
 #include <audio/state.h>
 #include <util/tracy.h>
 
+#ifdef __ANDROID__
+#include <SDL3/SDL_system.h>
+#include <jni.h>
+#endif
+
+#include <algorithm>
+#include <chrono>
+#include <cstring>
+#include <thread>
+
 #define PORT_ID 0
 
 TRACY_MODULE_NAME(SceAudioIn);
@@ -80,6 +90,59 @@ enum SceAudioInErrorCode : uint32_t {
     SCE_AUDIO_IN_ERROR_INVALID_PARAMETER = 0x8026010B
 };
 
+#ifdef __ANDROID__
+// Calls a no-argument Emulator activity method (UI-thread work is posted by the Kotlin side, so this
+// never blocks). Returns false when the method is missing or threw; `result` gets a boolean result.
+static bool call_activity_method(const char *name, bool *result) {
+    auto *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity)
+        return false;
+    bool ok = false;
+    if (jclass clazz = env->GetObjectClass(activity)) {
+        if (jmethodID method = env->GetMethodID(clazz, name, result ? "()Z" : "()V")) {
+            if (result)
+                *result = env->CallBooleanMethod(activity, method) == JNI_TRUE;
+            else
+                env->CallVoidMethod(activity, method);
+            ok = true;
+        }
+        env->DeleteLocalRef(clazz);
+    }
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        ok = false;
+    }
+    env->DeleteLocalRef(activity);
+    return ok;
+}
+#endif
+
+// Opens the capture stream if the platform allows it. On Android RECORD_AUDIO is checked first and,
+// when missing, requested asynchronously (the Kotlin side asks once per session); the port then feeds
+// silence until the grant re-triggers this via reopen_requested. Never blocks the guest thread on a prompt.
+static void open_capture_stream(AudioInPort &in, int freq) {
+#ifdef __ANDROID__
+    bool granted = true;
+    if (call_activity_method("hasRecordAudioPermission", &granted) && !granted) {
+        call_activity_method("requestRecordAudioPermission", nullptr);
+        LOG_WARN("AudioIn: RECORD_AUDIO not granted yet, feeding silence until it is");
+        return;
+    }
+#endif
+    SDL_AudioSpec desired = {
+        .format = SDL_AUDIO_S16LE,
+        .channels = 1,
+        .freq = freq
+    };
+    in.id = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_RECORDING, &desired, nullptr, nullptr);
+    if (in.id) {
+        SDL_ResumeAudioStreamDevice(static_cast<SDL_AudioStream *>(in.id));
+    } else {
+        LOG_WARN("AudioIn: capture device unavailable ({}), feeding silence", SDL_GetError());
+    }
+}
+
 EXPORT(int, sceAudioInGetAdopt, SceAudioInPortType portType) {
     TRACY_FUNC(sceAudioInGetAdopt, portType);
     if (portType != SCE_AUDIO_IN_PORT_TYPE_VOICE && portType != SCE_AUDIO_IN_PORT_TYPE_RAW) {
@@ -115,16 +178,48 @@ EXPORT(int, sceAudioInInput, int port, void *destPtr) {
         return RET_ERROR(SCE_AUDIO_IN_ERROR_INVALID_PORT_PARAM);
     }
 
-    auto to_read = emuenv.audio.in_port.len_bytes;
-    do {
-        auto readed = SDL_GetAudioStreamData(static_cast<SDL_AudioStream *>(emuenv.audio.in_port.id), destPtr, to_read);
-        if (readed < 0) {
+    if (!destPtr) {
+        return RET_ERROR(SCE_AUDIO_IN_ERROR_INVALID_POINTER);
+    }
+
+    // Vita semantics: the call blocks until one grain is available, paced in real time
+    // (grain / sample rate). If the capture device delivers nothing in that period (no
+    // permission, no microphone, stalled device) the rest of the grain is zero-filled.
+    // The wait is bounded by one grain period; there is no unbounded polling loop.
+    auto &in = emuenv.audio.in_port;
+    const int len = in.len_bytes;
+    const int freq = in.freq > 0 ? in.freq : 16000;
+    const int64_t period_us = static_cast<int64_t>(len / 2) * 1000000 / freq;
+    const auto now_us = [] {
+        return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    };
+    int64_t deadline = in.next_deadline_us;
+    const int64_t start = now_us();
+    // First call, or the guest was away for a long time: restart the cadence from now.
+    if (deadline == 0 || start - deadline > period_us * 4)
+        deadline = start + period_us;
+    in.next_deadline_us = deadline + period_us;
+    for (int64_t remaining = deadline - now_us(); remaining > 0; remaining = deadline - now_us())
+        std::this_thread::sleep_for(std::chrono::microseconds(std::min<int64_t>(remaining, 2000)));
+
+    // RECORD_AUDIO was granted after the port opened: start capturing without a restart.
+    if (!in.id && in.reopen_requested.exchange(false))
+        open_capture_stream(in, freq);
+
+    int filled = 0;
+    if (auto *stream = static_cast<SDL_AudioStream *>(in.id)) {
+        // Keep latency bounded if the device ran ahead of the guest.
+        if (SDL_GetAudioStreamAvailable(stream) > len * 4)
+            SDL_ClearAudioStream(stream);
+        const int got = SDL_GetAudioStreamData(stream, destPtr, len);
+        if (got < 0) {
             LOG_ERROR("AudioIn: Error while reading audio stream: {}", SDL_GetError());
-            return RET_ERROR(SCE_AUDIO_IN_ERROR_FATAL);
+        } else {
+            filled = got;
         }
-        to_read -= readed;
-        destPtr = (char *)destPtr + readed;
-    } while (to_read > 0);
+    }
+    if (filled < len)
+        std::memset(static_cast<char *>(destPtr) + filled, 0, len - filled);
     return 0;
 }
 
@@ -161,19 +256,14 @@ EXPORT(int, sceAudioInOpenPort, SceAudioInPortType portType, int grain, int freq
         }
     }
 
-    SDL_AudioSpec desired = {
-        .format = SDL_AUDIO_S16LE,
-        .channels = 1,
-        .freq = freq
-    };
-    emuenv.audio.in_port.id = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_RECORDING, &desired, nullptr, nullptr);
-    if (!emuenv.audio.in_port.id) {
-        return RET_ERROR(SCE_AUDIO_IN_ERROR_FATAL);
-    }
-
-    SDL_ResumeAudioStreamDevice(static_cast<SDL_AudioStream *>(emuenv.audio.in_port.id));
+    // Capture may be unavailable (permission pending/denied, no microphone): the port stays open and
+    // sceAudioInInput delivers silence so the game keeps running.
+    emuenv.audio.in_port.reopen_requested = false;
+    open_capture_stream(emuenv.audio.in_port, freq);
 
     emuenv.audio.in_port.len_bytes = grain * 2;
+    emuenv.audio.in_port.freq = freq;
+    emuenv.audio.in_port.next_deadline_us = 0;
     emuenv.audio.in_port.running = true;
     return PORT_ID;
 }
@@ -192,7 +282,9 @@ EXPORT(int, sceAudioInReleasePort, int port) {
         return RET_ERROR(SCE_AUDIO_IN_ERROR_NOT_OPENED);
     }
     emuenv.audio.in_port.running = false;
-    SDL_DestroyAudioStream(static_cast<SDL_AudioStream *>(emuenv.audio.in_port.id));
+    if (emuenv.audio.in_port.id)
+        SDL_DestroyAudioStream(static_cast<SDL_AudioStream *>(emuenv.audio.in_port.id));
+    emuenv.audio.in_port.id = nullptr;
     return 0;
 }
 

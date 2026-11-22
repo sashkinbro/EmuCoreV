@@ -118,7 +118,10 @@ static bool writable(const MemState &mem, const Ptr<T> &p) {
 
 EXPORT(int, sceLocationInit, SceUInt32 unk0, SceUInt32 unk1) {
     TRACY_FUNC(sceLocationInit, unk0, unk1);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    if (!emuenv.kernel.obj_store.get_shared<LocationState>())
+        emuenv.kernel.obj_store.create<LocationState>(); // absent after a cold save-state restore
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
     {
         std::lock_guard<std::mutex> lock(state->mutex);
         state->handles.clear();
@@ -129,7 +132,10 @@ EXPORT(int, sceLocationInit, SceUInt32 unk0, SceUInt32 unk1) {
 
 EXPORT(int, sceLocationTerm) {
     TRACY_FUNC(sceLocationTerm);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return 0;
     std::lock_guard<std::mutex> lock(state->mutex);
     state->handles.clear();
     return 0;
@@ -140,7 +146,10 @@ EXPORT(int, sceLocationOpen, Ptr<SceLocationHandle> handle, SceUInt32 locateMeth
     if (!writable(emuenv.mem, handle))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_ADDRESS);
 
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
 
     const SceLocationHandle id = state->next_handle++;
@@ -153,7 +162,10 @@ EXPORT(int, sceLocationOpen, Ptr<SceLocationHandle> handle, SceUInt32 locateMeth
 
 EXPORT(int, sceLocationClose, SceLocationHandle handle) {
     TRACY_FUNC(sceLocationClose, handle);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     if (state->handles.erase(handle) == 0)
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
@@ -162,7 +174,10 @@ EXPORT(int, sceLocationClose, SceLocationHandle handle) {
 
 EXPORT(int, sceLocationReopen, SceLocationHandle handle, SceUInt32 locateMethod, SceUInt32 headingMethod) {
     TRACY_FUNC(sceLocationReopen, handle, locateMethod, headingMethod);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     LocationHandleState *opened = find_handle(state, handle);
     if (!opened)
@@ -174,7 +189,10 @@ EXPORT(int, sceLocationReopen, SceLocationHandle handle, SceUInt32 locateMethod,
 
 EXPORT(int, sceLocationGetMethod, SceLocationHandle handle, Ptr<SceUInt32> locateMethod, Ptr<SceUInt32> headingMethod) {
     TRACY_FUNC(sceLocationGetMethod, handle, locateMethod, headingMethod);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     LocationHandleState *opened = find_handle(state, handle);
     if (!opened)
@@ -196,7 +214,10 @@ EXPORT(int, sceLocationGetLocation, SceLocationHandle handle, Ptr<SceLocationLoc
     TRACY_FUNC(sceLocationGetLocation, handle, locationInfo);
     if (!writable(emuenv.mem, locationInfo))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_ADDRESS);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     if (!find_handle(state, handle))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
@@ -212,7 +233,10 @@ EXPORT(int, sceLocationGetLocationWithTimeout, SceLocationHandle handle, SceUInt
 
 EXPORT(int, sceLocationCancelGetLocation, SceLocationHandle handle) {
     TRACY_FUNC(sceLocationCancelGetLocation, handle);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     if (!find_handle(state, handle))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
@@ -221,7 +245,10 @@ EXPORT(int, sceLocationCancelGetLocation, SceLocationHandle handle) {
 
 EXPORT(int, sceLocationStartLocationCallback, SceLocationHandle handle, SceUInt32 distance, Ptr<void> callback, Ptr<void> userdata) {
     TRACY_FUNC(sceLocationStartLocationCallback, handle, distance, callback, userdata);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     if (!find_handle(state, handle))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
@@ -231,7 +258,10 @@ EXPORT(int, sceLocationStartLocationCallback, SceLocationHandle handle, SceUInt3
 
 EXPORT(int, sceLocationStopLocationCallback, SceLocationHandle handle) {
     TRACY_FUNC(sceLocationStopLocationCallback, handle);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     if (!find_handle(state, handle))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
@@ -242,7 +272,10 @@ EXPORT(int, sceLocationGetHeading, SceLocationHandle handle, Ptr<SceLocationHead
     TRACY_FUNC(sceLocationGetHeading, handle, headingInfo);
     if (!writable(emuenv.mem, headingInfo))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_ADDRESS);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     if (!find_handle(state, handle))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
@@ -254,7 +287,10 @@ EXPORT(int, sceLocationGetHeading, SceLocationHandle handle, Ptr<SceLocationHead
 // TODO: The shape of this must be varified and fixed before its ever used!
 EXPORT(int, sceLocationStartHeadingCallback, SceLocationHandle handle, SceUInt32 difference, Ptr<void> callback, Ptr<void> userdata) {
     TRACY_FUNC(sceLocationStartHeadingCallback, handle, difference, callback, userdata);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     if (!find_handle(state, handle))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
@@ -263,7 +299,10 @@ EXPORT(int, sceLocationStartHeadingCallback, SceLocationHandle handle, SceUInt32
 
 EXPORT(int, sceLocationStopHeadingCallback, SceLocationHandle handle) {
     TRACY_FUNC(sceLocationStopHeadingCallback, handle);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     if (!find_handle(state, handle))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
@@ -272,7 +311,10 @@ EXPORT(int, sceLocationStopHeadingCallback, SceLocationHandle handle) {
 
 EXPORT(int, sceLocationConfirm, SceLocationHandle handle) {
     TRACY_FUNC(sceLocationConfirm, handle);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     LocationHandleState *opened = find_handle(state, handle);
     if (!opened)
@@ -286,7 +328,10 @@ EXPORT(int, sceLocationConfirm, SceLocationHandle handle) {
 
 EXPORT(int, sceLocationConfirmGetStatus, SceLocationHandle handle, Ptr<SceUInt32> status) {
     TRACY_FUNC(sceLocationConfirmGetStatus, handle, status);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     LocationHandleState *opened = find_handle(state, handle);
     if (!opened)
@@ -299,7 +344,10 @@ EXPORT(int, sceLocationConfirmGetStatus, SceLocationHandle handle, Ptr<SceUInt32
 
 EXPORT(int, sceLocationConfirmGetResult, SceLocationHandle handle, Ptr<SceUInt32> result) {
     TRACY_FUNC(sceLocationConfirmGetResult, handle, result);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     LocationHandleState *opened = find_handle(state, handle);
     if (!opened)
@@ -312,7 +360,10 @@ EXPORT(int, sceLocationConfirmGetResult, SceLocationHandle handle, Ptr<SceUInt32
 
 EXPORT(int, sceLocationConfirmAbort, SceLocationHandle handle) {
     TRACY_FUNC(sceLocationConfirmAbort, handle);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     LocationHandleState *opened = find_handle(state, handle);
     if (!opened)
@@ -324,7 +375,10 @@ EXPORT(int, sceLocationConfirmAbort, SceLocationHandle handle) {
 
 EXPORT(int, sceLocationGetPermission, SceLocationHandle handle, Ptr<SceLocationPermissionInfo> info) {
     TRACY_FUNC(sceLocationGetPermission, handle, info);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     if (!find_handle(state, handle))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
@@ -345,7 +399,10 @@ EXPORT(int, sceLocationGetPermission, SceLocationHandle handle, Ptr<SceLocationP
 
 EXPORT(int, sceLocationDenyApplication, SceLocationHandle handle) {
     TRACY_FUNC(sceLocationDenyApplication, handle);
-    LocationState *state = emuenv.kernel.obj_store.get<LocationState>();
+    const auto state_owner = emuenv.kernel.obj_store.get_shared<LocationState>();
+    LocationState *const state = state_owner.get();
+    if (!state)
+        return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);
     std::lock_guard<std::mutex> lock(state->mutex);
     if (!find_handle(state, handle))
         return RET_ERROR(SCE_LOCATION_ERROR_INVALID_HANDLE);

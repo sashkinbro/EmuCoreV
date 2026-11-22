@@ -18,6 +18,7 @@
 #include "SceAppMgr.h"
 
 #include <io/state.h>
+#include <app/state.h>
 #include <kernel/state.h>
 #include <native_library_runtime.h>
 #include <packages/sfo.h>
@@ -760,9 +761,13 @@ EXPORT(int, _sceAppMgrWorkDirMountById) {
     return UNIMPLEMENTED();
 }
 
+// The BGM port carries the system music player's audio; the emulator has none, so taking the port only
+// records that the application owns it. Acquiring it again while owned is accepted.
 EXPORT(int, sceAppMgrAcquireBgmPort) {
     TRACY_FUNC(sceAppMgrAcquireBgmPort);
-    return UNIMPLEMENTED();
+    const std::lock_guard<std::mutex> lock(emuenv.app.services.mutex);
+    emuenv.app.services.bgm_port_acquired = true;
+    return 0;
 }
 
 EXPORT(int, sceAppMgrAcquireBgmPortForMusicPlayer) {
@@ -959,9 +964,12 @@ EXPORT(int, sceAppMgrReceiveShellEventNum) {
     return UNIMPLEMENTED();
 }
 
+// PROVISIONAL: releasing a port that is not held is accepted (firmware behaviour unverified).
 EXPORT(int, sceAppMgrReleaseBgmPort) {
     TRACY_FUNC(sceAppMgrReleaseBgmPort);
-    return UNIMPLEMENTED();
+    const std::lock_guard<std::mutex> lock(emuenv.app.services.mutex);
+    emuenv.app.services.bgm_port_acquired = false;
+    return 0;
 }
 
 EXPORT(int, sceAppMgrReleaseBtrm) {

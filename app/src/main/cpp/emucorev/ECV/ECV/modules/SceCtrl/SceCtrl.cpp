@@ -23,6 +23,13 @@
 #include <util/log.h>
 #include <util/tracy.h>
 
+#include <SDL3/SDL_haptic.h>
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_timer.h>
+
+#include <algorithm>
+#include <mutex>
+
 TRACY_MODULE_NAME(SceCtrl);
 
 template <>
@@ -187,22 +194,87 @@ EXPORT(int, sceCtrlResetLightBar) {
     return UNIMPLEMENTED();
 }
 
+#ifdef __ANDROID__
+// Phone vibrator, exposed by SDL's Android haptic driver. The Kotlin side applies the user's
+// gamepad-vibration switch, strength and device-fallback setting to every request.
+static void vibrate_phone(uint8_t small, uint8_t large) {
+    static std::mutex mutex;
+    static uint8_t last_strength = 0;
+    static Uint64 last_play_ms = 0;
+    const std::lock_guard lock(mutex);
+
+    const uint8_t strength = std::max(small, large);
+    const Uint64 now = SDL_GetTicks();
+    // Games re-send the same state every frame; a pulse lasts 400 ms, so refresh only when it changes or expires.
+    constexpr Uint32 PULSE_MS = 400;
+    if (strength == last_strength && (strength == 0 || now - last_play_ms < PULSE_MS - 50))
+        return;
+
+    if (!SDL_WasInit(SDL_INIT_HAPTIC) && !SDL_InitSubSystem(SDL_INIT_HAPTIC))
+        return;
+    int count = 0;
+    SDL_HapticID *ids = SDL_GetHaptics(&count);
+    if (!ids)
+        return;
+    SDL_Haptic *haptic = nullptr;
+    if (count > 0) {
+        haptic = SDL_GetHapticFromID(ids[0]);
+        if (!haptic) {
+            haptic = SDL_OpenHaptic(ids[0]);
+            if (haptic && !SDL_InitHapticRumble(haptic)) {
+                SDL_CloseHaptic(haptic);
+                haptic = nullptr;
+            }
+        }
+    }
+    SDL_free(ids);
+    if (!haptic)
+        return;
+
+    last_strength = strength;
+    last_play_ms = now;
+    if (strength == 0)
+        SDL_StopHapticRumble(haptic);
+    else
+        SDL_PlayHapticRumble(haptic, strength / 255.0f, PULSE_MS);
+}
+#endif
+
 EXPORT(int, sceCtrlSetActuator, int port, const SceCtrlActuator *pState) {
     TRACY_FUNC(sceCtrlSetActuator, port, pState);
+    // A handheld Vita has no actuators; DualShock rumble exists only on PS TV.
     if (!emuenv.cfg.current_config.pstv_mode) {
         return RET_ERROR(SCE_CTRL_ERROR_NOT_SUPPORTED);
     }
+    if (!pState)
+        return RET_ERROR(SCE_CTRL_ERROR_INVALID_ARG);
+
+    // Both motor strengths are 8-bit (0-255, provisional: no SDK header available); SDL wants 0-65535.
+    const auto to_sdl = [](uint8_t v) { return static_cast<Uint16>(v * 257); };
 
     CtrlState &state = emuenv.ctrl;
+    const std::lock_guard lock(state.mutex);
     for (const auto &controller : state.controllers) {
+        // sceCtrl ports are 1-based and SDL_Gamepad index is 0-based. Need to convert.
         if (controller.second.port + 1 == port) {
-            // sceCtrl ports are 1-based and SDL_Gamepad index is 0-based. Need to convert.
-            SDL_RumbleGamepad(controller.second.controller.get(), pState->small * 655.35f, pState->large * 655.35f, SDL_HAPTIC_INFINITY);
-
+            // SDL caps the duration and re-sends it; a zero state stops the motors.
+            if (!SDL_RumbleGamepad(controller.second.controller.get(), to_sdl(pState->small), to_sdl(pState->large), SDL_HAPTIC_INFINITY)) {
+#ifdef __ANDROID__
+                // This pad cannot rumble: use the phone instead (if the user allows it).
+                vibrate_phone(pState->small, pState->large);
+#endif
+            }
             return 0;
         }
     }
 
+#ifdef __ANDROID__
+    // No pad on this port (touch-only / handheld-style play): the phone is the only actuator.
+    if (state.controllers.empty() && port == 1) {
+        vibrate_phone(pState->small, pState->large);
+        return 0;
+    }
+#endif
     return RET_ERROR(SCE_CTRL_ERROR_NO_DEVICE);
 }
 

@@ -17,6 +17,17 @@
 
 #include <module/module.h>
 
+#include <np/state.h>
+
+#include <mutex>
+
+// Generic NP codes (see SceNpManager).
+enum : uint32_t {
+    SCE_NP_ERROR_ALREADY_INITIALIZED = 0x80550001,
+    SCE_NP_ERROR_NOT_INITIALIZED = 0x80550002,
+    SCE_NP_ERROR_INVALID_ARGUMENT = 0x80550003,
+};
+
 EXPORT(int, sceNpScoreAbortRequest) {
     return UNIMPLEMENTED();
 }
@@ -97,8 +108,14 @@ EXPORT(int, sceNpScoreGetRankingByRangeAsync) {
     return UNIMPLEMENTED();
 }
 
+// Offline console: the service initialises, but any request needing the PlayStation Network is not served.
+// PROVISIONAL: double init reuses the generic SCE_NP_ERROR_ALREADY_INITIALIZED (service-specific code unrecovered).
 EXPORT(int, sceNpScoreInit) {
-    return UNIMPLEMENTED();
+    const std::lock_guard<std::mutex> lock(emuenv.np.mutex);
+    if (emuenv.np.offline.score_inited)
+        return RET_ERROR(SCE_NP_ERROR_ALREADY_INITIALIZED);
+    emuenv.np.offline.score_inited = true;
+    return 0;
 }
 
 EXPORT(int, sceNpScorePollAsync) {
@@ -138,7 +155,11 @@ EXPORT(int, sceNpScoreSetTimeout) {
 }
 
 EXPORT(int, sceNpScoreTerm) {
-    return UNIMPLEMENTED();
+    const std::lock_guard<std::mutex> lock(emuenv.np.mutex);
+    if (!emuenv.np.offline.score_inited)
+        return RET_ERROR(SCE_NP_ERROR_NOT_INITIALIZED);
+    emuenv.np.offline.score_inited = false;
+    return 0;
 }
 
 EXPORT(int, sceNpScoreWaitAsync) {

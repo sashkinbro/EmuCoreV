@@ -18,6 +18,7 @@
 #include <module/module.h>
 
 #include <touch/functions.h>
+#include <touch/region.h>
 #include <touch/state.h>
 #include <touch/touch.h>
 #include <util/tracy.h>
@@ -78,9 +79,26 @@ EXPORT(int, sceTouchEnableTouchForceExt) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceTouchGetDeviceInfo) {
-    TRACY_FUNC(sceTouchGetDeviceInfo);
-    return UNIMPLEMENTED();
+// SceTouchDeviceInfo (vita-headers psp2common/touch.h, 0xC bytes)
+struct SceTouchDeviceInfo {
+    SceUInt16 vendor_id;
+    SceUInt16 firmware_rev;
+    SceUInt16 config_rev;
+    SceUInt8 hw_version;
+    SceUInt8 vendor_info;
+    SceUInt8 reserved[4];
+};
+static_assert(sizeof(SceTouchDeviceInfo) == 0xC, "SceTouchDeviceInfo is an invalid size");
+
+EXPORT(int, sceTouchGetDeviceInfo, SceUInt32 port, SceTouchDeviceInfo *pInfo) {
+    TRACY_FUNC(sceTouchGetDeviceInfo, port, pInfo);
+    if (port >= SCE_TOUCH_PORT_MAX_NUM || pInfo == nullptr) {
+        return RET_ERROR(SCE_TOUCH_ERROR_INVALID_ARG);
+    }
+    // Provisional: the controller identifiers of the real panels were not recovered, so the
+    // emulated (virtual) controller reports all-zero vendor/firmware/config/hardware values.
+    *pInfo = {};
+    return SCE_TOUCH_OK;
 }
 
 EXPORT(int, sceTouchGetPanelInfo, SceUInt32 port, SceTouchPanelInfo *pPanelInfo) {
@@ -111,6 +129,12 @@ EXPORT(int, sceTouchGetPanelInfo, SceUInt32 port, SceTouchPanelInfo *pPanelInfo)
     if (port == SCE_TOUCH_PORT_BACK) {
         pPanelInfo->minAaY = 108;
         pPanelInfo->maxAaY = 889;
+        // The rear panel only covers y 108..889 (touch.cpp reports 108 + y * 781 on this port), so the
+        // display area follows the active area instead of the full 1920x1088 screen.
+        // PROVISIONAL: the active-area bounds match what we report; reusing them for the display
+        // area is not proven from firmware (the SDK header only documents the field meanings).
+        pPanelInfo->minDispY = 108;
+        pPanelInfo->maxDispY = 889;
     }
 
     return SCE_TOUCH_OK;
@@ -216,11 +240,20 @@ EXPORT(int, sceTouchPeek2, SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs)
 
 EXPORT(int, sceTouchPeekRegion, SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs, int region) {
     TRACY_FUNC(sceTouchPeekRegion, port, pData, nBufs, region);
-    if (region > 0xFF) {
+    if (!touch_region::region_id_valid(region) || port >= SCE_TOUCH_PORT_MAX_NUM) {
         return RET_ERROR(SCE_TOUCH_ERROR_INVALID_ARG);
     }
-    STUBBED("Ignore region");
-    return CALL_EXPORT(sceTouchPeek, port, pData, nBufs);
+    const int ret = CALL_EXPORT(sceTouchPeek, port, pData, nBufs);
+    if (ret <= 0 || !pData)
+        return ret;
+    touch_region::Region reg;
+    {
+        const std::lock_guard lock(emuenv.touch.mutex);
+        reg = emuenv.touch.regions[port][region];
+    }
+    for (int i = 0; i < ret; i++)
+        pData[i].reportNum = touch_region::filter_reports(pData[i].report, std::min<SceUInt32>(pData[i].reportNum, SCE_TOUCH_MAX_REPORT), reg);
+    return ret;
 }
 
 EXPORT(int, sceTouchPeekRegionExt) {
@@ -258,9 +291,22 @@ EXPORT(int, sceTouchRead2, SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs)
     return touch_get(thread_id, emuenv, port, pData, nBufs, false);
 }
 
-EXPORT(int, sceTouchReadRegion) {
-    TRACY_FUNC(sceTouchReadRegion);
-    return UNIMPLEMENTED();
+EXPORT(int, sceTouchReadRegion, SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs, int region) {
+    TRACY_FUNC(sceTouchReadRegion, port, pData, nBufs, region);
+    if (!touch_region::region_id_valid(region) || port >= SCE_TOUCH_PORT_MAX_NUM || pData == nullptr || nBufs > MAX_TOUCH_BUFFER_SAVED) {
+        return RET_ERROR(SCE_TOUCH_ERROR_INVALID_ARG);
+    }
+    const int ret = touch_get(thread_id, emuenv, port, pData, nBufs, false);
+    if (ret <= 0)
+        return ret;
+    touch_region::Region reg;
+    {
+        const std::lock_guard lock(emuenv.touch.mutex);
+        reg = emuenv.touch.regions[port][region];
+    }
+    for (int i = 0; i < ret; i++)
+        pData[i].reportNum = touch_region::filter_reports(pData[i].report, std::min<SceUInt32>(pData[i].reportNum, SCE_TOUCH_MAX_REPORT), reg);
+    return ret;
 }
 
 EXPORT(int, sceTouchReadRegionExt) {

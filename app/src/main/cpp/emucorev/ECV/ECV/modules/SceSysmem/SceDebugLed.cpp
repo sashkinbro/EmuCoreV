@@ -29,6 +29,9 @@ EXPORT(int, sceKernelGetGPI) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceKernelSetGPO) {
-    return UNIMPLEMENTED();
+// The general purpose output pins only drive the dev-kit LEDs; retail hardware (and the emulator) has
+// nothing attached, so the value is accepted and dropped.
+EXPORT(int, sceKernelSetGPO, uint32_t gpoValue) {
+    (void)gpoValue;
+    return 0;
 }

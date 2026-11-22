@@ -90,8 +90,25 @@ struct H264DecoderOptions {
     uint32_t dts_lower;
 };
 
+// The hardware AVC and MPEG-4 Part 2 decoders share one implementation (same picture API).
+enum class VideoCodecKind : uint8_t {
+    H264 = 0,
+    MPEG4 = 1,
+};
+
+// Output description of one decoded picture (SceAvcdecFrame as filled in by the guest).
+struct H264PictureRequest {
+    uint32_t pixel_type; // SceAvcdecPixelFormat, see codec/avc_picture.h
+    uint32_t pitch; // framePitch (pixels)
+    uint32_t width; // frameWidth
+    uint32_t height; // frameHeight
+    uint8_t alpha; // SceAvcdecFrameOptionRGBA::alpha
+    uint8_t csc_coefficient; // SceCscCoefficient
+};
+
 struct H264DecoderState : public DecoderState {
     AVCodecParserContext *parser{};
+    VideoCodecKind kind = VideoCodecKind::H264;
 
     uint32_t width_in = 0;
     uint32_t height_in = 0;
@@ -108,6 +125,13 @@ struct H264DecoderState : public DecoderState {
 
     bool is_stopped = true;
 
+    // Last requested output pixel type (SceAvcdecPixelFormat), kept for save states.
+    uint32_t pixel_type = 0x20;
+    // Mode settings stored by sceAvcdecSet*Mode (not interpreted by the host decoder).
+    uint32_t decode_mode = 0;
+    uint32_t recovery_point_sei_mode = 0;
+    uint32_t interlaced_stream_mode = 0;
+
     static uint32_t buffer_size(DecoderSize size);
 
     uint32_t get(DecoderQuery query) override;
@@ -119,8 +143,12 @@ struct H264DecoderState : public DecoderState {
     void get_res(uint32_t &width, uint32_t &height);
     void get_pts(uint32_t &upper, uint32_t &lower);
     void set_output_format(bool is_yuv_p3);
+    void set_pixel_type(uint32_t type);
+    // Receives one frame and writes it as described by the request (YUV copy honouring the pitch,
+    // or conversion to an RGB pixel type).
+    bool receive_picture(uint8_t *data, const H264PictureRequest &request);
 
-    H264DecoderState(uint32_t width, uint32_t height);
+    H264DecoderState(uint32_t width, uint32_t height, VideoCodecKind kind = VideoCodecKind::H264);
     ~H264DecoderState() override;
 };
 

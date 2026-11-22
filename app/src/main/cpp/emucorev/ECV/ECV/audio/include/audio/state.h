@@ -64,6 +64,8 @@ struct AudioOutPort {
     int len = 0;
     int freq = 0;
     int mode = 0;
+    // sceAudioOutSetCompress selection (BGM / voice ports only); stored, not yet used by the mixer
+    bool compressed = false;
 };
 
 typedef std::shared_ptr<AudioOutPort> AudioOutPortPtr;
@@ -73,6 +75,12 @@ struct AudioInPort {
     void *id = nullptr;
     bool running = false;
     int len_bytes = 0;
+    int freq = 0;
+    // steady_clock microseconds at which the next grain is due (sceAudioInInput pacing); 0 = unset
+    int64_t next_deadline_us = 0;
+    // Set from the UI thread when RECORD_AUDIO was granted after the port opened; sceAudioInInput
+    // then re-opens the capture device.
+    std::atomic<bool> reopen_requested{ false };
 };
 
 struct ThreadState;
@@ -120,7 +128,11 @@ struct AudioState {
     AudioOutPortPtrs out_ports;
     AudioInPort in_port;
     std::string audio_backend;
-    float global_volume = 1;
+    // Written under `mutex` by set_global_volume; atomic because set_volume reads it lock-free.
+    std::atomic<float> global_volume{ 1.0f };
+    // sceAudioOutSetAlcMode / sceAudioOutSetEffectType selections; stored, not yet applied to output
+    int alc_mode = 0;
+    int effect_type = 0;
 
     bool init(const std::string &adapter_name);
     void deinit();

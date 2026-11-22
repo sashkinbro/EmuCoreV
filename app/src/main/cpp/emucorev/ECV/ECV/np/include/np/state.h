@@ -24,6 +24,7 @@
 
 #include <map>
 #include <mutex>
+#include <set>
 #include <vector>
 
 struct SceNpServiceStateCallback {
@@ -89,9 +90,23 @@ struct NpMatching2State {
     std::vector<SceNpMatching2ContextEvent> pending;
 };
 
+// Init state and registered handlers of the NP services the emulator only provides offline
+// (see the SceNpBasic / SceNpActivity / SceNpScore / SceNpCommerce2 modules).
+struct NpOfflineServices {
+    bool basic_inited = false;
+    Address basic_handler_pc = 0;
+    Address basic_handler_arg = 0;
+    bool activity_inited = false;
+    bool score_inited = false;
+    bool commerce2_inited = false;
+    uint32_t commerce2_next_ctx_id = 1;
+    std::set<uint32_t> commerce2_ctxs;
+};
+
 struct NpState {
     std::mutex mutex;
     bool inited = false;
+    NpOfflineServices offline;
     uint64_t generation = 0;
     np_callbacks cbs;
     SceUID state_cb_id = 0;

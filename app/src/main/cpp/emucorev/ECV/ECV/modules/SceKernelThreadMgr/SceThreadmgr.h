@@ -28,6 +28,14 @@ struct sceKernelRegisterThreadEventHandlerOpt {
     int reserved1;
 };
 
+// One segment of a message pipe vector transfer (guest layout: pointer + size, 8 bytes).
+// The vitasdk kernel headers document it as MsgPipeSendData / MsgPipeRecvData.
+struct SceKernelMsgPipeVector {
+    Ptr<void> buf;
+    SceSize size;
+};
+static_assert(sizeof(SceKernelMsgPipeVector) == 8, "SceKernelMsgPipeVector is an invalid size");
+
 DECL_EXPORT(SceUID, _sceKernelCreateCond, const char *pName, SceUInt32 attr, SceUID mutexId, const SceKernelCondOptParam *pOptParam);
 DECL_EXPORT(SceInt32, _sceKernelGetCondInfo, SceUID condId, Ptr<SceKernelCondInfo> pInfo);
 DECL_EXPORT(SceUID, _sceKernelCreateSimpleEvent, const char *name, SceUInt32 attr, SceUInt32 init_pattern, const SceKernelSimpleEventOptParam *pOptParam);
@@ -81,6 +89,14 @@ DECL_EXPORT(int, sceKernelResumeThreadForVM, SceUID threadId);
 DECL_EXPORT(int, sceKernelSuspendThreadForVM, SceUID threadId);
 DECL_EXPORT(int, sceKernelUnlockMutex, SceUID mutexid, int unlock_count);
 
+DECL_EXPORT(SceInt32, _sceKernelGetSystemTime, SceKernelSysClock *pClock);
+DECL_EXPORT(SceInt32, _sceKernelGetTimerTime, SceUID timer_handle, SceKernelSysClock *pClock);
+DECL_EXPORT(SceInt32, _sceKernelSetTimerTime, SceUID timer_handle, const SceKernelSysClock *pClock);
+DECL_EXPORT(SceInt32, _sceKernelGetTimerEventRemainingTime, SceUID timer_handle, SceKernelSysClock *pRemaining);
+DECL_EXPORT(SceInt32, _sceKernelSendMsgPipeVector, SceUID msgPipeId, const SceKernelMsgPipeVector *pVector, SceUInt32 numVector, SceUInt32 waitMode, SceSize *pResult, SceUInt32 *pTimeout);
+DECL_EXPORT(SceInt32, _sceKernelSendMsgPipeVectorCB, SceUID msgPipeId, const SceKernelMsgPipeVector *pVector, SceUInt32 numVector, SceUInt32 waitMode, SceSize *pResult, SceUInt32 *pTimeout);
+DECL_EXPORT(SceInt32, _sceKernelReceiveMsgPipeVector, SceUID msgPipeId, const SceKernelMsgPipeVector *pVector, SceUInt32 numVector, SceUInt32 waitMode, SceSize *pResult, SceUInt32 *pTimeout);
+DECL_EXPORT(SceInt32, _sceKernelReceiveMsgPipeVectorCB, SceUID msgPipeId, const SceKernelMsgPipeVector *pVector, SceUInt32 numVector, SceUInt32 waitMode, SceSize *pResult, SceUInt32 *pTimeout);
 DECL_EXPORT(SceInt32, _sceKernelCancelEvent, SceUID event_id, SceUInt32 *num_wait_threads);
 DECL_EXPORT(SceInt32, _sceKernelCancelTimer, SceUID timer_id, SceUInt32 *num_wait_threads);
 DECL_EXPORT(SceInt32, _sceKernelCancelMutex, SceUID mutex_id, SceInt32 new_count, SceUInt32 *num_wait_threads);

@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL_events.h>
 
+#include <touch/rear_contacts.h>
+#include <touch/region.h>
 #include <touch/touch.h>
 
 #include <algorithm>
@@ -16,6 +18,8 @@ struct TouchState {
     bool mouse_button_left = false;
     bool mouse_button_right = false;
     bool renderer_focused = false;
+    // Per-port region tables used by sceTouchPeekRegion/sceTouchReadRegion (see touch/region.h)
+    touch_region::Table regions[2] = {};
     SceTouchPortType touchscreen_port = SCE_TOUCH_PORT_FRONT;
     bool touchscreen_both = false; // screen touches feed both ports
     SceTouchData touch_buffers[MAX_TOUCH_BUFFER_SAVED][2] = {};
@@ -25,8 +29,7 @@ struct TouchState {
     SDL_GamepadTouchpadEvent touchpad_buffer[8] = {};
     SDL_TouchID finger_devices[8] = {};
     SDL_JoystickID touchpad_devices[8] = {};
-    SceTouchReport rear_contacts[4] = {};
-    bool rear_contact_down[4] = {};
+    touch_rear::Contacts rear;
     uint8_t finger_count = 0;
     uint8_t touchpad_finger_count = 0;
     bool is_touched[2] = { false, false };
@@ -59,8 +62,7 @@ struct TouchState {
         std::fill_n(touchpad_buffer, 8, SDL_GamepadTouchpadEvent{});
         std::fill_n(finger_devices, 8, SDL_TouchID{});
         std::fill_n(touchpad_devices, 8, SDL_JoystickID{});
-        std::fill_n(rear_contacts, 4, SceTouchReport{});
-        std::fill_n(rear_contact_down, 4, false);
+        rear.clear();
         finger_count = 0;
         touchpad_finger_count = 0;
         is_touched[0] = false;
@@ -72,6 +74,8 @@ struct TouchState {
         last_vcount[1] = 0;
         force_touch_enabled[0] = false;
         force_touch_enabled[1] = false;
+        regions[0] = {};
+        regions[1] = {};
         pinch_modifier_enabled = false;
         pinch_velocity = 0.f;
         old_pinch_behavior = false;

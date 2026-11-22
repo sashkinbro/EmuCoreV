@@ -17,16 +17,31 @@
 
 #include <module/module.h>
 
+#include "power_battery.h"
+
+#include <kernel/state.h>
+#include <util/lock_and_find.h>
 #include <util/tracy.h>
 #include <util/types.h>
 
 #include <SDL3/SDL_power.h>
 
 #include <climits>
+#include <mutex>
 
 #define LOW_BATTERY_PERCENT 10
 
 TRACY_MODULE_NAME(ScePower);
+
+// Charge percentage reported by the host, or -1 when unknown.
+static int host_battery_percent() {
+    int percent = -1;
+    SDL_GetPowerInfo(nullptr, &percent);
+    return percent;
+}
+
+static power_battery::CallbackRegistry g_power_callbacks;
+static std::mutex g_power_callbacks_mutex;
 
 enum ScePowerErrorCode {
     SCE_POWER_ERROR_INVALID_VALUE = 0x802B0000,
@@ -62,22 +77,23 @@ EXPORT(int, scePowerGetArmClockFrequency) {
 
 EXPORT(int, scePowerGetBatteryChargingStatus) {
     TRACY_FUNC(scePowerGetBatteryChargingStatus);
-    return UNIMPLEMENTED();
+    return power_battery::charging_status(SDL_GetPowerInfo(nullptr, nullptr) == SDL_POWERSTATE_CHARGING);
 }
 
 EXPORT(int, scePowerGetBatteryCycleCount) {
     TRACY_FUNC(scePowerGetBatteryCycleCount);
-    return UNIMPLEMENTED();
+    return power_battery::CYCLE_COUNT;
 }
 
 EXPORT(int, scePowerGetBatteryElec) {
     TRACY_FUNC(scePowerGetBatteryElec);
-    return UNIMPLEMENTED();
+    // Provisional: no current measurement is available on the host.
+    return 0;
 }
 
 EXPORT(int, scePowerGetBatteryFullCapacity) {
     TRACY_FUNC(scePowerGetBatteryFullCapacity);
-    return UNIMPLEMENTED();
+    return power_battery::FULL_CAPACITY_MAH;
 }
 
 EXPORT(int, scePowerGetBatteryLifePercent) {
@@ -94,15 +110,13 @@ EXPORT(int, scePowerGetBatteryLifeTime) {
     TRACY_FUNC(scePowerGetBatteryLifeTime);
     int res;
     SDL_GetPowerInfo(&res, NULL);
-    if (res == -1) {
-        return INT_MAX;
-    }
-    return res;
+    // SDL reports seconds, the SDK returns minutes
+    return power_battery::life_time_minutes(res);
 }
 
 EXPORT(int, scePowerGetBatteryRemainCapacity) {
     TRACY_FUNC(scePowerGetBatteryRemainCapacity);
-    return UNIMPLEMENTED();
+    return power_battery::remain_capacity_mah(host_battery_percent());
 }
 
 EXPORT(int, scePowerGetBatteryRemainLevel) {
@@ -128,17 +142,17 @@ EXPORT(int, scePowerGetBatteryRemainMaxLevel) {
 
 EXPORT(int, scePowerGetBatterySOH) {
     TRACY_FUNC(scePowerGetBatterySOH);
-    return UNIMPLEMENTED();
+    return power_battery::HEALTH_PERCENT;
 }
 
 EXPORT(int, scePowerGetBatteryTemp) {
     TRACY_FUNC(scePowerGetBatteryTemp);
-    return UNIMPLEMENTED();
+    return power_battery::BATTERY_TEMP_CENTI_C;
 }
 
 EXPORT(int, scePowerGetBatteryVolt) {
     TRACY_FUNC(scePowerGetBatteryVolt);
-    return UNIMPLEMENTED();
+    return power_battery::voltage_mv(host_battery_percent());
 }
 
 EXPORT(int, scePowerGetBusClockFrequency) {
@@ -148,7 +162,7 @@ EXPORT(int, scePowerGetBusClockFrequency) {
 
 EXPORT(int, scePowerGetCaseTemp) {
     TRACY_FUNC(scePowerGetCaseTemp);
-    return UNIMPLEMENTED();
+    return power_battery::CASE_TEMP_CENTI_C;
 }
 
 EXPORT(int, scePowerGetGpuClockFrequency) {
@@ -214,9 +228,20 @@ EXPORT(int, scePowerIsSuspendRequired) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, scePowerRegisterCallback) {
-    TRACY_FUNC(scePowerRegisterCallback);
-    return UNIMPLEMENTED();
+// Callbacks are stored so that registration/unregistration pair up as on hardware, but they are
+// never invoked: the emulated device has no power events to report.
+EXPORT(int, scePowerRegisterCallback, SceUID cbid) {
+    TRACY_FUNC(scePowerRegisterCallback, cbid);
+    const CallbackPtr cb = lock_and_find(cbid, emuenv.kernel.callbacks, emuenv.kernel.mutex);
+    if (!cb)
+        return RET_ERROR(SCE_POWER_ERROR_INVALID_VALUE);
+
+    const std::lock_guard<std::mutex> lock(g_power_callbacks_mutex);
+    // forget callbacks that were deleted since (also covers a restarted emulation)
+    g_power_callbacks.prune([&](std::int32_t id) { return lock_and_find(id, emuenv.kernel.callbacks, emuenv.kernel.mutex) != nullptr; });
+    if (g_power_callbacks.add(cbid) == power_battery::CallbackRegistry::AlreadyRegistered)
+        return RET_ERROR(SCE_POWER_ERROR_ALREADY_REGISTERED);
+    return 0;
 }
 
 EXPORT(int, scePowerRequestColdReset) {
@@ -297,7 +322,10 @@ EXPORT(int, scePowerSetUsingWireless, SceBool enabled) {
     return 0;
 }
 
-EXPORT(int, scePowerUnregisterCallback) {
-    TRACY_FUNC(scePowerUnregisterCallback);
-    return UNIMPLEMENTED();
+EXPORT(int, scePowerUnregisterCallback, SceUID cbid) {
+    TRACY_FUNC(scePowerUnregisterCallback, cbid);
+    const std::lock_guard<std::mutex> lock(g_power_callbacks_mutex);
+    if (g_power_callbacks.remove(cbid) == power_battery::CallbackRegistry::NotRegistered)
+        return RET_ERROR(SCE_POWER_ERROR_CALLBACK_NOT_REGISTERED);
+    return 0;
 }

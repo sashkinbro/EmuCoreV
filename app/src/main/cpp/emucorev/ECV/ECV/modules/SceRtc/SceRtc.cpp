@@ -175,6 +175,7 @@ EXPORT(int, _sceRtcGetLastReincarnatedTick) {
 
 EXPORT(SceULong64, sceRtcGetAccumulativeTime) {
     TRACY_FUNC(sceRtcGetAccumulativeTime);
-    STUBBED("sceRtcGetAccumulativeTime");
-    return rtc_get_ticks(emuenv.kernel.base_tick.tick);
+    // Provisional: the firmware's accumulation origin is unknown; report the microseconds the
+    // emulated process has been running, which is monotonic and starts near zero.
+    return emuenv.kernel.process_time_us();
 }

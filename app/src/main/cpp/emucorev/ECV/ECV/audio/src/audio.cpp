@@ -23,7 +23,9 @@
 
 #include <util/log.h>
 
+#include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstring>
 
 bool validate_audio_port_snapshot(uint32_t codec, int len_bytes, const std::vector<uint8_t> &snapshot) {
@@ -64,10 +66,13 @@ void AudioState::deinit() {
     out_ports.clear();
 
     if (in_port.running) {
-        SDL_DestroyAudioStream(static_cast<SDL_AudioStream *>(in_port.id));
+        if (in_port.id)
+            SDL_DestroyAudioStream(static_cast<SDL_AudioStream *>(in_port.id));
         in_port.id = nullptr;
         in_port.running = false;
         in_port.len_bytes = 0;
+        in_port.freq = 0;
+        in_port.next_deadline_us = 0;
     }
 
     next_port_id = 1;
@@ -126,9 +131,13 @@ void AudioState::set_volume(AudioOutPort &out_port, float volume) {
 }
 
 void AudioState::set_global_volume(float volume) {
-    global_volume = volume;
+    // Out-of-range or NaN input (corrupt config) must never reach the backend: clamp to [0, 1].
+    volume = std::isnan(volume) ? 1.0f : std::clamp(volume, 0.0f, 1.0f);
     //  Update adapter volume for each port.
     const std::lock_guard lock(mutex);
+    global_volume = volume;
+    if (!adapter)
+        return;
     for (const auto &[_, port] : out_ports) {
         adapter->set_volume(*port, port->volume * volume);
     }

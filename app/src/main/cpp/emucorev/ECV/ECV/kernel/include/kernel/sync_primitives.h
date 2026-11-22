@@ -19,6 +19,7 @@
 
 #include <atomic>
 #include <kernel/thread/thread_state.h>
+#include <kernel/kernel_arith.h>
 #include <kernel/rwlock_policy.h>
 #include <kernel/thread/wait_queue.h>
 #include <kernel/types.h>
@@ -100,7 +101,9 @@ struct Timer : SyncPrimitive {
     uint64_t time = 0;
     // Host epoch translation only; raw GetTimerBase/SetTimerTime values persist.
     uint64_t elapsed_clock_bias = 0;
-    uint64_t elapsed_time_at(uint64_t now) const { return now - elapsed_clock_bias - time; }
+    uint64_t elapsed_time_at(uint64_t now) const { return kernel_arith::timer_elapsed(now, time, elapsed_clock_bias); }
+    // sceKernelSetTimerTime: the counter reads `elapsed` at `now` and keeps running from there.
+    void set_elapsed_time(uint64_t now, uint64_t elapsed) { kernel_arith::timer_set_elapsed(now, elapsed, time, elapsed_clock_bias); }
     void restore_elapsed_time(uint64_t now, uint64_t saved_elapsed) { elapsed_clock_bias = now - time - saved_elapsed; }
     void reset_time_base(uint64_t now) {
         time = now;

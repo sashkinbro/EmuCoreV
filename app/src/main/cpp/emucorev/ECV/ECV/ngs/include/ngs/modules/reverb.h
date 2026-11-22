@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <ngs/dsp/reverb.h>
 #include <ngs/system.h>
 #include <ngs/types.h>
 
@@ -53,10 +54,16 @@ struct SceNgsReverbParams {
 
 namespace ngs {
 
+struct ReverbLogicalState : public ModuleLogicalState {
+    dsp::ReverbState dsp; // host-only, not part of save states
+};
+
 class ReverbModule : public Module {
 public:
     bool process(KernelState &kern, const MemState &mem, const SceUID thread_id, ModuleData &data, std::unique_lock<std::recursive_mutex> &scheduler_lock, std::unique_lock<std::mutex> &voice_lock) override;
     uint32_t module_id() const override { return 0x5CE7; }
+    std::unique_ptr<ModuleLogicalState> create_logical_state() const override;
+    void on_key_on(const MemState &mem, ModuleData &data) override;
 
     static constexpr uint32_t get_max_parameter_size() {
         return sizeof(SceNgsReverbParams);

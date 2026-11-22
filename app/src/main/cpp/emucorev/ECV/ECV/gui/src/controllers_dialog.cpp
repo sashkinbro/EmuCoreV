@@ -267,8 +267,7 @@ void draw_controllers_dialog(GuiState &gui, EmuEnvState &emuenv) {
                 if (ImGui::Button(controller_it->second.name))
                     rebinds_is_open = true;
                 if (rebinds_is_open) {
-                    const SDL_GUID guid = SDL_GetJoystickGUIDForID(gamepad_id);
-                    if (!ctrl.controllers.contains(guid)) {
+                    if (!ctrl.controllers.contains(gamepad_id)) {
                         rebinds_is_open = false;
                         continue;
                     }
@@ -368,9 +367,9 @@ void draw_controllers_dialog(GuiState &gui, EmuEnvState &emuenv) {
                     ImGui::Spacing();
                     ImGui::Separator();
                     ImGui::Spacing();
-                    if (ctrl.controllers[guid].has_led) {
+                    if (ctrl.controllers[gamepad_id].has_led) {
                         const auto set_led_color = [&](const std::vector<int> &led) {
-                            SDL_SetGamepadLED(ctrl.controllers[guid].controller.get(), led[0], led[1], led[2]);
+                            SDL_SetGamepadLED(ctrl.controllers[gamepad_id].controller.get(), led[0], led[1], led[2]);
                             config::serialize_config(emuenv.cfg, emuenv.cfg.config_path);
                         };
                         ImGui::Spacing();

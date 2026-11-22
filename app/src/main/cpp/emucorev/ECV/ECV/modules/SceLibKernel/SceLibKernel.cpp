@@ -1573,9 +1573,9 @@ EXPORT(int, sceKernelGetSystemInfo) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceKernelGetSystemTime) {
-    TRACY_FUNC(sceKernelGetSystemTime);
-    return UNIMPLEMENTED();
+EXPORT(int, sceKernelGetSystemTime, SceKernelSysClock *pClock) {
+    TRACY_FUNC(sceKernelGetSystemTime, pClock);
+    return CALL_EXPORT(_sceKernelGetSystemTime, pClock);
 }
 
 EXPORT(Ptr<Ptr<void>>, sceKernelGetTLSAddr, int key) {
@@ -1660,9 +1660,9 @@ EXPORT(int, sceKernelGetTimerBase, SceUID timer_handle, SceKernelSysClock *time)
     return 0;
 }
 
-EXPORT(int, sceKernelGetTimerEventRemainingTime) {
-    TRACY_FUNC(sceKernelGetTimerEventRemainingTime);
-    return UNIMPLEMENTED();
+EXPORT(int, sceKernelGetTimerEventRemainingTime, SceUID timer_handle, SceKernelSysClock *pRemaining) {
+    TRACY_FUNC(sceKernelGetTimerEventRemainingTime, timer_handle, pRemaining);
+    return CALL_EXPORT(_sceKernelGetTimerEventRemainingTime, timer_handle, pRemaining);
 }
 
 EXPORT(int, sceKernelGetTimerInfo) {
@@ -1672,15 +1672,7 @@ EXPORT(int, sceKernelGetTimerInfo) {
 
 EXPORT(int, sceKernelGetTimerTime, SceUID timer_handle, SceKernelSysClock *time) {
     TRACY_FUNC(sceKernelGetTimerTime, timer_handle, time);
-    const TimerPtr timer_info = lock_and_find(timer_handle, emuenv.kernel.timers, emuenv.kernel.mutex);
-
-    auto object_lock = timer_info ? timer_info->lock() : std::unique_lock<std::mutex>();
-    if (!object_lock)
-        return SCE_KERNEL_ERROR_UNKNOWN_TIMER_ID;
-
-    *time = get_current_time() - timer_info->time;
-
-    return 0;
+    return CALL_EXPORT(_sceKernelGetTimerTime, timer_handle, time);
 }
 
 EXPORT(SceUID, sceKernelLoadModule, char *path, int flags, SceKernelLMOption *option) {
@@ -1795,14 +1787,14 @@ EXPORT(SceInt32, sceKernelReceiveMsgPipeCB, SceUID msgPipeId, void *pRecvBuf, Sc
     return receive_msg_pipe(emuenv, export_name, thread_id, msgPipeId, pRecvBuf, recvSize, waitMode, pResult, pTimeout, true);
 }
 
-EXPORT(int, sceKernelReceiveMsgPipeVector) {
-    TRACY_FUNC(sceKernelReceiveMsgPipeVector);
-    return UNIMPLEMENTED();
+EXPORT(SceInt32, sceKernelReceiveMsgPipeVector, SceUID msgPipeId, const SceKernelMsgPipeVector *pVector, SceUInt32 numVector, SceUInt32 waitMode, SceSize *pResult, SceUInt32 *pTimeout) {
+    TRACY_FUNC(sceKernelReceiveMsgPipeVector, msgPipeId, pVector, numVector, waitMode, pResult, pTimeout);
+    return CALL_EXPORT(_sceKernelReceiveMsgPipeVector, msgPipeId, pVector, numVector, waitMode, pResult, pTimeout);
 }
 
-EXPORT(int, sceKernelReceiveMsgPipeVectorCB) {
-    TRACY_FUNC(sceKernelReceiveMsgPipeVectorCB);
-    return UNIMPLEMENTED();
+EXPORT(SceInt32, sceKernelReceiveMsgPipeVectorCB, SceUID msgPipeId, const SceKernelMsgPipeVector *pVector, SceUInt32 numVector, SceUInt32 waitMode, SceSize *pResult, SceUInt32 *pTimeout) {
+    TRACY_FUNC(sceKernelReceiveMsgPipeVectorCB, msgPipeId, pVector, numVector, waitMode, pResult, pTimeout);
+    return CALL_EXPORT(_sceKernelReceiveMsgPipeVectorCB, msgPipeId, pVector, numVector, waitMode, pResult, pTimeout);
 }
 
 EXPORT(int, sceKernelRegisterThreadEventHandler, const char *name, SceUID thread_mask, SceUInt32 mask, Ptr<const void> handler, Address common) {
@@ -1836,14 +1828,14 @@ EXPORT(SceInt32, sceKernelSendMsgPipeCB, SceUID msgPipeId, const void *pSendBuf,
     return send_msg_pipe(emuenv, export_name, thread_id, msgPipeId, pSendBuf, sendSize, waitMode, pResult, pTimeout, true);
 }
 
-EXPORT(int, sceKernelSendMsgPipeVector) {
-    TRACY_FUNC(sceKernelSendMsgPipeVector);
-    return UNIMPLEMENTED();
+EXPORT(SceInt32, sceKernelSendMsgPipeVector, SceUID msgPipeId, const SceKernelMsgPipeVector *pVector, SceUInt32 numVector, SceUInt32 waitMode, SceSize *pResult, SceUInt32 *pTimeout) {
+    TRACY_FUNC(sceKernelSendMsgPipeVector, msgPipeId, pVector, numVector, waitMode, pResult, pTimeout);
+    return CALL_EXPORT(_sceKernelSendMsgPipeVector, msgPipeId, pVector, numVector, waitMode, pResult, pTimeout);
 }
 
-EXPORT(int, sceKernelSendMsgPipeVectorCB) {
-    TRACY_FUNC(sceKernelSendMsgPipeVectorCB);
-    return UNIMPLEMENTED();
+EXPORT(SceInt32, sceKernelSendMsgPipeVectorCB, SceUID msgPipeId, const SceKernelMsgPipeVector *pVector, SceUInt32 numVector, SceUInt32 waitMode, SceSize *pResult, SceUInt32 *pTimeout) {
+    TRACY_FUNC(sceKernelSendMsgPipeVectorCB, msgPipeId, pVector, numVector, waitMode, pResult, pTimeout);
+    return CALL_EXPORT(_sceKernelSendMsgPipeVectorCB, msgPipeId, pVector, numVector, waitMode, pResult, pTimeout);
 }
 
 EXPORT(int, sceKernelSetEventWithNotifyCallback) {
@@ -1862,9 +1854,9 @@ EXPORT(int, sceKernelSetTimerEvent, SceUID timer_handle, SceInt32 type, SceKerne
     return timer_set(emuenv.kernel, export_name, thread_id, timer_handle, type, interval, repeats);
 }
 
-EXPORT(int, sceKernelSetTimerTime) {
-    TRACY_FUNC(sceKernelSetTimerTime);
-    return UNIMPLEMENTED();
+EXPORT(int, sceKernelSetTimerTime, SceUID timer_handle, const SceKernelSysClock *time) {
+    TRACY_FUNC(sceKernelSetTimerTime, timer_handle, time);
+    return CALL_EXPORT(_sceKernelSetTimerTime, timer_handle, time);
 }
 
 EXPORT(int, sceKernelSignalLwCond, Ptr<SceKernelLwCondWork> workarea) {
@@ -1936,9 +1928,17 @@ EXPORT(int, sceKernelTryReceiveMsgPipe, SceUID msgpipe_id, char *recv_buf, SceSi
     return SCE_KERNEL_OK;
 }
 
-EXPORT(int, sceKernelTryReceiveMsgPipeVector) {
-    TRACY_FUNC(sceKernelTryReceiveMsgPipeVector);
-    return UNIMPLEMENTED();
+EXPORT(int, sceKernelTryReceiveMsgPipeVector, SceUID msgPipeId, const SceKernelMsgPipeVector *pVector, SceUInt32 numVector, SceUInt32 waitMode, SceSize *pResult) {
+    TRACY_FUNC(sceKernelTryReceiveMsgPipeVector, msgPipeId, pVector, numVector, waitMode, pResult);
+    SceSize received = 0;
+    const SceInt32 ret = CALL_EXPORT(_sceKernelReceiveMsgPipeVector, msgPipeId, pVector, numVector, waitMode | SCE_KERNEL_MSG_PIPE_MODE_DONT_WAIT, &received, nullptr);
+    if (ret < 0)
+        return ret;
+    if (received == 0)
+        return SCE_KERNEL_ERROR_MPP_EMPTY;
+    if (pResult)
+        *pResult = received;
+    return SCE_KERNEL_OK;
 }
 
 EXPORT(int, sceKernelTrySendMsgPipe, SceUID msgPipeId, const void *pSendBuf, SceSize sendSize, SceUInt32 waitMode, SceSize *pResult) {
@@ -1957,9 +1957,15 @@ EXPORT(int, sceKernelTrySendMsgPipe, SceUID msgPipeId, const void *pSendBuf, Sce
     // return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceKernelTrySendMsgPipeVector) {
-    TRACY_FUNC(sceKernelTrySendMsgPipeVector);
-    return UNIMPLEMENTED();
+EXPORT(int, sceKernelTrySendMsgPipeVector, SceUID msgPipeId, const SceKernelMsgPipeVector *pVector, SceUInt32 numVector, SceUInt32 waitMode, SceSize *pResult) {
+    TRACY_FUNC(sceKernelTrySendMsgPipeVector, msgPipeId, pVector, numVector, waitMode, pResult);
+    SceSize sent = 0;
+    const SceInt32 ret = CALL_EXPORT(_sceKernelSendMsgPipeVector, msgPipeId, pVector, numVector, waitMode | SCE_KERNEL_MSG_PIPE_MODE_DONT_WAIT, &sent, nullptr);
+    if (ret < 0)
+        return ret;
+    if (pResult)
+        *pResult = sent;
+    return SCE_KERNEL_OK;
 }
 
 EXPORT(int, sceKernelUnloadModule, SceUID uid, SceUInt32 flags, const void *pOpt) {

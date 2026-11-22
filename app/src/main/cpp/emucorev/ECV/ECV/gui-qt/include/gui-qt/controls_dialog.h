@@ -188,7 +188,7 @@ private:
 
         bool connected = false;
         int port = -1;
-        SDL_GUID guid{};
+        SDL_JoystickID guid{}; // controller instance id
         SDL_GamepadType type = SDL_GAMEPAD_TYPE_STANDARD;
     };
 

@@ -20,6 +20,9 @@
 #include <codec/state.h>
 #include <codec/types.h>
 
+#include <cstring>
+#include <vector>
+
 #include <util/tracy.h>
 TRACY_MODULE_NAME(SceJpegEncUser);
 
@@ -30,6 +33,10 @@ struct SceJpegEncoderContext {
     Ptr<uint8_t> outBuffer;
     uint32_t outSize;
     SceJpegEncoderInitParamOption option;
+
+    // Region of the input image that is encoded (sceJpegEncoderSetValidRegion); defaults to inWidth x inHeight.
+    int32_t validWidth;
+    int32_t validHeight;
 
     int32_t compressRatio;
     int32_t headerMode;
@@ -42,6 +49,9 @@ static int sceJpegEncoderInitImpl(SceJpegEncoderContext *context, int32_t inWidt
     context->outBuffer = outBuffer;
     context->outSize = outSize;
     context->option = option;
+
+    context->validWidth = inWidth;
+    context->validHeight = inHeight;
 
     context->compressRatio = 64;
     context->headerMode = SCE_JPEGENC_HEADER_MODE_JPEG;
@@ -106,6 +116,29 @@ EXPORT(int, sceJpegEncoderEncode, SceJpegEncoderContext *context, Ptr<uint8_t> i
         return SCE_JPEGENC_ERROR_INVALID_PIXELFORMAT;
     }
 
+    // Encode only the valid region: crop the planar input (rows are inWidth wide) into a tight buffer.
+    std::vector<uint8_t> cropped;
+    if (context->validWidth != width || context->validHeight != height) {
+        const bool is422 = color_space == COLORSPACE_YUV422P;
+        const int32_t cw = (width + 1) / 2, ch = is422 ? height : (height + 1) / 2;
+        const int32_t vw = context->validWidth, vh = context->validHeight;
+        const int32_t vcw = (vw + 1) / 2, vch = is422 ? vh : (vh + 1) / 2;
+        cropped.resize(static_cast<size_t>(vw) * vh + 2 * static_cast<size_t>(vcw) * vch);
+        uint8_t *dst = cropped.data();
+        const uint8_t *src = inBufferData;
+        for (int32_t y = 0; y < vh; y++, dst += vw)
+            memcpy(dst, src + static_cast<size_t>(y) * width, vw);
+        src += static_cast<size_t>(width) * height;
+        for (int plane = 0; plane < 2; plane++) {
+            for (int32_t y = 0; y < vch; y++, dst += vcw)
+                memcpy(dst, src + static_cast<size_t>(y) * cw, vcw);
+            src += static_cast<size_t>(cw) * ch;
+        }
+        inBufferData = cropped.data();
+        width = vw;
+        height = vh;
+    }
+
     uint32_t size = convert_yuv_to_jpeg(inBufferData, outBufferData, width, height, context->outSize, color_space, context->compressRatio);
 
     if (size == -1) {
@@ -164,5 +197,12 @@ EXPORT(int, sceJpegEncoderSetOutputAddr, SceJpegEncoderContext *context, Ptr<uin
 
 EXPORT(int, sceJpegEncoderSetValidRegion, SceJpegEncoderContext *context, int32_t inWidth, int32_t inHeight) {
     TRACY_FUNC(sceJpegEncoderSetValidRegion, context, inWidth, inHeight);
-    return UNIMPLEMENTED();
+    if (!context)
+        return SCE_JPEGENC_ERROR_INVALID_POINTER;
+    // The valid region is a sub-rectangle of the image the encoder was initialised with.
+    if (inWidth <= 0 || inHeight <= 0 || inWidth > context->inWidth || inHeight > context->inHeight)
+        return SCE_JPEGENC_ERROR_IMAGE_SIZE;
+    context->validWidth = inWidth;
+    context->validHeight = inHeight;
+    return 0;
 }

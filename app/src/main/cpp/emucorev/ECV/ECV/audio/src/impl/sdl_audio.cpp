@@ -109,8 +109,17 @@ AudioSubmitResult SDLAudioAdapter::try_audio_output(AudioOutPort &out_port, cons
     const int samples_available = get_rest_sample(port);
     if (samples_available < 0)
         return AudioSubmitResult::error;
-    if (!allow_overflow && samples_available > get_threshold_samples(device_buffer_samples))
+    const int threshold = get_threshold_samples(device_buffer_samples);
+    if (!allow_overflow && samples_available > threshold)
         return AudioSubmitResult::would_block;
+    // An overflow submit (the guest's wait expired, e.g. after the device stalled or the app was in
+    // the background) adds data on top of a full queue. Without a bound that surplus is never
+    // drained and the sound lags further behind the picture every time it happens. Drop the stale
+    // backlog instead: one short skip, then audio is in sync again.
+    if (samples_available > 4 * threshold) {
+        LOG_WARN_ONCE("Audio output backlog of {} samples (limit {}): dropping it to keep audio in sync", samples_available, 4 * threshold);
+        SDL_ClearAudioStream(port.stream.get());
+    }
     return SDL_PutAudioStreamData(port.stream.get(), buffer, port.len_bytes)
         ? AudioSubmitResult::submitted : AudioSubmitResult::error;
 }

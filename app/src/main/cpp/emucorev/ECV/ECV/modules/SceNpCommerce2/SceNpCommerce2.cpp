@@ -17,12 +17,38 @@
 
 #include <module/module.h>
 
+#include <np/state.h>
+
+#include <mutex>
+
+// Generic NP codes (see SceNpManager).
+enum : uint32_t {
+    SCE_NP_ERROR_ALREADY_INITIALIZED = 0x80550001,
+    SCE_NP_ERROR_NOT_INITIALIZED = 0x80550002,
+    SCE_NP_ERROR_INVALID_ARGUMENT = 0x80550003,
+};
+
 EXPORT(int, sceNpCommerce2AbortReq) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceNpCommerce2CreateCtx) {
-    return UNIMPLEMENTED();
+// PROVISIONAL signature: (version, npId, handler, handler argument, out ctxId). The context only
+// records its id; every request made on it needs the network, which this offline console lacks.
+EXPORT(int, sceNpCommerce2CreateCtx, uint32_t version, Ptr<const void> npId, uint32_t handler, uint32_t arg, Ptr<int32_t> ctxId) {
+    // The 5-argument layout is unconfirmed on the Vita (Crazy Market passed ctxId = 0x2C, which
+    // crashed the host when it was written blindly): validate before writing and log the raw
+    // arguments once so the real ABI can be confirmed.
+    LOG_WARN_ONCE("sceNpCommerce2CreateCtx(version={:#x}, npId={:#x}, handler={:#x}, arg={:#x}, ctxId={:#x})",
+        version, npId.address(), handler, arg, ctxId.address());
+    if (!npId || !ctxId || !ctxId.valid(emuenv.mem))
+        return RET_ERROR(SCE_NP_ERROR_INVALID_ARGUMENT);
+    const std::lock_guard<std::mutex> lock(emuenv.np.mutex);
+    if (!emuenv.np.offline.commerce2_inited)
+        return RET_ERROR(SCE_NP_ERROR_NOT_INITIALIZED);
+    const uint32_t id = emuenv.np.offline.commerce2_next_ctx_id++;
+    emuenv.np.offline.commerce2_ctxs.insert(id);
+    *ctxId.get(emuenv.mem) = static_cast<int32_t>(id);
+    return 0;
 }
 
 EXPORT(int, sceNpCommerce2CreateSessionCreateReq) {
@@ -37,8 +63,13 @@ EXPORT(int, sceNpCommerce2CreateSessionStart) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceNpCommerce2DestroyCtx) {
-    return UNIMPLEMENTED();
+EXPORT(int, sceNpCommerce2DestroyCtx, int32_t ctxId) {
+    const std::lock_guard<std::mutex> lock(emuenv.np.mutex);
+    if (!emuenv.np.offline.commerce2_inited)
+        return RET_ERROR(SCE_NP_ERROR_NOT_INITIALIZED);
+    if (emuenv.np.offline.commerce2_ctxs.erase(static_cast<uint32_t>(ctxId)) == 0)
+        return RET_ERROR(SCE_NP_ERROR_INVALID_ARGUMENT);
+    return 0;
 }
 
 EXPORT(int, sceNpCommerce2DestroyGetCategoryContentsResult) {
@@ -153,8 +184,14 @@ EXPORT(int, sceNpCommerce2HidePsStoreIcon) {
     return UNIMPLEMENTED();
 }
 
+// Offline console: the service initialises, but any request needing the PlayStation Network is not served.
+// PROVISIONAL: double init reuses the generic SCE_NP_ERROR_ALREADY_INITIALIZED (service-specific code unrecovered).
 EXPORT(int, sceNpCommerce2Init) {
-    return UNIMPLEMENTED();
+    const std::lock_guard<std::mutex> lock(emuenv.np.mutex);
+    if (emuenv.np.offline.commerce2_inited)
+        return RET_ERROR(SCE_NP_ERROR_ALREADY_INITIALIZED);
+    emuenv.np.offline.commerce2_inited = true;
+    return 0;
 }
 
 EXPORT(int, sceNpCommerce2InitGetCategoryContentsResult) {
@@ -182,5 +219,10 @@ EXPORT(int, sceNpCommerce2StopEmptyStoreCheck) {
 }
 
 EXPORT(int, sceNpCommerce2Term) {
-    return UNIMPLEMENTED();
+    const std::lock_guard<std::mutex> lock(emuenv.np.mutex);
+    if (!emuenv.np.offline.commerce2_inited)
+        return RET_ERROR(SCE_NP_ERROR_NOT_INITIALIZED);
+    emuenv.np.offline.commerce2_inited = false;
+    emuenv.np.offline.commerce2_ctxs.clear();
+    return 0;
 }

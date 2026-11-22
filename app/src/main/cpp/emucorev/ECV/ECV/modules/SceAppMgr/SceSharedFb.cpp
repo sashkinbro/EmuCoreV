@@ -88,7 +88,9 @@ EXPORT(int, _sceSharedFbOpen, int smth) {
 
 EXPORT(int, sceSharedFbBegin, int id, SceSharedFbInfo *info) {
     TRACY_FUNC(sceSharedFbBegin, id, info);
-    SharedFbState *state = emuenv.kernel.obj_store.get<SharedFbState>();
+    const auto state = emuenv.kernel.obj_store.get_shared<SharedFbState>();
+    if (!state)
+        return RET_ERROR(SCE_KERNEL_ERROR_INVALID_UID);
     state->info.curbuf = 1;
     *info = state->info;
     return 0;
@@ -100,7 +102,9 @@ EXPORT(int, sceSharedFbClose) {
 
 EXPORT(int, sceSharedFbCreate, int smth) {
     TRACY_FUNC(sceSharedFbCreate, smth);
-    SharedFbState *state = emuenv.kernel.obj_store.get<SharedFbState>();
+    const auto state = emuenv.kernel.obj_store.get_shared<SharedFbState>();
+    if (!state)
+        return RET_ERROR(SCE_KERNEL_ERROR_INVALID_UID);
     if (state->info.memsize == 0) {
         // enough memory for 2 956x544 buffers
         constexpr uint32_t alloc_size = 4 * 1024 * 512 * 2;
@@ -125,7 +129,9 @@ EXPORT(int, sceSharedFbDelete) {
 
 EXPORT(int, sceSharedFbEnd) {
     TRACY_FUNC(sceSharedFbEnd);
-    SharedFbState *state = emuenv.kernel.obj_store.get<SharedFbState>();
+    const auto state = emuenv.kernel.obj_store.get_shared<SharedFbState>();
+    if (!state)
+        return RET_ERROR(SCE_KERNEL_ERROR_INVALID_UID);
     Ptr<void> data = (state->info.curbuf == 0) ? state->info.base2 : state->info.base1;
 #ifndef NDEBUG
     static std::atomic_uint trace_count{0};
@@ -145,7 +151,9 @@ EXPORT(int, sceSharedFbEnd) {
 
 EXPORT(int, sceSharedFbGetInfo, int id, SceSharedFbInfo *info) {
     TRACY_FUNC(sceSharedFbGetInfo);
-    SharedFbState *state = emuenv.kernel.obj_store.get<SharedFbState>();
+    const auto state = emuenv.kernel.obj_store.get_shared<SharedFbState>();
+    if (!state)
+        return RET_ERROR(SCE_KERNEL_ERROR_INVALID_UID);
     *info = state->info;
     return 0;
 }
@@ -168,7 +176,9 @@ EXPORT(int, sceSharedFbUpdateProcessBegin, SceUID id, const SceSharedFbRenderInf
         poll_native_library_catalog(emuenv, *thread);
     if (!render_info || !update_count)
         return RET_ERROR(SCE_KERNEL_ERROR_ILLEGAL_ADDR);
-    auto *state = emuenv.kernel.obj_store.get<SharedFbState>();
+    const auto state = emuenv.kernel.obj_store.get_shared<SharedFbState>();
+    if (!state)
+        return RET_ERROR(SCE_KERNEL_ERROR_INVALID_UID);
     if (id != 1 || state->info.memsize == 0)
         return RET_ERROR(SCE_KERNEL_ERROR_INVALID_UID);
     if (!render_info->frame_buffer_base || render_info->width == 0 || render_info->height == 0
@@ -195,7 +205,9 @@ EXPORT(int, sceSharedFbUpdateProcessBegin, SceUID id, const SceSharedFbRenderInf
 }
 
 EXPORT(int, sceSharedFbUpdateProcessEnd) {
-    auto *state = emuenv.kernel.obj_store.get<SharedFbState>();
+    const auto state = emuenv.kernel.obj_store.get_shared<SharedFbState>();
+    if (!state)
+        return RET_ERROR(SCE_KERNEL_ERROR_INVALID_UID);
     const std::lock_guard lock(state->handoff_mutex);
     if (!state->pending_valid)
         return RET_ERROR(SCE_KERNEL_ERROR_INVALID_ARGUMENT);

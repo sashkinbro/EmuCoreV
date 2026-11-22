@@ -21,6 +21,7 @@
 
 #include <kernel/state.h>
 #include <kernel/thread/thread_state.h>
+#include <ngs/param_lock.h>
 #include <ngs/state.h>
 #include <ngs/system.h>
 #include <ngs/update_admission.h>
@@ -224,14 +225,39 @@ EXPORT(int, sceNgsAT9GetSectionDetails, uint32_t samples_start, const uint32_t n
     return 0;
 }
 
+// PROVISIONAL: the module libraries' preset tables are not recovered, so no module reports a preset.
+// (A module id other than a valid one is not distinguished.)
 EXPORT(int, sceNgsModuleGetNumPresets, ngs::System *system, const SceUInt32 module, SceUInt32 *num_presets) {
     TRACY_FUNC(sceNgsModuleGetNumPresets, system, module, num_presets);
-    return UNIMPLEMENTED();
+    if (!emuenv.cfg.current_config.ngs_enable)
+        return SCE_NGS_OK;
+
+    if (!system || !num_presets)
+        return RET_ERROR(SCE_NGS_ERROR_INVALID_ARG);
+
+    LOG_WARN_ONCE("{}: module presets are not recovered, reporting none", export_name);
+    *num_presets = 0;
+    return SCE_NGS_OK;
 }
 
-EXPORT(int, sceNgsModuleGetPreset, ngs::System *system, const SceUInt32 module, const SceUInt32 preset_index, void *params_buffer) {
+// Copies the module's preset parameters into the buffer (SceNgsBufferInfo: data + size).
+// PROVISIONAL: with no preset table recovered (see sceNgsModuleGetNumPresets) every index is out of range.
+EXPORT(int, sceNgsModuleGetPreset, ngs::System *system, const SceUInt32 module, const SceUInt32 preset_index, SceNgsBufferInfo *params_buffer) {
     TRACY_FUNC(sceNgsModuleGetPreset, system, module, preset_index, params_buffer);
-    return UNIMPLEMENTED();
+    if (!emuenv.cfg.current_config.ngs_enable)
+        return SCE_NGS_OK;
+
+    if (!system || !params_buffer)
+        return RET_ERROR(SCE_NGS_ERROR_INVALID_ARG);
+
+    SceUInt32 num_presets = 0;
+    const int result = CALL_EXPORT(sceNgsModuleGetNumPresets, system, module, &num_presets);
+    if (result != SCE_NGS_OK)
+        return result;
+    if (preset_index >= num_presets)
+        return RET_ERROR(SCE_NGS_ERROR_INVALID_ARG);
+
+    return RET_ERROR(SCE_NGS_ERROR);
 }
 
 EXPORT(int, sceNgsPatchCreateRouting, SceNgsPatchSetupInfo *patch_info, Ptr<ngs::Patch> *handle) {
@@ -489,9 +515,24 @@ EXPORT(SceUInt32, sceNgsSystemInit, Ptr<void> memspace, const uint32_t memspace_
     return SCE_NGS_OK;
 }
 
-EXPORT(int, sceNgsSystemLock) {
-    TRACY_FUNC(sceNgsSystemLock);
-    return UNIMPLEMENTED();
+EXPORT(SceInt32, sceNgsSystemLock, ngs::System *system) {
+    TRACY_FUNC(sceNgsSystemLock, system);
+    if (!emuenv.cfg.current_config.ngs_enable)
+        return SCE_NGS_OK;
+
+    if (!system)
+        return RET_ERROR(SCE_NGS_ERROR_INVALID_ARG);
+
+    // Waits for an update in flight and keeps new updates from other threads out
+    // until sceNgsSystemUnlock, so guest parameter writes cannot be torn.
+    ngs::VoiceScheduler &scheduler = system->voice_scheduler;
+    std::unique_lock<std::recursive_mutex> lock(scheduler.mutex);
+    ngs::param_lock_acquire(
+        ngs::system_param_lock(&scheduler), lock, scheduler.condvar, thread_id,
+        [&scheduler, thread_id] { return scheduler.is_updating && !scheduler.is_update_thread(thread_id); },
+        [] { guest_sched_release_for_block(); });
+
+    return SCE_NGS_OK;
 }
 
 EXPORT(SceInt32, sceNgsSystemRelease, ngs::System *system) {
@@ -513,14 +554,23 @@ EXPORT(SceInt32, sceNgsSystemRelease, ngs::System *system) {
         }
     }
 
+    ngs::system_param_lock_erase(&system->voice_scheduler);
     ngs::release_system(emuenv.ngs, emuenv.mem, system);
 
     return SCE_NGS_OK;
 }
 
-EXPORT(int, sceNgsSystemSetFlags) {
-    TRACY_FUNC(sceNgsSystemSetFlags);
-    return UNIMPLEMENTED();
+EXPORT(int, sceNgsSystemSetFlags, ngs::System *system, const SceUInt32 flags) {
+    TRACY_FUNC(sceNgsSystemSetFlags, system, flags);
+    if (!emuenv.cfg.current_config.ngs_enable)
+        return SCE_NGS_OK;
+
+    if (!system)
+        return RET_ERROR(SCE_NGS_ERROR_INVALID_ARG);
+
+    // Stored for the system; none of the flags changes how the emulated mixer runs.
+    system->flags = flags;
+    return SCE_NGS_OK;
 }
 
 EXPORT(int, sceNgsSystemSetParamErrorCallback) {
@@ -528,9 +578,20 @@ EXPORT(int, sceNgsSystemSetParamErrorCallback) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceNgsSystemUnlock) {
-    TRACY_FUNC(sceNgsSystemUnlock);
-    return UNIMPLEMENTED();
+EXPORT(SceInt32, sceNgsSystemUnlock, ngs::System *system) {
+    TRACY_FUNC(sceNgsSystemUnlock, system);
+    if (!emuenv.cfg.current_config.ngs_enable)
+        return SCE_NGS_OK;
+
+    if (!system)
+        return RET_ERROR(SCE_NGS_ERROR_INVALID_ARG);
+
+    ngs::VoiceScheduler &scheduler = system->voice_scheduler;
+    std::unique_lock<std::recursive_mutex> lock(scheduler.mutex);
+    if (!ngs::param_lock_release(ngs::system_param_lock(&scheduler), scheduler.condvar, thread_id))
+        LOG_WARN_ONCE("sceNgsSystemUnlock called while the system lock is not held (unbalanced unlock)");
+
+    return SCE_NGS_OK;
 }
 
 EXPORT(SceUInt32, sceNgsSystemUpdate, ngs::System *system) {

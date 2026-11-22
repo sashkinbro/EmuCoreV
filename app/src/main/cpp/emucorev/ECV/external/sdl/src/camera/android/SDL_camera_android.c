@@ -704,7 +704,7 @@ static void ANDROIDCAMERA_FreeDeviceHandle(SDL_Camera *device)
     }
 }
 
-static void GatherCameraSpecs(const char *devid, CameraFormatAddData *add_data, char **fullname, SDL_CameraPosition *position)
+static void GatherCameraSpecs(const char *devid, CameraFormatAddData *add_data, char **fullname, SDL_CameraPosition *position, int *sensor_orientation, int *lens_facing)
 {
     SDL_zerop(add_data);
 
@@ -736,8 +736,14 @@ static void GatherCameraSpecs(const char *devid, CameraFormatAddData *add_data, 
         }
     }
 
+    ACameraMetadata_const_entry oriententry;
+    if (pACameraMetadata_getConstEntry(metadata, ACAMERA_SENSOR_ORIENTATION, &oriententry) == ACAMERA_OK && oriententry.count > 0 && oriententry.data.i32) {
+        *sensor_orientation = oriententry.data.i32[0];
+    }
+
     ACameraMetadata_const_entry posentry;
     if (pACameraMetadata_getConstEntry(metadata, ACAMERA_LENS_FACING, &posentry) == ACAMERA_OK && posentry.count > 0) {
+        *lens_facing = *posentry.data.u8;
         if (*posentry.data.u8 == ACAMERA_LENS_FACING_FRONT) {
             *position = SDL_CAMERA_POSITION_FRONT_FACING;
             if (!*fullname) {
@@ -825,13 +831,20 @@ static void MaybeAddDevice(const char *devid)
     SDL_CameraPosition position = SDL_CAMERA_POSITION_UNKNOWN;
     char *fullname = NULL;
     CameraFormatAddData add_data;
-    GatherCameraSpecs(devid, &add_data, &fullname, &position);
+    int sensor_orientation = 0;
+    int lens_facing = -1;
+    GatherCameraSpecs(devid, &add_data, &fullname, &position, &sensor_orientation, &lens_facing);
     if (add_data.num_specs > 0) {
         char *namecpy = SDL_strdup(devid);
         if (namecpy) {
             SDL_Camera *device = SDL_AddCamera(fullname, position, add_data.num_specs, add_data.specs, namecpy);
             if (!device) {
                 SDL_free(namecpy);
+            } else {
+                // Consumed by the emulator's camera frame orientation correction.
+                const SDL_PropertiesID props = SDL_GetCameraProperties(device);
+                SDL_SetNumberProperty(props, "emucorev.camera.sensor_orientation", sensor_orientation);
+                SDL_SetNumberProperty(props, "emucorev.camera.lens_facing", lens_facing);
             }
         }
     }

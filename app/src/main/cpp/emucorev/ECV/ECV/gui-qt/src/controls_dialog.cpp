@@ -1086,7 +1086,7 @@ void ControlsDialog::refresh_controller_tabs() {
         auto &tab = m_ctrl_tabs[i];
         tab.connected = false;
         tab.port = -1;
-        tab.guid = {};
+        tab.guid = 0;
         tab.type = SDL_GAMEPAD_TYPE_STANDARD;
     }
 

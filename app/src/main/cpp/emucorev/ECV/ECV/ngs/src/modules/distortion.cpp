@@ -21,12 +21,33 @@
 namespace ngs {
 
 bool DistortionModule::process(KernelState &kern, const MemState &mem, const SceUID thread_id, ModuleData &data, std::unique_lock<std::recursive_mutex> &scheduler_lock, std::unique_lock<std::mutex> &voice_lock) {
-    if (!data.is_bypassed) {
-        const SceNgsParamsDescriptor *desc = data.get_parameters<SceNgsParamsDescriptor>(mem);
-        if (desc->id == SCE_NGS_DISTORTION_PARAMS_STRUCT_ID) {
-            LOG_WARN_ONCE("Game is using unimplemented distortion audio module");
-        }
-    }
+    if (data.is_bypassed)
+        return false;
+
+    Voice *voice = data.parent;
+    const SceNgsParamsDescriptor *desc = data.get_parameters<SceNgsParamsDescriptor>(mem);
+    if (!desc || desc->id != SCE_NGS_DISTORTION_PARAMS_STRUCT_ID)
+        return false;
+    const SceNgsDistortionParams *params = data.get_parameters<SceNgsDistortionParams>(mem);
+
+    const uint32_t frames = static_cast<uint32_t>(voice->rack->system->granularity);
+    const float *main_signal = reinterpret_cast<const float *>(voice->products[0].data);
+    if (!main_signal || frames == 0)
+        return false;
+
+    dsp::DistortionParams p;
+    p.a = params->fA;
+    p.b = params->fB;
+    p.clip = params->fClip;
+    p.gate = params->fGate;
+    p.wet_gain = params->fWetGain;
+    p.dry_gain = params->fDryGain;
+
+    data.ensure_scratch_size(static_cast<size_t>(frames) * 2 * sizeof(float));
+    float *out = reinterpret_cast<float *>(data.scratch_data.data());
+    const uint32_t channels = voice->rack->channels_per_voice == 1 ? 1 : 2;
+    dsp::distortion_process(p, channels, main_signal, out, frames);
+    voice->products[0].data = reinterpret_cast<uint8_t *>(out);
 
     return false;
 }

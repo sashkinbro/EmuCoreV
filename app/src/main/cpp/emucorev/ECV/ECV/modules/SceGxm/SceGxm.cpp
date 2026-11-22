@@ -127,6 +127,20 @@ void release_tracked_program_sources(EmuEnvState &emuenv) {
 }
 } // namespace
 
+// Waits for the background pipeline compiles of a program to finish: a few yields for the common
+// short wait, then 1 ms sleeps so a long compile does not burn a core.
+static void wait_compile_threads_done(const std::atomic<uint32_t> &compile_threads_on) {
+    unsigned spins = 0;
+    while (compile_threads_on.load(std::memory_order_acquire) > 0) {
+        if (spins < 32) {
+            ++spins;
+            std::this_thread::yield();
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
+}
+
 // Precomputed vertex/fragment state applies to every draw once set on the context, not only sceGxmDrawPrecomputed.
 static constexpr bool use_precomputed_state_on_draw = true;
 
@@ -1113,6 +1127,7 @@ struct SceGxmContext {
     std::unique_ptr<renderer::Context> renderer;
 
     std::mutex &callback_lock;
+    std::recursive_mutex &command_lists_lock;
 
     Ptr<uint8_t> alloc_space{};
     Ptr<uint8_t> alloc_space_end{};
@@ -1140,8 +1155,9 @@ struct SceGxmContext {
     bool was_vert_default_uniform_reserved = false;
     bool was_frag_default_uniform_reserved = false;
 
-    explicit SceGxmContext(std::mutex &callback_lock_)
-        : callback_lock(callback_lock_) {
+    SceGxmContext(std::mutex &callback_lock_, std::recursive_mutex &command_lists_lock_)
+        : callback_lock(callback_lock_)
+        , command_lists_lock(command_lists_lock_) {
     }
 
     void reset_recording() {
@@ -1198,6 +1214,7 @@ struct SceGxmContext {
 
     // insert new memory range used by a command list
     void insert_new_memory_range() {
+        const std::lock_guard<std::recursive_mutex> lists_guard(command_lists_lock);
         CommandListRange range = {
             alloc_space_start.address(),
             alloc_space.address(),
@@ -1345,6 +1362,7 @@ static void destroy_pending_deferred_command_chain(renderer::CommandList &comman
 }
 
 static void destroy_pending_deferred_commands(SceGxmContext *context) {
+    const std::lock_guard<std::recursive_mutex> lists_guard(context->command_lists_lock);
     if (context->curr_command_list) {
         while (!context->curr_command_list->memory_ranges.empty()) {
             context->command_list_ranges.erase(context->curr_command_list->memory_ranges.top());
@@ -1406,6 +1424,7 @@ static int destroy_gxm_context(EmuEnvState &emuenv, SceGxmContext *context, cons
             return static_cast<int>(SCE_GXM_ERROR_WITHIN_COMMAND_LIST);
         }
 
+        const std::lock_guard<std::recursive_mutex> lists_guard(emuenv.gxm.command_lists_mutex);
         destroy_pending_deferred_commands(context);
         emuenv.gxm.deferred_contexts.erase(deferred_context);
     } else {
@@ -1461,13 +1480,14 @@ void invalidate_sync_objects(GxmState &gxm) {
 }
 
 void shutdown(EmuEnvState &emuenv) {
+    // Publish every abort flag first, then wake all waiters in one place. wake_all_waiters takes each
+    // waiter mutex once so a waiter between its predicate check and its wait cannot miss the wakeup.
     emuenv.display.abort = true;
-    emuenv.renderer->notification_ready.notify_all();
+    emuenv.renderer->render_abort = true;
     emuenv.gxm.display_snapshot_gate.stop();
     emuenv.gxm.display_queue.abort();
-    emuenv.renderer->render_abort = true;
     invalidate_sync_objects(emuenv.gxm);
-    emuenv.renderer->command_finish_one.notify_all();
+    emuenv.renderer->wake_all_waiters();
 
     // wait for any deferred GXM callback to finish before continuing shutdown
     const std::lock_guard<std::mutex> callback_guard(emuenv.gxm.callback_lock);
@@ -1933,7 +1953,7 @@ bool restore_contexts(EmuEnvState &emuenv, const std::vector<ContextSnapshot> &s
     };
     for (const ContextSnapshot &snapshot : snapshots) {
         SceGxmContext *context = Ptr<SceGxmContext>(snapshot.address).get(emuenv.mem);
-        new (context) SceGxmContext(emuenv.gxm.callback_lock);
+        new (context) SceGxmContext(emuenv.gxm.callback_lock, emuenv.gxm.command_lists_mutex);
         context->state = snapshot.state;
         context->last_precomputed = snapshot.last_precomputed;
         context->alloc_space = snapshot.alloc_space.cast<uint8_t>();
@@ -2831,7 +2851,7 @@ EXPORT(int, sceGxmCreateContext, const SceGxmContextParams *params, Ptr<SceGxmCo
     *context = Ptr<SceGxmContext>(align(params->hostMem.address(), 8));
 
     SceGxmContext *ctx = context->get(emuenv.mem);
-    new (ctx) SceGxmContext(emuenv.gxm.callback_lock);
+    new (ctx) SceGxmContext(emuenv.gxm.callback_lock, emuenv.gxm.command_lists_mutex);
 
     ctx->state.fragment_ring_buffer = params->fragmentRingBufferMem;
     ctx->state.vertex_ring_buffer = params->vertexRingBufferMem;
@@ -2882,7 +2902,7 @@ EXPORT(int, sceGxmCreateDeferredContext, SceGxmDeferredContextParams *params, Pt
 
     *deferredContext = Ptr<SceGxmContext>(align(params->hostMem.address(), 8));
     SceGxmContext *ctx = deferredContext->get(emuenv.mem);
-    new (ctx) SceGxmContext(emuenv.gxm.callback_lock);
+    new (ctx) SceGxmContext(emuenv.gxm.callback_lock, emuenv.gxm.command_lists_mutex);
 
     ctx->state.vertex_memory_callback = params->vertexCallback;
     ctx->state.fragment_memory_callback = params->fragmentCallback;
@@ -2893,7 +2913,10 @@ EXPORT(int, sceGxmCreateDeferredContext, SceGxmDeferredContextParams *params, Pt
 
     // Create a generic context. This is only used for storing command list
     ctx->renderer = std::make_unique<renderer::Context>();
-    emuenv.gxm.deferred_contexts.emplace(ctx, deferredContext->address());
+    {
+        const std::lock_guard<std::recursive_mutex> lists_guard(emuenv.gxm.command_lists_mutex);
+        emuenv.gxm.deferred_contexts.emplace(ctx, deferredContext->address());
+    }
 
     return 0;
 }
@@ -3959,15 +3982,20 @@ EXPORT(int, sceGxmExecuteCommandList, SceGxmContext *context, SceGxmCommandList 
         return RET_ERROR(SCE_GXM_ERROR_NOT_WITHIN_SCENE);
     }
 
-    auto *saved_list = commandList ? gxm::resolve_deferred_command_list(emuenv,
-        reinterpret_cast<uintptr_t>(commandList->list)) : nullptr;
-    if (!saved_list)
-        return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
+    {
+        // The list may be recycled by its deferred context on another thread at any moment: look it
+        // up and copy it under the lock that guards recycling.
+        const std::lock_guard<std::recursive_mutex> lists_guard(emuenv.gxm.command_lists_mutex);
+        auto *saved_list = commandList ? gxm::resolve_deferred_command_list(emuenv,
+            reinterpret_cast<uintptr_t>(commandList->list)) : nullptr;
+        if (!saved_list)
+            return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
 
-    // Deferred VDM storage can be reused before the renderer consumes the
-    // immediate list, so execution must own copies of the deferred commands.
-    if (!context->renderer || !append_deferred_command_list(*context->renderer, *saved_list))
-        return RET_ERROR(SCE_GXM_ERROR_RESERVE_FAILED);
+        // Deferred VDM storage can be reused before the renderer consumes the
+        // immediate list, so execution must own copies of the deferred commands.
+        if (!context->renderer || !append_deferred_command_list(*context->renderer, *saved_list))
+            return RET_ERROR(SCE_GXM_ERROR_RESERVE_FAILED);
+    }
 
     // Restore back our GXM state
     gxmContextStateRestore(*emuenv.renderer, context, true);
@@ -4002,8 +4030,22 @@ EXPORT(int, sceGxmFinish, SceGxmContext *context) {
 EXPORT(SceGxmPassType, sceGxmFragmentProgramGetPassType, const SceGxmFragmentProgram *fragmentProgram) {
     TRACY_FUNC(sceGxmFragmentProgramGetPassType, fragmentProgram);
     assert(fragmentProgram);
-    STUBBED("SCE_GXM_PASS_TYPE_OPAQUE");
-    return SceGxmPassType::SCE_GXM_PASS_TYPE_OPAQUE;
+    // PROVISIONAL derivation: the pass type is not stored in the program, it follows from how it was
+    // created (mask update program), what the shader does (depth write, discard) and the blend state.
+    if (fragmentProgram->is_maskupdate)
+        return SCE_GXM_PASS_TYPE_MASK_UPDATE;
+
+    const SceGxmProgram *const gxp = fragmentProgram->program.get(emuenv.mem);
+    if (gxp && gxp->is_depth_replace_used())
+        return SCE_GXM_PASS_TYPE_DEPTH_REPLACE;
+    if (gxp && gxp->is_discard_used())
+        return SCE_GXM_PASS_TYPE_DISCARD;
+
+    const auto info = emuenv.gxm.fragment_programs.find(Ptr<const SceGxmFragmentProgram>(fragmentProgram, emuenv.mem).address());
+    if (info != emuenv.gxm.fragment_programs.end() && info->second.has_blend
+        && (info->second.blend.colorFunc != SCE_GXM_BLEND_FUNC_NONE || info->second.blend.alphaFunc != SCE_GXM_BLEND_FUNC_NONE))
+        return SCE_GXM_PASS_TYPE_TRANSLUCENT;
+    return SCE_GXM_PASS_TYPE_OPAQUE;
 }
 
 EXPORT(Ptr<const SceGxmProgram>, sceGxmFragmentProgramGetProgram, const SceGxmFragmentProgram *fragmentProgram) {
@@ -4142,8 +4184,14 @@ EXPORT(int, sceGxmGetRenderTargetMemSize, const SceGxmRenderTargetParams *params
     if (!params || !hostMemSize)
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
 
-    *hostMemSize = static_cast<uint32_t>(KiB(64));
-    return STUBBED("64KiB emuenv mem");
+    // Same validation as sceGxmCreateRenderTarget.
+    if (params->flags & 0xFFFF00EC)
+        return RET_ERROR(SCE_GXM_ERROR_INVALID_VALUE);
+
+    // The host memory the library needs for a render target is the object sceGxmCreateRenderTarget
+    // allocates; the firmware's own figure depends on its internal layout (not recovered).
+    *hostMemSize = static_cast<uint32_t>(sizeof(SceGxmRenderTarget));
+    return 0;
 }
 
 EXPORT(int, sceGxmInitialize, const SceGxmInitializeParams *params) {
@@ -4300,13 +4348,23 @@ EXPORT(int, sceGxmNotificationWait, const SceGxmNotification *notification) {
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
     }
 
+    // A null address is legal (the renderer ignores it when signalling), so nothing can ever be
+    // written there: do not block. An address outside guest memory is rejected, never dereferenced.
+    if (!notification->address)
+        return 0;
+    const Address notification_addr = notification->address.address();
+    if (notification_addr > 0xFFFFFFFCu || !is_valid_addr_range(emuenv.mem, notification_addr, notification_addr + sizeof(std::uint32_t)))
+        return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
+
     std::uint32_t volatile *value = notification->address.get(emuenv.mem);
     const std::uint32_t target_value = notification->value;
 
     guest_sched_release_for_block();
     std::unique_lock<std::mutex> lock(emuenv.renderer->notification_mutex);
     if (*value != target_value) {
-        emuenv.renderer->notification_ready.wait(lock, [&]() { return *value == target_value || emuenv.display.abort.load(); });
+        emuenv.renderer->notification_ready.wait(lock, [&]() {
+            return *value == target_value || emuenv.display.abort.load() || emuenv.renderer->render_abort.load();
+        });
     }
 
     return 0;
@@ -5122,7 +5180,16 @@ EXPORT(void, sceGxmSetBackStencilRef, SceGxmContext *context, uint8_t sref) {
 
 EXPORT(void, sceGxmSetBackVisibilityTestEnable, SceGxmContext *context, SceGxmVisibilityTestMode enable) {
     TRACY_FUNC(sceGxmSetBackVisibilityTestEnable, context, enable);
-    UNIMPLEMENTED();
+
+    // The renderer keeps one visibility state for both faces, so the back-face call drives the same
+    // state as the front-face one (games set both to the same value).
+    if (!emuenv.renderer->features.enable_memory_mapping) {
+        UNIMPLEMENTED();
+        return;
+    }
+
+    context->state.visibility_enable = enable != SCE_GXM_VISIBILITY_TEST_DISABLED;
+    renderer::set_visibility_index(*emuenv.renderer, context->renderer.get(), context->state.visibility_enable, context->state.visibility_index, context->state.visibility_is_increment);
 }
 
 EXPORT(void, sceGxmSetBackVisibilityTestIndex, SceGxmContext *context, uint32_t index) {
@@ -6036,8 +6103,7 @@ EXPORT(int, sceGxmShaderPatcherForceUnregisterProgram, SceGxmShaderPatcher *shad
         for (auto it = shaderPatcher->vertex_program_cache.begin(); it != shaderPatcher->vertex_program_cache.end();) {
             if (it->first.vertex_program.program == rp->program) {
                 SceGxmVertexProgram *vertex_program = it->second.get(emuenv.mem);
-                while (vertex_program->compile_threads_on.load(std::memory_order_acquire) > 0)
-                    std::this_thread::yield();
+                wait_compile_threads_done(vertex_program->compile_threads_on);
 
                 renderer::release_program_source(*vertex_program);
                 emuenv.gxm.vertex_programs.erase(it->second.address());
@@ -6051,8 +6117,7 @@ EXPORT(int, sceGxmShaderPatcherForceUnregisterProgram, SceGxmShaderPatcher *shad
         for (auto it = shaderPatcher->fragment_program_cache.begin(); it != shaderPatcher->fragment_program_cache.end();) {
             if (it->first.fragment_program.program == rp->program) {
                 SceGxmFragmentProgram *frag_program = it->second.get(emuenv.mem);
-                while (frag_program->compile_threads_on.load(std::memory_order_acquire) > 0)
-                    std::this_thread::yield();
+                wait_compile_threads_done(frag_program->compile_threads_on);
 
                 renderer::release_program_source(*frag_program);
                 emuenv.gxm.fragment_programs.erase(it->second.address());
@@ -6153,8 +6218,7 @@ EXPORT(int, sceGxmShaderPatcherReleaseFragmentProgram, SceGxmShaderPatcher *shad
     --fp->reference_count;
     if (fp->reference_count == 0) {
         guest_sched_release_for_block();
-        while (fp->compile_threads_on.load(std::memory_order_acquire) > 0)
-            std::this_thread::yield();
+        wait_compile_threads_done(fp->compile_threads_on);
 
         renderer::finish(*emuenv.renderer, nullptr);
 
@@ -6181,8 +6245,7 @@ EXPORT(int, sceGxmShaderPatcherReleaseVertexProgram, SceGxmShaderPatcher *shader
     --vp->reference_count;
     if (vp->reference_count == 0) {
         guest_sched_release_for_block();
-        while (vp->compile_threads_on.load(std::memory_order_acquire) > 0)
-            std::this_thread::yield();
+        wait_compile_threads_done(vp->compile_threads_on);
 
         renderer::finish(*emuenv.renderer, nullptr);
 

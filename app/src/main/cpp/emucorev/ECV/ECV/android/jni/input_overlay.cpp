@@ -81,7 +81,17 @@ bool attach_overlay_virtual_controller() {
 }
 
 bool overlay_virtual_controller_attached() {
-    return virtual_joystick != nullptr;
+    if (!virtual_joystick)
+        return false;
+    // An in-process relaunch (LoadExec, e.g. picking a game in the God of War Collection) resets
+    // the ctrl runtime while our SDL joystick stays open: then the pad is no longer in the
+    // controller list and every overlay press was ignored until the overlay was toggled. Report
+    // "not attached" so the overlay re-attaches (which refreshes the controller list).
+    auto *emuenv = get_emuenv();
+    if (!emuenv)
+        return true;
+    const std::lock_guard lock(emuenv->ctrl.mutex);
+    return emuenv->ctrl.controllers.contains(static_cast<SDL_JoystickID>(virtual_joystick_id));
 }
 
 extern "C" {
@@ -135,9 +145,13 @@ JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_input_RearTouchNative_setContact(JNIEnv *, jobject, jint slot, jboolean pressed, jfloat x, jfloat y) {
     const std::lock_guard input_operation(emucorev::savestate::save_state_operation_mutex());
     auto *emuenv = get_emuenv();
+    if (!emuenv) return; // no core: nothing stored, nothing to clear
+    // A release is always applied so a contact can never stay stuck down; only new presses are gated.
     auto *controller = get_app_session_controller();
-    if (!emuenv || !controller || !controller->is_running()) return;
-    if (pressed && (emuenv->drop_inputs || emuenv->ctrl.overlay_input_intercepted.load(std::memory_order_relaxed))) return;
+    if (pressed == JNI_TRUE) {
+        if (!controller || !controller->is_running()) return;
+        if (emuenv->drop_inputs || emuenv->ctrl.overlay_input_intercepted.load(std::memory_order_relaxed)) return;
+    }
     set_rear_touch_contact(emuenv->touch, slot, pressed == JNI_TRUE, x, y);
 }
 

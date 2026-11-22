@@ -18,6 +18,7 @@
 #include <algorithm>
 
 #include <io/device.h>
+#include <io/guest_path.h>
 
 namespace device {
 
@@ -29,8 +30,11 @@ std::string construct_normalized_path(const VitaIoDevice dev, const std::string 
     }
 
     // Normalize the path
-    auto normalized = path;
-    normalized.front() == '/' ? normalized = device_path + normalized : normalized = device_path + '/' + normalized;
+    // '.' and '..' are resolved here so a guest path can never leave its device.
+    const auto resolved = resolve_guest_subpath(path);
+    if (resolved.empty()) // e.g. "/" or ".." only: the device root
+        return device_path + "/";
+    auto normalized = device_path + '/' + resolved;
 
     if (!ext.empty()) {
         if (fs::path(normalized).has_extension()) {

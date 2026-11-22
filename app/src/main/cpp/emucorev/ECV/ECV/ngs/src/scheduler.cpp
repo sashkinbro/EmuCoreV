@@ -17,11 +17,13 @@
 
 #include <ngs/modules/atrac9.h>
 #include <ngs/modules/envelope.h>
+#include <ngs/param_lock.h>
 #include <ngs/scheduler.h>
 #include <ngs/state.h>
 #include <ngs/system.h>
 
 #include <kernel/state.h>
+#include <kernel/thread/thread_state.h>
 
 #include <algorithm>
 #include <cstring>
@@ -147,6 +149,9 @@ bool VoiceScheduler::off(const MemState &mem, Voice *voice) {
 
 void VoiceScheduler::update(KernelState &kern, const MemState &mem, const SceUID thread_id) {
     std::unique_lock<std::recursive_mutex> scheduler_lock(mutex);
+    // sceNgsSystemLock held by another guest thread: wait until it is released
+    // so parameter writes made under the lock are never observed half done.
+    param_lock_wait_for_update(system_param_lock(this), scheduler_lock, condvar, thread_id, [] { guest_sched_release_for_block(); });
     update_thread_id = thread_id;
     is_updating = true;
     set_callback_kind(UpdateCallbackKind::None);

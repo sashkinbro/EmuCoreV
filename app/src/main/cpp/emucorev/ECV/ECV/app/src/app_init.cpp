@@ -568,6 +568,8 @@ void shutdown_app_runtime(EmuEnvState &state) {
 
     state.common_dialog.deinit();
 
+    state.app.services.reset();
+
     state.ime.deinit();
 
     state.touch.reset_runtime();

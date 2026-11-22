@@ -45,6 +45,9 @@ EXPORT(int, sceLiveAreaUpdateFrameAsync) {
     return UNIMPLEMENTED();
 }
 
+// The LiveArea frame update (page content replaced by the running title) has no counterpart in the
+// emulator: LiveArea is never displayed while a title runs, so the update is accepted and not shown.
 EXPORT(int, sceLiveAreaUpdateFrameSync) {
-    return UNIMPLEMENTED();
+    LOG_WARN_ONCE("{}: the LiveArea frame update is accepted but not displayed", export_name);
+    return 0;
 }

@@ -102,6 +102,13 @@ struct NetcheckState {
     SceNetCheckDialogMode mode = SCE_NETCHECK_DIALOG_MODE_INVALID;
 };
 
+// Values the application set with sceCommonDialogSetConfigParam; -1 = not set (the system setting applies).
+struct CommonDialogConfig {
+    int language = -1;
+    int enter_button_assign = -1;
+    bool set = false;
+};
+
 struct DialogState {
     mutable std::recursive_mutex mutex;
 
@@ -116,6 +123,7 @@ struct DialogState {
     TrophyState trophy;
     SavedataState savedata;
     stub_dialog::Core stub;
+    CommonDialogConfig config;
 
     void deinit() {
         std::lock_guard<std::recursive_mutex> lock(mutex);
@@ -130,5 +138,6 @@ struct DialogState {
         trophy = {};
         savedata = {};
         stub = {};
+        config = {};
     }
 };

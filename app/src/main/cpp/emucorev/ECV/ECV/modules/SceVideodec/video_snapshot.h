@@ -22,14 +22,19 @@
 //
 // Layout (little endian):
 //   u8[4]  magic "VCOD"
-//   u32    version (1)
+//   u32    version (2; version 1 is still accepted)
 //   u8     videodec_initialized   (sceVideodecInitLibrary* was called and not terminated)
 //   u8     mjpeg_initialized      (sceJpegInitMJpeg was called and not finished)
 //   u16    reserved (0)
 //   u32    decoder_count
 //   decoder_count x {
 //       i32 handle, u32 width, u32 height, u8 output_yuvp3, u8 stopped, u16 reserved(0)
+//       version >= 2 only:
+//       u32 pixel_type (last SceAvcdecPixelFormat), u32 decode_mode,
+//       u32 recovery_point_sei_mode, u32 interlaced_stream_mode,
+//       u8 codec (0 = AVC, 1 = MPEG-4 Part 2), u8 reserved[3] (0)
 //   }
+// Version 1 records (no extra fields) get pixel_type derived from output_yuvp3, zero modes, AVC.
 // Only creation parameters are stored. FFmpeg reference frames and parser state cannot be
 // serialised: restored decoders start with fresh contexts and the game resynchronises at the
 // next IDR frame.
@@ -41,12 +46,17 @@
 
 namespace video_snapshot {
 
-constexpr uint32_t kVersion = 1;
+constexpr uint32_t kVersion = 2;
+constexpr uint32_t kMinVersion = 1;
 constexpr uint32_t kMaxDecoders = 1024;
 // Same limits as sceAvcdecCreateDecoder.
 constexpr uint32_t kMaxWidth = 1920;
 constexpr uint32_t kMaxHeight = 1088;
 constexpr uint32_t kMaxPixels = 1280 * 720;
+
+inline bool valid_pixel_type(uint32_t type) {
+    return type == 0x00 || type == 0x01 || type == 0x02 || type == 0x08 || type == 0x10 || type == 0x20;
+}
 
 struct AvcDecoderRecord {
     int32_t handle = 0;
@@ -54,6 +64,12 @@ struct AvcDecoderRecord {
     uint32_t height = 0;
     bool output_yuvp3 = false;
     bool stopped = true;
+    // Added in version 2.
+    uint32_t pixel_type = 0x20; // SceAvcdecPixelFormat, default YUV420_PACKED_RASTER
+    uint32_t decode_mode = 0;
+    uint32_t recovery_point_sei_mode = 0;
+    uint32_t interlaced_stream_mode = 0;
+    uint8_t codec = 0; // 0 = AVC, 1 = MPEG-4 Part 2
 
     bool operator==(const AvcDecoderRecord &) const = default;
 };
@@ -91,6 +107,14 @@ inline bool serialize(const Snapshot &snapshot, std::vector<uint8_t> &out, std::
         put_u32(out, d.height);
         out.push_back(d.output_yuvp3 ? 1 : 0);
         out.push_back(d.stopped ? 1 : 0);
+        out.push_back(0);
+        out.push_back(0);
+        put_u32(out, d.pixel_type);
+        put_u32(out, d.decode_mode);
+        put_u32(out, d.recovery_point_sei_mode);
+        put_u32(out, d.interlaced_stream_mode);
+        out.push_back(d.codec);
+        out.push_back(0);
         out.push_back(0);
         out.push_back(0);
     }
@@ -140,7 +164,7 @@ inline bool parse(const std::vector<uint8_t> &blob, Snapshot &out, std::string &
     uint8_t vd = 0, mj = 0, r0 = 0, r1 = 0;
     if (!c.u32(version) || !c.u8(vd) || !c.u8(mj) || !c.u8(r0) || !c.u8(r1) || !c.u32(count))
         return fail("truncated video codec snapshot");
-    if (version != kVersion)
+    if (version < kMinVersion || version > kVersion)
         return fail("unsupported video codec snapshot version");
     if (vd > 1 || mj > 1 || r0 != 0 || r1 != 0)
         return fail("invalid video codec snapshot header");
@@ -161,6 +185,17 @@ inline bool parse(const std::vector<uint8_t> &blob, Snapshot &out, std::string &
         d.handle = static_cast<int32_t>(handle);
         if (d.handle <= 0 || yuvp3 > 1 || stopped > 1 || q0 != 0 || q1 != 0)
             return fail("invalid video decoder record");
+        if (version >= 2) {
+            uint8_t codec = 0, s0 = 0, s1 = 0, s2 = 0;
+            if (!c.u32(d.pixel_type) || !c.u32(d.decode_mode) || !c.u32(d.recovery_point_sei_mode) || !c.u32(d.interlaced_stream_mode)
+                || !c.u8(codec) || !c.u8(s0) || !c.u8(s1) || !c.u8(s2))
+                return fail("truncated video codec snapshot");
+            if (codec > 1 || s0 != 0 || s1 != 0 || s2 != 0 || !valid_pixel_type(d.pixel_type))
+                return fail("invalid video decoder record");
+            d.codec = codec;
+        } else {
+            d.pixel_type = yuvp3 ? 0x10 : 0x20;
+        }
         if (d.width > kMaxWidth || d.height > kMaxHeight || d.width * d.height > kMaxPixels)
             return fail("invalid video decoder dimensions");
         d.output_yuvp3 = yuvp3 != 0;

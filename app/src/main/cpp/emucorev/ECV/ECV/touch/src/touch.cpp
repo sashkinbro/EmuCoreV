@@ -33,8 +33,8 @@
 #include <cmath>
 #include <cstring>
 
-void clear_touch_contacts(TouchState &state) {
-    const std::lock_guard lock(state.mutex);
+// Front/touchpad/mouse contacts only; rear contacts are owned by the host UI (see set_touch_mode).
+static void clear_front_contacts(TouchState &state) {
     state.finger_count = 0;
     state.touchpad_finger_count = 0;
     state.is_touchpad = false;
@@ -47,12 +47,16 @@ void clear_touch_contacts(TouchState &state) {
     std::fill_n(state.touchpad_buffer, 8, SDL_GamepadTouchpadEvent{});
     std::fill_n(state.finger_devices, 8, SDL_TouchID{});
     std::fill_n(state.touchpad_devices, 8, SDL_JoystickID{});
-    std::fill_n(state.rear_contacts, 4, SceTouchReport{});
-    std::fill_n(state.rear_contact_down, 4, false);
     std::fill_n(state.is_touched, 2, false);
     for (auto &ports : state.touch_buffers)
         for (auto &data : ports)
             data.reportNum = 0;
+}
+
+void clear_touch_contacts(TouchState &state) {
+    const std::lock_guard lock(state.mutex);
+    clear_front_contacts(state);
+    state.rear.clear();
 }
 
 void set_touch_mode(TouchState &state, int mode) {
@@ -60,7 +64,7 @@ void set_touch_mode(TouchState &state, int mode) {
     if (mode < 0 || mode > 2) return;
     if (state.touchscreen_port != (mode == 1 ? SCE_TOUCH_PORT_BACK : SCE_TOUCH_PORT_FRONT)
         || state.touchscreen_both != (mode == 2))
-        clear_touch_contacts(state);
+        clear_front_contacts(state); // Kotlin still holds the rear contacts; keep them
     state.touchscreen_port = (mode == 1) ? SCE_TOUCH_PORT_BACK : SCE_TOUCH_PORT_FRONT;
     state.touchscreen_both = (mode == 2);
 }
@@ -85,18 +89,19 @@ static bool normalized_touch_to_report(float x, float y, SceTouchPortType port, 
     return true;
 }
 
+static int next_physical_touch_id(TouchState &state);
+
 void set_rear_touch_contact(TouchState &state, int slot, bool pressed, float x, float y) {
     const std::lock_guard lock(state.mutex);
-    if (slot < 0 || slot >= 4) return;
+    if (slot < 0 || slot >= touch_rear::SLOTS) return;
     if (!pressed) {
-        state.rear_contact_down[slot] = false;
+        touch_rear::release(state.rear, slot);
         return;
     }
-    auto &report = state.rear_contacts[slot];
-    if (!normalized_touch_to_report(x, y, SCE_TOUCH_PORT_BACK, report)) return;
-    // Reserved IDs cannot collide with physical contact IDs (0..119).
-    report.id = static_cast<uint8_t>(120 + slot);
-    state.rear_contact_down[slot] = true;
+    SceTouchReport pos{};
+    if (!normalized_touch_to_report(x, y, SCE_TOUCH_PORT_BACK, pos)) return;
+    // Rear contacts share the physical ID pool (0..119) with front touches, so IDs never collide.
+    touch_rear::press(state.rear, slot, pos.x, pos.y, [&state] { return next_physical_touch_id(state); });
 }
 
 void set_touch_sampling_state(TouchState &state, int port, SceTouchSamplingState mode) {
@@ -163,7 +168,7 @@ void touch_vsync_update(EmuEnvState &emuenv) {
     constexpr bool on_android = false;
 #endif
     if (touch.finger_count > 0 || touch.touchpad_finger_count > 0 || on_android
-        || std::any_of(std::begin(touch.rear_contact_down), std::end(touch.rear_contact_down), [](bool down) { return down; })) {
+        || touch.rear.any_active()) {
         SceTouchData *buffers = touch.touch_buffers[(touch.touch_buffer_idx + 1) % MAX_TOUCH_BUFFER_SAVED];
         for (int port = 0; port < 2; port++) {
             buffers[port].status = 0;
@@ -178,12 +183,7 @@ void touch_vsync_update(EmuEnvState &emuenv) {
             auto &data = buffers[port];
             const unsigned int limit = port == SCE_TOUCH_PORT_BACK ? 4 : 6;
             if (port == SCE_TOUCH_PORT_BACK) {
-                for (int slot = 0; slot < 4; ++slot) {
-                    if (!touch.rear_contact_down[slot]) continue;
-                    auto report = touch.rear_contacts[slot];
-                    report.force = touch.force_touch_enabled[port] ? 128 : 0;
-                    data.report[data.reportNum++] = report;
-                }
+                data.reportNum += touch_rear::sample(touch.rear, data.report, limit, touch.force_touch_enabled[port] ? 128 : 0);
             }
             if (touch.touchscreen_both || port == touch.touchscreen_port) {
                 const auto screen = recover_touch_events(emuenv, touch_port);
@@ -264,6 +264,9 @@ void touch_vsync_update(EmuEnvState &emuenv) {
         }
     }
 
+    // Latched quick taps have now been sampled once.
+    touch_rear::end_sampling(touch.rear);
+
     touch.touch_buffer_idx++;
     touch.touch_buffer_idx %= MAX_TOUCH_BUFFER_SAVED;
 }
@@ -295,6 +298,7 @@ static int next_physical_touch_id(TouchState &state) {
             used = used || state.finger_buffer[i].touchID == candidate;
         for (int i = 0; i < state.touchpad_finger_count; ++i)
             used = used || state.touchpad_buffer[i].which == candidate;
+        used = used || state.rear.id_in_use(candidate);
         if (!used) return candidate;
     }
     return 0; // At most 16 physical contacts can be live, so exhaustion is unreachable.
@@ -466,9 +470,9 @@ int touch_get(const SceUID thread_id, EmuEnvState &emuenv, const SceUInt32 &port
     if (count == 0)
         return 0;
     memset(pData, 0, sizeof(SceTouchData) * count);
-    // sceTouchRead with count > 0 must report at least one (empty) sample, otherwise a guest loop can stall
-    if (emuenv.drop_inputs || emuenv.ctrl.overlay_input_intercepted.load(std::memory_order_relaxed))
-        return count > 0 ? 1 : 0;
+    // While inputs are dropped (menu open) the guest still gets the normal blocking/timing semantics,
+    // only the samples are empty (pData is already zeroed), so a polling loop cannot spin.
+    const bool suppressed = emuenv.drop_inputs || emuenv.ctrl.overlay_input_intercepted.load(std::memory_order_relaxed);
 
     const int port_idx = static_cast<int>(port);
 
@@ -494,6 +498,9 @@ int touch_get(const SceUID thread_id, EmuEnvState &emuenv, const SceUInt32 &port
             nb_returned_data = 1;
         }
     }
+
+    if (suppressed)
+        return nb_returned_data;
 
     const std::lock_guard lock(emuenv.touch.mutex);
     int corr_buffer_idx;

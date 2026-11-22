@@ -18,6 +18,7 @@
 #include <cpu/functions.h>
 #include <kernel/state.h>
 
+#include <ngs/dsp/mix.h>
 #include <ngs/modules/atrac9.h>
 #include <ngs/modules/compressor.h>
 #include <ngs/modules/envelope.h>
@@ -145,12 +146,7 @@ int32_t VoiceInputManager::receive(const MemState &mem, ngs::Patch *patch, const
 
     // Try mixing, also with the use of this volume matrix
     // Dest is our voice to receive this data.
-    for (int32_t k = 0; k < dest->rack->system->granularity; k++) {
-        dest_buffer[k * 2] = std::clamp(dest_buffer[k * 2] + data_to_mix_in[k * 2] * volume_matrix[0][0]
-                + data_to_mix_in[k * 2 + 1] * volume_matrix[1][0],
-            -1.0f, 1.0f);
-        dest_buffer[k * 2 + 1] = std::clamp(dest_buffer[k * 2 + 1] + data_to_mix_in[k * 2] * volume_matrix[0][1] + data_to_mix_in[k * 2 + 1] * volume_matrix[1][1], -1.0f, 1.0f);
-    }
+    dsp::accumulate_matrix(dest_buffer, data_to_mix_in, volume_matrix, static_cast<uint32_t>(std::max(dest->rack->system->granularity, 0)));
 
     return 0;
 }

@@ -134,6 +134,7 @@ using PhysicalKeyCode = input::PhysicalKeyCode;
     code(bool, "disable-raster-order", false, disable_raster_order)                                    \
     code(bool, "disable-programmable-blending", false, disable_programmable_blending)                   \
     code(bool, "force-full-precision", false, force_full_precision)                                    \
+    code(bool, "no-fp-contraction", false, no_fp_contraction)                                          \
     code(int, "hang-dump-seconds", 0, hang_dump_seconds)                                               \
     code(float, "resolution-multiplier", 1.0f, resolution_multiplier)                                   \
     code(bool, "disable-surface-sync", false, disable_surface_sync)                                      \

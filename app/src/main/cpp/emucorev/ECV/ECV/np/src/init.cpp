@@ -42,6 +42,7 @@ bool deinit(NpState &state) {
     state.cbs.clear();
     state.state_cb_id = 0;
     state.comm_id = {};
+    state.offline = {};
     ++state.matching2.callback_generation;
     state.matching2.dispatching = false;
     state.matching2.context_cb_pc = 0;

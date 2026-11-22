@@ -18,6 +18,7 @@
 #include "config/state.h"
 
 #include <array>
+#include <string_view>
 #include <camera/camera.h>
 #include <camera/state.h>
 #include <camera/frame_copy.h>
@@ -29,6 +30,7 @@
 #include <SDL3/SDL_camera.h>
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_timer.h>
+#include <SDL3/SDL_video.h>
 
 #if defined(__ANDROID__) && !defined(NDEBUG)
 #include <SDL3/SDL_log.h>
@@ -121,6 +123,8 @@ public:
     SDL_CameraPtr sdl_camera;
     SDL_CameraID device_id{};
     bool suspended = false;
+    int sensor_orientation = 0; // degrees, Android CameraCharacteristics.SENSOR_ORIENTATION
+    int lens_facing = -1; // Android LENS_FACING: 0 front, 1 back, 2 external, -1 unknown
     int reverse = SCE_CAMERA_REVERSE_OFF;
     SDL_SurfacePtr frame;
     SDL_PixelFormat format;
@@ -131,6 +135,16 @@ public:
 Camera::Camera()
     : pImpl(std::make_unique<CameraImpl>()) {}
 Camera::~Camera() = default;
+
+// A camera id is either the full SDL device name or the bare Android Camera2 id,
+// which SDL's Android driver appends to every device name as " [<id>]".
+static bool camera_id_matches(const char *name, const std::string &id) {
+    if (!name || id.empty()) return false;
+    if (id == name) return true;
+    const std::string_view n(name);
+    const std::string suffix = " [" + id + "]";
+    return n.size() >= suffix.size() && n.substr(n.size() - suffix.size()) == suffix;
+}
 
 static bool init_web_camera(Camera *self) {
     // open web camera via SDL3
@@ -143,7 +157,7 @@ static bool init_web_camera(Camera *self) {
     self->pImpl->device_id = 0;
     for (int i = 0; i < num_cameras; i++) {
         auto camera_name = SDL_GetCameraName(cameras[i]);
-        if (camera_name && self->id == camera_name) {
+        if (camera_id_matches(camera_name, self->id)) {
             if (self->pImpl->device_id != 0) {
                 LOG_ERROR("Ambiguous camera name '{}'; refusing to select a different sensor", self->id);
                 self->pImpl->device_id = 0;
@@ -153,7 +167,7 @@ static bool init_web_camera(Camera *self) {
         }
     }
     if (self->pImpl->device_id == 0) {
-        LOG_ERROR("Web camera with id '{}' not found.", self->id);
+        LOG_WARN_ONCE("Web camera with id '{}' not found.", self->id);
         return false;
     }
     uint16_t framerate_numerator = self->info.framerate;
@@ -196,12 +210,43 @@ static bool init_web_camera(Camera *self) {
         LOG_ERROR("Failed to open camera: {}", SDL_GetError());
         return false;
     }
+    const SDL_PropertiesID props = SDL_GetCameraProperties(self->pImpl->sdl_camera.get());
+    self->pImpl->sensor_orientation = static_cast<int>(SDL_GetNumberProperty(props, "emucorev.camera.sensor_orientation", 0));
+    self->pImpl->lens_facing = static_cast<int>(SDL_GetNumberProperty(props, "emucorev.camera.lens_facing", -1));
     return true;
+}
+
+// Clockwise rotation that makes a raw sensor frame upright for the current display rotation
+// (Android camera2 recipe). The Emulator activity is sensorLandscape, so this is normally 0 or 180.
+// The front camera is deliberately NOT mirrored: real Vita hardware delivers an unmirrored image
+// and games mirror it themselves through the Reverse attribute (applied in ecv_camera_copy).
+static int camera_frame_rotation(const Camera *self) {
+#ifdef __ANDROID__
+    if (self->pImpl->lens_facing < 0) return 0;
+    const auto angle = [](SDL_DisplayOrientation o) {
+        switch (o) {
+        case SDL_ORIENTATION_LANDSCAPE: return 90;
+        case SDL_ORIENTATION_PORTRAIT_FLIPPED: return 180;
+        case SDL_ORIENTATION_LANDSCAPE_FLIPPED: return 270;
+        default: return 0;
+        }
+    };
+    const SDL_DisplayID display = SDL_GetPrimaryDisplay();
+    const SDL_DisplayOrientation current = display ? SDL_GetCurrentDisplayOrientation(display) : SDL_ORIENTATION_UNKNOWN;
+    if (current == SDL_ORIENTATION_UNKNOWN) return 0;
+    // SDL folds the natural orientation into the reported one; undo it to get Surface.ROTATION_*.
+    const int display_rotation = (angle(current) - angle(SDL_GetNaturalDisplayOrientation(display)) + 360) % 360;
+    const int sign = self->pImpl->lens_facing == 0 ? 1 : -1; // front: +, back/external: -
+    return (self->pImpl->sensor_orientation + sign * display_rotation + 720) % 360;
+#else
+    (void)self;
+    return 0;
+#endif
 }
 
 static SDL_SurfacePtr convert_camera_frame(Camera *self, SDL_Surface *source) {
     return SDL_SurfacePtr(ecv_camera_convert_surface(source, self->pImpl->format,
-        self->pImpl->colorspace, self->info.width, self->info.height));
+        self->pImpl->colorspace, self->info.width, self->info.height, camera_frame_rotation(self)));
 }
 
 static bool init_image(Camera *self) {
@@ -275,7 +320,15 @@ static bool refresh_camera_image(Camera *self) {
     self->pImpl->sdl_camera.reset();
     self->pImpl->frame.reset();
     switch (self->type) {
-    case CameraType::WebCamera: return init_web_camera(self);
+    case CameraType::WebCamera:
+        if (init_web_camera(self))
+            return true;
+        // A real Vita always has both cameras. When the host has no usable camera for this side
+        // (e.g. handhelds without one), feed a solid frame instead of failing every open and
+        // retry: the game sees a working, dark camera.
+        LOG_WARN_ONCE("No host camera available for '{}'; using a solid frame", self->id);
+        self->pImpl->sdl_camera.reset();
+        return init_solid_color(self);
     case CameraType::Image: return init_image(self);
     case CameraType::SolidColor: return init_solid_color(self);
     }
@@ -392,7 +445,8 @@ static bool camera_disconnected(Camera *self) {
 int Camera::is_active() {
     const std::lock_guard lock(pImpl->frame_mutex);
     if (!is_started || pImpl->suspended) return 0;
-    if (type != CameraType::WebCamera) return pImpl->frame ? 1 : 0;
+    // Solid/Image sources, and a real camera that fell back to a solid frame (no host camera).
+    if (type != CameraType::WebCamera || !pImpl->sdl_camera) return pImpl->frame ? 1 : 0;
     return pImpl->sdl_camera && !camera_disconnected(this)
         && SDL_GetCameraPermissionState(pImpl->sdl_camera.get()) > 0 ? 1 : 0;
 }
@@ -428,7 +482,7 @@ int Camera::read(SceCameraRead *read, void *pIBase, void *pUBase, void *pVBase, 
     bool diag_sample = false;
 #endif
     Uint64 timestamp_ns = 0;
-    if (type == CameraType::WebCamera) {
+    if (type == CameraType::WebCamera && (pImpl->sdl_camera || !pImpl->frame)) {
         for (;;) {
             if (!pImpl->sdl_camera || camera_disconnected(this))
                 return SCE_CAMERA_ERROR_NOT_MOUNTED;
@@ -564,16 +618,15 @@ void Camera::set_suspended(bool suspended) {
 }
 
 void Camera::update_config(int type, const std::string &id, const std::string &image, uint32_t color) {
+    const std::lock_guard lock(pImpl->frame_mutex);
     if (static_cast<int>(this->type) == type && this->id == id && this->image == image && this->color == color)
         return;
     this->type = static_cast<CameraType>(type);
     this->id = id;
     this->image = image;
     this->color = color;
-    if (is_started && !pImpl->suspended) {
-        const std::lock_guard lock(pImpl->frame_mutex);
+    if (is_started && !pImpl->suspended)
         refresh_camera_image(this);
-    }
 }
 
 void CameraState::deinit() {
@@ -596,13 +649,6 @@ void CameraState::deinit() {
 BOOST_DESCRIBE_ENUM(SDL_CameraPosition, SDL_CAMERA_POSITION_UNKNOWN, SDL_CAMERA_POSITION_FRONT_FACING, SDL_CAMERA_POSITION_BACK_FACING)
 
 void init_default_cameras(Config &cfg) {
-#ifdef __ANDROID__
-    // Older Android runs persisted the no-hardware solid-color fallback. Migrate
-    // those selections to actual facing cameras; never expose a fake Android feed.
-    if (cfg.front_camera_type != WebCamera) cfg.front_camera_id.clear();
-    if (cfg.back_camera_type != WebCamera) cfg.back_camera_id.clear();
-    cfg.front_camera_type = cfg.back_camera_type = WebCamera;
-#endif
 #ifndef __ANDROID__
     if (!((cfg.front_camera_type == WebCamera && cfg.front_camera_id.empty()) || (cfg.back_camera_type == WebCamera && cfg.back_camera_id.empty())))
         return;
@@ -621,7 +667,7 @@ void init_default_cameras(Config &cfg) {
         if (position == SDL_CAMERA_POSITION_FRONT_FACING) {
 #ifdef __ANDROID__
             if (default_front.empty()) default_front = name;
-            front_valid = front_valid || cfg.front_camera_id == name;
+            front_valid = front_valid || camera_id_matches(name, cfg.front_camera_id);
 #else
             cfg.front_camera_id = SDL_GetCameraName(cameras[i]);
             cfg.front_camera_type = WebCamera;
@@ -630,7 +676,7 @@ void init_default_cameras(Config &cfg) {
         if (position == SDL_CAMERA_POSITION_BACK_FACING) {
 #ifdef __ANDROID__
             if (default_back.empty()) default_back = name;
-            back_valid = back_valid || cfg.back_camera_id == name;
+            back_valid = back_valid || camera_id_matches(name, cfg.back_camera_id);
 #else
             cfg.back_camera_id = SDL_GetCameraName(cameras[i]);
             cfg.back_camera_type = WebCamera;
@@ -640,8 +686,9 @@ void init_default_cameras(Config &cfg) {
 #ifdef __ANDROID__
     // SDL names include stable Camera2 IDs. Preserve a valid selected sensor,
     // migrate legacy vendor-version names, and never assign unknown-facing USB cameras.
-    if (!front_valid) cfg.front_camera_id = default_front;
-    if (!back_valid) cfg.back_camera_id = default_back;
+    // The user's Solid colour / Image choice is honoured; only a real camera needs a valid sensor.
+    if (cfg.front_camera_type == WebCamera && !front_valid) cfg.front_camera_id = default_front;
+    if (cfg.back_camera_type == WebCamera && !back_valid) cfg.back_camera_id = default_back;
 #else
     if (num_cameras > 0) {
         if (cfg.front_camera_id.empty()) cfg.front_camera_id = SDL_GetCameraName(cameras[0]);

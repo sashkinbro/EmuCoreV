@@ -19,6 +19,7 @@
 #include <module/module.h>
 
 #include <rtc/rtc.h>
+#include <rtc/rtc_text.h>
 
 #include <util/safe_time.h>
 
@@ -29,6 +30,26 @@
 TRACY_MODULE_NAME(SceRtcUser);
 
 #define VITA_CLOCKS_PER_SEC 1000000
+
+// Host UTC offset (minutes east of UTC) in effect at the given RTC tick, DST included.
+// Ticks outside the host time_t range (or before 1970) are mapped by 400 year cycles like
+// sceRtcFormatRFC2822LocalTime does.
+static int host_utc_offset_minutes(std::uint64_t ticks) {
+    while (ticks < RTC_OFFSET)
+        ticks += RTC_400_YEAR_TICKS;
+    while (ticks >= RTC_OFFSET + RTC_400_YEAR_TICKS)
+        ticks -= RTC_400_YEAR_TICKS;
+    const std::time_t t = static_cast<std::time_t>((ticks - RTC_OFFSET) / VITA_CLOCKS_PER_SEC);
+    tm lt = {};
+    SAFE_LOCALTIME(&t, &lt);
+    const std::int64_t local_secs = rtc_text::days_from_civil(lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday) * 86400
+        + lt.tm_hour * 3600 + lt.tm_min * 60 + lt.tm_sec;
+    return static_cast<int>((local_secs - static_cast<std::int64_t>(t)) / 60);
+}
+
+static int rtc_ret(std::uint32_t err) {
+    return static_cast<int>(err);
+}
 
 EXPORT(int, sceRtcCheckValid, const SceDateTime *pTime) {
     TRACY_FUNC(sceRtcCheckValid, pTime);
@@ -97,9 +118,11 @@ EXPORT(int, sceRtcConvertUtcToLocalTime, const SceRtcTick *pUtc, SceRtcTick *pLo
     return CALL_EXPORT(_sceRtcConvertUtcToLocalTime, pUtc, pLocalTime);
 }
 
-EXPORT(int, sceRtcFormatRFC2822) {
-    TRACY_FUNC(sceRtcFormatRFC2822);
-    return UNIMPLEMENTED();
+EXPORT(int, sceRtcFormatRFC2822, char *pszDateTime, const SceRtcTick *utc, int iTimeZoneMinutes) {
+    TRACY_FUNC(sceRtcFormatRFC2822, pszDateTime, utc, iTimeZoneMinutes);
+    if (!pszDateTime || !utc)
+        return RET_ERROR(SCE_RTC_ERROR_INVALID_POINTER);
+    return rtc_ret(rtc_text::format_rfc2822(pszDateTime, utc->tick, iTimeZoneMinutes));
 }
 
 EXPORT(int, sceRtcFormatRFC2822LocalTime, char *pszDateTime, const SceRtcTick *utc) {
@@ -169,14 +192,18 @@ EXPORT(int, sceRtcFormatRFC2822LocalTime, char *pszDateTime, const SceRtcTick *u
     return 0;
 }
 
-EXPORT(int, sceRtcFormatRFC3339) {
-    TRACY_FUNC(sceRtcFormatRFC3339);
-    return UNIMPLEMENTED();
+EXPORT(int, sceRtcFormatRFC3339, char *pszDateTime, const SceRtcTick *utc, int iTimeZoneMinutes) {
+    TRACY_FUNC(sceRtcFormatRFC3339, pszDateTime, utc, iTimeZoneMinutes);
+    if (!pszDateTime || !utc)
+        return RET_ERROR(SCE_RTC_ERROR_INVALID_POINTER);
+    return rtc_ret(rtc_text::format_rfc3339(pszDateTime, utc->tick, iTimeZoneMinutes));
 }
 
-EXPORT(int, sceRtcFormatRFC3339LocalTime) {
-    TRACY_FUNC(sceRtcFormatRFC3339LocalTime);
-    return UNIMPLEMENTED();
+EXPORT(int, sceRtcFormatRFC3339LocalTime, char *pszDateTime, const SceRtcTick *utc) {
+    TRACY_FUNC(sceRtcFormatRFC3339LocalTime, pszDateTime, utc);
+    if (!pszDateTime || !utc)
+        return RET_ERROR(SCE_RTC_ERROR_INVALID_POINTER);
+    return rtc_ret(rtc_text::format_rfc3339(pszDateTime, utc->tick, host_utc_offset_minutes(utc->tick)));
 }
 
 EXPORT(int, sceRtcGetCurrentClock, SceDateTime *datePtr, int iTimeZone) {
@@ -263,9 +290,17 @@ EXPORT(int, sceRtcGetDayOfWeek, int year, int month, int day) {
     return weekday;
 }
 
-EXPORT(int, sceRtcGetDayOfYear) {
-    TRACY_FUNC(sceRtcGetDayOfYear);
-    return UNIMPLEMENTED();
+// Not in the vitasdk headers: the (year, month, day) signature and the 1-based result mirror
+// sceRtcGetDayOfWeek and are provisional.
+EXPORT(int, sceRtcGetDayOfYear, int year, int month, int day) {
+    TRACY_FUNC(sceRtcGetDayOfYear, year, month, day);
+    if (year < 0)
+        return RET_ERROR(SCE_RTC_ERROR_INVALID_YEAR);
+    if (month < 1 || month > 12)
+        return RET_ERROR(SCE_RTC_ERROR_INVALID_MONTH);
+    if (day < 1 || day > rtc_text::days_in_month(year, month))
+        return RET_ERROR(SCE_RTC_ERROR_INVALID_DAY);
+    return rtc_text::day_of_year(year, month, day);
 }
 
 EXPORT(int, sceRtcGetDaysInMonth, int year, int month) {
@@ -395,19 +430,43 @@ EXPORT(int, sceRtcIsLeapYear, int year) {
     return 0;
 }
 
-EXPORT(int, sceRtcParseDateTime) {
-    TRACY_FUNC(sceRtcParseDateTime);
-    return UNIMPLEMENTED();
+EXPORT(int, sceRtcParseDateTime, SceRtcTick *utc, const char *pszDateTime) {
+    TRACY_FUNC(sceRtcParseDateTime, utc, pszDateTime);
+    if (!utc || !pszDateTime)
+        return RET_ERROR(SCE_RTC_ERROR_INVALID_POINTER);
+    std::uint64_t ticks = 0;
+    const int ret = rtc_ret(rtc_text::parse_datetime(pszDateTime, ticks));
+    if (ret == 0)
+        utc->tick = ticks;
+    return ret;
 }
 
-EXPORT(int, sceRtcParseRFC3339) {
-    TRACY_FUNC(sceRtcParseRFC3339);
-    return UNIMPLEMENTED();
+EXPORT(int, sceRtcParseRFC3339, SceRtcTick *utc, const char *pszDateTime) {
+    TRACY_FUNC(sceRtcParseRFC3339, utc, pszDateTime);
+    if (!utc || !pszDateTime)
+        return RET_ERROR(SCE_RTC_ERROR_INVALID_POINTER);
+    std::uint64_t ticks = 0;
+    const int ret = rtc_ret(rtc_text::parse_iso(pszDateTime, true, ticks));
+    if (ret == 0)
+        utc->tick = ticks;
+    return ret;
 }
 
-EXPORT(int, sceRtcSetDosTime) {
-    TRACY_FUNC(sceRtcSetDosTime);
-    return UNIMPLEMENTED();
+EXPORT(int, sceRtcSetDosTime, SceDateTime *datePtr, unsigned int uiDosTime) {
+    TRACY_FUNC(sceRtcSetDosTime, datePtr, uiDosTime);
+    if (!datePtr)
+        return RET_ERROR(SCE_RTC_ERROR_INVALID_POINTER);
+    rtc_text::Civil c;
+    if (const auto err = rtc_text::civil_from_dos(uiDosTime, c))
+        return RET_ERROR(static_cast<int>(err));
+    datePtr->year = static_cast<unsigned short>(c.year);
+    datePtr->month = static_cast<unsigned short>(c.month);
+    datePtr->day = static_cast<unsigned short>(c.day);
+    datePtr->hour = static_cast<unsigned short>(c.hour);
+    datePtr->minute = static_cast<unsigned short>(c.minute);
+    datePtr->second = static_cast<unsigned short>(c.second);
+    datePtr->microsecond = 0;
+    return 0;
 }
 
 EXPORT(int, sceRtcSetTick, SceDateTime *datePtr, const SceRtcTick *pTick) {
@@ -442,9 +501,21 @@ EXPORT(int, sceRtcSetTime_t, SceDateTime *datePtr, uint32_t iTime) {
     return 0;
 }
 
-EXPORT(int, sceRtcSetWin32FileTime) {
-    TRACY_FUNC(sceRtcSetWin32FileTime);
-    return UNIMPLEMENTED();
+EXPORT(int, sceRtcSetWin32FileTime, SceDateTime *datePtr, SceUInt64 win32Time) {
+    TRACY_FUNC(sceRtcSetWin32FileTime, datePtr, win32Time);
+    if (!datePtr)
+        return RET_ERROR(SCE_RTC_ERROR_INVALID_POINTER);
+    rtc_text::Civil c;
+    if (const auto err = rtc_text::civil_from_filetime(win32Time, c))
+        return RET_ERROR(static_cast<int>(err));
+    datePtr->year = static_cast<unsigned short>(c.year);
+    datePtr->month = static_cast<unsigned short>(c.month);
+    datePtr->day = static_cast<unsigned short>(c.day);
+    datePtr->hour = static_cast<unsigned short>(c.hour);
+    datePtr->minute = static_cast<unsigned short>(c.minute);
+    datePtr->second = static_cast<unsigned short>(c.second);
+    datePtr->microsecond = c.microsecond;
+    return 0;
 }
 
 EXPORT(int, sceRtcTickAddDays, SceRtcTick *pTick0, const SceRtcTick *pTick1, SceInt lAdd) {
