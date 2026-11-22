@@ -125,7 +125,10 @@ internal object VitaArchiveContainerSupport {
                     val relative = file.relativeTo(session.root).invariantSeparatorsPath
                     val safeRelative = InstallerArchiveSafety.normalizeEntryPath(relative)
                         ?: throw InstallerExpansionException(InstallerExpansionFailure.UNSUPPORTED_PATH, "Expanded member path is unsafe")
-                    if (VitaEmbeddedPackageSupport.hasPkgSignature(file)) {
+                    // sce_sys/package/head.bin of an installed/dumped title starts with the PKG
+                    // magic but is metadata of that content, not an installable package.
+                    if (!VitaEmbeddedPackageSupport.isInsideContentMetadata(safeRelative) &&
+                        VitaEmbeddedPackageSupport.hasPkgSignature(file)) {
                         candidates += InstallerPackageCandidate(
                             safeRelative,
                             InstallerPackageKind.PKG,

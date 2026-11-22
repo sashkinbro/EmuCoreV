@@ -318,6 +318,10 @@ internal object VitaEmbeddedPackageSupport {
     private fun isRootDirectoryMarker(name: String): Boolean =
         name.replace('\\', '/').split('/').all { it.isBlank() || it == "." }
 
+    /** True for files inside a content's sce_sys/ directory (never standalone packages). */
+    internal fun isInsideContentMetadata(relativePath: String): Boolean =
+        relativePath.replace('\\', '/').lowercase(java.util.Locale.US).split('/').dropLast(1).contains("sce_sys")
+
     internal fun hasPkgSignature(file: File): Boolean = runCatching {
         file.inputStream().buffered().use { input ->
             val header = ByteArray(4)

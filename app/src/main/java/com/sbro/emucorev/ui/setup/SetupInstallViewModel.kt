@@ -134,7 +134,10 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
             }
             val detectedFormat = InstallerArchiveSafety.detectContainerFormat(File(path))
             val directInstallableZip = detectedFormat == InstallerArchiveFormat.ZIP && VitaArchiveInspector.isInstallableVpk(path)
-            if (detectedFormat != null && (!directInstallableZip || !repairArchive)) {
+            // A ZIP that already carries Vita install metadata (VPK or app/patch/addcont dump)
+            // goes straight to the native installer; only other containers and ZIPs without
+            // metadata (nested VPK/PKG/7z/RAR) are expanded and scanned first.
+            if (shouldExpandBeforeInstall(detectedFormat, directInstallableZip)) {
                 val installJob = currentCoroutineContext()[Job]
                 _uiState.value = _uiState.value.copy(
                     cancellable = true,
@@ -146,9 +149,12 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                         path,
                         isCancelled = { installJob?.isActive != true }
                     ) { progress ->
+                        // Expansion reports bytes, not items: drive the percentage from them.
                         _uiState.value = _uiState.value.copy(
-                            current = progress.copiedBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-                            total = progress.totalBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                            progress = if (progress.totalBytes > 0)
+                                (progress.copiedBytes * 10f / progress.totalBytes).coerceIn(0f, 10f) else 0f,
+                            current = null,
+                            total = null,
                             detail = appContext.getString(
                                 R.string.install_dialog_repack_entry,
                                 progress.archiveEntryPath
@@ -274,8 +280,20 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
                 path
             }
             _uiState.value = _uiState.value.copy(detail = null)
-            val installedCount = VitaInstallBridge.installContent(appContext, installPath, systemLanguage())
+            var installedCount = VitaInstallBridge.installContent(appContext, installPath, systemLanguage())
             Log.i(TAG, "Content install finished repair=$repairArchive installedCount=$installedCount installPath=$installPath")
+            // A repaired copy is a temporary, full-size archive in the app cache.
+            if (installPath != path) File(installPath).delete()
+            if (installedCount <= 0 && !repairArchive && detectedFormat == InstallerArchiveFormat.ZIP) {
+                // The direct path failed: fall back once to repacking the archive (the repair
+                // path) before reporting an error, instead of always repacking up front.
+                Log.i(TAG, "Direct install failed; retrying through archive repair")
+                repairArchiveForInstall(path)?.let { repairedPath ->
+                    installedCount = VitaInstallBridge.installContent(appContext, repairedPath, systemLanguage())
+                    Log.i(TAG, "Repair fallback finished installedCount=$installedCount path=$repairedPath")
+                    File(repairedPath).delete()
+                }
+            }
             if (installedCount > 0) {
                 finishSuccess(
                     appContext.resources.getQuantityString(
@@ -571,7 +589,16 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
 
     private fun systemLanguage(): Int = configRepository.load().sysLang
 
-    private companion object {
+    internal companion object {
+        /**
+         * Expansion (copy to staging, scan, maybe repack) is only for containers the native
+         * installer can't take directly: 7z/RAR and ZIPs without Vita install metadata.
+         * Installable ZIPs always go straight to the native installer; broken ones are
+         * handled by the explicit repair action, not by default.
+         */
+        internal fun shouldExpandBeforeInstall(format: InstallerArchiveFormat?, directInstallableZip: Boolean): Boolean =
+            format != null && !directInstallableZip
+
         const val TAG = "SetupInstallViewModel"
         const val REPAIR_NATIVE_PROGRESS_OFFSET = 45f
         const val REPAIR_NATIVE_PROGRESS_SCALE = 0.55f
