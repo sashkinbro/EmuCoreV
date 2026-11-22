@@ -171,6 +171,12 @@ android {
     buildTypes {
         debug {
             isJniDebuggable = true
+            // Opt-in (-PdebugWithReleaseSigning=true): sign the debug build with the release
+            // key so it installs over an existing release install (install -r) and keeps
+            // the device's games, saves and settings while testing with core logs.
+            if (hasReleaseSigning && providers.gradleProperty("debugWithReleaseSigning").orNull == "true") {
+                signingConfig = signingConfigs.getByName("release")
+            }
             externalNativeBuild {
                 cmake {
                     // CMake Debug compiles the whole emulator at -O0 and instruments
