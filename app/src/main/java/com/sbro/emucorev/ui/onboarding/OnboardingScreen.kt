@@ -968,8 +968,8 @@ private fun FirmwareDownloadInfoDialog(
                     .widthIn(max = 560.dp)
                     .heightIn(max = maxHeight),
                 shape = neonShape(28.dp),
+                // Same flat surface as every other app dialog (no tonal tint).
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp,
                 shadowElevation = 12.dp,
                 border = androidx.compose.foundation.BorderStroke(
                     1.dp,
