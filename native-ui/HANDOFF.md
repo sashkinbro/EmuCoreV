@@ -43,7 +43,8 @@ Everything below is pushed to `main`.
   are estimates; reference capture needs the emulated SceShell (Anbernic RG556
   has a debug build with firmware — ask the user before using it; Lenovo has a
   release-signed build, never uninstall it: it would wipe games/firmware).
-- m_waveType -> effect mapping uses libpaf name-table order (unverified).
+- m_waveType -> effect: traced (libpaf table 0x813012e8 via ScePafGraphics 2E30F1B5;
+  out of range = default). Type 31 (waveparam.bin custom wave) uses the bundled preset.
 - Theme BGM audio quality not listened to; Quick Saves resume not tested (no saves
   on the device); monthly Default wave colour not implemented.
 - Vita "Hidden trophy" name string and grade names are our translations.

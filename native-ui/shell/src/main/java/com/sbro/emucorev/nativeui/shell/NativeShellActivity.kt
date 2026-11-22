@@ -146,8 +146,8 @@ open class NativeShellActivity : NativeActivity() {
                 THEME_IMAGE_BASE + i
             }
         }
-        // The wave follows the theme's m_waveType, otherwise the Default theme's.
-        val wave = if (theme != null) theme.waveType?.let { ShellThemes.WAVE_TYPES.getOrNull(it) }
+        // The wave follows the theme's m_waveType (libpaf table), otherwise the Default theme's.
+        val wave = if (theme != null) theme.waveType?.let(ShellThemes::waveEffect)
             ?: ShellSettings.DEFAULT_THEME else shellSettings.waveTheme
         synchronized(nativeBridgeLock) { if (!closed.get()) nativeSetWaveTheme(wave) }
         val start = if (shellThemes.startPhoto.isFile) shellThemes.startPhoto else theme?.startScreen
