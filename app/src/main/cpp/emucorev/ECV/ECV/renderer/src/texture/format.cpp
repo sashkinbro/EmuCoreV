@@ -16,6 +16,7 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -176,13 +177,26 @@ void decompress_packed_float_e5m9m9m9(SceGxmTextureBaseFormat fmt, void *dest, c
     const uint32_t *in = static_cast<const uint32_t *>(data);
     uint16_t *out = static_cast<uint16_t *>(dest);
 
+    // SE5M9M9M9: value = mantissa * 2^(E - 15 - 9) for each channel (no implicit leading one). Every such value is
+    // exactly representable as an F16, so convert with integer arithmetic.
+    auto to_f16 = [](uint32_t mantissa, uint32_t exponent) -> uint16_t {
+        // the value in units of the smallest F16 subnormal (2^-24)
+        const uint64_t units = static_cast<uint64_t>(mantissa) << exponent;
+        if (units < 1024)
+            return static_cast<uint16_t>(units); // zero or subnormal
+        const uint32_t msb = static_cast<uint32_t>(std::bit_width(units)) - 1; // >= 10
+        const uint32_t f16_exp = msb - 9; // msb == 10 -> exponent field 1
+        const uint32_t frac = static_cast<uint32_t>((units >> (msb - 10)) & 0x3FF);
+        return static_cast<uint16_t>((f16_exp << 10) | frac);
+    };
+
     for (uint32_t in_offset = 0, out_offset = 0; in_offset < width * height; ++in_offset) {
         const uint32_t packed = in[in_offset];
-        const uint16_t exponent = static_cast<uint16_t>(packed >> 17);
+        const uint32_t exponent = packed >> 27;
 
-        out[out_offset++] = exponent | ((packed & (0x1FF << 18)) >> 17);
-        out[out_offset++] = exponent | ((packed & (0x1FF << 9)) >> 8);
-        out[out_offset++] = exponent | ((packed & 0x1FF) << 1);
+        out[out_offset++] = to_f16((packed >> 18) & 0x1FF, exponent);
+        out[out_offset++] = to_f16((packed >> 9) & 0x1FF, exponent);
+        out[out_offset++] = to_f16(packed & 0x1FF, exponent);
     }
 }
 
@@ -466,8 +480,10 @@ uint32_t get_compressed_size(SceGxmTextureBaseFormat base_format, uint32_t width
  *
  * \param block_storage     pointer to the block to decompress.
  * \param image             pointer to image where the decompressed pixel data should be stored.
+ * \param is_bc1           true for BC1 (c0 <= c1 selects the 3-colour + transparent mode). BC2/BC3 colour blocks are
+ *                         always decoded in 4-colour mode, whatever the endpoint order (S3TC spec).
  **/
-static void decompress_block_bc1(const uint8_t *block_storage, uint32_t *image) {
+static void decompress_block_bc1_impl(const uint8_t *block_storage, uint32_t *image, bool is_bc1) {
     std::uint16_t n0 = static_cast<std::uint16_t>((block_storage[1] << 8) | block_storage[0]);
     std::uint16_t n1 = static_cast<std::uint16_t>((block_storage[3] << 8) | block_storage[2]);
 
@@ -491,7 +507,7 @@ static void decompress_block_bc1(const uint8_t *block_storage, uint32_t *image) 
     std::uint32_t c0 = 0xFF000000 | (b0 << 16) | (g0 << 8) | r0;
     std::uint32_t c1 = 0xFF000000 | (b1 << 16) | (g1 << 8) | r1;
 
-    if (n0 > n1) {
+    if (n0 > n1 || !is_bc1) {
         std::uint8_t r2 = static_cast<uint8_t>((2 * r0 + r1 + 1) / 3);
         std::uint8_t r3 = static_cast<uint8_t>((2 * r1 + r0 + 1) / 3);
         std::uint8_t g2 = static_cast<uint8_t>((2 * g0 + g1 + 1) / 3);
@@ -545,6 +561,10 @@ static void decompress_block_bc1(const uint8_t *block_storage, uint32_t *image) 
             }
         }
     }
+}
+
+static void decompress_block_bc1(const uint8_t *block_storage, uint32_t *image) {
+    decompress_block_bc1_impl(block_storage, image, true);
 }
 
 /**
@@ -612,25 +632,33 @@ static void decompress_block_alpha(const uint8_t *block_storage, uint8_t *image,
 static void decompress_block_alpha_signed(const uint8_t *block_storage, uint8_t *image, const uint32_t offset, const uint32_t stride) {
     int8_t alpha[8];
 
-    alpha[0] = static_cast<int8_t>(block_storage[0]);
-    alpha[1] = static_cast<int8_t>(block_storage[1]);
+    // SNORM8: -128 and -127 both mean -1.0, so -128 endpoints are treated as -127 (affects the mode choice and the mixes)
+    alpha[0] = std::max<int8_t>(static_cast<int8_t>(block_storage[0]), -127);
+    alpha[1] = std::max<int8_t>(static_cast<int8_t>(block_storage[1]), -127);
+
+    // The interpolants must round to nearest, so they need a flooring division (C++ '/' truncates towards zero, which
+    // biases negative values). Shifting the numerator by 128 * divisor keeps it non-negative without changing the fraction.
+    constexpr int bias = 128;
+    auto mix = [&](int w0, int w1, int div, int round) {
+        return static_cast<int8_t>((w0 * (alpha[0] + bias) + w1 * (alpha[1] + bias) + round) / div - bias);
+    };
 
     if (alpha[0] > alpha[1]) {
         // 8-alpha block:  derive the other six alphas.
         // Bit code 000 = alpha_0, 001 = alpha_1, others are interpolated.
-        alpha[2] = static_cast<int8_t>((6 * alpha[0] + 1 * alpha[1] + 3) / 7); // bit code 010
-        alpha[3] = static_cast<int8_t>((5 * alpha[0] + 2 * alpha[1] + 3) / 7); // bit code 011
-        alpha[4] = static_cast<int8_t>((4 * alpha[0] + 3 * alpha[1] + 3) / 7); // bit code 100
-        alpha[5] = static_cast<int8_t>((3 * alpha[0] + 4 * alpha[1] + 3) / 7); // bit code 101
-        alpha[6] = static_cast<int8_t>((2 * alpha[0] + 5 * alpha[1] + 3) / 7); // bit code 110
-        alpha[7] = static_cast<int8_t>((1 * alpha[0] + 6 * alpha[1] + 3) / 7); // bit code 111
+        alpha[2] = mix(6, 1, 7, 3); // bit code 010
+        alpha[3] = mix(5, 2, 7, 3); // bit code 011
+        alpha[4] = mix(4, 3, 7, 3); // bit code 100
+        alpha[5] = mix(3, 4, 7, 3); // bit code 101
+        alpha[6] = mix(2, 5, 7, 3); // bit code 110
+        alpha[7] = mix(1, 6, 7, 3); // bit code 111
     } else {
         // 6-alpha block.
         // Bit code 000 = alpha_0, 001 = alpha_1, others are interpolated.
-        alpha[2] = static_cast<int8_t>((4 * alpha[0] + 1 * alpha[1] + 2) / 5); // Bit code 010
-        alpha[3] = static_cast<int8_t>((3 * alpha[0] + 2 * alpha[1] + 2) / 5); // Bit code 011
-        alpha[4] = static_cast<int8_t>((2 * alpha[0] + 3 * alpha[1] + 2) / 5); // Bit code 100
-        alpha[5] = static_cast<int8_t>((1 * alpha[0] + 4 * alpha[1] + 2) / 5); // Bit code 101
+        alpha[2] = mix(4, 1, 5, 2); // Bit code 010
+        alpha[3] = mix(3, 2, 5, 2); // Bit code 011
+        alpha[4] = mix(2, 3, 5, 2); // Bit code 100
+        alpha[5] = mix(1, 4, 5, 2); // Bit code 101
         alpha[6] = -128; // Bit code 110
         alpha[7] = 127; // Bit code 111
     }
@@ -662,7 +690,7 @@ static void decompress_block_alpha_signed(const uint8_t *block_storage, uint8_t 
  * \param image             pointer to image where the decompressed pixel data should be stored.
  **/
 static void decompress_block_bc2(const uint8_t *block_storage, uint32_t *image) {
-    decompress_block_bc1(block_storage + 8, image);
+    decompress_block_bc1_impl(block_storage + 8, image, false);
 
     for (int i = 0; i < 8; i++) {
         image[2 * i] = (((block_storage[i] & 0x0F) | ((block_storage[i] & 0x0F) << 4)) << 24) | (image[2 * i] & 0x00FFFFFF);
@@ -677,7 +705,7 @@ static void decompress_block_bc2(const uint8_t *block_storage, uint32_t *image) 
  * \param image             pointer to image where the decompressed pixel data should be stored.
  **/
 static void decompress_block_bc3(const uint8_t *block_storage, uint32_t *image) {
-    decompress_block_bc1(block_storage + 8, image);
+    decompress_block_bc1_impl(block_storage + 8, image, false);
     decompress_block_alpha(block_storage, reinterpret_cast<std::uint8_t *>(image), 3, 4);
 }
 
