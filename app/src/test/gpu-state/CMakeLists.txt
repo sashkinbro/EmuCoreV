@@ -2,37 +2,37 @@ cmake_minimum_required(VERSION 3.22)
 project(EmuCoreVGpuStateTests LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 get_filename_component(NATIVE "${CMAKE_CURRENT_SOURCE_DIR}/../../main/cpp" ABSOLUTE)
-set(EXTERNAL "${NATIVE}/vita3k/external")
+set(EXTERNAL "${NATIVE}/emucorev/ECV/external")
 add_executable(gpu-state-tests image_snapshot_tests.cpp
     surface_cache_snapshot_tests.cpp
     surface_capability_selection_tests.cpp
     allocator.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../cpp/test_logging.cpp"
-    "${NATIVE}/vita3k/vita3k/renderer/src/vulkan/surface_cache_snapshot_codec.cpp"
-    "${NATIVE}/vita3k/vita3k/vkutil/src/image_snapshot.cpp"
-    "${NATIVE}/vita3k/vita3k/vkutil/src/objects.cpp"
-    "${NATIVE}/vita3k/vita3k/vkutil/src/vkutil.cpp"
+    "${NATIVE}/emucorev/ECV/ECV/renderer/src/vulkan/surface_cache_snapshot_codec.cpp"
+    "${NATIVE}/emucorev/ECV/ECV/vkutil/src/image_snapshot.cpp"
+    "${NATIVE}/emucorev/ECV/ECV/vkutil/src/objects.cpp"
+    "${NATIVE}/emucorev/ECV/ECV/vkutil/src/vkutil.cpp"
     "${EXTERNAL}/googletest/googletest/src/gtest-all.cc"
     "${EXTERNAL}/googletest/googletest/src/gtest_main.cc")
 target_include_directories(gpu-state-tests PRIVATE
-    "${NATIVE}/vita3k/vita3k/renderer/include"
-    "${NATIVE}/vita3k/vita3k/gxm/include"
-    "${NATIVE}/vita3k/vita3k/mem/include"
-    "${NATIVE}/vita3k/vita3k/display/include"
-    "${NATIVE}/vita3k/vita3k/emuenv/include"
-    "${NATIVE}/vita3k/vita3k/kernel/include"
-    "${NATIVE}/vita3k/vita3k/cpu/include"
-    "${NATIVE}/vita3k/vita3k/rtc/include"
-    "${NATIVE}/vita3k/vita3k/config/include"
-    "${NATIVE}/vita3k/vita3k/input/include"
-    "${NATIVE}/vita3k/vita3k/threads/include"
-    "${NATIVE}/vita3k/vita3k/vkutil/include"
+    "${NATIVE}/emucorev/ECV/ECV/renderer/include"
+    "${NATIVE}/emucorev/ECV/ECV/gxm/include"
+    "${NATIVE}/emucorev/ECV/ECV/mem/include"
+    "${NATIVE}/emucorev/ECV/ECV/display/include"
+    "${NATIVE}/emucorev/ECV/ECV/emuenv/include"
+    "${NATIVE}/emucorev/ECV/ECV/kernel/include"
+    "${NATIVE}/emucorev/ECV/ECV/cpu/include"
+    "${NATIVE}/emucorev/ECV/ECV/rtc/include"
+    "${NATIVE}/emucorev/ECV/ECV/config/include"
+    "${NATIVE}/emucorev/ECV/ECV/input/include"
+    "${NATIVE}/emucorev/ECV/ECV/threads/include"
+    "${NATIVE}/emucorev/ECV/ECV/vkutil/include"
     "${EXTERNAL}/vita-toolchain/src"
     "${EXTERNAL}/sdl/include"
     "${EXTERNAL}/stb"
     "${EXTERNAL}/fmt/include"
     "${EXTERNAL}/spdlog/include"
-    "${NATIVE}/vita3k/vita3k/util/include"
+    "${NATIVE}/emucorev/ECV/ECV/util/include"
     "${EXTERNAL}/VulkanMemoryAllocator-Hpp/include"
     "${EXTERNAL}/VulkanMemoryAllocator-Hpp/VulkanMemoryAllocator/include"
     "${EXTERNAL}/VulkanMemoryAllocator-Hpp/Vulkan-Headers/include"
