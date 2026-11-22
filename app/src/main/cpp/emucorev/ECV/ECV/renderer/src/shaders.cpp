@@ -19,6 +19,7 @@
 
 #include <renderer/vulkan/state.h>
 
+#include <gxm/functions.h>
 #include <gxm/types.h>
 #include <renderer/state.h>
 #include <renderer/types.h>
@@ -161,8 +162,12 @@ static R load_shader_generic(const fs::path &shader_path) {
 static shader::GeneratedShader load_shader_generic(shader::Target target, const SceGxmProgram &program, const FeatureState &features, const shader::Hints &hints, bool maskupdate, const fs::path &shader_cache_path, const fs::path &shaderlog_path, const char *shader_type_str, const std::string &shader_version, bool shader_cache) {
     // TODO: no need to recompute the hash here
     const auto hash = get_shader_hash(program);
-    const std::string hash_text = hex_string(program.is_fragment()
-            ? fragment_shader_variant_hash(hash, hints.color_format, hints.raw_color_attachment_input, hints.vertex_output_mask) : hash);
+    // Vulkan: the module identity covers every Hints field the recompiler reads (see
+    // vulkan_shader_variant_key_bytes) and must match PipelineCache::retrieve_shader, which loads
+    // these files by that hash. OpenGL keeps its program-level keys.
+    const std::string hash_text = hex_string(target == shader::Target::SpirVVulkan
+            ? vulkan_shader_variant_hash(hash, !program.is_fragment(), hints, static_cast<uint32_t>(gxp::get_textures_used(program).to_ulong()), maskupdate)
+            : (program.is_fragment() ? fragment_shader_variant_hash(hash, hints.color_format, hints.raw_color_attachment_input, hints.vertex_output_mask) : hash));
     // Set Shader Hash with Version
     const std::string hash_hex_ver = fmt::format("{}-{}", shader_version, hash_text);
     const auto get_shader_path = [&](const char *ext) {

@@ -27,12 +27,20 @@
 
 #include <config/state.h>
 #include <display/state.h>
+#include <gxm/functions.h>
+#include <gxm/state.h>
 #include <functional>
 #include <overlay/display_manager.h>
 #include <overlay/shader_precompile_progress.h>
 #include <util/log.h>
 
+#if ECV_ORACLE
+#include <ecv_frame_capture.h> // oracle: GXM frame capture (debug builds only)
+#endif
+
+#include <exception>
 #include <memory>
+#include <string>
 #include <thread>
 
 #ifdef TRACY_ENABLE
@@ -140,7 +148,13 @@ bool process_batch_until_wait(renderer::State &state, const FeatureState &featur
             LOG_ERROR("Unimplemented command opcode {}", static_cast<int>(cmd->opcode));
         } else {
             CommandHelper helper(cmd);
+#if ECV_ORACLE
+            ecv::oracle::fcap::before_command(state, mem, command_list, *cmd);
+#endif
             handler_fn(state, mem, config, helper, features, command_list.context);
+#if ECV_ORACLE
+            ecv::oracle::fcap::after_command(state, mem, command_list, *cmd);
+#endif
         }
 
         state.progress_counter.fetch_add(1, std::memory_order_relaxed);
@@ -219,7 +233,7 @@ void reset_command_list(CommandList &command_list) {
     command_list.last = nullptr;
 }
 
-static void render_loop(renderer::State &state, DisplayState &display, GxmState &gxm, MemState &mem, Config &config) {
+static void render_loop_body(renderer::State &state, DisplayState &display, GxmState &gxm, MemState &mem, Config &config) {
     if (state.precompile_requested) {
         auto progress_overlay = state.overlay_manager
             ? state.overlay_manager->create<overlay::shader_precompile_progress>()
@@ -299,6 +313,12 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
         if (!state.set_current())
             break;
 
+        // between batches, with the backend context current
+        state.service_render_thread_task();
+#if ECV_ORACLE
+        ecv::oracle::fcap::poll();
+#endif
+
         process_batches(state, state.features, mem, config, 500);
 
         if (state.shell_suspended.load(std::memory_order_relaxed))
@@ -343,6 +363,9 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
             state.should_display = false;
         }
         state.async_flip_requested.store(false, std::memory_order_relaxed);
+#if ECV_ORACLE
+        ecv::oracle::fcap::frame_end(state, display, mem);
+#endif
 
 #ifdef TRACY_ENABLE
         FrameMark;
@@ -352,9 +375,47 @@ static void render_loop(renderer::State &state, DisplayState &display, GxmState 
     state.done_current();
 }
 
+// Backend calls (vk::DeviceLostError, ...) throw. An exception escaping a std::thread is std::terminate,
+// so contain it here, report it once and wind the session down like a shutdown.
+static void render_loop(renderer::State &state, DisplayState &display, GxmState &gxm, MemState &mem, Config &config) {
+    std::string error;
+    bool device_lost = false;
+    try {
+        render_loop_body(state, display, gxm, mem, config);
+        return;
+    } catch (const vk::DeviceLostError &e) {
+        device_lost = true;
+        error = std::string("render thread: ") + e.what();
+    } catch (const std::exception &e) {
+        error = std::string("render thread: ") + e.what();
+    } catch (...) {
+        error = "render thread: unknown exception";
+    }
+
+    state.signal_fatal_error(error, device_lost);
+    try {
+        state.done_current();
+    } catch (...) {
+    }
+}
+
 void start_render_thread(State &state, DisplayState &display, GxmState &gxm, MemState &mem, Config &config) {
     state.snapshot_gate.reset();
+#if ECV_ORACLE
+    ecv::oracle::fcap::bind(state, display, mem, config);
+#endif
     state.render_abort = false;
+    state.fatal_error_raised = false;
+    state.device_lost = false;
+    {
+        const std::lock_guard<std::mutex> lock(state.fatal_error_mutex);
+        state.fatal_error_message.clear();
+    }
+    state.fatal_abort_hook = [&display, &gxm]() {
+        display.abort = true;
+        gxm.display_queue.abort();
+        gxm::invalidate_sync_objects(gxm);
+    };
     state.render_thread = std::make_unique<std::thread>(render_loop, std::ref(state), std::ref(display), std::ref(gxm), std::ref(mem), std::ref(config));
 }
 
@@ -385,9 +446,12 @@ void stop_render_thread(State &state) {
     state.set_shell_suspended(false);
     state.snapshot_gate.stop();
     state.command_buffer_queue.abort();
+    // guest threads blocked in notification / finish waits must see render_abort
+    state.wake_all_waiters();
     if (state.render_thread && state.render_thread->joinable())
         state.render_thread->join();
     state.render_thread.reset();
+    state.fatal_abort_hook = nullptr;
     discard_pending_batches(state);
 }
 

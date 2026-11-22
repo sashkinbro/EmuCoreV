@@ -940,10 +940,14 @@ void USSERecompiler::compile_code_node(const usse::USSECodeNode &code) {
 
         // Recompile the instruction, to the current block
         auto decoder = usse::DecodeUSSE<usse::USSETranslatorVisitor>(cur_instr);
-        if (decoder.has_value())
-            decoder->call(visitor, cur_instr);
-        else
+        if (decoder.has_value()) {
+            // a handler returning false could not translate the instruction
+            if (!decoder->call(visitor, cur_instr))
+                stats.record(false, cur_instr);
+        } else {
+            stats.record(true, cur_instr);
             LOG_DISASM("{:016x}: error: instruction unmatched", cur_instr);
+        }
     }
 
     if (cond_builder) {
@@ -1070,7 +1074,7 @@ spv::Function *USSERecompiler::compile_program_function() {
 }
 
 void convert_gxp_usse_to_spirv(spv::Builder &b, const SceGxmProgram &program, const FeatureState &features, const SpirvShaderParameters &parameters, utils::SpirvUtilFunctions &utils,
-    spv::Function *begin_hook_func, spv::Function *end_hook_func, const NonDependentTextureQueryCallInfos &queries, const spv::Id render_info_id, spv::Function *spv_func_main, std::vector<spv::Id> &interfaces) {
+    spv::Function *begin_hook_func, spv::Function *end_hook_func, const NonDependentTextureQueryCallInfos &queries, const spv::Id render_info_id, spv::Function *spv_func_main, std::vector<spv::Id> &interfaces, UsseTranslationStats *stats_out) {
     const uint64_t *primary_program = program.primary_program_start();
     const uint64_t primary_program_instr_count = program.primary_program_instr_count;
 
@@ -1119,6 +1123,9 @@ void convert_gxp_usse_to_spirv(spv::Builder &b, const SceGxmProgram &program, co
         interfaces.push_back(recomp.visitor.frag_depth_id);
         b.addExecutionMode(spv_func_main, spv::ExecutionModeDepthReplacing);
     }
+
+    if (stats_out)
+        *stats_out = recomp.stats;
 }
 
 } // namespace shader::usse

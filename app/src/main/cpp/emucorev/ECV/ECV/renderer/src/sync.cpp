@@ -31,9 +31,61 @@
 #include <renderer/vulkan/types.h>
 
 #include <renderer/functions.h>
+#include <mem/functions.h>
 #include <util/tracy.h>
 
 namespace renderer {
+bool State::run_on_render_thread(std::function<bool()> task, std::chrono::milliseconds timeout) {
+    if (!task || !render_thread || render_abort.load(std::memory_order_relaxed))
+        return false;
+
+    std::unique_lock lock(render_task_mutex);
+    if (render_task_phase != RenderTaskPhase::Idle)
+        return false;
+    render_task = std::move(task);
+    render_task_result = false;
+    render_task_phase = RenderTaskPhase::Pending;
+
+    render_task_cv.wait_for(lock, timeout, [&] {
+        return render_task_phase == RenderTaskPhase::Finished || render_abort.load(std::memory_order_relaxed);
+    });
+    if (render_task_phase == RenderTaskPhase::Pending) {
+        // never started: withdraw it
+        render_task = nullptr;
+        render_task_phase = RenderTaskPhase::Idle;
+        return false;
+    }
+    // A running task cannot be abandoned: the render thread always finishes it.
+    render_task_cv.wait(lock, [&] { return render_task_phase == RenderTaskPhase::Finished; });
+    const bool ok = render_task_result;
+    render_task_phase = RenderTaskPhase::Idle;
+    return ok;
+}
+
+void State::service_render_thread_task() {
+    std::function<bool()> task;
+    {
+        const std::lock_guard lock(render_task_mutex);
+        if (render_task_phase != RenderTaskPhase::Pending)
+            return;
+        task = std::move(render_task);
+        render_task = nullptr;
+        render_task_phase = RenderTaskPhase::Running;
+    }
+    bool result = false;
+    try {
+        result = task();
+    } catch (...) {
+        result = false;
+    }
+    {
+        const std::lock_guard lock(render_task_mutex);
+        render_task_result = result;
+        render_task_phase = RenderTaskPhase::Finished;
+    }
+    render_task_cv.notify_all();
+}
+
 void State::enqueue_finish_drain(std::function<void()> completion) {
     if (current_backend == Backend::Vulkan && features.enable_memory_mapping) {
         auto &vk = static_cast<vulkan::VKState &>(*this);
@@ -72,15 +124,57 @@ COMMAND(handle_wait_sync_object) {
     renderer::wishlist(sync, timestamp);
 }
 
+bool write_notification_value(const MemState &mem, const SceGxmNotification &notification) {
+    // The address is guest controlled: only write when the whole word is inside guest memory.
+    // A null address is legal (Ratchet and clank Trilogy submits one) and silently ignored.
+    if (!notification.address)
+        return false;
+    const Address addr = notification.address.address();
+    if (addr > 0xFFFFFFFCu || !is_valid_addr_range(mem, addr, addr + sizeof(uint32_t))) {
+        LOG_WARN("Notification address {} is not valid guest memory, ignoring", log_hex(addr));
+        return false;
+    }
+    *notification.address.get(mem) = notification.value;
+    return true;
+}
+
+void State::wake_all_waiters() {
+    // The flag a waiter's predicate reads is already stored. Taking each waiter
+    // mutex once orders that store before any waiter that is still between its
+    // predicate check and its wait, so the notify below cannot be lost.
+    { const std::lock_guard<std::mutex> lock(notification_mutex); }
+    notification_ready.notify_all();
+    { const std::lock_guard<std::mutex> lock(command_finish_one_mutex); }
+    command_finish_one.notify_all();
+}
+
+void State::signal_fatal_error(const std::string &message, bool is_device_lost) {
+    if (is_device_lost)
+        device_lost.store(true);
+    if (!fatal_error_raised.exchange(true)) {
+        {
+            const std::lock_guard<std::mutex> lock(fatal_error_mutex);
+            fatal_error_message = message;
+        }
+        LOG_CRITICAL("[renderer] fatal GPU error{}: {}. Stopping the render session.", is_device_lost ? " (device lost)" : "", message);
+    }
+    render_abort.store(true);
+    set_shell_suspended(false);
+    command_buffer_queue.abort();
+    abort_backend_queues();
+    if (fatal_abort_hook)
+        fatal_abort_hook();
+    abort_finish_operations(*this);
+    wake_all_waiters();
+}
+
 COMMAND(handle_notification) {
     TRACY_FUNC_COMMANDS(handle_notification);
     SceGxmNotification notif = helper.pop<SceGxmNotification>();
 
     {
         std::unique_lock<std::mutex> lock(renderer.notification_mutex);
-        uint32_t *val = notif.address.get(mem);
-        if (val) // Ratchet and clank Trilogy request this
-            *val = notif.value;
+        write_notification_value(mem, notif);
     }
     renderer.notification_ready.notify_all();
 }

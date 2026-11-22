@@ -36,6 +36,9 @@
 #else
 #define XXH_INLINE_ALL
 #include <xxhash.h>
+#if ECV_ORACLE
+#include <ecv_gpu_trace.h>
+#endif
 #endif
 
 namespace renderer {
@@ -823,6 +826,14 @@ void TextureCache::cache_and_bind_texture(const SceGxmTexture &gxm_texture, MemS
         if (importing_texture)
             import_done();
     }
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled()) {
+        const Address oracle_addr = gxm_texture.data_addr << 2;
+        const bool oracle_valid = upload && oracle_addr && is_valid_addr_range(mem, oracle_addr, oracle_addr + info->texture_size);
+        ecv::oracle::gpu::tex_cache_result(upload, configure, info->use_hash, info->texture_size, info->hash,
+            oracle_valid ? hash_data(Ptr<const void>(oracle_addr).get(mem), info->texture_size) : 0);
+    }
+#endif
     importing_texture = false;
 
     // set the texture as the mru

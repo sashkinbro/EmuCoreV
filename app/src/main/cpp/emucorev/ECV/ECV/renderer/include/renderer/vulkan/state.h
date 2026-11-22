@@ -127,6 +127,11 @@ struct VKState : public renderer::State {
     Queue<WaitThreadRequest> request_queue;
     std::atomic<size_t> gpu_request_reader_count{ 0 };
 
+    // fatal GPU error: stop accepting GPU wait requests so waiters are released
+    void abort_backend_queues() override {
+        request_queue.abort();
+    }
+
     vkutil::Image default_image;
     vkutil::Image default_raw_image;
     vkutil::Buffer default_buffer;

@@ -91,6 +91,32 @@ bool USSETranslatorVisitor::vmov(
     inst.opr.src1.type = move_data_type;
     inst.opr.dest.type = move_data_type;
 
+    // An unconditional f16 move between register-file registers copies the 16-bit lanes untouched; programs use it
+    // to move packed non-f16 data (e.g. U8x4 native colour into o0). Going through unpackHalf/packHalf at relaxed
+    // precision rewrites lanes that decode as NaN/Inf or denormals, so move the raw bits instead. Internal registers
+    // hold f16 values widened to f32 and constants/immediates are decoded values, so those keep the float path.
+    const auto is_raw_f16_bank = [](const Operand &op) {
+        return op.bank != RegisterBank::FPINTERNAL && op.bank != RegisterBank::FPCONSTANT && op.bank != RegisterBank::IMMEDIATE
+            && op.bank != RegisterBank::SPECIAL && op.bank != RegisterBank::GLOBAL && op.bank != RegisterBank::PREDICATE
+            && op.bank != RegisterBank::INDEX;
+    };
+    // constant swizzle channels (0, 1, 0.5) are float values, not lanes
+    const auto swizzle_reads_lanes_only = [&]() {
+        for (int i = 0; i < 4; i++) {
+            if (!(dest_mask & (1 << i)))
+                continue;
+            const auto ch = inst.opr.src1.swizzle[i];
+            if (ch != SwizzleChannel::C_X && ch != SwizzleChannel::C_Y && ch != SwizzleChannel::C_Z && ch != SwizzleChannel::C_W)
+                return false;
+        }
+        return true;
+    };
+    if (!is_conditional && move_data_type == DataType::F16 && inst.opr.src1.flags == 0
+        && is_raw_f16_bank(inst.opr.src1) && is_raw_f16_bank(inst.opr.dest) && swizzle_reads_lanes_only()) {
+        inst.opr.src1.type = DataType::UINT16;
+        inst.opr.dest.type = DataType::UINT16;
+    }
+
     // TODO: adjust dest mask if needed
     CompareMethod compare_method = CompareMethod::NE_ZERO;
     spv::Op compare_op = spv::OpAny;

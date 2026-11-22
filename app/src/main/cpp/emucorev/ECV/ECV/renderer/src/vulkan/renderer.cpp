@@ -52,6 +52,10 @@
 #include <mutex>
 #include <unordered_set>
 
+#if ECV_ORACLE
+#include <ecv_gpu_trace.h>
+#endif
+
 #ifdef __APPLE__
 #include <MoltenVK/mvk_vulkan.h>
 #endif
@@ -487,7 +491,19 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             }
         }
 
-        const bool use_validation_layer = has_validation_layer && !found_debug_extension.empty() && config.validation_layer;
+        // debug-only: <files dir>/vk-sync-validation turns on the validation layer with synchronization validation
+        bool oracle_sync_validation = false;
+#if ECV_ORACLE
+        {
+            fs::path oracle_root = vita_fs_path;
+            if (!oracle_root.has_filename())
+                oracle_root = oracle_root.parent_path();
+            oracle_sync_validation = fs::exists(oracle_root.parent_path() / "vk-sync-validation");
+            if (oracle_sync_validation)
+                LOG_WARN("vk-sync-validation flag file present (layer found: {})", has_validation_layer);
+        }
+#endif
+        const bool use_validation_layer = has_validation_layer && !found_debug_extension.empty() && (config.validation_layer || oracle_sync_validation);
         if (has_validation_layer && !found_debug_extension.empty()) {
             if (config.validation_layer)
                 LOG_INFO("Enabling vulkan validation layers (has a performance impact but allows better error messages)");
@@ -559,7 +575,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         instance_info.setPEnabledLayerNames(instance_layers);
         instance_info.setPEnabledExtensionNames(instance_extensions);
 #if !defined(__APPLE__) && !defined(NDEBUG)
-        if (use_validation_layer && has_validation_features_ext && std::getenv("VITA3K_SYNC_VALIDATION")) {
+        if (use_validation_layer && has_validation_features_ext && (std::getenv("VITA3K_SYNC_VALIDATION") || oracle_sync_validation)) {
             validation_features.pNext = instance_info.pNext;
             instance_info.pNext = &validation_features;
             LOG_INFO("Synchronization validation + best-practices enabled (VITA3K_SYNC_VALIDATION)");
@@ -645,7 +661,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                     physical_device_properties.deviceName.data()))
                 LOG_INFO("Custom GPU driver {} injected successfully", config.current_config.custom_driver_name);
             else
-                LOG_WARN("Custom Adreno driver {} fell back to the system Vulkan loader", config.current_config.custom_driver_name);
+                LOG_WARN("Custom Vulkan driver {} fell back to the system Vulkan loader", config.current_config.custom_driver_name);
         }
 #endif
 
@@ -1068,6 +1084,9 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
 
 void VKState::late_init(const Config &cfg, const std::string_view game_id, MemState &mem) {
     this->mem = &mem;
+#if ECV_ORACLE
+    ecv::oracle::gpu::g_oracle_mem = &mem;
+#endif
 
     bool use_high_accuracy = cfg.current_config.high_accuracy;
     surface_sync_clamp_rt = cfg.surface_sync_clamp_rt;
@@ -1128,6 +1147,7 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
 
     features.enable_memory_mapping = mapping_method != MappingMethod::Disabled;
     features.force_full_precision = cfg.force_full_precision;
+    features.no_fp_contraction = cfg.no_fp_contraction;
 
 #ifdef __ANDROID__
     if (mapping_method == MappingMethod::NativeBuffer) {
@@ -1635,6 +1655,7 @@ uint32_t VKState::get_features_mask() {
             bool use_clip_distance : 1;
             bool use_gxm_clip_planes : 1;
             bool force_full_precision : 1;
+            bool no_fp_contraction : 1;
         };
         uint32_t value;
     } features_mask;
@@ -1654,6 +1675,7 @@ uint32_t VKState::get_features_mask() {
     features_mask.use_clip_distance = features.support_clip_distance;
     features_mask.use_gxm_clip_planes = features.support_gxm_clip_planes;
     features_mask.force_full_precision = features.force_full_precision;
+    features_mask.no_fp_contraction = features.no_fp_contraction;
 
     return features_mask.value;
 }

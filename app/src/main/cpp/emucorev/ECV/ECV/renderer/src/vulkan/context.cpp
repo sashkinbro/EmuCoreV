@@ -35,10 +35,33 @@
 #include <algorithm>
 #include <limits>
 
+#if ECV_ORACLE
+#include <ecv_gpu_trace.h>
+#include <thread>
+#include <android/log.h>
+#endif
+
 namespace renderer::vulkan {
 
 void VKContext::wait_thread_function(const MemState &mem) {
     const ActiveGpuRequestReader active_reader(state.gpu_request_reader_count);
+    try {
+        wait_thread_body(mem);
+    } catch (const vk::DeviceLostError &e) {
+        // Nothing submitted can complete any more. Never signal syncs/notifications as done:
+        // abort the queues so every waiter is released instead.
+        state.signal_fatal_error(std::string("GPU wait thread: ") + e.what(), true);
+        new_frame_condv.notify_all();
+    } catch (const std::exception &e) {
+        state.signal_fatal_error(std::string("GPU wait thread: ") + e.what());
+        new_frame_condv.notify_all();
+    } catch (...) {
+        state.signal_fatal_error("GPU wait thread: unknown exception");
+        new_frame_condv.notify_all();
+    }
+}
+
+void VKContext::wait_thread_body(const MemState &mem) {
     // try to wait for multiple fences at the same time if possible
     std::vector<vk::Fence> fences;
 
@@ -58,10 +81,11 @@ void VKContext::wait_thread_function(const MemState &mem) {
                 }
                 continue;
             }
-            LOG_ERROR("Could not wait for fences.");
-            assert(false);
+            // Any other result means the GPU work is in an unknown state. Do not fall through and
+            // let the caller signal syncs/notifications as completed: unwind to wait_thread_function.
+            LOG_ERROR("Could not wait for fences: {}", vk::to_string(result));
             fences.clear();
-            break;
+            throw vk::SystemError(vk::make_error_code(result), "waitForFences");
         }
     };
 
@@ -83,10 +107,8 @@ void VKContext::wait_thread_function(const MemState &mem) {
                                // same as in handle_sync_surface_data
                                std::unique_lock<std::mutex> lock(state.notification_mutex);
 
-                               if (request.notifications[0].address)
-                                   *request.notifications[0].address.get(mem) = request.notifications[0].value;
-                               if (request.notifications[1].address)
-                                   *request.notifications[1].address.get(mem) = request.notifications[1].value;
+                               write_notification_value(mem, request.notifications[0]);
+                               write_notification_value(mem, request.notifications[1]);
 
                                // unlocking before a notify should be faster
                                lock.unlock();
@@ -132,6 +154,10 @@ void VKContext::wait_thread_function(const MemState &mem) {
                                    request.row_bytes, request.row_count);
                            } else {
                                memcpy(dst, src, request.size);
+#if ECV_ORACLE
+                               if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_UB_CHECK))
+                                   ecv::oracle::gpu::vis_synced(request.location, reinterpret_cast<const uint32_t *>(dst), request.size / 4);
+#endif
                            }
                            renderer::vulkan::surface_sync_internal_write = false;
                            if (!copied)
@@ -215,6 +241,9 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
     if (!restoring)
         context.scene_timestamp++;
     context.state.texture_cache.current_scene_timestamp = context.scene_timestamp;
+#if ECV_ORACLE
+    ecv::oracle::gpu::scene_begin(context.scene_timestamp);
+#endif
 
     SceGxmColorSurface *color_surface_fin = &context.record.color_surface;
     // set these values for the pipeline cache
@@ -312,17 +341,29 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
     // GXM force_store controls write-back to the depth surface memory, not whether the buffer keeps its contents
     force_store = true;
 
+#if ECV_ORACLE
+    bool oracle_depth_valid = true;
+#endif
     bool depth_load = restoring ? true : force_load;
     bool stencil_load = restoring ? true : force_load;
     if (!restoring && ds_surface_fin != nullptr) {
         constexpr bool use_ds_depth_validity = true;
         const bool game_stores = context.record.depth_stencil_surface.force_store;
         const bool depth_content_valid = state.surface_cache.begin_ds_scene_depth_check(*ds_surface_fin, game_stores, context.record.color_surface.data.address());
+#if ECV_ORACLE
+        oracle_depth_valid = depth_content_valid;
+#endif
         if (use_ds_depth_validity && game_stores && !depth_content_valid)
             depth_load = false;
     }
     const bool color_has_raw = context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16;
     context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(vk_format, depth_load, stencil_load, force_store, color_surface_fin == nullptr, false, color_has_raw);
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::scene_cfg(restoring, context.record.depth_stencil_surface.force_load, context.record.depth_stencil_surface.force_store,
+            oracle_depth_valid, depth_load, stencil_load, ds_surface_fin ? ds_surface_fin->depth_data.address() : 0,
+            ds_surface_fin ? ds_surface_fin->stencil_data.address() : 0, reinterpret_cast<uint64_t>(static_cast<VkRenderPass>(context.current_render_pass)));
+#endif
     if (context.state.features.support_shader_interlock)
         // also retrieve / create the shader interlock pass
         context.current_shader_interlock_pass = context.state.pipeline_cache.retrieve_render_pass(vk_format, true, true, true, color_surface_fin == nullptr, true);
@@ -553,6 +594,19 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
     curr_clear_values[1].depthStencil = ds_clear;
     curr_clear_values[2].depthStencil = ds_clear;
     curr_renderpass_info.setClearValues(curr_clear_values);
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::rp_begin(reinterpret_cast<uint64_t>(static_cast<VkRenderPass>(current_render_pass)),
+            reinterpret_cast<uint64_t>(static_cast<VkFramebuffer>(current_framebuffer)), is_first_scene_draw, curr_renderpass_info.renderArea.offset.x,
+            curr_renderpass_info.renderArea.offset.y, curr_renderpass_info.renderArea.extent.width, curr_renderpass_info.renderArea.extent.height);
+    if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FULL_BARRIER)) {
+        const vk::MemoryBarrier oracle_all{
+            .srcAccessMask = vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite,
+            .dstAccessMask = vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite
+        };
+        render_cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, oracle_all, {}, {});
+    }
+#endif
     render_cmd.beginRenderPass(curr_renderpass_info, vk::SubpassContents::eInline);
 
     // set the renderpass info ready in case we need to switch between classic and framebuffer fetch usage
@@ -619,9 +673,25 @@ void VKContext::stop_render_pass() {
         is_in_query = false;
     }
 
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::rp_end();
+#endif
     render_cmd.endRenderPass();
 
     in_renderpass = false;
+}
+
+void VKContext::abandon_empty_recording() {
+    if (!is_recording)
+        return;
+    if (in_renderpass)
+        stop_render_pass();
+    prerender_cmd.end();
+    render_cmd.end();
+    prerender_cmd = nullptr;
+    render_cmd = nullptr;
+    is_recording = false;
 }
 
 void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNotification &notif2, bool submit) {
@@ -630,6 +700,9 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
         return;
     }
 
+#if ECV_ORACLE
+    ecv::oracle::gpu::rp_reason("stop_recording");
+#endif
     if (in_renderpass)
         stop_render_pass();
 
@@ -678,6 +751,12 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
 
     prerender_cmd.end();
     render_cmd.end();
+#if ECV_ORACLE
+    if (submit)
+        ecv::oracle::gpu::mirror_verify_at_submit();
+    if (submit)
+        ecv::oracle::gpu::dbg_stall_once(ecv::oracle::gpu::DBG_STALL_SUBMIT, "before submit");
+#endif
 
     // the prerender cmd must be submitted before the render cmd, the pipeline barriers do the rest
     cmdbuffers_to_submit.push_back(prerender_cmd);
@@ -701,6 +780,10 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
 
     vk::SubmitInfo submit_info{};
     submit_info.setCommandBuffers(cmdbuffers_to_submit);
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_IDLE_SUBMIT))
+        state.general_queue.waitIdle();
+#endif
 
     try {
         state.general_queue.submit(submit_info, fence);
@@ -718,6 +801,12 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
         if (state.mapping_method == MappingMethod::DoubleBuffer) {
             // sync all the visibility buffers
             for (auto &range : occlusion_ranges) {
+#if ECV_ORACLE
+                if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_UB_CHECK))
+                    ecv::oracle::gpu::vis_note(current_visibility_buffer->address + range.offset * 4, range.size * 4);
+                if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_NO_VIS_SYNC))
+                    continue;
+#endif
                 state.request_queue.push(BufferSyncRequest{ current_visibility_buffer->address + range.offset * 4, range.size * 4 });
             }
 
@@ -811,6 +900,9 @@ void VKContext::check_for_macroblock_change(bool is_draw) {
         scene_macroblock_flushed = true;
 
         if (in_renderpass) {
+#if ECV_ORACLE
+    ecv::oracle::gpu::rp_reason("macroblock_change");
+#endif
             if (state.features.use_texture_viewport) {
                 // no need to copy the texture after this renderpass
                 stop_render_pass();
@@ -833,6 +925,27 @@ void new_frame(VKContext &context) {
     }
 
     context.frame_timestamp++;
+#if ECV_ORACLE
+    ecv::oracle::gpu::frame_begin(context.frame_timestamp, context.state.vita_fs_path.c_str());
+    {
+        // debug A/B: a ~75 ms renderer-thread stall at the frame boundary once per second
+        static std::chrono::steady_clock::time_point oracle_next_stall{};
+        const auto now = std::chrono::steady_clock::now();
+        if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_STALL_FRAME) && now >= oracle_next_stall) {
+            oracle_next_stall = now + std::chrono::milliseconds(1050);
+            std::this_thread::sleep_for(std::chrono::milliseconds(75));
+        }
+        // debug A/B: keep the GPU at most one frame behind the renderer
+        if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FRAME_SYNC))
+            context.state.general_queue.waitIdle();
+        static bool oracle_logged_mapping = false;
+        if (!oracle_logged_mapping) {
+            oracle_logged_mapping = true;
+            __android_log_print(ANDROID_LOG_WARN, "GPUTRACE", "memory mapping enabled=%d method=%d", context.state.features.enable_memory_mapping,
+                static_cast<int>(context.state.mapping_method));
+        }
+    }
+#endif
     context.state.frame_epoch++;
     context.state.current_frame_idx = context.frame_timestamp % MAX_FRAMES_RENDERING;
 
@@ -849,15 +962,32 @@ void new_frame(VKContext &context) {
             uint64_t previous_frame_timestamp = context.frame_timestamp - MAX_FRAMES_RENDERING;
 
             // the wait is done by the wait thread
+            // abort paths (shutdown or fatal GPU error) must release this wait: the wait thread may be gone
             std::unique_lock<std::mutex> lock(context.new_frame_mutex);
-            context.new_frame_condv.wait(lock, [&]() {
-                return context.last_frame_waited >= previous_frame_timestamp;
-            });
+            const auto frame_done_or_abort = [&]() {
+                return context.last_frame_waited >= previous_frame_timestamp
+                    || context.state.request_queue.is_aborted()
+                    || context.state.render_abort.load(std::memory_order_relaxed);
+            };
+            // the bounded wait also covers an abort flag set without a notification
+            while (!context.new_frame_condv.wait_for(lock, std::chrono::milliseconds(50), frame_done_or_abort)) {
+            }
+            if (context.last_frame_waited < previous_frame_timestamp) {
+                // aborted before the GPU finished: leave the fences/pools alone, the session is stopping
+                return;
+            }
         } else {
-            auto result = device.waitForFences(frame.rendered_fences, VK_TRUE, std::numeric_limits<uint64_t>::max());
+            // bounded wait so shutdown or a fatal error is noticed; device loss throws and is
+            // handled by the render thread
+            vk::Result result;
+            do {
+                result = device.waitForFences(frame.rendered_fences, VK_TRUE, 100'000'000ULL);
+                if (result == vk::Result::eTimeout && context.state.render_abort.load(std::memory_order_relaxed))
+                    return;
+            } while (result == vk::Result::eTimeout);
             if (result != vk::Result::eSuccess) {
-                LOG_ERROR("Could not wait for fences.");
-                assert(false);
+                LOG_ERROR("Could not wait for fences: {}", vk::to_string(result));
+                context.state.signal_fatal_error("waitForFences failed: " + vk::to_string(result));
                 return;
             }
         }

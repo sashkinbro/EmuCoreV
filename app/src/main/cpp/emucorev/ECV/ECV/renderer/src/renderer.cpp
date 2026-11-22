@@ -19,6 +19,10 @@
 #include <renderer/state.h>
 #include <renderer/types.h>
 
+#if ECV_ORACLE
+#include <ecv_gpu_trace.h>
+#endif
+
 #include <atomic>
 #include <chrono>
 #include <mutex>
@@ -196,11 +200,26 @@ void set_context(State &state, Context *ctx, RenderTarget *target, SceGxmColorSu
 }
 
 void set_vertex_stream(State &state, Context *ctx, const std::size_t index, const std::size_t data_len, const Ptr<const void> stream) {
+#if ECV_ORACLE
+    uint64_t oracle_hash = 0;
+    if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_UB_CHECK) && stream && ecv::oracle::gpu::g_oracle_mem && data_len)
+        oracle_hash = ecv::oracle::gpu::ub_quick_hash(stream.cast<const uint8_t>().get(*ecv::oracle::gpu::g_oracle_mem), static_cast<uint32_t>(data_len));
+    renderer::add_state_set_command(ctx, renderer::GXMState::VertexStream, stream, index, data_len, oracle_hash);
+#else
     renderer::add_state_set_command(ctx, renderer::GXMState::VertexStream, stream, index, data_len);
+#endif
 }
 
 void draw(State &state, Context *ctx, SceGxmPrimitiveType prim_type, SceGxmIndexFormat index_type, Ptr<const void> index_data, const std::uint32_t index_count, const std::uint32_t instance_count) {
+#if ECV_ORACLE
+    uint64_t oracle_hash = 0;
+    const uint32_t oracle_ib_bytes = index_count * (index_type == SCE_GXM_INDEX_FORMAT_U16 ? 2u : 4u);
+    if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_UB_CHECK) && index_data && ecv::oracle::gpu::g_oracle_mem && oracle_ib_bytes)
+        oracle_hash = ecv::oracle::gpu::ub_quick_hash(index_data.cast<const uint8_t>().get(*ecv::oracle::gpu::g_oracle_mem), oracle_ib_bytes);
+    renderer::add_command(ctx, renderer::CommandOpcode::Draw, nullptr, prim_type, index_type, index_data, index_count, instance_count, oracle_hash);
+#else
     renderer::add_command(ctx, renderer::CommandOpcode::Draw, nullptr, prim_type, index_type, index_data, index_count, instance_count);
+#endif
 }
 
 void transfer_copy(State &state, uint32_t colorKeyValue, uint32_t colorKeyMask, SceGxmTransferColorKeyMode colorKeyMode, const SceGxmTransferImage *images, SceGxmTransferType srcType, SceGxmTransferType destType) {
@@ -271,7 +290,14 @@ void set_uniform_buffer(State &state, Context *ctx, const bool is_vertex_uniform
     // Calculate the number of bytes
     std::uint32_t bytes_to_copy_and_pad = ((block_size + 15) / 16) * 16;
 
+#if ECV_ORACLE
+    uint64_t oracle_hash = 0;
+    if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_UB_CHECK) && buffer && ecv::oracle::gpu::g_oracle_mem)
+        oracle_hash = ecv::oracle::gpu::ub_quick_hash(buffer.cast<const uint8_t>().get(*ecv::oracle::gpu::g_oracle_mem), bytes_to_copy_and_pad);
+    renderer::add_state_set_command(ctx, renderer::GXMState::UniformBuffer, buffer, is_vertex_uniform, block_number, bytes_to_copy_and_pad, oracle_hash);
+#else
     renderer::add_state_set_command(ctx, renderer::GXMState::UniformBuffer, buffer, is_vertex_uniform, block_number, bytes_to_copy_and_pad);
+#endif
 }
 
 void set_visibility_buffer(State &state, Context *ctx, Ptr<uint32_t> visibility_address, uint32_t visibility_stride) {

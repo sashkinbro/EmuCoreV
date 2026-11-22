@@ -20,8 +20,13 @@
 #include <renderer/commands.h>
 #include <renderer/command_snapshot.h>
 #include <renderer/driver_functions.h>
+#include <renderer/functions.h>
 #include <renderer/state.h>
 #include <renderer/types.h>
+
+#if ECV_ORACLE
+#include <ecv_gpu_trace.h>
+#endif
 
 #include <renderer/gl/functions.h>
 #include <renderer/gl/types.h>
@@ -111,10 +116,8 @@ COMMAND(handle_sync_surface_data) {
         // signal the notification now
         std::unique_lock<std::mutex> lock(renderer.notification_mutex);
 
-        if (vertex_notification.address)
-            *vertex_notification.address.get(mem) = vertex_notification.value;
-        if (fragment_notification.address)
-            *fragment_notification.address.get(mem) = fragment_notification.value;
+        ::renderer::write_notification_value(mem, vertex_notification);
+        ::renderer::write_notification_value(mem, fragment_notification);
 
         // unlocking before a notify should be faster
         lock.unlock();
@@ -231,6 +234,15 @@ COMMAND(handle_draw) {
     Ptr<const void> indices = helper.pop<Ptr<const void>>();
     const std::uint32_t count = helper.pop<const std::uint32_t>();
     const std::uint32_t instance_count = helper.pop<const std::uint32_t>();
+#if ECV_ORACLE
+    {
+        const uint64_t oracle_hash = helper.pop<uint64_t>();
+        const uint32_t oracle_ib_bytes = count * (format == SCE_GXM_INDEX_FORMAT_U16 ? 2u : 4u);
+        if (oracle_hash && indices)
+            ecv::oracle::gpu::submit_check("ib", indices.address(), oracle_ib_bytes, oracle_hash,
+                ecv::oracle::gpu::ub_quick_hash(indices.cast<const uint8_t>().get(mem), oracle_ib_bytes));
+    }
+#endif
 
     switch (renderer.current_backend) {
     case Backend::OpenGL:

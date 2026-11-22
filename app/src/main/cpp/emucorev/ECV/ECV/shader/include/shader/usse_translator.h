@@ -867,6 +867,9 @@ struct USSERecompiler final {
 
     USSEBlockNode tree_block_node;
 
+    // unmatched / unsupported instructions seen while compiling (all phases)
+    UsseTranslationStats stats;
+
     explicit USSERecompiler(spv::Builder &b, const SceGxmProgram &program, const FeatureState &features,
         const SpirvShaderParameters &parameters, utils::SpirvUtilFunctions &utils, spv::Function *end_hook_func,
         const NonDependentTextureQueryCallInfos &queries, const spv::Id render_info_id);

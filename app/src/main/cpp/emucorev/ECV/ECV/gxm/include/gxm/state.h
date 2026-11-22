@@ -114,6 +114,10 @@ struct GxmState {
 
     std::map<Address, MemoryMapInfo> memory_mapped_regions;
     std::mutex callback_lock;
+    // Guards the deferred contexts map and every deferred context's command-list ranges: deferred
+    // contexts record (and recycle) command lists on game worker threads while another thread runs
+    // sceGxmExecuteCommandList, which looks lists up across all deferred contexts and copies them.
+    std::recursive_mutex command_lists_mutex;
     std::unordered_map<SceGxmContext *, Address> immediate_contexts;
     Address last_immediate_context = 0;
     std::unordered_map<SceGxmContext *, Address> deferred_contexts;

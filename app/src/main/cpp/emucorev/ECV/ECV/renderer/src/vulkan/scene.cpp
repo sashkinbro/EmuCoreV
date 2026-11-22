@@ -35,6 +35,9 @@
 #include <spdlog/fmt/bin_to_hex.h>
 
 #include <util/log.h>
+#if ECV_ORACLE
+#include <ecv_gpu_trace.h>
+#endif
 
 namespace renderer::vulkan {
 
@@ -43,6 +46,10 @@ namespace renderer::vulkan {
 constexpr uint32_t uniform_slack_window = 16 * 1024;
 
 static void copy_uniform_slack(VKContext &context, MemState &mem, const Address address, const uint32_t declared) {
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_NO_SLACK))
+        return;
+#endif
     VKState &state = context.state;
     const auto mapping = state.mapped_memories.lower_bound(address);
     if (mapping == state.mapped_memories.end() || address < mapping->first)
@@ -73,17 +80,61 @@ void set_uniform_buffer(VKContext &context, MemState &mem, const ShaderProgram *
     }
 
     const uint32_t data_size_upload = std::min<uint32_t>(size, program->uniform_buffer_sizes.at(block_num) * 4);
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::draws_enabled())
+        ecv::oracle::gpu::ub_bind(vertex_shader, block_num, data.address(), std::min<uint32_t>(size, program->uniform_buffer_sizes.at(block_num) * 4));
+    if (ecv::oracle::gpu::uniforms_enabled() && data.address())
+        ecv::oracle::gpu::ub_data(vertex_shader, block_num, data.address(), std::min<uint32_t>(size, program->uniform_buffer_sizes.at(block_num) * 4), data.get(mem));
+#endif
     if (context.state.features.enable_memory_mapping) {
         const bool aliases_surface = context.state.surface_cache.sync_surface_for_gpu_read(data.address(), data_size_upload);
 
         if (!aliases_surface && context.state.mapping_method == MappingMethod::DoubleBuffer) {
-            context.state.buffer_trapping.access_buffer(data.address(), data_size_upload, mem, false, true);
+            TrappedBuffer *oracle_ub = context.state.buffer_trapping.access_buffer(data.address(), data_size_upload, mem, false, true);
+#if ECV_ORACLE
+            if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_UB_CHECK) && oracle_ub && oracle_ub->mapped_location && oracle_ub->size)
+                ecv::oracle::gpu::mirror_check(vertex_shader ? "uv" : "uf", data.address(), std::min<uint32_t>(oracle_ub->size, data_size_upload),
+                    oracle_ub->mapped_location, data.get(mem));
+            if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_MIRROR_VERIFY) && oracle_ub && oracle_ub->size)
+                ecv::oracle::gpu::mirror_note(vertex_shader ? "uv" : "uf", data.address(), std::min<uint32_t>(oracle_ub->size, data_size_upload), oracle_ub->mapped_location);
+#else
+            (void)oracle_ub;
+#endif
             if (block_num >= 0 && block_num < 32
                 && (program->dynamic_uniform_buffers & (1u << block_num)) && !context.state.has_shader_store)
                 copy_uniform_slack(context, mem, data.address(), data_size_upload);
         }
 
-        const uint64_t buffer_address = context.state.get_matching_device_address(data.address());
+        uint64_t buffer_address = context.state.get_matching_device_address(data.address());
+#if ECV_ORACLE
+        if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_UB_SNAPSHOT) && data.address()) {
+            // debug A/B: give the GPU a private per-draw snapshot of the uniform data (+16 KiB slack)
+            static vkutil::Buffer *oracle_ring = nullptr;
+            static uint64_t oracle_ring_addr = 0;
+            static uint32_t oracle_cursor = 0;
+            constexpr uint32_t oracle_cap = 96u * 1024 * 1024;
+            if (!oracle_ring) {
+                oracle_ring = new vkutil::Buffer(oracle_cap + 64 * 1024);
+                constexpr vma::AllocationCreateInfo oracle_alloc = {
+                    .flags = vma::AllocationCreateFlagBits::eHostAccessRandom | vma::AllocationCreateFlagBits::eMapped,
+                    .usage = vma::MemoryUsage::eAutoPreferHost,
+                    .requiredFlags = vk::MemoryPropertyFlagBits::eHostCoherent,
+                };
+                oracle_ring->init_buffer(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress, oracle_alloc);
+                oracle_ring_addr = context.state.device.getBufferAddress(vk::BufferDeviceAddressInfo{ .buffer = oracle_ring->buffer });
+            }
+            auto oracle_map = context.state.mapped_memories.lower_bound(data.address());
+            if (oracle_map != context.state.mapped_memories.end() && data.address() < oracle_map->first + oracle_map->second.size) {
+                const uint32_t remaining = oracle_map->first + oracle_map->second.size - data.address();
+                const uint32_t copy_size = std::min<uint32_t>(remaining, data_size_upload + 16 * 1024);
+                if (oracle_cursor + copy_size > oracle_cap)
+                    oracle_cursor = 0;
+                std::memcpy(reinterpret_cast<uint8_t *>(oracle_ring->mapped_data) + oracle_cursor, data.get(mem), copy_size);
+                buffer_address = oracle_ring_addr + oracle_cursor;
+                oracle_cursor = (oracle_cursor + copy_size + 255u) & ~255u;
+            }
+        }
+#endif
 
         if (vertex_shader) {
             context.curr_vert_ublock.set_buffer_address(block_num, buffer_address);
@@ -124,6 +175,9 @@ void mid_scene_flush(VKContext &context, const SceGxmNotification notification) 
     // const bool restart_render_pass = notification.address.address() != 0;
     const bool restart_render_pass = true;
 
+#if ECV_ORACLE
+    ecv::oracle::gpu::rp_reason("mid_scene_flush");
+#endif
     if (restart_render_pass && context.in_renderpass)
         context.stop_render_pass();
 
@@ -312,16 +366,30 @@ static bool bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
         }
 
         for (int i = 0; i < max_stream_idx; i++) {
-            if (state.vertex_streams[i].data)
+            if (state.vertex_streams[i].data) {
                 // on the PS Vita, shader stores are used most of the time to write to a vertex buffer
-                context.state.buffer_trapping.access_buffer(state.vertex_streams[i].data.address(), static_cast<uint32_t>(state.vertex_streams[i].size), mem, context.state.has_shader_store);
+                TrappedBuffer *oracle_tb = context.state.buffer_trapping.access_buffer(state.vertex_streams[i].data.address(), static_cast<uint32_t>(state.vertex_streams[i].size), mem, context.state.has_shader_store);
+#if ECV_ORACLE
+                if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_UB_CHECK) && oracle_tb && oracle_tb->mapped_location && oracle_tb->size)
+                    ecv::oracle::gpu::mirror_check("vb", state.vertex_streams[i].data.address(), std::min<uint32_t>(oracle_tb->size, static_cast<uint32_t>(state.vertex_streams[i].size)),
+                        oracle_tb->mapped_location, state.vertex_streams[i].data.cast<const uint8_t>().get(mem));
+                if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_MIRROR_VERIFY) && oracle_tb && oracle_tb->size)
+                    ecv::oracle::gpu::mirror_note("vb", state.vertex_streams[i].data.address(), std::min<uint32_t>(oracle_tb->size, static_cast<uint32_t>(state.vertex_streams[i].size)), oracle_tb->mapped_location);
+#else
+                (void)oracle_tb;
+#endif
+            }
         }
     }
 
     if (max_stream_idx == 0)
         return true;
 
-    const bool mapped = context.state.features.enable_memory_mapping;
+    bool mapped = context.state.features.enable_memory_mapping;
+#if ECV_ORACLE
+    if (mapped && ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_VB_COPY))
+        mapped = false;
+#endif
     std::array<bool, SCE_GXM_MAX_VERTEX_STREAMS> restride_streams{};
     std::array<size_t, SCE_GXM_MAX_VERTEX_STREAMS> batch_stream_sizes{};
     size_t batch_stream_count = 0;
@@ -366,6 +434,7 @@ static bool bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
                 }
                 context.vertex_stream_ring_buffer.allocate(context.prerender_cmd, stream_size, stream);
                 context.vertex_stream_offsets[i] = context.vertex_stream_ring_buffer.data_offset;
+                context.vertex_stream_buffers[i] = context.vertex_stream_ring_buffer.handle();
             }
 
             state.vertex_streams[i].data = nullptr;
@@ -379,6 +448,9 @@ static bool bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
 
 void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format,
     Ptr<void> indices, size_t count, uint32_t instance_count, MemState &mem, const Config &config) {
+#if ECV_ORACLE
+    ecv::oracle::gpu::dbg_stall_once(ecv::oracle::gpu::DBG_STALL_DRAW, "draw start");
+#endif
     // A save-state load can leave the record pointing at a program whose guest
     // memory was freed: skip such draws instead of dereferencing garbage.
     const SceGxmFragmentProgram *frag_program = context.record.fragment_program.get(mem);
@@ -468,12 +540,26 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         // update the render pass to load and store the depth and stencil
         context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(context.current_color_format, true, true, true, !context.record.color_surface.data, false,
             context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16);
+#if ECV_ORACLE
+        if (ecv::oracle::gpu::enabled())
+            ecv::oracle::gpu::rp_loads(reinterpret_cast<uint64_t>(static_cast<VkRenderPass>(context.current_render_pass)), "first_draw_upgrade");
+#endif
         context.is_first_scene_draw = false;
     }
 
     const SceGxmFragmentProgram &gxm_fragment_program = *context.record.fragment_program.get(mem);
     const SceGxmProgram &fragment_program_gxp = *renderer::get_program(gxm_fragment_program, mem);
+#if ECV_ORACLE
+    if (fragment_program_gxp.is_frag_color_used()) {
+        ecv::oracle::gpu::fbfetch_note(vert_program->renderer_data->hash.data(), frag_program->renderer_data->hash.data());
+        if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_SKIP_FBFETCH))
+            return;
+    }
+#endif
     if (context.shell_fetch_snapshot && fragment_program_gxp.is_frag_color_used()) {
+#if ECV_ORACLE
+    ecv::oracle::gpu::rp_reason("shell_fetch_snapshot");
+#endif
         // PAF's glow must sample completed pixels, not a simultaneous write to
         // the same attachment on a non-coherent mobile framebuffer-fetch path.
         context.stop_render_pass();
@@ -569,11 +655,40 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
             if (new_pipeline != nullptr)
                 context.render_cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, context.current_pipeline);
         }
+        // Still compiling: look it up again on the next draw. Clearing the flag here kept the
+        // pipeline null (draws skipped) until some unrelated state change, even long after the
+        // asynchronous compile had finished.
+        if (new_pipeline == nullptr)
+            context.refresh_pipeline = true;
     }
 
     // can happen with asynchronous pipeline compilation
-    if (context.current_pipeline == nullptr)
+    if (context.current_pipeline == nullptr) {
+#if ECV_ORACLE
+        if (ecv::oracle::gpu::enabled())
+            ecv::oracle::gpu::pipe_skip(vert_program->renderer_data->hash.data(), frag_program->renderer_data->hash.data());
+#endif
         return;
+    }
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::dbg_skip_draw(vert_program->renderer_data->hash.data(), frag_program->renderer_data->hash.data()))
+        return;
+    if (ecv::oracle::gpu::draws_enabled()) {
+        for (int i = 0; i < SCE_GXM_MAX_VERTEX_STREAMS; i++)
+            if (context.record.vertex_streams[i].data)
+                ecv::oracle::gpu::vb_note(i, context.record.vertex_streams[i].data.address(), static_cast<uint32_t>(context.record.vertex_streams[i].size));
+        ecv::oracle::gpu::ib_note(indices.address(), static_cast<uint32_t>(count), format == SCE_GXM_INDEX_FORMAT_U16 ? 2u : 4u);
+        const GxmRecordState &rec = context.record;
+        ecv::oracle::gpu::draw_state(static_cast<uint32_t>(rec.front_depth_func), static_cast<uint32_t>(rec.front_depth_write_mode),
+            static_cast<uint32_t>(rec.front_stencil_state_op.func), static_cast<uint32_t>(rec.front_stencil_state_op.stencil_fail),
+            static_cast<uint32_t>(rec.front_stencil_state_op.depth_fail), static_cast<uint32_t>(rec.front_stencil_state_op.depth_pass),
+            rec.front_stencil_state_values.ref, rec.front_stencil_state_values.compare_mask, rec.front_stencil_state_values.write_mask,
+            static_cast<uint32_t>(rec.cull_mode), context.scissor.offset.x, context.scissor.offset.y, context.scissor.extent.width,
+            context.scissor.extent.height);
+    }
+    if (ecv::oracle::gpu::draws_enabled())
+        ecv::oracle::gpu::draw(vert_program->renderer_data->hash.data(), frag_program->renderer_data->hash.data(), static_cast<uint32_t>(count), instance_count);
+#endif
 
     if (config.log_active_shaders) {
         LOG_DEBUG("\nVertex  : {}\nFragment: {}",
@@ -623,6 +738,14 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
                                     && context.state.surface_cache.current_surface_raw_is_valid())
         ? 1.0f
         : 0.0f;
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_NO_RAW))
+        frag_ublock.use_raw_image = 0.0f;
+    if (renderer::get_program(*context.record.fragment_program.get(mem), mem)->is_frag_color_used())
+        ecv::oracle::gpu::fbfetch_state(frag_program->renderer_data->hash.data(), frag_ublock.use_raw_image,
+            reinterpret_cast<VKFragmentProgram *>(context.record.fragment_program.get(mem)->renderer_data.get())->blending.blendEnable,
+            context.current_color_raw_view != nullptr);
+#endif
     const bool has_msaa = context.render_target->multisample_mode;
     const bool has_downscale = context.record.color_surface.downscale;
     if (has_msaa && !has_downscale)
@@ -666,7 +789,20 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
                 }
             }
             max_index = trapped_buffer->extra;
+#if ECV_ORACLE
+            if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_UB_CHECK) && trapped_buffer->mapped_location && trapped_buffer->size)
+                ecv::oracle::gpu::mirror_check("ib", indices.address(), std::min<uint32_t>(trapped_buffer->size, count * index_size),
+                    trapped_buffer->mapped_location, indices.cast<const uint8_t>().get(mem));
+            if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_MIRROR_VERIFY) && trapped_buffer->size)
+                ecv::oracle::gpu::mirror_note("ib", indices.address(), std::min<uint32_t>(trapped_buffer->size, count * index_size), trapped_buffer->mapped_location);
+#endif
         }
+#if ECV_ORACLE
+        if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_IB_COPY)) {
+            context.index_stream_ring_buffer.allocate(context.prerender_cmd, index_size * count, indices_ptr);
+            context.render_cmd.bindIndexBuffer(context.index_stream_ring_buffer.handle(), context.index_stream_ring_buffer.data_offset, index_type);
+        } else
+#endif
         context.render_cmd.bindIndexBuffer(buffer, offset, index_type);
     } else {
         const size_t index_buffer_size = index_size * count;

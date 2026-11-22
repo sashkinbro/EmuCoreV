@@ -22,6 +22,7 @@
 
 #include <cheat/functions.h>
 #include <config/state.h>
+#include <atomic>
 #include <ctime>
 #include <ctrl/state.h>
 #include <dialog/state.h>
@@ -969,25 +970,36 @@ static std::vector<uint32_t> get_current_app_frame(EmuEnvState &emuenv, uint32_t
 }
 
 void take_screenshot(EmuEnvState &emuenv) {
+    fs::path saved_file;
+    take_screenshot(emuenv, saved_file);
+}
+
+bool take_screenshot(EmuEnvState &emuenv, fs::path &saved_file) {
+    saved_file.clear();
     if (emuenv.cfg.screenshot_format == None)
-        return;
+        return false;
 
     if (emuenv.io.title_id.empty()) {
         LOG_ERROR("Trying to take a screenshot while not ingame");
-        return;
+        return false;
     }
 
     uint32_t width, height;
     auto frame = get_current_app_frame(emuenv, width, height);
     if (frame.empty()) {
         LOG_ERROR("Failed to take screenshot");
-        return;
+        return false;
     }
 
     const fs::path save_folder = emuenv.shared_path / "screenshots" / fmt::format("{}", string_utils::remove_special_chars(emuenv.current_app_title));
     fs::create_directories(save_folder);
 
-    auto t = std::time(nullptr);
+    // Millisecond timestamp plus a process-wide counter: two captures in the same second
+    // (or the same millisecond) must never overwrite each other.
+    static std::atomic<uint32_t> screenshot_counter{ 0 };
+    const auto now = std::chrono::system_clock::now();
+    const auto t = std::chrono::system_clock::to_time_t(now);
+    const auto millis = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000);
     struct tm localtime;
 #ifdef _WIN32
     localtime_s(&localtime, &t);
@@ -996,19 +1008,20 @@ void take_screenshot(EmuEnvState &emuenv) {
 #endif
 
     const auto img_format = emuenv.cfg.screenshot_format == JPEG ? ".jpg" : ".png";
-    const fs::path save_file = save_folder / fmt::format("{}_{:%Y-%m-%d-%H%M%OS}{}", string_utils::remove_special_chars(emuenv.current_app_title), localtime, img_format);
+    const fs::path save_file = save_folder / fmt::format("{}_{:%Y-%m-%d-%H%M%S}-{:03}-{}{}", string_utils::remove_special_chars(emuenv.current_app_title), localtime, millis, screenshot_counter.fetch_add(1), img_format);
     constexpr int quality = 85; // google recommended value
-    if (emuenv.cfg.screenshot_format == JPEG) {
-        if (stbi_write_jpg(fs_utils::path_to_utf8(save_file).c_str(), width, height, 4, frame.data(), quality) == 1)
-            LOG_INFO("Successfully saved screenshot to {}", save_file);
-        else
-            LOG_INFO("Failed to save screenshot");
-    } else {
-        if (stbi_write_png(fs_utils::path_to_utf8(save_file).c_str(), width, height, 4, frame.data(), width * 4) == 1)
-            LOG_INFO("Successfully saved screenshot to {}", save_file);
-        else
-            LOG_INFO("Failed to save screenshot");
+    int written;
+    if (emuenv.cfg.screenshot_format == JPEG)
+        written = stbi_write_jpg(fs_utils::path_to_utf8(save_file).c_str(), width, height, 4, frame.data(), quality);
+    else
+        written = stbi_write_png(fs_utils::path_to_utf8(save_file).c_str(), width, height, 4, frame.data(), width * 4);
+    if (written != 1) {
+        LOG_INFO("Failed to save screenshot");
+        return false;
     }
+    LOG_INFO("Successfully saved screenshot to {}", save_file);
+    saved_file = save_file;
+    return true;
 }
 
 ExitCode load_app(int32_t &main_module_id, EmuEnvState &emuenv) {

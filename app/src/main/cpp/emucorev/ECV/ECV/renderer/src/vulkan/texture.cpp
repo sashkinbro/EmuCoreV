@@ -31,6 +31,9 @@
 #include <renderer/functions.h>
 #include <util/align.h>
 #include <vkutil/vkutil.h>
+#if ECV_ORACLE
+#include <ecv_gpu_trace.h>
+#endif
 
 namespace renderer::vulkan {
 
@@ -120,6 +123,8 @@ void VKTextureCache::cleanup() {
 
 void VKTextureCache::reset() {
     const size_t sampler_cache_size = sampler_queue.items.size();
+    // cleanup() destroys views, images and samplers immediately: wait for submitted work using them
+    state.device.waitIdle();
     cleanup();
     texture_lookup.clear();
     texture_queue.init(TextureCacheSize);
@@ -152,6 +157,9 @@ void sync_texture(VKContext &context, MemState &mem, std::size_t index, SceGxmTe
     // so start a new recording right now if the macroblock has changed
     context.check_for_macroblock_change(false);
 
+#if ECV_ORACLE
+    ecv::oracle::gpu::tex_begin();
+#endif
     bool is_vertex = index >= SCE_GXM_MAX_TEXTURE_UNITS;
 
     const SceGxmTextureFormat format = gxm::get_format(texture);
@@ -183,12 +191,18 @@ void sync_texture(VKContext &context, MemState &mem, std::size_t index, SceGxmTe
         lookup_result = context.state.surface_cache.retrieve_color_surface_as_texture(texture, format_target_of_texture, &texture_viewport);
     }
 
+#if ECV_ORACLE
+    const bool oracle_color_hit = lookup_result.has_value();
+#endif
     bool is_depth_surface = false;
     if (!lookup_result.has_value() && !texture_is_cube && is_depth_stencil_compatible_format(base_format, is_depth_surface)) {
         // Try to retrieve depth/stencil cache
         lookup_result = context.state.surface_cache.retrieve_depth_stencil_as_texture(texture, &texture_viewport);
     }
 
+#if ECV_ORACLE
+    const int oracle_source = oracle_color_hit ? 2 : (lookup_result.has_value() ? 3 : 1);
+#endif
     if (lookup_result.has_value()) {
         const bool needs_nearest = !context.state.texture_cache.format_supports_linear_filter(lookup_result->format);
         context.state.texture_cache.cache_and_bind_sampler(texture, needs_nearest);
@@ -236,6 +250,12 @@ void sync_texture(VKContext &context, MemState &mem, std::size_t index, SceGxmTe
         context.curr_frag_ublock.set_cast_sampler_bit(index, lookup_result->is_typeless_cast, lookup_result->cast_phase_hi);
         context.curr_frag_ublock.set_raw_cast_bit(index, lookup_result->is_raw_bits);
     }
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::tex_bind(static_cast<uint32_t>(index), texture, oracle_source,
+            oracle_source != 1 && context.state.features.use_texture_viewport,
+            texture_viewport.ratio.first, texture_viewport.ratio.second, texture_viewport.offset.first, texture_viewport.offset.second);
+#endif
 }
 
 void VKTextureCache::prepare_staging_buffer(bool is_configure) {
@@ -263,6 +283,24 @@ void VKTextureCache::prepare_staging_buffer(bool is_configure) {
         && staging_buffer->scene_timestamp > last_waited_scene;
     const vk::Fence current_fence = context->next_fence;
 
+    // Bounded wait: re-check the abort flag every 100 ms so a lost device or a shutdown cannot hang the
+    // render thread. A real failure raises a fatal renderer error instead of leaving the texture empty.
+    // Returns false when the caller must give up (aborted or failed).
+    auto wait_for_fence = [&](vk::Fence fence) {
+        vk::Result result;
+        do {
+            result = state.device.waitForFences(fence, VK_TRUE, 100'000'000ULL);
+            if (result == vk::Result::eTimeout && state.render_abort.load(std::memory_order_relaxed))
+                return false;
+        } while (result == vk::Result::eTimeout);
+        if (result != vk::Result::eSuccess) {
+            LOG_ERROR("Could not wait for fences: {}", vk::to_string(result));
+            state.signal_fatal_error("texture staging waitForFences failed: " + vk::to_string(result), result == vk::Result::eErrorDeviceLost);
+            return false;
+        }
+        return true;
+    };
+
     if (need_wait) {
         if (staging_buffer->scene_timestamp == current_scene_timestamp) {
             assert(current_fence == staging_buffer->waiting_fence);
@@ -276,12 +314,8 @@ void VKTextureCache::prepare_staging_buffer(bool is_configure) {
             state.general_queue.submit(submit_info, current_fence);
             context->cmdbuffers_to_submit.clear();
 
-            auto result = state.device.waitForFences(current_fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
-            if (result != vk::Result::eSuccess) {
-                LOG_ERROR("Could not wait for fences.");
-                assert(false);
+            if (!wait_for_fence(current_fence))
                 return;
-            }
             state.device.resetFences(current_fence);
 
             // also call begin again on the prerender command
@@ -297,12 +331,8 @@ void VKTextureCache::prepare_staging_buffer(bool is_configure) {
             }
         } else {
             // wait for the fence, but don't reset it
-            auto result = state.device.waitForFences(staging_buffer->waiting_fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
-            if (result != vk::Result::eSuccess) {
-                LOG_ERROR("Could not wait for fences.");
-                assert(false);
+            if (!wait_for_fence(staging_buffer->waiting_fence))
                 return;
-            }
             last_waited_scene = staging_buffer->scene_timestamp;
         }
     }
@@ -622,6 +652,9 @@ void VKTextureCache::upload_texture_impl(SceGxmTextureBaseFormat base_format, ui
 
     if (staging_buffer.used_so_far + upload_size > staging_buffer.buffer.size) {
         LOG_ERROR("Staging buffer size left ({}) is too small for texture size {}!", staging_buffer.buffer.size - staging_buffer.used_so_far, upload_size);
+#if ECV_ORACLE
+        ecv::oracle::gpu::tex_upload_fail(static_cast<uint32_t>(staging_buffer.buffer.size - staging_buffer.used_so_far), upload_size, mip_index, width, height);
+#endif
         return;
     }
 
@@ -648,6 +681,9 @@ void VKTextureCache::upload_texture_impl(SceGxmTextureBaseFormat base_format, ui
 void VKTextureCache::upload_done() {
     if (!is_texture_transfer_ready) {
         LOG_ERROR_ONCE("Texture upload produced no data (see preceding texture errors) - skipping layout transition");
+#if ECV_ORACLE
+        ecv::oracle::gpu::tex_upload_nodata();
+#endif
         return;
     }
 

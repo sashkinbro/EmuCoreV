@@ -99,14 +99,15 @@ SurfaceCacheImageSnapshot capture_image(vkutil::Image &image, const vk::ImageUsa
 }
 
 bool make_image(VKState &state, const SurfaceCacheImageSnapshot &snapshot,
-    const vkutil::ImageSnapshotDevice &device, vkutil::Image &image, std::string &error) {
+    const vkutil::ImageSnapshotDevice &device, vkutil::Image &image, std::string &error,
+    const vk::ImageUsageFlags extra_usage = {}) {
     if (!snapshot.present)
         return true;
     image = vkutil::Image(snapshot.image.width, snapshot.image.height, snapshot.image.format);
     static const vk::Format rgba8_views[] = { vk::Format::eR8G8B8A8Unorm, vk::Format::eR8G8B8A8Srgb };
     const vk::ImageFormatListCreateInfoKHR format_list{ .viewFormatCount = 2, .pViewFormats = rgba8_views };
     const void *p_next = snapshot.rgba8_format_list ? &format_list : nullptr;
-    image.init_image(snapshot.usage, snapshot.mapping, snapshot.create_flags, p_next);
+    image.init_image(snapshot.usage | extra_usage, snapshot.mapping, snapshot.create_flags, p_next);
     return vkutil::restore_image_snapshot(device, image, snapshot.image, error);
 }
 
@@ -221,7 +222,7 @@ bool capture_color(ColorSurfaceCacheInfo &info, ColorSurfaceSnapshot &out,
     if (info.raw_image) {
         out.raw_image = capture_image(*info.raw_image,
             vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eColorAttachment
-                | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc,
+                | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc,
             vk::ImageCreateFlagBits::eMutableFormat, false, vkutil::default_comp_mapping, device, aggregate_bytes, error);
         if (!error.empty())
             return false;
@@ -308,11 +309,14 @@ struct SurfaceCacheSnapshotAccess {
             const auto &entry = snapshot.colors[i];
             if (!entry.active)
                 continue;
-            if (!make_image(state, entry.texture, device, color_images[i], error))
+            // framebuffer-fetch emulation binds colour surfaces (and their raw views) as
+            // input attachments; states saved by older builds may lack that usage
+            constexpr auto input = vk::ImageUsageFlagBits::eInputAttachment;
+            if (!make_image(state, entry.texture, device, color_images[i], error, input))
                 return false;
             if (entry.raw_image.present) {
                 raw_images[i] = std::make_unique<vkutil::Image>();
-                if (!make_image(state, entry.raw_image, device, *raw_images[i], error))
+                if (!make_image(state, entry.raw_image, device, *raw_images[i], error, input))
                     return false;
             }
         }

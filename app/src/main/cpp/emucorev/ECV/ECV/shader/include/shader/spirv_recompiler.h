@@ -18,6 +18,8 @@
 #pragma once
 
 #include <gxm/types.h>
+#include <shader/hints.h>
+#include <shader/usse_translator_entry.h>
 #include <shader/usse_translator_types.h>
 #include <shader/usse_types.h>
 
@@ -31,7 +33,7 @@ namespace shader {
 static constexpr int COLOR_ATTACHMENT_TEXTURE_SLOT_IMAGE = 0;
 static constexpr int MASK_TEXTURE_SLOT_IMAGE = 1;
 static constexpr int COLOR_ATTACHMENT_RAW_TEXTURE_SLOT_IMAGE = 3;
-static constexpr uint32_t CURRENT_VERSION = 27;
+static constexpr uint32_t CURRENT_VERSION = 29; // 28: shader module keys cover every Hints field the recompiler reads; 29: native-colour o0 register layout, raw f16 register moves
 // fragment shader using the rendering surface as a storage image (because of shader interlock) have a line
 // layout (constant_id = GAMMA_CORRECTION_SPECIALIZATIO_ID) const bool is_srgb = false;
 // Setting this constant to true performs gamma correction in the shader
@@ -43,34 +45,11 @@ enum struct Target {
     SpirVVulkan
 };
 
-// Hints given while compiling the shader
-// For example, the gxp shader knows at runtime the swizzle of the color surface
-// or the format / number of components of the sampled images, but we can't
-struct Hints {
-    // used when symbols are stripped
-    // also used when scaled attribute formats are not supported and conversion must be done in the shader
-    const std::vector<SceGxmVertexAttribute> *attributes;
-    // color format of the surface, used for the opengl renderer when the GPU does not support features.support_unknown_format
-    // I'm asking for the format instead of the base format as the swizzle might be used in future updates for surfaces with only 1 or 2 components
-    SceGxmColorFormat color_format;
-
-    // we need to have the texture formats of the sampled textures in two cases:
-    // - when doing dependent texture queries with unknown format we need to know the format
-    // - when sampling, we need to know the component count of a texture
-    SceGxmTextureFormat vertex_textures[SCE_GXM_MAX_TEXTURE_UNITS];
-    SceGxmTextureFormat fragment_textures[SCE_GXM_MAX_TEXTURE_UNITS];
-
-    // The F16 raw alias is input attachment1 on Vulkan subpass fetch.
-    bool raw_color_attachment_input = false;
-
-    // Vulkan must not statically declare inputs absent from the paired vertex
-    // shader, even when a runtime iterator mask selects their fallback value.
-    uint32_t vertex_output_mask = 0xFFFFFFFFu;
-};
-
 struct GeneratedShader {
     std::string glsl;
     usse::SpirvCode spirv;
+    // USSE instructions the translator dropped (counted in every build type, 0 = fully translated)
+    usse::UsseTranslationStats usse_stats;
 };
 
 // Dump generated SPIR-V disassembly up to this point

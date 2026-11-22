@@ -25,6 +25,9 @@
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/types.h>
 #include <vkutil/vkutil.h>
+#if ECV_ORACLE
+#include <ecv_gpu_trace.h>
+#endif
 
 #include <vulkan/vulkan_format_traits.hpp>
 
@@ -154,11 +157,18 @@ void VKSurfaceCache::destroy_framebuffers(vk::ImageView view) {
 void VKSurfaceCache::record_pending_cast(PendingCast &cast, VKContext &context) {
     const bool pre_scene = cast.info->last_scene_rendered == context.scene_timestamp && context.scene_has_drawn
         && !context.scene_macroblock_flushed;
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::cast(pre_scene ? "RECORD_PRE" : "RECORD_MID", cast.info->data.address(), 0, 0, 0, 0, false, cast.info->last_scene_rendered);
+#endif
     if (pre_scene) {
         cast.record(context.prerender_cmd);
         return;
     }
 
+#if ECV_ORACLE
+    ecv::oracle::gpu::rp_reason("cast_copy");
+#endif
     if (context.in_renderpass)
         context.stop_render_pass();
 
@@ -287,6 +297,9 @@ VKSurfaceCache::VKSurfaceCache(VKState &state)
 }
 
 void VKSurfaceCache::reset() {
+    // cleanup() destroys views, images and framebuffers immediately; the render thread may
+    // still have submitted work (and descriptor sets) referencing them
+    state.device.waitIdle();
     cleanup();
     color_address_lookup.clear();
     depth_address_lookup.clear();
@@ -590,6 +603,11 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
             surface_stat_changed = surface_extent_changed || info.width < width || base_format != info.format;
 
         const bool invalidated = cache_probably_freed || surface_stat_changed || !addr_in_range_of_cache;
+#if ECV_ORACLE
+        if (ecv::oracle::gpu::enabled())
+            ecv::oracle::gpu::rt_surface("INVALIDATE", ite->first, info.total_bytes, info.original_width, info.original_height,
+                static_cast<uint32_t>(info.format), info.stride_bytes, static_cast<uint32_t>(info.tiling), *info.dirty, false, info.last_frame_rendered);
+#endif
         if (invalidated) {
             destroy_surface(info);
             color_address_lookup.erase(ite);
@@ -603,6 +621,10 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
                 info.rendered_h = static_cast<uint16_t>(std::max<uint32_t>(info.rendered_h, std::min<uint32_t>(info.original_height, rt_h)));
             }
 
+#if ECV_ORACLE
+            const bool oracle_was_dirty = info.data && *info.dirty;
+            const uint64_t oracle_prev_lfr = info.last_frame_rendered;
+#endif
             if (info.data && *info.dirty) {
                 try_upload_guest_content(info, mem);
                 protect_surface(mem, info);
@@ -611,6 +633,11 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
 
             last_written_surface = &info;
 
+#if ECV_ORACLE
+            if (ecv::oracle::gpu::enabled())
+                ecv::oracle::gpu::rt_surface("REUSE", ite->first, info.total_bytes, info.original_width, info.original_height,
+                    static_cast<uint32_t>(info.format), info.stride_bytes, static_cast<uint32_t>(info.tiling), oracle_was_dirty, oracle_was_dirty, oracle_prev_lfr);
+#endif
             // if this surface has not been rendered to for the last 60 frames, consider it is not safe not to render all shaders to it
             constexpr uint64_t big_delay_between_frames = 60;
             state.pipeline_cache.can_use_deferred_compilation = context->frame_timestamp - info.last_frame_rendered < big_delay_between_frames;
@@ -724,6 +751,11 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
     if (info_added.data && original_width >= 1024 && original_height >= 1024) {
         try_upload_guest_content(info_added, mem);
     }
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::rt_surface("NEW", address, total_surface_size, original_width, original_height, static_cast<uint32_t>(base_format),
+            bytes_per_stride, static_cast<uint32_t>(tiling), false, info_added.data && original_width >= 1024 && original_height >= 1024, 0);
+#endif
 
     if (state.features.preserve_f16_nan_as_u16 && base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16) {
         info_added.raw_image = std::make_unique<vkutil::Image>(width, height, vk::Format::eR16G16B16A16Uint);
@@ -820,6 +852,15 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
         return std::nullopt;
     }
 
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled()) {
+        const ColorSurfaceCacheInfo &oracle_info = *ite->second;
+        ecv::oracle::gpu::tex_surface_candidate(ite->first, oracle_info.total_bytes, oracle_info.width, oracle_info.height,
+            oracle_info.original_width, oracle_info.original_height, static_cast<uint32_t>(oracle_info.format), oracle_info.stride_bytes,
+            static_cast<uint32_t>(oracle_info.tiling), *oracle_info.dirty, oracle_info.last_frame_rendered, oracle_info.last_scene_rendered,
+            oracle_info.need_surface_sync && *oracle_info.need_surface_sync, address - ite->first);
+    }
+#endif
     if (*ite->second->dirty && ite->second->last_frame_rendered + 2 <= reinterpret_cast<VKContext *>(state.context)->frame_timestamp) {
         return std::nullopt;
     }
@@ -908,7 +949,11 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
     const vk::ImageView color_handle_view = reinterpret_cast<VKContext *>(state.context)->current_color_view;
     const bool is_same_image = (color_handle_view == info.texture.view) || (color_handle_view == info.alternate_view);
 
-    if (state.features.use_texture_viewport && base_format == info.format) {
+    bool oracle_force_color_copy = false;
+#if ECV_ORACLE
+    oracle_force_color_copy = ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_COLOR_COPY);
+#endif
+    if (state.features.use_texture_viewport && base_format == info.format && !oracle_force_color_copy) {
         // use a texture viewport
         *texture_viewport = {
             .ratio = {
@@ -956,7 +1001,7 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
         && texture.min_filter == SCE_GXM_TEXTURE_FILTER_POINT
         && texture.mag_filter == SCE_GXM_TEXTURE_FILTER_POINT;
 
-    if (is_same_image || (start_sourced_line != 0) || (start_x != 0) || (info.width != width) || (info.height != height) || (info.format != base_format) || non_integer_downsample) {
+    if (oracle_force_color_copy || is_same_image || (start_sourced_line != 0) || (start_x != 0) || (info.width != width) || (info.height != height) || (info.format != base_format) || non_integer_downsample) {
         const uint64_t scene_timestamp = reinterpret_cast<VKContext *>(state.context)->scene_timestamp;
 
         std::vector<CastedTexture> &casted_vec = info.casted_textures;
@@ -969,6 +1014,10 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
                 casted = &casted_vec[i];
 
                 if (casted->scene_timestamp == scene_timestamp) {
+#if ECV_ORACLE
+                    if (ecv::oracle::gpu::enabled())
+                        ecv::oracle::gpu::cast("REUSE_SCENE", info.data.address(), start_x, start_sourced_line, width, height, is_same_image, casted->scene_timestamp);
+#endif
                     // already copied (or copy pending) for this scene, don't do it again
                     const bool base_is_srgb = casted->texture.format == vk::Format::eR8G8B8A8Srgb;
                     const bool use_alt_view = casted->alt_gamma_view && (is_srgb != base_is_srgb);
@@ -1090,6 +1139,10 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
             }
         }
 
+#if ECV_ORACLE
+        if (ecv::oracle::gpu::enabled())
+            ecv::oracle::gpu::cast(casted_is_new ? "NEW" : "PENDING", info.data.address(), start_x, start_sourced_line, width, height, is_same_image, scene_timestamp);
+#endif
         casted->scene_timestamp = scene_timestamp;
 
         const size_t casted_index = static_cast<size_t>(casted - casted_vec.data());
@@ -1775,7 +1828,11 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_tex
         && delta_col_samples == 0
         && delta_row_samples == 0;
 
-    if (!reading_ds_attachment && (state.features.use_texture_viewport || same_dimension)) {
+    bool oracle_force_ds_copy = false;
+#if ECV_ORACLE
+    oracle_force_ds_copy = ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_DS_COPY);
+#endif
+    if (!reading_ds_attachment && !oracle_force_ds_copy && (state.features.use_texture_viewport || same_dimension)) {
         // we can just sample from the surface itself
 
         // we must create a new read-only view if it is not already present
@@ -1916,6 +1973,11 @@ Framebuffer &VKSurfaceCache::retrieve_framebuffer_handle(MemState &mem, SceGxmCo
     if (!color && !depth_stencil)
         LOG_ERROR_ONCE("Depth stencil and color surface are both null!");
 
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled() && color)
+        ecv::oracle::gpu::rt_begin(color->data.address(), color->width, color->height, color->strideInPixels,
+            static_cast<uint32_t>(color->colorFormat), static_cast<uint32_t>(color->surfaceType), depth_stencil ? depth_stencil->depth_data.address() : 0);
+#endif
     // might get modified by retrieve_color_surface_for_framebuffer
     state.pipeline_cache.can_use_deferred_compilation = true;
 
@@ -2012,6 +2074,15 @@ std::map<Address, ColorSurfaceCacheInfo *>::iterator VKSurfaceCache::find_color_
     return contains(it) ? it : color_address_lookup.end();
 }
 
+void VKSurfaceCache::mark_guest_range_written(Address first, Address end) {
+    for (auto &[address, info] : color_address_lookup) {
+        if (address >= end)
+            break;
+        if (info->dirty && static_cast<uint64_t>(address) + info->total_bytes > first)
+            *info->dirty = true;
+    }
+}
+
 bool VKSurfaceCache::check_for_surface(MemState &mem, Address source_address, CallbackRequestFunction &callback, Address target_address, uint32_t source_size) {
     if (!state.features.enable_memory_mapping || state.disable_surface_sync)
         return false;
@@ -2040,6 +2111,10 @@ bool VKSurfaceCache::check_for_surface(MemState &mem, Address source_address, Ca
     if (surface.last_frame_rendered + MAX_FRAMES_RENDERING <= context.frame_timestamp)
         return false;
 
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::surf_sync_request("cpu_read", surface.data.address(), source_size);
+#endif
     // we found something
     if (!*surface.need_surface_sync) {
         // first send the command to sync the surface with the GPU
@@ -2100,6 +2175,10 @@ bool VKSurfaceCache::check_for_surface(MemState &mem, Address source_address, Ca
 void VKSurfaceCache::submit_immediate_surface_sync(ColorSurfaceCacheInfo &surface, MemState *mem, Address sync_addr, uint32_t sync_size) {
     VKContext &context = *static_cast<VKContext *>(state.context);
 
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::surf_sync_request(mem ? "immediate_cpu" : "immediate_gpu", surface.data.address(), sync_size);
+#endif
     // first send the command to sync the surface with the GPU
     *surface.need_surface_sync = true;
 
@@ -2488,6 +2567,11 @@ ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {
     last_written_surface->post_sync_width = sync_w;
     last_written_surface->post_sync_height = sync_h;
     last_written_surface->partial_write_back = partial_scene_sync;
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::surf_sync_gpu(last_written_surface->data.address(), last_written_surface->total_bytes,
+            static_cast<uint32_t>(last_written_surface->format), sync_x0, sync_y0, sync_w, sync_h, partial_scene_sync);
+#endif
 
     cmd_buffer.copyImageToBuffer(image_to_copy, image_layout, buffer, copy);
 
@@ -2556,6 +2640,11 @@ static void swizzle_text_T(T *pixels, uint32_t nb_pixel, ColorSurfaceCacheInfo *
 void VKSurfaceCache::perform_post_surface_sync(const MemState &mem, ColorSurfaceCacheInfo *surface) {
     if (surface == nullptr)
         return;
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::surf_writeback(surface->data.address(), surface->total_bytes, static_cast<uint32_t>(surface->format),
+            surface->post_sync_x0, surface->post_sync_y0, surface->post_sync_width, surface->post_sync_height);
+#endif
 
     const uint32_t pixel_stride = (surface->stride_bytes * 8) / gxm::bits_per_pixel(surface->format);
     const uint32_t nb_pixels = pixel_stride * surface->original_height;

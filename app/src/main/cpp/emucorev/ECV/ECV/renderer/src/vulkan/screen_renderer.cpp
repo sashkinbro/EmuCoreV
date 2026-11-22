@@ -415,7 +415,9 @@ void ScreenRenderer::cleanup() {
     surface = nullptr;
 }
 
-static constexpr uint64_t next_image_timeout = std::numeric_limits<uint64_t>::max();
+// Bounded so a stalled presentation engine cannot block the render thread forever: the waits below
+// are retried until they succeed or the session is aborted.
+static constexpr uint64_t next_image_timeout = 100'000'000ULL; // 100 ms
 
 bool ScreenRenderer::acquire_swapchain_image() {
     if (!window_has_drawable_size(state)) {
@@ -437,9 +439,13 @@ bool ScreenRenderer::acquire_swapchain_image() {
         return false;
     }
 
-    if (swapchain)
-        acquire_result = state.device.acquireNextImageKHR(swapchain,
-            next_image_timeout, image_acquired_semaphores[current_frame], vk::Fence(), &swapchain_image_idx);
+    if (swapchain) {
+        do {
+            acquire_result = state.device.acquireNextImageKHR(swapchain,
+                next_image_timeout, image_acquired_semaphores[current_frame], vk::Fence(), &swapchain_image_idx);
+            // a timeout leaves the semaphore unsignaled, so retrying with it is valid
+        } while (acquire_result == vk::Result::eTimeout && !state.render_abort.load(std::memory_order_relaxed));
+    }
 
     const bool has_acquired_image = acquire_result == vk::Result::eSuccess || acquire_result == vk::Result::eSuboptimalKHR;
     if (!has_acquired_image) {
@@ -468,9 +474,20 @@ bool ScreenRenderer::acquire_swapchain_image() {
     }
 
     // wait for the previous frame using this image to finish
-    auto result = state.device.waitForFences(fences[swapchain_image_idx], VK_TRUE, next_image_timeout);
+    vk::Result result;
+    do {
+        result = state.device.waitForFences(fences[swapchain_image_idx], VK_TRUE, next_image_timeout);
+    } while (result == vk::Result::eTimeout && !state.render_abort.load(std::memory_order_relaxed));
     if (result != vk::Result::eSuccess) {
-        LOG_ERROR("Could not wait for fences.");
+        if (result != vk::Result::eTimeout)
+            LOG_ERROR("Could not wait for fences: {}", vk::to_string(result));
+        // The image was acquired and its semaphore is signaled but will never be waited on. Reusing that
+        // semaphore (or the frame index) would signal it twice, so drop the whole swapchain: it is
+        // rebuilt (images and semaphores recreated) before the next acquire.
+        need_rebuild = true;
+        rebuild_reason = "acquire: fence wait failed";
+        current_cmd_buffer = nullptr;
+        swapchain_image_idx = 0xDEADBEAF;
         return false;
     }
     state.device.resetFences(fences[swapchain_image_idx]);

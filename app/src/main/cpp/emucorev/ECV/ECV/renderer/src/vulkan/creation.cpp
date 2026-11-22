@@ -56,6 +56,10 @@ VKContext::VKContext(VKState &state, MemState &mem)
     if (state.features.enable_memory_mapping) {
         // use the default buffer
         std::fill_n(vertex_stream_buffers, SCE_GXM_MAX_VERTEX_STREAMS, state.default_buffer.buffer);
+#if ECV_ORACLE
+        vertex_stream_ring_buffer.create(); // debug A/B: per-draw vertex copies (dbg-vb-copy)
+        index_stream_ring_buffer.create(); // debug A/B: per-draw index copies (dbg-ib-copy)
+#endif
 
         // also initialize the gpu wait thread
         gpu_request_wait_thread = std::thread(&VKContext::wait_thread_function, this, std::ref(mem));
@@ -169,6 +173,12 @@ VKRenderTarget::VKRenderTarget(VKState &state, const SceGxmRenderTargetParams &p
     height = static_cast<uint32_t>(params.height * state.res_multiplier);
     base_width = width;
     base_height = height;
+    guest_width = params.width;
+    guest_height = params.height;
+    if (params.flags & SCE_GXM_RENDER_TARGET_MACROTILE_SYNC) {
+        macroblocks_x = (params.flags >> 8) & 0b111;
+        macroblocks_y = (params.flags >> 12) & 0b111;
+    }
 
     vk::ImageUsageFlags color_usage = vk::ImageUsageFlagBits::eColorAttachment
         | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst;
@@ -213,6 +223,55 @@ VKRenderTarget::VKRenderTarget(VKState &state, const SceGxmRenderTargetParams &p
 
         buffer_info.commandPool = state.frames[i].prerender_pool;
         pre_cmd_buffers[i] = state.device.allocateCommandBuffers(buffer_info);
+    }
+}
+
+void VKRenderTarget::prepare_resize(VKState &state, float multiplier, ResizedImages &out) const {
+    const uint32_t scaled_width = static_cast<uint32_t>(guest_width * multiplier);
+    const uint32_t scaled_height = static_cast<uint32_t>(guest_height * multiplier);
+
+    ResizedImages images;
+    images.width = static_cast<uint16_t>(scaled_width);
+    images.height = static_cast<uint16_t>(scaled_height);
+    images.color = vkutil::Image(scaled_width, scaled_height, vk::Format::eR8G8B8A8Unorm);
+    images.depthstencil = vkutil::Image(scaled_width, scaled_height, depthstencil.format);
+
+    // same usage as the constructor
+    vk::ImageUsageFlags color_usage = vk::ImageUsageFlagBits::eColorAttachment
+        | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst;
+    if (state.features.support_shader_interlock)
+        color_usage |= vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eStorage;
+    else
+        color_usage |= vk::ImageUsageFlagBits::eInputAttachment;
+    images.color.init_image(color_usage);
+    if (multisample_mode == SCE_GXM_MULTISAMPLE_4X) {
+        images.depthstencil.width *= 2;
+        images.depthstencil.height *= 2;
+    }
+    images.depthstencil.init_image(vk::ImageUsageFlagBits::eDepthStencilAttachment
+        | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst);
+
+    vk::CommandBuffer cmd_buffer = vkutil::create_single_time_command(state.device, state.general_command_pool);
+    images.color.transition_to_discard(cmd_buffer, vkutil::ImageLayout::ColorAttachmentReadWrite);
+    images.depthstencil.transition_to_discard(cmd_buffer, vkutil::ImageLayout::DepthStencilAttachment, vkutil::ds_subresource_range);
+    vkutil::end_single_time_command(state.device, state.general_queue, state.general_command_pool, cmd_buffer);
+
+    out = std::move(images);
+}
+
+void VKRenderTarget::commit_resize(float multiplier, ResizedImages &&images) {
+    // move assignment only overwrites: release the previous images explicitly
+    color.destroy();
+    depthstencil.destroy();
+    color = std::move(images.color);
+    depthstencil = std::move(images.depthstencil);
+    width = images.width;
+    height = images.height;
+    base_width = images.width;
+    base_height = images.height;
+    if (has_macroblock_sync && macroblocks_x && macroblocks_y) {
+        macroblock_width = static_cast<uint16_t>((guest_width / macroblocks_x) * multiplier);
+        macroblock_height = static_cast<uint16_t>((guest_height / macroblocks_y) * multiplier);
     }
 }
 

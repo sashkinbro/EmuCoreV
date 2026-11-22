@@ -38,6 +38,10 @@
 #include <util/log.h>
 #include <util/tracy.h>
 
+#if ECV_ORACLE
+#include <ecv_frame_capture.h> // oracle: GXM frame capture (debug builds only)
+#endif
+
 namespace renderer {
 
 static void layout_ssbo_offset_from_uniform_buffer_sizes(UniformBufferSizes &sizes, UniformBufferSizes &offsets, std::size_t &total_hold) {
@@ -286,6 +290,9 @@ bool create(std::unique_ptr<FragmentProgram> &fp, State &state, const SceGxmProg
 
     // Try to hash this shader
     fp->hash = sha256(&program, program.size);
+#if ECV_ORACLE
+    ecv::oracle::fcap::note_fragment_program(fp.get(), blend);
+#endif
     gxp_ptr_map.emplace(fp->hash, &program);
 
     fp->buffer_count = shader::usse::get_uniform_buffer_sizes(program, fp->uniform_buffer_sizes);

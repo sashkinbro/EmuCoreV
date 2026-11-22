@@ -48,6 +48,9 @@
 // with a known size
 #define XXH_INLINE_ALL
 #include <xxhash.h>
+#if ECV_ORACLE
+#include <ecv_gpu_trace.h>
+#endif
 
 namespace renderer::vulkan {
 
@@ -417,8 +420,11 @@ void PipelineCache::cleanup() {
 
     {
         std::lock_guard<std::mutex> guard(shaders_mutex);
-        for (auto &[hash, shader] : shaders)
-            state.device.destroy(shader);
+        for (auto &[hash, gate] : shaders) {
+            vk::ShaderModule shader;
+            if (gate.try_get(shader))
+                state.device.destroy(shader);
+        }
         shaders.clear();
     }
 
@@ -490,11 +496,11 @@ static const vk::SpecializationInfo srgb_info_false = {
 };
 
 vk::PipelineShaderStageCreateInfo PipelineCache::retrieve_shader(const SceGxmProgram *program, const Sha256Hash &hash, bool is_vertex, bool maskupdate, MemState &mem, const shader::Hints &hints, bool is_srgb) {
-    const auto variant_hash = is_vertex ? hash : fragment_shader_variant_hash(hash, hints.color_format, hints.raw_color_attachment_input, hints.vertex_output_mask);
+    // The module identity covers everything convert_gxp reads (see vulkan_shader_variant_key_bytes)
+    const uint32_t used_textures_mask = static_cast<uint32_t>(gxp::get_textures_used(*program).to_ulong());
+    const auto variant_hash = vulkan_shader_variant_hash(hash, is_vertex, hints, used_textures_mask, maskupdate);
     if (maskupdate)
         LOG_WARN_ONCE("Mask not implemented in the vulkan renderer!");
-
-    const vk::ShaderModule shader_compiling = std::bit_cast<vk::ShaderModule>(~0ULL);
 
     const vk::SpecializationInfo *spec_info = nullptr;
     if (!is_vertex && state.features.should_use_shader_interlock() && program->is_frag_color_used()) {
@@ -502,73 +508,83 @@ vk::PipelineShaderStageCreateInfo PipelineCache::retrieve_shader(const SceGxmPro
         spec_info = is_srgb ? &srgb_info_true : &srgb_info_false;
     }
 
-    vk::ShaderModule *shader_module;
-    {
-        // look if it is in the cache
-        std::unique_lock<std::mutex> lock(shaders_mutex);
-        shader_module = &shaders.insert({ variant_hash, nullptr }).first->second;
-        if (*shader_module == shader_compiling) {
-            // another thread is compiling the same exact shader at the same time
-            // it's no use re-compiling it, so just wait for the other thread being done
-            lock.unlock();
-
-            // we shouldn't need atomics and the compiler shouldn't be able to optimize this
-            while (*shader_module == shader_compiling)
-                std::this_thread::yield();
-        }
-
-        if (*shader_module == nullptr)
-            // now mark the shader as compiling so that other threads accessing it won't try to compile it a second time
-            *shader_module = shader_compiling;
-    }
-
-    if (*shader_module == shader_compiling) {
-        precompile_shader(variant_hash, false);
-    }
-
-    if (*shader_module != shader_compiling) {
-        vk::PipelineShaderStageCreateInfo shader_stage_info{
+    // a null module means the shader could not be built, the caller must fail the pipeline
+    const auto make_stage = [&](vk::ShaderModule module) {
+        return vk::PipelineShaderStageCreateInfo{
             .stage = is_vertex ? vk::ShaderStageFlagBits::eVertex : vk::ShaderStageFlagBits::eFragment,
-            .module = *shader_module,
+            .module = module,
             .pName = is_vertex ? "main_vs" : "main_fs",
             .pSpecializationInfo = spec_info,
         };
-        return shader_stage_info;
-    }
-
-    const std::string hash_text = hex_string(variant_hash);
-
-    LOG_INFO("Generating vulkan spv shader {}", hash_text);
-    const std::string shader_version = fmt::format("vk{}", shader::CURRENT_VERSION);
-
-    shader::usse::SpirvCode source = load_spirv_shader(*program, state.features, true, hints, maskupdate, state.shaders_path, state.shaders_log_path, shader_version, true);
-
-    vk::ShaderModuleCreateInfo shader_info{
-        .codeSize = sizeof(uint32_t) * source.size(),
-        .pCode = source.data()
     };
 
-    *shader_module = state.device.createShaderModule(shader_info);
+    CompileGate<vk::ShaderModule> *gate;
     {
-        std::lock_guard<std::mutex> guard(shaders_mutex);
-        // Save shader cache hashes
-        // vertex and fragment shaders are not linked together so no need to associate them
-        Sha256Hash empty_hash{};
-        if (is_vertex) {
-            state.shaders_cache_hashs.push_back({ hash, empty_hash });
-        } else {
-            state.shaders_cache_hashs.push_back({ empty_hash, variant_hash });
+        // the map is only protected by shaders_mutex, the entries by their own gate
+        std::lock_guard<std::mutex> lock(shaders_mutex);
+        gate = &shaders.try_emplace(variant_hash).first->second;
+    }
+    // another thread may be compiling the same exact shader at the same time
+    // it's no use re-compiling it, so wait (blocking, not spinning) for the other thread being done
+    const auto acquired = gate->acquire();
+    if (acquired.status == CompileGate<vk::ShaderModule>::Status::Failed)
+        return make_stage(nullptr);
+    if (acquired.status == CompileGate<vk::ShaderModule>::Status::Ready)
+        return make_stage(acquired.value);
+
+    // We own the gate: whatever happens it must be released, or waiters would block forever
+    vk::ShaderModule module = nullptr;
+    bool permanent_failure = false;
+    try {
+        // precompiled on disk?
+        module = load_cached_shader_module(variant_hash);
+
+        if (!module) {
+            const std::string hash_text = hex_string(variant_hash);
+
+            LOG_INFO("Generating vulkan spv shader {}", hash_text);
+            const std::string shader_version = fmt::format("vk{}", shader::CURRENT_VERSION);
+
+            shader::usse::SpirvCode source = load_spirv_shader(*program, state.features, true, hints, maskupdate, state.shaders_path, state.shaders_log_path, shader_version, true);
+
+            if (source.empty()) {
+                LOG_ERROR("Vulkan shader {} generated no SPIR-V", hash_text);
+                permanent_failure = true;
+            } else {
+                vk::ShaderModuleCreateInfo shader_info{
+                    .codeSize = sizeof(uint32_t) * source.size(),
+                    .pCode = source.data()
+                };
+
+                module = state.device.createShaderModule(shader_info);
+
+                std::lock_guard<std::mutex> guard(shaders_mutex);
+                // Save shader cache hashes
+                // vertex and fragment shaders are not linked together so no need to associate them
+                Sha256Hash empty_hash{};
+                if (is_vertex) {
+                    state.shaders_cache_hashs.push_back({ variant_hash, empty_hash });
+                } else {
+                    state.shaders_cache_hashs.push_back({ empty_hash, variant_hash });
+                }
+            }
         }
+    } catch (const vk::SystemError &e) {
+        // device errors (out of memory, device lost...) may be transient: let a later request retry
+        LOG_ERROR("Could not create the vulkan shader module {}: {}", hex_string(variant_hash), e.what());
+        module = nullptr;
+    } catch (const std::exception &e) {
+        LOG_ERROR("Could not generate the vulkan shader {}: {}", hex_string(variant_hash), e.what());
+        module = nullptr;
+        permanent_failure = true;
     }
 
-    vk::PipelineShaderStageCreateInfo shader_stage_info{
-        .stage = is_vertex ? vk::ShaderStageFlagBits::eVertex : vk::ShaderStageFlagBits::eFragment,
-        .module = *shader_module,
-        .pName = is_vertex ? "main_vs" : "main_fs",
-        .pSpecializationInfo = spec_info,
-    };
+    if (module)
+        gate->finish(module);
+    else
+        gate->fail(permanent_failure);
 
-    return shader_stage_info;
+    return make_stage(module);
 }
 
 vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth_load, bool stencil_load, bool force_store, bool is_color_transient, bool no_color, bool has_raw_attachment) {
@@ -647,17 +663,26 @@ vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth
         .finalLayout = vk::ImageLayout::eDepthStencilReadOnlyOptimal
     };
 
-    std::array<vk::SubpassDependency, 4> dependencies;
+    std::array<vk::SubpassDependency, 5> dependencies;
+
+    // Render targets written by an earlier render pass are sampled directly by later passes
+    // (surface cache SURF_COLOR / SURF_DEPTH views, no copy and no pipeline barrier). Those
+    // attachment writes must be made visible to fragment-shader reads as well, not only to
+    // attachment access, otherwise a tiler may sample data its store/resolve has not finished.
+    constexpr vk::PipelineStageFlags attachment_write_stages = vk::PipelineStageFlagBits::eColorAttachmentOutput
+        | vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests;
+    constexpr vk::AccessFlags attachment_access = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite
+        | vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite;
 
     // external dependency
     // we want the previous render pass to be done when we reach the fragment stage / stencil*depth testing
     dependencies[0] = {
         .srcSubpass = VK_SUBPASS_EXTERNAL,
         .dstSubpass = 0,
-        .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eLateFragmentTests,
-        .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
+        .srcStageMask = attachment_write_stages,
+        .dstStageMask = attachment_write_stages | vk::PipelineStageFlagBits::eFragmentShader,
         .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-        .dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite
+        .dstAccessMask = attachment_access | vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eInputAttachmentRead
     };
 
     // BUG: This is dead code (as immediately overwritten below)
@@ -682,9 +707,21 @@ vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth
         dependencies[1].srcAccessMask |= vk::AccessFlagBits::eShaderWrite;
     }
 
+    // outgoing dependency: without it the implicit one (dst = BOTTOM_OF_PIPE, no access) leaves the
+    // final layout transition and the store unordered against a later pass that samples this target
+    dependencies[2] = {
+        .srcSubpass = 0,
+        .dstSubpass = VK_SUBPASS_EXTERNAL,
+        .srcStageMask = attachment_write_stages | vk::PipelineStageFlagBits::eFragmentShader,
+        .dstStageMask = attachment_write_stages | vk::PipelineStageFlagBits::eFragmentShader | vk::PipelineStageFlagBits::eTransfer,
+        .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eShaderWrite,
+        .dstAccessMask = attachment_access | vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eInputAttachmentRead
+            | vk::AccessFlagBits::eTransferRead | vk::AccessFlagBits::eTransferWrite
+    };
+
     // self-dependency
     // this allows us to use a pipeline barrier in the render pass for programmable blending
-    dependencies[2] = {
+    dependencies[3] = {
         .srcSubpass = 0,
         .dstSubpass = 0,
         .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
@@ -696,7 +733,7 @@ vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth
 
     // mid-scene flush
     // unity games use it to write to a buffer in a vertex shader then use it as the vertex input in the next draw
-    dependencies[3] = {
+    dependencies[4] = {
         .srcSubpass = 0,
         .dstSubpass = 0,
         .srcStageMask = vk::PipelineStageFlagBits::eVertexShader,
@@ -719,8 +756,8 @@ vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth
         // only add the ds attachment
         pass_info.pAttachments = &attachments[2];
         pass_info.attachmentCount = 1;
-        // no need for the self-dependency
-        pass_info.setDependencyCount(2);
+        // no need for the self-dependency (keep the incoming and outgoing external ones)
+        pass_info.setDependencyCount(3);
     }
 
     render_passes_map[format] = state.device.createRenderPass(pass_info);
@@ -907,6 +944,11 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
     // disable the fragment shader if gxm asks us to
     const bool is_fragment_disabled = record.front_side_fragment_program_mode == SCE_GXM_FRAGMENT_PROGRAM_DISABLED || gxm_fragment_shader->has_no_effect();
     const uint32_t shader_stage_count = is_fragment_disabled ? 1U : 2U;
+    if (!vertex_shader.module || (!is_fragment_disabled && !fragment_shader.module)) {
+        // a shader could not be generated: fail this pipeline instead of passing a null module to the driver
+        LOG_ERROR("Pipeline skipped: shader module unavailable");
+        return nullptr;
+    }
 
     const vk::PipelineInputAssemblyStateCreateInfo input_assembly{
         .topology = translate_primitive(type)
@@ -1050,9 +1092,13 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
             if (it->second == kPipelineCompiling)
                 // pipeline is still compiling
                 return nullptr;
-            else if (it->second == kPipelineFailed)
+            else if (it->second == kPipelineFailed) {
                 // the driver already rejected this one, don't try again
+#if ECV_ORACLE
+                ecv::oracle::gpu::pipe_note(2);
+#endif
                 return nullptr;
+            }
             else
                 return it->second;
         }
@@ -1073,7 +1119,9 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
     context.shader_hints.attributes = &vertex_program_gxm.attributes;
 
     // note: the flag can_use_deferred_compilation is not considered here because it causes way too many false positives
-    const bool compile_pipeline_async = !already_in_cache && consider_for_async && use_async_compilation;
+    const bool sync_window = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()
+        < sync_compile_until_ns.load(std::memory_order_acquire);
+    const bool compile_pipeline_async = !already_in_cache && consider_for_async && use_async_compilation && !sync_window;
 
     if (compile_pipeline_async) {
         // create the pipeline compile request
@@ -1108,20 +1156,17 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
         if (!already_in_cache)
             state.shaders_count_compiled++;
 
+#if ECV_ORACLE
+        if (!result)
+            ecv::oracle::gpu::pipe_note(3);
+#endif
         it->second = result ? result : kPipelineFailed;
 
         return result;
     }
 }
 
-vk::ShaderModule PipelineCache::precompile_shader(const Sha256Hash &hash, bool search_first) {
-    if (search_first) {
-        // happens while loading the thread, no parallel access so no need for a mutex
-        auto it = shaders.find(hash);
-        if (it != shaders.end())
-            return it->second;
-    }
-
+vk::ShaderModule PipelineCache::load_cached_shader_module(const Sha256Hash &hash) {
     if (!fs::exists(state.shaders_path) || fs::is_empty(state.shaders_path))
         return nullptr;
 
@@ -1138,11 +1183,28 @@ vk::ShaderModule PipelineCache::precompile_shader(const Sha256Hash &hash, bool s
         .pCode = source.data()
     };
 
-    vk::ShaderModule shader = state.device.createShaderModule(shader_info);
+    return state.device.createShaderModule(shader_info);
+}
+
+vk::ShaderModule PipelineCache::precompile_shader(const Sha256Hash &hash, bool search_first) {
+    if (search_first) {
+        // happens while loading the thread, no parallel access so no need for a mutex
+        auto it = shaders.find(hash);
+        vk::ShaderModule existing;
+        if (it != shaders.end() && it->second.try_get(existing))
+            return existing;
+    }
+
+    const vk::ShaderModule shader = load_cached_shader_module(hash);
+    if (!shader)
+        return nullptr;
+
+    CompileGate<vk::ShaderModule> *gate;
     {
         std::lock_guard<std::mutex> guard(shaders_mutex);
-        shaders[hash] = shader;
+        gate = &shaders.try_emplace(hash).first->second;
     }
+    gate->finish(shader);
 
     return shader;
 }

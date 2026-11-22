@@ -32,3 +32,5 @@ ExitCode run_app(EmuEnvState &emuenv, int32_t main_module_id);
 ExitCode run_app(EmuEnvState &emuenv, int32_t main_module_id, const AppLaunchRequest &launch_request);
 void toggle_texture_replacement(EmuEnvState &emuenv);
 void take_screenshot(EmuEnvState &emuenv);
+// Captures the current frame; on success returns true and sets saved_file to the written image.
+bool take_screenshot(EmuEnvState &emuenv, fs::path &saved_file);

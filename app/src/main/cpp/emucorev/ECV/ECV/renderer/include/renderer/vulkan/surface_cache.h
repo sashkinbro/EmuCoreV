@@ -370,6 +370,10 @@ public:
     // so that subsequent calls to check_for_surface with the target destination also get delayed
     bool check_for_surface(MemState &mem, Address source_address, CallbackRequestFunction &callback, Address target_address, uint32_t source_size = 0);
     std::map<Address, ColorSurfaceCacheInfo *>::iterator find_color_surface_containing(Address address, uint32_t size);
+    // The renderer wrote guest RAM in [first, end) without going through the GPU (e.g. a transfer
+    // fill): flag every cached color surface overlapping it dirty so its next use re-uploads the
+    // guest content. Works even where memory protection cannot trap the write.
+    void mark_guest_range_written(Address first, Address end);
     // Called when a guest address is about to be read by the GPU through raw buffer
     // accesses (e.g. a uniform buffer aliasing a rendered surface, like Killzone Mercenary's
     // bloom chain reading its HDR render target). If the address lies inside a

@@ -37,7 +37,7 @@ get_filename_component(ECV_ORACLE_HOOKS_DIR "${EMUCOREV_BRIDGE_DIR}/../../../../
 if(ECV_ORACLE AND EXISTS "${ECV_ORACLE_HOOKS_DIR}/ecv_oracle.h")
     file(GLOB ECV_ORACLE_SOURCES CONFIGURE_DEPENDS "${ECV_ORACLE_HOOKS_DIR}/*.cpp")
     target_sources(ECV PRIVATE ${ECV_ORACLE_SOURCES})
-    foreach(oracle_target ECV kernel)
+    foreach(oracle_target ECV kernel renderer mem)
         target_include_directories(${oracle_target} PRIVATE "${ECV_ORACLE_HOOKS_DIR}")
         target_compile_definitions(${oracle_target} PRIVATE ECV_ORACLE=1)
     endforeach()
@@ -84,6 +84,7 @@ set(EMUCOREV_BRIDGE_SOURCES
     "${EMUCOREV_BRIDGE_DIR}/src/layer_contract.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/vita_install_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/runtime_bridge.cpp"
+    "${EMUCOREV_BRIDGE_DIR}/src/live_resolution.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/stats_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/cheat_bridge.cpp"
     "${EMUCOREV_BRIDGE_DIR}/src/input_overlay_bridge.cpp"

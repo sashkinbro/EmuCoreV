@@ -382,12 +382,16 @@ struct VKContext : public renderer::Context {
     void start_render_pass(bool create_descriptor_set = true);
     void stop_render_pass();
     void stop_recording(const SceGxmNotification &notif1, const SceGxmNotification &notif2, bool submit = true);
+    // Drop an open recording that has no recorded work (an empty scene-segment checkpoint) without
+    // submitting it, so the scene can be re-entered with another framebuffer.
+    void abandon_empty_recording();
 
     // check (when the render target has macroblock set) if we are drawing to another block
     void check_for_macroblock_change(bool is_draw);
 
 private:
     void wait_thread_function(const MemState &mem);
+    void wait_thread_body(const MemState &mem);
 };
 
 struct VKRenderTarget : public renderer::RenderTarget {
@@ -398,6 +402,24 @@ struct VKRenderTarget : public renderer::RenderTarget {
     uint16_t base_height;
     vkutil::Image color;
     vkutil::Image depthstencil;
+
+    // guest-space description, kept so the images can be rebuilt when the resolution multiplier changes
+    uint16_t guest_width = 0;
+    uint16_t guest_height = 0;
+    uint16_t macroblocks_x = 0;
+    uint16_t macroblocks_y = 0;
+
+    // Replacement images for another resolution multiplier, allocated before anything live is touched.
+    struct ResizedImages {
+        vkutil::Image color;
+        vkutil::Image depthstencil;
+        uint16_t width = 0;
+        uint16_t height = 0;
+    };
+    // Throws on allocation failure; the live images stay untouched.
+    void prepare_resize(VKState &state, float multiplier, ResizedImages &out) const;
+    // The GPU must be idle and every framebuffer that used the old images destroyed.
+    void commit_resize(float multiplier, ResizedImages &&images);
 
     // sync objects
     std::vector<vk::Fence> fences;

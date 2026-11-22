@@ -21,6 +21,14 @@
 #include <util/align.h>
 #include <util/log.h>
 
+#if ECV_ORACLE
+#include <android/log.h>
+#include <chrono>
+#include <pthread.h>
+#include <ecv_gpu_trace.h>
+#include <thread>
+#endif
+
 #include <algorithm>
 #include <atomic>
 #include <cassert>
@@ -152,8 +160,12 @@ static void delete_memory(uint8_t *memory) {
 }
 
 bool is_valid_addr(const MemState &state, Address addr) {
+    // Page 0 is reserved in the allocator (so nothing is ever placed at NULL) but never mapped on
+    // the host: a near-null guest pointer such as 0x2C must not pass as valid.
+    if (addr < STANDARD_PAGE_SIZE)
+        return false;
     const uint32_t page_num = addr / STANDARD_PAGE_SIZE;
-    return addr && state.allocator.free_slot_count(page_num, page_num + 1) == 0;
+    return state.allocator.free_slot_count(page_num, page_num + 1) == 0;
 }
 
 // re-check under the allocator's writer lock
@@ -165,6 +177,8 @@ bool is_valid_addr_synced(MemState &state, Address addr) {
 }
 
 bool is_valid_addr_range(const MemState &state, Address start, Address end) {
+    if (start < STANDARD_PAGE_SIZE)
+        return false;
     const uint32_t start_page = start / STANDARD_PAGE_SIZE;
     const uint32_t end_page = (uint64_t{ end } + STANDARD_PAGE_SIZE - 1) / STANDARD_PAGE_SIZE;
     return state.allocator.free_slot_count(start_page, end_page) == 0;
@@ -304,7 +318,21 @@ static bool apply_host_protect(uint8_t *target, size_t size, const MemPerm perm,
     LOG_CRITICAL_IF(!ret, "VirtualProtect failed: {}", get_error_msg());
     return ret != 0;
 #else
+#if ECV_ORACLE
+    const auto oracle_t0 = std::chrono::steady_clock::now();
+#endif
     const int ret = mprotect(aligned_start, aligned_size, (perm == MemPerm::None) ? PROT_NONE : ((perm == MemPerm::ReadOnly) ? PROT_READ : (PROT_READ | PROT_WRITE)));
+#if ECV_ORACLE
+    {
+        const auto oracle_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - oracle_t0).count();
+        if (oracle_ms >= 10) {
+            char oracle_name[32] = "";
+            pthread_getname_np(pthread_self(), oracle_name, sizeof(oracle_name));
+            __android_log_print(ANDROID_LOG_WARN, "GPUTRACE", "slow mprotect %lld ms thread=%s size=%zu perm=%d", static_cast<long long>(oracle_ms),
+                oracle_name, aligned_size, static_cast<int>(perm));
+        }
+    }
+#endif
     LOG_CRITICAL_IF(ret == -1, "mprotect failed: {}", get_error_msg());
     return ret != -1;
 #endif
@@ -409,7 +437,13 @@ bool handle_access_violation(MemState &state, uint8_t *addr, bool write) noexcep
     const uintptr_t fault_addr = reinterpret_cast<uintptr_t>(addr);
 
     Address vaddr = 0;
+#if ECV_ORACLE
+    ecv::oracle::gpu::dbg_stall_once(ecv::oracle::gpu::DBG_STALL_FAULT_NOLOCK, "fault(no lock)");
+#endif
     const std::unique_lock<std::mutex> lock(state.protect_mutex);
+#if ECV_ORACLE
+    ecv::oracle::gpu::dbg_stall_once(ecv::oracle::gpu::DBG_STALL_FAULT, "fault(locked)");
+#endif
     if (fault_addr < memory_addr || fault_addr >= memory_addr + TOTAL_MEM_SIZE) {
         if (state.use_page_table) {
             // this may come from an external mapping
@@ -495,6 +529,9 @@ Address host_to_guest(const MemState &state, const void *host) {
 }
 
 bool add_protect(MemState &state, Address addr, const uint32_t size, const MemPerm perm, const ProtectCallback &callback) {
+#if ECV_ORACLE
+    ecv::oracle::gpu::dbg_stall_once(ecv::oracle::gpu::DBG_STALL_PROTECT_NOLOCK, "add_protect(no lock)");
+#endif
     const std::lock_guard<std::mutex> lock(state.protect_mutex);
     ProtectSegmentInfo protect(size, perm);
     align_to_page(state, addr, protect.size);
@@ -529,6 +566,20 @@ bool add_protect(MemState &state, Address addr, const uint32_t size, const MemPe
         state.protect_tree.erase(it--);
     }
 
+#if ECV_ORACLE
+    {
+        // debug A/B: emulate a ~75 ms mmap_lock stall of this call once per second
+        static std::chrono::steady_clock::time_point oracle_next_stall{};
+        const auto now = std::chrono::steady_clock::now();
+        if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_STALL_PROTECT) && now >= oracle_next_stall) {
+            oracle_next_stall = now + std::chrono::milliseconds(1050);
+            char oracle_name[32] = "";
+            pthread_getname_np(pthread_self(), oracle_name, sizeof(oracle_name));
+            __android_log_print(ANDROID_LOG_WARN, "GPUTRACE", "stall add_protect addr=0x%08X size=0x%X thread=%s", addr, protect.size, oracle_name);
+            std::this_thread::sleep_for(std::chrono::milliseconds(75));
+        }
+    }
+#endif
     protect_inner(state, addr, protect.size, protect.perm);
 
     state.protect_tree.emplace(addr, std::move(protect));

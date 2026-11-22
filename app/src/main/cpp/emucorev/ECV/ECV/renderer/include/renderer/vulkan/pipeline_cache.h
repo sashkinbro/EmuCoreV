@@ -18,10 +18,13 @@
 #pragma once
 
 #include <blockingconcurrentqueue.h>
+#include <renderer/compile_gate.h>
 #include <util/containers.h>
 #include <vkutil/vkutil.h>
 
 #include <array>
+#include <atomic>
+#include <chrono>
 #include <limits>
 #include <map>
 #include <mutex>
@@ -56,11 +59,21 @@ using PipelineCompileQueue = moodycamel::BlockingConcurrentQueue<CompileRequest 
 class PipelineCache {
     friend struct VKState;
 
+public:
+    void force_sync_compilation_for(std::chrono::milliseconds duration) {
+        const auto until = std::chrono::steady_clock::now() + duration;
+        sync_compile_until_ns.store(std::chrono::duration_cast<std::chrono::nanoseconds>(until.time_since_epoch()).count(), std::memory_order_release);
+    }
+
 private:
     VKState &state;
 
     // are we performing pipeline compilation on a parallel thread?
     bool use_async_compilation = false;
+    // Until this steady_clock time (ns since epoch) new pipelines compile synchronously even with
+    // async compilation on: after a save-state restore every pipeline is new, and skipping their
+    // draws while they compile made objects/textures pop in for seconds.
+    std::atomic<int64_t> sync_compile_until_ns{ 0 };
     // how many threads are used in case async compilation is enabled
     int nb_worker_threads = 0;
 
@@ -93,9 +106,12 @@ private:
     // only used when accessing the shaders map
     std::mutex shaders_mutex;
     // because of multithreading, we want the pointers to remain stable
-    unordered_map_stable<Sha256Hash, vk::ShaderModule> shaders;
+    // each entry is compiled by one thread, the others wait on its gate (never touch it without the gate)
+    unordered_map_stable<Sha256Hash, CompileGate<vk::ShaderModule>> shaders;
     unordered_map_stable<uint64_t, vk::Pipeline> pipelines;
 
+    // reads a precompiled module from the shader cache directory, does not touch the shaders map
+    vk::ShaderModule load_cached_shader_module(const Sha256Hash &hash);
     vk::PipelineShaderStageCreateInfo retrieve_shader(const SceGxmProgram *program, const Sha256Hash &hash, bool is_vertex, bool maskupdate, MemState &mem, const shader::Hints &hints, bool is_srgb = false);
     vk::PipelineVertexInputStateCreateInfo get_vertex_input_state(const SceGxmVertexProgram &vertex_program, MemState &mem);
 

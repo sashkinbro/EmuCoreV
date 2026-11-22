@@ -46,6 +46,10 @@ void finish(State &state, Context *context);
 
 bool has_pending_deferred_unmap();
 
+// Write a notification value into guest memory if the address is a mapped, 4 byte word.
+// The caller must hold State::notification_mutex. Returns false (and writes nothing) otherwise.
+bool write_notification_value(const MemState &mem, const SceGxmNotification &notification);
+
 enum class SyncWaitResult {
     Ready,
     TimedOut,

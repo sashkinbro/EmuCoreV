@@ -25,6 +25,7 @@
 
 #include <gxm/functions.h>
 #include <gxm/types.h>
+#include <shader/fragment_output.h>
 #include <shader/gxp_parser.h>
 #include <shader/usse_translator_entry.h>
 #include <shader/usse_translator_types.h>
@@ -42,7 +43,9 @@
 #include <limits>
 #include <list>
 #include <map>
+#include <mutex>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -122,6 +125,7 @@ struct TranslationState {
     bool is_vulkan = false;
     spv::ImageFormat image_storage_format = spv::ImageFormat::ImageFormatUnknown;
     const Hints *hints = nullptr;
+    usse::UsseTranslationStats usse_stats;
 };
 
 static bool is_u8_alpha_color_surface(const TranslationState &state) {
@@ -770,7 +774,7 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
             }
 
             if (store_type == DataType::F16)
-                b.setPrecision(tex_query_info.sampler, spv::DecorationRelaxedPrecision);
+                b.setPrecision(tex_query_info.sampler, features.force_full_precision ? spv::NoPrecision : spv::DecorationRelaxedPrecision);
             tex_query_infos.push_back(tex_query_info);
 
             pa_offset += size;
@@ -827,16 +831,9 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
 
         target_to_store.bank = RegisterBank::OUTPUT;
         target_to_store.num = 0;
-        target_to_store.type = std::get<0>(shader::get_parameter_type_store_and_name(program.get_fragment_output_type()));
-
-        // see frag_finalize for the following cases
-        if (target_to_store.type == DataType::INT32 || target_to_store.type == DataType::UINT32)
-            target_to_store.type = DataType::F32;
-
-        if (gxm::get_base_format(translation_state.hints->color_format) == SCE_GXM_COLOR_BASE_FORMAT_F32F32 && vertex_varyings_ptr->output_comp_count > 2) {
-            if (target_to_store.type == DataType::F16)
-                target_to_store.type = DataType::F32;
-        }
+        // o0 is preloaded with the surface pixel in its register layout (native colour), see fragment_color_register_type
+        target_to_store.type = fragment_color_register_type(std::get<0>(shader::get_parameter_type_store_and_name(program.get_fragment_output_type())),
+            program.is_native_color(), translation_state.hints->color_format, vertex_varyings_ptr->output_comp_count);
 
         spv::Decoration precision = (get_data_type_size(target_to_store.type) < 4 && !features.force_full_precision) ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
         if (target_to_store.type == DataType::INT16 || target_to_store.type == DataType::UINT16)
@@ -1643,9 +1640,9 @@ static SpirvShaderParameters create_parameters(spv::Builder &b, const SceGxmProg
 
 static void generate_shader_body(spv::Builder &b, const SpirvShaderParameters &parameters, const SceGxmProgram &program,
     const FeatureState &features, utils::SpirvUtilFunctions &utils, spv::Function *begin_hook_func, spv::Function *end_hook_func,
-    const NonDependentTextureQueryCallInfos &texture_queries, const spv::Id render_info_id, spv::Function *spv_func_main, std::vector<spv::Id> &interfaces) {
+    const NonDependentTextureQueryCallInfos &texture_queries, const spv::Id render_info_id, spv::Function *spv_func_main, std::vector<spv::Id> &interfaces, usse::UsseTranslationStats &usse_stats) {
     // Do texture queries
-    usse::convert_gxp_usse_to_spirv(b, program, features, parameters, utils, begin_hook_func, end_hook_func, texture_queries, render_info_id, spv_func_main, interfaces);
+    usse::convert_gxp_usse_to_spirv(b, program, features, parameters, utils, begin_hook_func, end_hook_func, texture_queries, render_info_id, spv_func_main, interfaces, &usse_stats);
 }
 
 static spv::Function *make_frag_finalize_function(spv::Builder &b, const SpirvShaderParameters &parameters,
@@ -1666,18 +1663,9 @@ static spv::Function *make_frag_finalize_function(spv::Builder &b, const SpirvSh
     color_val_operand.bank = program.is_native_color() ? RegisterBank::OUTPUT : RegisterBank::PRIMATTR;
     color_val_operand.num = 0;
     color_val_operand.swizzle = SWIZZLE_CHANNEL_4_DEFAULT;
-    color_val_operand.type = std::get<0>(shader::get_parameter_type_store_and_name(param_type));
-    // if the shader tries to write a INT32 or UINT32, it means the raw content
-    if (color_val_operand.type == DataType::INT32 || color_val_operand.type == DataType::UINT32)
-        color_val_operand.type = DataType::F32;
-
-    // if the output component count is greater than the surface component count,
-    // it means we must pack multiple components (with lower precision) into one of the surface component
-    // this is used in assassin creed 3
-    if (gxm::get_base_format(translate_state.hints->color_format) == SCE_GXM_COLOR_BASE_FORMAT_F32F32 && vertex_varyings_ptr->output_comp_count > 2) {
-        if (color_val_operand.type == DataType::F16)
-            color_val_operand.type = DataType::F32;
-    }
+    // native colour programs usually leave o0 in the surface's register layout, see fragment_color_register_type
+    color_val_operand.type = fragment_color_register_type(std::get<0>(shader::get_parameter_type_store_and_name(param_type)),
+        fragment_output_in_surface_layout(program), translate_state.hints->color_format, vertex_varyings_ptr->output_comp_count);
 
     spv::Decoration precision = (get_data_type_size(color_val_operand.type) < 4 && !features.force_full_precision) ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
     if (color_val_operand.type == DataType::INT16 || color_val_operand.type == DataType::UINT16)
@@ -2118,6 +2106,61 @@ static void generate_update_mask_body(spv::Builder &b, TranslationState &transla
     b.createStore(mask_v, out);
 }
 
+// Adds NoContraction to every float multiply/add result so the driver must round each operation
+// separately instead of fusing a*b+c into one fma. Drivers differ in whether they contract, and
+// shaders that work on large values (e.g. hashes of a growing time uniform) then give per-driver
+// results. Annotations are inserted after the module's existing decorations (before types).
+static void decorate_no_contraction(SpirvCode &code) {
+    constexpr size_t header_words = 5;
+    if (code.size() <= header_words)
+        return;
+    const auto is_preamble = [](uint32_t op) {
+        switch (op) {
+        case spv::OpCapability: case spv::OpExtension: case spv::OpExtInstImport: case spv::OpMemoryModel:
+        case spv::OpEntryPoint: case spv::OpExecutionMode: case spv::OpExecutionModeId: case spv::OpString:
+        case spv::OpSourceExtension: case spv::OpSource: case spv::OpSourceContinued: case spv::OpName:
+        case spv::OpMemberName: case spv::OpModuleProcessed: case spv::OpDecorate: case spv::OpMemberDecorate:
+        case spv::OpDecorationGroup: case spv::OpGroupDecorate: case spv::OpGroupMemberDecorate:
+        case spv::OpDecorateId: case spv::OpDecorateString: case spv::OpMemberDecorateString:
+        case spv::OpLine: case spv::OpNoLine:
+            return true;
+        default:
+            return false;
+        }
+    };
+    size_t insert_at = 0;
+    std::vector<uint32_t> targets;
+    for (size_t i = header_words; i < code.size();) {
+        const uint32_t word_count = code[i] >> 16;
+        const uint32_t op = code[i] & 0xFFFF;
+        if (word_count == 0 || i + word_count > code.size())
+            return; // malformed: leave the module untouched
+        if (insert_at == 0 && !is_preamble(op))
+            insert_at = i;
+        switch (op) {
+        case spv::OpFMul: case spv::OpFAdd: case spv::OpFSub: case spv::OpFNegate: case spv::OpVectorTimesScalar:
+        case spv::OpMatrixTimesScalar: case spv::OpVectorTimesMatrix: case spv::OpMatrixTimesVector:
+        case spv::OpMatrixTimesMatrix: case spv::OpDot:
+            if (word_count >= 3)
+                targets.push_back(code[i + 2]);
+            break;
+        default:
+            break;
+        }
+        i += word_count;
+    }
+    if (targets.empty() || insert_at == 0)
+        return;
+    std::vector<uint32_t> decorations;
+    decorations.reserve(targets.size() * 3);
+    for (const uint32_t id : targets) {
+        decorations.push_back((3u << 16) | spv::OpDecorate);
+        decorations.push_back(id);
+        decorations.push_back(spv::DecorationNoContraction);
+    }
+    code.insert(code.begin() + static_cast<std::ptrdiff_t>(insert_at), decorations.begin(), decorations.end());
+}
+
 static SpirvCode convert_gxp_to_spirv_impl(const SceGxmProgram &program, const std::string &shader_hash, const FeatureState &features, TranslationState &translation_state, bool force_shader_debug, const std::function<bool(const std::string &ext, const std::string &dump)> &dumper, bool dump_disassembly) {
     SpirvCode spirv;
 
@@ -2267,7 +2310,7 @@ static SpirvCode convert_gxp_to_spirv_impl(const SceGxmProgram &program, const s
             }
         }
 
-        generate_shader_body(b, parameters, program, features, utils, begin_hook_func, end_hook_func, texture_queries, translation_state.render_info_id, spv_func_main, translation_state.interfaces);
+        generate_shader_body(b, parameters, program, features, utils, begin_hook_func, end_hook_func, texture_queries, translation_state.render_info_id, spv_func_main, translation_state.interfaces, translation_state.usse_stats);
     } else {
         generate_update_mask_body(b, translation_state);
     }
@@ -2292,6 +2335,8 @@ static SpirvCode convert_gxp_to_spirv_impl(const SceGxmProgram &program, const s
 #endif
 
     b.dump(spirv);
+    if (features.no_fp_contraction)
+        decorate_no_contraction(spirv);
 
 #ifndef NDEBUG
     if (LOG_SHADER_CODE || force_shader_debug) {
@@ -2395,6 +2440,22 @@ static spv::ImageFormat translate_color_format(const SceGxmColorBaseFormat forma
 // * Functions (exposed API) *
 // ***************************
 
+// Release builds compile the per-instruction decoder logs out: say once per shader that code was dropped.
+static void warn_untranslated_usse_once(const std::string &shader_hash, const usse::UsseTranslationStats &stats) {
+    static std::mutex warned_mutex;
+    static std::set<std::string> warned;
+    {
+        const std::lock_guard<std::mutex> lock(warned_mutex);
+        if (!warned.insert(shader_hash).second)
+            return;
+    }
+
+    std::string words;
+    for (uint32_t i = 0; i < stats.recorded_word_count; ++i)
+        words += fmt::format(" {:016x}", stats.recorded_words[i]);
+    LOG_WARN("Shader {} lost USSE instructions: {} unmatched, {} unsupported; first words:{}", shader_hash, stats.unmatched_count, stats.unsupported_count, words);
+}
+
 GeneratedShader convert_gxp(const SceGxmProgram &program, const std::string &shader_hash, const FeatureState &features, const Target target, const Hints &hints, bool maskupdate,
     bool force_shader_debug, const std::function<bool(const std::string &ext, const std::string &dump)> &dumper, bool dump_disassembly) {
     TranslationState translation_state;
@@ -2411,6 +2472,9 @@ GeneratedShader convert_gxp(const SceGxmProgram &program, const std::string &sha
 
     GeneratedShader shader{};
     shader.spirv = convert_gxp_to_spirv_impl(program, shader_hash, features, translation_state, force_shader_debug, dumper, dump_disassembly);
+    shader.usse_stats = translation_state.usse_stats;
+    if (shader.usse_stats.total() != 0)
+        warn_untranslated_usse_once(shader_hash, shader.usse_stats);
 
     if (translation_state.is_target_glsl) {
         // also generate the glsl file

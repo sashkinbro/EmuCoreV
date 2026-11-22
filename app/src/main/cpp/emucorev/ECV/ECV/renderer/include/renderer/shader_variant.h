@@ -1,9 +1,13 @@
 #pragma once
 
 #include <gxm/types.h>
+#include <shader/hints.h>
 #include <util/hash.h>
 
 #include <algorithm>
+#include <array>
+#include <cstdint>
+#include <vector>
 
 namespace renderer {
 // Other formats retain their existing cache identity. Alpha-only surfaces
@@ -34,6 +38,64 @@ inline Sha256Hash fragment_shader_variant_hash(const Sha256Hash &hash, SceGxmCol
     tagged[34] = '_';
     tagged[35] = 'A';
     return sha256(tagged.data(), tagged.size());
+}
+
+// Canonical byte description of every input of shader::convert_gxp (Vulkan target) other than the
+// program binary and the device features. Two compilations with equal program hash and equal bytes
+// produce the same SPIR-V, so this is the identity of a shader module and of its disk cache entry.
+// Only what the recompiler reads for that stage is serialized, so unrelated state (for example the
+// color format while compiling a vertex shader, or textures the program never samples) does not split
+// the cache. Reads in shader/src/spirv_recompiler.cpp:
+//  - hints.attributes (regIndex, format, componentCount): vertex only (scaled/rgb attribute emulation and
+//    stripped-symbol attribute creation)
+//  - hints.vertex_textures / fragment_textures: component type and count of every sampled slot
+//  - hints.color_format, raw_color_attachment_input, vertex_output_mask: fragment only
+//  - maskupdate: changes the generated entry point
+// used_textures_mask is gxp::get_textures_used() of the program (bit i = texture slot i).
+inline std::vector<uint8_t> vulkan_shader_variant_key_bytes(bool is_vertex, const shader::Hints &hints, uint32_t used_textures_mask, bool maskupdate) {
+    std::vector<uint8_t> bytes;
+    bytes.reserve(64 + (is_vertex && hints.attributes ? hints.attributes->size() * 7 : 0));
+    const auto put = [&](uint32_t value, int byte_count) {
+        for (int i = 0; i < byte_count; ++i)
+            bytes.push_back(static_cast<uint8_t>(value >> (i * 8)));
+    };
+
+    put('V' | ('S' << 8) | ('V' << 16) | ('1' << 24), 4);
+    put(is_vertex ? 1 : 0, 1);
+    put(maskupdate ? 1 : 0, 1);
+    put(used_textures_mask, 4);
+
+    const SceGxmTextureFormat *textures = is_vertex ? hints.vertex_textures : hints.fragment_textures;
+    for (uint32_t i = 0; i < SCE_GXM_MAX_TEXTURE_UNITS; ++i) {
+        if (used_textures_mask & (1u << i))
+            put(static_cast<uint32_t>(textures[i]), 4);
+    }
+
+    if (is_vertex) {
+        if (hints.attributes) {
+            put(1, 1);
+            put(static_cast<uint32_t>(hints.attributes->size()), 4);
+            for (const SceGxmVertexAttribute &attribute : *hints.attributes) {
+                put(attribute.regIndex, 2);
+                put(static_cast<uint32_t>(attribute.format), 4);
+                put(attribute.componentCount, 1);
+            }
+        } else {
+            put(0, 1);
+        }
+    } else {
+        put(static_cast<uint32_t>(hints.color_format), 4);
+        put(hints.raw_color_attachment_input ? 1 : 0, 1);
+        put(hints.vertex_output_mask, 4);
+    }
+    return bytes;
+}
+
+inline Sha256Hash vulkan_shader_variant_hash(const Sha256Hash &program_hash, bool is_vertex, const shader::Hints &hints, uint32_t used_textures_mask, bool maskupdate) {
+    std::vector<uint8_t> data(program_hash.begin(), program_hash.end());
+    const std::vector<uint8_t> key = vulkan_shader_variant_key_bytes(is_vertex, hints, used_textures_mask, maskupdate);
+    data.insert(data.end(), key.begin(), key.end());
+    return sha256(data.data(), data.size());
 }
 
 inline uint64_t alpha_surface_pipeline_key(uint64_t key, SceGxmColorFormat format) {

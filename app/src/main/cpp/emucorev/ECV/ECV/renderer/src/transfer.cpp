@@ -27,9 +27,13 @@
 #include <renderer/driver_functions.h>
 #include <renderer/functions.h>
 #include <renderer/state.h>
+#include <renderer/transfer_fill.h>
 #include <renderer/types.h>
 #include <util/log.h>
 #include <util/tracy.h>
+#if ECV_ORACLE
+#include <ecv_gpu_trace.h>
+#endif
 
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/surface_cache.h>
@@ -214,6 +218,12 @@ COMMAND(handle_transfer_copy) {
     const SceGxmTransferFormat src_fmt = images[0].format;
     const SceGxmTransferFormat dst_fmt = images[1].format;
     SceGxmTransferType src_type = helper.pop<SceGxmTransferType>();
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::xfer("copy", images[0].address.address(), static_cast<uint32_t>(src_fmt), images[0].x, images[0].y, images[0].width, images[0].height, images[0].stride,
+            images[1].address.address(), static_cast<uint32_t>(dst_fmt), images[1].x, images[1].y, images[1].width, images[1].height, images[1].stride,
+            static_cast<uint32_t>(colorKeyMode));
+#endif
     SceGxmTransferType dst_type = helper.pop<SceGxmTransferType>();
 
     if (use_gpu_depth_transfer && renderer.current_backend == Backend::Vulkan) {
@@ -295,6 +305,11 @@ COMMAND(handle_transfer_downscale) {
     TRACY_FUNC_COMMANDS(handle_transfer_downscale);
     SceGxmTransferImage *src = helper.pop<SceGxmTransferImage *>();
     SceGxmTransferImage *dst = helper.pop<SceGxmTransferImage *>();
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::xfer("down", src->address.address(), static_cast<uint32_t>(src->format), src->x, src->y, src->width, src->height, src->stride,
+            dst->address.address(), static_cast<uint32_t>(dst->format), dst->x, dst->y, dst->width, dst->height, dst->stride, 0);
+#endif
 
     if (src->format != dst->format) {
         LOG_ERROR_ONCE("Unhandled format conversion from 0x{:0X} to 0x{:0X}", fmt::underlying(src->format), fmt::underlying(dst->format));
@@ -431,23 +446,42 @@ COMMAND(handle_transfer_fill) {
     const uint32_t fill_color = helper.pop<uint32_t>();
     const SceGxmTransferImage *dest = helper.pop<SceGxmTransferImage *>();
 
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::xfer("fill", 0, 0, 0, 0, 0, 0, 0, dest->address.address(), static_cast<uint32_t>(dest->format), dest->x, dest->y, dest->width, dest->height,
+            dest->stride, fill_color);
+#endif
     const auto bpp = gxm::get_bits_per_pixel(dest->format);
 
-    const uint32_t bytes_per_pixel = (bpp + 7) >> 3;
-    for (uint32_t y = 0; y < dest->height; y++) {
-        for (uint32_t x = 0; x < dest->width; x++) {
-            // Set offset of destination
-            const auto dest_offset = ((x + dest->x) * bytes_per_pixel) + ((y + dest->y) * dest->stride);
+    const uint32_t bytes_per_pixel = transfer_fill_pixel_bytes(bpp);
+    uint8_t pixel[transfer_fill_max_pixel_bytes];
+    uint64_t first_byte = 0, end_byte = 0;
+    if (build_transfer_fill_pixel(fill_color, bytes_per_pixel, pixel) == 0) {
+        LOG_ERROR("Transfer fill: unsupported destination format 0x{:0X}", fmt::underlying(dest->format));
+    } else if (dest->width != 0 && dest->height != 0) {
+        if (!transfer_fill_span(dest->address.address(), dest->x, dest->y, dest->width, dest->height, dest->stride, bytes_per_pixel, first_byte, end_byte)
+            || end_byte > UINT32_MAX
+            || !is_valid_addr_range(mem, static_cast<Address>(first_byte), static_cast<Address>(end_byte))) {
+            // guest controlled geometry: never write outside mapped guest memory
+            LOG_ERROR("Transfer fill: destination {} ({}x{} at {},{} stride {}) is outside guest memory",
+                log_hex(dest->address.address()), dest->width, dest->height, dest->x, dest->y, dest->stride);
+        } else {
+            // build the row once, then fill row by row
+            std::vector<uint8_t> row(static_cast<size_t>(dest->width) * bytes_per_pixel);
+            fill_transfer_row(row.data(), dest->width, pixel, bytes_per_pixel);
 
-            // Set pointer of destination
-            auto dest_ptr = (uint8_t *)dest->address.get(mem) + dest_offset;
+            uint8_t *base = dest->address.cast<uint8_t>().get(mem);
+            for (uint32_t y = 0; y < dest->height; y++) {
+                const int64_t offset = (static_cast<int64_t>(y) + dest->y) * dest->stride + static_cast<int64_t>(dest->x) * bytes_per_pixel;
+                memcpy(base + offset, row.data(), row.size());
+            }
 
-            // Fill color in destination
-            memcpy(dest_ptr, &fill_color, bytes_per_pixel);
+            // The fill bypassed the GPU: a cached surface covering these bytes must re-upload them.
+            // (The GL surface cache has no CPU-write tracking to hook into.)
+            if (renderer.current_backend == Backend::Vulkan)
+                dynamic_cast<vulkan::VKState &>(renderer).surface_cache.mark_guest_range_written(static_cast<Address>(first_byte), static_cast<Address>(end_byte));
         }
     }
-
-    // TODO: handle case where dest is a cached surface
 
     delete dest;
 }

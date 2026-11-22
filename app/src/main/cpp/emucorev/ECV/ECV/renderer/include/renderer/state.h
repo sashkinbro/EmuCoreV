@@ -127,10 +127,38 @@ struct State {
 
     std::atomic<bool> async_flip_requested{ false };
     std::atomic<int> pending_vsync{ -1 };
+    enum class RenderTaskPhase { Idle, Pending, Running, Finished };
+    std::mutex render_task_mutex;
+    std::condition_variable render_task_cv;
+    std::function<bool()> render_task;
+    RenderTaskPhase render_task_phase = RenderTaskPhase::Idle;
+    bool render_task_result = false;
     std::atomic<int> frame_limit{ 0 };
+
+    // Run `task` on the render thread at its next boundary between batches and wait for the
+    // result. The task may touch every renderer-owned object (surface cache, render targets,
+    // contexts) without further locking. Returns false if the task did not run (no render
+    // thread, shutdown, timeout) or returned false itself. One task at a time.
+    bool run_on_render_thread(std::function<bool()> task, std::chrono::milliseconds timeout);
+    // Render thread only: execute a task posted with run_on_render_thread, if any.
+    void service_render_thread_task();
 
     std::unique_ptr<std::thread> render_thread;
     std::atomic<bool> render_abort{ false };
+    // Set once a backend thread hit an unrecoverable error (for example
+    // VK_ERROR_DEVICE_LOST). The session is then wound down like a shutdown.
+    std::atomic<bool> fatal_error_raised{ false };
+    std::atomic<bool> device_lost{ false };
+    std::mutex fatal_error_mutex;
+    std::string fatal_error_message;
+    // Wakes the GXM/display side (sync objects, display queue); set by start_render_thread.
+    std::function<void()> fatal_abort_hook;
+    // Record the error once, abort the render thread and wake every waiter. Callable from any thread.
+    void signal_fatal_error(const std::string &message, bool is_device_lost = false);
+    // Wake every waiter of notification_ready / command_finish_one without losing a wakeup.
+    void wake_all_waiters();
+    // Backend hook: abort backend request queues (Vulkan wait-thread queue).
+    virtual void abort_backend_queues() {}
     SnapshotGate snapshot_gate;
     FirstPresentReadiness restore_presentation;
     FirstPresentReadiness::Callback restore_presentation_callback;
