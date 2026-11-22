@@ -36,7 +36,8 @@ add_executable(core_host_tests
     hle_stub_batch3_tests.cpp
     hle_stub_batch4_tests.cpp
     rear_touch_tests.cpp
-    save_data_write_tests.cpp)
+    save_data_write_tests.cpp
+    fragment_output_tests.cpp)
 target_include_directories(core_host_tests PRIVATE
     "${CORE_ROOT}/kernel/include"
     "${CORE_ROOT}/ngs/include"

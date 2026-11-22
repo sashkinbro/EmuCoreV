@@ -1355,6 +1355,9 @@ enum SceGxmFragmentProgramInputs : int {
 enum SceGxmProgramFlags : uint32_t {
     SCE_GXM_PROGRAM_FLAG_FRAGMENT = 1 << 0,
     SCE_GXM_PROGRAM_FLAG_PER_INSTANCE_MODE = 1 << 1,
+    // Inferred from compiled programs (not in the SDK headers): a native-colour program with this bit works on unpacked
+    // half values in o0, both the preloaded surface pixel and its result (e.g. VF16ADD r0 -o0 pa0).
+    SCE_GXM_PROGRAM_FLAG_NATIVECOLOR_HALF = 1 << 2,
     SCE_GXM_PROGRAM_FLAG_DISCARD_USED = 1 << 3,
     SCE_GXM_PROGRAM_FLAG_DEPTH_USED = 1 << 4,
     SCE_GXM_PROGRAM_FLAG_SPRITECOORD_USED = 1 << 5,
@@ -1362,8 +1365,8 @@ enum SceGxmProgramFlags : uint32_t {
     SCE_GXM_PROGRAM_FLAG_FRAGCOLOR_USED = 1 << 7,
     SCE_GXM_PROGRAM_FLAG_NATIVECOLOR_MSAA2X = 1 << 8,
     SCE_GXM_PROGRAM_FLAG_NATIVECOLOR_MSAA4X = 1 << 9,
-    // Inferred from compiled programs (not in the SDK headers): a native-colour program with this bit leaves unpacked
-    // half values in o0 (e.g. VPCKF16U8 o0 [scale] at the end); without it o0 holds the packed surface pixel.
+    // Inferred from compiled programs (not in the SDK headers): a native-colour program with this bit reads the packed
+    // surface pixel from o0 but leaves unpacked half values there (e.g. VPCKF16U8 o0 [scale] at the end).
     SCE_GXM_PROGRAM_FLAG_NATIVECOLOR_HALF_OUTPUT = 1 << 10,
     // Note, I'm not sure about this one
     SCE_GXM_PROGRAM_FLAG_BUFFER_STORE = 1 << 14,

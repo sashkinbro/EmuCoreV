@@ -128,6 +128,17 @@ struct TranslationState {
     usse::UsseTranslationStats usse_stats;
 };
 
+static DataType apply_fragment_color_layout(DataType declared, FragmentColorLayout layout) {
+    switch (layout) {
+    case FragmentColorLayout::PackedU8:
+        return DataType::UINT8;
+    case FragmentColorLayout::PackedS8:
+        return DataType::INT8;
+    default:
+        return declared;
+    }
+}
+
 static bool is_u8_alpha_color_surface(const TranslationState &state) {
     return state.hints->color_format == SCE_GXM_COLOR_FORMAT_U8_A;
 }
@@ -831,9 +842,19 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
 
         target_to_store.bank = RegisterBank::OUTPUT;
         target_to_store.num = 0;
-        // o0 is preloaded with the surface pixel in its register layout (native colour), see fragment_color_register_type
-        target_to_store.type = fragment_color_register_type(std::get<0>(shader::get_parameter_type_store_and_name(program.get_fragment_output_type())),
-            program.is_native_color(), translation_state.hints->color_format, vertex_varyings_ptr->output_comp_count);
+        target_to_store.type = std::get<0>(shader::get_parameter_type_store_and_name(program.get_fragment_output_type()));
+
+        // see frag_finalize for the following cases
+        if (target_to_store.type == DataType::INT32 || target_to_store.type == DataType::UINT32)
+            target_to_store.type = DataType::F32;
+
+        if (gxm::get_base_format(translation_state.hints->color_format) == SCE_GXM_COLOR_BASE_FORMAT_F32F32 && vertex_varyings_ptr->output_comp_count > 2) {
+            if (target_to_store.type == DataType::F16)
+                target_to_store.type = DataType::F32;
+        }
+
+        // a native-colour program usually finds the surface pixel in o0 in its register layout, see fragment_color_layout
+        target_to_store.type = apply_fragment_color_layout(target_to_store.type, fragment_color_layout(fragment_input_in_surface_layout(program), translation_state.hints->color_format));
 
         spv::Decoration precision = (get_data_type_size(target_to_store.type) < 4 && !features.force_full_precision) ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
         if (target_to_store.type == DataType::INT16 || target_to_store.type == DataType::UINT16)
@@ -1663,9 +1684,21 @@ static spv::Function *make_frag_finalize_function(spv::Builder &b, const SpirvSh
     color_val_operand.bank = program.is_native_color() ? RegisterBank::OUTPUT : RegisterBank::PRIMATTR;
     color_val_operand.num = 0;
     color_val_operand.swizzle = SWIZZLE_CHANNEL_4_DEFAULT;
-    // native colour programs usually leave o0 in the surface's register layout, see fragment_color_register_type
-    color_val_operand.type = fragment_color_register_type(std::get<0>(shader::get_parameter_type_store_and_name(param_type)),
-        fragment_output_in_surface_layout(program), translate_state.hints->color_format, vertex_varyings_ptr->output_comp_count);
+    color_val_operand.type = std::get<0>(shader::get_parameter_type_store_and_name(param_type));
+    // if the shader tries to write a INT32 or UINT32, it means the raw content
+    if (color_val_operand.type == DataType::INT32 || color_val_operand.type == DataType::UINT32)
+        color_val_operand.type = DataType::F32;
+
+    // if the output component count is greater than the surface component count,
+    // it means we must pack multiple components (with lower precision) into one of the surface component
+    // this is used in assassin creed 3
+    if (gxm::get_base_format(translate_state.hints->color_format) == SCE_GXM_COLOR_BASE_FORMAT_F32F32 && vertex_varyings_ptr->output_comp_count > 2) {
+        if (color_val_operand.type == DataType::F16)
+            color_val_operand.type = DataType::F32;
+    }
+
+    // native-colour programs usually leave o0 in the surface's register layout, see fragment_color_layout
+    color_val_operand.type = apply_fragment_color_layout(color_val_operand.type, fragment_color_layout(fragment_output_in_surface_layout(program), translate_state.hints->color_format));
 
     spv::Decoration precision = (get_data_type_size(color_val_operand.type) < 4 && !features.force_full_precision) ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
     if (color_val_operand.type == DataType::INT16 || color_val_operand.type == DataType::UINT16)
