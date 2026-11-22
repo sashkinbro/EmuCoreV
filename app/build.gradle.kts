@@ -180,6 +180,8 @@ android {
                     arguments += "-DCMAKE_CXX_FLAGS_DEBUG=-O2 -g"
                     arguments += "-DCMAKE_C_FLAGS_DEBUG=-O2 -g"
                     arguments += "-DTRACY_ENABLE_ON_CORE_COMPONENTS=OFF"
+                    // Private research oracles (tools/oracles, if present) exist only in the debug variant.
+                    arguments += "-DECV_ORACLE=ON"
                 }
             }
         }

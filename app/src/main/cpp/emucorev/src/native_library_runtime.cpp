@@ -21,6 +21,9 @@
 #include <string_view>
 #include <array>
 #include <deque>
+#if ECV_ORACLE
+#include <ecv_oracle.h>
+#endif
 #include <mutex>
 
 namespace {
@@ -164,6 +167,10 @@ void poll_native_library_catalog(EmuEnvState &emuenv, ThreadState &thread) {
             shell_pacing_requested.store(false);
         }
     }
+#if ECV_ORACLE
+    if (!shell_pacing_requested.load())
+        ecv::oracle::on_native_library_poll(emuenv, thread);
+#endif
     if (!shell_catalog_requested.load()) return;
     auto *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
     auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
@@ -335,6 +342,9 @@ bool prepare_native_library(EmuEnvState &emuenv) {
     emuenv.cfg.current_config.lle_modules.emplace_back("libnet");
     for (const auto *name : { "sqlite", "bXCe", "ini_file_processor", "common_gui_dialog", "dbutil", "activity_db" })
         emuenv.cfg.current_config.lle_modules.emplace_back(name);
+#if ECV_ORACLE
+    ecv::oracle::on_native_library_prepare(emuenv);
+#endif
     emuenv.io.app_path = "__VITA_NATIVE_LIBRARY__";
     emuenv.kernel.is_system_process = true;
     emuenv.io.title_id = "SceShell";

@@ -31,6 +31,18 @@ target_include_directories(ECV PRIVATE
 
 target_compile_definitions(ECV PRIVATE EMUCOREV_ANDROID_BRIDGE=1)
 
+# Private research oracles (tools/ is git-ignored). Enabled only when the debug variant
+# passes -DECV_ORACLE=ON AND the directory exists, so a fresh clone builds without it.
+get_filename_component(ECV_ORACLE_HOOKS_DIR "${EMUCOREV_BRIDGE_DIR}/../../../../../tools/oracles/core-hooks" ABSOLUTE)
+if(ECV_ORACLE AND EXISTS "${ECV_ORACLE_HOOKS_DIR}/ecv_oracle.h")
+    file(GLOB ECV_ORACLE_SOURCES CONFIGURE_DEPENDS "${ECV_ORACLE_HOOKS_DIR}/*.cpp")
+    target_sources(ECV PRIVATE ${ECV_ORACLE_SOURCES})
+    foreach(oracle_target ECV kernel)
+        target_include_directories(${oracle_target} PRIVATE "${ECV_ORACLE_HOOKS_DIR}")
+        target_compile_definitions(${oracle_target} PRIVATE ECV_ORACLE=1)
+    endforeach()
+endif()
+
 # Core static libraries that merge the EmuCoreV keyboard/mouse source state.
 if(TARGET ctrl)
     target_include_directories(ctrl PRIVATE "${EMUCOREV_BRIDGE_DIR}/include")

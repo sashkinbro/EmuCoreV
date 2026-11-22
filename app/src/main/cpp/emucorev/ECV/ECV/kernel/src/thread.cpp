@@ -16,6 +16,9 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include <cpu/functions.h>
+#if ECV_ORACLE
+#include <ecv_oracle.h>
+#endif
 #include <kernel/thread/thread_state.h>
 
 #include <kernel/state.h>
@@ -476,8 +479,11 @@ void ThreadState::run_loop() {
             bool probe_thumb = false;
             if (!do_step && hit_breakpoint(*cpu) && kernel.debugger.is_probe(read_pc(*cpu) & ~1u, probe_thumb)) {
                 const uint32_t probe_pc = read_pc(*cpu) & ~1u;
-#ifndef NDEBUG
-                if (spdlog::default_logger_raw()->should_log(spdlog::level::err)) {
+                bool probe_hooked = false;
+#if ECV_ORACLE
+                probe_hooked = ecv::oracle::on_probe(kernel, mem, *cpu, probe_pc);
+#endif
+                if (!probe_hooked && spdlog::default_logger_raw()->should_log(spdlog::level::err)) {
                     std::string ctx = fmt::format("[CUEPROBE] pc=0x{:08X} thread='{}' ({})", probe_pc, name, id);
                     for (int ri = 0; ri <= 12; ri++)
                         ctx += fmt::format(" r{}=0x{:08X}", ri, read_reg(*cpu, ri));
@@ -497,7 +503,6 @@ void ThreadState::run_loop() {
                     }
                     LOG_ERROR("{}\n{}", ctx, log_stack_traceback());
                 }
-#endif
                 {
                     const std::lock_guard<std::mutex> probe_guard(kernel.debugger.probe_step_mutex);
                     kernel.debugger.remove_breakpoint(mem, probe_pc);
