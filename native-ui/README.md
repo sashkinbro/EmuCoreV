@@ -18,9 +18,34 @@
   area from cutouts and rounded corners.
 
 Open: exact timings of the notification fade, app open/close zoom and page
-slide are provisional (not traced from SceShell); m_waveType to effect
-mapping is provisional; theme BGM, theme deletion and the monthly Default
-wave colour are not implemented.
+slide are provisional (not yet attributed to SceShell call sites, see
+"Shell timer survey"); the monthly Default wave colour is not implemented.
+m_waveType follows libpaf's table at 0x813012e8 (ScePafGraphics 2E30F1B5,
+values outside 0..31 give effects_default_0512_01). The LiveArea sheet is
+anchored to the canvas bottom (Vita content y 44..544, flush with the panel).
+
+## Shell timer survey (static, 2026-11-22)
+
+`Timer::InitTimer` (libpaf 0x8104845e) takes the duration in **milliseconds**
+(`s0`, scaled by 0.001f inside), curve id in `r1` (timer.h enum: 0 linear,
+7 quad-in, 21 quad-out, 23 quart-out, 24 quint-out, 32 back-out, 33/68
+elastic-out, 35 quad-in-out, 36 cubic-in-out, 39 sine-in-out). shell.self
+calls it through stub 0x8145b2c8 from 480 sites. Candidates (shell VAs,
+attribution not yet confirmed at runtime):
+
+- 0x810ba824, applauncher 960x512 group 0x795b9e68 opening: scale
+  0.165865 -> 1 as 375 ms quad-out then 375 ms back-out; position 275 ms
+  quint-out then 275 ms quad-out (LiveArea open or folder open).
+- 0x810baefc (closing counterpart): 275 ms and 325 ms quart-out.
+- 0x810b519e selection: scale 1.4 + white, 200 ms quad-out; previous back
+  to 1.0 in 200 ms.
+- Indicator plugin: mostly 200 ms linear/quad-out fades; a pop page with
+  800 ms elastic-out to 1.1 and 350 ms back-out (150 ms delay).
+- ScrollView auto-snap (libpaf 0x8111f14e): computed `K * |d|^0.25` ms,
+  quart-out, K = snap_anim_time * 0.5 (default 100).
+
+Runtime confirmation needs a trace of InitTimer (r0, s0, r1..r3, lr) while
+the emulated SceShell performs each transition.
 
 This directory contains the independent C++ implementation. Its core libraries
 have no emulator, guest CPU, SDL, Android application or game runtime dependency. It is not yet a
