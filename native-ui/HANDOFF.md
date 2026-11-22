@@ -46,7 +46,9 @@ Everything below is pushed to `main`.
 - m_waveType -> effect: traced (libpaf table 0x813012e8 via ScePafGraphics 2E30F1B5;
   out of range = default). Type 31 (waveparam.bin custom wave) uses the bundled preset.
 - Theme BGM audio quality not listened to; Quick Saves resume not tested (no saves
-  on the device); monthly Default wave colour not implemented.
+  on the device). Monthly Default wave colour: shell.self/libpaf contain no month
+  logic (all RTC callers and wave-type writers checked); if it exists it is data in
+  vs0:data/internal/theme (only in the installed firmware, check on a device).
 - Vita "Hidden trophy" name string and grade names are our translations.
 
 ## How to build / test

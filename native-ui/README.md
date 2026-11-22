@@ -19,7 +19,8 @@
 
 Open: exact timings of the notification fade, app open/close zoom and page
 slide are provisional (not yet attributed to SceShell call sites, see
-"Shell timer survey"); the monthly Default wave colour is not implemented.
+"Shell timer survey"). No month-based Default wave logic exists in shell.self or
+libpaf; any monthly variation would come from vs0:data/internal/theme data.
 m_waveType follows libpaf's table at 0x813012e8 (ScePafGraphics 2E30F1B5,
 values outside 0..31 give effects_default_0512_01). The LiveArea sheet is
 anchored to the canvas bottom (Vita content y 44..544, flush with the panel).
