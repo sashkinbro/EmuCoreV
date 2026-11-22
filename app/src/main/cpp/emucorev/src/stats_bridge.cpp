@@ -43,8 +43,10 @@ Java_com_sbro_emucorev_core_PerformanceStatsBridge_nativeSnapshot(JNIEnv *env, j
         out << ",\"fps\":" << uint32_t(packed) << ",\"frameMs\":" << uint32_t(packed >> 32);
     {
         std::lock_guard display_lock(emuenv->display.display_info_mutex);
-        out << ",\"width\":" << emuenv->display.next_rendered_frame.image_size.x
-            << ",\"height\":" << emuenv->display.next_rendered_frame.image_size.y;
+        // Host render size: the guest frame scaled by the internal resolution multiplier (changes live).
+        const float scale = state.res_multiplier > 0.0f ? state.res_multiplier : 1.0f;
+        out << ",\"width\":" << static_cast<uint32_t>(emuenv->display.next_rendered_frame.image_size.x * scale + 0.5f)
+            << ",\"height\":" << static_cast<uint32_t>(emuenv->display.next_rendered_frame.image_size.y * scale + 0.5f);
     }
     out << '}';
     return env->NewStringUTF(out.str().c_str());

@@ -5,6 +5,7 @@
 // objects, std::thread handles) is rebuilt on load.
 
 #include <emucorev/savestate/savestate.h>
+#include <emucorev/live_resolution.h>
 
 #include <emucorev/savestate/archive.h>
 #include <emucorev/savestate/memory_image.h>
@@ -48,6 +49,7 @@
 #include <ngs/state.h>
 #include <renderer/functions.h>
 #include <renderer/state.h>
+#include <renderer/vulkan/state.h>
 #include <touch/functions.h>
 #include <touch/state.h>
 #include <util/log.h>
@@ -2265,6 +2267,20 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         return result;
     }
 
+    // The internal resolution can be changed live from the pause menu, so a save made at another
+    // resolution is common. Switch the running session to the save's resolution first (same path as
+    // the menu); the session stays at that resolution after the load. Only if the switch is not
+    // possible (unsupported here, renderer refused) is the save reported as a mismatch.
+    if (emuenv.renderer->current_backend == renderer::Backend::Vulkan
+        && static_cast<uint32_t>(emuenv.renderer->mapping_method) == gpu_snapshot.mapping_method
+        && emuenv.renderer->res_multiplier != gpu_snapshot.resolution) {
+        std::string resolution_error;
+        const auto switched = emucorev::live_resolution::apply(emuenv, gpu_snapshot.resolution, resolution_error);
+        if (switched == emucorev::live_resolution::Result::Applied)
+            LOG_INFO("[savestate] load: internal resolution switched to {}x to match the save", gpu_snapshot.resolution);
+        else if (switched != emucorev::live_resolution::Result::Unchanged)
+            LOG_WARN("[savestate] load: cannot switch to the save's resolution {}x: {}", gpu_snapshot.resolution, resolution_error);
+    }
     if (emuenv.renderer->current_backend != renderer::Backend::Vulkan
         || static_cast<uint32_t>(emuenv.renderer->mapping_method) != gpu_snapshot.mapping_method
         || emuenv.renderer->res_multiplier != gpu_snapshot.resolution) {
@@ -2450,6 +2466,9 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         result.error = error;
         return result;
     }
+    // Every pipeline of the restored scene is new to this session: compile them in place for the
+    // first seconds instead of skipping those draws (objects and textures popped in late).
+    static_cast<renderer::vulkan::VKState &>(*emuenv.renderer).pipeline_cache.force_sync_compilation_for(std::chrono::seconds(3));
 
 
     if (!read_ngs(emuenv, ngs_snapshot, error)) {
