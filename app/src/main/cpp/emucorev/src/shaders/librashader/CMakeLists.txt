@@ -230,7 +230,26 @@ string(REPLACE "-" "_" _lrs_target_under "${_lrs_rust_target}")
 # The NDK already carries a self-contained equivalent (llvm-dlltool), so stage it under
 # the name rustc looks for, next to the libwinpthread it is linked against, and prepend
 # that directory to cargo's PATH. Only GNU hosts need this.
-if(CMAKE_HOST_WIN32 AND _lrs_rustup_env MATCHES "gnu")
+# The GNU host may also be rustup's default toolchain (no RUSTUP_TOOLCHAIN override),
+# so ask the effective rustc for its host triple instead of relying on the override.
+set(_lrs_host_is_gnu FALSE)
+if(CMAKE_HOST_WIN32)
+	if(NOT RUSTC_EXECUTABLE)
+		get_filename_component(_lrs_cargo_bin_dir "${CARGO_EXECUTABLE}" DIRECTORY)
+		find_program(RUSTC_EXECUTABLE rustc HINTS "${_lrs_cargo_bin_dir}" "$ENV{USERPROFILE}/.cargo/bin")
+	endif()
+	if(RUSTC_EXECUTABLE)
+		execute_process(
+			COMMAND "${CMAKE_COMMAND}" -E env ${_lrs_rustup_env} "${RUSTC_EXECUTABLE}" -vV
+			OUTPUT_VARIABLE _lrs_effective_rustc
+			ERROR_QUIET
+		)
+		if(_lrs_effective_rustc MATCHES "host: [A-Za-z0-9_.-]*-gnu")
+			set(_lrs_host_is_gnu TRUE)
+		endif()
+	endif()
+endif()
+if(CMAKE_HOST_WIN32 AND (_lrs_rustup_env MATCHES "gnu" OR _lrs_host_is_gnu))
 	set(_lrs_host_tools_dir "${CMAKE_CURRENT_BINARY_DIR}/host-tools")
 	set(_lrs_dlltool_shim "${_lrs_host_tools_dir}/dlltool.exe")
 	file(MAKE_DIRECTORY "${_lrs_host_tools_dir}")
