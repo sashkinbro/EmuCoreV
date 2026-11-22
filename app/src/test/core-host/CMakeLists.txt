@@ -23,9 +23,13 @@ add_executable(core_host_tests
     video_snapshot_tests.cpp
     guest_atomics_tests.cpp
     clib_chk_tests.cpp
-    rwlock_policy_tests.cpp)
+    rwlock_policy_tests.cpp
+    async_io_tests.cpp
+    stub_dialog_tests.cpp)
 target_include_directories(core_host_tests PRIVATE
     "${CORE_ROOT}/kernel/include"
+    "${CORE_ROOT}/io/include"
+    "${CORE_ROOT}/dialog/include"
     "${CORE_ROOT}/modules/SceVideodec"
     "${CORE_ROOT}/modules/SceLibKernel")
 target_link_libraries(core_host_tests PRIVATE gtest_host)

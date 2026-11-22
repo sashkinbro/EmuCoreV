@@ -663,9 +663,10 @@ EXPORT(int, sceIoDevctl, const char *dev, SceInt cmd, const void *indata, SceSiz
         break;
     }
     default: {
-        LOG_WARN("Unhandled case for sceIoDevctl cmd={}", cmd);
-        assert(false);
-        return 0;
+        // vita-headers documents only command 0x3001 (device info); anything else is refused like an unknown
+        // device command instead of aborting the emulator
+        LOG_WARN_ONCE("Unhandled case for sceIoDevctl cmd={}", cmd);
+        return RET_ERROR(SCE_ERROR_ERRNO_EINVAL);
     }
     }
 
@@ -724,9 +725,11 @@ EXPORT(SceOff, sceIoLseek, const SceUID fd, const SceOff offset, const SceIoSeek
     return res;
 }
 
-EXPORT(int, sceIoLseekAsync) {
-    TRACY_FUNC(sceIoLseekAsync);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoLseekAsync, const SceUID fd, const SceOff offset, const SceIoSeekMode whence) {
+    TRACY_FUNC(sceIoLseekAsync, fd, offset, whence);
+    const SceOff res = CALL_EXPORT(sceIoLseek, fd, offset, whence);
+    emuenv.io.async_ops.push(fd, res);
+    return 0;
 }
 
 EXPORT(int, sceIoMkdir, const char *dir, const SceMode mode) {
@@ -754,9 +757,17 @@ EXPORT(SceUID, sceIoOpen, const char *file, const int flags, const SceMode mode)
     return opened_fd;
 }
 
-EXPORT(int, sceIoOpenAsync) {
-    TRACY_FUNC(sceIoOpenAsync);
-    return UNIMPLEMENTED();
+// Executes the open at submit time. The fd is the async handle: the open result (the fd, or a negative
+// error) is collected with sceIoComplete(fd, ...). A failed open has no fd to hand out, so its error is
+// returned directly.
+EXPORT(SceUID, sceIoOpenAsync, const char *file, const int flags, const SceMode mode) {
+    TRACY_FUNC(sceIoOpenAsync, file, flags, mode);
+    const SceUID fd = CALL_EXPORT(sceIoOpen, file, flags, mode);
+    if (fd < 0)
+        return fd;
+    emuenv.io.async_ops.discard(fd);
+    emuenv.io.async_ops.push(fd, fd);
+    return fd;
 }
 
 EXPORT(SceSSize, sceIoPread, SceUID fd, void *buf, SceSize nbyte, SceOff offset) {
@@ -770,9 +781,13 @@ EXPORT(SceSSize, sceIoPread, SceUID fd, void *buf, SceSize nbyte, SceOff offset)
     return read_file_at(buf, emuenv.io, fd, nbyte, offset, export_name);
 }
 
-EXPORT(int, sceIoPreadAsync) {
-    TRACY_FUNC(sceIoPreadAsync);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoPreadAsync, SceUID fd, void *buf, SceSize nbyte, SceOff offset) {
+    TRACY_FUNC(sceIoPreadAsync, fd, buf, nbyte, offset);
+    if (!buf)
+        return RET_ERROR(SCE_ERROR_ERRNO_EINVAL);
+    const SceSSize res = CALL_EXPORT(sceIoPread, fd, buf, nbyte, offset);
+    emuenv.io.async_ops.push(fd, res);
+    return 0;
 }
 
 EXPORT(SceSSize, sceIoPwrite, SceUID fd, const void *buf, SceSize nbyte, SceOff offset) {
@@ -780,9 +795,13 @@ EXPORT(SceSSize, sceIoPwrite, SceUID fd, const void *buf, SceSize nbyte, SceOff 
     return write_file_at(fd, buf, nbyte, offset, emuenv.io, export_name);
 }
 
-EXPORT(int, sceIoPwriteAsync) {
-    TRACY_FUNC(sceIoPwriteAsync);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoPwriteAsync, SceUID fd, const void *buf, SceSize nbyte, SceOff offset) {
+    TRACY_FUNC(sceIoPwriteAsync, fd, buf, nbyte, offset);
+    if (!buf)
+        return RET_ERROR(SCE_ERROR_ERRNO_EINVAL);
+    const SceSSize res = CALL_EXPORT(sceIoPwrite, fd, buf, nbyte, offset);
+    emuenv.io.async_ops.push(fd, res);
+    return 0;
 }
 
 EXPORT(int, sceIoRead2) {
@@ -830,9 +849,11 @@ EXPORT(int, sceIoRmdirAsync) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceIoSync) {
-    TRACY_FUNC(sceIoSync);
-    return UNIMPLEMENTED();
+// sceIoSync(const char *device, unsigned int flags) in vita-headers. Host files are written through
+// the C stdio layer on every operation, so there is nothing device-wide left to flush.
+EXPORT(int, sceIoSync, const char *device, const unsigned int flags) {
+    TRACY_FUNC(sceIoSync, device, flags);
+    return 0;
 }
 
 EXPORT(int, sceIoSyncAsync) {

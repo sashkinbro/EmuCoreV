@@ -18,6 +18,7 @@
 #include <module/module.h>
 
 #include <dialog/state.h>
+#include <dialog/stub_dialog.h>
 #include <dialog/types.h>
 #include <emuenv/app_util.h>
 #include <ime/state.h>
@@ -33,6 +34,7 @@
 
 #include <SDL3/SDL_timer.h>
 
+#include <cstring>
 #include <mutex>
 #include <span>
 
@@ -54,6 +56,82 @@ void complete_trophy_setup_dialog(DialogState &dialog) {
 
     dialog.status = SCE_COMMON_DIALOG_STATUS_FINISHED;
     dialog.result = SCE_COMMON_DIALOG_RESULT_OK;
+}
+
+static_assert(stub_dialog::STATUS_NONE == SCE_COMMON_DIALOG_STATUS_NONE);
+static_assert(stub_dialog::STATUS_RUNNING == SCE_COMMON_DIALOG_STATUS_RUNNING);
+static_assert(stub_dialog::STATUS_FINISHED == SCE_COMMON_DIALOG_STATUS_FINISHED);
+static_assert(stub_dialog::RESULT_OK == SCE_COMMON_DIALOG_RESULT_OK);
+static_assert(stub_dialog::RESULT_USER_CANCELED == SCE_COMMON_DIALOG_RESULT_USER_CANCELED);
+static_assert(stub_dialog::RESULT_ABORTED == SCE_COMMON_DIALOG_RESULT_ABORTED);
+static_assert(stub_dialog::ERR_BUSY == static_cast<int32_t>(SCE_COMMON_DIALOG_ERROR_BUSY));
+static_assert(stub_dialog::ERR_NULL == static_cast<int32_t>(SCE_COMMON_DIALOG_ERROR_NULL));
+static_assert(stub_dialog::ERR_NOT_RUNNING == static_cast<int32_t>(SCE_COMMON_DIALOG_ERROR_NOT_RUNNING));
+static_assert(stub_dialog::ERR_NOT_FINISHED == static_cast<int32_t>(SCE_COMMON_DIALOG_ERROR_NOT_FINISHED));
+static_assert(stub_dialog::ERR_NOT_IN_USE == static_cast<int32_t>(SCE_COMMON_DIALOG_ERROR_NOT_IN_USE));
+
+// Shared by the dialogs that have no UI (see stub_dialog.h). There is nothing to display, so the dialog is
+// finished right after Init; the shared DialogState is kept in sync for the renderer/touch checks.
+void sync_stub_dialog(DialogState &dialog) {
+    dialog.status = static_cast<SceCommonDialogStatus>(dialog.stub.status);
+    dialog.result = static_cast<SceCommonDialogResult>(dialog.stub.result);
+}
+
+int stub_dialog_init(DialogState &dialog, stub_dialog::Kind kind, const void *param) {
+    if (!param)
+        return static_cast<int>(SCE_COMMON_DIALOG_ERROR_NULL);
+    std::lock_guard<std::recursive_mutex> lock(dialog.mutex);
+    const int32_t err = stub_dialog::init(dialog.stub, kind, dialog.type != NO_DIALOG);
+    if (err != 0)
+        return err;
+    stub_dialog::update(dialog.stub);
+    dialog.type = STUB_DIALOG;
+    sync_stub_dialog(dialog);
+    return 0;
+}
+
+int stub_dialog_get_status(DialogState &dialog, stub_dialog::Kind kind) {
+    std::lock_guard<std::recursive_mutex> lock(dialog.mutex);
+    stub_dialog::update(dialog.stub);
+    if (dialog.type == STUB_DIALOG)
+        sync_stub_dialog(dialog);
+    return stub_dialog::get_status(dialog.stub, kind);
+}
+
+int stub_dialog_abort(DialogState &dialog, stub_dialog::Kind kind) {
+    std::lock_guard<std::recursive_mutex> lock(dialog.mutex);
+    const int32_t err = stub_dialog::abort(dialog.stub, kind);
+    if (err == 0)
+        sync_stub_dialog(dialog);
+    return err;
+}
+
+// The result structs of these dialogs begin with SceInt32 result. result_size is the full struct size when
+// vita-headers documents it (zero-filled), otherwise 0 and only the leading result code is written.
+int stub_dialog_get_result(DialogState &dialog, stub_dialog::Kind kind, void *out, size_t result_size) {
+    if (!out)
+        return static_cast<int>(SCE_COMMON_DIALOG_ERROR_NULL);
+    std::lock_guard<std::recursive_mutex> lock(dialog.mutex);
+    stub_dialog::update(dialog.stub);
+    int32_t result = 0;
+    const int32_t err = stub_dialog::get_result(dialog.stub, kind, result);
+    if (err != 0)
+        return err;
+    if (result_size)
+        memset(out, 0, result_size);
+    memcpy(out, &result, sizeof(result));
+    return 0;
+}
+
+int stub_dialog_term(DialogState &dialog, stub_dialog::Kind kind) {
+    std::lock_guard<std::recursive_mutex> lock(dialog.mutex);
+    const int32_t err = stub_dialog::term(dialog.stub, kind);
+    if (err != 0)
+        return err;
+    dialog.type = NO_DIALOG;
+    dialog.status = SCE_COMMON_DIALOG_STATUS_NONE;
+    dialog.result = SCE_COMMON_DIALOG_RESULT_OK;
+    return 0;
 }
 } // namespace
 
@@ -77,27 +155,27 @@ std::string to_debug_str<SceSaveDataDialogProgressBarTarget>(const MemState &mem
 
 EXPORT(int, sceCameraImportDialogAbort) {
     TRACY_FUNC(sceCameraImportDialogAbort);
-    return UNIMPLEMENTED();
+    return stub_dialog_abort(emuenv.common_dialog, stub_dialog::Kind::CameraImport);
 }
 
-EXPORT(int, sceCameraImportDialogGetResult) {
-    TRACY_FUNC(sceCameraImportDialogGetResult);
-    return UNIMPLEMENTED();
+EXPORT(int, sceCameraImportDialogGetResult, void *result) {
+    TRACY_FUNC(sceCameraImportDialogGetResult, result);
+    return stub_dialog_get_result(emuenv.common_dialog, stub_dialog::Kind::CameraImport, result, 0);
 }
 
 EXPORT(int, sceCameraImportDialogGetStatus) {
     TRACY_FUNC(sceCameraImportDialogGetStatus);
-    return UNIMPLEMENTED();
+    return stub_dialog_get_status(emuenv.common_dialog, stub_dialog::Kind::CameraImport);
 }
 
-EXPORT(int, sceCameraImportDialogInit) {
-    TRACY_FUNC(sceCameraImportDialogInit);
-    return UNIMPLEMENTED();
+EXPORT(int, sceCameraImportDialogInit, const void *param) {
+    TRACY_FUNC(sceCameraImportDialogInit, param);
+    return stub_dialog_init(emuenv.common_dialog, stub_dialog::Kind::CameraImport, param);
 }
 
 EXPORT(int, sceCameraImportDialogTerm) {
     TRACY_FUNC(sceCameraImportDialogTerm);
-    return UNIMPLEMENTED();
+    return stub_dialog_term(emuenv.common_dialog, stub_dialog::Kind::CameraImport);
 }
 
 EXPORT(int, sceCommonDialog_B7D4C911) {
@@ -122,7 +200,14 @@ EXPORT(int, sceCommonDialogSetConfigParam) {
 
 EXPORT(int, sceCommonDialogUpdate) {
     TRACY_FUNC(sceCommonDialogUpdate);
-    STUBBED("Return 0");
+    // Display-update hook (SceCommonDialogUpdateParam: render target + sync object). Dialogs are drawn by the
+    // overlay, so only the UI-less dialogs need to advance here.
+    {
+        std::lock_guard<std::recursive_mutex> lock(emuenv.common_dialog.mutex);
+        stub_dialog::update(emuenv.common_dialog.stub);
+        if (emuenv.common_dialog.type == STUB_DIALOG)
+            sync_stub_dialog(emuenv.common_dialog);
+    }
     return 0;
 }
 
@@ -553,7 +638,15 @@ EXPORT(int, sceMsgDialogTerm) {
 
 EXPORT(int, sceNetCheckDialogAbort) {
     TRACY_FUNC(sceNetCheckDialogAbort);
-    return UNIMPLEMENTED();
+    if (emuenv.common_dialog.type != NETCHECK_DIALOG)
+        return RET_ERROR(SCE_COMMON_DIALOG_ERROR_NOT_IN_USE);
+
+    std::lock_guard<std::recursive_mutex> lock(emuenv.common_dialog.mutex);
+    if (emuenv.common_dialog.status == SCE_COMMON_DIALOG_STATUS_RUNNING) {
+        emuenv.common_dialog.status = SCE_COMMON_DIALOG_STATUS_FINISHED;
+        emuenv.common_dialog.result = SCE_COMMON_DIALOG_RESULT_ABORTED;
+    }
+    return 0;
 }
 
 EXPORT(int, sceNetCheckDialogGetPS3ConnectInfo) {
@@ -604,6 +697,8 @@ EXPORT(SceCommonDialogStatus, sceNetCheckDialogGetStatus) {
 
 EXPORT(int, sceNetCheckDialogInit, const SceNetCheckDialogParam *param) {
     TRACY_FUNC(sceNetCheckDialogInit);
+    if (!param)
+        return RET_ERROR(SCE_COMMON_DIALOG_ERROR_NULL);
     if (emuenv.common_dialog.type != NO_DIALOG)
         return RET_ERROR(SCE_COMMON_DIALOG_ERROR_BUSY);
 
@@ -624,115 +719,119 @@ EXPORT(int, sceNetCheckDialogInit, const SceNetCheckDialogParam *param) {
         break;
     }
 
-    return UNIMPLEMENTED();
+    return 0;
 }
 
 EXPORT(int, sceNetCheckDialogTerm) {
     TRACY_FUNC(sceNetCheckDialogTerm);
+    if (emuenv.common_dialog.type != NETCHECK_DIALOG)
+        return RET_ERROR(SCE_COMMON_DIALOG_ERROR_NOT_IN_USE);
+
+    std::lock_guard<std::recursive_mutex> lock(emuenv.common_dialog.mutex);
     emuenv.common_dialog.status = SCE_COMMON_DIALOG_STATUS_NONE;
     emuenv.common_dialog.type = NO_DIALOG;
     emuenv.common_dialog.netcheck.mode = SCE_NETCHECK_DIALOG_MODE_INVALID;
-    return UNIMPLEMENTED();
+    return 0;
 }
 
 EXPORT(int, sceNpFriendList2DialogAbort) {
     TRACY_FUNC(sceNpFriendList2DialogAbort);
-    return UNIMPLEMENTED();
+    return stub_dialog_abort(emuenv.common_dialog, stub_dialog::Kind::NpFriendList2);
 }
 
-EXPORT(int, sceNpFriendList2DialogGetResult) {
-    TRACY_FUNC(sceNpFriendList2DialogGetResult);
-    return UNIMPLEMENTED();
+EXPORT(int, sceNpFriendList2DialogGetResult, void *result) {
+    TRACY_FUNC(sceNpFriendList2DialogGetResult, result);
+    return stub_dialog_get_result(emuenv.common_dialog, stub_dialog::Kind::NpFriendList2, result, 0);
 }
 
 EXPORT(int, sceNpFriendList2DialogGetStatus) {
     TRACY_FUNC(sceNpFriendList2DialogGetStatus);
-    return UNIMPLEMENTED();
+    return stub_dialog_get_status(emuenv.common_dialog, stub_dialog::Kind::NpFriendList2);
 }
 
-EXPORT(int, sceNpFriendList2DialogInit) {
-    TRACY_FUNC(sceNpFriendList2DialogInit);
-    return UNIMPLEMENTED();
+EXPORT(int, sceNpFriendList2DialogInit, const void *param) {
+    TRACY_FUNC(sceNpFriendList2DialogInit, param);
+    return stub_dialog_init(emuenv.common_dialog, stub_dialog::Kind::NpFriendList2, param);
 }
 
 EXPORT(int, sceNpFriendList2DialogTerm) {
     TRACY_FUNC(sceNpFriendList2DialogTerm);
-    return UNIMPLEMENTED();
+    return stub_dialog_term(emuenv.common_dialog, stub_dialog::Kind::NpFriendList2);
 }
 
 EXPORT(int, sceNpFriendListDialogAbort) {
     TRACY_FUNC(sceNpFriendListDialogAbort);
-    return UNIMPLEMENTED();
+    return stub_dialog_abort(emuenv.common_dialog, stub_dialog::Kind::NpFriendList);
 }
 
-EXPORT(int, sceNpFriendListDialogGetResult) {
-    TRACY_FUNC(sceNpFriendListDialogGetResult);
-    return UNIMPLEMENTED();
+EXPORT(int, sceNpFriendListDialogGetResult, void *result) {
+    TRACY_FUNC(sceNpFriendListDialogGetResult, result);
+    return stub_dialog_get_result(emuenv.common_dialog, stub_dialog::Kind::NpFriendList, result, 0);
 }
 
 EXPORT(int, sceNpFriendListDialogGetStatus) {
     TRACY_FUNC(sceNpFriendListDialogGetStatus);
-    return UNIMPLEMENTED();
+    return stub_dialog_get_status(emuenv.common_dialog, stub_dialog::Kind::NpFriendList);
 }
 
-EXPORT(int, sceNpFriendListDialogInit) {
-    TRACY_FUNC(sceNpFriendListDialogInit);
-    return UNIMPLEMENTED();
+EXPORT(int, sceNpFriendListDialogInit, const void *param) {
+    TRACY_FUNC(sceNpFriendListDialogInit, param);
+    return stub_dialog_init(emuenv.common_dialog, stub_dialog::Kind::NpFriendList, param);
 }
 
 EXPORT(int, sceNpFriendListDialogTerm) {
     TRACY_FUNC(sceNpFriendListDialogTerm);
-    return UNIMPLEMENTED();
+    return stub_dialog_term(emuenv.common_dialog, stub_dialog::Kind::NpFriendList);
 }
 
 EXPORT(int, sceNpMessageDialogAbort) {
     TRACY_FUNC(sceNpMessageDialogAbort);
-    return UNIMPLEMENTED();
+    return stub_dialog_abort(emuenv.common_dialog, stub_dialog::Kind::NpMessage);
 }
 
-EXPORT(int, sceNpMessageDialogGetResult) {
-    TRACY_FUNC(sceNpMessageDialogGetResult);
-    return UNIMPLEMENTED();
+EXPORT(int, sceNpMessageDialogGetResult, void *result) {
+    TRACY_FUNC(sceNpMessageDialogGetResult, result);
+    return stub_dialog_get_result(emuenv.common_dialog, stub_dialog::Kind::NpMessage, result, 0);
 }
 
 EXPORT(int, sceNpMessageDialogGetStatus) {
     TRACY_FUNC(sceNpMessageDialogGetStatus);
-    return UNIMPLEMENTED();
+    return stub_dialog_get_status(emuenv.common_dialog, stub_dialog::Kind::NpMessage);
 }
 
-EXPORT(int, sceNpMessageDialogInit) {
-    TRACY_FUNC(sceNpMessageDialogInit);
-    return UNIMPLEMENTED();
+EXPORT(int, sceNpMessageDialogInit, const void *param) {
+    TRACY_FUNC(sceNpMessageDialogInit, param);
+    return stub_dialog_init(emuenv.common_dialog, stub_dialog::Kind::NpMessage, param);
 }
 
 EXPORT(int, sceNpMessageDialogTerm) {
     TRACY_FUNC(sceNpMessageDialogTerm);
-    return UNIMPLEMENTED();
+    return stub_dialog_term(emuenv.common_dialog, stub_dialog::Kind::NpMessage);
 }
 
 EXPORT(int, sceNpProfileDialogAbort) {
     TRACY_FUNC(sceNpProfileDialogAbort);
-    return UNIMPLEMENTED();
+    return stub_dialog_abort(emuenv.common_dialog, stub_dialog::Kind::NpProfile);
 }
 
-EXPORT(int, sceNpProfileDialogGetResult) {
-    TRACY_FUNC(sceNpProfileDialogGetResult);
-    return UNIMPLEMENTED();
+EXPORT(int, sceNpProfileDialogGetResult, void *result) {
+    TRACY_FUNC(sceNpProfileDialogGetResult, result);
+    return stub_dialog_get_result(emuenv.common_dialog, stub_dialog::Kind::NpProfile, result, 0);
 }
 
 EXPORT(int, sceNpProfileDialogGetStatus) {
     TRACY_FUNC(sceNpProfileDialogGetStatus);
-    return UNIMPLEMENTED();
+    return stub_dialog_get_status(emuenv.common_dialog, stub_dialog::Kind::NpProfile);
 }
 
-EXPORT(int, sceNpProfileDialogInit) {
-    TRACY_FUNC(sceNpProfileDialogInit);
-    return UNIMPLEMENTED();
+EXPORT(int, sceNpProfileDialogInit, const void *param) {
+    TRACY_FUNC(sceNpProfileDialogInit, param);
+    return stub_dialog_init(emuenv.common_dialog, stub_dialog::Kind::NpProfile, param);
 }
 
 EXPORT(int, sceNpProfileDialogTerm) {
     TRACY_FUNC(sceNpProfileDialogTerm);
-    return UNIMPLEMENTED();
+    return stub_dialog_term(emuenv.common_dialog, stub_dialog::Kind::NpProfile);
 }
 
 EXPORT(int, sceNpSnsFacebookDialogAbort) {
@@ -818,52 +917,52 @@ EXPORT(int, sceNpTrophySetupDialogTerm) {
 
 EXPORT(int, scePhotoImportDialogAbort) {
     TRACY_FUNC(scePhotoImportDialogAbort);
-    return UNIMPLEMENTED();
+    return stub_dialog_abort(emuenv.common_dialog, stub_dialog::Kind::PhotoImport);
 }
 
-EXPORT(int, scePhotoImportDialogGetResult) {
-    TRACY_FUNC(scePhotoImportDialogGetResult);
-    return UNIMPLEMENTED();
+EXPORT(int, scePhotoImportDialogGetResult, void *result) {
+    TRACY_FUNC(scePhotoImportDialogGetResult, result);
+    return stub_dialog_get_result(emuenv.common_dialog, stub_dialog::Kind::PhotoImport, result, 0x28);
 }
 
 EXPORT(int, scePhotoImportDialogGetStatus) {
     TRACY_FUNC(scePhotoImportDialogGetStatus);
-    return UNIMPLEMENTED();
+    return stub_dialog_get_status(emuenv.common_dialog, stub_dialog::Kind::PhotoImport);
 }
 
-EXPORT(int, scePhotoImportDialogInit) {
-    TRACY_FUNC(scePhotoImportDialogInit);
-    return UNIMPLEMENTED();
+EXPORT(int, scePhotoImportDialogInit, const void *param) {
+    TRACY_FUNC(scePhotoImportDialogInit, param);
+    return stub_dialog_init(emuenv.common_dialog, stub_dialog::Kind::PhotoImport, param);
 }
 
 EXPORT(int, scePhotoImportDialogTerm) {
     TRACY_FUNC(scePhotoImportDialogTerm);
-    return UNIMPLEMENTED();
+    return stub_dialog_term(emuenv.common_dialog, stub_dialog::Kind::PhotoImport);
 }
 
 EXPORT(int, scePhotoReviewDialogAbort) {
     TRACY_FUNC(scePhotoReviewDialogAbort);
-    return UNIMPLEMENTED();
+    return stub_dialog_abort(emuenv.common_dialog, stub_dialog::Kind::PhotoReview);
 }
 
-EXPORT(int, scePhotoReviewDialogGetResult) {
-    TRACY_FUNC(scePhotoReviewDialogGetResult);
-    return UNIMPLEMENTED();
+EXPORT(int, scePhotoReviewDialogGetResult, void *result) {
+    TRACY_FUNC(scePhotoReviewDialogGetResult, result);
+    return stub_dialog_get_result(emuenv.common_dialog, stub_dialog::Kind::PhotoReview, result, 0x24);
 }
 
 EXPORT(int, scePhotoReviewDialogGetStatus) {
     TRACY_FUNC(scePhotoReviewDialogGetStatus);
-    return UNIMPLEMENTED();
+    return stub_dialog_get_status(emuenv.common_dialog, stub_dialog::Kind::PhotoReview);
 }
 
-EXPORT(int, scePhotoReviewDialogInit) {
-    TRACY_FUNC(scePhotoReviewDialogInit);
-    return UNIMPLEMENTED();
+EXPORT(int, scePhotoReviewDialogInit, const void *param) {
+    TRACY_FUNC(scePhotoReviewDialogInit, param);
+    return stub_dialog_init(emuenv.common_dialog, stub_dialog::Kind::PhotoReview, param);
 }
 
 EXPORT(int, scePhotoReviewDialogTerm) {
     TRACY_FUNC(scePhotoReviewDialogTerm);
-    return UNIMPLEMENTED();
+    return stub_dialog_term(emuenv.common_dialog, stub_dialog::Kind::PhotoReview);
 }
 
 EXPORT(int, scePspSaveDataDialogContinue) {
@@ -1567,27 +1666,27 @@ EXPORT(int, sceSaveDataDialogTerm) {
 
 EXPORT(int, sceStoreCheckoutDialogAbort) {
     TRACY_FUNC(sceStoreCheckoutDialogAbort);
-    return UNIMPLEMENTED();
+    return stub_dialog_abort(emuenv.common_dialog, stub_dialog::Kind::StoreCheckout);
 }
 
-EXPORT(int, sceStoreCheckoutDialogGetResult) {
-    TRACY_FUNC(sceStoreCheckoutDialogGetResult);
-    return UNIMPLEMENTED();
+EXPORT(int, sceStoreCheckoutDialogGetResult, void *result) {
+    TRACY_FUNC(sceStoreCheckoutDialogGetResult, result);
+    return stub_dialog_get_result(emuenv.common_dialog, stub_dialog::Kind::StoreCheckout, result, 0);
 }
 
 EXPORT(int, sceStoreCheckoutDialogGetStatus) {
     TRACY_FUNC(sceStoreCheckoutDialogGetStatus);
-    return UNIMPLEMENTED();
+    return stub_dialog_get_status(emuenv.common_dialog, stub_dialog::Kind::StoreCheckout);
 }
 
-EXPORT(int, sceStoreCheckoutDialogInit) {
-    TRACY_FUNC(sceStoreCheckoutDialogInit);
-    return UNIMPLEMENTED();
+EXPORT(int, sceStoreCheckoutDialogInit, const void *param) {
+    TRACY_FUNC(sceStoreCheckoutDialogInit, param);
+    return stub_dialog_init(emuenv.common_dialog, stub_dialog::Kind::StoreCheckout, param);
 }
 
 EXPORT(int, sceStoreCheckoutDialogTerm) {
     TRACY_FUNC(sceStoreCheckoutDialogTerm);
-    return UNIMPLEMENTED();
+    return stub_dialog_term(emuenv.common_dialog, stub_dialog::Kind::StoreCheckout);
 }
 
 EXPORT(int, sceTwDialogAbort) {

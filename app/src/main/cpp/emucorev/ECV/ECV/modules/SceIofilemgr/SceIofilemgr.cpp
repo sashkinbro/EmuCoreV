@@ -19,6 +19,7 @@
 
 #include <cpu/functions.h>
 #include <io/functions.h>
+#include <io/io.h>
 #include <kernel/state.h>
 #include <kernel/thread/thread_state.h>
 #include <kernel/types.h>
@@ -26,10 +27,29 @@
 #include <string_view>
 
 #include <chrono>
+#include <cstdio>
+#include <mutex>
 #include <thread>
 
 #include <util/tracy.h>
 TRACY_MODULE_NAME(SceIofilemgr);
+
+// Async I/O is executed synchronously when it is submitted; the result is parked per fd until the guest
+// collects it with sceIoComplete (see io/async_io.h). vita-headers has no prototype for the *Async
+// functions or sceIoComplete (only sceIoCancel, "per file descriptor"), so the shapes below follow the
+// synchronous counterparts: submit returns 0, the operation result is delivered through sceIoComplete.
+static int io_sync_fd(IOState &io, const SceUID fd) {
+    std::lock_guard<std::mutex> lock(io.file_mutex);
+    const auto file = io.std_files.find(fd);
+    if (file != io.std_files.end()) {
+        if (FILE *fp = file->second.get_file_pointer())
+            fflush(fp);
+        return 0;
+    }
+    if (io.tty_files.find(fd) != io.tty_files.end())
+        return 0;
+    return SCE_ERROR_ERRNO_EBADFD;
+}
 
 EXPORT(int, _sceIoChstat) {
     TRACY_FUNC(_sceIoChstat);
@@ -224,17 +244,31 @@ EXPORT(int, sceIoChstatByFdAsync) {
 
 EXPORT(int, sceIoClose, const SceUID fd) {
     TRACY_FUNC(sceIoClose, fd);
+    // a synchronous close abandons whatever async result was still parked for the fd
+    emuenv.io.async_ops.discard(fd);
+    emuenv.io.priorities.forget(fd);
     return close_file(emuenv.io, fd, export_name);
 }
 
-EXPORT(int, sceIoCloseAsync) {
-    TRACY_FUNC(sceIoCloseAsync);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoCloseAsync, const SceUID fd) {
+    TRACY_FUNC(sceIoCloseAsync, fd);
+    const int res = close_file(emuenv.io, fd, export_name);
+    emuenv.io.priorities.forget(fd);
+    emuenv.io.async_ops.push(fd, res);
+    return 0;
 }
 
-EXPORT(int, sceIoComplete) {
-    TRACY_FUNC(sceIoComplete);
-    return UNIMPLEMENTED();
+// PROVISIONAL signature: sceIoComplete(SceUID fd, SceInt64 *res, ...) mirrors the PSP sceIoWaitAsync(fd, res)
+// shape (the result is 64 bit because sceIoLseekAsync produces an offset). Unproven, vita-headers lacks it.
+// Returns 0 and writes the result of the oldest async op of fd; an fd with nothing pending is an error.
+EXPORT(int, sceIoComplete, const SceUID fd, int64_t *res) {
+    TRACY_FUNC(sceIoComplete, fd, res);
+    int64_t result = 0;
+    if (!emuenv.io.async_ops.pop(fd, result))
+        return RET_ERROR(async_io::ERR_NO_PENDING);
+    if (res)
+        *res = result;
+    return 0;
 }
 
 EXPORT(int, sceIoDclose, const SceUID fd) {
@@ -262,29 +296,29 @@ EXPORT(int, sceIoFlockForSystem) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceIoGetPriority) {
-    TRACY_FUNC(sceIoGetPriority);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoGetPriority, const SceUID fd) {
+    TRACY_FUNC(sceIoGetPriority, fd);
+    return emuenv.io.priorities.get(fd);
 }
 
-EXPORT(int, sceIoGetPriorityForSystem) {
-    TRACY_FUNC(sceIoGetPriorityForSystem);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoGetPriorityForSystem, const SceUID fd) {
+    TRACY_FUNC(sceIoGetPriorityForSystem, fd);
+    return emuenv.io.priorities.get(fd);
 }
 
 EXPORT(int, sceIoGetProcessDefaultPriority) {
     TRACY_FUNC(sceIoGetProcessDefaultPriority);
-    return UNIMPLEMENTED();
+    return emuenv.io.priorities.process_default();
 }
 
 EXPORT(int, sceIoGetThreadDefaultPriority) {
     TRACY_FUNC(sceIoGetThreadDefaultPriority);
-    return UNIMPLEMENTED();
+    return emuenv.io.priorities.thread_default();
 }
 
 EXPORT(int, sceIoGetThreadDefaultPriorityForSystem) {
     TRACY_FUNC(sceIoGetThreadDefaultPriorityForSystem);
-    return UNIMPLEMENTED();
+    return emuenv.io.priorities.thread_default();
 }
 
 EXPORT(int, sceIoGetstatByFdAsync) {
@@ -307,44 +341,59 @@ EXPORT(int, sceIoRead, const SceUID fd, void *data, const SceSize size) {
     return read_file(data, emuenv.io, fd, size, export_name);
 }
 
-EXPORT(int, sceIoReadAsync) {
-    TRACY_FUNC(sceIoReadAsync);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoReadAsync, const SceUID fd, void *data, const SceSize size) {
+    TRACY_FUNC(sceIoReadAsync, fd, data, size);
+    if (!data)
+        return RET_ERROR(SCE_ERROR_ERRNO_EINVAL);
+    const int res = CALL_EXPORT(sceIoRead, fd, data, size);
+    emuenv.io.async_ops.push(fd, res);
+    return 0;
 }
 
-EXPORT(int, sceIoSetPriority) {
-    TRACY_FUNC(sceIoSetPriority);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoSetPriority, const SceUID fd, const int priority) {
+    TRACY_FUNC(sceIoSetPriority, fd, priority);
+    if (fd < 0)
+        return RET_ERROR(SCE_ERROR_ERRNO_EBADFD);
+    emuenv.io.priorities.set(fd, priority);
+    return 0;
 }
 
-EXPORT(int, sceIoSetPriorityForSystem) {
-    TRACY_FUNC(sceIoSetPriorityForSystem);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoSetPriorityForSystem, const SceUID fd, const int priority) {
+    TRACY_FUNC(sceIoSetPriorityForSystem, fd, priority);
+    if (fd < 0)
+        return RET_ERROR(SCE_ERROR_ERRNO_EBADFD);
+    emuenv.io.priorities.set(fd, priority);
+    return 0;
 }
 
-EXPORT(int, sceIoSetProcessDefaultPriority) {
-    TRACY_FUNC(sceIoSetProcessDefaultPriority);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoSetProcessDefaultPriority, const int priority) {
+    TRACY_FUNC(sceIoSetProcessDefaultPriority, priority);
+    emuenv.io.priorities.set_process_default(priority);
+    return 0;
 }
 
-EXPORT(int, sceIoSetThreadDefaultPriority) {
-    TRACY_FUNC(sceIoSetThreadDefaultPriority);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoSetThreadDefaultPriority, const int priority) {
+    TRACY_FUNC(sceIoSetThreadDefaultPriority, priority);
+    emuenv.io.priorities.set_thread_default(priority);
+    return 0;
 }
 
-EXPORT(int, sceIoSetThreadDefaultPriorityForSystem) {
-    TRACY_FUNC(sceIoSetThreadDefaultPriorityForSystem);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoSetThreadDefaultPriorityForSystem, const int priority) {
+    TRACY_FUNC(sceIoSetThreadDefaultPriorityForSystem, priority);
+    emuenv.io.priorities.set_thread_default(priority);
+    return 0;
 }
 
-EXPORT(int, sceIoSyncByFd) {
-    TRACY_FUNC(sceIoSyncByFd);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoSyncByFd, const SceUID fd, const int flag) {
+    TRACY_FUNC(sceIoSyncByFd, fd, flag);
+    const int res = io_sync_fd(emuenv.io, fd);
+    return res < 0 ? RET_ERROR(res) : res;
 }
 
-EXPORT(int, sceIoSyncByFdAsync) {
-    TRACY_FUNC(sceIoSyncByFdAsync);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoSyncByFdAsync, const SceUID fd, const int flag) {
+    TRACY_FUNC(sceIoSyncByFdAsync, fd, flag);
+    emuenv.io.async_ops.push(fd, io_sync_fd(emuenv.io, fd));
+    return 0;
 }
 
 EXPORT(int, sceIoWrite, const SceUID fd, const void *data, const SceSize size) {
@@ -352,7 +401,11 @@ EXPORT(int, sceIoWrite, const SceUID fd, const void *data, const SceSize size) {
     return write_file(fd, data, size, emuenv.io, export_name);
 }
 
-EXPORT(int, sceIoWriteAsync) {
-    TRACY_FUNC(sceIoWriteAsync);
-    return UNIMPLEMENTED();
+EXPORT(int, sceIoWriteAsync, const SceUID fd, const void *data, const SceSize size) {
+    TRACY_FUNC(sceIoWriteAsync, fd, data, size);
+    if (!data)
+        return RET_ERROR(SCE_ERROR_ERRNO_EINVAL);
+    const int res = write_file(fd, data, size, emuenv.io, export_name);
+    emuenv.io.async_ops.push(fd, res);
+    return 0;
 }

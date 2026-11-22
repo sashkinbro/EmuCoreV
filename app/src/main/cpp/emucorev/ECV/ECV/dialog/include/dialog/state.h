@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <dialog/stub_dialog.h>
 #include <dialog/types.h>
 
 #include <io/vfs.h>
@@ -33,7 +34,8 @@ enum DialogType {
     MESSAGE_DIALOG,
     TROPHY_SETUP_DIALOG,
     SAVEDATA_DIALOG,
-    NETCHECK_DIALOG
+    NETCHECK_DIALOG,
+    STUB_DIALOG // dialogs without UI, see stub_dialog.h
 };
 
 struct ImeState {
@@ -113,6 +115,7 @@ struct DialogState {
     NetcheckState netcheck;
     TrophyState trophy;
     SavedataState savedata;
+    stub_dialog::Core stub;
 
     void deinit() {
         std::lock_guard<std::recursive_mutex> lock(mutex);
@@ -126,5 +129,6 @@ struct DialogState {
         netcheck = {};
         trophy = {};
         savedata = {};
+        stub = {};
     }
 };

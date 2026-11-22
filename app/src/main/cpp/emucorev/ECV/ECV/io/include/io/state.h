@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <io/async_io.h>
 #include <io/filesystem.h>
 #include <io/types.h>
 #include <io/util.h>
@@ -121,6 +122,10 @@ struct IOState {
     TtyFiles tty_files;
     StdFiles std_files;
     DirEntries dir_entries;
+
+    // HLE async I/O: results of operations executed at submit time, and stored I/O priorities
+    async_io::AsyncOpTable async_ops;
+    async_io::PriorityTable priorities;
 
     std::unordered_map<std::string, std::string> cachemap;
     std::unordered_set<std::string> indexed_roots;
