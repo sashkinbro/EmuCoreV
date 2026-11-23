@@ -136,12 +136,17 @@ object GpuDriverRecommendations {
     }
 
     fun supportedFamilies(gpu: String): Set<AdrenoFamily> = buildSet {
-        val normalized = gpu.lowercase(Locale.US)
+        // Catalog text can exclude families ("Adreno 6xx/7xx; not Adreno 8xx"): drop the
+        // negated mentions first so an excluded family is never read as supported.
+        val normalized = NEGATED_ADRENO_FAMILIES.replace(gpu.lowercase(Locale.US), " ")
         AdrenoFamily.entries.forEach { family ->
             if (family.catalogToken in normalized) add(family)
         }
     }
 
+    private val NEGATED_ADRENO_FAMILIES = Regex(
+        """\b(?:not|no|except|excluding|without)\s+(?:for\s+)?(?:adreno\s*)?\dxx(?:\s*(?:/|,|or|and)\s*(?:adreno\s*)?\dxx)*"""
+    )
     private val EXPLICIT_ADRENO_MODEL = Regex("8xx\\s*\\(([^)]+)\\)", RegexOption.IGNORE_CASE)
     private val ADRENO_MODEL = Regex("""adreno\s*(\d{3})""", RegexOption.IGNORE_CASE)
 }
