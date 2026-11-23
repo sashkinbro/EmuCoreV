@@ -52,7 +52,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
+import com.sbro.emucorev.ui.common.SyncedSlider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -251,7 +251,7 @@ private fun GeneralTab(
             ModeChip(2, stringResource(R.string.settings_modules_mode_manual), uiState, viewModel)
         }
         SliderRow(title = stringResource(R.string.settings_cpu_pool_size), description = stringResource(R.string.settings_help_cpu_pool_size), valueText = stringResource(R.string.settings_cpu_pool_size_value, uiState.coreConfig.cpuPoolSize), onResetDefault = { viewModel.updateCoreSettings { it.copy(cpuPoolSize = defaults.cpuPoolSize) } }) {
-            Slider(value = uiState.coreConfig.cpuPoolSize.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(cpuPoolSize = value.roundToInt().coerceIn(1, 32)) } }, valueRange = 1f..32f, steps = 30)
+            SyncedSlider(value = uiState.coreConfig.cpuPoolSize.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(cpuPoolSize = value.roundToInt().coerceIn(1, 32)) } }, valueRange = 1f..32f, steps = 30)
         }
     }
 
@@ -316,7 +316,7 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
         Toggle(stringResource(R.string.settings_use_angle), stringResource(R.string.settings_help_use_angle), uiState.coreConfig.useAngle, { enabled -> viewModel.updateCoreSettings { it.copy(useAngle = enabled) } }, { viewModel.updateCoreSettings { it.copy(useAngle = defaults.useAngle) } }, enabled = uiState.coreConfig.backendRenderer == "OpenGL")
         Toggle(stringResource(R.string.settings_core_high_accuracy), stringResource(R.string.settings_help_high_accuracy), uiState.coreConfig.highAccuracy, { enabled -> viewModel.updateCoreSettings { it.copy(highAccuracy = enabled) } }, { viewModel.updateCoreSettings { it.copy(highAccuracy = defaults.highAccuracy) } })
         SliderRow(stringResource(R.string.settings_core_resolution_label), stringResource(R.string.settings_help_resolution), stringResource(R.string.settings_core_resolution_value, uiState.coreConfig.resolutionMultiplier), { viewModel.updateCoreSettings { it.copy(resolutionMultiplier = defaults.resolutionMultiplier) } }) {
-            Slider(value = uiState.coreConfig.resolutionMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(resolutionMultiplier = (value * 2).roundToInt() / 2f) } }, valueRange = 0.5f..8f, steps = 14)
+            SyncedSlider(value = uiState.coreConfig.resolutionMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(resolutionMultiplier = (value * 2).roundToInt() / 2f) } }, valueRange = 0.5f..8f, steps = 14)
         }
         Chips(stringResource(R.string.settings_core_screen_filter_label), stringResource(R.string.settings_help_screen_filter), { viewModel.updateCoreSettings { it.copy(screenFilter = defaults.screenFilter) } }) {
             TextChip(
@@ -331,7 +331,7 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
             ) { config, value -> config.copy(screenFilter = value) }
         }
         SliderRow(stringResource(R.string.settings_core_anisotropic_label), stringResource(R.string.settings_help_anisotropic), stringResource(R.string.settings_core_anisotropic_value, uiState.coreConfig.anisotropicFiltering), { viewModel.updateCoreSettings { it.copy(anisotropicFiltering = defaults.anisotropicFiltering) } }) {
-            Slider(value = uiState.coreConfig.anisotropicFiltering.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { config -> config.copy(anisotropicFiltering = listOf(1, 2, 4, 8, 16).minByOrNull { kotlin.math.abs(it - value.roundToInt()) } ?: 1) } }, valueRange = 1f..16f, steps = 3)
+            SyncedSlider(value = uiState.coreConfig.anisotropicFiltering.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { config -> config.copy(anisotropicFiltering = listOf(1, 2, 4, 8, 16).minByOrNull { kotlin.math.abs(it - value.roundToInt()) } ?: 1) } }, valueRange = 1f..16f, steps = 3)
         }
         Toggle(stringResource(R.string.settings_core_texture_cache), stringResource(R.string.settings_help_texture_cache), uiState.coreConfig.textureCache, { enabled -> viewModel.updateCoreSettings { it.copy(textureCache = enabled) } }, { viewModel.updateCoreSettings { it.copy(textureCache = defaults.textureCache) } })
         Toggle(stringResource(R.string.settings_hashless_texture_cache), stringResource(R.string.settings_help_hashless_texture_cache), uiState.coreConfig.hashlessTextureCache, { enabled -> viewModel.updateCoreSettings { it.copy(hashlessTextureCache = enabled) } }, { viewModel.updateCoreSettings { it.copy(hashlessTextureCache = defaults.hashlessTextureCache) } })
@@ -418,7 +418,7 @@ private fun AudioTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMod
             ) { config, value -> config.copy(audioBackend = value) }
         }
         SliderRow(stringResource(R.string.settings_core_audio_volume_label), stringResource(R.string.settings_help_audio_volume), stringResource(R.string.settings_core_audio_volume_value, uiState.coreConfig.audioVolume), { viewModel.updateCoreSettings { it.copy(audioVolume = defaults.audioVolume) } }) {
-            Slider(value = uiState.coreConfig.audioVolume.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(audioVolume = value.roundToInt()) } }, valueRange = 0f..100f)
+            SyncedSlider(value = uiState.coreConfig.audioVolume.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(audioVolume = value.roundToInt()) } }, valueRange = 0f..100f)
         }
         Toggle(stringResource(R.string.settings_core_ngs_enable), stringResource(R.string.settings_help_ngs_enable), uiState.coreConfig.ngsEnable, { enabled -> viewModel.updateCoreSettings { it.copy(ngsEnable = enabled) } }, { viewModel.updateCoreSettings { it.copy(ngsEnable = defaults.ngsEnable) } })
         TrophySoundSettingsSection(
@@ -447,10 +447,10 @@ private fun OverlayTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewM
         Toggle(stringResource(R.string.settings_core_gamepad_overlay), stringResource(R.string.settings_help_gamepad_overlay), uiState.coreConfig.enableGamepadOverlay, { enabled -> viewModel.updateCoreSettings { it.copy(enableGamepadOverlay = enabled) } }, { viewModel.updateCoreSettings { it.copy(enableGamepadOverlay = defaults.enableGamepadOverlay) } })
         Toggle(stringResource(R.string.settings_show_touch_switch), stringResource(R.string.settings_help_show_touch_switch), uiState.coreConfig.overlayShowTouchSwitch, { enabled -> viewModel.updateCoreSettings { it.copy(overlayShowTouchSwitch = enabled) } }, { viewModel.updateCoreSettings { it.copy(overlayShowTouchSwitch = defaults.overlayShowTouchSwitch) } })
         SliderRow(stringResource(R.string.settings_core_overlay_scale_label), stringResource(R.string.settings_help_overlay_scale), stringResource(R.string.settings_core_overlay_scale_value, uiState.coreConfig.overlayScale), { viewModel.updateCoreSettings { it.copy(overlayScale = defaults.overlayScale) } }) {
-            Slider(value = uiState.coreConfig.overlayScale, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(overlayScale = (value * 10).roundToInt() / 10f) } }, valueRange = 0.5f..2f, steps = 14)
+            SyncedSlider(value = uiState.coreConfig.overlayScale, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(overlayScale = (value * 10).roundToInt() / 10f) } }, valueRange = 0.5f..2f, steps = 14)
         }
         SliderRow(stringResource(R.string.settings_core_overlay_opacity_label), stringResource(R.string.settings_help_overlay_opacity), stringResource(R.string.settings_core_overlay_opacity_value, uiState.coreConfig.overlayOpacity), { viewModel.updateCoreSettings { it.copy(overlayOpacity = defaults.overlayOpacity) } }) {
-            Slider(value = uiState.coreConfig.overlayOpacity.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(overlayOpacity = value.roundToInt()) } }, valueRange = 10f..100f, steps = 8)
+            SyncedSlider(value = uiState.coreConfig.overlayOpacity.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(overlayOpacity = value.roundToInt()) } }, valueRange = 10f..100f, steps = 8)
         }
     }
 }
@@ -468,7 +468,7 @@ private fun ControlsTab(
         Toggle(stringResource(R.string.settings_core_touchpad_cursor), stringResource(R.string.settings_help_touchpad_cursor), uiState.coreConfig.showTouchpadCursor, { enabled -> viewModel.updateCoreSettings { it.copy(showTouchpadCursor = enabled) } }, { viewModel.updateCoreSettings { it.copy(showTouchpadCursor = defaults.showTouchpadCursor) } })
         Toggle(stringResource(R.string.settings_core_disable_motion), stringResource(R.string.settings_help_disable_motion), uiState.coreConfig.disableMotion, { enabled -> viewModel.updateCoreSettings { it.copy(disableMotion = enabled) } }, { viewModel.updateCoreSettings { it.copy(disableMotion = defaults.disableMotion) } })
         SliderRow(stringResource(R.string.settings_core_analog_multiplier_label), stringResource(R.string.settings_help_analog_multiplier), stringResource(R.string.settings_core_analog_multiplier_value, uiState.coreConfig.analogMultiplier), { viewModel.updateCoreSettings { it.copy(analogMultiplier = defaults.analogMultiplier) } }) {
-            Slider(value = uiState.coreConfig.analogMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(analogMultiplier = (value * 10).roundToInt() / 10f) } }, valueRange = 0.5f..2f, steps = 14)
+            SyncedSlider(value = uiState.coreConfig.analogMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(analogMultiplier = (value * 10).roundToInt() / 10f) } }, valueRange = 0.5f..2f, steps = 14)
         }
     }
     SectionCard(
@@ -508,7 +508,7 @@ private fun ControlsTab(
             stringResource(R.string.settings_gamepad_percent_value, uiState.coreConfig.touchHapticsStrength),
             { viewModel.updateCoreSettings { it.copy(touchHapticsStrength = defaults.touchHapticsStrength) } }
         ) {
-            Slider(
+            SyncedSlider(
                 enabled = uiState.coreConfig.touchHaptics,
                 value = uiState.coreConfig.touchHapticsStrength.toFloat(),
                 onValueChange = { value -> viewModel.updateCoreSettings { it.copy(touchHapticsStrength = value.roundToInt().coerceIn(10, 100)) } },
@@ -550,7 +550,7 @@ private fun ControlsTab(
                 stringResource(R.string.settings_gamepad_percent_value, uiState.coreConfig.gyroSensitivity),
                 { viewModel.updateCoreSettings { it.copy(gyroSensitivity = defaults.gyroSensitivity) } }
             ) {
-                Slider(value = uiState.coreConfig.gyroSensitivity.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gyroSensitivity = value.roundToInt()) } }, valueRange = 25f..300f, steps = 10)
+                SyncedSlider(value = uiState.coreConfig.gyroSensitivity.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gyroSensitivity = value.roundToInt()) } }, valueRange = 25f..300f, steps = 10)
             }
             SliderRow(
                 stringResource(R.string.settings_gyro_smoothing),
@@ -558,7 +558,7 @@ private fun ControlsTab(
                 stringResource(R.string.settings_gamepad_percent_value, uiState.coreConfig.gyroSmoothing),
                 { viewModel.updateCoreSettings { it.copy(gyroSmoothing = defaults.gyroSmoothing) } }
             ) {
-                Slider(value = uiState.coreConfig.gyroSmoothing.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gyroSmoothing = value.roundToInt()) } }, valueRange = 0f..90f, steps = 8)
+                SyncedSlider(value = uiState.coreConfig.gyroSmoothing.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gyroSmoothing = value.roundToInt()) } }, valueRange = 0f..90f, steps = 8)
             }
             Toggle(stringResource(R.string.settings_gyro_invert_x), stringResource(R.string.settings_gyro_invert_x_desc), uiState.coreConfig.gyroInvertX, { enabled -> viewModel.updateCoreSettings { it.copy(gyroInvertX = enabled) } }, { viewModel.updateCoreSettings { it.copy(gyroInvertX = defaults.gyroInvertX) } })
             if (uiState.coreConfig.gyroMode == VitaCoreConfig.GYRO_MODE_AIM) {
@@ -580,7 +580,7 @@ private fun ControlsTab(
             stringResource(R.string.settings_gamepad_percent_value, uiState.coreConfig.gamepadVibrationStrength),
             { viewModel.updateCoreSettings { it.copy(gamepadVibrationStrength = defaults.gamepadVibrationStrength) } }
         ) {
-            Slider(
+            SyncedSlider(
                 enabled = uiState.coreConfig.gamepadVibration,
                 value = uiState.coreConfig.gamepadVibrationStrength.toFloat(),
                 onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadVibrationStrength = value.roundToInt().coerceIn(0, 100)) } },
@@ -615,10 +615,10 @@ private fun ControlsTab(
             modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
         )
         SliderRow(stringResource(R.string.settings_gamepad_deadzone), stringResource(R.string.settings_help_gamepad_deadzone), stringResource(R.string.settings_gamepad_percent_value, (uiState.coreConfig.gamepadDeadzone * 100f).toInt()), { viewModel.updateCoreSettings { it.copy(gamepadDeadzone = defaults.gamepadDeadzone) } }) {
-            Slider(enabled = gamepadConnected, value = uiState.coreConfig.gamepadDeadzone, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadDeadzone = (value * 100).roundToInt() / 100f) } }, valueRange = 0f..0.45f, steps = 8)
+            SyncedSlider(enabled = gamepadConnected, value = uiState.coreConfig.gamepadDeadzone, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadDeadzone = (value * 100).roundToInt() / 100f) } }, valueRange = 0f..0.45f, steps = 8)
         }
         SliderRow(stringResource(R.string.settings_gamepad_trigger_threshold), stringResource(R.string.settings_help_gamepad_trigger_threshold), stringResource(R.string.settings_gamepad_percent_value, (uiState.coreConfig.gamepadTriggerThreshold * 100f).toInt()), { viewModel.updateCoreSettings { it.copy(gamepadTriggerThreshold = defaults.gamepadTriggerThreshold) } }) {
-            Slider(enabled = gamepadConnected, value = uiState.coreConfig.gamepadTriggerThreshold, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadTriggerThreshold = (value * 100).roundToInt() / 100f) } }, valueRange = 0f..0.9f, steps = 8)
+            SyncedSlider(enabled = gamepadConnected, value = uiState.coreConfig.gamepadTriggerThreshold, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(gamepadTriggerThreshold = (value * 100).roundToInt() / 100f) } }, valueRange = 0f..0.9f, steps = 8)
         }
         Chips(stringResource(R.string.settings_gamepad_button_profile), stringResource(R.string.settings_help_gamepad_button_profile), { viewModel.updateCoreSettings { it.copy(gamepadButtonProfile = defaults.gamepadButtonProfile) } }) {
             TextChip(VitaCoreConfig.GAMEPAD_PROFILE_STANDARD, stringResource(R.string.settings_gamepad_profile_standard), uiState.coreConfig.gamepadButtonProfile, viewModel, enabled = gamepadConnected) { config, value -> config.copy(gamepadButtonProfile = value) }
@@ -785,7 +785,7 @@ private fun SystemTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMo
         Toggle(stringResource(R.string.settings_show_welcome), stringResource(R.string.settings_help_show_welcome), uiState.coreConfig.showWelcome, { enabled -> viewModel.updateCoreSettings { it.copy(showWelcome = enabled) } }, { viewModel.updateCoreSettings { it.copy(showWelcome = defaults.showWelcome) } })
         Toggle(stringResource(R.string.settings_warn_missing_firmware), stringResource(R.string.settings_help_warn_missing_firmware), uiState.coreConfig.warnMissingFirmware, { enabled -> viewModel.updateCoreSettings { it.copy(warnMissingFirmware = enabled) } }, { viewModel.updateCoreSettings { it.copy(warnMissingFirmware = defaults.warnMissingFirmware) } })
         SliderRow(stringResource(R.string.settings_file_loading_delay), stringResource(R.string.settings_help_file_loading_delay), stringResource(R.string.settings_file_loading_delay_value, uiState.coreConfig.fileLoadingDelay), { viewModel.updateCoreSettings { it.copy(fileLoadingDelay = defaults.fileLoadingDelay) } }) {
-            Slider(value = uiState.coreConfig.fileLoadingDelay.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(fileLoadingDelay = value.roundToInt().coerceIn(0, 500)) } }, valueRange = 0f..500f, steps = 24)
+            SyncedSlider(value = uiState.coreConfig.fileLoadingDelay.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(fileLoadingDelay = value.roundToInt().coerceIn(0, 500)) } }, valueRange = 0f..500f, steps = 24)
         }
     }
 }

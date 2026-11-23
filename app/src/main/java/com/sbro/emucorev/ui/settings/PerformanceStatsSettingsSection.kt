@@ -23,7 +23,7 @@ import com.sbro.emucorev.ui.gamemanager.ChoiceContainer as GameManagerChoiceCont
 import com.sbro.emucorev.ui.gamemanager.ToggleRow as GameManagerToggleRow
 import com.sbro.emucorev.ui.gamemanager.SliderRow as GameManagerSliderRow
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
+import com.sbro.emucorev.ui.common.SyncedSlider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
@@ -163,7 +163,7 @@ private fun StatsSlider(label: String, value: Int, range: ClosedFloatingPointRan
             Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = textPrimary)
             Text("$value%", style = MaterialTheme.typography.labelMedium, color = textSecondary)
         }
-        Slider(value.toFloat(), { change(it.roundToInt()) }, valueRange = range)
+        SyncedSlider(value.toFloat(), { change(it.roundToInt()) }, valueRange = range)
     }
 }
 
@@ -217,7 +217,7 @@ private fun StatsScreenControls(
             75f..200f, onReset = resetSize, onChange = changeSize)
     } else {
         SettingSliderRow(sizeTitle, sizeTitle, "${settings.scalePercent}%", resetSize) {
-            Slider(settings.scalePercent.toFloat(), changeSize, valueRange = 75f..200f)
+            SyncedSlider(settings.scalePercent.toFloat(), changeSize, valueRange = 75f..200f)
         }
     }
     if (settings.rememberedMode == StatsMode.DETAILED) {

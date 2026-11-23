@@ -22,7 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
+import com.sbro.emucorev.ui.common.SyncedSlider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
@@ -451,7 +451,7 @@ private fun ShaderParameterControl(
         if (parameter.maximum > parameter.minimum) {
             Text("%.2f".format(value), modifier = Modifier.fillMaxWidth().testTag("shader_parameter_value:${parameter.id}"),
                 style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1)
-            Slider(
+            SyncedSlider(
                 modifier = Modifier.fillMaxWidth().testTag("shader_parameter_slider:${parameter.id}"),
                 value = value.coerceIn(parameter.minimum, parameter.maximum),
                 onValueChange = { raw ->

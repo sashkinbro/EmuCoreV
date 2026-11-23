@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.*
+import com.sbro.emucorev.ui.common.SyncedSlider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -235,6 +236,6 @@ private fun RearBindingCaptureWindow(input: RearTouchInput) {
 private fun CoordinateSlider(label: String, value: Float, changed: (Float) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("$label ${(value * 100).roundToInt()}%", modifier = Modifier.width(64.dp), style = MaterialTheme.typography.labelMedium)
-        Slider(value = value, onValueChange = changed, valueRange = 0f..1f, steps = 99, modifier = Modifier.weight(1f))
+        SyncedSlider(value = value, onValueChange = changed, valueRange = 0f..1f, steps = 99, modifier = Modifier.weight(1f))
     }
 }

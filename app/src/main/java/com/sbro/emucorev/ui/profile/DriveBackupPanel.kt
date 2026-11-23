@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModelStoreOwner
@@ -145,9 +146,16 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
             }
             if (settings.lastBackupMs > 0) {
                 Surface(shape = neonShape(18.dp), border = profileCardBorder()) {
-                ListItem(headlineContent = { Text(stringResource(R.string.drive_last_backup)) },
+                // Pins the legacy ListItem look: rectangular shape, 16/8 dp padding, 72 dp two-line
+                // height and a 16 dp leading-to-text gap (the new overload defaults differ).
+                ListItem(
+                    modifier = Modifier.heightIn(min = 72.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    shapes = ListItemDefaults.shapes(shape = RectangleShape),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     supportingContent = { Text("${date(settings.lastBackupMs)} · ${Formatter.formatFileSize(context, settings.lastSize)}") },
-                    leadingContent = { Icon(Icons.Default.CloudDone, null) })
+                    leadingContent = { Box(Modifier.padding(end = 4.dp)) { Icon(Icons.Default.CloudDone, null) } }
+                ) { Text(stringResource(R.string.drive_last_backup)) }
                 }
             }
             if (state.queued || state.operation.phase.isNotBlank()) {

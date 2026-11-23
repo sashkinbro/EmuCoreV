@@ -42,7 +42,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Slider
+import com.sbro.emucorev.ui.common.SyncedSlider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -610,7 +610,7 @@ private fun CustomizationSlider(
                 Text(valueLabel, color = MaterialTheme.colorScheme.primary)
             }
         }
-        Slider(
+        SyncedSlider(
             value = value.toFloat(),
             onValueChange = { raw ->
                 val stepped = ((raw.toInt() + 2) / 5) * 5

@@ -68,7 +68,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
+import com.sbro.emucorev.ui.common.SyncedSlider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -2064,7 +2064,7 @@ private fun MenuSliderRow(
                 maxLines = 2
             )
         }
-        Slider(
+        SyncedSlider(
             value = pendingValue,
             onValueChange = { pendingValue = it },
             onValueChangeFinished = { onValueChange(pendingValue) },
