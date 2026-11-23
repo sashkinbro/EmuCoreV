@@ -173,6 +173,38 @@ class AppPreferences(context: Context) {
         get() = prefs.getBoolean(KEY_WELCOME_DIALOG_SHOWN, false)
         set(value) = prefs.edit { putBoolean(KEY_WELCOME_DIALOG_SHOWN, value) }
 
+    // Recurring Pro promotion. Separate from welcomeDialogShown, which also marks existing installs.
+    var proReminderLastShownAtMs: Long
+        get() = prefs.getLong(KEY_PRO_REMINDER_LAST_SHOWN_AT_MS, 0L)
+        set(value) = prefs.edit { putLong(KEY_PRO_REMINDER_LAST_SHOWN_AT_MS, value) }
+
+    var proReminderDismissStreak: Int
+        get() = prefs.getInt(KEY_PRO_REMINDER_DISMISS_STREAK, 0)
+        set(value) = prefs.edit { putInt(KEY_PRO_REMINDER_DISMISS_STREAK, value) }
+
+    fun proPromoHiddenUntilFlow(id: String): Flow<Long> = callbackFlow {
+        val key = proPromoHiddenUntilKey(id)
+        trySend(prefs.getLong(key, 0L))
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, changed ->
+            if (changed == key) trySend(prefs.getLong(key, 0L))
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.distinctUntilChanged()
+
+    fun proPromoDismissStreak(id: String): Int = prefs.getInt(proPromoDismissStreakKey(id), 0)
+
+    fun hideProPromo(id: String, streak: Int, untilMs: Long) {
+        prefs.edit {
+            putInt(proPromoDismissStreakKey(id), streak)
+            putLong(proPromoHiddenUntilKey(id), untilMs)
+        }
+    }
+
+    fun resetProPromoDismissStreak(id: String) {
+        prefs.edit { remove(proPromoDismissStreakKey(id)) }
+    }
+
     var showEmulationQuickBar: Boolean
         get() = prefs.getBoolean(KEY_SHOW_EMULATION_QUICK_BAR, false)
         set(value) = prefs.edit { putBoolean(KEY_SHOW_EMULATION_QUICK_BAR, value) }
@@ -327,6 +359,10 @@ class AppPreferences(context: Context) {
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_PRO_UNLOCKED = "pro_unlocked"
         private const val KEY_WELCOME_DIALOG_SHOWN = "welcome_dialog_shown"
+        private const val KEY_PRO_REMINDER_LAST_SHOWN_AT_MS = "pro_reminder_last_shown_at_ms"
+        private const val KEY_PRO_REMINDER_DISMISS_STREAK = "pro_reminder_dismiss_streak"
+        private fun proPromoHiddenUntilKey(id: String) = "pro_promo_hidden_until_$id"
+        private fun proPromoDismissStreakKey(id: String) = "pro_promo_dismiss_streak_$id"
         private const val AGE_PREFS_NAME = "age_signals"
         private const val KEY_AGE_LOWER = "age_signals_lower"
         private const val KEY_AGE_UPPER = "age_signals_upper"

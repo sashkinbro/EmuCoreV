@@ -913,6 +913,16 @@
     <string name="settings_pro_patron_title">Pro 패트론</string>
     <string name="settings_pro_patron_desc">모든 Pro 기능과 최대 프로젝트 후원.</string>
     <string name="settings_pro_support_same_features">모든 수준은 동일한 Pro 기능을 영구적으로 잠금 해제합니다. 개발을 더 후원하고 싶을 때만 더 높은 수준을 선택하세요.</string>
+    <string name="pro_promo_library_title">나만의 EmuCoreV 만들기</string>
+    <string name="pro_promo_library_body">Crimson 테마, 골드 아이콘, 통계, 플레이어 카드. 영구 이용.</string>
+    <string name="pro_promo_themes_title">Crimson 테마 잠금 해제</string>
+    <string name="pro_promo_themes_body">앱 전체를 더 어두운 레드 룩으로, 골드 아이콘까지.</string>
+    <string name="pro_promo_profile_title">고급 통계와 플레이어 카드</string>
+    <string name="pro_promo_profile_body">주간 활동, 연속 기록, 랭크, 플레이어 카드.</string>
+    <string name="pro_promo_hide">지금은 숨기기</string>
+    <string name="pro_reminder_title">EmuCoreV Pro 잠금 해제</string>
+    <string name="pro_reminder_later">나중에</string>
+    <string name="pro_reminder_body">Crimson 테마, 골드 아이콘, 고급 통계, 플레이어 카드. 한 번 구매로 영구 이용.</string>
     <string name="pro_price_loading">가격 불러오는 중</string>
     <string name="pro_price_unavailable">Pro는 아직 사용할 수 없습니다</string>
     <string name="settings_pro_feature_crimson_title">크림슨 테마</string>

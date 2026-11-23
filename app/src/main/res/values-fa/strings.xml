@@ -914,6 +914,16 @@
     <string name="settings_pro_patron_title">حامی ویژه Pro</string>
     <string name="settings_pro_patron_desc">همه ویژگی‌های Pro همراه با حداکثر حمایت از پروژه.</string>
     <string name="settings_pro_support_same_features">همه سطوح به‌طور دائمی همان ویژگی‌های Pro را باز می‌کنند. تنها اگر می‌خواهید بیشتر از توسعه حمایت کنید، سطح بالاتری را انتخاب کنید.</string>
+    <string name="pro_promo_library_title">EmuCoreV را مال خودتان کنید</string>
+    <string name="pro_promo_library_body">تم Crimson، آیکون طلایی، آمار و کارت بازیکن. برای همیشه.</string>
+    <string name="pro_promo_themes_title">تم Crimson را باز کنید</string>
+    <string name="pro_promo_themes_body">ظاهر قرمز تیره‌تر برای کل برنامه، به‌علاوه آیکون طلایی.</string>
+    <string name="pro_promo_profile_title">آمار پیشرفته و کارت بازیکن</string>
+    <string name="pro_promo_profile_body">فعالیت هفتگی، رکوردهای پیاپی، رتبه و کارت بازیکن.</string>
+    <string name="pro_promo_hide">فعلاً پنهان کن</string>
+    <string name="pro_reminder_title">EmuCoreV Pro را باز کنید</string>
+    <string name="pro_reminder_later">بعداً</string>
+    <string name="pro_reminder_body">تم Crimson، آیکون طلایی، آمار پیشرفته و کارت بازیکن. یک بار خرید، برای همیشه.</string>
     <string name="pro_price_loading">در حال بارگذاری قیمت</string>
     <string name="pro_price_unavailable">Pro هنوز در دسترس نیست</string>
     <string name="settings_pro_feature_crimson_title">تم زرشکی</string>

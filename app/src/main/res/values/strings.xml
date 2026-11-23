@@ -914,6 +914,16 @@
     <string name="settings_pro_patron_title">Pro Patron</string>
     <string name="settings_pro_patron_desc">All Pro features with maximum project support.</string>
     <string name="settings_pro_support_same_features">All levels permanently unlock the same Pro features. Choose a higher level only if you want to support development more.</string>
+    <string name="pro_promo_library_title">Make EmuCoreV yours</string>
+    <string name="pro_promo_library_body">Crimson theme, gold icon, stats and a Player Card. Yours forever.</string>
+    <string name="pro_promo_themes_title">Unlock the Crimson theme</string>
+    <string name="pro_promo_themes_body">A darker red look for the whole app, plus a gold icon.</string>
+    <string name="pro_promo_profile_title">Advanced stats and Player Card</string>
+    <string name="pro_promo_profile_body">Weekly activity, streaks, rank and a Player Card.</string>
+    <string name="pro_promo_hide">Hide for now</string>
+    <string name="pro_reminder_title">Unlock EmuCoreV Pro</string>
+    <string name="pro_reminder_later">Later</string>
+    <string name="pro_reminder_body">Crimson theme, gold icon, extended stats and a Player Card. One purchase, yours forever.</string>
     <string name="pro_price_loading">Loading price</string>
     <string name="pro_price_unavailable">Pro is not available yet</string>
     <string name="settings_pro_feature_crimson_title">Crimson theme</string>

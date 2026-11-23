@@ -912,6 +912,16 @@
     <string name="settings_pro_patron_title">Меценат Pro</string>
     <string name="settings_pro_patron_desc">Усі функції Pro та максимальна підтримка проєкту.</string>
     <string name="settings_pro_support_same_features">Усі рівні назавжди відкривають однакові функції Pro. Обирайте вищий рівень лише якщо хочете сильніше підтримати розробку.</string>
+    <string name="pro_promo_library_title">Зробіть EmuCoreV своїм</string>
+    <string name="pro_promo_library_body">Тема Crimson, золота іконка, статистика й картка гравця. Назавжди.</string>
+    <string name="pro_promo_themes_title">Відкрийте тему Crimson</string>
+    <string name="pro_promo_themes_body">Темніший червоний вигляд усього застосунку та золота іконка.</string>
+    <string name="pro_promo_profile_title">Розширена статистика і картка гравця</string>
+    <string name="pro_promo_profile_body">Активність за тиждень, серії, ранг і картка гравця.</string>
+    <string name="pro_promo_hide">Поки сховати</string>
+    <string name="pro_reminder_title">Відкрийте EmuCoreV Pro</string>
+    <string name="pro_reminder_later">Пізніше</string>
+    <string name="pro_reminder_body">Тема Crimson, золота іконка, розширена статистика й картка гравця. Одна покупка — назавжди.</string>
     <string name="pro_price_loading">Завантаження ціни</string>
     <string name="pro_price_unavailable">Версія Pro поки недоступна</string>
     <string name="settings_pro_feature_crimson_title">Тема Crimson</string>

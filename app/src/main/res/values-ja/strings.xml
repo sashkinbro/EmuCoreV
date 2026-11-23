@@ -913,6 +913,16 @@
     <string name="settings_pro_patron_title">Proパトロン</string>
     <string name="settings_pro_patron_desc">すべてのPro機能に加え、プロジェクトへの最大限の支援。</string>
     <string name="settings_pro_support_same_features">すべてのレベルで同じPro機能が永続的にアンロックされます。開発をさらに支援したい場合にのみ、より高いレベルを選択してください。</string>
+    <string name="pro_promo_library_title">EmuCoreV を自分好みに</string>
+    <string name="pro_promo_library_body">Crimson テーマ、ゴールドアイコン、統計、プレイヤーカード。ずっと使えます。</string>
+    <string name="pro_promo_themes_title">Crimson テーマを解放</string>
+    <string name="pro_promo_themes_body">アプリ全体をより暗い赤のデザインに。ゴールドアイコン付き。</string>
+    <string name="pro_promo_profile_title">詳細な統計とプレイヤーカード</string>
+    <string name="pro_promo_profile_body">週間アクティビティ、連続記録、ランク、プレイヤーカード。</string>
+    <string name="pro_promo_hide">今は非表示</string>
+    <string name="pro_reminder_title">EmuCoreV Pro を解放</string>
+    <string name="pro_reminder_later">あとで</string>
+    <string name="pro_reminder_body">Crimson テーマ、ゴールドアイコン、詳細な統計、プレイヤーカード。一度の購入でずっと使えます。</string>
     <string name="pro_price_loading">価格を読み込み中</string>
     <string name="pro_price_unavailable">Proはまだ利用できません</string>
     <string name="settings_pro_feature_crimson_title">Crimsonテーマ</string>

@@ -88,7 +88,8 @@ import java.io.File
 fun CustomizationTab(
     settings: CustomizationSettings,
     viewModel: SettingsViewModel,
-    libraryContentWidthDp: Float
+    libraryContentWidthDp: Float,
+    onOpenProTab: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val preferences = remember(context) { AppPreferences(context) }
@@ -127,6 +128,11 @@ fun CustomizationTab(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        com.sbro.emucorev.ui.common.ProPromoCard(
+            variant = com.sbro.emucorev.ui.common.ProPromoVariant.THEMES,
+            modifier = Modifier.padding(horizontal = com.sbro.emucorev.ui.theme.ScreenHorizontalPadding),
+            onLearnMore = onOpenProTab
+        )
         CustomizationPreview(settings, libraryContentWidthDp)
 
         SectionCard(

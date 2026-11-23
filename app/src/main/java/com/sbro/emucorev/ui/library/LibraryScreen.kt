@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.Constraints
 import android.widget.Toast
 import com.sbro.emucorev.data.CoverArtRepository
 import com.sbro.emucorev.ui.common.prefetchGameCoverArt
+import com.sbro.emucorev.ui.common.ProPromoCard
+import com.sbro.emucorev.ui.common.ProPromoVariant
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.EaseIn
@@ -141,6 +143,7 @@ fun LibraryScreen(
     onOpenGameManager: (String) -> Unit,
     onOpenPlayTime: (String) -> Unit,
     onOpenAchievements: (String) -> Unit,
+    onOpenProSettings: (() -> Unit)? = null,
     onMenuClick: (() -> Unit)? = null,
     shelfMode: Boolean = false,
     onShelfModeChanged: (Boolean) -> Unit = {},
@@ -394,6 +397,13 @@ fun LibraryScreen(
                     }
                 }
             }
+        }
+
+        item {
+            ProPromoCard(
+                variant = ProPromoVariant.LIBRARY,
+                onLearnMore = onOpenProSettings
+            )
         }
 
         if (uiState.isLoading) {

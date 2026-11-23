@@ -924,6 +924,16 @@
     <string name="settings_pro_patron_title">Pro Patron</string>
     <string name="settings_pro_patron_desc">Alle Pro-Funktionen mit maximaler Projektunterstützung.</string>
     <string name="settings_pro_support_same_features">Alle Stufen schalten dauerhaft dieselben Pro-Funktionen frei. Wähle eine höhere Stufe nur, wenn du die Entwicklung stärker unterstützen möchtest.</string>
+    <string name="pro_promo_library_title">Mach EmuCoreV zu deinem</string>
+    <string name="pro_promo_library_body">Crimson-Design, goldenes Symbol, Statistiken und Spielerkarte. Für immer.</string>
+    <string name="pro_promo_themes_title">Crimson-Design freischalten</string>
+    <string name="pro_promo_themes_body">Dunkleres Rot für die ganze App plus goldenes Symbol.</string>
+    <string name="pro_promo_profile_title">Erweiterte Statistiken und Spielerkarte</string>
+    <string name="pro_promo_profile_body">Wochenaktivität, Serien, Rang und Spielerkarte.</string>
+    <string name="pro_promo_hide">Vorerst ausblenden</string>
+    <string name="pro_reminder_title">EmuCoreV Pro freischalten</string>
+    <string name="pro_reminder_later">Später</string>
+    <string name="pro_reminder_body">Crimson-Design, goldenes Symbol, erweiterte Statistiken und Spielerkarte. Einmal kaufen, für immer behalten.</string>
     <string name="pro_price_loading">Preis wird geladen</string>
     <string name="pro_price_unavailable">Pro ist noch nicht verfügbar</string>
     <string name="settings_pro_feature_crimson_title">Crimson-Design</string>

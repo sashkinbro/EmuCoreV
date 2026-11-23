@@ -924,6 +924,16 @@
     <string name="settings_pro_patron_title">Pro संरक्षक</string>
     <string name="settings_pro_patron_desc">सभी Pro सुविधाएँ और परियोजना के लिए अधिकतम सहयोग।</string>
     <string name="settings_pro_support_same_features">सभी स्तर हमेशा के लिए समान Pro सुविधाएँ खोलते हैं। ऊँचा स्तर तभी चुनें जब आप विकास को अधिक सहयोग देना चाहते हों।</string>
+    <string name="pro_promo_library_title">EmuCoreV को अपना बनाएं</string>
+    <string name="pro_promo_library_body">Crimson थीम, गोल्ड आइकन, आँकड़े और प्लेयर कार्ड। हमेशा के लिए।</string>
+    <string name="pro_promo_themes_title">Crimson थीम अनलॉक करें</string>
+    <string name="pro_promo_themes_body">पूरे ऐप के लिए गहरा लाल लुक, साथ में गोल्ड आइकन।</string>
+    <string name="pro_promo_profile_title">उन्नत आँकड़े और प्लेयर कार्ड</string>
+    <string name="pro_promo_profile_body">साप्ताहिक गतिविधि, स्ट्रीक, रैंक और प्लेयर कार्ड।</string>
+    <string name="pro_promo_hide">अभी छिपाएं</string>
+    <string name="pro_reminder_title">EmuCoreV Pro अनलॉक करें</string>
+    <string name="pro_reminder_later">बाद में</string>
+    <string name="pro_reminder_body">Crimson थीम, गोल्ड आइकन, उन्नत आँकड़े और प्लेयर कार्ड। एक बार खरीदें, हमेशा के लिए आपका।</string>
     <string name="pro_price_loading">मूल्य लोड हो रहा है</string>
     <string name="pro_price_unavailable">Pro अभी उपलब्ध नहीं है</string>
     <string name="settings_pro_feature_crimson_title">Crimson थीम</string>

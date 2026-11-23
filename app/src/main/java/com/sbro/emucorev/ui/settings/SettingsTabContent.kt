@@ -158,12 +158,13 @@ fun SettingsTabContent(
     restoreBackupClick: () -> Unit,
     onOpenTrophySoundPicker: () -> Unit = {},
     onOpenTouchLayoutEditor: () -> Unit = {},
-    libraryContentWidthDp: Float
+    libraryContentWidthDp: Float,
+    onOpenProTab: () -> Unit = {}
 ) {
     CompositionLocalProvider(LocalSettingsItemIcon provides selectedTab.icon) {
         when (selectedTab) {
             SettingsTab.General -> GeneralTab(uiState, defaults, viewModel, onOpenLanguageSettings, onOpenVitaLanguageSettings)
-            SettingsTab.Customization -> CustomizationTab(uiState.customization, viewModel, libraryContentWidthDp)
+            SettingsTab.Customization -> CustomizationTab(uiState.customization, viewModel, libraryContentWidthDp, onOpenProTab)
             SettingsTab.Pro -> Column(
                 modifier = Modifier.padding(horizontal = ScreenHorizontalPadding),
                 verticalArrangement = Arrangement.spacedBy(12.dp)

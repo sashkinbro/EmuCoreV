@@ -913,6 +913,16 @@
     <string name="settings_pro_patron_title">Pro Patron</string>
     <string name="settings_pro_patron_desc">Semua fitur Pro dengan dukungan proyek maksimal.</string>
     <string name="settings_pro_support_same_features">Semua tingkat membuka fitur Pro yang sama secara permanen. Pilih tingkat yang lebih tinggi hanya jika Anda ingin mendukung pengembangan lebih banyak.</string>
+    <string name="pro_promo_library_title">Jadikan EmuCoreV milikmu</string>
+    <string name="pro_promo_library_body">Tema Crimson, ikon emas, statistik, dan Kartu Pemain. Selamanya.</string>
+    <string name="pro_promo_themes_title">Buka tema Crimson</string>
+    <string name="pro_promo_themes_body">Tampilan merah yang lebih gelap untuk seluruh aplikasi, plus ikon emas.</string>
+    <string name="pro_promo_profile_title">Statistik lanjutan dan Kartu Pemain</string>
+    <string name="pro_promo_profile_body">Aktivitas mingguan, streak, peringkat, dan Kartu Pemain.</string>
+    <string name="pro_promo_hide">Sembunyikan dulu</string>
+    <string name="pro_reminder_title">Buka EmuCoreV Pro</string>
+    <string name="pro_reminder_later">Nanti</string>
+    <string name="pro_reminder_body">Tema Crimson, ikon emas, statistik lanjutan, dan Kartu Pemain. Sekali beli, milikmu selamanya.</string>
     <string name="pro_price_loading">Memuat harga</string>
     <string name="pro_price_unavailable">Pro belum tersedia</string>
     <string name="settings_pro_feature_crimson_title">Tema Crimson</string>

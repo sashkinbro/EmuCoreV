@@ -928,6 +928,16 @@
     <string name="settings_pro_patron_title">Pro راعٍ</string>
     <string name="settings_pro_patron_desc">جميع ميزات Pro مع أقصى دعم للمشروع.</string>
     <string name="settings_pro_support_same_features">تفتح جميع المستويات ميزات Pro نفسها بشكل دائم. اختر مستوى أعلى فقط إذا كنت تريد تقديم دعم أكبر للتطوير.</string>
+    <string name="pro_promo_library_title">اجعل EmuCoreV على ذوقك</string>
+    <string name="pro_promo_library_body">سمة Crimson وأيقونة ذهبية وإحصاءات وبطاقة لاعب. لك للأبد.</string>
+    <string name="pro_promo_themes_title">افتح سمة Crimson</string>
+    <string name="pro_promo_themes_body">مظهر أحمر أغمق للتطبيق كله مع أيقونة ذهبية.</string>
+    <string name="pro_promo_profile_title">إحصاءات متقدمة وبطاقة لاعب</string>
+    <string name="pro_promo_profile_body">النشاط الأسبوعي والسلاسل والرتبة وبطاقة لاعب.</string>
+    <string name="pro_promo_hide">إخفاء الآن</string>
+    <string name="pro_reminder_title">افتح EmuCoreV Pro</string>
+    <string name="pro_reminder_later">لاحقًا</string>
+    <string name="pro_reminder_body">سمة Crimson وأيقونة ذهبية وإحصاءات موسعة وبطاقة لاعب. عملية شراء واحدة لك للأبد.</string>
     <string name="pro_price_loading">جاري تحميل السعر</string>
     <string name="pro_price_unavailable">Pro غير متوفر بعد</string>
     <string name="settings_pro_feature_crimson_title">مظهر Crimson</string>

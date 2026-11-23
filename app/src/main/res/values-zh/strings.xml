@@ -922,6 +922,16 @@
     <string name="settings_pro_patron_title">Pro 赞助者</string>
     <string name="settings_pro_patron_desc">全部 Pro 功能，并为项目提供最大支持。</string>
     <string name="settings_pro_support_same_features">所有级别都会永久解锁相同的 Pro 功能。仅在希望进一步支持开发时选择更高级别。</string>
+    <string name="pro_promo_library_title">打造属于你的 EmuCoreV</string>
+    <string name="pro_promo_library_body">Crimson 主题、金色图标、统计与玩家卡片。永久拥有。</string>
+    <string name="pro_promo_themes_title">解锁 Crimson 主题</string>
+    <string name="pro_promo_themes_body">整个应用采用更深的红色外观，并附带金色图标。</string>
+    <string name="pro_promo_profile_title">高级统计与玩家卡片</string>
+    <string name="pro_promo_profile_body">每周活动、连续天数、排名与玩家卡片。</string>
+    <string name="pro_promo_hide">暂时隐藏</string>
+    <string name="pro_reminder_title">解锁 EmuCoreV Pro</string>
+    <string name="pro_reminder_later">稍后</string>
+    <string name="pro_reminder_body">Crimson 主题、金色图标、高级统计与玩家卡片。一次购买，永久拥有。</string>
     <string name="pro_price_loading">正在加载价格</string>
     <string name="pro_price_unavailable">Pro 尚未可用</string>
     <string name="settings_pro_feature_crimson_title">Crimson 主题</string>

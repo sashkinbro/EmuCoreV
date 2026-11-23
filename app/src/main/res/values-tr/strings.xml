@@ -924,6 +924,16 @@
     <string name="settings_pro_patron_title">Pro Hami</string>
     <string name="settings_pro_patron_desc">Tüm Pro özellikleri ve projeye en yüksek destek.</string>
     <string name="settings_pro_support_same_features">Tüm düzeyler aynı Pro özelliklerini kalıcı olarak açar. Yalnızca geliştirmeyi daha fazla desteklemek istiyorsanız daha yüksek bir düzey seçin.</string>
+    <string name="pro_promo_library_title">EmuCoreV\'i kendine göre yap</string>
+    <string name="pro_promo_library_body">Crimson teması, altın simge, istatistikler ve Oyuncu Kartı. Sonsuza dek.</string>
+    <string name="pro_promo_themes_title">Crimson temasının kilidini aç</string>
+    <string name="pro_promo_themes_body">Tüm uygulama için daha koyu kırmızı görünüm ve altın simge.</string>
+    <string name="pro_promo_profile_title">Gelişmiş istatistikler ve Oyuncu Kartı</string>
+    <string name="pro_promo_profile_body">Haftalık etkinlik, seriler, sıralama ve Oyuncu Kartı.</string>
+    <string name="pro_promo_hide">Şimdilik gizle</string>
+    <string name="pro_reminder_title">EmuCoreV Pro\'nun kilidini aç</string>
+    <string name="pro_reminder_later">Sonra</string>
+    <string name="pro_reminder_body">Crimson teması, altın simge, gelişmiş istatistikler ve Oyuncu Kartı. Tek satın alma, sonsuza dek.</string>
     <string name="pro_price_loading">Fiyat yükleniyor</string>
     <string name="pro_price_unavailable">Pro henüz kullanılamıyor</string>
     <string name="settings_pro_feature_crimson_title">Crimson teması</string>

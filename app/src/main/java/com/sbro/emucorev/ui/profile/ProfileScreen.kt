@@ -1,6 +1,8 @@
 package com.sbro.emucorev.ui.profile
 
 import com.sbro.emucorev.ui.common.controllerFocus
+import com.sbro.emucorev.ui.common.ProPromoCard
+import com.sbro.emucorev.ui.common.ProPromoVariant
 import com.sbro.emucorev.ui.common.formatCoreDisplayName
 import android.app.Activity
 import android.content.Context
@@ -186,6 +188,7 @@ fun ProfileScreen(
     onOpenGameDetails: (Long) -> Unit,
     onOpenMyLists: () -> Unit,
     onOpenTrophies: (String?) -> Unit,
+    onOpenProSettings: (() -> Unit)? = null,
     viewModel: ProfileViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -363,6 +366,12 @@ fun ProfileScreen(
                         }
                         when (tabs[selectedTab.intValue]) {
                             ProfileTab.Overview -> {
+                                item {
+                                    ProPromoCard(
+                                        variant = ProPromoVariant.PROFILE,
+                                        onLearnMore = onOpenProSettings
+                                    )
+                                }
                                 item {
                                     RevealOnEnter(revealKey = "overview-${uiState.account?.uid}") {
                                         ProfileOverview(

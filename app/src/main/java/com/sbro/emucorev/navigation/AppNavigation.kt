@@ -60,6 +60,7 @@ import com.sbro.emucorev.ui.playtime.PlayTimeScreen
 import com.sbro.emucorev.ui.profile.MyListsScreen
 import com.sbro.emucorev.ui.profile.ProfileScreen
 import com.sbro.emucorev.ui.discord.DiscordScreen
+import com.sbro.emucorev.ui.common.ProReminderHost
 import com.sbro.emucorev.ui.pro.ProWelcomeDialog
 import com.sbro.emucorev.ui.saves.SaveDataScreen
 import com.sbro.emucorev.ui.savestates.SaveStatesScreen
@@ -516,6 +517,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         onOpenGameManager = { titleId -> navigateGameManager(titleId) },
                         onOpenPlayTime = { titleId -> navigatePlayTime(titleId) },
                         onOpenAchievements = { titleId -> navigateAchievements(titleId) },
+                        onOpenProSettings = {
+                            navController.navigate(settingsRoute(SettingsTab.Pro)) { launchSingleTop = true }
+                        },
                         onMenuClick = openDrawer
                     )
                 }
@@ -971,7 +975,10 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         onMenuClick = openDrawer,
                         onOpenGameDetails = { igdbId -> navController.navigate("$ROUTE_CATALOG_DETAIL_PREFIX/$igdbId") },
                         onOpenMyLists = navigateMyLists,
-                        onOpenTrophies = { titleId -> navigateAchievements(titleId) }
+                        onOpenTrophies = { titleId -> navigateAchievements(titleId) },
+                        onOpenProSettings = {
+                            navController.navigate(settingsRoute(SettingsTab.Pro)) { launchSingleTop = true }
+                        }
                     )
                 }
             }
@@ -1236,6 +1243,12 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             }
         )
     }
+
+    ProReminderHost(
+        isHomeVisible = !showWelcomeDialog &&
+            preferences.onboardingCompleted &&
+            (currentRoute == ROUTE_LIBRARY || currentRoute == ROUTE_HOME)
+    )
 
 
 }

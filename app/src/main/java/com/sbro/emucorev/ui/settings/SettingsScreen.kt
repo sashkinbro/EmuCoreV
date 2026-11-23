@@ -280,7 +280,8 @@ fun SettingsScreen(
                                 restoreBackupClick = { showRestoreBackupDialog = true },
                                 onOpenTrophySoundPicker = { trophySoundPicker.launch(arrayOf("audio/*")) },
                                 onOpenTouchLayoutEditor = onOpenTouchLayoutEditor,
-                                libraryContentWidthDp = libraryContentWidthDp
+                                libraryContentWidthDp = libraryContentWidthDp,
+                                onOpenProTab = { selectedTab = SettingsTab.Pro }
                             )
                         }
                     }
