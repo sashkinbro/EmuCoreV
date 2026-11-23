@@ -203,7 +203,7 @@ class SaveStateRepository internal constructor(
                 val result = backend.save(state.absolutePath, appVersion)
                 if (result.isOk) {
                     // Publish the preview in the same repository critical section as the state.
-                    val published = captured && stagedThumbnail != null && try {
+                    val published = captured && try {
                         Files.move(stagedThumbnail.toPath(), thumbnail.toPath(),
                             StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
                         true

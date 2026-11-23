@@ -113,7 +113,7 @@ class CheatCatalogRepository(private val context: Context) {
             val bytes = try { httpGetBytes(url, MAX_PACK_BYTES) }
                 catch (cancelled: CancellationException) { throw cancelled }
                 catch (_: Exception) { continue }
-            if (bytes != null && bytes.isNotEmpty() && verifyCheatPack(bytes, entry.sha256)) return bytes
+            if (bytes.isNotEmpty() && verifyCheatPack(bytes, entry.sha256)) return bytes
         }
         return null
     }

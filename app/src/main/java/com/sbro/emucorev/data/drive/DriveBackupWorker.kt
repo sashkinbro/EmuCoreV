@@ -137,7 +137,7 @@ class DriveBackupWorker(context: Context, params: WorkerParameters) : CoroutineW
                         phase("verify")
                         val manifest = archive.extract(download)
                         phase("restore")
-                        archive.restore(manifest, inputData.getStringArray("categories")?.toSet().orEmpty())
+                        archive.restore(manifest, inputData.getNullableStringArray("categories")?.filterNotNull()?.toSet().orEmpty())
                         store.update { it.copy(lastDigest = "", lastError = "restored") }
                     } finally {
                         download.delete()

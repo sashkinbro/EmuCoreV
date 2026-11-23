@@ -86,7 +86,7 @@ fun GameCoverArt(
                 bitmapCache.get(bitmapKey(path, artworkVersion, style, cacheVersion, decodeWidth, decodeHeight))
             }
         }
-        mutableStateOf(bitmap?.let { DisplayedGameCover(it, resolved?.is3d == true) })
+        mutableStateOf(bitmap?.let { DisplayedGameCover(it, resolved.is3d) })
     }
     val presentationChanged by rememberUpdatedState(onPresentationChanged)
     val is3d = artwork?.is3d == true

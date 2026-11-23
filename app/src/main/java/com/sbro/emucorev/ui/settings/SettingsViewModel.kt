@@ -127,7 +127,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
     private val initialCoreConfig = coreConfigRepository.ensureDefaultsPersisted()
     private val coreSettingsSaveQueue = Channel<VitaCoreConfig>(Channel.CONFLATED)
-    private lateinit var coreSettingsSaveJob: Job
+    private var coreSettingsSaveJob: Job
 
     private val _uiState = MutableStateFlow(
         SettingsUiState(

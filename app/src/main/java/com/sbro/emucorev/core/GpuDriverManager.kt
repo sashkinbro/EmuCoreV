@@ -129,7 +129,7 @@ internal class GpuDriverStore(private val root: File, private val device: () -> 
             permissions(library)
             if (target.exists()) {
                 backup = File(root, ".previous-${UUID.randomUUID()}")
-                check(target.renameTo(backup!!)) { "Could not replace installed driver" }
+                check(target.renameTo(backup)) { "Could not replace installed driver" }
             }
             if (!staging.renameTo(target)) {
                 backup?.renameTo(target)

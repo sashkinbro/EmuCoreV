@@ -2001,7 +2001,7 @@ private fun ProfileOverview(
                                 Text(
                                     text = stringResource(R.string.profile_player_id_format, tag),
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = if (profile?.isProMember == true) accent else MaterialTheme.colorScheme.primary
+                                    color = if (profile.isProMember) accent else MaterialTheme.colorScheme.primary
                                 )
                             }
                             email?.takeIf { it.isNotBlank() }?.let { mail ->

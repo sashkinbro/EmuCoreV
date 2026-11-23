@@ -29,7 +29,8 @@ object DriveAuthorization {
             GetSignInWithGoogleOption.Builder(clientId).build()
         ).build()
         val result = CredentialManager.create(activity).getCredential(activity, request)
-        return GoogleIdTokenCredential.createFrom(result.credential.data).id
+        val credential = GoogleIdTokenCredential.createFrom(result.credential.data)
+        return credential.email?.takeIf { it.isNotBlank() } ?: credential.uniqueId
     }
 
     suspend fun authorize(context: Context, email: String): AuthorizationResult =

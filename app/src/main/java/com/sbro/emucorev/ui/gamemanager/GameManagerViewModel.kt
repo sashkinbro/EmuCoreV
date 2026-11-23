@@ -52,7 +52,7 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
     private val gpuDriverManager = GpuDriverManager(application)
     private val profileSaveQueue = Channel<ProfileWriteRequest>(Channel.UNLIMITED)
     private val latestProfileWrites = linkedMapOf<String, ProfileWriteRequest>()
-    private lateinit var profileSaveJob: Job
+    private var profileSaveJob: Job
 
     private val _uiState = MutableStateFlow(GameManagerUiState())
     val uiState: StateFlow<GameManagerUiState> = _uiState.asStateFlow()

@@ -86,8 +86,8 @@ class CoverArtRepository private constructor(context: Context) {
         val request = Request(titleId, igdbId, candidatePath, fallbackIconPath.takeIf { candidatePath != null },
             styleOverride ?: style.value, cacheVersion.value)
         val serialOnly = titleId != null && igdbId == null && candidatePath.isNullOrBlank()
-        val known = if (serialOnly) identities.find(titleId!!, request.style) else null
-        val result = if (serialOnly && identities.isKnownMissing(titleId!!, request.style)) {
+        val known = if (serialOnly) identities.find(titleId, request.style) else null
+        val result = if (serialOnly && identities.isKnownMissing(titleId, request.style)) {
             ResolvedVitaCover(null)
         } else if (known != null) {
             val file = if (cachedOnly) cache.findCached(known) else cache.resolve(known)
@@ -98,8 +98,8 @@ class CoverArtRepository private constructor(context: Context) {
                 .resolve(titleId, igdbId, candidatePath, fallbackIconPath, request.style, cachedOnly)
             if (serialOnly) {
                 val asset = index.find(titleId, style = request.style)
-                if (asset != null) identities.remember(titleId!!, asset)
-                else identities.rememberMissing(titleId!!, request.style)
+                if (asset != null) identities.remember(titleId, asset)
+                else identities.rememberMissing(titleId, request.style)
             }
             resolved
         }
