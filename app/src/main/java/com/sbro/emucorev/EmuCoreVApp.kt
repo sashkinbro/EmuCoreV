@@ -1,6 +1,7 @@
 package com.sbro.emucorev
 
 import android.app.Application
+import com.sbro.emucorev.core.AppAnalytics
 import com.sbro.emucorev.core.AppStartup
 import com.sbro.emucorev.core.BackupSessionGate
 import com.sbro.emucorev.core.NativeLib
@@ -25,6 +26,7 @@ class EmuCoreVApp : Application() {
         // are not initialized, and the Discord SDK runs in its own isolated process; neither
         // helper may build the emulator-side graph.
         if (skipsAppStartup(Application.getProcessName())) return
+        AppAnalytics.initialize(this)
         TrophyCloudRepository.resumePending(this)
         recoverPendingDriveRestore()
         DriveBackupWork.resumePending(this)

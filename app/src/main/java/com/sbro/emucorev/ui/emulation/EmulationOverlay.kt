@@ -2,6 +2,7 @@
 
 package com.sbro.emucorev.ui.emulation
 
+import com.sbro.emucorev.core.AppAnalytics
 import android.annotation.SuppressLint
 import android.provider.OpenableColumns
 import android.util.Log
@@ -351,6 +352,12 @@ fun EmulationOverlayHost(
                     )
                 }
                 saveStatesRefreshKey++
+                when (action) {
+                    is SaveStateAction.Save -> AppAnalytics.logSaveStateAction("save", false, result.isOk)
+                    is SaveStateAction.Load ->
+                        if (!result.requiresRendererRestart) AppAnalytics.logSaveStateAction("load", false, result.isOk)
+                    is SaveStateAction.Delete -> Unit
+                }
                 if (!result.isOk) {
                     Log.e("SaveStateOverlay", "${action.javaClass.simpleName} failed (${result.status}): ${result.error}")
                 }

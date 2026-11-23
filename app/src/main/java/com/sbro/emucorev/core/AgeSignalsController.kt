@@ -56,6 +56,7 @@ object AgeSignalsController {
     suspend fun publishStored(preferences: AppPreferences) {
         val stored = runCatching { preferences.getAgeSignals() }.getOrNull() ?: return
         state.value = stored
+        AppAnalytics.applyAgeSignals(stored)
     }
 
     /** Runs at most once per process. Safe to call from a lifecycleScope; never throws. */
@@ -65,6 +66,7 @@ object AgeSignalsController {
             val manager = AgeSignalsManagerFactory.create(activity.applicationContext)
             val snapshot = fetchWithRetry(manager, activity)
             state.value = snapshot
+            AppAnalytics.applyAgeSignals(snapshot)
             preferences.setAgeSignals(snapshot)
             if (snapshot.consentDeclined) {
                 Log.i(TAG, "Significant-change consent declined; no action taken")

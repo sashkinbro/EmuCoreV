@@ -66,6 +66,7 @@ commons-compress = { group = "org.apache.commons", name = "commons-compress", ve
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 google-play-billing = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billing" }
 google-play-review = { group = "com.google.android.play", name = "review", version.ref = "playReview" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }

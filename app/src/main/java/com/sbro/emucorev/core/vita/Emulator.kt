@@ -58,6 +58,7 @@ import com.sbro.emucorev.core.BackupSessionGate
 import com.sbro.emucorev.core.KeyboardMouseManager
 import com.sbro.emucorev.core.MenuPauseQueue
 import com.sbro.emucorev.core.EmulatorStorage
+import com.sbro.emucorev.core.AppAnalytics
 import com.sbro.emucorev.core.PlayTimeRepository
 import com.sbro.emucorev.core.VitaCoreConfig
 import com.sbro.emucorev.core.VitaCoreConfigRepository
@@ -194,6 +195,9 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     var useBuiltInKeyboard by mutableStateOf(false)
         private set
     private var keyboardRequestGeneration = 0
+    private var automaticLoadLogged = false
+    private var analyticsRenderer = ""
+    private var analyticsAudioBackend = ""
 
     var hasPhysicalGamepad by mutableStateOf(false)
         private set
@@ -206,6 +210,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             sessionUsable = false
             launchStateLoading = launchStateLoading.onFailure()
             clearLoadMarker()
+            logAutomaticStateLoadOnce(false)
             Toast.makeText(this, R.string.emulation_savestate_failed_toast, Toast.LENGTH_LONG).show()
             if (intent.getBooleanExtra(AUTOMATIC_STATE_LOAD_EXTRA, false)) {
                 // Header inspection cannot detect every corrupt payload. A failed
@@ -220,6 +225,12 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 triggerRebirthAfterNativeShutdown(fallback, allowAutoSave = false)
             }
         }
+    }
+
+    private fun logAutomaticStateLoadOnce(success: Boolean) {
+        if (automaticLoadLogged || !intent.getBooleanExtra(AUTOMATIC_STATE_LOAD_EXTRA, false)) return
+        automaticLoadLogged = true
+        AppAnalytics.logSaveStateAction("load", true, success)
     }
 
     fun onLaunchStateProgress(progress: Float, active: Boolean) {
@@ -243,6 +254,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             if (generation < stateFramePendingGeneration) return@runOnUiThread
             stateFrameReadyGeneration = maxOf(stateFrameReadyGeneration, generation)
             launchStateLoading = launchStateLoading.onNativeProgress(1f, false)
+            logAutomaticStateLoadOnce(true)
             clearLoadMarkerIfSettled()
         }
     }
@@ -417,11 +429,18 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             }
             when (GameLaunchPreparation.prepare(this, gameId)) {
                 is GameLaunchPreparation.Outcome.Ready -> Unit
-                GameLaunchPreparation.Outcome.MissingFirmware ->
+                GameLaunchPreparation.Outcome.MissingFirmware -> {
+                    AppAnalytics.logEmulationStartFailed("game", "bios_missing")
                     return abortLaunch(R.string.game_launch_requires_firmware)
-                GameLaunchPreparation.Outcome.MissingFirmwareUpdate ->
+                }
+                GameLaunchPreparation.Outcome.MissingFirmwareUpdate -> {
+                    AppAnalytics.logEmulationStartFailed("game", "bios_missing")
                     return abortLaunch(R.string.game_launch_requires_firmware_update)
-                GameLaunchPreparation.Outcome.Failed -> return abortLaunch(R.string.settings_clear_cache_failed)
+                }
+                GameLaunchPreparation.Outcome.Failed -> {
+                    AppAnalytics.logEmulationStartFailed("game", "unknown")
+                    return abortLaunch(R.string.settings_clear_cache_failed)
+                }
             }
             val explicitState = loadStatePath(args)
             if (explicitState != null) {
@@ -1455,6 +1474,19 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         playTimeSessionLastSeenAt = session.lastSeenAt
         BackupSessionGate.gameStarted()
         DiscordIntegration.setPlaying(title, gameId)
+        runCatching {
+            val config = VitaGameSettingsRepository(this).loadEffective(gameId)
+            analyticsRenderer = config.backendRenderer
+            analyticsAudioBackend = config.audioBackend
+            AppAnalytics.logEmulationStarted(
+                launchType = "game",
+                renderer = config.backendRenderer,
+                audioBackend = config.audioBackend,
+                upscaleMultiplier = config.resolutionMultiplier,
+                saveStateLoad = intent.getBooleanExtra(AUTOMATIC_STATE_LOAD_EXTRA, false) ||
+                    loadStatePath(intent.getStringArrayExtra(APP_RESTART_PARAMETERS) ?: emptyArray()) != null
+            )
+        }
     }
 
     private fun requestRetroArchShaderReapply(titleId: String) {
@@ -1499,6 +1531,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         val sessionId = playTimeSessionId ?: return
         PlayTimeRepository(this).finishSession(sessionId)
         val durationMs = (System.currentTimeMillis() - playTimeSessionStartedAt).coerceAtLeast(0L)
+        AppAnalytics.logEmulationEnded(durationMs, analyticsRenderer, analyticsAudioBackend)
         val titleId = playTimeSessionTitleId
         if (titleId.isNotBlank() && durationMs > 0L) {
             val title = runCatching {
@@ -1573,11 +1606,13 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                             if (SaveStateBridge.runningTitleId() != title) null else
                                 SaveStateRepository(this@Emulator).save(title, SaveStateRepository.QUICK_SLOT, BuildConfig.VERSION_NAME)
                         }
+                        if (result != null) AppAnalytics.logSaveStateAction("save", true, result.isOk)
                         if (result != null && !result.isOk) {
                             Toast.makeText(this@Emulator, R.string.emulation_savestate_failed_toast, Toast.LENGTH_LONG).show()
                         }
                     } catch (error: Exception) {
                         Log.e(TAG, "Automatic exit save failed", error)
+                        AppAnalytics.logSaveStateAction("save", true, false)
                         Toast.makeText(this@Emulator, R.string.emulation_savestate_failed_toast, Toast.LENGTH_LONG).show()
                     } finally {
                         autoSaveInProgress = false

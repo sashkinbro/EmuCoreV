@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.onboarding
 
+import com.sbro.emucorev.core.AppAnalytics
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -58,6 +59,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
 
     fun completeOnboarding() {
         preferences.onboardingCompleted = true
+        AppAnalytics.logOnboardingCompleted()
     }
 
     fun selectStorageLocation(rootPath: String) {

@@ -79,6 +79,7 @@ private val ProGold = Color(0xFFFFC857)
 fun ProPurchasePanel(
     modifier: Modifier = Modifier,
     showFeatures: Boolean = true,
+    source: String = "other",
     manager: ProPurchaseManager = ProPurchaseManager.getInstance(LocalContext.current)
 ) {
     val context = LocalContext.current
@@ -138,7 +139,7 @@ fun ProPurchasePanel(
             if (!state.isProUnlocked) {
                 Button(
                     onClick = {
-                        if (activity != null) manager.purchase(activity, ProPurchaseTier.BASE)
+                        if (activity != null) manager.purchase(activity, ProPurchaseTier.BASE, source)
                     },
                     enabled = activity != null &&
                         state.isBillingReady &&
@@ -216,7 +217,7 @@ fun ProPurchasePanel(
             offers = supportOffers,
             purchaseInProgress = state.isPurchaseInProgress,
             onPurchase = { tier ->
-                if (activity != null) manager.purchase(activity, tier)
+                if (activity != null) manager.purchase(activity, tier, source)
             },
             onDismiss = { supportDialogVisible = false }
         )
@@ -666,7 +667,7 @@ fun ProWelcomeDialog(
                                 if (state.isProUnlocked) {
                                     onContinue()
                                 } else if (activity != null) {
-                                    manager.purchase(activity, ProPurchaseTier.BASE)
+                                    manager.purchase(activity, ProPurchaseTier.BASE, "welcome")
                                 }
                             },
                             enabled = state.isProUnlocked ||
@@ -711,7 +712,7 @@ fun ProWelcomeDialog(
             offers = supportOffers,
             purchaseInProgress = state.isPurchaseInProgress,
             onPurchase = { tier ->
-                if (activity != null) manager.purchase(activity, tier)
+                if (activity != null) manager.purchase(activity, tier, "welcome")
             },
             onDismiss = { supportDialogVisible = false }
         )

@@ -1,5 +1,6 @@
 package com.sbro.emucorev.ui.savestates
 
+import com.sbro.emucorev.core.AppAnalytics
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -124,6 +125,13 @@ class SaveStatesViewModel(application: Application) : AndroidViewModel(applicati
             } finally {
                 endAction()
             }
+            AppAnalytics.logSaveStateAction(
+                "load", false,
+                when (result) {
+                    is SaveStateLoadOutcome.Loaded -> result.result.isOk
+                    is SaveStateLoadOutcome.Relaunched -> result.result == VitaLaunchBridge.LaunchResult.Success
+                }
+            )
             withContext(Dispatchers.Main) { onComplete(result) }
         }
     }
@@ -144,6 +152,7 @@ class SaveStatesViewModel(application: Application) : AndroidViewModel(applicati
             } finally {
                 endAction()
             }
+            AppAnalytics.logSaveStateAction("load", false, result == VitaLaunchBridge.LaunchResult.Success)
             withContext(Dispatchers.Main) { onComplete(result) }
         }
     }

@@ -424,7 +424,8 @@ private fun OnboardingProContent() {
         ProBenefitCards(modifier = Modifier.widthIn(max = 640.dp))
         ProPurchasePanel(
             modifier = Modifier.widthIn(max = 640.dp),
-            showFeatures = false
+            showFeatures = false,
+            source = "onboarding"
         )
     }
 }

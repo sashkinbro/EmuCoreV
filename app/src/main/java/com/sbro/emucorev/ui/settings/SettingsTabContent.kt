@@ -170,7 +170,7 @@ fun SettingsTabContent(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ProBenefitCards()
-                ProPurchasePanel(showFeatures = false)
+                ProPurchasePanel(showFeatures = false, source = "settings")
             }
             SettingsTab.Graphics -> GraphicsTab(uiState, defaults, viewModel, onOpenGpuDriverSettings)
             SettingsTab.Audio -> AudioTab(uiState, defaults, viewModel, refreshCoreSettingsClick, onOpenTrophySoundPicker)
