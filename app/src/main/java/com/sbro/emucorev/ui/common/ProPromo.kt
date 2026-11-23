@@ -3,6 +3,7 @@ package com.sbro.emucorev.ui.common
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -116,9 +117,11 @@ enum class ProPromoVariant(
     val id: String,
     val icon: ImageVector,
     @StringRes val title: Int,
-    @StringRes val body: Int
+    @StringRes val body: Int,
+    /** Optional image shown instead of [icon] (the library card shows the gold Pro app icon). */
+    @DrawableRes val image: Int? = null
 ) {
-    LIBRARY("library", Icons.Rounded.Star, R.string.pro_promo_library_title, R.string.pro_promo_library_body),
+    LIBRARY("library", Icons.Rounded.Star, R.string.pro_promo_library_title, R.string.pro_promo_library_body, R.drawable.ic_drawer_app_pro),
     THEMES("themes", Icons.Rounded.Palette, R.string.pro_promo_themes_title, R.string.pro_promo_themes_body),
     PROFILE("profile", Icons.Rounded.Insights, R.string.pro_promo_profile_title, R.string.pro_promo_profile_body)
 }
@@ -207,12 +210,23 @@ fun ProPromoCard(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = variant.icon,
-                contentDescription = null,
-                modifier = Modifier.size(iconSize),
-                tint = primary
-            )
+            val image = variant.image
+            if (image != null) {
+                // The gold Pro launcher icon: exactly what the purchase turns the app icon into.
+                Image(
+                    painter = painterResource(image),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            } else {
+                Icon(
+                    imageVector = variant.icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(iconSize),
+                    tint = primary
+                )
+            }
         }
     }
     val buyButton: @Composable () -> Unit = {
@@ -370,7 +384,7 @@ fun ProReminderDialog(
         showIconContainer = false,
         icon = {
             Image(
-                painter = painterResource(R.drawable.ic_drawer_app),
+                painter = painterResource(R.drawable.ic_drawer_app_pro),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
