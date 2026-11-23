@@ -67,6 +67,11 @@ import com.sbro.emucorev.core.ProPurchaseTier
 import com.sbro.emucorev.core.review.AndroidInAppReviewAttemptStore
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.ui.theme.neon.neonButtonShape
+import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
+import com.sbro.emucorev.ui.theme.neon.NeonRed
+import com.sbro.emucorev.ui.theme.neon.NeonYellow
+import com.sbro.emucorev.ui.theme.neon.neonChipShape
+import com.sbro.emucorev.ui.theme.neon.neonCornerAccent
 import com.sbro.emucorev.ui.theme.neon.neonShape
 import kotlinx.coroutines.delay
 
@@ -160,6 +165,8 @@ fun ProPromoCard(
 
     val price = state.productPrice
     val colors = MaterialTheme.colorScheme
+    // Neon theme: cut corners, neon yellow/red frame, corner marks, uppercase title.
+    val neon = LocalNeonTheme.current
     val primary = colors.primary
     val gold = Color(0xFFE9B949)
     val shape = neonShape(20.dp)
@@ -170,14 +177,19 @@ fun ProPromoCard(
             colors.surfaceVariant.copy(alpha = 0.22f)
         )
     )
-    val borderBrush = Brush.linearGradient(listOf(gold.copy(alpha = 0.60f), primary.copy(alpha = 0.35f)))
+    val borderBrush = if (neon) {
+        Brush.linearGradient(listOf(NeonYellow.copy(alpha = 0.70f), NeonRed.copy(alpha = 0.55f)))
+    } else {
+        Brush.linearGradient(listOf(gold.copy(alpha = 0.60f), primary.copy(alpha = 0.35f)))
+    }
 
     val proPill: @Composable () -> Unit = {
         Row(
             modifier = Modifier
                 .height(22.dp)
-                .clip(RoundedCornerShape(50))
-                .background(Brush.horizontalGradient(listOf(Color(0xFFF6D06B), Color(0xFFD99A2B))))
+                .clip(if (neon) neonChipShape() else RoundedCornerShape(50))
+                .background(if (neon) Brush.horizontalGradient(listOf(NeonYellow, NeonYellow))
+                    else Brush.horizontalGradient(listOf(Color(0xFFF6D06B), Color(0xFFD99A2B))))
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -281,7 +293,9 @@ fun ProPromoCard(
     }
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .neonCornerAccent(NeonYellow, markSize = 10.dp, bracket = true),
         shape = shape,
         color = Color.Transparent,
         border = BorderStroke(1.dp, borderBrush)
@@ -315,7 +329,7 @@ fun ProPromoCard(
                                 proPill()
                                 Spacer(Modifier.width(10.dp))
                                 Text(
-                                    text = stringResource(variant.title),
+                                    text = stringResource(variant.title).let { if (neon) it.uppercase() else it },
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = colors.onSurface,
@@ -347,7 +361,7 @@ fun ProPromoCard(
                             iconBox(40.dp, 22.dp)
                             Spacer(Modifier.width(12.dp))
                             Text(
-                                text = stringResource(variant.title),
+                                text = stringResource(variant.title).let { if (neon) it.uppercase() else it },
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
