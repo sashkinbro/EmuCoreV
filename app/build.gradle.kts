@@ -73,8 +73,8 @@ run {
     if (vcpkgRoot.exists()) setEnv("VCPKG_ROOT", vcpkgRoot.absolutePath.replace('\\', '/'))
 }
 
-// The native PS Vita shell module exists only when its local resource pack does
-// (see settings.gradle.kts); otherwise library mode keeps the Compose carousel.
+// The native PS Vita shell module (see settings.gradle.kts). It is always built; the
+// library mode is only offered once firmware is installed (NativeLibraryMode.available).
 val nativeShellAvailable = rootProject.findProject(":native-ui-shell") != null
 
 plugins {

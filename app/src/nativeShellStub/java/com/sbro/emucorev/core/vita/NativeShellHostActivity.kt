@@ -4,7 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 
 /**
- * Builds without the local native UI resource pack keep the Compose carousel;
+ * Builds without the native shell module keep the Compose carousel;
  * NativeLibraryMode.available is false there, so this is never started.
  */
 class NativeShellHostActivity : Activity(), NativeLibraryMode.ReturnTarget {

@@ -14,7 +14,7 @@ import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import com.sbro.emucorev.nativeui.DeviceStatusSource
 import com.sbro.emucorev.nativeui.BundledImages
-import com.sbro.emucorev.nativeui.BundledResources
+import com.sbro.emucorev.nativeui.FirmwarePack
 import com.sbro.emucorev.nativeui.NativeUiSoundBank
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -85,6 +85,9 @@ open class NativeShellActivity : NativeActivity() {
     private var lastLiveAreaTarget: String? = null
     @Volatile private var catalogEntries: List<BundledImages.HomeCatalogEntry> = emptyList()
     private val requestedLiveAreas = java.util.Collections.synchronizedSet(HashSet<String>())
+
+    /** Root of the installed Vita file system (vs0, sa0, ...) the resource pack is built from. */
+    protected open fun firmwareRoot(): File? = null
 
     /** Home bubbles, in catalog order. Runs on a worker thread. */
     protected open fun loadCatalog(): List<BundledImages.HomeCatalogSource> = emptyList()
@@ -360,12 +363,10 @@ open class NativeShellActivity : NativeActivity() {
             else -> defaultScene // Cold launch settles on the Lock scene with Home ready behind it.
         }
         val waveTheme = intent.getStringExtra("wave_theme") ?: "effects_default_0512_01"
-        // Show the original Shell topmenu busy animation while the pack is prepared.
+        // The busy animation runs while the pack is prepared; its dot is generated
+        // here (the firmware's own image is only available from the built pack).
         val startupRoot = File(noBackupFilesDir, "native-ui-startup").apply {
             check(isDirectory || mkdirs()) { "Cannot create startup resource directory" }
-        }
-        assets.open("startup-busy.png").use { input ->
-            File(startupRoot, "startup-busy.png").outputStream().use { output -> input.copyTo(output) }
         }
         nativeSetWaveTheme(intent.getStringExtra("wave_theme") ?: shellSettings.waveTheme)
         nativeSetDisplayArea(shellSettings.displayArea)
@@ -391,9 +392,7 @@ open class NativeShellActivity : NativeActivity() {
         }
         deviceStatus = DeviceStatusSource(this)
         startupImages = BundledImages(startupRoot, ::uploadImage)
-        val busy = File(startupRoot, "startup-busy.png").inputStream().use {
-            requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid startup busy image" }
-        }
+        val busy = BundledImages.placeholderBusyDot()
         try { startupImages.loadBusyImage(busy) } finally { busy.recycle() }
         if (requestedScene == 1 || requestedScene == 4) {
             images = startupImages
@@ -416,7 +415,8 @@ open class NativeShellActivity : NativeActivity() {
         var loader: BundledImages? = null
         var handedOff = false
         try {
-            val resources = BundledResources.prepare(this)
+            // Builds the pack from the installed firmware on first use (no-op when ready).
+            val resources = FirmwarePack.prepare(this, checkNotNull(firmwareRoot()) { "Firmware location is unknown" })
             if (Thread.currentThread().isInterrupted || closed.get()) return
             synchronized(nativeBridgeLock) {
                 if (closed.get()) return

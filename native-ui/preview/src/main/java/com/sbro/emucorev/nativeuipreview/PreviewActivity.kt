@@ -7,6 +7,12 @@ import java.io.File
 
 /** Development host: the native shell over the local fixture catalog. */
 class PreviewActivity : NativeShellActivity() {
+    /**
+     * The preview has no installed emulator: push a firmware tree (vs0, sa0, ...) to
+     * Android/data/com.sbro.emucorev.nativeuipreview/files/vita and the pack is built from it.
+     */
+    override fun firmwareRoot(): File = File(getExternalFilesDir(null), "vita")
+
     override fun loadCatalog(): List<BundledImages.HomeCatalogSource> {
         val root = File(noBackupFilesDir, "home-fixture")
         if (!File(root, "catalog.json").isFile) {

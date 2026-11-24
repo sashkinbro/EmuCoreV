@@ -114,7 +114,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var isNativeShellSession = false
     private var isNativeTrophySession = false
     private val isFirmwareSession get() = isNativeShellSession || isNativeTrophySession
-    val returnsToNativeLibrary: Boolean get() = NativeLibraryMode.available &&
+    val returnsToNativeLibrary: Boolean get() = NativeLibraryMode.available(this) &&
         (isNativeShellSession || intent.getBooleanExtra(NativeLibraryMode.RETURN_TO_NATIVE_LIBRARY, false))
     private val shellLaunchPending = java.util.concurrent.atomic.AtomicBoolean(false)
     private var shellExitDialog: android.app.Dialog? = null

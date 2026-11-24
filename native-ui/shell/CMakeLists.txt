@@ -15,3 +15,8 @@ target_compile_features(emucorev_shell PRIVATE cxx_std_20)
 target_compile_options(emucorev_shell PRIVATE -Wall -Wextra -Werror -fno-fast-math -ffp-contract=off)
 target_link_options(emucorev_shell PRIVATE "-uANativeActivity_onCreate")
 target_link_libraries(emucorev_shell PRIVATE shell_atrac9 native_app_glue emucorev_paf emucorev_paf_gles android log EGL)
+# Firmware asset extractor entry (FirmwarePack.kt): builds the resource pack on the device.
+add_library(emucorev_packjni SHARED src/main/cpp/pack_jni.cpp)
+target_compile_features(emucorev_packjni PRIVATE cxx_std_20)
+target_compile_options(emucorev_packjni PRIVATE -Wall -Wextra -Werror -fno-fast-math -ffp-contract=off)
+target_link_libraries(emucorev_packjni PRIVATE emucorev_extract log)

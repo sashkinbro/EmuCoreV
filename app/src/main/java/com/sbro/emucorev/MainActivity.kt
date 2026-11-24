@@ -104,7 +104,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (com.sbro.emucorev.core.vita.NativeLibraryMode.available &&
+        if (com.sbro.emucorev.core.vita.NativeLibraryMode.available(this) &&
             getSharedPreferences("emucorev_library_ui", MODE_PRIVATE).getBoolean("shelf_mode", false)) {
             startActivity(com.sbro.emucorev.core.vita.NativeLibraryMode.intent(this))
             return

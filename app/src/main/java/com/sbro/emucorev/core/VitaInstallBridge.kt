@@ -1,6 +1,7 @@
 package com.sbro.emucorev.core
 
 import android.content.Context
+import com.sbro.emucorev.nativeui.FirmwarePack
 
 data class NativeInstallProgress(
     val stage: String,
@@ -122,11 +123,20 @@ object VitaInstallBridge {
     ): String? {
         CoreMaintenanceRepository(context).ensureCoreUpdated()
         NativeLibraryLoader.ensureLoaded(context)
-        return nativeInstallFirmware(
-            EmulatorStorage.vitaRoot(context).absolutePath,
+        val vitaRoot = EmulatorStorage.vitaRoot(context)
+        val version = nativeInstallFirmware(
+            vitaRoot.absolutePath,
             firmwarePath,
             systemLanguage
         )
+        if (version != null) {
+            // The shell's resources derive from the installed firmware: drop the old
+            // pack and build the new one once both firmware packages are present
+            // (otherwise the shell builds it lazily at its first launch).
+            FirmwarePack.invalidate(context)
+            FirmwarePack.prepareIfPossible(context, vitaRoot)
+        }
+        return version
     }
 
     fun installContent(
