@@ -495,6 +495,20 @@ void VKContext::start_recording(bool first_in_scene) {
 static constexpr uint32_t DESCRIPTOR_PACK_SIZE = 16;
 
 static vk::DescriptorSet retrieve_color_descriptor(VKState &state, FrameDescriptor &frame_descriptor) {
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FRESH_RTSET)) {
+        // debug A/B: a never-reused set for every render pass (pools are leaked until shutdown)
+        const uint32_t per_set = state.features.preserve_f16_nan_as_u16 ? 2 : 1;
+        std::vector<vk::DescriptorPoolSize> sizes{ { vk::DescriptorType::eInputAttachment, per_set }, { vk::DescriptorType::eStorageImage, per_set + 1 } };
+        vk::DescriptorPoolCreateInfo info{ .maxSets = 1 };
+        info.setPoolSizes(sizes);
+        vk::DescriptorPool pool = state.device.createDescriptorPool(info);
+        state.frame_descriptor_pools.push_back(pool);
+        vk::DescriptorSetAllocateInfo alloc{ .descriptorPool = pool };
+        alloc.setSetLayouts(state.pipeline_cache.attachments_layout);
+        return state.device.allocateDescriptorSets(alloc)[0];
+    }
+#endif
     if (frame_descriptor.descriptors_idx < frame_descriptor.sets.size())
         return frame_descriptor.sets[frame_descriptor.descriptors_idx++];
 

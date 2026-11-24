@@ -258,6 +258,17 @@ void PipelineCache::init(bool support_rasterized_order_access) {
     }
 
     support_coherent_framebuffer_fetch = support_rasterized_order_access;
+#if ECV_ORACLE
+    {
+        fs::path oracle_root = state.vita_fs_path;
+        if (!oracle_root.has_filename())
+            oracle_root = oracle_root.parent_path();
+        if (fs::exists(oracle_root.parent_path() / "dbg-no-roaa")) {
+            LOG_WARN("dbg-no-roaa: rasterization-order attachment access disabled");
+            support_coherent_framebuffer_fetch = false;
+        }
+    }
+#endif
 
     const int nb_logical_threads = SDL_GetNumLogicalCPUCores();
     // took this from RPCS3 (slightly modified)

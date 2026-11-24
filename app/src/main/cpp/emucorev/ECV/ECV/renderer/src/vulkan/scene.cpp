@@ -590,6 +590,14 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         if (vk_frag_program.blending.blendEnable)
             context.state.surface_cache.mark_current_surface_blended();
     }
+#if ECV_ORACLE
+    if (context.state.features.direct_fragcolor && fragment_program_gxp.is_frag_color_used()
+        && ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FB_RESTART) && context.in_renderpass) {
+        // debug A/B: every framebuffer-fetch draw starts a fresh render pass instance (attachment LOADed)
+        context.stop_render_pass();
+        context.start_render_pass();
+    }
+#endif
     if (context.state.features.direct_fragcolor && fragment_program_gxp.is_frag_color_used()) {
         // the fragment shader is using programmable blending with a subpass input
         vk::ImageMemoryBarrier barrier{
@@ -606,6 +614,13 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         const uint32_t barrier_count = context.current_color_raw_image ? 2 : 1;
         if (context.current_color_raw_image)
             barriers[1].image = context.current_color_raw_image->image;
+#if ECV_ORACLE
+        if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FB_NOBARRIER)) {
+        } else if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FB_NOREGION)) {
+            context.render_cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eFragmentShader,
+                vk::DependencyFlags(), {}, {}, vk::ArrayProxy<const vk::ImageMemoryBarrier>(barrier_count, barriers.data()));
+        } else
+#endif
         context.render_cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eFragmentShader,
             vk::DependencyFlagBits::eByRegion, {}, {}, vk::ArrayProxy<const vk::ImageMemoryBarrier>(barrier_count, barriers.data()));
     } else if (context.state.features.support_shader_interlock

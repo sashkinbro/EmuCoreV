@@ -25,9 +25,6 @@
 #include <renderer/state.h>
 #include <renderer/types.h>
 
-#if ECV_ORACLE
-#include <ecv_gpu_trace.h>
-#endif
 
 #include <renderer/gl/functions.h>
 #include <renderer/gl/state.h>
@@ -155,12 +152,6 @@ COMMAND_SET_STATE(uniform_buffer) {
     const bool is_vertex = helper.pop<bool>();
     const int block_num = helper.pop<int>();
     const std::uint32_t size = helper.pop<std::uint32_t>();
-#if ECV_ORACLE
-    const uint64_t oracle_hash = helper.pop<uint64_t>();
-    if (oracle_hash && data)
-        ecv::oracle::gpu::ub_check_result(is_vertex, block_num, data.address(), size, oracle_hash,
-            ecv::oracle::gpu::ub_quick_hash(data.cast<const uint8_t>().get(mem), size));
-#endif
 
     ShaderProgram *program = nullptr;
     if (is_vertex) {
@@ -546,12 +537,6 @@ COMMAND_SET_STATE(vertex_stream) {
     const Ptr<const uint8_t> stream_data = helper.pop<Ptr<const uint8_t>>();
     const std::size_t stream_index = helper.pop<std::size_t>();
     const std::size_t stream_data_length = helper.pop<std::size_t>();
-#if ECV_ORACLE
-    const uint64_t oracle_hash = helper.pop<uint64_t>();
-    if (oracle_hash && stream_data && stream_data_length)
-        ecv::oracle::gpu::submit_check("vb", stream_data.address(), static_cast<uint32_t>(stream_data_length), oracle_hash,
-            ecv::oracle::gpu::ub_quick_hash(stream_data.get(mem), static_cast<uint32_t>(stream_data_length)));
-#endif
 
     renderer::GXMStreamInfo &info = render_context->record.vertex_streams[stream_index];
     info.data = stream_data;
