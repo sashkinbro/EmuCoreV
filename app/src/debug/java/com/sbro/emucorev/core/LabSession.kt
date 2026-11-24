@@ -11,6 +11,7 @@ internal data class LabConfig(
     val runId: String,
     val frameCapture: Int?,
     val gpuTrace: Boolean,
+    val frameCaptureOpts: String,
     val statsOverlay: Boolean,
     val perfIntervalSeconds: Int
 ) {
@@ -19,11 +20,14 @@ internal data class LabConfig(
         const val EXTRA_RUN_ID = "ecv.lab.run_id"
         const val EXTRA_FRAME_CAPTURE = "ecv.lab.frame_capture"
         const val EXTRA_GPU_TRACE = "ecv.lab.gpu_trace"
+        const val EXTRA_FRAME_CAPTURE_OPTS = "ecv.lab.frame_capture_opts"
         const val EXTRA_STATS_OVERLAY = "ecv.lab.stats_overlay"
         const val EXTRA_PERF_INTERVAL = "ecv.lab.perf_interval_s"
         const val DEFAULT_PERF_INTERVAL_S = 5
         const val MAX_FRAME_CAPTURE = 120 // the native capture hook caps at 120
         private val RUN_ID = Regex("[A-Za-z0-9._-]{1,64}")
+        // options appended to the frame-capture flag content ("perdraw=0-60 mirror=1"): a conservative character set, it ends up in a file
+        private val CAPTURE_OPTS = Regex("[A-Za-z0-9=,._ -]{0,200}")
 
         /** Null unless the intent asks for a lab launch with a well-formed run id. */
         fun fromIntent(intent: Intent?): LabConfig? {
@@ -35,6 +39,7 @@ internal data class LabConfig(
                 frameCapture = if (intent.hasExtra(EXTRA_FRAME_CAPTURE))
                     intent.getIntExtra(EXTRA_FRAME_CAPTURE, 0).takeIf { it > 0 }?.coerceAtMost(MAX_FRAME_CAPTURE) else null,
                 gpuTrace = intent.getBooleanExtra(EXTRA_GPU_TRACE, false),
+                frameCaptureOpts = intent.getStringExtra(EXTRA_FRAME_CAPTURE_OPTS)?.trim().orEmpty().takeIf { CAPTURE_OPTS.matches(it) }.orEmpty(),
                 statsOverlay = intent.getBooleanExtra(EXTRA_STATS_OVERLAY, true),
                 perfIntervalSeconds = intent.getIntExtra(EXTRA_PERF_INTERVAL, DEFAULT_PERF_INTERVAL_S)
                     .takeIf { it > 0 } ?: DEFAULT_PERF_INTERVAL_S
@@ -79,7 +84,7 @@ internal object LabSession {
         val index = args.indexOf("-loadstate")
         val state = args.getOrNull(index + 1)?.takeIf { index >= 0 }.orEmpty()
         Log.i(TAG, "launch run=${cfg.runId} title=$titleId state=$state")
-        runCatching { LabBridge.nativeConfigure(cfg.runId, titleId, cfg.perfIntervalSeconds, state.isNotEmpty(), cfg.frameCapture ?: 0, cfg.gpuTrace) }
+        runCatching { LabBridge.nativeConfigure(cfg.runId, titleId, cfg.perfIntervalSeconds, state.isNotEmpty(), cfg.frameCapture ?: 0, cfg.gpuTrace, cfg.frameCaptureOpts) }
             .onFailure { Log.w(TAG, "native lab hooks unavailable", it) }
     }
 
