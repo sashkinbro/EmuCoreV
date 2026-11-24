@@ -27,6 +27,20 @@ if(ANDROID)
     target_link_libraries(paf_bubble_preview PRIVATE emucorev_paf_gles emucorev_paf EGL)
 endif()
 
+# On-device firmware asset extractor (no emulator dependency): builds the shell's
+# resource pack from the firmware the user installed; nothing derived from
+# firmware is bundled in the application.
+add_library(emucorev_extract STATIC extract/src/codecs.cpp extract/src/pack_extractor.cpp)
+target_include_directories(emucorev_extract PUBLIC extract/include)
+target_link_libraries(emucorev_extract PUBLIC emucorev_paf)
+if(MSVC)
+    target_compile_options(emucorev_extract PRIVATE /W4 /WX /fp:strict)
+else()
+    target_compile_options(emucorev_extract PRIVATE -Wall -Wextra -Werror -fno-fast-math -ffp-contract=off)
+endif()
+add_executable(paf_extract_pack tools/extract_pack.cpp)
+target_link_libraries(paf_extract_pack PRIVATE emucorev_extract)
+
 add_executable(paf_resource_inspect tools/resource_inspect.cpp)
 target_link_libraries(paf_resource_inspect PRIVATE emucorev_paf)
 
