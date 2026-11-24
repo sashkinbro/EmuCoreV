@@ -99,6 +99,7 @@ import com.sbro.emucorev.core.GameLaunchPreparation
 import com.sbro.emucorev.core.GameSessionMarker
 import com.sbro.emucorev.core.InputGateWatchdog
 import com.sbro.emucorev.core.LaunchGate
+import com.sbro.emucorev.core.LabSession
 import com.sbro.emucorev.core.LaunchIntents
 import com.sbro.emucorev.data.TrophySoundRepository
 import com.sbro.emucorev.data.TrophySyncSessionGate
@@ -250,6 +251,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     fun onStateFrameReady(generation: Long) {
+        LabSession.onStateFrameReady(this)
         runOnUiThread {
             if (generation < stateFramePendingGeneration) return@runOnUiThread
             stateFrameReadyGeneration = maxOf(stateFrameReadyGeneration, generation)
@@ -413,6 +415,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 if (it.isBlank()) emptyArray() else arrayOf("-r", it)
             }
             val gameId = gameIdFromArgs(args)
+            if (gameId.isNotBlank()) LabSession.accepted(gameId, args)
             val repository = SaveStateRepository(this)
             // Before any save or load of this process: drop temp files of interrupted ones.
             runCatching { repository.sweepOrphans() }
@@ -446,7 +449,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             if (explicitState != null) {
                 // An explicit resume (for example from the native shell) names a raw path.
                 // Validate it here, where the engine that will load it lives.
-                if (repository.interruptedLoad(gameId) == explicitState) {
+                if (!LabSession.active && repository.interruptedLoad(gameId) == explicitState) {
                     Log.e(TAG, "Previous load of $explicitState never finished; not retrying it")
                     repository.finishLoad(gameId)
                     return abortLaunch(R.string.emulation_savestate_failed_toast)
@@ -490,7 +493,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         val enabled = SaveStateAutomationPreferences(this, gameId).use { it.current.autoLoadOnStart }
         val interrupted = repository.interruptedLoad(gameId)
         val args = resolveAutoLoadArguments(baseArgs, enabled,
-            skipAutomatic = intent.getBooleanExtra(SKIP_AUTOMATIC_STATE_LOAD_EXTRA, false)) {
+            skipAutomatic = intent.getBooleanExtra(SKIP_AUTOMATIC_STATE_LOAD_EXTRA, false) || LabSession.active) {
             val quick = repository.validQuickStatePath(gameId)
             if (quick != null && quick == interrupted) {
                 // The last automatic load of this file killed the process: boot normally once.
@@ -519,7 +522,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         setIntent(intent)
         if (isLaunchIntent(intent)) {
             triggerRebirthAfterNativeShutdown(markRebirthHandled(intent), outgoingTitle,
-                allowAutoSave = !isNativeShellSession && !shouldSkipExitAutoSave(intent.getStringArrayExtra(APP_RESTART_PARAMETERS),
+                allowAutoSave = !isNativeShellSession && !LabSession.isLabIntent(intent) && !shouldSkipExitAutoSave(intent.getStringArrayExtra(APP_RESTART_PARAMETERS),
                     intent.getBooleanExtra(AUTOMATIC_STATE_LOAD_EXTRA, false)))
         }
     }
@@ -530,6 +533,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         // A task the system brings back from recents or after process death carries the original
         // launch Intent; it must not replay an old explicit state load.
         intent?.let { LaunchIntents.sanitizeRestoredLaunch(it, restoredByFramework = savedInstanceState != null) }
+        LabSession.begin(intent, restored = savedInstanceState != null)
         isNativeShellSession = gameIdFromIntent(intent) == NativeLibraryMode.TITLE_ID
         isNativeTrophySession = gameIdFromIntent(intent) == "__VITA_NATIVE_TROPHIES__"
         shellCatalogBootstrap = isNativeShellSession && NativeLibraryMode.needsCatalogBootstrap(this)
@@ -675,6 +679,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onDestroy() {
+        LabSession.onDestroy()
         shellExitDialog?.dismiss()
         shellExitDialog = null
         KeyboardMouseManager.setEmulationInputEnabled(false)
@@ -1594,7 +1599,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             cancelActiveTouches()
             keyboardRequestGeneration++
             if (::inputOverlay.isInitialized) inputOverlay.setTouchControlsActive(false)
-            val saveEnabled = allowAutoSave && sessionUsable &&
+            val saveEnabled = allowAutoSave && !LabSession.active && sessionUsable &&
                 SaveStateAutomationPreferences(this, outgoingTitle).use { it.current.autoSaveOnExit }
             exitScope.launch {
                 exitCoordinator.run(outgoingTitle, saveEnabled, save = { title ->

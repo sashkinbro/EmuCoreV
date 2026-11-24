@@ -50,6 +50,7 @@ emulog.txt
 .tmp_repo_style/
 third_party/vcpkg/
 release/
+!app/src/release/
 tools/
 # Local documentation only. NEVER force-add docs/ (including plans and test reports).
 # Keep this directory out of commits and pushes unless the user explicitly asks otherwise.

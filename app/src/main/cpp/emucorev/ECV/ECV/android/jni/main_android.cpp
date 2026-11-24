@@ -43,7 +43,12 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
+#if ECV_ORACLE
+#include <ecv_lab.h> // oracle: lab launch hooks (debug builds only)
+#endif
+
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <optional>
@@ -459,6 +464,9 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
             startup_state_operation.lock();
             const auto config_result = emucorev::savestate::prepare_launch_gpu_config(*emuenv, load_state_path);
             if (!config_result.ok()) {
+#if ECV_ORACLE
+                ecv::oracle::lab::restore_finished(false, 0.0);
+#endif
                 LOG_ERROR("Failed to prepare launch save state: {}", config_result.error);
                 report_save_state_load_error(config_result.error);
                 exit_code = -1;
@@ -567,8 +575,15 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
             }
             LOG_INFO("Applying launch save state {}", requested_state_path);
             register_state_frame_readiness(*emuenv->renderer);
+#if ECV_ORACLE
+            const auto lab_load_start = std::chrono::steady_clock::now();
+#endif
             const auto state_result = emucorev::savestate::load_state(*emuenv, requested_state_path, true,
                 [](float progress, const char *) { report_launch_state_progress(progress, true); });
+#if ECV_ORACLE
+            ecv::oracle::lab::restore_finished(state_result.ok(),
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - lab_load_start).count());
+#endif
             if (state_result.ok()) {
                 LOG_INFO("Loaded save state from {}", requested_state_path);
             } else {

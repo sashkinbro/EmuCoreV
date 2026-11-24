@@ -3,6 +3,7 @@
 package com.sbro.emucorev.ui.emulation
 
 import com.sbro.emucorev.core.AppAnalytics
+import com.sbro.emucorev.core.LabSession
 import android.annotation.SuppressLint
 import android.provider.OpenableColumns
 import android.util.Log
@@ -717,7 +718,8 @@ fun EmulationOverlayHost(
 
     Box(modifier = modifier.fillMaxSize()) {
         PerformanceStatsOverlay(visible = inputResumed && !menuOpen && !controlsEditMode && !nativeImeActive &&
-            !activity.exitInProgress && !saveStateBusy && !waitingForStateFrame && !launchStateLoading.active && pendingSaveStateAction == null,
+            !activity.exitInProgress && !saveStateBusy && !waitingForStateFrame && !launchStateLoading.active && pendingSaveStateAction == null &&
+            LabSession.statsOverlayAllowed,
             titleId = gameId)
         if (showTouchControls && inputResumed) {
             OnScreenControls(

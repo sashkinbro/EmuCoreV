@@ -36,6 +36,7 @@
 
 #if ECV_ORACLE
 #include <ecv_frame_capture.h> // oracle: GXM frame capture (debug builds only)
+#include <ecv_lab.h> // oracle: lab launch perf hooks (debug builds only)
 #endif
 
 #include <exception>
@@ -351,6 +352,9 @@ static void render_loop_body(renderer::State &state, DisplayState &display, GxmS
         if (should_present) {
             state.render_frame(display, gxm, mem);
             state.swap_window();
+#if ECV_ORACLE
+            ecv::oracle::lab::frame_presented();
+#endif
             if (frame_limit > 0) {
                 const auto interval = std::chrono::nanoseconds(1'000'000'000LL / frame_limit);
                 next_presentation += interval;
