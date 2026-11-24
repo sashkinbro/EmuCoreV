@@ -33,7 +33,7 @@ namespace shader {
 static constexpr int COLOR_ATTACHMENT_TEXTURE_SLOT_IMAGE = 0;
 static constexpr int MASK_TEXTURE_SLOT_IMAGE = 1;
 static constexpr int COLOR_ATTACHMENT_RAW_TEXTURE_SLOT_IMAGE = 3;
-static constexpr uint32_t CURRENT_VERSION = 30; // 28: shader module keys cover every Hints field the recompiler reads; 29: native-colour o0 register layout, raw f16 register moves; 30: native-colour half flags
+static constexpr uint32_t CURRENT_VERSION = 31; // 28: shader module keys cover every Hints field the recompiler reads; 29: native-colour o0 register layout, raw f16 register moves; 30: native-colour half flags; 31: native-colour o0 is packed bytes only when the program packs
 // fragment shader using the rendering surface as a storage image (because of shader interlock) have a line
 // layout (constant_id = GAMMA_CORRECTION_SPECIALIZATIO_ID) const bool is_srgb = false;
 // Setting this constant to true performs gamma correction in the shader

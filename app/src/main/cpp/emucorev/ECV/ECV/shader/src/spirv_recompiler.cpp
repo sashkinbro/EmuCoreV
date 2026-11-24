@@ -139,6 +139,26 @@ static DataType apply_fragment_color_layout(DataType declared, FragmentColorLayo
     }
 }
 
+// Whether the program itself packs bytes (VPCK to U8/S8/O8) anywhere in its primary or secondary phase. Only such a native-colour
+// program can leave a packed U8x4 pixel in o0; one that never packs (a plain texture copy "VMOV.f16 o0 pa0", NFS / Uncharted)
+// leaves unpacked halves there even when its header flags do not say so, and reading them as bytes gives colour noise.
+// Matches the VPCK entry of the decoder table in usse_translator_entry.cpp: "01000pppsnuydercaaaaffftttmmmm...", the
+// destination format `ttt` (bits 40..38) is 0 = U8, 1 = S8, 2 = O8.
+static bool program_packs_bytes(const SceGxmProgram &program) {
+    const auto packs_bytes = [](const uint64_t *begin, const uint64_t *end) {
+        for (const uint64_t *word = begin; word < end; ++word) {
+            if ((*word >> 59) != 0b01000)
+                continue;
+            if (((*word >> 38) & 7) <= 2)
+                return true;
+        }
+        return false;
+    };
+    const uint64_t *primary = program.primary_program_start();
+    return packs_bytes(primary, primary + program.primary_program_instr_count)
+        || packs_bytes(program.secondary_program_start(), program.secondary_program_end());
+}
+
 static bool is_u8_alpha_color_surface(const TranslationState &state) {
     return state.hints->color_format == SCE_GXM_COLOR_FORMAT_U8_A;
 }
@@ -1698,7 +1718,7 @@ static spv::Function *make_frag_finalize_function(spv::Builder &b, const SpirvSh
     }
 
     // native-colour programs usually leave o0 in the surface's register layout, see fragment_color_layout
-    color_val_operand.type = apply_fragment_color_layout(color_val_operand.type, fragment_color_layout(fragment_output_in_surface_layout(program), translate_state.hints->color_format));
+    color_val_operand.type = apply_fragment_color_layout(color_val_operand.type, fragment_color_layout(fragment_output_in_surface_layout(program) && program_packs_bytes(program), translate_state.hints->color_format));
 
     spv::Decoration precision = (get_data_type_size(color_val_operand.type) < 4 && !features.force_full_precision) ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
     if (color_val_operand.type == DataType::INT16 || color_val_operand.type == DataType::UINT16)
