@@ -693,7 +693,7 @@ bool write_kernel_sync(EmuEnvState &emuenv, Writer &writer, std::string &error) 
     write_objects(kernel.rwlocks, [&](const RWLock &object) {
         buffer.u32(static_cast<uint32_t>(object.state));
         buffer.u32(static_cast<uint32_t>(object.owners.size()));
-        for (const auto &[owner, count] : object.owners) { buffer.i32(owner ? owner->id : 0); buffer.i32(count); }
+        for (const auto &[owner, hold] : object.owners) { buffer.i32(owner ? owner->id : 0); buffer.i32(rwlock_pack_hold(hold)); }
     });
     write_objects(kernel.eventflags, [&](const EventFlag &object) { buffer.i32(object.flags); });
     write_objects(kernel.msgpipes, [&](const MsgPipe &object) {
@@ -767,8 +767,9 @@ bool read_kernel_sync(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std
         }
         case SyncSnapshotKind::rwlock: {
             auto object = std::make_shared<RWLock>(header.attr);
-            object->state = static_cast<RWLockState>(v[0]);
-            for (const auto &[uid, count] : saved.owners) object->owners.emplace(owner_thread(uid), count);
+            const auto saved_state = static_cast<RWLockState>(v[0]);
+            for (const auto &[uid, count] : saved.owners) object->owners.emplace(owner_thread(uid), rwlock_unpack_hold(count, saved_state));
+            object->recompute_state();
             install_sync_object(kernel, kernel.rwlocks, header, std::move(object)); break;
         }
         case SyncSnapshotKind::event_flag: {

@@ -160,10 +160,11 @@ protected:
 typedef std::shared_ptr<Mutex> MutexPtr;
 typedef std::map<SceUID, MutexPtr> MutexPtrs;
 
-// the int value is the lock count for recursive locks
-typedef std::map<ThreadStatePtr, int> RWLockOwners;
+// Per-thread read and write hold counts
+typedef std::map<ThreadStatePtr, RWLockHold> RWLockOwners;
 
-struct RWLock : SyncPrimitive {
+// state / owners come from RWLockCore (kernel/rwlock_policy.h), which holds the firmware rules.
+struct RWLock : SyncPrimitive, RWLockCore<ThreadStatePtr> {
     struct WaitEntry {
         bool is_write;
     };
@@ -171,9 +172,13 @@ struct RWLock : SyncPrimitive {
     explicit RWLock(SceUInt32 attr)
         : waiters(attr) {}
 
-    RWLockState state = RWLockState::Unlocked;
-    RWLockOwners owners;
     WaitQueue<WaitEntry> waiters;
+
+    bool writer_queued() const {
+        bool queued = false;
+        waiters.for_each([&](const auto &waiter) { queued = queued || waiter.entry.is_write; });
+        return queued;
+    }
 
 protected:
     void on_delete() override;

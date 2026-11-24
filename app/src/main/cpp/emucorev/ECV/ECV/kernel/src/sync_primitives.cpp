@@ -870,6 +870,19 @@ SceUID rwlock_create(KernelState &kernel, MemState &mem, const char *export_name
     return uid;
 }
 
+// Hands the lock to queued waiters, in queue order, as far as the rules allow (RWLockCore::grant_queued).
+// Must run after every change that can free the lock or drop a queued writer. rwlock->mutex held.
+static void rwlock_wake_waiters(RWLock &rwlock) {
+    RWLockCore<ThreadStatePtr>::WakePass pass;
+    rwlock.waiters.wake_if([&](auto &waiter) {
+        return rwlock.grant_queued(pass, waiter.thread, waiter.entry.is_write);
+    });
+}
+
+static bool rwlock_recursive_attr(const RWLock &rwlock) {
+    return (rwlock.attr & SCE_KERNEL_MUTEX_ATTR_RECURSIVE) != 0; // SCE_KERNEL_RW_LOCK_ATTR_RECURSIVE
+}
+
 SceInt32 rwlock_lock(KernelState &kernel, MemState &mem, const char *export_name, SceUID thread_id, SceUID lock_id, uint32_t *timeout, bool is_write, bool callbacks) {
     const ThreadStatePtr thread = kernel.get_thread(thread_id);
     if (!thread) // the thread is being torn down so fail its last import instead of crashing the process
@@ -892,38 +905,31 @@ SceInt32 rwlock_lock(KernelState &kernel, MemState &mem, const char *export_name
     if (!rwlock_lock)
         return SCE_KERNEL_ERROR_UNKNOWN_RW_LOCK_ID;
 
-    // if it is a read lock, it is always recursive
-    bool is_recursive = !is_write || (rwlock->attr & SCE_KERNEL_MUTEX_ATTR_RECURSIVE);
-
-    const RWLockAcquire decision = rwlock_acquire_decision(rwlock->state, is_write, is_recursive, rwlock->owners.contains(thread));
-
-    // cases where we don't need to wait :
-    if (!continuation.resuming && decision == RWLockAcquire::Acquire) {
-
-        auto it = rwlock->owners.find(thread);
-        if (it != rwlock->owners.end()) {
-            // increase the count
-            it->second++;
-        } else {
-            rwlock->owners.emplace(thread, 1);
+    if (!continuation.resuming) {
+        switch (rwlock->decide(thread, is_write, rwlock_recursive_attr(*rwlock), rwlock->writer_queued())) {
+        case RWLockAcquire::Acquire:
+            rwlock->grant(thread, is_write);
+            return SCE_KERNEL_OK;
+        case RWLockAcquire::Recursive:
+            return RET_ERROR(SCE_KERNEL_ERROR_RW_LOCK_RECURSIVE);
+        case RWLockAcquire::Busy:
+            break;
         }
-
-        rwlock->state = is_write ? RWLockState::WriteLocked : RWLockState::ReadLocked;
-
-        return SCE_KERNEL_OK;
-    } else if (!continuation.resuming && decision == RWLockAcquire::Recursive) {
-        return RET_ERROR(SCE_KERNEL_ERROR_RW_LOCK_RECURSIVE);
-    } else {
-        // we need to wait
-        const Deadline deadline = continuation.deadline();
-        const WaitResult r = rwlock->waiters.wait(rwlock_lock, thread, { SCE_KERNEL_WAITTYPE_RW_LOCK, lock_id }, { is_write }, deadline, callbacks);
-        writeback_timeout(timeout, deadline);
-        return guest_result(r);
     }
+
+    // Wait until a waker hands the lock over (rwlock_wake_waiters records the hold before waking)
+    const Deadline deadline = continuation.deadline();
+    const WaitResult r = rwlock->waiters.wait(rwlock_lock, thread, { SCE_KERNEL_WAITTYPE_RW_LOCK, lock_id }, { is_write }, deadline, callbacks);
+    writeback_timeout(timeout, deadline);
+    if (r && *r != SCE_KERNEL_OK && is_write && !rwlock->deleted.load(std::memory_order_relaxed)) {
+        // A writer that gave up (timeout / cancel) no longer holds back the readers queued behind it
+        rwlock_wake_waiters(*rwlock);
+    }
+    return guest_result(r);
 }
 
-// Non-blocking variant of rwlock_lock: same acquisition rules (owner / recursion), but when the
-// caller would have to wait it fails with SCE_KERNEL_ERROR_RW_LOCK_FAILED_TO_LOCK instead.
+// Non-blocking variant of rwlock_lock: same acquisition rules, but when the caller would have to
+// wait it fails with SCE_KERNEL_ERROR_RW_LOCK_FAILED_TO_LOCK instead.
 SceInt32 rwlock_try_lock(KernelState &kernel, const char *export_name, SceUID thread_id, SceUID lock_id, bool is_write) {
     const ThreadStatePtr thread = kernel.get_thread(thread_id);
     if (!thread) // the thread is being torn down so fail its last import instead of crashing the process
@@ -937,19 +943,10 @@ SceInt32 rwlock_try_lock(KernelState &kernel, const char *export_name, SceUID th
     if (!rwlock_lock)
         return RET_ERROR(SCE_KERNEL_ERROR_UNKNOWN_RW_LOCK_ID);
 
-    // if it is a read lock, it is always recursive
-    const bool is_recursive = !is_write || (rwlock->attr & SCE_KERNEL_MUTEX_ATTR_RECURSIVE);
-
-    switch (rwlock_acquire_decision(rwlock->state, is_write, is_recursive, rwlock->owners.contains(thread))) {
-    case RWLockAcquire::Acquire: {
-        auto it = rwlock->owners.find(thread);
-        if (it != rwlock->owners.end())
-            it->second++;
-        else
-            rwlock->owners.emplace(thread, 1);
-        rwlock->state = is_write ? RWLockState::WriteLocked : RWLockState::ReadLocked;
+    switch (rwlock->decide(thread, is_write, rwlock_recursive_attr(*rwlock), rwlock->writer_queued())) {
+    case RWLockAcquire::Acquire:
+        rwlock->grant(thread, is_write);
         return SCE_KERNEL_OK;
-    }
     case RWLockAcquire::Recursive:
         return RET_ERROR(SCE_KERNEL_ERROR_RW_LOCK_RECURSIVE);
     case RWLockAcquire::Busy:
@@ -977,42 +974,16 @@ SceInt32 rwlock_unlock(KernelState &kernel, MemState &mem, const char *export_na
     if (!rwlock_lock)
         return SCE_KERNEL_ERROR_UNKNOWN_RW_LOCK_ID;
 
-    auto it = rwlock->owners.find(current_thread);
-    if (it == rwlock->owners.end()) {
+    switch (rwlock->release(current_thread, is_write)) {
+    case RWLockRelease::NotHeld:
         return RET_ERROR(SCE_KERNEL_ERROR_RW_LOCK_FAILED_TO_UNLOCK);
+    case RWLockRelease::WrongKind:
+        return RET_ERROR(SCE_KERNEL_ERROR_RW_LOCK_NOT_OWNED);
+    case RWLockRelease::Released:
+        break;
     }
 
-    // decrease the lock count
-    it->second--;
-    if (it->second == 0)
-        rwlock->owners.erase(current_thread);
-
-    // if it is still locked
-    if (!rwlock->owners.empty())
-        return SCE_KERNEL_OK;
-
-    rwlock->state = RWLockState::Unlocked;
-
-    bool woke_writer = false;
-    rwlock->waiters.wake_if([&](auto &waiter) {
-        const bool waiting_is_write = waiter.entry.is_write;
-
-        if (woke_writer || (rwlock->state == RWLockState::ReadLocked && waiting_is_write)) {
-            // only awaken read threads
-            return false;
-        }
-
-        rwlock->owners.emplace(waiter.thread, 1);
-
-        if (waiting_is_write) {
-            rwlock->state = RWLockState::WriteLocked;
-            woke_writer = true;
-        } else {
-            rwlock->state = RWLockState::ReadLocked;
-        }
-        return true;
-    });
-
+    rwlock_wake_waiters(*rwlock);
     return SCE_KERNEL_OK;
 }
 
@@ -1885,13 +1856,9 @@ SceInt32 rwlock_cancel(KernelState &kernel, const char *export_name, SceUID thre
         return SCE_KERNEL_ERROR_UNKNOWN_RW_LOCK_ID;
     const auto writers = static_cast<SceUInt32>(rwlock->waiters.wake_if([](auto &waiter) { return waiter.entry.is_write; }, SCE_KERNEL_ERROR_WAIT_CANCEL));
     const auto readers = static_cast<SceUInt32>(rwlock->waiters.wake_all(SCE_KERNEL_ERROR_WAIT_CANCEL));
-    rwlock->owners.clear();
-    if (flag & SCE_KERNEL_RW_LOCK_CANCEL_WITH_WRITE_LOCK) {
-        rwlock->owners.emplace(thread, 1);
-        rwlock->state = RWLockState::WriteLocked;
-    } else {
-        rwlock->state = RWLockState::Unlocked;
-    }
+    rwlock->reset();
+    if (flag & SCE_KERNEL_RW_LOCK_CANCEL_WITH_WRITE_LOCK)
+        rwlock->grant(thread, true);
     if (num_readers)
         *num_readers = readers;
     if (num_writers)

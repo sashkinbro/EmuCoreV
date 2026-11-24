@@ -357,44 +357,24 @@ EXPORT(int, _sceKernelGetRWLockInfo, SceUID rwlockId, SceKernelRWLockInfo *info)
     info->rwLockId = rwlock->uid;
     strncpy(info->name, rwlock->name, KERNELOBJECT_MAX_NAME_LENGTH + 1);
     info->attr = rwlock->attr;
-    if (rwlock->state == RWLockState::Unlocked) {
-        info->lockCount = 0;
-        info->writeOwnerId = 0;
-        info->numReadWaitThreads = 0;
-        info->numWriteWaitThreads = 0;
-    } else if (rwlock->state == RWLockState::ReadLocked) {
-        int lock_count = 0;
-        for (auto &t : rwlock->owners) {
-            lock_count += t.second;
+    // lockCount: the write owner's write holds, or the sum of the read holds when read-locked
+    SceInt32 lock_count = 0;
+    SceUID write_owner = 0;
+    for (const auto &[owner, hold] : rwlock->owners) {
+        if (hold.write > 0) {
+            write_owner = owner ? owner->id : 0;
+            lock_count = hold.write;
+            break;
         }
-        info->lockCount = lock_count;
-        info->writeOwnerId = 0;
-        info->numReadWaitThreads = 0;
-        info->numWriteWaitThreads = 0;
-        if (rwlock->waiters.size() > 0) {
-            STUBBED("info for rw lock with waiting threads is not implemented");
-        }
-    } else {
-        if (rwlock->owners.size() == 1) {
-            int lock_count = 0;
-            SceUID owner_id = 0;
-            for (auto &t : rwlock->owners) {
-                lock_count += t.second;
-                owner_id = t.first->id;
-            }
-            info->lockCount = lock_count;
-            info->writeOwnerId = owner_id;
-        } else {
-            STUBBED("info for locked rw lock is not implemented");
-        }
-        if (rwlock->waiters.size() == 0) {
-            info->numReadWaitThreads = 0;
-            info->numWriteWaitThreads = 0;
-        } else {
-            STUBBED("info for rw lock with waiting threads is not implemented");
-        }
+        lock_count += hold.read;
     }
-    return UNIMPLEMENTED();
+    SceUInt32 read_waiters = 0, write_waiters = 0;
+    rwlock->waiters.for_each([&](const auto &waiter) { ++(waiter.entry.is_write ? write_waiters : read_waiters); });
+    info->lockCount = lock_count;
+    info->writeOwnerId = write_owner;
+    info->numReadWaitThreads = read_waiters;
+    info->numWriteWaitThreads = write_waiters;
+    return SCE_KERNEL_OK;
 }
 
 EXPORT(SceInt32, _sceKernelGetSemaInfo, SceUID semaId, Ptr<SceKernelSemaInfo> pInfo) {
