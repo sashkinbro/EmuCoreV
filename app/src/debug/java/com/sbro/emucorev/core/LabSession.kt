@@ -94,7 +94,13 @@ internal object LabSession {
         // Created after the first restored frame so the capture starts inside the restored scene.
         val dir = context.getExternalFilesDir(null) ?: return
         runCatching {
-            cfg.frameCapture?.let { File(dir, "frame-capture").writeText(it.toString()) }
+            cfg.frameCapture?.let { frames ->
+                // After the first capture "frame-capture" is the output directory; the hook then
+                // polls "frame-capture/trigger" instead of the flag file.
+                val flag = File(dir, "frame-capture")
+                val target = if (flag.isDirectory) File(flag, "trigger") else flag
+                target.writeText(frames.toString())
+            }
             if (cfg.gpuTrace) File(dir, "gpu-trace").writeText("")
         }.onFailure { Log.w(TAG, "could not create oracle flag files", it) }
     }
