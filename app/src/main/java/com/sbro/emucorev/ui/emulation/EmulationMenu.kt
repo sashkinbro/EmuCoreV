@@ -41,7 +41,7 @@ import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Fullscreen
-import androidx.compose.material.icons.rounded.Gamepad
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Gradient
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.SettingsSuggest
@@ -1721,7 +1721,7 @@ private data class EmulationMenuTabItem(
 private fun emulationMenuTabs(): List<EmulationMenuTabItem> = listOf(
     EmulationMenuTabItem(EmulationMenuTab.Game, stringResource(R.string.emulation_tab_game), Icons.Rounded.Menu),
     EmulationMenuTabItem(EmulationMenuTab.SaveStates, stringResource(R.string.emulation_tab_savestates), Icons.Rounded.Save),
-    EmulationMenuTabItem(EmulationMenuTab.Controls, stringResource(R.string.emulation_tab_controls), Icons.Rounded.Gamepad),
+    EmulationMenuTabItem(EmulationMenuTab.Controls, stringResource(R.string.emulation_tab_controls), Icons.Rounded.TouchApp),
     EmulationMenuTabItem(EmulationMenuTab.Display, stringResource(R.string.emulation_tab_display), Icons.Rounded.Fullscreen),
     EmulationMenuTabItem(EmulationMenuTab.Shaders, stringResource(R.string.shader_scope_ingame), Icons.Rounded.Gradient),
     EmulationMenuTabItem(EmulationMenuTab.Cheats, stringResource(R.string.emulation_tab_cheats), Icons.Rounded.AutoFixHigh),
