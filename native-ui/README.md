@@ -3,10 +3,13 @@
 ## Current integration (2026-11-21)
 
 - `shell/` is the `:native-ui-shell` Android library: the C++ shell
-  (`shell.cpp`, `app_screen.h`), `NativeShellActivity`, the resource pack and
-  every `native_ui_*` string of the app (all 18 locales). It is included only
-  when `native-ui/resources/` exists; otherwise the app keeps the Compose
-  carousel. `preview/` is a thin fixture host over it.
+  (`shell.cpp`, `app_screen.h`), `NativeShellActivity`, the on-device resource
+  pack builder (`FirmwarePack` + `extract/`) and every `native_ui_*` string of
+  the app (all 18 locales). It is always built; the app offers the mode only
+  when the user's firmware is installed (`NativeLibraryMode.available(context)`),
+  otherwise the Compose carousel stays the library. The APK ships no
+  firmware-derived data (see "Resource pack"). `preview/` is a thin fixture
+  host over it.
 - The app's library mode starts `NativeShellHostActivity` (process
   `:native_shell`): installed games, launch through `VitaLaunchBridge`,
   return to the game's LiveArea after the Emulator process retires.
@@ -70,7 +73,7 @@ derives CornerSize (.96,.92,25,12.5). Native pose and model matrices remain
 separate. The page samples the corresponding rectangle of the bundled canvas.
 Date/hour/minute/separator/AM-PM positions, regular/bold fonts and sizes are
 derived from the `power_manage_plugin` template f5228777 rather than the former
-manually composed large labels. Ready assets remain in the ignored resource pack.
+manually composed large labels. Ready assets come from the pack extracted on the device from the installed firmware.
 
 On Lenovo, the visible page curl, dragging, short-drag return, complete peel,
 and minute changes were inspected in the running preview. Text-bearing page
@@ -128,8 +131,8 @@ path queue the request for the native thread. The Android XML parser path was
 also exercised on-device after removing unsupported desktop parser flags.
 
 Cold preview startup now renders BusyIndicator while a single worker prepares
-the ZIP, images, catalog and LiveArea snapshots. A separate 767-byte bundled
-busy image is available before ZIP extraction. The main thread publishes the
+the firmware pack (built on first use), images, catalog and LiveArea snapshots. A
+generated busy dot is available before the pack exists. The main thread publishes the
 ready scene only after preparation; native scene replacement happens on the
 render thread, destroying the previous EGL window before creating its successor.
 Cancellation serializes JNI publication with Activity destruction. Home bubble
@@ -214,35 +217,77 @@ All new translated product text belongs in the existing main `strings.xml` files
 for all supported locales. The host provides resolved text; this module must not
 introduce a second partial translation catalogue.
 
-Firmware binaries remain local development inputs. Ready images and fonts live
-in the Git-ignored `native-ui/resources/` directory and are packaged in one ZIP;
-they are never extracted from firmware when the UI starts. The resource pack is
-not uploaded to Git. Complete materials, layout, animation integration and the
-host bridge are still pending. No approximate implementation is marked as equivalent.
+## Resource pack (built on the device from the installed firmware)
 
-The preview build creates a reproducible `native-ui.zip` plus its SHA-256 version
-under its ignored build directory. Only those two assets enter the APK; the
-unpacked source directory is not duplicated. `BundledResources` verifies the
-archive and installs it once into a versioned app-private, non-backed-up directory.
-It stages the complete ZIP before an atomic directory rename, serializes installs
-with a process/file lock, rejects escaping paths and oversized packs, and retries
-partial installs on the next launch. Changed content selects a new version and
-removes obsolete ready packs after activation; unchanged content skips extraction.
-Kotlin images/fonts and C++ preview geometry read the installed files directly.
+The shell ships **no** Sony-derived data (bug cards B028/B029). Its resource pack
+(fonts, images, sounds, effect textures, lookups, the two firmware system
+applications) is built on the user's device from the firmware they installed
+(`<vita root>/vs0`, `sa0`) by `native-ui/extract/` (`emucorev_extract`, C++,
+no emulator/SDL/guest CPU dependency), exposed to Kotlin through
+`FirmwarePack` and the `emucorev_packjni` library:
 
-Current pack: 1,033 files, 53,694,683 bytes unpacked, 30,799,432 bytes in ZIP.
-Extraction needs additional private storage; it reduces the bundled archive size,
-not the size of the decoded files. Both Lenovo and RG556 verified every installed
-file against the ZIP, first/repeated startup, unchanged completion timestamps,
-partial-install recovery and obsolete-directory cleanup. Preview assemble/lint
-pass. This installer is connected only to the independent preview at present.
+- When: after a successful firmware install (`VitaInstallBridge.installFirmware`
+  drops the old pack and builds the new one once both firmware packages -
+  core `vs0` and fonts `sa0` - are present) and lazily at shell launch if the
+  pack is missing or stale (`NativeShellActivity.preparePreview`, behind the busy
+  animation). Extraction of the 3.74 firmware takes about 2.4 s on a PC and
+  writes about 54 MB (1,035 files).
+- Where: `noBackupFilesDir/native-ui-resources/<key>/`, key = hash of the
+  installed firmware sources (size/mtime of the key files and the
+  `system-packages/*.version` records) plus the extractor revision, so a
+  reinstall or an extractor change rebuilds. Builds are staged and activated by
+  an atomic rename under a file lock (same lock/stage/`.complete` pattern as the
+  former bundled pack), one pack kept.
+- Gate: `NativeLibraryMode.available(context)` = shell built **and**
+  `FirmwarePack.sourcesPresent(vitaRoot)`. No firmware: no shell mode, nothing
+  Sony is ever shown. `NativeLibraryModeGateTest` covers the gate.
+- Content (same layout and manifests as the earlier offline pack, now written by
+  the extractor): fonts copied from the PVF files and renamed by SFNT magic
+  (`fonts/*.otf|ttf`, `fonts.json`); images from the 18 RCOs (RCO -> GIM/PNG/DDS
+  -> PNG, `images/<rco>/<id>.png`, `images.json`); HE-VAG sounds decoded to PCM16
+  WAV (`audio/`, `sounds.json`, own HE-VAG decoder in `codecs.cpp`); effect
+  DDS mips and `keylock.png` (`effects/`, `effects.json`); the two PageTurn
+  lookups; `system-apps/NPXS10008`, `NPXS10015` (icon0 + LiveArea contents).
+- Not from firmware: the Home bubble mesh/base material are generated in process
+  (`paf/bubble_reference.*`: analytic mesh within 3e-6 of the recorded stream,
+  recorded uniform blocks as PROVISIONAL constants, zero environment map, neutral
+  icon); EmuCoreV's own Quick Saves application art (`ECVS00001`) is an APK asset
+  copied into the pack; the startup busy dot is generated.
+- Missing optional pack content degrades to neutral placeholders (transparent
+  texel, platform font); required content (fonts ltn0/ltn4, topmenu and common
+  RCOs, keylock, effect mips) failing aborts the build and the shell reports it.
+- The lookups are analytic fits verified bit-exact against every pixel of the
+  original generator output (`exp-minus`: `trunc(255 exp(-5 x / 127))`;
+  `corner-distance`: `min(255, trunc(255 sqrt(x^2 + y^2) / 63))`). The HE-VAG
+  decoder follows the published predictor table and truncates the float32
+  prediction toward zero (verified on all 48 channel streams of the 44 sounds).
 
-The offline `tools/prepare_image_pack.py` uses our standalone C++ readers for
+Verification (host): build `paf_extract_pack` (see `CMakeLists.txt`; needs zlib),
+install the firmware PUPs into a temporary vita root with the core's
+`install_pup` (`packages/src/pup.cpp`), run `paf_extract_pack VITA_ROOT OUT`, then
+
+```text
+python -I native-ui/tests/verify_extracted_pack.py --pack OUT --golden native-ui/resources
+```
+
+which compares decoded image pixels, PCM/WAV bytes, font/system-app bytes, effect
+mips and lookups with the golden manifests of the earlier offline pack (all
+match for firmware 3.74). `paf_bubble_reference_test [RECORDED_BUBBLE_DIR]`
+checks the generated bubble data. The release build is checked by
+`verify<Variant>ApkHasNoFirmwareData` (no `native-ui*` assets, no
+`.rco/.gim/.pvf/.wav/.vag/.dds/.otf`, no `.ttf` beyond the app's own fonts).
+
+Firmware binaries and extracted packs are never committed; `native-ui/resources/`
+remains a git-ignored reference location for the golden manifests only.
+
+The offline `tools/prepare_*.py` scripts below produced the golden pack that the
+on-device extractor is verified against; the application no longer uses or
+bundles any of their output. `tools/prepare_image_pack.py` uses our standalone C++ readers for
 RCO/GIM and Pillow for embedded PNG/DDS images. It writes 935 PNG images from the
 current 18 local references, verifies every PNG round trip, and records source,
 pixel and output hashes in `images.json`. `tools/prepare_font_pack.py` copies
 the supplied OpenType CFF/TrueType fonts unchanged into the same ignored directory.
-Neither preparation tool is invoked at runtime or included in the application.
+The same conversions now run on the device in `native-ui/extract/`.
 
 `tools/prepare_effect_pack.py` additionally prepares the five standalone effect
 DDS textures and the lock wallpaper under the ignored `resources/effects/`.
@@ -268,10 +313,8 @@ the generated bytes. Both images round-trip through scalar8 PNGs exactly, and
 their manifest retains source/pixel/PNG hashes, dimensions, range and wrap values.
 
 The results live in the ignored `resources/effects/lookups/` and are packaged in
-the preview APK. Neither reference code, Unicorn nor this development tool enters
-the application. No procedural generation or firmware access is needed at UI
-startup. The pre-build resource check requires both ready images and their
-manifest. Runtime material/image assembly remains pending.
+the pack. Neither reference code, Unicorn nor this development tool enters the
+application; the extractor regenerates both images analytically.
 
 ```text
 python native-ui/tools/prepare_page_turn_lookups.py --reference OWNED_DECRYPTED_PAF --pack native-ui/resources
@@ -287,9 +330,8 @@ The ordinary PSX ADPCM decoder in the available FFmpeg build rejects these
 HE-VAG frames, so it is not used as a conversion fallback.
 
 `audio/sounds.json` records source/channel/PCM/WAV hashes, decoder metadata,
-looping metadata and all original sound-event bindings. WAVs are compressed
-inside the shared ZIP and read directly after its first-start installation. Neither vgmstream, its DLLs, VAG data nor
-the firmware containers enter the APK. Runtime event routing/playback remains
+looping metadata and all original sound-event bindings. WAVs are written by the on-device extractor and read directly. Neither vgmstream,
+its DLLs, VAG data nor the firmware containers enter the APK. Runtime event routing/playback remains
 to be connected as the native UI interactions are implemented.
 
 ```text
@@ -690,25 +732,20 @@ builds do not include this module, and its release variant is disabled.
 gradlew -PnativeUiPreview=true :native-ui-preview:assembleDebug
 ```
 
-Local debug reference inputs are prepared in the ignored resource pack before
-building. The debug APK packages these as `preview/bubble` assets; a fresh
-installation no longer needs private-file injection, installed firmware or the
-emulator. The mesh, initial pose and icon sample still come from the local
-capture, rather than a complete reconstructed widget/geometry generator. The
+The preview builds its resource pack on the device from a firmware tree pushed to
+`Android/data/com.sbro.emucorev.nativeuipreview/files/vita` (vs0, sa0); the bubble
+mesh and base material are generated in process (`paf/bubble_reference.*`). The
 current surface is one bubble on a flat clear color, with recovered cone-motion
 geometry applied relative to the supplied pose. It is not the reconstructed
 menu/background or complete widget animation system.
 
 ```text
-python native-ui/tools/prepare_image_pack.py --adb ADB --serial DEVICE --exporter ANDROID_EXPORTER --output native-ui/resources OWNED_RESOURCES.rco [MORE_RESOURCES.rco ...]
-python native-ui/tools/prepare_font_pack.py LOCAL_PVF_DIRECTORY native-ui/resources
-python native-ui/tools/prepare_preview_fixture.py LOCAL_BUBBLE_CAPTURE native-ui/resources
+adb push FIRMWARE_VITA_ROOT /sdcard/Android/data/com.sbro.emucorev.nativeuipreview/files/vita
 ```
 
-Image preparation expects a new output directory. Font and preview preparation
-then add their files to that pack. A missing pack fails the opt-in preview build
-with an explicit preparation message. The fixture helper defaults to a zero
-reflection texture, explicitly a placeholder until that source is reconstructed.
+Without that firmware the preview shows the busy animation and reports that the
+shell failed. The reflection texture is a zero-filled placeholder until that
+source is reconstructed.
 
 `SpriteRenderer` composes straight-alpha RGBA images in C++, uploading only
 changed images and retaining them for the GL context lifetime. The Kotlin adapter
