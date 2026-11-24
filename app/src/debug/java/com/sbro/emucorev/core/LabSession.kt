@@ -5,7 +5,6 @@ import android.content.Intent
 import android.os.SystemClock
 import android.util.Log
 import com.sbro.emucorev.BuildConfig
-import java.io.File
 
 /** Parsed `ecv.lab*` extras of a lab launch (tools/oracles/lab/LAUNCH_CONTRACT.md). */
 internal data class LabConfig(
@@ -80,7 +79,7 @@ internal object LabSession {
         val index = args.indexOf("-loadstate")
         val state = args.getOrNull(index + 1)?.takeIf { index >= 0 }.orEmpty()
         Log.i(TAG, "launch run=${cfg.runId} title=$titleId state=$state")
-        runCatching { LabBridge.nativeConfigure(cfg.runId, titleId, cfg.perfIntervalSeconds, state.isNotEmpty()) }
+        runCatching { LabBridge.nativeConfigure(cfg.runId, titleId, cfg.perfIntervalSeconds, state.isNotEmpty(), cfg.frameCapture ?: 0, cfg.gpuTrace) }
             .onFailure { Log.w(TAG, "native lab hooks unavailable", it) }
     }
 
@@ -91,18 +90,8 @@ internal object LabSession {
         if (firstFrameLogged) return
         firstFrameLogged = true
         Log.i(TAG, "first_frame run=${cfg.runId} ms_since_launch=${now - startedAtMs}")
-        // Created after the first restored frame so the capture starts inside the restored scene.
-        val dir = context.getExternalFilesDir(null) ?: return
-        runCatching {
-            cfg.frameCapture?.let { frames ->
-                // After the first capture "frame-capture" is the output directory; the hook then
-                // polls "frame-capture/trigger" instead of the flag file.
-                val flag = File(dir, "frame-capture")
-                val target = if (flag.isDirectory) File(flag, "trigger") else flag
-                target.writeText(frames.toString())
-            }
-            if (cfg.gpuTrace) File(dir, "gpu-trace").writeText("")
-        }.onFailure { Log.w(TAG, "could not create oracle flag files", it) }
+        // The capture / gpu-trace flag files are created by the native lab hook (lab.cpp, after K presented frames),
+        // independent of this callback, which sometimes never fires (B007); this line is how that is detected.
     }
 
     fun onDestroy() {
