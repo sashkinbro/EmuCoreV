@@ -40,7 +40,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.Fullscreen
+import androidx.compose.material.icons.rounded.Gamepad
+import androidx.compose.material.icons.rounded.Gradient
+import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -55,9 +59,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Save
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SportsEsports
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.HorizontalDivider
@@ -271,7 +273,7 @@ fun EmulationQuickBar(
             )
             QuickBarButton(
                 accentIndex = 4,
-                icon = Icons.Rounded.Tune,
+                icon = Icons.Rounded.Menu,
                 contentDescription = stringResource(R.string.emulation_quickbar_open_menu),
                 onClick = onOpenMenu,
                 palette = palette
@@ -1717,13 +1719,13 @@ private data class EmulationMenuTabItem(
 
 @Composable
 private fun emulationMenuTabs(): List<EmulationMenuTabItem> = listOf(
-    EmulationMenuTabItem(EmulationMenuTab.Game, stringResource(R.string.emulation_tab_game), Icons.Rounded.PlayArrow),
+    EmulationMenuTabItem(EmulationMenuTab.Game, stringResource(R.string.emulation_tab_game), Icons.Rounded.Menu),
     EmulationMenuTabItem(EmulationMenuTab.SaveStates, stringResource(R.string.emulation_tab_savestates), Icons.Rounded.Save),
-    EmulationMenuTabItem(EmulationMenuTab.Controls, stringResource(R.string.emulation_tab_controls), Icons.Rounded.Tune),
-    EmulationMenuTabItem(EmulationMenuTab.Display, stringResource(R.string.emulation_tab_display), Icons.Rounded.Visibility),
-    EmulationMenuTabItem(EmulationMenuTab.Shaders, stringResource(R.string.shader_scope_ingame), Icons.Rounded.AutoFixHigh),
-    EmulationMenuTabItem(EmulationMenuTab.Cheats, stringResource(R.string.emulation_tab_cheats), Icons.Rounded.Extension),
-    EmulationMenuTabItem(EmulationMenuTab.System, stringResource(R.string.emulation_tab_system), Icons.Rounded.Settings),
+    EmulationMenuTabItem(EmulationMenuTab.Controls, stringResource(R.string.emulation_tab_controls), Icons.Rounded.Gamepad),
+    EmulationMenuTabItem(EmulationMenuTab.Display, stringResource(R.string.emulation_tab_display), Icons.Rounded.Fullscreen),
+    EmulationMenuTabItem(EmulationMenuTab.Shaders, stringResource(R.string.shader_scope_ingame), Icons.Rounded.Gradient),
+    EmulationMenuTabItem(EmulationMenuTab.Cheats, stringResource(R.string.emulation_tab_cheats), Icons.Rounded.AutoFixHigh),
+    EmulationMenuTabItem(EmulationMenuTab.System, stringResource(R.string.emulation_tab_system), Icons.Rounded.SettingsSuggest),
     EmulationMenuTabItem(
         EmulationMenuTab.Achievements,
         stringResource(R.string.emulation_tab_achievements),
