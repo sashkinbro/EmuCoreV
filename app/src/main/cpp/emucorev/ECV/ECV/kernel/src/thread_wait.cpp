@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <cpu/functions.h>
+#if ECV_ORACLE
+#include <ecv_hle_trace.h>
+#endif
 #include <kernel/state.h>
 #include <kernel/sync_primitives.h>
 #include <kernel/thread/thread_state.h>
@@ -142,11 +145,17 @@ WaitResult ThreadState::wait(WaitTarget target, Deadline deadline, bool callback
     }
     wait_target = { callbacks ? target.type | WAITTYPE_CB_BIT : target.type, target.id };
     update_status(ThreadStatus::waiting);
+#if ECV_ORACLE
+    ecv::oracle::hle::wait_begin(id, target.type, target.id, deadline != Deadline::max());
+#endif
     bool satisfied = true;
     if (deadline == Deadline::max())
         wait_cv.wait(lock, woken);
     else
         satisfied = wait_cv.wait_until(lock, deadline, woken);
+#if ECV_ORACLE
+    ecv::oracle::hle::wait_end(id, satisfied);
+#endif
     // A freeze may have accepted WAITING as quiescent. Do not resume or dispatch
     // callbacks until it is lifted; the mutex serializes this with freeze requests.
     const bool resumed = wait_for_guest_resume(lock);
@@ -169,6 +178,9 @@ WaitResult ThreadState::wait(WaitTarget target, Deadline deadline, bool callback
 }
 
 void ThreadState::wake() {
+#if ECV_ORACLE
+    ecv::oracle::hle::wake(g_tls_guest_thread ? g_tls_guest_thread->id : 0, id);
+#endif
     const std::lock_guard<std::mutex> lock(mutex);
     wake_pending = true;
     wait_cv.notify_all();

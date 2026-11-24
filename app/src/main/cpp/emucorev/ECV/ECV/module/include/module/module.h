@@ -21,14 +21,23 @@
 
 #include <util/log.h>
 
+#if ECV_ORACLE
+#include <ecv_hle_trace.h>
+#define ECV_NOTE_STUB(unimplemented) ecv::oracle::hle::note_stub(export_name, unimplemented);
+#else
+#define ECV_NOTE_STUB(unimplemented)
+#endif
+
 #define UNIMPLEMENTED()                                                \
     ([&]() {                                                           \
+        ECV_NOTE_STUB(1)                                               \
         LOG_WARN_ONCE("Unimplemented {} import called.", export_name); \
         return 0;                                                      \
     })()
 
 #define STUBBED(info)                                                       \
     ([&]() {                                                                \
+        ECV_NOTE_STUB(0)                                                    \
         LOG_WARN_ONCE("Stubbed {} import called. ({})", export_name, info); \
         return 0;                                                           \
     })()

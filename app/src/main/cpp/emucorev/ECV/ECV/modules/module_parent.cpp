@@ -23,6 +23,9 @@
 #include <modules/guest_code_fixes.h>
 
 #include <cpu/functions.h>
+#if ECV_ORACLE
+#include <ecv_hle_trace.h>
+#endif
 #include <emuenv/state.h>
 #include <io/device.h>
 #include <io/state.h>
@@ -155,6 +158,9 @@ static void log_import_call(char emulation_level, uint32_t nid, SceUID thread_id
 #endif
 
 void call_import(EmuEnvState &emuenv, CPUState &cpu, uint32_t nid, SceUID thread_id) {
+#if ECV_ORACLE
+    const bool hle_traced = ecv::oracle::hle::enter(emuenv, cpu, nid, thread_id);
+#endif
     // HLE - call our C++ function
 #ifndef NDEBUG
     if (emuenv.kernel.debugger.watch_import_calls && spdlog::default_logger_raw()->should_log(spdlog::level::trace)) {
@@ -194,6 +200,10 @@ void call_import(EmuEnvState &emuenv, CPUState &cpu, uint32_t nid, SceUID thread
         }
 #endif
     }
+#if ECV_ORACLE
+    if (hle_traced)
+        ecv::oracle::hle::leave(cpu, nid, thread_id);
+#endif
 }
 
 struct SceKernelBootimageModules {
