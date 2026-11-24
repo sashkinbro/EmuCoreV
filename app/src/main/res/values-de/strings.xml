@@ -41,6 +41,7 @@
     <string name="onboarding_firmware_cancel_download">Abbrechen</string>
     <string name="onboarding_firmware_downloading">Download %1$d%%</string>
     <string name="onboarding_firmware_download_failed">Download fehlgeschlagen. Erneut versuchen.</string>
+    <string name="onboarding_firmware_download_corrupt">Die heruntergeladene Datei ist unvollständig oder beschädigt. Versuche es erneut.</string>
     <string name="onboarding_back">Zurück</string>
     <string name="onboarding_next">Weiter</string>
     <string name="onboarding_get_started">Loslegen</string>
@@ -373,6 +374,16 @@
     <string name="install_dialog_close">Schließen</string>
     <string name="install_dialog_unexpected_error">Bei der Installation ist ein Fehler aufgetreten.</string>
     <string name="install_dialog_firmware_failed">Firmware-Installation fehlgeschlagen.</string>
+    <string name="install_dialog_firmware_validating">Firmware-Paket wird geprüft…</string>
+    <string name="install_dialog_firmware_decrypting">%1$s wird entschlüsselt…</string>
+    <string name="install_dialog_firmware_extracting">%1$s wird entpackt (%2$d Dateien)…</string>
+    <string name="install_dialog_firmware_finalizing">Installation wird abgeschlossen…</string>
+    <string name="install_dialog_firmware_not_pup">Dies ist kein PlayStation-Vita-Firmware-Paket (PUP).</string>
+    <string name="install_dialog_firmware_truncated">Das Firmware-Paket ist unvollständig. Lade es erneut herunter oder verwende eine vollständige Kopie.</string>
+    <string name="install_dialog_firmware_corrupt">Das Firmware-Paket ist beschädigt oder wird nicht unterstützt.</string>
+    <string name="install_dialog_firmware_io_error">Die Firmware-Dateien konnten nicht geschrieben werden. Prüfe den freien Speicher und versuche es erneut.</string>
+    <string name="install_dialog_firmware_internal">Ein unerwarteter Fehler ist aufgetreten. Die bisherige Firmware wurde nicht verändert.</string>
+    <string name="install_dialog_firmware_no_space">Nicht genug freier Speicher. Es werden etwa %1$d MB benötigt.</string>
     <string name="install_dialog_content_failed">Spielinstallation fehlgeschlagen.</string>
     <string name="install_dialog_pkg_failed">PKG-Installation fehlgeschlagen.</string>
     <string name="install_dialog_firmware_done">Firmware-Paket erfolgreich installiert.</string>

@@ -43,6 +43,7 @@
     <string name="onboarding_firmware_cancel_download">Zrušit</string>
     <string name="onboarding_firmware_downloading">Stahování %1$d%%</string>
     <string name="onboarding_firmware_download_failed">Stahování se nezdařilo. Zkuste to znovu.</string>
+    <string name="onboarding_firmware_download_corrupt">Stažený soubor je neúplný nebo poškozený. Zkuste to znovu.</string>
     <string name="onboarding_firmware_info_title">Oficiální stažení firmwaru</string>
     <string name="onboarding_firmware_info_body">Soubory firmwaru se stahují přímo z oficiálních aktualizačních serverů Sony. EmuCoreV firmware nehostuje, nezrcadlí, neupravuje ani nešíří z vlastních zdrojů; pouze otevírá oficiální veřejné odkazy ke stažení a nainstaluje balíček, který vyberete.</string>
     <string name="onboarding_back">Zpět</string>
@@ -729,6 +730,16 @@
     <string name="install_dialog_close">Zavřít</string>
     <string name="install_dialog_unexpected_error">Během instalace se něco pokazilo.</string>
     <string name="install_dialog_firmware_failed">Instalace firmwaru se nezdařila.</string>
+    <string name="install_dialog_firmware_validating">Kontrola balíčku firmwaru…</string>
+    <string name="install_dialog_firmware_decrypting">Dešifrování %1$s…</string>
+    <string name="install_dialog_firmware_extracting">Rozbalování %1$s (souborů: %2$d)…</string>
+    <string name="install_dialog_firmware_finalizing">Dokončování instalace…</string>
+    <string name="install_dialog_firmware_not_pup">Toto není balíček firmwaru PlayStation Vita (PUP).</string>
+    <string name="install_dialog_firmware_truncated">Balíček firmwaru je neúplný. Stáhněte jej znovu nebo použijte úplnou kopii.</string>
+    <string name="install_dialog_firmware_corrupt">Balíček firmwaru je poškozený nebo není podporován.</string>
+    <string name="install_dialog_firmware_io_error">Zápis souborů firmwaru se nezdařil. Zkontrolujte volné místo a zkuste to znovu.</string>
+    <string name="install_dialog_firmware_internal">Došlo k neočekávané chybě. Původní firmware nebyl změněn.</string>
+    <string name="install_dialog_firmware_no_space">Nedostatek volného místa. Je potřeba přibližně %1$d MB.</string>
     <string name="install_dialog_content_failed">Instalace hry se nezdařila.</string>
     <string name="install_dialog_vitamin_unsupported">Dumpy Vitamin nejsou podporovány. Oprava archivu je neopraví. Použijte dump vlastní hry ve formátu NoNpDrm nebo FAGDec, případně její PKG a odpovídající licenci.</string>
     <string name="install_dialog_content_try_repair">Pokud jde o platný obraz VPK nebo ZIP, zkuste v dialogu instalace hry možnost Opravit a nainstalovat.</string>

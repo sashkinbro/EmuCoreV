@@ -43,6 +43,7 @@
     <string name="onboarding_firmware_cancel_download">취소</string>
     <string name="onboarding_firmware_downloading">다운로드 중 %1$d%%</string>
     <string name="onboarding_firmware_download_failed">다운로드에 실패했습니다. 다시 시도하세요.</string>
+    <string name="onboarding_firmware_download_corrupt">다운로드한 파일이 불완전하거나 손상되었습니다. 다시 시도하세요.</string>
     <string name="onboarding_firmware_info_title">공식 펌웨어 다운로드</string>
     <string name="onboarding_firmware_info_body">펌웨어 파일은 Sony의 공식 업데이트 서버에서 직접 다운로드됩니다. EmuCoreV는 자체 리소스에서 펌웨어를 호스팅, 미러링, 수정 또는 재배포하지 않으며, 공식 공개 다운로드 링크를 열고 선택한 패키지를 설치할 뿐입니다.</string>
     <string name="onboarding_back">뒤로</string>
@@ -729,6 +730,16 @@
     <string name="install_dialog_close">닫기</string>
     <string name="install_dialog_unexpected_error">설치 중 문제가 발생했습니다.</string>
     <string name="install_dialog_firmware_failed">펌웨어 설치에 실패했습니다.</string>
+    <string name="install_dialog_firmware_validating">펌웨어 패키지를 확인하는 중…</string>
+    <string name="install_dialog_firmware_decrypting">%1$s 복호화 중…</string>
+    <string name="install_dialog_firmware_extracting">%1$s 추출 중(파일 %2$d개)…</string>
+    <string name="install_dialog_firmware_finalizing">설치를 마무리하는 중…</string>
+    <string name="install_dialog_firmware_not_pup">PlayStation Vita 펌웨어 패키지(PUP)가 아닙니다.</string>
+    <string name="install_dialog_firmware_truncated">펌웨어 패키지가 불완전합니다. 다시 다운로드하거나 완전한 사본을 사용하세요.</string>
+    <string name="install_dialog_firmware_corrupt">펌웨어 패키지가 손상되었거나 지원되지 않습니다.</string>
+    <string name="install_dialog_firmware_io_error">펌웨어 파일을 쓰지 못했습니다. 여유 저장 공간을 확인한 후 다시 시도하세요.</string>
+    <string name="install_dialog_firmware_internal">예기치 않은 오류가 발생했습니다. 기존 펌웨어는 변경되지 않았습니다.</string>
+    <string name="install_dialog_firmware_no_space">저장 공간이 부족합니다. 약 %1$d MB가 필요합니다.</string>
     <string name="install_dialog_content_failed">게임 설치에 실패했습니다.</string>
     <string name="install_dialog_vitamin_unsupported">Vitamin 덤프는 지원되지 않습니다. 아카이브 복구로 해결할 수 없습니다. 소유한 게임의 NoNpDrm 또는 FAGDec 덤프나 해당 PKG와 일치하는 라이선스를 사용하세요.</string>
     <string name="install_dialog_content_try_repair">유효한 VPK 또는 ZIP 이미지라면 게임 설치 대화 상자에서 복구 후 설치를 시도하세요.</string>

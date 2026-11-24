@@ -41,6 +41,7 @@
     <string name="onboarding_firmware_cancel_download">İptal</string>
     <string name="onboarding_firmware_downloading">İndiriliyor: %1$d%%</string>
     <string name="onboarding_firmware_download_failed">İndirme başarısız oldu. Tekrar deneyin.</string>
+    <string name="onboarding_firmware_download_corrupt">İndirilen dosya eksik veya hasarlı. Tekrar deneyin.</string>
     <string name="onboarding_firmware_info_title">Resmi firmware indirme</string>
     <string name="onboarding_firmware_info_body">Firmware dosyaları doğrudan Sony\'nin resmi güncelleme sunucularından indirilir. EmuCoreV kendi kaynaklarından firmware barındırmaz, yansıtmaz, değiştirmez veya yeniden dağıtmaz; yalnızca resmi açık indirme bağlantılarını açar ve seçtiğiniz paketi yükler.</string>
     <string name="onboarding_back">Geri</string>
@@ -404,6 +405,16 @@
     <string name="install_dialog_close">Kapat</string>
     <string name="install_dialog_unexpected_error">Yükleme sırasında bir şeyler ters gitti.</string>
     <string name="install_dialog_firmware_failed">Firmware yüklemesi başarısız oldu.</string>
+    <string name="install_dialog_firmware_validating">Bellenim paketi denetleniyor…</string>
+    <string name="install_dialog_firmware_decrypting">%1$s şifresi çözülüyor…</string>
+    <string name="install_dialog_firmware_extracting">%1$s çıkarılıyor (%2$d dosya)…</string>
+    <string name="install_dialog_firmware_finalizing">Kurulum tamamlanıyor…</string>
+    <string name="install_dialog_firmware_not_pup">Bu bir PlayStation Vita bellenim paketi (PUP) değil.</string>
+    <string name="install_dialog_firmware_truncated">Bellenim paketi eksik. Yeniden indirin veya eksiksiz bir kopya kullanın.</string>
+    <string name="install_dialog_firmware_corrupt">Bellenim paketi hasarlı veya desteklenmiyor.</string>
+    <string name="install_dialog_firmware_io_error">Bellenim dosyaları yazılamadı. Boş depolama alanını kontrol edip tekrar deneyin.</string>
+    <string name="install_dialog_firmware_internal">Beklenmeyen bir hata oluştu. Önceki bellenim değiştirilmedi.</string>
+    <string name="install_dialog_firmware_no_space">Yeterli boş depolama alanı yok. Yaklaşık %1$d MB gerekiyor.</string>
     <string name="install_dialog_content_failed">Oyun yüklemesi başarısız oldu.</string>
     <string name="install_dialog_pkg_failed">PKG yüklemesi başarısız oldu.</string>
     <string name="install_dialog_firmware_done">Firmware paketi başarıyla yüklendi.</string>

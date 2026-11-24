@@ -43,6 +43,7 @@
     <string name="onboarding_firmware_cancel_download">Anuluj</string>
     <string name="onboarding_firmware_downloading">Pobieranie %1$d%%</string>
     <string name="onboarding_firmware_download_failed">Pobieranie nie powiodło się. Spróbuj ponownie.</string>
+    <string name="onboarding_firmware_download_corrupt">Pobrany plik jest niekompletny lub uszkodzony. Spróbuj ponownie.</string>
     <string name="onboarding_firmware_info_title">Oficjalne pobieranie firmware</string>
     <string name="onboarding_firmware_info_body">Pliki firmware są pobierane bezpośrednio z oficjalnych serwerów aktualizacji Sony. EmuCoreV nie hostuje, nie tworzy kopii lustrzanych, nie modyfikuje ani nie redystrybuuje firmware ze swoich zasobów; jedynie otwiera oficjalne publiczne linki do pobrania i instaluje wybrany pakiet.</string>
     <string name="onboarding_back">Wstecz</string>
@@ -729,6 +730,16 @@
     <string name="install_dialog_close">Zamknij</string>
     <string name="install_dialog_unexpected_error">Coś poszło nie tak podczas instalacji.</string>
     <string name="install_dialog_firmware_failed">Instalacja firmware nie powiodła się.</string>
+    <string name="install_dialog_firmware_validating">Sprawdzanie pakietu firmware…</string>
+    <string name="install_dialog_firmware_decrypting">Odszyfrowywanie %1$s…</string>
+    <string name="install_dialog_firmware_extracting">Wypakowywanie %1$s (plików: %2$d)…</string>
+    <string name="install_dialog_firmware_finalizing">Kończenie instalacji…</string>
+    <string name="install_dialog_firmware_not_pup">To nie jest pakiet firmware PlayStation Vita (PUP).</string>
+    <string name="install_dialog_firmware_truncated">Pakiet firmware jest niekompletny. Pobierz go ponownie lub użyj pełnej kopii.</string>
+    <string name="install_dialog_firmware_corrupt">Pakiet firmware jest uszkodzony lub nieobsługiwany.</string>
+    <string name="install_dialog_firmware_io_error">Nie udało się zapisać plików firmware. Sprawdź wolne miejsce i spróbuj ponownie.</string>
+    <string name="install_dialog_firmware_internal">Wystąpił nieoczekiwany błąd. Poprzedni firmware nie został zmieniony.</string>
+    <string name="install_dialog_firmware_no_space">Za mało wolnego miejsca. Potrzeba około %1$d MB.</string>
     <string name="install_dialog_content_failed">Instalacja gry nie powiodła się.</string>
     <string name="install_dialog_vitamin_unsupported">Zrzuty Vitamin nie są obsługiwane. Naprawa archiwum ich nie naprawi. Użyj zrzutu własnej gry w formacie NoNpDrm lub FAGDec albo jej PKG i pasującej licencji.</string>
     <string name="install_dialog_content_try_repair">Jeśli to prawidłowy obraz VPK lub ZIP, spróbuj opcji Napraw i zainstaluj w oknie instalacji gry.</string>

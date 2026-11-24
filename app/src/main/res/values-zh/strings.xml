@@ -41,6 +41,7 @@
     <string name="onboarding_firmware_cancel_download">取消</string>
     <string name="onboarding_firmware_downloading">下載中 %1$d%%</string>
     <string name="onboarding_firmware_download_failed">下載失敗。請再試一次。</string>
+    <string name="onboarding_firmware_download_corrupt">下载的文件不完整或已损坏。请重试。</string>
     <string name="onboarding_back">返回</string>
     <string name="onboarding_next">下一步</string>
     <string name="onboarding_get_started">開始使用</string>
@@ -373,6 +374,16 @@
     <string name="install_dialog_close">關閉</string>
     <string name="install_dialog_unexpected_error">安裝期間發生錯誤。</string>
     <string name="install_dialog_firmware_failed">韌體安裝失敗。</string>
+    <string name="install_dialog_firmware_validating">正在检查固件包…</string>
+    <string name="install_dialog_firmware_decrypting">正在解密 %1$s…</string>
+    <string name="install_dialog_firmware_extracting">正在解压 %1$s（%2$d 个文件）…</string>
+    <string name="install_dialog_firmware_finalizing">正在完成安装…</string>
+    <string name="install_dialog_firmware_not_pup">这不是 PlayStation Vita 固件包（PUP）。</string>
+    <string name="install_dialog_firmware_truncated">固件包不完整。请重新下载或使用完整的副本。</string>
+    <string name="install_dialog_firmware_corrupt">固件包已损坏或不受支持。</string>
+    <string name="install_dialog_firmware_io_error">写入固件文件失败。请检查可用存储空间后重试。</string>
+    <string name="install_dialog_firmware_internal">发生意外错误。之前的固件未被更改。</string>
+    <string name="install_dialog_firmware_no_space">可用存储空间不足。大约需要 %1$d MB。</string>
     <string name="install_dialog_content_failed">遊戲安裝失敗。</string>
     <string name="install_dialog_pkg_failed">PKG 安裝失敗。</string>
     <string name="install_dialog_firmware_done">韌體套件安裝成功。</string>

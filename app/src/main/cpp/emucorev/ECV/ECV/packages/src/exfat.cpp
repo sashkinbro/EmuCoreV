@@ -17,6 +17,9 @@
 
 #include <packages/exfat.h>
 
+#include <stdexcept>
+#include <system_error>
+
 namespace exfat {
 
 static fs::path get_exfat_file_name(fs::ifstream &img, const uint8_t continuations, const uint8_t name_length) {
@@ -60,7 +63,7 @@ static uint64_t get_cluster_offset(const ExFATSuperBlock &super_block, uint32_t 
 }
 
 static void traverse_directory(fs::ifstream &img, const uint64_t img_size, std::vector<std::streampos> &offset_stack, const ExFATSuperBlock &super_block,
-    const uint32_t cluster, const fs::path &output_path, fs::path current_dir) {
+    const uint32_t cluster, const fs::path &output_path, fs::path current_dir, const std::function<void(uint64_t)> &on_progress) {
     // Seek to the cluster offset
     img.seekg(get_cluster_offset(super_block, cluster));
 
@@ -96,18 +99,35 @@ static void traverse_directory(fs::ifstream &img, const uint64_t img_size, std::
                 offset_stack.push_back(current_offset);
 
                 // Traverse the directory recursively
-                traverse_directory(img, img_size, offset_stack, super_block, file_info.start_cluster, output_path, subdir);
+                traverse_directory(img, img_size, offset_stack, super_block, file_info.start_cluster, output_path, subdir, on_progress);
             } else if (file_entry.attrib & EXFAT_ATTRIB_ARCH) {
                 // Seek to the file offset
                 img.seekg(get_cluster_offset(super_block, file_info.start_cluster));
 
                 // Create the file and write the data
+                // EmuCoreV: report I/O failures instead of silently writing a truncated file; stream in chunks.
                 fs::ofstream output_file(current_output_path, std::ios::binary);
-                const auto file_size = file_info.size;
-                std::vector<char> buffer(file_size);
-                img.read(buffer.data(), file_size);
-                output_file.write(buffer.data(), file_size);
+                if (!output_file)
+                    throw std::system_error(errno, std::generic_category(), "cannot create " + fs_utils::path_to_utf8(current_output_path));
+                uint64_t remaining = file_info.size;
+                std::vector<char> buffer(static_cast<size_t>(std::min<uint64_t>(remaining, 0x100000)));
+                while (remaining) {
+                    const auto chunk = static_cast<std::streamsize>(std::min<uint64_t>(remaining, buffer.size()));
+                    img.read(buffer.data(), chunk);
+                    if (img.gcount() != chunk)
+                        throw std::runtime_error("short read from partition image while extracting " + fs_utils::path_to_utf8(current_output_path));
+                    output_file.write(buffer.data(), chunk);
+                    if (!output_file)
+                        throw std::system_error(errno, std::generic_category(), "write failed for " + fs_utils::path_to_utf8(current_output_path));
+                    remaining -= static_cast<uint64_t>(chunk);
+                    if (on_progress)
+                        on_progress(static_cast<uint64_t>(chunk));
+                }
                 output_file.close();
+                if (output_file.fail())
+                    throw std::system_error(errno, std::generic_category(), "close failed for " + fs_utils::path_to_utf8(current_output_path));
+                if (on_progress)
+                    on_progress(0);
 
                 // Go back to the current offset for the next entry
                 img.seekg(current_offset);
@@ -128,12 +148,13 @@ static void traverse_directory(fs::ifstream &img, const uint64_t img_size, std::
     }
 }
 
-void extract_exfat(const fs::path &partition_path, const std::string &partition, const fs::path &vita_fs_path) {
+void extract_exfat(const fs::path &partition_path, const std::string &partition, const fs::path &vita_fs_path, const std::function<void(uint64_t)> &on_progress) {
     // Open the partition file for reading in binary mode
     fs::ifstream img(partition_path / partition, std::ios::binary);
     if (!img.is_open()) {
         LOG_ERROR("Failed to open partition file");
-        return;
+        // EmuCoreV: a missing image is a failure, not a silent no-op.
+        throw std::system_error(errno, std::generic_category(), "cannot open partition image " + fs_utils::path_to_utf8(partition_path / partition));
     }
 
     // Get the size of the partition file
@@ -153,7 +174,7 @@ void extract_exfat(const fs::path &partition_path, const std::string &partition,
     fs::path current_dir;
 
     // Traverse the root directory
-    traverse_directory(img, img_size, offset_stack, super_block, super_block.rootdir_cluster, output_path, current_dir);
+    traverse_directory(img, img_size, offset_stack, super_block, super_block.rootdir_cluster, output_path, current_dir, on_progress);
 
     // Close the partition file
     img.close();

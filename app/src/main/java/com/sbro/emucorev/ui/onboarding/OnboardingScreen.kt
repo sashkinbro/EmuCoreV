@@ -754,7 +754,9 @@ private fun firmwareDownloadStatusText(
             stringResource(R.string.onboarding_firmware_downloading, percent)
         }
 
-        FirmwareDownloadStatus.Failed -> stringResource(R.string.onboarding_firmware_download_failed)
+        FirmwareDownloadStatus.Failed -> stringResource(
+            if (state.corruptDownload) R.string.onboarding_firmware_download_corrupt else R.string.onboarding_firmware_download_failed
+        )
         else -> null
     }
 }

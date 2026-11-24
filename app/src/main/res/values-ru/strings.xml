@@ -41,6 +41,7 @@
     <string name="onboarding_firmware_cancel_download">Отмена</string>
     <string name="onboarding_firmware_downloading">Загрузка %1$d%%</string>
     <string name="onboarding_firmware_download_failed">Не удалось скачать. Попробуйте снова.</string>
+    <string name="onboarding_firmware_download_corrupt">Скачанный файл неполный или повреждён. Попробуйте ещё раз.</string>
     <string name="onboarding_back">Назад</string>
     <string name="onboarding_next">Далее</string>
     <string name="onboarding_get_started">Начать</string>
@@ -373,6 +374,16 @@
     <string name="install_dialog_close">Закрыть</string>
     <string name="install_dialog_unexpected_error">Что-то пошло не так во время установки.</string>
     <string name="install_dialog_firmware_failed">Установка прошивки не удалась.</string>
+    <string name="install_dialog_firmware_validating">Проверка пакета прошивки…</string>
+    <string name="install_dialog_firmware_decrypting">Расшифровка %1$s…</string>
+    <string name="install_dialog_firmware_extracting">Извлечение %1$s (%2$d файлов)…</string>
+    <string name="install_dialog_firmware_finalizing">Завершение установки…</string>
+    <string name="install_dialog_firmware_not_pup">Это не пакет прошивки PlayStation Vita (PUP).</string>
+    <string name="install_dialog_firmware_truncated">Пакет прошивки неполный. Скачайте его снова или используйте полную копию.</string>
+    <string name="install_dialog_firmware_corrupt">Пакет прошивки повреждён или не поддерживается.</string>
+    <string name="install_dialog_firmware_io_error">Не удалось записать файлы прошивки. Проверьте свободное место и повторите попытку.</string>
+    <string name="install_dialog_firmware_internal">Произошла непредвиденная ошибка. Прежняя прошивка не изменена.</string>
+    <string name="install_dialog_firmware_no_space">Недостаточно свободного места. Требуется примерно %1$d МБ.</string>
     <string name="install_dialog_content_failed">Установка игры не удалась.</string>
     <string name="install_dialog_pkg_failed">Установка PKG не удалась.</string>
     <string name="install_dialog_firmware_done">Пакет прошивки успешно установлен.</string>

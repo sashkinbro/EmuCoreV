@@ -41,6 +41,7 @@
     <string name="onboarding_firmware_cancel_download">रद्द करें</string>
     <string name="onboarding_firmware_downloading">डाउनलोड हो रहा है %1$d%%</string>
     <string name="onboarding_firmware_download_failed">डाउनलोड विफल रहा। फिर कोशिश करें।</string>
+    <string name="onboarding_firmware_download_corrupt">डाउनलोड की गई फ़ाइल अधूरी या क्षतिग्रस्त है। फिर प्रयास करें।</string>
     <string name="onboarding_back">पीछे</string>
     <string name="onboarding_next">आगे</string>
     <string name="onboarding_get_started">शुरू करें</string>
@@ -373,6 +374,16 @@
     <string name="install_dialog_close">बंद करें</string>
     <string name="install_dialog_unexpected_error">इंस्टॉलेशन के दौरान कुछ गलत हो गया।</string>
     <string name="install_dialog_firmware_failed">फ़र्मवेयर इंस्टॉलेशन विफल रहा।</string>
+    <string name="install_dialog_firmware_validating">फ़र्मवेयर पैकेज की जाँच की जा रही है…</string>
+    <string name="install_dialog_firmware_decrypting">%1$s को डिक्रिप्ट किया जा रहा है…</string>
+    <string name="install_dialog_firmware_extracting">%1$s निकाला जा रहा है (%2$d फ़ाइलें)…</string>
+    <string name="install_dialog_firmware_finalizing">इंस्टॉलेशन पूरा किया जा रहा है…</string>
+    <string name="install_dialog_firmware_not_pup">यह PlayStation Vita फ़र्मवेयर पैकेज (PUP) नहीं है।</string>
+    <string name="install_dialog_firmware_truncated">फ़र्मवेयर पैकेज अधूरा है। इसे दोबारा डाउनलोड करें या पूरी प्रति का उपयोग करें।</string>
+    <string name="install_dialog_firmware_corrupt">फ़र्मवेयर पैकेज क्षतिग्रस्त है या समर्थित नहीं है।</string>
+    <string name="install_dialog_firmware_io_error">फ़र्मवेयर फ़ाइलें लिखने में विफल रहे। खाली स्टोरेज जाँचें और फिर प्रयास करें।</string>
+    <string name="install_dialog_firmware_internal">एक अप्रत्याशित त्रुटि हुई। पिछला फ़र्मवेयर नहीं बदला गया।</string>
+    <string name="install_dialog_firmware_no_space">पर्याप्त खाली स्टोरेज नहीं है। लगभग %1$d MB चाहिए।</string>
     <string name="install_dialog_content_failed">गेम इंस्टॉलेशन विफल रहा।</string>
     <string name="install_dialog_pkg_failed">PKG इंस्टॉलेशन विफल रहा।</string>
     <string name="install_dialog_firmware_done">फ़र्मवेयर पैकेज सफलतापूर्वक इंस्टॉल हो गया।</string>

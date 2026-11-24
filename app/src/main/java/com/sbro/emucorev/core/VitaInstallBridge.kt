@@ -115,18 +115,32 @@ object VitaInstallBridge {
         }
     }
 
+    /**
+     * Installs a firmware package (PUP). Atomic: on any failure or cancel the previous firmware is left untouched.
+     * On success [FirmwareInstallEvents.installed] fires. Blocking; call from a background thread.
+     */
     fun installFirmware(
         context: Context,
         firmwarePath: String,
         systemLanguage: Int
-    ): String? {
+    ): FirmwareInstallResult {
         CoreMaintenanceRepository(context).ensureCoreUpdated()
         NativeLibraryLoader.ensureLoaded(context)
-        return nativeInstallFirmware(
-            EmulatorStorage.vitaRoot(context).absolutePath,
-            firmwarePath,
-            systemLanguage
+        val vitaRoot = EmulatorStorage.vitaRoot(context)
+        val result = FirmwareInstallResult.parse(
+            nativeInstallFirmware(vitaRoot.absolutePath, firmwarePath, systemLanguage)
         )
+        if (result.success) {
+            FirmwareInstallEvents.notifyInstalled(
+                FirmwareInstalledEvent(result.version, result.partitionFiles.keys, vitaRoot)
+            )
+        }
+        return result
+    }
+
+    /** Asks a running [installFirmware] to stop; it unwinds, removes its staging data and reports CANCELLED. */
+    fun cancelFirmwareInstall() {
+        runCatching { nativeCancelFirmwareInstall() }
     }
 
     fun installContent(
@@ -217,11 +231,14 @@ object VitaInstallBridge {
         )
     }
 
+    /** `<STATUS>|<payload>`, see [FirmwareInstallResult.parse]. */
     private external fun nativeInstallFirmware(
         vitaRootPath: String,
         firmwarePath: String,
         systemLanguage: Int
     ): String?
+
+    private external fun nativeCancelFirmwareInstall()
 
     private external fun nativeInstallContent(
         vitaRootPath: String,
