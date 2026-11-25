@@ -577,8 +577,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val catalogId = withContext(Dispatchers.IO) {
                 runCatchingCancellable {
-                    catalogRepository.findBySerial(game.serial.orEmpty())?.igdbId
-                        ?: catalogRepository.findBestMatch(game.title)?.igdbId
+                    catalogRepository.findForGame(game.serial, game.title)?.igdbId
                 }.getOrNull()
             }
             if (catalogId != null) {

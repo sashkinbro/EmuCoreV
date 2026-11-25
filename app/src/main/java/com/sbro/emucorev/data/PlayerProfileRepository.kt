@@ -946,8 +946,7 @@ class PlayerProfileRepository(context: Context) {
     private fun catalogCoverUrl(titleId: String?, title: String?): String? {
         val key = "${titleId.orEmpty()}|${title.orEmpty()}"
         coverUrlCache[key]?.let { return it.ifEmpty { null } }
-        val resolved = catalogRepository.findBySerial(titleId.orEmpty())?.coverUrl
-            ?: title?.takeIf { it.isNotBlank() }?.let { name -> catalogRepository.findBestMatch(name)?.coverUrl }
+        val resolved = catalogRepository.findForGame(titleId, title)?.coverUrl
         coverUrlCache[key] = resolved.orEmpty()
         return resolved
     }

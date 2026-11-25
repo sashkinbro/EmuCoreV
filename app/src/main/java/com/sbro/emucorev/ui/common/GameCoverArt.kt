@@ -93,7 +93,8 @@ fun GameCoverArt(
     // Callback identity never becomes a key for network or decode work.
     LaunchedEffect(is3d) { presentationChanged?.invoke(is3d) }
 
-    LaunchedEffect(titleId, igdbId, coverPath, fallbackIconPath, style, artworkVersion, cacheVersion, memoryVersion, decodeWidth) {
+    val retryVersion by repository.retryVersion.collectAsState()
+    LaunchedEffect(titleId, igdbId, coverPath, fallbackIconPath, style, artworkVersion, cacheVersion, memoryVersion, decodeWidth, retryVersion) {
         if (artwork != null) return@LaunchedEffect
         fun isCurrent() = repository.cacheVersion.value == cacheVersion && bitmapGeneration.version.value == memoryVersion
         coverLoads.loadVisible(

@@ -5,10 +5,15 @@ import android.database.sqlite.SQLiteDatabase
 import java.io.File
 import java.util.Locale
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 
 class VitaCatalogRepository(private val context: Context) {
     private val assetName = "catalog/psvita_games.db"
     private val localDbName = "psvita_games.db"
+    private var verified = false // local copy matched the asset this instance; guarded by lock
     private val reviewedSerialIndex: VitaCoverIndex by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         val json = runCatching {
             context.assets.open("catalog/vita_covers.json").use { input ->
@@ -144,9 +149,16 @@ class VitaCatalogRepository(private val context: Context) {
         }.orEmpty()
     }
 
+    /**
+     * Exact serial lookup. The bundled DB's game_serials table is empty, so the reviewed serial index
+     * (vita_covers.json) is authoritative (B100); the SQL join only serves DBs that do carry serials.
+     */
     fun findBySerial(serial: String): VitaCatalogEntry? {
         val value = serial.trim()
         if (value.isBlank()) return null
+        reviewedSerialIndex.igdbIdForSerial(value)?.let { id ->
+            getEntries(listOf(id)).firstOrNull()?.let { return it }
+        }
         return openDatabase()?.use { database ->
             database.rawQuery(
                 """
@@ -173,6 +185,19 @@ class VitaCatalogRepository(private val context: Context) {
                 )
             }
         }
+    }
+
+    /**
+     * Cover/identity lookup for one library game. A well-formed Vita serial is decided by the serial
+     * alone: an unknown serial yields null and is never guessed from the title. The name match is only an
+     * explicit fallback for games that have no usable serial.
+     */
+    fun findForGame(serial: String?, name: String?): VitaCatalogEntry? {
+        if (!serial.isNullOrBlank()) {
+            findBySerial(serial)?.let { return it }
+            if (VitaCoverIndex.normalizeTitleId(serial) != null) return null
+        }
+        return name?.takeIf { it.isNotBlank() }?.let(::findBestMatch)
     }
 
     fun findBestMatch(gameName: String): VitaCatalogEntry? {
@@ -395,20 +420,93 @@ class VitaCatalogRepository(private val context: Context) {
     }
 
     private fun openDatabase(): SQLiteDatabase? {
-        val dbFile = prepareLocalDatabase() ?: return null
-        return runCatching {
-            SQLiteDatabase.openDatabase(dbFile.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
-        }.getOrNull()
+        repeat(2) { attempt ->
+            val dbFile = prepareLocalDatabase(force = attempt > 0) ?: return null
+            val db = runCatching {
+                SQLiteDatabase.openDatabase(dbFile.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+            }.getOrNull()
+            if (db != null) return db
+            // Truncated/corrupt local copy: re-copy once from the bundled asset (B101).
+            synchronized(lock) { verified = false }
+        }
+        return null
     }
 
-    private fun prepareLocalDatabase(): File? {
+    /**
+     * Keeps filesDir/psvita_games.db equal to the bundled asset (B101). A sidecar stores the asset's
+     * SHA-256 and the copy is atomic (temp, verify, rename), so an app update replaces a stale DB and a
+     * killed copy can never leave a truncated file that is trusted. Checked once per repository instance.
+     */
+    private fun prepareLocalDatabase(force: Boolean = false): File? {
         val target = File(context.filesDir, localDbName)
-        if (target.exists() && target.length() > 0) return target
-        return runCatching {
-            context.assets.open(assetName).use { input ->
-                target.outputStream().use { output -> input.copyTo(output) }
+        synchronized(lock) {
+            if (!force && verified && target.length() > 0) return target
+            val assetHash = runCatching { context.assets.open(assetName).use(::sha256) }.getOrNull()
+            val marker = File(target.parentFile, "$localDbName.sha256")
+            if (assetHash == null) {
+                // Asset unreadable: keep whatever local copy opens, never delete it.
+                return target.takeIf { it.length() > 0 }
             }
-            target
-        }.getOrNull()
+            if (!force && target.length() > 0 && runCatching { marker.readText().trim() }.getOrNull() == assetHash &&
+                integrityOk(target)) {
+                verified = true
+                return target
+            }
+            val temp = File(target.parentFile, "$localDbName.tmp")
+            return runCatching {
+                target.parentFile?.mkdirs()
+                val copiedHash = context.assets.open(assetName).use { input ->
+                    val digest = MessageDigest.getInstance("SHA-256")
+                    temp.outputStream().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            digest.update(buffer, 0, count)
+                            output.write(buffer, 0, count)
+                        }
+                        output.fd.sync()
+                    }
+                    digest.digest().toHex()
+                }
+                check(copiedHash == assetHash) { "Catalog asset changed or was truncated during copy" }
+                check(integrityOk(temp)) { "Copied catalog failed its integrity check" }
+                Files.move(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING)
+                val markerTemp = File(target.parentFile, "$localDbName.sha256.tmp")
+                markerTemp.writeText(assetHash)
+                Files.move(markerTemp.toPath(), marker.toPath(), StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING)
+                verified = true
+                target
+            }.getOrElse {
+                temp.delete()
+                null
+            }
+        }
+    }
+
+    private fun integrityOk(file: File): Boolean = runCatching {
+        SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            db.rawQuery("PRAGMA quick_check", emptyArray()).use { it.moveToFirst() && it.getString(0) == "ok" }
+        }
+    }.getOrDefault(false)
+
+    private fun sha256(input: InputStream): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+        }
+        return digest.digest().toHex()
+    }
+
+    private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+
+    private companion object {
+        /** Serialises copies of the shared filesDir file across repository instances. */
+        val lock = Any()
     }
 }

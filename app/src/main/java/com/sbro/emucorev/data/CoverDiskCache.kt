@@ -53,6 +53,12 @@ class CoverDiskCache(
     }
     private val flights = ConcurrentHashMap<String, Flight>()
     private val misses = ConcurrentHashMap<String, Long>()
+    private class Failure(val count: Int, val at: Long)
+    private data class Stamp(val length: Long, val modified: Long)
+    /** Transient failures (B102): short, exponential back-off so offline scrolling cannot flood the network. */
+    private val failures = ConcurrentHashMap<String, Failure>()
+    /** Files already verified (hash + image) at this exact size/mtime (B103): not re-hashed per lookup. */
+    private val verified = ConcurrentHashMap<String, Stamp>()
     private val permits = Semaphore(4)
     private val generation = AtomicLong()
     private val mutationLock = Any()
@@ -66,7 +72,7 @@ class CoverDiskCache(
         val startedGeneration = generation.get()
         val target = File(directory, asset.cacheKey)
         if (!isManagedPath(target.path)) return@withContext null
-        if (!valid(target, asset.sha256)) return@withContext null
+        if (!validManaged(target, asset.sha256)) return@withContext null
         target.takeIf { generation.get() == startedGeneration }
     }
 
@@ -134,7 +140,7 @@ class CoverDiskCache(
         if (generation.get() != startedGeneration) return null
         val target = File(directory, asset.cacheKey)
         if (!isManagedPath(target.path)) return null
-        if (valid(target, asset.sha256)) return target.takeIf { generation.get() == startedGeneration }
+        if (validManaged(target, asset.sha256)) return target.takeIf { generation.get() == startedGeneration }
         val checkedAt = now()
         synchronized(mutationLock) {
             // An old request may resume after clear and a fresh confirmed miss.
@@ -143,6 +149,9 @@ class CoverDiskCache(
             val missAge = misses[asset.cacheKey]?.let { checkedAt - it }
             if (missAge != null && missAge in 0 until MISS_TTL_MS) return null
             misses.remove(asset.cacheKey)
+            val failure = failures[asset.cacheKey]
+            val failureAge = failure?.let { checkedAt - it.at }
+            if (failure != null && failureAge != null && failureAge in 0 until retryDelayMs(failure.count)) return null
         }
         return run {
             currentCoroutineContext().ensureActive()
@@ -155,7 +164,12 @@ class CoverDiskCache(
                 if (status == CoverFetchResult.NOT_FOUND) synchronized(mutationLock) {
                     if (generation.get() == startedGeneration) misses[asset.cacheKey] = now()
                 }
-                if (status != CoverFetchResult.DOWNLOADED || !valid(temp, asset.sha256)) return@run null
+                if (status != CoverFetchResult.DOWNLOADED || !valid(temp, asset.sha256)) {
+                    // Only definitive 404/410 are negative-cached (30 min); everything else backs off briefly.
+                    if (status != CoverFetchResult.NOT_FOUND) noteFailure(asset.cacheKey, startedGeneration)
+                    return@run null
+                }
+                val stamp = Stamp(temp.length(), temp.lastModified())
                 synchronized(mutationLock) {
                     if (generation.get() != startedGeneration) return@synchronized null
                     // Same-directory atomic promotion never exposes a partly downloaded file.
@@ -167,12 +181,33 @@ class CoverDiskCache(
                         return@synchronized null
                     }
                     misses.remove(asset.cacheKey)
+                    failures.remove(asset.cacheKey)
+                    verified[target.path] = stamp
                     target
                 }
             } finally {
                 temp.delete()
             }
         }
+    }
+
+    private fun noteFailure(key: String, startedGeneration: Long) {
+        val at = now()
+        synchronized(mutationLock) {
+            if (generation.get() != startedGeneration) return
+            failures[key] = Failure((failures[key]?.count ?: 0) + 1, at)
+        }
+    }
+
+    /** Connectivity regained: let every back-off expire so visible covers retry at once. */
+    fun resetFailureBackoff() { failures.clear() }
+
+    private suspend fun validManaged(file: File, expectedHash: String): Boolean {
+        val stamp = Stamp(file.length(), file.lastModified())
+        if (file.isFile && verified[file.path] == stamp) return true
+        if (!valid(file, expectedHash)) { verified.remove(file.path); return false }
+        verified[file.path] = stamp
+        return true
     }
 
     private suspend fun valid(file: File, expectedHash: String): Boolean {
@@ -205,6 +240,8 @@ class CoverDiskCache(
         synchronized(mutationLock) {
             generation.incrementAndGet()
             misses.clear()
+            failures.clear()
+            verified.clear()
             val invalidated = flights.values.toList()
             flights.clear()
             invalidated.forEach { flight ->
@@ -253,5 +290,10 @@ class CoverDiskCache(
     companion object {
         const val MAX_BYTES: Long = 32L * 1024 * 1024
         private const val MISS_TTL_MS = 30L * 60 * 1000
+        private const val RETRY_BASE_MS = 60_000L
+        private const val RETRY_MAX_MS = 10L * 60 * 1000
+        /** 60 s, 2 min, 4 min ... capped at 10 min. */
+        internal fun retryDelayMs(failureCount: Int): Long =
+            (RETRY_BASE_MS shl (failureCount - 1).coerceIn(0, 10)).coerceAtMost(RETRY_MAX_MS)
     }
 }

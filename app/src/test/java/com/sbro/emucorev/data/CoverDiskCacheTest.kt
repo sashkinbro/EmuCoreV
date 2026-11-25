@@ -55,13 +55,14 @@ class CoverDiskCacheTest {
         assertTrue(root.walk().none { it.extension == "tmp" })
     } }
     @Test fun hashFailureNeverPromotesAndRetries() = runBlocking { fixture { root ->
-        val count = AtomicInteger()
+        val count = AtomicInteger(); var time = 0L
         val cache = CoverDiskCache(root, { _, temp, _ ->
             temp.writeBytes(if (count.incrementAndGet() == 1) "bad".toByteArray() else valid)
             CoverFetchResult.DOWNLOADED
-        }, { true })
+        }, { true }, { time })
         assertNull(cache.resolve(asset()))
         assertTrue(root.walk().none { it.isFile })
+        time += 61_000
         assertNotNull(cache.resolve(asset()))
         assertEquals(2, count.get())
     } }
@@ -70,13 +71,45 @@ class CoverDiskCacheTest {
         assertNull(cache.resolve(asset()))
         assertTrue(root.walk().none { it.isFile })
     } }
-    @Test fun transientFailureIsRetriedImmediately() = runBlocking { fixture { root ->
-        var calls = 0
+    @Test fun transientFailureBacksOffThenRetriesAndGrowsExponentially() = runBlocking { fixture { root ->
+        var calls = 0; var time = 1_000L; var succeed = false
         val cache = CoverDiskCache(root, { _, temp, _ ->
-            if (++calls == 1) CoverFetchResult.RETRYABLE_FAILURE
-            else { temp.writeBytes(valid); CoverFetchResult.DOWNLOADED }
-        }, { true })
-        assertNull(cache.resolve(asset())); assertNotNull(cache.resolve(asset())); assertEquals(2, calls)
+            calls++
+            if (succeed) { temp.writeBytes(valid); CoverFetchResult.DOWNLOADED } else CoverFetchResult.RETRYABLE_FAILURE
+        }, { true }, { time })
+        assertNull(cache.resolve(asset())); assertEquals(1, calls)
+        assertNull(cache.resolve(asset())); assertEquals("inside the 60 s window the fetcher is not called", 1, calls)
+        time += 61_000
+        assertNull(cache.resolve(asset())); assertEquals(2, calls)
+        time += 61_000
+        assertNull(cache.resolve(asset())); assertEquals("second failure doubles the delay", 2, calls)
+        time += 60_000
+        succeed = true
+        assertNotNull(cache.resolve(asset())); assertEquals(3, calls)
+    } }
+    @Test fun connectivityResetLetsFailedCoverRetryImmediately() = runBlocking { fixture { root ->
+        var calls = 0; var fail = true
+        val cache = CoverDiskCache(root, { _, temp, _ ->
+            calls++
+            if (fail) CoverFetchResult.RETRYABLE_FAILURE else { temp.writeBytes(valid); CoverFetchResult.DOWNLOADED }
+        }, { true }, { 5L })
+        assertNull(cache.resolve(asset())); assertNull(cache.resolve(asset())); assertEquals(1, calls)
+        fail = false; cache.resetFailureBackoff()
+        assertNotNull(cache.resolve(asset())); assertEquals(2, calls)
+    } }
+    @Test fun backoffIsCappedAndNotNegativeCachedLikeNotFound() {
+        assertEquals(60_000L, CoverDiskCache.retryDelayMs(1))
+        assertEquals(120_000L, CoverDiskCache.retryDelayMs(2))
+        assertEquals(600_000L, CoverDiskCache.retryDelayMs(50))
+    }
+    @Test fun verifiedFileIsNotRehashedUntilItChanges() = runBlocking { fixture { root ->
+        var validations = 0
+        val file = stored(root)
+        val cache = CoverDiskCache(root, { _, _, _ -> CoverFetchResult.NOT_FOUND }, { validations++; true })
+        assertNotNull(cache.findCached(asset())); assertNotNull(cache.findCached(asset())); assertNotNull(cache.findCached(asset()))
+        assertEquals("image validator (and hashing) ran once for three lookups", 1, validations)
+        file.writeBytes("tampered".toByteArray()); file.setLastModified(file.lastModified() + 5_000)
+        assertNull("a changed file is re-hashed and rejected", cache.findCached(asset()))
     } }
     @Test fun confirmedMissExpiresAndNewRevisionIsIndependent() = runBlocking { fixture { root ->
         var calls = 0; var time = 10L
@@ -95,10 +128,11 @@ class CoverDiskCacheTest {
         assertTrue(paths.all { it != null }); assertEquals(1, calls.get())
     } }
     @Test fun concurrentFailuresShareOneAttemptButNextCallRetries() = runBlocking { fixture { root ->
-        val calls = AtomicInteger()
-        val cache = CoverDiskCache(root, { _, _, _ -> calls.incrementAndGet(); delay(80); CoverFetchResult.RETRYABLE_FAILURE }, { true })
+        val calls = AtomicInteger(); var time = 0L
+        val cache = CoverDiskCache(root, { _, _, _ -> calls.incrementAndGet(); delay(80); CoverFetchResult.RETRYABLE_FAILURE }, { true }, { time })
         coroutineScope { (1..12).map { async { cache.resolve(asset()) } }.awaitAll() }
         assertEquals(1, calls.get())
+        time += 61_000
         assertNull(cache.resolve(asset())); assertEquals(2, calls.get())
     } }
     @Test fun cancellationRemovesTempAndAllowsRetry() = runBlocking { fixture { root ->
@@ -148,14 +182,14 @@ class CoverDiskCacheTest {
     } }
     @Test fun cancelledOwnerRetryStopsAtRealMissOrTransientFailure() = runBlocking { fixture { root ->
         for (status in listOf(CoverFetchResult.NOT_FOUND, CoverFetchResult.RETRYABLE_FAILURE)) {
-            var calls = 0
+            var calls = 0; var time = 0L
             val cache = CoverDiskCache(File(root, status.name), { _, temp, _ ->
                 when (++calls) {
                     1 -> awaitCancellation()
                     2 -> status
                     else -> { temp.writeBytes(valid); CoverFetchResult.DOWNLOADED }
                 }
-            }, { true }, ioDispatcher = Dispatchers.Unconfined)
+            }, { true }, { time }, ioDispatcher = Dispatchers.Unconfined)
             val owner = launch(start = CoroutineStart.UNDISPATCHED) { cache.resolve(asset()) }
             val waiter = async(start = CoroutineStart.UNDISPATCHED) { cache.resolve(asset()) }
             owner.cancelAndJoin()
@@ -164,6 +198,7 @@ class CoverDiskCacheTest {
             if (status == CoverFetchResult.NOT_FOUND) {
                 assertNull(cache.resolve(asset())); assertEquals(2, calls)
             } else {
+                time += 61_000
                 assertNotNull(cache.resolve(asset())); assertEquals(3, calls)
             }
         }

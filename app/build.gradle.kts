@@ -264,6 +264,11 @@ android {
         }
     }
 
+    // B101: SQLite -shm/-wal sidecars of the bundled catalog are build artefacts, never package them.
+    androidResources {
+        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!*.db-shm:!*.db-wal"
+    }
+
     packaging {
         jniLibs {
             useLegacyPackaging = true

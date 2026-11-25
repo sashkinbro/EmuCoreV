@@ -36,6 +36,12 @@ class VitaCoverIndex private constructor(
     fun serialsForIgdbId(igdbId: Long): List<String> =
         if (igdbId <= 0 || igdbId !in games) emptyList() else serialsByIgdbId[igdbId].orEmpty()
 
+    /** Exact reviewed serial -> IGDB id (B100); null for unknown or conflicting serials. */
+    fun igdbIdForSerial(titleId: String?): Long? {
+        val serial = titleId?.let(::normalizeTitleId) ?: return null
+        return serials[serial]
+    }
+
     fun find(titleId: String? = null, igdbId: Long? = null, candidateUrl: String? = null,
              style: VitaCoverStyle = VitaCoverStyle.THREE_D): VitaCoverAsset? {
         val serialId = if (titleId != null) {

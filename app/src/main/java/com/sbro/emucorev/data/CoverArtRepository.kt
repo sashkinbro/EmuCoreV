@@ -3,6 +3,8 @@ package com.sbro.emucorev.data
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.BitmapFactory
+import android.net.ConnectivityManager
+import android.net.Network
 import android.net.Uri
 import android.util.LruCache
 import java.io.File
@@ -26,9 +28,12 @@ class CoverArtRepository private constructor(context: Context) {
     val style: StateFlow<VitaCoverStyle> = mutableStyle.asStateFlow()
     private val mutableCacheVersion = MutableStateFlow(0L)
     val cacheVersion: StateFlow<Long> = mutableCacheVersion.asStateFlow()
+    private val mutableRetryVersion = MutableStateFlow(0L)
+    /** Bumped when connectivity returns so covers that failed while offline are retried (B102). */
+    val retryVersion: StateFlow<Long> = mutableRetryVersion.asStateFlow()
     private data class Request(val titleId: String?, val igdbId: Long?, val candidatePath: String?,
                                val iconPath: String?, val style: VitaCoverStyle, val generation: Long)
-    private val resolvedPaths = LruCache<Request, ResolvedVitaCover>(256)
+    private val resolvedPaths = LruCache<Request, ResolvedVitaCover>(RESOLVED_PATH_CACHE_SIZE)
 
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == STYLE_KEY) mutableStyle.value = readStyle()
@@ -64,7 +69,25 @@ class CoverArtRepository private constructor(context: Context) {
         }
     }
 
-    init { preferences.registerOnSharedPreferenceChangeListener(preferenceListener) }
+    init {
+        preferences.registerOnSharedPreferenceChangeListener(preferenceListener)
+        registerConnectivityRetry()
+    }
+
+    private fun registerConnectivityRetry() {
+        runCatching {
+            val manager = app.getSystemService(ConnectivityManager::class.java) ?: return
+            val armed = java.util.concurrent.atomic.AtomicBoolean(manager.activeNetwork == null)
+            manager.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+                override fun onLost(network: Network) { armed.set(true) }
+                override fun onAvailable(network: Network) {
+                    if (!armed.compareAndSet(true, false)) return
+                    cache.resetFailureBackoff()
+                    mutableRetryVersion.update { it + 1 }
+                }
+            })
+        }
+    }
 
     fun setStyle(value: VitaCoverStyle) {
         mutableStyle.value = value
@@ -149,13 +172,18 @@ class CoverArtRepository private constructor(context: Context) {
 
     private suspend fun download(asset: VitaCoverAsset, target: File, maxBytes: Long): CoverFetchResult {
         // VitaCoverAsset validates every path and constructs the sole permitted remote host.
-        val connection = URL(asset.url).openConnection() as HttpURLConnection
+        var connection = openCoverConnection(asset.url)
         try {
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 15_000
-            connection.instanceFollowRedirects = false
-            connection.setRequestProperty("User-Agent", "EmuCoreV-Covers/2")
-            val status = connection.responseCode
+            var redirects = 0
+            var status = connection.responseCode
+            // Follow only same-host https redirects, manually and bounded (B102).
+            while (status in REDIRECT_STATUSES) {
+                val next = followableRedirect(connection.url.toString(), connection.getHeaderField("Location"))
+                if (next == null || ++redirects > MAX_REDIRECTS) return CoverFetchResult.RETRYABLE_FAILURE
+                connection.disconnect()
+                connection = openCoverConnection(next)
+                status = connection.responseCode
+            }
             if (status == 404 || status == 410) return CoverFetchResult.NOT_FOUND
             if (status != 200) return CoverFetchResult.RETRYABLE_FAILURE
             val length = connection.contentLengthLong
@@ -181,8 +209,31 @@ class CoverArtRepository private constructor(context: Context) {
         }
     }
 
+    private fun openCoverConnection(url: String): HttpURLConnection =
+        (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 10_000
+            readTimeout = 15_000
+            instanceFollowRedirects = false
+            setRequestProperty("User-Agent", "EmuCoreV-Covers/2")
+        }
+
     companion object {
         private const val STYLE_KEY = "cover_style"
+        /** Sized for libraries of several hundred titles (B103); entries are small path records. */
+        internal const val RESOLVED_PATH_CACHE_SIZE = 1024
+        private const val MAX_REDIRECTS = 3
+        private val REDIRECT_STATUSES = setOf(301, 302, 303, 307, 308)
+
+        /** Absolute https target of a redirect on the same host and default port, else null. */
+        internal fun followableRedirect(from: String, location: String?): String? = runCatching {
+            if (location.isNullOrBlank()) return null
+            val base = java.net.URI(from)
+            val target = base.resolve(location.trim())
+            target.toString().takeIf {
+                base.scheme == "https" && target.scheme == "https" && target.userInfo == null &&
+                    target.port == -1 && target.host.equals(base.host, ignoreCase = true)
+            }
+        }.getOrNull()
         @Volatile private var instance: CoverArtRepository? = null
 
         fun get(context: Context): CoverArtRepository = instance ?: synchronized(this) {
