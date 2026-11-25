@@ -2,7 +2,7 @@
 agp = "9.5.2"
 coreKtx = "1.19.1"
 junit = "4.13.2"
-robolectric = "4.18"
+robolectric = "4.18.1"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
 lifecycleRuntimeKtx = "2.11.1"
