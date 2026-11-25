@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(emucorev_core_host_tests CXX)
+project(emucorev_core_host_tests C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -62,3 +62,64 @@ target_compile_options(core_host_tests PRIVATE -Wall -Wextra)
 
 enable_testing()
 add_test(NAME core_host_tests COMMAND core_host_tests)
+
+# Save-state tests: compile the adapter's real save-state code (validators, IO restore) and the
+# ECV pieces it needs against real .ecvs files. Everything the code reaches but the tests never
+# execute (renderer, kernel, guest memory) stays unresolved, so this target is linked with
+# /force:unresolved. Build and run it with run-core-host-tests.ps1 -Target savestate_host_tests.
+# Not part of "all": it needs the lab artifacts (EMUCOREV_LAB) for most of its tests.
+set(ADAPTER_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../main/cpp/emucorev")
+set(VK_HEADERS "${ECV_ROOT}/external/VulkanMemoryAllocator-Hpp/Vulkan-Headers/include")
+file(GLOB BOOST_LIB_INCLUDES "${ECV_ROOT}/external/boost/libs/*/include")
+file(GLOB BOOST_FS_SOURCES "${ECV_ROOT}/external/boost/libs/filesystem/src/*.cpp")
+set(SS_SRC "${ADAPTER_ROOT}/src/savestate")
+set(RENDERER_SRC "${CORE_ROOT}/renderer/src")
+add_library(boost_fs_host STATIC ${BOOST_FS_SOURCES})
+target_include_directories(boost_fs_host PRIVATE "${ECV_ROOT}/external/boost" ${BOOST_LIB_INCLUDES})
+target_compile_definitions(boost_fs_host PRIVATE BOOST_FILESYSTEM_SOURCE BOOST_FILESYSTEM_STATIC_LINK=1 _WIN32_WINNT=0x0A00)
+add_library(ss_third_party_host STATIC
+    "${ECV_ROOT}/external/miniz/miniz.c"
+    "${ECV_ROOT}/external/fmt/src/format.cc"
+    "${ECV_ROOT}/external/spdlog/src/spdlog.cpp"
+    "${ECV_ROOT}/external/spdlog/src/async.cpp"
+    "${ECV_ROOT}/external/spdlog/src/color_sinks.cpp"
+    "${ECV_ROOT}/external/spdlog/src/file_sinks.cpp"
+    "${ECV_ROOT}/external/spdlog/src/stdout_sinks.cpp"
+    "${ECV_ROOT}/external/spdlog/src/cfg.cpp")
+set(SS_INCLUDES
+    "${ADAPTER_ROOT}/include"
+    "${CORE_ROOT}" "${CORE_ROOT}/android/jni" "${CORE_ROOT}/modules" "${CORE_ROOT}/modules/SceGxm"
+    "${ECV_ROOT}/external/boost" ${BOOST_LIB_INCLUDES}
+    "${ECV_ROOT}/external/fmt/include" "${ECV_ROOT}/external/spdlog/include"
+    "${ECV_ROOT}/external/miniz" "${ECV_ROOT}/external/xxHash/cmake_unofficial/.."
+    "${ECV_ROOT}/external/vita-toolchain/src" "${ECV_ROOT}/external/concurrentqueue"
+    "${ECV_ROOT}/external/sdl/include" "${ECV_ROOT}/external/pugixml/src"
+    "${ECV_ROOT}/external/CppCommon" "${ECV_ROOT}/external/imgui" "${ECV_ROOT}/external/stb"
+    "${ECV_ROOT}/external/glad/include"
+    "${VK_HEADERS}"
+    "${ECV_ROOT}/external/VulkanMemoryAllocator-Hpp/include"
+    "${ECV_ROOT}/external/VulkanMemoryAllocator-Hpp/VulkanMemoryAllocator/include"
+    "${ECV_ROOT}/external/psvpfstools/psvpfsparser/cmake/.." "${ECV_ROOT}/external/psvpfstools/zlib"
+    "${ECV_ROOT}/external/psvpfstools/libb64/include" "${ECV_ROOT}/external/psvpfstools/libzrif/include")
+file(GLOB SS_CORE_INCLUDES "${CORE_ROOT}/*/include")
+list(APPEND SS_INCLUDES ${SS_CORE_INCLUDES})
+set(SS_DEFINES BOOST_FILESYSTEM_NO_LIB BOOST_FILESYSTEM_STATIC_LINK=1 SPDLOG_COMPILED_LIB SPDLOG_FMT_EXTERNAL
+    SPDLOG_NO_THREAD_ID EMUCOREV_ANDROID_BRIDGE=1)
+target_include_directories(ss_third_party_host PRIVATE ${SS_INCLUDES})
+target_compile_definitions(ss_third_party_host PRIVATE ${SS_DEFINES})
+add_executable(savestate_host_tests EXCLUDE_FROM_ALL
+    savestate_tests.cpp
+    "${SS_SRC}/memory_image.cpp" "${SS_SRC}/gxm_state_io.cpp" "${SS_SRC}/gpu_state_io.cpp" "${SS_SRC}/gpu_buffer_stream.cpp"
+    "${RENDERER_SRC}/command_snapshot.cpp" "${RENDERER_SRC}/finish.cpp"
+    "${RENDERER_SRC}/vulkan/context_snapshot.cpp" "${RENDERER_SRC}/vulkan/surface_cache_snapshot.cpp"
+    "${RENDERER_SRC}/vulkan/surface_cache_snapshot_codec.cpp" "${CORE_ROOT}/vkutil/src/image_snapshot.cpp"
+    "${CORE_ROOT}/gxm/src/color.cpp" "${CORE_ROOT}/modules/SceGxm/SceGxm.cpp"
+    "${CORE_ROOT}/io/src/device.cpp" "${CORE_ROOT}/io/src/file.cpp" "${CORE_ROOT}/io/src/filesystem.cpp"
+    "${CORE_ROOT}/io/src/io.cpp" "${CORE_ROOT}/io/src/state_functions.cpp"
+    "${CORE_ROOT}/util/src/string_utils.cpp" "${CORE_ROOT}/util/src/fs_utils.cpp")
+target_sources(savestate_host_tests PRIVATE archive_host_shim.cpp)
+target_include_directories(savestate_host_tests PRIVATE ${SS_INCLUDES})
+target_compile_definitions(savestate_host_tests PRIVATE ${SS_DEFINES})
+set_target_properties(savestate_host_tests PROPERTIES CXX_STANDARD 23) # kernel headers use std::expected
+target_link_libraries(savestate_host_tests PRIVATE gtest_host boost_fs_host ss_third_party_host)
+target_link_options(savestate_host_tests PRIVATE -static -Wl,/force:unresolved)

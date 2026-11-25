@@ -4,6 +4,7 @@
 #include <renderer/vulkan/surface_cache_snapshot.h>
 #include <renderer/vulkan/context_snapshot.h>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -47,6 +48,15 @@ bool parse_gpu_state(const std::vector<uint8_t> &, GpuSnapshot &, std::string &e
 bool write_gpu_buffer_pages(Writer &, const GpuSnapshot &, std::string &error);
 bool parse_gpu_buffer_pages(SectionReader &, GpuSnapshot &, const fs::path &staging_directory, std::string &error);
 uint64_t gpu_buffer_page_payload_bound(const GpuSnapshot &);
+// A surface-cache entry keeps describing its guest range after the game frees that memory
+// (the entry just sits in the LRU queue until the slot is reused), so a live cache can hold
+// entries whose range is no longer mapped. They cannot be read back, written back or
+// trapped, and the next lookup would invalidate them anyway. Turn each such active slot
+// into an inactive one instead of keeping a dangling reference. `mapped(address, size)` tells
+// whether a guest range is fully allocated. Returns the number of dropped entries.
+// Applied when a state is captured and, for states saved before that, when one is loaded.
+size_t drop_unmapped_surface_cache_entries(renderer::vulkan::SurfaceCacheSnapshot &,
+    const std::function<bool(uint64_t address, uint64_t size)> &mapped);
 bool validate_gpu_state(const GpuSnapshot &, const MemoryImage &, std::string &error);
 bool validate_gpu_gxm_references(const GpuSnapshot &, const GxmSnapshot &, std::string &error);
 bool capture_gpu_buffer_pages(const uint8_t *cpu, const uint8_t *gpu, uint32_t mapping_size,

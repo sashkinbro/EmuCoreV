@@ -10,11 +10,12 @@ struct EmuEnvState;
 
 namespace emucorev::savestate {
 
-constexpr uint32_t kEngineVersion = 18;
+constexpr uint32_t kEngineVersion = 19;
 // Older revisions remain readable, but cannot recover NP state (<17) or video codec
-// handles (<18) they never saved.
+// handles (<18) they never saved, and cannot recreate open savedata files missing on the
+// loading machine (<19).
 constexpr bool supports_engine_version(uint32_t version) {
-    return version == 15 || version == 16 || version == 17 || version == kEngineVersion;
+    return version == 15 || version == 16 || version == 17 || version == 18 || version == kEngineVersion;
 }
 
 struct Meta {

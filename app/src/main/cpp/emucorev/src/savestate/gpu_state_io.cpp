@@ -269,6 +269,10 @@ bool capture_gpu_state(EmuEnvState &env, GpuSnapshot &snapshot, std::string &err
     uint64_t surface_bytes = 0;
     if (!renderer::vulkan::capture_surface_cache_snapshot(state.surface_cache, image_device(state), staged.surfaces, error))
         return false;
+    // Entries whose guest memory the game has since freed are dead; do not save dangling references.
+    drop_unmapped_surface_cache_entries(staged.surfaces, [&env](uint64_t address, uint64_t size) {
+        return size == 0 || (address + size <= UINT32_MAX && is_valid_addr_range(env.mem, static_cast<Address>(address), static_cast<Address>(address + size)));
+    });
     for (const auto &color : staged.surfaces.colors)
         surface_bytes += color.texture.image.bytes.size() + color.raw_image.image.bytes.size();
     for (const auto &ds : staged.surfaces.depth_stencil) surface_bytes += ds.texture.image.bytes.size();
@@ -526,6 +530,34 @@ bool parse_gpu_state(const std::vector<uint8_t> &data, GpuSnapshot &snapshot, st
     if (!reader.ok() || reader.remaining()) { error = "invalid GPU snapshot"; return false; }
     snapshot = std::move(staged);
     return true;
+}
+
+size_t drop_unmapped_surface_cache_entries(renderer::vulkan::SurfaceCacheSnapshot &surfaces,
+    const std::function<bool(uint64_t address, uint64_t size)> &mapped) {
+    constexpr uint8_t no_slot = 0xFF;
+    size_t dropped = 0;
+    for (size_t slot = 0; slot < surfaces.colors.size(); ++slot) {
+        auto &color = surfaces.colors[slot];
+        if (!color.active || mapped(color.guest_address, color.total_bytes))
+            continue;
+        color = {};
+        if (surfaces.last_written_color_slot == slot)
+            surfaces.last_written_color_slot = no_slot;
+        ++dropped;
+    }
+    for (size_t slot = 0; slot < surfaces.depth_stencil.size(); ++slot) {
+        auto &ds = surfaces.depth_stencil[slot];
+        if (!ds.active || surfaces.pending_depth_stencil_slot == slot)
+            continue;
+        // Same lookup keys validate_gpu_state() checks for a depth surface.
+        const bool depth_mapped = !ds.surface.depth_data || mapped(ds.surface.depth_data.address(), 4);
+        const bool stencil_mapped = !ds.surface.stencil_data || mapped(ds.surface.stencil_data.address(), 4);
+        if (depth_mapped && stencil_mapped)
+            continue;
+        ds = {};
+        ++dropped;
+    }
+    return dropped;
 }
 
 bool validate_gpu_state(const GpuSnapshot &snapshot, const MemoryImage &memory, std::string &error) {

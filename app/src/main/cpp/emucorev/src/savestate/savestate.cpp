@@ -22,6 +22,7 @@
 #include <emucorev/savestate/kernel_import_io.h>
 #include <emucorev/savestate/motion_state_io.h>
 #include <emucorev/savestate/np_state_io.h>
+#include <emucorev/savestate/io_embedded_files.h>
 
 #include <cpu/functions.h>
 #include <config/state.h>
@@ -399,6 +400,16 @@ bool write_memory(EmuEnvState &emuenv, Writer &writer, const ProgressCallback &p
     }
 
     return writer.end_section(error);
+}
+
+// States saved before capture dropped dead surface-cache entries can reference guest memory
+// the game had already freed; discard those entries (see drop_unmapped_surface_cache_entries).
+bool drop_stale_gpu_surfaces(GpuSnapshot &gpu, const MemoryImage &memory) {
+    const size_t dropped = drop_unmapped_surface_cache_entries(gpu.surfaces,
+        [&memory](uint64_t address, uint64_t size) { return memory.contains(address, size); });
+    if (dropped)
+        LOG_WARN("[savestate] load: dropped {} stale surface-cache entries whose guest memory was freed", dropped);
+    return true;
 }
 
 bool read_memory(EmuEnvState &emuenv, const MemoryImage &image, const ProgressCallback &progress, std::string &error) {
@@ -1678,6 +1689,29 @@ bool write_io(EmuEnvState &emuenv, Writer &writer, std::string &error) {
         buffer.str(stats.get_translated_path());
     }
 
+    // Carry the content of open user-data files (savedata) so the state does not depend on them
+    // existing on the machine that loads it (see io_embedded_files.h).
+    std::vector<io_files::EmbeddedFile> embedded;
+    uint64_t embedded_bytes = 0;
+    for (const auto &[fd, stats] : io.std_files) {
+        const std::string &path = stats.get_translated_path();
+        if (embedded.size() >= io_files::kMaxFiles || !io_files::embeddable_path(path) || io_files::find_embedded(embedded, path))
+            continue;
+        // Buffered guest writes must reach the host file before it is read.
+        if (stats.can_write_file() && stats.get_file_pointer())
+            std::fflush(stats.get_file_pointer());
+        io_files::EmbeddedFile file;
+        file.path = path;
+        if (!io_files::read_host_file(stats.get_system_location(), file.data)
+            || file.data.size() > io_files::kMaxTotalBytes - embedded_bytes) {
+            LOG_WARN("[savestate] open file {} is not embedded in the state (missing or over the size limit)", path);
+            continue;
+        }
+        embedded_bytes += file.data.size();
+        embedded.push_back(std::move(file));
+    }
+    io_files::write_extension(buffer, embedded);
+
     if (!preflight_io(buffer.data(), error))
         return false;
     return writer.write_section(SectionId::Io, buffer.data().data(), buffer.size(), true, error);
@@ -1705,6 +1739,7 @@ struct IoSnapshot {
     std::vector<IoTtyInfo> ttys;
     std::vector<IoFileInfo> files;
     std::vector<IoDirInfo> dirs;
+    std::vector<io_files::EmbeddedFile> embedded;
 };
 
 bool read_bounded_io_path(BufferReader &reader, std::string &path) {
@@ -1782,6 +1817,18 @@ bool parse_io_state(const std::vector<uint8_t> &data, IoSnapshot &snapshot, std:
         }
     }
 
+    // Optional embedded user-data files (engine 19+); an absent extension is a valid older state.
+    if (!io_files::parse_extension(reader, read_bounded_io_path, parsed.embedded, error))
+        return false;
+    for (const io_files::EmbeddedFile &embedded : parsed.embedded) {
+        const bool is_open = std::any_of(parsed.files.begin(), parsed.files.end(),
+            [&](const IoFileInfo &file) { return file.path == embedded.path; });
+        if (!is_open) {
+            error = "invalid IO embedded file table";
+            return false;
+        }
+    }
+
     if (!reader.ok() || reader.remaining() != 0 || parsed.next_fd < 0) {
         error = "invalid IO state";
         return false;
@@ -1845,8 +1892,7 @@ bool read_io(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::string 
 
     for (const IoFileInfo &file : snapshot.files) {
         const int32_t safe_mode = file.open_mode & ~(SCE_O_CREAT | SCE_O_TRUNC | SCE_O_EXCL);
-        staged.next_fd = file.fd;
-        const SceUID opened = open_file(staged, file.path.c_str(), safe_mode, emuenv.vita_fs_path, "savestate");
+        const SceUID opened = io_files::reopen_saved_file(staged, emuenv.vita_fs_path, snapshot.embedded, file.path, file.fd, safe_mode);
         if (opened != file.fd) {
             error = "failed to reopen saved IO file: " + file.path;
             return false;
@@ -1858,8 +1904,7 @@ bool read_io(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::string 
         }
     }
     for (const IoDirInfo &dir : snapshot.dirs) {
-        staged.next_fd = dir.fd;
-        const SceUID opened = open_dir(staged, dir.path.c_str(), emuenv.vita_fs_path, "savestate");
+        const SceUID opened = io_files::reopen_saved_dir(staged, emuenv.vita_fs_path, dir.path, dir.fd);
         if (opened != dir.fd) {
             error = "failed to reopen saved IO directory: " + dir.path;
             return false;
@@ -2221,6 +2266,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         || !validate_kernel_import_abis(thread_snapshots, *memory_image, error)
         || !validate_kernel_thread_allocations(thread_snapshots, kernel_snapshot.tls_msize, *memory_image, error)
         || !parse_gpu_state(gpu_data, gpu_snapshot, error)
+        || !drop_stale_gpu_surfaces(gpu_snapshot, *memory_image)
         || !parse_gxm_state(gxm_data, gxm_snapshot, error)
         || !validate_gxm_state(gxm_snapshot, *memory_image, error)
         || !validate_gpu_state(gpu_snapshot, *memory_image, error)

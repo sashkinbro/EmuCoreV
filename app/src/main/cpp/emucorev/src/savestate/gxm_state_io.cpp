@@ -732,6 +732,14 @@ bool validate_gxm_state(const GxmSnapshot &state, const MemoryImage &memory, std
         if (!binary_disjoint(program.program.address(), program.program_source)) return fail("GXP binary overlaps a reconstructed host object");
     for (const auto &program : state.fragment_programs)
         if (!binary_disjoint(program.program.address(), program.program_source)) return fail("GXP binary overlaps a reconstructed host object");
+    // An immediate context owns one fixed ring, so its cursor never exceeds it. A deferred
+    // context's ring pointer and size are replaced independently of the cursor (the game
+    // passes null/0 to sceGxmSetDeferredContextVertexBuffer after a command list, or the
+    // memory callback returns a zero size), while the cursor is only reset by the next
+    // sceGxmBeginCommandList. Such an idle context legitimately has used > size == 0.
+    const auto ring_used_valid = [](const gxm::ContextSnapshot &context, uint64_t used, uint64_t size) {
+        return context.deferred ? used <= UINT32_MAX : used <= size;
+    };
     if (!gxm::validate_command_graph(state.contexts, state.commands, state.batches, error)) return false;
     if (!renderer::validate_finish_operations(state.finish_operations, state.commands, error)) return false;
     for (const auto &context : state.contexts) {
@@ -751,8 +759,9 @@ bool validate_gxm_state(const GxmSnapshot &state, const MemoryImage &memory, std
             || (context.renderer_record.fragment_program && !fragment.contains(context.renderer_record.fragment_program.address()))
             || (s.fragment_sync_object && !syncs.contains(s.fragment_sync_object.address()))
             || !optional(s.vertex_ring_buffer.address(), s.vertex_ring_buffer_size) || !optional(s.fragment_ring_buffer.address(), s.fragment_ring_buffer_size)
-            || !optional(s.vdm_buffer.address(), s.vdm_buffer_size) || s.vertex_ring_buffer_used > s.vertex_ring_buffer_size
-            || s.fragment_ring_buffer_used > s.fragment_ring_buffer_size
+            || !optional(s.vdm_buffer.address(), s.vdm_buffer_size)
+            || !ring_used_valid(context, s.vertex_ring_buffer_used, s.vertex_ring_buffer_size)
+            || !ring_used_valid(context, s.fragment_ring_buffer_used, s.fragment_ring_buffer_size)
             || !callback(s.vertex_memory_callback.address()) || !callback(s.fragment_memory_callback.address()) || !callback(s.vdm_memory_callback.address())) return fail("invalid saved GXM context references");
         const Address begin = context.alloc_space.address(), end = context.alloc_space_end.address();
         if (end < begin || (!begin && end) || (begin && !memory.contains(begin, uint64_t(end) - begin))) return fail("invalid saved GXM command arena");
