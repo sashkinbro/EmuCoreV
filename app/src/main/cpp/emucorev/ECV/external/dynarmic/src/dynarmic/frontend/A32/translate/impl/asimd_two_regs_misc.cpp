@@ -696,12 +696,10 @@ bool TranslatorVisitor::asimd_VRECPE(bool D, size_t sz, size_t Vd, bool F, bool 
         return UndefinedInstruction();
     }
 
-    if (sz == 0b00 || sz == 0b11) {
-        return UndefinedInstruction();
-    }
-
-    if (!F && sz == 0b01) {
-        // TODO: Implement 16-bit VectorUnsignedRecipEstimate
+    // Only the 32-bit forms exist on ARMv7 (size == 0b10, both float and unsigned integer).
+    // F=1 with size == 0b01 is the ARMv8.2 half-precision form: UNDEFINED here, and it must not
+    // reach the backends (the arm64 backend has no 16-bit vector recip/rsqrt estimate emitter).
+    if (sz != 0b10) {
         return UndefinedInstruction();
     }
 
@@ -722,12 +720,10 @@ bool TranslatorVisitor::asimd_VRSQRTE(bool D, size_t sz, size_t Vd, bool F, bool
         return UndefinedInstruction();
     }
 
-    if (sz == 0b00 || sz == 0b11) {
-        return UndefinedInstruction();
-    }
-
-    if (!F && sz == 0b01) {
-        // TODO: Implement 16-bit VectorUnsignedRecipEstimate
+    // Only the 32-bit forms exist on ARMv7 (size == 0b10, both float and unsigned integer).
+    // F=1 with size == 0b01 is the ARMv8.2 half-precision form: UNDEFINED here, and it must not
+    // reach the backends (the arm64 backend has no 16-bit vector recip/rsqrt estimate emitter).
+    if (sz != 0b10) {
         return UndefinedInstruction();
     }
 
