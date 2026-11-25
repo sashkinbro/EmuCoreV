@@ -85,3 +85,10 @@
     public static *** wtf(...);
     public static *** println(...);
 }
+
+# ConfigOverrides (GameProfileOverrides.kt) reads/writes VitaCoreConfig fields by
+# reflection and persists the field names in per-game profiles, so R8 must neither
+# rename nor remove them.
+-keepclassmembers,allowoptimization class com.sbro.emucorev.core.VitaCoreConfig {
+    <fields>;
+}
