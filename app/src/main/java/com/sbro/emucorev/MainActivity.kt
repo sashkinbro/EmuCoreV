@@ -78,7 +78,10 @@ class MainActivity : ComponentActivity() {
                 themePackage = themePackage
             ) {
                 Surface(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    // Text drawn straight on a screen background reads on the background colors.
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                    contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
                 ) {
                     AppNavigation()
                 }

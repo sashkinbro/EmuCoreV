@@ -48,100 +48,103 @@ internal fun TouchControlEditorChrome(
 ) {
     var showAdjust by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-    Column(
-        modifier.widthIn(max = 720.dp).fillMaxWidth().testTag("controls_editor_panel")
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Surface(color = Color(0xFF2B3F93).copy(alpha = .88f), shape = neonShape(16.dp)) {
-            Text(
-                text = stringResource(R.string.emulation_controls_editor_title),
-                color = Color.White,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-        }
-        // Wrap rather than scroll sideways, so Done and every tool remain reachable in portrait.
-        FlowRow(
-            modifier = Modifier.testTag("controls_editor_toolbar"),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+    // Fixed dark scheme: the panels sit on a dark game overlay, whatever the app theme is.
+    MaterialTheme(colorScheme = touchControlEditorColorScheme()) {
+        Column(
+            modifier.widthIn(max = 720.dp).fillMaxWidth().testTag("controls_editor_panel")
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            EditorTool(Icons.Rounded.Refresh, stringResource(R.string.emulation_controls_editor_reset), "reset_all", onReset)
-            EditorTool(Icons.Rounded.RestartAlt, stringResource(R.string.controls_editor_reset_selected), "reset_selected", onResetSelected)
-            if (!groupSelected) {
-                EditorTool(if (selectedVisible) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
-                    stringResource(R.string.emulation_controls_editor_visible), "visibility", onVisibilityToggle)
-                EditorTool(Icons.Rounded.Add, stringResource(R.string.controls_editor_create_combo), "create_combo", onCreate, canCreate)
-                EditorTool(Icons.Rounded.ContentCopy, stringResource(R.string.controls_editor_duplicate), "duplicate", onDuplicate, canDuplicate)
+            Surface(color = Color(0xFF2B3F93).copy(alpha = .88f), shape = neonShape(16.dp)) {
+                Text(
+                    text = stringResource(R.string.emulation_controls_editor_title),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
             }
-            EditorTool(Icons.Rounded.Tune, stringResource(R.string.emulation_controls_editor_size), "adjust", { showAdjust = !showAdjust }, active = showAdjust)
-            if (analogMode != null) {
-                EditorTool(Icons.Rounded.TouchApp, stringResource(R.string.emulation_controls_editor_touch_area_mode), "analog_mode", onAnalogModeToggle,
-                    active = analogMode == TouchAnalogMode.TouchArea)
+            // Wrap rather than scroll sideways, so Done and every tool remain reachable in portrait.
+            FlowRow(
+                modifier = Modifier.testTag("controls_editor_toolbar"),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                EditorTool(Icons.Rounded.Refresh, stringResource(R.string.emulation_controls_editor_reset), "reset_all", onReset)
+                EditorTool(Icons.Rounded.RestartAlt, stringResource(R.string.controls_editor_reset_selected), "reset_selected", onResetSelected)
+                if (!groupSelected) {
+                    EditorTool(if (selectedVisible) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                        stringResource(R.string.emulation_controls_editor_visible), "visibility", onVisibilityToggle)
+                    EditorTool(Icons.Rounded.Add, stringResource(R.string.controls_editor_create_combo), "create_combo", onCreate, canCreate)
+                    EditorTool(Icons.Rounded.ContentCopy, stringResource(R.string.controls_editor_duplicate), "duplicate", onDuplicate, canDuplicate)
+                }
+                EditorTool(Icons.Rounded.Tune, stringResource(R.string.emulation_controls_editor_size), "adjust", { showAdjust = !showAdjust }, active = showAdjust)
+                if (analogMode != null) {
+                    EditorTool(Icons.Rounded.TouchApp, stringResource(R.string.emulation_controls_editor_touch_area_mode), "analog_mode", onAnalogModeToggle,
+                        active = analogMode == TouchAnalogMode.TouchArea)
+                }
+                EditorTool(Icons.Rounded.GridOn, stringResource(R.string.controls_editor_grid), "grid", onGridToggle, active = showGrid)
+                EditorTool(Icons.Rounded.Grid4x4, stringResource(R.string.controls_editor_snap), "snap", onSnapToggle, active = snapToGrid)
+                Button(onClick = onDone, modifier = Modifier.testTag("controls_editor_done"), shape = neonShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3565FF), contentColor = Color.White)) {
+                    Text(stringResource(R.string.emulation_controls_editor_done))
+                }
             }
-            EditorTool(Icons.Rounded.GridOn, stringResource(R.string.controls_editor_grid), "grid", onGridToggle, active = showGrid)
-            EditorTool(Icons.Rounded.Grid4x4, stringResource(R.string.controls_editor_snap), "snap", onSnapToggle, active = snapToGrid)
-            Button(onClick = onDone, modifier = Modifier.testTag("controls_editor_done"), shape = neonShape(16.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3565FF), contentColor = Color.White)) {
-                Text(stringResource(R.string.emulation_controls_editor_done))
-            }
-        }
-        if (showAdjust) {
-            Surface(color = Color(0xFF111827).copy(alpha = .92f), shape = neonShape(16.dp)) {
-                Column(Modifier.widthIn(max = 340.dp).fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(selectedLabel, Modifier.weight(1f), color = Color.White, maxLines = 1,
-                            style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                        IconButton(onClick = { showAdjust = false }, modifier = Modifier.size(26.dp).testTag("controls_editor_adjust_close")) {
-                            Icon(Icons.Rounded.Close, stringResource(R.string.emulation_controls_editor_done), tint = Color.White)
+            if (showAdjust) {
+                Surface(color = Color(0xFF111827).copy(alpha = .92f), shape = neonShape(16.dp)) {
+                    Column(Modifier.widthIn(max = 340.dp).fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(selectedLabel, Modifier.weight(1f), color = Color.White, maxLines = 1,
+                                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                            IconButton(onClick = { showAdjust = false }, modifier = Modifier.size(26.dp).testTag("controls_editor_adjust_close")) {
+                                Icon(Icons.Rounded.Close, stringResource(R.string.emulation_controls_editor_done), tint = Color.White)
+                            }
+                        }
+                        if (groupSelected) {
+                            EditorStepper(stringResource(R.string.emulation_controls_editor_percent, groupScalePercent),
+                                onGroupScaleDecrease, onGroupScaleIncrease,
+                                minusEnabled = groupScalePercent > GROUP_SCALE_MIN_PERCENT,
+                                plusEnabled = groupScalePercent < GROUP_SCALE_MAX_PERCENT)
+                        } else {
+                            EditorStepper(stringResource(R.string.emulation_controls_editor_percent, selectedScalePercent),
+                                onSizeDecrease, onSizeIncrease, minusEnabled = selectedScalePercent > 35, plusEnabled = selectedScalePercent < 250)
+                            if (showDimensions) {
+                                EditorStepper(stringResource(R.string.emulation_controls_editor_width) + " $touchAreaWidthPercent%",
+                                    onTouchAreaWidthDecrease, onTouchAreaWidthIncrease, minusEnabled = touchAreaWidthPercent > 50, plusEnabled = touchAreaWidthPercent < 300)
+                                EditorStepper(stringResource(R.string.emulation_controls_editor_height) + " $touchAreaHeightPercent%",
+                                    onTouchAreaHeightDecrease, onTouchAreaHeightIncrease, Modifier.testTag("controls_editor_height_row"),
+                                    minusEnabled = touchAreaHeightPercent > 50, plusEnabled = touchAreaHeightPercent < 300)
+                            }
+                            EditorStepper(stringResource(R.string.controls_editor_opacity_value, selectedOpacityPercent),
+                                onOpacityDecrease, onOpacityIncrease,
+                                minusEnabled = selectedOpacityPercent > CONTROL_OPACITY_MIN,
+                                plusEnabled = selectedOpacityPercent < CONTROL_OPACITY_MAX)
                         }
                     }
-                    if (groupSelected) {
-                        EditorStepper(stringResource(R.string.emulation_controls_editor_percent, groupScalePercent),
-                            onGroupScaleDecrease, onGroupScaleIncrease,
-                            minusEnabled = groupScalePercent > GROUP_SCALE_MIN_PERCENT,
-                            plusEnabled = groupScalePercent < GROUP_SCALE_MAX_PERCENT)
-                    } else {
-                        EditorStepper(stringResource(R.string.emulation_controls_editor_percent, selectedScalePercent),
-                            onSizeDecrease, onSizeIncrease, minusEnabled = selectedScalePercent > 35, plusEnabled = selectedScalePercent < 250)
-                        if (showDimensions) {
-                            EditorStepper(stringResource(R.string.emulation_controls_editor_width) + " $touchAreaWidthPercent%",
-                                onTouchAreaWidthDecrease, onTouchAreaWidthIncrease, minusEnabled = touchAreaWidthPercent > 50, plusEnabled = touchAreaWidthPercent < 300)
-                            EditorStepper(stringResource(R.string.emulation_controls_editor_height) + " $touchAreaHeightPercent%",
-                                onTouchAreaHeightDecrease, onTouchAreaHeightIncrease, Modifier.testTag("controls_editor_height_row"),
-                                minusEnabled = touchAreaHeightPercent > 50, plusEnabled = touchAreaHeightPercent < 300)
-                        }
-                        EditorStepper(stringResource(R.string.controls_editor_opacity_value, selectedOpacityPercent),
-                            onOpacityDecrease, onOpacityIncrease,
-                            minusEnabled = selectedOpacityPercent > CONTROL_OPACITY_MIN,
-                            plusEnabled = selectedOpacityPercent < CONTROL_OPACITY_MAX)
-                    }
                 }
-            }
-        } else if (canCombo) {
-            Surface(color = Color(0xFF111827).copy(alpha = .82f), shape = neonShape(16.dp)) {
-                Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onCombo, modifier = Modifier.testTag("controls_editor_combo"), shape = neonShape(14.dp),
-                        colors = editorButtonColors()) { Text(stringResource(R.string.controls_editor_combo)) }
-                    if (canDelete) {
-                        EditorTool(Icons.Rounded.Delete, stringResource(R.string.controls_editor_delete), "delete", { confirmDelete = true })
+            } else if (canCombo) {
+                Surface(color = Color(0xFF111827).copy(alpha = .82f), shape = neonShape(16.dp)) {
+                    Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onCombo, modifier = Modifier.testTag("controls_editor_combo"), shape = neonShape(14.dp),
+                            colors = editorButtonColors()) { Text(stringResource(R.string.controls_editor_combo)) }
+                        if (canDelete) {
+                            EditorTool(Icons.Rounded.Delete, stringResource(R.string.controls_editor_delete), "delete", { confirmDelete = true })
+                        }
                     }
                 }
             }
         }
-    }
-    if (confirmDelete && canDelete) {
-        AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text(stringResource(R.string.controls_editor_delete)) },
-            text = { Text(selectedLabel) }, confirmButton = {
-                TextButton(onClick = { confirmDelete = false; onDelete() }, modifier = Modifier.testTag("controls_editor_confirm_delete_custom")) {
-                    Text(stringResource(R.string.controls_editor_delete))
-                }
-            }, dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(android.R.string.cancel)) } })
+        if (confirmDelete && canDelete) {
+            AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text(stringResource(R.string.controls_editor_delete)) },
+                text = { Text(selectedLabel) }, confirmButton = {
+                    TextButton(onClick = { confirmDelete = false; onDelete() }, modifier = Modifier.testTag("controls_editor_confirm_delete_custom")) {
+                        Text(stringResource(R.string.controls_editor_delete))
+                    }
+                }, dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(android.R.string.cancel)) } })
+        }
     }
 }
 
@@ -175,3 +178,28 @@ private fun EditorStepper(value: String, onMinus: () -> Unit, onPlus: () -> Unit
         }
     }
 }
+
+private fun touchControlEditorColorScheme() = androidx.compose.material3.darkColorScheme(
+    primary = Color(0xFF7C9BFF),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF3565FF),
+    onPrimaryContainer = Color.White,
+    secondary = Color(0xFF9DB3FF),
+    onSecondary = Color(0xFF0D1424),
+    secondaryContainer = Color(0xFF3565FF),
+    onSecondaryContainer = Color.White,
+    tertiary = Color(0xFF86D7FF),
+    onTertiary = Color(0xFF0D1424),
+    background = Color(0xFF0D1424),
+    onBackground = Color.White,
+    surface = Color(0xFF111827),
+    onSurface = Color.White,
+    surfaceVariant = Color(0xFF1E293B),
+    onSurfaceVariant = Color.White.copy(alpha = 0.74f),
+    surfaceContainerLowest = Color(0xFF0A101C),
+    surfaceContainerLow = Color(0xFF0F1626),
+    surfaceContainer = Color(0xFF141C2E),
+    surfaceContainerHigh = Color(0xFF1A2338),
+    surfaceContainerHighest = Color(0xFF212B42),
+    outline = Color.White.copy(alpha = 0.34f)
+)
