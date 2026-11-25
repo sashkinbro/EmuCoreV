@@ -772,8 +772,6 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             { VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME, &temp_bool },
             { VK_KHR_MULTIVIEW_EXTENSION_NAME, &temp_bool },
             { VK_KHR_MAINTENANCE_2_EXTENSION_NAME, &temp_bool },
-            // eMirrorClampToEdge sampler address mode (no feature bit, the extension is the enable)
-            { VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME, &temp_bool },
 #ifdef __APPLE__
             // Needed to create the MoltenVK device
             { vk::KHRPortabilitySubsetExtensionName, &temp_bool },
