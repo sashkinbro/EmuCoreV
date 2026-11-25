@@ -147,7 +147,8 @@ bool schema(const CommandSnapshot &s, size_t &size, std::string &error) {
                 && read<int32_t>(s.data.data(), h + 5) >= 0
                 && read<int32_t>(s.data.data(), h + 5) < SCE_GXM_REAL_MAX_UNIFORM_BUFFER; break;
         case GXMState::VisibilityBuffer: size = h + 8; break;
-        case GXMState::VisibilityIndex: size = h + 6; valid = boolean(h + 4) && boolean(h + 5); break;
+        case GXMState::VisibilityIndex:
+        case GXMState::VisibilityIndexBack: size = h + 6; valid = boolean(h + 4) && boolean(h + 5); break;
         default: valid = false; size = 0; break;
         }
         break;

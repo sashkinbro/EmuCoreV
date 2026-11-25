@@ -107,8 +107,6 @@ static bool surface_sync_needs_se5_repack(const ColorSurfaceCacheInfo &surface) 
     return surface.format == SCE_GXM_COLOR_BASE_FORMAT_SE5M9M9M9 && surface.texture.format == vk::Format::eR16G16B16A16Sfloat;
 }
 
-static bool protect_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
-    const bool trap_reads = (info.tiling == SurfaceTiling::Linear
 // host format != guest layout for the fallback formats of the colour format model (P7), see colourmodel::Repack
 static colourmodel::Repack surface_fallback_repack(const ColorSurfaceCacheInfo &surface) {
     const colourmodel::Repack r = colourmodel::repack_for(surface.format, surface.texture.format);
@@ -128,6 +126,8 @@ static bool surface_sync_needs_cpu_repack(const ColorSurfaceCacheInfo &surface) 
         || surface_fallback_repack(surface) != colourmodel::Repack::None;
 }
 
+static bool protect_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
+    const bool trap_reads = (info.tiling == SurfaceTiling::Linear
         && format_support_surface_sync(info.format));
 
     // Every surface, whatever its size, is trapped over the whole page span that covers its bytes
@@ -3172,6 +3172,21 @@ void VKSurfaceCache::perform_post_surface_sync(const MemState &mem, ColorSurface
         return;
     }
 
+    if (const colourmodel::Repack fallback = surface_fallback_repack(*surface); fallback != colourmodel::Repack::None) {
+        const uint32_t guest_bpp = gxm::bits_per_pixel(surface->format) / 8;
+        if (colourmodel::host_to_guest_extra(fallback, pixels, static_cast<const uint8_t *>(surface->copy_buffer->mapped_data), pixel_stride * surface->original_height, guest_bpp)) {
+            // component swizzles of the plain component formats are applied on the guest data after the repack
+            const bool identity = surface->swizzle.r == vk::ComponentSwizzle::eR;
+            if (!identity && (fallback == colourmodel::Repack::Unorm16_F32 || fallback == colourmodel::Repack::Snorm16_F32))
+                swizzle_text_T<uint16_t>(reinterpret_cast<uint16_t *>(pixels), nb_pixels, surface);
+            else if (!identity && fallback == colourmodel::Repack::Snorm8_F16)
+                swizzle_text_T<uint8_t>(pixels, nb_pixels, surface);
+            else if (!identity && fallback == colourmodel::Repack::F32_F16)
+                swizzle_text_T<uint32_t>(reinterpret_cast<uint32_t *>(pixels), nb_pixels, surface);
+        }
+        return;
+    }
+
     if (format_need_additional_memory(surface->format)) {
         // special case, use a custom function
         const bool is_swizzle_identity = surface->swizzle.r == vk::ComponentSwizzle::eR;
@@ -3329,21 +3344,6 @@ std::vector<uint32_t> VKSurfaceCache::dump_frame(Ptr<const void> address, uint32
 void VKSurfaceCache::ensure_reinterpret_pipeline() {
     if (reinterpret_pipeline)
         return;
-    if (const colourmodel::Repack fallback = surface_fallback_repack(*surface); fallback != colourmodel::Repack::None) {
-        const uint32_t guest_bpp = gxm::bits_per_pixel(surface->format) / 8;
-        if (colourmodel::host_to_guest_extra(fallback, pixels, static_cast<const uint8_t *>(surface->copy_buffer->mapped_data), pixel_stride * surface->original_height, guest_bpp)) {
-            // component swizzles of the plain component formats are applied on the guest data after the repack
-            const bool identity = surface->swizzle.r == vk::ComponentSwizzle::eR;
-            if (!identity && (fallback == colourmodel::Repack::Unorm16_F32 || fallback == colourmodel::Repack::Snorm16_F32))
-                swizzle_text_T<uint16_t>(reinterpret_cast<uint16_t *>(pixels), nb_pixels, surface);
-            else if (!identity && fallback == colourmodel::Repack::Snorm8_F16)
-                swizzle_text_T<uint8_t>(pixels, nb_pixels, surface);
-            else if (!identity && fallback == colourmodel::Repack::F32_F16)
-                swizzle_text_T<uint32_t>(reinterpret_cast<uint32_t *>(pixels), nb_pixels, surface);
-        }
-        return;
-    }
-
 
     const fs::path shader_path = state.static_assets / "shaders-builtin/vulkan" / "surface_cast_reinterpret.comp.spv";
     reinterpret_shader = vkutil::load_shader(state.device, shader_path);

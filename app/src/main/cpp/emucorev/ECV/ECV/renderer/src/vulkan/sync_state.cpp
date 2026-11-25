@@ -247,54 +247,52 @@ void sync_visibility_buffer(VKContext &context, Ptr<uint32_t> buffer, uint32_t s
         return;
     }
 
+    const uint32_t entries = stride / sizeof(uint32_t);
+    const uint32_t pool_size = entries + visibility::spare_slots;
     auto ite = context.visibility_buffers.find(buffer.address());
+    if (ite != context.visibility_buffers.end() && ite->second.pool_size < pool_size) {
+        // the guest uses a bigger buffer at the same address: the old pool cannot be destroyed under queued work
+        if (ite->second.scene.empty()) {
+            if (context.is_in_query && context.current_visibility_buffer == &ite->second) {
+                context.render_cmd.endQuery(ite->second.query_pool, context.running_query_slot);
+                context.is_in_query = false;
+            }
+            context.retired_query_pools.push_back(ite->second.query_pool);
+            context.visibility_buffers.erase(ite);
+            ite = context.visibility_buffers.end();
+            context.current_visibility_buffer = nullptr;
+        } else {
+            LOG_WARN_ONCE("Visibility buffer at {} grows in the middle of a scene: keeping its size until the scene ends", log_hex(buffer.address()));
+        }
+    }
     if (ite == context.visibility_buffers.end()) {
         vk::QueryPoolCreateInfo pool_info{
             .queryType = vk::QueryType::eOcclusion,
-            .queryCount = static_cast<uint32_t>(stride / sizeof(uint32_t))
+            .queryCount = pool_size
         };
         vk::QueryPool query_pool = context.state.device.createQueryPool(pool_info);
-
-        context.visibility_buffers[buffer.address()] = { buffer.address(), nullptr, 0, static_cast<uint32_t>(stride / sizeof(uint32_t)), query_pool };
-        ite = context.visibility_buffers.find(buffer.address());
-
-        std::tie(ite->second.gpu_buffer, ite->second.buffer_offset) = context.state.get_matching_mapping(buffer.cast<void>());
-        // the + 1 is to make computing the ranges easier in context.cpp
-        ite->second.queries_used.resize(ite->second.size + 1, false);
+        ite = context.visibility_buffers.insert_or_assign(buffer.address(), VisibilityBuffer{ buffer.address(), entries, query_pool, pool_size, {} }).first;
+    } else {
+        // same pool, the guest may use a smaller or equal range of it
+        ite->second.size = std::min(entries, ite->second.pool_size - visibility::spare_slots);
     }
 
+    if (context.is_in_query && context.current_visibility_buffer != &ite->second) {
+        context.render_cmd.endQuery(context.current_visibility_buffer->query_pool, context.running_query_slot);
+        context.is_in_query = false;
+    }
     context.current_visibility_buffer = &ite->second;
 }
 
+// Both faces only store their state here: a query is begun (and ended) by the draws, see activate_visibility in scene.cpp
 void sync_visibility_index(VKContext &context, bool enable, uint32_t index, bool is_increment) {
-    if (context.current_visibility_buffer == nullptr) {
-        context.current_query_idx = enable ? index : -1;
-        context.is_query_op_increment = is_increment;
-        return;
-    }
-
-    if (index >= context.current_visibility_buffer->size) {
-        LOG_WARN_ONCE("Using visibility index {} which is too big for the buffer", index);
-        index = 0;
-    }
-
-    if (!enable) {
-        if (context.is_in_query) {
-            context.render_cmd.endQuery(context.current_visibility_buffer->query_pool, context.current_query_idx);
-            context.is_in_query = false;
-        }
-
-        context.current_query_idx = -1;
-        return;
-    }
-
-    // do not end the query if it's the same index
-    if (context.is_in_query && context.current_query_idx != index) {
-        context.render_cmd.endQuery(context.current_visibility_buffer->query_pool, context.current_query_idx);
-        context.is_in_query = false;
-    }
-    context.current_query_idx = index;
+    context.current_query_idx = enable ? static_cast<int>(index) : -1;
     context.is_query_op_increment = is_increment;
+}
+
+void sync_visibility_index_back(VKContext &context, bool enable, uint32_t index, bool is_increment) {
+    context.back_query_idx = enable ? static_cast<int>(index) : -1;
+    context.back_query_op_increment = is_increment;
 }
 
 void refresh_pipeline(VKContext &context) {

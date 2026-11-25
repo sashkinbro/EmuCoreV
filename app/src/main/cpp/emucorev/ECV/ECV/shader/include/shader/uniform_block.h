@@ -44,13 +44,13 @@ struct RenderFragUniformBlock {
     float inv_frag_height = 1.0f;
     float raw_cast_mask = 0.0f;
     float iterator_written_mask = 16777215.0f;
-};
-
     // 1 when the colour surface has its dither bit set (only read by shaders writing a surface with less than 8 bits per channel)
     float dither_enabled = 0.0f;
     // point sprite coordinate modes of the polygon mode (1: that axis runs from 1 to 0)
     float point_flip_u = 0.0f;
     float point_flip_v = 0.0f;
+};
+
 enum FragUniformFieldId : uint32_t {
     FRAG_UNIFORM_back_disabled,
     FRAG_UNIFORM_front_disabled,

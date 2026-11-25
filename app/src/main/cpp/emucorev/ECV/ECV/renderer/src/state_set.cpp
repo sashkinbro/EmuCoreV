@@ -589,6 +589,17 @@ COMMAND_SET_STATE(visibility_index) {
     }
 }
 
+COMMAND_SET_STATE(visibility_index_back) {
+    TRACY_FUNC_COMMANDS_SET_STATE(visibility_index_back);
+    const uint32_t index = helper.pop<uint32_t>();
+    const bool enable = helper.pop<bool>();
+    const bool is_increment = helper.pop<bool>();
+
+    if (renderer.current_backend == Backend::Vulkan) {
+        vulkan::sync_visibility_index_back(*reinterpret_cast<vulkan::VKContext *>(render_context), enable, index, is_increment);
+    }
+}
+
 COMMAND(handle_set_state) {
     // TRACY_FUNC_COMMANDS(handle_set_state); All set state commands have tracy so kinda redundant
     renderer::GXMState gxm_state_to_set = helper.pop<renderer::GXMState>();
@@ -612,7 +623,8 @@ COMMAND(handle_set_state) {
         { GXMState::UniformBuffer, cmd_set_state_uniform_buffer },
         { GXMState::FragmentProgramEnable, cmd_set_state_fragment_program_enable },
         { GXMState::VisibilityBuffer, cmd_set_state_visibility_buffer },
-        { GXMState::VisibilityIndex, cmd_set_state_visibility_index }
+        { GXMState::VisibilityIndex, cmd_set_state_visibility_index },
+        { GXMState::VisibilityIndexBack, cmd_set_state_visibility_index_back }
     };
 
     static const std::array<StateChangeHandlerFunc *, static_cast<size_t>(GXMState::TotalState)> handler_table = [&]() {

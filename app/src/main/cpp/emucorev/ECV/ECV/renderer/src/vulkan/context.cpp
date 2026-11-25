@@ -28,6 +28,7 @@
 
 #include <cpu/functions.h>
 #include <gxm/functions.h>
+#include <mem/functions.h>
 #include <renderer/functions.h>
 
 #include <util/log.h>
@@ -40,6 +41,8 @@
 
 #include <algorithm>
 #include <limits>
+#include <memory>
+#include <shared_mutex>
 
 #if ECV_ORACLE
 #include <ecv_gpu_trace.h>
@@ -48,6 +51,24 @@
 #endif
 
 namespace renderer::vulkan {
+
+// The GPU has finished the scene: add the slot results up per entry and write the entries into the guest buffer.
+// The same path with and without memory mapping (no copy into mapped memory is needed).
+static void resolve_visibility(const MemState &mem, VisibilityResolve &resolve) {
+    const auto values = visibility::resolve(resolve.activations, static_cast<const uint32_t *>(resolve.staging.mapped_data));
+    {
+        const std::shared_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
+        renderer::vulkan::surface_sync_internal_write = true;
+        for (const visibility::EntryValue &v : values) {
+            const uint64_t address = static_cast<uint64_t>(resolve.address) + static_cast<uint64_t>(v.entry) * sizeof(uint32_t);
+            if (address + sizeof(uint32_t) > std::numeric_limits<Address>::max() || !is_valid_addr_range(mem, static_cast<Address>(address), static_cast<Address>(address + sizeof(uint32_t))))
+                continue;
+            *Ptr<uint32_t>(static_cast<Address>(address)).get(mem) = v.value;
+        }
+        renderer::vulkan::surface_sync_internal_write = false;
+    }
+    resolve.staging.destroy();
+}
 
 void VKContext::wait_thread_function(const MemState &mem) {
     const ActiveGpuRequestReader active_reader(state.gpu_request_reader_count);
@@ -191,6 +212,10 @@ void VKContext::wait_thread_body(const MemState &mem) {
                            renderer::vulkan::surface_sync_internal_write = false;
                            if (!copied)
                                LOG_ERROR("Invalid row layout in Buffer Sync request at {}", log_hex(request.location));
+                       },
+                       [&](VisibilityResolveRequest &request) {
+                           wait_for_fences();
+                           resolve_visibility(mem, *request.resolve);
                        },
                        [&](PostSurfaceSyncRequest &request) {
                            wait_for_fences();
@@ -1070,7 +1095,7 @@ void VKContext::stop_render_pass(bool scene_end) {
 
     // do this before ending the secondary command buffer
     if (is_in_query) {
-        render_cmd.endQuery(current_visibility_buffer->query_pool, current_query_idx);
+        render_cmd.endQuery(current_visibility_buffer->query_pool, running_query_slot);
         is_in_query = false;
     }
 
@@ -1109,41 +1134,25 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
     if (in_renderpass)
         stop_render_pass(scene_end);
 
-    struct VisibilityRange {
-        uint32_t offset;
-        uint32_t size;
-    };
-    std::vector<VisibilityRange> occlusion_ranges;
+    // the visibility queries of this scene: reset before the render pass, copy the slots to a host readable buffer at its end
     if (visibility_max_used_idx != -1) {
-        // get all the entry ranges that were used
-        bool in_range = false;
-        uint32_t range_start = 0;
-        for (uint32_t entry = 0; entry <= visibility_max_used_idx + 1; entry++) {
-            if (current_visibility_buffer->queries_used[entry] == in_range)
+        for (auto &[address, vb] : visibility_buffers) {
+            if (vb.scene.empty())
                 continue;
+            const uint32_t slots = vb.scene.slots();
+            auto resolve = std::make_shared<VisibilityResolve>();
+            resolve->address = vb.address;
+            resolve->activations = std::move(vb.scene.activations);
+            vb.scene.activations.clear();
+            resolve->staging.size = static_cast<vk::DeviceSize>(slots) * sizeof(uint32_t);
+            resolve->staging.init_buffer(vk::BufferUsageFlagBits::eTransferDst, vkutil::vma_readback_alloc);
 
-            if (in_range) {
-                occlusion_ranges.push_back({ range_start, entry - range_start });
-                in_range = false;
-            } else {
-                range_start = entry;
-                in_range = true;
-            }
-        }
-
-        for (auto &range : occlusion_ranges) {
-            // reset before the beginning of the render pass
-            prerender_cmd.resetQueryPool(current_visibility_buffer->query_pool, range.offset, range.size);
-
-            // wait for the range at the end
+            prerender_cmd.resetQueryPool(vb.query_pool, 0, slots);
             // TODO: this will be wrong with upscaling enabled and precise mode set
-            render_cmd.copyQueryPoolResults(current_visibility_buffer->query_pool, range.offset, range.size,
-                current_visibility_buffer->gpu_buffer, current_visibility_buffer->buffer_offset + range.offset * sizeof(uint32_t),
-                sizeof(uint32_t), vk::QueryResultFlagBits::eWait);
+            render_cmd.copyQueryPoolResults(vb.query_pool, 0, slots, resolve->staging.buffer, 0, sizeof(uint32_t), vk::QueryResultFlagBits::eWait);
+            pending_visibility.push_back(std::move(resolve));
         }
         visibility_max_used_idx = -1;
-        // The range builder reads one false sentinel after the final query.
-        current_visibility_buffer->queries_used.assign(current_visibility_buffer->size + 1, false);
     }
 
     // remember which part of the colour surface this scene's draws could have touched (for write-back bounds)
@@ -1209,22 +1218,28 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
     cmdbuffers_to_submit.clear();
     state.frame().rendered_fences.push_back(fence);
 
+    if (!state.features.enable_memory_mapping && !pending_visibility.empty()) {
+        // no wait thread without memory mapping: wait for this scene and write the entries right here
+        const vk::Result wait_result = state.device.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+        if (wait_result == vk::Result::eSuccess) {
+            for (auto &resolve : pending_visibility)
+                resolve_visibility(mem, *resolve);
+        } else {
+            for (auto &resolve : pending_visibility)
+                resolve->staging.destroy();
+        }
+        pending_visibility.clear();
+    }
+
     if (state.features.enable_memory_mapping) {
         // send it to the wait queue
         state.request_queue.push(FenceWaitRequest{ fence, timeline_value });
 
-        if (state.mapping_method == MappingMethod::DoubleBuffer) {
-            // sync all the visibility buffers
-            for (auto &range : occlusion_ranges) {
-#if ECV_ORACLE
-                if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_UB_CHECK))
-                    ecv::oracle::gpu::vis_note(current_visibility_buffer->address + range.offset * 4, range.size * 4);
-                if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_NO_VIS_SYNC))
-                    continue;
-#endif
-                state.request_queue.push(BufferSyncRequest{ current_visibility_buffer->address + range.offset * 4, range.size * 4 });
-            }
+        for (auto &resolve : pending_visibility)
+            state.request_queue.push(VisibilityResolveRequest{ std::move(resolve) });
+        pending_visibility.clear();
 
+        if (state.mapping_method == MappingMethod::DoubleBuffer) {
             // we must sync the two buffers
             if (surface_info && surface_info->need_buffer_sync) {
                 const bool partial_sync = surface_info->partial_write_back

@@ -165,8 +165,6 @@ static bool is_u8_alpha_color_surface(const TranslationState &state) {
     return state.hints->color_format == SCE_GXM_COLOR_FORMAT_U8_A;
 }
 
-static spv::Id alpha_surface_to_shader_color(spv::Builder &b, const spv::Id color) {
-    // Host R8 reads (R, 0, 0, 1); GXM A8 exposes (0, 0, 0, R).
 // GXM dithers the colour written to a surface with less than 8 bits per channel when the surface's dither bit is set.
 // The exact hardware pattern is not recovered: PROVISIONAL ordered 4x4 Bayer dither of one quantisation step of the
 // channel, applied before the (host) quantisation. Formats of 8 bits and more emit no code at all.
@@ -218,6 +216,8 @@ static spv::Id apply_surface_dither(spv::Builder &b, const TranslationState &sta
     return b.createBinOp(spv::OpFAdd, v4, color, b.createBinOp(spv::OpFMul, v4, noise4, amp4));
 }
 
+static spv::Id alpha_surface_to_shader_color(spv::Builder &b, const spv::Id color) {
+    // Host R8 reads (R, 0, 0, 1); GXM A8 exposes (0, 0, 0, R).
     return b.createOp(spv::OpVectorShuffle, b.getTypeId(color), { { true, color }, { true, color }, { false, 1 }, { false, 2 }, { false, 1 }, { false, 0 } });
 }
 
@@ -1385,6 +1385,9 @@ static SpirvShaderParameters create_parameters(spv::Builder &b, const SceGxmProg
         ADD_FRAG_UNIFORM_MEMBER(inv_frag_height);
         ADD_FRAG_UNIFORM_MEMBER(raw_cast_mask);
         ADD_FRAG_UNIFORM_MEMBER(iterator_written_mask);
+        ADD_FRAG_UNIFORM_MEMBER(dither_enabled);
+        ADD_FRAG_UNIFORM_MEMBER(point_flip_u);
+        ADD_FRAG_UNIFORM_MEMBER(point_flip_v);
 
 #undef ADD_FRAG_UNIFORM_MEMBER
         // the resolution multiplier does not require a high precision
@@ -1819,6 +1822,8 @@ static spv::Function *make_frag_finalize_function(spv::Builder &b, const SpirvSh
     if (is_u8_alpha_color_surface(translate_state))
         color = shader_color_to_alpha_surface(b, color);
 
+    color = apply_surface_dither(b, translate_state, color);
+
     if (program.is_frag_color_used() && features.should_use_shader_interlock()) {
         spv::Id signed_i32 = b.makeIntType(32);
         spv::Id coord_id = b.createLoad(translate_state.frag_coord_id, spv::NoPrecision);
@@ -1827,8 +1832,6 @@ static spv::Function *make_frag_finalize_function(spv::Builder &b, const SpirvSh
 
         if (translate_state.is_vulkan) {
             spv::Id old_color = color;
-    color = apply_surface_dither(b, translate_state, color);
-
             // if (is_srgb)
             spv::Builder::If cond_builder(parameters.is_srgb_constant, spv::SelectionControlMaskNone, b);
 
@@ -2174,9 +2177,8 @@ static spv::Function *make_vert_finalize_function(spv::Builder &b, const SpirvSh
         }
     }
 
-    b.makeReturn(false);
-    b.setBuildPoint(last_build_point);
-
+    // A program without PSIZE gets the size of the point width register (a Vulkan point of unwritten size is undefined)
+    if (translation_state.is_vulkan && !(vertex_outputs & SCE_GXM_VERTEX_PROGRAM_OUTPUT_PSIZE)) {
         const spv::Id point_size_var = b.createVariable(spv::NoPrecision, spv::StorageClassOutput, b.makeFloatType(32), "gl_PointSize");
         b.addDecoration(point_size_var, spv::DecorationBuiltIn, spv::BuiltInPointSize);
         translation_state.interfaces.push_back(point_size_var);
@@ -2184,13 +2186,14 @@ static spv::Function *make_vert_finalize_function(spv::Builder &b, const SpirvSh
         b.createStore(b.createLoad(size_ptr, spv::NoPrecision), point_size_var);
     }
 
+    b.makeReturn(false);
+    b.setBuildPoint(last_build_point);
+
     return vert_fin_func;
 }
 
 static spv::Function *make_frag_initialize_function(spv::Builder &b, TranslationState &translate_state) {
     std::vector<std::vector<spv::Decoration>> decorations;
-    // A program without PSIZE gets the size of the point width register (a Vulkan point of unwritten size is undefined)
-    if (translation_state.is_vulkan && !(vertex_outputs & SCE_GXM_VERTEX_PROGRAM_OUTPUT_PSIZE)) {
 
     spv::Block *frag_init_block;
     spv::Block *last_build_point = b.getBuildPoint();
@@ -2226,9 +2229,6 @@ static spv::Function *make_frag_initialize_function(spv::Builder &b, Translation
     b.makeStatementTerminator(spv::OpKill, "kill");
     back_disabled_cond_builder.makeEndIf();
 
-    b.makeReturn(false);
-    b.setBuildPoint(last_build_point);
-
     if (translate_state.point_coord_input_id != spv::NoResult && translate_state.point_coord_private_id != spv::NoResult) {
         // x' = x + flip * (1 - 2x) per axis: PROVISIONAL point sprite coordinate modes of the polygon mode (raster_model.h)
         const spv::Id f32 = b.makeFloatType(32);
@@ -2243,6 +2243,9 @@ static spv::Function *make_frag_initialize_function(spv::Builder &b, Translation
         };
         b.createStore(b.createCompositeConstruct(v2, { flipped(0, flip_u), flipped(1, flip_v) }), translate_state.point_coord_private_id);
     }
+
+    b.makeReturn(false);
+    b.setBuildPoint(last_build_point);
 
     return frag_init_func;
 }

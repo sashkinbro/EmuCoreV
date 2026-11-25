@@ -23,6 +23,7 @@
 #include <renderer/types.h>
 #include <renderer/vulkan/depth_stencil_model.h>
 #include <renderer/vulkan/raster_model.h>
+#include <renderer/vulkan/visibility_model.h>
 #include <shader/uniform_block.h>
 #include <renderer/vulkan/frame_command_buffer_cursor.h>
 #include <renderer/vulkan/yuv_convert.h>
@@ -198,11 +199,22 @@ struct BufferTrapping {
 // Use vulkan queries to implement visibility buffer
 struct VisibilityBuffer {
     Address address;
-    vk::Buffer gpu_buffer;
-    uint64_t buffer_offset;
-    uint32_t size;
+    uint32_t size; // entries of the guest buffer
     vk::QueryPool query_pool;
-    std::vector<bool> queries_used; // the queries that were used in the current scene
+    uint32_t pool_size; // query slots of the pool: one per entry plus visibility::spare_slots
+    visibility::SceneQueries scene; // the queries begun in the current scene
+};
+
+// The slot results of one scene (copied to a host readable buffer) and what they mean; the entries are written to guest memory
+// once the GPU has finished (wait thread, or inline without a wait thread).
+struct VisibilityResolve {
+    Address address = 0;
+    std::vector<visibility::Activation> activations;
+    vkutil::Buffer staging;
+};
+
+struct VisibilityResolveRequest {
+    std::shared_ptr<VisibilityResolve> resolve;
 };
 
 struct FenceWaitRequest {
@@ -257,6 +269,7 @@ typedef std::variant<
     NotificationRequest,
     FrameDoneRequest,
     BufferSyncRequest,
+    VisibilityResolveRequest,
     PostSurfaceSyncRequest,
     SyncSignalRequest,
     CallbackRequest>
@@ -316,7 +329,18 @@ struct VKContext : public renderer::Context {
     int visibility_max_used_idx = -1;
     bool is_in_query = false;
     int current_query_idx = -1;
+    // region clip INSIDE: the rectangles outside the region, one draw per rectangle (count 0 for the other modes)
+    raster::Strips inside_clip;
     bool is_query_op_increment = false;
+    // back face visibility state (current_query_idx / is_query_op_increment are the front face ones); -1: disabled
+    int back_query_idx = -1;
+    bool back_query_op_increment = false;
+    // the query running right now (face state and slot of the pool of current_visibility_buffer)
+    visibility::Face running_query_face;
+    int running_query_slot = -1;
+    // resolves of the scene segments recorded but not submitted yet
+    std::vector<std::shared_ptr<VisibilityResolve>> pending_visibility;
+    std::vector<vk::QueryPool> retired_query_pools; // replaced by a bigger pool, destroyed with the context
 
     // descriptor pool for dynamic uniforms (allocated once for the whole game)
     vk::DescriptorPool global_descriptor_pool;
@@ -329,9 +353,7 @@ struct VKContext : public renderer::Context {
     vk::DescriptorSet rendertarget_set;
 
     uint16_t last_vert_texture_count = ~0;
-    raster::Strips inside_clip;
     vk::DescriptorSet last_vert_texture_descriptor;
-    // region clip INSIDE: the rectangles outside the region, one draw per rectangle (count 0 for the other modes)
     uint16_t last_frag_texture_count = ~0;
     vk::DescriptorSet last_frag_texture_descriptor;
 

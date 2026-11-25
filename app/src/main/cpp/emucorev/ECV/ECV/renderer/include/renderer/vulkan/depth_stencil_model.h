@@ -11,6 +11,7 @@
 #pragma once
 
 #include <gxm/types.h>
+#include <renderer/vulkan/visibility_model.h>
 
 // vkutil.h sets the vulkan.hpp configuration macros and platform defines before including it: never include vulkan.hpp first
 #include <vkutil/vkutil.h>
@@ -197,6 +198,7 @@ struct FaceState {
     SceGxmPolygonMode polygon_mode = SCE_GXM_POLYGON_MODE_TRIANGLE_FILL;
     SceGxmFragmentProgramMode fragment_mode = SCE_GXM_FRAGMENT_PROGRAM_ENABLED;
     DepthBias bias;
+    visibility::Face visibility; // a draw counts into the entry of the face it hits (P8)
     bool operator==(const FaceState &) const = default;
 };
 

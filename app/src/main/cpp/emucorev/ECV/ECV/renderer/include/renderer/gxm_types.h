@@ -282,6 +282,9 @@ struct GxmContextState {
     bool visibility_enable = false;
     uint32_t visibility_index;
     bool visibility_is_increment = false;
+    bool visibility_back_enable = false;
+    uint32_t visibility_back_index = 0;
+    bool visibility_back_is_increment = false;
 
     bool active = false;
 };

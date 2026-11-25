@@ -160,6 +160,11 @@ VKContext::~VKContext() {
     for (auto &[addr, vb] : visibility_buffers)
         state.device.destroy(vb.query_pool);
     visibility_buffers.clear();
+    for (const vk::QueryPool pool : retired_query_pools)
+        state.device.destroy(pool);
+    for (auto &resolve : pending_visibility)
+        resolve->staging.destroy();
+    pending_visibility.clear();
 
     state.device.destroy(global_descriptor_pool);
     global_descriptor_pool = nullptr;

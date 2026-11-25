@@ -448,6 +448,35 @@ static bool bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
 }
 
 // Begin or end the occlusion query so that the next draw counts into the entry of the face it hits (P8). Every activation
+// takes a fresh slot of the pool: a slot must not be begun twice between resets, and the CPU adds the slots of an entry up.
+static void activate_visibility(VKContext &context, const bool is_back) {
+    VisibilityBuffer *buffer = context.current_visibility_buffer;
+    const visibility::Face front{ context.current_query_idx, context.is_query_op_increment };
+    const visibility::Face back{ context.back_query_idx, context.back_query_op_increment };
+    const visibility::Face &face = visibility::effective_face(front, back, is_back, context.record.two_sided == SCE_GXM_TWO_SIDED_ENABLED);
+    const bool wanted = buffer != nullptr && face.enabled();
+
+    if (context.is_in_query && (!wanted || !(context.running_query_face == face))) {
+        context.render_cmd.endQuery(buffer->query_pool, context.running_query_slot);
+        context.is_in_query = false;
+    }
+    if (!wanted || context.is_in_query)
+        return;
+
+    const int32_t slot = buffer->scene.begin(static_cast<uint32_t>(face.index), face.increment, buffer->size, buffer->pool_size);
+    if (slot < 0) {
+        LOG_WARN_ONCE("Visibility entry {} is outside the buffer ({} entries) or the query pool is exhausted: not counted", face.index, buffer->size);
+        return;
+    }
+    context.visibility_max_used_idx = slot;
+    const vk::QueryControlFlags control_flags = (face.increment && context.state.physical_device_features.occlusionQueryPrecise) ? vk::QueryControlFlagBits::ePrecise : vk::QueryControlFlags();
+    context.render_cmd.beginQuery(buffer->query_pool, static_cast<uint32_t>(slot), control_flags);
+    context.is_in_query = true;
+    context.instance_queries++;
+    context.running_query_face = face;
+    context.running_query_slot = slot;
+}
+
 void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format,
     Ptr<void> indices, size_t count, uint32_t instance_count, MemState &mem, const Config &config) {
 #if ECV_ORACLE
@@ -669,21 +698,6 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         context.last_draw_was_framebuffer_fetch = fragment_program_gxp.is_frag_color_used();
     }
 
-    if (context.current_visibility_buffer != nullptr && context.current_query_idx != -1 && !context.is_in_query) {
-        if (context.current_visibility_buffer->queries_used[context.current_query_idx]) {
-            LOG_WARN_ONCE("Visibility buffer entry is used more than once in a scene");
-            // still let this happen, this is a validation error but I think most GPUs should be fine with it
-        }
-        context.current_visibility_buffer->queries_used[context.current_query_idx] = true;
-
-        context.visibility_max_used_idx = std::max(context.visibility_max_used_idx, context.current_query_idx);
-
-        const vk::QueryControlFlags control_flags = (context.is_query_op_increment && context.state.physical_device_features.occlusionQueryPrecise) ? vk::QueryControlFlagBits::ePrecise : vk::QueryControlFlags();
-        context.render_cmd.beginQuery(context.current_visibility_buffer->query_pool, context.current_query_idx, control_flags);
-        context.is_in_query = true;
-        context.instance_queries++;
-    }
-
     // do we need to check for a pipeline change?
     if (context.refresh_pipeline || type != context.last_primitive) {
         context.refresh_pipeline = false;
@@ -696,10 +710,13 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         // The Vita uses the front or the back depth state of the face a primitive hits. Vulkan can not do that per face (stencil
         // aside): if the guest gives the faces different state, draw once per facing with the other facing culled.
         const GxmRecordState &rec = context.record;
+        // a different visibility state per face also needs one draw per facing (only when a visibility buffer is in use)
+        const visibility::Face query_front = context.current_visibility_buffer ? visibility::Face{ context.current_query_idx, context.is_query_op_increment } : visibility::Face{};
+        const visibility::Face query_back = context.current_visibility_buffer ? visibility::Face{ context.back_query_idx, context.back_query_op_increment } : visibility::Face{};
         const dsmodel::FaceState front_face{ rec.front_depth_func, rec.front_depth_write_mode, rec.front_polygon_mode,
-            rec.front_side_fragment_program_mode, dsmodel::DepthBias{ rec.depth_bias_slope, rec.depth_bias_unit } };
+            rec.front_side_fragment_program_mode, dsmodel::DepthBias{ rec.depth_bias_slope, rec.depth_bias_unit }, query_front };
         const dsmodel::FaceState back_face{ rec.back_depth_func, rec.back_depth_write_mode, rec.back_polygon_mode,
-            rec.back_side_fragment_program_mode, context.depth_bias.back };
+            rec.back_side_fragment_program_mode, context.depth_bias.back, query_back };
         const dsmodel::FacePlan plan = dsmodel::plan_faces(rec.two_sided == SCE_GXM_TWO_SIDED_ENABLED, rec.cull_mode, front_face, back_face);
         const dsmodel::PassList passes = dsmodel::passes_for(plan);
         if (plan == dsmodel::FacePlan::Split)
@@ -789,6 +806,8 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     vert_ublock.viewport_flag = (context.record.viewport_flat) ? 0.0f : 1.0f;
     vert_ublock.z_offset = context.record.z_offset;
     vert_ublock.z_scale = context.record.z_scale;
+    vert_ublock.point_size = raster::point_size(context.record.line_width, context.state.res_multiplier, context.state.physical_device_features.largePoints,
+        context.state.physical_device_properties.limits.pointSizeRange[1]);
     vert_ublock.screen_width = context.render_target->width / context.state.res_multiplier;
     vert_ublock.screen_height = context.render_target->height / context.state.res_multiplier;
 
@@ -802,12 +821,14 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     auto &frag_ublock = context.curr_frag_ublock.base_block;
     frag_ublock.writing_mask = context.record.writing_mask;
     frag_ublock.res_multiplier = context.state.res_multiplier;
+    frag_ublock.dither_enabled = context.record.color_surface.dither ? 1.0f : 0.0f;
+    const raster::PointUvFlip point_flip = raster::point_uv_flip(context.record.front_polygon_mode);
+    frag_ublock.point_flip_u = point_flip.flip_u ? 1.0f : 0.0f;
+    frag_ublock.point_flip_v = point_flip.flip_v ? 1.0f : 0.0f;
     frag_ublock.use_raw_image = (context.state.features.preserve_f16_nan_as_u16
                                     && context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16
                                     && context.state.surface_cache.current_surface_raw_is_valid())
         ? 1.0f
-    vert_ublock.point_size = raster::point_size(context.record.line_width, context.state.res_multiplier, context.state.physical_device_features.largePoints,
-        context.state.physical_device_properties.limits.pointSizeRange[1]);
         : 0.0f;
 #if ECV_ORACLE
     if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_NO_RAW))
