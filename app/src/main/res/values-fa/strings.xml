@@ -1487,6 +1487,7 @@
     <string name="emulation_savestate_loaded_toast">بارگذاری شد</string>
     <string name="emulation_savestate_deleted_toast">حذف شد</string>
     <string name="emulation_savestate_failed_toast">انجام عملیات ممکن نبود</string>
+    <string name="emulation_savestate_vulkan_only">ذخیره وضعیت به رندرر Vulkan نیاز دارد</string>
     <string name="emulation_savestate_refused_no_game">بازی‌ای در حال اجرا نیست، بنابراین وضعیت ذخیره نمی‌شود</string>
     <string name="emulation_savestate_refused_exiting">بازی در حال بسته شدن است، بعداً دوباره امتحان کنید</string>
     <string name="emulation_savestate_refused_loading">بازی هنوز در حال بارگذاری است، کمی بعد دوباره امتحان کنید</string>

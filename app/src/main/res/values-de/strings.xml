@@ -1486,6 +1486,7 @@
     <string name="emulation_savestate_loaded_toast">Geladen</string>
     <string name="emulation_savestate_deleted_toast">Gelöscht</string>
     <string name="emulation_savestate_failed_toast">Aktion fehlgeschlagen</string>
+    <string name="emulation_savestate_vulkan_only">Speicherstände benötigen den Vulkan-Renderer</string>
     <string name="emulation_savestate_refused_no_game">Es läuft kein Spiel, der Zustand kann nicht gespeichert werden</string>
     <string name="emulation_savestate_refused_exiting">Das Spiel wird beendet, versuche es später erneut</string>
     <string name="emulation_savestate_refused_loading">Das Spiel lädt noch, versuche es gleich noch einmal</string>

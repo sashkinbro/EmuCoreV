@@ -1487,6 +1487,7 @@
     <string name="emulation_savestate_loaded_toast">Carregado</string>
     <string name="emulation_savestate_deleted_toast">Excluído</string>
     <string name="emulation_savestate_failed_toast">Não foi possível concluir a operação</string>
+    <string name="emulation_savestate_vulkan_only">Os estados salvos exigem o renderizador Vulkan</string>
     <string name="emulation_savestate_refused_no_game">Nenhum jogo em execução, não é possível salvar o estado</string>
     <string name="emulation_savestate_refused_exiting">O jogo está sendo fechado, tente novamente mais tarde</string>
     <string name="emulation_savestate_refused_loading">O jogo ainda está carregando, tente novamente em instantes</string>

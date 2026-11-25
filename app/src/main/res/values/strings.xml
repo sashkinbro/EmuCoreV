@@ -1487,6 +1487,7 @@
     <string name="emulation_savestate_loaded_toast">Loaded</string>
     <string name="emulation_savestate_deleted_toast">Deleted</string>
     <string name="emulation_savestate_failed_toast">Could not complete the operation</string>
+    <string name="emulation_savestate_vulkan_only">Save states need the Vulkan renderer</string>
     <string name="emulation_savestate_refused_no_game">No game is running, so the state cannot be saved</string>
     <string name="emulation_savestate_refused_exiting">The game is closing, try again later</string>
     <string name="emulation_savestate_refused_loading">The game is still loading, try again in a moment</string>

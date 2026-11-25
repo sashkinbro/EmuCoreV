@@ -139,6 +139,7 @@ class SaveStateRepository internal constructor(
         removed
     }
 
+    // Only these two shapes are orphans: "<slot>.ecvs.bak" (the state Writer::finalize replaced) is kept for manual recovery.
     private fun isOrphanName(name: String): Boolean =
         name.endsWith(".tmp") || (name.startsWith(".preview-") && name.endsWith(THUMBNAIL_EXTENSION))
 
@@ -250,6 +251,8 @@ class SaveStateRepository internal constructor(
         }
 
     fun delete(titleId: String, slot: Int): SaveStateResult = operationLock.withLock {
+        // Traceability for vanished saves: who asked for the deletion. Native delete_state logs the file side.
+        Log.w("SaveStateRepository", "delete title=$titleId slot=$slot caller=${callerFrames()}")
         try {
             val state = stateFile(titleId, slot)
             val result = if (state.isFile) backend.delete(state.absolutePath) else SaveStateResult(
@@ -272,6 +275,10 @@ class SaveStateRepository internal constructor(
             ioError(titleId, error)
         }
     }
+
+    private fun callerFrames(): String = Throwable().stackTrace
+        .filterNot { it.className.startsWith(SaveStateRepository::class.java.name) }
+        .take(4).joinToString(" <- ") { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
 
     private fun baseName(slot: Int): String = if (slot == QUICK_SLOT) "quick" else "slot_$slot"
 

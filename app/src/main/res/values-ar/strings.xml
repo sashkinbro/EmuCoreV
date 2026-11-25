@@ -1490,6 +1490,7 @@
     <string name="emulation_savestate_loaded_toast">تم التحميل</string>
     <string name="emulation_savestate_deleted_toast">تم الحذف</string>
     <string name="emulation_savestate_failed_toast">تعذر إكمال العملية</string>
+    <string name="emulation_savestate_vulkan_only">حالات الحفظ تتطلب عارض Vulkan</string>
     <string name="emulation_savestate_refused_no_game">لا توجد لعبة قيد التشغيل، لذا لا يمكن حفظ الحالة</string>
     <string name="emulation_savestate_refused_exiting">اللعبة قيد الإغلاق، حاول لاحقًا</string>
     <string name="emulation_savestate_refused_loading">اللعبة لا تزال قيد التحميل، حاول بعد قليل</string>

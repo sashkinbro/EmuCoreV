@@ -238,6 +238,51 @@ std::vector<uint8_t> save_io_with_open_file(const fs::path &device_a, const char
 
 } // namespace
 
+TEST(SaveStateB149, FinalizeKeepsExactlyOnePreviousStateAsBak) {
+    const fs::path dir = scratch_dir("b149-bak");
+    const fs::path slot = dir / "quick.ecvs", bak = dir / "quick.ecvs.bak";
+    const auto write_state = [&](uint8_t marker) {
+        ss::Writer writer;
+        std::string error;
+        ASSERT_TRUE(writer.open(slot, error)) << error;
+        ASSERT_TRUE(writer.write_section(ss::SectionId::Meta, &marker, 1, false, error)) << error;
+        ASSERT_TRUE(writer.finalize(error)) << error;
+    };
+    const auto marker_of = [](const fs::path &file) {
+        ss::Reader reader;
+        std::string error;
+        std::vector<uint8_t> section;
+        EXPECT_TRUE(reader.open(file, error)) << error;
+        EXPECT_TRUE(reader.read_section(ss::SectionId::Meta, section, error)) << error;
+        return section.empty() ? 0 : section[0];
+    };
+    write_state(1);
+    EXPECT_FALSE(fs::exists(bak)); // nothing to keep on the first save
+    write_state(2);
+    ASSERT_TRUE(fs::exists(bak));
+    EXPECT_EQ(marker_of(slot), 2);
+    EXPECT_EQ(marker_of(bak), 1);
+    write_state(3); // the older .bak is replaced, never accumulated
+    EXPECT_EQ(marker_of(slot), 3);
+    EXPECT_EQ(marker_of(bak), 2);
+    size_t files = 0;
+    for (const auto &entry : fs::directory_iterator(dir)) {
+        (void)entry;
+        ++files;
+    }
+    EXPECT_EQ(files, 2u); // slot + .bak, no .tmp left behind
+}
+
+TEST(SaveStateB149, DeleteStateLeavesTheBakForManualRecovery) {
+    const fs::path dir = scratch_dir("b149-delete");
+    const fs::path slot = dir / "quick.ecvs", bak = dir / "quick.ecvs.bak";
+    std::ofstream(slot.string()) << "x";
+    std::ofstream(bak.string()) << "y";
+    EXPECT_EQ(ss::delete_state(slot).status, ss::Status::Ok);
+    EXPECT_FALSE(fs::exists(slot));
+    EXPECT_TRUE(fs::exists(bak));
+}
+
 TEST(SaveStateB018, MissingSavedataFileIsRecreatedFromTheState) {
     const fs::path device_a = scratch_dir("b018-a"), device_b = scratch_dir("b018-b");
     const std::string content = "JETPACK SAVE v3 coins=12345";

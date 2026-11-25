@@ -1486,6 +1486,7 @@
     <string name="emulation_savestate_loaded_toast">Dimuat</string>
     <string name="emulation_savestate_deleted_toast">Dihapus</string>
     <string name="emulation_savestate_failed_toast">Operasi tidak dapat diselesaikan</string>
+    <string name="emulation_savestate_vulkan_only">Status simpan memerlukan renderer Vulkan</string>
     <string name="emulation_savestate_refused_no_game">Tidak ada game yang berjalan, status tidak dapat disimpan</string>
     <string name="emulation_savestate_refused_exiting">Game sedang ditutup, coba lagi nanti</string>
     <string name="emulation_savestate_refused_loading">Game masih dimuat, coba lagi sebentar lagi</string>

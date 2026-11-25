@@ -7,9 +7,12 @@ import kotlinx.coroutines.withContext
 internal const val AUTOMATIC_STATE_LOAD_EXTRA = "AutomaticStateLoad"
 internal const val SKIP_AUTOMATIC_STATE_LOAD_EXTRA = "SkipAutomaticStateLoad"
 
+/** Save states are Vulkan-only: any other effective backend must neither auto-load, auto-save nor load a state (B149). */
+internal fun isVulkanBackend(backendRenderer: String?): Boolean = backendRenderer.equals("Vulkan", ignoreCase = true)
+
 internal fun resolveAutoLoadArguments(args: Array<String>, enabled: Boolean, skipAutomatic: Boolean = false,
-                                     validQuickPath: () -> String?): Array<String> {
-    if (!enabled || skipAutomatic || args.contains("-loadstate")) return args
+                                     vulkanBackend: Boolean = true, validQuickPath: () -> String?): Array<String> {
+    if (!enabled || skipAutomatic || !vulkanBackend || args.contains("-loadstate")) return args
     val titleIndex = args.indexOf("-r") + 1
     if (titleIndex <= 0 || args.getOrNull(titleIndex).isNullOrBlank()) return args
     val path = validQuickPath()?.takeIf { it.isNotBlank() } ?: return args

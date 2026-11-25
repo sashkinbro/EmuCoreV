@@ -1486,6 +1486,7 @@
     <string name="emulation_savestate_loaded_toast">लोड हो गया</string>
     <string name="emulation_savestate_deleted_toast">हटा दिया गया</string>
     <string name="emulation_savestate_failed_toast">कार्रवाई पूरी नहीं हो सकी</string>
+    <string name="emulation_savestate_vulkan_only">सेव स्टेट के लिए Vulkan रेंडरर आवश्यक है</string>
     <string name="emulation_savestate_refused_no_game">कोई गेम नहीं चल रहा है, इसलिए स्टेट सेव नहीं हो सकता</string>
     <string name="emulation_savestate_refused_exiting">गेम बंद हो रहा है, बाद में पुनः प्रयास करें</string>
     <string name="emulation_savestate_refused_loading">गेम अभी लोड हो रहा है, कुछ देर बाद पुनः प्रयास करें</string>

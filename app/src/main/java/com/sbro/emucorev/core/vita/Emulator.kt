@@ -72,6 +72,7 @@ import com.sbro.emucorev.core.SaveStateRepository
 import com.sbro.emucorev.core.SaveStateExitCoordinator
 import com.sbro.emucorev.core.resolveAutoLoadArguments
 import com.sbro.emucorev.core.shouldSkipExitAutoSave
+import com.sbro.emucorev.core.isVulkanBackend
 import com.sbro.emucorev.data.SaveStateAutomationPreferences
 import com.sbro.emucorev.BuildConfig
 import kotlinx.coroutines.CoroutineScope
@@ -466,6 +467,12 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             }
             val explicitState = loadStatePath(args)
             if (explicitState != null) {
+                // Save states are Vulkan-only; refuse instead of silently launching on another renderer.
+                val backend = VitaGameSettingsRepository(this).loadEffective(gameId).backendRenderer
+                if (!isVulkanBackend(backend)) {
+                    Log.w(TAG, "Refusing explicit state load for $gameId: backend is $backend, states need Vulkan")
+                    return abortLaunch(R.string.emulation_savestate_vulkan_only)
+                }
                 // An explicit resume (for example from the native shell) names a raw path.
                 // Validate it here, where the engine that will load it lives.
                 if (!LabSession.active && repository.interruptedLoad(gameId) == explicitState) {
@@ -511,8 +518,13 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         val repository = SaveStateRepository(this)
         val enabled = SaveStateAutomationPreferences(this, gameId).use { it.current.autoLoadOnStart }
         val interrupted = repository.interruptedLoad(gameId)
+        // Effective backend as the launch resolves it: per-game override when present, else the global setting.
+        val vulkanBackend = isVulkanBackend(runCatching { VitaGameSettingsRepository(this).loadEffective(gameId).backendRenderer }
+            .getOrNull())
+        if (enabled && !vulkanBackend) Log.i(TAG, "Automatic quick load skipped for $gameId: backend is not Vulkan")
         val args = resolveAutoLoadArguments(baseArgs, enabled,
-            skipAutomatic = intent.getBooleanExtra(SKIP_AUTOMATIC_STATE_LOAD_EXTRA, false) || LabSession.active) {
+            skipAutomatic = intent.getBooleanExtra(SKIP_AUTOMATIC_STATE_LOAD_EXTRA, false) || LabSession.active,
+            vulkanBackend = vulkanBackend) {
             val quick = repository.validQuickStatePath(gameId)
             if (quick != null && quick == interrupted) {
                 // The last automatic load of this file killed the process: boot normally once.
@@ -1679,7 +1691,9 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                         setMenuPausedAndAwait(true)
                         val result = withContext(Dispatchers.IO) {
                             // A failed/destructive Load or already stopped core must never overwrite quick0.
-                            if (SaveStateBridge.runningTitleId() != title) null else
+                            // Save states are Vulkan-only; an OpenGL session never writes quick0.
+                            if (SaveStateBridge.runningTitleId() != title ||
+                                !isVulkanBackend(runCatching { VitaGameSettingsRepository(this@Emulator).loadEffective(title).backendRenderer }.getOrNull())) null else
                                 SaveStateRepository(this@Emulator).save(title, SaveStateRepository.QUICK_SLOT, BuildConfig.VERSION_NAME)
                         }
                         if (result != null) AppAnalytics.logSaveStateAction("save", true, result.isOk)

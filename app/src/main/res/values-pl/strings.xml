@@ -1489,6 +1489,7 @@
     <string name="emulation_savestate_loaded_toast">Wczytano</string>
     <string name="emulation_savestate_deleted_toast">Usunięto</string>
     <string name="emulation_savestate_failed_toast">Nie udało się wykonać operacji</string>
+    <string name="emulation_savestate_vulkan_only">Zapisy stanu wymagają renderera Vulkan</string>
     <string name="emulation_savestate_refused_no_game">Żadna gra nie jest uruchomiona, nie można zapisać stanu</string>
     <string name="emulation_savestate_refused_exiting">Gra się zamyka, spróbuj ponownie później</string>
     <string name="emulation_savestate_refused_loading">Gra jeszcze się wczytuje, spróbuj za chwilę</string>

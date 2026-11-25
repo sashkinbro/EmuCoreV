@@ -281,12 +281,24 @@ bool Writer::finalize(std::string &error) {
     }
 
     boost::system::error_code ec;
-    // rename replaces the old slot atomically on Android/POSIX and uses
-    // MOVEFILE_REPLACE_EXISTING on Windows. Never delete the old slot first.
+    // Keep exactly one previous state as "<slot>.bak" (old .bak dropped first, old slot renamed to .bak) so a
+    // slot that later vanishes or fails to load can still be recovered by hand. The window between the two
+    // renames leaves the previous state in .bak; a failed commit moves it back.
+    fs::path backup_path = path_;
+    backup_path += ".bak";
+    bool backed_up = false;
+    if (fs::is_regular_file(path_, ec)) {
+        fs::remove(backup_path, ec);
+        fs::rename(path_, backup_path, ec);
+        backed_up = !ec; // a failed backup must never block publishing the new state
+    }
+    // rename replaces the slot atomically on Android/POSIX and uses MOVEFILE_REPLACE_EXISTING on Windows.
     fs::rename(temp_path_, path_, ec);
     if (ec) {
         error = "unable to commit file: " + ec.message();
         fs::remove(temp_path_, ec);
+        if (backed_up)
+            fs::rename(backup_path, path_, ec);
         return false;
     }
 

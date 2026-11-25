@@ -1488,6 +1488,7 @@
     <string name="emulation_savestate_loaded_toast">Завантажено</string>
     <string name="emulation_savestate_deleted_toast">Видалено</string>
     <string name="emulation_savestate_failed_toast">Не вдалося виконати дію</string>
+    <string name="emulation_savestate_vulkan_only">Збереження стану працюють лише з рендерером Vulkan</string>
     <string name="emulation_savestate_refused_no_game">Гру не запущено, стан зберегти неможливо</string>
     <string name="emulation_savestate_refused_exiting">Гра закривається, повторіть пізніше</string>
     <string name="emulation_savestate_refused_loading">Гра ще завантажується, повторіть за мить</string>

@@ -2698,6 +2698,8 @@ Result prepare_launch_gpu_config(EmuEnvState &emuenv, const fs::path &path) {
         "disabled", "double-buffer", "external-host", "page-table", "native-buffer"
     };
     auto current = emuenv.cfg.current_config;
+    if (current.backend_renderer != "Vulkan")
+        LOG_WARN("[savestate] launch with a save state forces Vulkan over the configured backend '{}' (B149)", current.backend_renderer);
     current.backend_renderer = "Vulkan";
     current.memory_mapping = mapping_names[snapshot.mapping_method];
     current.resolution_multiplier = snapshot.resolution;
@@ -2727,8 +2729,13 @@ Result inspect_state(const fs::path &path) {
 
 Result delete_state(const fs::path &path) {
     Result result;
+    // Traceability for vanished saves: every deletion names title (directory), slot (file stem) and size.
+    // The only caller is the JNI delete; the Kotlin side logs the calling frames.
     boost::system::error_code ec;
+    LOG_WARN("[savestate] delete_state title={} slot={} exists={} size={}", path.parent_path().filename().string(),
+        path.stem().string(), fs::exists(path, ec), fs::is_regular_file(path, ec) ? fs::file_size(path, ec) : 0);
     fs::remove(path, ec);
+    // "<slot>.bak" (the previous state kept by Writer::finalize) is deliberately left for manual recovery.
     if (ec) {
         result.status = Status::IoError;
         result.error = ec.message();

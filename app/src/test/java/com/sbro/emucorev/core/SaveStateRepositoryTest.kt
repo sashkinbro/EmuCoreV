@@ -161,5 +161,26 @@ class SaveStateRepositoryTest {
         }
     }
 
+    @Test fun backupFilesSurviveSweepAndAreNotListedAsSlots() {
+        val backup = File(state.parentFile, state.name + ".bak").apply { writeText("older state") }
+        val orphan = File(state.parentFile, state.name + ".aaaa-bbbb-cccc.tmp").apply { writeText("partial") }
+        assertEquals(1, repository.sweepOrphans())
+        assertTrue(backup.isFile)
+        assertFalse(orphan.exists())
+        val slots = repository.listSlots("PCSE00120")
+        assertEquals(1, slots.count { it.exists })
+        assertEquals(state.absolutePath, slots.single { it.exists }.statePath)
+    }
+
+    @Test fun deleteRemovesTheSlotButLeavesItsBackup() {
+        val backup = File(state.parentFile, state.name + ".bak").apply { writeText("older state") }
+        val deleting = object : SaveStateBackend by backend {
+            override fun delete(path: String): SaveStateResult { File(path).delete(); return result(SaveStateResult.STATUS_OK) }
+        }
+        assertTrue(SaveStateRepository(RuntimeEnvironment.getApplication(), deleting).delete("PCSE00120", 0).isOk)
+        assertFalse(state.exists())
+        assertTrue(backup.isFile)
+    }
+
     private fun result(status: String) = SaveStateResult(status, "", 0, "PCSE00120", "test", 11, true, 0)
 }

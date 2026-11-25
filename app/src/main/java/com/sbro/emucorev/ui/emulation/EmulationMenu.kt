@@ -872,7 +872,8 @@ private fun SaveStatesTab(
         Surface(modifier = Modifier.fillMaxWidth().clip(neonShape(16.dp)).clickable {
                 // Empty slot: save right away (same path as the Save button). Filled slot: never overwrite or
                 // load implicitly, just move focus to the always-visible action bar.
-                if (!hasState) callbacks.onSaveStateSave(selected)
+                if (saveStates.vulkanOnly) Unit
+                else if (!hasState) callbacks.onSaveStateSave(selected)
                 else runCatching { saveActionFocus.requestFocus() }
             }, shape = neonShape(16.dp), color = palette.panelSoft,
             border = runtimeMenuBorder(RuntimeMenuSurfaceRole.SaveSummary, MaterialTheme.colorScheme)) {
@@ -894,7 +895,8 @@ private fun SaveStatesTab(
                 )
             }
             SaveStatePreview(slot = slot, contentDescription = saveStateSlotLabel(selected))
-            Text(text = statusText, style = MaterialTheme.typography.bodySmall,
+            Text(text = if (saveStates.vulkanOnly) stringResource(R.string.emulation_savestate_vulkan_only) else statusText,
+                style = MaterialTheme.typography.bodySmall,
                 color = palette.textSecondary, modifier = Modifier.fillMaxWidth())
             }
         }
@@ -923,7 +925,7 @@ private fun SaveStateActionBar(
         SaveStateActionButton(
             icon = Icons.Rounded.Save,
             contentDescription = stringResource(R.string.emulation_savestate_save_action),
-            enabled = !busy,
+            enabled = !busy && !saveStates.vulkanOnly,
             showProgress = saveStates.busy && saveStates.busySaving,
             onClick = { callbacks.onSaveStateSave(selected) },
             modifier = Modifier.weight(1f).focusRequester(saveActionFocus)
@@ -931,7 +933,7 @@ private fun SaveStateActionBar(
         SaveStateActionButton(
             icon = Icons.Rounded.Restore,
             contentDescription = stringResource(R.string.emulation_savestate_load_action),
-            enabled = hasState && !busy,
+            enabled = hasState && !busy && !saveStates.vulkanOnly,
             showProgress = saveStates.busy && !saveStates.busySaving,
             onClick = { callbacks.onSaveStateLoad(selected) },
             modifier = Modifier.weight(1f)
@@ -1805,7 +1807,9 @@ data class SaveStateMenuState(
     val selectedSlot: Int = SaveStateRepository.QUICK_SLOT,
     val busy: Boolean = false,
     val busySaving: Boolean = false,
-    val canInteract: Boolean = true
+    val canInteract: Boolean = true,
+    /** Save states are Vulkan-only: true when the running session uses another backend. */
+    val vulkanOnly: Boolean = false
 )
 
 private enum class MenuBadge { Broken }

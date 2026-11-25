@@ -63,6 +63,22 @@ class SaveStateAutomationTest {
         assertArrayEquals(emptyArray<String>(), resolveAutoLoadArguments(emptyArray(), true) { error("no game") })
     }
 
+    @Test fun nonVulkanBackendNeverAutoLoadsQuickState() {
+        val args = arrayOf("-r", "A")
+        assertTrue(isVulkanBackend("Vulkan"))
+        assertTrue(isVulkanBackend("vulkan"))
+        assertFalse(isVulkanBackend("OpenGL"))
+        assertFalse(isVulkanBackend(""))
+        assertFalse(isVulkanBackend(null))
+        // OpenGL: the quick state is not even inspected, the launch stays a normal boot.
+        assertArrayEquals(args, resolveAutoLoadArguments(args, true, vulkanBackend = false) { error("must not inspect") })
+        // Vulkan (and the default) still loads it.
+        assertArrayEquals(arrayOf("-r", "A", "-loadstate", "/quick.ecvs"),
+            resolveAutoLoadArguments(args, true, vulkanBackend = true) { "/quick.ecvs" })
+        assertArrayEquals(arrayOf("-r", "A", "-loadstate", "/quick.ecvs"),
+            resolveAutoLoadArguments(args, true) { "/quick.ecvs" })
+    }
+
     @Test fun failedAutomaticLoadFallbackKeepsOtherArgumentsAndCannotRetryAutomaticSlot() {
         val args = arrayOf("-r", "A", "-loadstate", "/quick.ecvs", "--other")
         val fallback = autoLoadFallbackArguments(args)

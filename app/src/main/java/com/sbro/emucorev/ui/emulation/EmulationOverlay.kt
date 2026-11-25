@@ -115,6 +115,7 @@ import com.sbro.emucorev.core.SaveStateResult
 import com.sbro.emucorev.core.ScreenshotPublisher
 import com.sbro.emucorev.core.VitaLaunchBridge
 import com.sbro.emucorev.core.SaveStateRepository
+import com.sbro.emucorev.core.isVulkanBackend
 import com.sbro.emucorev.core.SaveStateSlot
 import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.core.VitaCheatSnapshot
@@ -288,6 +289,8 @@ fun EmulationOverlayHost(
     }
 
     val saveStateRepository = remember(activity) { SaveStateRepository(activity) }
+    // The renderer is a setup-only option, so the menu config is the running session's backend.
+    val vulkanSession = isVulkanBackend(config.backendRenderer)
     var saveStateSlots by remember(activity, gameId) { mutableStateOf(emptyList<SaveStateSlot>()) }
     var selectedSaveStateSlot by remember(activity) { mutableIntStateOf(SaveStateRepository.QUICK_SLOT) }
     var saveStateBusy by remember { mutableStateOf(false) }
@@ -311,6 +314,10 @@ fun EmulationOverlayHost(
     val overlayScope = rememberCoroutineScope()
 
     fun performSaveStateAction(action: SaveStateAction) {
+        if (!vulkanSession && action !is SaveStateAction.Delete) {
+            Toast.makeText(activity, R.string.emulation_savestate_vulkan_only, Toast.LENGTH_SHORT).show()
+            return
+        }
         val refusal = saveStateRefusalReason(
             gameIdBlank = gameId.isBlank(),
             exitInProgress = activity.exitInProgress,
@@ -999,7 +1006,7 @@ fun EmulationOverlayHost(
         ) {
             EmulationQuickBar(
                 paused = effectivePaused,
-                quickActionsEnabled = !saveStateBusy && gameId.isNotBlank(),
+                quickActionsEnabled = !saveStateBusy && gameId.isNotBlank() && vulkanSession,
                 onPauseToggle = menuCallbacks.onPauseToggle,
                 onQuickSave = menuCallbacks.onQuickSaveState,
                 onQuickLoad = menuCallbacks.onQuickLoadState,
@@ -1055,7 +1062,8 @@ fun EmulationOverlayHost(
                                 selectedSlot = selectedSaveStateSlot,
                                 busy = saveStateBusy,
                                 busySaving = saveStateBusySaving || autoSaving,
-                                canInteract = !activity.exitInProgress
+                                canInteract = !activity.exitInProgress,
+                                vulkanOnly = !vulkanSession
                             ),
                             paused = effectivePaused,
                             sessionElapsedMs = sessionElapsedMs,

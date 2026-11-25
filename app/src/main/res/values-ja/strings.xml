@@ -1486,6 +1486,7 @@
     <string name="emulation_savestate_loaded_toast">読み込みました</string>
     <string name="emulation_savestate_deleted_toast">削除しました</string>
     <string name="emulation_savestate_failed_toast">操作に失敗しました</string>
+    <string name="emulation_savestate_vulkan_only">ステートセーブには Vulkan レンダラーが必要です</string>
     <string name="emulation_savestate_refused_no_game">ゲームが実行されていないため、状態を保存できません</string>
     <string name="emulation_savestate_refused_exiting">ゲームを終了中です。しばらくしてからお試しください</string>
     <string name="emulation_savestate_refused_loading">ゲームを読み込み中です。少し待ってからお試しください</string>
