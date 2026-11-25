@@ -1218,7 +1218,7 @@ EXPORT(int, sceKernelGetMsgPipeCreatorId) {
 
 EXPORT(int, sceKernelGetProcessId) {
     TRACY_FUNC(sceKernelGetProcessId);
-    STUBBED("pid: 1");
+    // One emulated user process: the native-library host reports the same id 1 for the running app (sceAppMgrGetStatusByName).
     return 1;
 }
 

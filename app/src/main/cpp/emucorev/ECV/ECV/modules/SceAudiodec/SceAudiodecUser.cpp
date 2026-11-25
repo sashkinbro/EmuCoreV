@@ -819,11 +819,20 @@ EXPORT(int, sceAudiodecCreateDecoder, SceAudiodecCtrl *ctrl, SceAudiodecCodec co
     return create_decoder(emuenv, ctrl, codec);
 }
 
+DECL_EXPORT(int, sceAudiodecGetContextSize, SceAudiodecCtrl *pCtrl, SceAudiodecCodec codecType);
+
 EXPORT(int, sceAudiodecCreateDecoderExternal, SceAudiodecCtrl *ctrl, SceAudiodecCodec codec, void *context, uint32_t size) {
     TRACY_FUNC(sceAudiodecCreateDecoderExternal, ctrl, codec, context, size);
-    // I think context is supposed to be just extra memory where I can allocate my context.
-    // I'm just going to allocate like regular sceAudiodecCreateDecoder and see how it goes.
-    // Almost sure zang has already tried this so :/ - desgroup
+    // The context is caller-provided memory for the decoder state (its minimum size is what
+    // sceAudiodecGetContextSize reports). The decoder state of this core lives on the host side, so the memory is
+    // only checked, not used.
+    const int needed = CALL_EXPORT(sceAudiodecGetContextSize, ctrl, codec);
+    if (needed > 0) {
+        if (!context)
+            return SCE_AUDIODEC_ERROR_INVALID_PTR;
+        if (size < static_cast<uint32_t>(needed))
+            return SCE_AUDIODEC_ERROR_INVALID_SIZE;
+    }
     return create_decoder(emuenv, ctrl, codec);
 }
 

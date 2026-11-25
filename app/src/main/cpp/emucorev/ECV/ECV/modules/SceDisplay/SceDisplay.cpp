@@ -64,6 +64,8 @@ static int display_wait(EmuEnvState &emuenv, SceUID thread_id, int vcount, const
 
 EXPORT(SceInt32, _sceDisplayGetFrameBuf, SceDisplayFrameBuf *pFrameBuf, SceDisplaySetBufSync sync, uint32_t *pFrameBuf_size) {
     TRACY_FUNC(_sceDisplayGetFrameBuf, pFrameBuf, sync, pFrameBuf_size);
+    if (!pFrameBuf)
+        return RET_ERROR(SCE_DISPLAY_ERROR_INVALID_ADDR);
     if (pFrameBuf->size != sizeof(SceDisplayFrameBuf) && pFrameBuf->size != sizeof(SceDisplayFrameBuf2))
         return RET_ERROR(SCE_DISPLAY_ERROR_INVALID_VALUE);
     else if (sync != SCE_DISPLAY_SETBUF_NEXTFRAME && sync != SCE_DISPLAY_SETBUF_IMMEDIATE)

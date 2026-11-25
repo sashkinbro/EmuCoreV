@@ -17,7 +17,9 @@
 
 #include <net/epoll.h>
 
+#include <chrono>
 #include <optional>
+#include <thread>
 
 int Epoll::add(int id, std::weak_ptr<Socket> sock, SceNetEpollEvent *ev) {
     if (!eventEntries.try_emplace(id, EpollSocket{ ev->events, ev->data, sock }).second) {
@@ -52,6 +54,10 @@ static void add_event_fd_set(fd_set *set, int *maxFd, abs_socket sock) {
         *maxFd = sock;
 }
 
+int Epoll::abort(int flags) {
+    return abort_state.abort(flags) ? 0 : SCE_NET_ERROR_EINVAL;
+}
+
 int Epoll::wait(SceNetEpollEvent *events, int maxevents, int timeout_microseconds) {
     fd_set readFds, writeFds, exceptFds;
     FD_ZERO(&readFds);
@@ -84,15 +90,40 @@ int Epoll::wait(SceNetEpollEvent *events, int maxevents, int timeout_microsecond
             add_event_fd_set(&exceptFds, &maxFd, *sock);
     }
 
-    if (maxFd == 0)
-        return 0;
+    // The wait is made of short polls so that sceNetEpollAbort can wake it; a negative timeout waits forever.
+    // Without any pollable socket the wait simply runs out its timeout (an abort still wakes it).
+    fd_set readOut = readFds, writeOut = writeFds, exceptOut = exceptFds;
+    int poll_result = 0;
+    const auto outcome = epoll_abort::wait(
+        abort_state, timeout_microseconds,
+        [&](int slice) {
+            if (maxFd == 0) {
+                if (slice > 0)
+                    std::this_thread::sleep_for(std::chrono::microseconds(slice));
+                return 0;
+            }
+            timeval timeout;
+            timeout.tv_sec = slice / 1000000;
+            timeout.tv_usec = slice % 1000000;
+            readOut = readFds;
+            writeOut = writeFds;
+            exceptOut = exceptFds;
+            const int ret = select(maxFd + 1, &readOut, &writeOut, &exceptOut, &timeout);
+            // a failed select ends the wait; report it through a value select never returns
+            return ret < 0 ? -1 : ret;
+        },
+        &poll_result);
 
-    timeval timeout;
-    timeout.tv_sec = timeout_microseconds / 1000000;
-    timeout.tv_usec = timeout_microseconds % 1000000;
-    auto ret = select(maxFd + 1, &readFds, &writeFds, &exceptFds, &timeout);
-    if (ret < 0)
-        return PosixSocket::translate_return_value(ret);
+    if (outcome == epoll_abort::Outcome::Aborted)
+        return SCE_NET_ERROR_EINTR;
+    if (outcome == epoll_abort::Outcome::Timeout)
+        return 0;
+    if (poll_result < 0)
+        return PosixSocket::translate_return_value(poll_result);
+
+    readFds = readOut;
+    writeFds = writeOut;
+    exceptFds = exceptOut;
 
     int eventCount = 0;
     for (const auto &[id, entry] : eventEntries) {

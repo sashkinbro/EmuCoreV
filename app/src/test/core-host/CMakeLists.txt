@@ -35,6 +35,7 @@ add_executable(core_host_tests
     ngs_effects_tests.cpp
     hle_stub_batch3_tests.cpp
     hle_stub_batch4_tests.cpp
+    hle_stub_wave1_tests.cpp
     rear_touch_tests.cpp
     save_data_write_tests.cpp
     fragment_output_tests.cpp
@@ -52,7 +53,9 @@ target_include_directories(core_host_tests PRIVATE
     "${CORE_ROOT}/rtc/include"
     "${CORE_ROOT}/audio/include"
     "${CORE_ROOT}/touch/include"
+    "${CORE_ROOT}/net/include"
     "${CORE_ROOT}/modules/SceAppUtil"
+    "${CORE_ROOT}/modules/SceCodecEngine"
     "${CORE_ROOT}/modules/SceKernelModulemgr"
     "${CORE_ROOT}/modules/ScePower"
     "${CORE_ROOT}/modules/SceVideodec"

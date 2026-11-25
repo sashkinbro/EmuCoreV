@@ -215,6 +215,10 @@ EXPORT(int, sceJpegDecodeMJpeg, const unsigned char *pJpeg, SceSize isize, uint8
     int decodeMode, void *pTempBuffer, SceSize tempBufferSize, void *pCoefBuffer, SceSize coefBufferSize) {
     TRACY_FUNC(sceJpegDecodeMJpeg, pJpeg, isize, pRGBA, osize, decodeMode, pTempBuffer, tempBufferSize, pCoefBuffer, coefBufferSize);
 
+    // pTempBuffer / pCoefBuffer are scratch memory of the hardware decoder, the host decoder needs none.
+    if (!pJpeg || !pRGBA || !isize || !osize)
+        return RET_ERROR(SCE_JPEG_ERROR_INVALID_POINTER);
+
     // Absent when sceJpegInitMJpeg was not called in this process (e.g. cold restore of an older
     // save state) or after sceJpegFinishMJpeg.
     const auto state = emuenv.kernel.obj_store.get_shared<MJpegState>();
@@ -229,8 +233,9 @@ EXPORT(int, sceJpegDecodeMJpeg, const unsigned char *pJpeg, SceSize isize, uint8
     std::vector<uint8_t> temporary(osize);
     DecoderSize size = {};
 
-    state->decoder->send(pJpeg, isize);
-    state->decoder->receive(temporary.data(), &size);
+    // A stream the decoder rejects must not report success with an untouched output buffer.
+    if (!state->decoder->send(pJpeg, isize) || !state->decoder->receive(temporary.data(), &size))
+        return RET_ERROR(SCE_JPEG_ERROR_DECODE_ERROR);
 
     SceJpegPitch yuv_pitch[4];
     state->decoder->get_pitch_info(yuv_pitch);
@@ -249,6 +254,10 @@ EXPORT(int, sceJpegDecodeMJpegYCbCr, const uint8_t *pJpeg, SceSize isize,
     uint8_t *pYCbCr, SceSize osize, int decodeMode, void *pCoefBuffer, SceSize coefBufferSize) {
     TRACY_FUNC(sceJpegDecodeMJpegYCbCr, pJpeg, isize, pYCbCr, osize, decodeMode, pCoefBuffer, coefBufferSize);
 
+    // pCoefBuffer is scratch memory of the hardware decoder, the host decoder needs none.
+    if (!pJpeg || !pYCbCr || !isize || !osize)
+        return RET_ERROR(SCE_JPEG_ERROR_INVALID_POINTER);
+
     // Absent when sceJpegInitMJpeg was not called in this process (e.g. cold restore of an older
     // save state) or after sceJpegFinishMJpeg.
     const auto state = emuenv.kernel.obj_store.get_shared<MJpegState>();
@@ -261,8 +270,8 @@ EXPORT(int, sceJpegDecodeMJpegYCbCr, const uint8_t *pJpeg, SceSize isize,
 
     DecoderSize size = {};
 
-    state->decoder->send(pJpeg, isize);
-    state->decoder->receive(pYCbCr, &size);
+    if (!state->decoder->send(pJpeg, isize) || !state->decoder->receive(pYCbCr, &size))
+        return RET_ERROR(SCE_JPEG_ERROR_DECODE_ERROR);
 
     SceJpegPitch yuv_pitch[4];
     state->decoder->get_pitch_info(yuv_pitch);

@@ -17,8 +17,9 @@
 
 #include <module/module.h>
 
+// Party events come from the PSN party service; offline there is never one to dispatch, so the pump is empty.
 EXPORT(int, sceNpPartyCheckCallback) {
-    return UNIMPLEMENTED();
+    return 0;
 }
 
 EXPORT(int, sceNpPartyGetGameSessionReadyState) {

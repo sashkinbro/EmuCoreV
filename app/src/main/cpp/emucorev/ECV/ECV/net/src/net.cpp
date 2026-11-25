@@ -42,6 +42,7 @@ void NetState::deinit() {
     next_id = 0;
     next_epoll_id = 0;
     state = -1;
+    init_memory_size = 0;
     resolver_id = 0;
     current_addr_index = 0;
     broadcastAddr = 0xFFFFFFFF;

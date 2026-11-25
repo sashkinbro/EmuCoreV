@@ -2625,8 +2625,16 @@ EXPORT(int, sceGxmBeginSceneEx, SceGxmContext *immediateContext, uint32_t flags,
         return RET_ERROR(SCE_GXM_ERROR_WITHIN_SCENE);
     }
 
-    STUBBED("Using sceGxmBeginScene");
-    return CALL_EXPORT(sceGxmBeginScene, immediateContext, flags, renderTarget, validRegion, vertexSyncObject, fragmentSyncObject, colorSurface, loadDepthStencilSurface);
+    // The renderer binds one depth/stencil surface per scene, used both for the load and for the store.
+    // Without a load surface the scene renders into the store surface (otherwise it would have no depth at all).
+    // With two different surfaces the load surface is bound and the store surface is not written separately.
+    const SceGxmDepthStencilSurface *boundDepthStencil = loadDepthStencilSurface ? loadDepthStencilSurface : storeDepthStencilSurface;
+    if (loadDepthStencilSurface && storeDepthStencilSurface && storeDepthStencilSurface != loadDepthStencilSurface
+        && (storeDepthStencilSurface->depth_data != loadDepthStencilSurface->depth_data
+            || storeDepthStencilSurface->stencil_data != loadDepthStencilSurface->stencil_data)) {
+        LOG_WARN_ONCE("{}: separate load and store depth/stencil surfaces are not supported, using the load surface", export_name);
+    }
+    return CALL_EXPORT(sceGxmBeginScene, immediateContext, flags, renderTarget, validRegion, vertexSyncObject, fragmentSyncObject, colorSurface, boundDepthStencil);
 }
 
 DECL_EXPORT(int, sceGxmTextureInitLinear, SceGxmTexture *texture, Ptr<const void> data, SceGxmTextureFormat texFormat, uint32_t width, uint32_t height, uint32_t mipCount);
@@ -2659,8 +2667,7 @@ EXPORT(Ptr<void>, sceGxmColorSurfaceGetData, const SceGxmColorSurface *surface) 
 EXPORT(SceGxmColorSurfaceDitherMode, sceGxmColorSurfaceGetDitherMode, const SceGxmColorSurface *surface) {
     TRACY_FUNC(sceGxmColorSurfaceGetDitherMode, surface);
     assert(surface);
-    STUBBED("SCE_GXM_COLOR_SURFACE_DITHER_DISABLED");
-    return SceGxmColorSurfaceDitherMode::SCE_GXM_COLOR_SURFACE_DITHER_DISABLED;
+    return surface->dither ? SCE_GXM_COLOR_SURFACE_DITHER_ENABLED : SCE_GXM_COLOR_SURFACE_DITHER_DISABLED;
 }
 
 EXPORT(SceGxmColorFormat, sceGxmColorSurfaceGetFormat, const SceGxmColorSurface *surface) {
@@ -2792,7 +2799,14 @@ EXPORT(int, sceGxmColorSurfaceSetDitherMode, SceGxmColorSurface *surface, SceGxm
         return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
     }
 
-    return UNIMPLEMENTED();
+    if (ditherMode != SCE_GXM_COLOR_SURFACE_DITHER_DISABLED && ditherMode != SCE_GXM_COLOR_SURFACE_DITHER_ENABLED) {
+        return RET_ERROR(SCE_GXM_ERROR_INVALID_VALUE);
+    }
+
+    // Recorded so that GetDitherMode answers what the game set. The host renderer does not dither: the
+    // result is only visible on low-precision (16-bit) surfaces and is a cosmetic difference.
+    surface->dither = ditherMode == SCE_GXM_COLOR_SURFACE_DITHER_ENABLED;
+    return 0;
 }
 
 EXPORT(int, sceGxmColorSurfaceSetFormat, SceGxmColorSurface *surface, SceGxmColorFormat format) {
@@ -6150,9 +6164,11 @@ EXPORT(int, sceGxmShaderPatcherGetFragmentProgramRefCount, const SceGxmShaderPat
     return 0;
 }
 
+// Programs are recompiled for the host GPU: no patched USSE code is ever placed in the application's USSE
+// pools, so the bytes allocated from them are really 0 (and never exceed the pool size the game gave).
 EXPORT(uint32_t, sceGxmShaderPatcherGetFragmentUsseMemAllocated, const SceGxmShaderPatcher *shaderPatcher) {
     TRACY_FUNC(sceGxmShaderPatcherGetFragmentUsseMemAllocated, shaderPatcher);
-    return UNIMPLEMENTED();
+    return 0;
 }
 
 EXPORT(uint32_t, sceGxmShaderPatcherGetHostMemAllocated, const SceGxmShaderPatcher *shaderPatcher) {
@@ -6187,9 +6203,10 @@ EXPORT(int, sceGxmShaderPatcherGetVertexProgramRefCount, const SceGxmShaderPatch
     return 0;
 }
 
+// See sceGxmShaderPatcherGetFragmentUsseMemAllocated.
 EXPORT(uint32_t, sceGxmShaderPatcherGetVertexUsseMemAllocated, const SceGxmShaderPatcher *shaderPatcher) {
     TRACY_FUNC(sceGxmShaderPatcherGetVertexUsseMemAllocated, shaderPatcher);
-    return UNIMPLEMENTED();
+    return 0;
 }
 
 EXPORT(int, sceGxmShaderPatcherRegisterProgram, SceGxmShaderPatcher *shaderPatcher, Ptr<const SceGxmProgram> programHeader, SceGxmShaderPatcherId *programId) {

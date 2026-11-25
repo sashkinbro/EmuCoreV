@@ -20,6 +20,8 @@
 
 #include <kernel/state.h>
 
+#include "codec_engine_alloc.h"
+
 #include <util/tracy.h>
 TRACY_MODULE_NAME(SceCodecEngineUser);
 
@@ -32,13 +34,23 @@ enum SceCodecEngineErrorCode : uint32_t {
 
 EXPORT(int32_t, sceCodecEngineAllocMemoryFromUnmapMemBlock, SceUID uid, uint32_t size, uint32_t alignment) {
     TRACY_FUNC(sceCodecEngineAllocMemoryFromUnmapMemBlock, uid, size, alignment);
-    STUBBED("fake vaddr");
     auto guard = std::lock_guard<std::mutex>(emuenv.kernel.mutex);
     auto it = emuenv.kernel.codec_blocks.find(uid);
     if (it == emuenv.kernel.codec_blocks.end())
         return SCE_CODECENGINE_ERROR_INVALID_VALUE;
     auto &block = it->second;
-    return 0xDEADBEAF + block.vaddr++;
+
+    // CodecEngineBlock::vaddr is the next free offset of the bump allocation.
+    const codec_engine::AllocResult result = codec_engine::alloc(uid, block.size, block.vaddr, size, alignment);
+    switch (result.status) {
+    case codec_engine::AllocStatus::InvalidSize:
+        return SCE_CODECENGINE_ERROR_INVALID_SIZE;
+    case codec_engine::AllocStatus::InvalidValue:
+        return SCE_CODECENGINE_ERROR_INVALID_VALUE;
+    case codec_engine::AllocStatus::Ok:
+        break;
+    }
+    return static_cast<int32_t>(result.vaddr);
 }
 
 EXPORT(int, sceCodecEngineCloseUnmapMemBlock, SceUID uid) {
@@ -51,9 +63,17 @@ EXPORT(int, sceCodecEngineCloseUnmapMemBlock, SceUID uid) {
     return 0;
 }
 
-EXPORT(int, sceCodecEngineFreeMemoryFromUnmapMemBlock) {
-    TRACY_FUNC(sceCodecEngineFreeMemoryFromUnmapMemBlock);
-    STUBBED("always return success");
+EXPORT(int, sceCodecEngineFreeMemoryFromUnmapMemBlock, SceUID uid, uint32_t vaddr) {
+    TRACY_FUNC(sceCodecEngineFreeMemoryFromUnmapMemBlock, uid, vaddr);
+    auto guard = std::lock_guard<std::mutex>(emuenv.kernel.mutex);
+    const auto it = emuenv.kernel.codec_blocks.find(uid);
+    if (it == emuenv.kernel.codec_blocks.end())
+        return SCE_CODECENGINE_ERROR_INVALID_VALUE;
+
+    if (!codec_engine::owns(uid, it->second.size, vaddr))
+        return SCE_CODECENGINE_ERROR_INVALID_POINTER;
+
+    // Bump allocation: the range is not reused, the block is released as a whole by sceCodecEngineCloseUnmapMemBlock.
     return 0;
 }
 

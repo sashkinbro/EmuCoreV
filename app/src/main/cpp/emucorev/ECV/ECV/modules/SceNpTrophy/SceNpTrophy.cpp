@@ -150,6 +150,10 @@ EXPORT(int, sceNpTrophyCreateContext, np::trophy::ContextHandle *context, const 
         return SCE_NP_TROPHY_ERROR_NOT_INITIALIZED;
     }
 
+    if (!context) {
+        return SCE_NP_TROPHY_ERROR_INVALID_ARGUMENT;
+    }
+
     if (comm_id && comm_id->num > 99) {
         return SCE_NP_TROPHY_ERROR_INVALID_NPCOMMID;
     }
@@ -169,11 +173,14 @@ EXPORT(int, sceNpTrophyCreateContext, np::trophy::ContextHandle *context, const 
         }
 
         default:
-            break;
+            // No context was created: do not hand the guest an invalid handle together with success.
+            return SCE_NP_TROPHY_ERROR_UNKNOWN;
         }
     }
 
     np::trophy::Context *ctx_ptr = get_trophy_context(emuenv.np.trophy_state, *context);
+    if (!ctx_ptr)
+        return SCE_NP_TROPHY_ERROR_INVALID_CONTEXT;
     LOG_TRACE("Trophy context for {}_{:0>2d} create successfuly!", std::string(ctx_ptr->comm_id.data, 9), ctx_ptr->comm_id.num);
 
     return 0;
@@ -183,6 +190,8 @@ EXPORT(int, sceNpTrophyCreateHandle, SceNpTrophyHandle *handle) {
     TRACY_FUNC(sceNpTrophyCreateHandle, handle);
     // We don't handle "handle" for now. It's just a mechanic for async and its abortion.
     // Everything emulated here is sync :)
+    if (!handle)
+        return SCE_NP_TROPHY_ERROR_INVALID_ARGUMENT;
     STUBBED("Stubbed handle with 1");
     *handle = 1;
     return 0;

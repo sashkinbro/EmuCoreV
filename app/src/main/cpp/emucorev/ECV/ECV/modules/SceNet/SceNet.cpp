@@ -201,9 +201,16 @@ EXPORT(int, sceNetEmulationSet) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceNetEpollAbort) {
-    TRACY_FUNC(sceNetEpollAbort);
-    return UNIMPLEMENTED();
+EXPORT(int, sceNetEpollAbort, int eid, int flags) {
+    TRACY_FUNC(sceNetEpollAbort, eid, flags);
+    if (!emuenv.net.inited)
+        RET_NET_ERRNO(SCE_NET_ERROR_ENOTINIT);
+
+    auto epoll = lock_and_find(eid, emuenv.net.epolls, emuenv.kernel.mutex);
+    if (!epoll)
+        RET_NET_ERRNO(SCE_NET_ERROR_EBADF);
+
+    RET_NET_ERRNO(epoll->abort(flags));
 }
 
 EXPORT(int, sceNetEpollControl, int eid, SceNetEpollControlFlag op, int id, SceNetEpollEvent *ev) {
@@ -250,6 +257,11 @@ EXPORT(int, sceNetEpollDestroy, int eid) {
 EXPORT(int, sceNetEpollWait, int eid, SceNetEpollEvent *events, int maxevents, int timeout) {
     TRACY_FUNC(sceNetEpollWait, eid, events, maxevents, timeout);
     auto epoll = lock_and_find(eid, emuenv.net.epolls, emuenv.kernel.mutex);
+
+    // A wait can last until sceNetEpollAbort is called from another guest thread,
+    // so this thread must not keep the guest scheduler token meanwhile.
+    if (epoll && timeout != 0)
+        guest_sched_release_for_block();
 
     RET_NET_ERRNO(epoll ? epoll->wait(events, maxevents, timeout) : SCE_NET_ERROR_EBADF);
 }
@@ -398,9 +410,24 @@ EXPORT(int, sceNetGetSockInfo) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceNetGetStatisticsInfo) {
-    TRACY_FUNC(sceNetGetStatisticsInfo);
-    return UNIMPLEMENTED();
+// sceNetGetStatisticsInfo(SceNetStatisticsInfo *info, int flags) in vita-headers.
+// Sockets are host sockets: the libnet pool given to sceNetInit is never consumed and no packet goes through
+// the Vita network stack, so the pool is reported as untouched and the packet counters as 0.
+// The kernel pool size is not known (PROVISIONAL: reported as the same size as the libnet pool).
+EXPORT(int, sceNetGetStatisticsInfo, SceNetStatisticsInfo *info, int flags) {
+    TRACY_FUNC(sceNetGetStatisticsInfo, info, flags);
+    if (!emuenv.net.inited)
+        RET_NET_ERRNO(SCE_NET_ERROR_ENOTINIT);
+    if (!info)
+        RET_NET_ERRNO(SCE_NET_ERROR_EINVAL);
+
+    info->kernel_mem_free_size = emuenv.net.init_memory_size;
+    info->kernel_mem_free_min = emuenv.net.init_memory_size;
+    info->packet_count = 0;
+    info->packet_qos_count = 0;
+    info->libnet_mem_free_size = emuenv.net.init_memory_size;
+    info->libnet_mem_free_min = emuenv.net.init_memory_size;
+    return 0;
 }
 
 EXPORT(int, sceNetGetpeername, int sid, SceNetSockaddr *addr, unsigned int *addrlen) {
@@ -482,6 +509,7 @@ EXPORT(int, sceNetInit, SceNetInitParam *param) {
     WSAStartup(versionWanted, &wsaData);
 #endif
     emuenv.net.state = 0;
+    emuenv.net.init_memory_size = param->size;
     emuenv.net.inited = true;
     emuenv.net.resolver_id = ++emuenv.net.next_id;
     net_utils::init_address(emuenv.cfg.adhoc_addr, emuenv.net.netAddr, emuenv.net.broadcastAddr);

@@ -39,6 +39,7 @@ struct NetState {
     NetEpolls epolls;
     int state = -1;
     int resolver_id = 0;
+    int init_memory_size = 0; // SceNetInitParam::size, reported by sceNetGetStatisticsInfo
     int current_addr_index = 0;
     uint32_t broadcastAddr = 0xFFFFFFFF;
     uint32_t netAddr = 0xFFFFFFFF;

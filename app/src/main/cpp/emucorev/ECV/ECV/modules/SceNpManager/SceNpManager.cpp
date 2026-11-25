@@ -142,7 +142,7 @@ EXPORT(int, sceNpCheckCallback) {
         thread->run_callback(context_cb_pc, { event.ctx_id, event.event, event.cause, event.error_code, context_cb_arg });
     }
 
-    return STUBBED("Stub");
+    return 0;
 }
 
 EXPORT(int, sceNpGetServiceState, SceNpServiceState *state) {
@@ -152,9 +152,10 @@ EXPORT(int, sceNpGetServiceState, SceNpServiceState *state) {
         return RET_ERROR(SCE_NP_ERROR_NOT_INITIALIZED);
     if (!state)
         return RET_ERROR(SCE_NP_ERROR_INVALID_ARGUMENT);
+    // Offline (no PSN session) is the default: report SIGNED_OUT, which is what the real system answers.
     *state = emuenv.cfg.current_config.psn_signed_in ? SCE_NP_SERVICE_STATE_SIGNED_IN : SCE_NP_SERVICE_STATE_SIGNED_OUT;
 
-    return STUBBED("Stub");
+    return 0;
 }
 
 EXPORT(int, sceNpInit, np::CommunicationConfig *comm_config, void *dontcare) {

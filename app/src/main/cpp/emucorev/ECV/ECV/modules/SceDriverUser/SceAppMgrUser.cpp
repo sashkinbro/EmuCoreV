@@ -255,7 +255,7 @@ EXPORT(int, sceAppMgrGetCurrentBgmState2) {
 
 EXPORT(int, sceAppMgrGetDevInfo, const char *dev, uint64_t *max_size, uint64_t *free_size) {
     TRACY_FUNC(sceAppMgrGetDevInfo, dev, max_size, free_size);
-    if (dev == nullptr) {
+    if (dev == nullptr || max_size == nullptr || free_size == nullptr) {
         return RET_ERROR(SCE_ERROR_ERRNO_EINVAL);
     }
 
@@ -267,7 +267,13 @@ EXPORT(int, sceAppMgrGetDevInfo, const char *dev, uint64_t *max_size, uint64_t *
 
     fs::path dev_path = boost::describe::enum_to_string(device, "");
     fs::path path = emuenv.vita_fs_path / dev_path;
-    fs::space_info space = fs::space(path);
+    // The throwing overload would take the emulator down when the device directory does not exist (yet).
+    boost::system::error_code space_error;
+    fs::space_info space = fs::space(path, space_error);
+    if (space_error) {
+        LOG_ERROR("Cannot query the space of {}: {}", path.string(), space_error.message());
+        return RET_ERROR(SCE_ERROR_ERRNO_ENOENT);
+    }
 
     // TODO: Use free or available?
     // free = free space available on the whole partition
@@ -563,6 +569,9 @@ EXPORT(int, sceAppMgrReceiveEvent) {
 
 EXPORT(int, sceAppMgrReceiveEventNum, SceUInt32 *eventNum) {
     TRACY_FUNC(sceAppMgrReceiveEventNum, eventNum);
+
+    if (!eventNum)
+        return RET_ERROR(SCE_APPMGR_ERROR_NULL_POINTER);
 
     // Vita3K does not yet manage events
     *eventNum = 0;

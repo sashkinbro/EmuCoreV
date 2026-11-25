@@ -387,6 +387,15 @@ struct SceNetInitParam {
     int32_t flags;
 };
 
+struct SceNetStatisticsInfo {
+    int32_t kernel_mem_free_size;
+    int32_t kernel_mem_free_min;
+    int32_t packet_count;
+    int32_t packet_qos_count;
+    int32_t libnet_mem_free_size;
+    int32_t libnet_mem_free_min;
+};
+
 union SceNetEpollData {
     char data[8];
 };
