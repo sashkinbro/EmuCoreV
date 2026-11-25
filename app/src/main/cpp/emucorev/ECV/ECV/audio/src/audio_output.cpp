@@ -5,8 +5,40 @@
 #include <kernel/state.h>
 #include <kernel/thread/thread_state.h>
 #include <mem/ptr.h>
+#include <util/log.h>
+
+#include <cerrno>
+#ifdef ECV_ORACLE
+#include <ecv_lab.h> // oracle: lab A/B switches (debug builds only)
+#endif
+#ifdef __ANDROID__
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
 
 namespace {
+// The guest thread that feeds sceAudioOutOutput takes the host stream lock for every grain, and the real-time SDL audio
+// thread (THREAD_PRIORITY_AUDIO) takes the same lock for every device pull. A default-priority producer that is preempted
+// while it holds the lock keeps the device thread waiting for the whole scheduler latency of a loaded CPU, which the
+// platform buffer then plays as a gap. Raising the producer to THREAD_PRIORITY_URGENT_DISPLAY (-8) keeps it from being
+// preempted by ordinary guest/render threads; it only runs for the short time a grain takes.
+void boost_audio_producer_priority() {
+#ifdef __ANDROID__
+    static thread_local bool done = false;
+    if (done)
+        return;
+    done = true;
+#ifdef ECV_ORACLE
+    if (ecv::oracle::lab::audio_ab_off(0)) // A/B switch: audio-no-boost
+        return;
+#endif
+    constexpr int kUrgentDisplay = -8;
+    if (setpriority(PRIO_PROCESS, static_cast<id_t>(::syscall(SYS_gettid)), kUrgentDisplay) != 0)
+        LOG_WARN_ONCE("Could not raise the audio output thread priority (errno {})", errno);
+#endif
+}
+
 constexpr int32_t invalid_port = static_cast<int32_t>(0x80260003U);
 uint64_t wall_us() {
     return std::chrono::duration_cast<std::chrono::microseconds>(
@@ -28,7 +60,14 @@ struct OutputSubscription {
     OutputSubscription(AudioOutPort &port, const ThreadStatePtr &thread) : port(port), id(thread->id) {
         std::weak_ptr<ThreadState> weak = thread;
         const std::lock_guard lock(port.output_wakers_mutex);
-        port.output_wakers[id] = [weak] { if (const auto thread = weak.lock()) thread->wake(); };
+        port.output_wakers[id] = [weak](bool nonblocking) {
+            if (const auto thread = weak.lock()) {
+                if (nonblocking)
+                    thread->try_wake();
+                else
+                    thread->wake();
+            }
+        };
     }
     ~OutputSubscription() {
         const std::lock_guard lock(port.output_wakers_mutex);
@@ -44,6 +83,7 @@ int32_t audio_output_wait(KernelState &kernel, AudioState &audio, MemState &mem,
         return invalid_port;
     if (!buffer)
         return 0;
+    boost_audio_producer_priority();
     const auto self = kernel.get_thread(thread.id);
     if (!self)
         return invalid_port;

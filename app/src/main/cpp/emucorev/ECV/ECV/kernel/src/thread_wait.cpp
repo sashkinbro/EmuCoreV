@@ -186,6 +186,15 @@ void ThreadState::wake() {
     wait_cv.notify_all();
 }
 
+bool ThreadState::try_wake() {
+    const std::unique_lock<std::mutex> lock(mutex, std::try_to_lock);
+    if (!lock.owns_lock())
+        return false;
+    wake_pending = true;
+    wait_cv.notify_all();
+    return true;
+}
+
 SceUInt32 ThreadState::process_callbacks() {
     std::shared_ptr<WaitContinuation> dispatch;
     {

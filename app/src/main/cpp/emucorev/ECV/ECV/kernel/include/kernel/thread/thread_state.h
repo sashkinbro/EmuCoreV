@@ -128,6 +128,8 @@ struct ThreadState {
     [[nodiscard]] WaitResult wait(WaitTarget target, Deadline deadline, bool callbacks);
     // Wakes this thread from wait().
     void wake();
+    // wake() that gives up instead of waiting for the thread's state lock (callers that must not block, e.g. the audio device thread).
+    bool try_wake();
 
     // Runs the notified callbacks of this thread and returns how many ran. Called by the thread itself.
     SceUInt32 process_callbacks();

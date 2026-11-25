@@ -44,14 +44,19 @@ void SDLCALL SDLAudioAdapter::thread_wakeup_callback(void *userdata, SDL_AudioSt
     assert(userdata != nullptr);
     assert(stream != nullptr);
     SDLAudioOutPort *port = static_cast<SDLAudioOutPort *>(userdata);
-#ifdef ECV_ORACLE
-    if (additional_amount > 0)
-        ecv::oracle::lab::audio_underrun(); // the device asked for more than the stream holds
-#endif
     const int samples_available = port->adapter.get_rest_sample(*port);
+#ifdef ECV_ORACLE
+    ecv::oracle::lab::audio_pull(port, samples_available, port->adapter.device_buffer_samples, port->adapter.dst_spec.freq);
+#endif
     if (samples_available < get_threshold_samples(port->adapter.device_buffer_samples) || additional_amount > 0) {
         port->cond_var.notify_one();
-        port->notify_output_ready();
+        // This runs on the real-time device thread with the stream lock held: never wait for a guest thread's state
+        // lock here (a missed wake is retried by the next device pull).
+        bool nonblocking = true;
+#ifdef ECV_ORACLE
+        nonblocking = !ecv::oracle::lab::audio_ab_off(1); // A/B switch: audio-blocking-wake
+#endif
+        port->notify_output_ready(nonblocking);
     }
 }
 

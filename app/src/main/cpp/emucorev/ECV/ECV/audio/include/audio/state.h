@@ -41,10 +41,18 @@ struct AudioOutPort {
     // SDL invokes its callback with the stream lock held: wake subscribers must
     // not take the producer mutex (producer calls SDL while holding it).
     std::mutex output_wakers_mutex;
-    std::map<int, std::function<void()>> output_wakers;
-    void notify_output_ready() {
-        const std::lock_guard lock(output_wakers_mutex);
-        for (auto &[_, wake] : output_wakers) wake();
+    // wake(nonblocking): a nonblocking wake may be skipped when the waiter's state is busy; used from the SDL audio thread
+    // (holding the stream lock, mixing on a real-time deadline), which must never wait for a guest thread. The next device pull retries.
+    std::map<int, std::function<void(bool nonblocking)>> output_wakers;
+    void notify_output_ready(bool nonblocking = false) {
+        std::unique_lock lock(output_wakers_mutex, std::defer_lock);
+        if (nonblocking) {
+            if (!lock.try_lock())
+                return;
+        } else {
+            lock.lock();
+        }
+        for (auto &[_, wake] : output_wakers) wake(nonblocking);
     }
 
     // shutdown flag
