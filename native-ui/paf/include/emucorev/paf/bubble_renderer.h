@@ -23,11 +23,20 @@ struct BubbleImage {
     std::span<const std::uint8_t> rgba;
 };
 
+// Program, mesh, environment map and static state shared by every bubble of one GL context
+// (see make_bubble_shared). A BubbleRenderer built from it only owns its icon and parameter blocks.
+struct BubbleShared;
+std::shared_ptr<const BubbleShared> make_bubble_shared(std::string_view vertex_shader,
+    std::string_view fragment_shader, std::span<const BubbleVertex> vertices,
+    std::span<const std::uint16_t> indices, BubbleImage environment);
+
 class BubbleRenderer {
 public:
     BubbleRenderer(std::string_view vertex_shader, std::string_view fragment_shader,
         std::span<const BubbleVertex> vertices, std::span<const std::uint16_t> indices,
         BubbleImage icon, BubbleImage environment);
+    // A bubble that reuses shared resources: no shader compile, no mesh upload.
+    BubbleRenderer(std::shared_ptr<const BubbleShared> shared, BubbleImage icon);
     ~BubbleRenderer();
     BubbleRenderer(const BubbleRenderer&) = delete;
     BubbleRenderer& operator=(const BubbleRenderer&) = delete;

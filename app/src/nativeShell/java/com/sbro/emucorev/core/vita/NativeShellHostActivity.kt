@@ -127,8 +127,12 @@ class NativeShellHostActivity : NativeShellActivity(), NativeLibraryMode.ReturnT
         }
     }
 
+    private var exitDialog: NativeLibraryExitDialog? = null
+
     override fun onExitRequested() {
-        NativeLibraryExitDialog(this) {
+        // Back pressed again (or Settings > exit) while the confirmation is up must not stack a second dialog.
+        if (exitDialog?.isShowing == true || isFinishing || isDestroyed) return
+        exitDialog = NativeLibraryExitDialog(this) {
             NativeLibraryMode.setSelected(this, false)
             startActivity(Intent(this, MainActivity::class.java).apply {
                 action = Intent.ACTION_MAIN
@@ -137,12 +141,15 @@ class NativeShellHostActivity : NativeShellActivity(), NativeLibraryMode.ReturnT
                 putExtra(NativeLibraryMode.EXIT_NATIVE_LIBRARY, true)
             })
             finish()
-        }.show()
+        }.also { it.show() }
     }
 
     private fun toast(message: Int) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 
     override fun onDestroy() {
+        // A dialog that outlives its Activity leaks its window.
+        exitDialog?.dismiss()
+        exitDialog = null
         scope.cancel()
         super.onDestroy()
     }

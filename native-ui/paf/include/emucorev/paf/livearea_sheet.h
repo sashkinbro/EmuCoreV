@@ -2,7 +2,9 @@
 
 #include <emucorev/paf/page_turn.h>
 
+#include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace emucorev::paf {
@@ -57,6 +59,15 @@ public:
     // Returns true if a new tab was opened (caller may emitdecide sound).
     bool open_or_focus(const std::string& title_id, int catalog_index,
         float bubble_x, float bubble_y);
+
+    // Rebuilds the open tabs (newest first) without any animation, e.g. when the shell is
+    // recreated after its process was killed. `active` is -1 for Home or a tab index; invalid
+    // input is clamped (duplicates dropped, at most kLiveAreaMaxOpenTabs kept).
+    void restore(const std::vector<std::pair<std::string, int>>& tabs, int active);
+
+    // Re-resolves every tab's catalog index after the Home catalog changed. Tabs whose title is
+    // gone (lookup returns < 0) are closed; the pager snaps to the surviving active page.
+    void remap_catalog(const std::function<int(const std::string&)>& lookup);
 
     // Glides horizontally back to Home while keeping all open tabs in the top bar.
     bool slide_to_home();

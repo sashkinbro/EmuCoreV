@@ -16,6 +16,7 @@ import com.sbro.emucorev.nativeui.DeviceStatusSource
 import com.sbro.emucorev.nativeui.BundledImages
 import com.sbro.emucorev.nativeui.FirmwarePack
 import com.sbro.emucorev.nativeui.NativeUiSoundBank
+import com.sbro.emucorev.nativeui.ShellSessionStore
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.text.format.DateFormat
@@ -82,7 +83,32 @@ open class NativeShellActivity : NativeActivity() {
     private external fun nativeWaveThemes(): Array<String>
     private external fun nativeSetDisplayArea(mode: Int)
     private external fun nativeSetHomeTheme(wallpapers: IntArray, barColor: Int)
+    private external fun nativeSessionState(): String
+    private external fun nativeRestoreSession(state: String)
+    private external fun nativeResetSession()
     private var lastLiveAreaTarget: String? = null
+    // Unlocked/Home focus/open LiveAreas, kept on disk: the shell process is often killed while a game
+    // runs and must not come back on the lock screen (B048).
+    private val sessionStore by lazy {
+        ShellSessionStore(File(noBackupFilesDir, ShellSessionStore.FILE_NAME), ::bootId)
+    }
+    /** LiveAreas the restored session had open; their images are loaded once the shell is ready. */
+    private var restoredTitles: List<String> = emptyList()
+
+    private fun bootId(): Long {
+        val count = runCatching {
+            android.provider.Settings.Global.getInt(contentResolver, android.provider.Settings.Global.BOOT_COUNT, 0)
+        }.getOrDefault(0)
+        // Without a boot counter the (rounded) boot time still tells restarts apart.
+        return if (count > 0) count.toLong()
+        else (System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime()) / 120_000L
+    }
+
+    private fun persistSession() {
+        if (isFinishing || closed.get()) return
+        // Nothing published yet (not unlocked / window not up) must not erase the stored session.
+        runCatching { nativeSessionState().takeIf { it.isNotBlank() }?.let(sessionStore::save) }
+    }
     @Volatile private var catalogEntries: List<BundledImages.HomeCatalogEntry> = emptyList()
     private val requestedLiveAreas = java.util.Collections.synchronizedSet(HashSet<String>())
 
@@ -186,8 +212,10 @@ open class NativeShellActivity : NativeActivity() {
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC).build())
                     setDataSource(playable.path)
                     isLooping = true
-                    prepare()
-                    if (resumed) start()
+                    // Decoding/opening a long track must not block the main thread.
+                    setOnPreparedListener { player -> if (music === player && resumed) player.start() }
+                    setOnErrorListener { player, _, _ -> if (music === player) stopMusic(); true }
+                    prepareAsync()
                 }
             }.onFailure { Log.w(TAG, "Cannot play theme music", it) }.getOrNull()
         }
@@ -199,19 +227,24 @@ open class NativeShellActivity : NativeActivity() {
         musicSource = null
     }
 
+    private var picking = false
+
     private fun pick(request: Int, mime: String) { mainHandler.post {
-        if (closed.get() || isFinishing) return@post
+        // One system picker at a time: a double tap must not stack two of them.
+        if (closed.get() || isFinishing || picking) return@post
+        picking = true
         runCatching {
             startActivityForResult(android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
                 addCategory(android.content.Intent.CATEGORY_OPENABLE)
                 type = mime
             }, request)
-        }.onFailure { Log.w(TAG, "No document picker", it) }
+        }.onFailure { picking = false; Log.w(TAG, "No document picker", it) }
     } }
 
     @Deprecated("NativeActivity has no activity result registry")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        picking = false
         val uri = data?.data ?: return
         if (resultCode != RESULT_OK) return
         runApp {
@@ -323,8 +356,12 @@ open class NativeShellActivity : NativeActivity() {
     }
 
     private fun runApp(block: () -> Unit) {
-        startupExecutor.execute {
-            runCatching(block).onFailure { Log.w(TAG, "Shell application failed", it) }
+        // Native callbacks can still arrive while the Activity is being destroyed.
+        if (closed.get()) return
+        runCatching {
+            startupExecutor.execute {
+                runCatching(block).onFailure { Log.w(TAG, "Shell application failed", it) }
+            }
         }
     }
 
@@ -374,6 +411,14 @@ open class NativeShellActivity : NativeActivity() {
         nativeResourceRoot(startupRoot.absolutePath)
         nativePreviewScene(if (requestedScene == 4) 4 else 1)
         nativePreviewLoading(requestedScene != 1 && requestedScene != 4)
+        if (sceneArgument == null) {
+            // No explicit scene: a stored session means the shell is coming back (after a game, or after
+            // its process was killed) and returns unlocked where the user was; otherwise the lock screen.
+            sessionStore.load()?.let { stored ->
+                restoredTitles = ShellSessionStore.openTitles(stored)
+                nativeRestoreSession(stored)
+            }
+        }
         super.onCreate(state)
         window.attributes = window.attributes.apply {
             // Draw edge to edge; the native canvas keeps chrome inside the
@@ -454,6 +499,11 @@ open class NativeShellActivity : NativeActivity() {
             if (requestedScene == 2) {
                 localLoader.updateLockClock(seedClock)
             }
+            // LiveAreas the restored session had open are in place before the first frame (no blank sheet).
+            for (title in restoredTitles) {
+                if (deliverLiveArea(localLoader, title)) requestedLiveAreas.add(title)
+            }
+            restoredTitles = emptyList()
             val readySounds = NativeUiSoundBank(resources)
             if (Thread.currentThread().isInterrupted || closed.get()) {
                 readySounds.release()
@@ -541,17 +591,26 @@ open class NativeShellActivity : NativeActivity() {
     @Suppress("unused")
     fun onNativeRequestLiveArea(titleId: String) {
         if (!requestedLiveAreas.add(titleId)) return
+        if (closed.get()) { requestedLiveAreas.remove(titleId); return }
+        runCatching { startupExecutor.execute {
+            // Not ready yet: forget the request so the next one is honoured instead of being swallowed.
+            val loader = if (::images.isInitialized) images else null
+            if (loader == null || !deliverLiveArea(loader, titleId)) requestedLiveAreas.remove(titleId)
+        } }.onFailure { requestedLiveAreas.remove(titleId) }
+    }
+
+    /** Decodes a title's LiveArea and hands it to native. Worker thread; false when it could not be delivered. */
+    private fun deliverLiveArea(loader: BundledImages, titleId: String): Boolean {
         val index = catalogEntries.indexOfFirst { it.id == titleId }
-        if (index < 0) return
+        if (index < 0) return false
         val entry = catalogEntries[index]
-        val startLabel = getString(R.string.native_ui_start)
-        startupExecutor.execute {
-            val loader = if (::images.isInitialized) images else return@execute
-            val snapshot = runCatching { loader.loadHomeLiveArea(entry, index, startLabel) }
-                .onFailure { Log.w(TAG, "Cannot load LiveArea for $titleId", it) }
-                .getOrNull() ?: return@execute
+        val snapshot = runCatching { loader.loadHomeLiveArea(entry, index, getString(R.string.native_ui_start)) }
+            .onFailure { Log.w(TAG, "Cannot load LiveArea for $titleId", it) }
+            .getOrNull() ?: return false
+        // The native side rejects malformed LiveAreas by throwing; on this worker that would kill the process.
+        return runCatching {
             synchronized(nativeBridgeLock) {
-                if (closed.get()) return@execute
+                if (closed.get()) return false
                 nativeHomeLiveArea(
                     snapshot.titleId,
                     snapshot.backgroundImageId,
@@ -569,7 +628,8 @@ open class NativeShellActivity : NativeActivity() {
                     snapshot.targetRects,
                 )
             }
-        }
+            true
+        }.onFailure { Log.w(TAG, "Native rejected the LiveArea of $titleId", it) }.getOrDefault(false)
     }
 
     protected open fun onShellFailed(error: Throwable) {
@@ -662,10 +722,22 @@ open class NativeShellActivity : NativeActivity() {
         resumed = false
         soundBank?.onPause()
         deviceStatus.stop()
+        persistSession()
         super.onPause()
     }
 
+    override fun onStop() {
+        // The surface goes away after this; the native window publishes its final state first.
+        persistSession()
+        super.onStop()
+    }
+
     override fun onDestroy() {
+        if (isFinishing) {
+            // The user left on purpose (or the task was removed): the next entry starts locked again.
+            runCatching { sessionStore.clear() }
+            runCatching { nativeResetSession() }
+        }
         synchronized(nativeBridgeLock) { closed.set(true) }
         startupTask?.cancel(true)
         startupExecutor.shutdownNow()

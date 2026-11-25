@@ -18,6 +18,7 @@
 #include <emucorev/paf/wave_preset.h>
 #include <emucorev/paf/wave_renderer.h>
 #include "app_screen.h"
+#include "shell_session_state.h"
 #include <android/choreographer.h>
 #include <fstream>
 #include <android/input.h>
@@ -37,6 +38,8 @@
 #include <vector>
 #include <unordered_map>
 #include <atomic>
+#include <chrono>
+#include <sys/system_properties.h>
 
 namespace {
 std::mutex status_mutex;
@@ -55,6 +58,7 @@ struct LiveAreaLayer { std::uint32_t image_id = 0; ScreenRect rect{}; std::uint3
 struct LiveAreaTarget { std::string id; ScreenRect rect{}; };
 struct LiveAreaSnapshot {
     std::string title_id;
+    std::uint64_t serial = 0; // livearea_catalog_revision at insertion; tells a cached copy it is outdated
     std::uint32_t background_id = 0, gate_id = 0;
     std::uint32_t gate_start_label_id = 0, gate_control_id = 0;
     ScreenRect background_rect{}, gate_rect{};
@@ -168,18 +172,29 @@ template<class T> std::vector<T> read_path(const std::string& relative, std::siz
     if (!file) throw std::runtime_error("Incomplete preview asset: " + path);
     return values;
 }
+// The render/input thread is a native thread, not attached by the glue. Attaching and detaching on
+// every UI sound / event cost an ART thread peer each time; attach once and detach when the
+// thread exits.
+struct ThreadAttachment {
+    JavaVM* vm = nullptr;
+    ~ThreadAttachment() { if (vm) vm->DetachCurrentThread(); }
+};
+JNIEnv* thread_env(JavaVM* vm) {
+    JNIEnv* env = nullptr;
+    const jint state = vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (state == JNI_OK) return env;
+    if (state != JNI_EDETACHED || vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return nullptr;
+    thread_local ThreadAttachment attachment;
+    attachment.vm = vm;
+    return env;
+}
 // Calls a void (String) or (String, String) method on the host Activity from any thread.
 void emit_activity_strings(jmethodID* slot, const std::string& first, const std::string* second) {
     JavaVM* vm = nullptr;
     { const std::lock_guard lock_guard(status_mutex); vm = preview_java_vm; }
     if (!vm) return;
-    JNIEnv* env = nullptr;
-    bool attached = false;
-    const jint state = vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
-    if (state == JNI_EDETACHED) {
-        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
-        attached = true;
-    } else if (state != JNI_OK || !env) return;
+    JNIEnv* env = thread_env(vm);
+    if (!env) return;
 
     jobject activity = nullptr;
     jmethodID callback = nullptr;
@@ -200,7 +215,6 @@ void emit_activity_strings(jmethodID* slot, const std::string& first, const std:
         if (b) env->DeleteLocalRef(b);
         env->DeleteGlobalRef(activity);
     }
-    if (attached) vm->DetachCurrentThread();
 }
 
 void emit_livearea_target_request(const std::string& title_id, const std::string& target) {
@@ -212,13 +226,8 @@ void emit_app_event(jmethodID* slot, const std::string& app, int key, int row, b
     JavaVM* vm = nullptr;
     { const std::lock_guard lock_guard(status_mutex); vm = preview_java_vm; }
     if (!vm) return;
-    JNIEnv* env = nullptr;
-    bool attached = false;
-    const jint state = vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
-    if (state == JNI_EDETACHED) {
-        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
-        attached = true;
-    } else if (state != JNI_OK || !env) return;
+    JNIEnv* env = thread_env(vm);
+    if (!env) return;
     jobject activity = nullptr;
     jmethodID callback = nullptr;
     {
@@ -235,7 +244,6 @@ void emit_app_event(jmethodID* slot, const std::string& app, int key, int row, b
         }
         env->DeleteGlobalRef(activity);
     }
-    if (attached) vm->DetachCurrentThread();
 }
 
 // Back on an otherwise idle Home: the host decides whether to leave the shell.
@@ -251,13 +259,8 @@ void emit_ui_sound(int sound_id) {
     JavaVM* vm = nullptr;
     { const std::lock_guard lock_guard(status_mutex); vm = preview_java_vm; }
     if (!vm) return;
-    JNIEnv* env = nullptr;
-    bool attached = false;
-    const jint state = vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
-    if (state == JNI_EDETACHED) {
-        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
-        attached = true;
-    } else if (state != JNI_OK || !env) return;
+    JNIEnv* env = thread_env(vm);
+    if (!env) return;
 
     jobject activity = nullptr;
     jmethodID callback = nullptr;
@@ -271,20 +274,14 @@ void emit_ui_sound(int sound_id) {
         env->CallVoidMethod(activity, callback, static_cast<jint>(sound_id));
         env->DeleteGlobalRef(activity);
     }
-    if (attached) vm->DetachCurrentThread();
 }
 
 void emit_save_home_layout(const std::string& layout) {
     JavaVM* vm = nullptr;
     { const std::lock_guard lock_guard(status_mutex); vm = preview_java_vm; }
     if (!vm) return;
-    JNIEnv* env = nullptr;
-    bool attached = false;
-    const jint state = vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
-    if (state == JNI_EDETACHED) {
-        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
-        attached = true;
-    } else if (state != JNI_OK || !env) return;
+    JNIEnv* env = thread_env(vm);
+    if (!env) return;
 
     jobject activity = nullptr;
     jmethodID callback = nullptr;
@@ -302,7 +299,6 @@ void emit_save_home_layout(const std::string& layout) {
         }
         env->DeleteGlobalRef(activity);
     }
-    if (attached) vm->DetachCurrentThread();
 }
 
 // Shell state that must outlive a surface: Android destroys the native window
@@ -313,6 +309,82 @@ struct ShellSession {
     int focus_page = 0, focus_slot = 0;
 };
 std::optional<ShellSession> shell_session;
+// The host persists the session across process death (the :native_shell process is often killed
+// while a game runs); without it the recreated shell would come back on the lock screen.
+// All three are guarded by status_mutex except the atomic flag.
+std::string published_session_text;                      // what the host should store
+std::optional<shell_session::State> pending_session_restore; // stored session waiting for the next Home window
+std::atomic<bool> session_reset_requested{false};        // the user left the shell: forget the session
+
+#ifndef NDEBUG
+// Debug builds only: per-frame timing for on-device measurement. Every kReportFrames frames it logs
+// (tag NativeShellPerf) the frame interval, the CPU time spent recording the frame, the time
+// eglSwapBuffers blocked, late frames (interval > 20 ms at 60 Hz) and the texture-upload backlog.
+// Disable with `adb shell setprop debug.emucorev.shell.perf 0`.
+class FramePerf {
+public:
+    FramePerf() {
+        char value[PROP_VALUE_MAX] = {};
+        enabled_ = !(__system_property_get("debug.emucorev.shell.perf", value) > 0 && value[0] == '0');
+    }
+    void begin(int scene) {
+        if (!enabled_) return;
+        const auto now = Clock::now();
+        if (have_start_) interval_.push_back(ms(now - start_));
+        start_ = now;
+        have_start_ = true;
+        scene_ = scene;
+    }
+    void submitted() { if (enabled_) submitted_ = Clock::now(); }
+    void end(unsigned uploads_pending) {
+        if (!enabled_) return;
+        const auto now = Clock::now();
+        submit_.push_back(ms(submitted_ - start_));
+        swap_.push_back(ms(now - submitted_));
+        pending_ = std::max(pending_, uploads_pending);
+        if (submit_.size() >= kReportFrames) report();
+    }
+private:
+    using Clock = std::chrono::steady_clock;
+    static constexpr std::size_t kReportFrames = 120;
+    static float ms(Clock::duration d) { return std::chrono::duration<float, std::milli>(d).count(); }
+    static float percentile(std::vector<float> values, float p) {
+        if (values.empty()) return 0.f;
+        const auto index = static_cast<std::size_t>(p * float(values.size() - 1));
+        std::nth_element(values.begin(), values.begin() + static_cast<std::ptrdiff_t>(index), values.end());
+        return values[index];
+    }
+    static float mean(const std::vector<float>& values) {
+        float sum = 0.f;
+        for (const float v : values) sum += v;
+        return values.empty() ? 0.f : sum / float(values.size());
+    }
+    void report() {
+        unsigned late = 0;
+        float worst = 0.f;
+        for (const float v : interval_) { late += v > 20.f; worst = std::max(worst, v); }
+        __android_log_print(ANDROID_LOG_INFO, "NativeShellPerf",
+            "scene=%d frames=%zu interval avg=%.2f p95=%.2f max=%.2f late=%u | record avg=%.2f p95=%.2f max=%.2f"
+            " | swap avg=%.2f p95=%.2f | pending_uploads=%u",
+            scene_, submit_.size(), mean(interval_), percentile(interval_, .95f), worst, late,
+            mean(submit_), percentile(submit_, .95f), percentile(submit_, 1.f),
+            mean(swap_), percentile(swap_, .95f), pending_);
+        interval_.clear(); submit_.clear(); swap_.clear();
+        pending_ = 0;
+    }
+    bool enabled_ = true, have_start_ = false;
+    int scene_ = 0;
+    unsigned pending_ = 0;
+    Clock::time_point start_{}, submitted_{};
+    std::vector<float> interval_, submit_, swap_;
+};
+#else
+struct FramePerf {
+    void begin(int) {}
+    void submitted() {}
+    void end(unsigned) {}
+};
+#endif
 
 struct Window {
     EGLDisplay display = EGL_NO_DISPLAY;
@@ -368,6 +440,7 @@ struct Window {
     };
     std::vector<HomeCatalogItem> home_catalog_items;
     std::vector<std::string> home_catalog_ids;
+    std::shared_ptr<const emucorev::paf::BubbleShared> bubble_shared; // before the renderers: destroyed after them
     std::vector<std::unique_ptr<emucorev::paf::BubbleRenderer>> catalog_bubble_renderers;
     std::unordered_map<std::string, BubbleVisualSlot> bubble_slots;
     emucorev::paf::HomeDesktopState desktop;
@@ -377,10 +450,10 @@ struct Window {
     emucorev::paf::LiveAreaDeck livearea_deck;
     emucorev::paf::PageTurnMesh livearea_mesh;
     std::unordered_map<std::string, LiveAreaSnapshot> cached_livearea_snapshots;
-    std::uint64_t applied_livearea_catalog_revision = 0;
 
     bool home_visible = false;
     int home_page = 0, home_focus_page = 0, home_focus_slot = 0;
+    shell_session::State published_state; // last state handed to the host (see publish_session_if_changed)
     int home_touch_page = -1, home_touch_slot = -1;
     bool home_touch_down = false;
     float home_hold_elapsed = 0.f;
@@ -475,6 +548,8 @@ struct Window {
 
     std::unordered_map<std::uint32_t, std::uint64_t> uploaded_images;
     std::uint64_t uploaded_revision = 0;
+    unsigned frames_drawn = 0, upload_backlog = 0;
+    FramePerf perf;
     std::array<float, 96> vertex{};
     std::array<float, 96> base_vertex{};
     std::array<float, 10> material{};
@@ -483,13 +558,15 @@ struct Window {
 
     ~Window() {
         const int scene = preview_scene.load();
-        if ((scene == 2 || scene == 3) && (home_visible || lock_anim_state == LockAnimState::unlocked)) {
+        if ((scene == 2 || scene == 3) && (home_visible || lock_anim_state == LockAnimState::unlocked)
+            && !session_reset_requested.load()) {
             ShellSession session;
             session.unlocked = true;
             session.deck = livearea_deck;
             session.focus_page = home_focus_page;
             session.focus_slot = home_focus_slot;
             shell_session = std::move(session);
+            publish_session_state();
         }
         // GPU resources must die before their context, including partial init.
         if (context != EGL_NO_CONTEXT && surface != EGL_NO_SURFACE)
@@ -497,6 +574,7 @@ struct Window {
         // Catalog bubble renderers own GL objects; destroy them while their
         // originating context is current, before EGL teardown below.
         catalog_bubble_renderers.clear();
+        bubble_shared.reset();
         bubble_env.reset();
         focus_cursor.reset();
         wave.reset();
@@ -520,6 +598,56 @@ struct Window {
             if (surface != EGL_NO_SURFACE) eglDestroySurface(display, surface);
             eglTerminate(display);
         }
+    }
+
+    static ShellSession session_from_state(const shell_session::State& state) {
+        ShellSession session;
+        session.unlocked = state.unlocked;
+        session.focus_page = state.focus_page;
+        session.focus_slot = state.focus_slot;
+        std::vector<std::pair<std::string, int>> tabs;
+        {
+            const std::lock_guard lock_guard(status_mutex);
+            for (const auto& title : state.tabs) {
+                const auto found = std::find_if(home_catalog.begin(), home_catalog.end(),
+                    [&](const HomeCatalogItem& item) { return item.id == title; });
+                tabs.emplace_back(title, found == home_catalog.end() ? -1
+                    : static_cast<int>(found - home_catalog.begin()));
+            }
+        }
+        session.deck.restore(tabs, state.active);
+        return session;
+    }
+
+    shell_session::State session_state() const {
+        shell_session::State state;
+        state.unlocked = true;
+        state.focus_page = home_focus_page;
+        state.focus_slot = home_focus_slot;
+        state.active = livearea_deck.active_tab_index();
+        for (const auto& tab : livearea_deck.tabs()) state.tabs.push_back(tab.title_id);
+        return state;
+    }
+
+    void publish_session_state() {
+        if (session_reset_requested.load()) return;
+        published_state = session_state();
+        const auto text = shell_session::serialize(published_state);
+        const std::lock_guard lock_guard(status_mutex);
+        published_session_text = text;
+    }
+
+    // Cheap per-frame check; builds and publishes text only when the persisted fields changed.
+    void publish_session_if_changed() {
+        const bool unlocked = preview_scene.load() == 3 || lock_anim_state == LockAnimState::unlocked;
+        if (!unlocked) return;
+        bool same = published_state.unlocked && published_state.focus_page == home_focus_page
+            && published_state.focus_slot == home_focus_slot
+            && published_state.active == livearea_deck.active_tab_index()
+            && published_state.tabs.size() == livearea_deck.tabs().size();
+        for (std::size_t i = 0; same && i < published_state.tabs.size(); ++i)
+            same = published_state.tabs[i] == livearea_deck.tabs()[i].title_id;
+        if (!same) publish_session_state();
     }
 
     void initialize(android_app* app) {
@@ -610,6 +738,18 @@ struct Window {
         ensure_canvas(sw, sh);
 
         wire_app_screen();
+        if (preview_scene.load() == 2 || preview_scene.load() == 3) {
+            // A session persisted by the host (process death) applies once; the user having left
+            // the shell discards whatever this process still remembers.
+            if (session_reset_requested.exchange(false)) shell_session.reset();
+            std::optional<shell_session::State> restore;
+            {
+                const std::lock_guard lock_guard(status_mutex);
+                restore = std::move(pending_session_restore);
+                pending_session_restore.reset();
+            }
+            if (!shell_session && restore && restore->unlocked) shell_session = session_from_state(*restore);
+        }
         if ((preview_scene.load() == 2 || preview_scene.load() == 3) && shell_session) {
             livearea_deck = shell_session->deck;
             home_focus_page = shell_session->focus_page;
@@ -618,6 +758,8 @@ struct Window {
                 lock_anim_state = LockAnimState::unlocked;
                 home_visible = true;
                 home_enter_elapsed = 1.f;
+                // The host may be paused before the first tick: keep what it stores current.
+                publish_session_state();
             }
         }
     }
@@ -830,6 +972,13 @@ struct Window {
             catalog_bubble_renderers.resize(home_catalog_items.size());
             desktop.sync_with_catalog(home_catalog_ids);
             applied_home_catalog_revision = cat_rev;
+            // Open LiveAreas follow their title when the catalog changed (a restored or carried-over
+            // session may predate installs/uninstalls); vanished titles close.
+            if (livearea_deck.tab_count() > 0)
+                livearea_deck.remap_catalog([&](const std::string& id) {
+                    const auto found = std::find(home_catalog_ids.begin(), home_catalog_ids.end(), id);
+                    return found == home_catalog_ids.end() ? -1 : static_cast<int>(found - home_catalog_ids.begin());
+                });
         }
         if (layout_rev != applied_home_layout_revision) {
             if (!layout_str.empty()) {
@@ -855,19 +1004,20 @@ struct Window {
             return nullptr;
         auto& slot_ptr = catalog_bubble_renderers[static_cast<std::size_t>(catalog_index)];
         if (slot_ptr) return slot_ptr.get();
-        HostImage icon;
+        // One program/mesh for every bubble (compiled once per GL context, not per game).
+        if (!bubble_shared)
+            bubble_shared = emucorev::paf::make_bubble_shared(
+                emucorev::paf::opaque_bubble_vertex_shader(), emucorev::paf::opaque_bubble_fragment_shader(),
+                bubble_vertices, bubble_indices, emucorev::paf::BubbleImage{64, 64, bubble_environment});
         {
+            // The icon goes straight from the host image to the GPU; no per-bubble copy of its pixels.
             const std::lock_guard lock_guard(status_mutex);
             const auto image = host_images.find(
                 home_catalog_items[static_cast<std::size_t>(catalog_index)].icon_image_id);
             if (image == host_images.end()) return nullptr;
-            icon = image->second;
+            slot_ptr = std::make_unique<emucorev::paf::BubbleRenderer>(bubble_shared,
+                emucorev::paf::BubbleImage{image->second.width, image->second.height, image->second.rgba});
         }
-        slot_ptr = std::make_unique<emucorev::paf::BubbleRenderer>(
-            emucorev::paf::opaque_bubble_vertex_shader(), emucorev::paf::opaque_bubble_fragment_shader(),
-            bubble_vertices, bubble_indices,
-            emucorev::paf::BubbleImage{icon.width, icon.height, icon.rgba},
-            emucorev::paf::BubbleImage{64, 64, bubble_environment});
         return slot_ptr.get();
     }
 
@@ -1248,20 +1398,16 @@ struct Window {
 
     const LiveAreaSnapshot* ensure_livearea_snapshot(const std::string& title_id) {
         if (title_id.empty()) return nullptr;
-        std::uint64_t revision = 0;
         {
             const std::lock_guard lock_guard(status_mutex);
-            revision = livearea_catalog_revision;
-            if (revision != applied_livearea_catalog_revision) {
-                cached_livearea_snapshots.clear();
-                applied_livearea_catalog_revision = revision;
-            }
-            if (const auto cached = cached_livearea_snapshots.find(title_id);
-                cached != cached_livearea_snapshots.end()) {
-                return &cached->second;
-            }
             const auto entry = livearea_catalog.find(title_id);
             if (entry == livearea_catalog.end()) return nullptr;
+            // Only the changed title is rebuilt. Clearing the whole cache whenever any LiveArea arrived
+            // freed snapshots another caller in the same frame still held a pointer to.
+            if (const auto cached = cached_livearea_snapshots.find(title_id);
+                cached != cached_livearea_snapshots.end() && cached->second.serial == entry->second.serial) {
+                return &cached->second;
+            }
             LiveAreaSnapshot copy = entry->second;
             const auto& gate = copy.gate_rect;
             const float gcx = gate[0] + gate[2] * 0.5f - emucorev::paf::kLiveAreaSheetLeft;
@@ -1306,8 +1452,9 @@ struct Window {
             copy.gate_control_quads = emucorev::paf::build_plane_div_screen_quads(
                 control_spec, gcx, gcy + 54.f);
 
-            const auto [it, _] = cached_livearea_snapshots.emplace(title_id, std::move(copy));
-            return &it->second;
+            auto& slot = cached_livearea_snapshots[title_id];
+            slot = std::move(copy);
+            return &slot;
         }
     }
 
@@ -1691,6 +1838,7 @@ struct Window {
         // Provisional 200 ms linear fade: the emulated reference confirms the
         // end states (dimmed Home, opaque balloon) but not the exact curve.
         notif_blend = std::clamp(notif_blend + (notif_open ? elapsed : -elapsed) / 0.2f, 0.f, 1.f);
+        publish_session_if_changed();
 
         if (home_touch_down && !home_drag_moved && !edit_visual.edit_mode
             && !edit_visual.folder_open && livearea_deck.is_home_active()) {
@@ -2337,12 +2485,17 @@ struct Window {
     bool is_livearea_visible() const noexcept { return livearea_deck.is_livearea_visible(); }
 
     void ensure_wave() {
-        std::string theme_name;
+        // Called every frame (tick and draw): the theme name is only copied when the theme changed.
         std::uint64_t rev = 0;
         {
             const std::lock_guard lock_guard(status_mutex);
-            theme_name = requested_wave_theme;
             rev = wave_theme_revision;
+        }
+        if (wave && rev == applied_wave_theme_revision) return;
+        std::string theme_name;
+        {
+            const std::lock_guard lock_guard(status_mutex);
+            theme_name = requested_wave_theme;
         }
         auto sync_index = [&](const emucorev::paf::WaveThemePreset& active) {
             const auto presets = emucorev::paf::wave_theme_presets();
@@ -2365,6 +2518,11 @@ struct Window {
     }
 
     void tick_wave(float elapsed) {
+        {
+            // A photo/theme background replaces the wave: do not build or simulate what is never drawn.
+            const std::lock_guard lock_guard(status_mutex);
+            if (!home_wallpaper_ids.empty()) return;
+        }
         ensure_wave();
         wave->step(elapsed);
     }
@@ -2520,21 +2678,29 @@ struct Window {
         return 0;
     }
 
+    // Uploads host images the GPU does not have yet. A burst (a LiveArea with a 960x544 background plus
+    // dozens of layers, an application page of many rows) used to be uploaded inside one frame while
+    // holding status_mutex, a visible hitch on weak GPUs. After the first frames of a window the work is
+    // capped per frame (at least one image always), the rest follows on the next frames.
     void upload_images() {
-        // Packaged textures are decoded once by Kotlin and uploaded only when
-        // changed. A recreated GL context gets its own complete texture cache.
         const std::lock_guard lock(status_mutex);
-        if (uploaded_revision != image_revision) {
-            for (const auto& [id, image] : host_images) {
-                // BubbleRenderer owns icon textures on demand for the active
-                // 10-item page; never mirror the full catalog into sprites.
-                if (id >= home_icon_image_min && id < home_icon_image_limit) continue;
-                if (uploaded_images[id] == image.revision) continue;
-                sprites->upload(id, image.width, image.height, image.rgba);
-                uploaded_images[id] = image.revision;
-            }
-            uploaded_revision = image_revision;
+        if (uploaded_revision == image_revision) { upload_backlog = 0; return; }
+        constexpr auto budget = std::chrono::microseconds(3000);
+        const bool unlimited = frames_drawn < 3;
+        const auto started = std::chrono::steady_clock::now();
+        unsigned uploaded = 0, pending = 0;
+        for (const auto& [id, image] : host_images) {
+            // BubbleRenderer owns icon textures on demand for the active
+            // 10-item page; never mirror the full catalog into sprites.
+            if (id >= home_icon_image_min && id < home_icon_image_limit) continue;
+            if (uploaded_images[id] == image.revision) continue;
+            if (!unlimited && uploaded > 0 && std::chrono::steady_clock::now() - started > budget) { ++pending; continue; }
+            sprites->upload(id, image.width, image.height, image.rgba);
+            uploaded_images[id] = image.revision;
+            ++uploaded;
         }
+        upload_backlog = pending;
+        if (!pending) uploaded_revision = image_revision;
     }
 
     void draw_status(std::uint32_t charging_texture) {
@@ -2800,6 +2966,7 @@ struct Window {
     }
 
     void draw(const emucorev::paf::BusySnapshot* busy, std::uint32_t charging_texture) {
+        perf.begin(preview_scene.load());
         EGLint width, height;
         if (!eglQuerySurface(display, surface, EGL_WIDTH, &width)
             || !eglQuerySurface(display, surface, EGL_HEIGHT, &height) || width <= 0 || height <= 0) return;
@@ -2850,7 +3017,10 @@ struct Window {
         const int x = (width - w) / 2, y = (height - h) / 2;
         glBindFramebuffer(GL_READ_FRAMEBUFFER, target);
         glBlitFramebuffer(0, 0, target_w, target_h, x, y, x + w, y + h, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+        perf.submitted();
         if (!eglSwapBuffers(display, surface)) throw std::runtime_error("Preview presentation failed");
+        ++frames_drawn;
+        perf.end(upload_backlog);
     }
 };
 
@@ -3184,6 +3354,36 @@ Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeBackRequested(JN
     native_back_requested.store(true);
 }
 
+// Text the host stores to bring the session back after its process was killed ("" = nothing yet).
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeSessionState(JNIEnv* env, jobject) {
+    std::string text;
+    { const std::lock_guard lock(status_mutex); text = published_session_text; }
+    return env->NewStringUTF(text.c_str());
+}
+
+// Hands a stored session to the next Home window (unlocked, focus, open LiveAreas).
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeRestoreSession(JNIEnv* env, jobject, jstring text) {
+    if (!text) return;
+    const char* chars = env->GetStringUTFChars(text, nullptr);
+    if (!chars) return;
+    auto state = shell_session::parse(chars);
+    env->ReleaseStringUTFChars(text, chars);
+    if (!state) return;
+    const std::lock_guard lock(status_mutex);
+    pending_session_restore = std::move(state);
+}
+
+// The user left the shell on purpose: the next entry starts on the lock screen again.
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeResetSession(JNIEnv*, jobject) {
+    const std::lock_guard lock(status_mutex);
+    published_session_text.clear();
+    pending_session_restore.reset();
+    session_reset_requested.store(true);
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeImage(JNIEnv* env, jobject,
     jint id, jint width, jint height, jbyteArray rgba) {
@@ -3469,8 +3669,8 @@ Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeHomeLiveArea(JNI
             page.targets.push_back({std::move(target), rect_at(target_bounds, static_cast<std::size_t>(i))});
         }
         const std::lock_guard lock_guard(status_mutex);
+        page.serial = ++livearea_catalog_revision;
         livearea_catalog[page.title_id] = std::move(page);
-        ++livearea_catalog_revision;
     } catch (const std::exception& error) {
         env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), error.what());
     }
@@ -3490,8 +3690,10 @@ Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeLoadHomeLayout(J
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeReleaseHomeCallback(JNIEnv* env, jobject) {
+Java_com_sbro_emucorev_nativeui_shell_NativeShellActivity_nativeReleaseHomeCallback(JNIEnv* env, jobject activity) {
     const std::lock_guard lock_guard(status_mutex);
+    // A newer Activity instance may already have registered itself; only drop our own callbacks.
+    if (preview_activity_ref && !env->IsSameObject(preview_activity_ref, activity)) return;
     if (preview_activity_ref) env->DeleteGlobalRef(preview_activity_ref);
     preview_activity_ref = nullptr;
     livearea_target_callback = nullptr;

@@ -114,6 +114,56 @@ bool LiveAreaDeck::open_or_focus(const std::string& title_id, int catalog_index,
     return newly_opened;
 }
 
+void LiveAreaDeck::restore(const std::vector<std::pair<std::string, int>>& tabs, int active) {
+    tabs_.clear();
+    for (const auto& [title_id, catalog_index] : tabs) {
+        if (title_id.empty() || find_tab(title_id) >= 0) continue;
+        if (static_cast<int>(tabs_.size()) >= kLiveAreaMaxOpenTabs) break;
+        LiveAreaTab tab{};
+        tab.title_id = title_id;
+        tab.catalog_index = catalog_index;
+        reset_tab_rest(tab);
+        tabs_.push_back(std::move(tab));
+    }
+    active_tab_ = std::clamp(active, -1, static_cast<int>(tabs_.size()) - 1);
+    pager_x_ = pager_target_ = static_cast<float>(active_tab_ + 1);
+    pager_velocity_ = 0.0f;
+    pager_dragging_ = false;
+    post_peel_gap_active_ = false;
+    post_peel_gap_idx_ = -1;
+    open_anim_active_ = false;
+    open_anim_time_ = 0.0f;
+    open_catalog_index_ = -1;
+}
+
+void LiveAreaDeck::remap_catalog(const std::function<int(const std::string&)>& lookup) {
+    const std::string active_title = active_tab_ >= 0 && active_tab_ < static_cast<int>(tabs_.size())
+        ? tabs_[static_cast<std::size_t>(active_tab_)].title_id : std::string();
+    bool removed = false, reindexed = false;
+    for (std::size_t i = 0; i < tabs_.size();) {
+        const int index = lookup(tabs_[i].title_id);
+        if (index < 0) {
+            tabs_.erase(tabs_.begin() + static_cast<std::ptrdiff_t>(i));
+            removed = true;
+        } else {
+            reindexed = reindexed || tabs_[i].catalog_index != index;
+            tabs_[i].catalog_index = index;
+            ++i;
+        }
+    }
+    if (!removed && !reindexed) return;
+    // The indices behind a running open transition may be stale: finish it instantly.
+    open_anim_active_ = false;
+    open_catalog_index_ = -1;
+    if (!removed) return;
+    active_tab_ = find_tab(active_title);
+    pager_x_ = pager_target_ = static_cast<float>(active_tab_ + 1);
+    pager_velocity_ = 0.0f;
+    pager_dragging_ = false;
+    post_peel_gap_active_ = false;
+    post_peel_gap_idx_ = -1;
+}
+
 bool LiveAreaDeck::slide_to_home() {
     if (active_tab_ < 0 && pager_target_ <= 0.0f) return false;
     active_tab_ = -1;
