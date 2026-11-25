@@ -1835,4 +1835,22 @@
     <string name="emulation_screenshot_saved">Знімок екрана збережено в Pictures/EmuCoreV</string>
     <string name="emulation_screenshot_failed">Не вдалося зберегти знімок екрана</string>
     <string name="native_ui_new_folder">Нова тека</string>
+    <string name="projects_title">Наші інші проєкти</string>
+    <string name="projects_badge_on_play">У Google Play</string>
+    <string name="projects_badge_coming_to_play">Незабаром у Google Play</string>
+    <string name="projects_badge_open_source">Відкритий код</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">Вебсайт</string>
+    <string name="projects_patreon">Підтримати на Patreon</string>
+    <string name="projects_github_profile">Розробник на GitHub</string>
+    <string name="projects_footer">Усе це створює один розробник. Ваша підтримка допомагає проєктам жити.</string>
+    <string name="projects_open_failed">Не вдалося відкрити посилання</string>
+    <string name="projects_desc_x">Бібліотека, лаунчер та емулятор PlayStation 2 із ядром на основі PCSX2, адаптованим для Android.</string>
+    <string name="projects_desc_a">Бібліотека, лаунчер та емулятор PSP із вбудованим ядром PPSSPP і рендерингом через Vulkan або OpenGL ES.</string>
+    <string name="projects_desc_c">Експериментальний емулятор PlayStation 3 із ядром на основі RPCS3, бібліотекою ігор, інсталяторами та трофеями.</string>
+    <string name="projects_desc_d">Оболонка для десяти родин консолей Nintendo: 3DS, DS, N64, GameCube, Wii, Game Boy, GBA, NES і SNES.</string>
+    <string name="projects_desc_h">Оболонка для Sega з вбудованими ядрами для Dreamcast, аркадних автоматів, Mega Drive, Master System, Saturn і Model 3.</string>
+    <string name="projects_desc_r">Емулятор і бібліотека PlayStation 1 з ядром ECR, JIT для ARM64 та власною оболонкою BIOS.</string>
+    <string name="projects_desc_v">Емулятор PlayStation Vita на ядрі ECV із бібліотекою, каталогом і встановленням VPK/PKG.</string>
 </resources>

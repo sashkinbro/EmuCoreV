@@ -1821,4 +1821,22 @@
     <string name="emulation_screenshot_saved">Tangkapan layar disimpan di Pictures/EmuCoreV</string>
     <string name="emulation_screenshot_failed">Tidak dapat menyimpan tangkapan layar</string>
     <string name="native_ui_new_folder">Folder Baru</string>
+    <string name="projects_title">Proyek kami lainnya</string>
+    <string name="projects_badge_on_play">Di Google Play</string>
+    <string name="projects_badge_coming_to_play">Segera hadir di Google Play</string>
+    <string name="projects_badge_open_source">Sumber terbuka</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">Situs web</string>
+    <string name="projects_patreon">Dukung di Patreon</string>
+    <string name="projects_github_profile">Pengembang di GitHub</string>
+    <string name="projects_footer">Dibuat oleh satu pengembang. Dukungan Anda menjaga proyek-proyek ini tetap hidup.</string>
+    <string name="projects_open_failed">Tidak dapat membuka tautan</string>
+    <string name="projects_desc_x">Pustaka, peluncur, dan emulator PlayStation 2 dengan inti berbasis PCSX2 yang disesuaikan untuk Android.</string>
+    <string name="projects_desc_a">Pustaka, peluncur, dan emulator PSP dengan inti PPSSPP bawaan serta rendering Vulkan atau OpenGL ES.</string>
+    <string name="projects_desc_c">Emulator PlayStation 3 eksperimental dengan inti berbasis RPCS3, pustaka game, penginstal, dan trofi.</string>
+    <string name="projects_desc_d">Antarmuka untuk sepuluh keluarga konsol Nintendo: 3DS, DS, N64, GameCube, Wii, Game Boy, GBA, NES, dan SNES.</string>
+    <string name="projects_desc_h">Antarmuka Sega dengan inti bawaan untuk Dreamcast, arkade, Mega Drive, Master System, Saturn, dan Model 3.</string>
+    <string name="projects_desc_r">Emulator dan pustaka PlayStation 1 dengan inti ECR, JIT ARM64, dan shell BIOS native.</string>
+    <string name="projects_desc_v">Emulator PlayStation Vita dengan inti ECV, pustaka, katalog, dan instalasi VPK/PKG.</string>
 </resources>

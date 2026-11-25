@@ -1845,4 +1845,22 @@
     <string name="emulation_screenshot_saved">تم حفظ لقطة الشاشة في Pictures/EmuCoreV</string>
     <string name="emulation_screenshot_failed">تعذّر حفظ لقطة الشاشة</string>
     <string name="native_ui_new_folder">مجلد جديد</string>
+    <string name="projects_title">مشاريعنا الأخرى</string>
+    <string name="projects_badge_on_play">على Google Play</string>
+    <string name="projects_badge_coming_to_play">قريبًا على Google Play</string>
+    <string name="projects_badge_open_source">مفتوح المصدر</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">الموقع</string>
+    <string name="projects_patreon">الدعم على Patreon</string>
+    <string name="projects_github_profile">المطوّر على GitHub</string>
+    <string name="projects_footer">يطوّرها مطوّر واحد. دعمك يُبقي هذه المشاريع حيّة.</string>
+    <string name="projects_open_failed">تعذّر فتح الرابط</string>
+    <string name="projects_desc_x">مكتبة ومشغّل ومحاكي PlayStation 2 بنواة مبنية على PCSX2 ومكيّفة لنظام Android.</string>
+    <string name="projects_desc_a">مكتبة ومشغّل ومحاكي PSP بنواة PPSSPP مدمجة وعرض عبر Vulkan أو OpenGL ES.</string>
+    <string name="projects_desc_c">محاكي PlayStation 3 تجريبي بنواة مبنية على RPCS3 مع مكتبة ألعاب وأدوات تثبيت وكؤوس.</string>
+    <string name="projects_desc_d">واجهة لعشر عائلات من أجهزة Nintendo: 3DS وDS وN64 وGameCube وWii وGame Boy وGBA وNES وSNES.</string>
+    <string name="projects_desc_h">واجهة Sega بنوى مدمجة لـ Dreamcast وألعاب الأركيد وMega Drive وMaster System وSaturn وModel 3.</string>
+    <string name="projects_desc_r">محاكي ومكتبة PlayStation 1 بنواة ECR ومترجم JIT لمعمارية ARM64 وواجهة BIOS أصلية.</string>
+    <string name="projects_desc_v">محاكي PlayStation Vita بنواة ECV مع مكتبة وكتالوج وتثبيت VPK/PKG.</string>
 </resources>

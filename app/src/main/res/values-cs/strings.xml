@@ -1836,4 +1836,22 @@
     <string name="emulation_screenshot_saved">Snímek obrazovky byl uložen do Pictures/EmuCoreV</string>
     <string name="emulation_screenshot_failed">Snímek obrazovky se nepodařilo uložit</string>
     <string name="native_ui_new_folder">Nová složka</string>
+    <string name="projects_title">Naše další projekty</string>
+    <string name="projects_badge_on_play">Na Google Play</string>
+    <string name="projects_badge_coming_to_play">Brzy na Google Play</string>
+    <string name="projects_badge_open_source">Open source</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">Web</string>
+    <string name="projects_patreon">Podpořit na Patreonu</string>
+    <string name="projects_github_profile">Vývojář na GitHubu</string>
+    <string name="projects_footer">Vytváří jediný vývojář. Vaše podpora udržuje tyto projekty při životě.</string>
+    <string name="projects_open_failed">Odkaz se nepodařilo otevřít</string>
+    <string name="projects_desc_x">Knihovna, launcher a emulátor PlayStation 2 s jádrem založeným na PCSX2 upraveným pro Android.</string>
+    <string name="projects_desc_a">Knihovna, launcher a emulátor PSP s integrovaným jádrem PPSSPP a vykreslováním přes Vulkan nebo OpenGL ES.</string>
+    <string name="projects_desc_c">Experimentální emulátor PlayStation 3 s jádrem založeným na RPCS3, knihovnou her, instalátory a trofejemi.</string>
+    <string name="projects_desc_d">Rozhraní pro deset rodin konzolí Nintendo: 3DS, DS, N64, GameCube, Wii, Game Boy, GBA, NES a SNES.</string>
+    <string name="projects_desc_h">Rozhraní Sega s integrovanými jádry pro Dreamcast, arkády, Mega Drive, Master System, Saturn a Model 3.</string>
+    <string name="projects_desc_r">Emulátor a knihovna PlayStation 1 s jádrem ECR, JIT pro ARM64 a nativním shellem BIOSu.</string>
+    <string name="projects_desc_v">Emulátor PlayStation Vita s jádrem ECV, knihovnou, katalogem a instalací VPK/PKG.</string>
 </resources>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Rounded D: bowl drawn as one stroke so the joint stays flush instead
+         of overlapping round caps. -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M34,30 L52,30 A25,25 0 0 1 52,80 L34,80"
+        android:strokeColor="#4D9EFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="8" />
+    <!-- Rounded D: the stem uses the same darker accent tone as the original
+         EmuCore A mark. -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M34,30 L34,80"
+        android:strokeColor="#3A7FD5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="8" />
+</vector>

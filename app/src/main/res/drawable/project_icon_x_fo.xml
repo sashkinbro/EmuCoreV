@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- X shape - left top to center -->
+    <path
+        android:fillColor="#4D9EFF"
+        android:pathData="M30,28 L50,48 L42,48 L22,28 Z" />
+    <!-- X shape - right top to center -->
+    <path
+        android:fillColor="#4D9EFF"
+        android:pathData="M78,28 L58,48 L66,48 L86,28 Z" />
+    <!-- X shape - left bottom to center -->
+    <path
+        android:fillColor="#3A7FD5"
+        android:pathData="M30,80 L50,60 L42,60 L22,80 Z" />
+    <!-- X shape - right bottom to center -->
+    <path
+        android:fillColor="#3A7FD5"
+        android:pathData="M78,80 L58,60 L66,60 L86,80 Z" />
+    <!-- Center glow -->
+    <path
+        android:fillColor="#70B4FF"
+        android:pathData="M49,50 L54,44 L59,50 L54,56 Z" />
+</vector>

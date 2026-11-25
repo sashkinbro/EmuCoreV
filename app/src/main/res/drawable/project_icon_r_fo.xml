@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Rounded R: upper stem and bowl. -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M34,56 L34,30 M34,30 L61,30 C73,30 80,36 80,44 C80,52 73,58 61,58 L34,58"
+        android:strokeColor="#4D9EFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="8" />
+    <!-- Rounded R: lower stem and diagonal leg. -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M34,58 L34,80 M56,58 L80,80"
+        android:strokeColor="#3A7FD5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="8" />
+</vector>

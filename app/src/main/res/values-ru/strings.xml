@@ -1835,4 +1835,22 @@
     <string name="emulation_screenshot_saved">Скриншот сохранён в Pictures/EmuCoreV</string>
     <string name="emulation_screenshot_failed">Не удалось сохранить скриншот</string>
     <string name="native_ui_new_folder">Новая папка</string>
+    <string name="projects_title">Другие наши проекты</string>
+    <string name="projects_badge_on_play">В Google Play</string>
+    <string name="projects_badge_coming_to_play">Скоро в Google Play</string>
+    <string name="projects_badge_open_source">Открытый код</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">Сайт</string>
+    <string name="projects_patreon">Поддержать на Patreon</string>
+    <string name="projects_github_profile">Разработчик на GitHub</string>
+    <string name="projects_footer">Всё это создаёт один разработчик. Ваша поддержка помогает проектам жить.</string>
+    <string name="projects_open_failed">Не удалось открыть ссылку</string>
+    <string name="projects_desc_x">Библиотека, лаунчер и эмулятор PlayStation 2 с ядром на основе PCSX2, адаптированным для Android.</string>
+    <string name="projects_desc_a">Библиотека, лаунчер и эмулятор PSP со встроенным ядром PPSSPP и рендерингом через Vulkan или OpenGL ES.</string>
+    <string name="projects_desc_c">Экспериментальный эмулятор PlayStation 3 с ядром на основе RPCS3, библиотекой игр, установщиками и трофеями.</string>
+    <string name="projects_desc_d">Оболочка для десяти семейств консолей Nintendo: 3DS, DS, N64, GameCube, Wii, Game Boy, GBA, NES и SNES.</string>
+    <string name="projects_desc_h">Оболочка для Sega со встроенными ядрами для Dreamcast, аркад, Mega Drive, Master System, Saturn и Model 3.</string>
+    <string name="projects_desc_r">Эмулятор и библиотека PlayStation 1 с ядром ECR, JIT для ARM64 и собственной оболочкой BIOS.</string>
+    <string name="projects_desc_v">Эмулятор PlayStation Vita на ядре ECV с библиотекой, каталогом и установкой VPK/PKG.</string>
 </resources>

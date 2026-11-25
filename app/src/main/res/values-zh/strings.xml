@@ -1819,4 +1819,22 @@
     <string name="emulation_screenshot_saved">截图已保存到 Pictures/EmuCoreV</string>
     <string name="emulation_screenshot_failed">无法保存截图</string>
     <string name="native_ui_new_folder">新建文件夹</string>
+    <string name="projects_title">我们的其他项目</string>
+    <string name="projects_badge_on_play">已上架 Google Play</string>
+    <string name="projects_badge_coming_to_play">即将登陆 Google Play</string>
+    <string name="projects_badge_open_source">开源</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">网站</string>
+    <string name="projects_patreon">在 Patreon 上支持</string>
+    <string name="projects_github_profile">GitHub 开发者</string>
+    <string name="projects_footer">由一位开发者独立制作。你的支持让这些项目得以延续。</string>
+    <string name="projects_open_failed">无法打开链接</string>
+    <string name="projects_desc_x">PlayStation 2 游戏库、启动器和模拟器，核心基于 PCSX2 并针对 Android 做了适配。</string>
+    <string name="projects_desc_a">PSP 游戏库、启动器和模拟器，内置 PPSSPP 核心，支持 Vulkan 或 OpenGL ES 渲染。</string>
+    <string name="projects_desc_c">实验性 PlayStation 3 模拟器，核心基于 RPCS3，带有游戏库、安装器和奖杯功能。</string>
+    <string name="projects_desc_d">支持十个任天堂主机系列的前端：3DS、DS、N64、GameCube、Wii、Game Boy、GBA、NES 和 SNES。</string>
+    <string name="projects_desc_h">Sega 前端，内置 Dreamcast、街机、Mega Drive、Master System、Saturn 和 Model 3 核心。</string>
+    <string name="projects_desc_r">PlayStation 1 模拟器和游戏库，采用 ECR 核心、ARM64 JIT 和原生 BIOS 界面。</string>
+    <string name="projects_desc_v">基于 ECV 核心的 PlayStation Vita 模拟器，带有游戏库、目录以及 VPK/PKG 安装功能。</string>
 </resources>
