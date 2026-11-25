@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.QueryStats
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Newspaper
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SettingsEthernet
@@ -88,11 +89,14 @@ import com.sbro.emucorev.ui.theme.shouldUseExpandedShell
 import kotlinx.coroutines.launch
 
 enum class PrimaryDestination {
-    Home, Setup, Library, MyLists, GameManager, PlayTime, Achievements, SaveData, SaveStates, CheatManager, Search, Settings, Profile, Discord, Feedback, Projects
+    Home, Setup, Library, MyLists, GameManager, PlayTime, Achievements, SaveData, SaveStates, CheatManager, Search, Settings, Profile, Discord, Feedback, Projects, Hub
 }
 
 /** Opens the "Our other projects" screen from the drawer; null hides the drawer entry. */
 val LocalOpenProjects = staticCompositionLocalOf<(() -> Unit)?> { null }
+
+/** Opens the Hub (news and Store) from the drawer; null hides the drawer entry. */
+val LocalOpenHub = staticCompositionLocalOf<(() -> Unit)?> { null }
 
 private enum class MobileLeadingAction {
     Drawer,
@@ -431,6 +435,13 @@ private fun SideNavigation(
             it()
         }
     }
+    val openHub = LocalOpenHub.current
+    val navigateHub = openHub?.let {
+        rememberDebouncedClick {
+            onCloseDrawer()
+            it()
+        }
+    }
     val navigateFeedback = rememberDebouncedClick {
         onCloseDrawer()
         onNavigateFeedback()
@@ -520,6 +531,14 @@ private fun SideNavigation(
                 selected = selected == PrimaryDestination.Search,
                 onClick = navigateSearch
             )
+            if (navigateHub != null) {
+                ShellItem(
+                    icon = Icons.Rounded.Newspaper,
+                    label = stringResource(R.string.hub_title),
+                    selected = selected == PrimaryDestination.Hub,
+                    onClick = navigateHub
+                )
+            }
             ShellItem(
                 icon = Icons.Rounded.EmojiEvents,
                 label = stringResource(R.string.nav_achievements),

@@ -121,6 +121,33 @@ class TrophySoundRepository(
         return TrophySoundSelectionResult.ACCEPTED
     }
 
+    /**
+     * Selects an app-private sound file (for example one installed from the Store) as the custom trophy
+     * sound. Unlike [selectCustomSound] it needs no document-provider permission.
+     */
+    fun selectLocalFile(file: java.io.File, displayName: String?): Boolean {
+        if (!file.isFile || file.length() <= 0L) return false
+        val revision = selectionRevision.incrementAndGet()
+        val before = current()
+        val uri = Uri.fromFile(file)
+        synchronized(writeLock) {
+            if (selectionRevision.get() != revision) return false
+            val saved = preferences.edit()
+                .putString(KEY_MODE, TrophySoundMode.CUSTOM.name)
+                .putString(KEY_URI, uri.toString())
+                .putNullable(KEY_NAME, displayName?.takeIf(String::isNotBlank))
+                .putBoolean(KEY_UNAVAILABLE, false)
+                .commit()
+            if (!saved) {
+                restorePreferences(before)
+                return false
+            }
+        }
+        val old = before.customUri
+        if (old != null && old != uri && old.scheme != "file") runCatching { uriAccess.releasePermission(old) }
+        return true
+    }
+
     fun refreshCustomAvailability(): Boolean {
         val uri = current().customUri ?: return false
         val available = runCatching { uriAccess.isReadable(uri) }.getOrDefault(false)

@@ -76,6 +76,7 @@ import com.sbro.emucorev.ui.common.GameCoverAspectRatio
 import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.ThemeMode
+import com.sbro.emucorev.ui.store.StoreEntryButton
 import com.sbro.emucorev.data.theme.ThemePackageRepository
 import androidx.compose.ui.platform.LocalConfiguration
 import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
@@ -239,6 +240,7 @@ fun CustomizationTab(
                     )
                 }
             }
+            StoreEntryButton(tab = "themes")
         }
 
         SectionCard(
@@ -263,6 +265,7 @@ fun CustomizationTab(
                 selected = settings.backgroundPath != null,
                 onClick = { backgroundPicker.launch(arrayOf("image/*", "video/*")) }
             )
+            StoreEntryButton(tab = "wallpapers")
         }
 
         TouchControlStyleSection(
@@ -270,6 +273,7 @@ fun CustomizationTab(
             onStyleSelected = viewModel::updateTouchControlVisualStyle,
             onPressEffectSelected = viewModel::updateTouchControlPressEffect
         )
+        StoreEntryButton(tab = "controls")
 
         DrawerStyleSection(
             selected = settings.drawerVisualStyle,
@@ -326,6 +330,7 @@ fun CustomizationTab(
                 subtitle = stringResource(R.string.customization_import_font_hint),
                 onClick = { fontPicker.launch(arrayOf("font/ttf", "font/otf", "application/x-font-ttf", "application/x-font-opentype")) }
             )
+            StoreEntryButton(tab = "fonts")
             CustomizationSlider(
                 title = stringResource(R.string.customization_text_size),
                 valueLabel = stringResource(

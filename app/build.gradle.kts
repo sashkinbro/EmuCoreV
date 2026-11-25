@@ -82,6 +82,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.google.services)
+    alias(libs.plugins.ksp)
 }
 
 fun buildConfigString(value: String): String = "\"" + value
@@ -375,6 +376,11 @@ dependencies {
     implementation(libs.google.play.review)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+    ksp(libs.androidx.room.compiler)
     implementation(libs.google.play.review.ktx)
     implementation(libs.google.play.age.signals)
     implementation(libs.androidx.credentials)
@@ -393,4 +399,8 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }

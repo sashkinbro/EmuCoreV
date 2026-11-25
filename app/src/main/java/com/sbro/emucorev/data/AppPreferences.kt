@@ -139,6 +139,57 @@ class AppPreferences(context: Context) {
     val themePackageId: String?
         get() = prefs.getString(KEY_THEME_PACKAGE_ID, null)
 
+    /** Id of the applied Store controls skin pack (see data/store/StoreControlSkins), or null. */
+    val touchControlSkinPack: Flow<String?>
+        get() = callbackFlow {
+            trySend(prefs.getString(KEY_TOUCH_CONTROL_SKIN_PACK, null)?.takeIf { it.isNotBlank() })
+            val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key == KEY_TOUCH_CONTROL_SKIN_PACK) {
+                    trySend(prefs.getString(KEY_TOUCH_CONTROL_SKIN_PACK, null)?.takeIf { it.isNotBlank() })
+                }
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }.distinctUntilChanged()
+
+    fun setTouchControlSkinPack(id: String?) {
+        prefs.edit {
+            if (id.isNullOrBlank()) remove(KEY_TOUCH_CONTROL_SKIN_PACK) else putString(KEY_TOUCH_CONTROL_SKIN_PACK, id)
+        }
+    }
+
+    /**
+     * Remembers which Store font was copied into the custom-font slot and where, so the Store can tell
+     * whether that font is still the selected one. Null clears it.
+     */
+    fun setStoreFont(id: String?, path: String?) {
+        prefs.edit {
+            if (id.isNullOrBlank() || path.isNullOrBlank()) {
+                remove(KEY_STORE_FONT_ID)
+                remove(KEY_STORE_FONT_PATH)
+            } else {
+                putString(KEY_STORE_FONT_ID, id)
+                putString(KEY_STORE_FONT_PATH, path)
+            }
+        }
+    }
+
+    /** (Store font id, custom-font path it was installed to), or null. */
+    val storeFont: Flow<Pair<String, String>?>
+        get() = callbackFlow {
+            fun read(): Pair<String, String>? {
+                val id = prefs.getString(KEY_STORE_FONT_ID, null)?.takeIf { it.isNotBlank() } ?: return null
+                val path = prefs.getString(KEY_STORE_FONT_PATH, null)?.takeIf { it.isNotBlank() } ?: return null
+                return id to path
+            }
+            trySend(read())
+            val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key == KEY_STORE_FONT_ID || key == KEY_STORE_FONT_PATH) trySend(read())
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }.distinctUntilChanged()
+
     /** Id of the applied theme package; meaningful only while [themeMode] is PACKAGE. */
     val themePackageIdFlow: Flow<String?>
         get() = callbackFlow {
@@ -409,6 +460,9 @@ class AppPreferences(context: Context) {
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_THEME_PACKAGE_ID = "theme_package_id"
+        private const val KEY_TOUCH_CONTROL_SKIN_PACK = "touch_control_skin_pack"
+        private const val KEY_STORE_FONT_ID = "store_font_id"
+        private const val KEY_STORE_FONT_PATH = "store_font_path"
         private const val KEY_THEME_PACKAGE_REQUIRES_PRO = "theme_package_requires_pro"
         private const val KEY_PRO_UNLOCKED = "pro_unlocked"
         private const val KEY_WELCOME_DIALOG_SHOWN = "welcome_dialog_shown"

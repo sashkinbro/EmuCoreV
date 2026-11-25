@@ -108,6 +108,9 @@ private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_PROFILE = "profile"
 private const val ROUTE_FEEDBACK = "feedback"
 private const val ROUTE_PROJECTS = "projects"
+private const val ROUTE_HUB = "hub?tab={tab}&storeTab={storeTab}"
+private const val ROUTE_STORE_ITEM = "store-item"
+private const val ROUTE_STORE_INSTALLED = "store-installed"
 private const val ROUTE_SETTINGS_WITH_TAB = "settings/{tab}"
 private const val ROUTE_APP_LANGUAGE = "app-language"
 private const val ROUTE_VITA_LANGUAGE = "vita-language"
@@ -321,7 +324,19 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         navController.navigate(ROUTE_PROJECTS) { launchSingleTop = true }
     }
 
-    CompositionLocalProvider(LocalOpenProjects provides navigateProjects) {
+    val navigateHub = {
+        navController.navigate("hub") { launchSingleTop = true }
+    }
+    val openStore: (String?) -> Unit = { tab ->
+        val target = if (tab.isNullOrBlank()) "hub?tab=store" else "hub?tab=store&storeTab=${Uri.encode(tab)}"
+        navController.navigate(target) { launchSingleTop = true }
+    }
+
+    CompositionLocalProvider(
+        LocalOpenProjects provides navigateProjects,
+        LocalOpenHub provides navigateHub,
+        com.sbro.emucorev.ui.store.LocalOpenStore provides openStore
+    ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1098,6 +1113,117 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 ) {
                     FeedbackScreen(onBackClick = { navController.popBackStack() })
                 }
+            }
+            composable(
+                ROUTE_HUB,
+                arguments = listOf(
+                    androidx.navigation.navArgument("tab") {
+                        type = androidx.navigation.NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    androidx.navigation.navArgument("storeTab") {
+                        type = androidx.navigation.NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) { hubBackStackEntry ->
+                val hubTab = hubBackStackEntry.arguments?.getString("tab")
+                val hubStoreTab = hubBackStackEntry.arguments?.getString("storeTab")
+                val detailBackStack = androidx.compose.runtime.saveable.rememberSaveable(
+                    saver = androidx.compose.runtime.saveable.listSaver(
+                        save = { it.toList() },
+                        restore = { androidx.compose.runtime.snapshots.SnapshotStateList<String>().also { list -> list.addAll(it) } }
+                    )
+                ) {
+                    androidx.compose.runtime.mutableStateListOf<String>()
+                }
+                val closeDetail = {
+                    if (detailBackStack.isNotEmpty()) detailBackStack.removeAt(detailBackStack.lastIndex)
+                }
+                val openDetail: (String) -> Unit = { contentId ->
+                    if (detailBackStack.lastOrNull() != contentId) detailBackStack.add(contentId)
+                }
+                androidx.activity.compose.BackHandler(enabled = detailBackStack.isNotEmpty(), onBack = closeDetail)
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AdaptiveShell(
+                        selected = PrimaryDestination.Hub,
+                        onNavigateSetup = {
+                            navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
+                        },
+                        onNavigateLibrary = {
+                            navController.navigate(ROUTE_LIBRARY) { launchSingleTop = true }
+                        },
+                        onNavigateGameManager = { navigateGameManager(null) },
+                        onNavigatePlayTime = { navigatePlayTime(null) },
+                        onNavigateAchievements = navigateAchievementsRoot,
+                        onNavigateSaveStates = { navController.navigate(saveStatesRoute()) { launchSingleTop = true } },
+                        onNavigateSaveData = {
+                            navController.navigate(saveManagerRoute()) { launchSingleTop = true }
+                        },
+                        onNavigateSearch = {
+                            navController.navigate(ROUTE_CATALOG) { launchSingleTop = true }
+                        },
+                        onNavigateSettings = {
+                            navController.navigate(settingsRoute()) { launchSingleTop = true }
+                        },
+                        onNavigateProfile = navigateProfile,
+                        onNavigateDiscord = navigateDiscord,
+                        onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
+                        onNavigateFeedback = navigateFeedback,
+                        onBackClick = { navController.popBackStack() },
+                        onInstallFirmware = null,
+                        onInstallContent = null
+                    ) {
+                        com.sbro.emucorev.ui.hub.HubScreen(
+                            onBackClick = { navController.popBackStack() },
+                            onOpenArticle = openDetail,
+                            onOpenStoreItem = { id ->
+                                navController.navigate("$ROUTE_STORE_ITEM/${Uri.encode(id)}") { launchSingleTop = true }
+                            },
+                            onOpenInstalled = {
+                                navController.navigate(ROUTE_STORE_INSTALLED) { launchSingleTop = true }
+                            },
+                            initialTab = hubTab,
+                            initialStoreTab = hubStoreTab,
+                            backEnabled = detailBackStack.isEmpty()
+                        )
+                    }
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = detailBackStack.isNotEmpty(),
+                        enter = androidx.compose.animation.slideInHorizontally(
+                            animationSpec = tween(durationMillis = 260, easing = EaseOut),
+                            initialOffsetX = { it / 5 }
+                        ) + fadeIn(animationSpec = tween(durationMillis = 180)),
+                        exit = androidx.compose.animation.slideOutHorizontally(
+                            animationSpec = tween(durationMillis = 220, easing = EaseIn),
+                            targetOffsetX = { it / 5 }
+                        ) + fadeOut(animationSpec = tween(durationMillis = 180))
+                    ) {
+                        detailBackStack.lastOrNull()?.let { contentId ->
+                            com.sbro.emucorev.ui.hub.detail.HubDetailScreen(
+                                contentId = contentId,
+                                onBackClick = closeDetail,
+                                onOpenArticle = openDetail
+                            )
+                        }
+                    }
+                }
+            }
+            composable(ROUTE_STORE_INSTALLED) {
+                com.sbro.emucorev.ui.store.StoreInstalledScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onOpenItem = { id ->
+                        navController.navigate("$ROUTE_STORE_ITEM/${Uri.encode(id)}") { launchSingleTop = true }
+                    }
+                )
+            }
+            composable("$ROUTE_STORE_ITEM/{id}") { backStackEntry ->
+                com.sbro.emucorev.ui.store.StoreItemScreen(
+                    itemId = backStackEntry.arguments?.getString("id").orEmpty(),
+                    onBackClick = { navController.popBackStack() }
+                )
             }
             composable(ROUTE_PROJECTS) {
                 AdaptiveShell(

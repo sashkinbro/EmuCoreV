@@ -1,5 +1,6 @@
 ﻿package com.sbro.emucorev.ui.common
 
+import android.graphics.BitmapFactory
 import android.view.MotionEvent
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.animateFloatAsState
@@ -23,6 +24,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,7 +41,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -47,6 +58,8 @@ import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,8 +68,12 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sbro.emucorev.R
+import com.sbro.emucorev.data.AppPreferences
 import com.sbro.emucorev.data.TouchControlPressEffect
 import com.sbro.emucorev.data.TouchControlVisualStyle
+import com.sbro.emucorev.data.store.StoreControlSkins
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -124,6 +141,87 @@ fun overlayDrawableForControl(controlId: String): Int? = when (controlId) {
     else -> null
 }
 
+/**
+ * Decoded Store skin art for the overlay. Built once off the main thread; drawing only reads it.
+ */
+@Immutable
+class ControlSkinBitmaps(
+    val images: Map<String, ImageBitmap>,
+    val pressed: Map<String, ImageBitmap>,
+    val opacity: Float,
+    val tintFilter: ColorFilter?,
+    val pressEffect: TouchControlPressEffect?
+)
+
+/** Applied skin for the emulation overlay; null (default) keeps the built-in style art. */
+val LocalControlSkin = staticCompositionLocalOf<ControlSkinBitmaps?> { null }
+
+private val SkinControlIds = listOf(
+    "triangle", "cross", "square", "circle",
+    "dpad_up", "dpad_down", "dpad_left", "dpad_right",
+    "l1", "l2", "r1", "r2", "select", "start", "l3", "r3",
+    "left_input_toggle", "pressure"
+)
+
+private val drawableControlIds: Map<Int, String> by lazy {
+    SkinControlIds.mapNotNull { id -> overlayDrawableForControl(id)?.let { it to id } }.toMap()
+}
+
+private fun decodeSkinBitmap(file: java.io.File, targetPx: Int): ImageBitmap? = runCatching {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.path, bounds)
+    val minSide = minOf(bounds.outWidth, bounds.outHeight)
+    if (minSide <= 0) return@runCatching null
+    var sample = 1
+    while (minSide / (sample * 2) >= targetPx) sample *= 2
+    BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
+        ?.asImageBitmap()
+}.getOrNull()
+
+/** Loads the applied Store controls skin once per pack id (and density) on Dispatchers.IO. */
+@Composable
+fun rememberAppliedControlSkin(): ControlSkinBitmaps? {
+    val context = LocalContext.current.applicationContext
+    val density = LocalDensity.current.density
+    val packId by remember(context) { AppPreferences(context).touchControlSkinPack }
+        .collectAsState(initial = null)
+    val skin by produceState<ControlSkinBitmaps?>(initialValue = null, packId, density) {
+        val id = packId
+        value = if (id == null) {
+            null
+        } else {
+            withContext(Dispatchers.IO) {
+                val pack = StoreControlSkins.load(context, id) ?: return@withContext null
+                val controlPx = (200f * density).roundToInt().coerceIn(64, 512)
+                val analogPx = (320f * density).roundToInt().coerceIn(64, 512)
+                fun decodeAll(files: Map<String, java.io.File>): Map<String, ImageBitmap> {
+                    val out = HashMap<String, ImageBitmap>()
+                    files.forEach { (controlId, file) ->
+                        val isAnalog = controlId == "analog_base" || controlId == "analog_stick"
+                        if (!isAnalog && controlId !in SkinControlIds) return@forEach
+                        decodeSkinBitmap(file, if (isAnalog) analogPx else controlPx)
+                            ?.let { out[controlId] = it }
+                    }
+                    return out
+                }
+                val images = decodeAll(pack.images)
+                if (images.isEmpty()) {
+                    null
+                } else {
+                    ControlSkinBitmaps(
+                        images = images,
+                        pressed = decodeAll(pack.pressed),
+                        opacity = pack.opacity,
+                        tintFilter = pack.tint?.let { ColorFilter.tint(Color(it), BlendMode.Modulate) },
+                        pressEffect = pack.pressEffect
+                    )
+                }
+            }
+        }
+    }
+    return skin
+}
+
 @Composable
 fun VectorOverlayButton(
     @DrawableRes drawableRes: Int,
@@ -145,14 +243,22 @@ fun VectorOverlayButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val isActivelyPressed = pressed || (interactive && isPressed)
+    val skin = LocalControlSkin.current
+    val skinControlId = if (skin != null) drawableControlIds[drawableRes] else null
+    val skinImage = skinControlId?.let { skin?.images?.get(it) }
+    val skinPressedImage = skinControlId?.let { skin?.pressed?.get(it) }
+    val skinShown = if (isActivelyPressed && skinPressedImage != null) skinPressedImage else skinImage
+    val effectivePressEffect = if (skinImage != null) skin?.pressEffect ?: pressEffect else pressEffect
     val scale = animatedPressScale(
-        pressed = isActivelyPressed,
-        effect = pressEffect,
+        pressed = isActivelyPressed && !(skinImage != null && skinPressedImage != null),
+        effect = effectivePressEffect,
         growScale = pressedScale,
         label = "vector_overlay_button_scale"
     )
     val glowProgress by animateFloatAsState(
-        targetValue = if (isActivelyPressed && pressEffect == TouchControlPressEffect.GLOW) 1f else 0f,
+        targetValue = if (isActivelyPressed && effectivePressEffect == TouchControlPressEffect.GLOW &&
+            !(skinImage != null && skinPressedImage != null)
+        ) 1f else 0f,
         animationSpec = tween(durationMillis = 110),
         label = "vector_overlay_button_glow"
     )
@@ -186,14 +292,14 @@ fun VectorOverlayButton(
         drawableRes == R.drawable.ic_controller_down_button ||
         drawableRes == R.drawable.ic_controller_left_button ||
         drawableRes == R.drawable.ic_controller_right_button
-    val styleShape = when (visualStyle) {
+    val styleShape = if (skinImage != null) RectangleShape else when (visualStyle) {
         TouchControlVisualStyle.CLASSIC -> shape
         TouchControlVisualStyle.LEGACY -> if (isFaceButton) CircleShape else RoundedCornerShape(if (isShoulderButton) 16.dp else 12.dp)
         TouchControlVisualStyle.MODERN -> if (isFaceButton) RoundedCornerShape(32) else RoundedCornerShape(if (isShoulderButton) 10.dp else 8.dp)
         TouchControlVisualStyle.ARCADE -> if (isFaceButton || isDirectionalButton) CircleShape else RoundedCornerShape(if (isShoulderButton) 18.dp else 12.dp)
         TouchControlVisualStyle.MINIMAL -> if (isFaceButton || isDirectionalButton) CircleShape else RoundedCornerShape(if (isShoulderButton) 8.dp else 6.dp)
     }
-    val styleBrush = when (visualStyle) {
+    val styleBrush = if (skinImage != null) null else when (visualStyle) {
         TouchControlVisualStyle.CLASSIC -> null
         TouchControlVisualStyle.LEGACY -> Brush.verticalGradient(
             listOf(
@@ -221,7 +327,7 @@ fun VectorOverlayButton(
             )
         )
     }
-    val styleBorder = when (visualStyle) {
+    val styleBorder = if (skinImage != null) null else when (visualStyle) {
         TouchControlVisualStyle.CLASSIC -> null
         TouchControlVisualStyle.LEGACY -> Color.White.copy(alpha = if (isActivelyPressed) 0.48f else 0.34f)
         TouchControlVisualStyle.MODERN -> MaterialTheme.colorScheme.primary.copy(alpha = if (isActivelyPressed) 0.96f else 0.72f)
@@ -235,7 +341,7 @@ fun VectorOverlayButton(
             .graphicsLayer(
                 scaleX = scale,
                 scaleY = scale,
-                alpha = alpha
+                alpha = if (skinImage != null && skin != null) alpha * skin.opacity else alpha
             )
             .clip(styleShape)
             .then(styleBrush?.let { Modifier.background(it, styleShape) } ?: Modifier)
@@ -275,7 +381,7 @@ fun VectorOverlayButton(
             .then(clickableModifier),
         contentAlignment = Alignment.Center
     ) {
-        when (visualStyle) {
+        when (if (skinImage != null) null else visualStyle) {
             TouchControlVisualStyle.LEGACY -> Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -308,7 +414,16 @@ fun VectorOverlayButton(
             }
             else -> Unit
         }
-        if (visualStyle == TouchControlVisualStyle.CLASSIC) {
+        if (skinShown != null) {
+            Image(
+                bitmap = skinShown,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+                colorFilter = skin?.tintFilter,
+                filterQuality = FilterQuality.Medium
+            )
+        } else if (visualStyle == TouchControlVisualStyle.CLASSIC) {
             Image(
                 painter = painterResource(drawableRes),
                 contentDescription = null,
@@ -631,6 +746,9 @@ fun VectorAnalogStick(
     var lastSentX by remember { mutableIntStateOf(0) }
     var lastSentY by remember { mutableIntStateOf(0) }
     var activePointerId by remember { mutableStateOf<Long?>(null) }
+    val skin = LocalControlSkin.current
+    val analogSkinBase = skin?.images?.get("analog_base")
+    val analogSkinStick = skin?.images?.get("analog_stick")
 
     fun dispatchStickValue(x: Float, y: Float) {
         val quantizedX = (x * 255f).roundToInt()
@@ -885,6 +1003,55 @@ fun VectorAnalogStick(
                     .background(guideColor.copy(alpha = 0.78f))
                     .offset { IntOffset(displayedThumbOffset.x.roundToInt(), displayedThumbOffset.y.roundToInt()) }
             )
+        } else if (analogSkinBase != null || analogSkinStick != null) {
+            val skinStickShown = if (isActivelyPressed) {
+                skin?.pressed?.get("analog_stick") ?: analogSkinStick
+            } else {
+                analogSkinStick
+            }
+            val skinAlpha = skin?.opacity ?: 1f
+            if (analogSkinBase != null) {
+                Image(
+                    bitmap = analogSkinBase,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                    alpha = skinAlpha,
+                    colorFilter = skin?.tintFilter,
+                    filterQuality = FilterQuality.Medium
+                )
+            } else {
+                Image(
+                    painter = painterResource(R.drawable.ic_controller_analog_base),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                    alpha = skinAlpha
+                )
+            }
+            if (skinStickShown != null) {
+                Image(
+                    bitmap = skinStickShown,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(analogSize * 0.52f)
+                        .offset { IntOffset(displayedThumbOffset.x.roundToInt(), displayedThumbOffset.y.roundToInt()) },
+                    contentScale = ContentScale.Fit,
+                    alpha = skinAlpha,
+                    colorFilter = skin?.tintFilter,
+                    filterQuality = FilterQuality.Medium
+                )
+            } else {
+                Image(
+                    painter = painterResource(R.drawable.ic_controller_analog_stick),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(analogSize * 0.52f)
+                        .offset { IntOffset(displayedThumbOffset.x.roundToInt(), displayedThumbOffset.y.roundToInt()) },
+                    contentScale = ContentScale.Fit,
+                    alpha = skinAlpha
+                )
+            }
         } else {
             when (visualStyle) {
                 TouchControlVisualStyle.CLASSIC -> {

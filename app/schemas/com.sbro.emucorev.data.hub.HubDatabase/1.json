@@ -1,0 +1,534 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "af5a766687ade2644a11e986df600d4c",
+    "entities": [
+      {
+        "tableName": "hub_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, `contentVersion` INTEGER NOT NULL, `localeVersion` INTEGER NOT NULL, `locale` TEXT NOT NULL, `title` TEXT NOT NULL, `summary` TEXT NOT NULL, `publishedAt` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, `eventDate` TEXT, `datePrecision` TEXT, `year` INTEGER, `categoriesJson` TEXT NOT NULL, `tagsJson` TEXT NOT NULL, `relatedProductIdsJson` TEXT NOT NULL, `featured` INTEGER NOT NULL, `priority` INTEGER NOT NULL, `canonicalUrl` TEXT NOT NULL, `sourcesJson` TEXT NOT NULL, `heroAssetId` TEXT, `heroThumbnailUrl` TEXT, `heroThumbnailSha256` TEXT, `heroThumbnailBytes` INTEGER, `heroDisplayUrl` TEXT, `heroDisplaySha256` TEXT, `heroDisplayBytes` INTEGER, `heroOriginalUrl` TEXT, `heroOriginalSha256` TEXT, `heroOriginalBytes` INTEGER, `imageDownloadAllowed` INTEGER NOT NULL, `documentUrl` TEXT NOT NULL, `documentSha256` TEXT NOT NULL, `documentBytes` INTEGER NOT NULL, `providerId` TEXT, `channelTitle` TEXT, `sourceLanguage` TEXT, `thumbnailUrl` TEXT, `catalogRevision` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentVersion",
+            "columnName": "contentVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localeVersion",
+            "columnName": "localeVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "locale",
+            "columnName": "locale",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "summary",
+            "columnName": "summary",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publishedAt",
+            "columnName": "publishedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventDate",
+            "columnName": "eventDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "datePrecision",
+            "columnName": "datePrecision",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "year",
+            "columnName": "year",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "categoriesJson",
+            "columnName": "categoriesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tagsJson",
+            "columnName": "tagsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relatedProductIdsJson",
+            "columnName": "relatedProductIdsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "featured",
+            "columnName": "featured",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priority",
+            "columnName": "priority",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canonicalUrl",
+            "columnName": "canonicalUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourcesJson",
+            "columnName": "sourcesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "heroAssetId",
+            "columnName": "heroAssetId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "heroThumbnailUrl",
+            "columnName": "heroThumbnailUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "heroThumbnailSha256",
+            "columnName": "heroThumbnailSha256",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "heroThumbnailBytes",
+            "columnName": "heroThumbnailBytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "heroDisplayUrl",
+            "columnName": "heroDisplayUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "heroDisplaySha256",
+            "columnName": "heroDisplaySha256",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "heroDisplayBytes",
+            "columnName": "heroDisplayBytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "heroOriginalUrl",
+            "columnName": "heroOriginalUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "heroOriginalSha256",
+            "columnName": "heroOriginalSha256",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "heroOriginalBytes",
+            "columnName": "heroOriginalBytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "imageDownloadAllowed",
+            "columnName": "imageDownloadAllowed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "documentUrl",
+            "columnName": "documentUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "documentSha256",
+            "columnName": "documentSha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "documentBytes",
+            "columnName": "documentBytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerId",
+            "columnName": "providerId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "channelTitle",
+            "columnName": "channelTitle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceLanguage",
+            "columnName": "sourceLanguage",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "thumbnailUrl",
+            "columnName": "thumbnailUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "catalogRevision",
+            "columnName": "catalogRevision",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_hub_items_locale",
+            "unique": false,
+            "columnNames": [
+              "locale"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_items_locale` ON `${TABLE_NAME}` (`locale`)"
+          },
+          {
+            "name": "index_hub_items_kind",
+            "unique": false,
+            "columnNames": [
+              "kind"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_items_kind` ON `${TABLE_NAME}` (`kind`)"
+          },
+          {
+            "name": "index_hub_items_publishedAt",
+            "unique": false,
+            "columnNames": [
+              "publishedAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_items_publishedAt` ON `${TABLE_NAME}` (`publishedAt`)"
+          },
+          {
+            "name": "index_hub_items_eventDate",
+            "unique": false,
+            "columnNames": [
+              "eventDate"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_items_eventDate` ON `${TABLE_NAME}` (`eventDate`)"
+          }
+        ]
+      },
+      {
+        "tableName": "hub_assets",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`assetId` TEXT NOT NULL, `ownerContentId` TEXT NOT NULL, `thumbnailUrl` TEXT, `thumbnailSha256` TEXT, `thumbnailBytes` INTEGER, `displayUrl` TEXT, `displaySha256` TEXT, `displayBytes` INTEGER, `originalUrl` TEXT, `originalSha256` TEXT, `originalBytes` INTEGER, `creator` TEXT NOT NULL, `sourceUrl` TEXT NOT NULL, `licenseId` TEXT NOT NULL, `licenseUrl` TEXT, `attribution` TEXT, `downloadAllowed` INTEGER NOT NULL, `catalogRevision` INTEGER NOT NULL, PRIMARY KEY(`assetId`))",
+        "fields": [
+          {
+            "fieldPath": "assetId",
+            "columnName": "assetId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ownerContentId",
+            "columnName": "ownerContentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "thumbnailUrl",
+            "columnName": "thumbnailUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "thumbnailSha256",
+            "columnName": "thumbnailSha256",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "thumbnailBytes",
+            "columnName": "thumbnailBytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "displayUrl",
+            "columnName": "displayUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "displaySha256",
+            "columnName": "displaySha256",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "displayBytes",
+            "columnName": "displayBytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "originalUrl",
+            "columnName": "originalUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "originalSha256",
+            "columnName": "originalSha256",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "originalBytes",
+            "columnName": "originalBytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "creator",
+            "columnName": "creator",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceUrl",
+            "columnName": "sourceUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "licenseId",
+            "columnName": "licenseId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "licenseUrl",
+            "columnName": "licenseUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "attribution",
+            "columnName": "attribution",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "downloadAllowed",
+            "columnName": "downloadAllowed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "catalogRevision",
+            "columnName": "catalogRevision",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "assetId"
+          ]
+        }
+      },
+      {
+        "tableName": "hub_articles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`contentId` TEXT NOT NULL, `locale` TEXT NOT NULL, `contentVersion` INTEGER NOT NULL, `rawJson` TEXT NOT NULL, `sha256` TEXT NOT NULL, `cachedAtMillis` INTEGER NOT NULL, PRIMARY KEY(`contentId`, `locale`, `contentVersion`))",
+        "fields": [
+          {
+            "fieldPath": "contentId",
+            "columnName": "contentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "locale",
+            "columnName": "locale",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentVersion",
+            "columnName": "contentVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rawJson",
+            "columnName": "rawJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sha256",
+            "columnName": "sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cachedAtMillis",
+            "columnName": "cachedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "contentId",
+            "locale",
+            "contentVersion"
+          ]
+        }
+      },
+      {
+        "tableName": "hub_favorites",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`contentId` TEXT NOT NULL, `kind` TEXT NOT NULL, `addedAtMillis` INTEGER NOT NULL, `lastKnownTitle` TEXT NOT NULL, `lastKnownThumbnailUrl` TEXT, PRIMARY KEY(`contentId`))",
+        "fields": [
+          {
+            "fieldPath": "contentId",
+            "columnName": "contentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "addedAtMillis",
+            "columnName": "addedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastKnownTitle",
+            "columnName": "lastKnownTitle",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastKnownThumbnailUrl",
+            "columnName": "lastKnownThumbnailUrl",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "contentId"
+          ]
+        }
+      },
+      {
+        "tableName": "hub_catalog_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `releaseId` TEXT NOT NULL, `catalogRevision` INTEGER NOT NULL, `locale` TEXT NOT NULL, `commit` TEXT NOT NULL, `baseUrl` TEXT NOT NULL, `lastCheckedAtMillis` INTEGER NOT NULL, `updatedAtMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "releaseId",
+            "columnName": "releaseId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "catalogRevision",
+            "columnName": "catalogRevision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "locale",
+            "columnName": "locale",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "commit",
+            "columnName": "commit",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "baseUrl",
+            "columnName": "baseUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastCheckedAtMillis",
+            "columnName": "lastCheckedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtMillis",
+            "columnName": "updatedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'af5a766687ade2644a11e986df600d4c')"
+    ]
+  }
+}
