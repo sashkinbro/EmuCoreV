@@ -126,6 +126,7 @@ private:
     vk::Pipeline compile_pipeline(SceGxmPrimitiveType type, vk::RenderPass render_pass, const SceGxmVertexProgram &vertex_program_gxm, const SceGxmFragmentProgram &fragment_program_gxm, const ProgramSource &vertex_source, const ProgramSource &fragment_source, const GxmRecordState &record, const shader::Hints &hints, MemState &mem);
 
 public:
+    bool uses_coherent_framebuffer_fetch() const { return support_coherent_framebuffer_fetch; }
     // if not 0, next time the pipeline cache should be saved (in seconds since epoch)
     uint64_t next_pipeline_cache_save = std::numeric_limits<uint64_t>::max();
 

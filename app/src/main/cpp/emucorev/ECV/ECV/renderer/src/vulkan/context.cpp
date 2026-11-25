@@ -692,6 +692,7 @@ void VKContext::stop_render_pass() {
         ecv::oracle::gpu::rp_end();
 #endif
     render_cmd.endRenderPass();
+    prev_draw_fbfetch = false;
 
     in_renderpass = false;
 }

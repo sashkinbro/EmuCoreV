@@ -590,6 +590,20 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         if (vk_frag_program.blending.blendEnable)
             context.state.surface_cache.mark_current_surface_blended();
     }
+    if (context.state.features.direct_fragcolor && fragment_program_gxp.is_frag_color_used() && context.state.features.split_fbfetch_between_draws
+        && context.in_renderpass && context.prev_draw_fbfetch) {
+        // Two consecutive fetching draws inside ONE render pass instance read wrong tile data on some drivers (Adreno 840 stock, B025; proven
+        // at start-up by gpu_caps_selftest.h, never guessed from a vendor name): restart the instance (attachments stored, then loaded again).
+        // The restarted instance must load the depth-stencil (the scene-begin clear must not run twice) without changing the scene's render
+        // pass for the instances that follow (a macroblock change still starts from the scene-begin clear).
+        const vk::RenderPass scene_render_pass = context.current_render_pass;
+        context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(context.current_color_format, true, true, true, !context.record.color_surface.data, false,
+            context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16);
+        context.stop_render_pass();
+        context.start_render_pass();
+        context.current_render_pass = scene_render_pass;
+    }
+    context.prev_draw_fbfetch = context.state.features.direct_fragcolor && fragment_program_gxp.is_frag_color_used();
 #if ECV_ORACLE
     if (context.state.features.direct_fragcolor && fragment_program_gxp.is_frag_color_used()
         && ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FB_RESTART) && context.in_renderpass) {

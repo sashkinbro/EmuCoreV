@@ -25,6 +25,7 @@
 #include <renderer/vulkan/functions.h>
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/frame_runtime_reset.h>
+#include <renderer/vulkan/gpu_caps_selftest.h>
 #include <renderer/vulkan/surface_capability_selection.h>
 
 #include <chrono>
@@ -45,10 +46,14 @@
 #include <util/mem_snapshot.h>
 #include <util/warning.h>
 #include <vkutil/vkutil.h>
+#if ECV_ORACLE && defined(__ANDROID__)
+#include <android/log.h>
+#endif
 
 #include <overlay/display_manager.h>
 
 #include <algorithm>
+#include <fstream>
 #include <mutex>
 #include <unordered_set>
 
@@ -1082,6 +1087,91 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
     return true;
 }
 
+// Decides features.split_fbfetch_between_draws (B025). The subpass-input fetch path is run once on the real driver (gpu_caps_selftest.h): two
+// consecutive fetching draws in one render pass instance against a CPU model. Pass = the split is not needed (it costs a store+load per
+// draw, Mali: Rayman 60 -> 31 fps); Fail or "could not run" = split (always correct). The result is cached per driver build in
+// <files dir>/fbfetch-selftest.cache so the test runs once per driver update. Never a vendor/device-name decision.
+static void select_fbfetch_split(VKState &s) {
+    namespace st = renderer::vulkan::selftest;
+    constexpr int test_version = 1; // bump when the test or its shaders change
+    fs::path flag_dir = s.vita_fs_path;
+    if (!flag_dir.has_filename())
+        flag_dir = flag_dir.parent_path();
+    flag_dir = flag_dir.parent_path();
+
+    std::string driver_info;
+    try {
+        const auto chain = s.physical_device.getProperties2KHR<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceDriverProperties>();
+        const auto &driver = chain.get<vk::PhysicalDeviceDriverProperties>();
+        driver_info = std::string(driver.driverName.data()) + "/" + driver.driverInfo.data();
+    } catch (...) {
+    }
+    const auto &props = s.physical_device_properties;
+    const std::string key = fmt::format("v{}|{}|{:x}:{:x}|{}|{}|roaa={}|raw={}", test_version, props.deviceName.data(), props.vendorID, props.deviceID, props.driverVersion, driver_info,
+        s.pipeline_cache.uses_coherent_framebuffer_fetch() ? 1 : 0, s.features.preserve_f16_nan_as_u16 ? 1 : 0);
+    const fs::path cache_path = flag_dir / "fbfetch-selftest.cache";
+
+    st::Result result = st::Result::NotRun;
+    st::FbFetchReport report;
+    const char *source = "selftest";
+    bool decided = false;
+#if ECV_ORACLE
+    if (fs::exists(flag_dir / "dbg-no-fbsplit")) {
+        result = st::Result::Pass;
+        source = "dbg-no-fbsplit";
+        decided = true;
+    } else if (fs::exists(flag_dir / "dbg-force-fbsplit")) {
+        result = st::Result::Fail;
+        source = "dbg-force-fbsplit";
+        decided = true;
+    }
+#endif
+    if (!decided) {
+        try {
+            std::ifstream in(cache_path.string());
+            std::string cached_key, cached_result;
+            if (in && std::getline(in, cached_key) && std::getline(in, cached_result) && cached_key == key) {
+                result = cached_result == "pass" ? st::Result::Pass : (cached_result == "fail" ? st::Result::Fail : st::Result::NotRun);
+                if (result != st::Result::NotRun) {
+                    source = "cache";
+                    decided = true;
+                }
+            }
+        } catch (...) {
+        }
+    }
+    if (!decided) {
+        if (!s.features.preserve_f16_nan_as_u16) {
+            report.note = "no raw attachment on this device: real render pass differs, test not run";
+        } else {
+            st::FbFetchInput in{};
+            in.device = s.device;
+            in.physical_device = s.physical_device;
+            in.queue = s.general_queue;
+            in.queue_family = s.general_family_index;
+            in.render_pass = s.pipeline_cache.retrieve_render_pass(vk::Format::eR16G16B16A16Sfloat, true, true, true, false, false, true);
+            in.depth_stencil_format = s.deep_stencil_use;
+            in.rasterization_order_access = s.pipeline_cache.uses_coherent_framebuffer_fetch();
+            report = st::run_fbfetch_selftest(in);
+            result = report.result;
+            if (result != st::Result::NotRun) {
+                try {
+                    std::ofstream out(cache_path.string(), std::ios::trunc);
+                    out << key << "\n" << st::to_string(result) << "\n";
+                } catch (...) {
+                }
+            }
+        }
+    }
+    s.features.split_fbfetch_between_draws = result != st::Result::Pass;
+    LOG_INFO("Framebuffer-fetch self-test: {} (source {}), split between consecutive fetching draws = {}; mismatch in-pass raw {:.5f} float {:.5f} split {:.5f}, {:.0f} ms {}",
+        st::to_string(result), source, s.features.split_fbfetch_between_draws, report.mismatch_inplace_raw, report.mismatch_inplace_float, report.mismatch_split, report.ms, report.note);
+#if ECV_ORACLE && defined(__ANDROID__)
+    __android_log_print(ANDROID_LOG_INFO, "ECVLAB", "paths fbfetch=%s fbfetch_split=%d selftest=%s source=%s mismatch_raw=%.5f mismatch_float=%.5f mismatch_split=%.5f ms=%.0f", s.pipeline_cache.uses_coherent_framebuffer_fetch() ? "roaa" : "input-attachment",
+        s.features.split_fbfetch_between_draws ? 1 : 0, st::to_string(result), source, report.mismatch_inplace_raw, report.mismatch_inplace_float, report.mismatch_split, report.ms);
+#endif
+}
+
 void VKState::late_init(const Config &cfg, const std::string_view game_id, MemState &mem) {
     this->mem = &mem;
 #if ECV_ORACLE
@@ -1106,6 +1196,8 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
         // We use subpass input to get something similar to direct fragcolor access (there is no difference for the shader)
         features.direct_fragcolor = true;
         features.support_shader_interlock = false;
+        // conservative until the start-up self-test (select_fbfetch_split, after pipeline_cache.init) has proven the in-pass fetch coherent
+        features.split_fbfetch_between_draws = true;
     }
 
     // Diagnostic/workaround: without VK_EXT/ARM_rasterization_order_attachment_access, overlapping
@@ -1169,6 +1261,9 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
 #endif
 
     pipeline_cache.init(support_rasterized_order_access);
+
+    if (features.direct_fragcolor)
+        select_fbfetch_split(*this);
 
     texture_cache.init(true, texture_folder(), game_id); // Nick - Turning off hashless texture cache can be useful for debugging
 
