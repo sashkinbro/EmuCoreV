@@ -40,7 +40,24 @@ TEST(GpuStrategy, RoaaTilerPicksTheTopRungAndSync2) {
 TEST(GpuStrategy, LadderFallsThroughRoaaLocalReadInputAttachmentCopy) {
     GpuCaps c = tiler_caps();
     c.roaa_color = false;
-    EXPECT_EQ(choose_strategy(c, {}, everything()).fbfetch, FbFetchPath::DynamicRenderingLocalRead);
+    c.dynamic_rendering = true;
+    // dynamic rendering is opt-in: without a request the VkRenderPass ladder runs and local read is not a rung of it
+    EXPECT_EQ(choose_strategy(c, {}, everything()).render_path, RenderPath::RenderPass);
+    EXPECT_EQ(choose_strategy(c, {}, everything()).fbfetch, FbFetchPath::InputAttachmentBarrier);
+    Implemented auto_dr = everything();
+    auto_dr.dynamic_auto = true;
+    EXPECT_EQ(choose_strategy(c, {}, auto_dr).render_path, RenderPath::DynamicRendering);
+    EXPECT_EQ(choose_strategy(c, {}, auto_dr).fbfetch, FbFetchPath::DynamicRenderingLocalRead);
+    ForcedPaths dyn;
+    dyn.dynamic_rendering = true;
+    const Strategy d = choose_strategy(c, dyn, everything());
+    EXPECT_EQ(d.render_path, RenderPath::DynamicRendering);
+    EXPECT_EQ(d.fbfetch, FbFetchPath::DynamicRenderingLocalRead);
+    EXPECT_FALSE(d.use_shader_interlock);
+    EXPECT_FALSE(d.force_rejected);
+    ForcedPaths back;
+    back.render_pass = true;
+    EXPECT_EQ(choose_strategy(c, back, auto_dr).render_path, RenderPath::RenderPass);
     c.dynamic_rendering_local_read = false;
     EXPECT_EQ(choose_strategy(c, {}, everything()).fbfetch, FbFetchPath::InputAttachmentBarrier);
     c.max_per_stage_input_attachments = 0;
@@ -48,8 +65,7 @@ TEST(GpuStrategy, LadderFallsThroughRoaaLocalReadInputAttachmentCopy) {
 }
 
 TEST(GpuStrategy, DefaultImplementationTableNeverSelectsUnimplementedPaths) {
-    // today: the local-read and generic copy fbfetch rungs have no implementation (the renderer is VkRenderPass based, local-read needs
-    // dynamic rendering); timeline submit tracking, lazy transient attachments and the ds-resolve plan do
+    // today: the generic copy fbfetch rung has no implementation; local read exists only on the opt-in dynamic rendering path
     const Strategy s = choose_strategy(tiler_caps());
     EXPECT_EQ(s.fbfetch, FbFetchPath::RasterOrderAttachmentAccess);
     EXPECT_EQ(s.submit, SubmitTracking::Fences); // timeline is implemented but opt-in (Implemented::timeline_auto)
@@ -66,13 +82,37 @@ TEST(GpuStrategy, DefaultImplementationTableNeverSelectsUnimplementedPaths) {
     EXPECT_EQ(t.msaa_resolve, MsaaResolvePath::ResolveAttachmentColorOnly);
     GpuCaps c = tiler_caps();
     c.roaa_color = false;
-    EXPECT_EQ(choose_strategy(c).fbfetch, FbFetchPath::InputAttachmentBarrier); // not the unimplemented local-read
+    EXPECT_EQ(choose_strategy(c).fbfetch, FbFetchPath::InputAttachmentBarrier); // dynamic rendering is opt-in, local read is not a rung of the VkRenderPass ladder
     ForcedPaths forced_timeline_off;
     forced_timeline_off.fences = true;
     EXPECT_EQ(choose_strategy(tiler_caps(), forced_timeline_off).submit, SubmitTracking::Fences);
     ForcedPaths forced_normal;
     forced_normal.normal_memory = true;
     EXPECT_EQ(choose_strategy(tiler_caps(), forced_normal).transient, TransientMemory::Normal);
+}
+
+TEST(GpuStrategy, DynamicRenderingNeedsLocalReadAndTheImplementation) {
+    GpuCaps c = tiler_caps();
+    c.dynamic_rendering = true;
+    ForcedPaths dyn;
+    dyn.dynamic_rendering = true;
+    c.dynamic_rendering_local_read = false; // dynamic rendering alone cannot read the attachment as an input attachment
+    Strategy s = choose_strategy(c, dyn, everything());
+    EXPECT_EQ(s.render_path, RenderPath::RenderPass);
+    EXPECT_TRUE(s.force_rejected);
+    c.dynamic_rendering_local_read = true;
+    c.dynamic_rendering = false;
+    EXPECT_TRUE(choose_strategy(c, dyn, everything()).force_rejected);
+    c.dynamic_rendering = true;
+    Implemented not_yet = everything();
+    not_yet.dynamic_rendering = false;
+    EXPECT_EQ(choose_strategy(c, dyn, not_yet).render_path, RenderPath::RenderPass);
+    // forcing a VkRenderPass-only fbfetch rung together with dynamic rendering is rejected, the dynamic path keeps its single rung
+    ForcedPaths both = dyn;
+    both.input_attachment = true;
+    s = choose_strategy(c, both, everything());
+    EXPECT_EQ(s.render_path, RenderPath::DynamicRendering);
+    EXPECT_TRUE(s.force_rejected);
 }
 
 TEST(GpuStrategy, DesktopInterlockOnlyWhenNoBetterRungExists) {
@@ -146,6 +186,6 @@ TEST(GpuStrategy, ForceFlagNamesRoundTrip) {
 
 TEST(GpuStrategy, DescribeLineHasStableKeys) {
     const std::string d = describe(tiler_caps(), choose_strategy(tiler_caps()));
-    for (const char *key : { "barriers=", "submit=", "transient=", "fbfetch=", "interlock=", "msaa_resolve=", "ds_resolve=", "load_store=", "forced_rejected=" })
+    for (const char *key : { "render_path=", "barriers=", "submit=", "transient=", "fbfetch=", "interlock=", "msaa_resolve=", "ds_resolve=", "load_store=", "forced_rejected=" })
         EXPECT_NE(d.find(key), std::string::npos) << key;
 }

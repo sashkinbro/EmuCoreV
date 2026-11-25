@@ -51,6 +51,10 @@ struct GpuCaps {
 enum class BarrierStyle : uint8_t { Legacy, Sync2 };
 enum class SubmitTracking : uint8_t { Fences, TimelineSemaphore };
 enum class TransientMemory : uint8_t { Normal, Lazy };
+// How the scene draws are enclosed: VkRenderPass + VkFramebuffer objects (always available), or vkCmdBeginRendering (dynamic rendering).
+// The dynamic path needs VK_KHR_dynamic_rendering_local_read as well, because every framebuffer-fetch shader reads its colour attachment as an
+// input attachment, which dynamic rendering only offers through local read.
+enum class RenderPath : uint8_t { RenderPass, DynamicRendering };
 
 // Programmable blending / framebuffer fetch ladder, best first. Each rung is correct on its own; lower rungs are slower
 // or need more passes. "Copy" = snapshot the attachment into a texture and sample that (no feedback loop at all).
@@ -85,6 +89,7 @@ struct ForcedPaths {
     bool fences = false, timeline = false;
     bool normal_memory = false, lazy_memory = false;
     bool roaa = false, local_read = false, input_attachment = false, copy_snapshot = false;
+    bool dynamic_rendering = false, render_pass = false; // render_pass = stay on VkRenderPass objects
     bool color_only_resolve = false;
 };
 
@@ -98,7 +103,10 @@ struct Implemented {
     bool timeline_auto = false;
     bool lazy_memory = true; // Image::init_transient_attachment (used by MSAA attachments; no existing attachment is provably dead)
     bool fbfetch_roaa = true;
-    bool fbfetch_local_read = false;
+    bool fbfetch_local_read = true; // only reachable together with Implemented::dynamic_rendering
+    bool dynamic_rendering = true; // context.cpp / pipeline_cache.cpp: vkCmdBeginRendering path with explicit tracker barriers
+    // opt-in until a device A/B (B025 table) says it is equal or better: `ecv-force-path-dynamic-rendering` selects it
+    bool dynamic_auto = false;
     bool fbfetch_input_attachment = true;
     bool fbfetch_copy = false; // the generic copy rung (only the SceShell glow snapshot exists)
     bool ds_resolve = true; // render_pass_policy.h::plan_ds_resolve; MSAA itself is B140 (C:\w\msaa)
@@ -108,6 +116,7 @@ struct Strategy {
     BarrierStyle barriers = BarrierStyle::Legacy;
     SubmitTracking submit = SubmitTracking::Fences;
     TransientMemory transient = TransientMemory::Normal;
+    RenderPath render_path = RenderPath::RenderPass;
     FbFetchPath fbfetch = FbFetchPath::InputAttachmentBarrier;
     MsaaResolvePath msaa_resolve = MsaaResolvePath::None;
     bool use_shader_interlock = false; // desktop interlock path (only when no fbfetch rung above InputAttachment is available)
@@ -117,10 +126,10 @@ struct Strategy {
     bool force_rejected = false;
 };
 
-inline bool fbfetch_path_available(const GpuCaps &c, FbFetchPath p, const Implemented &impl = {}) {
+inline bool fbfetch_path_available(const GpuCaps &c, FbFetchPath p, const Implemented &impl = {}, bool dynamic_rendering_selected = false) {
     switch (p) {
     case FbFetchPath::RasterOrderAttachmentAccess: return c.roaa_color && impl.fbfetch_roaa;
-    case FbFetchPath::DynamicRenderingLocalRead: return c.dynamic_rendering_local_read && impl.fbfetch_local_read;
+    case FbFetchPath::DynamicRenderingLocalRead: return dynamic_rendering_selected && c.dynamic_rendering_local_read && impl.fbfetch_local_read;
     case FbFetchPath::InputAttachmentBarrier: return c.input_attachment_self_dependency && c.max_per_stage_input_attachments >= 1 && impl.fbfetch_input_attachment;
     case FbFetchPath::CopySnapshot: return impl.fbfetch_copy;
     }
@@ -141,14 +150,27 @@ inline Strategy choose_strategy(const GpuCaps &c, const ForcedPaths &f = {}, con
     s.transient = (c.lazily_allocated_memory && impl.lazy_memory && !f.normal_memory) ? TransientMemory::Lazy : TransientMemory::Normal;
     if (f.lazy_memory && !(c.lazily_allocated_memory && impl.lazy_memory))
         s.force_rejected = true;
+    // render path: dynamic rendering (+ local read) only when asked for, every other combination stays on VkRenderPass objects
+    const bool dr_possible = c.dynamic_rendering && c.dynamic_rendering_local_read && impl.dynamic_rendering && impl.fbfetch_local_read;
+    const bool dr_wanted = (f.dynamic_rendering || f.local_read || impl.dynamic_auto) && !f.render_pass;
+    s.render_path = (dr_possible && dr_wanted) ? RenderPath::DynamicRendering : RenderPath::RenderPass;
+    if ((f.dynamic_rendering || f.local_read) && !dr_possible)
+        s.force_rejected = true;
+    const bool dr = s.render_path == RenderPath::DynamicRendering;
     // fbfetch ladder: first available rung unless one is forced and available
     FbFetchPath forced = FbFetchPath::CopySnapshot;
     bool have_forced = false;
-    if (f.roaa) { forced = FbFetchPath::RasterOrderAttachmentAccess; have_forced = true; }
-    else if (f.local_read) { forced = FbFetchPath::DynamicRenderingLocalRead; have_forced = true; }
+    if (dr) {
+        // the dynamic path has exactly one way to read the attachment; other forced rungs belong to the VkRenderPass path
+        if (f.roaa || f.input_attachment || f.copy_snapshot)
+            s.force_rejected = true;
+        forced = FbFetchPath::DynamicRenderingLocalRead;
+        have_forced = true;
+    } else if (f.roaa) { forced = FbFetchPath::RasterOrderAttachmentAccess; have_forced = true; }
+    else if (f.local_read) { forced = FbFetchPath::DynamicRenderingLocalRead; have_forced = true; } // rejected below: needs dr
     else if (f.input_attachment) { forced = FbFetchPath::InputAttachmentBarrier; have_forced = true; }
     else if (f.copy_snapshot) { forced = FbFetchPath::CopySnapshot; have_forced = true; }
-    if (have_forced && fbfetch_path_available(c, forced, impl)) {
+    if (have_forced && fbfetch_path_available(c, forced, impl, dr)) {
         s.fbfetch = forced;
     } else {
         if (have_forced)
@@ -156,7 +178,7 @@ inline Strategy choose_strategy(const GpuCaps &c, const ForcedPaths &f = {}, con
         s.fbfetch = FbFetchPath::CopySnapshot;
         for (size_t i = 0; i < fbfetch_path_count; i++) {
             const FbFetchPath p = static_cast<FbFetchPath>(i);
-            if (fbfetch_path_available(c, p, impl)) {
+            if (fbfetch_path_available(c, p, impl, dr)) {
                 s.fbfetch = p;
                 break;
             }
@@ -164,7 +186,7 @@ inline Strategy choose_strategy(const GpuCaps &c, const ForcedPaths &f = {}, con
     }
     // interlock stands in only when nothing better than the barrier rung exists (matches the pre-existing renderer rule:
     // ROAA wins over interlock)
-    s.use_shader_interlock = c.shader_interlock && !f.roaa && s.fbfetch != FbFetchPath::RasterOrderAttachmentAccess
+    s.use_shader_interlock = c.shader_interlock && !dr && !f.roaa && s.fbfetch != FbFetchPath::RasterOrderAttachmentAccess
         && s.fbfetch != FbFetchPath::DynamicRenderingLocalRead && !f.input_attachment && !f.copy_snapshot;
     // MSAA resolve
     const bool ms = c.supports_samples(4) || c.supports_samples(2);
@@ -178,6 +200,7 @@ inline Strategy choose_strategy(const GpuCaps &c, const ForcedPaths &f = {}, con
 }
 
 inline const char *to_string(BarrierStyle v) { return v == BarrierStyle::Sync2 ? "sync2" : "legacy"; }
+inline const char *to_string(RenderPath v) { return v == RenderPath::DynamicRendering ? "dynamic" : "render-pass"; }
 inline const char *to_string(SubmitTracking v) { return v == SubmitTracking::TimelineSemaphore ? "timeline" : "fences"; }
 inline const char *to_string(TransientMemory v) { return v == TransientMemory::Lazy ? "lazy" : "normal"; }
 inline const char *to_string(FbFetchPath v) {
@@ -204,6 +227,8 @@ inline std::string describe(const GpuCaps &c, const Strategy &s) {
     r += to_string(s.barriers);
     r += " submit=";
     r += to_string(s.submit);
+    r += " render_path=";
+    r += to_string(s.render_path);
     r += " transient=";
     r += to_string(s.transient);
     r += " fbfetch=";
@@ -231,6 +256,8 @@ inline bool apply_force_name(ForcedPaths &f, std::string_view name) {
     else if (name == "normal-memory") f.normal_memory = true;
     else if (name == "lazy-memory") f.lazy_memory = true;
     else if (name == "roaa") f.roaa = true;
+    else if (name == "dynamic-rendering") f.dynamic_rendering = true;
+    else if (name == "render-pass") f.render_pass = true;
     else if (name == "local-read") f.local_read = true;
     else if (name == "input-attachment") f.input_attachment = true;
     else if (name == "copy-snapshot") f.copy_snapshot = true;
@@ -238,7 +265,7 @@ inline bool apply_force_name(ForcedPaths &f, std::string_view name) {
     else return false;
     return true;
 }
-inline constexpr std::array<std::string_view, 11> force_path_names = { "legacy-barriers", "sync2-barriers", "fences", "timeline",
+inline constexpr std::array<std::string_view, 13> force_path_names = { "dynamic-rendering", "render-pass", "legacy-barriers", "sync2-barriers", "fences", "timeline",
     "normal-memory", "lazy-memory", "roaa", "local-read", "input-attachment", "copy-snapshot", "color-only-resolve" };
 
 } // namespace renderer::vulkan

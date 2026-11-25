@@ -71,6 +71,8 @@ struct VKState : public renderer::State {
     // capability layer + the path table chosen from it at device creation (gpu_caps.h)
     GpuCaps gpu_caps;
     Strategy gpu_strategy;
+    // RenderPath::DynamicRendering: scenes use vkCmdBeginRendering (+ local read), no VkRenderPass/VkFramebuffer objects
+    bool use_dynamic_rendering = false;
     // SubmitTracking::TimelineSemaphore: every scene submit signals ++submit_counter (render thread only); null when fences are used
     vk::Semaphore submit_timeline = nullptr;
     uint64_t submit_counter = 0;

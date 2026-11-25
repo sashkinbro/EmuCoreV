@@ -737,6 +737,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         bool support_shader_interlock = false;
         bool support_sync2 = false;
         bool support_timeline = false;
+        bool support_dyn_rendering = false;
+        bool support_local_read = false;
         const std::map<std::string_view, bool *> optional_extensions = {
             { vk::KHRGetMemoryRequirements2ExtensionName, &temp_bool },
             // can be used by vma to improve performance
@@ -762,6 +764,13 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             { vk::KHRSynchronization2ExtensionName, &support_sync2 },
             // submit/frame completion tracking through one timeline semaphore (strategy table: SubmitTracking)
             { VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME, &support_timeline },
+            // dynamic rendering + local read (RenderPath::DynamicRendering) and the extensions they depend on on a Vulkan 1.1 instance
+            { VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, &support_dyn_rendering },
+            { VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME, &support_local_read },
+            { VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME, &temp_bool },
+            { VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME, &temp_bool },
+            { VK_KHR_MULTIVIEW_EXTENSION_NAME, &temp_bool },
+            { VK_KHR_MAINTENANCE_2_EXTENSION_NAME, &temp_bool },
             // eMirrorClampToEdge sampler address mode (no feature bit, the extension is the enable)
             { VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME, &temp_bool },
 #ifdef __APPLE__
@@ -926,7 +935,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             gpu_caps.roaa_color = support_rasterized_order_access;
             gpu_caps.shader_interlock = support_shader_interlock;
             gpu_caps.input_attachment_self_dependency = true;
-            ForcedPaths forced;
+            ForcedPaths forced = read_forced_paths(std::string()); // ECV_FORCE_PATHS environment variable (debug builds, host replay)
 #if ECV_ORACLE
             {
                 fs::path oracle_root = vita_fs_path;
@@ -946,6 +955,18 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             support_shader_interlock = gpu_strategy.use_shader_interlock;
             support_sync2 = gpu_strategy.barriers == BarrierStyle::Sync2;
             support_timeline = gpu_strategy.submit == SubmitTracking::TimelineSemaphore;
+            support_dyn_rendering = support_local_read = gpu_strategy.render_path == RenderPath::DynamicRendering;
+            use_dynamic_rendering = support_dyn_rendering;
+            // the optional-extension map enables everything the driver lists; extensions of paths that were not selected stay off
+            std::erase_if(device_extensions, [&](const char *e) {
+                const std::string_view n(e);
+                if (!use_dynamic_rendering
+                    && (n == VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME || n == VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME
+                        || n == VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME || n == VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME
+                        || n == VK_KHR_MULTIVIEW_EXTENSION_NAME || n == VK_KHR_MAINTENANCE_2_EXTENSION_NAME))
+                    return true;
+                return !support_timeline && n == VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME;
+            });
             vkutil::sync::config().use_sync2 = support_sync2;
             LOG_INFO("GPU paths: {}", describe(gpu_caps, gpu_strategy));
             publish_paths_line(describe(gpu_caps, gpu_strategy));
@@ -985,7 +1006,9 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT,
             vk::PhysicalDeviceFaultFeaturesEXT,
             vk::PhysicalDeviceSynchronization2Features,
-            vk::PhysicalDeviceTimelineSemaphoreFeatures>
+            vk::PhysicalDeviceTimelineSemaphoreFeatures,
+            vk::PhysicalDeviceDynamicRenderingFeatures,
+            vk::PhysicalDeviceDynamicRenderingLocalReadFeatures>
             device_info{
                 vk::DeviceCreateInfo{
                     .pEnabledFeatures = &enabled_features },
@@ -1005,7 +1028,11 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                 vk::PhysicalDeviceSynchronization2Features{
                     .synchronization2 = VK_TRUE },
                 vk::PhysicalDeviceTimelineSemaphoreFeatures{
-                    .timelineSemaphore = VK_TRUE }
+                    .timelineSemaphore = VK_TRUE },
+                vk::PhysicalDeviceDynamicRenderingFeatures{
+                    .dynamicRendering = VK_TRUE },
+                vk::PhysicalDeviceDynamicRenderingLocalReadFeatures{
+                    .dynamicRenderingLocalRead = VK_TRUE }
             };
         device_info.get().setQueueCreateInfos(queue_infos);
         device_info.get().setPEnabledExtensionNames(device_extensions);
@@ -1035,6 +1062,10 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             device_info.unlink<vk::PhysicalDeviceSynchronization2Features>();
         if (!support_timeline)
             device_info.unlink<vk::PhysicalDeviceTimelineSemaphoreFeatures>();
+        if (!support_dyn_rendering) {
+            device_info.unlink<vk::PhysicalDeviceDynamicRenderingFeatures>();
+            device_info.unlink<vk::PhysicalDeviceDynamicRenderingLocalReadFeatures>();
+        }
 
         if (sampler_device_support.ycbcr_conversion) {
             ycbcr_features.pNext = const_cast<void *>(device_info.get().pNext);

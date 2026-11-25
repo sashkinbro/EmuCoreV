@@ -1,5 +1,6 @@
 #include <renderer/vulkan/gpu_caps_probe.h>
 
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 
@@ -78,6 +79,15 @@ GpuCaps probe_gpu_caps(vk::PhysicalDevice device, const std::vector<vk::Extensio
 ForcedPaths read_forced_paths(const std::string &flag_dir) {
     ForcedPaths f;
 #ifndef NDEBUG
+    // host/replay/lab: ECV_FORCE_PATHS=name,name (same names as the flag files)
+    if (const char *env = std::getenv("ECV_FORCE_PATHS")) {
+        std::string_view list(env);
+        while (!list.empty()) {
+            const size_t comma = list.find(',');
+            apply_force_name(f, list.substr(0, comma));
+            list = comma == std::string_view::npos ? std::string_view() : list.substr(comma + 1);
+        }
+    }
     if (flag_dir.empty())
         return f;
     std::error_code ec;

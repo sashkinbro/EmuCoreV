@@ -363,6 +363,15 @@ struct VKContext : public renderer::Context {
     bool current_ds_loaded = false;
     // the colour attachment is backed by a surface (loaded), not the transient/unbacked one (initial layout Undefined)
     bool current_color_loaded = true;
+    // RenderPath::DynamicRendering: what the scene's pass instances begin with (the VkRenderPass objects' loadOp/storeOp/formats)
+    struct DynamicPass {
+        bool has_raw = false; // second colour attachment (R16G16B16A16_UINT raw bits of an F16 surface)
+        bool depth_load = false;
+        bool stencil_load = false;
+        bool store = true;
+    } dyn_pass;
+    // restarts of the pass inside the current scene (look-ahead statistics, docs/gpu-sync-tracker.md section 9)
+    uint32_t scene_pass_starts = 0;
     vk::Format current_color_format;
     vk::ImageView current_color_view;
     vk::ImageView current_ds_view;
@@ -415,6 +424,9 @@ struct VKContext : public renderer::Context {
 
     void start_recording(bool first_in_scene = false);
     void start_render_pass(bool create_descriptor_set = true);
+    // RenderPath::DynamicRendering: tracker barriers + vkCmdBeginRendering / vkCmdEndRendering + the barriers the pass dependencies used to be
+    void begin_dynamic_pass(const vk::ClearDepthStencilValue &ds_clear);
+    void end_dynamic_pass();
     void stop_render_pass();
     void stop_recording(const SceGxmNotification &notif1, const SceGxmNotification &notif2, bool submit = true);
     // Drop an open recording that has no recorded work (an empty scene-segment checkpoint) without

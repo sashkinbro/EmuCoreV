@@ -1126,6 +1126,26 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
         .subpass = 0
     };
 
+    // RenderPath::DynamicRendering: no VkRenderPass, the attachment formats go through VkPipelineRenderingCreateInfo (same formats the
+    // render pass objects would have been created with: retrieve_render_pass)
+    vk::PipelineRenderingCreateInfo rendering_info{};
+    std::array<vk::Format, 2> rendering_color_formats{};
+    if (state.use_dynamic_rendering) {
+        vk::Format color_format = color::translate_surface_format(record.color_base_format);
+        if (record.is_gamma_corrected && color_format == vk::Format::eR8G8B8A8Unorm)
+            color_format = vk::Format::eR8G8B8A8Srgb;
+        rendering_color_formats = { color_format, vk::Format::eR16G16B16A16Uint };
+        rendering_info.colorAttachmentCount = with_raw_attachment ? 2 : 1;
+        rendering_info.pColorAttachmentFormats = rendering_color_formats.data();
+        rendering_info.depthAttachmentFormat = state.deep_stencil_use;
+        const vk::Format ds_format = state.deep_stencil_use;
+        const bool ds_has_stencil = ds_format == vk::Format::eD24UnormS8Uint || ds_format == vk::Format::eD32SfloatS8Uint
+            || ds_format == vk::Format::eD16UnormS8Uint || ds_format == vk::Format::eS8Uint;
+        rendering_info.stencilAttachmentFormat = ds_has_stencil ? ds_format : vk::Format::eUndefined;
+        pipeline_info.pNext = &rendering_info;
+        pipeline_info.renderPass = nullptr;
+    }
+
     // vulkan.hpp THROWS on an error result here, so a driver refusing the pipeline used to take
     // the whole emulator down before the check below could run. Some drivers (notably Mesa/Turnip)
     // also report an internal shader-compiler rejection as ErrorOutOfHostMemory rather than a

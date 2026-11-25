@@ -540,8 +540,12 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     // must load the depth-stencil, never re-run the scene-begin clear
     if (context.is_first_scene_draw && (context.state.features.support_shader_interlock || context.ignore_macroblock || !context.render_target->has_macroblock_sync)) {
         // update the render pass to load and store the depth and stencil
-        context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(context.current_color_format, true, true, true, !context.record.color_surface.data, false,
-            context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16, context.ds_host_format);
+        if (context.state.use_dynamic_rendering) {
+            context.dyn_pass.depth_load = context.dyn_pass.stencil_load = context.dyn_pass.store = true;
+        } else {
+            context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(context.current_color_format, true, true, true, !context.record.color_surface.data, false,
+                context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16, context.ds_host_format);
+        }
 #if ECV_ORACLE
         if (ecv::oracle::gpu::enabled())
             ecv::oracle::gpu::rp_loads(reinterpret_cast<uint64_t>(static_cast<VkRenderPass>(context.current_render_pass)), "first_draw_upgrade");

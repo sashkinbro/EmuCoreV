@@ -2318,7 +2318,8 @@ Framebuffer &VKSurfaceCache::retrieve_framebuffer_handle(MemState &mem, SceGxmCo
     };
     vk::ImageView attachments[] = { color_result.view, color_result.raw_image ? color_result.raw_image->view : ds_result.view, ds_result.view };
     std::shared_ptr<vkutil::Image> shell_snapshot;
-    if (state.current_title_id == "SceShell" && color && !color_result.raw_image
+    // (the dynamic rendering path has neither framebuffers nor the shell input-attachment snapshot: local read does the job)
+    if (!state.use_dynamic_rendering && state.current_title_id == "SceShell" && color && !color_result.raw_image
         && color_result.base_image->format == vk::Format::eR8G8B8A8Unorm) {
         shell_snapshot = std::make_shared<vkutil::Image>(framebuffer_width, framebuffer_height, vk::Format::eR8G8B8A8Unorm);
         shell_snapshot->init_image(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eColorAttachment);
@@ -2330,10 +2331,12 @@ Framebuffer &VKSurfaceCache::retrieve_framebuffer_handle(MemState &mem, SceGxmCo
     fb_info.attachmentCount = color_result.raw_image ? 3 : 2;
     if (shell_snapshot)
         fb_info.attachmentCount = 3;
-    vk::Framebuffer fb_standard = state.device.createFramebuffer(fb_info);
+    vk::Framebuffer fb_standard = nullptr;
+    if (!state.use_dynamic_rendering)
+        fb_standard = state.device.createFramebuffer(fb_info);
 
     vk::Framebuffer fb_interlock = nullptr;
-    if (state.features.support_shader_interlock) {
+    if (state.features.support_shader_interlock && !state.use_dynamic_rendering) {
         // we also need to create the framebuffer for shader interlock
         fb_info.renderPass = interlock_render_pass;
         fb_info.pAttachments = &attachments[2];
