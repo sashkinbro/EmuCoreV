@@ -194,11 +194,10 @@ TEST(MicSettings, ApplyGainScalesAndSaturates) {
     EXPECT_EQ(mute[1], 0);
 }
 
-TEST(MicSettings, MuteStatusReflectsSettingAndPermission) {
-    EXPECT_EQ(ecv_audio_in::mute_status(true, true), 0);
-    EXPECT_EQ(ecv_audio_in::mute_status(false, true), 1);
-    EXPECT_EQ(ecv_audio_in::mute_status(true, false), 1);
-    EXPECT_EQ(ecv_audio_in::mute_status(false, false), 1);
+TEST(MicSettings, GuestNeverSeesTheMicrophoneAsMuted) {
+    // Hardware built-in mic: MUTE is 0 whatever the host state (setting off, permission missing, no port);
+    // those cases are silence from sceAudioInInput, which blocks one grain.
+    EXPECT_EQ(ecv_audio_in::guest_mute_status(), 0);
 }
 
 TEST(MicSettings, CaptureIsOnlyWantedWhenEnabledAndNotSuspended) {
@@ -227,4 +226,109 @@ TEST(MicSettings, GuestSelectionsAreValidated) {
     EXPECT_TRUE(ecv_audio_in::valid_guest_input(0));
     EXPECT_TRUE(ecv_audio_in::valid_guest_input(1));
     EXPECT_FALSE(ecv_audio_in::valid_guest_input(2));
+}
+
+TEST(MicPacing, GrainPeriodFollowsGrainAndRate) {
+    EXPECT_EQ(ecv_audio_in::grain_period_us(512, 16000), 16000);   // 256 samples @ 16 kHz
+    EXPECT_EQ(ecv_audio_in::grain_period_us(1536, 48000), 16000);  // 768 samples @ 48 kHz
+    EXPECT_EQ(ecv_audio_in::grain_period_us(0, 16000), ecv_audio_in::kDefaultPollPeriodUs);
+    EXPECT_EQ(ecv_audio_in::grain_period_us(512, 0), 16000);
+}
+
+TEST(MicPacing, EveryInputCallBlocksOneGrainWhateverTheCaptureState) {
+    // The cadence does not look at capture data: back-to-back calls from an instantly returning guest are
+    // spaced one period apart, so the thread sleeps instead of spinning.
+    int64_t next = 0;
+    int64_t now = 1000000;
+    const int64_t period = 16000;
+    int64_t done = ecv_audio_in::next_grain_deadline(next, now, period);
+    EXPECT_EQ(done, now + period); // first call waits a full grain
+    for (int i = 1; i <= 100; ++i) {
+        now = done; // the guest returns immediately and calls again
+        const int64_t d = ecv_audio_in::next_grain_deadline(next, now, period);
+        EXPECT_EQ(d - now, period);
+        done = d;
+    }
+    EXPECT_EQ(done, 1000000 + 101 * period);
+}
+
+TEST(MicPacing, LateGuestRestartsTheCadenceInsteadOfBursting) {
+    int64_t next = 0;
+    const int64_t period = 16000;
+    const int64_t d0 = ecv_audio_in::next_grain_deadline(next, 0 + 5, period);
+    const int64_t late = d0 + period * 10;
+    const int64_t d1 = ecv_audio_in::next_grain_deadline(next, late, period);
+    EXPECT_EQ(d1, late + period);
+}
+
+TEST(MicPacing, FailedInputStillCostsAGrainSoAnErrorLoopCannotSpin) {
+    EXPECT_EQ(ecv_audio_in::failed_input_wait_us(true, 512, 16000), 16000);
+    EXPECT_EQ(ecv_audio_in::failed_input_wait_us(true, 1536, 48000), 16000);
+    EXPECT_EQ(ecv_audio_in::failed_input_wait_us(false, 0, 0), ecv_audio_in::kDefaultPollPeriodUs);
+    EXPECT_GT(ecv_audio_in::failed_input_wait_us(false, 0, 0), 0);
+}
+
+TEST(MicPorts, VoiceAndRawAreIndependentPorts) {
+    ecv_audio_in::SlotTable t;
+    const int voice = t.try_open(ecv_audio_in::kPortTypeVoice);
+    const int raw = t.try_open(ecv_audio_in::kPortTypeRaw);
+    EXPECT_EQ(voice, 0);
+    EXPECT_EQ(raw, 1);
+    EXPECT_EQ(t.count(), 2);
+    EXPECT_TRUE(t.is_open(0));
+    EXPECT_TRUE(t.is_open(1));
+}
+
+TEST(MicPorts, SameTypeTwiceIsPortFullButOtherTypeStillOpens) {
+    ecv_audio_in::SlotTable t;
+    EXPECT_EQ(t.try_open(ecv_audio_in::kPortTypeVoice), 0);
+    EXPECT_EQ(t.try_open(ecv_audio_in::kPortTypeVoice), ecv_audio_in::SlotTable::kErrFull);
+    EXPECT_EQ(t.count(), 1);
+    EXPECT_EQ(t.try_open(ecv_audio_in::kPortTypeRaw), 1);
+    EXPECT_EQ(t.try_open(ecv_audio_in::kPortTypeRaw), ecv_audio_in::SlotTable::kErrFull);
+}
+
+TEST(MicPorts, UnknownTypeIsRejectedWithoutTakingASlot) {
+    ecv_audio_in::SlotTable t;
+    EXPECT_EQ(t.try_open(1), ecv_audio_in::SlotTable::kErrType);
+    EXPECT_EQ(t.try_open(3), ecv_audio_in::SlotTable::kErrType);
+    EXPECT_FALSE(t.any());
+}
+
+TEST(MicPorts, ReleaseIsPerPortAndReopenWorks) {
+    ecv_audio_in::SlotTable t;
+    t.try_open(ecv_audio_in::kPortTypeVoice);
+    t.try_open(ecv_audio_in::kPortTypeRaw);
+    EXPECT_TRUE(t.release(0));
+    EXPECT_FALSE(t.release(0));  // already closed
+    EXPECT_TRUE(t.any());        // the RAW port keeps the capture alive
+    EXPECT_TRUE(t.is_open(1));
+    EXPECT_EQ(t.try_open(ecv_audio_in::kPortTypeVoice), 0);
+    EXPECT_FALSE(t.release(-1));
+    EXPECT_FALSE(t.release(ecv_audio_in::kPortSlots));
+    EXPECT_TRUE(t.release(0));
+    EXPECT_TRUE(t.release(1));
+    EXPECT_FALSE(t.any());
+}
+
+TEST(MicPorts, InvalidPortIdsAreNeverOpen) {
+    ecv_audio_in::SlotTable t;
+    t.try_open(ecv_audio_in::kPortTypeVoice);
+    EXPECT_FALSE(t.is_open(-1));
+    EXPECT_FALSE(t.is_open(1));
+    EXPECT_FALSE(t.is_open(ecv_audio_in::kPortSlots));
+}
+
+TEST(MicPorts, CaptureRateIsTheHighestOpenPortRate) {
+    bool open[ecv_audio_in::kPortSlots] = {};
+    int freq[ecv_audio_in::kPortSlots] = { 16000, 48000 };
+    EXPECT_EQ(ecv_audio_in::required_capture_freq(open, freq), 16000);   // nothing open
+    open[0] = true;
+    EXPECT_EQ(ecv_audio_in::required_capture_freq(open, freq), 16000);   // VOICE only
+    open[1] = true;
+    EXPECT_EQ(ecv_audio_in::required_capture_freq(open, freq), 48000);   // RAW 48 kHz joins
+    open[0] = false;
+    EXPECT_EQ(ecv_audio_in::required_capture_freq(open, freq), 48000);   // RAW alone
+    freq[1] = 16000;
+    EXPECT_EQ(ecv_audio_in::required_capture_freq(open, freq), 16000);   // RAW at 16 kHz
 }

@@ -73,13 +73,22 @@ struct AudioOutPort {
 typedef std::shared_ptr<AudioOutPort> AudioOutPortPtr;
 typedef std::map<int, AudioOutPortPtr> AudioOutPortPtrs;
 
-struct AudioInPort {
-    void *id = nullptr;
-    bool running = false;
+// One guest port (VOICE or RAW). Fields are written under AudioInPort::capture_mutex.
+struct AudioInSlot {
     int len_bytes = 0;
     int freq = 0;
     // steady_clock microseconds at which the next grain is due (sceAudioInInput pacing); 0 = unset
     int64_t next_deadline_us = 0;
+    // SDL_AudioStream converting the shared capture (capture_freq mono) down to this port's rate; owned, may be null.
+    void *feed = nullptr;
+};
+
+// Host capture shared by all guest ports, plus the state the guest stored for the microphone.
+struct AudioInPort {
+    void *id = nullptr; // the shared capture stream
+    int capture_freq = 0; // rate the capture stream was opened at (under capture_mutex)
+    ecv_audio_in::SlotTable ports; // which guest ports are open (under capture_mutex)
+    AudioInSlot slot[ecv_audio_in::kPortSlots];
     // Set from the UI thread when RECORD_AUDIO was granted after the port opened; sceAudioInInput
     // then re-opens the capture device.
     std::atomic<bool> reopen_requested{ false };
@@ -93,6 +102,10 @@ struct AudioInPort {
     int stalled_grains = 0;
 };
 
+// True when at least one guest port is open (takes the capture mutex).
+bool audio_in_has_open_ports(AudioInPort &in);
+// Closes all guest ports and releases the capture (session end).
+void audio_in_close_all(AudioInPort &in);
 // Capture control for the UI/JNI thread; all safe to call from any thread.
 void audio_in_release_capture(AudioInPort &in);
 // Menu pause / background: releases the capture stream and asks for a re-open on resume.
