@@ -1,7 +1,11 @@
 # Writes ${OUT} with a 64-bit hash of every file in ${INPUTS} (paths relative to ${ROOT}, content hashed).
 # Run at build time by shader/CMakeLists.txt, so any change to a translator source changes the identity the
 # shader cache is keyed by (docs/shader-cache.md). The header is only rewritten when the hash changes.
-string(REPLACE "|" ";" INPUT_LIST "${INPUTS}")
+if(DEFINED INPUTS_FILE)
+	file(STRINGS "${INPUTS_FILE}" INPUT_LIST)
+else()
+	string(REPLACE "|" ";" INPUT_LIST "${INPUTS}")
+endif()
 set(acc "")
 foreach(f IN LISTS INPUT_LIST)
 	file(SHA256 "${f}" h)
