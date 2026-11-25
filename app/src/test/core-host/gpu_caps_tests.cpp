@@ -22,7 +22,7 @@ GpuCaps tiler_caps() {
 }
 Implemented everything() {
     Implemented i;
-    i.timeline = i.lazy_memory = i.fbfetch_local_read = i.fbfetch_copy = i.ds_resolve = true;
+    i.timeline = i.timeline_auto = i.lazy_memory = i.fbfetch_local_read = i.fbfetch_copy = i.ds_resolve = true;
     return i;
 }
 } // namespace
@@ -52,9 +52,12 @@ TEST(GpuStrategy, DefaultImplementationTableNeverSelectsUnimplementedPaths) {
     // dynamic rendering); timeline submit tracking, lazy transient attachments and the ds-resolve plan do
     const Strategy s = choose_strategy(tiler_caps());
     EXPECT_EQ(s.fbfetch, FbFetchPath::RasterOrderAttachmentAccess);
-    EXPECT_EQ(s.submit, SubmitTracking::TimelineSemaphore);
+    EXPECT_EQ(s.submit, SubmitTracking::Fences); // timeline is implemented but opt-in (Implemented::timeline_auto)
     EXPECT_EQ(s.transient, TransientMemory::Lazy);
     EXPECT_EQ(s.msaa_resolve, MsaaResolvePath::ResolveAttachment);
+    ForcedPaths want_timeline;
+    want_timeline.timeline = true;
+    EXPECT_EQ(choose_strategy(tiler_caps(), want_timeline).submit, SubmitTracking::TimelineSemaphore);
     Implemented none;
     none.timeline = none.lazy_memory = none.ds_resolve = false;
     const Strategy t = choose_strategy(tiler_caps(), {}, none);

@@ -46,6 +46,7 @@ GpuCaps probe_gpu_caps(vk::PhysicalDevice device, const std::vector<vk::Extensio
 
     // the instance is created with at most Vulkan 1.1: everything newer is reached through its extension
     const bool has_props2 = has_features2_khr;
+    c.render_pass2 = has_extension(exts, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
     if (has_props2 && has_extension(exts, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME)) {
         const auto f = device.getFeatures2KHR<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceTimelineSemaphoreFeatures>();
         c.timeline_semaphore = static_cast<bool>(f.get<vk::PhysicalDeviceTimelineSemaphoreFeatures>().timelineSemaphore);

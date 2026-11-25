@@ -18,6 +18,7 @@
 #include <renderer/vulkan/pipeline_cache.h>
 
 #include <cstring>
+#include <renderer/vulkan/pipeline_cache_file.h>
 #include <renderer/vulkan/render_pass_sync.h>
 
 #include <renderer/functions.h>
@@ -46,6 +47,13 @@
 #include <unordered_map>
 
 #include <SDL3/SDL_cpuinfo.h>
+
+#if defined(__ANDROID__) || defined(__linux__)
+#include <dlfcn.h>
+#include <elf.h>
+#include <link.h>
+#include <sys/stat.h>
+#endif
 
 // don't use the dispatch version, because we always hash a small amount
 // with a known size
@@ -326,87 +334,137 @@ void PipelineCache::set_async_compilation(bool enable) {
 }
 
 // magic number put at the beginning of the pipeline cache file
-constexpr uint32_t pipeline_cache_magic = 0xBEEF4322; // 4322: pipeline keys are mixed with XXH3 instead of XOR (P14), old hash lists are meaningless
+// Identity of the running build: the ELF build id of the module that contains this code (changes with every relink), else a stamp of its file.
+static uint64_t current_binary_id() {
+#if defined(__ANDROID__) || defined(__linux__)
+    Dl_info info{};
+    if (dladdr(reinterpret_cast<const void *>(&current_binary_id), &info) && info.dli_fbase) {
+        struct Ctx {
+            const void *base;
+            uint64_t id;
+        } ctx{ info.dli_fbase, 0 };
+        dl_iterate_phdr([](dl_phdr_info *module, size_t, void *data) -> int {
+            auto *c = static_cast<Ctx *>(data);
+            for (int i = 0; i < module->dlpi_phnum; i++) {
+                const ElfW(Phdr) &ph = module->dlpi_phdr[i];
+                if (ph.p_type != PT_LOAD)
+                    continue;
+                const auto start = module->dlpi_addr + ph.p_vaddr;
+                if (reinterpret_cast<uintptr_t>(c->base) < start || reinterpret_cast<uintptr_t>(c->base) >= start + ph.p_memsz)
+                    continue;
+                // this module: look for the GNU build id note
+                for (int j = 0; j < module->dlpi_phnum; j++) {
+                    const ElfW(Phdr) &note_ph = module->dlpi_phdr[j];
+                    if (note_ph.p_type != PT_NOTE)
+                        continue;
+                    const uint8_t *p = reinterpret_cast<const uint8_t *>(module->dlpi_addr + note_ph.p_vaddr);
+                    const uint8_t *end = p + note_ph.p_memsz;
+                    while (p + sizeof(ElfW(Nhdr)) <= end) {
+                        const auto *nh = reinterpret_cast<const ElfW(Nhdr) *>(p);
+                        const uint8_t *name = p + sizeof(ElfW(Nhdr));
+                        const uint8_t *desc = name + ((nh->n_namesz + 3) & ~3u);
+                        if (nh->n_type == NT_GNU_BUILD_ID && desc + nh->n_descsz <= end) {
+                            c->id = XXH3_64bits(desc, nh->n_descsz);
+                            return 1;
+                        }
+                        p = desc + ((nh->n_descsz + 3) & ~3u);
+                    }
+                }
+                return 1;
+            }
+            return 0;
+        }, &ctx);
+        if (ctx.id)
+            return ctx.id;
+        // no build id note: stamp of the library file
+        if (info.dli_fname) {
+            struct stat st{};
+            if (stat(info.dli_fname, &st) == 0) {
+                const uint64_t parts[2] = { static_cast<uint64_t>(st.st_size), static_cast<uint64_t>(st.st_mtime) };
+                return XXH3_64bits(parts, sizeof(parts));
+            }
+        }
+    }
+#endif
+    // host builds (replay): the compile time of this file
+    static const char stamp[] = __DATE__ " " __TIME__;
+    return XXH3_64bits(stamp, sizeof(stamp));
+}
+
+static renderer::vulkan::PipelineCacheIdentity pipeline_cache_identity(const vk::PhysicalDeviceProperties &props) {
+    renderer::vulkan::PipelineCacheIdentity id;
+    id.binary_id = current_binary_id();
+    id.translator_version = static_cast<uint32_t>(shader::CURRENT_VERSION);
+    id.driver_version = props.driverVersion;
+    id.api_version = props.apiVersion;
+    id.vendor_id = props.vendorID;
+    id.device_id = props.deviceID;
+    for (size_t i = 0; i < id.uuid.size(); i++)
+        id.uuid[i] = props.pipelineCacheUUID[i];
+    return id;
+}
+
+static fs::path pipeline_cache_path(const VKState &state) {
+    return state.shaders_path / fmt::format("pipeline-cache-vk{}.dat", shader::CURRENT_VERSION);
+}
 
 void PipelineCache::read_pipeline_cache() {
-    const std::string pipeline_cache_name = fmt::format("pipeline-cache-vk{}.dat", shader::CURRENT_VERSION);
-    const fs::path path = state.shaders_path / pipeline_cache_name;
+    using namespace renderer::vulkan;
+    const fs::path path = pipeline_cache_path(state);
 
-    fs::ifstream pipeline_cache_file(path, std::ios::in | std::ios::binary);
-    if (!pipeline_cache_file.is_open())
+    fs::ifstream file(path, std::ios::in | std::ios::binary);
+    if (!file.is_open())
         return;
 
-    LOG_INFO("Found pipeline cache, reading...");
+    file.seekg(0, fs::ifstream::end);
+    const uint64_t file_size = static_cast<uint64_t>(file.tellg());
+    file.seekg(0);
 
-    pipeline_cache_file.seekg(0, fs::ifstream::end);
-    size_t pipeline_size = pipeline_cache_file.tellg();
-    pipeline_cache_file.seekg(0);
-
-    if (pipeline_size < sizeof(uint32_t) + sizeof(size_t))
-        return;
-
-    // read the hashes
-    auto read_integer = [&]<typename T>(T &val) {
-        pipeline_cache_file.read(reinterpret_cast<char *>(&val), sizeof(T));
+    // Never hand an unvalidated blob to the driver (B148: another build's blob crashed vkCreateGraphicsPipelines on Adreno at startup).
+    auto discard = [&](CacheReject reason) {
+        // lab-checkable: grep "pipeline cache: discarded"
+        LOG_WARN("pipeline cache: discarded ({})", to_string(reason));
+        file.close();
+        boost::system::error_code ignored;
+        fs::remove(path, ignored); // rewritten with the right identity at the next save
     };
-    uint32_t magic_number;
-    read_integer(magic_number);
-    size_t nb_hashes;
-    read_integer(nb_hashes);
-    // safety check
-    size_t hashes_size = sizeof(magic_number) + sizeof(nb_hashes) + nb_hashes * sizeof(uint64_t);
-    if (magic_number != pipeline_cache_magic || pipeline_size < hashes_size) {
-        LOG_WARN("Pipeline cache is corrupted, ignoring it.");
-        pipeline_cache_file.close();
+
+    PipelineCacheFileHeader header;
+    if (file_size < sizeof(header)) {
+        discard(CacheReject::TooSmall);
         return;
     }
-    pipeline_size -= hashes_size;
-
-    // P14: trust the blob only if this driver would accept it. The first bytes are VkPipelineCacheHeaderVersionOne
-    // (size, version, vendor, device, uuid); a driver update or another GPU makes it useless, and the hash list would then lie
-    // ("already compiled") and send every pipeline down the synchronous path.
-    {
-        const auto pos = pipeline_cache_file.tellg();
-        struct CacheHeader {
-            uint32_t size, version, vendor, device;
-            uint8_t uuid[VK_UUID_SIZE];
-        } header{};
-        pipeline_cache_file.seekg(static_cast<std::streamoff>(hashes_size));
-        pipeline_cache_file.read(reinterpret_cast<char *>(&header), sizeof(header));
-        const vk::PhysicalDeviceProperties props = state.physical_device.getProperties();
-        const bool accepted = pipeline_cache_file.gcount() == static_cast<std::streamsize>(sizeof(header))
-            && header.version == VK_PIPELINE_CACHE_HEADER_VERSION_ONE && header.vendor == props.vendorID && header.device == props.deviceID
-            && std::memcmp(header.uuid, props.pipelineCacheUUID.data(), VK_UUID_SIZE) == 0;
-        if (!accepted) {
-            LOG_WARN("Pipeline cache was written for another driver or GPU, ignoring it.");
-            pipeline_cache_file.close();
-            return;
-        }
-        pipeline_cache_file.clear();
-        pipeline_cache_file.seekg(pos);
-    }
-    // insert hashes with null pipeline
-    for (size_t i = 0; i < nb_hashes; i++) {
-        uint64_t hash;
-        read_integer(hash);
-        pipelines[hash] = nullptr;
+    file.read(reinterpret_cast<char *>(&header), sizeof(header));
+    const CacheReject reject = validate_header(header, pipeline_cache_identity(state.physical_device_properties), file_size);
+    if (reject != CacheReject::None) {
+        discard(reject);
+        return;
     }
 
-    std::vector<char> pipeline_data(pipeline_size);
-    pipeline_cache_file.read(pipeline_data.data(), pipeline_size);
-    pipeline_cache_file.close();
+    std::vector<uint64_t> keys(header.pipeline_count);
+    file.read(reinterpret_cast<char *>(keys.data()), static_cast<std::streamsize>(keys.size() * sizeof(uint64_t)));
+    std::vector<char> blob(header.blob_size);
+    file.read(blob.data(), static_cast<std::streamsize>(blob.size()));
+    if (!file || XXH3_64bits(blob.data(), blob.size()) != header.blob_hash) {
+        discard(file ? CacheReject::Corrupt : CacheReject::Truncated);
+        return;
+    }
+    file.close();
 
     vk::PipelineCacheCreateInfo cache_info{
-        .initialDataSize = pipeline_size,
-        .pInitialData = pipeline_data.data()
+        .initialDataSize = blob.size(),
+        .pInitialData = blob.data()
     };
-
     state.device.destroyPipelineCache(pipeline_cache);
     pipeline_cache = state.device.createPipelineCache(cache_info);
-    LOG_INFO("Pipeline cache read and loaded");
+    // only now are the keys trusted: they describe pipelines this cache can serve quickly
+    for (const uint64_t key : keys)
+        pipelines[key] = nullptr;
+    LOG_INFO("pipeline cache: loaded ({} pipelines, {} bytes)", keys.size(), blob.size());
 }
 
 void PipelineCache::save_pipeline_cache() {
+    using namespace renderer::vulkan;
     // first save the shader hashes
     // do a copy for thread safety
     std::vector<ShadersHash> shader_cache_copy;
@@ -421,31 +479,25 @@ void PipelineCache::save_pipeline_cache() {
         // No pipeline was created
         return;
 
-    const std::string pipeline_cache_name = fmt::format("pipeline-cache-vk{}.dat", shader::CURRENT_VERSION);
-    const fs::path path = state.shaders_path / pipeline_cache_name;
-
-    // P14: write next to the real file and rename, a crash or a full disk can no longer leave a truncated cache
+    const fs::path path = pipeline_cache_path(state);
+    // write next to the real file and rename, a crash or a full disk can no longer leave a truncated cache
     const fs::path tmp_path = fs::path(path.string() + ".tmp");
-    fs::ofstream pipeline_cache_file(tmp_path, std::ios::out | std::ios::binary | std::ios::trunc);
-    if (!pipeline_cache_file.is_open())
+    fs::ofstream file(tmp_path, std::ios::out | std::ios::binary | std::ios::trunc);
+    if (!file.is_open())
         return;
 
     LOG_INFO("Saving pipeline cache...");
 
-    // first save the hashes of all pipelines
-    auto write_integer = [&]<typename T>(T val) {
-        pipeline_cache_file.write(reinterpret_cast<const char *>(&val), sizeof(T));
-    };
-    write_integer(pipeline_cache_magic);
-    write_integer(pipelines.size());
+    const PipelineCacheFileHeader header = make_header(pipeline_cache_identity(state.physical_device_properties), pipeline_data.size(),
+        XXH3_64bits(pipeline_data.data(), pipeline_data.size()), pipelines.size());
+    file.write(reinterpret_cast<const char *>(&header), sizeof(header));
     for (auto &[hash, _] : pipelines) {
-        write_integer(hash);
+        const uint64_t key = hash;
+        file.write(reinterpret_cast<const char *>(&key), sizeof(key));
     }
-
-    // then save the cache
-    pipeline_cache_file.write(reinterpret_cast<const char *>(pipeline_data.data()), pipeline_data.size());
-    pipeline_cache_file.close();
-    if (!pipeline_cache_file.good()) {
+    file.write(reinterpret_cast<const char *>(pipeline_data.data()), static_cast<std::streamsize>(pipeline_data.size()));
+    file.close();
+    if (!file.good()) {
         LOG_WARN("Could not write the pipeline cache, keeping the previous one.");
         boost::system::error_code ignored;
         fs::remove(tmp_path, ignored);

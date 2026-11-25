@@ -25,6 +25,7 @@ struct GpuCaps {
     bool input_attachment_self_dependency = true; // core: input attachments + by-region self-dependency (every Vulkan 1.0 driver)
     uint32_t max_per_stage_input_attachments = 0;
     // --- MSAA / resolve ---
+    bool render_pass2 = false; // VK_KHR_create_renderpass2 listed (the MSAA diff needs vkCreateRenderPass2 for in-pass resolve + seed subpass)
     bool depth_stencil_resolve = false; // VK_KHR_depth_stencil_resolve enabled
     uint32_t ds_resolve_depth_modes = 0; // bit per vk::ResolveModeFlagBits (1 SAMPLE_ZERO, 2 AVERAGE, 4 MIN, 8 MAX)
     uint32_t ds_resolve_stencil_modes = 0;
@@ -92,6 +93,9 @@ struct ForcedPaths {
 struct Implemented {
     bool sync2 = true; // vkutil::sync::Batch emits both vkCmdPipelineBarrier2 and legacy masks
     bool timeline = true; // scene submits signal a timeline semaphore; frame waits use it (fences stay for per-scene recycling)
+    // Not chosen automatically yet: one lavapipe replay pair of a Need for Speed capture differed by 9 px (max 5) with timeline on, 0 of 3 with it off,
+    // so it stays opt-in (ecv-force-path-timeline) until a device A/B says it is equal. Flip to true to let the caps decide.
+    bool timeline_auto = false;
     bool lazy_memory = true; // Image::init_transient_attachment (used by MSAA attachments; no existing attachment is provably dead)
     bool fbfetch_roaa = true;
     bool fbfetch_local_read = false;
@@ -130,7 +134,7 @@ inline Strategy choose_strategy(const GpuCaps &c, const ForcedPaths &f = {}, con
     if (f.sync2_barriers && !(c.sync2 && impl.sync2))
         s.force_rejected = true;
     // submit tracking
-    s.submit = (c.timeline_semaphore && impl.timeline && !f.fences) ? SubmitTracking::TimelineSemaphore : SubmitTracking::Fences;
+    s.submit = (c.timeline_semaphore && impl.timeline && (impl.timeline_auto || f.timeline) && !f.fences) ? SubmitTracking::TimelineSemaphore : SubmitTracking::Fences;
     if (f.timeline && !(c.timeline_semaphore && impl.timeline))
         s.force_rejected = true;
     // transient attachments
