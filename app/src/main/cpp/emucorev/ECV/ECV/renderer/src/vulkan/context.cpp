@@ -740,6 +740,10 @@ void VKContext::begin_deferred_pass() {
         frame.secondary_cmds.push_back(state.device.allocateCommandBuffers(alloc)[0]);
     }
     pass_secondary = frame.secondary_cmds[frame.secondary_cursor++];
+    instance_draws = 0;
+    inst_depth_overwritten = inst_stencil_overwritten = false;
+    // the ops this instance begins with: later changes of dyn_pass (the "load from now on" upgrades done right after the first draw) are for the NEXT instance
+    inst_pass = dyn_pass;
 
     vk::CommandBufferInheritanceInfo inherit{};
     vk::CommandBufferInheritanceRenderingInfo inherit_rendering{};
@@ -787,11 +791,20 @@ void VKContext::begin_deferred_pass() {
 void VKContext::emit_pass(bool scene_end) {
     namespace sync = vkutil::sync;
     // ---- the final ops of this instance ----
-    const bool store = derive_depth_store({ dyn_pass.guest_store, !scene_depth_unbacked, !scene_end });
+    const bool store = derive_depth_store({ inst_pass.guest_store, !scene_depth_unbacked, !scene_end });
     if (!store)
         sync::stats().depth_stores_dropped++;
-    bool depth_load = dyn_pass.depth_load;
-    bool stencil_load = dyn_pass.stencil_load;
+    bool depth_load = inst_pass.depth_load;
+    bool stencil_load = inst_pass.stencil_load;
+    // retired by coverage: a full-area clear before the first draw makes the loaded content dead, the clear itself (recorded in the instance) provides the values
+    if (depth_load && inst_depth_overwritten) {
+        depth_load = false;
+        sync::stats().loads_retired++;
+    }
+    if (stencil_load && inst_stencil_overwritten) {
+        stencil_load = false;
+        sync::stats().loads_retired++;
+    }
     // depth and stencil share one content state: only an instance that loads both can be rewritten
     sync::LoadChoice ds_choice = sync::LoadChoice::Load;
     if (depth_load && stencil_load && current_ds_image && current_ds_image->image) {
@@ -887,7 +900,7 @@ void VKContext::emit_pass(bool scene_end) {
         return c;
     };
     const sync::LoadChoice color_choice = choose(current_color_base_image, current_color_loaded);
-    const sync::LoadChoice raw_choice = dyn_pass.has_raw ? choose(current_color_raw_image, true) : sync::LoadChoice::Load;
+    const sync::LoadChoice raw_choice = inst_pass.has_raw ? choose(current_color_raw_image, true) : sync::LoadChoice::Load;
     const sync::ClearValue color_cleared = current_color_base_image ? current_color_base_image->sync.cleared_to : sync::ClearValue{};
 
     sync::Batch batch;
@@ -902,7 +915,7 @@ void VKContext::emit_pass(bool scene_end) {
         batch.use_image(img->sync, img->image, range, stages, access, layout, !loaded);
     };
     prepare(current_color_base_image, color_stages, color_access, vk::ImageLayout::eGeneral, color_choice == sync::LoadChoice::Load, vkutil::color_subresource_range);
-    if (dyn_pass.has_raw)
+    if (inst_pass.has_raw)
         prepare(current_color_raw_image, color_stages, color_access, vk::ImageLayout::eGeneral, raw_choice == sync::LoadChoice::Load, vkutil::color_subresource_range);
     const vk::Format ds_format = current_ds_image ? current_ds_image->format : vk::Format::eUndefined;
     const bool ds_has_stencil = vkutil::format_has_stencil(ds_format);
@@ -954,7 +967,7 @@ void VKContext::emit_pass(bool scene_end) {
         .flags = vk::RenderingFlagBits::eContentsSecondaryCommandBuffers,
         .renderArea = pass_area,
         .layerCount = 1,
-        .colorAttachmentCount = dyn_pass.has_raw ? 2u : 1u,
+        .colorAttachmentCount = inst_pass.has_raw ? 2u : 1u,
         .pColorAttachments = colors.data(),
         .pDepthAttachment = ds_has_depth ? &depth : nullptr,
         .pStencilAttachment = ds_has_stencil ? &stencil : nullptr,
@@ -971,7 +984,7 @@ void VKContext::emit_pass(bool scene_end) {
             after.use_image(img->sync, img->image, range, sampled, readable, layout, false);
     };
     finish(current_color_base_image, vk::ImageLayout::eGeneral, vkutil::color_subresource_range);
-    if (dyn_pass.has_raw)
+    if (inst_pass.has_raw)
         finish(current_color_raw_image, vk::ImageLayout::eGeneral, vkutil::color_subresource_range);
     finish(current_ds_image, vk::ImageLayout::eDepthStencilReadOnlyOptimal, vkutil::aspect_clamped_range(ds_format, vkutil::ds_subresource_range));
     after.flush(render_cmd);

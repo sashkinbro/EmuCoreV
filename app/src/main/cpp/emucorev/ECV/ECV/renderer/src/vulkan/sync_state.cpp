@@ -139,6 +139,8 @@ void sync_depth_data(VKContext &context) {
         .baseArrayLayer = 0,
         .layerCount = 1
     };
+    if (context.instance_draws == 0 && context.in_renderpass)
+        context.inst_depth_overwritten = true; // covers the whole render target, so the whole render area of the instance
     context.render_cmd.clearAttachments(clear_attachment, clear_rect);
 }
 
@@ -160,6 +162,8 @@ void sync_stencil_data(VKContext &context, const MemState &mem) {
         .baseArrayLayer = 0,
         .layerCount = 1
     };
+    if (context.instance_draws == 0 && context.in_renderpass)
+        context.inst_stencil_overwritten = true;
     context.render_cmd.clearAttachments(clear_attachment, clear_rect);
 }
 

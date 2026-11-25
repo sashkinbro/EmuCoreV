@@ -370,13 +370,17 @@ struct VKContext : public renderer::Context {
         bool depth_load = false;
         bool stencil_load = false;
         bool guest_store = false; // the game asked for the depth to be written back (only meaningful with a guest surface behind the depth)
-    } dyn_pass;
+    } dyn_pass, inst_pass;
     // deferred pass recording: draws go into pass_secondary, the instance is begun when it ends
     vk::CommandBuffer primary_cmd{};
     vk::CommandBuffer pass_secondary{};
     vk::Rect2D pass_area{};
     vk::ClearDepthStencilValue pass_ds_clear{};
     bool interlock_pass_active = false;
+    // dirty-rect coverage of the running instance: draws recorded so far, and whether a full-area clear came before the first draw (the loaded content is then dead)
+    uint32_t instance_draws = 0;
+    bool inst_depth_overwritten = false;
+    bool inst_stencil_overwritten = false;
     // restarts of the pass inside the current scene (look-ahead statistics, docs/gpu-sync-tracker.md section 9)
     uint32_t scene_pass_starts = 0;
     bool scene_depth_unbacked = false;

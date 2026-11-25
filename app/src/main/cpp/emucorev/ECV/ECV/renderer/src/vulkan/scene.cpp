@@ -867,6 +867,7 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     }
 
     apply_depth_bias(context, context.face_plan == dsmodel::FacePlan::Back);
+    context.instance_draws++;
     context.render_cmd.drawIndexed(count, instance_count, 0, 0, 0);
 
     if (context.split_pipeline != nullptr) {
