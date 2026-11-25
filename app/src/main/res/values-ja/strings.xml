@@ -1298,6 +1298,13 @@
     <string name="profile_leaderboard_search_hint">名前またはID</string>
     <string name="profile_name_character_count">%1$d/32文字</string>
     <string name="profile_name_updated">表示名を更新しました。</string>
+    <string name="profile_delete_account">アカウントを削除</string>
+    <string name="profile_delete_account_title">アカウントを削除しますか？</string>
+    <string name="profile_delete_account_body">プレイヤーアカウントと、オンラインに保存されているすべてのデータ（プロフィール、プレイ時間、ランキング、アクティビティ、デバイス、フレンド、ブロック、クラウドのエミュレーター設定、トロフィーのバックアップ）を完全に削除します。この端末のゲームやセーブデータには影響しません。この操作は取り消せません。</string>
+    <string name="profile_delete_account_confirm">削除</string>
+    <string name="profile_delete_account_wrong_password">パスワードが正しくありません。</string>
+    <string name="profile_account_deleted">アカウントとオンラインのデータを削除しました。</string>
+    <string name="profile_friend_request_blocked">フレンドリクエストを送る前に、このプレイヤーのブロックを解除してください。</string>
     <string name="profile_need_account">アカウントを作成</string>
     <string name="profile_player">プレイヤー</string>
     <string name="profile_player_blocked">プレイヤーをブロックしました。</string>

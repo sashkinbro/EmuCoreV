@@ -1309,6 +1309,13 @@
     <string name="profile_leaderboard_search_hint">नाम या ID</string>
     <string name="profile_name_character_count">%1$d/32 कैरेक्टर</string>
     <string name="profile_name_updated">प्रदर्शन नाम अपडेट किया गया।</string>
+    <string name="profile_delete_account">खाता हटाएं</string>
+    <string name="profile_delete_account_title">अपना खाता हटाएं?</string>
+    <string name="profile_delete_account_body">इससे आपका प्लेयर खाता और ऑनलाइन संग्रहीत सब कुछ हमेशा के लिए हट जाएगा: प्रोफ़ाइल, खेलने का समय, लीडरबोर्ड एंट्री, गतिविधि, डिवाइस, मित्र, ब्लॉक, क्लाउड एमुलेटर प्रोफ़ाइल और ट्रॉफ़ी बैकअप। इस डिवाइस पर मौजूद गेम और सेव प्रभावित नहीं होंगे। इसे वापस नहीं किया जा सकता।</string>
+    <string name="profile_delete_account_confirm">हटाएं</string>
+    <string name="profile_delete_account_wrong_password">पासवर्ड गलत है।</string>
+    <string name="profile_account_deleted">आपका खाता और उसका ऑनलाइन डेटा हटा दिया गया।</string>
+    <string name="profile_friend_request_blocked">मित्र अनुरोध भेजने से पहले इस खिलाड़ी को अनब्लॉक करें।</string>
     <string name="profile_need_account">खाता बनाएं</string>
     <string name="profile_player">खिलाड़ी</string>
     <string name="profile_player_blocked">खिलाड़ी को ब्लॉक कर दिया गया।</string>

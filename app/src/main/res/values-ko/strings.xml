@@ -1298,6 +1298,13 @@
     <string name="profile_leaderboard_search_hint">이름 또는 ID</string>
     <string name="profile_name_character_count">%1$d/32자</string>
     <string name="profile_name_updated">표시 이름을 업데이트했습니다.</string>
+    <string name="profile_delete_account">계정 삭제</string>
+    <string name="profile_delete_account_title">계정을 삭제할까요?</string>
+    <string name="profile_delete_account_body">플레이어 계정과 온라인에 저장된 모든 데이터(프로필, 플레이 시간, 순위표 항목, 활동, 기기, 친구, 차단 목록, 클라우드 에뮬레이터 프로필, 트로피 백업)가 영구적으로 삭제됩니다. 이 기기의 게임과 저장 데이터는 그대로 유지됩니다. 이 작업은 되돌릴 수 없습니다.</string>
+    <string name="profile_delete_account_confirm">삭제</string>
+    <string name="profile_delete_account_wrong_password">비밀번호가 올바르지 않습니다.</string>
+    <string name="profile_account_deleted">계정과 온라인 데이터가 삭제되었습니다.</string>
+    <string name="profile_friend_request_blocked">친구 요청을 보내기 전에 이 플레이어의 차단을 해제하세요.</string>
     <string name="profile_need_account">계정 만들기</string>
     <string name="profile_player">플레이어</string>
     <string name="profile_player_blocked">플레이어를 차단했습니다.</string>

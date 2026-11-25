@@ -88,6 +88,7 @@ import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.WorkspacePremium
 import com.sbro.emucorev.ui.theme.style.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import com.sbro.emucorev.ui.theme.style.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -148,6 +149,9 @@ import com.sbro.emucorev.data.PlayerRankInsights
 import com.sbro.emucorev.data.PlayerTrophyStat
 import com.sbro.emucorev.data.PlayerTrophySummary
 import com.sbro.emucorev.data.PublicPlayerDevice
+import com.sbro.emucorev.data.ReauthMethod
+import com.sbro.emucorev.data.graphemeCount
+import com.sbro.emucorev.data.truncateGraphemes
 import com.sbro.emucorev.data.ProfileFeedEvent
 import com.sbro.emucorev.data.ProfileFriendship
 import com.sbro.emucorev.data.FriendshipStatus
@@ -393,6 +397,10 @@ fun ProfileScreen(
                                                 }
                                             },
                                             onUpdateName = viewModel::updateDisplayName,
+                                            reauthMethod = uiState.account?.reauthMethod ?: ReauthMethod.Unsupported,
+                                            onDeleteAccount = { password, onResult ->
+                                                viewModel.deleteAccount(context.findActivity(), password, onResult)
+                                            },
                                             onSignOut = { viewModel.signOut() }
                                         )
                                     }
@@ -1916,10 +1924,13 @@ private fun ProfileOverview(
     trophySummary: PlayerTrophySummary,
     onCustomizePro: () -> Unit,
     onShareCard: () -> Unit,
-    onUpdateName: (String) -> Unit,
+    onUpdateName: (String, (Boolean) -> Unit) -> Unit,
+    reauthMethod: ReauthMethod,
+    onDeleteAccount: (String?, (Boolean) -> Unit) -> Unit,
     onSignOut: () -> Unit
 ) {
     var showEditName by rememberSaveable { mutableStateOf(false) }
+    var showDeleteAccount by rememberSaveable { mutableStateOf(false) }
     var showProDialog by rememberSaveable { mutableStateOf(false) }
     val avatarUrl = photoURL ?: profile?.photoURL
     val accent = profileAccentColor(profile?.profileAccent ?: "gold")
@@ -1930,6 +1941,14 @@ private fun ProfileOverview(
             onNameChange = onUpdateName,
             onDismiss = { showEditName = false },
             onSave = { showEditName = false }
+        )
+    }
+    if (showDeleteAccount) {
+        DeleteAccountDialog(
+            requiresPassword = reauthMethod == ReauthMethod.Password,
+            isLoading = isActionLoading,
+            onConfirm = onDeleteAccount,
+            onDismiss = { showDeleteAccount = false }
         )
     }
     if (showProDialog) {
@@ -2042,6 +2061,25 @@ private fun ProfileOverview(
                         Text(stringResource(R.string.profile_sign_out), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
+                TextButton(
+                    enabled = !isActionLoading,
+                    onClick = { showDeleteAccount = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Rounded.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.profile_delete_account),
+                        color = MaterialTheme.colorScheme.error,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
@@ -2141,16 +2179,143 @@ private fun ProfileOverview(
 }
 
 @Composable
+private fun DeleteAccountDialog(
+    requiresPassword: Boolean,
+    isLoading: Boolean,
+    onConfirm: (String?, (Boolean) -> Unit) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val passwordState = rememberTextFieldState()
+    var submitting by remember { mutableStateOf(false) }
+    val busy = isLoading || submitting
+    val canConfirm = !busy && (!requiresPassword || passwordState.text.isNotEmpty())
+    Dialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = !busy,
+            dismissOnClickOutside = !busy
+        )
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier
+                    .widthIn(max = 560.dp)
+                    .fillMaxWidth(),
+                shape = neonShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                border = profileCardBorder(alpha = 0.82f)
+            ) {
+                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = neonShape(16.dp),
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            text = stringResource(R.string.profile_delete_account_title),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.profile_delete_account_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (requiresPassword) {
+                        OutlinedSecureTextField(
+                            state = passwordState,
+                            textObfuscationMode = TextObfuscationMode.Hidden,
+                            keyboardOptions = KeyboardOptions.Default,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = neonShape(18.dp),
+                            enabled = !busy,
+                            label = { Text(stringResource(R.string.profile_password)) }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            shape = neonButtonShape(),
+                            enabled = !busy,
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.common_cancel))
+                        }
+                        Button(
+                            shape = neonButtonShape(),
+                            enabled = canConfirm,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            ),
+                            onClick = {
+                                submitting = true
+                                onConfirm(if (requiresPassword) passwordState.text.toString() else null) { success ->
+                                    submitting = false
+                                    if (success) onDismiss()
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                stringResource(R.string.profile_delete_account_confirm),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun EditProfileNameDialog(
     initialName: String,
     isLoading: Boolean,
-    onNameChange: (String) -> Unit,
+    onNameChange: (String, (Boolean) -> Unit) -> Unit,
     onDismiss: () -> Unit,
     onSave: () -> Unit
 ) {
     var value by rememberSaveable { mutableStateOf(initialName) }
+    var submitting by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    // The dialog stays open until the update has a result; it closes only on success (B073).
+    val submit: () -> Unit = {
+        if (!submitting && value.trim().isNotEmpty()) {
+            keyboard?.hide()
+            submitting = true
+            onNameChange(value) { success ->
+                submitting = false
+                if (success) onSave()
+            }
+        }
+    }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(
             modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
@@ -2203,7 +2368,7 @@ private fun EditProfileNameDialog(
 
                 OutlinedTextField(
                     value = value,
-                    onValueChange = { value = it.take(32) },
+                    onValueChange = { value = it.truncateGraphemes() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester),
@@ -2212,15 +2377,11 @@ private fun EditProfileNameDialog(
                     label = { Text(stringResource(R.string.profile_display_name)) },
                     leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null) },
                     keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                        onDone = {
-                            keyboard?.hide()
-                            onNameChange(value)
-                            onSave()
-                        }
+                        onDone = { submit() }
                     ),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Done),
                     supportingText = {
-                        Text(stringResource(R.string.profile_name_character_count, value.length, 32))
+                        Text(stringResource(R.string.profile_name_character_count, value.graphemeCount(), 32))
                     }
                 )
                 Row(
@@ -2236,12 +2397,8 @@ private fun EditProfileNameDialog(
                     }
                     Button(
                         shape = neonButtonShape(),
-                        enabled = !isLoading && value.trim().isNotEmpty(),
-                        onClick = {
-                            keyboard?.hide()
-                            onNameChange(value)
-                            onSave()
-                        },
+                        enabled = !isLoading && !submitting && value.trim().isNotEmpty(),
+                        onClick = submit,
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(stringResource(R.string.save))
@@ -3703,6 +3860,7 @@ private fun profileMessageRes(key: String): Int = when (key) {
     "profile_account_created" -> R.string.profile_account_created
     "profile_password_reset_sent" -> R.string.profile_password_reset_sent
     "profile_name_updated" -> R.string.profile_name_updated
+    "profile_account_deleted" -> R.string.profile_account_deleted
     "profile_signed_out" -> R.string.profile_signed_out
     "profile_pro_updated" -> R.string.profile_pro_updated
     "profile_device_public" -> R.string.profile_device_public_done

@@ -1301,6 +1301,13 @@
     <string name="profile_leaderboard_search_hint">Nazwa lub ID</string>
     <string name="profile_name_character_count">%1$d/32 znaków</string>
     <string name="profile_name_updated">Zaktualizowano nazwę wyświetlaną.</string>
+    <string name="profile_delete_account">Usuń konto</string>
+    <string name="profile_delete_account_title">Usunąć konto?</string>
+    <string name="profile_delete_account_body">To trwale usunie Twoje konto gracza i wszystko, co jest dla niego przechowywane online: profil, czas gry, wpis w rankingu, aktywność, urządzenia, znajomych, blokady, profile emulatora w chmurze i kopie trofeów. Gry i zapisy na tym urządzeniu nie zostaną naruszone. Tej operacji nie można cofnąć.</string>
+    <string name="profile_delete_account_confirm">Usuń</string>
+    <string name="profile_delete_account_wrong_password">Hasło jest nieprawidłowe.</string>
+    <string name="profile_account_deleted">Twoje konto i jego dane online zostały usunięte.</string>
+    <string name="profile_friend_request_blocked">Odblokuj tego gracza, zanim wyślesz zaproszenie do znajomych.</string>
     <string name="profile_need_account">Utwórz konto</string>
     <string name="profile_player">Gracz</string>
     <string name="profile_player_blocked">Gracz zablokowany.</string>

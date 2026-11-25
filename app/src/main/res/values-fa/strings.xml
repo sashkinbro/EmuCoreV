@@ -1299,6 +1299,13 @@
     <string name="profile_leaderboard_search_hint">نام یا شناسه</string>
     <string name="profile_name_character_count">%1$d/32 نویسه</string>
     <string name="profile_name_updated">نام نمایشی به‌روزرسانی شد.</string>
+    <string name="profile_delete_account">حذف حساب</string>
+    <string name="profile_delete_account_title">حساب شما حذف شود؟</string>
+    <string name="profile_delete_account_body">با این کار حساب بازیکن شما و همه چیزهایی که به صورت آنلاین برای آن ذخیره شده برای همیشه حذف می‌شود: نمایه، زمان بازی، جایگاه در جدول رتبه‌بندی، فعالیت، دستگاه‌ها، دوستان، مسدودشده‌ها، نمایه‌های ابری شبیه‌ساز و پشتیبان جام‌ها. بازی‌ها و ذخیره‌های روی این دستگاه دست‌نخورده می‌مانند. این کار قابل بازگشت نیست.</string>
+    <string name="profile_delete_account_confirm">حذف</string>
+    <string name="profile_delete_account_wrong_password">گذرواژه نادرست است.</string>
+    <string name="profile_account_deleted">حساب شما و داده‌های آنلاین آن حذف شد.</string>
+    <string name="profile_friend_request_blocked">پیش از ارسال درخواست دوستی، این بازیکن را از حالت مسدود خارج کنید.</string>
     <string name="profile_need_account">ساخت حساب</string>
     <string name="profile_player">بازیکن</string>
     <string name="profile_player_blocked">بازیکن مسدود شد.</string>

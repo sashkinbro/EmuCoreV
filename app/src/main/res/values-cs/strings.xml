@@ -1301,6 +1301,13 @@
     <string name="profile_leaderboard_search_hint">Jméno nebo ID</string>
     <string name="profile_name_character_count">%1$d/32 znaků</string>
     <string name="profile_name_updated">Zobrazované jméno aktualizováno.</string>
+    <string name="profile_delete_account">Smazat účet</string>
+    <string name="profile_delete_account_title">Smazat váš účet?</string>
+    <string name="profile_delete_account_body">Tímto trvale smažete svůj hráčský účet a vše, co je k němu uloženo online: profil, herní čas, položku v žebříčku, aktivitu, zařízení, přátele, blokace, cloudové profily emulátoru a zálohy trofejí. Hry a uložené pozice v tomto zařízení zůstanou nedotčeny. Tuto akci nelze vrátit zpět.</string>
+    <string name="profile_delete_account_confirm">Smazat</string>
+    <string name="profile_delete_account_wrong_password">Heslo není správné.</string>
+    <string name="profile_account_deleted">Váš účet a jeho online data byly smazány.</string>
+    <string name="profile_friend_request_blocked">Před odesláním žádosti o přátelství tohoto hráče odblokujte.</string>
     <string name="profile_need_account">Vytvořit účet</string>
     <string name="profile_player">Hráč</string>
     <string name="profile_player_blocked">Hráč zablokován.</string>

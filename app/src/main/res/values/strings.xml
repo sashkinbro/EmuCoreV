@@ -1299,6 +1299,13 @@
     <string name="profile_leaderboard_search_hint">Name or ID</string>
     <string name="profile_name_character_count">%1$d/32 characters</string>
     <string name="profile_name_updated">Display name updated.</string>
+    <string name="profile_delete_account">Delete account</string>
+    <string name="profile_delete_account_title">Delete your account?</string>
+    <string name="profile_delete_account_body">This permanently deletes your player account and everything stored for it online: profile, play time, leaderboard entry, activity, devices, friends, blocks, cloud emulator profiles and trophy backups. Games and saves on this device are not touched. This cannot be undone.</string>
+    <string name="profile_delete_account_confirm">Delete</string>
+    <string name="profile_delete_account_wrong_password">The password is incorrect.</string>
+    <string name="profile_account_deleted">Your account and its online data were deleted.</string>
+    <string name="profile_friend_request_blocked">Unblock this player before sending a friend request.</string>
     <string name="profile_need_account">Create account</string>
     <string name="profile_player">Player</string>
     <string name="profile_player_blocked">Player blocked.</string>

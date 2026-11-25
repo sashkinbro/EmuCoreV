@@ -1298,6 +1298,13 @@
     <string name="profile_leaderboard_search_hint">Nama atau ID</string>
     <string name="profile_name_character_count">%1$d/32 karakter</string>
     <string name="profile_name_updated">Nama tampilan diperbarui.</string>
+    <string name="profile_delete_account">Hapus akun</string>
+    <string name="profile_delete_account_title">Hapus akun Anda?</string>
+    <string name="profile_delete_account_body">Ini akan menghapus akun pemain Anda secara permanen beserta semua data yang tersimpan secara online: profil, waktu bermain, entri papan peringkat, aktivitas, perangkat, teman, daftar blokir, profil emulator cloud, dan cadangan trofi. Game dan data simpanan di perangkat ini tidak terpengaruh. Tindakan ini tidak dapat dibatalkan.</string>
+    <string name="profile_delete_account_confirm">Hapus</string>
+    <string name="profile_delete_account_wrong_password">Kata sandi salah.</string>
+    <string name="profile_account_deleted">Akun Anda dan data onlinenya telah dihapus.</string>
+    <string name="profile_friend_request_blocked">Buka blokir pemain ini sebelum mengirim permintaan pertemanan.</string>
     <string name="profile_need_account">Buat akun</string>
     <string name="profile_player">Pemain</string>
     <string name="profile_player_blocked">Pemain diblokir.</string>

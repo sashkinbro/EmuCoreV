@@ -1311,6 +1311,13 @@
     <string name="profile_leaderboard_search_hint">Имя или ID</string>
     <string name="profile_name_character_count">%1$d/32 символов</string>
     <string name="profile_name_updated">Отображаемое имя обновлено.</string>
+    <string name="profile_delete_account">Удалить аккаунт</string>
+    <string name="profile_delete_account_title">Удалить аккаунт?</string>
+    <string name="profile_delete_account_body">Будут безвозвратно удалены ваш игровой аккаунт и всё, что хранится для него онлайн: профиль, время игры, запись в рейтинге, активность, устройства, друзья, блокировки, облачные профили эмулятора и резервные копии трофеев. Игры и сохранения на этом устройстве не затрагиваются. Это действие нельзя отменить.</string>
+    <string name="profile_delete_account_confirm">Удалить</string>
+    <string name="profile_delete_account_wrong_password">Неверный пароль.</string>
+    <string name="profile_account_deleted">Аккаунт и его онлайн-данные удалены.</string>
+    <string name="profile_friend_request_blocked">Разблокируйте этого игрока, прежде чем отправлять запрос в друзья.</string>
     <string name="profile_need_account">Создать аккаунт</string>
     <string name="profile_player">Игрок</string>
     <string name="profile_player_blocked">Игрок заблокирован.</string>

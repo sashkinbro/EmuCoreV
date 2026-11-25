@@ -1310,6 +1310,13 @@
     <string name="profile_leaderboard_search_hint">Nome o ID</string>
     <string name="profile_name_character_count">%1$d/32 caratteri</string>
     <string name="profile_name_updated">Nome visualizzato aggiornato.</string>
+    <string name="profile_delete_account">Elimina account</string>
+    <string name="profile_delete_account_title">Eliminare il tuo account?</string>
+    <string name="profile_delete_account_body">Questa azione elimina in modo permanente il tuo account giocatore e tutto ciò che è archiviato online: profilo, tempo di gioco, voce in classifica, attività, dispositivi, amici, blocchi, profili emulatore nel cloud e backup dei trofei. I giochi e i salvataggi su questo dispositivo non vengono toccati. Non può essere annullata.</string>
+    <string name="profile_delete_account_confirm">Elimina</string>
+    <string name="profile_delete_account_wrong_password">La password non è corretta.</string>
+    <string name="profile_account_deleted">Il tuo account e i relativi dati online sono stati eliminati.</string>
+    <string name="profile_friend_request_blocked">Sblocca questo giocatore prima di inviargli una richiesta di amicizia.</string>
     <string name="profile_need_account">Crea account</string>
     <string name="profile_player">Giocatore</string>
     <string name="profile_player_blocked">Giocatore bloccato.</string>

@@ -1309,6 +1309,13 @@
     <string name="profile_leaderboard_search_hint">Name oder ID</string>
     <string name="profile_name_character_count">%1$d/32 Zeichen</string>
     <string name="profile_name_updated">Anzeigename aktualisiert.</string>
+    <string name="profile_delete_account">Konto löschen</string>
+    <string name="profile_delete_account_title">Konto löschen?</string>
+    <string name="profile_delete_account_body">Dadurch werden dein Spielerkonto und alle online dazu gespeicherten Daten dauerhaft gelöscht: Profil, Spielzeit, Ranglisteneintrag, Aktivität, Geräte, Freunde, Sperren, Cloud-Emulatorprofile und Trophäen-Sicherungen. Spiele und Spielstände auf diesem Gerät bleiben unberührt. Das kann nicht rückgängig gemacht werden.</string>
+    <string name="profile_delete_account_confirm">Löschen</string>
+    <string name="profile_delete_account_wrong_password">Das Passwort ist falsch.</string>
+    <string name="profile_account_deleted">Dein Konto und die zugehörigen Online-Daten wurden gelöscht.</string>
+    <string name="profile_friend_request_blocked">Hebe die Sperre für diesen Spieler auf, bevor du eine Freundschaftsanfrage sendest.</string>
     <string name="profile_need_account">Konto erstellen</string>
     <string name="profile_player">Spieler</string>
     <string name="profile_player_blocked">Spieler blockiert.</string>

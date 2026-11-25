@@ -1310,6 +1310,13 @@
     <string name="profile_leaderboard_search_hint">Nom ou ID</string>
     <string name="profile_name_character_count">%1$d/32 caractères</string>
     <string name="profile_name_updated">Nom d\'affichage mis à jour.</string>
+    <string name="profile_delete_account">Supprimer le compte</string>
+    <string name="profile_delete_account_title">Supprimer votre compte ?</string>
+    <string name="profile_delete_account_body">Cela supprime définitivement votre compte joueur et tout ce qui est stocké en ligne : profil, temps de jeu, entrée au classement, activité, appareils, amis, blocages, profils d\'émulateur cloud et sauvegardes de trophées. Les jeux et sauvegardes de cet appareil ne sont pas touchés. Cette action est irréversible.</string>
+    <string name="profile_delete_account_confirm">Supprimer</string>
+    <string name="profile_delete_account_wrong_password">Le mot de passe est incorrect.</string>
+    <string name="profile_account_deleted">Votre compte et ses données en ligne ont été supprimés.</string>
+    <string name="profile_friend_request_blocked">Débloquez ce joueur avant de lui envoyer une demande d\'ami.</string>
     <string name="profile_need_account">Créer un compte</string>
     <string name="profile_player">Joueur</string>
     <string name="profile_player_blocked">Joueur bloqué.</string>

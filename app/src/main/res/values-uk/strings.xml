@@ -1297,6 +1297,13 @@
     <string name="profile_leaderboard_search_hint">Ім’я або ID</string>
     <string name="profile_name_character_count">%1$d/32 символів</string>
     <string name="profile_name_updated">Імя для відображення оновлено.</string>
+    <string name="profile_delete_account">Видалити акаунт</string>
+    <string name="profile_delete_account_title">Видалити акаунт?</string>
+    <string name="profile_delete_account_body">Буде безповоротно видалено ваш ігровий акаунт і все, що зберігається для нього онлайн: профіль, час гри, запис у рейтингу, активність, пристрої, друзів, блокування, хмарні профілі емулятора та резервні копії трофеїв. Ігри та збереження на цьому пристрої не зачіпаються. Цю дію не можна скасувати.</string>
+    <string name="profile_delete_account_confirm">Видалити</string>
+    <string name="profile_delete_account_wrong_password">Невірний пароль.</string>
+    <string name="profile_account_deleted">Акаунт і його онлайн-дані видалено.</string>
+    <string name="profile_friend_request_blocked">Розблокуйте цього гравця, перш ніж надсилати запит у друзі.</string>
     <string name="profile_need_account">Створити акаунт</string>
     <string name="profile_player">Гравець</string>
     <string name="profile_player_blocked">Гравця заблоковано.</string>

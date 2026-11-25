@@ -1309,6 +1309,13 @@
     <string name="profile_leaderboard_search_hint">Ad veya ID</string>
     <string name="profile_name_character_count">%1$d/32 karakter</string>
     <string name="profile_name_updated">Görünen ad güncellendi.</string>
+    <string name="profile_delete_account">Hesabı sil</string>
+    <string name="profile_delete_account_title">Hesabınız silinsin mi?</string>
+    <string name="profile_delete_account_body">Bu işlem oyuncu hesabınızı ve çevrimiçi saklanan her şeyi kalıcı olarak siler: profil, oynama süresi, liderlik tablosu girişi, etkinlik, cihazlar, arkadaşlar, engellemeler, bulut emülatör profilleri ve kupa yedekleri. Bu cihazdaki oyunlar ve kayıtlar etkilenmez. Bu işlem geri alınamaz.</string>
+    <string name="profile_delete_account_confirm">Sil</string>
+    <string name="profile_delete_account_wrong_password">Parola yanlış.</string>
+    <string name="profile_account_deleted">Hesabınız ve çevrimiçi verileri silindi.</string>
+    <string name="profile_friend_request_blocked">Arkadaşlık isteği göndermeden önce bu oyuncunun engelini kaldırın.</string>
     <string name="profile_need_account">Hesap oluştur</string>
     <string name="profile_player">Oyuncu</string>
     <string name="profile_player_blocked">Oyuncu engellendi.</string>

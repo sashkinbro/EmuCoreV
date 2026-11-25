@@ -11,6 +11,7 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.OAuthProvider
@@ -29,7 +30,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
-import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -42,7 +42,8 @@ data class PlayerAccount(
     val uid: String,
     val email: String?,
     val displayName: String,
-    val photoURL: String?
+    val photoURL: String?,
+    val reauthMethod: ReauthMethod = ReauthMethod.Unsupported
 )
 
 data class PlayerProfile(
@@ -124,7 +125,9 @@ data class PlayerPlayTimeDelta(
     val coverArtPath: String?,
     val durationMs: Long,
     val sessionCount: Long = 0L,
-    val lastPlayedAtMs: Long = System.currentTimeMillis()
+    val lastPlayedAtMs: Long = System.currentTimeMillis(),
+    /** Account the session was played under; blank only for entries queued by older app versions. */
+    val uid: String = ""
 )
 
 class PlayerProfileRepository(context: Context) {
@@ -145,6 +148,8 @@ class PlayerProfileRepository(context: Context) {
     }
 
     fun hasSignedInUser(): Boolean = auth.currentUser != null
+
+    fun currentUid(): String? = auth.currentUser?.uid
 
     suspend fun ensureCurrentUserProfile() {
         auth.currentUser?.let { user ->
@@ -408,14 +413,24 @@ class PlayerProfileRepository(context: Context) {
 
     suspend fun createAccount(email: String, password: String, displayName: String) {
         val result = auth.createUserWithEmailAndPassword(email.trim(), password).await()
-        val user = result.user ?: return
+        val user = result.user ?: throw IllegalStateException("Account creation returned no user")
         val cleanName = displayName.cleanDisplayName(user.email)
-        user.updateProfile(
-            UserProfileChangeRequest.Builder()
-                .setDisplayName(cleanName)
-                .build()
-        ).await()
-        ensureUserProfile(user.uid, user.email, cleanName, user.bestPhotoUrl())
+        // The auth profile name is cosmetic here (the Firestore profile is the source of truth), so a
+        // failure must not leave a half-created account: keep going and still write the profile (B071).
+        try {
+            user.updateProfile(
+                UserProfileChangeRequest.Builder()
+                    .setDisplayName(cleanName)
+                    .build()
+            ).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not set the auth display name after sign-up", e)
+        }
+        // forceName: the sign-up choice wins over the fallback name the auth listener may have stored
+        // first (B060).
+        ensureUserProfile(user.uid, user.email, cleanName, user.bestPhotoUrl(), forceName = true)
     }
 
     suspend fun sendPasswordReset(email: String) {
@@ -447,20 +462,103 @@ class PlayerProfileRepository(context: Context) {
         auth.signOut()
     }
 
-    suspend fun recordPlayTimeBatch(entries: List<PlayerPlayTimeDelta>) {
+    /**
+     * Permanently deletes the signed-in account and its cloud data (B066). The caller is re-authenticated
+     * first (Firebase requires a recent sign-in, and a failed re-auth must not leave a half-erased
+     * profile), then every Firestore document of the account is removed, and last the auth user itself.
+     * The data pass is idempotent, so a failure of the final step can simply be retried.
+     *
+     * @param activity needed for the Google re-authentication UI
+     * @param password current password, required for email/password accounts
+     * @throws ReauthCancelledException if the user dismissed the Google account chooser
+     */
+    suspend fun deleteAccount(activity: Activity?, password: String?) {
         val user = auth.currentUser ?: return
-        val validEntries = entries
-            .filter { entry ->
-                entry.titleId.isNotBlank() && entry.durationMs > 0L
+        val uid = user.uid
+        reauthenticateForDeletion(user, activity, password)
+        AccountDataEraser(FirestoreAccountDataStore()).erase(uid)
+        user.delete().await()
+        runCatchingCancellable { PlayTimeSyncCacheRepository(appContext).discardAccount(uid) }
+    }
+
+    private suspend fun reauthenticateForDeletion(
+        user: com.google.firebase.auth.FirebaseUser,
+        activity: Activity?,
+        password: String?
+    ) {
+        when (reauthMethodFor(user.providerData.map { it.providerId })) {
+            ReauthMethod.Password -> {
+                val email = user.email ?: error("Account has no email address")
+                require(!password.isNullOrEmpty()) { "Password is required" }
+                user.reauthenticate(EmailAuthProvider.getCredential(email, password)).await()
             }
-            .groupBy { entry -> buildGameKey(entry.titleId) }
-            .map { (gameKey, gameEntries) ->
-                val latestEntry = gameEntries.maxBy { it.lastPlayedAtMs }
-                gameKey to latestEntry.copy(
-                    durationMs = gameEntries.sumOf { it.durationMs },
-                    sessionCount = gameEntries.sumOf { it.sessionCount }
-                )
+            ReauthMethod.Google -> {
+                requireNotNull(activity) { "An activity is required to confirm the Google account" }
+                val idToken = try {
+                    requestGoogleIdToken(activity)
+                } catch (_: GetCredentialCancellationException) {
+                    throw ReauthCancelledException()
+                }
+                if (idToken != null) {
+                    user.reauthenticate(GoogleAuthProvider.getCredential(idToken, null)).await()
+                } else {
+                    val provider = OAuthProvider.newBuilder(GoogleAuthProvider.PROVIDER_ID)
+                        .addCustomParameter("prompt", "select_account")
+                        .build()
+                    user.startActivityForReauthenticateWithProvider(activity, provider).await()
+                }
             }
+            ReauthMethod.Unsupported -> error("This sign-in method cannot be re-verified")
+        }
+    }
+
+    /** Google ID token from Credential Manager, or null when the browser flow has to be used instead. */
+    private suspend fun requestGoogleIdToken(activity: Activity): String? {
+        try {
+            val option = GetSignInWithGoogleOption.Builder(activity.getString(R.string.default_web_client_id)).build()
+            val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
+            val credential = CredentialManager.create(activity).getCredential(activity, request).credential
+            if (credential is CustomCredential &&
+                credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+            ) {
+                return GoogleIdTokenCredential.createFrom(credential.data).idToken
+            }
+        } catch (e: GetCredentialCancellationException) {
+            throw e
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Credential Manager re-authentication failed, falling back to browser", e)
+        }
+        return null
+    }
+
+    private inner class FirestoreAccountDataStore : AccountDataStore {
+        override suspend fun listDocumentPaths(collectionPath: String, limit: Int): List<String> =
+            firestore.collection(collectionPath).limit(limit.toLong()).get().await().documents.map { it.reference.path }
+
+        override suspend fun listFriendshipPaths(uid: String, limit: Int): List<String> =
+            firestore.collection(FRIENDSHIPS_COLLECTION).whereArrayContains("members", uid)
+                .limit(limit.toLong()).get().await().documents.map { it.reference.path }
+
+        override suspend fun deleteDocuments(paths: List<String>) {
+            paths.chunked(DELETE_BATCH_SIZE).forEach { chunk ->
+                firestore.runBatch { batch -> chunk.forEach { batch.delete(firestore.document(it)) } }.await()
+            }
+        }
+    }
+
+    /**
+     * Applies one sealed play-time batch to [uid]'s profile exactly once. The batch id is remembered on
+     * the user document inside the same transaction, so a retry of a batch that already committed is
+     * recognised and skipped instead of being added twice (B063). The deltas are bounded (B067) and the
+     * `games` map on the user document is only a capped cache of the most played games (B064); the
+     * per-game documents under the public profile are the source of truth.
+     */
+    suspend fun recordPlayTimeBatch(uid: String, batchId: String, entries: List<PlayerPlayTimeDelta>) {
+        val user = auth.currentUser?.takeIf { it.uid == uid }
+            ?: throw IllegalStateException("The signed-in account changed before the play time was uploaded")
+        val validEntries = ProfileDocLogic.groupByGame(ProfileDocLogic.boundDeltas(entries))
         if (validEntries.isEmpty()) return
 
         val latestEntry = validEntries.maxBy { it.second.lastPlayedAtMs }.second
@@ -476,6 +574,9 @@ class PlayerProfileRepository(context: Context) {
         val activityRefs = activityGroups.mapValues { (day, _) ->
             userRef.collection(ACTIVITY_COLLECTION).document(day)
         }
+        val publicGameRefs = validEntries.associate { (gameKey, _) ->
+            gameKey to publicProfileRef.collection(PUBLIC_GAMES_COLLECTION).document(gameKey)
+        }
 
         // Resolve once before the transaction, which Firestore may retry on its worker.
         val shareableCovers = validEntries.associate { (gameKey, entry) ->
@@ -483,59 +584,78 @@ class PlayerProfileRepository(context: Context) {
                 CoverArtRepository.get(appContext).buildPublicCoverUrl(titleId = serial, candidatePath = candidate)
             }
         }
-        firestore.runTransaction { transaction ->
+        val applied = firestore.runTransaction { transaction ->
             val snapshot = transaction.get(userRef)
+            val rememberedBatches = snapshot.stringList(FIELD_SYNCED_BATCH_IDS)
+            if (ProfileDocLogic.isBatchApplied(rememberedBatches, batchId)) {
+                return@runTransaction false
+            }
+            val gameSnapshots = publicGameRefs.mapValues { (_, reference) -> transaction.get(reference) }
             val activitySnapshots = activityRefs.mapValues { (_, reference) -> transaction.get(reference) }
-            val existingGames = snapshot.getGamesMap().toMutableMap()
-            val changedGames = LinkedHashMap<String, Map<String, Any>>()
+            val existingGames = snapshot.getGamesMap().mapValues { (_, value) -> value.toGameMap() }
+            val changedGames = LinkedHashMap<String, Map<String, Any?>>()
+            var newGames = 0L
             validEntries.forEach { (gameKey, entry) ->
                 val cleanTitle = entry.title.ifBlank { entry.titleId }
-                val existingGame = existingGames[gameKey].toGameMap()
-                val nextGame = buildMap<String, Any> {
+                val existingGame = existingGames[gameKey].orEmpty()
+                val publicGame = gameSnapshots.getValue(gameKey)
+                val publicGameData = publicGame.data.orEmpty()
+                if (!publicGame.exists() && gameKey !in existingGames) newGames++
+                val previousTotal = maxOf(existingGame.longValue(GAME_TOTAL_MS), publicGameData.longValue(GAME_TOTAL_MS))
+                val previousSessions = maxOf(existingGame.longValue(GAME_SESSIONS), publicGameData.longValue(GAME_SESSIONS))
+                val nextGame = buildMap<String, Any?> {
                     put(GAME_TITLE, cleanTitle.take(MAX_GAME_TITLE_LENGTH))
-                    put(GAME_TOTAL_MS, existingGame.longValue(GAME_TOTAL_MS) + entry.durationMs)
-                    put(GAME_SESSIONS, existingGame.longValue(GAME_SESSIONS) + entry.sessionCount)
+                    put(GAME_TOTAL_MS, previousTotal + entry.durationMs)
+                    put(GAME_SESSIONS, previousSessions + entry.sessionCount)
                     put(GAME_LAST_PLAYED_AT_MS, entry.lastPlayedAtMs)
                     entry.titleId.takeIf { it.isNotBlank() }?.let { put(GAME_SERIAL, it.take(MAX_SERIAL_LENGTH)) }
                     shareableCovers[gameKey]?.let {
                         put(GAME_COVER_ART_PATH, it.take(MAX_COVER_PATH_LENGTH))
                     }
                 }
-                existingGames[gameKey] = nextGame
                 changedGames[gameKey] = nextGame
             }
 
             val totalPlayTimeMs = (snapshot.getLong(FIELD_TOTAL_PLAY_TIME_MS) ?: 0L) + validEntries.sumOf { it.second.durationMs }
-            val gamesPlayed = existingGames.size.toLong()
+            val gamesPlayed = (snapshot.getLong(FIELD_GAMES_PLAYED) ?: existingGames.size.toLong()) + newGames
             val profileAccent = snapshot.getString(FIELD_PROFILE_ACCENT)
                 ?.takeIf { it in PROFILE_ACCENTS }
                 ?: DEFAULT_PROFILE_ACCENT
             val favoriteGameKeys = snapshot.stringList(FIELD_FAVORITE_GAME_KEYS)
                 .distinct()
                 .take(MAX_FAVORITE_GAMES)
-            val userData = mapOf(
-                FIELD_PROFILE_SCHEMA_VERSION to PROFILE_SCHEMA_VERSION,
-                FIELD_UID to user.uid,
-                FIELD_EMAIL to (user.email ?: ""),
-                FIELD_DISPLAY_NAME to cleanName,
-                FIELD_SEARCH_NAME to searchName,
-                FIELD_PLAYER_TAG to playerTag,
-                FIELD_PHOTO_URL to photoURL,
-                FIELD_TOTAL_PLAY_TIME_MS to totalPlayTimeMs,
-                FIELD_GAMES_PLAYED to gamesPlayed,
-                FIELD_LAST_PLAYED_TITLE to latestTitle.take(MAX_GAME_TITLE_LENGTH),
-                FIELD_LAST_PLAYED_AT_MS to latestEntry.lastPlayedAtMs,
-                FIELD_GAMES to existingGames,
-                FIELD_PROFILE_ACCENT to profileAccent,
-                FIELD_FAVORITE_GAME_KEYS to favoriteGameKeys,
-                FIELD_UPDATED_AT to FieldValue.serverTimestamp(),
-                FIELD_CREATED_AT to (snapshot.getTimestamp(FIELD_CREATED_AT) ?: FieldValue.serverTimestamp())
+            val gamesPatch = ProfileDocLogic.gamesMapPatch(
+                existing = existingGames,
+                changed = changedGames,
+                cap = ProfileDocLogic.MAX_GAMES_MAP_ENTRIES,
+                deleteMarker = FieldValue.delete()
             )
+            val userData = buildMap<String, Any?> {
+                put(FIELD_PROFILE_SCHEMA_VERSION, PROFILE_SCHEMA_VERSION)
+                put(FIELD_UID, user.uid)
+                put(FIELD_EMAIL, user.email ?: "")
+                put(FIELD_DISPLAY_NAME, snapshot.getString(FIELD_DISPLAY_NAME)?.takeIf { it.isNotBlank() } ?: cleanName)
+                put(FIELD_SEARCH_NAME, snapshot.getString(FIELD_SEARCH_NAME)?.takeIf { it.isNotBlank() } ?: searchName)
+                put(FIELD_PLAYER_TAG, playerTag)
+                put(FIELD_PHOTO_URL, photoURL)
+                put(FIELD_TOTAL_PLAY_TIME_MS, totalPlayTimeMs)
+                put(FIELD_GAMES_PLAYED, gamesPlayed)
+                put(FIELD_LAST_PLAYED_TITLE, latestTitle.take(MAX_GAME_TITLE_LENGTH))
+                put(FIELD_LAST_PLAYED_AT_MS, latestEntry.lastPlayedAtMs)
+                if (gamesPatch.isNotEmpty()) put(FIELD_GAMES, gamesPatch)
+                put(FIELD_PROFILE_ACCENT, profileAccent)
+                put(FIELD_FAVORITE_GAME_KEYS, favoriteGameKeys)
+                put(FIELD_SYNCED_BATCH_IDS, ProfileDocLogic.rememberBatch(rememberedBatches, batchId))
+                put(FIELD_UPDATED_AT, FieldValue.serverTimestamp())
+                put(FIELD_CREATED_AT, snapshot.getTimestamp(FIELD_CREATED_AT) ?: FieldValue.serverTimestamp())
+            }
+            val storedName = userData.getValue(FIELD_DISPLAY_NAME)
+            val storedSearchName = userData.getValue(FIELD_SEARCH_NAME)
             val leaderboardData = mapOf(
                 FIELD_PROFILE_SCHEMA_VERSION to PROFILE_SCHEMA_VERSION,
                 FIELD_UID to user.uid,
-                FIELD_DISPLAY_NAME to cleanName,
-                FIELD_SEARCH_NAME to searchName,
+                FIELD_DISPLAY_NAME to storedName,
+                FIELD_SEARCH_NAME to storedSearchName,
                 FIELD_PLAYER_TAG to playerTag,
                 FIELD_PHOTO_URL to photoURL,
                 FIELD_TOTAL_PLAY_TIME_MS to totalPlayTimeMs,
@@ -547,8 +667,8 @@ class PlayerProfileRepository(context: Context) {
             val publicProfileData = mapOf(
                 FIELD_PROFILE_SCHEMA_VERSION to PROFILE_SCHEMA_VERSION,
                 FIELD_UID to user.uid,
-                FIELD_DISPLAY_NAME to cleanName,
-                FIELD_SEARCH_NAME to searchName,
+                FIELD_DISPLAY_NAME to storedName,
+                FIELD_SEARCH_NAME to storedSearchName,
                 FIELD_PLAYER_TAG to playerTag,
                 FIELD_PHOTO_URL to photoURL,
                 FIELD_TOTAL_PLAY_TIME_MS to totalPlayTimeMs,
@@ -564,11 +684,7 @@ class PlayerProfileRepository(context: Context) {
             transaction.set(publicProfileRef, publicProfileData, SetOptions.merge())
             transaction.set(leaderboardRef, leaderboardData, SetOptions.merge())
             changedGames.forEach { (gameKey, gameData) ->
-                transaction.set(
-                    publicProfileRef.collection(PUBLIC_GAMES_COLLECTION).document(gameKey),
-                    gameData,
-                    SetOptions.merge()
-                )
+                transaction.set(publicGameRefs.getValue(gameKey), gameData, SetOptions.merge())
             }
             activityGroups.forEach { (day, entriesForDay) ->
                 val activitySnapshot = activitySnapshots.getValue(day)
@@ -587,81 +703,51 @@ class PlayerProfileRepository(context: Context) {
                     SetOptions.merge()
                 )
             }
+            true
         }.await()
         // Trophy sync is additive and must never make play-time persistence fail.
-        runCatching { VitaTrophyProfileRepository(appContext).syncPublicSummary() }
+        if (applied) runCatchingCancellable { VitaTrophyProfileRepository(appContext).syncPublicSummary() }
     }
 
-    private suspend fun ensureUserProfile(uid: String, email: String?, displayName: String, photoURL: String?) {
+    private suspend fun ensureUserProfile(
+        uid: String,
+        email: String?,
+        displayName: String,
+        photoURL: String?,
+        forceName: Boolean = false
+    ) {
         val userRef = firestore.collection(USERS_COLLECTION).document(uid)
         val publicProfileRef = firestore.collection(PUBLIC_PROFILES_COLLECTION).document(uid)
         val leaderboardRef = firestore.collection(LEADERBOARD_COLLECTION).document(uid)
         firestore.runTransaction { transaction ->
             val snapshot = transaction.get(userRef)
             val existingGames = snapshot.getGamesMap()
-            val totalPlayTimeMs = snapshot.getLong(FIELD_TOTAL_PLAY_TIME_MS) ?: 0L
-            val gamesPlayed = if (snapshot.exists()) {
-                snapshot.getLong(FIELD_GAMES_PLAYED) ?: existingGames.size.toLong()
-            } else {
-                0L
-            }
-            val playerTag = buildPlayerTag(uid)
-            val searchName = normalizeSearchName(displayName)
-            val profileAccent = snapshot.getString(FIELD_PROFILE_ACCENT)
-                ?.takeIf { it in PROFILE_ACCENTS }
-                ?: DEFAULT_PROFILE_ACCENT
-            val favoriteGameKeys = snapshot.stringList(FIELD_FAVORITE_GAME_KEYS)
-                .distinct()
-                .take(MAX_FAVORITE_GAMES)
-            val userData = mutableMapOf<String, Any?>(
-                FIELD_PROFILE_SCHEMA_VERSION to PROFILE_SCHEMA_VERSION,
-                FIELD_UID to uid,
-                FIELD_EMAIL to (email ?: ""),
-                FIELD_DISPLAY_NAME to displayName,
-                FIELD_SEARCH_NAME to searchName,
-                FIELD_PLAYER_TAG to playerTag,
-                FIELD_PHOTO_URL to photoURL.orEmpty(),
-                FIELD_TOTAL_PLAY_TIME_MS to totalPlayTimeMs,
-                FIELD_GAMES_PLAYED to gamesPlayed,
-                FIELD_GAMES to existingGames,
-                FIELD_PROFILE_ACCENT to profileAccent,
-                FIELD_FAVORITE_GAME_KEYS to favoriteGameKeys,
-                FIELD_UPDATED_AT to FieldValue.serverTimestamp()
+            val patches = ProfileDocLogic.ensureProfilePatches(
+                uid = uid,
+                email = email,
+                incomingName = displayName,
+                photoURL = photoURL,
+                forceName = forceName,
+                existing = ExistingProfileDoc(
+                    exists = snapshot.exists(),
+                    displayName = snapshot.getString(FIELD_DISPLAY_NAME),
+                    photoURL = snapshot.getString(FIELD_PHOTO_URL),
+                    totalPlayTimeMs = snapshot.getLong(FIELD_TOTAL_PLAY_TIME_MS) ?: 0L,
+                    gamesPlayed = snapshot.getLong(FIELD_GAMES_PLAYED),
+                    gamesMapSize = existingGames.size,
+                    lastPlayedTitle = snapshot.getString(FIELD_LAST_PLAYED_TITLE),
+                    lastPlayedAtMs = snapshot.getLong(FIELD_LAST_PLAYED_AT_MS),
+                    profileAccent = snapshot.getString(FIELD_PROFILE_ACCENT),
+                    favoriteGameKeys = snapshot.stringList(FIELD_FAVORITE_GAME_KEYS)
+                ),
+                playerTag = buildPlayerTag(uid),
+                serverTimestamp = FieldValue.serverTimestamp()
             )
-            if (!snapshot.exists()) {
-                userData[FIELD_CREATED_AT] = FieldValue.serverTimestamp()
-            }
-            val leaderboardData = mapOf(
-                FIELD_PROFILE_SCHEMA_VERSION to PROFILE_SCHEMA_VERSION,
-                FIELD_UID to uid,
-                FIELD_DISPLAY_NAME to displayName,
-                FIELD_SEARCH_NAME to searchName,
-                FIELD_PLAYER_TAG to playerTag,
-                FIELD_PHOTO_URL to photoURL.orEmpty(),
-                FIELD_TOTAL_PLAY_TIME_MS to totalPlayTimeMs,
-                FIELD_GAMES_PLAYED to gamesPlayed,
-                FIELD_LAST_PLAYED_TITLE to snapshot.getString(FIELD_LAST_PLAYED_TITLE).orEmpty(),
-                FIELD_PROFILE_ACCENT to profileAccent,
-                FIELD_UPDATED_AT to FieldValue.serverTimestamp()
-            )
-            val publicProfileData = mapOf(
-                FIELD_PROFILE_SCHEMA_VERSION to PROFILE_SCHEMA_VERSION,
-                FIELD_UID to uid,
-                FIELD_DISPLAY_NAME to displayName,
-                FIELD_SEARCH_NAME to searchName,
-                FIELD_PLAYER_TAG to playerTag,
-                FIELD_PHOTO_URL to photoURL.orEmpty(),
-                FIELD_TOTAL_PLAY_TIME_MS to totalPlayTimeMs,
-                FIELD_GAMES_PLAYED to gamesPlayed,
-                FIELD_LAST_PLAYED_TITLE to snapshot.getString(FIELD_LAST_PLAYED_TITLE).orEmpty(),
-                FIELD_LAST_PLAYED_AT_MS to (snapshot.getLong(FIELD_LAST_PLAYED_AT_MS) ?: 0L),
-                FIELD_PROFILE_ACCENT to profileAccent,
-                FIELD_FAVORITE_GAME_KEYS to favoriteGameKeys,
-                FIELD_UPDATED_AT to FieldValue.serverTimestamp()
-            )
-            transaction.set(userRef, userData, SetOptions.merge())
-            transaction.set(publicProfileRef, publicProfileData, SetOptions.merge())
-            transaction.set(leaderboardRef, leaderboardData, SetOptions.merge())
+            transaction.set(userRef, patches.user, SetOptions.merge())
+            transaction.set(publicProfileRef, patches.publicProfile, SetOptions.merge())
+            transaction.set(leaderboardRef, patches.leaderboard, SetOptions.merge())
+            // The games map is no longer mirrored back (B064). Legacy users get their top games copied to
+            // the per-game public documents once; existing public documents are only merged.
             existingGames.entries
                 .sortedByDescending { (_, value) -> value.toGameMap().longValue(GAME_TOTAL_MS) }
                 .take(PUBLIC_MIGRATION_GAME_LIMIT)
@@ -822,7 +908,8 @@ class PlayerProfileRepository(context: Context) {
             uid = uid,
             email = email,
             displayName = displayName.cleanDisplayName(email),
-            photoURL = bestPhotoUrl()
+            photoURL = bestPhotoUrl(),
+            reauthMethod = reauthMethodFor(providerData.map { it.providerId })
         )
     }
 
@@ -833,28 +920,14 @@ class PlayerProfileRepository(context: Context) {
 
     private fun String?.cleanDisplayName(email: String?): String {
         val fallback = email?.substringBefore('@')?.takeIf { it.isNotBlank() } ?: DEFAULT_DISPLAY_NAME
-        return this?.trim()?.takeIf { it.isNotBlank() }?.take(MAX_DISPLAY_NAME_LENGTH) ?: fallback
-    }
-
-    private fun buildGameKey(titleId: String): String {
-        val key = titleId
-            .trim()
-            .uppercase()
-            .replace(Regex("[^A-Z0-9_-]"), "_")
-            .takeIf { it.isNotBlank() }
-        return key ?: "T_${titleId.sha256().take(32)}"
+        return this?.trim()?.takeIf { it.isNotBlank() }?.truncateGraphemes() ?: fallback
     }
 
     private fun buildPlayerTag(uid: String): String {
         return PLAYER_TAG_PREFIX + uid.sha256().take(7).uppercase(Locale.ROOT)
     }
 
-    private fun normalizeSearchName(value: String): String {
-        return value.trim()
-            .lowercase(Locale.ROOT)
-            .replace(Regex("\\s+"), " ")
-            .take(MAX_DISPLAY_NAME_LENGTH)
-    }
+    private fun normalizeSearchName(value: String): String = ProfileDocLogic.normalizeSearchName(value)
 
     private fun activityDayKey(timestampMs: Long): String {
         return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(timestampMs))
@@ -879,10 +952,7 @@ class PlayerProfileRepository(context: Context) {
         return resolved
     }
 
-    private fun String.sha256(): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        return digest.digest(toByteArray()).joinToString("") { "%02x".format(it) }
-    }
+    private fun String.sha256(): String = ProfileDocLogic.sha256(this)
 
     private fun Timestamp.toMillisCompat(): Long = seconds * 1000L + nanoseconds / 1_000_000L
 
@@ -905,6 +975,8 @@ class PlayerProfileRepository(context: Context) {
         private const val PUBLIC_GAMES_COLLECTION = "games"
         private const val ACTIVITY_COLLECTION = "activity"
         private const val LEADERBOARD_COLLECTION = "leaderboardPlayTime"
+        private const val FRIENDSHIPS_COLLECTION = "friendships"
+        private const val DELETE_BATCH_SIZE = 400
         private const val LEADERBOARD_PAGE_SIZE = 50L
         private const val LEADERBOARD_MAX_ENTRIES = 1000
         private const val PLAYER_SEARCH_LIMIT = 20L
@@ -940,6 +1012,7 @@ class PlayerProfileRepository(context: Context) {
         private const val FIELD_GAMES = "games"
         private const val FIELD_PROFILE_ACCENT = "profileAccent"
         private const val FIELD_FAVORITE_GAME_KEYS = "favoriteGameKeys"
+        private const val FIELD_SYNCED_BATCH_IDS = "syncedBatchIds"
         private const val FIELD_PRO_MEMBER = "proMember"
         private const val FIELD_ACHIEVEMENT_COUNT = "achievementCount"
         private const val FIELD_ACHIEVEMENT_POINTS = "achievementPoints"

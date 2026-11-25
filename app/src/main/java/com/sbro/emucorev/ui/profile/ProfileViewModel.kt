@@ -4,11 +4,14 @@ import android.app.Activity
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.firestore.DocumentSnapshot
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.ProPurchaseManager
 import com.sbro.emucorev.data.CloudEmulatorProfile
 import com.sbro.emucorev.data.CloudEmulatorSettingsRepository
+import com.sbro.emucorev.data.FriendRequestBlockedException
 import com.sbro.emucorev.data.PlayerAccount
 import com.sbro.emucorev.data.PlayerActivityDay
 import com.sbro.emucorev.data.PlayerDevice
@@ -22,9 +25,13 @@ import com.sbro.emucorev.data.ProfileDeviceRepository
 import com.sbro.emucorev.data.ProfileFeedEvent
 import com.sbro.emucorev.data.ProfileFriendship
 import com.sbro.emucorev.data.ProfileSocialRepository
+import com.sbro.emucorev.data.ReauthCancelledException
 import com.sbro.emucorev.data.TrophyCloudRepository
 import com.sbro.emucorev.data.VitaCatalogRepository
 import com.sbro.emucorev.data.VitaTrophyProfileRepository
+import com.sbro.emucorev.data.collectReporting
+import com.sbro.emucorev.data.runCatchingCancellable
+import com.sbro.emucorev.data.truncateGraphemes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -63,6 +70,7 @@ data class ProfileUiState(
     val isLeaderboardLoadingMore: Boolean = false,
     val hasMoreLeaderboard: Boolean = true,
     val hasLoadedLeaderboard: Boolean = false,
+    val leaderboardLoadFailed: Boolean = false,
     val isPlayerSearchLoading: Boolean = false,
     val isActivityLoading: Boolean = false,
     val hasLoadedActivity: Boolean = false,
@@ -94,7 +102,14 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private var feedJob: Job? = null
     private var trophiesJob: Job? = null
     private var blocksJob: Job? = null
-    private var leaderboardCursor: DocumentSnapshot? = null
+    private val leaderboardPager = LeaderboardPager { cursor, rankOffset ->
+        repository.loadLeaderboardPage(cursor = cursor, rankOffset = rankOffset)
+    }
+    private var leaderboardJob: Job? = null
+    private var allLeaderboard: List<PlayerLeaderboardEntry> = emptyList()
+    private var allSearchResults: List<PlayerLeaderboardEntry> = emptyList()
+    private var allFeed: List<ProfileFeedEvent> = emptyList()
+    private var allFriendships: List<ProfileFriendship> = emptyList()
     private var viewedGamesCursor: DocumentSnapshot? = null
 
     init {
@@ -109,7 +124,12 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 feedJob?.cancel()
                 trophiesJob?.cancel()
                 blocksJob?.cancel()
-                leaderboardCursor = null
+                leaderboardJob?.cancel()
+                leaderboardPager.invalidate()
+                allLeaderboard = emptyList()
+                allSearchResults = emptyList()
+                allFeed = emptyList()
+                allFriendships = emptyList()
                 viewedGamesCursor = null
                 _uiState.update {
                     it.copy(
@@ -132,6 +152,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                         isProfileLoading = account != null,
                         isViewedProfileLoading = false,
                         hasLoadedLeaderboard = false,
+                        leaderboardLoadFailed = false,
                         hasMoreLeaderboard = true,
                         hasLoadedActivity = false,
                         hasAttemptedActivityLoad = false,
@@ -141,7 +162,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 }
                 if (account != null) {
                     viewModelScope.launch {
-                        runCatching {
+                        runCatchingCancellable {
                             repository.ensureCurrentUserProfile()
                             deviceRepository.registerCurrentDevice()
                             val proState = proPurchaseManager.state.value
@@ -164,7 +185,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 _uiState.update { it.copy(isProUnlocked = proState.isProUnlocked) }
                 if (proState.isPurchaseStatusVerified && _uiState.value.account != null) {
                     viewModelScope.launch {
-                        runCatching { repository.updateProMembership(proState.isProUnlocked) }
+                        runCatchingCancellable { repository.updateProMembership(proState.isProUnlocked) }
                     }
                 }
             }
@@ -199,11 +220,29 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun updateDisplayName(displayName: String) {
-        runAuthAction {
+    /** [onFinished] receives true on success, so the name dialog can stay open until the result is known (B073). */
+    fun updateDisplayName(displayName: String, onFinished: (Boolean) -> Unit = {}) {
+        runAuthAction(onFinished = onFinished) {
             repository.updateDisplayName(displayName)
             "profile_name_updated"
         }
+    }
+
+    /**
+     * Re-authenticates, erases the account's cloud data and deletes the account (B066).
+     * [password] is only needed for email/password accounts, [activity] for Google accounts.
+     */
+    fun deleteAccount(activity: Activity?, password: String?, onFinished: (Boolean) -> Unit = {}) {
+        runAuthAction(onFinished = onFinished, errorText = ::deleteAccountErrorText) {
+            repository.deleteAccount(activity, password)
+            "profile_account_deleted"
+        }
+    }
+
+    private fun deleteAccountErrorText(error: Throwable): String? = when (error) {
+        is FirebaseAuthInvalidCredentialsException, is FirebaseAuthInvalidUserException ->
+            getApplication<Application>().getString(R.string.profile_delete_account_wrong_password)
+        else -> null
     }
 
     fun signOut() {
@@ -219,7 +258,9 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     fun onProfileTabSelected(tabName: String) {
         when (tabName) {
             "Achievements" -> refreshTrophies()
-            "Leaderboard" -> if (!_uiState.value.hasLoadedLeaderboard) refreshLeaderboard()
+            "Leaderboard" -> _uiState.value.let { state ->
+                if (!state.hasLoadedLeaderboard || state.leaderboardLoadFailed) refreshLeaderboard()
+            }
             "Stats" -> if (!_uiState.value.hasLoadedActivity) loadActivity()
         }
     }
@@ -237,7 +278,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     fun refreshCloudProfiles() {
         if (_uiState.value.account == null) return
         viewModelScope.launch {
-            runCatching { cloudSettingsRepository.loadProfiles() }
+            runCatchingCancellable { cloudSettingsRepository.loadProfiles() }
                 .onSuccess { profiles -> _uiState.update { it.copy(cloudProfiles = profiles) } }
         }
     }
@@ -280,7 +321,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     fun refreshTrophies() {
         trophiesJob?.cancel()
         trophiesJob = viewModelScope.launch(Dispatchers.IO) {
-            runCatching { trophyRepository.loadSummary() }
+            runCatchingCancellable { trophyRepository.loadSummary() }
                 .onSuccess { summary ->
                     _uiState.update { it.copy(trophies = summary, hasLoadedTrophies = true) }
                 }
@@ -292,12 +333,13 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                         )
                     }
                 }
-            runCatching { trophyRepository.syncPublicSummary() }
+            runCatchingCancellable { trophyRepository.syncPublicSummary() }
         }
     }
 
     fun refreshLeaderboard() {
-        leaderboardCursor = null
+        leaderboardJob?.cancel()
+        allLeaderboard = emptyList()
         _uiState.update {
             it.copy(
                 leaderboard = emptyList(),
@@ -305,53 +347,58 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 isLeaderboardLoadingMore = false,
                 hasMoreLeaderboard = true,
                 hasLoadedLeaderboard = false,
+                leaderboardLoadFailed = false,
                 errorMessage = null
             )
         }
-        loadLeaderboardPage(reset = true)
+        leaderboardJob = viewModelScope.launch { applyLeaderboardOutcome(leaderboardPager.reset()) }
     }
 
     fun loadMoreLeaderboard() {
         val state = _uiState.value
         if (!state.hasMoreLeaderboard || state.isLeaderboardLoading || state.isLeaderboardLoadingMore) return
         _uiState.update { it.copy(isLeaderboardLoadingMore = true) }
-        loadLeaderboardPage(reset = false)
+        leaderboardJob = viewModelScope.launch { applyLeaderboardOutcome(leaderboardPager.loadMore()) }
     }
 
-    private fun loadLeaderboardPage(reset: Boolean) {
-        viewModelScope.launch {
-            runCatching {
-                repository.loadLeaderboardPage(
-                    cursor = if (reset) null else leaderboardCursor,
-                    rankOffset = if (reset) 0 else _uiState.value.leaderboard.size
-                )
-            }.onSuccess { page ->
-                leaderboardCursor = page.cursor
+    private fun applyLeaderboardOutcome(outcome: LeaderboardPager.Outcome) {
+        when (outcome) {
+            // A superseded request must not touch the state a newer request owns (B070).
+            LeaderboardPager.Outcome.Ignored -> Unit
+            is LeaderboardPager.Outcome.Loaded -> {
+                allLeaderboard = if (outcome.replace) {
+                    outcome.entries
+                } else {
+                    (allLeaderboard + outcome.entries).distinctBy { it.uid }
+                }
                 _uiState.update { state ->
                     state.copy(
-                        leaderboard = if (reset) page.entries else (state.leaderboard + page.entries).distinctBy { it.uid },
+                        leaderboard = allLeaderboard.excludingBlocked(state.blockedUids),
                         isLeaderboardLoading = false,
                         isLeaderboardLoadingMore = false,
-                        hasMoreLeaderboard = page.hasMore,
-                        hasLoadedLeaderboard = true
-                    )
-                }
-            }.onFailure { error ->
-                _uiState.update {
-                    it.copy(
-                        isLeaderboardLoading = false,
-                        isLeaderboardLoadingMore = false,
+                        hasMoreLeaderboard = outcome.hasMore,
                         hasLoadedLeaderboard = true,
-                        errorMessage = error.localizedMessage ?: getApplication<Application>().getString(R.string.profile_leaderboard_load_failed)
+                        leaderboardLoadFailed = false
                     )
                 }
+            }
+            is LeaderboardPager.Outcome.Failed -> _uiState.update {
+                it.copy(
+                    isLeaderboardLoading = false,
+                    isLeaderboardLoadingMore = false,
+                    hasLoadedLeaderboard = true,
+                    // A failed first page is retried the next time the tab is opened.
+                    leaderboardLoadFailed = outcome.replace || it.leaderboardLoadFailed,
+                    errorMessage = outcome.error.localizedMessage ?: getApplication<Application>().getString(R.string.profile_leaderboard_load_failed)
+                )
             }
         }
     }
 
     fun updatePlayerSearch(query: String) {
         searchJob?.cancel()
-        val trimmed = query.take(32)
+        val trimmed = query.truncateGraphemes()
+        if (trimmed.length < 2) allSearchResults = emptyList()
         _uiState.update {
             it.copy(
                 leaderboardSearchQuery = trimmed,
@@ -362,14 +409,21 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         if (trimmed.length < 2) return
         searchJob = viewModelScope.launch {
             delay(400.milliseconds)
-            runCatching { repository.searchPlayers(trimmed) }
+            runCatchingCancellable { repository.searchPlayers(trimmed) }
                 .onSuccess { results ->
                     if (_uiState.value.leaderboardSearchQuery == trimmed) {
-                        _uiState.update { it.copy(searchResults = results, isPlayerSearchLoading = false) }
+                        allSearchResults = results
+                        _uiState.update {
+                            it.copy(
+                                searchResults = results.excludingBlocked(it.blockedUids),
+                                isPlayerSearchLoading = false
+                            )
+                        }
                     }
                 }
                 .onFailure { error ->
                     if (_uiState.value.leaderboardSearchQuery == trimmed) {
+                        allSearchResults = emptyList()
                         _uiState.update {
                             it.copy(
                                 searchResults = emptyList(),
@@ -386,7 +440,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         if (_uiState.value.isActivityLoading) return
         _uiState.update { it.copy(isActivityLoading = true, hasAttemptedActivityLoad = true) }
         viewModelScope.launch {
-            runCatching { repository.loadPlayerActivity() }
+            runCatchingCancellable { repository.loadPlayerActivity() }
                 .onSuccess { activity ->
                     _uiState.update {
                         it.copy(
@@ -453,7 +507,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         viewedGamesCursor = null
         _uiState.update { it.copy(viewedProfile = null, isViewedProfileLoading = true, errorMessage = null) }
         viewedProfileJob = viewModelScope.launch {
-            runCatching { repository.loadPublicProfile(uid) }
+            runCatchingCancellable { repository.loadPublicProfile(uid) }
                 .onSuccess { page ->
                     viewedGamesCursor = page.cursor
                     _uiState.update {
@@ -481,7 +535,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         if (!_uiState.value.hasMoreViewedGames || _uiState.value.isViewedGamesLoadingMore) return
         _uiState.update { it.copy(isViewedGamesLoadingMore = true) }
         viewedProfileJob = viewModelScope.launch {
-            runCatching { repository.loadPublicGamesPage(profile.uid, viewedGamesCursor) }
+            runCatchingCancellable { repository.loadPublicGamesPage(profile.uid, viewedGamesCursor) }
                 .onSuccess { page ->
                     viewedGamesCursor = page.cursor
                     _uiState.update { state ->
@@ -522,7 +576,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     fun openGameDetails(game: PlayerGamePlayStat, onOpen: (Long) -> Unit) {
         viewModelScope.launch {
             val catalogId = withContext(Dispatchers.IO) {
-                runCatching {
+                runCatchingCancellable {
                     catalogRepository.findBySerial(game.serial.orEmpty())?.igdbId
                         ?: catalogRepository.findBestMatch(game.title)?.igdbId
                 }.getOrNull()
@@ -539,20 +593,28 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     private fun observeProfile(uid: String) {
         profileJob = viewModelScope.launch {
-            runCatching {
-                repository.observeProfile(uid).collect { profile ->
-                    val previousTotal = _uiState.value.profile?.totalPlayTimeMs
+            // A listener error used to end this collection silently and leave the spinner up forever (B061).
+            repository.observeProfile(uid).collectReporting(
+                onError = { error ->
                     _uiState.update {
                         it.copy(
-                            profile = profile,
-                            games = profile?.games.orEmpty(),
-                            isProfileLoading = false
+                            isProfileLoading = false,
+                            errorMessage = error.localizedMessage ?: getApplication<Application>().getString(R.string.profile_action_failed)
                         )
                     }
-                    if (profile != null && profile.totalPlayTimeMs != previousTotal) {
-                        loadRankInsights(profile.totalPlayTimeMs)
-                        refreshTrophies()
-                    }
+                }
+            ) { profile ->
+                val previousTotal = _uiState.value.profile?.totalPlayTimeMs
+                _uiState.update {
+                    it.copy(
+                        profile = profile,
+                        games = profile?.games.orEmpty(),
+                        isProfileLoading = false
+                    )
+                }
+                if (profile != null && profile.totalPlayTimeMs != previousTotal) {
+                    loadRankInsights(profile.totalPlayTimeMs)
+                    refreshTrophies()
                 }
             }
         }
@@ -560,41 +622,49 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     private fun observeProfileFeatures(uid: String) {
         devicesJob = viewModelScope.launch {
-            runCatching {
-                deviceRepository.observeDevices().collect { devices ->
-                    _uiState.update { it.copy(devices = devices) }
-                }
+            deviceRepository.observeDevices().collectReporting(onError = {}) { devices ->
+                _uiState.update { it.copy(devices = devices) }
             }
         }
         friendshipsJob = viewModelScope.launch {
-            runCatching {
-                socialRepository.observeFriendships().collect { friendships ->
-                    _uiState.update { it.copy(friendships = friendships) }
-                    hydrateSocialProfiles(friendships.map { it.otherUid })
-                }
+            socialRepository.observeFriendships().collectReporting(onError = {}) { friendships ->
+                allFriendships = friendships
+                republishBlockFiltered()
+                hydrateSocialProfiles(friendships.map { it.otherUid })
             }
         }
         feedJob = viewModelScope.launch {
-            runCatching {
-                socialRepository.observeFeed(uid).collect { feed ->
-                    _uiState.update { it.copy(feed = feed) }
-                }
+            socialRepository.observeFeed(uid).collectReporting(onError = {}) { feed ->
+                allFeed = feed
+                republishBlockFiltered()
             }
         }
         blocksJob = viewModelScope.launch {
-            runCatching {
-                socialRepository.observeBlockedUids().collect { blocked ->
-                    _uiState.update { it.copy(blockedUids = blocked) }
-                    hydrateSocialProfiles(blocked)
-                }
+            socialRepository.observeBlockedUids().collectReporting(onError = {}) { blocked ->
+                _uiState.update { it.copy(blockedUids = blocked) }
+                republishBlockFiltered()
+                hydrateSocialProfiles(blocked)
             }
+        }
+    }
+
+    /** Re-derives every list that must hide blocked players from the unfiltered source lists (B069). */
+    private fun republishBlockFiltered() {
+        _uiState.update { state ->
+            val blocked = state.blockedUids
+            state.copy(
+                leaderboard = allLeaderboard.excludingBlocked(blocked),
+                searchResults = allSearchResults.excludingBlocked(blocked),
+                feed = allFeed.excludingBlockedAuthors(blocked),
+                friendships = allFriendships.excludingBlockedFriends(blocked)
+            )
         }
     }
 
     private suspend fun hydrateSocialProfiles(uids: List<String>) {
         val missing = uids.distinct().take(50).filterNot { it in _uiState.value.socialProfiles }
         if (missing.isEmpty()) return
-        val loaded = runCatching { repository.loadPublicProfileSummaries(missing) }.getOrDefault(emptyMap())
+        val loaded = runCatchingCancellable { repository.loadPublicProfileSummaries(missing) }.getOrDefault(emptyMap())
         if (loaded.isNotEmpty()) {
             _uiState.update { it.copy(socialProfiles = it.socialProfiles + loaded) }
         }
@@ -603,41 +673,60 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private fun runFeatureAction(successKey: String, action: suspend () -> Unit) {
         viewModelScope.launch {
             _uiState.update { it.copy(isFeatureActionLoading = true, messageKey = null, errorMessage = null) }
-            runCatching { action() }
+            runCatchingCancellable { action() }
                 .onSuccess { _uiState.update { it.copy(isFeatureActionLoading = false, messageKey = successKey) } }
                 .onFailure { error ->
                     _uiState.update {
                         it.copy(
                             isFeatureActionLoading = false,
-                            errorMessage = error.localizedMessage ?: getApplication<Application>().getString(R.string.profile_action_failed)
+                            errorMessage = featureErrorText(error)
                         )
                     }
                 }
+        }
+    }
+
+    private fun featureErrorText(error: Throwable): String {
+        val app = getApplication<Application>()
+        return when (error) {
+            is FriendRequestBlockedException -> app.getString(R.string.profile_friend_request_blocked)
+            else -> error.localizedMessage ?: app.getString(R.string.profile_action_failed)
         }
     }
 
     private fun loadRankInsights(totalPlayTimeMs: Long) {
         rankJob?.cancel()
         rankJob = viewModelScope.launch {
-            runCatching { repository.loadRankInsights(totalPlayTimeMs) }
+            runCatchingCancellable { repository.loadRankInsights(totalPlayTimeMs) }
                 .onSuccess { insights -> _uiState.update { it.copy(rankInsights = insights) } }
         }
     }
 
-    private fun runAuthAction(action: suspend () -> String) {
+    private fun runAuthAction(
+        onFinished: (Boolean) -> Unit = {},
+        errorText: (Throwable) -> String? = { null },
+        action: suspend () -> String
+    ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isAuthLoading = true, messageKey = null, errorMessage = null) }
-            runCatching { action() }
+            runCatchingCancellable { action() }
                 .onSuccess { messageKey ->
                     _uiState.update { it.copy(isAuthLoading = false, messageKey = messageKey) }
+                    onFinished(true)
                 }
                 .onFailure { error ->
                     _uiState.update {
                         it.copy(
                             isAuthLoading = false,
-                            errorMessage = error.localizedMessage ?: getApplication<Application>().getString(R.string.profile_action_failed)
+                            // The user dismissing a re-authentication prompt is not an error.
+                            errorMessage = if (error is ReauthCancelledException) null else {
+                                errorText(error)
+                                    ?: error.localizedMessage
+                                    ?: getApplication<Application>().getString(R.string.profile_action_failed)
+                            }
                         )
                     }
+                    onFinished(false)
                 }
         }
     }

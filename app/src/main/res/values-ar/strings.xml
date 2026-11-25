@@ -1313,6 +1313,13 @@
     <string name="profile_leaderboard_search_hint">الاسم أو المعرّف</string>
     <string name="profile_name_character_count">%1$d/32 حرفًا</string>
     <string name="profile_name_updated">تم تحديث اسم العرض.</string>
+    <string name="profile_delete_account">حذف الحساب</string>
+    <string name="profile_delete_account_title">حذف حسابك؟</string>
+    <string name="profile_delete_account_body">سيؤدي هذا إلى حذف حساب اللاعب الخاص بك وكل ما هو مخزّن له عبر الإنترنت بشكل دائم: الملف الشخصي ووقت اللعب والترتيب في لوحة المتصدرين والنشاط والأجهزة والأصدقاء وقائمة الحظر وملفات المحاكي السحابية والنسخ الاحتياطية للكؤوس. لن تتأثر الألعاب وملفات الحفظ على هذا الجهاز. لا يمكن التراجع عن ذلك.</string>
+    <string name="profile_delete_account_confirm">حذف</string>
+    <string name="profile_delete_account_wrong_password">كلمة المرور غير صحيحة.</string>
+    <string name="profile_account_deleted">تم حذف حسابك وبياناته على الإنترنت.</string>
+    <string name="profile_friend_request_blocked">ألغِ حظر هذا اللاعب قبل إرسال طلب صداقة.</string>
     <string name="profile_need_account">إنشاء حساب</string>
     <string name="profile_player">اللاعب</string>
     <string name="profile_player_blocked">تم حظر اللاعب.</string>

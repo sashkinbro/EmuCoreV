@@ -100,14 +100,36 @@ class ProfileSocialRepository {
         require(otherUid.isNotBlank() && otherUid != uid) { "Invalid player" }
         val members = listOf(uid, otherUid).sorted()
         val id = friendshipId(uid, otherUid)
-        firestore.collection(FRIENDSHIPS).document(id).set(mapOf(
-            "id" to id,
-            "members" to members,
-            "requestedBy" to uid,
-            "status" to "pending",
-            "createdAt" to FieldValue.serverTimestamp(),
-            "updatedAt" to FieldValue.serverTimestamp()
-        )).await()
+        val iBlockedOther = isBlocked(otherUid)
+        val reference = firestore.collection(FRIENDSHIPS).document(id)
+        // Decide against the stored relationship inside a transaction: a blind set() would reset an
+        // accepted friendship or overwrite the other player's pending request (B068).
+        val action = firestore.runTransaction { transaction ->
+            val snapshot = transaction.get(reference)
+            val existing = if (snapshot.exists()) {
+                ExistingFriendship(snapshot.getString("status"), snapshot.getString("requestedBy"))
+            } else {
+                null
+            }
+            val decision = FriendRequestPolicy.decide(uid, existing, iBlockedOther)
+            when (decision) {
+                FriendRequestAction.CreateRequest -> transaction.set(reference, mapOf(
+                    "id" to id,
+                    "members" to members,
+                    "requestedBy" to uid,
+                    "status" to "pending",
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                ))
+                FriendRequestAction.AcceptIncoming -> transaction.update(reference, mapOf(
+                    "status" to "accepted",
+                    "updatedAt" to FieldValue.serverTimestamp()
+                ))
+                FriendRequestAction.NoChange, FriendRequestAction.Blocked -> Unit
+            }
+            decision
+        }.await()
+        if (action == FriendRequestAction.Blocked) throw FriendRequestBlockedException()
     }
 
     suspend fun acceptFriendRequest(friendshipId: String) {
