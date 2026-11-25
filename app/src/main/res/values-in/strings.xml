@@ -190,10 +190,10 @@
     <string name="detail_compatibility_title_id_label">ID judul yang cocok</string>
     <string name="detail_compatibility_known_serials">ID judul yang dikenal</string>
     <string name="detail_compatibility_updated">Diperbarui</string>
-    <string name="detail_compatibility_unavailable">Basis data kompatibilitas Vita3K saat ini tidak tersedia.</string>
+    <string name="detail_compatibility_unavailable">Basis data kompatibilitas ECV saat ini tidak tersedia.</string>
     <string name="detail_compatibility_unmapped">Entri katalog ini belum memiliki ID judul yang dipetakan di katalog lokal.</string>
-    <string name="detail_compatibility_missing_entry">Vita3K saat ini tidak memiliki entri kompatibilitas untuk ID judul ini.</string>
-    <string name="detail_compatibility_source_note">Data kompatibilitas didasarkan pada daftar Vita3K. Masalah #%1$d.</string>
+    <string name="detail_compatibility_missing_entry">ECV saat ini tidak memiliki entri kompatibilitas untuk ID judul ini.</string>
+    <string name="detail_compatibility_source_note">Data kompatibilitas didasarkan pada daftar ECV. Masalah #%1$d.</string>
     <string name="detail_show_more">Tampilkan lebih banyak</string>
     <string name="detail_show_less">Tampilkan lebih sedikit</string>
     <string name="detail_screenshot_saved">Tangkapan layar disimpan</string>
@@ -629,7 +629,7 @@
     <string name="settings_about_emucorev">Tentang EmuCoreV</string>
     <string name="settings_about_version">Versi aplikasi</string>
     <string name="settings_about_version_value">Versi %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV adalah emulator PS Vita untuk Android yang menggunakan inti ECV. ECV berbasis inti Vita3K dan terus dikembangkan secara aktif oleh EmuCore dengan perbaikan dan peningkatannya sendiri.</string>
+    <string name="settings_about_body_extended">EmuCoreV adalah emulator PS Vita untuk Android yang menggunakan inti ECV. ECV dikembangkan secara aktif oleh EmuCore dengan perbaikan dan peningkatannya sendiri.</string>
     <string name="settings_about_community_title">Komunitas dan dukungan</string>
     <string name="settings_about_website">Situs web resmi</string>
     <string name="settings_about_website_desc">Buka situs web EmuCoreV untuk unduhan, berita, dan tautan proyek.</string>
@@ -640,15 +640,12 @@
     <string name="settings_about_support">Dukung EmuCoreV</string>
     <string name="settings_about_support_desc">Bantu pengembangan berlanjut melalui keanggotaan Patreon.</string>
     <string name="settings_emulation_core">Inti Emulasi</string>
-    <string name="settings_based_on_vita3k">ECV berbasis inti Vita3K dan terus dikembangkan secara aktif oleh EmuCore dengan perbaikan dan peningkatannya sendiri.</string>
     <string name="settings_developer">Pengembang</string>
     <string name="settings_created_by_sbro">Dibuat oleh Sashkin Apps</string>
     <string name="settings_play_store_profile">Profil Play Store</string>
     <string name="settings_play_store_profile_desc">Lihat lebih banyak aplikasi Android dari pengembang.</string>
     <string name="settings_core_source_code">Kode Sumber Inti</string>
-    <string name="settings_core_source_description">EmuCoreV menggunakan antarmuka Android miliknya sendiri. ECV berbasis inti Vita3K dan terus dikembangkan secara aktif oleh EmuCore dengan perbaikan dan peningkatannya sendiri.</string>
-    <string name="settings_open_github">Buka GitHub</string>
-    <string name="settings_vita3k_repository_desc">Buka repositori proyek Vita3K upstream.</string>
+    <string name="settings_core_source_description">EmuCoreV menggunakan antarmuka Android miliknya sendiri. ECV dikembangkan secara aktif oleh EmuCore dengan perbaikan dan peningkatannya sendiri.</string>
     <string name="settings_updates_checking_title">Memeriksa pembaruan</string>
     <string name="settings_updates_available_title">Pembaruan tersedia</string>
     <string name="settings_updates_current_title">Anda sudah menggunakan versi terbaru</string>
@@ -1605,8 +1602,6 @@
     <string name="library_view_list">Tampilkan sebagai daftar</string>
     <string name="settings_ecv_source">Kode sumber ECV</string>
     <string name="settings_ecv_source_desc">Lihat kode sumber inti ECV yang dimodifikasi dan aplikasi EmuCoreV di GitHub.</string>
-    <string name="settings_vita3k_license">Lisensi Vita3K asal</string>
-    <string name="settings_vita3k_license_desc">Baca lisensi asli GNU GPL versi 2.0 atau yang lebih baru.</string>
     <string name="settings_core_upstream_version">Versi inti asal</string>
 
     <string name="settings_cover_art_style">Gaya Sampul</string>

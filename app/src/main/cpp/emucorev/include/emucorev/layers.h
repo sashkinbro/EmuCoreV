@@ -3,7 +3,7 @@
 namespace emucorev {
 
 enum class NativeLayer {
-    Vita3KCore = 1,
+    EcvCore = 1,
     CoreAdapter = 2,
     AndroidBridge = 3,
 };

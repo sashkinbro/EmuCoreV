@@ -92,10 +92,10 @@
     <string name="detail_compatibility_title_id_label">Совпадающий Title ID</string>
     <string name="detail_compatibility_known_serials">Известные Title ID</string>
     <string name="detail_compatibility_updated">Обновлено</string>
-    <string name="detail_compatibility_unavailable">База данных совместимости Vita3K сейчас недоступна.</string>
+    <string name="detail_compatibility_unavailable">База данных совместимости ECV сейчас недоступна.</string>
     <string name="detail_compatibility_unmapped">У этой записи каталога еще нет сопоставленного Title ID в локальном каталоге.</string>
-    <string name="detail_compatibility_missing_entry">У Vita3K в настоящее время нет записи о совместимости для этих Title ID.</string>
-    <string name="detail_compatibility_source_note">Данные о совместимости основаны на списке Vita3K. Проблема #%1$d.</string>
+    <string name="detail_compatibility_missing_entry">У ECV в настоящее время нет записи о совместимости для этих Title ID.</string>
+    <string name="detail_compatibility_source_note">Данные о совместимости основаны на списке ECV. Проблема #%1$d.</string>
     <string name="detail_show_more">Показать больше</string>
     <string name="detail_show_less">Показать меньше</string>
     <string name="detail_screenshot_saved">Скриншот сохранен</string>
@@ -331,13 +331,11 @@
     <string name="settings_help_check_for_updates">Сохраняет включенной проверку обновлений.\n\nИспользуйте это, когда хотите настроить интерфейс эмулятора или системное отображение в игре под себя. Оставляйте стандарт, если дополнительная информация или визуальное изменение не нужны.</string>
     <string name="settings_about_emucorev">О EmuCoreV</string>
     <string name="settings_emulation_core">Ядро эмуляции</string>
-    <string name="settings_based_on_vita3k">ECV основан на ядре Vita3K и активно развивается EmuCore с собственными исправлениями и улучшениями.</string>
     <string name="settings_developer">Разработчик</string>
     <string name="settings_created_by_sbro">Создано Sashkin Apps</string>
     <string name="settings_play_store_profile">Профиль Play Маркет</string>
     <string name="settings_core_source_code">Исходный код ядра</string>
-    <string name="settings_core_source_description">EmuCoreV использует собственный интерфейс Android. ECV основан на ядре Vita3K и активно развивается EmuCore с собственными исправлениями и улучшениями.</string>
-    <string name="settings_open_github">Открыть GitHub</string>
+    <string name="settings_core_source_description">EmuCoreV использует собственный интерфейс Android. ECV активно развивается EmuCore с собственными исправлениями и улучшениями.</string>
     <string name="emulator_choose_file">Выберите файл</string>
     <string name="emulator_choose_folder">Выберите папку</string>
     <string name="emulator_installer_apk_missing">Пакет обновления не найден.</string>
@@ -540,7 +538,7 @@
     <string name="settings_tab_updates">Обновления</string>
     <string name="settings_about_version">Версия приложения</string>
     <string name="settings_about_version_value">Версия %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV — это эмулятор PS Vita для Android на базе ядра ECV. ECV основан на ядре Vita3K и активно развивается EmuCore с собственными исправлениями и улучшениями.</string>
+    <string name="settings_about_body_extended">EmuCoreV — это эмулятор PS Vita для Android на базе ядра ECV. ECV активно развивается EmuCore с собственными исправлениями и улучшениями.</string>
     <string name="settings_about_community_title">Сообщество и поддержка</string>
     <string name="settings_about_repository">Репозиторий EmuCoreV</string>
     <string name="settings_about_repository_desc">Просматривайте исходный код, сообщайте об ошибках и следите за разработкой на GitHub.</string>
@@ -549,7 +547,6 @@
     <string name="settings_about_support">Поддержите EmuCoreV</string>
     <string name="settings_about_support_desc">Помогите продолжить разработку, оформив подписку на Patreon.</string>
     <string name="settings_play_store_profile_desc">Смотреть другие Android-приложения от разработчика.</string>
-    <string name="settings_vita3k_repository_desc">Открыть репозиторий оригинального проекта Vita3K.</string>
     <string name="settings_updates_checking_title">Проверка обновлений</string>
     <string name="settings_updates_available_title">Доступно обновление</string>
     <string name="settings_updates_current_title">Установлена последняя версия</string>
@@ -1607,8 +1604,6 @@
     <string name="library_view_list">Показать списком</string>
     <string name="settings_ecv_source">Исходный код ECV</string>
     <string name="settings_ecv_source_desc">Открыть исходный код модифицированного ядра ECV и приложения EmuCoreV на GitHub.</string>
-    <string name="settings_vita3k_license">Лицензия исходного проекта Vita3K</string>
-    <string name="settings_vita3k_license_desc">Открыть исходную лицензию GNU GPL версии 2.0 или более поздней.</string>
     <string name="settings_core_upstream_version">Версия исходного ядра</string>
 
     <string name="settings_cover_art_style">Стиль обложки</string>

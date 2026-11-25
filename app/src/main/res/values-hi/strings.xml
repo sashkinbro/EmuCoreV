@@ -92,10 +92,10 @@
     <string name="detail_compatibility_title_id_label">मिलान किया गया शीर्षक ID</string>
     <string name="detail_compatibility_known_serials">ज्ञात शीर्षक ID</string>
     <string name="detail_compatibility_updated">अपडेट किया गया</string>
-    <string name="detail_compatibility_unavailable">Vita3K अनुकूलता डेटाबेस अभी अनुपलब्ध है।</string>
+    <string name="detail_compatibility_unavailable">ECV अनुकूलता डेटाबेस अभी अनुपलब्ध है।</string>
     <string name="detail_compatibility_unmapped">इस कैटलॉग प्रविष्टि के पास अभी तक स्थानीय कैटलॉग में मैप किया गया शीर्षक ID नहीं है।</string>
-    <string name="detail_compatibility_missing_entry">Vita3K के पास वर्तमान में इन शीर्षक ID के लिए कोई अनुकूलता प्रविष्टि नहीं है।</string>
-    <string name="detail_compatibility_source_note">अनुकूलता डेटा Vita3K सूची पर आधारित है। समस्या #%1$d.</string>
+    <string name="detail_compatibility_missing_entry">ECV के पास वर्तमान में इन शीर्षक ID के लिए कोई अनुकूलता प्रविष्टि नहीं है।</string>
+    <string name="detail_compatibility_source_note">अनुकूलता डेटा ECV सूची पर आधारित है। समस्या #%1$d.</string>
     <string name="detail_show_more">और दिखाएं</string>
     <string name="detail_show_less">कम दिखाएं</string>
     <string name="detail_screenshot_saved">स्क्रीनशॉट सहेजा गया</string>
@@ -331,13 +331,11 @@
     <string name="settings_help_check_for_updates">अपडेट जाँच सक्षम रखता है।\n\nEmulator interface या in-game system presentation को अपनी पसंद के अनुसार करने के लिए इस्तेमाल करें। Extra information या visual change न चाहिए तो default रखें।</string>
     <string name="settings_about_emucorev">EmuCoreV के बारे में</string>
     <string name="settings_emulation_core">एमुलेशन कोर</string>
-    <string name="settings_based_on_vita3k">ECV, Vita3K कोर पर आधारित है और EmuCore अपने सुधारों और संवर्द्धनों के साथ इसका सक्रिय विकास जारी रखता है।</string>
     <string name="settings_developer">डेवलपर</string>
     <string name="settings_created_by_sbro">Sashkin Apps द्वारा निर्मित</string>
     <string name="settings_play_store_profile">Play Store प्रोफ़ाइल</string>
     <string name="settings_core_source_code">कोर सोर्स कोड</string>
-    <string name="settings_core_source_description">EmuCoreV अपना Android इंटरफ़ेस उपयोग करता है। ECV, Vita3K कोर पर आधारित है और EmuCore अपने सुधारों और संवर्द्धनों के साथ इसका सक्रिय विकास जारी रखता है।</string>
-    <string name="settings_open_github">GitHub खोलें</string>
+    <string name="settings_core_source_description">EmuCoreV अपना Android इंटरफ़ेस उपयोग करता है। EmuCore अपने सुधारों और संवर्द्धनों के साथ ECV का सक्रिय विकास करता है।</string>
     <string name="emulator_choose_file">एक फ़ाइल चुनें</string>
     <string name="emulator_choose_folder">एक फ़ोल्डर चुनें</string>
     <string name="emulator_installer_apk_missing">अपडेट पैकेज नहीं मिला।</string>
@@ -540,7 +538,7 @@
     <string name="settings_tab_updates">अपडेट</string>
     <string name="settings_about_version">ऐप का वर्ज़न</string>
     <string name="settings_about_version_value">वर्ज़न %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV ECV कोर पर चलने वाला Android के लिए एक PS Vita एमुलेटर है। ECV, Vita3K कोर पर आधारित है और EmuCore अपने सुधारों और संवर्द्धनों के साथ इसका सक्रिय विकास जारी रखता है।</string>
+    <string name="settings_about_body_extended">EmuCoreV ECV कोर पर चलने वाला Android के लिए एक PS Vita एमुलेटर है। EmuCore अपने सुधारों और संवर्द्धनों के साथ ECV का सक्रिय विकास करता है।</string>
     <string name="settings_about_community_title">कम्युनिटी और सपोर्ट</string>
     <string name="settings_about_repository">EmuCoreV रिपॉजिटरी</string>
     <string name="settings_about_repository_desc">सोर्स कोड देखें, समस्याएँ रिपोर्ट करें और GitHub पर डेवलपमेंट को फ़ॉलो करें।</string>
@@ -549,7 +547,6 @@
     <string name="settings_about_support">EmuCoreV को सपोर्ट करें</string>
     <string name="settings_about_support_desc">Patreon मेंबरशिप के ज़रिए डेवलपमेंट को जारी रखने में मदद करें।</string>
     <string name="settings_play_store_profile_desc">डेवलपर के और Android ऐप देखें।</string>
-    <string name="settings_vita3k_repository_desc">अपस्ट्रीम Vita3K प्रोजेक्ट रिपॉजिटरी खोलें।</string>
     <string name="settings_updates_checking_title">अपडेट जाँचे जा रहे हैं</string>
     <string name="settings_updates_available_title">अपडेट उपलब्ध है</string>
     <string name="settings_updates_current_title">आपका ऐप अप टू डेट है</string>
@@ -1605,8 +1602,6 @@
     <string name="library_view_list">लिस्ट के रूप में दिखाएं</string>
     <string name="settings_ecv_source">ECV का स्रोत कोड</string>
     <string name="settings_ecv_source_desc">संशोधित ECV कोर और EmuCoreV ऐप का स्रोत कोड GitHub पर देखें।</string>
-    <string name="settings_vita3k_license">मूल Vita3K का लाइसेंस</string>
-    <string name="settings_vita3k_license_desc">मूल GNU GPL संस्करण 2.0 या बाद का लाइसेंस पढ़ें।</string>
     <string name="settings_core_upstream_version">मूल कोर का संस्करण</string>
 
     <string name="settings_cover_art_style">कवर स्टाइल</string>

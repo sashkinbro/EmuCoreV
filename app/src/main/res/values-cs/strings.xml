@@ -190,10 +190,10 @@
     <string name="detail_compatibility_title_id_label">Odpovídající ID titulu</string>
     <string name="detail_compatibility_known_serials">Známá ID titulů</string>
     <string name="detail_compatibility_updated">Aktualizováno</string>
-    <string name="detail_compatibility_unavailable">Databáze kompatibility Vita3K je momentálně nedostupná.</string>
+    <string name="detail_compatibility_unavailable">Databáze kompatibility ECV je momentálně nedostupná.</string>
     <string name="detail_compatibility_unmapped">Tento záznam katalogu zatím nemá v místním katalogu přiřazené ID titulu.</string>
-    <string name="detail_compatibility_missing_entry">Vita3K momentálně nemá záznam o kompatibilitě pro tato ID titulů.</string>
-    <string name="detail_compatibility_source_note">Data o kompatibilitě vycházejí ze seznamu Vita3K. Problém #%1$d.</string>
+    <string name="detail_compatibility_missing_entry">ECV momentálně nemá záznam o kompatibilitě pro tato ID titulů.</string>
+    <string name="detail_compatibility_source_note">Data o kompatibilitě vycházejí ze seznamu ECV. Problém #%1$d.</string>
     <string name="detail_show_more">Zobrazit více</string>
     <string name="detail_show_less">Zobrazit méně</string>
     <string name="detail_screenshot_saved">Snímek obrazovky uložen</string>
@@ -629,7 +629,7 @@
     <string name="settings_about_emucorev">O aplikaci EmuCoreV</string>
     <string name="settings_about_version">Verze aplikace</string>
     <string name="settings_about_version_value">Verze %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV je emulátor PS Vita pro Android s jádrem ECV. ECV vychází z jádra Vita3K a EmuCore jej aktivně dále vyvíjí vlastními opravami a vylepšeními.</string>
+    <string name="settings_about_body_extended">EmuCoreV je emulátor PS Vita pro Android s jádrem ECV. EmuCore aktivně vyvíjí ECV vlastními opravami a vylepšeními.</string>
     <string name="settings_about_community_title">Komunita a podpora</string>
     <string name="settings_about_website">Oficiální web</string>
     <string name="settings_about_website_desc">Otevřete web EmuCoreV pro stažení, novinky a odkazy k projektu.</string>
@@ -640,15 +640,12 @@
     <string name="settings_about_support">Podpořte EmuCoreV</string>
     <string name="settings_about_support_desc">Pomozte pokračovat vývoji členstvím na Patreonu.</string>
     <string name="settings_emulation_core">Emulační jádro</string>
-    <string name="settings_based_on_vita3k">ECV vychází z jádra Vita3K a EmuCore jej aktivně dále vyvíjí vlastními opravami a vylepšeními.</string>
     <string name="settings_developer">Vývojář</string>
     <string name="settings_created_by_sbro">Vytvořil Sashkin Apps</string>
     <string name="settings_play_store_profile">Profil na Play Store</string>
     <string name="settings_play_store_profile_desc">Zobrazte další aplikace pro Android od vývojáře.</string>
     <string name="settings_core_source_code">Zdrojový kód jádra</string>
-    <string name="settings_core_source_description">EmuCoreV používá vlastní rozhraní pro Android. ECV vychází z jádra Vita3K a EmuCore jej aktivně dále vyvíjí vlastními opravami a vylepšeními.</string>
-    <string name="settings_open_github">Otevřít GitHub</string>
-    <string name="settings_vita3k_repository_desc">Otevřete upstream repozitář projektu Vita3K.</string>
+    <string name="settings_core_source_description">EmuCoreV používá vlastní rozhraní pro Android. EmuCore aktivně vyvíjí ECV vlastními opravami a vylepšeními.</string>
     <string name="settings_updates_checking_title">Kontrola aktualizací</string>
     <string name="settings_updates_available_title">Je dostupná aktualizace</string>
     <string name="settings_updates_current_title">Máte nejnovější verzi</string>
@@ -1608,8 +1605,6 @@
     <string name="library_view_list">Zobrazit jako seznam</string>
     <string name="settings_ecv_source">Zdrojový kód ECV</string>
     <string name="settings_ecv_source_desc">Zobrazit zdrojový kód upraveného jádra ECV a aplikace EmuCoreV na GitHubu.</string>
-    <string name="settings_vita3k_license">Licence původního Vita3K</string>
-    <string name="settings_vita3k_license_desc">Přečíst původní licenci GNU GPL verze 2.0 nebo novější.</string>
     <string name="settings_core_upstream_version">Verze původního jádra</string>
 
     <string name="settings_cover_art_style">Styl přebalu</string>

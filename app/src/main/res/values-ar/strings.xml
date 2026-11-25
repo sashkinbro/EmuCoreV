@@ -156,10 +156,10 @@
     <string name="detail_compatibility_title_id_label">معرف العنوان المطابق</string>
     <string name="detail_compatibility_known_serials">معرفات العناوين المعروفة</string>
     <string name="detail_compatibility_updated">تم التحديث</string>
-    <string name="detail_compatibility_unavailable">قاعدة بيانات التوافق لـ Vita3K غير متوفرة في الوقت الحالي.</string>
+    <string name="detail_compatibility_unavailable">قاعدة بيانات التوافق لـ ECV غير متوفرة في الوقت الحالي.</string>
     <string name="detail_compatibility_unmapped">إدخال الكتالوج هذا لا يحتوي على معرف عنوان مطابق في الكتالوج المحلي بعد.</string>
-    <string name="detail_compatibility_missing_entry">لا يمتلك Vita3K حالياً إدخال توافق لمعرفات العناوين هذه.</string>
-    <string name="detail_compatibility_source_note">تستند بيانات التوافق إلى قائمة Vita3K. مشكلة رقم %1$d.</string>
+    <string name="detail_compatibility_missing_entry">لا يمتلك ECV حالياً إدخال توافق لمعرفات العناوين هذه.</string>
+    <string name="detail_compatibility_source_note">تستند بيانات التوافق إلى قائمة ECV. مشكلة رقم %1$d.</string>
     <string name="detail_show_more">عرض المزيد</string>
     <string name="detail_show_less">عرض أقل</string>
     <string name="detail_screenshot_saved">تم حفظ لقطة الشاشة</string>
@@ -502,7 +502,7 @@
     <string name="settings_about_emucorev">حول EmuCoreV</string>
     <string name="settings_about_version">إصدار التطبيق</string>
     <string name="settings_about_version_value">الإصدار %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV هو محاكي PS Vita لنظام Android يعمل بنواة ECV. تعتمد ECV على نواة Vita3K، وتواصل EmuCore تطويرها بنشاط بإصلاحاتها وتحسيناتها الخاصة.</string>
+    <string name="settings_about_body_extended">EmuCoreV هو محاكي PS Vita لنظام Android يعمل بنواة ECV. تواصل EmuCore تطوير ECV بنشاط بإصلاحاتها وتحسيناتها الخاصة.</string>
     <string name="settings_about_community_title">المجتمع والدعم</string>
     <string name="settings_about_repository">مستودع EmuCoreV</string>
     <string name="settings_about_repository_desc">عرض الكود المصدري، الإبلاغ عن المشاكل، ومتابعة التطوير على GitHub.</string>
@@ -511,15 +511,12 @@
     <string name="settings_about_support">دعم EmuCoreV</string>
     <string name="settings_about_support_desc">ساعد في استمرار التطوير من خلال عضوية Patreon.</string>
     <string name="settings_emulation_core">نواة المحاكاة</string>
-    <string name="settings_based_on_vita3k">تعتمد ECV على نواة Vita3K، وتواصل EmuCore تطويرها بنشاط بإصلاحاتها وتحسيناتها الخاصة.</string>
     <string name="settings_developer">المطور</string>
     <string name="settings_created_by_sbro">تم الإنشاء بواسطة Sashkin Apps</string>
     <string name="settings_play_store_profile">ملف متجر Play</string>
     <string name="settings_play_store_profile_desc">شاهد المزيد من تطبيقات Android من المطور.</string>
     <string name="settings_core_source_code">الكود المصدري للنواة</string>
-    <string name="settings_core_source_description">يستخدم EmuCoreV واجهة Android الخاصة به. تعتمد ECV على نواة Vita3K، وتواصل EmuCore تطويرها بنشاط بإصلاحاتها وتحسيناتها الخاصة.</string>
-    <string name="settings_open_github">فتح GitHub</string>
-    <string name="settings_vita3k_repository_desc">فتح مستودع مشروع Vita3K الأساسي.</string>
+    <string name="settings_core_source_description">يستخدم EmuCoreV واجهة Android الخاصة به. تواصل EmuCore تطوير ECV بنشاط بإصلاحاتها وتحسيناتها الخاصة.</string>
     <string name="settings_updates_checking_title">جاري التحقق من التحديثات</string>
     <string name="settings_updates_available_title">تحديث متاح</string>
     <string name="settings_updates_current_title">أنت على اطلاع دائم</string>
@@ -1609,8 +1606,6 @@
     <string name="library_view_list">عرض كقائمة</string>
     <string name="settings_ecv_source">الشيفرة المصدرية لـ ECV</string>
     <string name="settings_ecv_source_desc">اعرض مصدر نواة ECV المعدّلة وتطبيق EmuCoreV على GitHub.</string>
-    <string name="settings_vita3k_license">ترخيص Vita3K الأصلي</string>
-    <string name="settings_vita3k_license_desc">اقرأ ترخيص المشروع الأصلي GNU GPL بالإصدار 2.0 أو أحدث.</string>
     <string name="settings_core_upstream_version">إصدار النواة الأصلية</string>
 
     <string name="settings_cover_art_style">نمط الغلاف</string>

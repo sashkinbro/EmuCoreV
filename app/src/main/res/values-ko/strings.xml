@@ -190,10 +190,10 @@
     <string name="detail_compatibility_title_id_label">일치하는 타이틀 ID</string>
     <string name="detail_compatibility_known_serials">알려진 타이틀 ID</string>
     <string name="detail_compatibility_updated">업데이트됨</string>
-    <string name="detail_compatibility_unavailable">현재 Vita3K 호환성 데이터베이스를 사용할 수 없습니다.</string>
+    <string name="detail_compatibility_unavailable">현재 ECV 호환성 데이터베이스를 사용할 수 없습니다.</string>
     <string name="detail_compatibility_unmapped">이 카탈로그 항목은 아직 로컬 카탈로그에 매핑된 타이틀 ID가 없습니다.</string>
-    <string name="detail_compatibility_missing_entry">Vita3K에는 현재 이 타이틀 ID에 대한 호환성 항목이 없습니다.</string>
-    <string name="detail_compatibility_source_note">호환성 데이터는 Vita3K 목록을 기반으로 합니다. 문제 #%1$d.</string>
+    <string name="detail_compatibility_missing_entry">ECV에는 현재 이 타이틀 ID에 대한 호환성 항목이 없습니다.</string>
+    <string name="detail_compatibility_source_note">호환성 데이터는 ECV 목록을 기반으로 합니다. 문제 #%1$d.</string>
     <string name="detail_show_more">더 보기</string>
     <string name="detail_show_less">접기</string>
     <string name="detail_screenshot_saved">스크린샷 저장됨</string>
@@ -629,7 +629,7 @@
     <string name="settings_about_emucorev">EmuCoreV 정보</string>
     <string name="settings_about_version">앱 버전</string>
     <string name="settings_about_version_value">버전 %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV는 ECV 코어를 사용하는 Android용 PS Vita 에뮬레이터입니다. ECV는 Vita3K 코어를 기반으로 하며, EmuCore가 자체 수정 및 개선 사항을 추가하며 활발하게 개발을 이어가고 있습니다.</string>
+    <string name="settings_about_body_extended">EmuCoreV는 ECV 코어를 사용하는 Android용 PS Vita 에뮬레이터입니다. ECV는 EmuCore가 자체 수정 및 개선 사항을 추가하며 활발하게 개발하고 있습니다.</string>
     <string name="settings_about_community_title">커뮤니티 및 지원</string>
     <string name="settings_about_website">공식 웹사이트</string>
     <string name="settings_about_website_desc">다운로드, 뉴스, 프로젝트 링크를 보려면 EmuCoreV 웹사이트를 여세요.</string>
@@ -640,15 +640,12 @@
     <string name="settings_about_support">EmuCoreV 후원</string>
     <string name="settings_about_support_desc">Patreon 멤버십을 통해 개발이 계속될 수 있도록 도와주세요.</string>
     <string name="settings_emulation_core">에뮬레이션 코어</string>
-    <string name="settings_based_on_vita3k">ECV는 Vita3K 코어를 기반으로 하며, EmuCore가 자체 수정 및 개선 사항을 추가하며 활발하게 개발을 이어가고 있습니다.</string>
     <string name="settings_developer">개발자</string>
     <string name="settings_created_by_sbro">Sashkin Apps 제작</string>
     <string name="settings_play_store_profile">Play Store 프로필</string>
     <string name="settings_play_store_profile_desc">개발자의 다른 Android 앱을 확인하세요.</string>
     <string name="settings_core_source_code">코어 소스 코드</string>
-    <string name="settings_core_source_description">EmuCoreV는 자체 Android 인터페이스를 사용합니다. ECV는 Vita3K 코어를 기반으로 하며, EmuCore가 자체 수정 및 개선 사항을 추가하며 활발하게 개발을 이어가고 있습니다.</string>
-    <string name="settings_open_github">GitHub 열기</string>
-    <string name="settings_vita3k_repository_desc">업스트림 Vita3K 프로젝트 저장소를 엽니다.</string>
+    <string name="settings_core_source_description">EmuCoreV는 자체 Android 인터페이스를 사용합니다. ECV는 EmuCore가 자체 수정 및 개선 사항을 추가하며 활발하게 개발하고 있습니다.</string>
     <string name="settings_updates_checking_title">업데이트 확인 중</string>
     <string name="settings_updates_available_title">업데이트 있음</string>
     <string name="settings_updates_current_title">최신 상태입니다</string>
@@ -1604,8 +1601,6 @@
     <string name="library_view_list">목록으로 보기</string>
     <string name="settings_ecv_source">ECV 소스 코드</string>
     <string name="settings_ecv_source_desc">수정된 ECV 코어와 EmuCoreV 앱의 소스 코드를 GitHub에서 확인하세요.</string>
-    <string name="settings_vita3k_license">Vita3K 원본 라이선스</string>
-    <string name="settings_vita3k_license_desc">원본 GNU GPL 버전 2.0 이상 라이선스를 확인하세요.</string>
     <string name="settings_core_upstream_version">원본 코어 버전</string>
 
     <string name="settings_cover_art_style">커버 스타일</string>

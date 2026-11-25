@@ -5,7 +5,7 @@ import com.sbro.emucorev.BuildConfig
 import com.sbro.emucorev.data.PerformanceStatsPreferences
 import java.io.File
 
-// Defaults follow upstream Vita3K unless EmuCoreV needs a mobile-safe runtime
+// Defaults follow stock ECV unless EmuCoreV needs a mobile-safe runtime
 // override in its own layer. The vanilla core stays untouched.
 data class VitaCoreConfig(
     val validationLayer: Boolean = false,
@@ -127,7 +127,7 @@ data class VitaCoreConfig(
 
 class VitaCoreConfigRepository(private val context: Context) {
 
-    // Used to backup EmuCoreV UI settings that get dropped when native Vita3K rewrites config.yml
+    // Used to backup EmuCoreV UI settings that get dropped when native ECV rewrites config.yml
     private val prefs = context.getSharedPreferences("emucorev_ui_config", Context.MODE_PRIVATE)
 
     private val persistedKeys = setOf(
@@ -232,7 +232,7 @@ class VitaCoreConfigRepository(private val context: Context) {
     fun load(): VitaCoreConfig {
         val defaults = defaultConfig()
         val fileValues = readKeyValues()
-        // Native Vita3K drops unknown keys (like touch-haptics) when saving config.yml.
+        // Native ECV drops unknown keys (like touch-haptics) when saving config.yml.
         // We restore them from prefs so the user's UI settings don't reset to defaults.
         val values = mutableMapOf<String, String>()
         prefs.all.forEach { (k, v) ->
@@ -340,7 +340,7 @@ class VitaCoreConfigRepository(private val context: Context) {
     fun ensureDefaultsPersisted(): VitaCoreConfig {
         migrateLegacyConfigIfNeeded()
         val existingValues = readKeyValues()
-        // Native Vita3K rewrites config.yml at startup and intentionally drops
+        // Native ECV rewrites config.yml at startup and intentionally drops
         // EmuCoreV-only keys. Keep the schema marker in the preference mirror as
         // the durable source so migrations run once per app upgrade, not once per
         // process restart.
@@ -365,7 +365,7 @@ class VitaCoreConfigRepository(private val context: Context) {
     private fun applyMigrations(loaded: VitaCoreConfig, schemaOutdated: Boolean): VitaCoreConfig {
         if (!schemaOutdated) return loaded
         // Old EmuCoreV builds shipped non-upstream defaults that caused frozen
-        // launches and weaker CPU scheduling. Snap these back to vanilla Vita3K
+        // launches and weaker CPU scheduling. Snap these back to stock ECV
         // values whenever a stale config.yml is detected.
         // NOTE: User-facing preferences (touchHaptics, touchHapticsPreset,
         // touchHapticsStrength, gamepadVibration, etc.) are intentionally NOT
@@ -481,7 +481,7 @@ class VitaCoreConfigRepository(private val context: Context) {
         dropEmptyUpstreamSequenceValues(values)
 
         val content = buildString {
-            appendLine("# EmuCoreV overrides for the Vita3K core")
+            appendLine("# EmuCoreV overrides for the ECV core")
             values.toSortedMap().forEach { (key, value) ->
                 appendLine("$key: ${formatYamlScalar(value)}")
             }
@@ -649,7 +649,7 @@ class VitaCoreConfigRepository(private val context: Context) {
     private companion object {
         private val LEGACY_STATISTICS_KEYS = setOf("performance-overlay", "performance-overlay-detail", "performance-overlay-position")
         private val CONFIG_IO_LOCK = Any()
-        // 0 = TRACE (upstream Vita3K default). EmuCoreV keeps debug gameplay at
+        // 0 = TRACE (stock ECV default). EmuCoreV keeps debug gameplay at
         // CRITICAL so logcat/file flushing does not make debug builds untestable;
         // the Settings diagnostics toggles opt into DEBUG when needed.
         private const val DIAGNOSTIC_LOG_LEVEL = 1

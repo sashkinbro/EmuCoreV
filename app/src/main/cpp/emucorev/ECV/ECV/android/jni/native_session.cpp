@@ -68,7 +68,7 @@ Java_com_sbro_emucorev_core_input_RearTouchNative_setCamerasSuspended(JNIEnv *, 
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_setInputIntercepted(JNIEnv *, jclass, jboolean intercepted) {
+ECV_NativeBridge_NativeLib_setInputIntercepted(JNIEnv *, jclass, jboolean intercepted) {
     auto *controller = get_app_session_controller();
     if (!controller || !controller->is_running())
         return JNI_FALSE;
@@ -77,7 +77,7 @@ Java_org_vita3k_emulator_NativeLib_setInputIntercepted(JNIEnv *, jclass, jboolea
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_setPauseReasonEnabled(JNIEnv *, jclass, jint reason_mask, jboolean enabled) {
+ECV_NativeBridge_NativeLib_setPauseReasonEnabled(JNIEnv *, jclass, jint reason_mask, jboolean enabled) {
     auto *controller = get_app_session_controller();
     const auto reason = to_pause_reason(reason_mask);
     if (!controller || reason == app::AppSessionPauseReason::None || !controller->is_running())
@@ -87,13 +87,13 @@ Java_org_vita3k_emulator_NativeLib_setPauseReasonEnabled(JNIEnv *, jclass, jint 
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_isAppRunning(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_isAppRunning(JNIEnv *, jclass) {
     auto *controller = get_app_session_controller();
     return controller && controller->has_active_session() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_Emulator_setNativeDisplayRotation(JNIEnv *, jobject, jint rotation) {
+ECV_NativeBridge_Emulator_setNativeDisplayRotation(JNIEnv *, jobject, jint rotation) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return;
@@ -102,7 +102,7 @@ Java_org_vita3k_emulator_Emulator_setNativeDisplayRotation(JNIEnv *, jobject, ji
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_requestAppQuit(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_requestAppQuit(JNIEnv *, jclass) {
     auto *controller = get_app_session_controller();
     if (!controller || !controller->has_active_session())
         return JNI_FALSE;
@@ -113,7 +113,7 @@ Java_org_vita3k_emulator_NativeLib_requestAppQuit(JNIEnv *, jclass) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_requestAppRelaunch(JNIEnv *env, jclass, jstring title_id_str,
+ECV_NativeBridge_NativeLib_requestAppRelaunch(JNIEnv *env, jclass, jstring title_id_str,
     jstring self_path_str, jobjectArray args_array, jboolean load_exec_reason) {
     auto *emuenv = get_emuenv();
     auto *controller = get_app_session_controller();
@@ -138,7 +138,7 @@ Java_org_vita3k_emulator_NativeLib_requestAppRelaunch(JNIEnv *env, jclass, jstri
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_isAppPaused(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_isAppPaused(JNIEnv *, jclass) {
     auto *controller = get_app_session_controller();
     if (!controller || !controller->is_running())
         return JNI_FALSE;
@@ -147,7 +147,7 @@ Java_org_vita3k_emulator_NativeLib_isAppPaused(JNIEnv *, jclass) {
 }
 
 JNIEXPORT jstring JNICALL
-Java_org_vita3k_emulator_NativeLib_getRunningAppTitle(JNIEnv *env, jclass) {
+ECV_NativeBridge_NativeLib_getRunningAppTitle(JNIEnv *env, jclass) {
     auto *emuenv = get_emuenv();
     auto *controller = get_app_session_controller();
     if (!emuenv || !controller || !controller->is_running())
@@ -157,7 +157,7 @@ Java_org_vita3k_emulator_NativeLib_getRunningAppTitle(JNIEnv *env, jclass) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_isImeActive(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_isImeActive(JNIEnv *, jclass) {
     auto *emuenv = get_emuenv();
     auto *controller = get_app_session_controller();
     if (!emuenv || !controller || !controller->is_running())
@@ -167,7 +167,7 @@ Java_org_vita3k_emulator_NativeLib_isImeActive(JNIEnv *, jclass) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_submitIme(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_submitIme(JNIEnv *, jclass) {
     auto *emuenv = get_emuenv();
     auto *controller = get_app_session_controller();
     if (!emuenv || !controller || !controller->is_running())
@@ -180,7 +180,7 @@ Java_org_vita3k_emulator_NativeLib_submitIme(JNIEnv *, jclass) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_dismissIme(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_dismissIme(JNIEnv *, jclass) {
     auto *emuenv = get_emuenv();
     auto *controller = get_app_session_controller();
     if (!emuenv || !controller || !controller->is_running())

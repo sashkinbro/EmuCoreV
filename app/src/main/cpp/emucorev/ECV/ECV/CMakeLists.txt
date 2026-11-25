@@ -8,6 +8,13 @@ set(EMUCOREV_APP_NAME "EmuCoreV")
 set(EMUCOREV_APP_VERSION "${EMUCOREV_VERSION_MAJOR}.${EMUCOREV_VERSION_MINOR}")
 set(EMUCOREV_CORE_VERSION "ECV ${EMUCOREV_APP_VERSION}")
 set(EMUCOREV_UPSTREAM_VERSION "Vita3K ${VITA3K_APP_VERSION}")
+if(ANDROID)
+	# Android has no consumer of the upstream version string and uses its own storage paths;
+	# keep the origin out of the shipped library (it stays credited in README.md and licence headers).
+	set(EMUCOREV_UPSTREAM_VERSION "")
+	set(VITA3K_ORG_NAME "EmuCoreV")
+	set(VITA3K_APP_NAME "ECV")
+endif()
 
 execute_process(
 	COMMAND git rev-list HEAD --count

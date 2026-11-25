@@ -83,7 +83,7 @@ void update_presence(const std::string &state, const std::string &details, bool 
         activity.SetDetails(details.c_str());
         activity.SetState(state.c_str());
         activity.GetAssets().SetLargeImage("vita3k-logo");
-        activity.GetAssets().SetLargeText("EmuCoreV (ECV), based on Vita3K");
+        activity.GetAssets().SetLargeText("EmuCoreV (ECV)");
         activity.SetType(discord::ActivityType::Playing);
         if (reset_timer) {
             activity.GetTimestamps().SetStart(time(nullptr));

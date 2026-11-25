@@ -25,7 +25,7 @@
 extern "C" {
 
 JNIEXPORT jobjectArray JNICALL
-Java_org_vita3k_emulator_NativeLib_getUsers(JNIEnv *env, jclass) {
+ECV_NativeBridge_NativeLib_getUsers(JNIEnv *env, jclass) {
     jclass user_class = env->FindClass("org/vita3k/emulator/data/NativeUser");
     if (!user_class)
         return nullptr;
@@ -59,7 +59,7 @@ Java_org_vita3k_emulator_NativeLib_getUsers(JNIEnv *env, jclass) {
 }
 
 JNIEXPORT jstring JNICALL
-Java_org_vita3k_emulator_NativeLib_createUser(JNIEnv *env, jclass, jstring name_str) {
+ECV_NativeBridge_NativeLib_createUser(JNIEnv *env, jclass, jstring name_str) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return env->NewStringUTF("");
@@ -81,7 +81,7 @@ Java_org_vita3k_emulator_NativeLib_createUser(JNIEnv *env, jclass, jstring name_
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_activateUser(JNIEnv *env, jclass, jstring user_id_str) {
+ECV_NativeBridge_NativeLib_activateUser(JNIEnv *env, jclass, jstring user_id_str) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return JNI_FALSE;
@@ -96,7 +96,7 @@ Java_org_vita3k_emulator_NativeLib_activateUser(JNIEnv *env, jclass, jstring use
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_deleteUser(JNIEnv *env, jclass, jstring user_id_str) {
+ECV_NativeBridge_NativeLib_deleteUser(JNIEnv *env, jclass, jstring user_id_str) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return JNI_FALSE;

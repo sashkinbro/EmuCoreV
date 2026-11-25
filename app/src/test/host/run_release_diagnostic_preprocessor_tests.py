@@ -30,7 +30,7 @@ cases = {
     core + 'kernel/src/load_self.cpp': ['if (kernel.debugger.dump_elfs)', 'dump_elf.data()'],
     core + 'kernel/src/thread.cpp': ['is_probe(', 'probe_step_mutex', 'if (kernel.debugger.wait_for_debugger)'],
     core + 'android/jni/native_config.cpp': ['debugger.dump_elfs =', 'debugger.log_imports =', 'debugger.log_exports ='],
-    core + 'renderer/src/vulkan/renderer.cpp': ['VITA3K_SYNC_VALIDATION', 'debug_util_callback', 'debug_report_callback', 'vk::enumerateInstanceLayerProperties()'],
+    core + 'renderer/src/vulkan/renderer.cpp': ['ECV_SYNC_VALIDATION', 'debug_util_callback', 'debug_report_callback', 'vk::enumerateInstanceLayerProperties()'],
     core + 'display/src/display.cpp': ['log_thread_hang_dump()', 'last_dumped_setframe', 'never_flip_redumped', 'next_forced_dump_vblank'],
     core + 'shader/src/spirv_recompiler.cpp': ['spirv_disasm_print(spirv, &spirv_dump);', 'std::ofstream spirv_dump', 'dumper("dsm"', 'struct DisassemblyScope'],
 }

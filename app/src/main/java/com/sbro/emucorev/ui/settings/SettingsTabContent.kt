@@ -109,8 +109,6 @@ private const val EmuCoreWebsiteUrl = "https://emucorev.web.app"
 private const val EmuCoreDiscordUrl = "https://discord.gg/c5EBeNRpz2"
 private const val EmuCoreSupportUrl = "https://www.patreon.com/c/emucore/membership"
 private const val SashkinAppsPlayStoreUrl = "https://play.google.com/store/apps/dev?id=7136622298887775989"
-private const val Vita3KRepositoryUrl = "https://github.com/Vita3K/Vita3K"
-private const val Vita3KLicenseUrl = "https://github.com/Vita3K/Vita3K/blob/master/COPYING.txt"
 private const val PrivacyPolicyUrl = "https://sites.google.com/view/privacy-policy-for-emucorev/%D0%B3%D0%BE%D0%BB%D0%BE%D0%B2%D0%BD%D0%B0-%D1%81%D1%82%D0%BE%D1%80%D1%96%D0%BD%D0%BA%D0%B0"
 
 private data class VitaSystemLanguageOption(
@@ -1370,22 +1368,10 @@ private fun AboutTab(onOpenDiscord: () -> Unit) {
                 modifier = Modifier.padding(horizontal = SettingsSectionRowPadding)
             )
             LinkItem(
-                icon = Icons.Rounded.Link,
-                title = stringResource(R.string.settings_open_github),
-                subtitle = stringResource(R.string.settings_vita3k_repository_desc),
-                onClick = { uriHandler.openUri(Vita3KRepositoryUrl) }
-            )
-            LinkItem(
                 icon = Icons.Rounded.Code,
                 title = stringResource(R.string.settings_ecv_source),
                 subtitle = stringResource(R.string.settings_ecv_source_desc),
                 onClick = { uriHandler.openUri(EmuCoreRepositoryUrl) }
-            )
-            LinkItem(
-                icon = Icons.Rounded.Link,
-                title = stringResource(R.string.settings_vita3k_license),
-                subtitle = stringResource(R.string.settings_vita3k_license_desc),
-                onClick = { uriHandler.openUri(Vita3KLicenseUrl) }
             )
         }
     }

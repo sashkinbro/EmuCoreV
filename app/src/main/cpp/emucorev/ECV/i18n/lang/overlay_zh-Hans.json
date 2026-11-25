@@ -102,6 +102,6 @@
     "message": "已获得奖杯！"
   },
   "message.load_app_failed": {
-    "message": "无法读取“{}”，\n请检查vita3k.log查看控制台输出的详细信息。\n1、您是否安装了固件？\n2、重新提取您已拥有的PS Vita应用程序/游戏，并在Vita3K中安装。\n3、如果您想要安装/运行Vitamin是不支持的。"
+    "message": "无法读取“{}”，\n请检查ecv.log查看控制台输出的详细信息。\n1、您是否安装了固件？\n2、重新提取您已拥有的PS Vita应用程序/游戏，并在ECV中安装。\n3、如果您想要安装/运行Vitamin是不支持的。"
   }
 }

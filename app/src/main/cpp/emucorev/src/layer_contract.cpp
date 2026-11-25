@@ -4,8 +4,8 @@ namespace emucorev {
 
 const char *native_layer_name(NativeLayer layer) {
     switch (layer) {
-    case NativeLayer::Vita3KCore:
-        return "vita3k-core";
+    case NativeLayer::EcvCore:
+        return "ecv-core";
     case NativeLayer::CoreAdapter:
         return "emucorev-core-adapter";
     case NativeLayer::AndroidBridge:

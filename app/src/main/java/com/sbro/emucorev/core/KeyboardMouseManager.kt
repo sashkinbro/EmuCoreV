@@ -30,7 +30,7 @@ import kotlin.time.Duration.Companion.milliseconds
 /**
  * Keyboard and mouse input is deliberately isolated from the gamepad and touch
  * paths. The manager keeps one merged snapshot per emulated pad and injects it
- * through the native bridge, where Vita3K merges it with physical controllers
+ * through the native bridge, where ECV merges it with physical controllers
  * on the controller read path. Releasing one source therefore never clears a
  * button another source still holds.
  */

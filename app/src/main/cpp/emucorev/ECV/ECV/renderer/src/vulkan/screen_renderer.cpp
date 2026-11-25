@@ -52,7 +52,7 @@
 static std::atomic<bool> has_surface{ false };
 
 extern "C" JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_EmuSurface_setSurfaceStatus(JNIEnv *, jobject, jboolean surface_present) {
+ECV_NativeBridge_EmuSurface_setSurfaceStatus(JNIEnv *, jobject, jboolean surface_present) {
     has_surface.store(surface_present, std::memory_order_release);
 }
 #endif

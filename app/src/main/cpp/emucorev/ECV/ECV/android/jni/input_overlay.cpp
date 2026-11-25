@@ -97,22 +97,22 @@ bool overlay_virtual_controller_attached() {
 extern "C" {
 
 JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_overlay_InputOverlay_attachController(JNIEnv *env, jobject thiz) {
+ECV_NativeBridge_overlay_InputOverlay_attachController(JNIEnv *env, jobject thiz) {
     attach_overlay_virtual_controller();
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_overlay_InputOverlay_isControllerAttached(JNIEnv *env, jobject thiz) {
+ECV_NativeBridge_overlay_InputOverlay_isControllerAttached(JNIEnv *env, jobject thiz) {
     return overlay_virtual_controller_attached() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_overlay_InputOverlay_detachController(JNIEnv *env, jobject thiz) {
+ECV_NativeBridge_overlay_InputOverlay_detachController(JNIEnv *env, jobject thiz) {
     detach_overlay_virtual_controller();
 }
 
 JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_overlay_InputOverlay_setAxis(JNIEnv *env, jobject thiz, jint axis, jshort value) {
+ECV_NativeBridge_overlay_InputOverlay_setAxis(JNIEnv *env, jobject thiz, jint axis, jshort value) {
     if (!virtual_joystick)
         return;
 
@@ -120,7 +120,7 @@ Java_org_vita3k_emulator_overlay_InputOverlay_setAxis(JNIEnv *env, jobject thiz,
 }
 
 JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_overlay_InputOverlay_setButton(JNIEnv *env, jobject thiz, jint button, jboolean value) {
+ECV_NativeBridge_overlay_InputOverlay_setButton(JNIEnv *env, jobject thiz, jint button, jboolean value) {
     if (!virtual_joystick)
         return;
 
@@ -132,7 +132,7 @@ Java_org_vita3k_emulator_overlay_InputOverlay_setButton(JNIEnv *env, jobject thi
 }
 
 JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_overlay_InputOverlay_setTouchState(JNIEnv *env, jobject thiz, jint mode) {
+ECV_NativeBridge_overlay_InputOverlay_setTouchState(JNIEnv *env, jobject thiz, jint mode) {
     const std::lock_guard input_operation(emucorev::savestate::save_state_operation_mutex());
     auto *emuenv = get_emuenv();
     if (!emuenv)

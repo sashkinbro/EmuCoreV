@@ -1101,7 +1101,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     private external fun notifyRecordAudioGranted()
 
-    /** Apply runtime-safe menu settings to the active Vita3K session. */
+    /** Apply runtime-safe menu settings to the active ECV session. */
     external fun applyRuntimeCoreSettings(
         vSync: Boolean,
         stretchDisplayArea: Boolean,
@@ -1136,7 +1136,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
      */
     external fun requestScreenshot(): String?
 
-    /** Pause/resume the active Vita3K app session through the upstream session controller. */
+    /** Pause/resume the active ECV app session through the upstream session controller. */
     external fun setAppSessionMenuPaused(paused: Boolean): Boolean
 
     /** Native IME state used to route the Android keyboard Back action. */
@@ -1145,7 +1145,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     /** Requests the Vita IME's Close/Cancel action. */
     external fun dismissNativeIme(): Boolean
 
-    /** Best-effort runtime title for the active Vita3K app session. */
+    /** Best-effort runtime title for the active ECV app session. */
     external fun getRunningGameTitle(): String
 
     fun setMenuPaused(paused: Boolean) {

@@ -175,7 +175,7 @@ jint to_firmware_state_mask(const app::FirmwareState &state) {
 extern "C" {
 
 JNIEXPORT jboolean JNICALL
-Vita3K_initWithPaths(JNIEnv *env, jstring storage_path_str, jstring vita_path_str) {
+ECV_initWithPaths(JNIEnv *env, jstring storage_path_str, jstring vita_path_str) {
     auto &session = android_session_state();
 
     if (session.emuenv) {
@@ -199,11 +199,11 @@ Vita3K_initWithPaths(JNIEnv *env, jstring storage_path_str, jstring vita_path_st
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_prepareFrontend(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_prepareFrontend(JNIEnv *, jclass) {
     return prepare_frontend_runtime() ? JNI_TRUE : JNI_FALSE;
 }
 JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_NativeLib_onTrimMemory(JNIEnv *, jclass, jint level) {
+ECV_NativeBridge_NativeLib_onTrimMemory(JNIEnv *, jclass, jint level) {
     // Android is warning it may reclaim memory and/or kill us
     LOG_WARN("[ANDROID MEMORY] onTrimMemory level={} - OS under memory pressure, an OOM kill may follow", static_cast<int>(level));
     logging::flush();
@@ -222,30 +222,30 @@ Java_org_vita3k_emulator_NativeLib_onTrimMemory(JNIEnv *, jclass, jint level) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_init(JNIEnv *env, jclass, jstring storage_path_str) {
+ECV_NativeBridge_NativeLib_init(JNIEnv *env, jclass, jstring storage_path_str) {
     const std::string storage = jstring_to_string(env, storage_path_str);
     const fs::path storage_path = fs::path(storage) / "";
     const std::string vita = (storage_path / "vita" / "").string();
     jstring vita_path_str = env->NewStringUTF(vita.c_str());
     if (!vita_path_str)
         return JNI_FALSE;
-    const jboolean result = Vita3K_initWithPaths(env, storage_path_str, vita_path_str);
+    const jboolean result = ECV_initWithPaths(env, storage_path_str, vita_path_str);
     env->DeleteLocalRef(vita_path_str);
     return result;
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_isInitialized(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_isInitialized(JNIEnv *, jclass) {
     return get_emuenv() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_isOfficialBuild(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_isOfficialBuild(JNIEnv *, jclass) {
     return is_official_build ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_NativeLib_refreshAppsList(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_refreshAppsList(JNIEnv *, jclass) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return;
@@ -254,7 +254,7 @@ Java_org_vita3k_emulator_NativeLib_refreshAppsList(JNIEnv *, jclass) {
 }
 
 JNIEXPORT jint JNICALL
-Java_org_vita3k_emulator_NativeLib_getFirmwareInstallStateMask(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_getFirmwareInstallStateMask(JNIEnv *, jclass) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return 0;
@@ -263,13 +263,13 @@ Java_org_vita3k_emulator_NativeLib_getFirmwareInstallStateMask(JNIEnv *, jclass)
 }
 
 JNIEXPORT jstring JNICALL
-Java_org_vita3k_emulator_NativeLib_getAppVersion(JNIEnv *env, jclass) {
+ECV_NativeBridge_NativeLib_getAppVersion(JNIEnv *env, jclass) {
     const std::string version = format_app_version();
     return env->NewStringUTF(version.c_str());
 }
 
 JNIEXPORT jstring JNICALL
-Java_org_vita3k_emulator_NativeLib_getCompatibilityDatabaseVersion(JNIEnv *env, jclass) {
+ECV_NativeBridge_NativeLib_getCompatibilityDatabaseVersion(JNIEnv *env, jclass) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return env->NewStringUTF("");
@@ -278,7 +278,7 @@ Java_org_vita3k_emulator_NativeLib_getCompatibilityDatabaseVersion(JNIEnv *env, 
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_installCompatibilityDatabase(JNIEnv *env, jclass, jbyteArray zip_bytes, jstring version_str) {
+ECV_NativeBridge_NativeLib_installCompatibilityDatabase(JNIEnv *env, jclass, jbyteArray zip_bytes, jstring version_str) {
     auto *emuenv = get_emuenv();
     if (!emuenv || !zip_bytes || !version_str)
         return JNI_FALSE;

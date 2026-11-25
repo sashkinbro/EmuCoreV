@@ -163,7 +163,7 @@ bool extract_custom_driver_archive(const fs::path &archive_path, const fs::path 
 extern "C" {
 
 JNIEXPORT jobjectArray JNICALL
-Java_org_vita3k_emulator_NativeLib_getInstalledCustomDrivers(JNIEnv *env, jclass) {
+ECV_NativeBridge_NativeLib_getInstalledCustomDrivers(JNIEnv *env, jclass) {
     const auto driver_root = get_custom_driver_root(env);
     const auto drivers = driver_root ? list_installed_custom_drivers(*driver_root) : std::vector<std::string>{};
 
@@ -179,7 +179,7 @@ Java_org_vita3k_emulator_NativeLib_getInstalledCustomDrivers(JNIEnv *env, jclass
 }
 
 JNIEXPORT jstring JNICALL
-Java_org_vita3k_emulator_NativeLib_installCustomDriver(JNIEnv *env, jclass, jstring path_str) {
+ECV_NativeBridge_NativeLib_installCustomDriver(JNIEnv *env, jclass, jstring path_str) {
     const auto driver_root = get_custom_driver_root(env);
     if (!driver_root)
         return env->NewStringUTF("");
@@ -227,7 +227,7 @@ Java_org_vita3k_emulator_NativeLib_installCustomDriver(JNIEnv *env, jclass, jstr
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_removeCustomDriver(JNIEnv *env, jclass, jstring driver_name_str) {
+ECV_NativeBridge_NativeLib_removeCustomDriver(JNIEnv *env, jclass, jstring driver_name_str) {
     const auto driver_root = get_custom_driver_root(env);
     if (!driver_root)
         return JNI_FALSE;

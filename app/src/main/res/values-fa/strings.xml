@@ -190,10 +190,10 @@
     <string name="detail_compatibility_title_id_label">شناسه عنوان منطبق</string>
     <string name="detail_compatibility_known_serials">شناسه‌های عنوان شناخته‌شده</string>
     <string name="detail_compatibility_updated">به‌روزرسانی شده</string>
-    <string name="detail_compatibility_unavailable">پایگاه داده سازگاری Vita3K در حال حاضر در دسترس نیست.</string>
+    <string name="detail_compatibility_unavailable">پایگاه داده سازگاری ECV در حال حاضر در دسترس نیست.</string>
     <string name="detail_compatibility_unmapped">این مدخل فهرست هنوز شناسه عنوان نگاشت‌شده‌ای در فهرست محلی ندارد.</string>
-    <string name="detail_compatibility_missing_entry">Vita3K در حال حاضر مدخلی برای سازگاری این شناسه‌های عنوان ندارد.</string>
-    <string name="detail_compatibility_source_note">داده‌های سازگاری بر پایه فهرست Vita3K است. مشکل #%1$d.</string>
+    <string name="detail_compatibility_missing_entry">ECV در حال حاضر مدخلی برای سازگاری این شناسه‌های عنوان ندارد.</string>
+    <string name="detail_compatibility_source_note">داده‌های سازگاری بر پایه فهرست ECV است. مشکل #%1$d.</string>
     <string name="detail_show_more">نمایش بیشتر</string>
     <string name="detail_show_less">نمایش کمتر</string>
     <string name="detail_screenshot_saved">تصویر ذخیره شد</string>
@@ -629,7 +629,7 @@
     <string name="settings_about_emucorev">درباره EmuCoreV</string>
     <string name="settings_about_version">نسخه برنامه</string>
     <string name="settings_about_version_value">نسخه %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV یک شبیه‌ساز PS Vita برای Android با هسته ECV است. ECV بر پایه هسته Vita3K است و EmuCore فعالانه توسعه آن را با رفع اشکال‌ها و بهبودهای اختصاصی خود ادامه می‌دهد.</string>
+    <string name="settings_about_body_extended">EmuCoreV یک شبیه‌ساز PS Vita برای Android با هسته ECV است. EmuCore فعالانه ECV را با رفع اشکال‌ها و بهبودهای اختصاصی خود توسعه می‌دهد.</string>
     <string name="settings_about_community_title">انجمن و پشتیبانی</string>
     <string name="settings_about_website">وب‌سایت رسمی</string>
     <string name="settings_about_website_desc">وب‌سایت EmuCoreV را برای دانلودها، اخبار و پیوندهای پروژه باز کنید.</string>
@@ -640,15 +640,12 @@
     <string name="settings_about_support">حمایت از EmuCoreV</string>
     <string name="settings_about_support_desc">با عضویت در Patreon به ادامه توسعه کمک کنید.</string>
     <string name="settings_emulation_core">هسته شبیه‌سازی</string>
-    <string name="settings_based_on_vita3k">ECV بر پایه هسته Vita3K است و EmuCore فعالانه توسعه آن را با رفع اشکال‌ها و بهبودهای اختصاصی خود ادامه می‌دهد.</string>
     <string name="settings_developer">توسعه‌دهنده</string>
     <string name="settings_created_by_sbro">ساخته‌شده توسط Sashkin Apps</string>
     <string name="settings_play_store_profile">پروفایل فروشگاه Play</string>
     <string name="settings_play_store_profile_desc">برنامه‌های اندرویدی بیشتری از توسعه‌دهنده ببینید.</string>
     <string name="settings_core_source_code">کد منبع هسته</string>
-    <string name="settings_core_source_description">EmuCoreV از رابط Android اختصاصی خود استفاده می‌کند. ECV بر پایه هسته Vita3K است و EmuCore فعالانه توسعه آن را با رفع اشکال‌ها و بهبودهای اختصاصی خود ادامه می‌دهد.</string>
-    <string name="settings_open_github">باز کردن گیت‌هاب</string>
-    <string name="settings_vita3k_repository_desc">مخزن پروژه بالادستی Vita3K را باز کنید.</string>
+    <string name="settings_core_source_description">EmuCoreV از رابط Android اختصاصی خود استفاده می‌کند. EmuCore فعالانه ECV را با رفع اشکال‌ها و بهبودهای اختصاصی خود توسعه می‌دهد.</string>
     <string name="settings_updates_checking_title">بررسی به‌روزرسانی‌ها</string>
     <string name="settings_updates_available_title">به‌روزرسانی در دسترس است</string>
     <string name="settings_updates_current_title">شما به‌روز هستید</string>
@@ -1606,8 +1603,6 @@
     <string name="library_view_list">نمایش به صورت لیست</string>
     <string name="settings_ecv_source">کد منبع ECV</string>
     <string name="settings_ecv_source_desc">کد منبع هسته اصلاح‌شده ECV و برنامه EmuCoreV را در GitHub ببینید.</string>
-    <string name="settings_vita3k_license">مجوز پروژه اصلی Vita3K</string>
-    <string name="settings_vita3k_license_desc">مجوز اصلی GNU GPL نسخه 2.0 یا بالاتر را بخوانید.</string>
     <string name="settings_core_upstream_version">نسخه هسته اصلی</string>
 
     <string name="settings_cover_art_style">سبک کاور</string>

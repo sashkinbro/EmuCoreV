@@ -204,7 +204,7 @@ jobject new_trophy_collection_object(JNIEnv *env, jclass cls, const TrophyCollec
 extern "C" {
 
 JNIEXPORT jobjectArray JNICALL
-Java_org_vita3k_emulator_NativeLib_getTrophyCollections(JNIEnv *env, jclass) {
+ECV_NativeBridge_NativeLib_getTrophyCollections(JNIEnv *env, jclass) {
     jclass collection_class = find_trophy_collection_class(env);
     if (!collection_class)
         return new_empty_trophy_collection_array(env);

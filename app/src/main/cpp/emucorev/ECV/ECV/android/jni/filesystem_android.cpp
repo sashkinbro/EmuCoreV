@@ -48,7 +48,7 @@ static std::atomic<bool> file_dialog_running = false;
 static fs::path dialog_result_path{};
 
 extern "C" JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_Emulator_filedialogReturn(JNIEnv *env, jobject thiz, jstring result_path) {
+ECV_NativeBridge_Emulator_filedialogReturn(JNIEnv *env, jobject thiz, jstring result_path) {
     const char *result_ptr = env->GetStringUTFChars(result_path, nullptr);
     dialog_result_path = fs::path(result_ptr);
     env->ReleaseStringUTFChars(result_path, result_ptr);

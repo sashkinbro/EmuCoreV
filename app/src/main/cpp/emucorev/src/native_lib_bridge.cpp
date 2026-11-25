@@ -13,28 +13,28 @@
 extern "C" {
 
 JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_NativeLib_onTrimMemory(JNIEnv *env, jclass clazz, jint level);
+ECV_NativeBridge_NativeLib_onTrimMemory(JNIEnv *env, jclass clazz, jint level);
 
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_NativeLib_onTrimMemory(JNIEnv *env, jobject, jint level) {
-    Java_org_vita3k_emulator_NativeLib_onTrimMemory(env, nullptr, level);
+    ECV_NativeBridge_NativeLib_onTrimMemory(env, nullptr, level);
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_prepareFrontend(JNIEnv *env, jclass clazz);
+ECV_NativeBridge_NativeLib_prepareFrontend(JNIEnv *env, jclass clazz);
 
 JNIEXPORT jboolean JNICALL
-Vita3K_initWithPaths(JNIEnv *env, jstring runtime_path, jstring vita_path);
+ECV_initWithPaths(JNIEnv *env, jstring runtime_path, jstring vita_path);
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_isInitialized(JNIEnv *env, jclass clazz);
+ECV_NativeBridge_NativeLib_isInitialized(JNIEnv *env, jclass clazz);
 
 JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_NativeLib_refreshAppsList(JNIEnv *env, jclass clazz);
+ECV_NativeBridge_NativeLib_refreshAppsList(JNIEnv *env, jclass clazz);
 
 JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorev_core_NativeLib_prepareFrontend(JNIEnv *env, jobject /*thiz*/) {
-    return Java_org_vita3k_emulator_NativeLib_prepareFrontend(env, nullptr);
+    return ECV_NativeBridge_NativeLib_prepareFrontend(env, nullptr);
 }
 
 JNIEXPORT jboolean JNICALL
@@ -43,17 +43,17 @@ Java_com_sbro_emucorev_core_NativeLib_init(
     jobject /*thiz*/,
     jstring runtime_path,
     jstring vita_path) {
-    return Vita3K_initWithPaths(env, runtime_path, vita_path);
+    return ECV_initWithPaths(env, runtime_path, vita_path);
 }
 
 JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorev_core_NativeLib_isInitialized(JNIEnv *env, jobject /*thiz*/) {
-    return Java_org_vita3k_emulator_NativeLib_isInitialized(env, nullptr);
+    return ECV_NativeBridge_NativeLib_isInitialized(env, nullptr);
 }
 
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_NativeLib_refreshAppsList(JNIEnv *env, jobject /*thiz*/) {
-    Java_org_vita3k_emulator_NativeLib_refreshAppsList(env, nullptr);
+    ECV_NativeBridge_NativeLib_refreshAppsList(env, nullptr);
 }
 
 // Release builds ship native as RelWithDebInfo (Play symbols), where upstream

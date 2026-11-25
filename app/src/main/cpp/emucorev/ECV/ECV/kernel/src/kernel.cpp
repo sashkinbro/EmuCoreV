@@ -540,9 +540,9 @@ void KernelState::log_thread_hang_dump() {
         dump += line + "\n";
     }
 
-    // vita3k.log is truncated on relaunch, so also persist the dump where a restart cannot eat it
+    // ecv.log is truncated on relaunch, so also persist the dump where a restart cannot eat it
     const auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::ofstream hang_file("vita3k_hangdump.log", std::ios::app);
+    std::ofstream hang_file("ecv_hangdump.log", std::ios::app);
     if (hang_file)
         hang_file << "==== " << std::put_time(std::localtime(&now), "%Y-%m-%d %H:%M:%S") << " ====\n"
                   << dump << std::endl;

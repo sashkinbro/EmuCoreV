@@ -96,7 +96,7 @@ EmuCoreV currently targets Android with:
 
 ## Credits
 
-ECV started as a fork of the Vita3K core and is now developed by EmuCore with its own fixes and improvements.
+The ECV core was originally based on Vita3K and is now developed by EmuCore with its own fixes and improvements.
 
 EmuCoreV adds its own Android interface, catalog, installer flow, storage handling, and handheld-focused UX. The ECV name identifies this modified core; upstream contributors retain credit for their work, and existing copyright notices, licenses, and source history are preserved.
 

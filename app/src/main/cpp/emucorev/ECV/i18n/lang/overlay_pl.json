@@ -105,6 +105,6 @@
     "message": "Udało Ci się zdobyć trofeum!"
   },
   "message.load_app_failed": {
-    "message": "Nie udało się wczytać \"{}\".\nSprawdź plik vita3k.log, aby zobaczyć szczegóły na konsoli.\n1. Czy zainstalowałeś oprogramowanie (firmware)?\n2. Zrób ponowny zrzut swojej aplikacji/gry PS Vita i zainstaluj ją na Vita3K.\n3. Instalacja lub uruchamianie Vitamin nie jest wspierane."
+    "message": "Nie udało się wczytać \"{}\".\nSprawdź plik ecv.log, aby zobaczyć szczegóły na konsoli.\n1. Czy zainstalowałeś oprogramowanie (firmware)?\n2. Zrób ponowny zrzut swojej aplikacji/gry PS Vita i zainstaluj ją na ECV.\n3. Instalacja lub uruchamianie Vitamin nie jest wspierane."
   }
 }

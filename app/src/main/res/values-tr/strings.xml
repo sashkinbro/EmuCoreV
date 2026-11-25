@@ -94,10 +94,10 @@
     <string name="detail_compatibility_title_id_label">Eşleşen Title ID</string>
     <string name="detail_compatibility_known_serials">Bilinen Title ID\'leri</string>
     <string name="detail_compatibility_updated">Güncellendi</string>
-    <string name="detail_compatibility_unavailable">Vita3K uyumluluk veritabanı şu anda kullanılamıyor.</string>
+    <string name="detail_compatibility_unavailable">ECV uyumluluk veritabanı şu anda kullanılamıyor.</string>
     <string name="detail_compatibility_unmapped">Bu katalog kaydının henüz yerel katalogda eşleştirilmiş bir Title ID\'si yok.</string>
-    <string name="detail_compatibility_missing_entry">Vita3K\'da şu anda bu Title ID\'leri için bir uyumluluk kaydı bulunmuyor.</string>
-    <string name="detail_compatibility_source_note">Uyumluluk verileri Vita3K listesine dayanmaktadır. Sorun no #%1$d.</string>
+    <string name="detail_compatibility_missing_entry">ECV\'da şu anda bu Title ID\'leri için bir uyumluluk kaydı bulunmuyor.</string>
+    <string name="detail_compatibility_source_note">Uyumluluk verileri ECV listesine dayanmaktadır. Sorun no #%1$d.</string>
     <string name="detail_show_more">Daha fazla göster</string>
     <string name="detail_show_less">Daha az göster</string>
     <string name="detail_screenshot_saved">Ekran görüntüsü kaydedildi</string>
@@ -362,13 +362,11 @@
     <string name="settings_help_check_for_updates">Güncelleme kontrollerini etkin tutar.\n\nEmülatör arayüzünü veya oyun içi sistem görünümünü tercihinize uydurmak istediğinizde kullanın. Ek bilgiye veya görsel değişikliğe ihtiyacınız yoksa varsayılanda bırakın.</string>
     <string name="settings_about_emucorev">EmuCoreV Hakkında</string>
     <string name="settings_emulation_core">Emülasyon Çekirdeği</string>
-    <string name="settings_based_on_vita3k">ECV, Vita3K çekirdeğini temel alır ve EmuCore tarafından kendi düzeltmeleri ve iyileştirmeleriyle aktif olarak geliştirilmeye devam eder.</string>
     <string name="settings_developer">Geliştirici</string>
     <string name="settings_created_by_sbro">Sashkin Apps tarafından oluşturulmuştur</string>
     <string name="settings_play_store_profile">Play Store Profili</string>
     <string name="settings_core_source_code">Çekirdek Kaynak Kodu</string>
-    <string name="settings_core_source_description">EmuCoreV kendi Android arayüzünü kullanır. ECV, Vita3K çekirdeğini temel alır ve EmuCore tarafından kendi düzeltmeleri ve iyileştirmeleriyle aktif olarak geliştirilmeye devam eder.</string>
-    <string name="settings_open_github">GitHub\'ı Aç</string>
+    <string name="settings_core_source_description">EmuCoreV kendi Android arayüzünü kullanır. ECV, EmuCore tarafından kendi düzeltmeleri ve iyileştirmeleriyle aktif olarak geliştirilir.</string>
     <string name="emulator_choose_file">Bir dosya seçin</string>
     <string name="emulator_choose_folder">Bir klasör seçin</string>
     <string name="emulator_installer_apk_missing">Güncelleme paketi bulunamadı.</string>
@@ -540,7 +538,7 @@
     <string name="settings_tab_updates">Güncellemeler</string>
     <string name="settings_about_version">Uygulama sürümü</string>
     <string name="settings_about_version_value">Sürüm %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV, ECV çekirdeğini kullanan, Android için bir PS Vita emülatörüdür. ECV, Vita3K çekirdeğini temel alır ve EmuCore tarafından kendi düzeltmeleri ve iyileştirmeleriyle aktif olarak geliştirilmeye devam eder.</string>
+    <string name="settings_about_body_extended">EmuCoreV, ECV çekirdeğini kullanan, Android için bir PS Vita emülatörüdür. ECV, EmuCore tarafından kendi düzeltmeleri ve iyileştirmeleriyle aktif olarak geliştirilir.</string>
     <string name="settings_about_community_title">Topluluk ve destek</string>
     <string name="settings_about_repository">EmuCoreV deposu</string>
     <string name="settings_about_repository_desc">Kaynak kodunu görüntüleyin, sorunları bildirin ve GitHub\'daki geliştirmeleri takip edin.</string>
@@ -549,7 +547,6 @@
     <string name="settings_about_support">EmuCoreV\'yi Destekleyin</string>
     <string name="settings_about_support_desc">Patreon üyeliği ile geliştirmenin devam etmesine yardımcı olun.</string>
     <string name="settings_play_store_profile_desc">Geliştiricinin diğer Android uygulamalarını görün.</string>
-    <string name="settings_vita3k_repository_desc">Orijinal Vita3K proje deposunu açın.</string>
     <string name="settings_updates_checking_title">Güncellemeler kontrol ediliyor</string>
     <string name="settings_updates_available_title">Güncelleme mevcut</string>
     <string name="settings_updates_current_title">Uygulama güncel</string>
@@ -1605,8 +1602,6 @@
     <string name="library_view_list">Liste olarak göster</string>
     <string name="settings_ecv_source">ECV kaynak kodu</string>
     <string name="settings_ecv_source_desc">Değiştirilmiş ECV çekirdeğinin ve EmuCoreV uygulamasının kaynak kodunu GitHub’da görüntüleyin.</string>
-    <string name="settings_vita3k_license">Vita3K üst proje lisansı</string>
-    <string name="settings_vita3k_license_desc">Üst projenin GNU GPL sürüm 2.0 veya üzeri lisansını okuyun.</string>
     <string name="settings_core_upstream_version">Üst proje çekirdek sürümü</string>
 
     <string name="settings_cover_art_style">Kapak Stili</string>

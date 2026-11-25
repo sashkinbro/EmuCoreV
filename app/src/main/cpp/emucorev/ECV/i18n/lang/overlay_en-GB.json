@@ -105,6 +105,6 @@
     "message": "You have earned a trophy!"
   },
   "message.load_app_failed": {
-    "message": "Failed to load \"{}\".\nCheck vita3k.log to see console output for details.\n1. Have you installed the firmware?\n2. Re-dump your own PS Vita app/game and install it on Vita3K.\n3. If you want to install or boot Vitamin, it is not supported."
+    "message": "Failed to load \"{}\".\nCheck ecv.log to see console output for details.\n1. Have you installed the firmware?\n2. Re-dump your own PS Vita app/game and install it on ECV.\n3. If you want to install or boot Vitamin, it is not supported."
   }
 }

@@ -28,7 +28,7 @@
 extern "C" {
 
 JNIEXPORT jstring JNICALL
-Java_org_vita3k_emulator_NativeLib_installFirmware(JNIEnv *env, jclass, jstring path_str, jobject callback) {
+ECV_NativeBridge_NativeLib_installFirmware(JNIEnv *env, jclass, jstring path_str, jobject callback) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return env->NewStringUTF("");
@@ -52,7 +52,7 @@ Java_org_vita3k_emulator_NativeLib_installFirmware(JNIEnv *env, jclass, jstring 
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_installPkg(JNIEnv *env, jclass, jstring path_str, jstring zrif_str, jobject callback) {
+ECV_NativeBridge_NativeLib_installPkg(JNIEnv *env, jclass, jstring path_str, jstring zrif_str, jobject callback) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return JNI_FALSE;
@@ -77,7 +77,7 @@ Java_org_vita3k_emulator_NativeLib_installPkg(JNIEnv *env, jclass, jstring path_
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_installArchive(JNIEnv *env, jclass, jstring path_str, jobject callback, jboolean force_reinstall) {
+ECV_NativeBridge_NativeLib_installArchive(JNIEnv *env, jclass, jstring path_str, jobject callback, jboolean force_reinstall) {
     const std::string path = jstring_to_string(env, path_str);
     LOG_INFO("installArchive: '{}' force_reinstall={}", path, static_cast<bool>(force_reinstall));
 
@@ -113,7 +113,7 @@ Java_org_vita3k_emulator_NativeLib_installArchive(JNIEnv *env, jclass, jstring p
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_copyLicense(JNIEnv *env, jclass, jstring path_str) {
+ECV_NativeBridge_NativeLib_copyLicense(JNIEnv *env, jclass, jstring path_str) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return JNI_FALSE;
@@ -123,7 +123,7 @@ Java_org_vita3k_emulator_NativeLib_copyLicense(JNIEnv *env, jclass, jstring path
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_createLicense(JNIEnv *env, jclass, jstring zrif_str) {
+ECV_NativeBridge_NativeLib_createLicense(JNIEnv *env, jclass, jstring zrif_str) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return JNI_FALSE;
@@ -133,7 +133,7 @@ Java_org_vita3k_emulator_NativeLib_createLicense(JNIEnv *env, jclass, jstring zr
 }
 
 JNIEXPORT jstring JNICALL
-Java_org_vita3k_emulator_NativeLib_findPkgZrif(JNIEnv *env, jclass, jstring pkg_path_str) {
+ECV_NativeBridge_NativeLib_findPkgZrif(JNIEnv *env, jclass, jstring pkg_path_str) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return env->NewStringUTF("");
@@ -144,7 +144,7 @@ Java_org_vita3k_emulator_NativeLib_findPkgZrif(JNIEnv *env, jclass, jstring pkg_
 }
 
 JNIEXPORT jstring JNICALL
-Java_org_vita3k_emulator_NativeLib_convertRifToZrif(JNIEnv *env, jclass, jstring path_str) {
+ECV_NativeBridge_NativeLib_convertRifToZrif(JNIEnv *env, jclass, jstring path_str) {
     const std::string path = jstring_to_string(env, path_str);
     fs::ifstream binfile(path, std::ios::in | std::ios::binary | std::ios::ate);
     if (!binfile.is_open()) {

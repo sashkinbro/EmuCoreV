@@ -10,7 +10,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.nio.file.LinkOption
 
-/** Reads only the owned ECV cache and supplied bundled data; it has no network or Vita3K fallback. */
+/** Reads only the owned ECV cache and supplied bundled data; it has no network or upstream fallback. */
 class EcvCompatibilityDatasetRepository(
     private val cacheFile: File,
     private val bundledSource: () -> InputStream,

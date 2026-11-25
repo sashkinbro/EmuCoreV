@@ -60,7 +60,7 @@ endif()
 emucorev_filter_vita3k_target(ECV "${VITA3K_VENDOR_DIR}" "${VITA3K_CORE_DIR}")
 
 # Drop the upstream file-dialog JNI from vita3k's shared library: it exports
-# Java_org_vita3k_emulator_Emulator_filedialogReturn, which our Kotlin
+# ECV_NativeBridge_Emulator_filedialogReturn, which our Kotlin
 # Emulator (com.sbro.emucorev.core.vita) never calls. The replacement in
 # host_dialog below owns both the host::dialog::filesystem implementation and
 # our package's JNI symbol.

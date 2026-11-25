@@ -352,7 +352,7 @@ class SaveDataRepository {
 
 /**
  * Recognizes PlayStation Vita archive layouts such as
- * `ux0/user/00/savedata/<save id>/...` so raw console/Vita3K folders can be
+ * `ux0/user/00/savedata/<save id>/...` so raw console/ECV folders can be
  * imported without the user having to rebuild the zip by hand.
  */
 internal object SaveArchiveLayout {

@@ -26,7 +26,7 @@
 extern "C" {
 
 JNIEXPORT jobjectArray JNICALL
-Java_org_vita3k_emulator_NativeLib_getAppListDetailed(JNIEnv *env, jclass) {
+ECV_NativeBridge_NativeLib_getAppListDetailed(JNIEnv *env, jclass) {
     jclass app_info_class = env->FindClass("org/vita3k/emulator/data/NativeAppInfo");
     if (!app_info_class)
         return nullptr;
@@ -91,7 +91,7 @@ Java_org_vita3k_emulator_NativeLib_getAppListDetailed(JNIEnv *env, jclass) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_performAppAction(JNIEnv *env, jclass, jstring title_id_str, jint action_bit) {
+ECV_NativeBridge_NativeLib_performAppAction(JNIEnv *env, jclass, jstring title_id_str, jint action_bit) {
     auto *emuenv = get_emuenv();
     auto *controller = get_app_session_controller();
     if (!emuenv)
@@ -166,7 +166,7 @@ Java_org_vita3k_emulator_NativeLib_performAppAction(JNIEnv *env, jclass, jstring
 }
 
 JNIEXPORT jint JNICALL
-Java_org_vita3k_emulator_NativeLib_getAppActionAvailabilityMask(JNIEnv *env, jclass, jstring title_id_str) {
+ECV_NativeBridge_NativeLib_getAppActionAvailabilityMask(JNIEnv *env, jclass, jstring title_id_str) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return static_cast<jint>(0);
@@ -176,7 +176,7 @@ Java_org_vita3k_emulator_NativeLib_getAppActionAvailabilityMask(JNIEnv *env, jcl
 }
 
 JNIEXPORT jlong JNICALL
-Java_org_vita3k_emulator_NativeLib_getAppInstallSize(JNIEnv *env, jclass, jstring title_id_str) {
+ECV_NativeBridge_NativeLib_getAppInstallSize(JNIEnv *env, jclass, jstring title_id_str) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return 0L;
@@ -204,7 +204,7 @@ Java_org_vita3k_emulator_NativeLib_getAppInstallSize(JNIEnv *env, jclass, jstrin
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_clearShaderCache(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_clearShaderCache(JNIEnv *, jclass) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return JNI_FALSE;

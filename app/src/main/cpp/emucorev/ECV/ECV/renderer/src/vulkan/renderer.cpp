@@ -575,10 +575,10 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         instance_info.setPEnabledLayerNames(instance_layers);
         instance_info.setPEnabledExtensionNames(instance_extensions);
 #if !defined(__APPLE__) && !defined(NDEBUG)
-        if (use_validation_layer && has_validation_features_ext && (std::getenv("VITA3K_SYNC_VALIDATION") || oracle_sync_validation)) {
+        if (use_validation_layer && has_validation_features_ext && (std::getenv("ECV_SYNC_VALIDATION") || oracle_sync_validation)) {
             validation_features.pNext = instance_info.pNext;
             instance_info.pNext = &validation_features;
-            LOG_INFO("Synchronization validation + best-practices enabled (VITA3K_SYNC_VALIDATION)");
+            LOG_INFO("Synchronization validation + best-practices enabled (ECV_SYNC_VALIDATION)");
         }
 #endif
 

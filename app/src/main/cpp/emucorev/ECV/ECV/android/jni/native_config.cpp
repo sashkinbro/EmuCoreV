@@ -624,7 +624,7 @@ bool default_gpu_is_mali(EmuEnvState *emuenv) {
 extern "C" {
 
 JNIEXPORT jobject JNICALL
-Java_org_vita3k_emulator_NativeLib_getGlobalConfig(JNIEnv *env, jclass) {
+ECV_NativeBridge_NativeLib_getGlobalConfig(JNIEnv *env, jclass) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return nullptr;
@@ -643,7 +643,7 @@ Java_org_vita3k_emulator_NativeLib_getGlobalConfig(JNIEnv *env, jclass) {
 }
 
 JNIEXPORT jstring JNICALL
-Java_org_vita3k_emulator_NativeLib_getCurrentEmulatorPath(JNIEnv *env, jclass) {
+ECV_NativeBridge_NativeLib_getCurrentEmulatorPath(JNIEnv *env, jclass) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return env->NewStringUTF("");
@@ -653,7 +653,7 @@ Java_org_vita3k_emulator_NativeLib_getCurrentEmulatorPath(JNIEnv *env, jclass) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_setCurrentEmulatorPath(JNIEnv *env, jclass, jstring path_str) {
+ECV_NativeBridge_NativeLib_setCurrentEmulatorPath(JNIEnv *env, jclass, jstring path_str) {
     auto *emuenv = get_emuenv();
     auto *controller = get_app_session_controller();
     if (!emuenv || !path_str || (controller && controller->has_active_session()))
@@ -670,7 +670,7 @@ Java_org_vita3k_emulator_NativeLib_setCurrentEmulatorPath(JNIEnv *env, jclass, j
 }
 
 JNIEXPORT jintArray JNICALL
-Java_org_vita3k_emulator_NativeLib_saveSettings(JNIEnv *env, jclass, jstring title_id_str, jobject config_obj) {
+ECV_NativeBridge_NativeLib_saveSettings(JNIEnv *env, jclass, jstring title_id_str, jobject config_obj) {
     auto *emuenv = get_emuenv();
     if (!emuenv || !config_obj)
         return make_restart_required_array(env, {});
@@ -702,7 +702,7 @@ Java_org_vita3k_emulator_NativeLib_saveSettings(JNIEnv *env, jclass, jstring tit
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_hasCustomConfig(JNIEnv *env, jclass, jstring title_id_str) {
+ECV_NativeBridge_NativeLib_hasCustomConfig(JNIEnv *env, jclass, jstring title_id_str) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return JNI_FALSE;
@@ -712,7 +712,7 @@ Java_org_vita3k_emulator_NativeLib_hasCustomConfig(JNIEnv *env, jclass, jstring 
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_vita3k_emulator_NativeLib_getCustomConfig(JNIEnv *env, jclass, jstring title_id_str) {
+ECV_NativeBridge_NativeLib_getCustomConfig(JNIEnv *env, jclass, jstring title_id_str) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return nullptr;
@@ -736,7 +736,7 @@ Java_org_vita3k_emulator_NativeLib_getCustomConfig(JNIEnv *env, jclass, jstring 
 }
 
 JNIEXPORT jintArray JNICALL
-Java_org_vita3k_emulator_NativeLib_deleteCustomConfig(JNIEnv *env, jclass, jstring title_id_str) {
+ECV_NativeBridge_NativeLib_deleteCustomConfig(JNIEnv *env, jclass, jstring title_id_str) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return make_restart_required_array(env, {});
@@ -747,7 +747,7 @@ Java_org_vita3k_emulator_NativeLib_deleteCustomConfig(JNIEnv *env, jclass, jstri
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_vita3k_emulator_NativeLib_getDefaultConfig(JNIEnv *env, jclass) {
+ECV_NativeBridge_NativeLib_getDefaultConfig(JNIEnv *env, jclass) {
     const auto &fields = get_config_fields(env);
     if (!fields.cls || !fields.ctor)
         return nullptr;
@@ -762,7 +762,7 @@ Java_org_vita3k_emulator_NativeLib_getDefaultConfig(JNIEnv *env, jclass) {
 }
 
 JNIEXPORT jint JNICALL
-Java_org_vita3k_emulator_NativeLib_clearAllCustomConfigs(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_clearAllCustomConfigs(JNIEnv *, jclass) {
     auto *emuenv = get_emuenv();
     if (!emuenv)
         return 0;
@@ -771,7 +771,7 @@ Java_org_vita3k_emulator_NativeLib_clearAllCustomConfigs(JNIEnv *, jclass) {
 }
 
 JNIEXPORT jobjectArray JNICALL
-Java_org_vita3k_emulator_NativeLib_getModulesList(JNIEnv *env, jclass, jobjectArray current_modules_arr) {
+ECV_NativeBridge_NativeLib_getModulesList(JNIEnv *env, jclass, jobjectArray current_modules_arr) {
     jclass string_class = env->FindClass("java/lang/String");
     auto *emuenv = get_emuenv();
     if (!emuenv)
@@ -801,7 +801,7 @@ Java_org_vita3k_emulator_NativeLib_getModulesList(JNIEnv *env, jclass, jobjectAr
 }
 
 JNIEXPORT jint JNICALL
-Java_org_vita3k_emulator_NativeLib_getSupportedMemoryMappingMask(JNIEnv *env, jclass, jstring custom_driver_name_str) {
+ECV_NativeBridge_NativeLib_getSupportedMemoryMappingMask(JNIEnv *env, jclass, jstring custom_driver_name_str) {
     const std::string custom_driver_name = custom_driver_name_str ? jstring_to_string(env, custom_driver_name_str) : std::string();
     if (custom_driver_name.empty())
         return static_cast<jint>(get_default_supported_memory_mapping_mask(get_emuenv()));
@@ -814,7 +814,7 @@ Java_org_vita3k_emulator_NativeLib_getSupportedMemoryMappingMask(JNIEnv *env, jc
 }
 
 JNIEXPORT jintArray JNICALL
-Java_org_vita3k_emulator_NativeLib_getCustomDriverSupportInfo(JNIEnv *env, jclass, jstring custom_driver_name_str) {
+ECV_NativeBridge_NativeLib_getCustomDriverSupportInfo(JNIEnv *env, jclass, jstring custom_driver_name_str) {
     const std::string custom_driver_name = custom_driver_name_str ? jstring_to_string(env, custom_driver_name_str) : std::string();
     if (custom_driver_name.empty()) {
         jint values[2] = {
@@ -840,12 +840,12 @@ Java_org_vita3k_emulator_NativeLib_getCustomDriverSupportInfo(JNIEnv *env, jclas
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_vita3k_emulator_NativeLib_shouldShowCustomDriverOptions(JNIEnv *, jclass) {
+ECV_NativeBridge_NativeLib_shouldShowCustomDriverOptions(JNIEnv *, jclass) {
     return default_gpu_is_mali(get_emuenv()) ? JNI_FALSE : JNI_TRUE;
 }
 
 JNIEXPORT jobjectArray JNICALL
-Java_org_vita3k_emulator_NativeLib_getAvailableCameras(JNIEnv *env, jclass) {
+ECV_NativeBridge_NativeLib_getAvailableCameras(JNIEnv *env, jclass) {
     jclass string_class = env->FindClass("java/lang/String");
     const auto camera_names = app::get_available_camera_names();
 
@@ -859,7 +859,7 @@ Java_org_vita3k_emulator_NativeLib_getAvailableCameras(JNIEnv *env, jclass) {
 }
 
 JNIEXPORT jobjectArray JNICALL
-Java_org_vita3k_emulator_NativeLib_getAvailableAdhocAddresses(JNIEnv *env, jclass) {
+ECV_NativeBridge_NativeLib_getAvailableAdhocAddresses(JNIEnv *env, jclass) {
     jclass string_class = env->FindClass("java/lang/String");
     const auto addrs = app::get_available_adhoc_address_options();
     jobjectArray result = env->NewObjectArray(static_cast<jsize>(addrs.size() * 2), string_class, nullptr);

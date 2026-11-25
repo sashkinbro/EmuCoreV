@@ -92,10 +92,10 @@
     <string name="detail_compatibility_title_id_label">相符的 Title ID</string>
     <string name="detail_compatibility_known_serials">已知的 Title IDs</string>
     <string name="detail_compatibility_updated">已更新</string>
-    <string name="detail_compatibility_unavailable">目前無法使用 Vita3K 相容性資料庫。</string>
+    <string name="detail_compatibility_unavailable">目前無法使用 ECV 相容性資料庫。</string>
     <string name="detail_compatibility_unmapped">此目錄項目尚未在本機目錄中對應到 Title ID。</string>
-    <string name="detail_compatibility_missing_entry">Vita3K 目前沒有這些 Title ID 的相容性項目。</string>
-    <string name="detail_compatibility_source_note">相容性資料基於 Vita3K 列表。問題 #%1$d。</string>
+    <string name="detail_compatibility_missing_entry">ECV 目前沒有這些 Title ID 的相容性項目。</string>
+    <string name="detail_compatibility_source_note">相容性資料基於 ECV 列表。問題 #%1$d。</string>
     <string name="detail_show_more">顯示更多</string>
     <string name="detail_show_less">顯示較少</string>
     <string name="detail_screenshot_saved">螢幕截圖已儲存</string>
@@ -331,13 +331,11 @@
     <string name="settings_help_check_for_updates">保持啟用更新檢查。\n\n当你想调整模拟器界面或游戏内系统显示时使用。不需要额外信息或视觉变化时保持默认。</string>
     <string name="settings_about_emucorev">關於 EmuCoreV</string>
     <string name="settings_emulation_core">模擬器核心</string>
-    <string name="settings_based_on_vita3k">ECV 以 Vita3K 核心為基礎，EmuCore 持續積極開發，加入自行實作的修正與改進。</string>
     <string name="settings_developer">開發者</string>
     <string name="settings_created_by_sbro">由 Sashkin Apps 製作</string>
     <string name="settings_play_store_profile">Play 商店個人檔案</string>
     <string name="settings_core_source_code">核心原始碼</string>
-    <string name="settings_core_source_description">EmuCoreV 使用自己的 Android 介面。 ECV 以 Vita3K 核心為基礎，EmuCore 持續積極開發，加入自行實作的修正與改進。</string>
-    <string name="settings_open_github">開啟 GitHub</string>
+    <string name="settings_core_source_description">EmuCoreV 使用自己的 Android 介面。 EmuCore 持續積極開發 ECV，加入自行實作的修正與改進。</string>
     <string name="emulator_choose_file">選擇檔案</string>
     <string name="emulator_choose_folder">選擇資料夾</string>
     <string name="emulator_installer_apk_missing">找不到更新包。</string>
@@ -539,7 +537,7 @@
     <string name="settings_tab_updates">更新</string>
     <string name="settings_about_version">应用版本</string>
     <string name="settings_about_version_value">版本 %1$s</string>
-    <string name="settings_about_body_extended">EmuCoreV 是一款使用 ECV 核心的 Android 平台 PS Vita 模擬器。 ECV 以 Vita3K 核心為基礎，EmuCore 持續積極開發，加入自行實作的修正與改進。</string>
+    <string name="settings_about_body_extended">EmuCoreV 是一款使用 ECV 核心的 Android 平台 PS Vita 模擬器。 EmuCore 持續積極開發 ECV，加入自行實作的修正與改進。</string>
     <string name="settings_about_community_title">社区与支持</string>
     <string name="settings_about_repository">EmuCoreV 仓库</string>
     <string name="settings_about_repository_desc">在 GitHub 上查看源代码、报告问题并关注开发进展。</string>
@@ -548,7 +546,6 @@
     <string name="settings_about_support">支持 EmuCoreV</string>
     <string name="settings_about_support_desc">通过 Patreon 会员资格帮助我们继续开发。</string>
     <string name="settings_play_store_profile_desc">查看开发者的更多 Android 应用。</string>
-    <string name="settings_vita3k_repository_desc">打开上游 Vita3K 项目仓库。</string>
     <string name="settings_updates_checking_title">正在检查更新</string>
     <string name="settings_updates_available_title">有可用更新</string>
     <string name="settings_updates_current_title">您使用的是最新版本</string>
@@ -1603,8 +1600,6 @@
     <string name="library_view_list">以清單顯示</string>
     <string name="settings_ecv_source">ECV 原始碼</string>
     <string name="settings_ecv_source_desc">在 GitHub 查看修改後的 ECV 核心及 EmuCoreV 應用程式原始碼。</string>
-    <string name="settings_vita3k_license">Vita3K 上游授權條款</string>
-    <string name="settings_vita3k_license_desc">閱讀上游的 GNU GPL 2.0 或更新版本授權條款。</string>
     <string name="settings_core_upstream_version">上游核心版本</string>
 
     <string name="settings_cover_art_style">封面样式</string>

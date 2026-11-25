@@ -9,11 +9,11 @@
 extern "C" {
 
 JNIEXPORT void JNICALL
-Java_org_vita3k_emulator_EmuSurface_setSurfaceStatus(JNIEnv *env, jobject thiz, jboolean surface_present);
+ECV_NativeBridge_EmuSurface_setSurfaceStatus(JNIEnv *env, jobject thiz, jboolean surface_present);
 
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_vita_EmuSurface_setSurfaceStatus(JNIEnv *env, jobject thiz, jboolean surface_present) {
-    Java_org_vita3k_emulator_EmuSurface_setSurfaceStatus(env, thiz, surface_present);
+    ECV_NativeBridge_EmuSurface_setSurfaceStatus(env, thiz, surface_present);
 }
 
 } // extern "C"
