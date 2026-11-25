@@ -1013,6 +1013,18 @@ void VKContext::stop_render_pass(bool scene_end) {
     in_renderpass = false;
 }
 
+void VKContext::abandon_empty_recording() {
+    if (!is_recording)
+        return;
+    if (in_renderpass)
+        stop_render_pass();
+    prerender_cmd.end();
+    render_cmd.end();
+    prerender_cmd = nullptr;
+    render_cmd = nullptr;
+    is_recording = false;
+}
+
 void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNotification &notif2, bool submit, bool scene_end) {
     if (!is_recording) {
         LOG_ERROR("Stopping recording while not recording");

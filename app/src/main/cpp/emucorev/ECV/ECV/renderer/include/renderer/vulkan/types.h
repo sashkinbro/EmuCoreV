@@ -441,6 +441,8 @@ struct VKContext : public renderer::Context {
     void emit_pass(bool scene_end);
     // scene_end: this is the last pass instance of the scene (sceGxmEndScene), not a restart
     void stop_render_pass(bool scene_end = false);
+    // drops a recording that has no scene content (live resolution change)
+    void abandon_empty_recording();
     void stop_recording(const SceGxmNotification &notif1, const SceGxmNotification &notif2, bool submit = true, bool scene_end = false);
     // Drop an open recording that has no recorded work (an empty scene-segment checkpoint) without
     // submitting it, so the scene can be re-entered with another framebuffer.
