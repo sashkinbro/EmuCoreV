@@ -954,6 +954,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             }
 #endif
 #ifndef NDEBUG
+            if (std::getenv("ECV_SYNC_FULL"))
+                vkutil::sync::config().full_barrier = true; // every tracker barrier widened to ALL_COMMANDS (host A/B for missing barriers)
             if (std::getenv("ECV_SYNC_LOG")) {
                 vkutil::sync::config().log_hazards = true;
                 vkutil::sync::config().log = [](const char *line) { LOG_INFO("{}", line); };

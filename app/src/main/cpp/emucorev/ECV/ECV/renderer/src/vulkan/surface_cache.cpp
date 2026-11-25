@@ -35,6 +35,10 @@
 #define XXH_INLINE_ALL
 #include <xxhash.h>
 
+#if ECV_ORACLE
+#include <ecv_frame_capture.h> // oracle: GXM frame capture (debug builds only)
+#endif
+
 #include <atomic>
 #include <cmath>
 #include <shared_mutex>
@@ -128,6 +132,9 @@ static bool protect_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
         [dirty, need_sync, trap, surface_begin, surface_end](Address fault, bool write) {
             // the segment is one-shot: whatever happens below, the surface is unarmed from now on
             trap->fired.store(true);
+#if ECV_ORACLE
+            ecv::oracle::fcap::note_memory_write(fault, 1, surface_sync_internal_write);
+#endif
             // ignore our own guest write-backs (the hash baseline is not used for synced surfaces)
             if (write && surface_sync_internal_write) {
                 trap->emulator_wrote.store(true);
@@ -429,6 +436,9 @@ bool VKSurfaceCache::write_back_before_destroy(ColorSurfaceCacheInfo &info, MemS
                     const uint8_t *src = static_cast<const uint8_t *>(std::get<vkutil::Buffer>(mem_it->second.buffer_impl).mapped_data) + offset;
                     uint8_t *dst = Ptr<void>(static_cast<Address>(first)).cast<uint8_t>().get(mem);
                     surface_sync_internal_write = true;
+#if ECV_ORACLE
+                    ecv::oracle::fcap::note_memory_write(static_cast<uint32_t>(first), *span, true);
+#endif
                     copy_surface_sync_rows(dst, *span, src, *span, info.stride_bytes, row_bytes, info.post_sync_height);
                     surface_sync_internal_write = false;
                 }
@@ -2552,6 +2562,9 @@ void VKSurfaceCache::submit_immediate_surface_sync(ColorSurfaceCacheInfo &surfac
 
         if (returned_info) {
             surface_sync_internal_write = true;
+#if ECV_ORACLE
+            ecv::oracle::fcap::note_memory_write(returned_info->data.address(), returned_info->total_bytes, true);
+#endif
             perform_post_surface_sync(*mem, returned_info);
             surface_sync_internal_write = false;
         }

@@ -34,6 +34,10 @@
 #include <util/overloaded.h>
 #include <renderer/vulkan/gpu_resource_cleanup.h>
 
+#if ECV_ORACLE
+#include <ecv_frame_capture.h> // oracle: GXM frame capture (debug builds only)
+#endif
+
 #include <algorithm>
 #include <limits>
 
@@ -169,6 +173,9 @@ void VKContext::wait_thread_body(const MemState &mem) {
                            src += mapping_offset;
                            uint8_t *dst = reinterpret_cast<uint8_t *>(Ptr<void>(request.location).get(mem));
                            renderer::vulkan::surface_sync_internal_write = true;
+#if ECV_ORACLE
+                           ecv::oracle::fcap::note_memory_write(request.location, request.size, true);
+#endif
                            bool copied = true;
                            if (request.row_stride != 0) {
                                copied = copy_surface_sync_rows(dst, request.size, src,
@@ -189,6 +196,9 @@ void VKContext::wait_thread_body(const MemState &mem) {
                            wait_for_fences();
                            const std::shared_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
                            renderer::vulkan::surface_sync_internal_write = true;
+#if ECV_ORACLE
+                           ecv::oracle::fcap::note_memory_write(request.cache_info->data.address(), request.cache_info->total_bytes, true);
+#endif
                            state.surface_cache.perform_post_surface_sync(mem, request.cache_info);
                            renderer::vulkan::surface_sync_internal_write = false;
                        },
