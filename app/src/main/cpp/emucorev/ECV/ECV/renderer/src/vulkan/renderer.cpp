@@ -1580,6 +1580,13 @@ void VKState::cleanup() {
         submit_timeline = nullptr;
     }
 
+#ifndef NDEBUG
+    {
+        const auto &st = vkutil::sync::stats();
+        LOG_INFO("pass stats: scenes={} depth_unbacked={} restarted={} unbacked_restarted={} (unbacked and not restarted = scenes whose depth store was dead)",
+            st.scenes.load(), st.scenes_depth_unbacked.load(), st.scenes_restarted.load(), st.scenes_unbacked_restarted.load());
+    }
+#endif
     surface_cache.cleanup();
 
     texture_cache.cleanup();

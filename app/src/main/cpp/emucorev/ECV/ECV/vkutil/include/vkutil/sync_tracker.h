@@ -218,6 +218,9 @@ struct Stats {
     std::atomic<uint64_t> raw{ 0 }, war{ 0 }, waw{ 0 }, layout{ 0 }, init{ 0 };
     std::atomic<uint64_t> unsynced_in_pass{ 0 }; // uses that needed a barrier but happened inside a render pass
     std::atomic<uint64_t> pass_covered{ 0 }, pass_explicit{ 0 };
+    // load/store look-ahead statistics (docs/gpu-sync-tracker.md section 9): scenes, scenes whose depth has no guest surface behind it,
+    // scenes whose pass started more than once, and the intersection. unbacked && !restarted = scenes whose depth store was dead.
+    std::atomic<uint64_t> scenes{ 0 }, scenes_depth_unbacked{ 0 }, scenes_restarted{ 0 }, scenes_unbacked_restarted{ 0 };
     std::atomic<uint64_t> validation_hazards{ 0 }, validation_errors{ 0 }; // from VK_LAYER_KHRONOS_validation (debug)
 };
 Stats &stats();

@@ -379,7 +379,14 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
     // (render_pass_policy.h): dropped only when the depth is provably dead. A scene may restart its pass and LOAD what the first instance
     // stored (mid-scene flush, casts, fbfetch restarts, depth transfers), and that is not known when the scene begins, so today the
     // answer is always "store" unless a producer of "this scene cannot restart" exists.
-    force_store = derive_depth_store({ force_store, ds_surface_fin != nullptr, /*scene_may_restart*/ true });
+    {
+        SceneRestartFacts facts;
+        facts.shader_interlock = state.features.support_shader_interlock;
+        facts.shell_snapshot = state.current_title_id == "SceShell";
+        facts.macroblock_sync = rt && rt->has_macroblock_sync;
+        facts.depth_backed = ds_surface_fin != nullptr;
+        force_store = derive_depth_store({ force_store, ds_surface_fin != nullptr, scene_may_restart(facts) });
+    }
 
 #if ECV_ORACLE
     bool oracle_depth_valid = true;
@@ -408,6 +415,12 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
         context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(vk_format, depth_load, stencil_load, force_store, color_surface_fin == nullptr, false, color_has_raw, context.ds_host_format);
     }
     context.scene_pass_starts = 0;
+    context.scene_depth_unbacked = ds_surface_fin == nullptr;
+    if (!restoring) {
+        vkutil::sync::stats().scenes++;
+        if (context.scene_depth_unbacked)
+            vkutil::sync::stats().scenes_depth_unbacked++;
+    }
 #if ECV_ORACLE
     if (ecv::oracle::gpu::enabled())
         ecv::oracle::gpu::scene_cfg(restoring, context.record.depth_stencil_surface.force_load, context.record.depth_stencil_surface.force_store,
@@ -705,7 +718,11 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
         begin_dynamic_pass(ds_clear);
     else
         render_cmd.beginRenderPass(curr_renderpass_info, vk::SubpassContents::eInline);
-    scene_pass_starts++;
+    if (++scene_pass_starts == 2) {
+        vkutil::sync::stats().scenes_restarted++;
+        if (scene_depth_unbacked)
+            vkutil::sync::stats().scenes_unbacked_restarted++;
+    }
 
     // set the renderpass info ready in case we need to switch between classic and framebuffer fetch usage
     curr_renderpass_info.setClearValues(nullptr);

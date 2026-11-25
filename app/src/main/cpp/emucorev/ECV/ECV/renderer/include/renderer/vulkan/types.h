@@ -372,6 +372,7 @@ struct VKContext : public renderer::Context {
     } dyn_pass;
     // restarts of the pass inside the current scene (look-ahead statistics, docs/gpu-sync-tracker.md section 9)
     uint32_t scene_pass_starts = 0;
+    bool scene_depth_unbacked = false;
     vk::Format current_color_format;
     vk::ImageView current_color_view;
     vk::ImageView current_ds_view;

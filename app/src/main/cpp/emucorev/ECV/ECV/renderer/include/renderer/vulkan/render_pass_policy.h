@@ -29,6 +29,20 @@ inline bool derive_depth_store(const DepthStoreInput &in) {
     return false;
 }
 
+// What is knowable when a scene begins about pass restarts. Every restart source is listed; the ones the guest or the draw stream decide later
+// are `true` unless a look-ahead proves otherwise (none exists: the render thread cannot see the rest of the scene).
+struct SceneRestartFacts {
+    bool shader_interlock = false; // a framebuffer-fetch draw ends and restarts the pass (scene.cpp)
+    bool shell_snapshot = false; // SceShell glow snapshot: copy + restart per fetch draw
+    bool macroblock_sync = false; // render target with macroblock sync: one pass per macroblock
+    bool depth_backed = false; // guest depth surface: depth transfers / write-backs may interrupt the scene
+    bool guest_mid_scene_flush_possible = true; // sceGxmMidSceneFlush is decided by the guest mid-scene
+    bool texture_cast_possible = true; // a sampled surface that needs a cast copy is discovered when the draw binds it
+};
+inline bool scene_may_restart(const SceneRestartFacts &f) {
+    return f.shader_interlock || f.shell_snapshot || f.macroblock_sync || f.depth_backed || f.guest_mid_scene_flush_possible || f.texture_cast_possible;
+}
+
 // Colour attachment: DONT_CARE load when the previous content is not needed.
 inline bool derive_color_load(bool backed_by_guest_surface) {
     return backed_by_guest_surface;
