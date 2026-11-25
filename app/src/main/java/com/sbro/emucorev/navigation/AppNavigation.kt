@@ -472,7 +472,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 }
                 AdaptiveShell(
                     selected = PrimaryDestination.Library,
-                    immersiveContent = shelfMode && !com.sbro.emucorev.core.vita.NativeLibraryMode.available,
+                    immersiveContent = shelfMode && !com.sbro.emucorev.core.vita.NativeLibraryMode.available(context),
                     onNavigateSetup = {
                         navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
                     },
@@ -499,11 +499,11 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     onInstallContent = openInstallChoiceDialog
                 ) { openDrawer ->
                     LibraryScreen(
-                        shelfMode = shelfMode && !com.sbro.emucorev.core.vita.NativeLibraryMode.available,
+                        shelfMode = shelfMode && !com.sbro.emucorev.core.vita.NativeLibraryMode.available(context),
                         onShelfModeChanged = {
                             shelfMode = it
                             libraryUiPreferences.edit().putBoolean("shelf_mode", it).commit()
-                            if (it && com.sbro.emucorev.core.vita.NativeLibraryMode.available) {
+                            if (it && com.sbro.emucorev.core.vita.NativeLibraryMode.available(context)) {
                                 context.startActivity(com.sbro.emucorev.core.vita.NativeLibraryMode.intent(context))
                             }
                         },

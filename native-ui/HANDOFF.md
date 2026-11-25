@@ -6,9 +6,12 @@ Everything below is pushed to `main`.
 ## Architecture
 - `native-ui/shell` = `:native-ui-shell` library (C++ `shell.cpp`, `app_screen.h`,
   `at9_decode.cpp`; Kotlin `NativeShellActivity`, `ShellApps.kt`, `TrophyCollectionApp`,
-  `SettingsApp`, `QuickSavesApp`, `ShellThemes`). Included only when the git-ignored
-  `native-ui/resources/` pack exists (settings.gradle.kts); otherwise the app keeps the
-  Compose carousel via `app/src/nativeShellStub`.
+  `SettingsApp`, `QuickSavesApp`, `ShellThemes`). Always included; it bundles NO
+  firmware-derived data: the resource pack is extracted on the device from the installed
+  firmware (`FirmwarePack`, `native-ui/extract`, README "Resource pack"), and the app only
+  offers the mode when firmware is installed (`NativeLibraryMode.available(context)`),
+  otherwise the Compose carousel stays (`app/src/nativeShellStub` is now only a
+  fallback source set for builds without the module).
 - `native-ui/preview` = thin fixture host (`-PnativeUiPreview=true`).
 - App host: `app/src/nativeShell/.../NativeShellHostActivity.kt`, process `:native_shell`.
   `NativeLibraryMode.intent()` points to it; games launch via `VitaLaunchBridge`

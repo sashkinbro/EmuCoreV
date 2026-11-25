@@ -1,74 +1,14 @@
-import java.security.MessageDigest
 import javax.xml.parsers.DocumentBuilderFactory
 
 plugins {
     alias(libs.plugins.android.library)
 }
 
-// Standalone native Vita shell UI. The ready resource pack lives in the
-// git-ignored native-ui/resources directory (prepared offline, never extracted
-// from firmware at runtime); settings.gradle only includes this module when it
-// exists.
-val resourceRoot = file("../resources")
-
-val verifyNativeShellResources by tasks.registering {
-    doLast {
-        val required = listOf("images.json", "fonts.json", "fonts/ltn4.otf", "fonts/ltn0.otf", "audio/sounds.json",
-            "effects/lookups/lookups.json", "effects/lookups/exp-minus.png",
-            "effects/lookups/corner-distance.png",
-            "images/topmenu_plugin/754463d1.png",
-            "images/livearea_plugin/ca6a6db1.png",
-            "images/livearea_plugin/1e6a33de.png",
-            "images/indicator_plugin/ca76be07.png", "images/indicator_plugin/56e72f16.png",
-            "preview/bubble/stream-0.bin", "preview/bubble/indices.bin",
-            "preview/bubble/vertex-ubo-0.bin", "preview/bubble/fragment-ubo-0.bin",
-            "preview/bubble/fragment-texture-0.bin", "preview/bubble/fragment-texture-0-palette.bin",
-            "preview/bubble/environment.rgba")
-        check(required.all { resourceRoot.resolve(it).isFile }) {
-            "Local native UI resource pack is missing or incomplete. " +
-                "Prepare native-ui/resources using the offline tools documented in native-ui/README.md."
-        }
-    }
-}
-
-val packedAssets = layout.buildDirectory.dir("generated/nativeShellAssets")
-val startupAssets = layout.buildDirectory.dir("generated/nativeShellStartupAssets")
+// Standalone native Vita shell UI. It bundles no firmware-derived resources: the
+// resource pack (fonts, images, sounds, effects, system applications) is extracted
+// on the device from the firmware the user installed (FirmwarePack + the native
+// emucorev_extract library). Only the application's own art ships as assets.
 val generatedStrings = layout.buildDirectory.dir("generated/nativeShellStrings")
-
-val copyStartupBusyImage by tasks.registering(Copy::class) {
-    from(resourceRoot.resolve("images/topmenu_plugin/754463d1.png")) { rename { "startup-busy.png" } }
-    into(startupAssets)
-}
-
-// Development fixtures (copied game icons/LiveAreas) never enter the shipped pack.
-val packNativeShellAssets by tasks.registering(Zip::class) {
-    dependsOn(verifyNativeShellResources)
-    from(resourceRoot) { exclude("preview/home/**") }
-    destinationDirectory.set(packedAssets)
-    archiveFileName.set("native-ui.zip")
-    isPreserveFileTimestamps = false
-    isReproducibleFileOrder = true
-}
-
-val indexNativeShellAssets by tasks.registering {
-    dependsOn(packNativeShellAssets)
-    val archive = packNativeShellAssets.flatMap { it.archiveFile }
-    inputs.file(archive)
-    outputs.file(packedAssets.map { it.file("native-ui.sha256") })
-    doLast {
-        val hash = MessageDigest.getInstance("SHA-256")
-        archive.get().asFile.inputStream().use { input ->
-            val buffer = ByteArray(65536)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                hash.update(buffer, 0, count)
-            }
-        }
-        packedAssets.get().file("native-ui.sha256").asFile.writeText(
-            hash.digest().joinToString("") { "%02x".format(it) })
-    }
-}
 
 // Every native_ui_* string of the application (all of its locales) is mirrored
 // into this module, so the shell speaks every language the app does.
@@ -115,7 +55,7 @@ val generateNativeShellStrings by tasks.registering {
 }
 
 tasks.named("preBuild") {
-    dependsOn(indexNativeShellAssets, copyStartupBusyImage, generateNativeShellStrings)
+    dependsOn(generateNativeShellStrings)
 }
 
 android {
@@ -124,10 +64,7 @@ android {
         version = release(37) { minorApiLevel = 1 }
     }
     ndkVersion = "29.0.14206865"
-    androidResources { noCompress += "zip" }
     sourceSets.getByName("main").kotlin.srcDir("../android/src/main/java")
-    sourceSets.getByName("main").assets.srcDir(packedAssets.get().asFile)
-    sourceSets.getByName("main").assets.srcDir(startupAssets.get().asFile)
     sourceSets.getByName("main").res.srcDir(generatedStrings.get().asFile)
     defaultConfig {
         minSdk = 29
@@ -136,7 +73,7 @@ android {
         externalNativeBuild {
             cmake {
                 arguments += listOf("-DANDROID_STL=c++_static", "-DBUILD_TESTING=OFF")
-                targets += "emucorev_shell"
+                targets += listOf("emucorev_shell", "emucorev_packjni")
             }
         }
     }

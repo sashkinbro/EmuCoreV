@@ -10,6 +10,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
+import com.sbro.emucorev.nativeui.shellTypeface
 import java.io.File
 
 /** One list row: a host raster drawn over the PAF button planes. */
@@ -61,8 +62,8 @@ abstract class ShellApp(val titleId: String) {
  * Rodin Bold (ltn4), otherwise Rodin Regular (ltn0).
  */
 class PafText(resources: File) {
-    private val regular = Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
-    private val bold = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
+    private val regular = shellTypeface(resources, "ltn0", bold = false)
+    private val bold = shellTypeface(resources, "ltn4", bold = true)
 
     fun paint(size: Float, bold: Boolean = false, color: Int = Color.WHITE, shadow: Boolean = false) =
         TextPaint(Paint.ANTI_ALIAS_FLAG).apply {

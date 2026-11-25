@@ -5,6 +5,7 @@ import android.content.Intent
 import com.sbro.emucorev.BuildConfig
 import com.sbro.emucorev.core.SKIP_AUTOMATIC_STATE_LOAD_EXTRA
 import com.sbro.emucorev.core.EmulatorStorage
+import com.sbro.emucorev.nativeui.FirmwarePack
 import com.sbro.emucorev.data.InstalledGameRepository
 import java.io.File
 
@@ -17,8 +18,15 @@ object NativeLibraryMode {
     interface ReturnTarget
 
     // The standalone native shell (native-ui) replaces the former emulated
-    // firmware library; it is present whenever the build bundles its pack.
-    val available: Boolean get() = BuildConfig.NATIVE_SHELL
+    // firmware library. It ships no firmware-derived data: its resources are built
+    // on the device from the installed firmware, so the mode is only offered when
+    // that firmware (the pack's sources) is present. Otherwise the Compose
+    // carousel stays the library.
+    fun available(context: Context): Boolean = isAvailable(BuildConfig.NATIVE_SHELL, EmulatorStorage.vitaRoot(context))
+
+    /** Pure form of [available] (the shell is built into this app, firmware root to check). */
+    fun isAvailable(shellBuilt: Boolean, vitaRoot: File): Boolean =
+        shellBuilt && FirmwarePack.sourcesPresent(vitaRoot)
 
     fun needsCatalogBootstrap(context: Context): Boolean {
         val database = File(context.cacheDir, "native-shell-runtime/vita/ur0/shell/db/app.db")

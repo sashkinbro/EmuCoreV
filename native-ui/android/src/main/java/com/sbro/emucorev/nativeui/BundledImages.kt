@@ -13,6 +13,7 @@ import android.text.TextPaint
 import android.text.Layout
 import android.text.StaticLayout
 import android.graphics.Typeface
+import android.util.Log
 import org.json.JSONObject
 import javax.xml.parsers.DocumentBuilderFactory
 import org.xml.sax.InputSource
@@ -54,14 +55,14 @@ class BundledImages(
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textSize = 22f
-            typeface = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
+            typeface = shellTypeface(resources, "ltn4", bold = true)
         }
     }
     private val clockAmPmPaint by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textSize = 15f
-            typeface = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
+            typeface = shellTypeface(resources, "ltn4", bold = true)
         }
     }
     private val lockClockPaint by lazy {
@@ -70,7 +71,7 @@ class BundledImages(
             textSize = 120f // power_manage_plugin RCO textobj 6232
             // The reference lock text is SCE Rodin Cattleya LATIN Regular (ltn0),
             // not its Bold sibling ltn4 used by the shell status clock.
-            typeface = Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
+            typeface = shellTypeface(resources, "ltn0", bold = false)
             setShadowLayer(1f, 0f, 1f, Color.argb(128, 0, 0, 0))
         }
     }
@@ -78,7 +79,7 @@ class BundledImages(
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xfff2f2f2.toInt()
             textSize = 52f // RCO textobj 6552, bold=true
-            typeface = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
+            typeface = shellTypeface(resources, "ltn4", bold = true)
             setShadowLayer(1f, 0f, 1f, Color.argb(128, 0, 0, 0))
         }
     }
@@ -86,7 +87,7 @@ class BundledImages(
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xfff2f2f2.toInt()
             textSize = 32f // RCO textobj 6064
-            typeface = Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
+            typeface = shellTypeface(resources, "ltn0", bold = false)
             setShadowLayer(1f, 0f, 1f, Color.argb(128, 0, 0, 0))
         }
     }
@@ -94,7 +95,7 @@ class BundledImages(
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xfff2f2f2.toInt()
             textSize = 120f // RCO textobj 6736
-            typeface = Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
+            typeface = shellTypeface(resources, "ltn0", bold = false)
             setShadowLayer(1f, 0f, 1f, Color.argb(128, 0, 0, 0))
         }
     }
@@ -134,8 +135,14 @@ class BundledImages(
     fun uploadBitmap(id: Int, bitmap: Bitmap) = send(id, bitmap)
 
     private fun loadPngResource(id: Int, relativePath: String) {
-        val bitmap = File(resources, relativePath).inputStream().use {
-            requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled image: $relativePath" }
+        val bitmap = runCatching {
+            File(resources, relativePath).inputStream().use { BitmapFactory.decodeStream(it) }
+        }.getOrNull()
+        if (bitmap == null) {
+            // Absent or unreadable firmware image: a neutral transparent texel, never a crash.
+            Log.w("BundledImages", "Missing pack image: $relativePath")
+            upload(id, 1, 1, byteArrayOf(0, 0, 0, 0))
+            return
         }
         try { send(id, bitmap) } finally { bitmap.recycle() }
     }
@@ -177,9 +184,8 @@ class BundledImages(
             LOCK_EMPTY_BG_IMAGE to "images/power_manage_plugin/ca707736.png",
         ).forEach { (id, path) -> loadPngResource(id, path) }
         val keylockFile = File(resources, "effects/keylock.png")
-        val base = keylockFile.inputStream().use {
-            requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled keylock wallpaper" }
-        }
+        val base = runCatching { keylockFile.inputStream().use { BitmapFactory.decodeStream(it) } }.getOrNull()
+            ?: Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLACK) }
         releaseLockWallpaper()
         rawKeylock = base
         send(RAW_KEYLOCK_IMAGE, base)
@@ -576,7 +582,7 @@ class BundledImages(
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textSize = size
-            typeface = Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
+            typeface = shellTypeface(resources, "ltn0", bold = false)
         }
         val width = ceil(paint.measureText(text)).toInt().coerceAtLeast(1)
         val height = ceil(paint.descent() - paint.ascent()).toInt().coerceAtLeast(1)
@@ -589,7 +595,7 @@ class BundledImages(
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textSize = 24f
-            typeface = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
+            typeface = shellTypeface(resources, "ltn4", bold = true)
         }
         // The original control is 136 px wide; longer translations widen it
         // (16 px side padding inside the 3x1 slices) up to 260 px, beyond which
@@ -623,7 +629,7 @@ class BundledImages(
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textSize = textSizePx
-            typeface = Typeface.createFromFile(File(resources, "fonts/ltn4.otf"))
+            typeface = shellTypeface(resources, "ltn4", bold = true)
             setShadowLayer(2.0f, 0f, 1.2f, 0xCC000000.toInt())
         }
         val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
@@ -885,7 +891,7 @@ class BundledImages(
     }
 
     private val homeTitleTypeface: Typeface by lazy {
-        Typeface.createFromFile(File(resources, "fonts/ltn0.otf"))
+        shellTypeface(resources, "ltn0", bold = false)
     }
 
     fun updateLockClock(status: DeviceStatusSource.Snapshot) {
@@ -961,9 +967,9 @@ class BundledImages(
     }
 
     fun loadBusyImage() {
-        val busy = File(resources, "images/topmenu_plugin/754463d1.png").inputStream().use {
-            requireNotNull(BitmapFactory.decodeStream(it)) { "Invalid bundled busy image" }
-        }
+        val busy = runCatching {
+            File(resources, "images/topmenu_plugin/754463d1.png").inputStream().use { BitmapFactory.decodeStream(it) }
+        }.getOrNull() ?: placeholderBusyDot()
         try { loadBusyImage(busy) } finally { busy.recycle() }
     }
 
@@ -1019,6 +1025,21 @@ class BundledImages(
     }
 
     companion object {
+        /**
+         * Generated stand-in for the shell's busy dot (a 16x16 anti-aliased light disc),
+         * used while the firmware pack is not available; the firmware image replaces it.
+         */
+        fun placeholderBusyDot(): Bitmap {
+            val size = 16
+            val pixels = IntArray(size * size)
+            for (y in 0 until size) for (x in 0 until size) {
+                val distance = kotlin.math.hypot(x + 0.5 - size / 2.0, y + 0.5 - size / 2.0)
+                val alpha = (((size / 2.0 + 0.5) - distance).coerceIn(0.0, 1.0) * 255.0).toInt()
+                pixels[y * size + x] = Color.argb(alpha, 210, 210, 210)
+            }
+            return Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
+        }
+
         const val CLOCK_IMAGE = 1
         const val KEYLOCK_IMAGE = 100
         const val CORNER_IMAGE = 101

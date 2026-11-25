@@ -25,13 +25,11 @@ dependencyResolutionManagement {
 rootProject.name = "EmuCoreV"
 include(":app")
 
-// Native PS Vita shell UI. Its ready resource pack is prepared offline into the
-// git-ignored native-ui/resources directory; without it the app keeps the
-// Compose carousel library mode.
-if (file("native-ui/resources/images.json").isFile) {
-    include(":native-ui-shell")
-    project(":native-ui-shell").projectDir = file("native-ui/shell")
-}
+// Native PS Vita shell UI. It ships no firmware-derived data: its resource pack is
+// built on the device from the firmware the user installed (see FirmwarePack), and
+// the app keeps the Compose carousel library mode until that firmware is present.
+include(":native-ui-shell")
+project(":native-ui-shell").projectDir = file("native-ui/shell")
 
 // Explicitly requested development preview; absent from normal/release builds.
 if (providers.gradleProperty("nativeUiPreview").orNull == "true") {

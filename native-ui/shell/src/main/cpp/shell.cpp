@@ -1,3 +1,4 @@
+#include <emucorev/paf/bubble_reference.h>
 #include <emucorev/paf/bubble_renderer.h>
 #include <emucorev/paf/bubble_env_renderer.h>
 #include <emucorev/paf/bubble_shaders.h>
@@ -167,22 +168,6 @@ template<class T> std::vector<T> read_path(const std::string& relative, std::siz
     if (!file) throw std::runtime_error("Incomplete preview asset: " + path);
     return values;
 }
-template<class T> std::vector<T> read(const char* filename, std::size_t count) {
-    std::string path;
-    {
-        const std::lock_guard lock(status_mutex);
-        path = resource_root + "/preview/bubble/" + filename;
-    }
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file || file.tellg() != static_cast<std::streamoff>(count * sizeof(T)))
-        throw std::runtime_error("Missing or invalid local preview asset: " + path);
-    std::vector<T> values(count);
-    file.seekg(0);
-    file.read(reinterpret_cast<char*>(values.data()), count * sizeof(T));
-    if (!file) throw std::runtime_error("Incomplete preview asset: " + path);
-    return values;
-}
-
 // Calls a void (String) or (String, String) method on the host Activity from any thread.
 void emit_activity_strings(jmethodID* slot, const std::string& first, const std::string* second) {
     JavaVM* vm = nullptr;
@@ -558,22 +543,17 @@ struct Window {
         // Busy preview is isolated; lock and Home scenes share this original
         // bubble mesh, material, and environment resource set.
         if (preview_scene.load() == 0 || preview_scene.load() == 2 || preview_scene.load() == 3) {
-            bubble_vertices = read<emucorev::paf::BubbleVertex>("stream-0.bin", 608);
-            bubble_indices = read<std::uint16_t>("indices.bin", 1220);
-            const auto transform = read<float>("vertex-ubo-0.bin", 96);
-            const auto parameters = read<float>("fragment-ubo-0.bin", 10);
-            std::copy(transform.begin(), transform.end(), vertex.begin());
+            // The bubble mesh and base material are generated in process (no pack files).
+            auto reference = emucorev::paf::bubble_reference();
+            bubble_vertices = std::move(reference.vertices);
+            bubble_indices = std::move(reference.indices);
+            std::copy(reference.vertex_uniforms.begin(), reference.vertex_uniforms.end(), vertex.begin());
             base_vertex = vertex;
             initial_phase = std::atan2(vertex[14 * 4 + 1], vertex[14 * 4]);
             initial_basis = emucorev::paf::bubble_wobble_basis(std::cos(initial_phase), std::sin(initial_phase), 1);
-            std::copy(parameters.begin(), parameters.end(), material.begin());
-            const auto palette = read<std::uint8_t>("fragment-texture-0-palette.bin", 1024);
-            const auto indexed = read<std::uint8_t>("fragment-texture-0.bin", 128 * 128);
-            bubble_environment = read<std::uint8_t>("environment.rgba", 64 * 64 * 4);
-            std::vector<std::uint8_t> icon(128 * 128 * 4);
-            for (std::size_t i = 0; i < indexed.size(); ++i)
-                std::copy_n(palette.data() + indexed[i] * 4, 4, icon.data() + i * 4);
-            reference_icon = std::move(icon);
+            std::copy(reference.fragment_uniforms.begin(), reference.fragment_uniforms.end(), material.begin());
+            bubble_environment = emucorev::paf::bubble_environment_map();
+            reference_icon = emucorev::paf::bubble_placeholder_icon();
             if (preview_scene.load() == 0) {
                 bubble = std::make_unique<emucorev::paf::BubbleRenderer>(
                     emucorev::paf::opaque_bubble_vertex_shader(), emucorev::paf::opaque_bubble_fragment_shader(),

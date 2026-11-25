@@ -6,3 +6,8 @@
 -keepclassmembers class * extends com.sbro.emucorev.nativeui.shell.NativeShellActivity {
     public void onNative*(...);
 }
+
+# Firmware pack extractor entry points (bound by symbol).
+-keepclassmembers class com.sbro.emucorev.nativeui.FirmwarePack {
+    native <methods>;
+}
