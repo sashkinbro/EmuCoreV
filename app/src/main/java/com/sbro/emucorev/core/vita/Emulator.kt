@@ -169,6 +169,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var overlayBackHandler: (() -> Boolean)? = null
     private var overlayMenuButtonRevealHandler: (() -> Unit)? = null
     private var overlayPauseMenuOpenHandler: (() -> Unit)? = null
+    private var overlayMenuKeyHandler: ((KeyEvent) -> Boolean)? = null
     private var menuPaused: Boolean = false
     private var nativeThreadPaused: Boolean = false
     private var playTimeSessionId: String? = null
@@ -337,6 +338,13 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     fun setOverlayBackHandler(handler: (() -> Boolean)?) {
         overlayBackHandler = handler
     }
+
+    /** While the pause menu is open the Activity routes controller keys into it (its window is not focusable). */
+    fun setOverlayMenuKeyHandler(handler: ((KeyEvent) -> Boolean)?) {
+        overlayMenuKeyHandler = handler
+    }
+
+    fun dispatchOverlayBack(): Boolean = overlayBackHandler?.invoke() == true
 
     fun setOverlayMenuButtonRevealHandler(handler: (() -> Unit)?) {
         overlayMenuButtonRevealHandler = handler
@@ -1125,6 +1133,12 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
      */
     external fun setLiveResolutionMultiplier(multiplier: Float): Boolean
 
+    /**
+     * Like [setLiveResolutionMultiplier] but only changes the session at a frame boundary unless [allowMidScene]:
+     * 1 applied, 0 failed, 2 a scene is open (nothing changed, retry after the guest has run a little).
+     */
+    external fun setLiveResolutionMultiplierAtBoundary(multiplier: Float, allowMidScene: Boolean): Int
+
     /** Apply a screen filter name (as stored in the profile) to the running session. */
     external fun setLiveScreenFilter(filter: String)
 
@@ -1296,6 +1310,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 else -> true
             }
         }
+        if (overlayMenuKeyHandler?.invoke(event) == true) return true
         if (rearTouchInput.key(event)) return true
         if (KeyboardMouseManager.handleKeyBindingCapture(event)) return true
         if (!nativeKeyboardRequested && KeyboardMouseManager.handleKeyEvent(event)) return true

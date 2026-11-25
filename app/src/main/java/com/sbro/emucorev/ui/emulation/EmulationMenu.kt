@@ -742,12 +742,29 @@ private fun DisplayTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks
             // Chip values are half-steps (2 = 1x, 3 = 1.5x) because the chip row is Int based.
             MenuChipRow(
                 label = stringResource(R.string.settings_core_resolution_label),
-                selected = (config.resolutionMultiplier * 2f).roundToInt(),
+                selected = (LiveGraphicsSettings.displayedResolution(
+                    config.resolutionMultiplier, callbacks.liveResolution, callbacks.liveResolutionLimit) * 2f).roundToInt(),
                 options = LiveGraphicsSettings.resolutionChoices(callbacks.liveResolutionLimit).map {
                     (it * 2f).roundToInt() to LiveGraphicsSettings.formatResolution(it)
                 },
                 enabled = !callbacks.resolutionApplying,
                 onSelected = { callbacks.onResolutionMultiplier(it / 2f) }
+            )
+            if (callbacks.resolutionApplying) {
+                // The switch waits for a frame boundary and rebuilds the render targets: show that it is working.
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text(stringResource(R.string.emulation_menu_resolution_applying), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        } else if (!config.backendRenderer.equals("Vulkan", ignoreCase = true)) {
+            // OpenGL sessions cannot switch live: say so instead of hiding the row.
+            MenuChipRow(
+                label = stringResource(R.string.settings_core_resolution_label),
+                selected = 0,
+                options = listOf(0 to stringResource(R.string.emulation_menu_resolution_vulkan_only)),
+                enabled = false,
+                onSelected = {}
             )
         }
         if (LiveGraphicsSettings.Option.SCREEN_FILTER in live) {
@@ -826,16 +843,6 @@ private fun SystemTab(config: VitaCoreConfig, callbacks: EmulationMenuCallbacks)
             label = stringResource(R.string.settings_pstv_mode),
             checked = config.pstvMode,
             onCheckedChange = callbacks.onPstvMode
-        )
-        MenuToggleRow(
-            label = stringResource(R.string.settings_show_welcome),
-            checked = config.showWelcome,
-            onCheckedChange = callbacks.onShowWelcome
-        )
-        MenuToggleRow(
-            label = stringResource(R.string.settings_warn_missing_firmware),
-            checked = config.warnMissingFirmware,
-            onCheckedChange = callbacks.onWarnMissingFirmware
         )
     }
 }
@@ -1758,6 +1765,8 @@ data class EmulationMenuCallbacks(
     /** Largest resolution multiplier the running session can switch to; 0 hides the resolution row. */
     val liveResolutionLimit: Float = 0f,
     val resolutionApplying: Boolean = false,
+    /** Resolution the session renders right now (0 = unknown); the chip shows this, not the stored profile value. */
+    val liveResolution: Float = 0f,
     val onStretchDisplay: (Boolean) -> Unit,
     val onFpsHack: (Boolean) -> Unit,
     val onFrameLimit: (Int) -> Unit,
@@ -1765,8 +1774,6 @@ data class EmulationMenuCallbacks(
     val onDisableSurfaceSync: (Boolean) -> Unit,
     val onShowShaderNotice: (Boolean) -> Unit,
     val onPstvMode: (Boolean) -> Unit,
-    val onShowWelcome: (Boolean) -> Unit,
-    val onWarnMissingFirmware: (Boolean) -> Unit,
     val onGamepadDeadzone: (Float) -> Unit,
     val onGamepadAnalogMultiplier: (Float) -> Unit,
     val onGamepadTriggerThreshold: (Float) -> Unit,

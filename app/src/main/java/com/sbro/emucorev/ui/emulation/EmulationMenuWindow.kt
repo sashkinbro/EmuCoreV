@@ -33,6 +33,8 @@ import com.sbro.emucorev.ui.theme.WindowAwareRipple
 @Composable
 internal fun EmulationMenuWindow(
     hidden: Boolean = false,
+    /** Receives a function that delivers key events to the menu (null again when the window closes). */
+    registerKeyDispatcher: ((((android.view.KeyEvent) -> Boolean)?) -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     val anchor = LocalView.current
@@ -62,6 +64,11 @@ internal fun EmulationMenuWindow(
             WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT))
         dialog.setCancelable(false)
         dialog.show()
+        // The window is not focusable, but the menu host can still hold view focus for routed controller keys.
+        host.isFocusable = true
+        host.isFocusableInTouchMode = true
+        host.requestFocus()
+        registerKeyDispatcher?.invoke { event -> host.dispatchKeyEvent(event) }
         window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         WindowCompat.getInsetsController(window, host).apply {
             hide(WindowInsetsCompat.Type.systemBars())
@@ -69,6 +76,7 @@ internal fun EmulationMenuWindow(
         }
         onDispose {
             dialogRef[0] = null
+            registerKeyDispatcher?.invoke(null)
             try {
                 // Cancel any platform ripple animators while their host RenderNodes are still
                 // attached. A released press can still be fading when this window is closed.

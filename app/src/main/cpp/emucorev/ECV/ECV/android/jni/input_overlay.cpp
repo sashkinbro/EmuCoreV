@@ -26,6 +26,10 @@
 #include <touch/functions.h>
 #include <emucorev/savestate/operation_mutex.h>
 
+#include <atomic>
+#include <mutex>
+#include <vector>
+
 static int virtual_joystick_id = -1;
 static SDL_Joystick *virtual_joystick = nullptr;
 
@@ -94,6 +98,101 @@ bool overlay_virtual_controller_attached() {
     return emuenv->ctrl.controllers.contains(static_cast<SDL_JoystickID>(virtual_joystick_id));
 }
 
+// Touch/rear-contact JNI calls come from the UI thread. They must never wait on the save-state operation mutex
+// (a save/load can hold it for seconds): commands go into a small queue and are applied, in order, by whoever
+// can take the mutex without waiting (the JNI caller via try_lock, otherwise the SDL main loop).
+namespace {
+struct PendingTouchCommand {
+    enum class Kind { SetMode, Contact, Clear } kind;
+    int a = 0; // mode or slot
+    bool pressed = false;
+    float x = 0.f;
+    float y = 0.f;
+};
+constexpr size_t kMaxPendingTouchCommands = 512;
+std::mutex pending_touch_mutex; // guards only the vector; never held across the save-state mutex
+std::vector<PendingTouchCommand> pending_touch_commands;
+std::atomic<bool> pending_touch_flag{ false };
+
+void enqueue_touch_command(const PendingTouchCommand &command) {
+    const std::lock_guard lock(pending_touch_mutex);
+    auto &queue = pending_touch_commands;
+    if (command.kind == PendingTouchCommand::Kind::Contact) {
+        // Coalesce with the newest earlier command of the same slot (stop at a barrier).
+        for (auto it = queue.rbegin(); it != queue.rend(); ++it) {
+            if (it->kind != PendingTouchCommand::Kind::Contact)
+                break;
+            if (it->a != command.a)
+                continue;
+            if (it->pressed && command.pressed) {
+                *it = command; // newer position replaces the pending one
+                return;
+            }
+            if (!it->pressed && !command.pressed)
+                return; // double release
+            break;
+        }
+        if (command.pressed && queue.size() >= kMaxPendingTouchCommands)
+            return; // overload: drop a press, never a release or clear
+    } else if (command.kind == PendingTouchCommand::Kind::Clear) {
+        // Pending contacts before a clear are moot; a pending mode change is not.
+        std::erase_if(queue, [](const PendingTouchCommand &c) { return c.kind == PendingTouchCommand::Kind::Contact; });
+    }
+    queue.push_back(command);
+    pending_touch_flag.store(true, std::memory_order_release);
+}
+
+// Caller owns save_state_operation_mutex().
+void apply_pending_touch_commands_locked() {
+    std::vector<PendingTouchCommand> commands;
+    {
+        const std::lock_guard lock(pending_touch_mutex);
+        commands.swap(pending_touch_commands);
+        pending_touch_flag.store(false, std::memory_order_release);
+    }
+    auto *emuenv = get_emuenv();
+    if (!emuenv)
+        return; // no core: nothing stored, nothing to clear
+    for (const auto &command : commands) {
+        switch (command.kind) {
+        case PendingTouchCommand::Kind::SetMode:
+            set_touch_mode(emuenv->touch, command.a);
+            break;
+        case PendingTouchCommand::Kind::Clear:
+            clear_touch_contacts(emuenv->touch);
+            break;
+        case PendingTouchCommand::Kind::Contact: {
+            // A release is always applied so a contact can never stay stuck down; only new presses are gated.
+            if (command.pressed) {
+                auto *controller = get_app_session_controller();
+                if (!controller || !controller->is_running())
+                    continue;
+                if (emuenv->drop_inputs || emuenv->ctrl.overlay_input_intercepted.load(std::memory_order_relaxed))
+                    continue;
+            }
+            set_rear_touch_contact(emuenv->touch, command.a, command.pressed, command.x, command.y);
+            break;
+        }
+        }
+    }
+}
+
+void submit_touch_command(const PendingTouchCommand &command) {
+    enqueue_touch_command(command);
+    std::unique_lock lock(emucorev::savestate::save_state_operation_mutex(), std::try_to_lock);
+    if (lock.owns_lock())
+        apply_pending_touch_commands_locked();
+}
+} // namespace
+
+// Called by the SDL main loop each iteration; takes the mutex only when something is queued.
+void apply_pending_touch_commands() {
+    if (!pending_touch_flag.load(std::memory_order_acquire))
+        return;
+    const std::lock_guard operation(emucorev::savestate::save_state_operation_mutex());
+    apply_pending_touch_commands_locked();
+}
+
 extern "C" {
 
 JNIEXPORT void JNICALL
@@ -133,32 +232,17 @@ ECV_NativeBridge_overlay_InputOverlay_setButton(JNIEnv *env, jobject thiz, jint 
 
 JNIEXPORT void JNICALL
 ECV_NativeBridge_overlay_InputOverlay_setTouchState(JNIEnv *env, jobject thiz, jint mode) {
-    const std::lock_guard input_operation(emucorev::savestate::save_state_operation_mutex());
-    auto *emuenv = get_emuenv();
-    if (!emuenv)
-        return;
-
-    set_touch_mode(emuenv->touch, static_cast<int>(mode));
+    submit_touch_command({ PendingTouchCommand::Kind::SetMode, static_cast<int>(mode) });
 }
 
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_input_RearTouchNative_setContact(JNIEnv *, jobject, jint slot, jboolean pressed, jfloat x, jfloat y) {
-    const std::lock_guard input_operation(emucorev::savestate::save_state_operation_mutex());
-    auto *emuenv = get_emuenv();
-    if (!emuenv) return; // no core: nothing stored, nothing to clear
-    // A release is always applied so a contact can never stay stuck down; only new presses are gated.
-    auto *controller = get_app_session_controller();
-    if (pressed == JNI_TRUE) {
-        if (!controller || !controller->is_running()) return;
-        if (emuenv->drop_inputs || emuenv->ctrl.overlay_input_intercepted.load(std::memory_order_relaxed)) return;
-    }
-    set_rear_touch_contact(emuenv->touch, slot, pressed == JNI_TRUE, x, y);
+    submit_touch_command({ PendingTouchCommand::Kind::Contact, static_cast<int>(slot), pressed == JNI_TRUE, x, y });
 }
 
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_input_RearTouchNative_clearContacts(JNIEnv *, jobject) {
-    const std::lock_guard input_operation(emucorev::savestate::save_state_operation_mutex());
-    if (auto *emuenv = get_emuenv()) clear_touch_contacts(emuenv->touch);
+    submit_touch_command({ PendingTouchCommand::Kind::Clear });
 }
 
 } // extern "C"

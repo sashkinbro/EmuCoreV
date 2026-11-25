@@ -157,6 +157,31 @@ Java_com_sbro_emucorev_core_vita_Emulator_setLiveResolutionMultiplier(
     return JNI_FALSE;
 }
 
+/**
+ * Frame-boundary variant of setLiveResolutionMultiplier: 1 applied, 0 failed, 2 a scene is open (nothing changed;
+ * the caller lets the guest finish the scene and retries). allowMidScene = true never returns 2.
+ */
+extern "C" JNIEXPORT jint JNICALL
+Java_com_sbro_emucorev_core_vita_Emulator_setLiveResolutionMultiplierAtBoundary(
+    JNIEnv * /*env*/,
+    jobject /*thiz*/,
+    jfloat multiplier,
+    jboolean allow_mid_scene) {
+    auto *emuenv = get_emuenv();
+    auto *controller = get_app_session_controller();
+    if (!emuenv || !controller || !controller->is_running())
+        return 0;
+    std::string error;
+    const auto result = emucorev::live_resolution::apply(*emuenv, multiplier, error, allow_mid_scene == JNI_TRUE);
+    if (result == emucorev::live_resolution::Result::Applied
+        || result == emucorev::live_resolution::Result::Unchanged)
+        return 1;
+    if (result == emucorev::live_resolution::Result::SceneOpen)
+        return 2;
+    __android_log_print(ANDROID_LOG_WARN, "EmuCoreV", "live resolution change rejected: %s", error.c_str());
+    return 0;
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_vita_Emulator_setLiveScreenFilter(
     JNIEnv *env,

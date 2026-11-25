@@ -15,9 +15,11 @@ data class RearMotionResult(val event: MotionEvent? = null, val consumed: Boolea
 /** Activity-scoped input dispatch. No controls are reassigned until a binding is explicitly saved. */
 class RearTouchInput(
     emit: (Int, Boolean, Float, Float) -> Unit = RearTouchNative::setContact,
-    private val clearNative: () -> Unit = RearTouchNative::clearContacts
+    private val clearNative: () -> Unit = RearTouchNative::clearContacts,
+    schedule: ((Long, () -> Unit) -> Unit)? = null
 ) {
-    val dispatcher = RearTouchDispatcher(emit)
+    private val handler by lazy(LazyThreadSafetyMode.NONE) { android.os.Handler(android.os.Looper.getMainLooper()) }
+    val dispatcher = RearTouchDispatcher(emit, schedule ?: { delay, task -> handler.postDelayed(task, delay); Unit })
     var capture: ((RearTouchBinding) -> Unit)? = null
     var stretchDisplay = false
     private val axisGate = RearAxisGate()
@@ -107,6 +109,7 @@ class RearTouchInput(
                 position?.let { (x,y) ->
                     pointerX=x; pointerY=y
                     dispatcher.move(RearPositionMode.POINTER, pointerX, pointerY)
+                    dispatcher.move(RearPositionMode.ZONE, pointerX, pointerY)
                 }
             }
         }

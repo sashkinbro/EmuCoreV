@@ -81,12 +81,24 @@ enum class Result {
     // not a Vulkan session, value not on the grid, or too large for this GPU
     Unsupported,
     Failed,
+    // only with allow_mid_scene = false: a scene is open on some context, nothing was changed (retry later)
+    SceneOpen,
 };
+
+// A context is inside a scene (between its begin and end, or with work recorded but not ended).
+template <typename Context>
+bool context_has_open_scene(const Context &context) {
+    return context.is_recording
+        && (context.in_renderpass || context.is_in_query || context.visibility_max_used_idx != -1 || context.scene_has_drawn);
+}
 
 // Largest multiplier the active GPU can hold; 0 when a live change is not possible.
 float max_supported_multiplier(EmuEnvState &env);
 
 // Callable from any thread except the render thread. The game should be paused by the caller.
-Result apply(EmuEnvState &env, float multiplier, std::string &error);
+// With allow_mid_scene = false the change is only made when no context is inside a scene (a frame boundary);
+// otherwise Result::SceneOpen is returned and the session is untouched. Contents of the render targets are
+// scaled into the new images rather than discarded.
+Result apply(EmuEnvState &env, float multiplier, std::string &error, bool allow_mid_scene = true);
 
 } // namespace emucorev::live_resolution

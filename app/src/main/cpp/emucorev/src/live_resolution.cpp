@@ -36,7 +36,7 @@ struct TargetEntry {
     VKRenderTarget::ResizedImages images;
 };
 
-bool apply_on_render_thread(EmuEnvState &env, VKState &state, const float multiplier, std::string &error) {
+bool apply_on_render_thread(EmuEnvState &env, VKState &state, const float multiplier, std::string &error, const bool allow_mid_scene, bool &scene_open) {
     const float previous = state.res_multiplier;
     const float ratio = multiplier / previous;
     const uint32_t max_dimension = static_cast<uint32_t>(state.get_max_2d_texture_width());
@@ -57,14 +57,23 @@ bool apply_on_render_thread(EmuEnvState &env, VKState &state, const float multip
         }
     }
 
+    scene_open = false;
+    for (const auto &[address, context] : contexts) {
+        if (context && context_has_open_scene(*context))
+            scene_open = true;
+    }
+    LOG_INFO("live resolution: scene_open={} at apply (mid-scene allowed: {})", scene_open ? 1 : 0, allow_mid_scene);
+    if (scene_open && !allow_mid_scene) {
+        error = "a scene is open";
+        return false; // nothing was touched
+    }
+
     std::vector<ContextEntry> context_entries;
     for (const auto &[address, context] : contexts) {
         ContextEntry entry;
         entry.address = address;
         entry.context = context;
-        if (context->is_recording
-            && (context->in_renderpass || context->is_in_query || context->visibility_max_used_idx != -1
-                || context->scene_has_drawn)) {
+        if (context_has_open_scene(*context)) {
             // Same effect as a guest sceGxmMidSceneFlush without notification: end the work recorded
             // so far, continue with an empty segment.
             const SceGxmNotification no_notification = { Ptr<uint32_t>(0), 0 };
@@ -96,6 +105,15 @@ bool apply_on_render_thread(EmuEnvState &env, VKState &state, const float multip
 
     // Phase 2: destructive. The new images exist, so only cache rebuilding can still go wrong.
     state.wait_gpu_idle();
+    // Carry the pixels of the live render targets (colour and depth) over at the new size instead of letting
+    // the rest of an open scene continue on empty images.
+    for (auto &entry : target_entries) {
+        try {
+            entry.target->scale_contents_into(state, entry.images);
+        } catch (const std::exception &exception) {
+            LOG_WARN("live resolution: could not carry a render target over: {}", exception.what());
+        }
+    }
     // Cached surfaces are the only holder of GPU-written pixels; keep them in guest RAM so they
     // are re-uploaded at the new size on first use.
     state.flush_surfaces(env.mem);
@@ -132,7 +150,7 @@ float max_supported_multiplier(EmuEnvState &env) {
     return max_multiplier_for_image_limit(static_cast<uint32_t>(env.renderer->get_max_2d_texture_width()));
 }
 
-Result apply(EmuEnvState &env, const float multiplier, std::string &error) {
+Result apply(EmuEnvState &env, const float multiplier, std::string &error, const bool allow_mid_scene) {
     if (!is_supported_multiplier(multiplier) || multiplier > max_supported_multiplier(env)) {
         error = "resolution is not supported by this session";
         return Result::Unsupported;
@@ -144,10 +162,15 @@ Result apply(EmuEnvState &env, const float multiplier, std::string &error) {
     }
 
     std::string task_error;
+    bool scene_open = false;
     const bool applied = state.run_on_render_thread(
-        [&]() { return apply_on_render_thread(env, state, multiplier, task_error); },
+        [&]() { return apply_on_render_thread(env, state, multiplier, task_error, allow_mid_scene, scene_open); },
         std::chrono::seconds(8));
     if (!applied) {
+        if (!allow_mid_scene && scene_open && task_error == "a scene is open") {
+            error = task_error;
+            return Result::SceneOpen;
+        }
         error = task_error.empty() ? "the renderer did not accept the change" : task_error;
         return Result::Failed;
     }

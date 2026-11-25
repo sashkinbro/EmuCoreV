@@ -643,6 +643,7 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
 
         bool running = !pending_launch_request.has_value();
         while (running) {
+            apply_pending_touch_commands();
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
                 switch (event.type) {

@@ -38,6 +38,7 @@ class SettingsBackupRepository(
             )
             .put("core", config.toJson())
             .put("keyboardMouse", KeyboardMouseSettingsCodec.encode(preferences.keyboardMouseSettings))
+            .put("rearTouch", com.sbro.emucorev.core.input.RearTouchProfileRepository(context).exportAll())
             .put(
                 "customization",
                 JSONObject()
@@ -103,6 +104,9 @@ class SettingsBackupRepository(
         if (applyApp) root.optJSONObject("keyboardMouse")?.let { saved ->
             preferences.keyboardMouseSettings = KeyboardMouseSettingsCodec.decode(saved)
                 ?: preferences.keyboardMouseSettings
+        }
+        if (applyApp) root.optJSONObject("rearTouch")?.let { saved ->
+            com.sbro.emucorev.core.input.RearTouchProfileRepository(context).restoreAll(saved)
         }
         if (applyApp) root.optJSONObject("trophySound")?.let { sound ->
             check(trophySoundRepository.restoreBackup(

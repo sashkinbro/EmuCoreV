@@ -420,6 +420,9 @@ struct VKRenderTarget : public renderer::RenderTarget {
     void prepare_resize(VKState &state, float multiplier, ResizedImages &out) const;
     // The GPU must be idle and every framebuffer that used the old images destroyed.
     void commit_resize(float multiplier, ResizedImages &&images);
+    // The GPU must be idle. Blit-scales the current colour and depth/stencil contents into `images` (nearest filter,
+    // skipped for a format that cannot be blitted) so a scene continues on the pixels it already had.
+    void scale_contents_into(VKState &state, ResizedImages &images);
 
     // sync objects
     std::vector<vk::Fence> fences;

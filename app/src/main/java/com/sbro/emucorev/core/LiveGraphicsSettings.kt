@@ -104,6 +104,10 @@ object LiveGraphicsSettings {
         return normalizeResolution(configured, limit)
     }
 
+    /** What the resolution chip shows: the live value when the session reports a selectable one, else the profile value. */
+    fun displayedResolution(profile: Float, live: Float, limit: Float): Float =
+        if (live > 0f) normalizeResolution(live, limit) ?: profile else profile
+
     fun formatResolution(value: Float): String =
         if (value == value.toInt().toFloat()) "${value.toInt()}x" else "${value}x"
 }
@@ -129,3 +133,28 @@ class LiveResolutionSwitch(
         return Outcome.APPLIED
     }
 }
+
+/**
+ * Applies a live resolution change at a frame boundary. The core refuses (SCENE_OPEN) while a scene is open, as
+ * it is when the menu pause stopped the guest between begin and end of a scene; [advanceFrame] lets the guest run
+ * briefly and pauses it again. After [maxAttempts] refusals the change is made mid-scene (the core then carries the
+ * render target pixels over) so the switch can never be starved.
+ */
+suspend fun applyResolutionAtFrameBoundary(
+    maxAttempts: Int,
+    tryApply: suspend (allowMidScene: Boolean) -> Int,
+    advanceFrame: suspend () -> Unit
+): Boolean {
+    repeat(maxAttempts) { attempt ->
+        val last = attempt == maxAttempts - 1
+        when (tryApply(last)) {
+            APPLY_OK -> return true
+            APPLY_SCENE_OPEN -> if (!last) advanceFrame()
+            else -> return false
+        }
+    }
+    return false
+}
+
+const val APPLY_OK = 1
+const val APPLY_SCENE_OPEN = 2

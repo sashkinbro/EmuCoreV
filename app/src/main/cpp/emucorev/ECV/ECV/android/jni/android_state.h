@@ -41,6 +41,8 @@ EmuEnvState *get_emuenv();
 app::AppSessionController *get_app_session_controller();
 Root &get_root_paths();
 void register_state_frame_readiness(renderer::State &state);
+// Applies queued touch/rear-contact JNI commands (input_overlay.cpp); takes the save-state mutex only if work is queued.
+void apply_pending_touch_commands();
 
 std::string jstring_to_string(JNIEnv *env, jstring str);
 bool is_ime_dialog_active(const EmuEnvState &emuenv);

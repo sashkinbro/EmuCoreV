@@ -102,6 +102,7 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.BuildConfig
 import com.sbro.emucorev.core.LiveGraphicsSettings
 import com.sbro.emucorev.core.LiveResolutionSwitch
+import com.sbro.emucorev.core.applyResolutionAtFrameBoundary
 import com.sbro.emucorev.core.AndroidGyroscopeInput
 import com.sbro.emucorev.core.AndroidTouchHaptics
 import com.sbro.emucorev.core.AndroidTouchHaptics.ButtonPhase
@@ -131,6 +132,10 @@ import com.sbro.emucorev.ui.common.VectorAnalogStick
 import com.sbro.emucorev.ui.common.VectorOverlayButton
 import com.sbro.emucorev.ui.settings.KeyboardMouseSettingsDialog
 import java.io.File
+import com.sbro.emucorev.core.ConfigOverrides
+import com.sbro.emucorev.core.ProfileWriteQueue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -203,6 +208,7 @@ fun EmulationOverlayHost(
     // Largest internal resolution the running session can switch to (0 = not switchable live).
     var liveResolutionLimit by remember { mutableFloatStateOf(0f) }
     var resolutionApplying by remember { mutableStateOf(false) }
+    var liveResolution by remember { mutableFloatStateOf(0f) }
     val showQuickBar by appPreferences.showEmulationQuickBarFlow.collectAsState(
         initial = appPreferences.showEmulationQuickBar
     )
@@ -211,7 +217,16 @@ fun EmulationOverlayHost(
     var saveStateBusyLoading by remember { mutableStateOf(false) }
     var saveStateBusySaving by remember { mutableStateOf(false) }
     var pendingSaveStateAction by remember { mutableStateOf<SaveStateAction?>(null) }
-    var touchMode by remember { mutableIntStateOf(0) }
+    // Remembered per game (applied again at session start); only meaningful while the touch switch is shown.
+    var touchMode by remember(gameId) {
+        mutableIntStateOf(if (initialProfile.config.overlayShowTouchSwitch) rearTouchRepository.touchMode(gameId) else 0)
+    }
+    LaunchedEffect(gameId) { if (touchMode != 0) overlayBridge.sendTouchState(touchMode) }
+    fun setTouchModePersisted(mode: Int) {
+        touchMode = mode
+        overlayBridge.sendTouchState(mode)
+        rearTouchRepository.setTouchMode(gameId, mode)
+    }
     var exitDialogVisible by remember { mutableStateOf(false) }
     var cheatSnapshot by remember(activity) { mutableStateOf(VitaCheatSnapshot.EMPTY) }
     var sessionElapsedMs by remember(activity) { mutableLongStateOf(activity.currentPlayTimeElapsedMs()) }
@@ -308,11 +323,13 @@ fun EmulationOverlayHost(
             Toast.makeText(activity, refusal.messageRes, Toast.LENGTH_SHORT).show()
             return
         }
+        // Claim the busy state before the coroutine is dispatched: a second tap or quick-save shortcut in the same
+        // frame must hit the refusal check above instead of starting a second operation.
+        saveStateBusy = true
+        saveStateBusySaving = action is SaveStateAction.Save
+        saveStateBusyLoading = action is SaveStateAction.Load
         overlayScope.launch {
             val restoreMenuOnFailure = menuOpen
-            saveStateBusy = true
-            saveStateBusySaving = action is SaveStateAction.Save
-            saveStateBusyLoading = action is SaveStateAction.Load
             withSaveStateMenuPause(
                 setPaused = activity::setMenuPausedAndAwait,
                 pausedAfter = {
@@ -506,12 +523,20 @@ fun EmulationOverlayHost(
         }
     }
 
+    // Menu changes are stored as per-game overrides (only the fields the user changed) by one background writer;
+    // the UI thread never touches the disk. The scope is not tied to the composition so a pending write finishes.
+    val profileWriter = remember(activity, gameId) {
+        ProfileWriteQueue(CoroutineScope(SupervisorJob() + Dispatchers.IO), Dispatchers.IO) { latest, changed ->
+            // Blank ids (core has not reported the title yet) are ignored by the repository.
+            repository.saveOverrides(gameId, latest, changed)
+        }
+    }
+
     fun persistConfig(transform: (VitaCoreConfig) -> VitaCoreConfig) {
-        config = transform(config)
-        // Only persist when we have a real game ID — if still blank the native
-        // core hasn't reported the title yet and the save would be a no-op
-        // (savePreservingDriverOverride guards against blank IDs internally).
-        repository.savePreservingDriverOverride(gameId, config)
+        val before = config
+        val after = transform(before)
+        config = after
+        profileWriter.submit(after, ConfigOverrides.changed(before, after))
         activity.updateGamepadRuntimeInputSettings(config)
     }
 
@@ -528,8 +553,11 @@ fun EmulationOverlayHost(
         )
     }
 
+    // Read once at session start (so the row is ready when the menu opens) and again on every open.
     LaunchedEffect(menuOpen) {
-        if (menuOpen) liveResolutionLimit = withContext(Dispatchers.Default) { activity.getLiveResolutionLimit() }
+        liveResolutionLimit = withContext(Dispatchers.Default) { activity.getLiveResolutionLimit() }
+        liveResolution = withContext(Dispatchers.Default) { activity.getLiveResolutionMultiplier() }
+        if (menuOpen && BuildConfig.DEBUG) Log.d("EmulationMenu", "menu resolution live=$liveResolution profile=${config.resolutionMultiplier} limit=$liveResolutionLimit")
     }
 
     DisposableEffect(config) {
@@ -666,6 +694,7 @@ fun EmulationOverlayHost(
             activity.setOverlayBackHandler(null)
             activity.setOverlayMenuButtonRevealHandler(null)
             activity.setOverlayPauseMenuOpenHandler(null)
+            activity.setOverlayMenuKeyHandler(null)
             customizationPreferences.close()
         }
     }
@@ -756,8 +785,7 @@ fun EmulationOverlayHost(
                     persistConfig { it.copy(overlayScale = 0.9f, overlayOpacity = 100) }
                 },
                 onBackTouchToggle = {
-                    touchMode = (touchMode + 1) % 3
-                    overlayBridge.sendTouchState(touchMode)
+                    setTouchModePersisted((touchMode + 1) % 3)
                 },
                 onButtonChange = { button, pressed -> overlayBridge.sendButton(button, pressed) },
                 onAxisChange = { axis, value -> overlayBridge.sendAxis(axis, value) }
@@ -829,15 +857,11 @@ fun EmulationOverlayHost(
                         overlayOpacity = 100
                     )
                 }
-                touchMode = 0
-                overlayBridge.sendTouchState(0)
+                setTouchModePersisted(0)
             },
             onTouchSwitch = { enabled ->
                 persistConfig { it.copy(overlayShowTouchSwitch = enabled) }
-                if (!enabled) {
-                    touchMode = 0
-                    overlayBridge.sendTouchState(0)
-                }
+                if (!enabled) setTouchModePersisted(0)
             },
             onOverlayScale = { value -> persistConfig { it.copy(overlayScale = value) } },
             onOverlayOpacity = { value -> persistConfig { it.copy(overlayOpacity = value) } },
@@ -850,6 +874,7 @@ fun EmulationOverlayHost(
             onVsync = { enabled -> persistConfig { it.copy(vSync = enabled) } },
             liveResolutionLimit = liveResolutionLimit,
             resolutionApplying = resolutionApplying,
+            liveResolution = liveResolution,
             onResolutionMultiplier = { value ->
                 if (!resolutionApplying) {
                     resolutionApplying = true
@@ -858,10 +883,24 @@ fun EmulationOverlayHost(
                             val outcome = LiveResolutionSwitch(
                                 ensurePaused = { activity.setMenuPausedAndAwait(true) },
                                 applyToCore = { target ->
-                                    withContext(Dispatchers.Default) { activity.setLiveResolutionMultiplier(target) }
+                                    applyResolutionAtFrameBoundary(
+                                        maxAttempts = 8,
+                                        tryApply = { allowMidScene ->
+                                            withContext(Dispatchers.Default) { activity.setLiveResolutionMultiplierAtBoundary(target, allowMidScene) }
+                                        },
+                                        advanceFrame = {
+                                            activity.setMenuPausedAndAwait(false)
+                                            kotlinx.coroutines.delay(24)
+                                            activity.setMenuPausedAndAwait(true)
+                                        }
+                                    )
                                 },
-                                persist = { target -> persistConfig { it.copy(resolutionMultiplier = target) } }
-                            ).switchTo(config.resolutionMultiplier, value, liveResolutionLimit)
+                                persist = { target ->
+                                    liveResolution = target
+                                    persistConfig { it.copy(resolutionMultiplier = target) }
+                                }
+                            ).switchTo(LiveGraphicsSettings.displayedResolution(config.resolutionMultiplier, liveResolution, liveResolutionLimit),
+                                value, liveResolutionLimit)
                             if (outcome == LiveResolutionSwitch.Outcome.FAILED)
                                 Toast.makeText(activity, R.string.emulation_menu_resolution_failed, Toast.LENGTH_SHORT).show()
                         } finally {
@@ -881,8 +920,6 @@ fun EmulationOverlayHost(
             onDisableSurfaceSync = { enabled -> persistConfig { it.copy(disableSurfaceSync = enabled) } },
             onShowShaderNotice = { enabled -> persistConfig { it.copy(showCompileShaders = enabled) } },
             onPstvMode = { enabled -> persistConfig { it.copy(pstvMode = enabled) } },
-            onShowWelcome = { enabled -> persistConfig { it.copy(showWelcome = enabled) } },
-            onWarnMissingFirmware = { enabled -> persistConfig { it.copy(warnMissingFirmware = enabled) } },
             onGamepadDeadzone = { value -> persistConfig { it.copy(gamepadDeadzone = value) } },
             onGamepadAnalogMultiplier = { value -> persistConfig { it.copy(analogMultiplier = value) } },
             onGamepadTriggerThreshold = { value -> persistConfig { it.copy(gamepadTriggerThreshold = value) } },
@@ -984,7 +1021,13 @@ fun EmulationOverlayHost(
         }
 
         if (menuOpen) {
-            EmulationMenuWindow(hidden = saveStateBusySaving || autoSaving) {
+            EmulationMenuWindow(hidden = saveStateBusySaving || autoSaving, registerKeyDispatcher = { toMenu ->
+                activity.setOverlayMenuKeyHandler(toMenu?.let { send ->
+                    { event: android.view.KeyEvent ->
+                        dispatchMenuKey(event, send) { activity.dispatchOverlayBack() }
+                    }
+                })
+            }) {
                 Box(Modifier.fillMaxSize()) {
                     // Retain the selected menu tab and pause state while exposing only the game frame during Save.
                     Box(

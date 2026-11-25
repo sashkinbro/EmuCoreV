@@ -259,6 +259,36 @@ void VKRenderTarget::prepare_resize(VKState &state, float multiplier, ResizedIma
     out = std::move(images);
 }
 
+void VKRenderTarget::scale_contents_into(VKState &state, ResizedImages &images) {
+    const auto blittable = [&](vk::Format format) {
+        const auto features = state.physical_device.getFormatProperties(format).optimalTilingFeatures;
+        return (features & vk::FormatFeatureFlagBits::eBlitSrc) && (features & vk::FormatFeatureFlagBits::eBlitDst);
+    };
+    const auto blit = [](vk::CommandBuffer cmd, vkutil::Image &src, vkutil::Image &dst, const vk::ImageSubresourceRange &range,
+                          vkutil::ImageLayout dst_final) {
+        if (src.layout == vkutil::ImageLayout::Undefined)
+            return; // never written: nothing to carry over
+        src.transition_to(cmd, vkutil::ImageLayout::TransferSrc, range);
+        dst.transition_to(cmd, vkutil::ImageLayout::TransferDst, range);
+        const vk::ImageSubresourceLayers layers{ .aspectMask = range.aspectMask, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 };
+        vk::ImageBlit region{ .srcSubresource = layers, .dstSubresource = layers };
+        region.srcOffsets[0] = vk::Offset3D{ 0, 0, 0 };
+        region.srcOffsets[1] = vk::Offset3D{ static_cast<int32_t>(src.width), static_cast<int32_t>(src.height), 1 };
+        region.dstOffsets[0] = vk::Offset3D{ 0, 0, 0 };
+        region.dstOffsets[1] = vk::Offset3D{ static_cast<int32_t>(dst.width), static_cast<int32_t>(dst.height), 1 };
+        // nearest: depth/stencil only allows it and packed colour data must not be blended
+        cmd.blitImage(src.image, vk::ImageLayout::eTransferSrcOptimal, dst.image, vk::ImageLayout::eTransferDstOptimal, region, vk::Filter::eNearest);
+        dst.transition_to(cmd, dst_final, range);
+    };
+
+    vk::CommandBuffer cmd_buffer = vkutil::create_single_time_command(state.device, state.general_command_pool);
+    if (blittable(color.format) && blittable(images.color.format))
+        blit(cmd_buffer, color, images.color, vkutil::color_subresource_range, vkutil::ImageLayout::ColorAttachmentReadWrite);
+    if (blittable(depthstencil.format) && blittable(images.depthstencil.format))
+        blit(cmd_buffer, depthstencil, images.depthstencil, vkutil::ds_subresource_range, vkutil::ImageLayout::DepthStencilAttachment);
+    vkutil::end_single_time_command(state.device, state.general_queue, state.general_command_pool, cmd_buffer);
+}
+
 void VKRenderTarget::commit_resize(float multiplier, ResizedImages &&images) {
     // move assignment only overwrites: release the previous images explicitly
     color.destroy();
