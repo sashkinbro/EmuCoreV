@@ -254,6 +254,7 @@ struct Stats {
     // scenes whose pass started more than once, and the intersection. unbacked && !restarted = scenes whose depth store was dead.
     // attachments the pass was going to LOAD that the content state turned into CLEAR / DONT_CARE (dynamic rendering path)
     std::atomic<uint64_t> loads_to_clear{ 0 }, loads_to_dontcare{ 0 }, loads_kept{ 0 };
+    std::atomic<uint64_t> depth_stores_dropped{ 0 }; // pass instances that did not store their (dead) depth
     std::atomic<uint64_t> scenes{ 0 }, scenes_depth_unbacked{ 0 }, scenes_restarted{ 0 }, scenes_unbacked_restarted{ 0 };
     std::atomic<uint64_t> validation_hazards{ 0 }, validation_errors{ 0 }; // from VK_LAYER_KHRONOS_validation (debug)
 };

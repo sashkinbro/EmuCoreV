@@ -268,18 +268,6 @@ TEST(SyncTracker, LegacyConversionNeverProducesAnEmptyStageMask) {
     EXPECT_TRUE(to_legacy(A::eShaderSampledRead) & vk::AccessFlagBits::eShaderRead);
 }
 
-TEST(GpuCopyRoute, DepthTransferIsRecordedWhereTheSceneStreamIs) {
-    using renderer::vulkan::GpuCopyRoute;
-    using renderer::vulkan::gpu_copy_route;
-    // an open scene: its commands are not submitted yet, a separate submission would run before its draws
-    EXPECT_EQ(gpu_copy_route(true, false), GpuCopyRoute::RecordIntoOpenScene);
-    EXPECT_EQ(gpu_copy_route(true, true), GpuCopyRoute::RecordIntoOpenScene);
-    // closed but unsubmitted scenes: join the queue behind them
-    EXPECT_EQ(gpu_copy_route(false, true), GpuCopyRoute::QueueBehindPending);
-    // nothing pending: queue order alone is enough
-    EXPECT_EQ(gpu_copy_route(false, false), GpuCopyRoute::SeparateSubmit);
-}
-
 TEST(SyncValidationMessages, TheLayersHazardFormatsAreCounted) {
     // verbatim from the Anbernic sync-validation run (runs-gpusync2-V)
     EXPECT_TRUE(is_sync_hazard_message("Validation layer: VkValidation:Queue[0xB400007CC83DD7A0]:I0:L929810911: vkQueueSubmit(): WRITE_AFTER_READ hazard detected. vkCmdDrawIndexed (from VkCommandBuffer 0xb400007ca86cb230 ..."));

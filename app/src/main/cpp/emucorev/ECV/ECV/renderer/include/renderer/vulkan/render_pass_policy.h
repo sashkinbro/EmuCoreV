@@ -9,38 +9,19 @@
 namespace renderer::vulkan {
 
 // ---- depth store derivation ------------------------------------------------------------------------------------------
-// The render pass object is chosen when a scene begins and its storeOp is baked in, but the scene may restart its pass later
-// (mid-scene flush, cast copies, framebuffer-fetch restarts, depth transfers: scene.cpp, context.cpp) and each restart LOADs what the
-// previous instance stored. The store can therefore only be dropped when the content is provably dead:
-//  * the surface is backed by guest memory       -> any later scene / sampler / write-back may read it: store
-//  * the scene can restart its pass              -> the continuation loads it: store
-//  * otherwise (unbacked depth AND a scene that cannot restart)                       -> DONT_CARE
-// A scene that cannot restart is not knowable at scene begin (the guest decides later), so `scene_may_restart` is true for every
-// scene today and the result is the conservative "always store" the renderer used to hard-code; the function exists so the rule is
-// explicit, tested, and ready for a producer of the missing fact (command look-ahead).
+// Decided when a pass instance ENDS (VKContext::emit_pass), because the instance is begun then (deferred recording):
+//  * the surface is backed by guest memory   -> any later scene / sampler / write-back may read it: store
+//  * the instance is followed by another one of the same scene (restart: flush, cast, fbfetch split, macroblock) -> the next one loads it: store
+//  * otherwise (unbacked depth AND the last instance of the scene, sceGxmEndScene) -> dead, DONT_CARE
 struct DepthStoreInput {
     bool guest_force_store = false; // the game asked for the depth to be written back
     bool backed_by_guest_surface = false;
-    bool scene_may_restart = true;
+    bool followed_by_another_instance = true;
 };
 inline bool derive_depth_store(const DepthStoreInput &in) {
-    if (in.guest_force_store || in.backed_by_guest_surface || in.scene_may_restart)
+    if (in.guest_force_store || in.backed_by_guest_surface || in.followed_by_another_instance)
         return true;
     return false;
-}
-
-// What is knowable when a scene begins about pass restarts. Every restart source is listed; the ones the guest or the draw stream decide later
-// are `true` unless a look-ahead proves otherwise (none exists: the render thread cannot see the rest of the scene).
-struct SceneRestartFacts {
-    bool shader_interlock = false; // a framebuffer-fetch draw ends and restarts the pass (scene.cpp)
-    bool shell_snapshot = false; // SceShell glow snapshot: copy + restart per fetch draw
-    bool macroblock_sync = false; // render target with macroblock sync: one pass per macroblock
-    bool depth_backed = false; // guest depth surface: depth transfers / write-backs may interrupt the scene
-    bool guest_mid_scene_flush_possible = true; // sceGxmMidSceneFlush is decided by the guest mid-scene
-    bool texture_cast_possible = true; // a sampled surface that needs a cast copy is discovered when the draw binds it
-};
-inline bool scene_may_restart(const SceneRestartFacts &f) {
-    return f.shader_interlock || f.shell_snapshot || f.macroblock_sync || f.depth_backed || f.guest_mid_scene_flush_possible || f.texture_cast_possible;
 }
 
 // Colour attachment: DONT_CARE load when the previous content is not needed.

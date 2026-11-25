@@ -376,7 +376,8 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
     VKState &state = context.state;
     state.surface_cache.set_render_target(rt);
 
-    context.start_recording(!restoring);
+    if (!context.is_recording)
+        context.start_recording(!restoring); // a depth transfer between scenes may already have opened it
 
     bool force_load = context.record.depth_stencil_surface.force_load;
     bool force_store = context.record.depth_stencil_surface.force_store;
@@ -389,15 +390,6 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
     // (render_pass_policy.h): dropped only when the depth is provably dead. A scene may restart its pass and LOAD what the first instance
     // stored (mid-scene flush, casts, fbfetch restarts, depth transfers), and that is not known when the scene begins, so today the
     // answer is always "store" unless a producer of "this scene cannot restart" exists.
-    {
-        SceneRestartFacts facts;
-        facts.shader_interlock = state.features.support_shader_interlock;
-        facts.shell_snapshot = state.current_title_id == "SceShell";
-        facts.macroblock_sync = rt && rt->has_macroblock_sync;
-        facts.depth_backed = ds_surface_fin != nullptr;
-        force_store = derive_depth_store({ force_store, ds_surface_fin != nullptr, scene_may_restart(facts) });
-    }
-
 #if ECV_ORACLE
     bool oracle_depth_valid = true;
 #endif
@@ -414,16 +406,15 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
             depth_load = false;
     }
     const bool color_has_raw = context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16;
-    if (state.use_dynamic_rendering) {
-        // no render pass objects: remember what the pass instances of this scene begin with (same rule as retrieve_render_pass)
-        context.current_render_pass = nullptr;
-        context.dyn_pass.has_raw = color_has_raw && color_surface_fin != nullptr && state.features.preserve_f16_nan_as_u16 && vk_format == vk::Format::eR16G16B16A16Sfloat;
-        context.dyn_pass.depth_load = depth_load;
-        context.dyn_pass.stencil_load = stencil_load;
-        context.dyn_pass.store = force_store;
-    } else {
-        context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(vk_format, depth_load, stencil_load, force_store, color_surface_fin == nullptr, false, color_has_raw, context.ds_host_format);
-    }
+    // what the pass instances of this scene begin with; the store and a content-based load are decided when an instance ends (emit_pass)
+    context.dyn_pass.has_raw = color_has_raw && color_surface_fin != nullptr && state.features.preserve_f16_nan_as_u16 && vk_format == vk::Format::eR16G16B16A16Sfloat;
+    context.dyn_pass.depth_load = depth_load;
+    context.dyn_pass.stencil_load = stencil_load;
+    context.dyn_pass.guest_store = ds_surface_fin != nullptr && context.record.depth_stencil_surface.force_store;
+    context.interlock_pass_active = false;
+    // the pass pipelines and secondary command buffers are created against (any compatible variant)
+    context.current_render_pass = state.use_dynamic_rendering ? vk::RenderPass{}
+        : context.state.pipeline_cache.retrieve_render_pass(vk_format, true, true, true, color_surface_fin == nullptr, false, color_has_raw, context.ds_host_format);
     context.scene_pass_starts = 0;
     context.scene_depth_unbacked = ds_surface_fin == nullptr;
     if (!restoring) {
@@ -446,7 +437,6 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
     context.current_shader_interlock_framebuffer = framebuffer.shader_interlock;
     context.current_color_base_image = framebuffer.base_image;
     context.current_ds_image = framebuffer.ds_image;
-    context.current_ds_loaded = depth_load || stencil_load;
     context.current_color_loaded = color_surface_fin != nullptr;
     context.current_fb_width = framebuffer.width;
     context.current_fb_height = framebuffer.height;
@@ -643,10 +633,7 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
     if (!is_recording)
         start_recording();
 
-    curr_renderpass_info = vk::RenderPassBeginInfo{
-        .renderPass = current_render_pass,
-        .framebuffer = current_framebuffer
-    };
+    curr_renderpass_info = vk::RenderPassBeginInfo{};
 
     if (render_target->has_macroblock_sync && !ignore_macroblock) {
         // set the render area to the correct macroblock
@@ -679,68 +666,19 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
     }
 
     // only the depth-stencil attachment may be clear if not force loaded. It can sit at attachment index 1 or 2 (raw u16 attachment present) so provide the value at both
-    std::array<vk::ClearValue, 3> curr_clear_values{};
     const vk::ClearDepthStencilValue ds_clear{
         .depth = normalized_depth_clear(record.depth_stencil_surface.background_depth),
         .stencil = record.depth_stencil_surface.stencil
     };
-    curr_clear_values[1].depthStencil = ds_clear;
-    curr_clear_values[2].depthStencil = ds_clear;
-    curr_renderpass_info.setClearValues(curr_clear_values);
-    if (!state.use_dynamic_rendering) {
-        // sync tracker: the pass' external dependencies cover the tracked state of the attachments, else an explicit barrier first
-        namespace sync = vkutil::sync;
-        sync::Batch pass_batch;
-        const auto begin_attachment = [&](vkutil::Image *img, PassAttachment kind, bool loaded, const vk::ImageSubresourceRange &range) {
-            if (!img || !img->image)
-                return;
-            const sync::PassCoverage cov = pass_coverage(kind, loaded);
-            if (loaded && img->sync.layout == vk::ImageLayout::eUndefined) {
-                // never seen by the tracker (e.g. restored/legacy path): the render pass has always run on these without a barrier,
-                // so adopt the layout the pass expects instead of emitting an UNDEFINED -> X transition that would drop the content
-                LOG_WARN_ONCE("Render pass attachment with untracked layout: adopting the pass' initial layout");
-                img->sync.layout = cov.initial_layout;
-            }
-            sync::Barrier b;
-            const sync::UseResult r = sync::track_pass_begin(img->sync, cov, b);
-            if (r.barrier) {
-                sync::stats().pass_explicit++;
-                pass_batch.explicit_image(img->image, range, b);
-            } else {
-                sync::stats().pass_covered++;
-            }
-        };
-        begin_attachment(current_color_base_image, PassAttachment::Color, current_color_loaded, vkutil::color_subresource_range);
-        begin_attachment(current_color_raw_image, PassAttachment::ColorRaw, true, vkutil::color_subresource_range);
-        begin_attachment(current_ds_image, PassAttachment::DepthStencil, current_ds_loaded, vkutil::aspect_clamped_range(current_ds_image ? current_ds_image->format : vk::Format::eUndefined, vkutil::ds_subresource_range));
-        pass_batch.flush(render_cmd);
-    }
-#if ECV_ORACLE
-    if (ecv::oracle::gpu::enabled())
-        ecv::oracle::gpu::rp_begin(reinterpret_cast<uint64_t>(static_cast<VkRenderPass>(current_render_pass)),
-            reinterpret_cast<uint64_t>(static_cast<VkFramebuffer>(current_framebuffer)), is_first_scene_draw, curr_renderpass_info.renderArea.offset.x,
-            curr_renderpass_info.renderArea.offset.y, curr_renderpass_info.renderArea.extent.width, curr_renderpass_info.renderArea.extent.height);
-    // oracle A/B (dbg-full-barrier): the tracker widens every barrier to ALL_COMMANDS and adds one global barrier here
-    vkutil::sync::config().full_barrier = ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FULL_BARRIER);
-    vkutil::sync::debug_full_barrier(render_cmd);
-#endif
-    if (state.use_dynamic_rendering)
-        begin_dynamic_pass(ds_clear);
-    else
-        render_cmd.beginRenderPass(curr_renderpass_info, vk::SubpassContents::eInline);
+    pass_area = curr_renderpass_info.renderArea;
+    pass_ds_clear = ds_clear;
+    begin_deferred_pass();
     if (++scene_pass_starts == 2) {
         vkutil::sync::stats().scenes_restarted++;
         if (scene_depth_unbacked)
             vkutil::sync::stats().scenes_unbacked_restarted++;
     }
-
-    // set the renderpass info ready in case we need to switch between classic and framebuffer fetch usage
-    curr_renderpass_info.setClearValues(nullptr);
     last_draw_was_framebuffer_fetch = false;
-
-    refresh_pipeline = true;
-    current_pipeline = nullptr;
-    split_pipeline = nullptr;
     in_renderpass = true;
 
     if (!create_descriptor_set)
@@ -787,38 +725,169 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
     }
 }
 
-// ---- RenderPath::DynamicRendering ------------------------------------------------------------------------------------------
-// Without VkRenderPass objects nothing declares the external dependencies and layout transitions any more: the tracker emits them.
-//  begin: attachments -> attachment use (colour: ColorAttachmentOutput|Fragment, read|write|input read, GENERAL; depth: fragment tests,
-//         DEPTH_STENCIL_ATTACHMENT_OPTIMAL). Unloaded attachments are `discard` transitions.
-//  end:   the attachments are made visible to everything that samples or copies them (what dependency [2] of the render pass did) and
-//         the depth goes back to DEPTH_STENCIL_READ_ONLY, the layout the rest of the renderer (sampling, copies) expects.
-void VKContext::begin_dynamic_pass(const vk::ClearDepthStencilValue &ds_clear) {
+// ---- deferred pass recording -----------------------------------------------------------------------------------------------
+// The draws of a pass instance are recorded into a SECONDARY command buffer; the instance itself (vkCmdBeginRenderPass / vkCmdBeginRendering)
+// is emitted when it ENDS, so its load/store ops are chosen with the whole instance known:
+//   * the last instance of a scene whose depth has no guest surface behind it does not store the depth (it is dead: the next scene clears it),
+//   * an attachment whose content is known (tracked content state) is CLEARed instead of LOADed, a discarded one is not loaded at all.
+// Everything that used to be a render pass dependency or a layout transition of the VkRenderPass path is a tracker barrier here (dynamic
+// rendering) or is still covered by the pass' external dependencies (VkRenderPass path), see render_pass_sync.h.
+
+void VKContext::begin_deferred_pass() {
+    FrameObject &frame = state.frame();
+    if (frame.secondary_cursor == frame.secondary_cmds.size()) {
+        const vk::CommandBufferAllocateInfo alloc{ .commandPool = frame.render_pool, .level = vk::CommandBufferLevel::eSecondary, .commandBufferCount = 1 };
+        frame.secondary_cmds.push_back(state.device.allocateCommandBuffers(alloc)[0]);
+    }
+    pass_secondary = frame.secondary_cmds[frame.secondary_cursor++];
+
+    vk::CommandBufferInheritanceInfo inherit{};
+    vk::CommandBufferInheritanceRenderingInfo inherit_rendering{};
+    std::array<vk::Format, 2> color_formats{ current_color_format, vk::Format::eR16G16B16A16Uint };
+    if (state.use_dynamic_rendering) {
+        const vk::Format ds_format = current_ds_image ? current_ds_image->format : ds_host_format;
+        inherit_rendering.colorAttachmentCount = dyn_pass.has_raw ? 2u : 1u;
+        inherit_rendering.pColorAttachmentFormats = color_formats.data();
+        inherit_rendering.depthAttachmentFormat = vkutil::format_has_depth(ds_format) ? ds_format : vk::Format::eUndefined;
+        inherit_rendering.stencilAttachmentFormat = vkutil::format_has_stencil(ds_format) ? ds_format : vk::Format::eUndefined;
+        inherit_rendering.rasterizationSamples = vk::SampleCountFlagBits::e1;
+        inherit.pNext = &inherit_rendering;
+    } else {
+        // any compatible pass: load/store ops and layouts do not take part in render pass compatibility
+        inherit.renderPass = interlock_pass_active ? current_shader_interlock_pass : current_render_pass;
+        inherit.subpass = 0;
+        inherit.framebuffer = interlock_pass_active ? current_shader_interlock_framebuffer : current_framebuffer;
+    }
+    const vk::CommandBufferBeginInfo begin_info{
+        .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit | vk::CommandBufferUsageFlagBits::eRenderPassContinue,
+        .pInheritanceInfo = &inherit
+    };
+    pass_secondary.begin(begin_info);
+    primary_cmd = render_cmd;
+    render_cmd = pass_secondary;
+
+    // a secondary command buffer inherits no dynamic state, no bound pipeline and no bound descriptors: same list as a fresh scene command buffer
+    render_cmd.setViewport(0, viewport);
+    render_cmd.setScissor(0, scissor);
+    applied_bias_valid = false;
+    sync_depth_bias(*this);
+    sync_point_line_width(*this, true);
+    sync_stencil_func(*this, false);
+    if (record.two_sided == SCE_GXM_TWO_SIDED_ENABLED)
+        sync_stencil_func(*this, true);
+    last_vert_texture_count = ~0;
+    last_frag_texture_count = ~0;
+    curr_vert_ublock.changed = true;
+    curr_frag_ublock.changed = true;
+    refresh_pipeline = true;
+    current_pipeline = nullptr;
+    split_pipeline = nullptr;
+}
+
+void VKContext::emit_pass(bool scene_end) {
     namespace sync = vkutil::sync;
+    // ---- the final ops of this instance ----
+    const bool store = derive_depth_store({ dyn_pass.guest_store, !scene_depth_unbacked, !scene_end });
+    if (!store)
+        sync::stats().depth_stores_dropped++;
+    bool depth_load = dyn_pass.depth_load;
+    bool stencil_load = dyn_pass.stencil_load;
+    // depth and stencil share one content state: only an instance that loads both can be rewritten
+    sync::LoadChoice ds_choice = sync::LoadChoice::Load;
+    if (depth_load && stencil_load && current_ds_image && current_ds_image->image) {
+        ds_choice = sync::derive_load(current_ds_image->sync.content, true);
+        (ds_choice == sync::LoadChoice::Clear ? sync::stats().loads_to_clear : ds_choice == sync::LoadChoice::DontCare ? sync::stats().loads_to_dontcare : sync::stats().loads_kept)++;
+    }
+    const sync::ClearValue ds_cleared = current_ds_image ? current_ds_image->sync.cleared_to : sync::ClearValue{};
+    vk::ClearDepthStencilValue ds_clear = pass_ds_clear;
+    if (ds_choice == sync::LoadChoice::Clear)
+        ds_clear = vk::ClearDepthStencilValue{ ds_cleared.depth, ds_cleared.stencil };
+    const bool ds_discard = ds_choice == sync::LoadChoice::DontCare;
+    const bool ds_loaded = (depth_load || stencil_load) && ds_choice == sync::LoadChoice::Load;
+    if (ds_choice != sync::LoadChoice::Load)
+        depth_load = stencil_load = false; // CLEAR (VkRenderPass: the variant that clears) / DONT_CARE (dynamic rendering, below)
+
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::rp_begin(reinterpret_cast<uint64_t>(static_cast<VkRenderPass>(current_render_pass)),
+            reinterpret_cast<uint64_t>(static_cast<VkFramebuffer>(current_framebuffer)), is_first_scene_draw, pass_area.offset.x, pass_area.offset.y,
+            pass_area.extent.width, pass_area.extent.height);
+    // oracle A/B (dbg-full-barrier): the tracker widens every barrier to ALL_COMMANDS and adds one global barrier here
+    vkutil::sync::config().full_barrier = ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FULL_BARRIER);
+    vkutil::sync::debug_full_barrier(render_cmd);
+#endif
+
+    if (!state.use_dynamic_rendering) {
+        vk::RenderPass pass;
+        vk::Framebuffer framebuffer;
+        if (interlock_pass_active) {
+            pass = current_shader_interlock_pass;
+            framebuffer = current_shader_interlock_framebuffer;
+        } else {
+            pass = state.pipeline_cache.retrieve_render_pass(current_color_format, depth_load, stencil_load, store, !record.color_surface.data, false,
+                record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16, ds_host_format);
+            framebuffer = current_framebuffer;
+        }
+        // sync tracker: the pass' external dependencies cover the tracked state of the attachments, else an explicit barrier first
+        sync::Batch pass_batch;
+        const auto begin_attachment = [&](vkutil::Image *img, PassAttachment kind, bool loaded, const vk::ImageSubresourceRange &range) {
+            if (!img || !img->image)
+                return;
+            const sync::PassCoverage cov = pass_coverage(kind, loaded);
+            if (loaded && img->sync.layout == vk::ImageLayout::eUndefined) {
+                // never seen by the tracker: the pass runs on these without a barrier, adopt the layout it expects instead of an UNDEFINED -> X transition that would drop the content
+                LOG_WARN_ONCE("Render pass attachment with untracked layout: adopting the pass' initial layout");
+                img->sync.layout = cov.initial_layout;
+            }
+            sync::Barrier b;
+            const sync::UseResult r = sync::track_pass_begin(img->sync, cov, b);
+            if (r.barrier) {
+                sync::stats().pass_explicit++;
+                pass_batch.explicit_image(img->image, range, b);
+            } else {
+                sync::stats().pass_covered++;
+            }
+        };
+        begin_attachment(current_color_base_image, PassAttachment::Color, current_color_loaded, vkutil::color_subresource_range);
+        begin_attachment(current_color_raw_image, PassAttachment::ColorRaw, true, vkutil::color_subresource_range);
+        begin_attachment(current_ds_image, PassAttachment::DepthStencil, ds_loaded,
+            vkutil::aspect_clamped_range(current_ds_image ? current_ds_image->format : vk::Format::eUndefined, vkutil::ds_subresource_range));
+        pass_batch.flush(render_cmd);
+
+        std::array<vk::ClearValue, 3> clear_values{};
+        clear_values[1].depthStencil = ds_clear;
+        clear_values[2].depthStencil = ds_clear;
+        vk::RenderPassBeginInfo info{ .renderPass = pass, .framebuffer = framebuffer, .renderArea = pass_area };
+        info.setClearValues(clear_values);
+        render_cmd.beginRenderPass(info, vk::SubpassContents::eSecondaryCommandBuffers);
+        render_cmd.executeCommands(pass_secondary);
+        render_cmd.endRenderPass();
+
+        // sync tracker: what the pass wrote and what its outgoing dependency made visible
+        if (current_color_base_image && current_color_base_image->image)
+            note_pass_end(current_color_base_image->sync, PassAttachment::Color);
+        if (current_color_raw_image && current_color_raw_image->image)
+            note_pass_end(current_color_raw_image->sync, PassAttachment::ColorRaw);
+        if (current_ds_image && current_ds_image->image)
+            note_pass_end(current_ds_image->sync, PassAttachment::DepthStencil);
+        return;
+    }
+
+    // ---- dynamic rendering: attachments to attachment use (tracker), begin, execute, end, attachments back to their sampling state ----
     const sync::Stage color_stages = sync::S::eColorAttachmentOutput | sync::S::eFragmentShader;
     const sync::Access color_access = sync::A::eColorAttachmentRead | sync::A::eColorAttachmentWrite | sync::A::eInputAttachmentRead;
     const sync::Stage ds_stages = sync::S::eEarlyFragmentTests | sync::S::eLateFragmentTests;
     const sync::Access ds_access = sync::A::eDepthStencilAttachmentRead | sync::A::eDepthStencilAttachmentWrite;
 
-    // load ops from the tracked content state: an attachment that is known to be a uniform clear is CLEARed (no memory read), one whose
-    // content was discarded is DONT_CARE, everything else is LOADed
     const auto choose = [&](vkutil::Image *img, bool wants) {
         if (!wants || !img || !img->image)
             return wants ? sync::LoadChoice::Load : sync::LoadChoice::DontCare;
-        if (!state.use_content_load_ops) {
-            sync::stats().loads_kept++;
-            return sync::LoadChoice::Load;
-        }
         const sync::LoadChoice c = sync::derive_load(img->sync.content, true);
         (c == sync::LoadChoice::Clear ? sync::stats().loads_to_clear : c == sync::LoadChoice::DontCare ? sync::stats().loads_to_dontcare : sync::stats().loads_kept)++;
         return c;
     };
     const sync::LoadChoice color_choice = choose(current_color_base_image, current_color_loaded);
     const sync::LoadChoice raw_choice = dyn_pass.has_raw ? choose(current_color_raw_image, true) : sync::LoadChoice::Load;
-    // depth and stencil share one content state: only a scene that loads both can be rewritten; a mixed scene keeps its own ops
-    const bool ds_both = dyn_pass.depth_load && dyn_pass.stencil_load;
-    const sync::LoadChoice ds_choice = ds_both ? choose(current_ds_image, true) : sync::LoadChoice::Load;
-    const sync::ClearValue ds_cleared = current_ds_image ? current_ds_image->sync.cleared_to : sync::ClearValue{};
     const sync::ClearValue color_cleared = current_color_base_image ? current_color_base_image->sync.cleared_to : sync::ClearValue{};
 
     sync::Batch batch;
@@ -826,7 +895,7 @@ void VKContext::begin_dynamic_pass(const vk::ClearDepthStencilValue &ds_clear) {
         if (!img || !img->image)
             return;
         if (loaded && img->sync.layout == vk::ImageLayout::eUndefined) {
-            // never seen by the tracker: the previous path ran on these without a barrier, keep their content
+            // never seen by the tracker: keep their content, assume the layout the sampling code leaves them in
             LOG_WARN_ONCE("Dynamic rendering attachment with untracked layout: assuming the layout the sampling code leaves it in");
             img->sync.layout = layout == vk::ImageLayout::eDepthStencilAttachmentOptimal ? vk::ImageLayout::eDepthStencilReadOnlyOptimal : layout;
         }
@@ -838,9 +907,7 @@ void VKContext::begin_dynamic_pass(const vk::ClearDepthStencilValue &ds_clear) {
     const vk::Format ds_format = current_ds_image ? current_ds_image->format : vk::Format::eUndefined;
     const bool ds_has_stencil = vkutil::format_has_stencil(ds_format);
     const bool ds_has_depth = vkutil::format_has_depth(ds_format);
-    // the pass loads the depth/stencil it is told to; an aspect that is cleared counts as "not loaded" for the layout transition only when both are
-    prepare(current_ds_image, ds_stages, ds_access, vk::ImageLayout::eDepthStencilAttachmentOptimal, (dyn_pass.depth_load || dyn_pass.stencil_load) && ds_choice == sync::LoadChoice::Load,
-        vkutil::aspect_clamped_range(ds_format, vkutil::ds_subresource_range));
+    prepare(current_ds_image, ds_stages, ds_access, vk::ImageLayout::eDepthStencilAttachmentOptimal, ds_loaded, vkutil::aspect_clamped_range(ds_format, vkutil::ds_subresource_range));
     batch.flush(render_cmd);
 
     std::array<vk::RenderingAttachmentInfo, 2> colors{};
@@ -862,30 +929,30 @@ void VKContext::begin_dynamic_pass(const vk::ClearDepthStencilValue &ds_clear) {
         .storeOp = vk::AttachmentStoreOp::eStore,
     };
     colors[1].clearValue.color.setUint32({ 0, 0, 0, 0 });
-    const vk::AttachmentStoreOp store_op = dyn_pass.store ? vk::AttachmentStoreOp::eStore : vk::AttachmentStoreOp::eDontCare;
+    const vk::AttachmentStoreOp store_op = store ? vk::AttachmentStoreOp::eStore : vk::AttachmentStoreOp::eDontCare;
+    const auto ds_load_op = [&](bool wants_load) {
+        if (ds_discard)
+            return vk::AttachmentLoadOp::eDontCare;
+        return wants_load ? vk::AttachmentLoadOp::eLoad : vk::AttachmentLoadOp::eClear;
+    };
     vk::RenderingAttachmentInfo depth{
         .imageView = current_ds_view,
         .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-        .loadOp = dyn_pass.depth_load ? (ds_both && ds_choice == sync::LoadChoice::Clear ? vk::AttachmentLoadOp::eClear
-                                              : ds_both && ds_choice == sync::LoadChoice::DontCare ? vk::AttachmentLoadOp::eDontCare
-                                                                                                   : vk::AttachmentLoadOp::eLoad)
-                                      : vk::AttachmentLoadOp::eClear,
+        .loadOp = ds_load_op(depth_load),
         .storeOp = store_op,
     };
-    depth.clearValue.depthStencil = ds_both && ds_choice == sync::LoadChoice::Clear ? vk::ClearDepthStencilValue{ ds_cleared.depth, ds_cleared.stencil } : ds_clear;
+    depth.clearValue.depthStencil = ds_clear;
     vk::RenderingAttachmentInfo stencil{
         .imageView = current_ds_view,
         .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-        .loadOp = dyn_pass.stencil_load ? (ds_both && ds_choice == sync::LoadChoice::Clear ? vk::AttachmentLoadOp::eClear
-                                                : ds_both && ds_choice == sync::LoadChoice::DontCare ? vk::AttachmentLoadOp::eDontCare
-                                                                                                     : vk::AttachmentLoadOp::eLoad)
-                                        : vk::AttachmentLoadOp::eClear,
+        .loadOp = ds_load_op(stencil_load),
         .storeOp = store_op,
     };
-    stencil.clearValue.depthStencil = ds_both && ds_choice == sync::LoadChoice::Clear ? vk::ClearDepthStencilValue{ ds_cleared.depth, ds_cleared.stencil } : ds_clear;
+    stencil.clearValue.depthStencil = ds_clear;
 
     vk::RenderingInfo rendering{
-        .renderArea = curr_renderpass_info.renderArea,
+        .flags = vk::RenderingFlagBits::eContentsSecondaryCommandBuffers,
+        .renderArea = pass_area,
         .layerCount = 1,
         .colorAttachmentCount = dyn_pass.has_raw ? 2u : 1u,
         .pColorAttachments = colors.data(),
@@ -893,34 +960,30 @@ void VKContext::begin_dynamic_pass(const vk::ClearDepthStencilValue &ds_clear) {
         .pStencilAttachment = ds_has_stencil ? &stencil : nullptr,
     };
     render_cmd.beginRenderingKHR(rendering);
-}
-
-void VKContext::end_dynamic_pass() {
-    namespace sync = vkutil::sync;
+    render_cmd.executeCommands(pass_secondary);
     render_cmd.endRenderingKHR();
 
     const sync::Stage sampled = sync::S::eVertexShader | sync::S::eFragmentShader | sync::S::eTransfer;
     const sync::Access readable = sync::A::eShaderRead | sync::A::eTransferRead | sync::A::eInputAttachmentRead;
-    sync::Batch batch;
+    sync::Batch after;
     const auto finish = [&](vkutil::Image *img, vk::ImageLayout layout, const vk::ImageSubresourceRange &range) {
         if (img && img->image)
-            batch.use_image(img->sync, img->image, range, sampled, readable, layout, false);
+            after.use_image(img->sync, img->image, range, sampled, readable, layout, false);
     };
     finish(current_color_base_image, vk::ImageLayout::eGeneral, vkutil::color_subresource_range);
     if (dyn_pass.has_raw)
         finish(current_color_raw_image, vk::ImageLayout::eGeneral, vkutil::color_subresource_range);
-    finish(current_ds_image, vk::ImageLayout::eDepthStencilReadOnlyOptimal,
-        vkutil::aspect_clamped_range(current_ds_image ? current_ds_image->format : vk::Format::eUndefined, vkutil::ds_subresource_range));
-    batch.flush(render_cmd);
+    finish(current_ds_image, vk::ImageLayout::eDepthStencilReadOnlyOptimal, vkutil::aspect_clamped_range(ds_format, vkutil::ds_subresource_range));
+    after.flush(render_cmd);
 }
 
-void VKContext::stop_render_pass() {
+void VKContext::stop_render_pass(bool scene_end) {
     if (!in_renderpass) {
         LOG_ERROR("Stopping render pass while not in render pass");
         return;
     }
 
-    // do this before ending the render pass
+    // do this before ending the secondary command buffer
     if (is_in_query) {
         render_cmd.endQuery(current_visibility_buffer->query_pool, current_query_idx);
         is_in_query = false;
@@ -930,38 +993,14 @@ void VKContext::stop_render_pass() {
     if (ecv::oracle::gpu::enabled())
         ecv::oracle::gpu::rp_end();
 #endif
-    if (state.use_dynamic_rendering) {
-        end_dynamic_pass();
-        in_renderpass = false;
-        return;
-    }
-    render_cmd.endRenderPass();
+    pass_secondary.end();
+    render_cmd = primary_cmd;
+    emit_pass(scene_end);
     prev_draw_fbfetch = false;
-
-    // sync tracker: what the pass wrote and what its outgoing dependency made visible
-    if (current_color_base_image && current_color_base_image->image)
-        note_pass_end(current_color_base_image->sync, PassAttachment::Color);
-    if (current_color_raw_image && current_color_raw_image->image)
-        note_pass_end(current_color_raw_image->sync, PassAttachment::ColorRaw);
-    if (current_ds_image && current_ds_image->image)
-        note_pass_end(current_ds_image->sync, PassAttachment::DepthStencil);
-
     in_renderpass = false;
 }
 
-void VKContext::abandon_empty_recording() {
-    if (!is_recording)
-        return;
-    if (in_renderpass)
-        stop_render_pass();
-    prerender_cmd.end();
-    render_cmd.end();
-    prerender_cmd = nullptr;
-    render_cmd = nullptr;
-    is_recording = false;
-}
-
-void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNotification &notif2, bool submit) {
+void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNotification &notif2, bool submit, bool scene_end) {
     if (!is_recording) {
         LOG_ERROR("Stopping recording while not recording");
         return;
@@ -971,7 +1010,7 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
     ecv::oracle::gpu::rp_reason("stop_recording");
 #endif
     if (in_renderpass)
-        stop_render_pass();
+        stop_render_pass(scene_end);
 
     struct VisibilityRange {
         uint32_t offset;
@@ -1162,11 +1201,8 @@ void VKContext::check_for_macroblock_change(bool is_draw) {
         // so fallback to the slow path (one scene per draw, can't really do better)
         // TODO: with the feedback loop extension we can do better
         ignore_macroblock = true;
-        // in this case we must load and store the depth stencil each time
-        if (state.use_dynamic_rendering)
-            dyn_pass.depth_load = dyn_pass.stencil_load = dyn_pass.store = true;
-        else
-            current_render_pass = state.pipeline_cache.retrieve_render_pass(current_color_format, true, true, true, !record.color_surface.data, false, record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16, ds_host_format);
+        // in this case every instance must load the depth stencil (its store follows from "this is not the end of the scene")
+        dyn_pass.depth_load = dyn_pass.stencil_load = true;
     }
 
     // use the scissor to know in which macroblock we are
@@ -1292,6 +1328,7 @@ void new_frame(VKContext &context) {
 
     device.resetCommandPool(frame.prerender_pool);
     device.resetCommandPool(frame.render_pool);
+    frame.secondary_cursor = 0;
 
     // set the position in the used descriptor queue back to the beginning
     for (int i = 0; i < 16; i++) {

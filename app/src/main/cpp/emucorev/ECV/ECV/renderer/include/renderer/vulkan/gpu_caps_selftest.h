@@ -382,9 +382,11 @@ inline FbFetchReport run_fbfetch_selftest(const FbFetchInput &in) {
 
         auto image_barrier = [&](vk::CommandBuffer c, vk::Image img, vk::ImageLayout from, vk::ImageLayout to, vk::AccessFlags sa, vk::AccessFlags da,
                                  vk::PipelineStageFlags ss, vk::PipelineStageFlags ds_, const vk::ImageSubresourceRange &range) {
-            const vk::ImageMemoryBarrier b{ .srcAccessMask = sa, .dstAccessMask = da, .oldLayout = from, .newLayout = to,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .image = img, .subresourceRange = range };
-            c.pipelineBarrier(ss, ds_, vk::DependencyFlags(), {}, {}, b);
+            // through the same emitter as the renderer (sync2 or legacy, as the device supports): legacy and sync2 share the low 32 bits of both masks
+            namespace sync = vkutil::sync;
+            sync::explicit_barrier(c, img, range,
+                { sync::Stage(static_cast<VkPipelineStageFlags2>(static_cast<VkPipelineStageFlags>(ss))), sync::Stage(static_cast<VkPipelineStageFlags2>(static_cast<VkPipelineStageFlags>(ds_))),
+                    sync::Access(static_cast<VkAccessFlags2>(static_cast<VkAccessFlags>(sa))), sync::Access(static_cast<VkAccessFlags2>(static_cast<VkAccessFlags>(da))), from, to, true });
         };
 
         // fill the staging buffer with the initial pattern
@@ -442,13 +444,16 @@ inline FbFetchReport run_fbfetch_selftest(const FbFetchInput &in) {
                         begin();
                     }
                     // the same per-draw barrier the renderer records before a fetching draw (scene.cpp)
-                    vk::ImageMemoryBarrier b[2];
-                    b[0] = vk::ImageMemoryBarrier{ .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite, .dstAccessMask = vk::AccessFlagBits::eInputAttachmentRead,
-                        .oldLayout = vk::ImageLayout::eGeneral, .newLayout = vk::ImageLayout::eGeneral, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .image = r.color, .subresourceRange = color_range };
-                    b[1] = b[0];
-                    b[1].image = r.raw;
-                    c.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eFragmentShader, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ArrayProxy<const vk::ImageMemoryBarrier>(2, b));
+                    {
+                        namespace sync = vkutil::sync;
+                        const sync::Barrier self_dep{ sync::S::eColorAttachmentOutput, sync::S::eFragmentShader, sync::A::eColorAttachmentWrite, sync::A::eInputAttachmentRead,
+                            vk::ImageLayout::eGeneral, vk::ImageLayout::eGeneral, true };
+                        sync::Batch fetch_barrier;
+                        fetch_barrier.set_by_region(true);
+                        fetch_barrier.explicit_image(r.color, color_range, self_dep);
+                        fetch_barrier.explicit_image(r.raw, color_range, self_dep);
+                        fetch_barrier.flush(c);
+                    }
                     const Quad &q = quads[batch ? 0 : i];
                     PC pc{};
                     pc.batch = batch ? 1.0f : 0.0f;

@@ -9,8 +9,8 @@ TEST(RenderPassPolicy, DepthIsStoredUnlessProvablyDead) {
     EXPECT_TRUE(derive_depth_store({ true, false, false }));
     EXPECT_TRUE(derive_depth_store({ false, true, false })); // backed by a guest surface: a later reader may exist
     EXPECT_TRUE(derive_depth_store({ false, false, true })); // the pass may restart and LOAD what it stored
-    EXPECT_FALSE(derive_depth_store({ false, false, false })); // unbacked, never restarted, game does not ask: dead
-    // today every scene may restart, so nothing is dropped: the conservative default of the struct
+    EXPECT_FALSE(derive_depth_store({ false, false, false })); // unbacked, last instance of the scene, game does not ask: dead
+    // the struct default is the conservative answer
     EXPECT_TRUE(derive_depth_store(DepthStoreInput{}));
 }
 
@@ -63,26 +63,4 @@ TEST(RenderPassPolicy, UnsupportedSampleCountHasNoPlan) {
     GpuCaps c = ms_caps();
     c.framebuffer_depth_sample_counts = 1;
     EXPECT_EQ(plan_ds_resolve(c, 4, true).kind, DsResolveKind::None);
-}
-
-TEST(RenderPassPolicy, SceneRestartIsNeverRuledOutByWhatIsKnownAtSceneBegin) {
-    // the guest (mid-scene flush) and the draw stream (cast copies) decide later: with the defaults every scene may restart
-    EXPECT_TRUE(scene_may_restart(SceneRestartFacts{}));
-    SceneRestartFacts none;
-    none.guest_mid_scene_flush_possible = false;
-    none.texture_cast_possible = false;
-    EXPECT_FALSE(scene_may_restart(none)); // only a (future) look-ahead can produce this
-    for (int i = 0; i < 4; i++) {
-        SceneRestartFacts f = none;
-        f.shader_interlock = i == 0;
-        f.shell_snapshot = i == 1;
-        f.macroblock_sync = i == 2;
-        f.depth_backed = i == 3;
-        EXPECT_TRUE(scene_may_restart(f)) << i;
-    }
-    // with a look-ahead the unbacked depth store becomes droppable, a backed one never
-    EXPECT_FALSE(derive_depth_store({ false, false, scene_may_restart(none) }));
-    SceneRestartFacts backed = none;
-    backed.depth_backed = true;
-    EXPECT_TRUE(derive_depth_store({ false, true, scene_may_restart(backed) }));
 }

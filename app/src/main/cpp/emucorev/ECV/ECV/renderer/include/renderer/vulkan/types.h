@@ -123,6 +123,9 @@ struct FrameObject {
     vk::CommandPool prerender_pool;
 
     std::vector<vk::Fence> rendered_fences;
+    // secondary command buffers of the deferred pass recording (allocated from render_pool, reused every frame)
+    std::vector<vk::CommandBuffer> secondary_cmds;
+    size_t secondary_cursor = 0;
     // highest timeline value signalled by this frame slot's scene submits (0 = none / timeline tracking off)
     uint64_t rendered_timeline_value = 0;
     // Changes whenever this shared frame slot's command pools are reset.
@@ -359,8 +362,6 @@ struct VKContext : public renderer::Context {
     // we need the format or image for some cases
     vkutil::Image *current_color_base_image = nullptr;
     vkutil::Image *current_ds_image = nullptr;
-    // the current scene's pass loads depth or stencil content (selects the pass' initial depth layout)
-    bool current_ds_loaded = false;
     // the colour attachment is backed by a surface (loaded), not the transient/unbacked one (initial layout Undefined)
     bool current_color_loaded = true;
     // RenderPath::DynamicRendering: what the scene's pass instances begin with (the VkRenderPass objects' loadOp/storeOp/formats)
@@ -368,8 +369,14 @@ struct VKContext : public renderer::Context {
         bool has_raw = false; // second colour attachment (R16G16B16A16_UINT raw bits of an F16 surface)
         bool depth_load = false;
         bool stencil_load = false;
-        bool store = true;
+        bool guest_store = false; // the game asked for the depth to be written back (only meaningful with a guest surface behind the depth)
     } dyn_pass;
+    // deferred pass recording: draws go into pass_secondary, the instance is begun when it ends
+    vk::CommandBuffer primary_cmd{};
+    vk::CommandBuffer pass_secondary{};
+    vk::Rect2D pass_area{};
+    vk::ClearDepthStencilValue pass_ds_clear{};
+    bool interlock_pass_active = false;
     // restarts of the pass inside the current scene (look-ahead statistics, docs/gpu-sync-tracker.md section 9)
     uint32_t scene_pass_starts = 0;
     bool scene_depth_unbacked = false;
@@ -426,13 +433,13 @@ struct VKContext : public renderer::Context {
     void start_recording(bool first_in_scene = false);
     void start_render_pass(bool create_descriptor_set = true);
     // RenderPath::DynamicRendering: tracker barriers + vkCmdBeginRendering / vkCmdEndRendering + the barriers the pass dependencies used to be
-    void begin_dynamic_pass(const vk::ClearDepthStencilValue &ds_clear);
-    void end_dynamic_pass();
-    void stop_render_pass();
-    void stop_recording(const SceGxmNotification &notif1, const SceGxmNotification &notif2, bool submit = true);
+    void begin_deferred_pass();
+    void emit_pass(bool scene_end);
+    // scene_end: this is the last pass instance of the scene (sceGxmEndScene), not a restart
+    void stop_render_pass(bool scene_end = false);
+    void stop_recording(const SceGxmNotification &notif1, const SceGxmNotification &notif2, bool submit = true, bool scene_end = false);
     // Drop an open recording that has no recorded work (an empty scene-segment checkpoint) without
     // submitting it, so the scene can be re-entered with another framebuffer.
-    void abandon_empty_recording();
 
     // check (when the render target has macroblock set) if we are drawing to another block
     void check_for_macroblock_change(bool is_draw);

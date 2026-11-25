@@ -128,7 +128,7 @@ COMMAND(handle_sync_surface_data) {
     if (renderer.current_backend == Backend::Vulkan) {
         vulkan::VKContext *context = reinterpret_cast<vulkan::VKContext *>(render_context);
         if (context->is_recording)
-            context->stop_recording(vertex_notification, fragment_notification);
+            context->stop_recording(vertex_notification, fragment_notification, true, true);
     }
 
     SceGxmColorSurface *surface = &render_context->record.color_surface;

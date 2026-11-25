@@ -701,8 +701,9 @@ vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth
     const uint64_t pass_key = (static_cast<uint64_t>(format) << 32) | static_cast<uint64_t>(ds_format);
     const bool with_raw_attachment = has_raw_attachment && !no_color && !is_color_transient && state.features.preserve_f16_nan_as_u16 && format == vk::Format::eR16G16B16A16Sfloat;
     bool shell_snapshot = false;
-    shell_snapshot = state.current_title_id == "SceShell" && !no_color && !is_color_transient
-        && !with_raw_attachment && format == vk::Format::eR8G8B8A8Unorm;
+    // the SceShell glow always reads a snapshot (PAF samples completed pixels); the copy-snapshot fbfetch rung does it for every title and format
+    shell_snapshot = !no_color && !is_color_transient && !with_raw_attachment
+        && (state.use_copy_snapshot || (state.current_title_id == "SceShell" && format == vk::Format::eR8G8B8A8Unorm));
 
     auto &render_passes_map = no_color
         ? shader_interlock_pass
@@ -1140,7 +1141,7 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
         rendering_info.colorAttachmentCount = with_raw_attachment ? 2 : 1;
         rendering_info.pColorAttachmentFormats = rendering_color_formats.data();
         // the depth/stencil host format of this pipeline (P5: PipelineDsInfo::format instead of state.deep_stencil_use)
-        const vk::Format ds_format = state.deep_stencil_use;
+        const vk::Format ds_format = ds.format;
         rendering_info.depthAttachmentFormat = vkutil::format_has_depth(ds_format) ? ds_format : vk::Format::eUndefined;
         rendering_info.stencilAttachmentFormat = vkutil::format_has_stencil(ds_format) ? ds_format : vk::Format::eUndefined;
         pipeline_info.pNext = &rendering_info;

@@ -967,13 +967,14 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
 #endif
             gpu_strategy = choose_strategy(gpu_caps, forced);
             // apply the table: the existing renderer paths follow the strategy instead of their own ad-hoc probes
-            support_rasterized_order_access = gpu_strategy.fbfetch == FbFetchPath::RasterOrderAttachmentAccess;
+            // ROAA stays on for the dynamic path too (it makes the pipeline blend state coherent); only the input-attachment / copy rungs turn it off
+            support_rasterized_order_access = gpu_caps.roaa_color && gpu_strategy.fbfetch != FbFetchPath::InputAttachmentBarrier && gpu_strategy.fbfetch != FbFetchPath::CopySnapshot;
             support_shader_interlock = gpu_strategy.use_shader_interlock;
             support_sync2 = gpu_strategy.barriers == BarrierStyle::Sync2;
             support_timeline = gpu_strategy.submit == SubmitTracking::TimelineSemaphore;
             support_dyn_rendering = support_local_read = gpu_strategy.render_path == RenderPath::DynamicRendering;
             use_dynamic_rendering = support_dyn_rendering;
-            use_content_load_ops = gpu_strategy.content_load_ops;
+            use_copy_snapshot = gpu_strategy.fbfetch == FbFetchPath::CopySnapshot;
             // the optional-extension map enables everything the driver lists; extensions of paths that were not selected stay off
             std::erase_if(device_extensions, [&](const char *e) {
                 const std::string_view n(e);
@@ -1306,6 +1307,14 @@ static void select_fbfetch_split(VKState &s) {
         }
     }
     s.features.split_fbfetch_between_draws = result != st::Result::Pass;
+    // the split reference path itself disagrees with the CPU model: neither the in-pass fetch nor a split instance can be trusted on this driver,
+    // the last rung of the fbfetch ladder reads a snapshot copy of the attachment instead
+    if (!decided && result == st::Result::NotRun && report.mismatch_split > 0.0005 && !s.use_dynamic_rendering && !s.use_copy_snapshot) {
+        s.use_copy_snapshot = true;
+        s.gpu_strategy.fbfetch = FbFetchPath::CopySnapshot;
+        publish_paths_line(describe(s.gpu_caps, s.gpu_strategy));
+        LOG_WARN("fbfetch: self-test reference path disagrees with the model (mismatch_split {:.5f}): switching to the copy-snapshot rung", report.mismatch_split);
+    }
     LOG_INFO("Framebuffer-fetch self-test: {} (source {}), split between consecutive fetching draws = {}; mismatch in-pass raw {:.5f} float {:.5f} one-draw batch {:.5f} split {:.5f}, {:.0f} ms {}",
         st::to_string(result), source, s.features.split_fbfetch_between_draws, report.mismatch_inplace_raw, report.mismatch_inplace_float, report.mismatch_batch, report.mismatch_split, report.ms, report.note);
 #if ECV_ORACLE && defined(__ANDROID__)

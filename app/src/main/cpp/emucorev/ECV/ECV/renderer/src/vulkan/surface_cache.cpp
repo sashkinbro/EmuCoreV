@@ -1748,70 +1748,19 @@ bool VKSurfaceCache::try_transfer_depth_gpu(Address src_address, Address dst_add
         dst_info->texture.transition_to(cmd, vkutil::ImageLayout::DepthStencilReadOnly, vkutil::ds_subresource_range);
     };
 
-    // Ordering (docs/gpu-sync-tracker.md, hazard 2): this runs as a render-thread command, so the tracker state it touches is the
-    // render thread's. If a scene is being recorded its commands are NOT submitted yet: a separate submission would run BEFORE
-    // the draws that wrote the depth being copied (stale depth) and before the scene that later loads the destination. Record the
-    // copy into the open stream instead, after stopping the pass; draws restart the pass lazily.
+    // The copy is recorded into the scene command stream, in order with the draws that wrote the depth and the scenes that read the destination
+    // (a separate submission cannot be ordered against a scene that is still being recorded). Between two scenes a recording is opened for it:
+    // it is submitted with the next scene. Without a render target there is nothing to order against: the CPU transfer path runs.
     VKContext *recording_context = reinterpret_cast<VKContext *>(state.context);
-    const GpuCopyRoute route = gpu_copy_route(recording_context && recording_context->is_recording && recording_context->render_cmd,
-        recording_context && !recording_context->cmdbuffers_to_submit.empty());
-    if (route == GpuCopyRoute::RecordIntoOpenScene) {
-        if (recording_context->in_renderpass)
-            recording_context->stop_render_pass();
-        record_copy(recording_context->render_cmd);
-        dst_info->depth_content_stored = true;
-        LOG_WARN_ONCE("Depth transfer recorded into the open scene: 0x{:08X} -> 0x{:08X} (pass restart per transfer)", src_address, dst_address);
-        return true;
-    }
-
-    if (route == GpuCopyRoute::QueueBehindPending) {
-        // closed scenes that are queued but not submitted yet (batched submission): join the queue behind them so the copy still
-        // executes after them and before any later scene
-        vk::CommandBuffer queued_cmd = nullptr;
-        {
-            std::lock_guard<std::mutex> lock(state.multithread_pool_mutex);
-            queued_cmd = vkutil::create_single_time_command(state.device, state.multithread_command_pool);
-            record_copy(queued_cmd);
-            queued_cmd.end();
-        }
-        recording_context->cmdbuffers_to_submit.push_back(queued_cmd);
-        state.frame().destroy_queue.add_cmd_buffer(queued_cmd, state.multithread_command_pool);
-        dst_info->depth_content_stored = true;
-        return true;
-    }
-
-    // nothing is open or queued: every earlier scene is already submitted on this queue, so a separate submission is correctly ordered
-    vk::CommandBuffer transfer_cmd = nullptr;
-    vk::Fence fence = state.device.createFence({});
-    {
-        std::lock_guard<std::mutex> lock(state.multithread_pool_mutex);
-        transfer_cmd = vkutil::create_single_time_command(state.device, state.multithread_command_pool);
-        record_copy(transfer_cmd);
-        transfer_cmd.end();
-    }
-
-    vk::SubmitInfo submit_info{};
-    submit_info.setCommandBuffers(transfer_cmd);
-    state.general_queue.submit(submit_info, fence);
-
+    if (!recording_context || !recording_context->render_target)
+        return false;
+    if (!recording_context->is_recording)
+        recording_context->start_recording();
+    if (recording_context->in_renderpass)
+        recording_context->stop_render_pass();
+    record_copy(recording_context->render_cmd);
     dst_info->depth_content_stored = true;
-
-    CallbackRequestFunction vk_callback = [&state = this->state, fence, transfer_cmd]() {
-        const auto result = state.device.waitForFences(fence, vk::True, std::numeric_limits<uint64_t>::max());
-        if (result != vk::Result::eSuccess)
-            LOG_ERROR("Could not wait for the depth transfer fence.");
-
-        state.device.destroyFence(fence);
-
-        std::lock_guard<std::mutex> lock(state.multithread_pool_mutex);
-        state.device.freeCommandBuffers(state.multithread_command_pool, transfer_cmd);
-    };
-    dispatch_gpu_resource_cleanup(state.gpu_request_reader_count.load(std::memory_order_acquire) != 0,
-        [&](CallbackRequestFunction *callback) { return state.request_queue.try_push(CallbackRequest{ callback }); },
-        std::move(vk_callback), []() { LOG_ERROR("Could not release discarded GPU depth transfer resources."); });
-
-    LOG_INFO_ONCE("Depth transfer done on the GPU: 0x{:08X} -> 0x{:08X} {}x{} (scaled {}x{})", src_address, dst_address, width, height, copy_width, copy_height);
-
+    LOG_INFO_ONCE("Depth transfer on the GPU: 0x{:08X} -> 0x{:08X} {}x{} (scaled {}x{})", src_address, dst_address, width, height, copy_width, copy_height);
     return true;
 }
 
@@ -2357,9 +2306,9 @@ Framebuffer &VKSurfaceCache::retrieve_framebuffer_handle(MemState &mem, SceGxmCo
     vk::ImageView attachments[] = { color_result.view, color_result.raw_image ? color_result.raw_image->view : ds_result.view, ds_result.view };
     std::shared_ptr<vkutil::Image> shell_snapshot;
     // (the dynamic rendering path has neither framebuffers nor the shell input-attachment snapshot: local read does the job)
-    if (!state.use_dynamic_rendering && state.current_title_id == "SceShell" && color && !color_result.raw_image
-        && color_result.base_image->format == vk::Format::eR8G8B8A8Unorm) {
-        shell_snapshot = std::make_shared<vkutil::Image>(framebuffer_width, framebuffer_height, vk::Format::eR8G8B8A8Unorm);
+    if (!state.use_dynamic_rendering && color && !color_result.raw_image
+        && (state.use_copy_snapshot || (state.current_title_id == "SceShell" && color_result.base_image->format == vk::Format::eR8G8B8A8Unorm))) {
+        shell_snapshot = std::make_shared<vkutil::Image>(framebuffer_width, framebuffer_height, color_result.base_image->format);
         shell_snapshot->init_image(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eColorAttachment);
         auto &context = *static_cast<VKContext *>(state.context);
         shell_snapshot->transition_to(context.prerender_cmd, vkutil::ImageLayout::StorageImage);

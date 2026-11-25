@@ -539,13 +539,8 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     // multi-pass, or a mid-scene interruption such as a casted-texture copy), the re-begin
     // must load the depth-stencil, never re-run the scene-begin clear
     if (context.is_first_scene_draw && (context.state.features.support_shader_interlock || context.ignore_macroblock || !context.render_target->has_macroblock_sync)) {
-        // update the render pass to load and store the depth and stencil
-        if (context.state.use_dynamic_rendering) {
-            context.dyn_pass.depth_load = context.dyn_pass.stencil_load = context.dyn_pass.store = true;
-        } else {
-            context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(context.current_color_format, true, true, true, !context.record.color_surface.data, false,
-                context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16, context.ds_host_format);
-        }
+        // the following instances load the depth and stencil
+        context.dyn_pass.depth_load = context.dyn_pass.stencil_load = true;
 #if ECV_ORACLE
         if (ecv::oracle::gpu::enabled())
             ecv::oracle::gpu::rp_loads(reinterpret_cast<uint64_t>(static_cast<VkRenderPass>(context.current_render_pass)), "first_draw_upgrade");
@@ -605,12 +600,11 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         // at start-up by gpu_caps_selftest.h, never guessed from a vendor name): restart the instance (attachments stored, then loaded again).
         // The restarted instance must load the depth-stencil (the scene-begin clear must not run twice) without changing the scene's render
         // pass for the instances that follow (a macroblock change still starts from the scene-begin clear).
-        const vk::RenderPass scene_render_pass = context.current_render_pass;
-        context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(context.current_color_format, true, true, true, !context.record.color_surface.data, false,
-            context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16);
+        const auto scene_dyn_pass = context.dyn_pass;
+        context.dyn_pass.depth_load = context.dyn_pass.stencil_load = true;
         context.stop_render_pass();
         context.start_render_pass();
-        context.current_render_pass = scene_render_pass;
+        context.dyn_pass = scene_dyn_pass;
     }
     context.prev_draw_fbfetch = context.state.features.direct_fragcolor && fragment_program_gxp.is_frag_color_used();
 #if ECV_ORACLE
@@ -648,18 +642,13 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         }
     } else if (context.state.features.support_shader_interlock
         && fragment_program_gxp.is_frag_color_used() != context.last_draw_was_framebuffer_fetch) {
-        // restart the render pass to act as a barrier
-        context.render_cmd.endRenderPass();
-
-        if (fragment_program_gxp.is_frag_color_used()) {
-            context.curr_renderpass_info.framebuffer = context.current_shader_interlock_framebuffer;
-            context.curr_renderpass_info.renderPass = context.current_shader_interlock_pass;
-        } else {
-            context.curr_renderpass_info.framebuffer = context.current_framebuffer;
-            context.curr_renderpass_info.renderPass = context.current_render_pass;
-        }
-
-        context.render_cmd.beginRenderPass(context.curr_renderpass_info, vk::SubpassContents::eInline);
+        // restart the render pass to act as a barrier, in the other pass variant (the restarted instance loads the depth stencil)
+        const auto scene_dyn_pass = context.dyn_pass;
+        context.dyn_pass.depth_load = context.dyn_pass.stencil_load = true;
+        context.stop_render_pass();
+        context.interlock_pass_active = fragment_program_gxp.is_frag_color_used();
+        context.start_render_pass(false);
+        context.dyn_pass = scene_dyn_pass;
         context.last_draw_was_framebuffer_fetch = fragment_program_gxp.is_frag_color_used();
     }
 

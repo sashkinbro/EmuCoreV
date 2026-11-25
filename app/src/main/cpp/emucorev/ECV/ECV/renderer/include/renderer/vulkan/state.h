@@ -73,7 +73,8 @@ struct VKState : public renderer::State {
     Strategy gpu_strategy;
     // RenderPath::DynamicRendering: scenes use vkCmdBeginRendering (+ local read), no VkRenderPass/VkFramebuffer objects
     bool use_dynamic_rendering = false;
-    bool use_content_load_ops = false;
+    // FbFetchPath::CopySnapshot: framebuffer-fetch draws read a snapshot copy of the attachment (set from the strategy or the start-up self-test verdict)
+    bool use_copy_snapshot = false;
     // SubmitTracking::TimelineSemaphore: every scene submit signals ++submit_counter (render thread only); null when fences are used
     vk::Semaphore submit_timeline = nullptr;
     uint64_t submit_counter = 0;

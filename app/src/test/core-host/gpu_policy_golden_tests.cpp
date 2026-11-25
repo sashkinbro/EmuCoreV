@@ -43,16 +43,19 @@ std::vector<Entry> table() {
     qcom.roaa_color = true;
     qcom.lazily_allocated_memory = true;
     t.push_back({ "qcom-blob-modern", qcom, {} });
-    ForcedPaths dyn;
-    dyn.dynamic_rendering = true;
-    t.push_back({ "qcom-blob-modern+force-dynamic-rendering", qcom, dyn });
+    ForcedPaths rp;
+    rp.render_pass = true;
+    t.push_back({ "qcom-blob-modern+force-render-pass", qcom, rp });
     ForcedPaths legacy;
     legacy.legacy_barriers = true;
     legacy.fences = true;
     t.push_back({ "qcom-blob-modern+force-legacy-fences", qcom, legacy });
     ForcedPaths ia;
-    ia.input_attachment = true;
-    t.push_back({ "qcom-blob-modern+force-input-attachment", qcom, ia });
+    ia.render_pass = ia.input_attachment = true;
+    t.push_back({ "qcom-blob-modern+force-render-pass-input-attachment", qcom, ia });
+    ForcedPaths cp;
+    cp.render_pass = cp.copy_snapshot = true;
+    t.push_back({ "qcom-blob-modern+force-render-pass-copy-snapshot", qcom, cp });
     // Qualcomm proprietary, old driver: Vulkan 1.1 style, no sync2, no ROAA, no timeline/dynamic rendering
     GpuCaps qcom_old;
     qcom_old.identity = { 0x5143, 8, 0x40100 };
@@ -89,7 +92,7 @@ std::vector<Entry> table() {
     GpuCaps lvp = modern({ 0x10005, 13, 0x1000 });
     lvp.roaa_color = true;
     t.push_back({ "llvmpipe", lvp, {} });
-    t.push_back({ "llvmpipe+force-dynamic-rendering", lvp, dyn });
+    t.push_back({ "llvmpipe+force-render-pass", lvp, rp });
     // PowerVR proprietary, minimal
     GpuCaps pvr;
     pvr.identity = { 0x1010, 7, 0x1000 };
@@ -147,16 +150,12 @@ TEST(GpuPolicyGolden, NamedRulesAreKeyedByDriverNotModelAndApplyToTheRightFamili
     EXPECT_EQ(choose_strategy(c).rule_effects, 0u);
     c.identity = { 0x13B5, 9, 1 };
     EXPECT_TRUE(choose_strategy(c).rule_effects & (1u << static_cast<unsigned>(RuleEffect::RoaaDestinationReadUnverified)));
-    // an unknown driver falls back to the generic policy: legacy barriers, nothing opt-in
+    // an unknown driver gets the same capability-driven tiers (no per-vendor special case) and no rule effect
     c.identity = { 0x9999, 0, 1 };
     const Strategy generic = choose_strategy(c);
     EXPECT_EQ(generic.family, DriverFamily::Unknown);
-    EXPECT_EQ(generic.barriers, BarrierStyle::Legacy);
-    EXPECT_EQ(generic.render_path, RenderPath::RenderPass);
-    // ... unless the lab forces the path
-    ForcedPaths f;
-    f.sync2_barriers = true;
-    EXPECT_EQ(choose_strategy(c, f).barriers, BarrierStyle::Sync2);
+    EXPECT_EQ(generic.rule_effects, 0u);
+    EXPECT_EQ(generic.barriers, BarrierStyle::Sync2);
 }
 
 TEST(GpuPolicyGolden, DriverVersionRangesBoundTheRules) {
