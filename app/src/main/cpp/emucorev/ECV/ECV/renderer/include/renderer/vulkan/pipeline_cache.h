@@ -141,6 +141,9 @@ public:
     bool uses_coherent_framebuffer_fetch() const { return support_coherent_framebuffer_fetch; }
     // if not 0, next time the pipeline cache should be saved (in seconds since epoch)
     uint64_t next_pipeline_cache_save = std::numeric_limits<uint64_t>::max();
+    // periodic save: a session that ends with a kill (lab runs, crashes) still leaves the cache of the last 30 s behind
+    size_t last_saved_pipeline_count = 0;
+    uint64_t last_save_time_s = 0;
 
     // modified by the surface cache, estimates if it is safe to use async pipeline compilation
     // (i.e that it does not causes permanent graphical issues)

@@ -395,6 +395,10 @@ public:
     bool begin_ds_scene_depth_check(const SceGxmDepthStencilSurface &depth_stencil, bool this_scene_stores, Address scene_color_addr);
     void resolve_ds_scene_end(bool scene_wrote_depth);
 
+    void observe_sampled_color(vkutil::Image &image);
+    void observe_sampled_depth(vkutil::Image &image);
+    // sync state of the guest memory mirror buffers the surface write-back copies into (keyed by VkBuffer)
+    std::unordered_map<uint64_t, vkutil::sync::State> mirror_buffer_sync;
     bool try_transfer_depth_gpu(Address src_address, Address dst_address, uint32_t width, uint32_t height);
 
     void perform_pending_casts(VKContext &context, uint16_t vert_texture_count, uint16_t frag_texture_count);

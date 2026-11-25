@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <string_view>
 #include <vector>
 
 namespace vkutil::sync {
@@ -233,6 +234,7 @@ struct Config {
     bool use_sync2 = false; // vkCmdPipelineBarrier2KHR instead of vkCmdPipelineBarrier (gpu_caps decides)
     bool full_barrier = false; // debug/oracle: every barrier becomes ALL_COMMANDS / MEMORY_READ|WRITE
     bool log_hazards = false; // debug/oracle: one log line per emitted barrier
+    bool observe_samples = false; // debug/oracle/lab gate: check every sampled surface against the tracked state (off: no per-draw cost)
     void (*log)(const char *line) = nullptr;
 };
 Config &config();
@@ -244,6 +246,8 @@ struct Stats {
     std::atomic<uint64_t> full_barrier{ 0 }; // flushes widened to ALL_COMMANDS by the oracle fallback
     std::atomic<uint64_t> flushes{ 0 }, api_calls{ 0 }, merged{ 0 };
     std::atomic<uint64_t> raw{ 0 }, war{ 0 }, waw{ 0 }, layout{ 0 }, init{ 0 };
+    std::atomic<uint64_t> feedback_reads{ 0 }; // samples of the attachment being rendered (feedback loop): covered by the self-dependency, not a hazard
+    std::atomic<uint64_t> unsynced_raw{ 0 }, unsynced_layout{ 0 }, unsynced_other{ 0 };
     std::atomic<uint64_t> unsynced_in_pass{ 0 }; // uses that needed a barrier but happened inside a render pass
     std::atomic<uint64_t> pass_covered{ 0 }, pass_explicit{ 0 };
     // load/store look-ahead statistics (docs/gpu-sync-tracker.md section 9): scenes, scenes whose depth has no guest surface behind it,
@@ -276,6 +280,12 @@ inline void count_hazard(Hazard h) {
     case Hazard::Layout: s.layout++; break;
     default: break;
     }
+}
+
+// Does a validation-layer message report a synchronization hazard? Current layers print "<WRITE_AFTER_READ|READ_AFTER_WRITE|WRITE_AFTER_WRITE|
+// WRITE_RACING_WRITE|...> hazard detected"; older ones used VUID-style "SYNC-HAZARD-*" ids.
+inline bool is_sync_hazard_message(std::string_view msg) {
+    return msg.find("hazard detected") != std::string_view::npos || msg.find("SYNC-HAZARD") != std::string_view::npos;
 }
 
 // sync2 stage/access -> legacy masks

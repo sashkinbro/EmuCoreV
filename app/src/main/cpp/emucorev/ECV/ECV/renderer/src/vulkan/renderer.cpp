@@ -126,7 +126,8 @@ static void debug_log_message(std::string_view msg) {
 
     if (log_error) {
         // lab gate: `validation_hazards` must be 0 in a sync-validation run (ECVLAB sync line, result.json)
-        if (msg.contains("SYNC-HAZARD"))
+        // sync validation prints "<WRITE_AFTER_READ|READ_AFTER_WRITE|WRITE_AFTER_WRITE|...> hazard detected"; older layers used SYNC-HAZARD-* ids
+        if (vkutil::sync::is_sync_hazard_message(msg))
             vkutil::sync::stats().validation_hazards++;
         else
             vkutil::sync::stats().validation_errors++;
@@ -943,11 +944,24 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                     oracle_root = oracle_root.parent_path();
                 forced = read_forced_paths(oracle_root.parent_path().string());
                 // <files dir>/ecv-sync-log: one log line per emitted barrier with its hazard class (hazard logger)
+                // vk-sync-validation / ecv-sync-observe: the lab gate runs also count samples that need a barrier the pass dependencies do not give
+                if (fs::exists(oracle_root.parent_path() / "vk-sync-validation") || fs::exists(oracle_root.parent_path() / "ecv-sync-observe"))
+                    vkutil::sync::config().observe_samples = true;
                 if (fs::exists(oracle_root.parent_path() / "ecv-sync-log")) {
                     vkutil::sync::config().log_hazards = true;
                     vkutil::sync::config().log = [](const char *line) { LOG_INFO("{}", line); };
                 }
             }
+#endif
+#ifndef NDEBUG
+            if (std::getenv("ECV_SYNC_LOG")) {
+                vkutil::sync::config().log_hazards = true;
+                vkutil::sync::config().log = [](const char *line) { LOG_INFO("{}", line); };
+            }
+#endif
+            // sampled-surface hazard check: only for runs that look for hazards (no per-draw cost otherwise)
+#ifndef NDEBUG
+            vkutil::sync::config().observe_samples |= std::getenv("ECV_SYNC_OBSERVE") != nullptr || vkutil::sync::config().log_hazards;
 #endif
             gpu_strategy = choose_strategy(gpu_caps, forced);
             // apply the table: the existing renderer paths follow the strategy instead of their own ad-hoc probes
@@ -957,6 +971,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             support_timeline = gpu_strategy.submit == SubmitTracking::TimelineSemaphore;
             support_dyn_rendering = support_local_read = gpu_strategy.render_path == RenderPath::DynamicRendering;
             use_dynamic_rendering = support_dyn_rendering;
+            use_content_load_ops = gpu_strategy.content_load_ops;
             // the optional-extension map enables everything the driver lists; extensions of paths that were not selected stay off
             std::erase_if(device_extensions, [&](const char *e) {
                 const std::string_view n(e);
@@ -1856,6 +1871,12 @@ void VKState::swap_window() {
     flush_shader_cache_writes();
 
         pipeline_cache.next_pipeline_cache_save = std::numeric_limits<uint64_t>::max();
+    } else if (pipeline_cache.pipelines.size() != pipeline_cache.last_saved_pipeline_count
+        && time_s >= pipeline_cache.last_save_time_s + 30 && pipeline_cache.last_save_time_s != 0) {
+        // new pipelines since the last save and the debounce never fired (compiles keep coming): save at least every 30 s
+        pipeline_cache.save_pipeline_cache();
+    } else if (pipeline_cache.last_save_time_s == 0) {
+        pipeline_cache.last_save_time_s = time_s;
     }
 }
 

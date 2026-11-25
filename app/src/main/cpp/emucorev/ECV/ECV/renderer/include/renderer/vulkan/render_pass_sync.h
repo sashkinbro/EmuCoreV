@@ -74,7 +74,9 @@ inline vkutil::sync::PassCoverage pass_coverage(PassAttachment kind, bool conten
     vkutil::sync::PassCoverage c;
     c.raw_src_stages = to_stage2(d[0].srcStageMask);
     c.raw_src_access = to_access2(d[0].srcAccessMask);
-    c.war_src_stages = to_stage2(d[1].srcStageMask);
+    // Transfer readers (cast / write-back copies of the same image) are NOT trusted to the pass dependency: sync validation reports
+    // WRITE_AFTER_READ against vkCmdCopyImageToBuffer from an earlier submission, so they get an explicit execution dependency
+    c.war_src_stages = to_stage2(d[1].srcStageMask) & ~vkutil::sync::Stage(vkutil::sync::S::eTransfer);
     c.dst_stages = to_stage2(rt_attachment_write_stages);
     c.dst_access = to_access2(rt_attachment_access);
     c.initial_layout = !content_loaded ? vk::ImageLayout::eUndefined

@@ -460,7 +460,7 @@ void PipelineCache::read_pipeline_cache() {
     // only now are the keys trusted: they describe pipelines this cache can serve quickly
     for (const uint64_t key : keys)
         pipelines[key] = nullptr;
-    LOG_INFO("pipeline cache: loaded ({} pipelines, {} bytes)", keys.size(), blob.size());
+    LOG_WARN("pipeline cache: loaded ({} pipelines, {} bytes)", keys.size(), blob.size()); // WARN: the lab log level hides INFO
 }
 
 void PipelineCache::save_pipeline_cache() {
@@ -509,7 +509,9 @@ void PipelineCache::save_pipeline_cache() {
         LOG_WARN("Could not replace the pipeline cache: {}", rename_ec.message());
         return;
     }
-    LOG_INFO("Pipeline cache saved");
+    LOG_WARN("pipeline cache: saved ({} pipelines)", pipelines.size());
+    last_saved_pipeline_count = pipelines.size();
+    last_save_time_s = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 }
 
 void PipelineCache::cleanup() {
@@ -1166,7 +1168,8 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
 vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiveType &type, bool consider_for_async, MemState &mem, dsmodel::PassVariant variant) {
     const GxmRecordState &record = context.record;
     // get the hash of the current context
-    uint64_t key = XXH3_64bits(&record, record_pipeline_len);
+    const XXH128_hash_t record_hash = XXH3_128bits(&record, record_pipeline_len);
+    uint64_t key = record_hash.low64;
     key = alpha_surface_pipeline_key(key, record.color_surface.colorFormat);
 
     // the blending, vertex-layout and primitive-type parts are mixed in below with a real hash (P14: they used to be XORed in,
@@ -1178,7 +1181,7 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
     {
         const uint64_t parts[4] = { key, fragment_program.blending_hash, vertex_program_gxm.key_hash, static_cast<uint64_t>(type) };
         key = XXH3_64bits(parts, sizeof(parts));
-        const uint64_t check_parts[5] = { XXH3_64bits_withSeed(&record, record_pipeline_len, 0x9E3779B97F4A7C15ull), parts[1], parts[2], parts[3], static_cast<uint64_t>(record.color_surface.colorFormat) };
+        const uint64_t check_parts[5] = { record_hash.high64, parts[1], parts[2], parts[3], static_cast<uint64_t>(record.color_surface.colorFormat) };
         const uint64_t check = XXH3_64bits_withSeed(check_parts, sizeof(check_parts), 0xC2B2AE3D27D4EB4Full);
         for (int attempt = 0; attempt < 8; attempt++) {
             const auto found = pipeline_checks.find(key);

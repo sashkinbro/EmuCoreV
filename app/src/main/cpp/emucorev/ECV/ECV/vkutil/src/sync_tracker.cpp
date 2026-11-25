@@ -129,6 +129,8 @@ void Batch::global(Stage src_stage, Access src_access, Stage dst_stage, Access d
 }
 
 Hazard Batch::observe(State &st, Stage stage, Access access, vk::ImageLayout layout) {
+    if (!config().observe_samples)
+        return Hazard::None;
     stats().uses++;
     State probe = st;
     Barrier b;
@@ -140,7 +142,7 @@ Hazard Batch::observe(State &st, Stage stage, Access access, vk::ImageLayout lay
     }
     // cannot record inside a render pass: report, and leave the state untouched so every use is flagged
     stats().unsynced_in_pass++;
-    count_hazard(r.hazard);
+    (r.hazard == Hazard::Raw ? stats().unsynced_raw : r.hazard == Hazard::Layout ? stats().unsynced_layout : stats().unsynced_other)++;
     log_barrier("UNSYNCED-IN-PASS", &st, r.hazard, b);
     return r.hazard;
 }
@@ -182,6 +184,32 @@ void Batch::flush(vk::CommandBuffer cmd) {
     stt.image_barriers += images.size();
     stt.buffer_barriers += buffers.size();
     stt.global_barriers += has_global ? 1 : 0;
+
+    if (images.size() == 1 && buffers.empty() && !has_global) {
+        // fast path: stack only. Image::transition_to / explicit_barrier come through here thousands of times per second
+        const ImageEntry &e = images[0];
+        if (cfg.use_sync2) {
+            const vk::ImageMemoryBarrier2 b2{ .srcStageMask = e.b.src_stage, .srcAccessMask = e.b.src_access, .dstStageMask = e.b.dst_stage,
+                .dstAccessMask = e.b.dst_access, .oldLayout = e.b.old_layout, .newLayout = e.b.new_layout,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .image = e.image,
+                .subresourceRange = e.range };
+            vk::DependencyInfo dep{};
+            if (by_region)
+                dep.dependencyFlags = vk::DependencyFlagBits::eByRegion;
+            dep.setImageMemoryBarriers(b2);
+            cmd.pipelineBarrier2KHR(dep);
+        } else {
+            const vk::ImageMemoryBarrier b1{ .srcAccessMask = to_legacy(e.b.src_access), .dstAccessMask = to_legacy(e.b.dst_access),
+                .oldLayout = e.b.old_layout, .newLayout = e.b.new_layout, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .image = e.image, .subresourceRange = e.range };
+            cmd.pipelineBarrier(to_legacy(e.b.src_stage, false), to_legacy(e.b.dst_stage, true),
+                by_region ? vk::DependencyFlagBits::eByRegion : vk::DependencyFlags(), {}, {}, b1);
+        }
+        stt.api_calls++;
+        images.clear();
+        by_region = false;
+        return;
+    }
 
     if (cfg.use_sync2) {
         std::vector<vk::ImageMemoryBarrier2> img2;
@@ -269,7 +297,7 @@ extern "C" int ecv_sync_summary(char *buf, unsigned long n) {
     return std::snprintf(buf, n,
         "sync2=%d full_barrier=%d uses=%llu elided=%llu image_barriers=%llu buffer_barriers=%llu global_barriers=%llu api_calls=%llu merged=%llu "
         "raw=%llu war=%llu waw=%llu layout=%llu init=%llu unsynced_in_pass=%llu pass_covered=%llu pass_explicit=%llu "
-        "validation_hazards=%llu validation_errors=%llu scenes=%llu scenes_depth_unbacked=%llu scenes_restarted=%llu scenes_unbacked_restarted=%llu loads_to_clear=%llu loads_to_dontcare=%llu loads_kept=%llu",
+        "validation_hazards=%llu validation_errors=%llu feedback_reads=%llu unsynced_raw=%llu unsynced_layout=%llu unsynced_other=%llu scenes=%llu scenes_depth_unbacked=%llu scenes_restarted=%llu scenes_unbacked_restarted=%llu loads_to_clear=%llu loads_to_dontcare=%llu loads_kept=%llu",
         c.use_sync2 ? 1 : 0, c.full_barrier ? 1 : 0, static_cast<unsigned long long>(s.uses.load()), static_cast<unsigned long long>(s.elided.load()),
         static_cast<unsigned long long>(s.image_barriers.load()), static_cast<unsigned long long>(s.buffer_barriers.load()),
         static_cast<unsigned long long>(s.global_barriers.load()), static_cast<unsigned long long>(s.api_calls.load()), static_cast<unsigned long long>(s.merged.load()),
@@ -277,7 +305,9 @@ extern "C" int ecv_sync_summary(char *buf, unsigned long n) {
         static_cast<unsigned long long>(s.layout.load()), static_cast<unsigned long long>(s.init.load()),
         static_cast<unsigned long long>(s.unsynced_in_pass.load()), static_cast<unsigned long long>(s.pass_covered.load()),
         static_cast<unsigned long long>(s.pass_explicit.load()), static_cast<unsigned long long>(s.validation_hazards.load()),
-        static_cast<unsigned long long>(s.validation_errors.load()), static_cast<unsigned long long>(s.scenes.load()),
+        static_cast<unsigned long long>(s.validation_errors.load()), static_cast<unsigned long long>(s.feedback_reads.load()),
+        static_cast<unsigned long long>(s.unsynced_raw.load()), static_cast<unsigned long long>(s.unsynced_layout.load()),
+        static_cast<unsigned long long>(s.unsynced_other.load()), static_cast<unsigned long long>(s.scenes.load()),
         static_cast<unsigned long long>(s.scenes_depth_unbacked.load()), static_cast<unsigned long long>(s.scenes_restarted.load()),
         static_cast<unsigned long long>(s.scenes_unbacked_restarted.load()), static_cast<unsigned long long>(s.loads_to_clear.load()),
         static_cast<unsigned long long>(s.loads_to_dontcare.load()), static_cast<unsigned long long>(s.loads_kept.load()));

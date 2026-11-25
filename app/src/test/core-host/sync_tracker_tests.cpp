@@ -208,11 +208,43 @@ TEST(SyncTracker, ObserveInsideARenderPassCountsAnUnsyncedUseAndKeepsTheStateUnt
     State st;
     Barrier b;
     track(st, S::eComputeShader, A::eShaderWrite, kGeneral, false, b);
+    config().observe_samples = true; // the check is opt-in (lab gate runs)
     const uint64_t before = stats().unsynced_in_pass.load();
     EXPECT_NE(Batch::observe(st, S::eFragmentShader, A::eShaderRead, kGeneral), Hazard::None);
     EXPECT_EQ(stats().unsynced_in_pass.load(), before + 1);
     // still flagged on the next use: the state did not pretend the barrier happened
     EXPECT_NE(Batch::observe(st, S::eFragmentShader, A::eShaderRead, kGeneral), Hazard::None);
+}
+
+TEST(SyncTracker, ObserveIsAFreeNoOpUnlessEnabled) {
+    State st;
+    Barrier b;
+    track(st, S::eComputeShader, A::eShaderWrite, kGeneral, false, b);
+    config().observe_samples = false;
+    const uint64_t before = stats().unsynced_in_pass.load();
+    EXPECT_EQ(Batch::observe(st, S::eFragmentShader, A::eShaderRead, kGeneral), Hazard::None);
+    EXPECT_EQ(stats().unsynced_in_pass.load(), before);
+    config().observe_samples = true;
+}
+
+TEST(SyncTracker, PassCoverageGivesTransferReadersAnExplicitDependency) {
+    // sync validation reports WRITE_AFTER_READ for a draw after a vkCmdCopyImageToBuffer even though dependency [1] names TRANSFER
+    State st;
+    st.layout = kGeneral;
+    note_pass_end(st, PassAttachment::Color);
+    Barrier b;
+    track(st, S::eTransfer, A::eTransferRead, kGeneral, false, b); // a write-back copy of the surface
+    Barrier pass_barrier;
+    const UseResult r = track_pass_begin(st, pass_coverage(PassAttachment::Color, true), pass_barrier);
+    ASSERT_TRUE(r.barrier);
+    EXPECT_TRUE(has(pass_barrier.src_stage, S::eTransfer));
+    EXPECT_FALSE(any(pass_barrier.src_access));
+    // sampled readers stay covered by the pass dependency
+    State st2;
+    st2.layout = kGeneral;
+    note_pass_end(st2, PassAttachment::Color);
+    track(st2, S::eFragmentShader, A::eShaderRead, kGeneral, false, b);
+    EXPECT_FALSE(track_pass_begin(st2, pass_coverage(PassAttachment::Color, true), pass_barrier).barrier);
 }
 
 TEST(SyncTracker, TwoUsesOfOneImageInABatchMergeIntoOneBarrier) {
@@ -246,4 +278,14 @@ TEST(GpuCopyRoute, DepthTransferIsRecordedWhereTheSceneStreamIs) {
     EXPECT_EQ(gpu_copy_route(false, true), GpuCopyRoute::QueueBehindPending);
     // nothing pending: queue order alone is enough
     EXPECT_EQ(gpu_copy_route(false, false), GpuCopyRoute::SeparateSubmit);
+}
+
+TEST(SyncValidationMessages, TheLayersHazardFormatsAreCounted) {
+    // verbatim from the Anbernic sync-validation run (runs-gpusync2-V)
+    EXPECT_TRUE(is_sync_hazard_message("Validation layer: VkValidation:Queue[0xB400007CC83DD7A0]:I0:L929810911: vkQueueSubmit(): WRITE_AFTER_READ hazard detected. vkCmdDrawIndexed (from VkCommandBuffer 0xb400007ca86cb230 ..."));
+    EXPECT_TRUE(is_sync_hazard_message("vkQueueSubmit(): WRITE_AFTER_WRITE hazard detected. vkCmdCopyImageToBuffer (from VkCommandBuffer 0x1 ..."));
+    EXPECT_TRUE(is_sync_hazard_message("vkCmdDraw(): READ_AFTER_WRITE hazard detected."));
+    EXPECT_TRUE(is_sync_hazard_message("SYNC-HAZARD-WRITE-AFTER-READ: older layer id"));
+    EXPECT_FALSE(is_sync_hazard_message("vkCmdBeginRenderPass(): This render pass does not have VkRenderPassCreateInfo.pAttachments->loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR"));
+    EXPECT_FALSE(is_sync_hazard_message(""));
 }

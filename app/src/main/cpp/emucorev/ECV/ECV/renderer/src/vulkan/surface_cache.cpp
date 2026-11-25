@@ -1223,8 +1223,7 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
         };
 
         // sampled directly by the draws of this scene: the pass dependencies must already cover it (counted if not)
-        vkutil::sync::Batch::observe(info.texture.sync, vkutil::sync::S::eVertexShader | vkutil::sync::S::eFragmentShader,
-            vkutil::sync::A::eShaderRead, vk::ImageLayout::eGeneral);
+        observe_sampled_color(info.texture);
         // if everything matches
         if (vk_format == info.texture.format && swizzle == info.swizzle)
             return TextureLookupResult{
@@ -1637,8 +1636,7 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
         };
     } else {
         // the renderpass external dependencies should take care of the barrier (the tracker verifies that and counts a miss)
-        vkutil::sync::Batch::observe(info.texture.sync, vkutil::sync::S::eVertexShader | vkutil::sync::S::eFragmentShader,
-            vkutil::sync::A::eShaderRead, vk::ImageLayout::eGeneral);
+        observe_sampled_color(info.texture);
         if (swizzle == info.swizzle && vk_format == info.texture.format)
             // we can use the same texture view
             return TextureLookupResult{
@@ -1752,7 +1750,7 @@ bool VKSurfaceCache::try_transfer_depth_gpu(Address src_address, Address dst_add
             recording_context->stop_render_pass();
         record_copy(recording_context->render_cmd);
         dst_info->depth_content_stored = true;
-        LOG_INFO_ONCE("Depth transfer recorded into the open scene: 0x{:08X} -> 0x{:08X}", src_address, dst_address);
+        LOG_WARN_ONCE("Depth transfer recorded into the open scene: 0x{:08X} -> 0x{:08X} (pass restart per transfer)", src_address, dst_address);
         return true;
     }
 
@@ -2106,8 +2104,7 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_tex
     found_info->last_used_scene = reinterpret_cast<VKContext *>(state.context)->scene_timestamp;
 
     // depth sampled as a texture by this scene's draws (Killzone depth of field): verify the pass dependencies cover it
-    vkutil::sync::Batch::observe(cached_info.texture.sync, vkutil::sync::S::eVertexShader | vkutil::sync::S::eFragmentShader,
-        vkutil::sync::A::eShaderRead, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
+    observe_sampled_depth(cached_info.texture);
 
     // take MSAA into account
     if (cached_info.multisample_mode != SCE_GXM_MULTISAMPLE_NONE)
@@ -2261,6 +2258,32 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_tex
         img_view.layout,
         img_view.format
     };
+}
+
+// A surface sampled while it is also an attachment of the running pass is a feedback loop (the game reads what it is drawing): that is
+// ordered by the attachment access itself (rasterisation order / the in-pass self-dependency), not by a barrier, so it is not a hazard.
+void VKSurfaceCache::observe_sampled_color(vkutil::Image &image) {
+    if (!vkutil::sync::config().observe_samples)
+        return;
+    const VKContext *ctx = reinterpret_cast<VKContext *>(state.context);
+    if (ctx && (&image == ctx->current_color_base_image || &image == ctx->current_color_raw_image)) {
+        vkutil::sync::stats().feedback_reads++;
+        return;
+    }
+    vkutil::sync::Batch::observe(image.sync, vkutil::sync::S::eVertexShader | vkutil::sync::S::eFragmentShader, vkutil::sync::A::eShaderRead,
+        image.sync.layout == vk::ImageLayout::eUndefined ? vk::ImageLayout::eGeneral : vk::ImageLayout::eGeneral);
+}
+
+void VKSurfaceCache::observe_sampled_depth(vkutil::Image &image) {
+    if (!vkutil::sync::config().observe_samples)
+        return;
+    const VKContext *ctx = reinterpret_cast<VKContext *>(state.context);
+    if (ctx && &image == ctx->current_ds_image) {
+        vkutil::sync::stats().feedback_reads++;
+        return;
+    }
+    vkutil::sync::Batch::observe(image.sync, vkutil::sync::S::eVertexShader | vkutil::sync::S::eFragmentShader, vkutil::sync::A::eShaderRead,
+        vk::ImageLayout::eDepthStencilReadOnlyOptimal);
 }
 
 static Framebuffer empty_framebuffer{};
@@ -2871,6 +2894,12 @@ ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {
             static_cast<uint32_t>(last_written_surface->format), sync_x0, sync_y0, sync_w, sync_h, partial_scene_sync);
 #endif
 
+    {
+        // consecutive scenes write the same mirror buffer: WAW dependency (sync validation: WRITE_AFTER_WRITE between two vkCmdCopyImageToBuffer)
+        vkutil::sync::Batch mirror_batch;
+        mirror_batch.use_buffer(mirror_buffer_sync[reinterpret_cast<uint64_t>(static_cast<VkBuffer>(buffer))], buffer, vkutil::sync::S::eTransfer, vkutil::sync::A::eTransferWrite);
+        mirror_batch.flush(cmd_buffer);
+    }
     cmd_buffer.copyImageToBuffer(image_to_copy, image_layout, buffer, copy);
 
     ColorSurfaceCacheInfo *return_value = last_written_surface;

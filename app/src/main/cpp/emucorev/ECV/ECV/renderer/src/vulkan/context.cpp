@@ -795,6 +795,10 @@ void VKContext::begin_dynamic_pass(const vk::ClearDepthStencilValue &ds_clear) {
     const auto choose = [&](vkutil::Image *img, bool wants) {
         if (!wants || !img || !img->image)
             return wants ? sync::LoadChoice::Load : sync::LoadChoice::DontCare;
+        if (!state.use_content_load_ops) {
+            sync::stats().loads_kept++;
+            return sync::LoadChoice::Load;
+        }
         const sync::LoadChoice c = sync::derive_load(img->sync.content, true);
         (c == sync::LoadChoice::Clear ? sync::stats().loads_to_clear : c == sync::LoadChoice::DontCare ? sync::stats().loads_to_dontcare : sync::stats().loads_kept)++;
         return c;

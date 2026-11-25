@@ -178,6 +178,7 @@ struct ForcedPaths {
     bool fences = false, timeline = false;
     bool normal_memory = false, lazy_memory = false;
     bool roaa = false, local_read = false, input_attachment = false, copy_snapshot = false;
+    bool content_load_ops = false;
     bool dynamic_rendering = false, render_pass = false; // render_pass = stay on VkRenderPass objects
     bool color_only_resolve = false;
 };
@@ -196,6 +197,10 @@ struct Implemented {
     bool dynamic_rendering = true; // context.cpp / pipeline_cache.cpp: vkCmdBeginRendering path with explicit tracker barriers
     // opt-in until a device A/B (B025 table) says it is equal or better: `ecv-force-path-dynamic-rendering` selects it
     bool dynamic_auto = false;
+    // Tracked-content load ops (Cleared -> CLEAR, Invalidated -> DONT_CARE) on the dynamic path. Opt-in: a lavapipe replay A/B showed run-to-run
+    // variation (max 3 on 24 px) with it on and none with it off, which points at a surface whose content changed through a path the
+    // tracker does not see. `ecv-force-path-content-load-ops` enables it for the lab until that is understood.
+    bool content_load_auto = false;
     bool fbfetch_input_attachment = true;
     bool fbfetch_copy = false; // the generic copy rung (only the SceShell glow snapshot exists)
     bool ds_resolve = true; // render_pass_policy.h::plan_ds_resolve; MSAA itself is B140 (C:\w\msaa)
@@ -213,6 +218,7 @@ struct Strategy {
     bool state_driven_load_store = true;
     // which request could not be honoured (forced path not supported): shown in the log
     bool force_rejected = false;
+    bool content_load_ops = false;
     DriverFamily family = DriverFamily::Unknown;
     // rule effects that apply to this identity (bit per RuleEffect). None changes a selection today: they are verdict flags for the B025 work
     uint32_t rule_effects = 0;
@@ -287,6 +293,7 @@ inline Strategy choose_strategy(const GpuCaps &c, const ForcedPaths &f = {}, con
     // ROAA wins over interlock)
     s.use_shader_interlock = c.shader_interlock && !dr && !f.roaa && s.fbfetch != FbFetchPath::RasterOrderAttachmentAccess
         && s.fbfetch != FbFetchPath::DynamicRenderingLocalRead && !f.input_attachment && !f.copy_snapshot;
+    s.content_load_ops = dr && (f.content_load_ops || impl.content_load_auto);
     // MSAA resolve
     const bool ms = c.supports_samples(4) || c.supports_samples(2);
     if (!ms)
@@ -353,6 +360,8 @@ inline std::string describe(const GpuCaps &c, const Strategy &s) {
     r += c.depth_stencil_resolve ? "1" : "0";
     r += " load_store=";
     r += s.state_driven_load_store ? "state" : "fixed";
+    r += " content_load_ops=";
+    r += s.content_load_ops ? "1" : "0";
     r += " forced_rejected=";
     r += s.force_rejected ? "1" : "0";
     return r;
@@ -370,6 +379,7 @@ inline bool apply_force_name(ForcedPaths &f, std::string_view name) {
     else if (name == "roaa") f.roaa = true;
     else if (name == "dynamic-rendering") f.dynamic_rendering = true;
     else if (name == "render-pass") f.render_pass = true;
+    else if (name == "content-load-ops") f.content_load_ops = true;
     else if (name == "local-read") f.local_read = true;
     else if (name == "input-attachment") f.input_attachment = true;
     else if (name == "copy-snapshot") f.copy_snapshot = true;
@@ -377,7 +387,7 @@ inline bool apply_force_name(ForcedPaths &f, std::string_view name) {
     else return false;
     return true;
 }
-inline constexpr std::array<std::string_view, 13> force_path_names = { "dynamic-rendering", "render-pass", "legacy-barriers", "sync2-barriers", "fences", "timeline",
+inline constexpr std::array<std::string_view, 14> force_path_names = { "content-load-ops", "dynamic-rendering", "render-pass", "legacy-barriers", "sync2-barriers", "fences", "timeline",
     "normal-memory", "lazy-memory", "roaa", "local-read", "input-attachment", "copy-snapshot", "color-only-resolve" };
 
 } // namespace renderer::vulkan
