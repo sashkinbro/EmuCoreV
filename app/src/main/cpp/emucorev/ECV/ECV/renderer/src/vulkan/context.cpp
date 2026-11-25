@@ -805,8 +805,8 @@ void VKContext::begin_dynamic_pass(const vk::ClearDepthStencilValue &ds_clear) {
     if (dyn_pass.has_raw)
         prepare(current_color_raw_image, color_stages, color_access, vk::ImageLayout::eGeneral, true, vkutil::color_subresource_range);
     const vk::Format ds_format = current_ds_image ? current_ds_image->format : vk::Format::eUndefined;
-    const bool ds_has_stencil = ds_format == vk::Format::eD24UnormS8Uint || ds_format == vk::Format::eD32SfloatS8Uint
-        || ds_format == vk::Format::eD16UnormS8Uint || ds_format == vk::Format::eS8Uint;
+    const bool ds_has_stencil = vkutil::format_has_stencil(ds_format);
+    const bool ds_has_depth = vkutil::format_has_depth(ds_format);
     // the pass loads the depth/stencil it is told to; an aspect that is cleared counts as "not loaded" for the layout transition only when both are
     prepare(current_ds_image, ds_stages, ds_access, vk::ImageLayout::eDepthStencilAttachmentOptimal, dyn_pass.depth_load || dyn_pass.stencil_load,
         vkutil::aspect_clamped_range(ds_format, vkutil::ds_subresource_range));
@@ -846,7 +846,7 @@ void VKContext::begin_dynamic_pass(const vk::ClearDepthStencilValue &ds_clear) {
         .layerCount = 1,
         .colorAttachmentCount = dyn_pass.has_raw ? 2u : 1u,
         .pColorAttachments = colors.data(),
-        .pDepthAttachment = &depth,
+        .pDepthAttachment = ds_has_depth ? &depth : nullptr,
         .pStencilAttachment = ds_has_stencil ? &stencil : nullptr,
     };
     render_cmd.beginRenderingKHR(rendering);

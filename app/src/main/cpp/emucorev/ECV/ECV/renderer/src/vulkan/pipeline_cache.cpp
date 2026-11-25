@@ -1137,11 +1137,10 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
         rendering_color_formats = { color_format, vk::Format::eR16G16B16A16Uint };
         rendering_info.colorAttachmentCount = with_raw_attachment ? 2 : 1;
         rendering_info.pColorAttachmentFormats = rendering_color_formats.data();
-        rendering_info.depthAttachmentFormat = state.deep_stencil_use;
+        // the depth/stencil host format of this pipeline (P5: PipelineDsInfo::format instead of state.deep_stencil_use)
         const vk::Format ds_format = state.deep_stencil_use;
-        const bool ds_has_stencil = ds_format == vk::Format::eD24UnormS8Uint || ds_format == vk::Format::eD32SfloatS8Uint
-            || ds_format == vk::Format::eD16UnormS8Uint || ds_format == vk::Format::eS8Uint;
-        rendering_info.stencilAttachmentFormat = ds_has_stencil ? ds_format : vk::Format::eUndefined;
+        rendering_info.depthAttachmentFormat = vkutil::format_has_depth(ds_format) ? ds_format : vk::Format::eUndefined;
+        rendering_info.stencilAttachmentFormat = vkutil::format_has_stencil(ds_format) ? ds_format : vk::Format::eUndefined;
         pipeline_info.pNext = &rendering_info;
         pipeline_info.renderPass = nullptr;
     }
