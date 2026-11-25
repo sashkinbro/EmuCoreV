@@ -22,6 +22,7 @@
 
 #include <renderer/functions.h>
 #include <renderer/types.h>
+#include <renderer/shaders.h>
 #include <renderer/vulkan/functions.h>
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/frame_runtime_reset.h>
@@ -1717,6 +1718,7 @@ void VKState::swap_window() {
 
     if (time_s >= pipeline_cache.next_pipeline_cache_save) {
         pipeline_cache.save_pipeline_cache();
+    flush_shader_cache_writes();
 
         pipeline_cache.next_pipeline_cache_save = std::numeric_limits<uint64_t>::max();
     }
@@ -2537,6 +2539,7 @@ void VKState::preclose_action() {
     if (shaders_path.empty())
         return;
 
+    log_shader_cache_summary("session end");
     pipeline_cache.save_pipeline_cache();
 }
 

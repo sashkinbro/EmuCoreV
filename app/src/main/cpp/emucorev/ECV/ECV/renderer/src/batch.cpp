@@ -22,6 +22,7 @@
 #include <renderer/functions.h>
 #include <renderer/state.h>
 #include <renderer/types.h>
+#include <renderer/shaders.h>
 
 #include <renderer/vulkan/types.h>
 
@@ -264,6 +265,8 @@ static void render_loop_body(renderer::State &state, DisplayState &display, GxmS
         }
 
         state.precompile_queue.clear();
+        shader_cache_end_warmup(state);
+        log_shader_cache_summary("pre-warm done");
 
         if (progress_overlay) {
             if (!state.set_current()) {

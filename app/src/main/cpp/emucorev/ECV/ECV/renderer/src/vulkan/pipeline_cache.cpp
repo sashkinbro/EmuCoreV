@@ -557,7 +557,7 @@ vk::PipelineShaderStageCreateInfo PipelineCache::retrieve_shader(const SceGxmPro
             LOG_INFO("Generating vulkan spv shader {}", hash_text);
             const std::string shader_version = fmt::format("vk{}", shader::CURRENT_VERSION);
 
-            shader::usse::SpirvCode source = load_spirv_shader(*program, state.features, true, hints, maskupdate, state.shaders_path, state.shaders_log_path, shader_version, true);
+            shader::usse::SpirvCode source = load_spirv_shader(*program, state.features, true, hints, maskupdate, state.shaders_path, state.shaders_log_path, shader_version, false, renderer::shader_cache_key(state));
 
             if (source.empty()) {
                 LOG_ERROR("Vulkan shader {} generated no SPIR-V", hash_text);
@@ -870,6 +870,7 @@ void PipelineCache::compiler_thread(MemState &mem) {
         const auto time_s = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         next_pipeline_cache_save = time_s + pipeline_cache_save_delay;
 
+        renderer::shader_cache_stats().pipelines_compiled++;
         state.shaders_count_compiled++;
 
         delete request;
@@ -1120,6 +1121,7 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
 
         if (!already_in_cache)
             state.shaders_count_compiled++;
+        (already_in_cache ? renderer::shader_cache_stats().pipelines_cached : renderer::shader_cache_stats().pipelines_compiled)++;
 
 #if ECV_ORACLE
         if (!result)
@@ -1138,7 +1140,7 @@ vk::ShaderModule PipelineCache::load_cached_shader_module(const Sha256Hash &hash
     Sha256Hash shader_hash;
     memcpy(shader_hash.data(), hash.data(), sizeof(Sha256Hash));
     const std::string shader_file_name = fmt::format("vk{}-{}.spv", shader::CURRENT_VERSION, hex_string(shader_hash));
-    const std::vector<uint32_t> source = renderer::pre_load_shader_spirv(state.shaders_path / shader_file_name);
+    const std::vector<uint32_t> source = renderer::pre_load_shader_spirv(state.shaders_path / shader_file_name, renderer::shader_cache_key(state));
 
     if (source.empty())
         return nullptr;
