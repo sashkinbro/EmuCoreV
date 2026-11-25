@@ -45,6 +45,26 @@ enum class Hazard : uint8_t {
     Layout, // layout change (always a full dependency on everything before)
 };
 
+// What an attachment is known to contain (EmuCoreX "tracked content state"): Dirty = unknown / rendered, LOAD it; Cleared = every texel equals
+// `cleared_to`, a pass can CLEAR instead of LOAD; Invalidated = nobody needs the content (discarded and not written since), DONT_CARE.
+enum class Content : uint8_t { Dirty, Cleared, Invalidated };
+struct ClearValue {
+    float color[4] = { 0, 0, 0, 0 };
+    float depth = 1.0f;
+    uint32_t stencil = 0;
+};
+enum class LoadChoice : uint8_t { Load, Clear, DontCare };
+// Load op for an attachment the pass was going to LOAD (`wants_content`). Never turns a non-load into a load.
+inline LoadChoice derive_load(Content c, bool wants_content) {
+    if (!wants_content)
+        return LoadChoice::DontCare; // callers keep their own clear/dont-care choice for attachments that are not loaded
+    switch (c) {
+    case Content::Cleared: return LoadChoice::Clear;
+    case Content::Invalidated: return LoadChoice::DontCare;
+    default: return LoadChoice::Load;
+    }
+}
+
 // Tracked state of one image or buffer (all subresources are tracked together).
 struct State {
     vk::ImageLayout layout = vk::ImageLayout::eUndefined; // images only
@@ -54,6 +74,8 @@ struct State {
     // the last write has been made available and visible to every (stage in vis_stages) x (access in vis_access)
     Stage vis_stages{};
     Access vis_access{};
+    Content content = Content::Dirty;
+    ClearValue cleared_to{};
     uint32_t epoch = 0; // submit epoch of the last use (diagnostics: a hazard across epochs is an inter-submit hazard)
     const char *name = nullptr; // static string for logs, optional
 
@@ -123,6 +145,12 @@ inline UseResult track(State &st, Stage stage, Access access, vk::ImageLayout ne
         res.barrier = true;
     }
     res.hazard = hz;
+
+    // ---- content state ----
+    if (is_write)
+        st.content = Content::Dirty;
+    else if (discard && layout_change)
+        st.content = Content::Invalidated;
 
     // ---- state update ----
     if (layout_change) {
@@ -220,6 +248,8 @@ struct Stats {
     std::atomic<uint64_t> pass_covered{ 0 }, pass_explicit{ 0 };
     // load/store look-ahead statistics (docs/gpu-sync-tracker.md section 9): scenes, scenes whose depth has no guest surface behind it,
     // scenes whose pass started more than once, and the intersection. unbacked && !restarted = scenes whose depth store was dead.
+    // attachments the pass was going to LOAD that the content state turned into CLEAR / DONT_CARE (dynamic rendering path)
+    std::atomic<uint64_t> loads_to_clear{ 0 }, loads_to_dontcare{ 0 }, loads_kept{ 0 };
     std::atomic<uint64_t> scenes{ 0 }, scenes_depth_unbacked{ 0 }, scenes_restarted{ 0 }, scenes_unbacked_restarted{ 0 };
     std::atomic<uint64_t> validation_hazards{ 0 }, validation_errors{ 0 }; // from VK_LAYER_KHRONOS_validation (debug)
 };

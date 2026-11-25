@@ -790,6 +790,23 @@ void VKContext::begin_dynamic_pass(const vk::ClearDepthStencilValue &ds_clear) {
     const sync::Stage ds_stages = sync::S::eEarlyFragmentTests | sync::S::eLateFragmentTests;
     const sync::Access ds_access = sync::A::eDepthStencilAttachmentRead | sync::A::eDepthStencilAttachmentWrite;
 
+    // load ops from the tracked content state: an attachment that is known to be a uniform clear is CLEARed (no memory read), one whose
+    // content was discarded is DONT_CARE, everything else is LOADed
+    const auto choose = [&](vkutil::Image *img, bool wants) {
+        if (!wants || !img || !img->image)
+            return wants ? sync::LoadChoice::Load : sync::LoadChoice::DontCare;
+        const sync::LoadChoice c = sync::derive_load(img->sync.content, true);
+        (c == sync::LoadChoice::Clear ? sync::stats().loads_to_clear : c == sync::LoadChoice::DontCare ? sync::stats().loads_to_dontcare : sync::stats().loads_kept)++;
+        return c;
+    };
+    const sync::LoadChoice color_choice = choose(current_color_base_image, current_color_loaded);
+    const sync::LoadChoice raw_choice = dyn_pass.has_raw ? choose(current_color_raw_image, true) : sync::LoadChoice::Load;
+    // depth and stencil share one content state: only a scene that loads both can be rewritten; a mixed scene keeps its own ops
+    const bool ds_both = dyn_pass.depth_load && dyn_pass.stencil_load;
+    const sync::LoadChoice ds_choice = ds_both ? choose(current_ds_image, true) : sync::LoadChoice::Load;
+    const sync::ClearValue ds_cleared = current_ds_image ? current_ds_image->sync.cleared_to : sync::ClearValue{};
+    const sync::ClearValue color_cleared = current_color_base_image ? current_color_base_image->sync.cleared_to : sync::ClearValue{};
+
     sync::Batch batch;
     const auto prepare = [&](vkutil::Image *img, sync::Stage stages, sync::Access access, vk::ImageLayout layout, bool loaded, const vk::ImageSubresourceRange &range) {
         if (!img || !img->image)
@@ -801,14 +818,14 @@ void VKContext::begin_dynamic_pass(const vk::ClearDepthStencilValue &ds_clear) {
         }
         batch.use_image(img->sync, img->image, range, stages, access, layout, !loaded);
     };
-    prepare(current_color_base_image, color_stages, color_access, vk::ImageLayout::eGeneral, current_color_loaded, vkutil::color_subresource_range);
+    prepare(current_color_base_image, color_stages, color_access, vk::ImageLayout::eGeneral, color_choice == sync::LoadChoice::Load, vkutil::color_subresource_range);
     if (dyn_pass.has_raw)
-        prepare(current_color_raw_image, color_stages, color_access, vk::ImageLayout::eGeneral, true, vkutil::color_subresource_range);
+        prepare(current_color_raw_image, color_stages, color_access, vk::ImageLayout::eGeneral, raw_choice == sync::LoadChoice::Load, vkutil::color_subresource_range);
     const vk::Format ds_format = current_ds_image ? current_ds_image->format : vk::Format::eUndefined;
     const bool ds_has_stencil = vkutil::format_has_stencil(ds_format);
     const bool ds_has_depth = vkutil::format_has_depth(ds_format);
     // the pass loads the depth/stencil it is told to; an aspect that is cleared counts as "not loaded" for the layout transition only when both are
-    prepare(current_ds_image, ds_stages, ds_access, vk::ImageLayout::eDepthStencilAttachmentOptimal, dyn_pass.depth_load || dyn_pass.stencil_load,
+    prepare(current_ds_image, ds_stages, ds_access, vk::ImageLayout::eDepthStencilAttachmentOptimal, (dyn_pass.depth_load || dyn_pass.stencil_load) && ds_choice == sync::LoadChoice::Load,
         vkutil::aspect_clamped_range(ds_format, vkutil::ds_subresource_range));
     batch.flush(render_cmd);
 
@@ -816,30 +833,42 @@ void VKContext::begin_dynamic_pass(const vk::ClearDepthStencilValue &ds_clear) {
     colors[0] = vk::RenderingAttachmentInfo{
         .imageView = current_color_view,
         .imageLayout = vk::ImageLayout::eGeneral,
-        .loadOp = current_color_loaded ? vk::AttachmentLoadOp::eLoad : vk::AttachmentLoadOp::eDontCare,
+        .loadOp = color_choice == sync::LoadChoice::Load ? vk::AttachmentLoadOp::eLoad
+            : color_choice == sync::LoadChoice::Clear     ? vk::AttachmentLoadOp::eClear
+                                                          : vk::AttachmentLoadOp::eDontCare,
         .storeOp = current_color_loaded ? vk::AttachmentStoreOp::eStore : vk::AttachmentStoreOp::eDontCare,
     };
+    colors[0].clearValue.color = vk::ClearColorValue(std::array<float, 4>{ color_cleared.color[0], color_cleared.color[1], color_cleared.color[2], color_cleared.color[3] });
     colors[1] = vk::RenderingAttachmentInfo{
         .imageView = current_color_raw_view,
         .imageLayout = vk::ImageLayout::eGeneral,
-        .loadOp = vk::AttachmentLoadOp::eLoad,
+        .loadOp = raw_choice == sync::LoadChoice::Load ? vk::AttachmentLoadOp::eLoad
+            : raw_choice == sync::LoadChoice::Clear     ? vk::AttachmentLoadOp::eClear
+                                                        : vk::AttachmentLoadOp::eDontCare,
         .storeOp = vk::AttachmentStoreOp::eStore,
     };
+    colors[1].clearValue.color.setUint32({ 0, 0, 0, 0 });
     const vk::AttachmentStoreOp store_op = dyn_pass.store ? vk::AttachmentStoreOp::eStore : vk::AttachmentStoreOp::eDontCare;
     vk::RenderingAttachmentInfo depth{
         .imageView = current_ds_view,
         .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-        .loadOp = dyn_pass.depth_load ? vk::AttachmentLoadOp::eLoad : vk::AttachmentLoadOp::eClear,
+        .loadOp = dyn_pass.depth_load ? (ds_both && ds_choice == sync::LoadChoice::Clear ? vk::AttachmentLoadOp::eClear
+                                              : ds_both && ds_choice == sync::LoadChoice::DontCare ? vk::AttachmentLoadOp::eDontCare
+                                                                                                   : vk::AttachmentLoadOp::eLoad)
+                                      : vk::AttachmentLoadOp::eClear,
         .storeOp = store_op,
     };
-    depth.clearValue.depthStencil = ds_clear;
+    depth.clearValue.depthStencil = ds_both && ds_choice == sync::LoadChoice::Clear ? vk::ClearDepthStencilValue{ ds_cleared.depth, ds_cleared.stencil } : ds_clear;
     vk::RenderingAttachmentInfo stencil{
         .imageView = current_ds_view,
         .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-        .loadOp = dyn_pass.stencil_load ? vk::AttachmentLoadOp::eLoad : vk::AttachmentLoadOp::eClear,
+        .loadOp = dyn_pass.stencil_load ? (ds_both && ds_choice == sync::LoadChoice::Clear ? vk::AttachmentLoadOp::eClear
+                                                : ds_both && ds_choice == sync::LoadChoice::DontCare ? vk::AttachmentLoadOp::eDontCare
+                                                                                                     : vk::AttachmentLoadOp::eLoad)
+                                        : vk::AttachmentLoadOp::eClear,
         .storeOp = store_op,
     };
-    stencil.clearValue.depthStencil = ds_clear;
+    stencil.clearValue.depthStencil = ds_both && ds_choice == sync::LoadChoice::Clear ? vk::ClearDepthStencilValue{ ds_cleared.depth, ds_cleared.stencil } : ds_clear;
 
     vk::RenderingInfo rendering{
         .renderArea = curr_renderpass_info.renderArea,

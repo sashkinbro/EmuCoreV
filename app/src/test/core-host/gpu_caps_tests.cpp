@@ -9,6 +9,7 @@ using namespace renderer::vulkan;
 namespace {
 GpuCaps tiler_caps() {
     GpuCaps c;
+    c.identity = { 0x5143, 8, 0x80300 }; // a Qualcomm proprietary driver (vendor + VkDriverId, no model)
     c.sync2 = true;
     c.timeline_semaphore = true;
     c.roaa_color = true;

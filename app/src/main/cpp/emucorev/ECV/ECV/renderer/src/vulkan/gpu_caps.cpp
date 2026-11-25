@@ -24,6 +24,8 @@ static bool has_extension(const std::vector<vk::ExtensionProperties> &exts, cons
 GpuCaps probe_gpu_caps(vk::PhysicalDevice device, const std::vector<vk::ExtensionProperties> &exts, bool has_features2_khr) {
     GpuCaps c;
     const vk::PhysicalDeviceProperties props = device.getProperties();
+    c.identity.vendor_id = props.vendorID;
+    c.identity.driver_version = props.driverVersion;
     const auto &lim = props.limits;
     c.framebuffer_color_sample_counts = static_cast<uint32_t>(static_cast<VkSampleCountFlags>(lim.framebufferColorSampleCounts));
     c.framebuffer_depth_sample_counts = static_cast<uint32_t>(static_cast<VkSampleCountFlags>(lim.framebufferDepthSampleCounts));
@@ -47,6 +49,10 @@ GpuCaps probe_gpu_caps(vk::PhysicalDevice device, const std::vector<vk::Extensio
 
     // the instance is created with at most Vulkan 1.1: everything newer is reached through its extension
     const bool has_props2 = has_features2_khr;
+    if (has_props2 && has_extension(exts, VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME)) {
+        const auto p = device.getProperties2KHR<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceDriverProperties>();
+        c.identity.driver_id = static_cast<uint32_t>(p.get<vk::PhysicalDeviceDriverProperties>().driverID);
+    }
     c.render_pass2 = has_extension(exts, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
     if (has_props2 && has_extension(exts, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME)) {
         const auto f = device.getFeatures2KHR<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceTimelineSemaphoreFeatures>();

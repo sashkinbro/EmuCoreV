@@ -989,6 +989,9 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
     vk::ClearColorValue clear_color{ std::array<float, 4>({ 0.0f, 0.0f, 0.0f, 0.0f }) };
     cmd_buffer.clearColorImage(image.image, vk::ImageLayout::eTransferDstOptimal, clear_color, vkutil::color_subresource_range);
     image.transition_to(cmd_buffer, vkutil::ImageLayout::ColorAttachmentReadWrite);
+    // known content: every texel is the clear colour (a following pass can CLEAR instead of LOAD)
+    image.sync.content = vkutil::sync::Content::Cleared;
+    image.sync.cleared_to = {};
 
     // on real hardware the new surface already "contains" whatever the game put in its
     // memory — load it so CPU-prepared content isn't lost. Restricted to atlas-class
@@ -1978,6 +1981,8 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_depth_stencil_for_framebuffer(Sce
     clear_range.aspectMask = dsmodel::host_aspects(image.format);
     cmd_buffer.clearDepthStencilImage(image.image, vk::ImageLayout::eTransferDstOptimal, clear_value, clear_range);
     image.transition_to(cmd_buffer, vkutil::ImageLayout::DepthStencilReadOnly, vkutil::ds_subresource_range);
+    image.sync.content = vkutil::sync::Content::Cleared;
+    image.sync.cleared_to = { { 0, 0, 0, 0 }, 1.0f, 0 };
 
     return {
         image.view,

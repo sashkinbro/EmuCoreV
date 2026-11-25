@@ -12,7 +12,96 @@
 
 namespace renderer::vulkan {
 
+// ---- driver identity and named rules --------------------------------------------------------------------------------------------
+// Driver facts are keyed by vendorID + VkDriverId (+ driver version ranges), never by a model name. A driver we have no rule family for
+// falls back to the generic policy: only paths that are correct on every conforming driver are chosen automatically.
+struct GpuIdentity {
+    uint32_t vendor_id = 0;
+    uint32_t driver_id = 0; // VkDriverId (0 = not reported)
+    uint32_t driver_version = 0;
+};
+
+enum class DriverFamily : uint8_t {
+    Unknown,
+    QualcommProprietary, // VK_DRIVER_ID_QUALCOMM_PROPRIETARY (8)
+    MesaTurnip, // VK_DRIVER_ID_MESA_TURNIP (18)
+    ArmProprietary, // VK_DRIVER_ID_ARM_PROPRIETARY (9)
+    MesaOther, // radv, llvmpipe, panvk, v3dv, ...
+    NvidiaProprietary, // (4)
+    AmdProprietary, // (1, 2)
+    IntelDriver, // (5, 6)
+    ImaginationProprietary, // (7, 25)
+    SamsungProprietary, // (21)
+    SoftwareOrOther, // swiftshader, moltenvk
+};
+
+inline DriverFamily classify_driver(const GpuIdentity &id) {
+    switch (id.driver_id) {
+    case 8: return DriverFamily::QualcommProprietary;
+    case 18: return DriverFamily::MesaTurnip;
+    case 9: return DriverFamily::ArmProprietary;
+    case 3: case 13: case 19: case 20: case 22: case 23: case 24: case 26: return DriverFamily::MesaOther;
+    case 4: return DriverFamily::NvidiaProprietary;
+    case 1: case 2: return DriverFamily::AmdProprietary;
+    case 5: case 6: return DriverFamily::IntelDriver;
+    case 7: case 25: return DriverFamily::ImaginationProprietary;
+    case 21: return DriverFamily::SamsungProprietary;
+    case 10: case 14: return DriverFamily::SoftwareOrOther;
+    default: break;
+    }
+    return DriverFamily::Unknown; // driver id not reported (no VK_KHR_driver_properties): generic policy
+}
+
+inline const char *to_string(DriverFamily f) {
+    switch (f) {
+    case DriverFamily::QualcommProprietary: return "qcom-blob";
+    case DriverFamily::MesaTurnip: return "turnip";
+    case DriverFamily::ArmProprietary: return "arm-blob";
+    case DriverFamily::MesaOther: return "mesa";
+    case DriverFamily::NvidiaProprietary: return "nvidia";
+    case DriverFamily::AmdProprietary: return "amd";
+    case DriverFamily::IntelDriver: return "intel";
+    case DriverFamily::ImaginationProprietary: return "imagination";
+    case DriverFamily::SamsungProprietary: return "samsung";
+    case DriverFamily::SoftwareOrOther: return "other";
+    default: return "unknown";
+    }
+}
+
+// What a rule changes. Effects are deliberately conservative: a rule may only take an automatic choice AWAY or demand a verification, it
+// never enables something a driver did not offer.
+enum class RuleEffect : uint8_t {
+    FbfetchNeedsMeasurement, // the incoherent-framebuffer-fetch class (B025): the per-draw barrier rung is not trusted without a device A/B
+    RoaaDestinationReadUnverified, // ROAA destination read has a known failure on a driver of the family: keep it, demand the startup self-test
+    PipelineCacheStrict, // a foreign pipeline blob crashes the driver (B148): the cache identity check is mandatory (it always is; recorded for the log)
+};
+
+struct DriverRule {
+    const char *name; // stable, shown in the log and the golden snapshot
+    DriverFamily family;
+    uint32_t min_driver_version; // inclusive, 0 = no lower bound
+    uint32_t max_driver_version; // inclusive, 0 = no upper bound
+    RuleEffect effect;
+    bool provisional; // true = derived from one observation, not yet proven across drivers (the comment says where)
+};
+
+// The named rules. Every entry cites the bug it comes from; none keys on a model.
+inline constexpr std::array<DriverRule, 3> driver_rules = { {
+    // B025: Adreno 840 facade noise / cape flicker with the barrier fbfetch path on the stock driver, gone with a pass restart per fetch draw
+    { "qcom-blob-fbfetch-barrier-b025", DriverFamily::QualcommProprietary, 0, 0, RuleEffect::FbfetchNeedsMeasurement, true },
+    // docs/emucorex-renderer-lessons.md: ROAA destination read broken on an Arm Mali driver; the measurement, not the name, decides
+    { "arm-blob-roaa-dest-read-unverified", DriverFamily::ArmProprietary, 0, 0, RuleEffect::RoaaDestinationReadUnverified, true },
+    // B148: the Adreno blob crashed in vkCreateGraphicsPipelines with a pipeline cache written by another build
+    { "qcom-blob-stale-pipeline-cache-b148", DriverFamily::QualcommProprietary, 0, 0, RuleEffect::PipelineCacheStrict, false },
+} };
+
+inline bool rule_matches(const DriverRule &r, const GpuIdentity &id) {
+    return r.family == classify_driver(id) && (r.min_driver_version == 0 || id.driver_version >= r.min_driver_version)
+        && (r.max_driver_version == 0 || id.driver_version <= r.max_driver_version);
+}
+
 struct GpuCaps {
+    GpuIdentity identity;
     // --- synchronisation ---
     bool sync2 = false; // VK_KHR_synchronization2 enabled + feature
     bool timeline_semaphore = false; // feature (core 1.2 / VK_KHR_timeline_semaphore) enabled
@@ -124,6 +213,9 @@ struct Strategy {
     bool state_driven_load_store = true;
     // which request could not be honoured (forced path not supported): shown in the log
     bool force_rejected = false;
+    DriverFamily family = DriverFamily::Unknown;
+    // rule effects that apply to this identity (bit per RuleEffect). None changes a selection today: they are verdict flags for the B025 work
+    uint32_t rule_effects = 0;
 };
 
 inline bool fbfetch_path_available(const GpuCaps &c, FbFetchPath p, const Implemented &impl = {}, bool dynamic_rendering_selected = false) {
@@ -138,8 +230,15 @@ inline bool fbfetch_path_available(const GpuCaps &c, FbFetchPath p, const Implem
 
 inline Strategy choose_strategy(const GpuCaps &c, const ForcedPaths &f = {}, const Implemented &impl = {}) {
     Strategy s;
+    // driver family + named rules
+    s.family = classify_driver(c.identity);
+    for (const DriverRule &r : driver_rules)
+        if (rule_matches(r, c.identity))
+            s.rule_effects |= 1u << static_cast<unsigned>(r.effect);
+    // generic fallback: a driver that does not identify itself gets the baseline (legacy barriers; opt-in paths stay opt-in)
+    const bool known_driver = s.family != DriverFamily::Unknown;
     // barriers
-    s.barriers = (c.sync2 && impl.sync2 && !f.legacy_barriers) ? BarrierStyle::Sync2 : BarrierStyle::Legacy;
+    s.barriers = (c.sync2 && impl.sync2 && !f.legacy_barriers && (known_driver || f.sync2_barriers)) ? BarrierStyle::Sync2 : BarrierStyle::Legacy;
     if (f.sync2_barriers && !(c.sync2 && impl.sync2))
         s.force_rejected = true;
     // submit tracking
@@ -223,7 +322,20 @@ inline const char *to_string(MsaaResolvePath v) {
 
 // One line, stable keys: logged once per session and copied into the lab result (ECVLAB `paths` line, result.json "gpu_paths")
 inline std::string describe(const GpuCaps &c, const Strategy &s) {
-    std::string r = "barriers=";
+    std::string r = "family=";
+    r += to_string(s.family);
+    r += " rules=";
+    bool any_rule = false;
+    for (const DriverRule &rule : driver_rules) {
+        if (rule_matches(rule, c.identity)) {
+            r += any_rule ? "," : "";
+            r += rule.name;
+            any_rule = true;
+        }
+    }
+    if (!any_rule)
+        r += "none";
+    r += " barriers=";
     r += to_string(s.barriers);
     r += " submit=";
     r += to_string(s.submit);

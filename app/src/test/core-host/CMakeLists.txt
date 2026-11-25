@@ -148,7 +148,7 @@ target_link_options(surface_codec_host_tests PRIVATE -static -Wl,/force:unresolv
 # B132 render-pass / layout-table sync masks (vulkan.hpp structs only, no device).
 # Build and run with run-core-host-tests.ps1 -Target render_sync_host_tests.
 add_executable(render_sync_host_tests EXCLUDE_FROM_ALL
-    render_pass_sync_tests.cpp sync_tracker_tests.cpp gpu_caps_tests.cpp render_pass_policy_tests.cpp pipeline_cache_file_tests.cpp
+    render_pass_sync_tests.cpp sync_tracker_tests.cpp gpu_caps_tests.cpp render_pass_policy_tests.cpp pipeline_cache_file_tests.cpp gpu_policy_golden_tests.cpp
     "${CORE_ROOT}/vkutil/src/vkutil.cpp" "${CORE_ROOT}/vkutil/src/sync_tracker.cpp")
 target_include_directories(render_sync_host_tests PRIVATE ${SS_INCLUDES})
 target_compile_definitions(render_sync_host_tests PRIVATE ${SS_DEFINES})

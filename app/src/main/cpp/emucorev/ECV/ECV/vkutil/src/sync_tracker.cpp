@@ -269,7 +269,7 @@ extern "C" int ecv_sync_summary(char *buf, unsigned long n) {
     return std::snprintf(buf, n,
         "sync2=%d full_barrier=%d uses=%llu elided=%llu image_barriers=%llu buffer_barriers=%llu global_barriers=%llu api_calls=%llu merged=%llu "
         "raw=%llu war=%llu waw=%llu layout=%llu init=%llu unsynced_in_pass=%llu pass_covered=%llu pass_explicit=%llu "
-        "validation_hazards=%llu validation_errors=%llu scenes=%llu scenes_depth_unbacked=%llu scenes_restarted=%llu scenes_unbacked_restarted=%llu",
+        "validation_hazards=%llu validation_errors=%llu scenes=%llu scenes_depth_unbacked=%llu scenes_restarted=%llu scenes_unbacked_restarted=%llu loads_to_clear=%llu loads_to_dontcare=%llu loads_kept=%llu",
         c.use_sync2 ? 1 : 0, c.full_barrier ? 1 : 0, static_cast<unsigned long long>(s.uses.load()), static_cast<unsigned long long>(s.elided.load()),
         static_cast<unsigned long long>(s.image_barriers.load()), static_cast<unsigned long long>(s.buffer_barriers.load()),
         static_cast<unsigned long long>(s.global_barriers.load()), static_cast<unsigned long long>(s.api_calls.load()), static_cast<unsigned long long>(s.merged.load()),
@@ -279,6 +279,7 @@ extern "C" int ecv_sync_summary(char *buf, unsigned long n) {
         static_cast<unsigned long long>(s.pass_explicit.load()), static_cast<unsigned long long>(s.validation_hazards.load()),
         static_cast<unsigned long long>(s.validation_errors.load()), static_cast<unsigned long long>(s.scenes.load()),
         static_cast<unsigned long long>(s.scenes_depth_unbacked.load()), static_cast<unsigned long long>(s.scenes_restarted.load()),
-        static_cast<unsigned long long>(s.scenes_unbacked_restarted.load()));
+        static_cast<unsigned long long>(s.scenes_unbacked_restarted.load()), static_cast<unsigned long long>(s.loads_to_clear.load()),
+        static_cast<unsigned long long>(s.loads_to_dontcare.load()), static_cast<unsigned long long>(s.loads_kept.load()));
 }
 #endif
