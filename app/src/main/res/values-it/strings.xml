@@ -1841,4 +1841,22 @@
     <string name="emulation_screenshot_saved">Screenshot salvato in Pictures/EmuCoreV</string>
     <string name="emulation_screenshot_failed">Impossibile salvare lo screenshot</string>
     <string name="native_ui_new_folder">Nuova cartella</string>
+    <string name="projects_title">I nostri altri progetti</string>
+    <string name="projects_badge_on_play">Su Google Play</string>
+    <string name="projects_badge_coming_to_play">Presto su Google Play</string>
+    <string name="projects_badge_open_source">Open source</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">Sito web</string>
+    <string name="projects_patreon">Sostieni su Patreon</string>
+    <string name="projects_github_profile">Sviluppatore su GitHub</string>
+    <string name="projects_footer">Creato da un solo sviluppatore. Il tuo sostegno mantiene vivi questi progetti.</string>
+    <string name="projects_open_failed">Impossibile aprire il link</string>
+    <string name="projects_desc_x">Libreria, launcher ed emulatore PlayStation 2 con un core basato su PCSX2 adattato ad Android.</string>
+    <string name="projects_desc_a">Libreria, launcher ed emulatore PSP con core PPSSPP integrato e rendering Vulkan o OpenGL ES.</string>
+    <string name="projects_desc_c">Emulatore PlayStation 3 sperimentale con core basato su RPCS3, libreria giochi, installer e trofei.</string>
+    <string name="projects_desc_d">Interfaccia per dieci famiglie di console Nintendo: 3DS, DS, N64, GameCube, Wii, Game Boy, GBA, NES e SNES.</string>
+    <string name="projects_desc_h">Interfaccia Sega con core integrati per Dreamcast, arcade, Mega Drive, Master System, Saturn e Model 3.</string>
+    <string name="projects_desc_r">Emulatore e libreria PlayStation 1 con il core ECR, JIT ARM64 e shell BIOS nativa.</string>
+    <string name="projects_desc_v">Emulatore PlayStation Vita con il core ECV, libreria, catalogo e installazione di VPK/PKG.</string>
 </resources>

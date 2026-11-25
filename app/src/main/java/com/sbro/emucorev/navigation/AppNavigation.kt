@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,6 +58,7 @@ import com.sbro.emucorev.ui.home.HomeScreen
 import com.sbro.emucorev.ui.library.LibraryScreen
 import com.sbro.emucorev.ui.onboarding.OnboardingScreen
 import com.sbro.emucorev.ui.playtime.PlayTimeScreen
+import com.sbro.emucorev.ui.projects.OurProjectsScreen
 import com.sbro.emucorev.ui.profile.MyListsScreen
 import com.sbro.emucorev.ui.profile.ProfileScreen
 import com.sbro.emucorev.ui.discord.DiscordScreen
@@ -105,6 +107,7 @@ private const val ROUTE_CHEAT_MANAGER = "cheat-manager"
 private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_PROFILE = "profile"
 private const val ROUTE_FEEDBACK = "feedback"
+private const val ROUTE_PROJECTS = "projects"
 private const val ROUTE_SETTINGS_WITH_TAB = "settings/{tab}"
 private const val ROUTE_APP_LANGUAGE = "app-language"
 private const val ROUTE_VITA_LANGUAGE = "vita-language"
@@ -314,6 +317,11 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         navController.navigate(ROUTE_FEEDBACK) { launchSingleTop = true }
     }
 
+    val navigateProjects = {
+        navController.navigate(ROUTE_PROJECTS) { launchSingleTop = true }
+    }
+
+    CompositionLocalProvider(LocalOpenProjects provides navigateProjects) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1091,6 +1099,39 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     FeedbackScreen(onBackClick = { navController.popBackStack() })
                 }
             }
+            composable(ROUTE_PROJECTS) {
+                AdaptiveShell(
+                    selected = PrimaryDestination.Projects,
+                    onNavigateSetup = {
+                        navController.navigate(ROUTE_SETUP) { launchSingleTop = true }
+                    },
+                    onNavigateLibrary = {
+                        navController.navigate(ROUTE_LIBRARY) { launchSingleTop = true }
+                    },
+                    onNavigateGameManager = { navigateGameManager(null) },
+                    onNavigatePlayTime = { navigatePlayTime(null) },
+                    onNavigateAchievements = navigateAchievementsRoot,
+                    onNavigateSaveStates = { navController.navigate(saveStatesRoute()) { launchSingleTop = true } },
+                    onNavigateSaveData = {
+                        navController.navigate(saveManagerRoute()) { launchSingleTop = true }
+                    },
+                    onNavigateSearch = {
+                        navController.navigate(ROUTE_CATALOG) { launchSingleTop = true }
+                    },
+                    onNavigateSettings = {
+                        navController.navigate(settingsRoute()) { launchSingleTop = true }
+                    },
+                    onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
+                    onNavigateCheatManager = { navController.navigate(ROUTE_CHEAT_MANAGER) { launchSingleTop = true } },
+                    onNavigateFeedback = navigateFeedback,
+                    onBackClick = { navController.popBackStack() },
+                    onInstallFirmware = null,
+                    onInstallContent = null
+                ) {
+                    OurProjectsScreen(onBackClick = { navController.popBackStack() })
+                }
+            }
             composable(ROUTE_GAME_MANAGER) {
                 val navigateHome = {
                     navController.navigate(ROUTE_LIBRARY) {
@@ -1179,6 +1220,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 )
             }
         }
+    }
     }
 
     if (preparingLaunch) {

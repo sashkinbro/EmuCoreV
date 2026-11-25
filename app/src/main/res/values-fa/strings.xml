@@ -1837,4 +1837,22 @@
     <string name="emulation_screenshot_saved">اسکرین‌شات در Pictures/EmuCoreV ذخیره شد</string>
     <string name="emulation_screenshot_failed">ذخیره اسکرین‌شات ممکن نبود</string>
     <string name="native_ui_new_folder">پوشه جدید</string>
+    <string name="projects_title">پروژه‌های دیگر ما</string>
+    <string name="projects_badge_on_play">در Google Play</string>
+    <string name="projects_badge_coming_to_play">به‌زودی در Google Play</string>
+    <string name="projects_badge_open_source">متن‌باز</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">وب‌سایت</string>
+    <string name="projects_patreon">حمایت در Patreon</string>
+    <string name="projects_github_profile">توسعه‌دهنده در GitHub</string>
+    <string name="projects_footer">این پروژه‌ها را یک توسعه‌دهنده می‌سازد. حمایت شما آن‌ها را زنده نگه می‌دارد.</string>
+    <string name="projects_open_failed">باز کردن پیوند ممکن نشد</string>
+    <string name="projects_desc_x">کتابخانه، لانچر و شبیه‌ساز PlayStation 2 با هسته‌ای مبتنی بر PCSX2 و سازگار با اندروید.</string>
+    <string name="projects_desc_a">کتابخانه، لانچر و شبیه‌ساز PSP با هسته PPSSPP داخلی و رندر Vulkan یا OpenGL ES.</string>
+    <string name="projects_desc_c">شبیه‌ساز آزمایشی PlayStation 3 با هسته مبتنی بر RPCS3، کتابخانه بازی، نصاب‌ها و جام‌ها.</string>
+    <string name="projects_desc_d">رابط کاربری برای ده خانواده کنسول Nintendo: ‏3DS، DS، N64، GameCube، Wii، Game Boy، GBA، NES و SNES.</string>
+    <string name="projects_desc_h">رابط کاربری Sega با هسته‌های داخلی برای Dreamcast، آرکید، Mega Drive، Master System، Saturn و Model 3.</string>
+    <string name="projects_desc_r">شبیه‌ساز و کتابخانه PlayStation 1 با هسته ECR، JIT برای ARM64 و پوسته BIOS بومی.</string>
+    <string name="projects_desc_v">شبیه‌ساز PlayStation Vita با هسته ECV، کتابخانه، فهرست و نصب VPK/PKG.</string>
 </resources>

@@ -1846,4 +1846,22 @@
     <string name="emulation_screenshot_saved">Zrzut ekranu zapisano w Pictures/EmuCoreV</string>
     <string name="emulation_screenshot_failed">Nie udało się zapisać zrzutu ekranu</string>
     <string name="native_ui_new_folder">Nowy folder</string>
+    <string name="projects_title">Nasze pozostałe projekty</string>
+    <string name="projects_badge_on_play">W Google Play</string>
+    <string name="projects_badge_coming_to_play">Wkrótce w Google Play</string>
+    <string name="projects_badge_open_source">Otwarty kod</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">Strona internetowa</string>
+    <string name="projects_patreon">Wesprzyj na Patreonie</string>
+    <string name="projects_github_profile">Deweloper na GitHubie</string>
+    <string name="projects_footer">Tworzone przez jednego dewelopera. Twoje wsparcie utrzymuje te projekty przy życiu.</string>
+    <string name="projects_open_failed">Nie udało się otworzyć linku</string>
+    <string name="projects_desc_x">Biblioteka, launcher i emulator PlayStation 2 z rdzeniem opartym na PCSX2, dostosowanym do Androida.</string>
+    <string name="projects_desc_a">Biblioteka, launcher i emulator PSP z wbudowanym rdzeniem PPSSPP oraz renderowaniem Vulkan lub OpenGL ES.</string>
+    <string name="projects_desc_c">Eksperymentalny emulator PlayStation 3 z rdzeniem opartym na RPCS3, biblioteką gier, instalatorami i trofeami.</string>
+    <string name="projects_desc_d">Nakładka na dziesięć rodzin konsol Nintendo: 3DS, DS, N64, GameCube, Wii, Game Boy, GBA, NES i SNES.</string>
+    <string name="projects_desc_h">Nakładka Sega z wbudowanymi rdzeniami dla Dreamcast, automatów, Mega Drive, Master System, Saturn i Model 3.</string>
+    <string name="projects_desc_r">Emulator i biblioteka PlayStation 1 z rdzeniem ECR, JIT dla ARM64 i natywną powłoką BIOS.</string>
+    <string name="projects_desc_v">Emulator PlayStation Vita z rdzeniem ECV, biblioteką, katalogiem i instalacją VPK/PKG.</string>
 </resources>

@@ -1836,4 +1836,22 @@
     <string name="emulation_screenshot_saved">Ekran görüntüsü Pictures/EmuCoreV klasörüne kaydedildi</string>
     <string name="emulation_screenshot_failed">Ekran görüntüsü kaydedilemedi</string>
     <string name="native_ui_new_folder">Yeni Klasör</string>
+    <string name="projects_title">Diğer projelerimiz</string>
+    <string name="projects_badge_on_play">Google Play’de</string>
+    <string name="projects_badge_coming_to_play">Yakında Google Play’de</string>
+    <string name="projects_badge_open_source">Açık kaynak</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">Web sitesi</string>
+    <string name="projects_patreon">Patreon’da destekle</string>
+    <string name="projects_github_profile">GitHub’da geliştirici</string>
+    <string name="projects_footer">Tek bir geliştirici tarafından yapılıyor. Desteğiniz bu projeleri yaşatıyor.</string>
+    <string name="projects_open_failed">Bağlantı açılamadı</string>
+    <string name="projects_desc_x">Android için uyarlanmış, PCSX2 tabanlı çekirdeğe sahip PlayStation 2 kütüphanesi, başlatıcısı ve emülatörü.</string>
+    <string name="projects_desc_a">Yerleşik PPSSPP çekirdeği ile Vulkan veya OpenGL ES işlemeli PSP kütüphanesi, başlatıcısı ve emülatörü.</string>
+    <string name="projects_desc_c">RPCS3 tabanlı çekirdek, oyun kütüphanesi, yükleyiciler ve kupalarla deneysel PlayStation 3 emülatörü.</string>
+    <string name="projects_desc_d">On Nintendo konsol ailesi için arayüz: 3DS, DS, N64, GameCube, Wii, Game Boy, GBA, NES ve SNES.</string>
+    <string name="projects_desc_h">Dreamcast, arcade, Mega Drive, Master System, Saturn ve Model 3 için yerleşik çekirdeklere sahip Sega arayüzü.</string>
+    <string name="projects_desc_r">ECR çekirdeği, ARM64 JIT ve yerel BIOS kabuğuyla PlayStation 1 emülatörü ve kütüphanesi.</string>
+    <string name="projects_desc_v">ECV çekirdeğiyle çalışan, kütüphane, katalog ve VPK/PKG kurulumu sunan PlayStation Vita emülatörü.</string>
 </resources>

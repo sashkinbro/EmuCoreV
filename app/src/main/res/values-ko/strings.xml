@@ -1831,4 +1831,22 @@
     <string name="emulation_screenshot_saved">스크린샷을 Pictures/EmuCoreV에 저장했습니다</string>
     <string name="emulation_screenshot_failed">스크린샷을 저장할 수 없습니다</string>
     <string name="native_ui_new_folder">새 폴더</string>
+    <string name="projects_title">다른 프로젝트</string>
+    <string name="projects_badge_on_play">Google Play에서 제공 중</string>
+    <string name="projects_badge_coming_to_play">Google Play 출시 예정</string>
+    <string name="projects_badge_open_source">오픈 소스</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">웹사이트</string>
+    <string name="projects_patreon">Patreon에서 후원</string>
+    <string name="projects_github_profile">GitHub 개발자</string>
+    <string name="projects_footer">한 명의 개발자가 만들고 있습니다. 여러분의 후원이 프로젝트를 이어 갑니다.</string>
+    <string name="projects_open_failed">링크를 열 수 없습니다</string>
+    <string name="projects_desc_x">Android에 맞게 조정한 PCSX2 기반 코어를 사용하는 PlayStation 2 라이브러리, 런처, 에뮬레이터입니다.</string>
+    <string name="projects_desc_a">PPSSPP 코어를 내장하고 Vulkan 또는 OpenGL ES 렌더링을 지원하는 PSP 라이브러리, 런처, 에뮬레이터입니다.</string>
+    <string name="projects_desc_c">RPCS3 기반 코어, 게임 라이브러리, 설치 도구, 트로피를 갖춘 실험적인 PlayStation 3 에뮬레이터입니다.</string>
+    <string name="projects_desc_d">3DS, DS, N64, GameCube, Wii, Game Boy, GBA, NES, SNES 등 닌텐도 10개 계열을 위한 프런트엔드입니다.</string>
+    <string name="projects_desc_h">Dreamcast, 아케이드, Mega Drive, Master System, Saturn, Model 3용 코어를 내장한 세가 프런트엔드입니다.</string>
+    <string name="projects_desc_r">ECR 코어, ARM64 JIT, 네이티브 BIOS 셸을 갖춘 PlayStation 1 에뮬레이터와 라이브러리입니다.</string>
+    <string name="projects_desc_v">ECV 코어 기반으로 라이브러리, 카탈로그, VPK/PKG 설치를 지원하는 PlayStation Vita 에뮬레이터입니다.</string>
 </resources>

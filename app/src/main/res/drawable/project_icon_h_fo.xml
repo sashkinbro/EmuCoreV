@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Rounded H: left and right stems plus the crossbar, drawn with round
+         caps so every joint stays flush instead of overlapping. -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M36,29 L36,80"
+        android:strokeColor="#4D9EFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="8" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M72,29 L72,80"
+        android:strokeColor="#4D9EFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="8" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M36,54.5 L72,54.5"
+        android:strokeColor="#3A7FD5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="8" />
+</vector>

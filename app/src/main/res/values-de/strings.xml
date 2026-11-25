@@ -1836,4 +1836,22 @@
     <string name="emulation_screenshot_saved">Screenshot in Pictures/EmuCoreV gespeichert</string>
     <string name="emulation_screenshot_failed">Screenshot konnte nicht gespeichert werden</string>
     <string name="native_ui_new_folder">Neuer Ordner</string>
+    <string name="projects_title">Unsere anderen Projekte</string>
+    <string name="projects_badge_on_play">Bei Google Play</string>
+    <string name="projects_badge_coming_to_play">Bald bei Google Play</string>
+    <string name="projects_badge_open_source">Open Source</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">Website</string>
+    <string name="projects_patreon">Auf Patreon unterstützen</string>
+    <string name="projects_github_profile">Entwickler auf GitHub</string>
+    <string name="projects_footer">Von einem einzelnen Entwickler gemacht. Deine Unterstützung hält die Projekte am Leben.</string>
+    <string name="projects_open_failed">Link konnte nicht geöffnet werden</string>
+    <string name="projects_desc_x">PlayStation-2-Bibliothek, Launcher und Emulator mit einem für Android angepassten Kern auf PCSX2-Basis.</string>
+    <string name="projects_desc_a">PSP-Bibliothek, Launcher und Emulator mit integriertem PPSSPP-Kern und Vulkan- oder OpenGL-ES-Rendering.</string>
+    <string name="projects_desc_c">Experimenteller PlayStation-3-Emulator mit RPCS3-basiertem Kern, Spielebibliothek, Installern und Trophäen.</string>
+    <string name="projects_desc_d">Nintendo-Oberfläche für zehn Konsolenfamilien: 3DS, DS, N64, GameCube, Wii, Game Boy, GBA, NES und SNES.</string>
+    <string name="projects_desc_h">Sega-Oberfläche mit integrierten Kernen für Dreamcast, Arcade, Mega Drive, Master System, Saturn und Model 3.</string>
+    <string name="projects_desc_r">PlayStation-1-Emulator und Bibliothek mit dem ECR-Kern, ARM64-JIT und nativer BIOS-Oberfläche.</string>
+    <string name="projects_desc_v">PlayStation-Vita-Emulator mit dem ECV-Kern, Bibliothek, Katalog und VPK/PKG-Installation.</string>
 </resources>

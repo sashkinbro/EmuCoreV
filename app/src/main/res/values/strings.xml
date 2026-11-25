@@ -1839,4 +1839,22 @@
     <string name="emulation_screenshot_saved">Screenshot saved to Pictures/EmuCoreV</string>
     <string name="emulation_screenshot_failed">Could not save the screenshot</string>
     <string name="native_ui_new_folder">New Folder</string>
+    <string name="projects_title">Our other projects</string>
+    <string name="projects_badge_on_play">On Google Play</string>
+    <string name="projects_badge_coming_to_play">Coming to Google Play</string>
+    <string name="projects_badge_open_source">Open source</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">Website</string>
+    <string name="projects_patreon">Support on Patreon</string>
+    <string name="projects_github_profile">Developer on GitHub</string>
+    <string name="projects_footer">Made by one developer. Your support keeps these projects alive.</string>
+    <string name="projects_open_failed">Could not open the link</string>
+    <string name="projects_desc_x">PlayStation 2 library, launcher and emulator with a PCSX2-based core adapted for Android.</string>
+    <string name="projects_desc_a">PSP library, launcher and emulator with a bundled PPSSPP core and Vulkan or OpenGL ES rendering.</string>
+    <string name="projects_desc_c">Experimental PlayStation 3 emulator with an RPCS3-based core, game library, installers and trophies.</string>
+    <string name="projects_desc_d">Nintendo frontend for ten console families: 3DS, DS, N64, GameCube, Wii, Game Boy, GBA, NES and SNES.</string>
+    <string name="projects_desc_h">Sega frontend with bundled cores for Dreamcast, arcade, Mega Drive, Master System, Saturn and Model 3.</string>
+    <string name="projects_desc_r">PlayStation 1 emulator and library with the ECR core, an ARM64 JIT and a native BIOS shell.</string>
+    <string name="projects_desc_v">PlayStation Vita emulator powered by the ECV core, with a library, catalog and VPK/PKG install flows.</string>
 </resources>

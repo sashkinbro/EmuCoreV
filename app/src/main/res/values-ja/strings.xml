@@ -1832,4 +1832,22 @@
     <string name="emulation_screenshot_saved">スクリーンショットを Pictures/EmuCoreV に保存しました</string>
     <string name="emulation_screenshot_failed">スクリーンショットを保存できませんでした</string>
     <string name="native_ui_new_folder">新規フォルダ</string>
+    <string name="projects_title">その他のプロジェクト</string>
+    <string name="projects_badge_on_play">Google Playで配信中</string>
+    <string name="projects_badge_coming_to_play">Google Playで近日公開</string>
+    <string name="projects_badge_open_source">オープンソース</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">ウェブサイト</string>
+    <string name="projects_patreon">Patreonで支援</string>
+    <string name="projects_github_profile">GitHubの開発者</string>
+    <string name="projects_footer">1人の開発者が制作しています。皆さまのご支援がプロジェクトを支えます。</string>
+    <string name="projects_open_failed">リンクを開けませんでした</string>
+    <string name="projects_desc_x">Android向けに調整したPCSX2ベースのコアを搭載した、PlayStation 2のライブラリ、ランチャー、エミュレーター。</string>
+    <string name="projects_desc_a">PPSSPPコアを内蔵し、VulkanまたはOpenGL ESで描画するPSPのライブラリ、ランチャー、エミュレーター。</string>
+    <string name="projects_desc_c">RPCS3ベースのコア、ゲームライブラリ、インストーラー、トロフィーを備えた実験的なPlayStation 3エミュレーター。</string>
+    <string name="projects_desc_d">3DS、DS、N64、GameCube、Wii、Game Boy、GBA、NES、SNESの10系統に対応するNintendo向けフロントエンド。</string>
+    <string name="projects_desc_h">Dreamcast、アーケード、Mega Drive、Master System、Saturn、Model 3向けのコアを内蔵したSega向けフロントエンド。</string>
+    <string name="projects_desc_r">ECRコア、ARM64 JIT、ネイティブBIOSシェルを備えたPlayStation 1のエミュレーターとライブラリ。</string>
+    <string name="projects_desc_v">ECVコアで動作し、ライブラリ、カタログ、VPK/PKGのインストールに対応したPlayStation Vitaエミュレーター。</string>
 </resources>

@@ -1841,4 +1841,22 @@
     <string name="emulation_screenshot_saved">Captura de tela salva em Pictures/EmuCoreV</string>
     <string name="emulation_screenshot_failed">Não foi possível salvar a captura de tela</string>
     <string name="native_ui_new_folder">Nova pasta</string>
+    <string name="projects_title">Nossos outros projetos</string>
+    <string name="projects_badge_on_play">No Google Play</string>
+    <string name="projects_badge_coming_to_play">Em breve no Google Play</string>
+    <string name="projects_badge_open_source">Código aberto</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">Site</string>
+    <string name="projects_patreon">Apoiar no Patreon</string>
+    <string name="projects_github_profile">Desenvolvedor no GitHub</string>
+    <string name="projects_footer">Feito por um único desenvolvedor. O seu apoio mantém estes projetos vivos.</string>
+    <string name="projects_open_failed">Não foi possível abrir o link</string>
+    <string name="projects_desc_x">Biblioteca, launcher e emulador de PlayStation 2 com um núcleo baseado no PCSX2 adaptado para Android.</string>
+    <string name="projects_desc_a">Biblioteca, launcher e emulador de PSP com núcleo PPSSPP integrado e renderização Vulkan ou OpenGL ES.</string>
+    <string name="projects_desc_c">Emulador experimental de PlayStation 3 com núcleo baseado no RPCS3, biblioteca de jogos, instaladores e troféus.</string>
+    <string name="projects_desc_d">Interface para dez famílias de consoles Nintendo: 3DS, DS, N64, GameCube, Wii, Game Boy, GBA, NES e SNES.</string>
+    <string name="projects_desc_h">Interface Sega com núcleos integrados para Dreamcast, arcade, Mega Drive, Master System, Saturn e Model 3.</string>
+    <string name="projects_desc_r">Emulador e biblioteca de PlayStation 1 com o núcleo ECR, JIT para ARM64 e shell de BIOS nativa.</string>
+    <string name="projects_desc_v">Emulador de PlayStation Vita com o núcleo ECV, biblioteca, catálogo e instalação de VPK/PKG.</string>
 </resources>
